@@ -131,13 +131,13 @@ pub trait AsAccount {
 
 #[cfg(feature = "spl")]
 pub trait AsSplToken {
-    fn as_mint(&self) -> Result<spl_token::state::Mint, ProgramError>;
-    fn as_token_account(&self) -> Result<spl_token::state::Account, ProgramError>;
+    fn as_mint(&self) -> Result<spl_token_2022::state::Mint, ProgramError>;
+    fn as_token_account(&self) -> Result<spl_token_2022::state::Account, ProgramError>;
     fn as_associated_token_account(
         &self,
         owner: &Pubkey,
         mint: &Pubkey,
-    ) -> Result<spl_token::state::Account, ProgramError>;
+    ) -> Result<spl_token_2022::state::Account, ProgramError>;
 }
 
 // TODO Work in progress

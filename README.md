@@ -1,4 +1,4 @@
-# 🏗️ Steel 
+# 🏗️ Steel
 
 **Steel is a new Solana smart contract framework.** It provides a library of helper functions, macros, and code patterns for building safe and maintainable smart contracts on the Solana blockchain.
 
@@ -44,7 +44,7 @@ steel test
 
 ## File structure
 
-While not strictly enforced, we recommend organizing your Solana program with the following file structure. We have found this pattern to improve code readability, separating the contract interface from its implementation. It scales well for complex contracts. 
+While not strictly enforced, we recommend organizing your Solana program with the following file structure. We have found this pattern to improve code readability, separating the contract interface from its implementation. It scales well for complex contracts.
 
 ```
 Cargo.toml (workspace)
@@ -214,7 +214,7 @@ pub fn process_add(accounts: &[AccountInfo<'_>], _data: &[u8]) -> ProgramResult 
     signer_info.is_signer()?;
 
     let counter = counter_info
-        .as_account_mut::<Counter>(&example_api::ID)? 
+        .as_account_mut::<Counter>(&example_api::ID)?
         .assert_mut(|c| c.value <= 42)?;
 
     counter.value += 1;
@@ -255,7 +255,7 @@ pub fn process_transfer(accounts: &[AccountInfo<'_>], _data: &[u8]) -> ProgramRe
         .as_token_account()?
         .assert(|t| t.mint == *mint_info.key)?;
 
-    token_program.is_program(&spl_token::ID)?;
+    token_program.is_program(&spl_token_2022::ID)?;
 
     transfer(
         signer_info,

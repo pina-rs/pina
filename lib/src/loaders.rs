@@ -137,22 +137,22 @@ impl<'a, 'info> CloseAccount<'a, 'info> for AccountInfo<'info> {
 
 #[cfg(feature = "spl")]
 impl AsSplToken for AccountInfo<'_> {
-    fn as_mint(&self) -> Result<spl_token::state::Mint, ProgramError> {
+    fn as_mint(&self) -> Result<spl_token_2022::state::Mint, ProgramError> {
         unsafe {
-            self.has_owner(&spl_token::ID)?;
-            spl_token::state::Mint::unpack(std::slice::from_raw_parts(
+            self.has_owner(&spl_token_2022::ID)?;
+            spl_token_2022::state::Mint::unpack(std::slice::from_raw_parts(
                 self.try_borrow_data()?.as_ptr(),
-                spl_token::state::Mint::LEN,
+                spl_token_2022::state::Mint::LEN,
             ))
         }
     }
 
-    fn as_token_account(&self) -> Result<spl_token::state::Account, ProgramError> {
+    fn as_token_account(&self) -> Result<spl_token_2022::state::Account, ProgramError> {
         unsafe {
-            self.has_owner(&spl_token::ID)?;
-            spl_token::state::Account::unpack(std::slice::from_raw_parts(
+            self.has_owner(&spl_token_2022::ID)?;
+            spl_token_2022::state::Account::unpack(std::slice::from_raw_parts(
                 self.try_borrow_data()?.as_ptr(),
-                spl_token::state::Account::LEN,
+                spl_token_2022::state::Account::LEN,
             ))
         }
     }
@@ -161,7 +161,7 @@ impl AsSplToken for AccountInfo<'_> {
         &self,
         owner: &Pubkey,
         mint: &Pubkey,
-    ) -> Result<spl_token::state::Account, ProgramError> {
+    ) -> Result<spl_token_2022::state::Account, ProgramError> {
         self.has_address(&spl_associated_token_account::get_associated_token_address(
             owner, mint,
         ))?
@@ -170,7 +170,7 @@ impl AsSplToken for AccountInfo<'_> {
 }
 
 #[cfg(feature = "spl")]
-impl AccountValidation for spl_token::state::Mint {
+impl AccountValidation for spl_token_2022::state::Mint {
     fn assert<F>(&self, condition: F) -> Result<&Self, ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -236,7 +236,7 @@ impl AccountValidation for spl_token::state::Mint {
 }
 
 #[cfg(feature = "spl")]
-impl AccountValidation for spl_token::state::Account {
+impl AccountValidation for spl_token_2022::state::Account {
     fn assert<F>(&self, condition: F) -> Result<&Self, ProgramError>
     where
         F: Fn(&Self) -> bool,
