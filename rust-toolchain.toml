@@ -1,0 +1,5 @@
+[toolchain]
+# https://rust-lang.github.io/rustup-components-history/
+channel = "nightly-2024-11-09"
+components = ["rustfmt", "cargo", "clippy", "rust-analyzer", "llvm-tools-preview", "rust-src"]
+profile = "default"
