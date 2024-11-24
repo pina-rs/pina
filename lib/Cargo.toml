@@ -12,15 +12,11 @@ keywords.workspace = true
 
 [features]
 deafult = []
-spl = ["dep:spl-token-2022", "dep:spl-associated-token-account"]
 
 [dependencies]
 bytemuck.workspace = true
 num_enum.workspace = true
 solana-program.workspace = true
-spl-token-2022 = { workspace = true, optional = true }
-spl-associated-token-account = { workspace = true, optional = true }
-thiserror.workspace = true
 
 [[example]]
 name = "simple"

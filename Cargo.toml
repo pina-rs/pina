@@ -27,8 +27,6 @@ solana-clap-v3-utils = "=1.18"
 solana-cli-config = "=1.18"
 solana-program = "=1.18"
 solana-sdk = "=1.18"
-spl-token-2022 = { features = ["no-entrypoint"], version = "3" }
-spl-associated-token-account = { features = [ "no-entrypoint" ], version = "3" }
 thiserror = "2"
 tokio = "1"
 quote = "1"

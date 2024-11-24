@@ -129,18 +129,6 @@ pub trait AsAccount {
         T: AccountDeserialize + Discriminator + Pod;
 }
 
-#[cfg(feature = "spl")]
-pub trait AsSplToken {
-    fn as_mint(&self) -> Result<spl_token_2022::state::Mint, ProgramError>;
-    fn as_token_account(&self) -> Result<spl_token_2022::state::Account, ProgramError>;
-    fn as_associated_token_account(
-        &self,
-        owner: &Pubkey,
-        mint: &Pubkey,
-    ) -> Result<spl_token_2022::state::Account, ProgramError>;
-}
-
-// TODO Work in progress
 pub trait LamportTransfer<'a, 'info> {
     fn send(&'a self, lamports: u64, to: &'a AccountInfo<'info>);
     fn collect(&'a self, lamports: u64, from: &'a AccountInfo<'info>) -> Result<(), ProgramError>;
