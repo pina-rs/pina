@@ -10,6 +10,17 @@ macro_rules! impl_to_bytes {
 }
 
 #[macro_export]
+macro_rules! impl_space {
+	($struct_name:ident) => {
+		impl $struct_name {
+			pub const fn space() -> usize {
+				8 + std::mem::size_of::<$struct_name>()
+			}
+		}
+	};
+}
+
+#[macro_export]
 macro_rules! impl_from_bytes {
     ($struct_name:ident) => {
         impl $struct_name {
@@ -39,7 +50,7 @@ macro_rules! impl_instruction_from_bytes {
 macro_rules! account {
     ($discriminator_name:ident, $struct_name:ident) => {
         $crate::impl_to_bytes!($struct_name);
-
+        $crate::impl_space!($struct_name);
         impl $crate::Discriminator for $struct_name {
             fn discriminator() -> u8 {
                 $discriminator_name::$struct_name.into()
