@@ -11,13 +11,13 @@ macro_rules! impl_to_bytes {
 
 #[macro_export]
 macro_rules! impl_space {
-	($struct_name:ident) => {
-		impl $struct_name {
-			pub const fn space() -> usize {
-				8 + std::mem::size_of::<$struct_name>()
-			}
-		}
-	};
+    ($struct_name:ident) => {
+        impl $struct_name {
+            pub const fn space() -> usize {
+                8 + std::mem::size_of::<$struct_name>()
+            }
+        }
+    };
 }
 
 #[macro_export]

@@ -78,7 +78,6 @@ event!(MyEvent);
 
 // entrypoint!(process_instruction);
 
-
 // pub fn process_add(accounts: &[AccountInfo<'_>], _data: &[u8]) -> ProgramResult {
 //     let [signer_info, counter_info] = accounts else {
 //         return Err(ProgramError::NotEnoughAccountKeys);

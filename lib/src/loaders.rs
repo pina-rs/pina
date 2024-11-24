@@ -145,4 +145,3 @@ impl<'a, 'info> CloseAccount<'a, 'info> for AccountInfo<'info> {
         Ok(())
     }
 }
-
