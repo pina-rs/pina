@@ -1,6 +1,4 @@
 use bytemuck::Pod;
-#[cfg(feature = "spl")]
-use solana_program::program_pack::Pack;
 use solana_program::{account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey};
 
 use crate::{
@@ -15,6 +13,7 @@ impl AccountInfoValidation for AccountInfo<'_> {
         if !self.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
         }
+
         Ok(self)
     }
 
@@ -22,6 +21,7 @@ impl AccountInfoValidation for AccountInfo<'_> {
         if !self.is_writable {
             return Err(ProgramError::MissingRequiredSignature);
         }
+
         Ok(self)
     }
 
@@ -29,6 +29,7 @@ impl AccountInfoValidation for AccountInfo<'_> {
         if !self.executable {
             return Err(ProgramError::InvalidAccountData);
         }
+
         Ok(self)
     }
 
@@ -36,6 +37,7 @@ impl AccountInfoValidation for AccountInfo<'_> {
         if !self.data_is_empty() {
             return Err(ProgramError::AccountAlreadyInitialized);
         }
+
         Ok(self)
     }
 
@@ -45,9 +47,17 @@ impl AccountInfoValidation for AccountInfo<'_> {
 
     fn is_type<T: Discriminator>(&self, program_id: &Pubkey) -> Result<&Self, ProgramError> {
         self.has_owner(program_id)?;
-        if self.try_borrow_data()?[0].ne(&T::discriminator()) {
+        let data = self.try_borrow_data()?;
+        let data_len = 8 + std::mem::size_of::<T>();
+
+        if data[0].ne(&T::discriminator()) {
             return Err(ProgramError::InvalidAccountData);
         }
+
+        if data.len() != data_len {
+            return Err(ProgramError::AccountDataTooSmall);
+        }
+
         Ok(self)
     }
 
@@ -55,6 +65,7 @@ impl AccountInfoValidation for AccountInfo<'_> {
         if self.owner.ne(owner) {
             return Err(ProgramError::InvalidAccountOwner);
         }
+
         Ok(self)
     }
 
@@ -62,6 +73,7 @@ impl AccountInfoValidation for AccountInfo<'_> {
         if self.key.ne(&address) {
             return Err(ProgramError::InvalidAccountData);
         }
+
         Ok(self)
     }
 
@@ -70,6 +82,7 @@ impl AccountInfoValidation for AccountInfo<'_> {
         if self.key.ne(&pda.0) {
             return Err(ProgramError::InvalidSeeds);
         }
+
         Ok(self)
     }
 
