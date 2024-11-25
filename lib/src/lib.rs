@@ -4,21 +4,23 @@ pub mod macros;
 mod traits;
 mod utils;
 
+pub use bytemuck::Pod;
+pub use bytemuck::Zeroable;
 pub use cpi::*;
+pub use num_enum::IntoPrimitive;
+pub use num_enum::TryFromPrimitive;
+pub use solana_program::account_info::AccountInfo;
+pub use solana_program::clock::Clock;
+pub use solana_program::declare_id;
+pub use solana_program::entrypoint::ProgramResult;
+pub use solana_program::entrypoint_no_alloc as entrypoint;
+pub use solana_program::instruction::AccountMeta;
+pub use solana_program::instruction::Instruction;
+pub use solana_program::msg;
+pub use solana_program::program_error::ProgramError;
+pub use solana_program::pubkey::Pubkey;
+pub use solana_program::system_program;
+pub use solana_program::sysvar;
+pub use solana_program::sysvar::Sysvar;
 pub use traits::*;
 pub use utils::*;
-
-pub use bytemuck::{Pod, Zeroable};
-pub use num_enum::{IntoPrimitive, TryFromPrimitive};
-pub use solana_program::{
-    account_info::AccountInfo,
-    clock::Clock,
-    declare_id, entrypoint,
-    entrypoint::ProgramResult,
-    instruction::{AccountMeta, Instruction},
-    msg,
-    program_error::ProgramError,
-    pubkey::Pubkey,
-    system_program, sysvar,
-    sysvar::Sysvar,
-};
