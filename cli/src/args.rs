@@ -1,9 +1,10 @@
-use clap::{arg, Parser};
+use clap::arg;
+use clap::Parser;
 
 #[derive(Parser, Debug)]
 pub struct NewArgs {
-    #[arg(value_name = "NAME", help = "The name of the program")]
-    pub name: Option<String>,
+	#[arg(value_name = "NAME", help = "The name of the program")]
+	pub name: Option<String>,
 }
 
 #[derive(Parser, Debug)]
