@@ -129,6 +129,12 @@ pub trait AccountInfoValidation {
 	/// Find the canonical bump for the seeds provided
 	fn find_canonical_bump(&self, seeds: &[&[u8]], program_id: &Pubkey)
 		-> Result<u8, ProgramError>;
+	#[cfg(feature = "spl")]
+	fn is_associated_token_address(
+		&self,
+		wallet: &Pubkey,
+		mint: &Pubkey,
+	) -> Result<&Self, ProgramError>;
 }
 
 pub trait Discriminator {

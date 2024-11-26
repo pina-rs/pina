@@ -173,6 +173,32 @@ impl AccountInfoValidation for AccountInfo<'_> {
 
 		Ok(bump)
 	}
+
+	#[cfg(feature = "spl")]
+	fn is_associated_token_address(
+		&self,
+		wallet: &Pubkey,
+		mint: &Pubkey,
+	) -> Result<&Self, ProgramError> {
+		let address = spl_associated_token_account::get_associated_token_address_with_program_id(
+			wallet,
+			mint,
+			&spl_token_2022::ID,
+		);
+
+		if address.ne(self.key) {
+			#[cfg(feature = "logs")]
+			crate::msg!(
+				"address: {} is invalid, expected associated token address: {}",
+				self.key,
+				address
+			);
+
+			return Err(ProgramError::InvalidSeeds);
+		}
+
+		Ok(self)
+	}
 }
 
 impl AsAccount for AccountInfo<'_> {
