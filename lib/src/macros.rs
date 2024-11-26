@@ -35,12 +35,9 @@ macro_rules! impl_from_bytes {
 macro_rules! impl_instruction_from_bytes {
 	($struct_name:ident) => {
 		impl $struct_name {
-			pub fn try_from_bytes(
-				data: &[u8],
-			) -> Result<&Self, solana_program::program_error::ProgramError> {
-				bytemuck::try_from_bytes::<Self>(data).or(Err(
-					solana_program::program_error::ProgramError::InvalidInstructionData,
-				))
+			pub fn try_from_bytes(data: &[u8]) -> Result<&Self, $crate::ProgramError> {
+				bytemuck::try_from_bytes::<Self>(data)
+					.or(Err($crate::ProgramError::InvalidInstructionData))
 			}
 		}
 	};
@@ -59,44 +56,38 @@ macro_rules! account {
 		}
 
 		impl $crate::AccountValidation for $struct_name {
-			fn assert<F>(
-				&self,
-				condition: F,
-			) -> Result<&Self, solana_program::program_error::ProgramError>
+			fn assert<F>(&self, condition: F) -> Result<&Self, $crate::ProgramError>
 			where
 				F: Fn(&Self) -> bool,
 			{
 				if !condition(self) {
-					return Err(solana_program::program_error::ProgramError::InvalidAccountData);
+					return Err($crate::ProgramError::InvalidAccountData);
 				}
 				Ok(self)
 			}
 
-			fn assert_err<F>(
-				&self,
-				condition: F,
-				err: solana_program::program_error::ProgramError,
-			) -> Result<&Self, solana_program::program_error::ProgramError>
+			fn assert_err<F, E>(&self, condition: F, err: E) -> Result<&Self, $crate::ProgramError>
 			where
 				F: Fn(&Self) -> bool,
+				E: Into<$crate::ProgramError> + std::error::Error,
 			{
 				if !condition(self) {
-					return Err(err);
+					#[cfg(feature = "logs")]
+					$crate::msg!("Account validation error: {}", err);
+
+					return Err(err.into());
 				}
+
 				Ok(self)
 			}
 
-			fn assert_msg<F>(
-				&self,
-				condition: F,
-				msg: &str,
-			) -> Result<&Self, solana_program::program_error::ProgramError>
+			fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, $crate::ProgramError>
 			where
 				F: Fn(&Self) -> bool,
 			{
 				match $crate::assert(
 					condition(self),
-					solana_program::program_error::ProgramError::InvalidAccountData,
+					$crate::ProgramError::InvalidAccountData,
 					msg,
 				) {
 					Err(err) => Err(err.into()),
@@ -104,29 +95,31 @@ macro_rules! account {
 				}
 			}
 
-			fn assert_mut<F>(
-				&mut self,
-				condition: F,
-			) -> Result<&mut Self, solana_program::program_error::ProgramError>
+			fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, $crate::ProgramError>
 			where
 				F: Fn(&Self) -> bool,
 			{
 				if !condition(self) {
-					return Err(solana_program::program_error::ProgramError::InvalidAccountData);
+					return Err($crate::ProgramError::InvalidAccountData);
 				}
+
 				Ok(self)
 			}
 
-			fn assert_mut_err<F>(
+			fn assert_mut_err<F, E>(
 				&mut self,
 				condition: F,
-				err: solana_program::program_error::ProgramError,
-			) -> Result<&mut Self, solana_program::program_error::ProgramError>
+				err: E,
+			) -> Result<&mut Self, $crate::ProgramError>
 			where
 				F: Fn(&Self) -> bool,
+				E: Into<$crate::ProgramError> + std::error::Error,
 			{
 				if !condition(self) {
-					return Err(err);
+					#[cfg(feature = "logs")]
+					$crate::msg!("Account validation error: {}", err);
+
+					return Err(err.into());
 				}
 				Ok(self)
 			}
@@ -135,13 +128,13 @@ macro_rules! account {
 				&mut self,
 				condition: F,
 				msg: &str,
-			) -> Result<&mut Self, solana_program::program_error::ProgramError>
+			) -> Result<&mut Self, $crate::ProgramError>
 			where
 				F: Fn(&Self) -> bool,
 			{
 				match $crate::assert(
 					condition(self),
-					solana_program::program_error::ProgramError::InvalidAccountData,
+					$crate::ProgramError::InvalidAccountData,
 					msg,
 				) {
 					Err(err) => Err(err.into()),
@@ -155,9 +148,9 @@ macro_rules! account {
 #[macro_export]
 macro_rules! error {
 	($struct_name:ident) => {
-		impl From<$struct_name> for solana_program::program_error::ProgramError {
+		impl From<$struct_name> for $crate::ProgramError {
 			fn from(e: $struct_name) -> Self {
-				solana_program::program_error::ProgramError::Custom(e as u32)
+				$crate::ProgramError::Custom(e as u32)
 			}
 		}
 	};

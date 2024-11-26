@@ -45,7 +45,7 @@ instruction!(MyInstruction, Add);
 instruction!(MyInstruction, Initialize);
 
 #[repr(u32)]
-#[derive(Debug, Error, Clone, Copy, PartialEq, Eq, IntoPrimitive)]
+#[derive(Debug, thiserror::Error, Clone, Copy, PartialEq, Eq, IntoPrimitive)]
 pub enum MyError {
 	#[error("You did something wrong")]
 	Dummy = 0,
@@ -61,73 +61,30 @@ pub struct MyEvent {
 
 event!(MyEvent);
 
-// pub fn process_instruction(
-//     program_id: &Pubkey,
-//     accounts: &[AccountInfo],
-//     data: &[u8],
-// ) -> ProgramResult {
-//     let (ix, data) = parse_instruction::<MyInstruction>(&example_api::ID,
-// program_id, data)?;
+pub fn process_instruction(
+	program_id: &Pubkey,
+	accounts: &[AccountInfo],
+	data: &[u8],
+) -> ProgramResult {
+	let (ix, _) = parse_instruction::<MyInstruction>(&system_program::ID, program_id, data)?;
 
-//     match ix {
-//         MyInstruction::Add => process_add(accounts, data)?,
-//         MyInstruction::Initialize => process_initialize(accounts, data)?,
-//     }
+	match ix {
+		MyInstruction::Add => {
+			let [counter_info] = accounts else {
+				return Err(ProgramError::NotEnoughAccountKeys);
+			};
 
-//     Ok(())
-// }
+			let counter = counter_info.as_account_mut::<Counter>(&program_id)?;
+			counter.assert_err(|c| c.value <= 42, MyError::Dummy)?;
+			counter.assert_mut_err(|c| c.value <= 42, MyError::Dummy)?;
+			counter.value += 1;
+		}
+		MyInstruction::Initialize => {
+			//
+		}
+	}
 
-// entrypoint!(process_instruction);
+	Ok(())
+}
 
-// pub fn process_add(accounts: &[AccountInfo<'_>], _data: &[u8]) ->
-// ProgramResult {     let [signer_info, counter_info] = accounts else {
-//         return Err(ProgramError::NotEnoughAccountKeys);
-//     };
-
-//     signer_info.is_signer()?;
-
-//     let counter = counter_info
-//         .as_account_mut::<Counter>(&example_api::ID)?
-//         .assert_mut(|c| c.value <= 42)?;
-
-//     counter.value += 1;
-
-//     Ok(())
-// }
-
-// pub fn process_transfer(accounts: &[AccountInfo<'_>], _data: &[u8]) ->
-// ProgramResult {     let [signer_info, counter_info, mint_info, sender_info,
-// receiver_info, token_program] = accounts else {         return
-// Err(ProgramError::NotEnoughAccountKeys);     };
-
-//     signer_info.is_signer()?;
-
-//     counter_info
-//         .as_account::<Counter>(&example_api::ID)?
-//         .assert(|c| c.value >= 42)?;
-
-//     mint_info.as_mint()?;
-
-//     sender_info
-//         .is_writable()?
-//         .as_token_account()?
-//         .assert(|t| t.owner == *signer_info.key)?
-//         .assert(|t| t.mint == *mint_info.key)?;
-
-//     receiver_info
-//         .is_writable()?
-//         .as_token_account()?
-//         .assert(|t| t.mint == *mint_info.key)?;
-
-//     token_program.is_program(&spl_token_2022::ID)?;
-
-//     transfer(
-//         signer_info,
-//         sender_info,
-//         receiver_info,
-//         token_program,
-//         counter.value,
-//     )?;
-
-//     Ok(())
-// }
+entrypoint!(process_instruction);
