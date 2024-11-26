@@ -6,6 +6,8 @@ use solana_program::pubkey::Pubkey;
 use crate::AccountDeserialize;
 use crate::AccountInfoValidation;
 use crate::AsAccount;
+#[cfg(feature = "spl")]
+use crate::AsSplAccount;
 use crate::CloseAccount;
 use crate::Discriminator;
 use crate::LamportTransfer;
@@ -226,6 +228,53 @@ impl AsAccount for AccountInfo<'_> {
 				8 + std::mem::size_of::<T>(),
 			))
 		}
+	}
+}
+
+#[cfg(feature = "spl")]
+impl AsSplAccount for AccountInfo<'_> {
+	fn as_token_mint_state<'info>(
+		&self,
+	) -> Result<
+		spl_token_2022::extension::PodStateWithExtensions<'info, spl_token_2022::pod::PodMint>,
+		ProgramError,
+	> {
+		unsafe {
+			let data = self.try_borrow_data()?;
+			let state = spl_token_2022::extension::PodStateWithExtensions::<
+				spl_token_2022::pod::PodMint,
+			>::unpack(std::slice::from_raw_parts(data.as_ptr(), data.len()))?;
+
+			Ok(state)
+		}
+	}
+
+	fn as_token_mint(&self) -> Result<spl_token_2022::pod::PodMint, ProgramError> {
+		let state = self.as_token_mint_state()?;
+
+		Ok(*state.base)
+	}
+
+	fn as_token_account_state<'info>(
+		&self,
+	) -> Result<
+		spl_token_2022::extension::PodStateWithExtensions<'info, spl_token_2022::pod::PodAccount>,
+		ProgramError,
+	> {
+		unsafe {
+			let data = self.try_borrow_data()?;
+			let state = spl_token_2022::extension::PodStateWithExtensions::<
+				spl_token_2022::pod::PodAccount,
+			>::unpack(std::slice::from_raw_parts(data.as_ptr(), data.len()))?;
+
+			Ok(state)
+		}
+	}
+
+	fn as_token_account(&self) -> Result<spl_token_2022::pod::PodAccount, ProgramError> {
+		let state = self.as_token_account_state()?;
+
+		Ok(*state.base)
 	}
 }
 

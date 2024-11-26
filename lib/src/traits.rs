@@ -155,6 +155,24 @@ pub trait AsAccount {
 		T: AccountDeserialize + Discriminator + Pod;
 }
 
+#[cfg(feature = "spl")]
+pub trait AsSplAccount {
+	fn as_token_mint_state<'info>(
+		&self,
+	) -> Result<
+		spl_token_2022::extension::PodStateWithExtensions<'info, spl_token_2022::pod::PodMint>,
+		ProgramError,
+	>;
+	fn as_token_mint(&self) -> Result<spl_token_2022::pod::PodMint, ProgramError>;
+	fn as_token_account_state<'info>(
+		&self,
+	) -> Result<
+		spl_token_2022::extension::PodStateWithExtensions<'info, spl_token_2022::pod::PodAccount>,
+		ProgramError,
+	>;
+	fn as_token_account(&self) -> Result<spl_token_2022::pod::PodAccount, ProgramError>;
+}
+
 pub trait LamportTransfer<'a, 'info> {
 	fn send(&'a self, lamports: u64, to: &'a AccountInfo<'info>);
 	fn collect(&'a self, lamports: u64, from: &'a AccountInfo<'info>) -> Result<(), ProgramError>;
