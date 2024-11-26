@@ -12,6 +12,7 @@ keywords.workspace = true
 
 [features]
 deafult = []
+logs = [] # Enable logging for validation errors
 
 [dependencies]
 bytemuck.workspace = true
