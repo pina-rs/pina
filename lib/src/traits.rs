@@ -120,6 +120,8 @@ pub trait AccountInfoValidation {
 	fn has_address(&self, address: &Pubkey) -> Result<&Self, ProgramError>;
 	/// Check if the account is owned by the address provided
 	fn has_owner(&self, program_id: &Pubkey) -> Result<&Self, ProgramError>;
+	/// Check if the account has the seeds provided and uses the canonical bump.
+	fn has_seeds(&self, seeds: &[&[u8]], program_id: &Pubkey) -> Result<&Self, ProgramError>;
 	/// Check if the account has the seeds and bump provided
 	fn has_seeds_with_bump(
 		&self,
