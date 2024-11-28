@@ -72,7 +72,6 @@ macro_rules! account {
 				E: Into<$crate::ProgramError> + std::error::Error,
 			{
 				if !condition(self) {
-					#[cfg(feature = "logs")]
 					$crate::msg!("Account validation error: {}", err);
 
 					return Err(err.into());
@@ -116,7 +115,6 @@ macro_rules! account {
 				E: Into<$crate::ProgramError> + std::error::Error,
 			{
 				if !condition(self) {
-					#[cfg(feature = "logs")]
 					$crate::msg!("Account validation error: {}", err);
 
 					return Err(err.into());
@@ -195,4 +193,20 @@ macro_rules! instruction {
 			}
 		}
 	};
+}
+
+#[cfg(feature = "logs")]
+#[macro_export]
+macro_rules! msg {
+    ($msg:expr) => {
+        $crate::solana_program::msg!($msg)
+    };
+    ($($arg:tt)*) => ($crate::solana_program::msg!($($arg)*));
+}
+
+#[cfg(not(feature = "logs"))]
+#[macro_export]
+macro_rules! msg {
+	($msg:expr) => {};
+	($($arg:tt)*) => {};
 }

@@ -16,7 +16,7 @@ pub use solana_program::entrypoint::ProgramResult;
 pub use solana_program::entrypoint_no_alloc as entrypoint;
 pub use solana_program::instruction::AccountMeta;
 pub use solana_program::instruction::Instruction;
-pub use solana_program::msg;
+pub use solana_program;
 pub use solana_program::program_error::ProgramError;
 pub use solana_program::pubkey::Pubkey;
 pub use solana_program::system_program;

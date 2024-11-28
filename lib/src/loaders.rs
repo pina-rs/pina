@@ -15,7 +15,6 @@ use crate::LamportTransfer;
 impl AccountInfoValidation for AccountInfo<'_> {
 	fn is_signer(&self) -> Result<&Self, ProgramError> {
 		if !self.is_signer {
-			#[cfg(feature = "logs")]
 			crate::msg!("address: {} is missing a required signature", self.key);
 
 			return Err(ProgramError::MissingRequiredSignature);
@@ -26,7 +25,6 @@ impl AccountInfoValidation for AccountInfo<'_> {
 
 	fn is_writable(&self) -> Result<&Self, ProgramError> {
 		if !self.is_writable {
-			#[cfg(feature = "logs")]
 			crate::msg!("address: {} has not been marked as writable", self.key);
 
 			return Err(ProgramError::MissingRequiredSignature);
@@ -37,7 +35,6 @@ impl AccountInfoValidation for AccountInfo<'_> {
 
 	fn is_executable(&self) -> Result<&Self, ProgramError> {
 		if !self.executable {
-			#[cfg(feature = "logs")]
 			crate::msg!("address: {} is not executable", self.key);
 
 			return Err(ProgramError::InvalidAccountData);
@@ -48,7 +45,6 @@ impl AccountInfoValidation for AccountInfo<'_> {
 
 	fn is_empty(&self) -> Result<&Self, ProgramError> {
 		if !self.data_is_empty() {
-			#[cfg(feature = "logs")]
 			crate::msg!("address: {} is not empty", self.key);
 
 			return Err(ProgramError::AccountAlreadyInitialized);
@@ -67,14 +63,12 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		let data_len = 8 + std::mem::size_of::<T>();
 
 		if data[0].ne(&T::discriminator()) {
-			#[cfg(feature = "logs")]
 			crate::msg!("address: {} has invalid discriminator", self.key);
 
 			return Err(ProgramError::InvalidAccountData);
 		}
 
 		if data.len() != data_len {
-			#[cfg(feature = "logs")]
 			crate::msg!(
 				"address: {} has invalid data length for the account type",
 				self.key
@@ -93,7 +87,6 @@ impl AccountInfoValidation for AccountInfo<'_> {
 
 	fn has_owner(&self, owner: &Pubkey) -> Result<&Self, ProgramError> {
 		if self.owner.ne(owner) {
-			#[cfg(feature = "logs")]
 			crate::msg!(
 				"address: {} has invalid owner: {}, required: {}",
 				self.key,
@@ -109,7 +102,6 @@ impl AccountInfoValidation for AccountInfo<'_> {
 
 	fn has_address(&self, address: &Pubkey) -> Result<&Self, ProgramError> {
 		if self.key.ne(&address) {
-			#[cfg(feature = "logs")]
 			crate::msg!("address: {} is invalid, expected: {}", self.key, address);
 
 			return Err(ProgramError::InvalidAccountData);
@@ -122,7 +114,6 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		let pda = Pubkey::find_program_address(seeds, program_id).0;
 
 		if pda.ne(self.key) {
-			#[cfg(feature = "logs")]
 			crate::msg!("address: {} is invalid, expected pda: {}", self.key, pda);
 
 			return Err(ProgramError::InvalidSeeds);
@@ -139,7 +130,6 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		let pda = match Pubkey::create_program_address(seeds, program_id) {
 			Ok(pda) => pda,
 			Err(error) => {
-				#[cfg(feature = "logs")]
 				crate::msg!(
 					"could not create pda for address: {}, with provided seeds",
 					self.key
@@ -150,7 +140,6 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		};
 
 		if pda.ne(self.key) {
-			#[cfg(feature = "logs")]
 			crate::msg!("address: {} is invalid, expected pda: {}", self.key, pda);
 
 			return Err(ProgramError::InvalidSeeds);
@@ -167,7 +156,6 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		let (pda, bump) = Pubkey::find_program_address(seeds, program_id);
 
 		if pda.ne(self.key) {
-			#[cfg(feature = "logs")]
 			crate::msg!("address: {} is invalid, expected pda: {}", self.key, pda);
 
 			return Err(ProgramError::InvalidSeeds);
@@ -189,7 +177,6 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		);
 
 		if address.ne(self.key) {
-			#[cfg(feature = "logs")]
 			crate::msg!(
 				"address: {} is invalid, expected associated token address: {}",
 				self.key,
