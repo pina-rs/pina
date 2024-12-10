@@ -100,37 +100,45 @@ pub trait AccountValidation {
 }
 
 pub trait AccountInfoValidation {
-	/// Check if the account is a signer
-	fn is_signer(&self) -> Result<&Self, ProgramError>;
-	/// Check if the account is writable
-	fn is_writable(&self) -> Result<&Self, ProgramError>;
-	/// Check if the account is executable
-	fn is_executable(&self) -> Result<&Self, ProgramError>;
-	/// Check if the account is empty
-	fn is_empty(&self) -> Result<&Self, ProgramError>;
-	/// Check if the account is of the type provided
-	fn is_type<T: Discriminator>(&self, program_id: &Pubkey) -> Result<&Self, ProgramError>;
-	/// Check if the account is a program
-	fn is_program(&self, program_id: &Pubkey) -> Result<&Self, ProgramError>;
-	/// Check if the account is a system variable
-	fn is_sysvar(&self, sysvar_id: &Pubkey) -> Result<&Self, ProgramError>;
-	/// Check if the account has the address provided
-	fn has_address(&self, address: &Pubkey) -> Result<&Self, ProgramError>;
-	/// Check if the account is owned by the address provided
-	fn has_owner(&self, program_id: &Pubkey) -> Result<&Self, ProgramError>;
-	/// Check if the account has the seeds provided and uses the canonical bump.
-	fn has_seeds(&self, seeds: &[&[u8]], program_id: &Pubkey) -> Result<&Self, ProgramError>;
-	/// Check if the account has the seeds and bump provided
-	fn has_seeds_with_bump(
+	/// Assert that the account is a signer.
+	fn assert_signer(&self) -> Result<&Self, ProgramError>;
+	/// Assert that the account is writable.
+	fn assert_writable(&self) -> Result<&Self, ProgramError>;
+	/// Assert that the account is executable.
+	fn assert_executable(&self) -> Result<&Self, ProgramError>;
+	/// Assert that the account is empty.
+	fn assert_empty(&self) -> Result<&Self, ProgramError>;
+	/// Assert that the account is not empty.
+	fn assert_not_empty(&self) -> Result<&Self, ProgramError>;
+	/// Assert that the account is of the type provided.
+	fn assert_type<T: Discriminator>(&self, program_id: &Pubkey) -> Result<&Self, ProgramError>;
+	/// Assert that the account is a program.
+	fn assert_program(&self, program_id: &Pubkey) -> Result<&Self, ProgramError>;
+	/// Assert that the account is a system variable.
+	fn assert_sysvar(&self, sysvar_id: &Pubkey) -> Result<&Self, ProgramError>;
+	/// Assert that the account has the address provided.
+	fn assert_address(&self, address: &Pubkey) -> Result<&Self, ProgramError>;
+	/// Assert that the account is owned by the address provided.
+	fn assert_owner(&self, program_id: &Pubkey) -> Result<&Self, ProgramError>;
+	/// Assert that the account has the seeds provided and uses the canonical
+	/// bump.
+	fn assert_seeds(&self, seeds: &[&[u8]], program_id: &Pubkey) -> Result<&Self, ProgramError>;
+	/// Assert that the account has the seeds and bump provided.
+	fn assert_seeds_with_bump(
 		&self,
 		seeds: &[&[u8]],
 		program_id: &Pubkey,
 	) -> Result<&Self, ProgramError>;
-	/// Find the canonical bump for the seeds provided
-	fn find_canonical_bump(&self, seeds: &[&[u8]], program_id: &Pubkey)
-		-> Result<u8, ProgramError>;
+	/// Assert that the account uses the canonical bump for the seeds provided.
+	/// Returns the bump.
+	fn assert_canonical_bump(
+		&self,
+		seeds: &[&[u8]],
+		program_id: &Pubkey,
+	) -> Result<u8, ProgramError>;
+	/// Assert that the account is an associated token account.
 	#[cfg(feature = "spl")]
-	fn is_associated_token_address(
+	fn assert_associated_token_address(
 		&self,
 		wallet: &Pubkey,
 		mint: &Pubkey,

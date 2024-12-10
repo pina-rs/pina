@@ -13,7 +13,7 @@ use crate::Discriminator;
 use crate::LamportTransfer;
 
 impl AccountInfoValidation for AccountInfo<'_> {
-	fn is_signer(&self) -> Result<&Self, ProgramError> {
+	fn assert_signer(&self) -> Result<&Self, ProgramError> {
 		if !self.is_signer {
 			crate::msg!("address: {} is missing a required signature", self.key);
 
@@ -23,7 +23,7 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		Ok(self)
 	}
 
-	fn is_writable(&self) -> Result<&Self, ProgramError> {
+	fn assert_writable(&self) -> Result<&Self, ProgramError> {
 		if !self.is_writable {
 			crate::msg!("address: {} has not been marked as writable", self.key);
 
@@ -33,7 +33,7 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		Ok(self)
 	}
 
-	fn is_executable(&self) -> Result<&Self, ProgramError> {
+	fn assert_executable(&self) -> Result<&Self, ProgramError> {
 		if !self.executable {
 			crate::msg!("address: {} is not executable", self.key);
 
@@ -43,7 +43,7 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		Ok(self)
 	}
 
-	fn is_empty(&self) -> Result<&Self, ProgramError> {
+	fn assert_empty(&self) -> Result<&Self, ProgramError> {
 		if !self.data_is_empty() {
 			crate::msg!("address: {} is not empty", self.key);
 
@@ -53,12 +53,22 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		Ok(self)
 	}
 
-	fn is_program(&self, program_id: &Pubkey) -> Result<&Self, ProgramError> {
-		self.has_address(program_id)?.is_executable()
+	fn assert_not_empty(&self) -> Result<&Self, ProgramError> {
+		if self.data_is_empty() {
+			crate::msg!("address: {} is empty", self.key);
+
+			return Err(ProgramError::InvalidAccountData);
+		}
+
+		Ok(self)
 	}
 
-	fn is_type<T: Discriminator>(&self, program_id: &Pubkey) -> Result<&Self, ProgramError> {
-		self.has_owner(program_id)?;
+	fn assert_program(&self, program_id: &Pubkey) -> Result<&Self, ProgramError> {
+		self.assert_address(program_id)?.assert_executable()
+	}
+
+	fn assert_type<T: Discriminator>(&self, program_id: &Pubkey) -> Result<&Self, ProgramError> {
+		self.assert_owner(program_id)?;
 		let data = self.try_borrow_data()?;
 		let data_len = 8 + std::mem::size_of::<T>();
 
@@ -80,12 +90,12 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		Ok(self)
 	}
 
-	fn is_sysvar(&self, sysvar_id: &Pubkey) -> Result<&Self, ProgramError> {
-		self.has_owner(&solana_program::sysvar::ID)?
-			.has_address(sysvar_id)
+	fn assert_sysvar(&self, sysvar_id: &Pubkey) -> Result<&Self, ProgramError> {
+		self.assert_owner(&solana_program::sysvar::ID)?
+			.assert_address(sysvar_id)
 	}
 
-	fn has_owner(&self, owner: &Pubkey) -> Result<&Self, ProgramError> {
+	fn assert_owner(&self, owner: &Pubkey) -> Result<&Self, ProgramError> {
 		if self.owner.ne(owner) {
 			crate::msg!(
 				"address: {} has invalid owner: {}, required: {}",
@@ -100,7 +110,7 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		Ok(self)
 	}
 
-	fn has_address(&self, address: &Pubkey) -> Result<&Self, ProgramError> {
+	fn assert_address(&self, address: &Pubkey) -> Result<&Self, ProgramError> {
 		if self.key.ne(&address) {
 			crate::msg!("address: {} is invalid, expected: {}", self.key, address);
 
@@ -110,7 +120,7 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		Ok(self)
 	}
 
-	fn has_seeds(&self, seeds: &[&[u8]], program_id: &Pubkey) -> Result<&Self, ProgramError> {
+	fn assert_seeds(&self, seeds: &[&[u8]], program_id: &Pubkey) -> Result<&Self, ProgramError> {
 		let pda = Pubkey::find_program_address(seeds, program_id).0;
 
 		if pda.ne(self.key) {
@@ -122,7 +132,7 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		Ok(self)
 	}
 
-	fn has_seeds_with_bump(
+	fn assert_seeds_with_bump(
 		&self,
 		seeds: &[&[u8]],
 		program_id: &Pubkey,
@@ -148,7 +158,7 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		Ok(self)
 	}
 
-	fn find_canonical_bump(
+	fn assert_canonical_bump(
 		&self,
 		seeds: &[&[u8]],
 		program_id: &Pubkey,
@@ -165,7 +175,7 @@ impl AccountInfoValidation for AccountInfo<'_> {
 	}
 
 	#[cfg(feature = "spl")]
-	fn is_associated_token_address(
+	fn assert_associated_token_address(
 		&self,
 		wallet: &Pubkey,
 		mint: &Pubkey,
@@ -196,7 +206,7 @@ impl AsAccount for AccountInfo<'_> {
 		T: AccountDeserialize + Discriminator + Pod,
 	{
 		unsafe {
-			self.has_owner(program_id)?;
+			self.assert_owner(program_id)?;
 			T::try_from_bytes(std::slice::from_raw_parts(
 				self.try_borrow_data()?.as_ptr(),
 				8 + std::mem::size_of::<T>(),
@@ -209,7 +219,7 @@ impl AsAccount for AccountInfo<'_> {
 		T: AccountDeserialize + Discriminator + Pod,
 	{
 		unsafe {
-			self.has_owner(program_id)?;
+			self.assert_owner(program_id)?;
 			T::try_from_bytes_mut(std::slice::from_raw_parts_mut(
 				self.try_borrow_mut_data()?.as_mut_ptr(),
 				8 + std::mem::size_of::<T>(),
