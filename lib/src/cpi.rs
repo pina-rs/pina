@@ -8,6 +8,35 @@ use solana_program::sysvar::Sysvar;
 
 use crate::Discriminator;
 
+/// Creates a new non-program account.
+#[inline(always)]
+pub fn create_external_account<'a, 'info>(
+	from_pubkey: &'a AccountInfo<'info>,
+	to_pubkey: &'a AccountInfo<'info>,
+	system_program: &'a AccountInfo<'info>,
+	space: usize,
+	owner: &Pubkey,
+) -> ProgramResult {
+	let lamports_required = (Rent::get()?).minimum_balance(space);
+
+	solana_program::program::invoke(
+		&solana_program::system_instruction::create_account(
+			from_pubkey.key,
+			to_pubkey.key,
+			lamports_required,
+			space as u64,
+			owner,
+		),
+		&[
+			from_pubkey.clone(),
+			to_pubkey.clone(),
+			system_program.clone(),
+		],
+	)?;
+
+	Ok(())
+}
+
 /// Creates a new program account.
 #[inline(always)]
 pub fn create_account<'a, 'info, T: Discriminator + Pod>(

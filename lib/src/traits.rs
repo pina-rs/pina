@@ -120,6 +120,9 @@ pub trait AccountInfoValidation {
 	fn assert_address(&self, address: &Pubkey) -> Result<&Self, ProgramError>;
 	/// Assert that the account is owned by the address provided.
 	fn assert_owner(&self, program_id: &Pubkey) -> Result<&Self, ProgramError>;
+	/// Assert that the account is owned by one of the spl token programs.
+	#[cfg(feature = "spl")]
+	fn assert_spl_owner(&self) -> Result<&Self, ProgramError>;
 	/// Assert that the account has the seeds provided and uses the canonical
 	/// bump.
 	fn assert_seeds(&self, seeds: &[&[u8]], program_id: &Pubkey) -> Result<&Self, ProgramError>;
@@ -179,6 +182,19 @@ pub trait AsSplAccount {
 		ProgramError,
 	>;
 	fn as_token_account(&self) -> Result<spl_token_2022::pod::PodAccount, ProgramError>;
+	fn as_associated_token_account_state<'info>(
+		&self,
+		owner: &Pubkey,
+		mint: &Pubkey,
+	) -> Result<
+		spl_token_2022::extension::PodStateWithExtensions<'info, spl_token_2022::pod::PodAccount>,
+		ProgramError,
+	>;
+	fn as_associated_token_account(
+		&self,
+		owner: &Pubkey,
+		mint: &Pubkey,
+	) -> Result<spl_token_2022::pod::PodAccount, ProgramError>;
 }
 
 pub trait LamportTransfer<'a, 'info> {
