@@ -1,0 +1,37 @@
+[package]
+name = "solapino"
+version.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+description = "a solana and pinocchio smart contract framework"
+
+[features]
+default = ["logs", "derive"]
+std = ["pinocchio/std", "num_enum/std"]
+logs = ["dep:pinocchio-log"] # Enable logging for errors
+token = [
+	"dep:pinocchio-associated-token-account",
+	"dep:pinocchio-token",
+	"dep:pinocchio-token-2022",
+]
+derive = ["dep:solapino_macros"]
+
+[dependencies]
+bytemuck = { workspace = true, features = ["derive"] }
+num_enum = { workspace = true, default-features = false }
+paste = { workspace = true }
+pinocchio = { workspace = true }
+pinocchio-associated-token-account = { workspace = true, optional = true }
+pinocchio-log = { workspace = true, optional = true, features = ["macro"] }
+pinocchio-pubkey = { workspace = true }
+pinocchio-system = { workspace = true }
+pinocchio-token = { workspace = true, optional = true }
+pinocchio-token-2022 = { workspace = true, optional = true }
+solapino_macros = { workspace = true, optional = true }
+
+[lints]
+workspace = true

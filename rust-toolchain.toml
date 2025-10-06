@@ -1,5 +1,5 @@
 [toolchain]
 # https://rust-lang.github.io/rustup-components-history/
-channel = "1.85.0"
-components = ["rustfmt", "cargo", "clippy", "rust-analyzer", "llvm-tools-preview", "rust-src"]
+channel = "1.90.0"
+components = ["rustfmt", "cargo", "clippy", "rust-analyzer", "llvm-tools", "rust-src"]
 profile = "default"

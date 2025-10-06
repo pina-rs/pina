@@ -1,0 +1,24 @@
+[package]
+name = "escrow_program"
+version.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[features]
+bpf-entrypoint = []
+
+[dependencies]
+solapino = { workspace = true, default-features = false, features = ["logs", "token"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+
+[lints]
+workspace = true

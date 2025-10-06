@@ -3,8 +3,6 @@ use solana_program::account_info::AccountInfo;
 use solana_program::program_error::ProgramError;
 use solana_program::pubkey::Pubkey;
 
-use crate::assert;
-use crate::msg;
 use crate::AccountDeserialize;
 use crate::AccountInfoValidation;
 use crate::AccountValidation;
@@ -14,6 +12,8 @@ use crate::AsSplAccount;
 use crate::CloseAccount;
 use crate::Discriminator;
 use crate::LamportTransfer;
+use crate::assert;
+use crate::msg;
 
 impl AccountInfoValidation for AccountInfo<'_> {
 	#[track_caller]

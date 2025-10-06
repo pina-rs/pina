@@ -1,54 +1,259 @@
-{ pkgs, lib, config, inputs, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
+let
+  llvm = pkgs.llvmPackages_19;
+in
 
 {
-  # https://devenv.sh/packages/
   packages =
+    with pkgs;
     [
-      pkgs.binaryen
-      pkgs.cargo-binstall
-      pkgs.cargo-run-bin
-      pkgs.coreutils
-      pkgs.curl
-      pkgs.dprint
-      pkgs.git
-      pkgs.jq
-      pkgs.libiconv
-      pkgs.nixfmt-rfc-style
-      pkgs.openssl
-      pkgs.protobuf # needed for `solana-test-validator` in tests
-      pkgs.rustup
-      pkgs.shfmt
+      binaryen
+      cargo-binstall # speed up cargo-rust-bin installs
+      cargo-insta
+      cargo-nextest
+      cargo-run-bin
+      chromedriver
+      cmake
+      dprint
+      eget
+      gcc
+      libiconv
+      llvm.bintools
+      llvm.clang
+      llvm.clang-tools
+      llvm.libclang.lib
+      llvm.lld
+      llvm.llvm
+      llvm.mlir
+      nixfmt-rfc-style
+      openssl
+      perl
+      pkg-config
+      protobuf # needed for `solana-test-validator` in tests
+      rust-jemalloc-sys
+      rustup
+      shfmt
+      # solana-cli
+      zstd
     ]
-    ++ lib.optionals pkgs.stdenv.isDarwin (
-      with pkgs.darwin.apple_sdk;
-      [
-        frameworks.CoreFoundation
-        frameworks.Security
-        frameworks.System
-        frameworks.SystemConfiguration
-      ]
-    );
+    ++ lib.optionals stdenv.isDarwin [
+      coreutils
+    ]
+    ++ lib.optionals stdenv.isLinux [
+      libgcc.lib
+      udev
+    ];
 
-  # https://devenv.sh/tasks/
-  # tasks = {
-  #   "myproj:setup".exec = "mytool build";
-  #   "devenv:enterShell".after = [ "myproj:setup" ];
-  # };
-
-  # https://devenv.sh/tests/
-  enterTest = ''
-    echo "Running tests"
-    git --version | grep --color=auto "${pkgs.git.version}"
-  '';
-
-  scripts."update:deps" = {
-    exec = ''
-			set -e
-			cargo update
-			devenv update
-    '';
-    description = "Update dependencies.";
+  env = {
+    EGET_CONFIG = "${config.env.DEVENV_ROOT}/.eget/.eget.toml";
+    OPENSSL_NO_VENDOR = "1";
+    LIBCLANG_PATH = "${llvm.libclang.lib}/lib";
+    CC = "${llvm.clang}/bin/clang";
+    CXX = "${llvm.clang}/bin/clang++";
+    PROTOC = "${pkgs.protobuf}/bin/protoc";
+    LD_LIBRARY_PATH = "${config.env.DEVENV_PROFILE}/lib";
+    WASM_BINDGEN_TEST_WEBDRIVER_JSON = "${config.env.DEVENV_ROOT}/webdriver.json";
   };
 
-  # See full reference at https://devenv.sh/reference/options/
+  # Rely on the global sdk for now as the nix apple sdk is not working for me.
+  # apple.sdk = if pkgs.stdenv.isDarwin then pkgs.apple-sdk_15 else null;
+  apple.sdk = null;
+
+  # Use the stdenv conditionally.
+  # stdenv = if pkgs.stdenv.isLinux then llvm.stdenv else pkgs.stdenv;
+  stdenv = pkgs.stdenv;
+
+  enterShell = ''
+    set -e
+    export PATH="$DEVENV_ROOT/.eget/bin:$PATH";
+    export LDFLAGS="$NIX_LDFLAGS";
+  '';
+
+  # disable dotenv since it breaks the variable interpolation supported by `direnv`
+  dotenv.disableHint = true;
+
+  tasks = {
+    "rustfmt:nightly" = {
+      exec = ''
+        rustup toolchain install nightly --component rustfmt --force
+      '';
+      before = [ "devenv:enterShell" ];
+    };
+  };
+
+  scripts = {
+    "release-plz" = {
+      exec = ''
+        set -e
+        cargo bin release-plz $@
+      '';
+      description = "The `release-plz` executable";
+      binary = "bash";
+    };
+    "query-security-txt" = {
+      exec = ''
+        set -e
+        cargo bin query-security-txt $@
+      '';
+      description = "The `query-security-txt` executable";
+      binary = "bash";
+    };
+    "solana-verify" = {
+      exec = ''
+        set -e
+        cargo bin solana-verify $@
+      '';
+      description = "The `solana-verify` executable";
+      binary = "bash";
+    };
+    "generate:keypair" = {
+      exec = ''
+        set -e
+        solana-keygen new -s -o $DEVENV_ROOT/$1.json --no-bip39-passphrase || true
+      '';
+      description = "Generate a local solana keypair. Must provide a name.";
+      binary = "bash";
+    };
+    "install:all" = {
+      exec = ''
+        set -e
+        install:cargo:bin
+        install:eget
+      '';
+      description = "Install all packages.";
+      binary = "bash";
+    };
+    "install:eget" = {
+      exec = ''
+        HASH=$(nix hash path --base32 ./.eget/.eget.toml)
+        echo "HASH: $HASH"
+        if [ ! -f ./.eget/bin/hash ] || [ "$HASH" != "$(cat ./.eget/bin/hash)" ]; then
+          echo "Updating eget binaries"
+          eget -D --to "$DEVENV_ROOT/.eget/bin"
+          echo "$HASH" > ./.eget/bin/hash
+        else
+          echo "eget binaries are up to date"
+        fi
+      '';
+      description = "Install github binaries with eget.";
+    };
+    "install:cargo:bin" = {
+      exec = ''
+        set -e
+        cargo bin --install
+      '';
+      description = "Install cargo binaries locally.";
+      binary = "bash";
+    };
+    "update:deps" = {
+      exec = ''
+        set -e
+        cargo update
+        devenv update
+      '';
+      description = "Update dependencies.";
+      binary = "bash";
+    };
+    "build:all" = {
+      exec = ''
+        set -e
+        if [ -z "$CI" ]; then
+          echo "Builing project locally"
+          cargo build --all-features
+        else
+          echo "Building in CI"
+          cargo build --all-features --locked
+        fi
+      '';
+      description = "Build all crates with all features activated.";
+      binary = "bash";
+    };
+    "test:all" = {
+      exec = ''
+        set -e
+      '';
+      description = "Run all tests across the crates";
+      binary = "bash";
+    };
+    "coverage:all" = {
+      exec = ''
+        set -e
+      '';
+      description = "Run coverage across the crates";
+      binary = "bash";
+    };
+    "fix:all" = {
+      exec = ''
+        set -e
+        fix:clippy
+        fix:format
+      '';
+      description = "Fix all autofixable problems.";
+      binary = "bash";
+    };
+    "fix:format" = {
+      exec = ''
+        set -e
+        dprint fmt --config "$DEVENV_ROOT/dprint.json"
+      '';
+      description = "Format files with dprint.";
+      binary = "bash";
+    };
+    "fix:clippy" = {
+      exec = ''
+        set -e
+        cargo clippy --fix --allow-dirty --allow-staged --all-features
+      '';
+      description = "Fix clippy lints for rust.";
+      binary = "bash";
+    };
+    "lint:all" = {
+      exec = ''
+        set -e
+        lint:clippy
+        lint:format
+      '';
+      description = "Run all checks.";
+      binary = "bash";
+    };
+    "lint:format" = {
+      exec = ''
+        set -e
+        dprint check
+      '';
+      description = "Check that all files are formatted.";
+      binary = "bash";
+    };
+    "lint:clippy" = {
+      exec = ''
+        set -e
+        cargo clippy --all-features
+      '';
+      description = "Check that all rust lints are passing.";
+      binary = "bash";
+    };
+    "setup:vscode" = {
+      exec = ''
+        set -e
+        rm -rf .vscode
+        cp -r $DEVENV_ROOT/setup/editors/vscode .vscode
+      '';
+      description = "Setup the environment for vscode.";
+      binary = "bash";
+    };
+    "setup:helix" = {
+      exec = ''
+        set -e
+        rm -rf .helix
+        cp -r $DEVENV_ROOT/setup/editors/helix .helix
+      '';
+      description = "Setup for the helix editor.";
+      binary = "bash";
+    };
+  };
 }
