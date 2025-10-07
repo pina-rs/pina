@@ -1,11 +1,13 @@
 #![no_std]
 
-use solapino::*;
+use pina::*;
 
 #[cfg(feature = "bpf-entrypoint")]
 pub mod entrypoint {
-	use solapino::*;
+	use pina::*;
+
 	nostd_entrypoint!(process_instruction);
+
 	#[inline(always)]
 	pub fn process_instruction(
 		_program_id: &Pubkey,
@@ -14,7 +16,7 @@ pub mod entrypoint {
 	) -> ProgramResult {
 		// Validate program ID
 		// if _program_id != &crate::ID {
-		return Err(ProgramError::IncorrectProgramId);
+		Err(ProgramError::IncorrectProgramId)
 		// }
 
 		// let (discriminator, data) = instruction_data
@@ -34,9 +36,22 @@ pub mod entrypoint {
 	}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive)]
-#[repr(u32)]
+#[error]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EscrowError {
 	OfferKeyMismatch = 0,
 	TokenAccountMismatch = 1,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable, PartialEq, Eq)]
+#[bytemuck(crate = "pina::bytemuck")]
+pub struct Offer {
+	pub maker: Pubkey,
+	pub mint_a: Pubkey,
+	pub mint_b: Pubkey,
+	pub amount: [u8; 8],
+	pub receiver: [u8; 8],
+	pub seed: [u8; 8],
+	pub bump: u8,
 }

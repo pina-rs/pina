@@ -1,5 +1,5 @@
 [package]
-name = "solapino"
+name = "pina"
 version.workspace = true
 edition.workspace = true
 homepage.workspace = true
@@ -18,10 +18,10 @@ token = [
 	"dep:pinocchio-token",
 	"dep:pinocchio-token-2022",
 ]
-derive = ["dep:solapino_macros"]
+derive = ["dep:pina_macros"]
 
 [dependencies]
-bytemuck = { workspace = true, features = ["derive"] }
+bytemuck = { workspace = true, features = ["derive", "const_zeroed"] }
 num_enum = { workspace = true, default-features = false }
 paste = { workspace = true }
 pinocchio = { workspace = true }
@@ -31,7 +31,7 @@ pinocchio-pubkey = { workspace = true }
 pinocchio-system = { workspace = true }
 pinocchio-token = { workspace = true, optional = true }
 pinocchio-token-2022 = { workspace = true, optional = true }
-solapino_macros = { workspace = true, optional = true }
+pina_macros = { workspace = true, optional = true }
 
 [lints]
 workspace = true

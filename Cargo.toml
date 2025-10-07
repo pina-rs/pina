@@ -5,15 +5,16 @@ members = ["crates/*", "examples/*"]
 [workspace.package]
 version = "0.0.0"
 edition = "2024"
-homepage = "https://solapino.dev"
+homepage = "https://pina.rs"
 keywords = ["solana", "pinnochio"]
 license = "Apache-2.0"
 readme = "readme.md"
-repository = "https://github.com/solapino/solapino"
+repository = "https://github.com/pina-rs/pina"
 
 [workspace.dependencies]
 bytemuck = { default-features = false, version = "^1" }
 five8_const = { default-features = false, version = "^1" }
+mollusk-svm = { default-features = false, version = "^0.5" }
 num_enum = { default-features = false, version = "^0.7" }
 paste = { default-features = false, version = "^1" }
 pinocchio = { default-features = false, version = "^0.9" }
@@ -36,15 +37,14 @@ tokio = { default-features = false, version = "^1" }
 wasm_client_solana = { default-features = false, version = "^0.9" }
 
 # publishable crates
-solapino = { default-features = false, path = "crates/solapino", version = "^0" }
-solapino_macros = { default-features = false, path = "crates/solapino_macros", version = "^0" }
+pina = { default-features = false, path = "crates/pina", version = "^0" }
+pina_macros = { default-features = false, path = "crates/pina_macros", version = "^0" }
 
 [workspace.metadata.bin]
 cargo-llvm-cov = { version = "0.6.19" }
 cargo-semver-checks = { version = "0.44.0" }
 release-plz = { version = "0.3.147", bins = ["release-plz"] }
 solana-verify = { version = "0.4.11", bins = ["solana-verify"] }
-wait-for-them = { version = "0.5.1", bins = ["wait-for-them"] }
 
 [workspace.lints.rust]
 # Group lints
@@ -61,6 +61,12 @@ unused_macro_rules = "warn"
 unused_qualifications = "warn"
 variant_size_differences = "warn"
 edition_2024_expr_fragment_specifier = "allow"
+
+[workspace.lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = [
+	'cfg(target_os, values("solana"))',
+]
 
 [workspace.lints.clippy]
 # group lints

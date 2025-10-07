@@ -15,9 +15,10 @@ crate-type = ["cdylib", "lib"]
 bpf-entrypoint = []
 
 [dependencies]
-solapino = { workspace = true, default-features = false, features = ["logs", "token"] }
+pina = { workspace = true, features = ["logs", "token", "derive"] }
 
 [dev-dependencies]
+mollusk-svm = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 
 [lints]

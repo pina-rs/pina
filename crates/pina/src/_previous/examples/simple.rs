@@ -1,4 +1,4 @@
-use solapino::*;
+use pina::*;
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, IntoPrimitive, TryFromPrimitive)]

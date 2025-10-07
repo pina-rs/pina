@@ -1,6 +1,6 @@
-use solapino::*;
+use pina::*;
 
-#[error(crate_path = ::solapino)]
+#[error(crate_path = ::pina)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MyError {
 	Invalid = 0,

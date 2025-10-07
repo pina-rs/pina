@@ -1,5 +1,5 @@
 [package]
-name = "solapino_macros"
+name = "pina_macros"
 version.workspace = true
 edition.workspace = true
 homepage.workspace = true

@@ -1,6 +1,6 @@
-# `solapino_macros`
+# `pina_macros`
 
-> Derive, Attribute and Funtion macros which are used to make development with solapino easier.
+> Derive, Attribute and Funtion macros which are used to make development with pina easier.
 
 [![Crate][crate-image]][crate-link] [![Docs][docs-image]][docs-link] [![Status][ci-status-image]][ci-status-link] [![Unlicense][unlicense-image]][unlicense-link] [![codecov][codecov-image]][codecov-link]
 
@@ -11,9 +11,9 @@
 `#[error]` is a lightweight modification to the provided enum acting as syntactic sugar to make it easier to manage your custom program errors.
 
 ```rust
-use solapino::*;
+use pina::*;
 
-#[error(crate = ::solapino, final = false)]
+#[error(crate = ::pina, final = false)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MyError {
 	/// Doc comments are significant as they will be read by a future parse to
@@ -27,7 +27,6 @@ pub enum MyError {
 The above is transformed into:
 
 ```rust
-#[repr(u32)]
 #[non_exhaustive] // This is present if you haven't set the attribute `final` or it is set to false.
 #[derive(
 	::core::fmt::macros::Debug,
@@ -35,8 +34,12 @@ The above is transformed into:
 	::core::marker::Copy,
 	::core::cmp::PartialEq,
 	::core::cmp::Eq,
-	::solapino::IntoPrimitive, /* `IntoPrimitive` is added to the derive macros */
+	::pina::IntoPrimitive, // `IntoPrimitive` is added to the derive macros
+	::pina::Pod,
+	::pina::Zeroable,
 )]
+#[bytemuck(crate = "::pina::bytemuck")]
+#[repr(u32)]
 pub enum MyError {
 	/// Doc comments are significant as they will be read by a future parse to
 	/// generte the IDL.
@@ -45,26 +48,26 @@ pub enum MyError {
 	Duplicate = 1,
 }
 
-impl ::core::convert::From<MyError> for ::solapino::ProgramError {
+impl ::core::convert::From<MyError> for ::pina::ProgramError {
 	fn from(e: MyError) -> Self {
-		::solapino::ProgramError::Custom(e as u32)
+		::pina::pinocchio::program_error::ProgramError::Custom(e as u32)
 	}
 }
 ```
 
 #### Properties
 
-- `crate` - this defaults to `::solapino` as the developer is expected to have access to the `solapino` crate in the dependencies.
+- `crate` - this defaults to `::pina` as the developer is expected to have access to the `pina` crate in the dependencies.
 
 - `final` - By default all error enums are marked as `non_exhaustive`. The `final` attribute will remove this. This attribute is optional.
 
-[crate-image]: https://img.shields.io/crates/v/solapino_macros.svg
-[crate-link]: https://crates.io/crates/solapino_macros
-[docs-image]: https://docs.rs/solapino_macros/badge.svg
-[docs-link]: https://docs.rs/solapino_macros/
-[ci-status-image]: https://github.com/solapino/solapino_macros/workflows/ci/badge.svg
-[ci-status-link]: https://github.com/solapino/solapino_macros/actions?query=workflow:ci
+[crate-image]: https://img.shields.io/crates/v/pina_macros.svg
+[crate-link]: https://crates.io/crates/pina_macros
+[docs-image]: https://docs.rs/pina_macros/badge.svg
+[docs-link]: https://docs.rs/pina_macros/
+[ci-status-image]: https://github.com/pina-rs/pina_macros/workflows/ci/badge.svg
+[ci-status-link]: https://github.com/pina-rs/pina_macros/actions?query=workflow:ci
 [unlicense-image]: https://img.shields.io/badge/license-Unlicence-blue.svg
 [unlicense-link]: https://opensource.org/license/unlicense
-[codecov-image]: https://codecov.io/github/solapino/solapino_macros/graph/badge.svg?token=87K799Q78I
-[codecov-link]: https://codecov.io/github/solapino/solapino_macros
+[codecov-image]: https://codecov.io/github/pina-rs/pina_macros/graph/badge.svg?token=87K799Q78I
+[codecov-link]: https://codecov.io/github/pina-rs/pina_macros

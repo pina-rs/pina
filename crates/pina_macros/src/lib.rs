@@ -28,7 +28,11 @@ impl Parse for ErrorArgs {
 				{
 					crate_path = Some(expr_path.path);
 				}
-			} else if meta.path().is_ident("final") {
+
+				continue;
+			}
+
+			if meta.path().is_ident("final") {
 				if let syn::Meta::NameValue(nv) = meta
 					&& let syn::Expr::Lit(lit) = nv.value
 					&& let syn::Lit::Bool(lit_bool) = lit.lit
@@ -49,9 +53,9 @@ impl Parse for ErrorArgs {
 /// syntactic sugar to make it easier to manage your custom program errors.
 ///
 /// ```rust
-/// use solapino::*;
+/// use pina::*;
 ///
-/// #[error(crate_path = ::solapino, final = false)]
+/// #[error(crate_path = ::pina, final = false)]
 /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// pub enum MyError {
 /// 	/// Doc comments are significant as they will be read by a future parser to
@@ -73,7 +77,7 @@ impl Parse for ErrorArgs {
 /// 	::core::marker::Copy,
 /// 	::core::cmp::PartialEq,
 /// 	::core::cmp::Eq,
-/// 	::solapino::IntoPrimitive, /* `IntoPrimitive` is added to the derive macros */
+/// 	::pina::IntoPrimitive, /* `IntoPrimitive` is added to the derive macros */
 /// )]
 /// pub enum MyError {
 /// 	/// Doc comments are significant as they will be read by a future parse to
@@ -83,17 +87,17 @@ impl Parse for ErrorArgs {
 /// 	Duplicate = 1,
 /// }
 ///
-/// impl ::core::convert::From<MyError> for ::solapino::ProgramError {
+/// impl ::core::convert::From<MyError> for ::pina::ProgramError {
 /// 	fn from(e: MyError) -> Self {
-/// 		::solapino::ProgramError::Custom(e as u32)
+/// 		::pina::ProgramError::Custom(e as u32)
 /// 	}
 /// }
 /// ```
 ///
 /// #### Properties
 ///
-/// - `crate_path` - this defaults to `::solapino` as the developer is expected
-///   to have access to the `solapino` crate in the dependencies.
+/// - `crate_path` - this defaults to `::pina` as the developer is expected to
+///   have access to the `pina` crate in the dependencies.
 ///
 /// - `final` - By default all error enums are marked as `non_exhaustive`. The
 ///   `final` attribute will remove this. This attribute is optional.
@@ -104,7 +108,7 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 
 	let crate_path = args
 		.crate_path
-		.unwrap_or_else(|| syn::parse_str("::solapino").unwrap());
+		.unwrap_or_else(|| syn::parse_str("::pina").unwrap());
 	let is_final = args.is_final.is_some_and(|lit| lit.value);
 
 	// Add #[repr(u32)]
@@ -119,6 +123,8 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 
 	// Add IntoPrimitive to derive macros
 	let into_primitive_path: syn::Path = syn::parse_quote!(#crate_path::IntoPrimitive);
+	let pod_path: syn::Path = syn::parse_quote!(#crate_path::Pod);
+	let zeroable_path: syn::Path = syn::parse_quote!(#crate_path::Zeroable);
 
 	if let Some(derive_attr) = item_enum
 		.attrs
@@ -132,6 +138,8 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 		if let Ok(mut existing_derives) = existing_derives {
 			// Add our new derive
 			existing_derives.push(into_primitive_path);
+			existing_derives.push(pod_path);
+			existing_derives.push(zeroable_path);
 
 			// Create the new derive attribute
 			let new_derive_attr: Attribute = syn::parse_quote! {
@@ -143,9 +151,13 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 		}
 	} else {
 		// No derive attribute exists, so create one
-		let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#into_primitive_path)]);
+		let new_derive_attr: Attribute =
+			syn::parse_quote!(#[derive(#into_primitive_path, #pod_path, #zeroable_path)]);
 		item_enum.attrs.push(new_derive_attr);
 	}
+
+	// let bytemuck_attr: Attribute = syn::parse_quote!(#[bytemuck(crate = )])
+	// item_enum.attrs.push(value);
 
 	let enum_name = &item_enum.ident;
 
