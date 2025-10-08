@@ -19,6 +19,7 @@ pina = { workspace = true, features = ["logs", "token", "derive"] }
 
 [dev-dependencies]
 mollusk-svm = { workspace = true }
+solana-program = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 
 [lints]

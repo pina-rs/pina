@@ -1,7 +1,8 @@
 use bytemuck::Pod;
-use solana_program::account_info::AccountInfo;
-use solana_program::program_error::ProgramError;
-use solana_program::pubkey::Pubkey;
+
+use crate::AccountInfo;
+use crate::ProgramError;
+use crate::Pubkey;
 
 pub trait AccountDeserialize {
 	fn try_from_bytes(data: &[u8]) -> Result<&Self, ProgramError>;
@@ -13,21 +14,18 @@ where
 	T: Discriminator + Pod,
 {
 	fn try_from_bytes(data: &[u8]) -> Result<&Self, ProgramError> {
-		if Self::discriminator().ne(&data[0]) {
-			return Err(solana_program::program_error::ProgramError::InvalidAccountData);
+		if Self::DISCRIMINATOR.ne(&data[0]) {
+			return Err(ProgramError::InvalidAccountData);
 		}
-		bytemuck::try_from_bytes::<Self>(&data[8..]).or(Err(
-			solana_program::program_error::ProgramError::InvalidAccountData,
-		))
+		bytemuck::try_from_bytes::<Self>(&data[8..]).or(Err(ProgramError::InvalidAccountData))
 	}
 
 	fn try_from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, ProgramError> {
-		if Self::discriminator().ne(&data[0]) {
-			return Err(solana_program::program_error::ProgramError::InvalidAccountData);
+		if Self::DISCRIMINATOR.ne(&data[0]) {
+			return Err(ProgramError::InvalidAccountData);
 		}
-		bytemuck::try_from_bytes_mut::<Self>(&mut data[8..]).or(Err(
-			solana_program::program_error::ProgramError::InvalidAccountData,
-		))
+		bytemuck::try_from_bytes_mut::<Self>(&mut data[8..])
+			.or(Err(ProgramError::InvalidAccountData))
 	}
 }
 
@@ -48,14 +46,12 @@ where
 	T: Discriminator + Pod,
 {
 	fn try_header_from_bytes(data: &[u8]) -> Result<(&Self, &[u8]), ProgramError> {
-		if Self::discriminator().ne(&data[0]) {
-			return Err(solana_program::program_error::ProgramError::InvalidAccountData);
+		if Self::DISCRIMINATOR.ne(&data[0]) {
+			return Err(ProgramError::InvalidAccountData);
 		}
 		let (prefix, remainder) = data[8..].split_at(size_of::<T>());
 		Ok((
-			bytemuck::try_from_bytes::<Self>(prefix).or(Err(
-				solana_program::program_error::ProgramError::InvalidAccountData,
-			))?,
+			bytemuck::try_from_bytes::<Self>(prefix).or(Err(ProgramError::InvalidAccountData))?,
 			remainder,
 		))
 	}
@@ -63,9 +59,8 @@ where
 	fn try_header_from_bytes_mut(data: &mut [u8]) -> Result<(&mut Self, &mut [u8]), ProgramError> {
 		let (prefix, remainder) = data[8..].split_at_mut(size_of::<T>());
 		Ok((
-			bytemuck::try_from_bytes_mut::<Self>(prefix).or(Err(
-				solana_program::program_error::ProgramError::InvalidAccountData,
-			))?,
+			bytemuck::try_from_bytes_mut::<Self>(prefix)
+				.or(Err(ProgramError::InvalidAccountData))?,
 			remainder,
 		))
 	}
@@ -79,7 +74,7 @@ pub trait AccountValidation {
 	fn assert_err<F, E>(&self, condition: F, err: E) -> Result<&Self, ProgramError>
 	where
 		F: Fn(&Self) -> bool,
-		E: Into<ProgramError> + std::error::Error;
+		E: Into<ProgramError> + core::error::Error;
 
 	fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, ProgramError>
 	where
@@ -92,7 +87,7 @@ pub trait AccountValidation {
 	fn assert_mut_err<F, E>(&mut self, condition: F, err: E) -> Result<&mut Self, ProgramError>
 	where
 		F: Fn(&Self) -> bool,
-		E: Into<ProgramError> + std::error::Error;
+		E: Into<ProgramError> + core::error::Error;
 
 	fn assert_mut_msg<F>(&mut self, condition: F, msg: &str) -> Result<&mut Self, ProgramError>
 	where
@@ -121,7 +116,7 @@ pub trait AccountInfoValidation {
 	/// Assert that the account is owned by the address provided.
 	fn assert_owner(&self, program_id: &Pubkey) -> Result<&Self, ProgramError>;
 	/// Assert that the account is owned by one of the spl token programs.
-	#[cfg(feature = "spl")]
+	#[cfg(feature = "token")]
 	fn assert_spl_owner(&self) -> Result<&Self, ProgramError>;
 	/// Assert that the account has the seeds provided and uses the canonical
 	/// bump.
@@ -140,7 +135,7 @@ pub trait AccountInfoValidation {
 		program_id: &Pubkey,
 	) -> Result<u8, ProgramError>;
 	/// Assert that the account is an associated token account.
-	#[cfg(feature = "spl")]
+	#[cfg(feature = "token")]
 	fn assert_associated_token_address(
 		&self,
 		wallet: &Pubkey,
@@ -149,7 +144,7 @@ pub trait AccountInfoValidation {
 }
 
 pub trait Discriminator {
-	fn discriminator() -> u8;
+	const DISCRIMINATOR: u8;
 }
 
 /// Performs:
@@ -161,49 +156,53 @@ pub trait AsAccount {
 	where
 		T: AccountDeserialize + Discriminator + Pod;
 
+	#[allow(clippy::mut_from_ref)]
 	fn as_account_mut<T>(&self, program_id: &Pubkey) -> Result<&mut T, ProgramError>
 	where
 		T: AccountDeserialize + Discriminator + Pod;
 }
 
-#[cfg(feature = "spl")]
+#[cfg(feature = "token")]
 pub trait AsSplAccount {
-	fn as_token_mint_state<'info>(
-		&self,
-	) -> Result<
-		spl_token_2022::extension::PodStateWithExtensions<'info, spl_token_2022::pod::PodMint>,
-		ProgramError,
-	>;
-	fn as_token_mint(&self) -> Result<spl_token_2022::pod::PodMint, ProgramError>;
-	fn as_token_account_state<'info>(
-		&self,
-	) -> Result<
-		spl_token_2022::extension::PodStateWithExtensions<'info, spl_token_2022::pod::PodAccount>,
-		ProgramError,
-	>;
-	fn as_token_account(&self) -> Result<spl_token_2022::pod::PodAccount, ProgramError>;
-	fn as_associated_token_account_state<'info>(
-		&self,
-		owner: &Pubkey,
-		mint: &Pubkey,
-	) -> Result<
-		spl_token_2022::extension::PodStateWithExtensions<'info, spl_token_2022::pod::PodAccount>,
-		ProgramError,
-	>;
+	// fn as_token_mint_state<'info>(
+	// 	&self,
+	// ) -> Result<
+	// 	pinocchio_token_2022::extension::PodStateWithExtensions<
+	// 		'info,
+	// 		spl_token_2022::pod::PodMint,
+	// 	>,
+	// 	ProgramError,
+	// >;
+	fn as_token_mint(&self) -> Result<pinocchio_token_2022::state::Mint, ProgramError>;
+	// fn as_token_account_state<'info>(
+	// 	&self,
+	// ) -> Result<
+	// 	spl_token_2022::extension::PodStateWithExtensions<'info,
+	// spl_token_2022::pod::PodAccount>, 	ProgramError,
+	// >;
+	fn as_token_account(&self) -> Result<pinocchio_token_2022::state::TokenAccount, ProgramError>;
+	// fn as_associated_token_account_state<'info>(
+	// 	&self,
+	// 	owner: &Pubkey,
+	// 	mint: &Pubkey,
+	// ) -> Result<
+	// 	spl_token_2022::extension::PodStateWithExtensions<'info,
+	// spl_token_2022::pod::PodAccount>, 	ProgramError,
+	// >;
 	fn as_associated_token_account(
 		&self,
 		owner: &Pubkey,
 		mint: &Pubkey,
-	) -> Result<spl_token_2022::pod::PodAccount, ProgramError>;
+	) -> Result<pinocchio_token_2022::state::TokenAccount, ProgramError>;
 }
 
-pub trait LamportTransfer<'a, 'info> {
-	fn send(&'a self, lamports: u64, to: &'a AccountInfo<'info>);
-	fn collect(&'a self, lamports: u64, from: &'a AccountInfo<'info>) -> Result<(), ProgramError>;
+pub trait LamportTransfer<'a> {
+	fn send(&'a self, lamports: u64, to: &'a AccountInfo);
+	fn collect(&'a self, lamports: u64, from: &'a AccountInfo) -> Result<(), ProgramError>;
 }
 
-pub trait CloseAccount<'a, 'info> {
-	fn close(&'a self, to: &'a AccountInfo<'info>) -> Result<(), ProgramError>;
+pub trait CloseAccount<'a> {
+	fn close(&'a self, to: &'a AccountInfo) -> Result<(), ProgramError>;
 }
 
 pub trait Loggable {
@@ -217,6 +216,11 @@ pub trait ProgramOwner {
 
 #[cfg(test)]
 mod tests {
+	#![allow(unsafe_code)]
+	extern crate std;
+
+	use std::format;
+
 	use bytemuck::Pod;
 	use bytemuck::Zeroable;
 
@@ -238,9 +242,7 @@ mod tests {
 	}
 
 	impl Discriminator for GenericallySizedTypeHeader {
-		fn discriminator() -> u8 {
-			0
-		}
+		const DISCRIMINATOR: u8 = 0;
 	}
 
 	#[test]
@@ -268,9 +270,7 @@ mod tests {
 	}
 
 	impl Discriminator for TestType {
-		fn discriminator() -> u8 {
-			7
-		}
+		const DISCRIMINATOR: u8 = 7;
 	}
 
 	#[test]

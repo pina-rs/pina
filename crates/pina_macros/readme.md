@@ -34,11 +34,8 @@ The above is transformed into:
 	::core::marker::Copy,
 	::core::cmp::PartialEq,
 	::core::cmp::Eq,
-	::pina::IntoPrimitive, // `IntoPrimitive` is added to the derive macros
-	::pina::Pod,
-	::pina::Zeroable,
+	::pina::IntoPrimitive, /* `IntoPrimitive` is added to the derive macros */
 )]
-#[bytemuck(crate = "::pina::bytemuck")]
 #[repr(u32)]
 pub enum MyError {
 	/// Doc comments are significant as they will be read by a future parse to
@@ -53,6 +50,9 @@ impl ::core::convert::From<MyError> for ::pina::ProgramError {
 		::pina::pinocchio::program_error::ProgramError::Custom(e as u32)
 	}
 }
+
+unsafe impl Zeroable for MyError {}
+unsafe impl Pod for MyError {}
 ```
 
 #### Properties
@@ -65,9 +65,9 @@ impl ::core::convert::From<MyError> for ::pina::ProgramError {
 [crate-link]: https://crates.io/crates/pina_macros
 [docs-image]: https://docs.rs/pina_macros/badge.svg
 [docs-link]: https://docs.rs/pina_macros/
-[ci-status-image]: https://github.com/pina-rs/pina_macros/workflows/ci/badge.svg
-[ci-status-link]: https://github.com/pina-rs/pina_macros/actions?query=workflow:ci
+[ci-status-image]: https://github.com/pina-rs/pina/workflows/ci/badge.svg
+[ci-status-link]: https://github.com/pina-rs/pina/actions?query=workflow:ci
 [unlicense-image]: https://img.shields.io/badge/license-Unlicence-blue.svg
 [unlicense-link]: https://opensource.org/license/unlicense
-[codecov-image]: https://codecov.io/github/pina-rs/pina_macros/graph/badge.svg?token=87K799Q78I
-[codecov-link]: https://codecov.io/github/pina-rs/pina_macros
+[codecov-image]: https://codecov.io/github/pina-rs/pina/graph/badge.svg?token=87K799Q78I
+[codecov-link]: https://codecov.io/github/pina-rs/pina

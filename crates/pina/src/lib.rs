@@ -1,14 +1,16 @@
-#![cfg_attr(not(feature = "std"), no_std)] // Conditionally apply no_std
+#![no_std]
 
 mod errors;
+mod traits;
 
 pub use bytemuck;
 pub use bytemuck::Pod;
 pub use bytemuck::Zeroable;
 pub use num_enum::IntoPrimitive;
 pub use num_enum::TryFromPrimitive;
+#[cfg(feature = "derive")]
+pub use pina_macros::*;
 pub use pinocchio;
-pub use pinocchio::ProgramResult;
 pub use pinocchio::account_info::AccountInfo;
 pub use pinocchio::entrypoint;
 pub use pinocchio::instruction::AccountMeta;
@@ -16,14 +18,14 @@ pub use pinocchio::instruction::Instruction;
 pub use pinocchio::program_entrypoint;
 pub use pinocchio::program_error::ProgramError;
 pub use pinocchio::pubkey::Pubkey;
+pub use pinocchio::ProgramResult;
 pub use pinocchio_pubkey::*;
 pub use pinocchio_system;
-#[cfg(feature = "derive")]
-pub use pina_macros::*;
 
 pub use crate::errors::*;
+pub use crate::traits::*;
 
-#[cfg(not(feature = "std"))]
+// #[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! nostd_entrypoint {
 	($process_instruction:expr) => {
@@ -38,5 +40,6 @@ macro_rules! nostd_entrypoint {
 
 /// Make sure all traits are available.
 pub mod prelude {
+	pub use crate::traits::*;
 	pub use crate::PinaError;
 }

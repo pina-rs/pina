@@ -1,13 +1,13 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::Attribute;
-use syn::ItemEnum;
-use syn::LitBool;
-use syn::Token;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
 use syn::parse_macro_input;
 use syn::punctuated::Punctuated;
+use syn::Attribute;
+use syn::ItemEnum;
+use syn::LitBool;
+use syn::Token;
 
 struct ErrorArgs {
 	crate_path: Option<syn::Path>,
@@ -23,22 +23,33 @@ impl Parse for ErrorArgs {
 
 		for meta in metas {
 			if meta.path().is_ident("crate_path") {
-				if let syn::Meta::NameValue(nv) = meta
-					&& let syn::Expr::Path(expr_path) = nv.value
-				{
-					crate_path = Some(expr_path.path);
-				}
+				let syn::Meta::NameValue(nv) = meta else {
+					continue;
+				};
 
+				let syn::Expr::Path(expr_path) = nv.value else {
+					continue;
+				};
+
+				crate_path = Some(expr_path.path);
 				continue;
 			}
 
 			if meta.path().is_ident("final") {
-				if let syn::Meta::NameValue(nv) = meta
-					&& let syn::Expr::Lit(lit) = nv.value
-					&& let syn::Lit::Bool(lit_bool) = lit.lit
-				{
-					is_final = Some(lit_bool);
-				}
+				let syn::Meta::NameValue(nv) = meta else {
+					continue;
+				};
+
+				let syn::Expr::Lit(lit) = nv.value else {
+					continue;
+				};
+
+				let syn::Lit::Bool(lit_bool) = lit.lit else {
+					continue;
+				};
+
+				is_final = Some(lit_bool);
+				continue;
 			}
 		}
 
@@ -92,6 +103,9 @@ impl Parse for ErrorArgs {
 /// 		::pina::ProgramError::Custom(e as u32)
 /// 	}
 /// }
+///
+/// unsafe impl Zeroable for MyError {}
+/// unsafe impl Pod for MyError {}
 /// ```
 ///
 /// #### Properties
@@ -123,8 +137,6 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 
 	// Add IntoPrimitive to derive macros
 	let into_primitive_path: syn::Path = syn::parse_quote!(#crate_path::IntoPrimitive);
-	let pod_path: syn::Path = syn::parse_quote!(#crate_path::Pod);
-	let zeroable_path: syn::Path = syn::parse_quote!(#crate_path::Zeroable);
 
 	if let Some(derive_attr) = item_enum
 		.attrs
@@ -138,8 +150,6 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 		if let Ok(mut existing_derives) = existing_derives {
 			// Add our new derive
 			existing_derives.push(into_primitive_path);
-			existing_derives.push(pod_path);
-			existing_derives.push(zeroable_path);
 
 			// Create the new derive attribute
 			let new_derive_attr: Attribute = syn::parse_quote! {
@@ -151,13 +161,9 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 		}
 	} else {
 		// No derive attribute exists, so create one
-		let new_derive_attr: Attribute =
-			syn::parse_quote!(#[derive(#into_primitive_path, #pod_path, #zeroable_path)]);
+		let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#into_primitive_path)]);
 		item_enum.attrs.push(new_derive_attr);
 	}
-
-	// let bytemuck_attr: Attribute = syn::parse_quote!(#[bytemuck(crate = )])
-	// item_enum.attrs.push(value);
 
 	let enum_name = &item_enum.ident;
 
@@ -168,10 +174,16 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 			}
 		}
 	};
+	let bytemuck_impl = quote! {
+		unsafe impl #crate_path::Zeroable for #enum_name {}
+		unsafe impl #crate_path::Pod for #enum_name {}
+
+	};
 
 	let output = quote! {
 		#item_enum
 		#from_impl
+		#bytemuck_impl
 	};
 
 	output.into()

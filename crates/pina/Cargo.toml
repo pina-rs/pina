@@ -11,7 +11,7 @@ description = "a solana and pinocchio smart contract framework"
 
 [features]
 default = ["logs", "derive"]
-std = ["pinocchio/std", "num_enum/std"]
+# std = ["pinocchio/std", "num_enum/std"]
 logs = ["dep:pinocchio-log"] # Enable logging for errors
 token = [
 	"dep:pinocchio-associated-token-account",
@@ -24,6 +24,7 @@ derive = ["dep:pina_macros"]
 bytemuck = { workspace = true, features = ["derive", "const_zeroed"] }
 num_enum = { workspace = true, default-features = false }
 paste = { workspace = true }
+pina_macros = { workspace = true, optional = true }
 pinocchio = { workspace = true }
 pinocchio-associated-token-account = { workspace = true, optional = true }
 pinocchio-log = { workspace = true, optional = true, features = ["macro"] }
@@ -31,7 +32,6 @@ pinocchio-pubkey = { workspace = true }
 pinocchio-system = { workspace = true }
 pinocchio-token = { workspace = true, optional = true }
 pinocchio-token-2022 = { workspace = true, optional = true }
-pina_macros = { workspace = true, optional = true }
 
 [lints]
 workspace = true

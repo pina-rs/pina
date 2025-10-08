@@ -1,0 +1,17 @@
+[package]
+name = "pina_token_2022_extensions"
+version.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+
+[dependencies]
+pinocchio = { workspace = true }
+pinocchio-pubkey = { workspace = true }
+pinocchio-token-2022 = { workspace = true }
+
+[lints]
+workspace = true
