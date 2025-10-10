@@ -10,7 +10,7 @@ keywords = ["solana", "pinnochio"]
 license = "Apache-2.0"
 readme = "readme.md"
 repository = "https://github.com/pina-rs/pina"
-rust-verion = "1.84.1"
+rust-version = "1.84.1"
 
 [workspace.dependencies]
 bytemuck = { default-features = false, version = "^1" }
@@ -24,7 +24,7 @@ pinocchio-log = { default-features = false, version = "^0.5" }
 pinocchio-memo = { default-features = false, version = "^0.2" }
 pinocchio-pubkey = { default-features = false, version = "^0.3" }
 pinocchio-system = { default-features = false, version = "^0.3" }
-pinocchio-token = { default-features = false, version = "^0.1" }
+pinocchio-token = { default-features = false, version = "^0.4" }
 pinocchio-token-2022 = { default-features = false, version = "^0.1" }
 proc-macro2 = { default-features = false, version = "^1" }
 quote = { default-features = false, version = "^1" }
@@ -40,6 +40,8 @@ wasm_client_solana = { default-features = false, version = "^0.9" }
 # publishable crates
 pina = { default-features = false, path = "crates/pina", version = "^0" }
 pina_macros = { default-features = false, path = "crates/pina_macros", version = "^0" }
+pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "^0" }
+pina_token_2022_extensions = { default-features = false, path = "crates/pina_token_2022_extensions", version = "^0" }
 
 [workspace.metadata.bin]
 cargo-dylint = { version = "4.1.2" }

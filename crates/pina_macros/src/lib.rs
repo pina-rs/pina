@@ -49,7 +49,6 @@ impl Parse for ErrorArgs {
 				};
 
 				is_final = Some(lit_bool);
-				continue;
 			}
 		}
 

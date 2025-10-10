@@ -1,27 +1,38 @@
-use bytemuck::Pod;
-use solana_program::account_info::AccountInfo;
-use solana_program::program_error::ProgramError;
-use solana_program::pubkey::Pubkey;
+#![allow(unsafe_code)]
 
+use core::slice::from_raw_parts;
+use core::slice::from_raw_parts_mut;
+
+use pinocchio_system::instructions::Transfer;
+
+use crate::assert;
+use crate::create_program_address;
+use crate::log;
+use crate::log_caller;
+use crate::pubkey;
+use crate::try_find_program_address;
 use crate::AccountDeserialize;
+use crate::AccountInfo;
 use crate::AccountInfoValidation;
 use crate::AccountValidation;
 use crate::AsAccount;
-#[cfg(feature = "spl")]
-use crate::AsSplAccount;
-use crate::CloseAccount;
+#[cfg(feature = "token")]
+use crate::AsTokenAccount;
 use crate::Discriminator;
 use crate::LamportTransfer;
-use crate::assert;
-use crate::msg;
+use crate::Pod;
+use crate::ProgramError;
+use crate::Pubkey;
+use crate::DISCRIMINATOR_SIZE;
 
-impl AccountInfoValidation for AccountInfo<'_> {
+const SYSVAR_ID: Pubkey = pubkey!("Sysvar1111111111111111111111111111111111111");
+
+impl AccountInfoValidation for AccountInfo {
 	#[track_caller]
 	fn assert_signer(&self) -> Result<&Self, ProgramError> {
-		if !self.is_signer {
-			let caller = std::panic::Location::caller();
-			msg!("address: {} is missing a required signature", self.key);
-			msg!("{}", caller);
+		if !self.is_signer() {
+			log!("address: {} is missing a required signature", self.key());
+			log_caller();
 
 			return Err(ProgramError::MissingRequiredSignature);
 		}
@@ -31,10 +42,9 @@ impl AccountInfoValidation for AccountInfo<'_> {
 
 	#[track_caller]
 	fn assert_writable(&self) -> Result<&Self, ProgramError> {
-		if !self.is_writable {
-			let caller = std::panic::Location::caller();
-			msg!("address: {} has not been marked as writable", self.key);
-			msg!("{}", caller);
+		if !self.is_writable() {
+			log!("address: {} has not been marked as writable", self.key());
+			log_caller();
 
 			return Err(ProgramError::MissingRequiredSignature);
 		}
@@ -44,10 +54,9 @@ impl AccountInfoValidation for AccountInfo<'_> {
 
 	#[track_caller]
 	fn assert_executable(&self) -> Result<&Self, ProgramError> {
-		if !self.executable {
-			let caller = std::panic::Location::caller();
-			msg!("address: {} is not executable", self.key);
-			msg!("{}", caller);
+		if !self.executable() {
+			log!("address: {} is not executable", self.key());
+			log_caller();
 
 			return Err(ProgramError::InvalidAccountData);
 		}
@@ -58,9 +67,8 @@ impl AccountInfoValidation for AccountInfo<'_> {
 	#[track_caller]
 	fn assert_empty(&self) -> Result<&Self, ProgramError> {
 		if !self.data_is_empty() {
-			let caller = std::panic::Location::caller();
-			msg!("address: {} is not empty", self.key);
-			msg!("{}", caller);
+			log!("address: {} is not empty", self.key());
+			log_caller();
 
 			return Err(ProgramError::AccountAlreadyInitialized);
 		}
@@ -71,9 +79,8 @@ impl AccountInfoValidation for AccountInfo<'_> {
 	#[track_caller]
 	fn assert_not_empty(&self) -> Result<&Self, ProgramError> {
 		if self.data_is_empty() {
-			let caller = std::panic::Location::caller();
-			msg!("address: {} is empty", self.key);
-			msg!("{}", caller);
+			log!("address: {} is empty", self.key());
+			log_caller();
 
 			return Err(ProgramError::InvalidAccountData);
 		}
@@ -89,23 +96,21 @@ impl AccountInfoValidation for AccountInfo<'_> {
 	fn assert_type<T: Discriminator>(&self, program_id: &Pubkey) -> Result<&Self, ProgramError> {
 		self.assert_owner(program_id)?;
 		let data = self.try_borrow_data()?;
-		let data_len = 8 + size_of::<T>();
+		let data_len = DISCRIMINATOR_SIZE + size_of::<T>();
 
-		if data[0].ne(&T::discriminator()) {
-			let caller = std::panic::Location::caller();
-			msg!("address: {} has invalid discriminator", self.key);
-			msg!("{}", caller);
+		if data[0].ne(&T::DISCRIMINATOR) {
+			log!("address: {} has invalid discriminator", self.key());
+			log_caller();
 
 			return Err(ProgramError::InvalidAccountData);
 		}
 
 		if data.len() != data_len {
-			let caller = std::panic::Location::caller();
-			msg!(
+			log!(
 				"address: {} has invalid data length for the account type",
-				self.key
+				self.key()
 			);
-			msg!("{}", caller);
+			log_caller();
 
 			return Err(ProgramError::AccountDataTooSmall);
 		}
@@ -115,21 +120,19 @@ impl AccountInfoValidation for AccountInfo<'_> {
 
 	#[track_caller]
 	fn assert_sysvar(&self, sysvar_id: &Pubkey) -> Result<&Self, ProgramError> {
-		self.assert_owner(&solana_program::sysvar::ID)?
-			.assert_address(sysvar_id)
+		self.assert_owner(&SYSVAR_ID)?.assert_address(sysvar_id)
 	}
 
 	#[track_caller]
 	fn assert_owner(&self, owner: &Pubkey) -> Result<&Self, ProgramError> {
-		if self.owner.ne(owner) {
-			let caller = std::panic::Location::caller();
-			msg!(
+		if self.owner().ne(owner) {
+			log!(
 				"address: {} has invalid owner: {}, required: {}",
-				self.key,
-				self.owner,
+				self.key(),
+				self.owner(),
 				owner
 			);
-			msg!("{}", caller);
+			log_caller();
 
 			return Err(ProgramError::InvalidAccountOwner);
 		}
@@ -138,49 +141,56 @@ impl AccountInfoValidation for AccountInfo<'_> {
 	}
 
 	#[track_caller]
-	#[cfg(feature = "spl")]
+	#[cfg(feature = "token")]
 	fn assert_spl_owner(&self) -> Result<&Self, ProgramError> {
-		if spl_token_2022::check_spl_token_program_account(&self.owner).is_err() {
-			let caller = std::panic::Location::caller();
-			msg!(
-				"address: {} is not owned by a supported spl token program: {}",
-				self.key,
-				self.owner
-			);
-			msg!("{}", caller);
+		let owner = self.owner();
 
-			return Err(ProgramError::IncorrectProgramId);
+		if owner == &pinocchio_token::ID || owner == &pinocchio_token_2022::ID {
+			return Ok(self);
 		}
 
-		Ok(self)
+		log!(
+			"address: {} is not owned by a supported spl token program: {}",
+			self.key(),
+			owner
+		);
+		log_caller();
+
+		Err(ProgramError::IncorrectProgramId)
 	}
 
 	#[track_caller]
 	fn assert_address(&self, address: &Pubkey) -> Result<&Self, ProgramError> {
-		if self.key.ne(&address) {
-			let caller = std::panic::Location::caller();
-			msg!("address: {} is invalid, expected: {}", self.key, address);
-			msg!("{}", caller);
-
-			return Err(ProgramError::InvalidAccountData);
+		if self.key() == address {
+			return Ok(self);
 		}
 
-		Ok(self)
+		log!("address: {} is invalid, expected: {}", self.key(), address);
+		log_caller();
+
+		Err(ProgramError::InvalidAccountData)
 	}
 
 	#[track_caller]
 	fn assert_seeds(&self, seeds: &[&[u8]], program_id: &Pubkey) -> Result<&Self, ProgramError> {
-		let pda = Pubkey::find_program_address(seeds, program_id).0;
-
-		if pda.ne(self.key) {
-			let caller = std::panic::Location::caller();
-			msg!("address: {} is invalid, expected pda: {}", self.key, pda);
-			msg!("{}", caller);
-
+		let Some((pda, _bump)) = try_find_program_address(seeds, program_id) else {
+			log!(
+				"could not find program address from seeds: {} with program id: {}",
+				seeds,
+				program_id
+			);
+			log_caller();
 			return Err(ProgramError::InvalidSeeds);
+		};
+
+		if self.key() == &pda {
+			return Ok(self);
 		}
 
-		Ok(self)
+		log!("address: {} is invalid, expected pda: {}", self.key(), &pda);
+		log_caller();
+
+		Err(ProgramError::InvalidSeeds)
 	}
 
 	#[track_caller]
@@ -189,24 +199,22 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		seeds: &[&[u8]],
 		program_id: &Pubkey,
 	) -> Result<&Self, ProgramError> {
-		let pda = match Pubkey::create_program_address(seeds, program_id) {
+		let pda = match create_program_address(seeds, program_id) {
 			Ok(pda) => pda,
 			Err(error) => {
-				let caller = std::panic::Location::caller();
-				msg!(
-					"could not create pda for address: {}, with provided seeds",
-					self.key
+				log!(
+					"could not create pda for address: {}, with provided seeds and bump",
+					self.key(),
 				);
-				msg!("{}", caller);
+				log_caller();
 
-				return Err(error.into());
+				return Err(error);
 			}
 		};
 
-		if pda.ne(self.key) {
-			let caller = std::panic::Location::caller();
-			msg!("address: {} is invalid, expected pda: {}", self.key, pda);
-			msg!("{}", caller);
+		if &pda == self.key() {
+			log!("address: {} is invalid, expected pda: {}", self.key(), &pda);
+			log_caller();
 
 			return Err(ProgramError::InvalidSeeds);
 		}
@@ -220,48 +228,96 @@ impl AccountInfoValidation for AccountInfo<'_> {
 		seeds: &[&[u8]],
 		program_id: &Pubkey,
 	) -> Result<u8, ProgramError> {
-		let (pda, bump) = Pubkey::find_program_address(seeds, program_id);
-
-		if pda.ne(self.key) {
-			let caller = std::panic::Location::caller();
-			msg!("address: {} is invalid, expected pda: {}", self.key, pda);
-			msg!("{}", caller);
-
+		let Some((pda, bump)) = try_find_program_address(seeds, program_id) else {
+			log!(
+				"could not find program address from seeds: {} with program id: {}",
+				seeds,
+				program_id
+			);
+			log_caller();
 			return Err(ProgramError::InvalidSeeds);
+		};
+
+		if pda.eq(self.key()) {
+			return Ok(bump);
 		}
 
-		Ok(bump)
+		log!("address: {} is invalid, expected pda: {}", self.key(), &pda);
+		log_caller();
+
+		Err(ProgramError::InvalidSeeds)
 	}
 
-	#[cfg(feature = "spl")]
+	#[cfg(feature = "token")]
 	#[track_caller]
 	fn assert_associated_token_address(
 		&self,
 		wallet: &Pubkey,
 		mint: &Pubkey,
 	) -> Result<&Self, ProgramError> {
-		let address = spl_associated_token_account::get_associated_token_address_with_program_id(
-			wallet,
-			mint,
-			&spl_token_2022::ID,
-		);
-
-		if address.ne(self.key) {
-			let caller = std::panic::Location::caller();
-			msg!(
-				"address: {} is invalid, expected associated token address: {}",
-				self.key,
-				address
+		let Some((address, _bump)) =
+			crate::try_get_associated_token_address(wallet, mint, &pinocchio_token::ID)
+		else {
+			log!(
+				"could not find associated token (p-token) address for wallet: {}, mint: {}",
+				wallet,
+				mint,
 			);
-			msg!("{}", caller);
+			log_caller();
+
 			return Err(ProgramError::InvalidSeeds);
+		};
+
+		if address.eq(self.key()) {
+			return Ok(self);
 		}
 
-		Ok(self)
+		log!(
+			"address: {} is invalid, expected associated token address: {}",
+			self.key(),
+			&address
+		);
+		log_caller();
+
+		Err(ProgramError::InvalidSeeds)
+	}
+
+	#[cfg(feature = "token")]
+	#[track_caller]
+	fn assert_associated_token_2022_address(
+		&self,
+		wallet: &Pubkey,
+		mint: &Pubkey,
+	) -> Result<&Self, ProgramError> {
+		let Some((address, _bump)) =
+			crate::try_get_associated_token_address(wallet, mint, &pinocchio_token_2022::ID)
+		else {
+			log!(
+				"could not find associated token 2022 address for wallet: {}, mint: {}",
+				wallet,
+				mint,
+			);
+			log_caller();
+
+			return Err(ProgramError::InvalidSeeds);
+		};
+
+		if address.eq(self.key()) {
+			return Ok(self);
+		}
+
+		log!(
+			"address: {} is invalid, expected associated token address: {}",
+			self.key(),
+			&address
+		);
+		log_caller();
+
+		Err(ProgramError::InvalidSeeds)
 	}
 }
 
-impl AsAccount for AccountInfo<'_> {
+impl AsAccount for AccountInfo {
 	#[track_caller]
 	fn as_account<T>(&self, program_id: &Pubkey) -> Result<&T, ProgramError>
 	where
@@ -270,9 +326,9 @@ impl AsAccount for AccountInfo<'_> {
 		self.assert_owner(program_id)?;
 
 		unsafe {
-			T::try_from_bytes(std::slice::from_raw_parts(
+			T::try_from_bytes(from_raw_parts(
 				self.try_borrow_data()?.as_ptr(),
-				8 + size_of::<T>(),
+				DISCRIMINATOR_SIZE + size_of::<T>(),
 			))
 		}
 	}
@@ -285,52 +341,91 @@ impl AsAccount for AccountInfo<'_> {
 		self.assert_owner(program_id)?;
 
 		unsafe {
-			T::try_from_bytes_mut(std::slice::from_raw_parts_mut(
+			T::try_from_bytes_mut(from_raw_parts_mut(
 				self.try_borrow_mut_data()?.as_mut_ptr(),
-				8 + size_of::<T>(),
+				DISCRIMINATOR_SIZE + size_of::<T>(),
 			))
 		}
 	}
 }
 
-#[cfg(feature = "spl")]
-impl AccountValidation for spl_token_2022::pod::PodMint {
+#[cfg(feature = "token")]
+impl AccountValidation for crate::token_2022::state::Mint {
+	#[track_caller]
+	fn assert<F>(&self, condition: F) -> Result<&Self, ProgramError>
+	where
+		F: Fn(&Self) -> bool,
+	{
+		if condition(self) {
+			return Ok(self);
+		}
+
+		log!("Mint account data is invalid");
+		log_caller();
+
+		Err(ProgramError::InvalidAccountData)
+	}
+
+	#[track_caller]
+	fn assert_msg<F>(&self, condition: F, log: &str) -> Result<&Self, ProgramError>
+	where
+		F: Fn(&Self) -> bool,
+	{
+		match assert(condition(self), ProgramError::InvalidAccountData, log) {
+			Err(err) => Err(err),
+			Ok(()) => Ok(self),
+		}
+	}
+
+	#[track_caller]
+	fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, ProgramError>
+	where
+		F: Fn(&Self) -> bool,
+	{
+		if condition(self) {
+			return Ok(self);
+		}
+
+		log!("Mint account data is invalid");
+		log_caller();
+
+		Err(ProgramError::InvalidAccountData)
+	}
+
+	#[track_caller]
+	fn assert_mut_msg<F>(&mut self, condition: F, log: &str) -> Result<&mut Self, ProgramError>
+	where
+		F: Fn(&Self) -> bool,
+	{
+		match assert(condition(self), ProgramError::InvalidAccountData, log) {
+			Err(err) => Err(err),
+			Ok(()) => Ok(self),
+		}
+	}
+}
+
+#[cfg(feature = "token")]
+impl AccountValidation for crate::token::state::TokenAccount {
 	#[track_caller]
 	fn assert<F>(&self, condition: F) -> Result<&Self, ProgramError>
 	where
 		F: Fn(&Self) -> bool,
 	{
 		if !condition(self) {
-			let caller = std::panic::Location::caller();
-			msg!("Mint account data is invalid: {}", caller);
+			log!("Token account data is invalid");
+			log_caller();
 			return Err(ProgramError::InvalidAccountData);
 		}
 		Ok(self)
 	}
 
 	#[track_caller]
-	fn assert_err<F, E>(&self, condition: F, err: E) -> Result<&Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-		E: Into<ProgramError> + std::error::Error,
-	{
-		if !condition(self) {
-			let caller = std::panic::Location::caller();
-			msg!("Mint account data validation error: {}", err);
-			msg!("{}", caller);
-			return Err(err.into());
-		}
-
-		Ok(self)
-	}
-
-	#[track_caller]
-	fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, ProgramError>
+	fn assert_msg<F>(&self, condition: F, log: &str) -> Result<&Self, ProgramError>
 	where
 		F: Fn(&Self) -> bool,
 	{
-		match assert(condition(self), ProgramError::InvalidAccountData, msg) {
-			Err(err) => Err(err.into()),
+		match assert(condition(self), ProgramError::InvalidAccountData, log) {
+			Err(err) => Err(err),
 			Ok(()) => Ok(self),
 		}
 	}
@@ -341,8 +436,8 @@ impl AccountValidation for spl_token_2022::pod::PodMint {
 		F: Fn(&Self) -> bool,
 	{
 		if !condition(self) {
-			let caller = std::panic::Location::caller();
-			msg!("Mint account data is invalid: {}", caller);
+			log!("Token account data is invalid");
+			log_caller();
 
 			return Err(ProgramError::InvalidAccountData);
 		}
@@ -351,227 +446,92 @@ impl AccountValidation for spl_token_2022::pod::PodMint {
 	}
 
 	#[track_caller]
-	fn assert_mut_err<F, E>(&mut self, condition: F, err: E) -> Result<&mut Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-		E: Into<ProgramError> + std::error::Error,
-	{
-		if !condition(self) {
-			let caller = std::panic::Location::caller();
-			msg!("Mint account data validation error: {}", err);
-			msg!("{}", caller);
-
-			return Err(err.into());
-		}
-		Ok(self)
-	}
-
-	#[track_caller]
-	fn assert_mut_msg<F>(&mut self, condition: F, msg: &str) -> Result<&mut Self, ProgramError>
+	fn assert_mut_msg<F>(&mut self, condition: F, log: &str) -> Result<&mut Self, ProgramError>
 	where
 		F: Fn(&Self) -> bool,
 	{
-		match assert(condition(self), ProgramError::InvalidAccountData, msg) {
-			Err(err) => Err(err.into()),
+		match assert(condition(self), ProgramError::InvalidAccountData, log) {
+			Err(err) => Err(err),
 			Ok(()) => Ok(self),
 		}
 	}
 }
 
-#[cfg(feature = "spl")]
-impl AccountValidation for spl_token_2022::pod::PodAccount {
+#[cfg(feature = "token")]
+impl AsTokenAccount for AccountInfo {
 	#[track_caller]
-	fn assert<F>(&self, condition: F) -> Result<&Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-	{
-		if !condition(self) {
-			let caller = std::panic::Location::caller();
-			msg!("Token account data is invalid: {}", caller);
-			return Err(ProgramError::InvalidAccountData);
-		}
-		Ok(self)
+	fn as_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError> {
+		unsafe { crate::token::state::Mint::from_account_info_unchecked(self) }
 	}
 
-	#[track_caller]
-	fn assert_err<F, E>(&self, condition: F, err: E) -> Result<&Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-		E: Into<ProgramError> + std::error::Error,
-	{
-		if !condition(self) {
-			let caller = std::panic::Location::caller();
-			msg!("Token account data validation error: {}", err);
-			msg!("{}", caller);
-			return Err(err.into());
-		}
-
-		Ok(self)
+	fn as_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError> {
+		unsafe { crate::token::state::TokenAccount::from_account_info_unchecked(self) }
 	}
 
-	#[track_caller]
-	fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-	{
-		match assert(condition(self), ProgramError::InvalidAccountData, msg) {
-			Err(err) => Err(err.into()),
-			Ok(()) => Ok(self),
-		}
+	fn as_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError> {
+		unsafe { crate::token_2022::state::Mint::from_account_info_unchecked(self) }
 	}
 
-	#[track_caller]
-	fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-	{
-		if !condition(self) {
-			let caller = std::panic::Location::caller();
-			msg!("Token account data is invalid: {}", caller);
-
-			return Err(ProgramError::InvalidAccountData);
-		}
-
-		Ok(self)
-	}
-
-	#[track_caller]
-	fn assert_mut_err<F, E>(&mut self, condition: F, err: E) -> Result<&mut Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-		E: Into<ProgramError> + std::error::Error,
-	{
-		if !condition(self) {
-			let caller = std::panic::Location::caller();
-			msg!("Token account data validation error: {}", err);
-			msg!("{}", caller);
-
-			return Err(err.into());
-		}
-		Ok(self)
-	}
-
-	#[track_caller]
-	fn assert_mut_msg<F>(&mut self, condition: F, msg: &str) -> Result<&mut Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-	{
-		match assert(condition(self), ProgramError::InvalidAccountData, msg) {
-			Err(err) => Err(err.into()),
-			Ok(()) => Ok(self),
-		}
-	}
-}
-
-#[cfg(feature = "spl")]
-impl AsSplAccount for AccountInfo<'_> {
-	#[track_caller]
-	fn as_token_mint_state<'info>(
+	fn as_token_2022_account(
 		&self,
-	) -> Result<
-		spl_token_2022::extension::PodStateWithExtensions<'info, spl_token_2022::pod::PodMint>,
-		ProgramError,
-	> {
-		self.assert_spl_owner()?;
-
-		unsafe {
-			let data = self.try_borrow_data()?;
-			let state = spl_token_2022::extension::PodStateWithExtensions::<
-				spl_token_2022::pod::PodMint,
-			>::unpack(std::slice::from_raw_parts(data.as_ptr(), data.len()))?;
-
-			Ok(state)
-		}
+	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
+		unsafe { crate::token_2022::state::TokenAccount::from_account_info_unchecked(self) }
 	}
 
-	#[track_caller]
-	fn as_token_mint(&self) -> Result<spl_token_2022::pod::PodMint, ProgramError> {
-		let state = self.as_token_mint_state()?;
-
-		Ok(*state.base)
-	}
-
-	#[track_caller]
-	fn as_token_account_state<'info>(
-		&self,
-	) -> Result<
-		spl_token_2022::extension::PodStateWithExtensions<'info, spl_token_2022::pod::PodAccount>,
-		ProgramError,
-	> {
-		self.assert_spl_owner()?;
-
-		unsafe {
-			let data = self.try_borrow_data()?;
-			let state = spl_token_2022::extension::PodStateWithExtensions::<
-				spl_token_2022::pod::PodAccount,
-			>::unpack(std::slice::from_raw_parts(data.as_ptr(), data.len()))?;
-
-			Ok(state)
-		}
-	}
-
-	#[track_caller]
-	fn as_token_account(&self) -> Result<spl_token_2022::pod::PodAccount, ProgramError> {
-		let state = self.as_token_account_state()?;
-
-		Ok(*state.base)
-	}
-
-	#[track_caller]
-	fn as_associated_token_account_state<'info>(
-		&self,
-		owner: &Pubkey,
-		mint: &Pubkey,
-	) -> Result<
-		spl_token_2022::extension::PodStateWithExtensions<'info, spl_token_2022::pod::PodAccount>,
-		ProgramError,
-	> {
-		self.assert_address(
-			&spl_associated_token_account::get_associated_token_address_with_program_id(
-				owner,
-				mint,
-				&self.owner,
-			),
-		)?
-		.as_token_account_state()
-	}
-
-	#[track_caller]
 	fn as_associated_token_account(
 		&self,
 		owner: &Pubkey,
 		mint: &Pubkey,
-	) -> Result<spl_token_2022::pod::PodAccount, ProgramError> {
-		let state = self.as_associated_token_account_state(owner, mint)?;
+	) -> Result<&crate::token::state::TokenAccount, ProgramError> {
+		unsafe {
+			crate::token::state::TokenAccount::from_account_info_unchecked(
+				self.assert_associated_token_address(owner, mint)?,
+			)
+		}
+	}
 
-		Ok(*state.base)
+	fn as_associated_token_2022_account(
+		&self,
+		owner: &Pubkey,
+		mint: &Pubkey,
+	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
+		unsafe {
+			crate::token_2022::state::TokenAccount::from_account_info_unchecked(
+				self.assert_associated_token_address(owner, mint)?,
+			)
+		}
 	}
 }
 
-impl<'a, 'info> LamportTransfer<'a, 'info> for AccountInfo<'info> {
+impl<'a> LamportTransfer<'a> for AccountInfo {
+	/// Send the specified lamports to the `recipient` account.
+	/// The sender must be a mutable signer for this to be possible.
 	#[inline(always)]
-	fn send(&'a self, lamports: u64, to: &'a AccountInfo<'info>) {
-		**self.lamports.borrow_mut() -= lamports;
-		**to.lamports.borrow_mut() += lamports;
+	fn send(&'a self, lamports: u64, recipient: &'a AccountInfo) {
+		let Ok(self_lamports) = self.try_borrow_mut_lamports() else {
+			return;
+		};
+
+		let Ok(recipient_lamports) = recipient.try_borrow_mut_lamports() else {
+			return;
+		};
+
+		// SAFETY:
+		// The solana runtime will check that no extra lamports are created so this
+		// should be safe even if attempting to add more lamports than owned.
+		let _ = self_lamports.checked_sub(lamports);
+		let _ = recipient_lamports.checked_add(lamports);
 	}
 
+	/// The `from` account must be mutable and a signer for this to be
+	/// possible.
 	#[inline(always)]
-	fn collect(&'a self, lamports: u64, from: &'a AccountInfo<'info>) -> Result<(), ProgramError> {
-		solana_program::program::invoke(
-			&solana_program::system_instruction::transfer(from.key, self.key, lamports),
-			&[from.clone(), self.clone()],
-		)
-	}
-}
-
-impl<'a, 'info> CloseAccount<'a, 'info> for AccountInfo<'info> {
-	fn close(&'a self, to: &'a AccountInfo<'info>) -> Result<(), ProgramError> {
-		// Realloc data to zero.
-		self.realloc(0, true)?;
-
-		// Return rent lamports.
-		self.send(self.lamports(), to);
-
-		Ok(())
+	fn collect(&'a self, lamports: u64, from: &'a AccountInfo) -> Result<(), ProgramError> {
+		Transfer {
+			from,
+			to: self,
+			lamports,
+		}
+		.invoke()
 	}
 }

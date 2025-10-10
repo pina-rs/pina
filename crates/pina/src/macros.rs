@@ -14,7 +14,7 @@ macro_rules! impl_space {
 	($struct_name:ident) => {
 		impl $struct_name {
 			pub const fn space() -> usize {
-				8 + size_of::<$struct_name>()
+				$crate::DISCRIMINATOR_SIZE + size_of::<$struct_name>()
 			}
 		}
 	};
@@ -61,28 +61,14 @@ macro_rules! account {
 			where
 				F: Fn(&Self) -> bool,
 			{
-				if !condition(self) {
-					let caller = std::panic::Location::caller();
-					$crate::msg!("Account is invalid: {}", caller);
-					return Err($crate::ProgramError::InvalidAccountData);
-				}
-				Ok(self)
-			}
-
-			#[track_caller]
-			fn assert_err<F, E>(&self, condition: F, err: E) -> Result<&Self, $crate::ProgramError>
-			where
-				F: Fn(&Self) -> bool,
-				E: Into<$crate::ProgramError> + std::error::Error,
-			{
-				if !condition(self) {
-					let caller = std::panic::Location::caller();
-					$crate::msg!("Account validation error: {}", err);
-					$crate::msg!("{}", caller);
-					return Err(err.into());
+				if condition(self) {
+					return Ok(self);
 				}
 
-				Ok(self)
+				let caller = core::panic::Location::caller();
+				$crate::msg!("Account is invalid: {}", caller);
+
+				Err($crate::ProgramError::InvalidAccountData)
 			}
 
 			#[track_caller]
@@ -106,33 +92,13 @@ macro_rules! account {
 				F: Fn(&Self) -> bool,
 			{
 				if !condition(self) {
-					let caller = std::panic::Location::caller();
-					$crate::msg!("Account is invalid: {}", caller);
-
-					return Err($crate::ProgramError::InvalidAccountData);
+					return Ok(self);
 				}
 
-				Ok(self)
-			}
+				$crate::log!("Account is invalid: {}");
+				$crate::log_caller();
 
-			#[track_caller]
-			fn assert_mut_err<F, E>(
-				&mut self,
-				condition: F,
-				err: E,
-			) -> Result<&mut Self, $crate::ProgramError>
-			where
-				F: Fn(&Self) -> bool,
-				E: Into<$crate::ProgramError> + std::error::Error,
-			{
-				if !condition(self) {
-					let caller = std::panic::Location::caller();
-					$crate::msg!("Account validation error: {}", err);
-					$crate::msg!("{}", caller);
-
-					return Err(err.into());
-				}
-				Ok(self)
+				Err($crate::ProgramError::InvalidAccountData)
 			}
 
 			#[track_caller]
@@ -158,17 +124,6 @@ macro_rules! account {
 }
 
 #[macro_export]
-macro_rules! error {
-	($struct_name:ident) => {
-		impl From<$struct_name> for $crate::ProgramError {
-			fn from(e: $struct_name) -> Self {
-				$crate::ProgramError::Custom(e as u32)
-			}
-		}
-	};
-}
-
-#[macro_export]
 macro_rules! event {
 	($struct_name:ident) => {
 		$crate::impl_to_bytes!($struct_name);
@@ -176,11 +131,11 @@ macro_rules! event {
 
 		impl $crate::Loggable for $struct_name {
 			fn log(&self) {
-				solana_program::log::sol_log_data(&[self.to_bytes()]);
+				$crate::pinocchio::log::sol_log_data(&[self.to_bytes()]);
 			}
 
 			fn log_return(&self) {
-				solana_program::program::set_return_data(self.to_bytes());
+				$crate::pinocchio::cpi::set_return_data(self.to_bytes());
 			}
 		}
 	};
@@ -207,20 +162,4 @@ macro_rules! instruction {
 			}
 		}
 	};
-}
-
-#[cfg(feature = "logs")]
-#[macro_export]
-macro_rules! msg {
-    ($msg:expr) => {
-        $crate::solana_program::msg!($msg)
-    };
-    ($($arg:tt)*) => ($crate::solana_program::msg!($($arg)*));
-}
-
-#[cfg(not(feature = "logs"))]
-#[macro_export]
-macro_rules! msg {
-	($msg:expr) => {};
-	($($arg:tt)*) => {};
 }

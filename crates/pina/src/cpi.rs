@@ -1,67 +1,65 @@
 use bytemuck::Pod;
-use solana_program::account_info::AccountInfo;
-use solana_program::entrypoint::ProgramResult;
-use solana_program::instruction::Instruction;
-use solana_program::pubkey::Pubkey;
-use solana_program::rent::Rent;
-use solana_program::sysvar::Sysvar;
+use pinocchio::account_info::AccountInfo;
+use pinocchio::instruction::Seed;
+use pinocchio::instruction::Signer;
+use pinocchio::program_error::ProgramError;
+use pinocchio::pubkey::try_find_program_address;
+use pinocchio::pubkey::Pubkey;
+use pinocchio::pubkey::MAX_SEEDS;
+use pinocchio::sysvars::rent::Rent;
+use pinocchio::sysvars::Sysvar;
+use pinocchio_system::instructions::Allocate;
+use pinocchio_system::instructions::Assign;
+use pinocchio_system::instructions::CreateAccount;
+use pinocchio_system::instructions::Transfer;
 
 use crate::Discriminator;
+use crate::LamportTransfer;
+use crate::ProgramResult;
+use crate::DISCRIMINATOR_SIZE;
 
 /// Creates a new non-program account.
 #[inline(always)]
-pub fn create_external_account<'a, 'info>(
-	from_pubkey: &'a AccountInfo<'info>,
-	to_pubkey: &'a AccountInfo<'info>,
-	system_program: &'a AccountInfo<'info>,
+pub fn create_account<'a>(
+	from: &'a AccountInfo,
+	to: &'a AccountInfo,
 	space: usize,
 	owner: &Pubkey,
 ) -> ProgramResult {
-	let lamports_required = (Rent::get()?).minimum_balance(space);
+	let lamports = Rent::get()?.minimum_balance(space);
 
-	solana_program::program::invoke(
-		&solana_program::system_instruction::create_account(
-			from_pubkey.key,
-			to_pubkey.key,
-			lamports_required,
-			space as u64,
-			owner,
-		),
-		&[
-			from_pubkey.clone(),
-			to_pubkey.clone(),
-			system_program.clone(),
-		],
-	)?;
-
-	Ok(())
+	CreateAccount {
+		from,
+		to,
+		lamports,
+		space: space as u64,
+		owner,
+	}
+	.invoke()
 }
 
-/// Creates a new program account.
+/// Creates a new program account and returns the address and canonical bump.
 #[inline(always)]
-pub fn create_account<'a, 'info, T: Discriminator + Pod>(
-	target_account: &'a AccountInfo<'info>,
-	system_program: &'a AccountInfo<'info>,
-	payer: &'a AccountInfo<'info>,
+pub fn create_program_account<'a, T: Discriminator + Pod>(
+	target_account: &'a AccountInfo,
+	payer: &'a AccountInfo,
 	owner: &Pubkey,
 	seeds: &[&[u8]],
-) -> ProgramResult {
-	create_account_with_bump::<T>(
-		target_account,
-		system_program,
-		payer,
-		owner,
-		seeds,
-		Pubkey::find_program_address(seeds, owner).1,
-	)
+) -> Result<(Pubkey, u8), ProgramError> {
+	let Some((address, bump)) = try_find_program_address(seeds, owner) else {
+		return Err(ProgramError::InvalidSeeds);
+	};
+
+	create_program_account_with_bump::<T>(target_account, payer, owner, seeds, bump)?;
+
+	Ok((address, bump))
 }
 
 /// Creates a new program account with user-provided bump.
 #[inline(always)]
-pub fn create_account_with_bump<'a, 'info, T: Discriminator + Pod>(
-	target_account: &'a AccountInfo<'info>,
-	system_program: &'a AccountInfo<'info>,
-	payer: &'a AccountInfo<'info>,
+pub fn create_program_account_with_bump<'a, T: Discriminator + Pod>(
+	target_account: &'a AccountInfo,
+	payer: &'a AccountInfo,
 	owner: &Pubkey,
 	seeds: &[&[u8]],
 	bump: u8,
@@ -69,79 +67,90 @@ pub fn create_account_with_bump<'a, 'info, T: Discriminator + Pod>(
 	// Allocate space.
 	allocate_account_with_bump(
 		target_account,
-		system_program,
 		payer,
-		8 + size_of::<T>(),
+		DISCRIMINATOR_SIZE + size_of::<T>(),
 		owner,
 		seeds,
 		bump,
 	)?;
 
 	// Set discriminator.
-	let mut data = target_account.data.borrow_mut();
-	data[0] = T::discriminator();
+	let mut data = target_account.try_borrow_mut_data()?;
+	data[0] = T::DISCRIMINATOR;
 
 	Ok(())
 }
 
-/// Allocates space for a new program account.
+/// Allocates space for a new program account, returning the derived `address`
+/// and the canonical `bump`.
 #[inline(always)]
-pub fn allocate_account<'a, 'info>(
-	target_account: &'a AccountInfo<'info>,
-	system_program: &'a AccountInfo<'info>,
-	payer: &'a AccountInfo<'info>,
+pub fn allocate_account<'a>(
+	target_account: &'a AccountInfo,
+	payer: &'a AccountInfo,
 	space: usize,
 	owner: &Pubkey,
 	seeds: &[&[u8]],
-) -> ProgramResult {
-	allocate_account_with_bump(
-		target_account,
-		system_program,
-		payer,
-		space,
-		owner,
-		seeds,
-		Pubkey::find_program_address(seeds, owner).1,
-	)
+) -> Result<(Pubkey, u8), ProgramError> {
+	let Some((address, bump)) = try_find_program_address(seeds, owner) else {
+		return Err(ProgramError::InvalidSeeds);
+	};
+
+	allocate_account_with_bump(target_account, payer, space, owner, seeds, bump)?;
+
+	Ok((address, bump))
 }
 
-/// Allocates space for a new program account with user-provided bump.
+pub fn combine_seeds_with_bump<'a>(seeds: &[&'a [u8]], bump: &'a [u8; 1]) -> [&'a [u8]; MAX_SEEDS] {
+	assert!(
+		seeds.len() < MAX_SEEDS,
+		"number of seeds must be less than MAX_SEEDS"
+	);
+
+	// Create our backing storage on the stack, initialized with empty slices.
+	// Using a block ensures `storage` lives as long as the returned slice needs it
+	// to.
+	let mut storage: [&'a [u8]; MAX_SEEDS] = [&[]; MAX_SEEDS];
+
+	// 1. Copy the original seeds into our storage array.
+	let seeds_len = seeds.len();
+	storage[..seeds_len].copy_from_slice(seeds);
+
+	// 2. Add the single-byte bump slice to the end.
+	storage[seeds_len] = bump;
+
+	storage
+}
+
+/// Allocates space for a new program account with user-provided signer.
 #[inline(always)]
-pub fn allocate_account_with_bump<'a, 'info>(
-	target_account: &'a AccountInfo<'info>,
-	system_program: &'a AccountInfo<'info>,
-	payer: &'a AccountInfo<'info>,
+pub fn allocate_account_with_bump<'a>(
+	target_account: &'a AccountInfo,
+	payer: &'a AccountInfo,
 	space: usize,
 	owner: &Pubkey,
 	seeds: &[&[u8]],
 	bump: u8,
 ) -> ProgramResult {
 	// Combine seeds
-	let bump: &[u8] = &[bump];
-	let mut combined_seeds = Vec::with_capacity(seeds.len() + 1);
-	combined_seeds.extend_from_slice(seeds);
-	combined_seeds.push(bump);
-	let seeds = combined_seeds.as_slice();
-
+	let bump_array = [bump];
+	let combined_seeds = combine_seeds_with_bump(seeds, &bump_array).map(Seed::from);
+	let seeds = &combined_seeds[..=seeds.len()];
+	let signer = Signer::from(seeds);
+	let signers = &[signer];
 	// Allocate space for account
 	let rent = Rent::get()?;
+
 	if target_account.lamports().eq(&0) {
-		// If balance is zero, create account
-		solana_program::program::invoke_signed(
-			&solana_program::system_instruction::create_account(
-				payer.key,
-				target_account.key,
-				rent.minimum_balance(space),
-				space as u64,
-				owner,
-			),
-			&[
-				payer.clone(),
-				target_account.clone(),
-				system_program.clone(),
-			],
-			&[seeds],
-		)?;
+		let lamports = rent.minimum_balance(space);
+
+		CreateAccount {
+			from: payer,
+			to: target_account,
+			lamports,
+			space: space as u64,
+			owner,
+		}
+		.invoke_signed(signers)?;
 	} else {
 		// Otherwise, if balance is nonzero:
 
@@ -149,34 +158,28 @@ pub fn allocate_account_with_bump<'a, 'info>(
 		let rent_exempt_balance = rent
 			.minimum_balance(space)
 			.saturating_sub(target_account.lamports());
-		if rent_exempt_balance.gt(&0) {
-			solana_program::program::invoke(
-				&solana_program::system_instruction::transfer(
-					payer.key,
-					target_account.key,
-					rent_exempt_balance,
-				),
-				&[
-					payer.clone(),
-					target_account.clone(),
-					system_program.clone(),
-				],
-			)?;
+		if rent_exempt_balance > 0 {
+			Transfer {
+				from: payer,
+				to: target_account,
+				lamports: rent_exempt_balance,
+			}
+			.invoke_signed(signers)?;
 		}
 
 		// 2) allocate space for the account
-		solana_program::program::invoke_signed(
-			&solana_program::system_instruction::allocate(target_account.key, space as u64),
-			&[target_account.clone(), system_program.clone()],
-			&[seeds],
-		)?;
+		Allocate {
+			account: target_account,
+			space: space as u64,
+		}
+		.invoke_signed(signers)?;
 
 		// 3) assign our program as the owner
-		solana_program::program::invoke_signed(
-			&solana_program::system_instruction::assign(target_account.key, owner),
-			&[target_account.clone(), system_program.clone()],
-			&[seeds],
-		)?;
+		Assign {
+			account: target_account,
+			owner,
+		}
+		.invoke_signed(signers)?;
 	}
 
 	Ok(())
@@ -185,47 +188,9 @@ pub fn allocate_account_with_bump<'a, 'info>(
 /// Closes an account and returns the remaining rent lamports to the provided
 /// recipient.
 #[inline(always)]
-pub fn close_account<'info>(
-	account_info: &AccountInfo<'info>,
-	recipient: &AccountInfo<'info>,
-) -> ProgramResult {
-	// Realloc data to zero.
-	account_info.realloc(0, true)?;
-
+pub fn close_account(account_info: &AccountInfo, recipient: &AccountInfo) -> ProgramResult {
 	// Return rent lamports.
-	**recipient.lamports.borrow_mut() += account_info.lamports();
-	**account_info.lamports.borrow_mut() = 0;
-
-	Ok(())
-}
-
-/// Invokes a CPI with provided signer seeds and program id.
-#[inline(always)]
-pub fn invoke_signed<'info>(
-	instruction: &Instruction,
-	account_infos: &[AccountInfo<'info>],
-	program_id: &Pubkey,
-	seeds: &[&[u8]],
-) -> ProgramResult {
-	let bump = Pubkey::find_program_address(seeds, program_id).1;
-	invoke_signed_with_bump(instruction, account_infos, seeds, bump)
-}
-
-/// Invokes a CPI with the provided signer seeds and bump.
-#[inline(always)]
-pub fn invoke_signed_with_bump<'info>(
-	instruction: &Instruction,
-	account_infos: &[AccountInfo<'info>],
-	seeds: &[&[u8]],
-	bump: u8,
-) -> ProgramResult {
-	// Combine seeds
-	let bump: &[u8] = &[bump];
-	let mut combined_seeds = Vec::with_capacity(seeds.len() + 1);
-	combined_seeds.extend_from_slice(seeds);
-	combined_seeds.push(bump);
-	let seeds = combined_seeds.as_slice();
-
-	// Invoke CPI
-	solana_program::program::invoke_signed(instruction, account_infos, &[seeds])
+	account_info.send(account_info.lamports(), recipient);
+	// Realloc data to zero.
+	account_info.close()
 }

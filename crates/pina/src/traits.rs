@@ -71,11 +71,6 @@ pub trait AccountValidation {
 	where
 		F: Fn(&Self) -> bool;
 
-	fn assert_err<F, E>(&self, condition: F, err: E) -> Result<&Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-		E: Into<ProgramError> + core::error::Error;
-
 	fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, ProgramError>
 	where
 		F: Fn(&Self) -> bool;
@@ -83,11 +78,6 @@ pub trait AccountValidation {
 	fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, ProgramError>
 	where
 		F: Fn(&Self) -> bool;
-
-	fn assert_mut_err<F, E>(&mut self, condition: F, err: E) -> Result<&mut Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-		E: Into<ProgramError> + core::error::Error;
 
 	fn assert_mut_msg<F>(&mut self, condition: F, msg: &str) -> Result<&mut Self, ProgramError>
 	where
@@ -134,9 +124,16 @@ pub trait AccountInfoValidation {
 		seeds: &[&[u8]],
 		program_id: &Pubkey,
 	) -> Result<u8, ProgramError>;
-	/// Assert that the account is an associated token account.
+	/// Assert that the account is an associated token (key) / p-token account.
 	#[cfg(feature = "token")]
 	fn assert_associated_token_address(
+		&self,
+		wallet: &Pubkey,
+		mint: &Pubkey,
+	) -> Result<&Self, ProgramError>;
+	/// Assert that the account is an associated token 2022 account.
+	#[cfg(feature = "token")]
+	fn assert_associated_token_2022_address(
 		&self,
 		wallet: &Pubkey,
 		mint: &Pubkey,
@@ -146,6 +143,44 @@ pub trait AccountInfoValidation {
 pub trait Discriminator {
 	const DISCRIMINATOR: u8;
 }
+
+pub const DISCRIMINATOR_SIZE: usize = 1;
+
+// #[repr(u8)]
+// #[derive(Copy, Clone)]
+// enum V {
+// 	A = 0,
+// 	B = 1,
+// }
+
+// impl IntoDiscriminator<1> for u8 {
+// 	fn into_discriminator(self) -> [u8; 1] {
+// 		(self as u8).to_le_bytes()
+// 	}
+// }
+
+// impl IntoDiscriminator<2> for u16 {
+// 	fn into_discriminator(self) -> [u8; 2] {
+// 		self.to_le_bytes()
+// 	}
+// }
+
+// impl IntoDiscriminator<4> for u32 {
+// 	fn into_discriminator(self) -> [u8; 4] {
+// 		self.to_le_bytes()
+// 	}
+// }
+
+// pub trait IntoDiscriminator<const N: usize> {
+// 	fn into_discriminator(self) -> [u8; N];
+// 	fn len() -> usize {
+// 		N
+// 	}
+// }
+
+// pub trait HasDiscriminator<const N: usize> {
+// 	fn discriminator() -> [u8; N];
+// }
 
 /// Performs:
 /// 1. Program owner check
@@ -163,46 +198,28 @@ pub trait AsAccount {
 }
 
 #[cfg(feature = "token")]
-pub trait AsSplAccount {
-	// fn as_token_mint_state<'info>(
-	// 	&self,
-	// ) -> Result<
-	// 	pinocchio_token_2022::extension::PodStateWithExtensions<
-	// 		'info,
-	// 		spl_token_2022::pod::PodMint,
-	// 	>,
-	// 	ProgramError,
-	// >;
-	fn as_token_mint(&self) -> Result<pinocchio_token_2022::state::Mint, ProgramError>;
-	// fn as_token_account_state<'info>(
-	// 	&self,
-	// ) -> Result<
-	// 	spl_token_2022::extension::PodStateWithExtensions<'info,
-	// spl_token_2022::pod::PodAccount>, 	ProgramError,
-	// >;
-	fn as_token_account(&self) -> Result<pinocchio_token_2022::state::TokenAccount, ProgramError>;
-	// fn as_associated_token_account_state<'info>(
-	// 	&self,
-	// 	owner: &Pubkey,
-	// 	mint: &Pubkey,
-	// ) -> Result<
-	// 	spl_token_2022::extension::PodStateWithExtensions<'info,
-	// spl_token_2022::pod::PodAccount>, 	ProgramError,
-	// >;
+pub trait AsTokenAccount {
+	fn as_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError>;
+	fn as_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError>;
 	fn as_associated_token_account(
 		&self,
 		owner: &Pubkey,
 		mint: &Pubkey,
-	) -> Result<pinocchio_token_2022::state::TokenAccount, ProgramError>;
+	) -> Result<&crate::token::state::TokenAccount, ProgramError>;
+	fn as_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError>;
+	fn as_token_2022_account(
+		&self,
+	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError>;
+	fn as_associated_token_2022_account(
+		&self,
+		owner: &Pubkey,
+		mint: &Pubkey,
+	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError>;
 }
 
 pub trait LamportTransfer<'a> {
 	fn send(&'a self, lamports: u64, to: &'a AccountInfo);
 	fn collect(&'a self, lamports: u64, from: &'a AccountInfo) -> Result<(), ProgramError>;
-}
-
-pub trait CloseAccount<'a> {
-	fn close(&'a self, to: &'a AccountInfo) -> Result<(), ProgramError>;
 }
 
 pub trait Loggable {
