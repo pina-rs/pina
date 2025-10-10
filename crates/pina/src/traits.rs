@@ -153,11 +153,38 @@ pub const DISCRIMINATOR_SIZE: usize = 1;
 // 	B = 1,
 // }
 
-// impl IntoDiscriminator<1> for u8 {
-// 	fn into_discriminator(self) -> [u8; 1] {
-// 		(self as u8).to_le_bytes()
-// 	}
-// }
+impl IntoDiscriminator for u8 {
+	const DISCRIMINATOR_LEN: usize = 1;
+
+	fn into_discriminator(self) -> [u8; 8] {
+		let mut discriminator = [0u8; 8];
+		discriminator[0] = self;
+
+		discriminator
+	}
+}
+
+impl IntoDiscriminator for u16 {
+	const DISCRIMINATOR_LEN: usize = 2;
+
+	fn into_discriminator(self) -> [u8; 8] {
+		let mut discriminator = [0u8; 8];
+		discriminator.copy_from_slice(&self.to_le_bytes());
+
+		discriminator
+	}
+}
+
+impl IntoDiscriminator for u32 {
+	const DISCRIMINATOR_LEN: usize = 4;
+
+	fn into_discriminator(self) -> [u8; 8] {
+		let mut discriminator = [0u8; 8];
+		discriminator.copy_from_slice(&self.to_le_bytes());
+
+		discriminator
+	}
+}
 
 // impl IntoDiscriminator<2> for u16 {
 // 	fn into_discriminator(self) -> [u8; 2] {
@@ -171,16 +198,15 @@ pub const DISCRIMINATOR_SIZE: usize = 1;
 // 	}
 // }
 
-// pub trait IntoDiscriminator<const N: usize> {
-// 	fn into_discriminator(self) -> [u8; N];
-// 	fn len() -> usize {
-// 		N
-// 	}
-// }
+pub trait IntoDiscriminator {
+	const DISCRIMINATOR_LEN: usize;
+	fn into_discriminator(self) -> [u8; 8];
+}
 
-// pub trait HasDiscriminator<const N: usize> {
-// 	fn discriminator() -> [u8; N];
-// }
+pub trait HasDiscriminator {
+	fn len() -> usize;
+	fn discriminator() -> [u8; 8];
+}
 
 /// Performs:
 /// 1. Program owner check

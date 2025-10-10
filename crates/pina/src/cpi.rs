@@ -121,7 +121,7 @@ pub fn combine_seeds_with_bump<'a>(seeds: &[&'a [u8]], bump: &'a [u8; 1]) -> [&'
 	storage
 }
 
-/// Allocates space for a new program account with user-provided signer.
+/// Allocates space for a new program account with user-provided bump.
 #[inline(always)]
 pub fn allocate_account_with_bump<'a>(
 	target_account: &'a AccountInfo,

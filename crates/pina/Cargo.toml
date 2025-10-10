@@ -28,7 +28,7 @@ pina_macros = { workspace = true, optional = true }
 pinocchio = { workspace = true }
 pinocchio-associated-token-account = { workspace = true, optional = true }
 pinocchio-log = { workspace = true, optional = true, features = ["macro"] }
-pinocchio-pubkey = { workspace = true }
+pinocchio-pubkey = { workspace = true, features = ["const"] }
 pinocchio-system = { workspace = true }
 pinocchio-token = { workspace = true, optional = true }
 pinocchio-token-2022 = { workspace = true, optional = true }
