@@ -14,6 +14,7 @@ macro_rules! impl_space {
 	($struct_name:ident) => {
 		impl $struct_name {
 			pub const fn space() -> usize {
+				oo
 				$crate::DISCRIMINATOR_SIZE + size_of::<$struct_name>()
 			}
 		}

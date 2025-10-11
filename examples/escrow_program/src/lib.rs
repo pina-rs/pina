@@ -45,7 +45,6 @@ pub enum EscrowError {
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable, PartialEq, Eq)]
-#[bytemuck(crate = "pina::bytemuck")]
 pub struct Offer {
 	pub maker: Pubkey,
 	pub mint_a: Pubkey,

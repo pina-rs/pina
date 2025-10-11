@@ -13,10 +13,9 @@ use pinocchio_system::instructions::Assign;
 use pinocchio_system::instructions::CreateAccount;
 use pinocchio_system::instructions::Transfer;
 
-use crate::Discriminator;
+use crate::HasDiscriminator;
 use crate::LamportTransfer;
 use crate::ProgramResult;
-use crate::DISCRIMINATOR_SIZE;
 
 /// Creates a new non-program account.
 #[inline(always)]
@@ -40,7 +39,7 @@ pub fn create_account<'a>(
 
 /// Creates a new program account and returns the address and canonical bump.
 #[inline(always)]
-pub fn create_program_account<'a, T: Discriminator + Pod>(
+pub fn create_program_account<'a, T: HasDiscriminator + Pod>(
 	target_account: &'a AccountInfo,
 	payer: &'a AccountInfo,
 	owner: &Pubkey,
@@ -57,7 +56,7 @@ pub fn create_program_account<'a, T: Discriminator + Pod>(
 
 /// Creates a new program account with user-provided bump.
 #[inline(always)]
-pub fn create_program_account_with_bump<'a, T: Discriminator + Pod>(
+pub fn create_program_account_with_bump<'a, T: HasDiscriminator + Pod>(
 	target_account: &'a AccountInfo,
 	payer: &'a AccountInfo,
 	owner: &Pubkey,
@@ -68,7 +67,7 @@ pub fn create_program_account_with_bump<'a, T: Discriminator + Pod>(
 	allocate_account_with_bump(
 		target_account,
 		payer,
-		DISCRIMINATOR_SIZE + size_of::<T>(),
+		size_of::<T::Type>() + size_of::<T>(),
 		owner,
 		seeds,
 		bump,
@@ -76,7 +75,7 @@ pub fn create_program_account_with_bump<'a, T: Discriminator + Pod>(
 
 	// Set discriminator.
 	let mut data = target_account.try_borrow_mut_data()?;
-	data[0] = T::DISCRIMINATOR;
+	T::write_discriminator(&mut data);
 
 	Ok(())
 }

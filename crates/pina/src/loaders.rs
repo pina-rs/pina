@@ -18,12 +18,11 @@ use crate::AccountValidation;
 use crate::AsAccount;
 #[cfg(feature = "token")]
 use crate::AsTokenAccount;
-use crate::Discriminator;
+use crate::HasDiscriminator;
 use crate::LamportTransfer;
 use crate::Pod;
 use crate::ProgramError;
 use crate::Pubkey;
-use crate::DISCRIMINATOR_SIZE;
 
 const SYSVAR_ID: Pubkey = pubkey!("Sysvar1111111111111111111111111111111111111");
 
@@ -93,19 +92,18 @@ impl AccountInfoValidation for AccountInfo {
 		self.assert_address(program_id)?.assert_executable()
 	}
 
-	fn assert_type<T: Discriminator>(&self, program_id: &Pubkey) -> Result<&Self, ProgramError> {
+	fn assert_type<T: HasDiscriminator>(&self, program_id: &Pubkey) -> Result<&Self, ProgramError> {
 		self.assert_owner(program_id)?;
 		let data = self.try_borrow_data()?;
-		let data_len = DISCRIMINATOR_SIZE + size_of::<T>();
 
-		if data[0].ne(&T::DISCRIMINATOR) {
+		if !T::matches_discriminator(&data) {
 			log!("address: {} has invalid discriminator", self.key());
 			log_caller();
 
 			return Err(ProgramError::InvalidAccountData);
 		}
 
-		if data.len() != data_len {
+		if data.len() != T::SPACE {
 			log!(
 				"address: {} has invalid data length for the account type",
 				self.key()
@@ -321,29 +319,24 @@ impl AsAccount for AccountInfo {
 	#[track_caller]
 	fn as_account<T>(&self, program_id: &Pubkey) -> Result<&T, ProgramError>
 	where
-		T: AccountDeserialize + Discriminator + Pod,
+		T: AccountDeserialize + HasDiscriminator + Pod,
 	{
 		self.assert_owner(program_id)?;
 
-		unsafe {
-			T::try_from_bytes(from_raw_parts(
-				self.try_borrow_data()?.as_ptr(),
-				DISCRIMINATOR_SIZE + size_of::<T>(),
-			))
-		}
+		unsafe { T::try_from_bytes(from_raw_parts(self.try_borrow_data()?.as_ptr(), T::SPACE)) }
 	}
 
 	#[track_caller]
 	fn as_account_mut<T>(&self, program_id: &Pubkey) -> Result<&mut T, ProgramError>
 	where
-		T: AccountDeserialize + Discriminator + Pod,
+		T: AccountDeserialize + HasDiscriminator + Pod,
 	{
 		self.assert_owner(program_id)?;
 
 		unsafe {
 			T::try_from_bytes_mut(from_raw_parts_mut(
 				self.try_borrow_mut_data()?.as_mut_ptr(),
-				DISCRIMINATOR_SIZE + size_of::<T>(),
+				T::SPACE,
 			))
 		}
 	}

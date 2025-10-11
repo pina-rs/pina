@@ -707,7 +707,9 @@ dependencies = [
 name = "escrow_program"
 version = "0.0.0"
 dependencies = [
+ "bytemuck",
  "mollusk-svm",
+ "num_enum",
  "pina",
  "solana-program",
  "tokio",
