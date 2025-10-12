@@ -6,13 +6,84 @@
 
 ## Attribute Macros
 
+### `#[account]`
+
+The account macro is used to annotate account data that will exist within a solana account.
+
+It will transform the following:
+
+```rust
+use pina::*;
+
+#[account(crate = ::pina)]
+pub struct ConfigState {
+	/// The version of the state.
+	pub version: u8,
+	/// The authority which can update this config.
+	pub authority: Pubkey,
+	/// Store the bump to save compute units.
+	pub bump: u8,
+	/// The treasury account bump where fees are sent and where the minted
+	/// tokens are transferred.
+	pub treasury_bump: u8,
+	/// The mint account bump.
+	pub mint_bit_bump: u8,
+	/// The mint account bump for KIBIBIT.
+	pub mint_kibibit_bump: u8,
+	/// The mint account bump for MEBIBIT.
+	pub mint_mebibit_bump: u8,
+	/// The mint account bump for GIBIBIT.
+	pub mint_gibibit_bump: u8,
+	/// There will be a maximum of 8 games.
+	pub game_index: u8,
+}
+```
+
+Into:
+
+```rust
+use pina::*;
+
+#[repr(C)]
+#[derive(
+	::core::fmt::Debug,
+	::core::clone::Clone,
+	::core::marker::Copy,
+	::core::cmp::PartialEq,
+	::core::cmp::Eq,
+	::pina::Pod,
+	::pina::Zeroable,
+)]
+pub struct ConfigState {
+	/// The version of the state.
+	pub version: u8,
+	/// The authority which can update this config.
+	pub authority: Pubkey,
+	/// Store the bump to save compute units.
+	pub bump: u8,
+	/// The treasury account bump where fees are sent and where the minted
+	/// tokens are transferred.
+	pub treasury_bump: u8,
+	/// The mint account bump.
+	pub mint_bit_bump: u8,
+	/// The mint account bump for KIBIBIT.
+	pub mint_kibibit_bump: u8,
+	/// The mint account bump for MEBIBIT.
+	pub mint_mebibit_bump: u8,
+	/// The mint account bump for GIBIBIT.
+	pub mint_gibibit_bump: u8,
+	/// There will be a maximum of 8 games.
+	pub game_index: u8,
+}
+```
+
 ### `#[discriminator]`
 
-This attribut macro should be used for annotating the globally shared instruction and account discriminators.
+This attribute macro should be used for annotating the globally shared instruction and account discriminators.
 
 #### Attributes
 
-- `primitive` - Defaults to `u8` which takes up 1 byte of space for the discriminator. This would allow up to 256 variations of the type being discriminated. The the type can be the following:
+- `primitive` - Defaults to `u8` which takes up 1 byte of space for the discriminator. This would allow up to 256 variations of the type being discriminated. The type can be the following:
   - `u8` - 256 variations
   - `u16` - 65,536 variations
   - `u32` - 4,294,967,296 variations
@@ -40,7 +111,7 @@ use pina::*;
 
 #[repr(u8)]
 #[derive(
-	::core::fmt::macros::Debug,
+	::core::fmt::Debug,
 	::core::clone::Clone,
 	::core::marker::Copy,
 	::core::cmp::PartialEq,
@@ -48,6 +119,7 @@ use pina::*;
 	::pina::IntoPrimitive,
 	::pina::TryFromPrimitive,
 )]
+#[num_enum(error_type(name = ::pina::ProgramError, constructor = ::pina::num_enum::TryFromPrimitiveError::new))]
 pub enum MyAccount {
 	ConfigState = 0,
 	GameState = 1,
@@ -80,7 +152,7 @@ The above is transformed into:
 ```rust
 #[non_exhaustive] // This is present if you haven't set the flag`final`.
 #[derive(
-	::core::fmt::macros::Debug,
+	::core::fmt::Debug,
 	::core::clone::Clone,
 	::core::marker::Copy,
 	::core::cmp::PartialEq,

@@ -2,6 +2,7 @@
 #![allow(clippy::inline_always)]
 
 mod cpi;
+mod error;
 mod loaders;
 mod macros;
 mod traits;
@@ -43,6 +44,7 @@ pub use pinocchio_token as token;
 pub use pinocchio_token_2022 as token_2022;
 
 pub use crate::cpi::*;
+pub use crate::error::*;
 pub use crate::traits::*;
 pub use crate::utils::*;
 

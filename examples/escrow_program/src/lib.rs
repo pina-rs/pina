@@ -54,10 +54,3 @@ pub struct Offer {
 	pub seed: [u8; 8],
 	pub bump: u8,
 }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
-#[num_enum(error_type(name = ::pina::num_enum::TryFromPrimitiveError<TryIt>, constructor = ::pina::num_enum::TryFromPrimitiveError::new))]
-#[repr(u32)]
-enum TryIt {
-	A = 0,
-}

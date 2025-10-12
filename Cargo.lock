@@ -744,7 +744,6 @@ version = "0.0.0"
 dependencies = [
  "bytemuck",
  "mollusk-svm",
- "num_enum",
  "pina",
  "solana-program",
  "tokio",
@@ -1761,6 +1760,8 @@ name = "pina_macros"
 version = "0.0.0"
 dependencies = [
  "darling",
+ "num_enum",
+ "pina",
  "proc-macro2",
  "quote",
  "syn 2.0.106",

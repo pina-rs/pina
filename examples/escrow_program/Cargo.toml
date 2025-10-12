@@ -16,7 +16,6 @@ bpf-entrypoint = []
 
 [dependencies]
 bytemuck = { workspace = true }
-num_enum = { workspace = true }
 pina = { workspace = true, features = ["logs", "token", "derive"] }
 
 [dev-dependencies]
