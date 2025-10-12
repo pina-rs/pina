@@ -1,3 +1,5 @@
+use core::any;
+
 use bytemuck::Pod;
 
 use crate::AccountInfo;
@@ -54,6 +56,16 @@ where
 		}
 
 		let (prefix, remainder) = Self::strip_discriminator(data).split_at(Self::STRUCT_SPACE);
+		// let a0 = prefix[0];
+		// let a1 = prefix[1];
+		// let a2 = prefix[2];
+		// let a3 = prefix[3];
+		// let a4 = prefix[4];
+		// let a5 = prefix[5];
+		// let a6 = prefix[6];
+		// let a7 = prefix[7];
+		// let name = core::any::type_name::<Self>();
+		// let size = size_of::<Self>();
 
 		Ok((
 			bytemuck::try_from_bytes::<Self>(prefix).or(Err(ProgramError::InvalidAccountData))?,
@@ -167,8 +179,17 @@ primitive_into_discriminator!(u16);
 primitive_into_discriminator!(u32);
 primitive_into_discriminator!(u64);
 
+/// Wrap an enum to automatically make it into a discriminator.
+///
+/// ```rust
+/// #[repr(u64)]
+/// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// pub enum MyEnum {
+///   First = 0,
+///   Second = 1,
+/// }
 #[macro_export]
-macro_rules! enum_into_discriminator {
+macro_rules! into_discriminator {
 	($enum:path, $type:ty) => {
 		// This block is evaluated at compile time.
 		// If the sizes don't match, the code will fail to compile.
@@ -208,29 +229,22 @@ pub trait IntoDiscriminator: Sized {
 	fn matches_discriminator(&self, bytes: &[u8]) -> bool;
 }
 
-#[repr(u16)]
-#[derive(Clone, Copy, Debug)]
-enum ZZ {
-	A = 0,
-	B = 1,
-}
-
-enum_into_discriminator!(ZZ, u16);
+/// This is the space that a discriminator always takes up to prevent alignment
+/// issues. Since the larges alignment size us u64. 8bytes is needed to ensure
+/// the alignement does not error.
+pub const DISCRIMINATOR_SPACE: usize = 8;
 
 pub trait HasDiscriminator: Sized {
 	/// The underling type of the discriminator.
 	type Type: IntoDiscriminator;
 	/// The vaue of the discriminator.
 	const VALUE: Self::Type;
-	/// The number of bytes used by the discriminator.
-	const DISCRIMINATOR_SPACE: usize = Self::Type::SPACE;
 	/// The space used by the struct which implements this discriminator. This
 	/// does **NOT** include the space required for the [`IntoDiscriminator`].
-	/// That is stored in [`HasDiscriminator::DISCRIMINATOR_SPACE`]
 	const STRUCT_SPACE: usize = size_of::<Self>();
 	/// Get the total bytes needed to store this struct including it's
 	/// discriminator.
-	const SPACE: usize = Self::DISCRIMINATOR_SPACE + Self::STRUCT_SPACE;
+	const SPACE: usize = DISCRIMINATOR_SPACE + Self::STRUCT_SPACE;
 
 	/// Write the discriminator bytes to the provided mutable bytes array.
 	#[inline(always)]
@@ -246,23 +260,15 @@ pub trait HasDiscriminator: Sized {
 
 	/// Strip the discriminator from the returnd slice.
 	#[inline(always)]
-	fn strip_discriminator<'a>(bytes: &'a [u8]) -> &'a [u8] {
-		&bytes[Self::DISCRIMINATOR_SPACE..]
+	fn strip_discriminator(bytes: &[u8]) -> &[u8] {
+		&bytes[DISCRIMINATOR_SPACE..]
 	}
 
 	/// Strip the discriminator from the returned mutable bytes array slice.
 	#[inline(always)]
-	fn strip_discriminator_mut<'a>(bytes: &'a mut [u8]) -> &'a mut [u8] {
-		&mut bytes[Self::DISCRIMINATOR_SPACE..]
+	fn strip_discriminator_mut(bytes: &mut [u8]) -> &mut [u8] {
+		&mut bytes[DISCRIMINATOR_SPACE..]
 	}
-}
-
-struct A {}
-
-impl HasDiscriminator for A {
-	type Type = u8;
-
-	const VALUE: Self::Type = 0;
 }
 
 /// Performs:
@@ -349,9 +355,9 @@ mod tests {
 
 	#[test]
 	fn account_headers() {
-		let mut data = [0u8; 25];
-		data[1] = 4;
-		data[9] = 5;
+		let mut data = [0u8; 32];
+		data[8] = 4;
+		data[16] = 5;
 		let (_foo_header, foo) = GenericallySizedTypeHeader::try_header_from_bytes(&data)
 			.map(|(header, remainder)| {
 				let foo = match header.field_len {
@@ -379,10 +385,10 @@ mod tests {
 
 	#[test]
 	fn account_deserialize() {
-		let mut data = [0u8; 17];
+		let mut data = [0u8; 24];
 		data[0] = 7;
-		data[1] = 42;
-		data[9] = 43;
+		data[8] = 42;
+		data[16] = 43;
 		let foo = TestType::try_from_bytes(&data).unwrap();
 		assert_eq!(42, foo.field0);
 		assert_eq!(43, foo.field1);

@@ -21,7 +21,7 @@ token = [
 derive = ["dep:pina_macros"]
 
 [dependencies]
-bytemuck = { workspace = true, features = ["derive", "const_zeroed"] }
+bytemuck = { workspace = true, features = ["derive", "const_zeroed", "align_offset"] }
 num_enum = { workspace = true, default-features = false }
 paste = { workspace = true }
 pina_macros = { workspace = true, optional = true }

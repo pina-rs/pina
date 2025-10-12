@@ -2,7 +2,6 @@
 #![allow(clippy::inline_always)]
 
 mod cpi;
-mod errors;
 mod loaders;
 mod macros;
 mod traits;
@@ -11,6 +10,7 @@ mod utils;
 pub use bytemuck;
 pub use bytemuck::Pod;
 pub use bytemuck::Zeroable;
+pub use num_enum;
 pub use num_enum::IntoPrimitive;
 pub use num_enum::TryFromPrimitive;
 #[cfg(feature = "derive")]
@@ -28,6 +28,7 @@ pub use pinocchio::pubkey::Pubkey;
 pub use pinocchio::pubkey::*;
 pub use pinocchio::sysvars;
 pub use pinocchio::ProgramResult;
+#[cfg(feature = "token")]
 pub use pinocchio_associated_token_account as associated_token_account;
 #[cfg(feature = "logs")]
 pub use pinocchio_log::log;
@@ -42,7 +43,6 @@ pub use pinocchio_token as token;
 pub use pinocchio_token_2022 as token_2022;
 
 pub use crate::cpi::*;
-pub use crate::errors::*;
 pub use crate::traits::*;
 pub use crate::utils::*;
 
@@ -69,5 +69,4 @@ pub mod prelude {
 	#[cfg(feature = "logs")]
 	pub use super::Logger;
 	pub use crate::traits::*;
-	pub use crate::PinaError;
 }

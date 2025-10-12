@@ -14,6 +14,7 @@ rust-version = "1.84.1"
 
 [workspace.dependencies]
 bytemuck = { default-features = false, version = "^1" }
+darling = { default-features = false, version = "^0.21" }
 five8_const = { default-features = false, version = "^1" }
 mollusk-svm = { default-features = false, version = "^0.5" }
 num_enum = { default-features = false, version = "^0.7" }

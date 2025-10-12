@@ -6,6 +6,57 @@
 
 ## Attribute Macros
 
+### `#[discriminator]`
+
+This attribut macro should be used for annotating the globally shared instruction and account discriminators.
+
+#### Attributes
+
+- `primitive` - Defaults to `u8` which takes up 1 byte of space for the discriminator. This would allow up to 256 variations of the type being discriminated. The the type can be the following:
+  - `u8` - 256 variations
+  - `u16` - 65,536 variations
+  - `u32` - 4,294,967,296 variations
+  - `u64` - 18,446,744,073,709,551,616 variations (overkill!)
+- `crate` - this defaults to `::pina` as the developer is expected to have access to the `pina` crate in the dependencies.
+- `final` - By default all error enums are marked as `non_exhaustive`. The `final` flag will remove this annotation.
+
+The following:
+
+```rust
+use pina::*;
+
+#[discriminator(crate = ::pina, primitive = u8, final)]
+pub enum MyAccount {
+	ConfigState = 0,
+	GameState = 1,
+	SectionState = 2,
+}
+```
+
+Is transformed to:
+
+```rust
+use pina::*;
+
+#[repr(u8)]
+#[derive(
+	::core::fmt::macros::Debug,
+	::core::clone::Clone,
+	::core::marker::Copy,
+	::core::cmp::PartialEq,
+	::core::cmp::Eq,
+	::pina::IntoPrimitive,
+	::pina::TryFromPrimitive,
+)]
+pub enum MyAccount {
+	ConfigState = 0,
+	GameState = 1,
+	SectionState = 2,
+}
+
+::pina::into_discriminator!(MyAccount, u8);
+```
+
 ### `#[error]`
 
 `#[error]` is a lightweight modification to the provided enum acting as syntactic sugar to make it easier to manage your custom program errors.
@@ -13,7 +64,7 @@
 ```rust
 use pina::*;
 
-#[error(crate = ::pina, final = false)]
+#[error(crate = ::pina)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MyError {
 	/// Doc comments are significant as they will be read by a future parse to
@@ -27,7 +78,7 @@ pub enum MyError {
 The above is transformed into:
 
 ```rust
-#[non_exhaustive] // This is present if you haven't set the attribute `final` or it is set to false.
+#[non_exhaustive] // This is present if you haven't set the flag`final`.
 #[derive(
 	::core::fmt::macros::Debug,
 	::core::clone::Clone,
@@ -58,8 +109,7 @@ unsafe impl Pod for MyError {}
 #### Properties
 
 - `crate` - this defaults to `::pina` as the developer is expected to have access to the `pina` crate in the dependencies.
-
-- `final` - By default all error enums are marked as `non_exhaustive`. The `final` attribute will remove this. This attribute is optional.
+- `final` - By default all error enums are marked as `non_exhaustive`. The `final` flag will remove this.
 
 [crate-image]: https://img.shields.io/crates/v/pina_macros.svg
 [crate-link]: https://crates.io/crates/pina_macros

@@ -1,63 +1,16 @@
+use args::DiscriminatorArgs;
+use args::ErrorArgs;
+use darling::ast::NestedMeta;
+use darling::FromMeta;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::parse::Parse;
-use syn::parse::ParseStream;
 use syn::parse_macro_input;
 use syn::punctuated::Punctuated;
 use syn::Attribute;
 use syn::ItemEnum;
-use syn::LitBool;
 use syn::Token;
 
-struct ErrorArgs {
-	crate_path: Option<syn::Path>,
-	is_final: Option<LitBool>,
-}
-
-impl Parse for ErrorArgs {
-	fn parse(input: ParseStream) -> syn::Result<Self> {
-		let mut crate_path = None;
-		let mut is_final = None;
-
-		let metas = Punctuated::<syn::Meta, Token![,]>::parse_terminated(input)?;
-
-		for meta in metas {
-			if meta.path().is_ident("crate_path") {
-				let syn::Meta::NameValue(nv) = meta else {
-					continue;
-				};
-
-				let syn::Expr::Path(expr_path) = nv.value else {
-					continue;
-				};
-
-				crate_path = Some(expr_path.path);
-				continue;
-			}
-
-			if meta.path().is_ident("final") {
-				let syn::Meta::NameValue(nv) = meta else {
-					continue;
-				};
-
-				let syn::Expr::Lit(lit) = nv.value else {
-					continue;
-				};
-
-				let syn::Lit::Bool(lit_bool) = lit.lit else {
-					continue;
-				};
-
-				is_final = Some(lit_bool);
-			}
-		}
-
-		Ok(Self {
-			crate_path,
-			is_final,
-		})
-	}
-}
+mod args;
 
 /// `#[error]` is a lightweight modification to the provided enum acting as
 /// syntactic sugar to make it easier to manage your custom program errors.
@@ -65,7 +18,7 @@ impl Parse for ErrorArgs {
 /// ```rust
 /// use pina::*;
 ///
-/// #[error(crate_path = ::pina, final = false)]
+/// #[error(crate = ::pina)]
 /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// pub enum MyError {
 /// 	/// Doc comments are significant as they will be read by a future parser to
@@ -80,7 +33,7 @@ impl Parse for ErrorArgs {
 ///
 /// ```rust
 /// #[repr(u32)]
-/// #[non_exhaustive] // This is present if you haven't set the attribute `final` or it is set to false.
+/// #[non_exhaustive] // This is present if you haven't set the `final` flag.
 /// #[derive(
 /// 	::core::fmt::macros::Debug,
 /// 	::core::clone::Clone,
@@ -109,27 +62,42 @@ impl Parse for ErrorArgs {
 ///
 /// #### Properties
 ///
-/// - `crate_path` - this defaults to `::pina` as the developer is expected to
-///   have access to the `pina` crate in the dependencies.
+/// - `crate` - this defaults to `::pina` as the developer is expected to have
+///   access to the `pina` crate in the dependencies. This is optional and
+///   defaults to `::pina` assuming that `pina` is installed in the consuming
+///   crate.
 ///
 /// - `final` - By default all error enums are marked as `non_exhaustive`. The
-///   `final` attribute will remove this. This attribute is optional.
+///   `final` flag will remove this.
 #[proc_macro_attribute]
 pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
-	let args = parse_macro_input!(args as ErrorArgs);
+	let nested_metas = match NestedMeta::parse_meta_list(args.into()) {
+		Ok(value) => value,
+		Err(e) => {
+			return e.into_compile_error().into();
+		}
+	};
+
+	let args = match ErrorArgs::from_list(&nested_metas) {
+		Ok(v) => v,
+		Err(e) => {
+			return e.write_errors().into();
+		}
+	};
+
 	let mut item_enum = parse_macro_input!(input as ItemEnum);
 
-	let crate_path = args
-		.crate_path
-		.unwrap_or_else(|| syn::parse_str("::pina").unwrap());
-	let is_final = args.is_final.is_some_and(|lit| lit.value);
+	let ErrorArgs {
+		crate_path,
+		is_final,
+	} = args;
 
 	// Add #[repr(u32)]
 	let repr_attr: Attribute = syn::parse_quote!(#[repr(u32)]);
 	item_enum.attrs.push(repr_attr);
 
 	// Add #[non_exhaustive] if not final
-	if !is_final {
+	if !is_final.is_present() {
 		let non_exhaustive_attr: Attribute = syn::parse_quote!(#[non_exhaustive]);
 		item_enum.attrs.push(non_exhaustive_attr);
 	}
@@ -166,23 +134,20 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 
 	let enum_name = &item_enum.ident;
 
-	let from_impl = quote! {
+	let implementations = quote! {
 		impl ::core::convert::From<#enum_name> for #crate_path::ProgramError {
 			fn from(e: #enum_name) -> Self {
 				#crate_path::ProgramError::Custom(e as u32)
 			}
 		}
-	};
-	let bytemuck_impl = quote! {
+
 		unsafe impl #crate_path::Zeroable for #enum_name {}
 		unsafe impl #crate_path::Pod for #enum_name {}
-
 	};
 
 	let output = quote! {
 		#item_enum
-		#from_impl
-		#bytemuck_impl
+		#implementations
 	};
 
 	output.into()
