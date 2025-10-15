@@ -64,18 +64,7 @@ pub fn create_program_account_with_bump<'a, T: HasDiscriminator + Pod>(
 	bump: u8,
 ) -> ProgramResult {
 	// Allocate space.
-	allocate_account_with_bump(
-		target_account,
-		payer,
-		size_of::<T::Type>() + size_of::<T>(),
-		owner,
-		seeds,
-		bump,
-	)?;
-
-	// Set discriminator.
-	let mut data = target_account.try_borrow_mut_data()?;
-	T::write_discriminator(&mut data);
+	allocate_account_with_bump(target_account, payer, size_of::<T>(), owner, seeds, bump)?;
 
 	Ok(())
 }

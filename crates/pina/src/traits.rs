@@ -1,5 +1,3 @@
-use core::any;
-
 use bytemuck::Pod;
 
 use crate::AccountInfo;
@@ -20,8 +18,7 @@ where
 			return Err(ProgramError::InvalidAccountData);
 		}
 
-		bytemuck::try_from_bytes::<Self>(Self::strip_discriminator(data))
-			.or(Err(ProgramError::InvalidAccountData))
+		bytemuck::try_from_bytes::<Self>(data).or(Err(ProgramError::InvalidAccountData))
 	}
 
 	fn try_from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, ProgramError> {
@@ -29,59 +26,7 @@ where
 			return Err(ProgramError::InvalidAccountData);
 		}
 
-		bytemuck::try_from_bytes_mut::<Self>(Self::strip_discriminator_mut(data))
-			.or(Err(ProgramError::InvalidAccountData))
-	}
-}
-
-/// Account data is sometimes stored via a header and body type,
-/// where the former resolves the type of the latter (e.g. merkle trees with a
-/// generic size const). This trait parses a header type from the first N bytes
-/// of some data, and returns the remaining bytes, which are then available for
-/// further processing.
-///
-/// See module-level tests for example usage.
-pub trait AccountHeaderDeserialize {
-	fn try_header_from_bytes(data: &[u8]) -> Result<(&Self, &[u8]), ProgramError>;
-	fn try_header_from_bytes_mut(data: &mut [u8]) -> Result<(&mut Self, &mut [u8]), ProgramError>;
-}
-
-impl<T> AccountHeaderDeserialize for T
-where
-	T: HasDiscriminator + Pod,
-{
-	fn try_header_from_bytes(data: &[u8]) -> Result<(&Self, &[u8]), ProgramError> {
-		if !Self::matches_discriminator(data) {
-			return Err(ProgramError::InvalidAccountData);
-		}
-
-		let (prefix, remainder) = Self::strip_discriminator(data).split_at(Self::STRUCT_SPACE);
-		// let a0 = prefix[0];
-		// let a1 = prefix[1];
-		// let a2 = prefix[2];
-		// let a3 = prefix[3];
-		// let a4 = prefix[4];
-		// let a5 = prefix[5];
-		// let a6 = prefix[6];
-		// let a7 = prefix[7];
-		// let name = core::any::type_name::<Self>();
-		// let size = size_of::<Self>();
-
-		Ok((
-			bytemuck::try_from_bytes::<Self>(prefix).or(Err(ProgramError::InvalidAccountData))?,
-			remainder,
-		))
-	}
-
-	fn try_header_from_bytes_mut(data: &mut [u8]) -> Result<(&mut Self, &mut [u8]), ProgramError> {
-		let (prefix, remainder) =
-			Self::strip_discriminator_mut(data).split_at_mut(Self::STRUCT_SPACE);
-
-		Ok((
-			bytemuck::try_from_bytes_mut::<Self>(prefix)
-				.or(Err(ProgramError::InvalidAccountData))?,
-			remainder,
-		))
+		bytemuck::try_from_bytes_mut::<Self>(data).or(Err(ProgramError::InvalidAccountData))
 	}
 }
 
@@ -162,13 +107,22 @@ pub trait AccountInfoValidation {
 macro_rules! primitive_into_discriminator {
 	($type:ty) => {
 		impl IntoDiscriminator for $type {
+			fn discriminator_from_bytes(bytes: &[u8]) -> Result<Self, $crate::ProgramError> {
+				let sliced_bytes = &bytes[..Self::BYTES];
+				let mut discriminator_bytes = [0u8; Self::BYTES];
+				discriminator_bytes.copy_from_slice(sliced_bytes);
+
+				Ok(<$type>::from_le_bytes(discriminator_bytes))
+			}
+
 			fn write_discriminator(&self, bytes: &mut [u8]) {
+				assert!(bytes.len() >= Self::BYTES);
 				bytes.copy_from_slice(&self.to_le_bytes());
 			}
 
 			fn matches_discriminator(&self, bytes: &[u8]) -> bool {
-				assert!(bytes.len() >= Self::SPACE);
-				self.to_le_bytes().eq(&bytes[..Self::SPACE])
+				assert!(bytes.len() >= Self::BYTES);
+				self.to_le_bytes().eq(&bytes[..Self::BYTES])
 			}
 		}
 	};
@@ -181,13 +135,16 @@ primitive_into_discriminator!(u64);
 
 /// Wrap an enum to automatically make it into a discriminator.
 ///
-/// ```rust
+/// ```
 /// #[repr(u64)]
 /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// pub enum MyEnum {
-///   First = 0,
-///   Second = 1,
+/// 	First = 0,
+/// 	Second = 1,
 /// }
+///
+/// into_discriminator!(MyEnum, u64);
+/// ```
 #[macro_export]
 macro_rules! into_discriminator {
 	($enum:path, $type:ty) => {
@@ -206,6 +163,13 @@ macro_rules! into_discriminator {
 		);
 
 		impl $crate::IntoDiscriminator for $enum {
+			fn discriminator_from_bytes(
+				bytes: &[u8],
+			) -> ::core::result::Result<Self, $crate::ProgramError> {
+				<$type as $crate::IntoDiscriminator>::discriminator_from_bytes(bytes)
+					.and_then(|primitive| Self::try_from(primitive))
+			}
+
 			fn write_discriminator(&self, bytes: &mut [u8]) {
 				(*self as $type).write_discriminator(bytes);
 			}
@@ -218,8 +182,11 @@ macro_rules! into_discriminator {
 }
 
 pub trait IntoDiscriminator: Sized {
-	/// The space of this discriminator.
-	const SPACE: usize = size_of::<Self>();
+	/// The number of bytes required to store this discriminator.
+	const BYTES: usize = size_of::<Self>();
+
+	/// From a data slice check the first `SPACE` bytes.
+	fn discriminator_from_bytes(bytes: &[u8]) -> Result<Self, ProgramError>;
 
 	/// Write the discriminator to the provided bytes.
 	fn write_discriminator(&self, bytes: &mut [u8]);
@@ -229,22 +196,16 @@ pub trait IntoDiscriminator: Sized {
 	fn matches_discriminator(&self, bytes: &[u8]) -> bool;
 }
 
-/// This is the space that a discriminator always takes up to prevent alignment
-/// issues. Since the larges alignment size us u64. 8bytes is needed to ensure
-/// the alignement does not error.
-pub const DISCRIMINATOR_SPACE: usize = 8;
+/// This is the max number bytes that a discriminator can take to prevent
+/// alignment issues. Since the larges alignment size us u64. 8bytes is needed
+/// to ensure the alignement does not error.
+pub const MAX_DISCRIMINATOR_SPACE: usize = 8;
 
 pub trait HasDiscriminator: Sized {
 	/// The underling type of the discriminator.
 	type Type: IntoDiscriminator;
 	/// The vaue of the discriminator.
 	const VALUE: Self::Type;
-	/// The space used by the struct which implements this discriminator. This
-	/// does **NOT** include the space required for the [`IntoDiscriminator`].
-	const STRUCT_SPACE: usize = size_of::<Self>();
-	/// Get the total bytes needed to store this struct including it's
-	/// discriminator.
-	const SPACE: usize = DISCRIMINATOR_SPACE + Self::STRUCT_SPACE;
 
 	/// Write the discriminator bytes to the provided mutable bytes array.
 	#[inline(always)]
@@ -256,18 +217,6 @@ pub trait HasDiscriminator: Sized {
 	#[inline(always)]
 	fn matches_discriminator(bytes: &[u8]) -> bool {
 		Self::VALUE.matches_discriminator(bytes)
-	}
-
-	/// Strip the discriminator from the returnd slice.
-	#[inline(always)]
-	fn strip_discriminator(bytes: &[u8]) -> &[u8] {
-		&bytes[DISCRIMINATOR_SPACE..]
-	}
-
-	/// Strip the discriminator from the returned mutable bytes array slice.
-	#[inline(always)]
-	fn strip_discriminator_mut(bytes: &mut [u8]) -> &mut [u8] {
-		&mut bytes[DISCRIMINATOR_SPACE..]
 	}
 }
 
@@ -325,50 +274,10 @@ mod tests {
 	#![allow(unsafe_code)]
 	extern crate std;
 
-	use std::format;
-
 	use bytemuck::Pod;
 	use bytemuck::Zeroable;
 
 	use super::*;
-
-	#[repr(C)]
-	#[derive(Copy, Clone)]
-	struct GenericallySizedType<const N: usize> {
-		field: [u32; N],
-	}
-
-	unsafe impl<const N: usize> Zeroable for GenericallySizedType<N> {}
-	unsafe impl<const N: usize> Pod for GenericallySizedType<N> {}
-
-	#[repr(C)]
-	#[derive(Copy, Clone, Zeroable, Pod)]
-	struct GenericallySizedTypeHeader {
-		field_len: u64,
-	}
-
-	impl HasDiscriminator for GenericallySizedTypeHeader {
-		type Type = u8;
-
-		const VALUE: Self::Type = 0;
-	}
-
-	#[test]
-	fn account_headers() {
-		let mut data = [0u8; 32];
-		data[8] = 4;
-		data[16] = 5;
-		let (_foo_header, foo) = GenericallySizedTypeHeader::try_header_from_bytes(&data)
-			.map(|(header, remainder)| {
-				let foo = match header.field_len {
-					4 => bytemuck::try_from_bytes::<GenericallySizedType<4>>(remainder).unwrap(),
-					x => panic!("{}", format!("unknown field len, {x}")),
-				};
-				(header, foo)
-			})
-			.unwrap();
-		assert_eq!(5, foo.field[0]);
-	}
 
 	#[repr(C)]
 	#[derive(Copy, Clone, Zeroable, Pod)]
@@ -387,8 +296,8 @@ mod tests {
 	fn account_deserialize() {
 		let mut data = [0u8; 24];
 		data[0] = 7;
-		data[8] = 42;
-		data[16] = 43;
+		data[1] = 42;
+		data[9] = 43;
 		let foo = TestType::try_from_bytes(&data).unwrap();
 		assert_eq!(42, foo.field0);
 		assert_eq!(43, foo.field1);

@@ -10,12 +10,24 @@
 
 The account macro is used to annotate account data that will exist within a solana account.
 
+#### Attributes
+
+#### Codegen
+
 It will transform the following:
 
 ```rust
 use pina::*;
 
-#[account(crate = ::pina)]
+#[discriminator(crate = ::pina, primitive = u8, final)]
+pub enum MyAccount {
+	ConfigState = 0,
+	GameState = 1,
+	SectionState = 2,
+}
+
+#[account(crate = ::pina, discriminator = MyAccount)]
+#[derive(Debug)]
 pub struct ConfigState {
 	/// The version of the state.
 	pub version: u8,
@@ -44,17 +56,29 @@ Into:
 ```rust
 use pina::*;
 
+#[discriminator(crate = ::pina, primitive = u8, final)]
+pub enum MyAccount {
+	ConfigState = 0,
+	GameState = 1,
+	SectionState = 2,
+}
+
 #[repr(C)]
 #[derive(
-	::core::fmt::Debug,
+	Debug,
 	::core::clone::Clone,
 	::core::marker::Copy,
 	::core::cmp::PartialEq,
 	::core::cmp::Eq,
 	::pina::Pod,
 	::pina::Zeroable,
+	::pina::TypedBuilder,
 )]
+#[builder(builder_method(vis = "", name = __builder))]
 pub struct ConfigState {
+	// This discriminator is automatically injected as the first field in the struct. It must be
+	// present.
+	discriminator: [u8; MyAccount::BYTES],
 	/// The version of the state.
 	pub version: u8,
 	/// The authority which can update this config.
@@ -75,11 +99,110 @@ pub struct ConfigState {
 	/// There will be a maximum of 8 games.
 	pub game_index: u8,
 }
+
+// This type is generated to match the `TypedBuilder` type with the
+// discriminator already set.
+type ConfigStateBuilderType = ConfigStateBuilder<(
+	([u8; MyAccount::BYTES],), /* `discriminator`: automatically applied in the builder method
+	                            * below. */
+	(), // `version`
+	(), // `authority`
+	(), // `bump`
+	(), // `treasury_bump`
+	(), // `mint_bit_bump`
+	(), // `mint_kibibit_bump`
+	(), // `mint_mebibit_bump`
+	(), // `mint_gibibit_bump`
+	(), // `game_index`
+)>;
+
+impl ConfigState {
+	pub fn to_bytes(&self) -> &[u8] {
+		::pina::bytemuck::bytes_of(self)
+	}
+
+	pub fn builder() -> ConfigStateBuilderType {
+		let mut bytes = [0u8; MyAccount::BYTES];
+		<Self as ::pina::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
+
+		Self::__builder().discriminator(bytes)
+	}
+}
+
+impl ::pina::HasDiscriminator for ConfigState {
+	type Type = MyAccount;
+
+	const VALUE: Self::Type = MyAccount::ConfigState;
+}
+
+impl ::pina::AccountValidation for ConfigState {
+	#[track_caller]
+	fn assert<F>(&self, condition: F) -> Result<&Self, ::pina::ProgramError>
+	where
+		F: Fn(&Self) -> bool,
+	{
+		if condition(self) {
+			return Ok(self);
+		}
+
+		::pina::log!("Account is invalid");
+		::pina::log_caller();
+
+		Err(::pina::ProgramError::InvalidAccountData)
+	}
+
+	#[track_caller]
+	fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, ::pina::ProgramError>
+	where
+		F: Fn(&Self) -> bool,
+	{
+		match ::pina::assert(
+			condition(self),
+			::pina::ProgramError::InvalidAccountData,
+			msg,
+		) {
+			Err(err) => Err(err),
+			Ok(()) => Ok(self),
+		}
+	}
+
+	#[track_caller]
+	fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, ::pina::ProgramError>
+	where
+		F: Fn(&Self) -> bool,
+	{
+		if !condition(self) {
+			return Ok(self);
+		}
+
+		::pina::log!("Account is invalid");
+		::pina::log_caller();
+
+		Err(::pina::ProgramError::InvalidAccountData)
+	}
+
+	#[track_caller]
+	fn assert_mut_msg<F>(
+		&mut self,
+		condition: F,
+		msg: &str,
+	) -> Result<&mut Self, ::pina::ProgramError>
+	where
+		F: Fn(&Self) -> bool,
+	{
+		match ::pina::assert(
+			condition(self),
+			::pina::ProgramError::InvalidAccountData,
+			msg,
+		) {
+			Err(err) => Err(err),
+			Ok(()) => Ok(self),
+		}
+	}
+}
 ```
 
 ### `#[discriminator]`
-
-This attribute macro should be used for annotating the globally shared instruction and account discriminators.
 
 #### Attributes
 
@@ -89,7 +212,9 @@ This attribute macro should be used for annotating the globally shared instructi
   - `u32` - 4,294,967,296 variations
   - `u64` - 18,446,744,073,709,551,616 variations (overkill!)
 - `crate` - this defaults to `::pina` as the developer is expected to have access to the `pina` crate in the dependencies.
-- `final` - By default all error enums are marked as `non_exhaustive`. The `final` flag will remove this annotation.
+- `final` - By default all discriminator enums are marked as `non_exhaustive`. The `final` flag will remove this annotation.
+
+#### Codegen
 
 The following:
 
@@ -116,14 +241,38 @@ use pina::*;
 	::core::marker::Copy,
 	::core::cmp::PartialEq,
 	::core::cmp::Eq,
-	::pina::IntoPrimitive,
-	::pina::TryFromPrimitive,
 )]
-#[num_enum(error_type(name = ::pina::ProgramError, constructor = ::pina::num_enum::TryFromPrimitiveError::new))]
 pub enum MyAccount {
 	ConfigState = 0,
 	GameState = 1,
 	SectionState = 2,
+}
+
+impl From<MyAccount> for u8 {
+	#[inline]
+	fn from(enum_value: TryIt) -> Self {
+		enum_value as Self
+	}
+}
+
+impl ::core::convert::TryFrom<u8> for MyAccount {
+	type Error = ::pina::ProgramError;
+
+	#[inline]
+	fn try_from(number: u8) -> ::core::result::Result<Self, ::pina::ProgramError> {
+		#![allow(non_upper_case_globals)]
+		const __CONFIG_STATE: u8 = 0;
+		const __GAME_STATE: u8 = 1;
+		const __SECTION_STATE: u8 = 2;
+		#[deny(unreachable_patterns)]
+		match number {
+			__CONFIG_STATE => ::core::result::Result::Ok(Self::ConfigState),
+			__GAME_STATE => ::core::result::Result::Ok(Self::GameState),
+			__SECTION_STATE => ::core::result::Result::Ok(Self::SectionState),
+			#[allow(unreachable_patterns)]
+			_ => ::core::result::Result::Err(::pina::PinaError::InvalidDiscriminator.into()),
+		}
+	}
 }
 
 ::pina::into_discriminator!(MyAccount, u8);
@@ -157,7 +306,6 @@ The above is transformed into:
 	::core::marker::Copy,
 	::core::cmp::PartialEq,
 	::core::cmp::Eq,
-	::pina::IntoPrimitive, /* `IntoPrimitive` is added to the derive macros */
 )]
 #[repr(u32)]
 pub enum MyError {

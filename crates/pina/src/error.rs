@@ -5,5 +5,5 @@ use pina_macros::error;
 #[error(crate = crate)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PinaError {
-	TryFromPrimitiveError = 0xFFFF_FFFF,
+	InvalidDiscriminator = 0xFFFF_FFFF,
 }

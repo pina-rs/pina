@@ -11,9 +11,6 @@ mod utils;
 pub use bytemuck;
 pub use bytemuck::Pod;
 pub use bytemuck::Zeroable;
-pub use num_enum;
-pub use num_enum::IntoPrimitive;
-pub use num_enum::TryFromPrimitive;
 #[cfg(feature = "derive")]
 pub use pina_macros::*;
 pub use pinocchio;
@@ -42,6 +39,8 @@ pub use pinocchio_system as system;
 pub use pinocchio_token as token;
 #[cfg(feature = "token")]
 pub use pinocchio_token_2022 as token_2022;
+pub use typed_builder;
+pub use typed_builder::TypedBuilder;
 
 pub use crate::cpi::*;
 pub use crate::error::*;

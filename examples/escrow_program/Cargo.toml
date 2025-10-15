@@ -17,6 +17,7 @@ bpf-entrypoint = []
 [dependencies]
 bytemuck = { workspace = true }
 pina = { workspace = true, features = ["logs", "token", "derive"] }
+pinocchio-log = { workspace = true }
 
 [dev-dependencies]
 mollusk-svm = { workspace = true }

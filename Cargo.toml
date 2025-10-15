@@ -16,8 +16,8 @@ rust-version = "1.84.1"
 bytemuck = { default-features = false, version = "^1" }
 darling = { default-features = false, version = "^0.21" }
 five8_const = { default-features = false, version = "^1" }
+heck = { default-features = false, version = "^0.5" }
 mollusk-svm = { default-features = false, version = "^0.5" }
-num_enum = { default-features = false, version = "^0.7" }
 paste = { default-features = false, version = "^1" }
 pinocchio = { default-features = false, version = "^0.9" }
 pinocchio-associated-token-account = { default-features = false, version = "^0.2" }
@@ -36,6 +36,7 @@ syn = { default-features = false, version = "^2", features = ["full"] }
 test_utils_solana = { default-features = false, version = "^0.8" }
 thiserror = { default-features = false, version = "^2" }
 tokio = { default-features = false, version = "^1" }
+typed-builder = { default-features = false, version = "^0.22" }
 wasm_client_solana = { default-features = false, version = "^0.9" }
 
 # publishable crates

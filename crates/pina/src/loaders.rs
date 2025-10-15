@@ -5,6 +5,7 @@ use core::slice::from_raw_parts_mut;
 
 use pinocchio_system::instructions::Transfer;
 
+#[cfg(feature = "token")]
 use crate::assert;
 use crate::create_program_address;
 use crate::log;
@@ -14,6 +15,7 @@ use crate::try_find_program_address;
 use crate::AccountDeserialize;
 use crate::AccountInfo;
 use crate::AccountInfoValidation;
+#[cfg(feature = "token")]
 use crate::AccountValidation;
 use crate::AsAccount;
 #[cfg(feature = "token")]
@@ -103,7 +105,7 @@ impl AccountInfoValidation for AccountInfo {
 			return Err(ProgramError::InvalidAccountData);
 		}
 
-		if data.len() != T::SPACE {
+		if data.len() != size_of::<T>() {
 			log!(
 				"address: {} has invalid data length for the account type",
 				self.key()
@@ -323,7 +325,12 @@ impl AsAccount for AccountInfo {
 	{
 		self.assert_owner(program_id)?;
 
-		unsafe { T::try_from_bytes(from_raw_parts(self.try_borrow_data()?.as_ptr(), T::SPACE)) }
+		unsafe {
+			T::try_from_bytes(from_raw_parts(
+				self.try_borrow_data()?.as_ptr(),
+				size_of::<T>(),
+			))
+		}
 	}
 
 	#[track_caller]
@@ -336,7 +343,7 @@ impl AsAccount for AccountInfo {
 		unsafe {
 			T::try_from_bytes_mut(from_raw_parts_mut(
 				self.try_borrow_mut_data()?.as_mut_ptr(),
-				T::SPACE,
+				size_of::<T>(),
 			))
 		}
 	}

@@ -13,12 +13,12 @@ proc-macro = true
 
 [dependencies]
 darling = { workspace = true, default-features = true }
+heck = { workspace = true, default-features = true }
 proc-macro2 = { workspace = true, default-features = true }
 quote = { workspace = true, default-features = true }
 syn = { workspace = true, default-features = true, features = ["full"] }
 
 [dev-dependencies]
-num_enum = { workspace = true }
 pina = { workspace = true, default-features = true }
 
 [lints]

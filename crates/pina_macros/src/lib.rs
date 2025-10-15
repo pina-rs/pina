@@ -2,7 +2,9 @@ use args::DiscriminatorArgs;
 use args::ErrorArgs;
 use darling::ast::NestedMeta;
 use darling::FromMeta;
+use heck::ToShoutySnakeCase;
 use proc_macro::TokenStream;
+use quote::format_ident;
 use quote::quote;
 use syn::parse_macro_input;
 use syn::punctuated::Punctuated;
@@ -40,7 +42,6 @@ mod args;
 /// 	::core::marker::Copy,
 /// 	::core::cmp::PartialEq,
 /// 	::core::cmp::Eq,
-/// 	::pina::IntoPrimitive, /* `IntoPrimitive` is added to the derive macros */
 /// )]
 /// pub enum MyError {
 /// 	/// Doc comments are significant as they will be read by a future parser to
@@ -102,39 +103,8 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 		item_enum.attrs.push(non_exhaustive_attr);
 	}
 
-	// Add IntoPrimitive to derive macros
-	let into_primitive_path: syn::Path = syn::parse_quote!(#crate_path::IntoPrimitive);
-
-	if let Some(derive_attr) = item_enum
-		.attrs
-		.iter_mut()
-		.find(|attr| attr.path().is_ident("derive"))
-	{
-		// Get the existing derives
-		let existing_derives =
-			derive_attr.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated);
-
-		if let Ok(mut existing_derives) = existing_derives {
-			// Add our new derive
-			existing_derives.push(into_primitive_path);
-
-			// Create the new derive attribute
-			let new_derive_attr: Attribute = syn::parse_quote! {
-				#[derive(#existing_derives)]
-			};
-
-			// Replace the old attribute
-			*derive_attr = new_derive_attr;
-		}
-	} else {
-		// No derive attribute exists, so create one
-		let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#into_primitive_path)]);
-		item_enum.attrs.push(new_derive_attr);
-	}
-
 	let enum_name = &item_enum.ident;
-
-	let implementations = quote! {
+	let impls = quote! {
 		impl ::core::convert::From<#enum_name> for #crate_path::ProgramError {
 			fn from(e: #enum_name) -> Self {
 				#crate_path::ProgramError::Custom(e as u32)
@@ -147,7 +117,7 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 
 	let output = quote! {
 		#item_enum
-		#implementations
+		#impls
 	};
 
 	output.into()
@@ -195,10 +165,7 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 /// 	::core::marker::Copy,
 /// 	::core::cmp::PartialEq,
 /// 	::core::cmp::Eq,
-/// 	::pina::IntoPrimitive,
-/// 	::pina::TryFromPrimitive,
 /// )]
-/// #[num_enum(error_type(name = ::pina::ProgramError, constructor = MyAccount::try_from_primitive_error))]
 /// pub enum MyAccount {
 /// 	ConfigState = 0,
 /// 	GameState = 1,
@@ -206,9 +173,9 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 /// }
 ///
 /// impl MyAccount {
-///   fn try_from_primitive_error(_primitive: u8) ->
-///     ::pina::ProgramError { ::pina::PinaError::TryFromPrimitiveError.into()
-///   }
+/// 	fn try_from_primitive_error(_primitive: u8) -> ::pina::ProgramError {
+/// 		::pina::PinaError::InvalidDiscriminator.into()
+/// 	}
 /// }
 ///
 /// ::pina::into_discriminator!(MyAccount, u8);
@@ -249,14 +216,12 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 	}
 
 	// Add derive macros
-	let derives_to_add: [syn::Path; 7] = [
+	let derives_to_add: [syn::Path; 5] = [
 		syn::parse_quote!(::core::fmt::Debug),
 		syn::parse_quote!(::core::clone::Clone),
 		syn::parse_quote!(::core::marker::Copy),
 		syn::parse_quote!(::core::cmp::PartialEq),
 		syn::parse_quote!(::core::cmp::Eq),
-		syn::parse_quote!(#crate_path::IntoPrimitive),
-		syn::parse_quote!(#crate_path::TryFromPrimitive),
 	];
 
 	if let Some(derive_attr) = item_enum
@@ -292,25 +257,61 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 		item_enum.attrs.push(new_derive_attr);
 	}
 
-	// Add num_enum attribute
-	let num_enum_attr: Attribute = syn::parse_quote! {
-		#[num_enum(error_type(name = #crate_path::ProgramError, constructor = #enum_name::try_from_primitive_error))]
-	};
-	item_enum.attrs.push(num_enum_attr);
+	let mut consts = Vec::new();
+	let mut match_arms = Vec::new();
+	for variant in &item_enum.variants {
+		if let Some((_, discriminant)) = &variant.discriminant {
+			let variant_name = &variant.ident;
+			let const_ident =
+				format_ident!("__{}", variant_name.to_string().to_shouty_snake_case());
 
-	let implementation = quote! {
-		#crate_path::into_discriminator!(#enum_name, #primitive);
+			consts.push(quote! {
+				const #const_ident: #primitive = #discriminant;
+			});
 
-		impl #enum_name {
-			fn try_from_primitive_error(_primitive: #primitive) -> #crate_path::ProgramError {
-				#crate_path::PinaError::TryFromPrimitiveError.into()
+			match_arms.push(quote! {
+				#const_ident => ::core::result::Result::Ok(Self::#variant_name),
+			});
+		} else {
+			return syn::Error::new_spanned(
+				variant,
+				"Enum variant for discriminator must have an explicit value.",
+			)
+			.to_compile_error()
+			.into();
+		}
+	}
+
+	let implementations = quote! {
+		impl From<#enum_name> for #primitive {
+			#[inline]
+			fn from(enum_value: #enum_name) -> Self {
+				enum_value as Self
 			}
 		}
+
+		impl ::core::convert::TryFrom<#primitive> for #enum_name {
+			type Error = #crate_path::ProgramError;
+
+			#[inline]
+			fn try_from(number: #primitive) -> ::core::result::Result<Self, #crate_path::ProgramError> {
+				#![allow(non_upper_case_globals)]
+				#(#consts)*
+				#[deny(unreachable_patterns)]
+				match number {
+					#(#match_arms)*
+					#[allow(unreachable_patterns)]
+					_ => ::core::result::Result::Err(#crate_path::PinaError::InvalidDiscriminator.into()),
+				}
+			}
+		}
+
+		#crate_path::into_discriminator!(#enum_name, #primitive);
 	};
 
 	let output = quote! {
 		#item_enum
-		#implementation
+		#implementations
 	};
 
 	output.into()
