@@ -12,6 +12,15 @@ pub(crate) struct AccountArgs {
 }
 
 #[derive(Debug, FromMeta)]
+pub(crate) struct InstructionArgs {
+	/// Set the path to the crate
+	#[darling(default = "default_crate_path", rename = "crate")]
+	pub(crate) crate_path: syn::Path,
+	/// Set the discriminator enum for this instruction.
+	pub(crate) discriminator: syn::Path,
+}
+
+#[derive(Debug, FromMeta)]
 pub(crate) struct ErrorArgs {
 	/// Set the path to the crate
 	#[darling(default = "default_crate_path", rename = "crate")]

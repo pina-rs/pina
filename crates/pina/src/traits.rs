@@ -147,6 +147,7 @@ primitive_into_discriminator!(u64);
 ///
 /// impl TryFrom<u64> for MyEnum {
 /// 	type Error = ::pina::ProgramError;
+///
 /// 	#[inline]
 /// 	fn try_from(number: u64) -> ::core::result::Result<Self, ::pina::ProgramError> {
 /// 		#![allow(non_upper_case_globals)]
@@ -199,7 +200,6 @@ macro_rules! into_discriminator {
 		}
 	};
 }
-
 
 pub trait IntoDiscriminator: Sized {
 	/// The number of bytes required to store this discriminator.

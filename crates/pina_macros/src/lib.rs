@@ -15,6 +15,8 @@ use syn::ItemEnum;
 use syn::ItemStruct;
 use syn::Token;
 
+use crate::args::InstructionArgs;
+
 mod args;
 
 /// `#[error]` is a lightweight modification to the provided enum acting as
@@ -126,17 +128,22 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 	output.into()
 }
 
-/// This attribute macro should be used for annotating the globally shared instruction and account discriminators.
+/// This attribute macro should be used for annotating the globally shared
+/// instruction and account discriminators.
 ///
 /// #### Attributes
 ///
-/// - `primitive` - Defaults to `u8` which takes up 1 byte of space for the discriminator. This would allow up to 256 variations of the type being discriminated. The type can be the following:
+/// - `primitive` - Defaults to `u8` which takes up 1 byte of space for the
+///   discriminator. This would allow up to 256 variations of the type being
+///   discriminated. The type can be the following:
 ///   - `u8` - 256 variations
 ///   - `u16` - 65,536 variations
 ///   - `u32` - 4,294,967,296 variations
 ///   - `u64` - 18,446,744,073,709,551,616 variations (overkill!)
-/// - `crate` - this defaults to `::pina` as the developer is expected to have access to the `pina` crate in the dependencies.
-/// - `final` - By default all discriminator enums are marked as `non_exhaustive`. The `final` flag will remove this annotation.
+/// - `crate` - this defaults to `::pina` as the developer is expected to have
+///   access to the `pina` crate in the dependencies.
+/// - `final` - By default all discriminator enums are marked as
+///   `non_exhaustive`. The `final` flag will remove this annotation.
 ///
 /// #### Codegen
 ///
@@ -174,7 +181,7 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// impl ::core::convert::From<MyAccount> for u8 {
 /// 	#[inline]
-/// 	fn from(enum_value: TryIt) -> Self {
+/// 	fn from(enum_value: MyAccount) -> Self {
 /// 		enum_value as Self
 /// 	}
 /// }
@@ -338,13 +345,17 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 	output.into()
 }
 
-/// The account macro is used to annotate account data that will exist within a solana account.
+/// The account macro is used to annotate account data that will exist within a
+/// solana account.
 ///
 /// #### Properties
 ///
-/// - `crate` - this defaults to `::pina` as the developer is expected to have access to the `pina` crate in the dependencies.
-///   This is optional and defaults to `::pina` assuming that `pina` is installed in the consuming crate.
-/// - `discriminator` - the discriminator enum to use for this account. The variant should match the name of the account struct.
+/// - `crate` - this defaults to `::pina` as the developer is expected to have
+///   access to the `pina` crate in the dependencies. This is optional and
+///   defaults to `::pina` assuming that `pina` is installed in the consuming
+///   crate.
+/// - `discriminator` - the discriminator enum to use for this account. The
+///   variant should match the name of the account struct.
 ///
 /// #### Codegen
 ///
@@ -408,6 +419,7 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 /// 	::pina::Zeroable,
 /// 	::pina::TypedBuilder,
 /// )]
+/// #[bytemuck(crate = "::pina::bytemuck")]
 /// #[builder(builder_method(vis = "", name = __builder))]
 /// pub struct ConfigState {
 /// 	// This discriminator is automatically injected as the first field in the struct. It must be
@@ -614,6 +626,13 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 		item_struct.attrs.push(new_derive_attr);
 	}
 
+	let bytemuck_crate_str = format!(
+		"{}::bytemuck",
+		quote!(#crate_path).to_string().replace(' ', "")
+	);
+	let bytemuck_attr: Attribute = syn::parse_quote!(#[bytemuck(crate = #bytemuck_crate_str)]);
+	item_struct.attrs.push(bytemuck_attr);
+
 	// Add discriminator field
 	if let Fields::Named(named_fields) = &mut item_struct.fields {
 		let discriminator_field = syn::parse_quote! {
@@ -722,6 +741,258 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 					Ok(()) => Ok(self),
 				}
 			}
+		}
+	};
+
+	let output = quote! {
+		#item_struct
+		#implementations
+	};
+
+	output.into()
+}
+
+/// The instruction macro is used to annotate instruction data that will exist
+/// within a solana instruction.
+///
+/// #### Attributes
+///
+/// - `discriminator` - the discriminator enum to use for this instruction. The
+///   variant should match the name of the instruction struct.
+///
+/// #### Codegen
+///
+/// It will transform the following:
+///
+/// ```rust
+/// use pina::*;
+///
+/// #[discriminator(crate = ::pina, primitive = u8, final)]
+/// pub enum MyInstruction {
+/// 	Add = 0,
+/// 	FlipBit = 1,
+/// }
+///
+/// #[instruction(crate = ::pina, discriminator = MyInstruction)]
+/// #[derive(Debug)]
+/// pub struct FlipBit {
+/// 	/// The data section being updated.
+/// 	pub section_index: u8,
+/// 	/// The index of the `u16` value in the array.
+/// 	pub array_index: u8,
+/// 	/// The offset of the bit being set.
+/// 	pub offset: u8,
+/// 	/// The value to set the bit to: `0` or `1`.
+/// 	pub value: u8,
+/// }
+/// ```
+///
+/// Is transformed to:
+///
+/// ```rust
+/// use pina::*;
+///
+/// #[discriminator(crate = ::pina, primitive = u8, final)]
+/// pub enum MyInstruction {
+/// 	Add = 0,
+/// 	FlipBit = 1,
+/// }
+///
+/// #[repr(C)]
+/// #[derive(
+/// 	Debug,
+/// 	::core::clone::Clone,
+/// 	::core::marker::Copy,
+/// 	::core::cmp::PartialEq,
+/// 	::core::cmp::Eq,
+/// 	::pina::Pod,
+/// 	::pina::Zeroable,
+/// 	::pina::TypedBuilder,
+/// )]
+/// #[builder(builder_method(vis = "", name = __builder))]
+/// #[bytemuck(crate = "::pina::bytemuck")]
+/// pub struct FlipBit {
+/// 	// This discriminator is automatically injected as the first field in the struct. It must be
+/// 	// present.
+/// 	discriminator: [u8; MyInstruction::BYTES],
+/// 	/// The data section being updated.
+/// 	pub section_index: u8,
+/// 	/// The index of the `u16` value in the array.
+/// 	pub array_index: u8,
+/// 	/// The offset of the bit being set.
+/// 	pub offset: u8,
+/// 	/// The value to set the bit to: `0` or `1`.
+/// 	pub value: u8,
+/// }
+///
+/// // This type is generated to match the `TypedBuilder` type with the
+/// // discriminator already set.
+/// type FlipBitBuilderType = FlipBitBuilder<(
+/// 	([u8; MyInstruction::BYTES],), /* `discriminator`: automatically applied in the builder
+/// 	                                * method below. */
+/// 	(), // `section_index`
+/// 	(), // `array_index`
+/// 	(), // `offset`
+/// 	(), // `value`
+/// )>;
+///
+/// impl FlipBit {
+/// 	pub fn to_bytes(&self) -> &[u8] {
+/// 		::pina::bytemuck::bytes_of(self)
+/// 	}
+///
+/// 	pub fn try_from_bytes(data: &[u8]) -> Result<&Self, ::pina::ProgramError> {
+/// 		::pina::bytemuck::try_from_bytes::<Self>(data)
+/// 			.or(Err(::pina::ProgramError::InvalidInstructionData))
+/// 	}
+///
+/// 	pub fn builder() -> FlipBitBuilderType {
+/// 		let mut bytes = [0u8; MyInstruction::BYTES];
+/// 		<Self as ::pina::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
+///
+/// 		Self::__builder().discriminator(bytes)
+/// 	}
+/// }
+///
+/// impl ::pina::HasDiscriminator for FlipBit {
+/// 	type Type = MyInstruction;
+///
+/// 	const VALUE: Self::Type = MyInstruction::FlipBit;
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
+	let nested_metas = match NestedMeta::parse_meta_list(args.into()) {
+		Ok(value) => value,
+		Err(e) => {
+			return e.into_compile_error().into();
+		}
+	};
+
+	let args = match InstructionArgs::from_list(&nested_metas) {
+		Ok(v) => v,
+		Err(e) => {
+			return e.write_errors().into();
+		}
+	};
+
+	let mut item_struct = parse_macro_input!(input as ItemStruct);
+	let struct_name = &item_struct.ident;
+	let builder_name = format_ident!("{}Builder", struct_name);
+
+	let InstructionArgs {
+		crate_path,
+		discriminator,
+	} = args;
+
+	// Add #[repr(C)]
+	let repr_attr: Attribute = syn::parse_quote!(#[repr(C)]);
+	item_struct.attrs.push(repr_attr);
+
+	// Add builder attribute
+	let builder_attr: Attribute =
+		syn::parse_quote!(#[builder(builder_method(vis = "", name = __builder))]);
+	item_struct.attrs.push(builder_attr);
+
+	// Add derive macros
+	let derives_to_add: [syn::Path; 8] = [
+		syn::parse_quote!(#crate_path::TypedBuilder),
+		syn::parse_quote!(#crate_path::Pod),
+		syn::parse_quote!(#crate_path::Zeroable),
+		syn::parse_quote!(::core::clone::Clone),
+		syn::parse_quote!(::core::marker::Copy),
+		syn::parse_quote!(::core::cmp::PartialEq),
+		syn::parse_quote!(::core::cmp::Eq),
+		syn::parse_quote!(::core::fmt::Debug),
+	];
+
+	if let Some(derive_attr) = item_struct
+		.attrs
+		.iter_mut()
+		.find(|attr| attr.path().is_ident("derive"))
+	{
+		let existing_derives_result =
+			derive_attr.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated);
+
+		if let Ok(mut existing_derives) = existing_derives_result {
+			let existing_derive_names: std::collections::HashSet<String> = existing_derives
+				.iter()
+				.map(|p| p.segments.last().unwrap().ident.to_string())
+				.collect();
+
+			for derive_to_add in &derives_to_add {
+				let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
+				if !existing_derive_names.contains(&to_add_name) {
+					existing_derives.push(derive_to_add.clone());
+				}
+			}
+
+			let new_derive_attr: Attribute = syn::parse_quote! {
+				#[derive(#existing_derives)]
+			};
+
+			*derive_attr = new_derive_attr;
+		}
+	} else {
+		// No derive attribute exists, so create one
+		let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
+		item_struct.attrs.push(new_derive_attr);
+	}
+
+	let bytemuck_crate_str = format!(
+		"{}::bytemuck",
+		quote!(#crate_path).to_string().replace(' ', "")
+	);
+	let bytemuck_attr: Attribute = syn::parse_quote!(#[bytemuck(crate = #bytemuck_crate_str)]);
+	item_struct.attrs.push(bytemuck_attr);
+
+	// Add discriminator field
+	if let Fields::Named(named_fields) = &mut item_struct.fields {
+		let discriminator_field = syn::parse_quote! {
+			discriminator: [u8; #discriminator::BYTES]
+		};
+		named_fields.named.insert(0, discriminator_field);
+	} else {
+		return syn::Error::new_spanned(item_struct, "Instruction structs must have named fields")
+			.to_compile_error()
+			.into();
+	}
+
+	let builder_generics = (0..item_struct.fields.len() - 1)
+		.map(|_| quote! { () })
+		.collect::<Vec<_>>();
+
+	let builder_type_alias = format_ident!("{}BuilderType", struct_name);
+
+	let implementations = quote! {
+		#[allow(dead_code)]
+		type #builder_type_alias = #builder_name<(
+			([u8; #discriminator::BYTES],),
+			#(#builder_generics,)*
+		)>;
+
+		impl #struct_name {
+			pub fn to_bytes(&self) -> &[u8] {
+				#crate_path::bytemuck::bytes_of(self)
+			}
+
+			pub fn try_from_bytes(data: &[u8]) -> Result<&Self, #crate_path::ProgramError> {
+				#crate_path::bytemuck::try_from_bytes::<Self>(data)
+					.or(Err(#crate_path::ProgramError::InvalidInstructionData))
+			}
+
+			pub fn builder() -> #builder_type_alias {
+				let mut bytes = [0u8; #discriminator::BYTES];
+				<Self as #crate_path::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
+
+				Self::__builder().discriminator(bytes)
+			}
+		}
+
+		impl #crate_path::HasDiscriminator for #struct_name {
+			type Type = #discriminator;
+
+			const VALUE: Self::Type = #discriminator::#struct_name;
 		}
 	};
 

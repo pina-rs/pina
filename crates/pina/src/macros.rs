@@ -61,26 +61,3 @@ macro_rules! event {
 		}
 	};
 }
-
-#[macro_export]
-macro_rules! instruction {
-	($discriminator_name:ident, $struct_name:ident) => {
-		$crate::impl_instruction_from_bytes!($struct_name);
-
-		impl $crate::Discriminator for $struct_name {
-			fn discriminator() -> u8 {
-				$discriminator_name::$struct_name as u8
-			}
-		}
-
-		impl $struct_name {
-			pub fn to_bytes(&self) -> Vec<u8> {
-				[
-					[$discriminator_name::$struct_name as u8].to_vec(),
-					bytemuck::bytes_of(self).to_vec(),
-				]
-				.concat()
-			}
-		}
-	};
-}

@@ -78,6 +78,7 @@ pub enum MyAccount {
 	::pina::TypedBuilder,
 )]
 #[builder(builder_method(vis = "", name = __builder))]
+#[bytemuck(crate = "::pina::bytemuck")]
 pub struct ConfigState {
 	// This discriminator is automatically injected as the first field in the struct. It must be
 	// present.
@@ -283,6 +284,115 @@ impl ::core::convert::TryFrom<u8> for MyAccount {
 ::pina::into_discriminator!(MyAccount, u8);
 ```
 
+### `#[instruction]`
+
+The instruction macro is used to annotate instruction data that will exist within a solana instruction.
+
+#### Attributes
+
+- `discriminator` - the discriminator enum to use for this instruction. The variant should match the name of the instruction struct.
+
+#### Codegen
+
+It will transform the following:
+
+```rust
+use pina::*;
+
+#[discriminator(crate = ::pina, primitive = u8, final)]
+pub enum MyInstruction {
+	Add = 0,
+	FlipBit = 1,
+}
+
+#[instruction(crate = ::pina, discriminator = MyInstruction)]
+#[derive(Debug)]
+pub struct FlipBit {
+	/// The data section being updated.
+	pub section_index: u8,
+	/// The index of the `u16` value in the array.
+	pub array_index: u8,
+	/// The offset of the bit being set.
+	pub offset: u8,
+	/// The value to set the bit to: `0` or `1`.
+	pub value: u8,
+}
+```
+
+Is transformed to:
+
+```rust
+use pina::*;
+
+#[discriminator(crate = ::pina, primitive = u8, final)]
+pub enum MyInstruction {
+	Add = 0,
+	FlipBit = 1,
+}
+
+#[repr(C)]
+#[derive(
+	Debug,
+	::core::clone::Clone,
+	::core::marker::Copy,
+	::core::cmp::PartialEq,
+	::core::cmp::Eq,
+	::pina::Pod,
+	::pina::Zeroable,
+	::pina::TypedBuilder,
+)]
+#[builder(builder_method(vis = "", name = __builder))]
+#[bytemuck(crate = "::pina::bytemuck")]
+pub struct FlipBit {
+	// This discriminator is automatically injected as the first field in the struct. It must be
+	// present.
+	discriminator: [u8; MyInstruction::BYTES],
+	/// The data section being updated.
+	pub section_index: u8,
+	/// The index of the `u16` value in the array.
+	pub array_index: u8,
+	/// The offset of the bit being set.
+	pub offset: u8,
+	/// The value to set the bit to: `0` or `1`.
+	pub value: u8,
+}
+
+// This type is generated to match the `TypedBuilder` type with the
+// discriminator already set.
+type ConfigStateBuilderType = ConfigStateBuilder<(
+	([u8; MyInstruction::BYTES],), /* `discriminator`: automatically applied in the builder
+	                                * method below. */
+	(), // `section_index`
+	(), // `array_index`
+	(), // `offset`
+	(), // `value`
+)>;
+
+impl FlipBit {
+	pub fn to_bytes(&self) -> &[u8] {
+		::pina::bytemuck::bytes_of(self)
+	}
+
+	pub fn try_from_bytes(data: &[u8]) -> Result<&Self, ::pina::ProgramError> {
+		::pina::bytemuck::try_from_bytes::<Self>(data)
+			.or(Err(::pina::ProgramError::InvalidInstructionData))
+	}
+
+	pub fn builder() -> FlipBitBuilderType {
+		let mut bytes = [0u8; MyInstruction::BYTES];
+		<Self as ::pina::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
+
+		Self::__builder().discriminator(bytes)
+	}
+}
+
+impl ::pina::HasDiscriminator for FlipBit {
+	type Type = MyInstruction;
+
+	const VALUE: Self::Type = MyInstruction::FlipBit;
+}
+```
+
 ### `#[error]`
 
 `#[error]` is a lightweight modification to the provided enum acting as syntactic sugar to make it easier to manage your custom program errors.
@@ -346,3 +456,6 @@ unsafe impl Pod for MyError {}
 [unlicense-link]: https://opensource.org/license/unlicense
 [codecov-image]: https://codecov.io/github/pina-rs/pina/graph/badge.svg?token=87K799Q78I
 [codecov-link]: https://codecov.io/github/pina-rs/pina
+
+```
+```

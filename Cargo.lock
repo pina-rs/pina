@@ -1698,6 +1698,7 @@ dependencies = [
  "darling",
  "heck",
  "pina",
+ "pinocchio-log",
  "proc-macro2",
  "quote",
  "syn 2.0.106",
