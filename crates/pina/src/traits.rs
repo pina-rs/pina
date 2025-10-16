@@ -136,11 +136,30 @@ primitive_into_discriminator!(u64);
 /// Wrap an enum to automatically make it into a discriminator.
 ///
 /// ```
+/// use pina::*;
+///
 /// #[repr(u64)]
 /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// pub enum MyEnum {
 /// 	First = 0,
 /// 	Second = 1,
+/// }
+///
+/// impl TryFrom<u64> for MyEnum {
+/// 	type Error = ::pina::ProgramError;
+/// 	#[inline]
+/// 	fn try_from(number: u64) -> ::core::result::Result<Self, ::pina::ProgramError> {
+/// 		#![allow(non_upper_case_globals)]
+/// 		const ___FIRST: u64 = 0;
+/// 		const ___SECOND: u64 = 1;
+/// 		#[deny(unreachable_patterns)]
+/// 		match number {
+/// 			___FIRST => ::core::result::Result::Ok(Self::First),
+/// 			___SECOND => ::core::result::Result::Ok(Self::Second),
+/// 			#[allow(unreachable_patterns)]
+/// 			_ => ::core::result::Result::Err(::pina::PinaError::InvalidDiscriminator.into()),
+/// 		}
+/// 	}
 /// }
 ///
 /// into_discriminator!(MyEnum, u64);
@@ -180,6 +199,7 @@ macro_rules! into_discriminator {
 		}
 	};
 }
+
 
 pub trait IntoDiscriminator: Sized {
 	/// The number of bytes required to store this discriminator.
@@ -278,12 +298,14 @@ mod tests {
 	use bytemuck::Zeroable;
 
 	use super::*;
+	use crate::PodU64;
 
 	#[repr(C)]
 	#[derive(Copy, Clone, Zeroable, Pod)]
 	struct TestType {
-		field0: u64,
-		field1: u64,
+		discriminator: [u8; 1],
+		field0: PodU64,
+		field1: PodU64,
 	}
 
 	impl HasDiscriminator for TestType {
@@ -294,12 +316,12 @@ mod tests {
 
 	#[test]
 	fn account_deserialize() {
-		let mut data = [0u8; 24];
+		let mut data = [0u8; 17];
 		data[0] = 7;
 		data[1] = 42;
 		data[9] = 43;
 		let foo = TestType::try_from_bytes(&data).unwrap();
-		assert_eq!(42, foo.field0);
-		assert_eq!(43, foo.field1);
+		assert_eq!(42u64, foo.field0.into());
+		assert_eq!(43u64, foo.field1.into());
 	}
 }

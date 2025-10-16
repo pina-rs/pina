@@ -1,3 +1,4 @@
+use args::AccountArgs;
 use args::DiscriminatorArgs;
 use args::ErrorArgs;
 use darling::ast::NestedMeta;
@@ -9,7 +10,9 @@ use quote::quote;
 use syn::parse_macro_input;
 use syn::punctuated::Punctuated;
 use syn::Attribute;
+use syn::Fields;
 use syn::ItemEnum;
+use syn::ItemStruct;
 use syn::Token;
 
 mod args;
@@ -123,29 +126,26 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 	output.into()
 }
 
-/// This attribute macro should be used for annotating the globally shared
-/// instruction and account discriminators.
+/// This attribute macro should be used for annotating the globally shared instruction and account discriminators.
 ///
 /// #### Attributes
 ///
-/// - `primitive` - Defaults to `u8` which takes up 1 byte of space for the
-///   discriminator. This would allow up to 256 variations of the type being
-///   discriminated. The type can be the following:
+/// - `primitive` - Defaults to `u8` which takes up 1 byte of space for the discriminator. This would allow up to 256 variations of the type being discriminated. The type can be the following:
 ///   - `u8` - 256 variations
 ///   - `u16` - 65,536 variations
 ///   - `u32` - 4,294,967,296 variations
 ///   - `u64` - 18,446,744,073,709,551,616 variations (overkill!)
-/// - `crate` - this defaults to `::pina` as the developer is expected to have
-///   access to the `pina` crate in the dependencies.
-/// - `final` - By default all error enums are marked as `non_exhaustive`. The
-///   `final` flag will remove this annotation.
+/// - `crate` - this defaults to `::pina` as the developer is expected to have access to the `pina` crate in the dependencies.
+/// - `final` - By default all discriminator enums are marked as `non_exhaustive`. The `final` flag will remove this annotation.
+///
+/// #### Codegen
 ///
 /// The following:
 ///
-/// ```
+/// ```rust
 /// use pina::*;
 ///
-/// #[discriminator(crate = pina, primitive = u16, final)]
+/// #[discriminator(crate = ::pina, primitive = u8, final)]
 /// pub enum MyAccount {
 /// 	ConfigState = 0,
 /// 	GameState = 1,
@@ -155,7 +155,7 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// Is transformed to:
 ///
-/// ```
+/// ```rust
 /// use pina::*;
 ///
 /// #[repr(u8)]
@@ -172,9 +172,30 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 /// 	SectionState = 2,
 /// }
 ///
-/// impl MyAccount {
-/// 	fn try_from_primitive_error(_primitive: u8) -> ::pina::ProgramError {
-/// 		::pina::PinaError::InvalidDiscriminator.into()
+/// impl ::core::convert::From<MyAccount> for u8 {
+/// 	#[inline]
+/// 	fn from(enum_value: TryIt) -> Self {
+/// 		enum_value as Self
+/// 	}
+/// }
+///
+/// impl ::core::convert::TryFrom<u8> for MyAccount {
+/// 	type Error = ::pina::ProgramError;
+///
+/// 	#[inline]
+/// 	fn try_from(number: u8) -> ::core::result::Result<Self, ::pina::ProgramError> {
+/// 		#![allow(non_upper_case_globals)]
+/// 		const __CONFIG_STATE: u8 = 0;
+/// 		const __GAME_STATE: u8 = 1;
+/// 		const __SECTION_STATE: u8 = 2;
+/// 		#[deny(unreachable_patterns)]
+/// 		match number {
+/// 			__CONFIG_STATE => ::core::result::Result::Ok(Self::ConfigState),
+/// 			__GAME_STATE => ::core::result::Result::Ok(Self::GameState),
+/// 			__SECTION_STATE => ::core::result::Result::Ok(Self::SectionState),
+/// 			#[allow(unreachable_patterns)]
+/// 			_ => ::core::result::Result::Err(::pina::PinaError::InvalidDiscriminator.into()),
+/// 		}
 /// 	}
 /// }
 ///
@@ -283,7 +304,7 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 	}
 
 	let implementations = quote! {
-		impl From<#enum_name> for #primitive {
+		impl ::core::convert::From<#enum_name> for #primitive {
 			#[inline]
 			fn from(enum_value: #enum_name) -> Self {
 				enum_value as Self
@@ -311,6 +332,401 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 
 	let output = quote! {
 		#item_enum
+		#implementations
+	};
+
+	output.into()
+}
+
+/// The account macro is used to annotate account data that will exist within a solana account.
+///
+/// #### Properties
+///
+/// - `crate` - this defaults to `::pina` as the developer is expected to have access to the `pina` crate in the dependencies.
+///   This is optional and defaults to `::pina` assuming that `pina` is installed in the consuming crate.
+/// - `discriminator` - the discriminator enum to use for this account. The variant should match the name of the account struct.
+///
+/// #### Codegen
+///
+/// It will transform the following:
+///
+/// ```rust
+/// use pina::*;
+///
+/// #[discriminator(crate = ::pina, primitive = u8, final)]
+/// pub enum MyAccount {
+/// 	ConfigState = 0,
+/// 	GameState = 1,
+/// 	SectionState = 2,
+/// }
+///
+/// #[account(crate = ::pina, discriminator = MyAccount)]
+/// #[derive(Debug)]
+/// pub struct ConfigState {
+/// 	/// The version of the state.
+/// 	pub version: u8,
+/// 	/// The authority which can update this config.
+/// 	pub authority: Pubkey,
+/// 	/// Store the bump to save compute units.
+/// 	pub bump: u8,
+/// 	/// The treasury account bump where fees are sent and where the minted
+/// 	/// tokens are transferred.
+/// 	pub treasury_bump: u8,
+/// 	/// The mint account bump.
+/// 	pub mint_bit_bump: u8,
+/// 	/// The mint account bump for KIBIBIT.
+/// 	pub mint_kibibit_bump: u8,
+/// 	/// The mint account bump for MEBIBIT.
+/// 	pub mint_mebibit_bump: u8,
+/// 	/// The mint account bump for GIBIBIT.
+/// 	pub mint_gibibit_bump: u8,
+/// 	/// There will be a maximum of 8 games.
+/// 	pub game_index: u8,
+/// }
+/// ```
+///
+/// Into:
+///
+/// ```rust
+/// use pina::*;
+///
+/// #[discriminator(crate = ::pina, primitive = u8, final)]
+/// pub enum MyAccount {
+/// 	ConfigState = 0,
+/// 	GameState = 1,
+/// 	SectionState = 2,
+/// }
+///
+/// #[repr(C)]
+/// #[derive(
+/// 	Debug,
+/// 	::core::clone::Clone,
+/// 	::core::marker::Copy,
+/// 	::core::cmp::PartialEq,
+/// 	::core::cmp::Eq,
+/// 	::pina::Pod,
+/// 	::pina::Zeroable,
+/// 	::pina::TypedBuilder,
+/// )]
+/// #[builder(builder_method(vis = "", name = __builder))]
+/// pub struct ConfigState {
+/// 	// This discriminator is automatically injected as the first field in the struct. It must be
+/// 	// present.
+/// 	discriminator: [u8; MyAccount::BYTES],
+/// 	/// The version of the state.
+/// 	pub version: u8,
+/// 	/// The authority which can update this config.
+/// 	pub authority: Pubkey,
+/// 	/// Store the bump to save compute units.
+/// 	pub bump: u8,
+/// 	/// The treasury account bump where fees are sent and where the minted
+/// 	/// tokens are transferred.
+/// 	pub treasury_bump: u8,
+/// 	/// The mint account bump.
+/// 	pub mint_bit_bump: u8,
+/// 	/// The mint account bump for KIBIBIT.
+/// 	pub mint_kibibit_bump: u8,
+/// 	/// The mint account bump for MEBIBIT.
+/// 	pub mint_mebibit_bump: u8,
+/// 	/// The mint account bump for GIBIBIT.
+/// 	pub mint_gibibit_bump: u8,
+/// 	/// There will be a maximum of 8 games.
+/// 	pub game_index: u8,
+/// }
+///
+/// // This type is generated to match the `TypedBuilder` type with the
+/// // discriminator already set.
+/// type ConfigStateBuilderType = ConfigStateBuilder<(
+/// 	([u8; MyAccount::BYTES],), /* `discriminator`: automatically applied in the builder method
+/// 	                            * below. */
+/// 	(), // `version`
+/// 	(), // `authority`
+/// 	(), // `bump`
+/// 	(), // `treasury_bump`
+/// 	(), // `mint_bit_bump`
+/// 	(), // `mint_kibibit_bump`
+/// 	(), // `mint_mebibit_bump`
+/// 	(), // `mint_gibibit_bump`
+/// 	(), // `game_index`
+/// )>;
+///
+/// impl ConfigState {
+/// 	pub fn to_bytes(&self) -> &[u8] {
+/// 		::pina::bytemuck::bytes_of(self)
+/// 	}
+///
+/// 	pub fn builder() -> ConfigStateBuilderType {
+/// 		let mut bytes = [0u8; MyAccount::BYTES];
+/// 		<Self as ::pina::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
+///
+/// 		Self::__builder().discriminator(bytes)
+/// 	}
+/// }
+///
+/// impl ::pina::HasDiscriminator for ConfigState {
+/// 	type Type = MyAccount;
+///
+/// 	const VALUE: Self::Type = MyAccount::ConfigState;
+/// }
+///
+/// impl ::pina::AccountValidation for ConfigState {
+/// 	#[track_caller]
+/// 	fn assert<F>(&self, condition: F) -> Result<&Self, ::pina::ProgramError>
+/// 	where
+/// 		F: Fn(&Self) -> bool,
+/// 	{
+/// 		if condition(self) {
+/// 			return Ok(self);
+/// 		}
+///
+/// 		::pina::log!("Account is invalid");
+/// 		::pina::log_caller();
+///
+/// 		Err(::pina::ProgramError::InvalidAccountData)
+/// 	}
+///
+/// 	#[track_caller]
+/// 	fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, ::pina::ProgramError>
+/// 	where
+/// 		F: Fn(&Self) -> bool,
+/// 	{
+/// 		match ::pina::assert(
+/// 			condition(self),
+/// 			::pina::ProgramError::InvalidAccountData,
+/// 			msg,
+/// 		) {
+/// 			Err(err) => Err(err),
+/// 			Ok(()) => Ok(self),
+/// 		}
+/// 	}
+///
+/// 	#[track_caller]
+/// 	fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, ::pina::ProgramError>
+/// 	where
+/// 		F: Fn(&Self) -> bool,
+/// 	{
+/// 		if !condition(self) {
+/// 			return Ok(self);
+/// 		}
+///
+/// 		::pina::log!("Account is invalid");
+/// 		::pina::log_caller();
+///
+/// 		Err(::pina::ProgramError::InvalidAccountData)
+/// 	}
+///
+/// 	#[track_caller]
+/// 	fn assert_mut_msg<F>(
+/// 		&mut self,
+/// 		condition: F,
+/// 		msg: &str,
+/// 	) -> Result<&mut Self, ::pina::ProgramError>
+/// 	where
+/// 		F: Fn(&Self) -> bool,
+/// 	{
+/// 		match ::pina::assert(
+/// 			condition(self),
+/// 			::pina::ProgramError::InvalidAccountData,
+/// 			msg,
+/// 		) {
+/// 			Err(err) => Err(err),
+/// 			Ok(()) => Ok(self),
+/// 		}
+/// 	}
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
+	let nested_metas = match NestedMeta::parse_meta_list(args.into()) {
+		Ok(value) => value,
+		Err(e) => {
+			return e.into_compile_error().into();
+		}
+	};
+
+	let args = match AccountArgs::from_list(&nested_metas) {
+		Ok(v) => v,
+		Err(e) => {
+			return e.write_errors().into();
+		}
+	};
+
+	let mut item_struct = parse_macro_input!(input as ItemStruct);
+	let struct_name = &item_struct.ident;
+	let builder_name = format_ident!("{}Builder", struct_name);
+
+	let AccountArgs {
+		crate_path,
+		discriminator,
+	} = args;
+
+	// Add #[repr(C)]
+	let repr_attr: Attribute = syn::parse_quote!(#[repr(C)]);
+	item_struct.attrs.push(repr_attr);
+
+	// Add builder attribute
+	let builder_attr: Attribute =
+		syn::parse_quote!(#[builder(builder_method(vis = "", name = __builder))]);
+	item_struct.attrs.push(builder_attr);
+
+	// Add derive macros
+	let derives_to_add: [syn::Path; 8] = [
+		syn::parse_quote!(#crate_path::TypedBuilder),
+		syn::parse_quote!(#crate_path::Pod),
+		syn::parse_quote!(#crate_path::Zeroable),
+		syn::parse_quote!(::core::clone::Clone),
+		syn::parse_quote!(::core::marker::Copy),
+		syn::parse_quote!(::core::cmp::PartialEq),
+		syn::parse_quote!(::core::cmp::Eq),
+		syn::parse_quote!(::core::fmt::Debug),
+	];
+
+	if let Some(derive_attr) = item_struct
+		.attrs
+		.iter_mut()
+		.find(|attr| attr.path().is_ident("derive"))
+	{
+		let existing_derives_result =
+			derive_attr.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated);
+
+		if let Ok(mut existing_derives) = existing_derives_result {
+			let existing_derive_names: std::collections::HashSet<String> = existing_derives
+				.iter()
+				.map(|p| p.segments.last().unwrap().ident.to_string())
+				.collect();
+
+			for derive_to_add in &derives_to_add {
+				let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
+				if !existing_derive_names.contains(&to_add_name) {
+					existing_derives.push(derive_to_add.clone());
+				}
+			}
+
+			let new_derive_attr: Attribute = syn::parse_quote! {
+				#[derive(#existing_derives)]
+			};
+
+			*derive_attr = new_derive_attr;
+		}
+	} else {
+		// No derive attribute exists, so create one
+		let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
+		item_struct.attrs.push(new_derive_attr);
+	}
+
+	// Add discriminator field
+	if let Fields::Named(named_fields) = &mut item_struct.fields {
+		let discriminator_field = syn::parse_quote! {
+			discriminator: [u8; #discriminator::BYTES]
+		};
+		named_fields.named.insert(0, discriminator_field);
+	} else {
+		return syn::Error::new_spanned(item_struct, "Account structs must have named fields")
+			.to_compile_error()
+			.into();
+	}
+
+	let builder_generics = (0..item_struct.fields.len() - 1)
+		.map(|_| quote! { () })
+		.collect::<Vec<_>>();
+
+	let builder_type_alias = format_ident!("{}BuilderType", struct_name);
+
+	let implementations = quote! {
+		#[allow(dead_code)]
+		type #builder_type_alias = #builder_name<(
+			([u8; #discriminator::BYTES],),
+			#(#builder_generics,)*
+		)>;
+
+		impl #struct_name {
+			pub fn to_bytes(&self) -> &[u8] {
+				#crate_path::bytemuck::bytes_of(self)
+			}
+
+			pub fn builder() -> #builder_type_alias {
+				let mut bytes = [0u8; #discriminator::BYTES];
+				<Self as #crate_path::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
+
+				Self::__builder().discriminator(bytes)
+			}
+		}
+
+		impl #crate_path::HasDiscriminator for #struct_name {
+			type Type = #discriminator;
+
+			const VALUE: Self::Type = #discriminator::#struct_name;
+		}
+
+		impl #crate_path::AccountValidation for #struct_name {
+			#[track_caller]
+			fn assert<F>(&self, condition: F) -> Result<&Self, #crate_path::ProgramError>
+			where
+				F: Fn(&Self) -> bool,
+			{
+				if condition(self) {
+					return Ok(self);
+				}
+
+				#crate_path::log!("Account is invalid");
+				#crate_path::log_caller();
+
+				Err(#crate_path::ProgramError::InvalidAccountData)
+			}
+
+			#[track_caller]
+			fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, #crate_path::ProgramError>
+			where
+				F: Fn(&Self) -> bool,
+			{
+				match #crate_path::assert(
+					condition(self),
+					#crate_path::ProgramError::InvalidAccountData,
+					msg,
+				) {
+					Err(err) => Err(err),
+					Ok(()) => Ok(self),
+				}
+			}
+
+			#[track_caller]
+			fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, #crate_path::ProgramError>
+			where
+				F: Fn(&Self) -> bool,
+			{
+				if !condition(self) {
+					return Ok(self);
+				}
+
+				#crate_path::log!("Account is invalid");
+				#crate_path::log_caller();
+
+				Err(#crate_path::ProgramError::InvalidAccountData)
+			}
+
+			#[track_caller]
+			fn assert_mut_msg<F>(
+				&mut self,
+				condition: F,
+				msg: &str,
+			) -> Result<&mut Self, #crate_path::ProgramError>
+			where
+				F: Fn(&Self) -> bool,
+			{
+				match #crate_path::assert(
+					condition(self),
+					#crate_path::ProgramError::InvalidAccountData,
+					msg,
+				) {
+					Err(err) => Err(err),
+					Ok(()) => Ok(self),
+				}
+			}
+		}
+	};
+
+	let output = quote! {
+		#item_struct
 		#implementations
 	};
 

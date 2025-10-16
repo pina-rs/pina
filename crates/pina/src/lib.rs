@@ -5,6 +5,7 @@ mod cpi;
 mod error;
 mod loaders;
 mod macros;
+mod pod;
 mod traits;
 mod utils;
 
@@ -39,6 +40,7 @@ pub use pinocchio_system as system;
 pub use pinocchio_token as token;
 #[cfg(feature = "token")]
 pub use pinocchio_token_2022 as token_2022;
+pub use pod::*;
 pub use typed_builder;
 pub use typed_builder::TypedBuilder;
 

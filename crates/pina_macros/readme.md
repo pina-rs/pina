@@ -12,6 +12,9 @@ The account macro is used to annotate account data that will exist within a sola
 
 #### Attributes
 
+- `crate` - this defaults to `::pina` as the developer is expected to have access to the `pina` crate in the dependencies.
+- `discriminator` - the discriminator enum to use for this account. The variant should match the name of the account struct.
+
 #### Codegen
 
 It will transform the following:
@@ -204,6 +207,8 @@ impl ::pina::AccountValidation for ConfigState {
 
 ### `#[discriminator]`
 
+This attribute macro should be used for annotating the globally shared instruction and account discriminators.
+
 #### Attributes
 
 - `primitive` - Defaults to `u8` which takes up 1 byte of space for the discriminator. This would allow up to 256 variations of the type being discriminated. The type can be the following:
@@ -248,7 +253,7 @@ pub enum MyAccount {
 	SectionState = 2,
 }
 
-impl From<MyAccount> for u8 {
+impl ::core::convert::From<MyAccount> for u8 {
 	#[inline]
 	fn from(enum_value: TryIt) -> Self {
 		enum_value as Self
