@@ -281,6 +281,8 @@ impl ::core::convert::TryFrom<u8> for MyAccount {
 	}
 }
 
+unsafe impl Zeroable for MyAccount {}
+unsafe impl Pod for MyAccount {}
 ::pina::into_discriminator!(MyAccount, u8);
 ```
 
@@ -436,9 +438,6 @@ impl ::core::convert::From<MyError> for ::pina::ProgramError {
 		::pina::pinocchio::program_error::ProgramError::Custom(e as u32)
 	}
 }
-
-unsafe impl Zeroable for MyError {}
-unsafe impl Pod for MyError {}
 ```
 
 #### Properties

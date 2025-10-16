@@ -61,9 +61,6 @@ mod args;
 /// 		::pina::ProgramError::Custom(e as u32)
 /// 	}
 /// }
-///
-/// unsafe impl ::pina::Zeroable for MyError {}
-/// unsafe impl ::pina::Pod for MyError {}
 /// ```
 ///
 /// #### Properties
@@ -115,9 +112,6 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 				#crate_path::ProgramError::Custom(e as u32)
 			}
 		}
-
-		unsafe impl #crate_path::Zeroable for #enum_name {}
-		unsafe impl #crate_path::Pod for #enum_name {}
 	};
 
 	let output = quote! {
@@ -153,6 +147,7 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 /// use pina::*;
 ///
 /// #[discriminator(crate = ::pina, primitive = u8, final)]
+/// #[derive(Debug)]
 /// pub enum MyAccount {
 /// 	ConfigState = 0,
 /// 	GameState = 1,
@@ -167,11 +162,7 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// #[repr(u8)]
 /// #[derive(
-/// 	::core::fmt::Debug,
-/// 	::core::clone::Clone,
-/// 	::core::marker::Copy,
-/// 	::core::cmp::PartialEq,
-/// 	::core::cmp::Eq,
+/// 	Debug, ::core::clone::Clone, ::core::marker::Copy, ::core::cmp::PartialEq, ::core::cmp::Eq,
 /// )]
 /// pub enum MyAccount {
 /// 	ConfigState = 0,
@@ -206,6 +197,8 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 /// 	}
 /// }
 ///
+/// unsafe impl Pod for MyAccount {}
+/// unsafe impl Zeroable for MyAccount {}
 /// ::pina::into_discriminator!(MyAccount, u8);
 /// ```
 #[proc_macro_attribute]
@@ -244,8 +237,7 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 	}
 
 	// Add derive macros
-	let derives_to_add: [syn::Path; 5] = [
-		syn::parse_quote!(::core::fmt::Debug),
+	let derives_to_add: [syn::Path; 4] = [
 		syn::parse_quote!(::core::clone::Clone),
 		syn::parse_quote!(::core::marker::Copy),
 		syn::parse_quote!(::core::cmp::PartialEq),
@@ -334,6 +326,8 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 			}
 		}
 
+		unsafe impl #crate_path::Zeroable for #enum_name {}
+		unsafe impl #crate_path::Pod for #enum_name {}
 		#crate_path::into_discriminator!(#enum_name, #primitive);
 	};
 
@@ -582,7 +576,7 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 	item_struct.attrs.push(builder_attr);
 
 	// Add derive macros
-	let derives_to_add: [syn::Path; 8] = [
+	let derives_to_add: [syn::Path; 7] = [
 		syn::parse_quote!(#crate_path::TypedBuilder),
 		syn::parse_quote!(#crate_path::Pod),
 		syn::parse_quote!(#crate_path::Zeroable),
@@ -590,7 +584,6 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 		syn::parse_quote!(::core::marker::Copy),
 		syn::parse_quote!(::core::cmp::PartialEq),
 		syn::parse_quote!(::core::cmp::Eq),
-		syn::parse_quote!(::core::fmt::Debug),
 	];
 
 	if let Some(derive_attr) = item_struct

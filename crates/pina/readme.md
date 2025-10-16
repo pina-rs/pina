@@ -6,6 +6,16 @@
 
 <br />
 
+## Installation
+
+```bash
+cargo add pina pinocchio-log
+```
+
+In a future version the pinocchio-log dependency will not be required. Currently the `log!` macro hardcodes the `pinocchio-log` crate.
+
+## Documentation
+
 [![Crate][crate-image]][crate-link] [![Docs][docs-image]][docs-link] [![Status][ci-status-image]][ci-status-link] [![Unlicense][unlicense-image]][unlicense-link] [![codecov][codecov-image]][codecov-link]
 
 [crate-image]: https://img.shields.io/crates/v/pina.svg
