@@ -638,6 +638,28 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 			.into();
 	}
 
+	let assertions = if let Fields::Named(named_fields) = &item_struct.fields {
+		let field_assertions = named_fields.named.iter().map(|field| {
+			let field_name = field.ident.as_ref().unwrap();
+			let field_name_str = field_name.to_string();
+			let field_type = &field.ty;
+			quote! {
+				::core::assert!(
+					::core::mem::align_of::<#field_type>() == 1,
+					concat!("The alignment of field `", #field_name_str, "` with type `", stringify!(#field_type), "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+				);
+			}
+		});
+
+		quote! {
+			const _: () = {
+				#(#field_assertions)*
+			};
+		}
+	} else {
+		quote! {}
+	};
+
 	let builder_generics = (0..item_struct.fields.len() - 1)
 		.map(|_| quote! { () })
 		.collect::<Vec<_>>();
@@ -651,7 +673,10 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 			#(#builder_generics,)*
 		)>;
 
+		#assertions
+
 		impl #struct_name {
+
 			pub fn to_bytes(&self) -> &[u8] {
 				#crate_path::bytemuck::bytes_of(self)
 			}
@@ -951,6 +976,28 @@ pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
 			.into();
 	}
 
+	let assertions = if let Fields::Named(named_fields) = &item_struct.fields {
+		let field_assertions = named_fields.named.iter().map(|field| {
+			let field_name = field.ident.as_ref().unwrap();
+			let field_name_str = field_name.to_string();
+			let field_type = &field.ty;
+			quote! {
+				::core::assert!(
+					::core::mem::align_of::<#field_type>() == 1,
+					concat!("The alignment of field `", #field_name_str, "` with type `", stringify!(#field_type), "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+				);
+			}
+		});
+
+		quote! {
+			const _: () = {
+				#(#field_assertions)*
+			};
+		}
+	} else {
+		quote! {}
+	};
+
 	let builder_generics = (0..item_struct.fields.len() - 1)
 		.map(|_| quote! { () })
 		.collect::<Vec<_>>();
@@ -964,7 +1011,10 @@ pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
 			#(#builder_generics,)*
 		)>;
 
+		#assertions
+
 		impl #struct_name {
+
 			pub fn to_bytes(&self) -> &[u8] {
 				#crate_path::bytemuck::bytes_of(self)
 			}
