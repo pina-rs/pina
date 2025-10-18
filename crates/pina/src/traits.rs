@@ -285,8 +285,13 @@ pub trait Loggable {
 	fn log_return(&self);
 }
 
-pub trait ProgramOwner {
-	fn owner() -> Pubkey;
+pub trait TryFromAccountInfos<'a>: Sized {
+	fn try_from_account_infos(accounts: &'a [AccountInfo]) -> Result<Self, ProgramError>;
+}
+
+pub trait ValidateAccountInfos<'a>: TryFromAccountInfos<'a> {
+	type SuccessType;
+	fn validate_accounts(&self) -> Result<Self::SuccessType, ProgramError>;
 }
 
 #[cfg(test)]
