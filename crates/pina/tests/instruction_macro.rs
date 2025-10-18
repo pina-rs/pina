@@ -5,6 +5,7 @@ use pina::*;
 #[discriminator(crate = ::pina, primitive = u8, final)]
 pub enum MyInstruction {
 	FlipBit = 0,
+	Another = 1,
 }
 
 #[instruction(crate = ::pina, discriminator = MyInstruction)]

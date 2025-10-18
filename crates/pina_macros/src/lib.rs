@@ -1,6 +1,7 @@
 use args::AccountArgs;
 use args::DiscriminatorArgs;
 use args::ErrorArgs;
+use args::EventArgs;
 use darling::ast::NestedMeta;
 use darling::FromMeta;
 use heck::ToShoutySnakeCase;
@@ -651,8 +652,12 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 			}
 		});
 
+		let assertion_const_name = format_ident!(
+			"__{}_ALIGNMENT_ASSERTIONS__",
+			struct_name.to_string().to_uppercase()
+		);
 		quote! {
-			const _: () = {
+			const #assertion_const_name: () = {
 				#(#field_assertions)*
 			};
 		}
@@ -989,8 +994,12 @@ pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
 			}
 		});
 
+		let assertion_const_name = format_ident!(
+			"__{}_ALIGNMENT_ASSERTIONS__",
+			struct_name.to_string().to_uppercase()
+		);
 		quote! {
-			const _: () = {
+			const #assertion_const_name: () = {
 				#(#field_assertions)*
 			};
 		}
@@ -1036,6 +1045,263 @@ pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
 			type Type = #discriminator;
 
 			const VALUE: Self::Type = #discriminator::#struct_name;
+		}
+	};
+
+	let output = quote! {
+		#item_struct
+		#implementations
+	};
+
+	output.into()
+}
+
+/// The event macro is used to annotate event data that will be emitted from a
+/// solana program.
+///
+/// #### Attributes
+///
+/// - `crate` - this defaults to `::pina` as the developer is expected to have
+///   access to the `pina` crate in the dependencies.
+/// - `discriminator` - the discriminator enum to use for this event.
+/// - `variant` - the variant of the discriminator enum to use for this event.
+///
+/// #### Codegen
+///
+/// It will transform the following:
+///
+/// ```rust
+/// use pina::*;
+///
+/// #[discriminator(primitive = u8)]
+/// pub enum Event {
+/// 	Initialize = 0,
+/// 	Abandon = 1,
+/// }
+///
+/// #[event(crate = ::pina, discriminator = Event, variant = Initialize)]
+/// #[derive(Debug)]
+/// pub struct InitializeEvent {
+/// 	pub choice: u8,
+/// }
+/// ```
+///
+/// Is transformed to:
+///
+/// ```rust
+/// # use pina::*;
+/// # #[discriminator(primitive = u8)]
+/// # pub enum Event {
+/// # 	Initialize = 0,
+/// # 	Abandon = 1,
+/// # }
+/// #[repr(C)]
+/// #[derive(
+/// 	Debug,
+/// 	::core::clone::Clone,
+/// 	::core::marker::Copy,
+/// 	::core::cmp::PartialEq,
+/// 	::core::cmp::Eq,
+/// 	::pina::Pod,
+/// 	::pina::Zeroable,
+/// 	::pina::TypedBuilder,
+/// )]
+/// #[builder(builder_method(vis = "", name = __builder))]
+/// #[bytemuck(crate = "::pina::bytemuck")]
+/// pub struct InitializeEvent {
+/// 	discriminator: [u8; Event::BYTES],
+/// 	pub choice: u8,
+/// }
+///
+/// type InitializeEventBuilderType = InitializeEventBuilder<(([u8; 1],), ())>;
+/// impl InitializeEvent {
+/// 	pub fn to_bytes(&self) -> &[u8] {
+/// 		::pina::bytemuck::bytes_of(self)
+/// 	}
+///
+/// 	pub fn try_from_bytes(data: &[u8]) -> Result<&Self, ::pina::ProgramError> {
+/// 		::pina::bytemuck::try_from_bytes::<Self>(data)
+/// 			.or(Err(::pina::ProgramError::InvalidInstructionData))
+/// 	}
+///
+/// 	pub fn builder() -> InitializeEventBuilderType {
+/// 		let mut bytes = [0u8; Event::BYTES];
+/// 		<Self as ::pina::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
+///
+/// 		Self::__builder().discriminator(bytes)
+/// 	}
+/// }
+///
+/// impl ::pina::HasDiscriminator for InitializeEvent {
+/// 	type Type = Event;
+///
+/// 	const VALUE: Self::Type = Event::Initialize;
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
+	let nested_metas = match NestedMeta::parse_meta_list(args.into()) {
+		Ok(value) => value,
+		Err(e) => {
+			return e.into_compile_error().into();
+		}
+	};
+
+	let args = match EventArgs::from_list(&nested_metas) {
+		Ok(v) => v,
+		Err(e) => {
+			return e.write_errors().into();
+		}
+	};
+
+	let mut item_struct = parse_macro_input!(input as ItemStruct);
+	let struct_name = &item_struct.ident;
+	let builder_name = format_ident!("{}Builder", struct_name);
+
+	let EventArgs {
+		crate_path,
+		discriminator,
+		variant,
+	} = args;
+
+	let variant = variant.unwrap_or(struct_name.clone());
+
+	// Add #[repr(C)]
+	let repr_attr: Attribute = syn::parse_quote!(#[repr(C)]);
+	item_struct.attrs.push(repr_attr);
+
+	// Add builder attribute
+	let builder_attr: Attribute =
+		syn::parse_quote!(#[builder(builder_method(vis = "", name = __builder))]);
+	item_struct.attrs.push(builder_attr);
+
+	// Add derive macros
+	let derives_to_add: [syn::Path; 8] = [
+		syn::parse_quote!(#crate_path::TypedBuilder),
+		syn::parse_quote!(#crate_path::Pod),
+		syn::parse_quote!(#crate_path::Zeroable),
+		syn::parse_quote!(::core::clone::Clone),
+		syn::parse_quote!(::core::marker::Copy),
+		syn::parse_quote!(::core::cmp::PartialEq),
+		syn::parse_quote!(::core::cmp::Eq),
+		syn::parse_quote!(::core::fmt::Debug),
+	];
+
+	if let Some(derive_attr) = item_struct
+		.attrs
+		.iter_mut()
+		.find(|attr| attr.path().is_ident("derive"))
+	{
+		let existing_derives_result =
+			derive_attr.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated);
+
+		if let Ok(mut existing_derives) = existing_derives_result {
+			let existing_derive_names: std::collections::HashSet<String> = existing_derives
+				.iter()
+				.map(|p| p.segments.last().unwrap().ident.to_string())
+				.collect();
+
+			for derive_to_add in &derives_to_add {
+				let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
+				if !existing_derive_names.contains(&to_add_name) {
+					existing_derives.push(derive_to_add.clone());
+				}
+			}
+
+			let new_derive_attr: Attribute = syn::parse_quote! {
+				#[derive(#existing_derives)]
+			};
+
+			*derive_attr = new_derive_attr;
+		}
+	} else {
+		// No derive attribute exists, so create one
+		let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
+		item_struct.attrs.push(new_derive_attr);
+	}
+
+	let bytemuck_crate_str = format!(
+		"{}::bytemuck",
+		quote!(#crate_path).to_string().replace(' ', "")
+	);
+	let bytemuck_attr: Attribute = syn::parse_quote!(#[bytemuck(crate = #bytemuck_crate_str)]);
+	item_struct.attrs.push(bytemuck_attr);
+
+	// Add discriminator field
+	if let Fields::Named(named_fields) = &mut item_struct.fields {
+		let discriminator_field = syn::parse_quote! {
+			discriminator: [u8; #discriminator::BYTES]
+		};
+		named_fields.named.insert(0, discriminator_field);
+	} else {
+		return syn::Error::new_spanned(item_struct, "Event structs must have named fields")
+			.to_compile_error()
+			.into();
+	}
+
+	let assertions = if let Fields::Named(named_fields) = &item_struct.fields {
+		let field_assertions = named_fields.named.iter().map(|field| {
+			let field_name = field.ident.as_ref().unwrap();
+			let field_name_str = field_name.to_string();
+			let field_type = &field.ty;
+			quote! {
+				::core::assert!(
+					::core::mem::align_of::<#field_type>() == 1,
+					concat!("The alignment of field `", #field_name_str, "` with type `", stringify!(#field_type), "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+				);
+			}
+		});
+
+		let assertion_const_name = format_ident!(
+			"__{}_ALIGNMENT_ASSERTIONS__",
+			struct_name.to_string().to_uppercase()
+		);
+		quote! {
+			const #assertion_const_name: () = {
+				#(#field_assertions)*
+			};
+		}
+	} else {
+		quote! {}
+	};
+
+	let builder_generics = (0..item_struct.fields.len() - 1)
+		.map(|_| quote! { () })
+		.collect::<Vec<_>>();
+
+	let builder_type_alias = format_ident!("{}BuilderType", struct_name);
+
+	let implementations = quote! {
+		#[allow(dead_code)]
+		type #builder_type_alias = #builder_name<(
+			([u8; #discriminator::BYTES],),
+			#(#builder_generics,)*
+		)>;
+
+		#assertions
+
+		impl #struct_name {
+			pub fn to_bytes(&self) -> &[u8] {
+				#crate_path::bytemuck::bytes_of(self)
+			}
+
+			pub fn try_from_bytes(data: &[u8]) -> Result<&Self, #crate_path::ProgramError> {
+				#crate_path::bytemuck::try_from_bytes::<Self>(data)
+					.or(Err(#crate_path::ProgramError::InvalidInstructionData))
+			}
+
+			pub fn builder() -> #builder_type_alias {
+				let mut bytes = [0u8; #discriminator::BYTES];
+				<Self as #crate_path::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
+
+				Self::__builder().discriminator(bytes)
+			}
+		}
+
+		impl #crate_path::HasDiscriminator for #struct_name {
+			type Type = #discriminator;
+
+			const VALUE: Self::Type = #discriminator::#variant;
 		}
 	};
 

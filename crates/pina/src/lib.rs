@@ -4,7 +4,6 @@
 mod cpi;
 mod error;
 mod loaders;
-mod macros;
 mod pod;
 mod traits;
 mod utils;

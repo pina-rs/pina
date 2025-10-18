@@ -6,11 +6,91 @@
 
 ## Attribute Macros
 
+### `#[discriminator]`
+
+This attribute macro should be used for annotating the globally shared instruction and account discriminators.
+
+#### Properties
+
+- `primitive` - Defaults to `u8` which takes up 1 byte of space for the discriminator. This would allow up to 256 variations of the type being discriminated. The type can be the following:
+  - `u8` - 256 variations
+  - `u16` - 65,536 variations
+  - `u32` - 4,294,967,296 variations
+  - `u64` - 18,446,744,073,709,551,616 variations (overkill!)
+- `crate` - this defaults to `::pina` as the developer is expected to have access to the `pina` crate in the dependencies.
+- `final` - By default all discriminator enums are marked as `non_exhaustive`. The `final` flag will remove this annotation.
+
+#### Codegen
+
+The following:
+
+```rust
+use pina::*;
+
+#[discriminator(crate = ::pina, primitive = u8, final)]
+pub enum MyAccount {
+	ConfigState = 0,
+	GameState = 1,
+	SectionState = 2,
+}
+```
+
+Is transformed to:
+
+```rust
+use pina::*;
+
+#[repr(u8)]
+#[derive(
+	::core::fmt::Debug,
+	::core::clone::Clone,
+	::core::marker::Copy,
+	::core::cmp::PartialEq,
+	::core::cmp::Eq,
+)]
+pub enum MyAccount {
+	ConfigState = 0,
+	GameState = 1,
+	SectionState = 2,
+}
+
+impl ::core::convert::From<MyAccount> for u8 {
+	#[inline]
+	fn from(enum_value: TryIt) -> Self {
+		enum_value as Self
+	}
+}
+
+impl ::core::convert::TryFrom<u8> for MyAccount {
+	type Error = ::pina::ProgramError;
+
+	#[inline]
+	fn try_from(number: u8) -> ::core::result::Result<Self, ::pina::ProgramError> {
+		#![allow(non_upper_case_globals)]
+		const __CONFIG_STATE: u8 = 0;
+		const __GAME_STATE: u8 = 1;
+		const __SECTION_STATE: u8 = 2;
+		#[deny(unreachable_patterns)]
+		match number {
+			__CONFIG_STATE => ::core::result::Result::Ok(Self::ConfigState),
+			__GAME_STATE => ::core::result::Result::Ok(Self::GameState),
+			__SECTION_STATE => ::core::result::Result::Ok(Self::SectionState),
+			#[allow(unreachable_patterns)]
+			_ => ::core::result::Result::Err(::pina::PinaError::InvalidDiscriminator.into()),
+		}
+	}
+}
+
+unsafe impl Zeroable for MyAccount {}
+unsafe impl Pod for MyAccount {}
+::pina::into_discriminator!(MyAccount, u8);
+```
+
 ### `#[account]`
 
 The account macro is used to annotate account data that will exist within a solana account.
 
-#### Attributes
+#### Properties
 
 - `crate` - this defaults to `::pina` as the developer is expected to have access to the `pina` crate in the dependencies.
 - `discriminator` - the discriminator enum to use for this account. The variant should match the name of the account struct.
@@ -206,91 +286,11 @@ impl ::pina::AccountValidation for ConfigState {
 }
 ```
 
-### `#[discriminator]`
-
-This attribute macro should be used for annotating the globally shared instruction and account discriminators.
-
-#### Attributes
-
-- `primitive` - Defaults to `u8` which takes up 1 byte of space for the discriminator. This would allow up to 256 variations of the type being discriminated. The type can be the following:
-  - `u8` - 256 variations
-  - `u16` - 65,536 variations
-  - `u32` - 4,294,967,296 variations
-  - `u64` - 18,446,744,073,709,551,616 variations (overkill!)
-- `crate` - this defaults to `::pina` as the developer is expected to have access to the `pina` crate in the dependencies.
-- `final` - By default all discriminator enums are marked as `non_exhaustive`. The `final` flag will remove this annotation.
-
-#### Codegen
-
-The following:
-
-```rust
-use pina::*;
-
-#[discriminator(crate = ::pina, primitive = u8, final)]
-pub enum MyAccount {
-	ConfigState = 0,
-	GameState = 1,
-	SectionState = 2,
-}
-```
-
-Is transformed to:
-
-```rust
-use pina::*;
-
-#[repr(u8)]
-#[derive(
-	::core::fmt::Debug,
-	::core::clone::Clone,
-	::core::marker::Copy,
-	::core::cmp::PartialEq,
-	::core::cmp::Eq,
-)]
-pub enum MyAccount {
-	ConfigState = 0,
-	GameState = 1,
-	SectionState = 2,
-}
-
-impl ::core::convert::From<MyAccount> for u8 {
-	#[inline]
-	fn from(enum_value: TryIt) -> Self {
-		enum_value as Self
-	}
-}
-
-impl ::core::convert::TryFrom<u8> for MyAccount {
-	type Error = ::pina::ProgramError;
-
-	#[inline]
-	fn try_from(number: u8) -> ::core::result::Result<Self, ::pina::ProgramError> {
-		#![allow(non_upper_case_globals)]
-		const __CONFIG_STATE: u8 = 0;
-		const __GAME_STATE: u8 = 1;
-		const __SECTION_STATE: u8 = 2;
-		#[deny(unreachable_patterns)]
-		match number {
-			__CONFIG_STATE => ::core::result::Result::Ok(Self::ConfigState),
-			__GAME_STATE => ::core::result::Result::Ok(Self::GameState),
-			__SECTION_STATE => ::core::result::Result::Ok(Self::SectionState),
-			#[allow(unreachable_patterns)]
-			_ => ::core::result::Result::Err(::pina::PinaError::InvalidDiscriminator.into()),
-		}
-	}
-}
-
-unsafe impl Zeroable for MyAccount {}
-unsafe impl Pod for MyAccount {}
-::pina::into_discriminator!(MyAccount, u8);
-```
-
 ### `#[instruction]`
 
 The instruction macro is used to annotate instruction data that will exist within a solana instruction.
 
-#### Attributes
+#### Properties
 
 - `discriminator` - the discriminator enum to use for this instruction. The variant should match the name of the instruction struct.
 
@@ -361,7 +361,7 @@ pub struct FlipBit {
 
 // This type is generated to match the `TypedBuilder` type with the
 // discriminator already set.
-type ConfigStateBuilderType = ConfigStateBuilder<(
+type FlipBitBuilderType = FlipBitBuilder<(
 	([u8; MyInstruction::BYTES],), /* `discriminator`: automatically applied in the builder
 	                                * method below. */
 	(), // `section_index`
@@ -395,9 +395,105 @@ impl ::pina::HasDiscriminator for FlipBit {
 }
 ```
 
+### `#[event]`
+
+Annotates a struct as an event.
+
+#### Properties
+
+- `crate` - this defaults to `::pina` as the developer is expected to have access to the `pina` crate in the dependencies.
+- `discriminator` - the discriminator enum to use for this event. The variant should match the name of the account struct.
+
+#### Codegen
+
+```rust
+use pina::*;
+
+#[discriminator(primitive = u8)]
+pub enum Event {
+	Initialize = 0,
+	Abandon = 1,
+}
+
+#[event(discriminator = Event, variant = Initialize)]
+pub struct InitializeEvent {
+	pub choice: u8,
+}
+```
+
+Is transformed into:
+
+```rust
+use pina::*;
+
+#[discriminator(primitive = u8)]
+pub enum Event {
+	Initialize = 0,
+	Abandon = 1,
+}
+
+#[repr(C)]
+#[derive(
+	::core::clone::Clone,
+	::core::marker::Copy,
+	::core::cmp::PartialEq,
+	::core::cmp::Eq,
+	::pina::Pod,
+	::pina::Zeroable,
+	::pina::TypedBuilder,
+)]
+#[builder(builder_method(vis = "", name = __builder))]
+#[bytemuck(crate = "::pina::bytemuck")]
+pub struct InitializeEvent {
+	// This discriminator is automatically injected as the first field in the struct. It must be
+	// present.
+	discriminator: [u8; Event::BYTES],
+	pub choice: u8,
+}
+
+// This type is generated to match the `TypedBuilder` type with the
+// discriminator already set.
+type InitializeEventBuilderType = InitializeEventBuilder<(
+	([u8; Event::BYTES],), /* `discriminator`: automatically applied in the builder
+	                        * method below. */
+	(), // `choice`
+)>;
+
+impl InitializeEvent {
+	pub fn to_bytes(&self) -> &[u8] {
+		::pina::bytemuck::bytes_of(self)
+	}
+
+	pub fn try_from_bytes(data: &[u8]) -> Result<&Self, ::pina::ProgramError> {
+		::pina::bytemuck::try_from_bytes::<Self>(data)
+			.or(Err(::pina::ProgramError::InvalidInstructionData))
+	}
+
+	pub fn builder() -> InitializeEventBuilderType {
+		let mut bytes = [0u8; Event::BYTES];
+		<Self as ::pina::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
+
+		Self::__builder().discriminator(bytes)
+	}
+}
+
+impl ::pina::HasDiscriminator for InitializeEvent {
+	type Type = MyInstruction;
+
+	const VALUE: Self::Type = MyInstruction::FlipBit;
+}
+```
+
 ### `#[error]`
 
 `#[error]` is a lightweight modification to the provided enum acting as syntactic sugar to make it easier to manage your custom program errors.
+
+#### Properties
+
+- `crate` - this defaults to `::pina` as the developer is expected to have access to the `pina` crate in the dependencies.
+- `final` - By default all error enums are marked as `non_exhaustive`. The `final` flag will remove this.
+
+#### Codegen
 
 ```rust
 use pina::*;

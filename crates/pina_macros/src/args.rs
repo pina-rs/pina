@@ -21,6 +21,17 @@ pub(crate) struct InstructionArgs {
 }
 
 #[derive(Debug, FromMeta)]
+pub(crate) struct EventArgs {
+	/// Set the path to the crate
+	#[darling(default = "default_crate_path", rename = "crate")]
+	pub(crate) crate_path: syn::Path,
+	/// Set the discriminator enum for this event.
+	pub(crate) discriminator: syn::Path,
+	/// Set the variant of the discriminator enum.
+	pub(crate) variant: Option<syn::Ident>,
+}
+
+#[derive(Debug, FromMeta)]
 pub(crate) struct ErrorArgs {
 	/// Set the path to the crate
 	#[darling(default = "default_crate_path", rename = "crate")]
