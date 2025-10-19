@@ -1,8 +1,10 @@
 use args::AccountArgs;
+use args::AccountsInput;
 use args::DiscriminatorArgs;
 use args::ErrorArgs;
 use args::EventArgs;
 use darling::ast::NestedMeta;
+use darling::FromDeriveInput;
 use darling::FromMeta;
 use heck::ToShoutySnakeCase;
 use proc_macro::TokenStream;
@@ -11,6 +13,7 @@ use quote::quote;
 use syn::parse_macro_input;
 use syn::punctuated::Punctuated;
 use syn::Attribute;
+use syn::DeriveInput;
 use syn::Fields;
 use syn::ItemEnum;
 use syn::ItemStruct;
@@ -19,6 +22,101 @@ use syn::Token;
 use crate::args::InstructionArgs;
 
 mod args;
+
+#[proc_macro_derive(Accounts, attributes(pina))]
+pub fn accounts_derive(input: TokenStream) -> TokenStream {
+	let input = parse_macro_input!(input as DeriveInput);
+
+	let args = match AccountsInput::from_derive_input(&input) {
+		Ok(v) => v,
+		Err(e) => {
+			return e.write_errors().into();
+		}
+	};
+
+	let struct_name = &args.ident;
+	let (impl_generics, ty_generics, where_clause) = args.generics.split_for_impl();
+	let crate_path = &args.crate_path;
+	let fields = args.data.take_struct().unwrap();
+	let mut field_idents = Vec::new();
+	let mut remaining_field = None;
+
+	let lifetime = match args.generics.lifetimes().next() {
+		Some(lt) => &lt.lifetime,
+		None => {
+			return syn::Error::new_spanned(
+				&args.ident,
+				"Accounts struct must have **ONE** lifetime parameter",
+			)
+			.to_compile_error()
+			.into()
+		}
+	};
+
+	for field in fields.iter() {
+		if !field.remaining.is_present() {
+			field_idents.push(field.ident.as_ref().unwrap());
+			continue;
+		}
+
+		if remaining_field.is_some() {
+			return syn::Error::new_spanned(
+				&field.ident,
+				"Only one field can be marked as `remaining`",
+			)
+			.to_compile_error()
+			.into();
+		}
+
+		remaining_field = field.ident.as_ref();
+	}
+
+	let number_of_fields = field_idents.len();
+	let too_many_accounts = remaining_field.is_none().then(|| {
+		quote! {
+			if accounts.len() > #number_of_fields {
+				return ::core::result::Result::Err(#crate_path::PinaError::TooManyAccountKeys.into());
+			}
+		}
+	});
+	let destructure_pattern = if let Some(ref remaining_ident) = remaining_field {
+		quote! { let [#(#field_idents,)* #remaining_ident @ ..] = accounts }
+	} else {
+		quote! { let [#(#field_idents,)*] = accounts }
+	};
+
+	let remaining_field_ident = remaining_field.map(|f| quote!(#f,));
+	let not_enough_accounts_error = quote! {
+		return ::core::result::Result::Err(#crate_path::ProgramError::NotEnoughAccountKeys);
+	};
+	let try_from_impl = quote! {
+		impl #impl_generics #crate_path::TryFromAccountInfos #ty_generics for #struct_name #ty_generics #where_clause {
+			fn try_from_account_infos(
+				accounts: & #lifetime [#crate_path::AccountInfo],
+			) -> ::core::result::Result<Self, #crate_path::ProgramError> {
+				#too_many_accounts
+				#destructure_pattern else {
+					#not_enough_accounts_error
+				};
+
+				Ok(Self {
+					#(#field_idents,)*
+					#remaining_field_ident
+				})
+			}
+		}
+
+		impl #impl_generics ::core::convert::TryFrom<& #lifetime [#crate_path::AccountInfo]> for #struct_name #ty_generics #where_clause {
+			type Error = #crate_path::ProgramError;
+
+			fn try_from(accounts: & #lifetime [#crate_path::AccountInfo]) -> ::core::result::Result<Self, Self::Error> {
+				<Self as #crate_path::TryFromAccountInfos>::try_from_account_infos(accounts)
+			}
+		}
+	};
+
+	try_from_impl.into()
+}
 
 /// `#[error]` is a lightweight modification to the provided enum acting as
 /// syntactic sugar to make it easier to manage your custom program errors.

@@ -4,6 +4,8 @@ use pina_macros::error;
 /// errors work their way backwards from the max `u32`.
 #[error(crate = crate)]
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum PinaError {
+	TooManyAccountKeys = 0xFFFF_FFFE,
 	InvalidDiscriminator = 0xFFFF_FFFF,
 }

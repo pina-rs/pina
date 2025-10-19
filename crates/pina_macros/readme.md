@@ -536,10 +536,85 @@ impl ::core::convert::From<MyError> for ::pina::ProgramError {
 }
 ```
 
+## Derive Macros
+
+### `#[derive(Accounts)]`
+
+This adds a `TryFrom` implementation to a struct of `AccountInfo`'s.
+
 #### Properties
 
 - `crate` - this defaults to `::pina` as the developer is expected to have access to the `pina` crate in the dependencies.
-- `final` - By default all error enums are marked as `non_exhaustive`. The `final` flag will remove this.
+- `remaining` - a field level annotation that annotates the field as containing all the remaining accounts not specified in the struct. If not specified then the exact number of struct fields must be equal to the exact number of items in the provided `AccountInfo` slice.
+
+#### Codegen
+
+```rust
+use pina::*;
+
+#[derive(Accounts)]
+#[pina(crate = ::pina)]
+pub struct MakeOfferAccounts<'a> {
+	pub maker: &'a AccountInfo,
+	pub token_mint_a: &'a AccountInfo,
+	pub token_mint_b: &'a AccountInfo,
+	pub maker_ata_a: &'a AccountInfo,
+	pub offer: &'a AccountInfo,
+	pub vault: &'a AccountInfo,
+	pub token_program: &'a AccountInfo,
+	// If this is not present then the struct expects to consume all provided accounts.
+	#[pina(remaining)]
+	pub remaining: &'a [AccountInfo],
+}
+```
+
+Into:
+
+```rust
+use pina::*;
+
+pub struct MakeOfferAccounts<'a> {
+	pub maker: &'a AccountInfo,
+	pub token_mint_a: &'a AccountInfo,
+	pub token_mint_b: &'a AccountInfo,
+	pub maker_ata_a: &'a AccountInfo,
+	pub offer: &'a AccountInfo,
+	pub vault: &'a AccountInfo,
+	pub token_program: &'a AccountInfo,
+	pub remaining: &'a [AccountInfo],
+}
+
+impl<'a> ::pina::TryFromAccountInfos<'a> for MakeOfferAccounts<'a> {
+	fn try_from_account_infos(
+		accounts: &'a [::pina::AccountInfo],
+	) -> ::core::result::Result<Self, ::pina::ProgramError> {
+		let [maker, token_mint_a, token_mint_b, maker_ata_a, offer, vault, token_program, remaining @ ..] =
+			accounts
+		else {
+			return ::core::result::Result::Err(::pina::ProgramError::NotEnoughAccountKeys);
+		};
+
+		Ok(Self {
+			maker,
+			token_mint_a,
+			token_mint_b,
+			maker_ata_a,
+			offer,
+			vault,
+			token_program,
+			remaining,
+		})
+	}
+}
+
+impl<'a> ::core::convert::TryFrom<&'a [::pina::AccountInfo]> for MakeOfferAccounts<'a> {
+	type Error = ::pina::ProgramError;
+
+	fn try_from(accounts: &'a [::pina::AccountInfo]) -> ::core::result::Result<Self, Self::Error> {
+		<Self as ::pina::TryFromAccountInfos>::try_from_account_infos(accounts)
+	}
+}
+```
 
 [crate-image]: https://img.shields.io/crates/v/pina_macros.svg
 [crate-link]: https://crates.io/crates/pina_macros

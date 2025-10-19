@@ -1,3 +1,5 @@
+use darling::FromDeriveInput;
+use darling::FromField;
 use darling::FromMeta;
 use quote::ToTokens;
 use syn::Expr;
@@ -117,4 +119,23 @@ impl FromMeta for Primitive {
 			_ => Err(error),
 		}
 	}
+}
+
+#[derive(Debug, FromDeriveInput)]
+#[darling(attributes(pina), supports(struct_named))]
+pub(crate) struct AccountsInput {
+	pub(crate) ident: syn::Ident,
+	pub(crate) generics: syn::Generics,
+	pub(crate) data: darling::ast::Data<darling::util::Ignored, AccountsField>,
+	#[darling(default = "default_crate_path", rename = "crate")]
+	pub(crate) crate_path: syn::Path,
+}
+
+#[derive(Debug, FromField)]
+#[darling(attributes(pina))]
+pub(crate) struct AccountsField {
+	pub(crate) ident: Option<syn::Ident>,
+	pub(crate) ty: syn::Type,
+	#[darling(default)]
+	pub(crate) remaining: darling::util::Flag,
 }

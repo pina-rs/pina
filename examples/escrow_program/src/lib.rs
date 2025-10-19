@@ -198,3 +198,43 @@ impl ::pina::AccountValidation for ConfigState {
 		}
 	}
 }
+
+pub struct MakeOfferAccounts<'a> {
+	pub maker: &'a AccountInfo,
+	pub token_mint_a: &'a AccountInfo,
+	pub token_mint_b: &'a AccountInfo,
+	pub maker_ata_a: &'a AccountInfo,
+	pub offer: &'a AccountInfo,
+	pub vault: &'a AccountInfo,
+	pub token_program: &'a AccountInfo,
+	pub remaining: &'a [AccountInfo],
+}
+
+impl<'a> TryFromAccountInfos<'a> for MakeOfferAccounts<'a> {
+	fn try_from_account_infos(accounts: &'a [AccountInfo]) -> Result<Self, ProgramError> {
+		let [maker, token_mint_a, token_mint_b, maker_ata_a, offer, vault, token_program, remaining @ ..] =
+			accounts
+		else {
+			return Err(ProgramError::NotEnoughAccountKeys);
+		};
+
+		Ok(Self {
+			maker,
+			token_mint_a,
+			token_mint_b,
+			maker_ata_a,
+			offer,
+			vault,
+			token_program,
+			remaining,
+		})
+	}
+}
+
+impl<'a> TryFrom<&'a [AccountInfo]> for MakeOfferAccounts<'a> {
+	type Error = ProgramError;
+
+	fn try_from(accounts: &'a [AccountInfo]) -> Result<Self, Self::Error> {
+		<Self as TryFromAccountInfos>::try_from_account_infos(accounts)
+	}
+}
