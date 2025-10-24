@@ -76,9 +76,9 @@ fn test_accounts_derive_exact_excess() {
 		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
 
 	let result = TestAccounts::try_from_account_infos(too_many_accounts);
-	// let expected_err: ProgramError = PinaError::TooManyAccountKeys.into();
+	// let expected_err: ProgramError = PinaProgramError::TooManyAccountKeys.into();
 	// assert!(matches!(result, Err(expected_err)));
-	assert!(result.is_err_and(|error| error.eq(&PinaError::TooManyAccountKeys.into())));
+	assert!(result.is_err_and(|error| error.eq(&PinaProgramError::TooManyAccountKeys.into())));
 }
 
 #[test]

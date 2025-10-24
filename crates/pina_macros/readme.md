@@ -76,7 +76,7 @@ impl ::core::convert::TryFrom<u8> for MyAccount {
 			__GAME_STATE => ::core::result::Result::Ok(Self::GameState),
 			__SECTION_STATE => ::core::result::Result::Ok(Self::SectionState),
 			#[allow(unreachable_patterns)]
-			_ => ::core::result::Result::Err(::pina::PinaError::InvalidDiscriminator.into()),
+			_ => ::core::result::Result::Err(::pina::PinaProgramError::InvalidDiscriminator.into()),
 		}
 	}
 }

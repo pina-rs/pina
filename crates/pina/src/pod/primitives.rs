@@ -4,7 +4,7 @@ use bytemuck::Zeroable;
 use pinocchio::program_error::ProgramError;
 
 /// The standard `bool` is not a `Pod`, define a replacement that is
-#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct PodBool(pub u8);
 impl PodBool {
@@ -64,37 +64,37 @@ macro_rules! impl_int_conversion {
 }
 
 /// `u16` type that can be used in `Pod`s
-#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct PodU16(pub [u8; 2]);
 impl_int_conversion!(PodU16, u16);
 
 /// `i16` type that can be used in Pods
-#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct PodI16(pub [u8; 2]);
 impl_int_conversion!(PodI16, i16);
 
 /// `u32` type that can be used in `Pod`s
-#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct PodU32(pub [u8; 4]);
 impl_int_conversion!(PodU32, u32);
 
 /// `u64` type that can be used in Pods
-#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct PodU64(pub [u8; 8]);
 impl_int_conversion!(PodU64, u64);
 
 /// `i64` type that can be used in Pods
-#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct PodI64([u8; 8]);
 impl_int_conversion!(PodI64, i64);
 
 /// `u128` type that can be used in Pods
-#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct PodU128(pub [u8; 16]);
 impl_int_conversion!(PodU128, u128);

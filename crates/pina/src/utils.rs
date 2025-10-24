@@ -7,6 +7,8 @@ use crate::ProgramResult;
 use crate::Pubkey;
 
 /// Parses an instruction from the instruction data.
+/// Also checks that the program ID matches the provided ID when this
+/// instruction was called.
 pub fn parse_instruction<'a, T: IntoDiscriminator>(
 	api_id: &'a Pubkey,
 	program_id: &'a Pubkey,
@@ -18,7 +20,12 @@ pub fn parse_instruction<'a, T: IntoDiscriminator>(
 	}
 
 	// Get instruction for discriminator.
-	T::discriminator_from_bytes(data)
+	T::discriminator_from_bytes(data).map_err(|error| {
+		match error {
+			ProgramError::Custom(_) => ProgramError::InvalidInstructionData,
+			error => error,
+		}
+	})
 }
 
 #[track_caller]

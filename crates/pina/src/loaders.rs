@@ -3,6 +3,7 @@
 use core::slice::from_raw_parts;
 use core::slice::from_raw_parts_mut;
 
+use pinocchio::ProgramResult;
 use pinocchio_system::instructions::Transfer;
 
 #[cfg(feature = "token")]
@@ -20,6 +21,7 @@ use crate::AccountValidation;
 use crate::AsAccount;
 #[cfg(feature = "token")]
 use crate::AsTokenAccount;
+use crate::CloseAccountWithRecipient;
 use crate::HasDiscriminator;
 use crate::LamportTransfer;
 use crate::Pod;
@@ -66,6 +68,18 @@ impl AccountInfoValidation for AccountInfo {
 	}
 
 	#[track_caller]
+	fn assert_data_len(&self, len: usize) -> Result<&Self, ProgramError> {
+		if self.data_len() != len {
+			log!("address: {} has an incorrect length", self.key());
+			log_caller();
+
+			return Err(ProgramError::InvalidAccountData);
+		}
+
+		Ok(self)
+	}
+
+	#[track_caller]
 	fn assert_empty(&self) -> Result<&Self, ProgramError> {
 		if !self.data_is_empty() {
 			log!("address: {} is not empty", self.key());
@@ -83,7 +97,7 @@ impl AccountInfoValidation for AccountInfo {
 			log!("address: {} is empty", self.key());
 			log_caller();
 
-			return Err(ProgramError::InvalidAccountData);
+			return Err(ProgramError::UninitializedAccount);
 		}
 
 		Ok(self)
@@ -141,22 +155,19 @@ impl AccountInfoValidation for AccountInfo {
 	}
 
 	#[track_caller]
-	#[cfg(feature = "token")]
-	fn assert_spl_owner(&self) -> Result<&Self, ProgramError> {
-		let owner = self.owner();
-
-		if owner == &pinocchio_token::ID || owner == &pinocchio_token_2022::ID {
+	fn assert_owners(&self, owners: &[Pubkey]) -> Result<&Self, ProgramError> {
+		if owners.contains(self.owner()) {
 			return Ok(self);
 		}
 
 		log!(
-			"address: {} is not owned by a supported spl token program: {}",
+			"address: {} has invalid owner: {}",
 			self.key(),
-			owner
+			self.owner(),
 		);
 		log_caller();
 
-		Err(ProgramError::IncorrectProgramId)
+		Err(ProgramError::InvalidAccountOwner)
 	}
 
 	#[track_caller]
@@ -166,6 +177,18 @@ impl AccountInfoValidation for AccountInfo {
 		}
 
 		log!("address: {} is invalid, expected: {}", self.key(), address);
+		log_caller();
+
+		Err(ProgramError::InvalidAccountData)
+	}
+
+	#[track_caller]
+	fn assert_addresses(&self, addresses: &[Pubkey]) -> Result<&Self, ProgramError> {
+		if addresses.contains(self.key()) {
+			return Ok(self);
+		}
+
+		log!("address: {} is invalid", self.key());
 		log_caller();
 
 		Err(ProgramError::InvalidAccountData)
@@ -183,7 +206,7 @@ impl AccountInfoValidation for AccountInfo {
 			return Err(ProgramError::InvalidSeeds);
 		};
 
-		if self.key() == &pda {
+		if self.key() != &pda {
 			return Ok(self);
 		}
 
@@ -212,7 +235,7 @@ impl AccountInfoValidation for AccountInfo {
 			}
 		};
 
-		if &pda == self.key() {
+		if &pda != self.key() {
 			log!("address: {} is invalid, expected pda: {}", self.key(), &pda);
 			log_caller();
 
@@ -254,46 +277,13 @@ impl AccountInfoValidation for AccountInfo {
 		&self,
 		wallet: &Pubkey,
 		mint: &Pubkey,
+		token_program: &Pubkey,
 	) -> Result<&Self, ProgramError> {
 		let Some((address, _bump)) =
-			crate::try_get_associated_token_address(wallet, mint, &pinocchio_token::ID)
+			crate::try_get_associated_token_address(wallet, mint, token_program)
 		else {
 			log!(
 				"could not find associated token (p-token) address for wallet: {}, mint: {}",
-				wallet,
-				mint,
-			);
-			log_caller();
-
-			return Err(ProgramError::InvalidSeeds);
-		};
-
-		if address.eq(self.key()) {
-			return Ok(self);
-		}
-
-		log!(
-			"address: {} is invalid, expected associated token address: {}",
-			self.key(),
-			&address
-		);
-		log_caller();
-
-		Err(ProgramError::InvalidSeeds)
-	}
-
-	#[cfg(feature = "token")]
-	#[track_caller]
-	fn assert_associated_token_2022_address(
-		&self,
-		wallet: &Pubkey,
-		mint: &Pubkey,
-	) -> Result<&Self, ProgramError> {
-		let Some((address, _bump)) =
-			crate::try_get_associated_token_address(wallet, mint, &pinocchio_token_2022::ID)
-		else {
-			log!(
-				"could not find associated token 2022 address for wallet: {}, mint: {}",
 				wallet,
 				mint,
 			);
@@ -461,20 +451,28 @@ impl AccountValidation for crate::token::state::TokenAccount {
 impl AsTokenAccount for AccountInfo {
 	#[track_caller]
 	fn as_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError> {
+		self.can_borrow_data()?;
+
 		unsafe { crate::token::state::Mint::from_account_info_unchecked(self) }
 	}
 
 	fn as_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError> {
+		self.can_borrow_data()?;
+
 		unsafe { crate::token::state::TokenAccount::from_account_info_unchecked(self) }
 	}
 
 	fn as_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError> {
+		self.can_borrow_data()?;
+
 		unsafe { crate::token_2022::state::Mint::from_account_info_unchecked(self) }
 	}
 
 	fn as_token_2022_account(
 		&self,
 	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
+		self.can_borrow_data()?;
+
 		unsafe { crate::token_2022::state::TokenAccount::from_account_info_unchecked(self) }
 	}
 
@@ -482,22 +480,13 @@ impl AsTokenAccount for AccountInfo {
 		&self,
 		owner: &Pubkey,
 		mint: &Pubkey,
+		token_program: &Pubkey,
 	) -> Result<&crate::token::state::TokenAccount, ProgramError> {
+		self.can_borrow_data()?;
+
 		unsafe {
 			crate::token::state::TokenAccount::from_account_info_unchecked(
-				self.assert_associated_token_address(owner, mint)?,
-			)
-		}
-	}
-
-	fn as_associated_token_2022_account(
-		&self,
-		owner: &Pubkey,
-		mint: &Pubkey,
-	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
-		unsafe {
-			crate::token_2022::state::TokenAccount::from_account_info_unchecked(
-				self.assert_associated_token_address(owner, mint)?,
+				self.assert_associated_token_address(owner, mint, token_program)?,
 			)
 		}
 	}
@@ -507,20 +496,37 @@ impl<'a> LamportTransfer<'a> for AccountInfo {
 	/// Send the specified lamports to the `recipient` account.
 	/// The sender must be a mutable signer for this to be possible.
 	#[inline(always)]
-	fn send(&'a self, lamports: u64, recipient: &'a AccountInfo) {
-		let Ok(self_lamports) = self.try_borrow_mut_lamports() else {
-			return;
+	#[track_caller]
+	fn send(&'a self, lamports: u64, recipient: &'a AccountInfo) -> ProgramResult {
+		let self_lamports = match self.try_borrow_mut_lamports() {
+			Ok(v) => v,
+			Err(e) => {
+				log!("Could not mutably borrow owned lamports");
+				log_caller();
+				return Err(e);
+			}
 		};
 
-		let Ok(recipient_lamports) = recipient.try_borrow_mut_lamports() else {
-			return;
+		let recipient_lamports = match recipient.try_borrow_mut_lamports() {
+			Ok(v) => v,
+			Err(e) => {
+				log!("Could not mutably borrow recipent lamports");
+				log_caller();
+				return Err(e);
+			}
 		};
 
 		// SAFETY:
 		// The solana runtime will check that no extra lamports are created so this
 		// should be safe even if attempting to add more lamports than owned.
-		let _ = self_lamports.checked_sub(lamports);
-		let _ = recipient_lamports.checked_add(lamports);
+		self_lamports
+			.checked_sub(lamports)
+			.ok_or(ProgramError::InsufficientFunds)?;
+		recipient_lamports
+			.checked_add(lamports)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+
+		Ok(())
 	}
 
 	/// The `from` account must be mutable and a signer for this to be
@@ -533,5 +539,13 @@ impl<'a> LamportTransfer<'a> for AccountInfo {
 			lamports,
 		}
 		.invoke()
+	}
+}
+
+impl<'a> CloseAccountWithRecipient<'a> for AccountInfo {
+	fn close_with_recipient(&'a self, recipient: &'a AccountInfo) -> ProgramResult {
+		*recipient.try_borrow_mut_lamports()? += *self.try_borrow_lamports()?;
+		self.resize(0)?;
+		self.close()
 	}
 }

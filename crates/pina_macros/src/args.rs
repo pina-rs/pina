@@ -11,6 +11,8 @@ pub(crate) struct AccountArgs {
 	pub(crate) crate_path: syn::Path,
 	/// Set the discriminator enum for this account.
 	pub(crate) discriminator: syn::Path,
+	/// Set the variant of the discriminator enum.
+	pub(crate) variant: Option<syn::Ident>,
 }
 
 #[derive(Debug, FromMeta)]
@@ -20,6 +22,8 @@ pub(crate) struct InstructionArgs {
 	pub(crate) crate_path: syn::Path,
 	/// Set the discriminator enum for this instruction.
 	pub(crate) discriminator: syn::Path,
+	/// Set the variant of the discriminator enum.
+	pub(crate) variant: Option<syn::Ident>,
 }
 
 #[derive(Debug, FromMeta)]

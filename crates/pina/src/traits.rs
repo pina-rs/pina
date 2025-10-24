@@ -1,4 +1,5 @@
 use bytemuck::Pod;
+use pinocchio::ProgramResult;
 
 use crate::AccountInfo;
 use crate::ProgramError;
@@ -55,6 +56,8 @@ pub trait AccountInfoValidation {
 	fn assert_writable(&self) -> Result<&Self, ProgramError>;
 	/// Assert that the account is executable.
 	fn assert_executable(&self) -> Result<&Self, ProgramError>;
+	/// Assert that the data held by the account is of the specified length.
+	fn assert_data_len(&self, len: usize) -> Result<&Self, ProgramError>;
 	/// Assert that the account is empty.
 	fn assert_empty(&self) -> Result<&Self, ProgramError>;
 	/// Assert that the account is not empty.
@@ -67,11 +70,13 @@ pub trait AccountInfoValidation {
 	fn assert_sysvar(&self, sysvar_id: &Pubkey) -> Result<&Self, ProgramError>;
 	/// Assert that the account has the address provided.
 	fn assert_address(&self, address: &Pubkey) -> Result<&Self, ProgramError>;
+	/// Assert that the account has any of the address provided.
+	fn assert_addresses(&self, addresses: &[Pubkey]) -> Result<&Self, ProgramError>;
 	/// Assert that the account is owned by the address provided.
-	fn assert_owner(&self, program_id: &Pubkey) -> Result<&Self, ProgramError>;
-	/// Assert that the account is owned by one of the spl token programs.
-	#[cfg(feature = "token")]
-	fn assert_spl_owner(&self) -> Result<&Self, ProgramError>;
+	fn assert_owner(&self, owner: &Pubkey) -> Result<&Self, ProgramError>;
+	/// Assert that the account is owned by one of the owner (program) ids
+	/// provided.
+	fn assert_owners(&self, owners: &[Pubkey]) -> Result<&Self, ProgramError>;
 	/// Assert that the account has the seeds provided and uses the canonical
 	/// bump.
 	fn assert_seeds(&self, seeds: &[&[u8]], program_id: &Pubkey) -> Result<&Self, ProgramError>;
@@ -88,19 +93,14 @@ pub trait AccountInfoValidation {
 		seeds: &[&[u8]],
 		program_id: &Pubkey,
 	) -> Result<u8, ProgramError>;
-	/// Assert that the account is an associated token (key) / p-token account.
+	/// Assert that the account is an associated token with the provided token
+	/// account.
 	#[cfg(feature = "token")]
 	fn assert_associated_token_address(
 		&self,
 		wallet: &Pubkey,
 		mint: &Pubkey,
-	) -> Result<&Self, ProgramError>;
-	/// Assert that the account is an associated token 2022 account.
-	#[cfg(feature = "token")]
-	fn assert_associated_token_2022_address(
-		&self,
-		wallet: &Pubkey,
-		mint: &Pubkey,
+		token_program: &Pubkey,
 	) -> Result<&Self, ProgramError>;
 }
 
@@ -158,7 +158,11 @@ primitive_into_discriminator!(u64);
 /// 			___FIRST => ::core::result::Result::Ok(Self::First),
 /// 			___SECOND => ::core::result::Result::Ok(Self::Second),
 /// 			#[allow(unreachable_patterns)]
-/// 			_ => ::core::result::Result::Err(::pina::PinaError::InvalidDiscriminator.into()),
+/// 			_ => {
+/// 				::core::result::Result::Err(
+/// 					::pina::PinaProgramError::InvalidDiscriminator.into(),
+/// 				)
+/// 			}
 /// 		}
 /// 	}
 /// }
@@ -259,25 +263,27 @@ pub trait AsAccount {
 pub trait AsTokenAccount {
 	fn as_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError>;
 	fn as_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError>;
-	fn as_associated_token_account(
-		&self,
-		owner: &Pubkey,
-		mint: &Pubkey,
-	) -> Result<&crate::token::state::TokenAccount, ProgramError>;
 	fn as_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError>;
 	fn as_token_2022_account(
 		&self,
 	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError>;
-	fn as_associated_token_2022_account(
+	fn as_associated_token_account(
 		&self,
 		owner: &Pubkey,
 		mint: &Pubkey,
-	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError>;
+		token_program: &Pubkey,
+	) -> Result<&crate::token::state::TokenAccount, ProgramError>;
 }
 
 pub trait LamportTransfer<'a> {
-	fn send(&'a self, lamports: u64, to: &'a AccountInfo);
-	fn collect(&'a self, lamports: u64, from: &'a AccountInfo) -> Result<(), ProgramError>;
+	fn send(&'a self, lamports: u64, to: &'a AccountInfo) -> ProgramResult;
+	fn collect(&'a self, lamports: u64, from: &'a AccountInfo) -> ProgramResult;
+}
+
+pub trait CloseAccountWithRecipient<'a> {
+	/// Close the account and transfer all rent lamports to the recipient.
+	/// The account must be writable to be closed.
+	fn close_with_recipient(&'a self, recipient: &'a AccountInfo) -> ProgramResult;
 }
 
 pub trait Loggable {
@@ -289,9 +295,8 @@ pub trait TryFromAccountInfos<'a>: Sized {
 	fn try_from_account_infos(accounts: &'a [AccountInfo]) -> Result<Self, ProgramError>;
 }
 
-pub trait ValidateAccountInfos<'a>: TryFromAccountInfos<'a> {
-	type SuccessType;
-	fn validate_accounts(&self) -> Result<Self::SuccessType, ProgramError>;
+pub trait ProcessAccountInfos<'a>: TryFromAccountInfos<'a> {
+	fn process(&self, data: &[u8]) -> ProgramResult;
 }
 
 #[cfg(test)]

@@ -75,7 +75,7 @@ pub fn accounts_derive(input: TokenStream) -> TokenStream {
 	let too_many_accounts = remaining_field.is_none().then(|| {
 		quote! {
 			if accounts.len() > #number_of_fields {
-				return ::core::result::Result::Err(#crate_path::PinaError::TooManyAccountKeys.into());
+				return ::core::result::Result::Err(#crate_path::PinaProgramError::TooManyAccountKeys.into());
 			}
 		}
 	});
@@ -291,7 +291,11 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 /// 			__GAME_STATE => ::core::result::Result::Ok(Self::GameState),
 /// 			__SECTION_STATE => ::core::result::Result::Ok(Self::SectionState),
 /// 			#[allow(unreachable_patterns)]
-/// 			_ => ::core::result::Result::Err(::pina::PinaError::InvalidDiscriminator.into()),
+/// 			_ => {
+/// 				::core::result::Result::Err(
+/// 					::pina::PinaProgramError::InvalidDiscriminator.into(),
+/// 				)
+/// 			}
 /// 		}
 /// 	}
 /// }
@@ -420,7 +424,7 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 				match number {
 					#(#match_arms)*
 					#[allow(unreachable_patterns)]
-					_ => ::core::result::Result::Err(#crate_path::PinaError::InvalidDiscriminator.into()),
+					_ => ::core::result::Result::Err(#crate_path::PinaProgramError::InvalidDiscriminator.into()),
 				}
 			}
 		}
@@ -663,16 +667,14 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 	let AccountArgs {
 		crate_path,
 		discriminator,
+		variant,
 	} = args;
+
+	let variant = variant.unwrap_or(struct_name.clone());
 
 	// Add #[repr(C)]
 	let repr_attr: Attribute = syn::parse_quote!(#[repr(C)]);
 	item_struct.attrs.push(repr_attr);
-
-	// Add builder attribute
-	let builder_attr: Attribute =
-		syn::parse_quote!(#[builder(builder_method(vis = "", name = __builder))]);
-	item_struct.attrs.push(builder_attr);
 
 	// Add derive macros
 	let derives_to_add: [syn::Path; 7] = [
@@ -717,6 +719,11 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 		let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
 		item_struct.attrs.push(new_derive_attr);
 	}
+
+	// Add builder attribute
+	let builder_attr: Attribute =
+		syn::parse_quote!(#[builder(builder_method(vis = "", name = __builder))]);
+	item_struct.attrs.push(builder_attr);
 
 	let bytemuck_crate_str = format!(
 		"{}::bytemuck",
@@ -779,6 +786,10 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 		#assertions
 
 		impl #struct_name {
+			/// Zero out all bytes in the struct including padding bytes. This can be useful when closing an account.
+			pub fn zeroed(&mut self) {
+				#crate_path::bytemuck::write_zeroes(self);
+			}
 
 			pub fn to_bytes(&self) -> &[u8] {
 				#crate_path::bytemuck::bytes_of(self)
@@ -795,7 +806,7 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 		impl #crate_path::HasDiscriminator for #struct_name {
 			type Type = #discriminator;
 
-			const VALUE: Self::Type = #discriminator::#struct_name;
+			const VALUE: Self::Type = #discriminator::#variant;
 		}
 
 		impl #crate_path::AccountValidation for #struct_name {
@@ -1004,16 +1015,14 @@ pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
 	let InstructionArgs {
 		crate_path,
 		discriminator,
+		variant,
 	} = args;
+
+	let variant = variant.unwrap_or(struct_name.clone());
 
 	// Add #[repr(C)]
 	let repr_attr: Attribute = syn::parse_quote!(#[repr(C)]);
 	item_struct.attrs.push(repr_attr);
-
-	// Add builder attribute
-	let builder_attr: Attribute =
-		syn::parse_quote!(#[builder(builder_method(vis = "", name = __builder))]);
-	item_struct.attrs.push(builder_attr);
 
 	// Add derive macros
 	let derives_to_add: [syn::Path; 8] = [
@@ -1060,6 +1069,10 @@ pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
 		item_struct.attrs.push(new_derive_attr);
 	}
 
+	// Add builder attribute
+	let builder_attr: Attribute =
+		syn::parse_quote!(#[builder(builder_method(vis = "", name = __builder))]);
+	item_struct.attrs.push(builder_attr);
 	let bytemuck_crate_str = format!(
 		"{}::bytemuck",
 		quote!(#crate_path).to_string().replace(' ', "")
@@ -1142,7 +1155,7 @@ pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
 		impl #crate_path::HasDiscriminator for #struct_name {
 			type Type = #discriminator;
 
-			const VALUE: Self::Type = #discriminator::#struct_name;
+			const VALUE: Self::Type = #discriminator::#variant;
 		}
 	};
 

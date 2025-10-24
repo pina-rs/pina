@@ -5,7 +5,7 @@ use pina_macros::error;
 #[error(crate = crate)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum PinaError {
+pub enum PinaProgramError {
 	TooManyAccountKeys = 0xFFFF_FFFE,
 	InvalidDiscriminator = 0xFFFF_FFFF,
 }
