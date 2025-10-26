@@ -17,7 +17,7 @@ bytemuck = { default-features = false, version = "^1" }
 darling = { default-features = false, version = "^0.21" }
 five8_const = { default-features = false, version = "^1" }
 heck = { default-features = false, version = "^0.5" }
-mollusk-svm = { default-features = false, version = "^0.5" }
+mollusk-svm = { default-features = false, version = "^0.7" }
 paste = { default-features = false, version = "^1" }
 pinocchio = { default-features = false, version = "^0.9" }
 pinocchio-associated-token-account = { default-features = false, version = "^0.2" }
