@@ -36,7 +36,7 @@ syn = { default-features = false, version = "^2", features = ["full"] }
 test_utils_solana = { default-features = false, version = "^0.8" }
 thiserror = { default-features = false, version = "^2" }
 tokio = { default-features = false, version = "^1" }
-typed-builder = { default-features = false, version = "^0.22" }
+typed-builder = { default-features = false, version = "^0.23" }
 wasm_client_solana = { default-features = false, version = "^0.9" }
 
 # publishable crates
