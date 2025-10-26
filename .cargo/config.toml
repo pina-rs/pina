@@ -1,0 +1,4 @@
+[alias]
+dylint = ["bin", "cargo-dylint"]
+llvm-cov = ["bin", "cargo-llvm-cov"]
+semver-checks = ["bin", "cargo-semver-checks"]

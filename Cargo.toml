@@ -46,10 +46,11 @@ pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version
 pina_token_2022_extensions = { default-features = false, path = "crates/pina_token_2022_extensions", version = "^0" }
 
 [workspace.metadata.bin]
-cargo-dylint = { version = "4.1.2" }
-cargo-llvm-cov = { version = "0.6.19" }
+cargo-dylint = { version = "5.0.0" }
+cargo-llvm-cov = { version = "0.6.21" }
 cargo-semver-checks = { version = "0.44.0" }
-dylint-link = { version = "4.1.2", bins = ["dylint-link"] }
+dylint-link = { version = "5.0.0", bins = ["dylint-link"] }
+knope = { version = "0.5.3", bins = ["knope"] }
 solana-verify = { version = "0.4.11", bins = ["solana-verify"] }
 
 [workspace.lints.rust]

@@ -1,0 +1,74 @@
+name: "ci"
+permissions:
+  pull-requests: write
+  contents: write
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  lint:
+    timeout-minutes: 60
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: lint clippy
+        run: lint:clippy
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: lint formatting
+        run: lint:format
+        shell: devenv shell -c -- bash -e {0}
+
+  test:
+    timeout-minutes: 60
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: run tests
+        run: |
+          sudo prlimit --pid $$ --nofile=1000000:1000000
+          cargo test
+        shell: devenv shell -- bash -e {0}
+
+  build:
+    timeout-minutes: 60
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: build
+        run: cargo build --locked
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: build all features
+        run: cargo build --all-features --locked
+        shell: devenv shell -c -- bash -e {0}

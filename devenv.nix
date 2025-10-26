@@ -57,7 +57,6 @@ in
     CXX = "${llvm.clang}/bin/clang++";
     PROTOC = "${pkgs.protobuf}/bin/protoc";
     LD_LIBRARY_PATH = "${config.env.DEVENV_PROFILE}/lib";
-    WASM_BINDGEN_TEST_WEBDRIVER_JSON = "${config.env.DEVENV_ROOT}/webdriver.json";
   };
 
   # Rely on the global sdk for now as the nix apple sdk is not working for me.
@@ -87,12 +86,12 @@ in
   };
 
   scripts = {
-    "release-plz" = {
+    "knope" = {
       exec = ''
         set -e
-        cargo bin release-plz $@
+        cargo bin knope $@
       '';
-      description = "The `release-plz` executable";
+      description = "The `knope` executable";
       binary = "bash";
     };
     "query-security-txt" = {
