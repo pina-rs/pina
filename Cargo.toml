@@ -29,7 +29,7 @@ pinocchio-token = { default-features = false, version = "^0.4" }
 pinocchio-token-2022 = { default-features = false, version = "^0.1" }
 proc-macro2 = { default-features = false, version = "^1" }
 quote = { default-features = false, version = "^1" }
-solana-program = { default-features = false, version = "^2.3" }
+solana-program = { default-features = false, version = "^3.0" }
 spl-associated-token-account = { default-features = false, version = "^7" }
 spl-token-2022 = { default-features = false, version = "9" }
 syn = { default-features = false, version = "^2", features = ["full"] }
