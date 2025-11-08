@@ -139,7 +139,6 @@ pub(crate) struct AccountsInput {
 #[darling(attributes(pina))]
 pub(crate) struct AccountsField {
 	pub(crate) ident: Option<syn::Ident>,
-	pub(crate) ty: syn::Type,
 	#[darling(default)]
 	pub(crate) remaining: darling::util::Flag,
 }
