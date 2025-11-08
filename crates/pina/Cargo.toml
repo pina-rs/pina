@@ -5,7 +5,7 @@ edition.workspace = true
 homepage.workspace = true
 keywords.workspace = true
 license.workspace = true
-readme.workspace = true
+readme = "readme.md"
 repository.workspace = true
 description = "a solana and pinocchio smart contract framework"
 
