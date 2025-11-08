@@ -7,6 +7,7 @@ keywords.workspace = true
 license.workspace = true
 readme.workspace = true
 repository.workspace = true
+description = "draft token 2022 extensions for pinocchio and solana"
 
 [dependencies]
 pinocchio = { workspace = true }
