@@ -1,9 +1,14 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "examples/*"]
+members = [
+	"crates/pina",
+	"crates/pina_macros",
+	"crates/pina_sdk_ids",
+	"crates/pina_token_2022_extensions",
+	"examples/escrow_program",
+]
 
 [workspace.package]
-version = "0.0.0"
 edition = "2021"
 homepage = "https://pina.rs"
 keywords = ["solana", "pinnochio"]
@@ -29,9 +34,6 @@ pinocchio-token = { default-features = false, version = "^0.4" }
 pinocchio-token-2022 = { default-features = false, version = "^0.1" }
 proc-macro2 = { default-features = false, version = "^1" }
 quote = { default-features = false, version = "^1" }
-solana-program = { default-features = false, version = "^2.3" }
-spl-associated-token-account = { default-features = false, version = "^7" }
-spl-token-2022 = { default-features = false, version = "9" }
 syn = { default-features = false, version = "^2", features = ["full"] }
 test_utils_solana = { default-features = false, version = "^0.8" }
 thiserror = { default-features = false, version = "^2" }
@@ -40,17 +42,21 @@ typed-builder = { default-features = false, version = "^0.22" }
 wasm_client_solana = { default-features = false, version = "^0.9" }
 
 # publishable crates
-pina = { default-features = false, path = "crates/pina", version = "^0" }
-pina_macros = { default-features = false, path = "crates/pina_macros", version = "^0" }
-pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "^0" }
-pina_token_2022_extensions = { default-features = false, path = "crates/pina_token_2022_extensions", version = "^0" }
+pina = { default-features = false, path = "crates/pina", version = "0.0.0" }
+pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.0.0" }
+pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.0.0" }
+pina_token_2022_extensions = { default-features = false, path = "crates/pina_token_2022_extensions", version = "0.0.0" }
 
 [workspace.metadata.bin]
 cargo-dylint = { version = "5.0.0" }
+cargo-insta = { version = "1.43.2" }
 cargo-llvm-cov = { version = "0.6.21" }
+cargo-nextest = { version = "0.9.111" }
 cargo-semver-checks = { version = "0.44.0" }
+cargo-workspaces = { version = "0.4.1" }
 dylint-link = { version = "5.0.0", bins = ["dylint-link"] }
-knope = { version = "0.5.3", bins = ["knope"] }
+knope = { version = "0.21.5", bins = ["knope"] }
+sbpf-linker = { version = "0.1.5", bins = ["sbpf-linker"] }
 solana-verify = { version = "0.4.11", bins = ["solana-verify"] }
 
 [workspace.lints.rust]

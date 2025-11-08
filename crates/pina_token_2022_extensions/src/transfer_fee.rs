@@ -1,7 +1,6 @@
 use core::mem::MaybeUninit;
 use core::slice::from_raw_parts;
 
-use pinocchio::ProgramResult;
 use pinocchio::account_info::AccountInfo;
 use pinocchio::instruction::AccountMeta;
 use pinocchio::instruction::Instruction;
@@ -9,11 +8,12 @@ use pinocchio::instruction::Signer;
 use pinocchio::program::invoke_signed;
 use pinocchio::program_error::ProgramError;
 use pinocchio::pubkey::Pubkey;
+use pinocchio::ProgramResult;
 
-use super::Extension;
 use super::get_extension_from_bytes;
-use crate::UNINIT_BYTE;
+use super::Extension;
 use crate::write_bytes;
+use crate::UNINIT_BYTE;
 
 /// Transfer fee configuration
 #[repr(C)]

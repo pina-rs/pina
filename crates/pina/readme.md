@@ -9,10 +9,8 @@
 ## Installation
 
 ```bash
-cargo add pina pinocchio-log
+cargo add pina
 ```
-
-In a future version the pinocchio-log dependency will not be required. Currently the `log!` macro hardcodes the `pinocchio-log` crate.
 
 ## Documentation
 

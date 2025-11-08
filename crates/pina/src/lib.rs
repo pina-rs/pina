@@ -29,7 +29,7 @@ pub use pinocchio::ProgramResult;
 #[cfg(feature = "token")]
 pub use pinocchio_associated_token_account as associated_token_account;
 #[cfg(feature = "logs")]
-pub use pinocchio_log::log;
+pub use pinocchio_log;
 #[cfg(feature = "logs")]
 pub use pinocchio_log::log_cu_usage;
 pub use pinocchio_log::logger::Logger;
@@ -57,6 +57,14 @@ macro_rules! nostd_entrypoint {
 		$crate::pinocchio::program_entrypoint!($process_instruction, $maximum);
 		$crate::pinocchio::no_allocator!();
 		$crate::pinocchio::nostd_panic_handler!();
+	};
+}
+
+#[cfg(feature = "logs")]
+#[macro_export]
+macro_rules! log {
+	($($arg:tt)*) => {
+		$crate::pinocchio_log::log!($($arg)*);
 	};
 }
 

@@ -3,7 +3,6 @@ extern crate alloc;
 use alloc::vec::Vec;
 use core::str;
 
-use pinocchio::ProgramResult;
 use pinocchio::account_info::AccountInfo;
 use pinocchio::cpi::invoke_signed;
 use pinocchio::instruction::AccountMeta;
@@ -11,11 +10,12 @@ use pinocchio::instruction::Instruction;
 use pinocchio::instruction::Signer;
 use pinocchio::program_error::ProgramError;
 use pinocchio::pubkey::Pubkey;
+use pinocchio::ProgramResult;
 
+use super::get_extension_data_bytes_for_variable_pack;
 use super::BaseState;
 use super::Extension;
 use super::ExtensionType;
-use super::get_extension_data_bytes_for_variable_pack;
 
 /// State for Metadata for a token
 #[repr(C)]

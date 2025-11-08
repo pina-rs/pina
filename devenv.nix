@@ -13,9 +13,7 @@ in
     with pkgs;
     [
       binaryen
-      cargo-binstall # speed up cargo-rust-bin installs
-      cargo-insta
-      cargo-nextest
+      cargo-binstall
       cargo-run-bin
       chromedriver
       cmake
@@ -38,7 +36,6 @@ in
       rust-jemalloc-sys
       rustup
       shfmt
-      # solana-cli
       zstd
     ]
     ++ lib.optionals stdenv.isDarwin [

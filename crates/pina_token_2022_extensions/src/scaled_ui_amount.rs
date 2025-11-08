@@ -1,4 +1,3 @@
-use pinocchio::ProgramResult;
 use pinocchio::account_info::AccountInfo;
 use pinocchio::cpi::invoke_signed;
 use pinocchio::instruction::AccountMeta;
@@ -6,9 +5,10 @@ use pinocchio::instruction::Signer;
 use pinocchio::instruction::{self};
 use pinocchio::pubkey::Pubkey;
 use pinocchio::sysvars::clock::UnixTimestamp;
+use pinocchio::ProgramResult;
 
-use crate::UNINIT_BYTE;
 use crate::write_bytes;
+use crate::UNINIT_BYTE;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

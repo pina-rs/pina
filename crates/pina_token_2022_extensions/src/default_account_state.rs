@@ -1,14 +1,14 @@
-use pinocchio::ProgramResult;
 use pinocchio::account_info::AccountInfo;
 use pinocchio::instruction::AccountMeta;
 use pinocchio::instruction::Instruction;
 use pinocchio::instruction::Signer;
 use pinocchio::program::invoke_signed;
 use pinocchio::program_error::ProgramError;
+use pinocchio::ProgramResult;
 use pinocchio_token_2022::state::AccountState;
 
-use super::Extension;
 use super::get_extension_from_bytes;
+use super::Extension;
 
 /// State of the default account state
 #[repr(C)]

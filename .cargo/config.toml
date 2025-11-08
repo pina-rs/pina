@@ -1,4 +1,7 @@
 [alias]
 dylint = ["bin", "cargo-dylint"]
+insta = ["bin", "cargo-insta"]
 llvm-cov = ["bin", "cargo-llvm-cov"]
+nextest = ["bin", "cargo-nextest"]
 semver-checks = ["bin", "cargo-semver-checks"]
+workspaces = ["bin", "cargo-workspaces"]

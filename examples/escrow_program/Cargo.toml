@@ -1,6 +1,6 @@
 [package]
 name = "escrow_program"
-version.workspace = true
+version = "0.0.0"
 edition.workspace = true
 homepage.workspace = true
 keywords.workspace = true
@@ -15,13 +15,10 @@ crate-type = ["cdylib", "lib"]
 bpf-entrypoint = []
 
 [dependencies]
-bytemuck = { workspace = true }
 pina = { workspace = true, features = ["logs", "token", "derive"] }
-pinocchio-log = { workspace = true }
 
 [dev-dependencies]
 mollusk-svm = { workspace = true }
-solana-program = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 
 [lints]

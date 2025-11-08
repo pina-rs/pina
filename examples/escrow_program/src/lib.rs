@@ -69,6 +69,7 @@ pub struct MakeInstruction {
 	pub amount_b: PodU64,
 	pub bump: u8,
 }
+
 #[instruction(discriminator = EscrowInstruction, variant = Take)]
 pub struct TakeInstruction {}
 
