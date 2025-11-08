@@ -11,7 +11,7 @@ rust-version.workspace = true
 description = "pina compatible sdk id's"
 
 [dependencies]
-pinocchio-pubkey = { workspace = true }
+pinocchio-pubkey = { workspace = true, default-features = true }
 
 [lints]
 workspace = true
