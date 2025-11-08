@@ -1,3 +1,9 @@
+## 0.1.2 (2025-11-08)
+
+### Documentation
+
+- Update published readme contents
+
 ## 0.1.1 (2025-11-08)
 
 ### Fixes
