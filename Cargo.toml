@@ -9,13 +9,13 @@ members = [
 ]
 
 [workspace.package]
-edition = "2021"
+edition = "2024"
 homepage = "https://pina.rs"
 keywords = ["solana", "pinnochio"]
 license = "Apache-2.0"
 readme = "readme.md"
 repository = "https://github.com/pina-rs/pina"
-rust-version = "1.84.1"
+rust-version = "1.86.0"
 
 [workspace.dependencies]
 bytemuck = { default-features = false, version = "^1" }
