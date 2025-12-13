@@ -32,6 +32,7 @@ pub use pinocchio_associated_token_account as associated_token_account;
 pub use pinocchio_log;
 #[cfg(feature = "logs")]
 pub use pinocchio_log::log_cu_usage;
+#[cfg(feature = "logs")]
 pub use pinocchio_log::logger::Logger;
 pub use pinocchio_pubkey::*;
 pub use pinocchio_system as system;
@@ -77,6 +78,7 @@ macro_rules! log {
 /// Make sure all traits are available.
 pub mod prelude {
 	#[cfg(feature = "logs")]
-	pub use super::Logger;
+	pub use pinocchio_log::logger::Logger;
+
 	pub use crate::traits::*;
 }
