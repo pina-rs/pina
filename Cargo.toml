@@ -20,9 +20,8 @@ rust-version = "1.86.0"
 [workspace.dependencies]
 bytemuck = { default-features = false, version = "^1" }
 darling = { default-features = false, version = "^0.21" }
-five8_const = { default-features = false, version = "^1" }
 heck = { default-features = false, version = "^0.5" }
-mollusk-svm = { default-features = false, version = "^0.5" }
+mollusk-svm = { default-features = false, version = "^0.8" }
 paste = { default-features = false, version = "^1" }
 pinocchio = { default-features = false, version = "^0.9" }
 pinocchio-associated-token-account = { default-features = false, version = "^0.2" }
@@ -38,8 +37,8 @@ syn = { default-features = false, version = "^2", features = ["full"] }
 test_utils_solana = { default-features = false, version = "^0.8" }
 thiserror = { default-features = false, version = "^2" }
 tokio = { default-features = false, version = "^1" }
-typed-builder = { default-features = false, version = "^0.22" }
-wasm_client_solana = { default-features = false, version = "^0.9" }
+typed-builder = { default-features = false, version = "^0.23" }
+wasm_client_solana = { default-features = false, version = "^0.10" }
 
 # publishable crates
 pina = { default-features = false, path = "crates/pina", version = "0.1.2" }
@@ -49,13 +48,13 @@ pina_token_2022_extensions = { default-features = false, path = "crates/pina_tok
 
 [workspace.metadata.bin]
 cargo-dylint = { version = "5.0.0" }
-cargo-insta = { version = "1.43.2" }
+cargo-insta = { version = "1.44.3" }
 cargo-llvm-cov = { version = "0.6.21" }
-cargo-nextest = { version = "0.9.111" }
-cargo-semver-checks = { version = "0.44.0" }
-cargo-workspaces = { version = "0.4.1" }
+cargo-nextest = { version = "0.9.114" }
+cargo-semver-checks = { version = "0.45.0" }
+cargo-workspaces = { version = "0.4.2" }
 dylint-link = { version = "5.0.0", bins = ["dylint-link"] }
-knope = { version = "0.21.5", bins = ["knope"] }
+knope = { version = "0.21.7", bins = ["knope"] }
 sbpf-linker = { version = "0.1.5", bins = ["sbpf-linker"] }
 solana-verify = { version = "0.4.11", bins = ["solana-verify"] }
 

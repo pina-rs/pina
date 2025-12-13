@@ -1,10 +1,10 @@
 use core::panic::Location;
 
-use crate::log;
 use crate::IntoDiscriminator;
 use crate::ProgramError;
 use crate::ProgramResult;
 use crate::Pubkey;
+use crate::log;
 
 /// Parses an instruction from the instruction data.
 /// Also checks that the program ID matches the provided ID when this

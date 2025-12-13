@@ -3,21 +3,21 @@ use args::AccountsInput;
 use args::DiscriminatorArgs;
 use args::ErrorArgs;
 use args::EventArgs;
-use darling::ast::NestedMeta;
 use darling::FromDeriveInput;
 use darling::FromMeta;
+use darling::ast::NestedMeta;
 use heck::ToShoutySnakeCase;
 use proc_macro::TokenStream;
 use quote::format_ident;
 use quote::quote;
-use syn::parse_macro_input;
-use syn::punctuated::Punctuated;
 use syn::Attribute;
 use syn::DeriveInput;
 use syn::Fields;
 use syn::ItemEnum;
 use syn::ItemStruct;
 use syn::Token;
+use syn::parse_macro_input;
+use syn::punctuated::Punctuated;
 
 use crate::args::InstructionArgs;
 
@@ -49,7 +49,7 @@ pub fn accounts_derive(input: TokenStream) -> TokenStream {
 				"Accounts struct must have **ONE** lifetime parameter",
 			)
 			.to_compile_error()
-			.into()
+			.into();
 		}
 	};
 

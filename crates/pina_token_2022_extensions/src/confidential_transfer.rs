@@ -1,6 +1,7 @@
 use core::mem::MaybeUninit;
 use core::slice::from_raw_parts;
 
+use pinocchio::ProgramResult;
 use pinocchio::account_info::AccountInfo;
 use pinocchio::instruction::AccountMeta;
 use pinocchio::instruction::Instruction;
@@ -8,17 +9,16 @@ use pinocchio::instruction::Signer;
 use pinocchio::program::invoke_signed;
 use pinocchio::program_error::ProgramError;
 use pinocchio::pubkey::Pubkey;
-use pinocchio::ProgramResult;
 
-use super::get_extension_from_bytes;
 use super::DecryptableBalance;
 use super::EncryptedBalance;
 use super::Extension;
 use super::POD_AE_CIPHERTEXT_LEN;
 use super::POD_ELGAMAL_CIPHERTEXT_LEN;
-use crate::write_bytes;
+use super::get_extension_from_bytes;
 use crate::ELGAMAL_PUBKEY_LEN;
 use crate::UNINIT_BYTE;
+use crate::write_bytes;
 
 // State Structs and Extension Implementations
 

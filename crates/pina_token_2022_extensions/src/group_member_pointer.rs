@@ -1,3 +1,4 @@
+use pinocchio::ProgramResult;
 use pinocchio::account_info::AccountInfo;
 use pinocchio::cpi::invoke_signed;
 use pinocchio::instruction::AccountMeta;
@@ -5,14 +6,13 @@ use pinocchio::instruction::Instruction;
 use pinocchio::instruction::Signer;
 use pinocchio::program_error::ProgramError;
 use pinocchio::pubkey::Pubkey;
-use pinocchio::ProgramResult;
 
-use super::get_extension_from_bytes;
 use super::BaseState;
 use super::Extension;
 use super::ExtensionType;
-use crate::write_bytes;
+use super::get_extension_from_bytes;
 use crate::UNINIT_BYTE;
+use crate::write_bytes;
 
 /// State of the group member pointer
 #[derive(Debug, Clone, Copy, PartialEq)]

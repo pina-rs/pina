@@ -7,8 +7,8 @@ use std::alloc::dealloc;
 use std::mem::MaybeUninit;
 use std::vec;
 
-use pina::entrypoint::deserialize;
 use pina::entrypoint::NON_DUP_MARKER;
+use pina::entrypoint::deserialize;
 use pina::*;
 use pinocchio::account_info::MAX_PERMITTED_DATA_INCREASE;
 

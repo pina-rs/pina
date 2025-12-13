@@ -1,12 +1,12 @@
 extern crate alloc;
 use alloc::vec::Vec;
 
+use pinocchio::ProgramResult;
 use pinocchio::account_info::AccountInfo;
 use pinocchio::cpi::invoke_signed;
 use pinocchio::instruction::AccountMeta;
 use pinocchio::instruction::Instruction;
 use pinocchio::instruction::Signer;
-use pinocchio::ProgramResult;
 
 use super::ExtensionType;
 

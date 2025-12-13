@@ -14,6 +14,7 @@ pub use bytemuck::Zeroable;
 #[cfg(feature = "derive")]
 pub use pina_macros::*;
 pub use pinocchio;
+pub use pinocchio::ProgramResult;
 pub use pinocchio::account_info::AccountInfo;
 pub use pinocchio::entrypoint;
 pub use pinocchio::instruction::AccountMeta;
@@ -25,7 +26,6 @@ pub use pinocchio::program_error::ProgramError;
 pub use pinocchio::pubkey::Pubkey;
 pub use pinocchio::pubkey::*;
 pub use pinocchio::sysvars;
-pub use pinocchio::ProgramResult;
 #[cfg(feature = "token")]
 pub use pinocchio_associated_token_account as associated_token_account;
 #[cfg(feature = "logs")]

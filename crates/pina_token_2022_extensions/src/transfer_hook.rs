@@ -7,8 +7,8 @@ use pinocchio::program_error::ProgramError;
 use pinocchio::pubkey::Pubkey;
 
 use super::get_extension_from_bytes;
-use crate::write_bytes;
 use crate::UNINIT_BYTE;
+use crate::write_bytes;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]

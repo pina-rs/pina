@@ -1,4 +1,19 @@
+[target.bpfel-unknown-none]
+rustflags = [
+	"-C",
+	"linker=sbpf-linker",
+	"-C",
+	"panic=abort",
+	"-C",
+	"save-temps",
+	"-C",
+	"link-arg=--llvm-args=-bpf-stack-size=4096",
+	"-C",
+	"relocation-model=static",
+]
+
 [alias]
+build-escrow-program = "build --release --target bpfel-unknown-none -p escrow_program -Z build-std -F bpf-entrypoint"
 dylint = ["bin", "cargo-dylint"]
 insta = ["bin", "cargo-insta"]
 llvm-cov = ["bin", "cargo-llvm-cov"]

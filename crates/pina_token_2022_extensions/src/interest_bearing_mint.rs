@@ -1,3 +1,4 @@
+use pinocchio::ProgramResult;
 use pinocchio::account_info::AccountInfo;
 use pinocchio::cpi::invoke_signed;
 use pinocchio::instruction::AccountMeta;
@@ -5,11 +6,10 @@ use pinocchio::instruction::Instruction;
 use pinocchio::instruction::Signer;
 use pinocchio::program_error::ProgramError;
 use pinocchio::pubkey::Pubkey;
-use pinocchio::ProgramResult;
 
 use super::get_extension_from_bytes;
-use crate::write_bytes;
 use crate::UNINIT_BYTE;
+use crate::write_bytes;
 
 /// State for an interest-bearing token
 #[repr(C)]

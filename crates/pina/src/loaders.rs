@@ -6,13 +6,6 @@ use core::slice::from_raw_parts_mut;
 use pinocchio::ProgramResult;
 use pinocchio_system::instructions::Transfer;
 
-#[cfg(feature = "token")]
-use crate::assert;
-use crate::create_program_address;
-use crate::log;
-use crate::log_caller;
-use crate::pubkey;
-use crate::try_find_program_address;
 use crate::AccountDeserialize;
 use crate::AccountInfo;
 use crate::AccountInfoValidation;
@@ -27,6 +20,13 @@ use crate::LamportTransfer;
 use crate::Pod;
 use crate::ProgramError;
 use crate::Pubkey;
+#[cfg(feature = "token")]
+use crate::assert;
+use crate::create_program_address;
+use crate::log;
+use crate::log_caller;
+use crate::pubkey;
+use crate::try_find_program_address;
 
 const SYSVAR_ID: Pubkey = pubkey!("Sysvar1111111111111111111111111111111111111");
 

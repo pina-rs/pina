@@ -588,8 +588,16 @@ impl<'a> ::pina::TryFromAccountInfos<'a> for MakeOfferAccounts<'a> {
 	fn try_from_account_infos(
 		accounts: &'a [::pina::AccountInfo],
 	) -> ::core::result::Result<Self, ::pina::ProgramError> {
-		let [maker, token_mint_a, token_mint_b, maker_ata_a, offer, vault, token_program, remaining @ ..] =
-			accounts
+		let [
+			maker,
+			token_mint_a,
+			token_mint_b,
+			maker_ata_a,
+			offer,
+			vault,
+			token_program,
+			remaining @ ..,
+		] = accounts
 		else {
 			return ::core::result::Result::Err(::pina::ProgramError::NotEnoughAccountKeys);
 		};

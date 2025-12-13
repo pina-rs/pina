@@ -2,9 +2,9 @@
 #![allow(unsafe_code)]
 #![allow(clippy::inline_always)]
 
+pub(crate) use pinocchio_token_2022::ID;
 use pinocchio_token_2022::state::Mint;
 use pinocchio_token_2022::state::TokenAccount;
-pub(crate) use pinocchio_token_2022::ID;
 
 // pub mod confidential_transfer;
 pub mod confidential_mint_burn;

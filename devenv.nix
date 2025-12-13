@@ -73,15 +73,6 @@ in
   # disable dotenv since it breaks the variable interpolation supported by `direnv`
   dotenv.disableHint = true;
 
-  tasks = {
-    "rustfmt:nightly" = {
-      exec = ''
-        rustup toolchain install nightly --component rustfmt --force
-      '';
-      before = [ "devenv:enterShell" ];
-    };
-  };
-
   scripts = {
     "knope" = {
       exec = ''
@@ -97,6 +88,14 @@ in
         cargo bin query-security-txt $@
       '';
       description = "The `query-security-txt` executable";
+      binary = "bash";
+    };
+    "sbpf-linker" = {
+      exec = ''
+        set -e
+        cargo bin sbpf-linker $@
+      '';
+      description = "The `sbpf-linker` executable";
       binary = "bash";
     };
     "solana-verify" = {
