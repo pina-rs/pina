@@ -41,10 +41,10 @@ typed-builder = { default-features = false, version = "^0.23" }
 wasm_client_solana = { default-features = false, version = "^0.10" }
 
 # publishable crates
-pina = { default-features = false, path = "crates/pina", version = "0.1.2" }
-pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.1.2" }
-pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.1.1" }
-pina_token_2022_extensions = { default-features = false, path = "crates/pina_token_2022_extensions", version = "0.1.1" }
+pina = { default-features = false, path = "crates/pina", version = "0.2.0" }
+pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.2.0" }
+pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.2.0" }
+pina_token_2022_extensions = { default-features = false, path = "crates/pina_token_2022_extensions", version = "0.2.0" }
 
 [workspace.metadata.bin]
 cargo-dylint = { version = "5.0.0" }
