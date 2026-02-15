@@ -10,6 +10,16 @@
 #![allow(clippy::inline_always)]
 #![no_std]
 
+// On native builds the cdylib target needs std for unwinding and panic
+// handling. On BPF, `nostd_entrypoint!()` provides the panic handler and
+// allocator. Tests link against std automatically.
+#[cfg(all(
+	not(any(target_os = "solana", target_arch = "bpf")),
+	not(feature = "bpf-entrypoint"),
+	not(test)
+))]
+extern crate std;
+
 use pina::*;
 
 declare_id!("4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT");
@@ -284,7 +294,8 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		.invoke()?;
 
 		let bump_as_seeds = [*bump];
-		let escrow_seeds = seeds_escrow!(true, self.maker.address().as_ref(), &seed.0, &bump_as_seeds);
+		let escrow_seeds =
+			seeds_escrow!(true, self.maker.address().as_ref(), &seed.0, &bump_as_seeds);
 		let escrow_signer = Signer::from(&escrow_seeds);
 		let signers = [escrow_signer];
 

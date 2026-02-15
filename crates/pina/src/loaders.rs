@@ -8,10 +8,10 @@ use pinocchio_system::instructions::Transfer;
 
 use crate::AccountDeserialize;
 use crate::AccountInfoValidation;
-use crate::AccountView;
-use crate::Address;
 #[cfg(feature = "token")]
 use crate::AccountValidation;
+use crate::AccountView;
+use crate::Address;
 use crate::AsAccount;
 #[cfg(feature = "token")]
 use crate::AsTokenAccount;
@@ -74,7 +74,10 @@ impl AccountInfoValidation for AccountView {
 	#[track_caller]
 	fn assert_data_len(&self, len: usize) -> Result<&Self, ProgramError> {
 		if self.data_len() != len {
-			log!("address: {} has an incorrect length", self.address().as_ref());
+			log!(
+				"address: {} has an incorrect length",
+				self.address().as_ref()
+			);
 			log_caller();
 
 			return Err(ProgramError::InvalidAccountData);
@@ -120,7 +123,10 @@ impl AccountInfoValidation for AccountView {
 		let data = self.try_borrow()?;
 
 		if !T::matches_discriminator(&data) {
-			log!("address: {} has invalid discriminator", self.address().as_ref());
+			log!(
+				"address: {} has invalid discriminator",
+				self.address().as_ref()
+			);
 			log_caller();
 
 			return Err(ProgramError::InvalidAccountData);
@@ -212,11 +218,7 @@ impl AccountInfoValidation for AccountView {
 	}
 
 	#[track_caller]
-	fn assert_seeds(
-		&self,
-		seeds: &[&[u8]],
-		program_id: &Address,
-	) -> Result<&Self, ProgramError> {
+	fn assert_seeds(&self, seeds: &[&[u8]], program_id: &Address) -> Result<&Self, ProgramError> {
 		let Some((pda, _bump)) = crate::try_find_program_address(seeds, program_id) else {
 			log!(
 				"could not find program address from seeds with program id: {}",
@@ -351,12 +353,7 @@ impl AsAccount for AccountView {
 		// from the same pointer. `T::try_from_bytes` then validates the
 		// discriminator and performs a bytemuck cast — no uninitialized memory is
 		// read.
-		unsafe {
-			T::try_from_bytes(from_raw_parts(
-				self.try_borrow()?.as_ptr(),
-				size_of::<T>(),
-			))
-		}
+		unsafe { T::try_from_bytes(from_raw_parts(self.try_borrow()?.as_ptr(), size_of::<T>())) }
 	}
 
 	#[track_caller]

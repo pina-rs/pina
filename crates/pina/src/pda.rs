@@ -49,8 +49,7 @@ pub fn create_program_address(
 ) -> Result<Address, ProgramError> {
 	#[cfg(any(target_os = "solana", target_arch = "bpf"))]
 	{
-		Address::create_program_address(seeds, program_id)
-			.map_err(|_| ProgramError::InvalidSeeds)
+		Address::create_program_address(seeds, program_id).map_err(|_| ProgramError::InvalidSeeds)
 	}
 
 	#[cfg(not(any(target_os = "solana", target_arch = "bpf")))]

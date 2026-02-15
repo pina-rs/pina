@@ -83,10 +83,8 @@ pub trait AccountInfoValidation {
 	/// Assert that the account is not empty.
 	fn assert_not_empty(&self) -> Result<&Self, ProgramError>;
 	/// Assert that the account is of the type provided.
-	fn assert_type<T: HasDiscriminator>(
-		&self,
-		program_id: &Address,
-	) -> Result<&Self, ProgramError>;
+	fn assert_type<T: HasDiscriminator>(&self, program_id: &Address)
+	-> Result<&Self, ProgramError>;
 	/// Assert that the account is a program.
 	fn assert_program(&self, program_id: &Address) -> Result<&Self, ProgramError>;
 	/// Assert that the account is a system variable.
@@ -102,11 +100,7 @@ pub trait AccountInfoValidation {
 	fn assert_owners(&self, owners: &[Address]) -> Result<&Self, ProgramError>;
 	/// Assert that the account has the seeds provided and uses the canonical
 	/// bump.
-	fn assert_seeds(
-		&self,
-		seeds: &[&[u8]],
-		program_id: &Address,
-	) -> Result<&Self, ProgramError>;
+	fn assert_seeds(&self, seeds: &[&[u8]], program_id: &Address) -> Result<&Self, ProgramError>;
 	/// Assert that the account has the seeds and bump provided.
 	fn assert_seeds_with_bump(
 		&self,

@@ -47,8 +47,8 @@ pub use pinocchio::AccountView;
 pub use pinocchio::Address;
 pub use pinocchio::ProgramResult;
 pub use pinocchio::address::ADDRESS_BYTES;
-pub use pinocchio::address::MAX_SEEDS;
 pub use pinocchio::address::MAX_SEED_LEN;
+pub use pinocchio::address::MAX_SEEDS;
 pub use pinocchio::cpi::Seed;
 pub use pinocchio::cpi::Signer;
 pub use pinocchio::entrypoint;
@@ -57,7 +57,6 @@ pub use pinocchio::instruction::InstructionAccount;
 pub use pinocchio::instruction::InstructionView;
 pub use pinocchio::program_entrypoint;
 pub use pinocchio::sysvars;
-pub use pod::*;
 #[cfg(feature = "token")]
 pub use pinocchio_associated_token_account as associated_token_account;
 pub use pinocchio_system as system;
@@ -65,6 +64,7 @@ pub use pinocchio_system as system;
 pub use pinocchio_token as token;
 #[cfg(feature = "token")]
 pub use pinocchio_token_2022 as token_2022;
+pub use pod::*;
 pub use solana_address::address;
 pub use solana_address::declare_id;
 #[cfg(feature = "logs")]
