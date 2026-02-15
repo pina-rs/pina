@@ -11,8 +11,7 @@
 //! 6. Wire up the entrypoint with [`nostd_entrypoint!`] and
 //!    [`parse_instruction`].
 //!
-//! When invoked, this program simply logs "Hello, Solana!" along with the
-//! caller's address.
+//! When invoked, this program simply logs "Hello, Solana!".
 
 #![allow(clippy::inline_always)]
 #![no_std]

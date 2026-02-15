@@ -73,9 +73,11 @@ pub enum CounterAccountType {
 /// On-chain counter state.
 ///
 /// The `#[account]` macro generates:
-/// - A discriminator field (`CounterAccountType::Counter`) as the first byte.
+/// - A discriminator field (`CounterAccountType::CounterState`) as the first
+///   byte.
 /// - `Pod` + `Zeroable` derives for zero-copy (de)serialization.
-/// - `HasDiscriminator` linking this struct to `CounterAccountType::Counter`.
+/// - `HasDiscriminator` linking this struct to
+///   `CounterAccountType::CounterState`.
 /// - `TypedBuilder` for ergonomic construction.
 ///
 /// Layout (10 bytes total):
