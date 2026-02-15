@@ -60,10 +60,9 @@ Key style rules: hard tabs, max width 100, one import per line (`imports_granula
 
 ### Workspace Crates
 
-- **`crates/pina`** — Core framework. Provides traits (`AccountValidation`, `AccountInfoValidation`, `TryFromAccountInfos`, `ProcessAccountInfos`, `HasDiscriminator`), account loaders, Pod types, CPI helpers, and the `nostd_entrypoint!` macro. Features: `logs` (pinocchio-log), `token` (SPL token support), `derive` (proc macros).
+- **`crates/pina`** — Core framework. Provides traits (`AccountValidation`, `AccountInfoValidation`, `TryFromAccountInfos`, `ProcessAccountInfos`, `HasDiscriminator`), account loaders, Pod types, CPI helpers, and the `nostd_entrypoint!` macro. Features: `logs` (solana-program-log), `token` (SPL token support), `derive` (proc macros).
 - **`crates/pina_macros`** — Proc-macro crate. Provides `#[derive(Accounts)]`, `#[account]`, `#[instruction]`, `#[event]`, `#[error]`, `#[discriminator]` attribute macros. Uses `darling` for attribute parsing.
-- **`crates/pina_sdk_ids`** — Solana program and sysvar IDs using `pinocchio_pubkey::declare_id!`.
-- **`crates/pina_token_2022_extensions`** — Token 2022 extension parsing. **Slated for deprecation** (pinocchio is releasing its own extensions code).
+- **`crates/pina_sdk_ids`** — Solana program and sysvar IDs using `solana_address::declare_id!`.
 - **`examples/escrow_program`** — Reference implementation of a token escrow using pina. Built as `cdylib` for SBF target with `bpf-entrypoint` feature.
 
 ### Core Patterns
@@ -73,8 +72,8 @@ Key style rules: hard tabs, max width 100, one import per line (`imports_granula
 ```rust
 nostd_entrypoint!(process_instruction);
 fn process_instruction(
-	program_id: &Pubkey,
-	accounts: &[AccountInfo],
+	program_id: &Address,
+	accounts: &[AccountView],
 	data: &[u8],
 ) -> ProgramResult {
 	let instruction: MyInstruction = parse_instruction(program_id, &ID, data)?;
@@ -86,7 +85,7 @@ fn process_instruction(
 
 **Discriminator system:** Every account/instruction/event type has a discriminator enum (u8/u16/u32/u64) as its first field. The `#[discriminator]` macro generates conversions and `Pod`/`Zeroable` impls. The `#[account]`/`#[instruction]`/`#[event]` macros auto-inject a discriminator field and generate `HasDiscriminator` + validation impls.
 
-**Account validation:** Chain assertions on `AccountInfo` references: `account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?`. These methods return `Result<&AccountInfo>` for chaining.
+**Account validation:** Chain assertions on `AccountView` references: `account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?`. These methods return `Result<&AccountView>` for chaining.
 
 **Pod types:** `PodBool`, `PodU16`, `PodU32`, `PodU64`, `PodU128`, `PodI16`, `PodI64` — alignment-safe wrappers for use in `#[repr(C)]` account structs with bytemuck.
 
@@ -133,7 +132,7 @@ knope release
 knope publish
 ```
 
-Changesets should be highly detailed. Conventional commit scopes map to packages: `pina`, `pina_macros`, `pina_sdk_ids`, `pina_token_2022_extensions`. Extra changelog sections: `Notes` (type: `note`) and `Documentation` (type: `docs`).
+Changesets should be highly detailed. Conventional commit scopes map to packages: `pina`, `pina_macros`, `pina_sdk_ids`. Extra changelog sections: `Notes` (type: `note`) and `Documentation` (type: `docs`).
 
 ### Changeset Requirement
 
@@ -163,7 +162,7 @@ Detailed description of the change.
 - `docs` — documentation-only changes
 - `note` — general notes
 
-**Package names:** `pina`, `pina_macros`, `pina_sdk_ids`, `pina_token_2022_extensions`
+**Package names:** `pina`, `pina_macros`, `pina_sdk_ids`
 
 A single changeset file can reference multiple packages. Always run `dprint fmt .changeset/* --allow-no-files` after creating changeset files.
 
