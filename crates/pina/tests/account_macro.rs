@@ -13,14 +13,14 @@ pub struct ConfigState {
 	/// The version of the state.
 	pub version: u8,
 	/// The authority which can update this config.
-	pub authority: Pubkey,
+	pub authority: Address,
 	/// Store the bump to save compute units.
 	pub bump: u8,
 }
 
 #[test]
 fn test_account_macro() {
-	let authority = pubkey!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 	let config_state = ConfigState::builder()
 		.version(1)
 		.authority(authority)
@@ -39,7 +39,7 @@ fn test_account_macro() {
 
 #[test]
 fn test_account_assert_returns_ok_when_condition_true() {
-	let authority = pubkey!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 	let config_state = ConfigState::builder()
 		.version(1)
 		.authority(authority)
@@ -52,7 +52,7 @@ fn test_account_assert_returns_ok_when_condition_true() {
 
 #[test]
 fn test_account_assert_returns_err_when_condition_false() {
-	let authority = pubkey!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 	let config_state = ConfigState::builder()
 		.version(1)
 		.authority(authority)
@@ -66,7 +66,7 @@ fn test_account_assert_returns_err_when_condition_false() {
 
 #[test]
 fn test_account_assert_mut_returns_ok_when_condition_true() {
-	let authority = pubkey!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 	let mut config_state = ConfigState::builder()
 		.version(1)
 		.authority(authority)
@@ -79,7 +79,7 @@ fn test_account_assert_mut_returns_ok_when_condition_true() {
 
 #[test]
 fn test_account_assert_mut_returns_err_when_condition_false() {
-	let authority = pubkey!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 	let mut config_state = ConfigState::builder()
 		.version(1)
 		.authority(authority)
@@ -93,7 +93,7 @@ fn test_account_assert_mut_returns_err_when_condition_false() {
 
 #[test]
 fn test_account_assert_msg_returns_ok_when_condition_true() {
-	let authority = pubkey!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 	let config_state = ConfigState::builder()
 		.version(1)
 		.authority(authority)
@@ -106,7 +106,7 @@ fn test_account_assert_msg_returns_ok_when_condition_true() {
 
 #[test]
 fn test_account_assert_msg_returns_err_when_condition_false() {
-	let authority = pubkey!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 	let config_state = ConfigState::builder()
 		.version(1)
 		.authority(authority)

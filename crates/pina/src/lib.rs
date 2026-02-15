@@ -115,13 +115,21 @@ macro_rules! nostd_entrypoint {
 	};
 }
 
-/// Logs a formatted message to the Solana runtime.
+/// Logs a message to the Solana runtime.
+///
+/// Supports two forms:
+/// - `log!("simple string literal")` — works in all crates
+/// - `log!("format: {}", value)` — works in pina and crates that depend on
+///   `solana-program-log` directly (the proc macro generates absolute paths)
 ///
 /// When the `logs` feature is disabled this is a no-op that compiles to
 /// nothing.
 #[cfg(feature = "logs")]
 #[macro_export]
 macro_rules! log {
+	($msg:literal) => {
+		$crate::solana_program_log::logger::log_message($msg.as_bytes())
+	};
 	($($arg:tt)*) => {
 		$crate::solana_program_log::log!($($arg)*);
 	};
