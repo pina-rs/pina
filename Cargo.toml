@@ -10,7 +10,7 @@ members = [
 [workspace.package]
 edition = "2024"
 homepage = "https://pina.rs"
-keywords = ["solana", "pinnochio"]
+keywords = ["solana", "pinocchio"]
 license = "Apache-2.0"
 readme = "readme.md"
 repository = "https://github.com/pina-rs/pina"
