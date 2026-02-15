@@ -24,16 +24,6 @@ scopes = ["pina_sdk_ids"]
 changelog = "crates/pina_sdk_ids/changelog.md"
 extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
 
-[packages.pina_token_2022_extensions]
-versioned_files = [
-	"crates/pina_token_2022_extensions/Cargo.toml",
-	{ path = "Cargo.toml", dependency = "pina_token_2022_extensions" },
-	"Cargo.lock",
-]
-scopes = ["pina_token_2022_extensions"]
-changelog = "crates/pina_token_2022_extensions/changelog.md"
-extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
-
 [[workflows]]
 name = "release"
 

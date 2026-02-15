@@ -1,9 +1,9 @@
 use core::panic::Location;
 
+use crate::Address;
 use crate::IntoDiscriminator;
 use crate::ProgramError;
 use crate::ProgramResult;
-use crate::Pubkey;
 use crate::log;
 
 /// Parses an instruction discriminator from the raw instruction data.
@@ -20,8 +20,8 @@ use crate::log;
 // TODO: the error remapping above suppresses detail that could be useful
 // for debugging. Consider preserving the original error or logging it.
 pub fn parse_instruction<'a, T: IntoDiscriminator>(
-	api_id: &'a Pubkey,
-	program_id: &'a Pubkey,
+	api_id: &'a Address,
+	program_id: &'a Address,
 	data: &'a [u8],
 ) -> Result<T, ProgramError> {
 	// Validate the program id is valid.
@@ -72,12 +72,16 @@ pub fn log_caller() {}
 /// and token program. Returns `None` if no valid PDA exists.
 #[cfg(feature = "token")]
 pub fn try_get_associated_token_address(
-	wallet_address: &Pubkey,
-	token_mint_address: &Pubkey,
-	token_program_id: &Pubkey,
-) -> Option<(Pubkey, u8)> {
+	wallet_address: &Address,
+	token_mint_address: &Address,
+	token_program_id: &Address,
+) -> Option<(Address, u8)> {
 	crate::try_find_program_address(
-		&[wallet_address, token_program_id, token_mint_address],
+		&[
+			wallet_address.as_ref(),
+			token_program_id.as_ref(),
+			token_mint_address.as_ref(),
+		],
 		&pinocchio_associated_token_account::ID,
 	)
 }

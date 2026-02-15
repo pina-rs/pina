@@ -1,7 +1,7 @@
 //! Alignment-safe primitive wrappers that can be used in `Pod` structs.
 use bytemuck::Pod;
 use bytemuck::Zeroable;
-use pinocchio::program_error::ProgramError;
+use pinocchio::error::ProgramError;
 
 /// The standard `bool` is not a `Pod`, define a replacement that is
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]

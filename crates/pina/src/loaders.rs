@@ -7,10 +7,11 @@ use pinocchio::ProgramResult;
 use pinocchio_system::instructions::Transfer;
 
 use crate::AccountDeserialize;
-use crate::AccountInfo;
 use crate::AccountInfoValidation;
 #[cfg(feature = "token")]
 use crate::AccountValidation;
+use crate::AccountView;
+use crate::Address;
 use crate::AsAccount;
 #[cfg(feature = "token")]
 use crate::AsTokenAccount;
@@ -19,22 +20,19 @@ use crate::HasDiscriminator;
 use crate::LamportTransfer;
 use crate::Pod;
 use crate::ProgramError;
-use crate::Pubkey;
-#[cfg(feature = "token")]
-use crate::assert;
-use crate::create_program_address;
 use crate::log;
 use crate::log_caller;
-use crate::pubkey;
-use crate::try_find_program_address;
 
-const SYSVAR_ID: Pubkey = pubkey!("Sysvar1111111111111111111111111111111111111");
+const SYSVAR_ID: Address = crate::address!("Sysvar1111111111111111111111111111111111111");
 
-impl AccountInfoValidation for AccountInfo {
+impl AccountInfoValidation for AccountView {
 	#[track_caller]
 	fn assert_signer(&self) -> Result<&Self, ProgramError> {
 		if !self.is_signer() {
-			log!("address: {} is missing a required signature", self.key());
+			log!(
+				"address: {} is missing a required signature",
+				self.address().as_ref()
+			);
 			log_caller();
 
 			return Err(ProgramError::MissingRequiredSignature);
@@ -46,7 +44,10 @@ impl AccountInfoValidation for AccountInfo {
 	#[track_caller]
 	fn assert_writable(&self) -> Result<&Self, ProgramError> {
 		if !self.is_writable() {
-			log!("address: {} has not been marked as writable", self.key());
+			log!(
+				"address: {} has not been marked as writable",
+				self.address().as_ref()
+			);
 			log_caller();
 
 			// TODO: use a more specific error like `InvalidAccountData` or a
@@ -61,7 +62,7 @@ impl AccountInfoValidation for AccountInfo {
 	#[track_caller]
 	fn assert_executable(&self) -> Result<&Self, ProgramError> {
 		if !self.executable() {
-			log!("address: {} is not executable", self.key());
+			log!("address: {} is not executable", self.address().as_ref());
 			log_caller();
 
 			return Err(ProgramError::InvalidAccountData);
@@ -73,7 +74,10 @@ impl AccountInfoValidation for AccountInfo {
 	#[track_caller]
 	fn assert_data_len(&self, len: usize) -> Result<&Self, ProgramError> {
 		if self.data_len() != len {
-			log!("address: {} has an incorrect length", self.key());
+			log!(
+				"address: {} has an incorrect length",
+				self.address().as_ref()
+			);
 			log_caller();
 
 			return Err(ProgramError::InvalidAccountData);
@@ -84,8 +88,8 @@ impl AccountInfoValidation for AccountInfo {
 
 	#[track_caller]
 	fn assert_empty(&self) -> Result<&Self, ProgramError> {
-		if !self.data_is_empty() {
-			log!("address: {} is not empty", self.key());
+		if !self.is_data_empty() {
+			log!("address: {} is not empty", self.address().as_ref());
 			log_caller();
 
 			return Err(ProgramError::AccountAlreadyInitialized);
@@ -96,8 +100,8 @@ impl AccountInfoValidation for AccountInfo {
 
 	#[track_caller]
 	fn assert_not_empty(&self) -> Result<&Self, ProgramError> {
-		if self.data_is_empty() {
-			log!("address: {} is empty", self.key());
+		if self.is_data_empty() {
+			log!("address: {} is empty", self.address().as_ref());
 			log_caller();
 
 			return Err(ProgramError::UninitializedAccount);
@@ -107,16 +111,22 @@ impl AccountInfoValidation for AccountInfo {
 	}
 
 	#[track_caller]
-	fn assert_program(&self, program_id: &Pubkey) -> Result<&Self, ProgramError> {
+	fn assert_program(&self, program_id: &Address) -> Result<&Self, ProgramError> {
 		self.assert_address(program_id)?.assert_executable()
 	}
 
-	fn assert_type<T: HasDiscriminator>(&self, program_id: &Pubkey) -> Result<&Self, ProgramError> {
+	fn assert_type<T: HasDiscriminator>(
+		&self,
+		program_id: &Address,
+	) -> Result<&Self, ProgramError> {
 		self.assert_owner(program_id)?;
-		let data = self.try_borrow_data()?;
+		let data = self.try_borrow()?;
 
 		if !T::matches_discriminator(&data) {
-			log!("address: {} has invalid discriminator", self.key());
+			log!(
+				"address: {} has invalid discriminator",
+				self.address().as_ref()
+			);
 			log_caller();
 
 			return Err(ProgramError::InvalidAccountData);
@@ -125,7 +135,7 @@ impl AccountInfoValidation for AccountInfo {
 		if data.len() != size_of::<T>() {
 			log!(
 				"address: {} has invalid data length for the account type",
-				self.key()
+				self.address().as_ref()
 			);
 			log_caller();
 
@@ -136,18 +146,22 @@ impl AccountInfoValidation for AccountInfo {
 	}
 
 	#[track_caller]
-	fn assert_sysvar(&self, sysvar_id: &Pubkey) -> Result<&Self, ProgramError> {
+	fn assert_sysvar(&self, sysvar_id: &Address) -> Result<&Self, ProgramError> {
 		self.assert_owner(&SYSVAR_ID)?.assert_address(sysvar_id)
 	}
 
 	#[track_caller]
-	fn assert_owner(&self, owner: &Pubkey) -> Result<&Self, ProgramError> {
-		if self.owner().ne(owner) {
+	fn assert_owner(&self, owner: &Address) -> Result<&Self, ProgramError> {
+		// SAFETY: `owner()` is unsafe in pinocchio 0.10.x because it reads from
+		// raw account memory. The Solana runtime guarantees this memory is valid
+		// for the duration of the transaction.
+		let account_owner = unsafe { self.owner() };
+		if account_owner.ne(owner) {
 			log!(
 				"address: {} has invalid owner: {}, required: {}",
-				self.key(),
-				self.owner(),
-				owner
+				self.address().as_ref(),
+				account_owner.as_ref(),
+				owner.as_ref()
 			);
 			log_caller();
 
@@ -158,15 +172,17 @@ impl AccountInfoValidation for AccountInfo {
 	}
 
 	#[track_caller]
-	fn assert_owners(&self, owners: &[Pubkey]) -> Result<&Self, ProgramError> {
-		if owners.contains(self.owner()) {
+	fn assert_owners(&self, owners: &[Address]) -> Result<&Self, ProgramError> {
+		// SAFETY: see `assert_owner` above.
+		let account_owner = unsafe { self.owner() };
+		if owners.contains(account_owner) {
 			return Ok(self);
 		}
 
 		log!(
 			"address: {} has invalid owner: {}",
-			self.key(),
-			self.owner(),
+			self.address().as_ref(),
+			account_owner.as_ref(),
 		);
 		log_caller();
 
@@ -174,46 +190,53 @@ impl AccountInfoValidation for AccountInfo {
 	}
 
 	#[track_caller]
-	fn assert_address(&self, address: &Pubkey) -> Result<&Self, ProgramError> {
-		if self.key() == address {
+	fn assert_address(&self, addr: &Address) -> Result<&Self, ProgramError> {
+		if self.address() == addr {
 			return Ok(self);
 		}
 
-		log!("address: {} is invalid, expected: {}", self.key(), address);
+		log!(
+			"address: {} is invalid, expected: {}",
+			self.address().as_ref(),
+			addr.as_ref()
+		);
 		log_caller();
 
 		Err(ProgramError::InvalidAccountData)
 	}
 
 	#[track_caller]
-	fn assert_addresses(&self, addresses: &[Pubkey]) -> Result<&Self, ProgramError> {
-		if addresses.contains(self.key()) {
+	fn assert_addresses(&self, addresses: &[Address]) -> Result<&Self, ProgramError> {
+		if addresses.contains(self.address()) {
 			return Ok(self);
 		}
 
-		log!("address: {} is invalid", self.key());
+		log!("address: {} is invalid", self.address().as_ref());
 		log_caller();
 
 		Err(ProgramError::InvalidAccountData)
 	}
 
 	#[track_caller]
-	fn assert_seeds(&self, seeds: &[&[u8]], program_id: &Pubkey) -> Result<&Self, ProgramError> {
-		let Some((pda, _bump)) = try_find_program_address(seeds, program_id) else {
+	fn assert_seeds(&self, seeds: &[&[u8]], program_id: &Address) -> Result<&Self, ProgramError> {
+		let Some((pda, _bump)) = crate::try_find_program_address(seeds, program_id) else {
 			log!(
-				"could not find program address from seeds: {} with program id: {}",
-				seeds,
-				program_id
+				"could not find program address from seeds with program id: {}",
+				program_id.as_ref()
 			);
 			log_caller();
 			return Err(ProgramError::InvalidSeeds);
 		};
 
-		if self.key() == &pda {
+		if self.address() == &pda {
 			return Ok(self);
 		}
 
-		log!("address: {} is invalid, expected pda: {}", self.key(), &pda);
+		log!(
+			"address: {} is invalid, expected pda: {}",
+			self.address().as_ref(),
+			pda.as_ref()
+		);
 		log_caller();
 
 		Err(ProgramError::InvalidSeeds)
@@ -223,23 +246,27 @@ impl AccountInfoValidation for AccountInfo {
 	fn assert_seeds_with_bump(
 		&self,
 		seeds: &[&[u8]],
-		program_id: &Pubkey,
+		program_id: &Address,
 	) -> Result<&Self, ProgramError> {
-		let pda = match create_program_address(seeds, program_id) {
+		let pda = match crate::create_program_address(seeds, program_id) {
 			Ok(pda) => pda,
-			Err(error) => {
+			Err(_error) => {
 				log!(
 					"could not create pda for address: {}, with provided seeds and bump",
-					self.key(),
+					self.address().as_ref(),
 				);
 				log_caller();
 
-				return Err(error);
+				return Err(ProgramError::InvalidSeeds);
 			}
 		};
 
-		if &pda != self.key() {
-			log!("address: {} is invalid, expected pda: {}", self.key(), &pda);
+		if &pda != self.address() {
+			log!(
+				"address: {} is invalid, expected pda: {}",
+				self.address().as_ref(),
+				pda.as_ref()
+			);
 			log_caller();
 
 			return Err(ProgramError::InvalidSeeds);
@@ -252,23 +279,26 @@ impl AccountInfoValidation for AccountInfo {
 	fn assert_canonical_bump(
 		&self,
 		seeds: &[&[u8]],
-		program_id: &Pubkey,
+		program_id: &Address,
 	) -> Result<u8, ProgramError> {
-		let Some((pda, bump)) = try_find_program_address(seeds, program_id) else {
+		let Some((pda, bump)) = crate::try_find_program_address(seeds, program_id) else {
 			log!(
-				"could not find program address from seeds: {} with program id: {}",
-				seeds,
-				program_id
+				"could not find program address from seeds with program id: {}",
+				program_id.as_ref()
 			);
 			log_caller();
 			return Err(ProgramError::InvalidSeeds);
 		};
 
-		if pda.eq(self.key()) {
+		if pda.eq(self.address()) {
 			return Ok(bump);
 		}
 
-		log!("address: {} is invalid, expected pda: {}", self.key(), &pda);
+		log!(
+			"address: {} is invalid, expected pda: {}",
+			self.address().as_ref(),
+			pda.as_ref()
+		);
 		log_caller();
 
 		Err(ProgramError::InvalidSeeds)
@@ -278,31 +308,31 @@ impl AccountInfoValidation for AccountInfo {
 	#[track_caller]
 	fn assert_associated_token_address(
 		&self,
-		wallet: &Pubkey,
-		mint: &Pubkey,
-		token_program: &Pubkey,
+		wallet: &Address,
+		mint: &Address,
+		token_program: &Address,
 	) -> Result<&Self, ProgramError> {
-		let Some((address, _bump)) =
+		let Some((ata_address, _bump)) =
 			crate::try_get_associated_token_address(wallet, mint, token_program)
 		else {
 			log!(
-				"could not find associated token (p-token) address for wallet: {}, mint: {}",
-				wallet,
-				mint,
+				"could not find associated token address for wallet: {}, mint: {}",
+				wallet.as_ref(),
+				mint.as_ref(),
 			);
 			log_caller();
 
 			return Err(ProgramError::InvalidSeeds);
 		};
 
-		if address.eq(self.key()) {
+		if ata_address.eq(self.address()) {
 			return Ok(self);
 		}
 
 		log!(
 			"address: {} is invalid, expected associated token address: {}",
-			self.key(),
-			&address
+			self.address().as_ref(),
+			ata_address.as_ref()
 		);
 		log_caller();
 
@@ -310,29 +340,24 @@ impl AccountInfoValidation for AccountInfo {
 	}
 }
 
-impl AsAccount for AccountInfo {
+impl AsAccount for AccountView {
 	#[track_caller]
-	fn as_account<T>(&self, program_id: &Pubkey) -> Result<&T, ProgramError>
+	fn as_account<T>(&self, program_id: &Address) -> Result<&T, ProgramError>
 	where
 		T: AccountDeserialize + HasDiscriminator + Pod,
 	{
 		self.assert_owner(program_id)?;
 
-		// SAFETY: `try_borrow_data` returns a reference whose lifetime is tied to
+		// SAFETY: `try_borrow` returns a reference whose lifetime is tied to
 		// `self`. We create a raw-parts slice of exactly `size_of::<T>()` bytes
 		// from the same pointer. `T::try_from_bytes` then validates the
 		// discriminator and performs a bytemuck cast — no uninitialized memory is
 		// read.
-		unsafe {
-			T::try_from_bytes(from_raw_parts(
-				self.try_borrow_data()?.as_ptr(),
-				size_of::<T>(),
-			))
-		}
+		unsafe { T::try_from_bytes(from_raw_parts(self.try_borrow()?.as_ptr(), size_of::<T>())) }
 	}
 
 	#[track_caller]
-	fn as_account_mut<T>(&self, program_id: &Pubkey) -> Result<&mut T, ProgramError>
+	fn as_account_mut<T>(&self, program_id: &Address) -> Result<&mut T, ProgramError>
 	where
 		T: AccountDeserialize + HasDiscriminator + Pod,
 	{
@@ -340,10 +365,10 @@ impl AsAccount for AccountInfo {
 
 		// SAFETY: Same reasoning as `as_account` above, but with a mutable
 		// borrow. The Solana runtime guarantees exclusive access when
-		// `try_borrow_mut_data` succeeds.
+		// `try_borrow_mut` succeeds.
 		unsafe {
 			T::try_from_bytes_mut(from_raw_parts_mut(
-				self.try_borrow_mut_data()?.as_mut_ptr(),
+				self.try_borrow_mut()?.as_mut_ptr(),
 				size_of::<T>(),
 			))
 		}
@@ -372,7 +397,7 @@ impl AccountValidation for crate::token_2022::state::Mint {
 	where
 		F: Fn(&Self) -> bool,
 	{
-		match assert(condition(self), ProgramError::InvalidAccountData, log) {
+		match crate::assert(condition(self), ProgramError::InvalidAccountData, log) {
 			Err(err) => Err(err),
 			Ok(()) => Ok(self),
 		}
@@ -398,7 +423,7 @@ impl AccountValidation for crate::token_2022::state::Mint {
 	where
 		F: Fn(&Self) -> bool,
 	{
-		match assert(condition(self), ProgramError::InvalidAccountData, log) {
+		match crate::assert(condition(self), ProgramError::InvalidAccountData, log) {
 			Err(err) => Err(err),
 			Ok(()) => Ok(self),
 		}
@@ -425,7 +450,7 @@ impl AccountValidation for crate::token::state::TokenAccount {
 	where
 		F: Fn(&Self) -> bool,
 	{
-		match assert(condition(self), ProgramError::InvalidAccountData, log) {
+		match crate::assert(condition(self), ProgramError::InvalidAccountData, log) {
 			Err(err) => Err(err),
 			Ok(()) => Ok(self),
 		}
@@ -451,7 +476,7 @@ impl AccountValidation for crate::token::state::TokenAccount {
 	where
 		F: Fn(&Self) -> bool,
 	{
-		match assert(condition(self), ProgramError::InvalidAccountData, log) {
+		match crate::assert(condition(self), ProgramError::InvalidAccountData, log) {
 			Err(err) => Err(err),
 			Ok(()) => Ok(self),
 		}
@@ -459,91 +484,80 @@ impl AccountValidation for crate::token::state::TokenAccount {
 }
 
 #[cfg(feature = "token")]
-impl AsTokenAccount for AccountInfo {
+impl AsTokenAccount for AccountView {
 	#[track_caller]
 	fn as_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError> {
-		self.can_borrow_data()?;
+		self.check_borrow()?;
 
 		// SECURITY: relies on pinocchio's internal layout validation inside
-		// `from_account_info_unchecked`. Callers should verify ownership before
+		// `from_account_view_unchecked`. Callers should verify ownership before
 		// trusting the result.
-		unsafe { crate::token::state::Mint::from_account_info_unchecked(self) }
+		unsafe { crate::token::state::Mint::from_account_view_unchecked(self) }
 	}
 
 	fn as_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError> {
-		self.can_borrow_data()?;
+		self.check_borrow()?;
 
 		// SECURITY: see `as_token_mint` above.
-		unsafe { crate::token::state::TokenAccount::from_account_info_unchecked(self) }
+		unsafe { crate::token::state::TokenAccount::from_account_view_unchecked(self) }
 	}
 
 	fn as_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError> {
-		self.can_borrow_data()?;
+		self.check_borrow()?;
 
 		// SECURITY: see `as_token_mint` above.
-		unsafe { crate::token_2022::state::Mint::from_account_info_unchecked(self) }
+		unsafe { crate::token_2022::state::Mint::from_account_view_unchecked(self) }
 	}
 
 	fn as_token_2022_account(
 		&self,
 	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
-		self.can_borrow_data()?;
+		self.check_borrow()?;
 
 		// SECURITY: see `as_token_mint` above.
-		unsafe { crate::token_2022::state::TokenAccount::from_account_info_unchecked(self) }
+		unsafe { crate::token_2022::state::TokenAccount::from_account_view_unchecked(self) }
 	}
 
 	fn as_associated_token_account(
 		&self,
-		owner: &Pubkey,
-		mint: &Pubkey,
-		token_program: &Pubkey,
+		owner: &Address,
+		mint: &Address,
+		token_program: &Address,
 	) -> Result<&crate::token::state::TokenAccount, ProgramError> {
-		self.can_borrow_data()?;
+		self.check_borrow()?;
 
 		// SECURITY: see `as_token_mint` above. Additionally, the address is
 		// verified against the derived ATA address before the unchecked cast.
 		unsafe {
-			crate::token::state::TokenAccount::from_account_info_unchecked(
+			crate::token::state::TokenAccount::from_account_view_unchecked(
 				self.assert_associated_token_address(owner, mint, token_program)?,
 			)
 		}
 	}
 }
 
-impl<'a> LamportTransfer<'a> for AccountInfo {
+impl<'a> LamportTransfer<'a> for AccountView {
 	/// Send the specified lamports to the `recipient` account.
 	/// The sender must be a mutable signer for this to be possible.
 	#[inline(always)]
 	#[track_caller]
-	fn send(&'a self, lamports: u64, recipient: &'a AccountInfo) -> ProgramResult {
-		let mut self_lamports = match self.try_borrow_mut_lamports() {
-			Ok(v) => v,
-			Err(e) => {
-				log!("Could not mutably borrow owned lamports");
-				log_caller();
-				return Err(e);
-			}
-		};
+	fn send(&'a self, lamports: u64, recipient: &'a AccountView) -> ProgramResult {
+		let current = self.lamports();
+		let new_balance = current.checked_sub(lamports).ok_or_else(|| {
+			log!("Could not subtract lamports: insufficient funds");
+			log_caller();
+			ProgramError::InsufficientFunds
+		})?;
 
-		let mut recipient_lamports = match recipient.try_borrow_mut_lamports() {
-			Ok(v) => v,
-			Err(e) => {
-				log!("Could not mutably borrow recipient lamports");
-				log_caller();
-				return Err(e);
-			}
-		};
+		let recipient_balance = recipient.lamports();
+		let new_recipient_balance = recipient_balance.checked_add(lamports).ok_or_else(|| {
+			log!("Could not add lamports: arithmetic overflow");
+			log_caller();
+			ProgramError::ArithmeticOverflow
+		})?;
 
-		// SAFETY:
-		// The solana runtime will check that no extra lamports are created so this
-		// should be safe even if attempting to add more lamports than owned.
-		*self_lamports = self_lamports
-			.checked_sub(lamports)
-			.ok_or(ProgramError::InsufficientFunds)?;
-		*recipient_lamports = recipient_lamports
-			.checked_add(lamports)
-			.ok_or(ProgramError::ArithmeticOverflow)?;
+		self.set_lamports(new_balance);
+		recipient.set_lamports(new_recipient_balance);
 
 		Ok(())
 	}
@@ -551,7 +565,7 @@ impl<'a> LamportTransfer<'a> for AccountInfo {
 	/// The `from` account must be mutable and a signer for this to be
 	/// possible.
 	#[inline(always)]
-	fn collect(&'a self, lamports: u64, from: &'a AccountInfo) -> Result<(), ProgramError> {
+	fn collect(&'a self, lamports: u64, from: &'a AccountView) -> Result<(), ProgramError> {
 		Transfer {
 			from,
 			to: self,
@@ -561,13 +575,13 @@ impl<'a> LamportTransfer<'a> for AccountInfo {
 	}
 }
 
-impl<'a> CloseAccountWithRecipient<'a> for AccountInfo {
-	fn close_with_recipient(&'a self, recipient: &'a AccountInfo) -> ProgramResult {
+impl<'a> CloseAccountWithRecipient<'a> for AccountView {
+	fn close_with_recipient(&'a self, recipient: &'a AccountView) -> ProgramResult {
 		// SECURITY: unchecked addition — overflow is impossible in practice
 		// because the total supply of lamports fits in a u64, but an overflow
 		// here would be caught by the runtime's lamport balance check at the
 		// end of the transaction.
-		*recipient.try_borrow_mut_lamports()? += *self.try_borrow_lamports()?;
+		recipient.set_lamports(recipient.lamports() + self.lamports());
 		self.resize(0)?;
 		self.close()
 	}

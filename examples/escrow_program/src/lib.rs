@@ -10,6 +10,16 @@
 #![allow(clippy::inline_always)]
 #![no_std]
 
+// On native builds the cdylib target needs std for unwinding and panic
+// handling. On BPF, `nostd_entrypoint!()` provides the panic handler and
+// allocator. Tests link against std automatically.
+#[cfg(all(
+	not(any(target_os = "solana", target_arch = "bpf")),
+	not(feature = "bpf-entrypoint"),
+	not(test)
+))]
+extern crate std;
+
 use pina::*;
 
 declare_id!("4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT");
@@ -24,8 +34,8 @@ pub mod entrypoint {
 
 	#[inline(always)]
 	pub fn process_instruction(
-		program_id: &Pubkey,
-		accounts: &[AccountInfo],
+		program_id: &Address,
+		accounts: &[AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: EscrowInstruction = parse_instruction(program_id, &ID, data)?;
@@ -57,9 +67,9 @@ pub enum EscrowError {
 
 #[account(discriminator = EscrowAccount)]
 pub struct EscrowState {
-	pub maker: Pubkey,
-	pub mint_a: Pubkey,
-	pub mint_b: Pubkey,
+	pub maker: Address,
+	pub mint_a: Address,
+	pub mint_b: Address,
 	/// The amount of token A that was sent by sender.
 	pub amount_a: PodU64,
 	/// The amount of token B to be received by the recipient.
@@ -84,18 +94,18 @@ pub struct TakeInstruction {}
 
 #[derive(Accounts, Debug)]
 pub struct MakeAccounts<'a> {
-	pub maker: &'a AccountInfo,
-	pub mint_a: &'a AccountInfo,
-	pub mint_b: &'a AccountInfo,
-	pub maker_ata_a: &'a AccountInfo,
-	pub escrow: &'a AccountInfo,
-	pub vault: &'a AccountInfo,
-	pub system_program: &'a AccountInfo,
-	pub token_program: &'a AccountInfo,
+	pub maker: &'a AccountView,
+	pub mint_a: &'a AccountView,
+	pub mint_b: &'a AccountView,
+	pub maker_ata_a: &'a AccountView,
+	pub escrow: &'a AccountView,
+	pub vault: &'a AccountView,
+	pub system_program: &'a AccountView,
+	pub token_program: &'a AccountView,
 }
 
 const SEED_PREFIX: &[u8] = b"escrow";
-const SPL_PROGRAM_IDS: [Pubkey; 2] = [token::ID, token_2022::ID];
+const SPL_PROGRAM_IDS: [Address; 2] = [token::ID, token_2022::ID];
 
 #[macro_export]
 macro_rules! seeds_escrow {
@@ -119,9 +129,9 @@ macro_rules! seeds_escrow {
 impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
 		let args = MakeInstruction::try_from_bytes(data)?;
-		let escrow_seeds = seeds_escrow!(self.maker.key().as_ref(), &args.seed.0);
+		let escrow_seeds = seeds_escrow!(self.maker.address().as_ref(), &args.seed.0);
 		let escrow_seeds_with_bump =
-			seeds_escrow!(self.maker.key().as_ref(), &args.seed.0, args.bump);
+			seeds_escrow!(self.maker.address().as_ref(), &args.seed.0, args.bump);
 
 		// assertions
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
@@ -129,9 +139,9 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		self.mint_a.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.mint_b.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.maker_ata_a.assert_associated_token_address(
-			self.maker.key(),
-			self.mint_a.key(),
-			self.token_program.key(),
+			self.maker.address(),
+			self.mint_a.address(),
+			self.token_program.address(),
 		)?;
 		self.escrow
 			.assert_empty()?
@@ -141,9 +151,9 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			.assert_empty()?
 			.assert_writable()?
 			.assert_associated_token_address(
-				self.escrow.key(),
-				self.mint_a.key(),
-				self.token_program.key(),
+				self.escrow.address(),
+				self.mint_a.address(),
+				self.token_program.address(),
 			)?;
 
 		// create the program account
@@ -157,9 +167,9 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 
 		let escrow = self.escrow.as_account_mut::<EscrowState>(&ID)?;
 		*escrow = EscrowState::builder()
-			.maker(*self.maker.key())
-			.mint_a(*self.mint_a.key())
-			.mint_b(*self.mint_b.key())
+			.maker(*self.maker.address())
+			.mint_a(*self.mint_a.address())
+			.mint_b(*self.mint_b.address())
 			.amount_a(args.amount_a)
 			.amount_b(args.amount_b)
 			.seed(args.seed)
@@ -184,7 +194,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			amount: args.amount_a.into(),
 			mint: self.mint_a,
 			decimals,
-			token_program: self.token_program.key(),
+			token_program: self.token_program.address(),
 		}
 		.invoke()?;
 
@@ -194,17 +204,17 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 
 #[derive(Accounts, Debug)]
 pub struct TakeAccounts<'a> {
-	pub taker: &'a AccountInfo,
-	pub mint_a: &'a AccountInfo,
-	pub mint_b: &'a AccountInfo,
-	pub taker_ata_a: &'a AccountInfo,
-	pub taker_ata_b: &'a AccountInfo,
-	pub maker: &'a AccountInfo,
-	pub maker_ata_b: &'a AccountInfo,
-	pub escrow: &'a AccountInfo,
-	pub vault: &'a AccountInfo,
-	pub token_program: &'a AccountInfo,
-	pub system_program: &'a AccountInfo,
+	pub taker: &'a AccountView,
+	pub mint_a: &'a AccountView,
+	pub mint_b: &'a AccountView,
+	pub taker_ata_a: &'a AccountView,
+	pub taker_ata_b: &'a AccountView,
+	pub maker: &'a AccountView,
+	pub maker_ata_b: &'a AccountView,
+	pub escrow: &'a AccountView,
+	pub vault: &'a AccountView,
+	pub token_program: &'a AccountView,
+	pub system_program: &'a AccountView,
 }
 
 impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
@@ -222,9 +232,9 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			.assert_owners(&SPL_PROGRAM_IDS)?
 			.assert_data_len(token::state::TokenAccount::LEN)?
 			.assert_associated_token_address(
-				self.taker.key(),
-				self.mint_a.key(),
-				self.token_program.key(),
+				self.taker.address(),
+				self.mint_a.address(),
+				self.token_program.address(),
 			)?;
 		self.escrow
 			.assert_not_empty()?
@@ -240,7 +250,7 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			bump,
 			..
 		} = self.escrow.as_account::<EscrowState>(&ID)?;
-		let escrow_seeds_with_bump = seeds_escrow!(self.maker.key().as_ref(), &seed.0, *bump);
+		let escrow_seeds_with_bump = seeds_escrow!(self.maker.address().as_ref(), &seed.0, *bump);
 
 		self.escrow
 			.assert_seeds_with_bump(escrow_seeds_with_bump, &ID)?;
@@ -256,9 +266,9 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			.assert_not_empty()?
 			.assert_writable()?
 			.assert_associated_token_address(
-				self.escrow.key(),
-				self.mint_a.key(),
-				self.token_program.key(),
+				self.escrow.address(),
+				self.mint_a.address(),
+				self.token_program.address(),
 			)?;
 
 		// create token account if none exists
@@ -279,12 +289,13 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			authority: self.taker,
 			amount: (*amount_b).into(),
 			decimals: self.mint_b.as_token_2022_mint()?.decimals(),
-			token_program: self.token_program.key(),
+			token_program: self.token_program.address(),
 		}
 		.invoke()?;
 
 		let bump_as_seeds = [*bump];
-		let escrow_seeds = seeds_escrow!(true, self.maker.key().as_ref(), &seed.0, &bump_as_seeds);
+		let escrow_seeds =
+			seeds_escrow!(true, self.maker.address().as_ref(), &seed.0, &bump_as_seeds);
 		let escrow_signer = Signer::from(&escrow_seeds);
 		let signers = [escrow_signer];
 
@@ -295,14 +306,14 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			authority: self.escrow,
 			amount: self.vault.as_token_2022_account()?.amount(),
 			decimals: self.mint_a.as_token_2022_mint()?.decimals(),
-			token_program: self.token_program.key(),
+			token_program: self.token_program.address(),
 		}
 		.invoke_signed(&signers)?;
 		token_2022::instructions::CloseAccount {
 			account: self.vault,
 			destination: self.maker,
 			authority: self.escrow,
-			token_program: self.token_program.key(),
+			token_program: self.token_program.address(),
 		}
 		.invoke_signed(&signers)?;
 

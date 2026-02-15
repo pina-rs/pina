@@ -10,21 +10,21 @@ use std::vec;
 use pina::entrypoint::NON_DUP_MARKER;
 use pina::entrypoint::deserialize;
 use pina::*;
-use pinocchio::account_info::MAX_PERMITTED_DATA_INCREASE;
+use pinocchio::account::MAX_PERMITTED_DATA_INCREASE;
 
 #[derive(Accounts, Debug)]
 #[pina(crate = pina)]
 struct TestAccounts<'a> {
-	pub one: &'a AccountInfo,
-	pub two: &'a AccountInfo,
+	pub one: &'a AccountView,
+	pub two: &'a AccountView,
 }
 
 #[derive(Accounts)]
 #[pina(crate = pina)]
 struct TestAccountsRemaining<'a> {
-	pub one: &'a AccountInfo,
+	pub one: &'a AccountView,
 	#[pina(remaining)]
-	pub remaining: &'a [AccountInfo],
+	pub remaining: &'a [AccountView],
 }
 
 #[test]
@@ -37,7 +37,7 @@ fn test_accounts_derive_exact() {
 	let mut accounts = [UNINIT; 2];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
-	let accounts: &[AccountInfo] =
+	let accounts: &[AccountView] =
 		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
 
 	let test_accounts = TestAccounts::try_from_account_infos(accounts).unwrap();
@@ -55,7 +55,7 @@ fn test_accounts_derive_exact_not_enough() {
 	let mut accounts = [UNINIT; 1];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
-	let not_enough_accounts: &[AccountInfo] =
+	let not_enough_accounts: &[AccountView] =
 		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
 
 	let result = TestAccounts::try_from_account_infos(not_enough_accounts);
@@ -72,12 +72,10 @@ fn test_accounts_derive_exact_excess() {
 	let mut accounts = [UNINIT; 4];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
-	let too_many_accounts: &[AccountInfo] =
+	let too_many_accounts: &[AccountView] =
 		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
 
 	let result = TestAccounts::try_from_account_infos(too_many_accounts);
-	// let expected_err: ProgramError = PinaProgramError::TooManyAccountKeys.into();
-	// assert!(matches!(result, Err(expected_err)));
 	assert!(result.is_err_and(|error| error.eq(&PinaProgramError::TooManyAccountKeys.into())));
 }
 
@@ -89,7 +87,7 @@ fn test_accounts_derive_remaining_excess() {
 	let mut accounts = [UNINIT; 20];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
-	let accounts: &[AccountInfo] =
+	let accounts: &[AccountView] =
 		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
 
 	let test_accounts = TestAccountsRemaining::try_from_account_infos(accounts).unwrap();
@@ -105,7 +103,7 @@ fn test_accounts_derive_remaining_exact() {
 	let mut accounts = [UNINIT; 1];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
-	let accounts: &[AccountInfo] =
+	let accounts: &[AccountView] =
 		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
 
 	let test_accounts = TestAccountsRemaining::try_from_account_infos(accounts).unwrap();
@@ -114,12 +112,12 @@ fn test_accounts_derive_remaining_exact() {
 }
 
 /// The mock program ID used for testing.
-const MOCK_PROGRAM_ID: Pubkey = [5u8; 32];
+const MOCK_PROGRAM_ID: Address = Address::new_from_array([5u8; 32]);
 /// `assert_eq(core::mem::align_of::<u128>(), 8)` is true for BPF but not
 /// for some host machines.
 const BPF_ALIGN_OF_U128: usize = 8;
-/// An uninitialized account info.
-const UNINIT: MaybeUninit<AccountInfo> = MaybeUninit::<AccountInfo>::uninit();
+/// An uninitialized account view.
+const UNINIT: MaybeUninit<AccountView> = MaybeUninit::<AccountView>::uninit();
 /// The "static" size of an account in the input buffer.
 ///
 /// This is the size of the account header plus the maximum permitted data
@@ -219,7 +217,7 @@ unsafe fn create_input(accounts: usize, instruction_data: &[u8]) -> AlignedMemor
 	offset += instruction_data.len();
 	// Program ID (mock).
 	unsafe {
-		input.write(&MOCK_PROGRAM_ID, offset);
+		input.write(MOCK_PROGRAM_ID.as_ref(), offset);
 	}
 
 	input

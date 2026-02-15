@@ -1,9 +1,9 @@
 use bytemuck::Pod;
 use pinocchio::ProgramResult;
 
-use crate::AccountInfo;
+use crate::AccountView;
+use crate::Address;
 use crate::ProgramError;
-use crate::Pubkey;
 
 /// Zero-copy deserialization for on-chain account data.
 ///
@@ -63,7 +63,7 @@ pub trait AccountValidation {
 		F: Fn(&Self) -> bool;
 }
 
-/// Validation trait for raw `AccountInfo` references.
+/// Validation trait for raw `AccountView` references.
 ///
 /// Methods return `Result<&Self, ProgramError>` to enable chaining:
 /// ```ignore
@@ -83,44 +83,45 @@ pub trait AccountInfoValidation {
 	/// Assert that the account is not empty.
 	fn assert_not_empty(&self) -> Result<&Self, ProgramError>;
 	/// Assert that the account is of the type provided.
-	fn assert_type<T: HasDiscriminator>(&self, program_id: &Pubkey) -> Result<&Self, ProgramError>;
+	fn assert_type<T: HasDiscriminator>(&self, program_id: &Address)
+	-> Result<&Self, ProgramError>;
 	/// Assert that the account is a program.
-	fn assert_program(&self, program_id: &Pubkey) -> Result<&Self, ProgramError>;
+	fn assert_program(&self, program_id: &Address) -> Result<&Self, ProgramError>;
 	/// Assert that the account is a system variable.
-	fn assert_sysvar(&self, sysvar_id: &Pubkey) -> Result<&Self, ProgramError>;
+	fn assert_sysvar(&self, sysvar_id: &Address) -> Result<&Self, ProgramError>;
 	/// Assert that the account has the address provided.
-	fn assert_address(&self, address: &Pubkey) -> Result<&Self, ProgramError>;
+	fn assert_address(&self, address: &Address) -> Result<&Self, ProgramError>;
 	/// Assert that the account has any of the address provided.
-	fn assert_addresses(&self, addresses: &[Pubkey]) -> Result<&Self, ProgramError>;
+	fn assert_addresses(&self, addresses: &[Address]) -> Result<&Self, ProgramError>;
 	/// Assert that the account is owned by the address provided.
-	fn assert_owner(&self, owner: &Pubkey) -> Result<&Self, ProgramError>;
+	fn assert_owner(&self, owner: &Address) -> Result<&Self, ProgramError>;
 	/// Assert that the account is owned by one of the owner (program) ids
 	/// provided.
-	fn assert_owners(&self, owners: &[Pubkey]) -> Result<&Self, ProgramError>;
+	fn assert_owners(&self, owners: &[Address]) -> Result<&Self, ProgramError>;
 	/// Assert that the account has the seeds provided and uses the canonical
 	/// bump.
-	fn assert_seeds(&self, seeds: &[&[u8]], program_id: &Pubkey) -> Result<&Self, ProgramError>;
+	fn assert_seeds(&self, seeds: &[&[u8]], program_id: &Address) -> Result<&Self, ProgramError>;
 	/// Assert that the account has the seeds and bump provided.
 	fn assert_seeds_with_bump(
 		&self,
 		seeds: &[&[u8]],
-		program_id: &Pubkey,
+		program_id: &Address,
 	) -> Result<&Self, ProgramError>;
 	/// Assert that the account uses the canonical bump for the seeds provided.
 	/// Returns the bump.
 	fn assert_canonical_bump(
 		&self,
 		seeds: &[&[u8]],
-		program_id: &Pubkey,
+		program_id: &Address,
 	) -> Result<u8, ProgramError>;
 	/// Assert that the account is an associated token with the provided token
 	/// account.
 	#[cfg(feature = "token")]
 	fn assert_associated_token_address(
 		&self,
-		wallet: &Pubkey,
-		mint: &Pubkey,
-		token_program: &Pubkey,
+		wallet: &Address,
+		mint: &Address,
+		token_program: &Address,
 	) -> Result<&Self, ProgramError>;
 }
 
@@ -274,24 +275,24 @@ pub trait HasDiscriminator: Sized {
 	}
 }
 
-/// Deserializes raw `AccountInfo` data into a typed account reference.
+/// Deserializes raw `AccountView` data into a typed account reference.
 ///
 /// Performs:
 /// 1. Program owner check
 /// 2. Discriminator byte check
 /// 3. Checked bytemuck conversion of account data to `&T` or `&mut T`.
 pub trait AsAccount {
-	fn as_account<T>(&self, program_id: &Pubkey) -> Result<&T, ProgramError>
+	fn as_account<T>(&self, program_id: &Address) -> Result<&T, ProgramError>
 	where
 		T: AccountDeserialize + HasDiscriminator + Pod;
 
 	#[allow(clippy::mut_from_ref)]
-	fn as_account_mut<T>(&self, program_id: &Pubkey) -> Result<&mut T, ProgramError>
+	fn as_account_mut<T>(&self, program_id: &Address) -> Result<&mut T, ProgramError>
 	where
 		T: AccountDeserialize + HasDiscriminator + Pod;
 }
 
-/// Convenience methods for interpreting `AccountInfo` as SPL token account
+/// Convenience methods for interpreting `AccountView` as SPL token account
 /// types.
 #[cfg(feature = "token")]
 pub trait AsTokenAccount {
@@ -303,22 +304,22 @@ pub trait AsTokenAccount {
 	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError>;
 	fn as_associated_token_account(
 		&self,
-		owner: &Pubkey,
-		mint: &Pubkey,
-		token_program: &Pubkey,
+		owner: &Address,
+		mint: &Address,
+		token_program: &Address,
 	) -> Result<&crate::token::state::TokenAccount, ProgramError>;
 }
 
 /// Direct lamport transfer between accounts.
 pub trait LamportTransfer<'a> {
-	fn send(&'a self, lamports: u64, to: &'a AccountInfo) -> ProgramResult;
-	fn collect(&'a self, lamports: u64, from: &'a AccountInfo) -> ProgramResult;
+	fn send(&'a self, lamports: u64, to: &'a AccountView) -> ProgramResult;
+	fn collect(&'a self, lamports: u64, from: &'a AccountView) -> ProgramResult;
 }
 
 pub trait CloseAccountWithRecipient<'a> {
 	/// Close the account and transfer all rent lamports to the recipient.
 	/// The account must be writable to be closed.
-	fn close_with_recipient(&'a self, recipient: &'a AccountInfo) -> ProgramResult;
+	fn close_with_recipient(&'a self, recipient: &'a AccountView) -> ProgramResult;
 }
 
 /// Types that can emit themselves as a log or return-data message.
@@ -329,11 +330,11 @@ pub trait Loggable {
 	fn log_return(&self);
 }
 
-/// Destructures a slice of `AccountInfo` into a named accounts struct.
+/// Destructures a slice of `AccountView` into a named accounts struct.
 ///
 /// Automatically derived by `#[derive(Accounts)]`.
 pub trait TryFromAccountInfos<'a>: Sized {
-	fn try_from_account_infos(accounts: &'a [AccountInfo]) -> Result<Self, ProgramError>;
+	fn try_from_account_infos(accounts: &'a [AccountView]) -> Result<Self, ProgramError>;
 }
 
 /// Instruction processor.
