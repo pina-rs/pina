@@ -49,6 +49,9 @@ impl AccountInfoValidation for AccountInfo {
 			log!("address: {} has not been marked as writable", self.key());
 			log_caller();
 
+			// TODO: use a more specific error like `InvalidAccountData` or a
+			// custom `NotWritable` variant — `MissingRequiredSignature` is
+			// misleading for a writability check.
 			return Err(ProgramError::MissingRequiredSignature);
 		}
 
@@ -206,7 +209,7 @@ impl AccountInfoValidation for AccountInfo {
 			return Err(ProgramError::InvalidSeeds);
 		};
 
-		if self.key() != &pda {
+		if self.key() == &pda {
 			return Ok(self);
 		}
 
@@ -315,6 +318,11 @@ impl AsAccount for AccountInfo {
 	{
 		self.assert_owner(program_id)?;
 
+		// SAFETY: `try_borrow_data` returns a reference whose lifetime is tied to
+		// `self`. We create a raw-parts slice of exactly `size_of::<T>()` bytes
+		// from the same pointer. `T::try_from_bytes` then validates the
+		// discriminator and performs a bytemuck cast — no uninitialized memory is
+		// read.
 		unsafe {
 			T::try_from_bytes(from_raw_parts(
 				self.try_borrow_data()?.as_ptr(),
@@ -330,6 +338,9 @@ impl AsAccount for AccountInfo {
 	{
 		self.assert_owner(program_id)?;
 
+		// SAFETY: Same reasoning as `as_account` above, but with a mutable
+		// borrow. The Solana runtime guarantees exclusive access when
+		// `try_borrow_mut_data` succeeds.
 		unsafe {
 			T::try_from_bytes_mut(from_raw_parts_mut(
 				self.try_borrow_mut_data()?.as_mut_ptr(),
@@ -453,18 +464,23 @@ impl AsTokenAccount for AccountInfo {
 	fn as_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError> {
 		self.can_borrow_data()?;
 
+		// SECURITY: relies on pinocchio's internal layout validation inside
+		// `from_account_info_unchecked`. Callers should verify ownership before
+		// trusting the result.
 		unsafe { crate::token::state::Mint::from_account_info_unchecked(self) }
 	}
 
 	fn as_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError> {
 		self.can_borrow_data()?;
 
+		// SECURITY: see `as_token_mint` above.
 		unsafe { crate::token::state::TokenAccount::from_account_info_unchecked(self) }
 	}
 
 	fn as_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError> {
 		self.can_borrow_data()?;
 
+		// SECURITY: see `as_token_mint` above.
 		unsafe { crate::token_2022::state::Mint::from_account_info_unchecked(self) }
 	}
 
@@ -473,6 +489,7 @@ impl AsTokenAccount for AccountInfo {
 	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
 		self.can_borrow_data()?;
 
+		// SECURITY: see `as_token_mint` above.
 		unsafe { crate::token_2022::state::TokenAccount::from_account_info_unchecked(self) }
 	}
 
@@ -484,6 +501,8 @@ impl AsTokenAccount for AccountInfo {
 	) -> Result<&crate::token::state::TokenAccount, ProgramError> {
 		self.can_borrow_data()?;
 
+		// SECURITY: see `as_token_mint` above. Additionally, the address is
+		// verified against the derived ATA address before the unchecked cast.
 		unsafe {
 			crate::token::state::TokenAccount::from_account_info_unchecked(
 				self.assert_associated_token_address(owner, mint, token_program)?,
@@ -498,7 +517,7 @@ impl<'a> LamportTransfer<'a> for AccountInfo {
 	#[inline(always)]
 	#[track_caller]
 	fn send(&'a self, lamports: u64, recipient: &'a AccountInfo) -> ProgramResult {
-		let self_lamports = match self.try_borrow_mut_lamports() {
+		let mut self_lamports = match self.try_borrow_mut_lamports() {
 			Ok(v) => v,
 			Err(e) => {
 				log!("Could not mutably borrow owned lamports");
@@ -507,10 +526,10 @@ impl<'a> LamportTransfer<'a> for AccountInfo {
 			}
 		};
 
-		let recipient_lamports = match recipient.try_borrow_mut_lamports() {
+		let mut recipient_lamports = match recipient.try_borrow_mut_lamports() {
 			Ok(v) => v,
 			Err(e) => {
-				log!("Could not mutably borrow recipent lamports");
+				log!("Could not mutably borrow recipient lamports");
 				log_caller();
 				return Err(e);
 			}
@@ -519,10 +538,10 @@ impl<'a> LamportTransfer<'a> for AccountInfo {
 		// SAFETY:
 		// The solana runtime will check that no extra lamports are created so this
 		// should be safe even if attempting to add more lamports than owned.
-		self_lamports
+		*self_lamports = self_lamports
 			.checked_sub(lamports)
 			.ok_or(ProgramError::InsufficientFunds)?;
-		recipient_lamports
+		*recipient_lamports = recipient_lamports
 			.checked_add(lamports)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
 
@@ -544,6 +563,10 @@ impl<'a> LamportTransfer<'a> for AccountInfo {
 
 impl<'a> CloseAccountWithRecipient<'a> for AccountInfo {
 	fn close_with_recipient(&'a self, recipient: &'a AccountInfo) -> ProgramResult {
+		// SECURITY: unchecked addition — overflow is impossible in practice
+		// because the total supply of lamports fits in a u64, but an overflow
+		// here would be caught by the runtime's lamport balance check at the
+		// end of the transaction.
 		*recipient.try_borrow_mut_lamports()? += *self.try_borrow_lamports()?;
 		self.resize(0)?;
 		self.close()

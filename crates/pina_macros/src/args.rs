@@ -4,6 +4,7 @@ use darling::FromMeta;
 use quote::ToTokens;
 use syn::Expr;
 
+/// Arguments for the `#[account(...)]` attribute macro.
 #[derive(Debug, FromMeta)]
 pub(crate) struct AccountArgs {
 	/// Set the path to the crate
@@ -15,6 +16,7 @@ pub(crate) struct AccountArgs {
 	pub(crate) variant: Option<syn::Ident>,
 }
 
+/// Arguments for the `#[instruction(...)]` attribute macro.
 #[derive(Debug, FromMeta)]
 pub(crate) struct InstructionArgs {
 	/// Set the path to the crate
@@ -26,6 +28,7 @@ pub(crate) struct InstructionArgs {
 	pub(crate) variant: Option<syn::Ident>,
 }
 
+/// Arguments for the `#[event(...)]` attribute macro.
 #[derive(Debug, FromMeta)]
 pub(crate) struct EventArgs {
 	/// Set the path to the crate
@@ -37,6 +40,7 @@ pub(crate) struct EventArgs {
 	pub(crate) variant: Option<syn::Ident>,
 }
 
+/// Arguments for the `#[error(...)]` attribute macro.
 #[derive(Debug, FromMeta)]
 pub(crate) struct ErrorArgs {
 	/// Set the path to the crate
@@ -51,6 +55,7 @@ fn default_crate_path() -> syn::Path {
 	syn::parse_str("::pina").unwrap()
 }
 
+/// Arguments for the `#[discriminator(...)]` attribute macro.
 #[derive(Debug, FromMeta)]
 pub(crate) struct DiscriminatorArgs {
 	/// Set the primitive type that this enum discriminator will use. Can be one
@@ -125,6 +130,7 @@ impl FromMeta for Primitive {
 	}
 }
 
+/// Parsed input for `#[derive(Accounts)]`.
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(pina), supports(struct_named))]
 pub(crate) struct AccountsInput {

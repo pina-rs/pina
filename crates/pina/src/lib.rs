@@ -1,3 +1,31 @@
+//! # pina
+//!
+//! A performant Solana smart contract framework built on top of
+//! [`pinocchio`](https://docs.rs/pinocchio) — a lightweight alternative to
+//! `solana-program` that massively reduces dependency bloat and compute units.
+//!
+//! ## Features
+//!
+//! - **Zero-copy account deserialization** via `bytemuck` — no heap allocation.
+//! - **`no_std` compatible** — designed for on-chain deployment to the SBF
+//!   target.
+//! - **Discriminator system** — every account, instruction, and event type
+//!   carries a discriminator as its first field, enabling safe type
+//!   identification.
+//! - **Validation chaining** — chain assertions on `AccountInfo` references
+//!   (e.g. `account.assert_signer()?.assert_writable()?.assert_owner(&id)?`).
+//! - **Proc-macro sugar** — `#[account]`, `#[instruction]`, `#[event]`,
+//!   `#[error]`, `#[discriminator]`, and `#[derive(Accounts)]` reduce
+//!   boilerplate.
+//! - **CPI helpers** — account creation, PDA allocation, and token operations.
+//!
+//! ## Crate features
+//!
+//! - `logs` *(default)* — enables on-chain logging via `pinocchio-log`.
+//! - `derive` *(default)* — enables the `pina_macros` proc-macro crate.
+//! - `token` — enables SPL token / token-2022 helpers and associated token
+//!   account utilities.
+
 #![no_std]
 #![allow(clippy::inline_always)]
 
@@ -49,6 +77,17 @@ pub use crate::error::*;
 pub use crate::traits::*;
 pub use crate::utils::*;
 
+/// Sets up a `no_std` Solana program entrypoint.
+///
+/// This macro wires up the BPF entrypoint, disables the default allocator, and
+/// installs a minimal panic handler. Usage:
+///
+/// ```ignore
+/// nostd_entrypoint!(process_instruction);
+/// ```
+///
+/// An optional second argument overrides the maximum number of transaction
+/// accounts (defaults to `pinocchio::MAX_TX_ACCOUNTS`).
 #[macro_export]
 macro_rules! nostd_entrypoint {
 	($process_instruction:expr) => {
@@ -61,6 +100,10 @@ macro_rules! nostd_entrypoint {
 	};
 }
 
+/// Logs a formatted message to the Solana runtime.
+///
+/// When the `logs` feature is disabled this is a no-op that compiles to
+/// nothing.
 #[cfg(feature = "logs")]
 #[macro_export]
 macro_rules! log {

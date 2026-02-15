@@ -1,4 +1,4 @@
-//! primitive types that can be used in `Pod`s
+//! Alignment-safe primitive wrappers that can be used in `Pod` structs.
 use bytemuck::Pod;
 use bytemuck::Zeroable;
 use pinocchio::program_error::ProgramError;
@@ -37,11 +37,13 @@ impl From<PodBool> for bool {
 	}
 }
 
-/// Simple macro for implementing conversion functions between Pod* integers and
-/// standard integers.
+/// Implements bidirectional conversion between a `Pod*` wrapper type and its
+/// corresponding standard integer.
 ///
-/// The standard integer types can cause alignment issues when placed in a
-/// `Pod`, so these replacements are usable in all `Pod`s.
+/// For a given pair `($P, $I)`, this generates:
+/// - `$P::from_primitive($I) -> $P` (const)
+/// - `From<$I> for $P`
+/// - `From<$P> for $I`
 #[macro_export]
 macro_rules! impl_int_conversion {
 	($P:ty, $I:ty) => {
@@ -99,7 +101,8 @@ impl_int_conversion!(PodI64, i64);
 pub struct PodU128(pub [u8; 16]);
 impl_int_conversion!(PodU128, u128);
 
-/// Convert a slice of bytes into a `Pod` (zero copy)
+/// Reinterprets a byte slice as `&T` (zero-copy). Returns an error if the
+/// slice has incorrect length or alignment.
 pub fn pod_from_bytes<T: Pod>(bytes: &[u8]) -> Result<&T, ProgramError> {
 	bytemuck::try_from_bytes(bytes).map_err(|_| ProgramError::InvalidArgument)
 }

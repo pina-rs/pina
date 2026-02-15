@@ -1,3 +1,9 @@
+//! Token 2022 extension parsing utilities.
+//!
+//! **Deprecation notice:** this crate is slated for deprecation once
+//! `pinocchio-token-2022` ships its own extension parsing. Prefer using the
+//! upstream crate when available.
+
 #![no_std]
 #![allow(unsafe_code)]
 #![allow(clippy::inline_always)]
@@ -229,6 +235,17 @@ pub trait Extension {
 	const BASE_STATE: BaseState;
 }
 
+/// Walks the extension TLV data after the base account state and returns a
+/// reference to the first extension matching `T::TYPE`.
+///
+/// # Safety considerations
+///
+/// The returned reference is produced via an unsafe `from_bytes_ref` cast.
+/// The caller must ensure that `acc_data_bytes` contains valid, well-formed
+/// extension data from a genuine Token 2022 account.
+// SECURITY: the inner `from_bytes_ref` performs an unchecked pointer cast.
+// This is only sound when the data originates from a validated Token 2022
+// account. Passing arbitrary bytes could yield an invalid `&T`.
 pub fn get_extension_from_bytes<T: Extension + Clone + Copy>(acc_data_bytes: &[u8]) -> Option<&T> {
 	let ext_bytes = match T::BASE_STATE {
 		BaseState::Mint => {

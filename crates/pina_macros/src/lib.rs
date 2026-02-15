@@ -23,6 +23,10 @@ use crate::args::InstructionArgs;
 
 mod args;
 
+/// Derives the [`TryFromAccountInfos`] trait for a named-field struct.
+///
+/// Each field must be `&'a AccountInfo`. One field may be annotated with
+/// `#[pina(remaining)]` to capture all trailing accounts as a slice.
 #[proc_macro_derive(Accounts, attributes(pina))]
 pub fn accounts_derive(input: TokenStream) -> TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
@@ -614,7 +618,7 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 /// 	where
 /// 		F: Fn(&Self) -> bool,
 /// 	{
-/// 		if !condition(self) {
+/// 		if condition(self) {
 /// 			return Ok(self);
 /// 		}
 ///
@@ -845,7 +849,7 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 			where
 				F: Fn(&Self) -> bool,
 			{
-				if !condition(self) {
+				if condition(self) {
 					return Ok(self);
 				}
 
