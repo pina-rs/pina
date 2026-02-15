@@ -6,9 +6,19 @@ use crate::ProgramResult;
 use crate::Pubkey;
 use crate::log;
 
-/// Parses an instruction from the instruction data.
-/// Also checks that the program ID matches the provided ID when this
-/// instruction was called.
+/// Parses an instruction discriminator from the raw instruction data.
+///
+/// 1. Verifies that `program_id` matches `api_id`.
+/// 2. Reads the discriminator bytes and converts them into `T`.
+///
+/// # Error mapping
+///
+/// If `discriminator_from_bytes` returns a `ProgramError::Custom(_)` (i.e.
+/// `InvalidDiscriminator`), it is mapped to `InvalidInstructionData` so the
+/// caller sees a generic "bad data" error instead of an internal framework
+/// error.
+// TODO: the error remapping above suppresses detail that could be useful
+// for debugging. Consider preserving the original error or logging it.
 pub fn parse_instruction<'a, T: IntoDiscriminator>(
 	api_id: &'a Pubkey,
 	program_id: &'a Pubkey,
@@ -28,6 +38,7 @@ pub fn parse_instruction<'a, T: IntoDiscriminator>(
 	})
 }
 
+/// Asserts a boolean condition, logging `msg` and returning `err` on failure.
 #[track_caller]
 #[inline(always)]
 pub fn assert(v: bool, err: impl Into<ProgramError>, msg: &str) -> ProgramResult {
@@ -57,6 +68,8 @@ pub fn log_caller() {
 #[inline(always)]
 pub fn log_caller() {}
 
+/// Derives the associated token account address for the given wallet, mint,
+/// and token program. Returns `None` if no valid PDA exists.
 #[cfg(feature = "token")]
 pub fn try_get_associated_token_address(
 	wallet_address: &Pubkey,

@@ -5,6 +5,11 @@ use crate::AccountInfo;
 use crate::ProgramError;
 use crate::Pubkey;
 
+/// Zero-copy deserialization for on-chain account data.
+///
+/// Validates the discriminator and reinterprets the byte slice as `&Self`
+/// (or `&mut Self`) without copying. The blanket implementation covers all
+/// types that implement both [`HasDiscriminator`] and [`Pod`].
 pub trait AccountDeserialize {
 	fn try_from_bytes(data: &[u8]) -> Result<&Self, ProgramError>;
 	fn try_from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, ProgramError>;
@@ -31,24 +36,39 @@ where
 	}
 }
 
+/// Validation trait for deserialized account data (e.g. `EscrowState`).
+///
+/// Allows chaining arbitrary boolean assertions on the typed account, returning
+/// `Ok(&Self)` when the condition holds and `Err(InvalidAccountData)`
+/// otherwise.
 pub trait AccountValidation {
+	/// Assert an immutable condition on the account data.
 	fn assert<F>(&self, condition: F) -> Result<&Self, ProgramError>
 	where
 		F: Fn(&Self) -> bool;
 
+	/// Assert an immutable condition with a custom log message on failure.
 	fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, ProgramError>
 	where
 		F: Fn(&Self) -> bool;
 
+	/// Assert a condition on a mutable reference to the account data.
 	fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, ProgramError>
 	where
 		F: Fn(&Self) -> bool;
 
+	/// Assert a condition on a mutable reference with a custom log message.
 	fn assert_mut_msg<F>(&mut self, condition: F, msg: &str) -> Result<&mut Self, ProgramError>
 	where
 		F: Fn(&Self) -> bool;
 }
 
+/// Validation trait for raw `AccountInfo` references.
+///
+/// Methods return `Result<&Self, ProgramError>` to enable chaining:
+/// ```ignore
+/// account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?;
+/// ```
 pub trait AccountInfoValidation {
 	/// Assert that the account is a signer.
 	fn assert_signer(&self) -> Result<&Self, ProgramError>;
@@ -108,6 +128,8 @@ macro_rules! primitive_into_discriminator {
 	($type:ty) => {
 		impl IntoDiscriminator for $type {
 			fn discriminator_from_bytes(bytes: &[u8]) -> Result<Self, $crate::ProgramError> {
+				// SECURITY: panics if `bytes.len() < Self::BYTES`. Callers must
+				// ensure the slice is at least `BYTES` long.
 				let sliced_bytes = &bytes[..Self::BYTES];
 				let mut discriminator_bytes = [0u8; Self::BYTES];
 				discriminator_bytes.copy_from_slice(sliced_bytes);
@@ -205,30 +227,38 @@ macro_rules! into_discriminator {
 	};
 }
 
+/// Low-level discriminator codec.
+///
+/// Implemented for the primitive types (`u8`, `u16`, `u32`, `u64`) and for
+/// user-defined discriminator enums via the [`into_discriminator!`] macro or
+/// the `#[discriminator]` attribute macro.
 pub trait IntoDiscriminator: Sized {
 	/// The number of bytes required to store this discriminator.
 	const BYTES: usize = size_of::<Self>();
 
-	/// From a data slice check the first `SPACE` bytes.
+	/// Read a discriminator from the first `BYTES` of the data slice.
 	fn discriminator_from_bytes(bytes: &[u8]) -> Result<Self, ProgramError>;
 
 	/// Write the discriminator to the provided bytes.
 	fn write_discriminator(&self, bytes: &mut [u8]);
 
-	/// Check if the provided descriptor matches the first `N` bytes of the
-	/// provided bytes array.
+	/// Check if this discriminator matches the first `BYTES` of the provided
+	/// byte array.
 	fn matches_discriminator(&self, bytes: &[u8]) -> bool;
 }
 
-/// This is the max number bytes that a discriminator can take to prevent
-/// alignment issues. Since the larges alignment size us u64. 8bytes is needed
-/// to ensure the alignement does not error.
+/// The maximum number of bytes that a discriminator can occupy, chosen to
+/// prevent alignment issues. Since the largest alignment size is `u64`
+/// (8 bytes), this constant ensures the discriminator never causes alignment
+/// errors.
 pub const MAX_DISCRIMINATOR_SPACE: usize = 8;
 
+/// Associates a concrete type (account / instruction / event struct) with its
+/// discriminator enum variant.
 pub trait HasDiscriminator: Sized {
-	/// The underling type of the discriminator.
+	/// The underlying type of the discriminator.
 	type Type: IntoDiscriminator;
-	/// The vaue of the discriminator.
+	/// The value of the discriminator for this type.
 	const VALUE: Self::Type;
 
 	/// Write the discriminator bytes to the provided mutable bytes array.
@@ -244,10 +274,12 @@ pub trait HasDiscriminator: Sized {
 	}
 }
 
+/// Deserializes raw `AccountInfo` data into a typed account reference.
+///
 /// Performs:
 /// 1. Program owner check
 /// 2. Discriminator byte check
-/// 3. Checked bytemuck conversion of account data to &T or &mut T.
+/// 3. Checked bytemuck conversion of account data to `&T` or `&mut T`.
 pub trait AsAccount {
 	fn as_account<T>(&self, program_id: &Pubkey) -> Result<&T, ProgramError>
 	where
@@ -259,6 +291,8 @@ pub trait AsAccount {
 		T: AccountDeserialize + HasDiscriminator + Pod;
 }
 
+/// Convenience methods for interpreting `AccountInfo` as SPL token account
+/// types.
 #[cfg(feature = "token")]
 pub trait AsTokenAccount {
 	fn as_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError>;
@@ -275,6 +309,7 @@ pub trait AsTokenAccount {
 	) -> Result<&crate::token::state::TokenAccount, ProgramError>;
 }
 
+/// Direct lamport transfer between accounts.
 pub trait LamportTransfer<'a> {
 	fn send(&'a self, lamports: u64, to: &'a AccountInfo) -> ProgramResult;
 	fn collect(&'a self, lamports: u64, from: &'a AccountInfo) -> ProgramResult;
@@ -286,15 +321,24 @@ pub trait CloseAccountWithRecipient<'a> {
 	fn close_with_recipient(&'a self, recipient: &'a AccountInfo) -> ProgramResult;
 }
 
+/// Types that can emit themselves as a log or return-data message.
 pub trait Loggable {
+	/// Emit a log message.
 	fn log(&self);
+	/// Emit via `sol_set_return_data`.
 	fn log_return(&self);
 }
 
+/// Destructures a slice of `AccountInfo` into a named accounts struct.
+///
+/// Automatically derived by `#[derive(Accounts)]`.
 pub trait TryFromAccountInfos<'a>: Sized {
 	fn try_from_account_infos(accounts: &'a [AccountInfo]) -> Result<Self, ProgramError>;
 }
 
+/// Instruction processor.
+///
+/// Implementors validate accounts and execute the instruction logic.
 pub trait ProcessAccountInfos<'a>: TryFromAccountInfos<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult;
 }
@@ -311,7 +355,7 @@ mod tests {
 	use crate::PodU64;
 
 	#[repr(C)]
-	#[derive(Copy, Clone, Zeroable, Pod)]
+	#[derive(Copy, Clone, Debug, Zeroable, Pod)]
 	struct TestType {
 		discriminator: [u8; 1],
 		field0: PodU64,
@@ -333,5 +377,81 @@ mod tests {
 		let foo = TestType::try_from_bytes(&data).unwrap();
 		assert_eq!(42u64, foo.field0.into());
 		assert_eq!(43u64, foo.field1.into());
+	}
+
+	#[test]
+	fn account_deserialize_wrong_discriminator() {
+		let mut data = [0u8; 17];
+		data[0] = 99; // wrong discriminator — TestType expects 7
+		let result = TestType::try_from_bytes(&data);
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+	}
+
+	#[test]
+	fn account_deserialize_undersized_data() {
+		// Only 5 bytes — far too small for TestType (17 bytes).
+		let data = [7u8, 0, 0, 0, 0];
+		let result = TestType::try_from_bytes(&data);
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn account_deserialize_oversized_data() {
+		// 20 bytes — more than size_of::<TestType>() (17).
+		let mut data = [0u8; 20];
+		data[0] = 7;
+		let result = TestType::try_from_bytes(&data);
+		// bytemuck::try_from_bytes rejects slices that aren't exactly the right
+		// size.
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn account_deserialize_mut_roundtrip() {
+		let mut data = [0u8; 17];
+		data[0] = 7;
+		let foo = TestType::try_from_bytes_mut(&mut data).unwrap();
+		foo.field0 = PodU64::from_primitive(100);
+		assert_eq!(100u64, u64::from(foo.field0));
+		// Verify the underlying bytes changed.
+		assert_eq!(data[1], 100);
+	}
+
+	#[test]
+	fn discriminator_from_bytes_u8() {
+		let data = [42u8, 0, 0, 0];
+		let d = u8::discriminator_from_bytes(&data).unwrap();
+		assert_eq!(d, 42);
+	}
+
+	#[test]
+	fn discriminator_from_bytes_u16() {
+		// 0x0102 in little-endian is [2, 1]
+		let data = [2u8, 1];
+		let d = u16::discriminator_from_bytes(&data).unwrap();
+		assert_eq!(d, 0x0102);
+	}
+
+	#[test]
+	fn discriminator_write_and_match_u32() {
+		let val: u32 = 0xDEAD_BEEF;
+		let mut bytes = [0u8; 4];
+		val.write_discriminator(&mut bytes);
+		assert!(val.matches_discriminator(&bytes));
+
+		let other: u32 = 0x0000_0001;
+		assert!(!other.matches_discriminator(&bytes));
+	}
+
+	#[test]
+	fn has_discriminator_matches_and_writes() {
+		let mut bytes = [0u8; 1];
+		TestType::write_discriminator(&mut bytes);
+		assert_eq!(bytes[0], 7);
+		assert!(TestType::matches_discriminator(&bytes));
+
+		bytes[0] = 0;
+		assert!(!TestType::matches_discriminator(&bytes));
 	}
 }

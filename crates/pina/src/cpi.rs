@@ -88,6 +88,17 @@ pub fn allocate_account<'a>(
 	Ok((address, bump))
 }
 
+/// Appends a single-byte bump seed to the provided seeds array, returning
+/// a fixed-size `[&[u8]; MAX_SEEDS]` suitable for PDA signing.
+///
+/// # Panics
+///
+/// Panics if `seeds.len() >= MAX_SEEDS`. On-chain panics are fatal and will
+/// abort the transaction.
+// SECURITY: this function panics rather than returning a Result. Callers
+// must ensure seed count is within bounds before calling.
+// TODO: consider returning `Result` instead of panicking to give callers
+// the option of a graceful error path.
 pub fn combine_seeds_with_bump<'a>(seeds: &[&'a [u8]], bump: &'a [u8; 1]) -> [&'a [u8]; MAX_SEEDS] {
 	assert!(
 		seeds.len() < MAX_SEEDS,
@@ -110,6 +121,14 @@ pub fn combine_seeds_with_bump<'a>(seeds: &[&'a [u8]], bump: &'a [u8; 1]) -> [&'
 }
 
 /// Allocates space for a new program account with user-provided bump.
+///
+/// Two paths are taken depending on whether the target account already has
+/// lamports:
+///
+/// - **Zero balance** — a single `CreateAccount` CPI is issued.
+/// - **Non-zero balance** — a `Transfer` (to top up rent), `Allocate`, and
+///   `Assign` are issued separately. This covers the case where the account was
+///   pre-funded (e.g. by a previous failed transaction).
 #[inline(always)]
 pub fn allocate_account_with_bump<'a>(
 	target_account: &'a AccountInfo,

@@ -1,3 +1,9 @@
+//! Well-known Solana program and sysvar IDs.
+//!
+//! Each sub-module declares a single `ID` constant via
+//! [`pinocchio_pubkey::declare_id!`]. Import the module and use `module::ID` to
+//! reference the address.
+
 #![no_std]
 
 pub mod address_lookup_table {

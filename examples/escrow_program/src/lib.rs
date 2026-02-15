@@ -1,3 +1,12 @@
+//! Token escrow program built with pina.
+//!
+//! Flow:
+//! 1. **Make** — the maker deposits token A into a PDA-owned vault and records
+//!    the desired amount of token B in the escrow state.
+//! 2. **Take** — the taker sends token B to the maker's ATA, then the vault
+//!    releases token A to the taker's ATA. The escrow is closed and rent is
+//!    returned to the maker.
+
 #![allow(clippy::inline_always)]
 #![no_std]
 
@@ -200,13 +209,15 @@ pub struct TakeAccounts<'a> {
 
 impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
-		// This is purely to validate the discriminator as there are no needed
-		// arguments.
+		// Validate the discriminator; TakeInstruction has no payload fields.
 		let _ = TakeInstruction::try_from_bytes(data)?;
 
-		// assertions
+		// -- assertions --
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.taker.assert_signer()?.assert_writable()?;
+		// TODO: add validation for `self.taker_ata_b` — currently it is only
+		// validated implicitly by the token program during the transfer CPI. An
+		// explicit ATA address check here would catch mismatches earlier.
 		self.taker_ata_a
 			.assert_owners(&SPL_PROGRAM_IDS)?
 			.assert_data_len(token::state::TokenAccount::LEN)?
@@ -262,7 +273,7 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		.invoke()?;
 
 		token_2022::instructions::TransferChecked {
-			from: self.taker_ata_a,
+			from: self.taker_ata_b,
 			mint: self.mint_b,
 			to: self.maker_ata_b,
 			authority: self.taker,
