@@ -11,7 +11,7 @@ description = "a solana and pinocchio smart contract framework"
 
 [features]
 default = ["logs", "derive"]
-logs = ["dep:pinocchio-log"] # Enable logging for errors
+logs = ["dep:solana-program-log"] # Enable logging for errors
 token = [
 	"dep:pinocchio-associated-token-account",
 	"dep:pinocchio-token",
@@ -25,11 +25,11 @@ paste = { workspace = true }
 pina_macros = { workspace = true, optional = true }
 pinocchio = { workspace = true }
 pinocchio-associated-token-account = { workspace = true, optional = true }
-pinocchio-log = { workspace = true, optional = true, features = ["macro"] }
-pinocchio-pubkey = { workspace = true, features = ["const"] }
 pinocchio-system = { workspace = true }
 pinocchio-token = { workspace = true, optional = true }
 pinocchio-token-2022 = { workspace = true, optional = true }
+solana-address = { workspace = true }
+solana-program-log = { workspace = true, optional = true, features = ["macro"] }
 typed-builder = { workspace = true }
 
 [lints]

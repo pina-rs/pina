@@ -12,7 +12,7 @@
 //! - **Discriminator system** — every account, instruction, and event type
 //!   carries a discriminator as its first field, enabling safe type
 //!   identification.
-//! - **Validation chaining** — chain assertions on `AccountInfo` references
+//! - **Validation chaining** — chain assertions on `AccountView` references
 //!   (e.g. `account.assert_signer()?.assert_writable()?.assert_owner(&id)?`).
 //! - **Proc-macro sugar** — `#[account]`, `#[instruction]`, `#[event]`,
 //!   `#[error]`, `#[discriminator]`, and `#[derive(Accounts)]` reduce
@@ -21,7 +21,7 @@
 //!
 //! ## Crate features
 //!
-//! - `logs` *(default)* — enables on-chain logging via `pinocchio-log`.
+//! - `logs` *(default)* — enables on-chain logging via `solana-program-log`.
 //! - `derive` *(default)* — enables the `pina_macros` proc-macro crate.
 //! - `token` — enables SPL token / token-2022 helpers and associated token
 //!   account utilities.
@@ -32,6 +32,7 @@
 mod cpi;
 mod error;
 mod loaders;
+mod pda;
 mod pod;
 mod traits;
 mod utils;
@@ -42,45 +43,59 @@ pub use bytemuck::Zeroable;
 #[cfg(feature = "derive")]
 pub use pina_macros::*;
 pub use pinocchio;
+pub use pinocchio::AccountView;
+pub use pinocchio::Address;
 pub use pinocchio::ProgramResult;
-pub use pinocchio::account_info::AccountInfo;
+pub use pinocchio::address::ADDRESS_BYTES;
+pub use pinocchio::address::MAX_SEEDS;
+pub use pinocchio::address::MAX_SEED_LEN;
+pub use pinocchio::cpi::Seed;
+pub use pinocchio::cpi::Signer;
 pub use pinocchio::entrypoint;
-pub use pinocchio::instruction::AccountMeta;
-pub use pinocchio::instruction::Instruction;
-pub use pinocchio::instruction::Seed;
-pub use pinocchio::instruction::Signer;
+pub use pinocchio::error::ProgramError;
+pub use pinocchio::instruction::InstructionAccount;
+pub use pinocchio::instruction::InstructionView;
 pub use pinocchio::program_entrypoint;
-pub use pinocchio::program_error::ProgramError;
-pub use pinocchio::pubkey::Pubkey;
-pub use pinocchio::pubkey::*;
 pub use pinocchio::sysvars;
+pub use pod::*;
 #[cfg(feature = "token")]
 pub use pinocchio_associated_token_account as associated_token_account;
-#[cfg(feature = "logs")]
-pub use pinocchio_log;
-#[cfg(feature = "logs")]
-pub use pinocchio_log::log_cu_usage;
-#[cfg(feature = "logs")]
-pub use pinocchio_log::logger::Logger;
-pub use pinocchio_pubkey::*;
 pub use pinocchio_system as system;
 #[cfg(feature = "token")]
 pub use pinocchio_token as token;
 #[cfg(feature = "token")]
 pub use pinocchio_token_2022 as token_2022;
-pub use pod::*;
+pub use solana_address::address;
+pub use solana_address::declare_id;
+#[cfg(feature = "logs")]
+pub use solana_program_log;
+#[cfg(feature = "logs")]
+pub use solana_program_log::Logger;
+#[cfg(feature = "logs")]
+pub use solana_program_log::log_cu_usage;
 pub use typed_builder;
 pub use typed_builder::TypedBuilder;
 
 pub use crate::cpi::*;
 pub use crate::error::*;
+pub use crate::pda::*;
 pub use crate::traits::*;
 pub use crate::utils::*;
 
 /// Sets up a `no_std` Solana program entrypoint.
 ///
 /// This macro wires up the BPF entrypoint, disables the default allocator, and
-/// installs a minimal panic handler. Usage:
+/// installs a minimal panic handler. The entry function receives:
+///
+/// ```ignore
+/// fn process_instruction(
+///     program_id: &Address,
+///     accounts: &[AccountView],
+///     data: &[u8],
+/// ) -> ProgramResult
+/// ```
+///
+/// Usage:
 ///
 /// ```ignore
 /// nostd_entrypoint!(process_instruction);
@@ -108,7 +123,7 @@ macro_rules! nostd_entrypoint {
 #[macro_export]
 macro_rules! log {
 	($($arg:tt)*) => {
-		$crate::pinocchio_log::log!($($arg)*);
+		$crate::solana_program_log::log!($($arg)*);
 	};
 }
 
@@ -121,7 +136,7 @@ macro_rules! log {
 /// Make sure all traits are available.
 pub mod prelude {
 	#[cfg(feature = "logs")]
-	pub use pinocchio_log::logger::Logger;
+	pub use solana_program_log::Logger;
 
 	pub use crate::traits::*;
 }
