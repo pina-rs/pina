@@ -601,6 +601,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
+name = "counter_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "cpufeatures"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1040,6 +1047,13 @@ name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
+
+[[package]]
+name = "hello_solana"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
 
 [[package]]
 name = "hmac"
@@ -3075,6 +3089,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0742ff5ff03ea7e67c8ae6c93cac239e0d9784833362da3f9a9c1da8dfefcbdc"
 dependencies = [
  "winnow",
+]
+
+[[package]]
+name = "transfer_sol"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]

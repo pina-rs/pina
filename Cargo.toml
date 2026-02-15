@@ -4,7 +4,10 @@ members = [
 	"crates/pina",
 	"crates/pina_macros",
 	"crates/pina_sdk_ids",
+	"examples/counter_program",
 	"examples/escrow_program",
+	"examples/hello_solana",
+	"examples/transfer_sol",
 ]
 
 [workspace.package]
