@@ -549,6 +549,7 @@ impl<'a> CloseAccountWithRecipient<'a> for AccountView {
 				ProgramError::ArithmeticOverflow
 			})?;
 		recipient.set_lamports(new_balance);
+		self.set_lamports(0);
 		self.resize(0)?;
 		self.close()
 	}
