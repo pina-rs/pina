@@ -50,10 +50,7 @@ impl AccountInfoValidation for AccountView {
 			);
 			log_caller();
 
-			// TODO: use a more specific error like `InvalidAccountData` or a
-			// custom `NotWritable` variant — `MissingRequiredSignature` is
-			// misleading for a writability check.
-			return Err(ProgramError::MissingRequiredSignature);
+			return Err(ProgramError::InvalidAccountData);
 		}
 
 		Ok(self)
@@ -375,113 +372,78 @@ impl AsAccount for AccountView {
 	}
 }
 
+/// Implements `AccountValidation` for a token-related type. All four assertion
+/// methods follow the same pattern: check the condition, log on failure, and
+/// return the appropriate error.
 #[cfg(feature = "token")]
-impl AccountValidation for crate::token_2022::state::Mint {
-	#[track_caller]
-	fn assert<F>(&self, condition: F) -> Result<&Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-	{
-		if condition(self) {
-			return Ok(self);
+macro_rules! impl_account_validation {
+	($type:ty, $label:literal) => {
+		impl AccountValidation for $type {
+			#[track_caller]
+			fn assert<F>(&self, condition: F) -> Result<&Self, ProgramError>
+			where
+				F: Fn(&Self) -> bool,
+			{
+				if !condition(self) {
+					log!($label);
+					log_caller();
+					return Err(ProgramError::InvalidAccountData);
+				}
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_msg<F>(&self, condition: F, log: &str) -> Result<&Self, ProgramError>
+			where
+				F: Fn(&Self) -> bool,
+			{
+				match crate::assert(condition(self), ProgramError::InvalidAccountData, log) {
+					Err(err) => Err(err),
+					Ok(()) => Ok(self),
+				}
+			}
+
+			#[track_caller]
+			fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, ProgramError>
+			where
+				F: Fn(&Self) -> bool,
+			{
+				if !condition(self) {
+					log!($label);
+					log_caller();
+					return Err(ProgramError::InvalidAccountData);
+				}
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_mut_msg<F>(
+				&mut self,
+				condition: F,
+				log: &str,
+			) -> Result<&mut Self, ProgramError>
+			where
+				F: Fn(&Self) -> bool,
+			{
+				match crate::assert(condition(self), ProgramError::InvalidAccountData, log) {
+					Err(err) => Err(err),
+					Ok(()) => Ok(self),
+				}
+			}
 		}
-
-		log!("Mint account data is invalid");
-		log_caller();
-
-		Err(ProgramError::InvalidAccountData)
-	}
-
-	#[track_caller]
-	fn assert_msg<F>(&self, condition: F, log: &str) -> Result<&Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-	{
-		match crate::assert(condition(self), ProgramError::InvalidAccountData, log) {
-			Err(err) => Err(err),
-			Ok(()) => Ok(self),
-		}
-	}
-
-	#[track_caller]
-	fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-	{
-		if condition(self) {
-			return Ok(self);
-		}
-
-		log!("Mint account data is invalid");
-		log_caller();
-
-		Err(ProgramError::InvalidAccountData)
-	}
-
-	#[track_caller]
-	fn assert_mut_msg<F>(&mut self, condition: F, log: &str) -> Result<&mut Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-	{
-		match crate::assert(condition(self), ProgramError::InvalidAccountData, log) {
-			Err(err) => Err(err),
-			Ok(()) => Ok(self),
-		}
-	}
+	};
 }
 
 #[cfg(feature = "token")]
-impl AccountValidation for crate::token::state::TokenAccount {
-	#[track_caller]
-	fn assert<F>(&self, condition: F) -> Result<&Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-	{
-		if !condition(self) {
-			log!("Token account data is invalid");
-			log_caller();
-			return Err(ProgramError::InvalidAccountData);
-		}
-		Ok(self)
-	}
-
-	#[track_caller]
-	fn assert_msg<F>(&self, condition: F, log: &str) -> Result<&Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-	{
-		match crate::assert(condition(self), ProgramError::InvalidAccountData, log) {
-			Err(err) => Err(err),
-			Ok(()) => Ok(self),
-		}
-	}
-
-	#[track_caller]
-	fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-	{
-		if !condition(self) {
-			log!("Token account data is invalid");
-			log_caller();
-
-			return Err(ProgramError::InvalidAccountData);
-		}
-
-		Ok(self)
-	}
-
-	#[track_caller]
-	fn assert_mut_msg<F>(&mut self, condition: F, log: &str) -> Result<&mut Self, ProgramError>
-	where
-		F: Fn(&Self) -> bool,
-	{
-		match crate::assert(condition(self), ProgramError::InvalidAccountData, log) {
-			Err(err) => Err(err),
-			Ok(()) => Ok(self),
-		}
-	}
-}
+impl_account_validation!(
+	crate::token_2022::state::Mint,
+	"Mint account data is invalid"
+);
+#[cfg(feature = "token")]
+impl_account_validation!(
+	crate::token::state::TokenAccount,
+	"Token account data is invalid"
+);
 
 #[cfg(feature = "token")]
 impl AsTokenAccount for AccountView {
@@ -576,12 +538,18 @@ impl<'a> LamportTransfer<'a> for AccountView {
 }
 
 impl<'a> CloseAccountWithRecipient<'a> for AccountView {
+	#[track_caller]
 	fn close_with_recipient(&'a self, recipient: &'a AccountView) -> ProgramResult {
-		// SECURITY: unchecked addition — overflow is impossible in practice
-		// because the total supply of lamports fits in a u64, but an overflow
-		// here would be caught by the runtime's lamport balance check at the
-		// end of the transaction.
-		recipient.set_lamports(recipient.lamports() + self.lamports());
+		let new_balance = recipient
+			.lamports()
+			.checked_add(self.lamports())
+			.ok_or_else(|| {
+				log!("Could not close account: lamport overflow");
+				log_caller();
+				ProgramError::ArithmeticOverflow
+			})?;
+		recipient.set_lamports(new_balance);
+		self.set_lamports(0);
 		self.resize(0)?;
 		self.close()
 	}

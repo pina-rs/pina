@@ -7,7 +7,8 @@ fn combine_seeds_with_bump_basic() {
 	let seed_b: &[u8] = &[1, 2, 3];
 	let bump = [42u8; 1];
 
-	let result = combine_seeds_with_bump(&[seed_a, seed_b], &bump);
+	let result = combine_seeds_with_bump(&[seed_a, seed_b], &bump)
+		.unwrap_or_else(|e| panic!("failed: {e:?}"));
 
 	assert_eq!(&*result[0], b"escrow");
 	assert_eq!(&*result[1], &[1, 2, 3]);
@@ -23,7 +24,8 @@ fn combine_seeds_with_bump_single_seed() {
 	let seed: &[u8] = b"hello";
 	let bump = [0u8; 1];
 
-	let result = combine_seeds_with_bump(&[seed], &bump);
+	let result =
+		combine_seeds_with_bump(&[seed], &bump).unwrap_or_else(|e| panic!("failed: {e:?}"));
 
 	assert_eq!(&*result[0], b"hello");
 	assert_eq!(&*result[1], &[0]);
@@ -36,7 +38,7 @@ fn combine_seeds_with_bump_single_seed() {
 fn combine_seeds_with_bump_empty_seeds() {
 	let bump = [255u8; 1];
 
-	let result = combine_seeds_with_bump(&[], &bump);
+	let result = combine_seeds_with_bump(&[], &bump).unwrap_or_else(|e| panic!("failed: {e:?}"));
 
 	assert_eq!(&*result[0], &[255]);
 	for slot in &result[1..] {
@@ -50,7 +52,7 @@ fn combine_seeds_with_bump_at_max_minus_one() {
 	let seeds: Vec<&[u8]> = (0..MAX_SEEDS - 1).map(|_| &[1u8][..]).collect();
 	let bump = [7u8; 1];
 
-	let result = combine_seeds_with_bump(&seeds, &bump);
+	let result = combine_seeds_with_bump(&seeds, &bump).unwrap_or_else(|e| panic!("failed: {e:?}"));
 
 	for (i, slot) in result.iter().enumerate().take(MAX_SEEDS - 1) {
 		assert_eq!(&**slot, &[1u8], "slot {i} should be the original seed");
@@ -58,6 +60,12 @@ fn combine_seeds_with_bump_at_max_minus_one() {
 	assert_eq!(&*result[MAX_SEEDS - 1], &[7]);
 }
 
-// NOTE: a `#[should_panic]` test for `seeds.len() >= MAX_SEEDS` is omitted
-// because the pinocchio `no_std` runtime abort cannot be caught by the standard
-// test harness.
+#[test]
+fn combine_seeds_with_bump_too_many_seeds_fails() {
+	// MAX_SEEDS seeds leaves no room for the bump — should return Err.
+	let seeds: Vec<&[u8]> = (0..MAX_SEEDS).map(|_| &[1u8][..]).collect();
+	let bump = [7u8; 1];
+
+	let result = combine_seeds_with_bump(&seeds, &bump);
+	assert!(result.is_err());
+}
