@@ -2,4 +2,4 @@ disallowed-methods = [
 	{ path = "std::result::Result::expect", reason = "hides errors; use `unwrap_or_else(|error| panic!(...))`" },
 ]
 
-msrv = "1.84.1"
+msrv = "1.86.0"
