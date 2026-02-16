@@ -90,19 +90,16 @@ pub fn allocate_account<'a>(
 /// Appends a single-byte bump seed to the provided seeds array, returning
 /// a fixed-size `[Seed; MAX_SEEDS]` suitable for PDA signing.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if `seeds.len() >= MAX_SEEDS`. On-chain panics are fatal and will
-/// abort the transaction.
-// SECURITY: this function panics rather than returning a Result. Callers
-// must ensure seed count is within bounds before calling.
-// TODO: consider returning `Result` instead of panicking to give callers
-// the option of a graceful error path.
-pub fn combine_seeds_with_bump<'a>(seeds: &[&'a [u8]], bump: &'a [u8; 1]) -> [Seed<'a>; MAX_SEEDS] {
-	assert!(
-		seeds.len() < MAX_SEEDS,
-		"number of seeds must be less than MAX_SEEDS"
-	);
+/// Returns `ProgramError::InvalidSeeds` if `seeds.len() >= MAX_SEEDS`.
+pub fn combine_seeds_with_bump<'a>(
+	seeds: &[&'a [u8]],
+	bump: &'a [u8; 1],
+) -> Result<[Seed<'a>; MAX_SEEDS], ProgramError> {
+	if seeds.len() >= MAX_SEEDS {
+		return Err(ProgramError::InvalidSeeds);
+	}
 
 	// Create our backing storage on the stack, initialized with empty seeds.
 	let mut storage: [Seed<'a>; MAX_SEEDS] = core::array::from_fn(|_| Seed::from(&[] as &[u8]));
@@ -116,7 +113,7 @@ pub fn combine_seeds_with_bump<'a>(seeds: &[&'a [u8]], bump: &'a [u8; 1]) -> [Se
 	let seeds_len = seeds.len();
 	storage[seeds_len] = Seed::from(bump.as_slice());
 
-	storage
+	Ok(storage)
 }
 
 /// Allocates space for a new program account with user-provided bump.
@@ -139,7 +136,7 @@ pub fn allocate_account_with_bump<'a>(
 ) -> ProgramResult {
 	// Combine seeds
 	let bump_array = [bump];
-	let combined_seeds = combine_seeds_with_bump(seeds, &bump_array);
+	let combined_seeds = combine_seeds_with_bump(seeds, &bump_array)?;
 	let seeds_slice = &combined_seeds[..=seeds.len()];
 	let signer = Signer::from(seeds_slice);
 	let signers = &[signer];
