@@ -72,15 +72,15 @@ fn collect_calls(body: &rustc_hir::Body<'_>) -> Vec<CallInfo> {
 fn visit_expr(expr: &Expr<'_>, calls: &mut Vec<CallInfo>) {
 	match &expr.kind {
 		ExprKind::MethodCall(seg, receiver, args, _) => {
+			visit_expr(receiver, calls);
+			for arg in *args {
+				visit_expr(arg, calls);
+			}
 			calls.push(CallInfo {
 				span: expr.span,
 				method: seg.ident.name.as_str().to_string(),
 				receiver: receiver_ident(receiver),
 			});
-			visit_expr(receiver, calls);
-			for arg in *args {
-				visit_expr(arg, calls);
-			}
 		}
 		ExprKind::Call(callee, args) => {
 			visit_expr(callee, calls);

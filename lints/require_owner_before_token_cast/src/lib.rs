@@ -77,15 +77,15 @@ fn collect_method_calls(body: &rustc_hir::Body<'_>) -> Vec<CallInfo> {
 fn collect_from_expr(expr: &Expr<'_>, calls: &mut Vec<CallInfo>) {
 	match &expr.kind {
 		ExprKind::MethodCall(path_segment, receiver, args, _) => {
+			collect_from_expr(receiver, calls);
+			for arg in *args {
+				collect_from_expr(arg, calls);
+			}
 			calls.push(CallInfo {
 				span: expr.span,
 				method: path_segment.ident.name.as_str().to_string(),
 				receiver: receiver_ident_name(receiver),
 			});
-			collect_from_expr(receiver, calls);
-			for arg in *args {
-				collect_from_expr(arg, calls);
-			}
 		}
 		ExprKind::Block(block, _) => {
 			for stmt in block.stmts {
@@ -163,6 +163,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireOwnerBeforeTokenCast {
 
 			let has_owner_check = calls[..i].iter().any(|prev| {
 				OWNER_CHECK_METHODS.contains(&prev.method.as_str())
+					&& prev.receiver.is_some()
 					&& prev.receiver == info.receiver
 			});
 

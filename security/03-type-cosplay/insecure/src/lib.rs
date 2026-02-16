@@ -57,7 +57,7 @@ impl<'a> ProcessAccountInfos<'a> for AdminActionAccounts<'a> {
 		self.authority.assert_signer()?;
 		self.config.assert_owner(&ID)?;
 
-		// BUG: No discriminator check! Uses raw bytemuck cast.
+		// BUG: No discriminator check! Uses raw bytemuck cast for both read and write.
 		// An attacker can pass a UserProfile account (same size) as AdminConfig.
 		// Since UserProfile.authority == attacker's address, the authority check
 		// passes and they gain admin access.
@@ -67,7 +67,9 @@ impl<'a> ProcessAccountInfos<'a> for AdminActionAccounts<'a> {
 
 		self.authority.assert_address(&config.authority)?;
 
-		let config_mut = self.config.as_account_mut::<AdminConfig>(&ID)?;
+		let mut data_mut = self.config.try_borrow_mut()?;
+		let config_mut: &mut AdminConfig = bytemuck::try_from_bytes_mut(&mut data_mut)
+			.or(Err(ProgramError::InvalidAccountData))?;
 		config_mut.fee = args.new_fee;
 
 		Ok(())

@@ -18,7 +18,7 @@ An attacker can:
 
 ## Secure Example
 
-See [`secure/src/lib.rs`](secure/src/lib.rs). The program calls `assert_sysvar(&Rent::ID)?` which checks both the owner (Sysvar program) and the address.
+See [`secure/src/lib.rs`](secure/src/lib.rs). The program calls `assert_sysvar(&RENT_SYSVAR_ID)?` which checks both the owner (Sysvar program) and the address.
 
 ## Pina API Reference
 
