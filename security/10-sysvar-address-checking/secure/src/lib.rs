@@ -5,11 +5,7 @@
 
 #![no_std]
 
-#[cfg(all(
-	not(any(target_os = "solana", target_arch = "bpf")),
-	not(feature = "bpf-entrypoint"),
-	not(test)
-))]
+#[cfg(all(not(any(target_os = "solana", target_arch = "bpf")), not(test)))]
 extern crate std;
 
 use pina::*;

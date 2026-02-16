@@ -5,10 +5,7 @@ edition.workspace = true
 publish = false
 
 [lib]
-crate-type = ["cdylib", "lib"]
-
-[features]
-bpf-entrypoint = []
+crate-type = ["lib"]
 
 [dependencies]
 pina = { workspace = true, features = ["logs", "derive", "token"] }
