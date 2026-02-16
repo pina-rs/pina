@@ -8,6 +8,33 @@ members = [
 	"examples/escrow_program",
 	"examples/hello_solana",
 	"examples/transfer_sol",
+	"security/00-signer-authorization/secure",
+	"security/01-account-data-matching/secure",
+	"security/02-owner-checks/secure",
+	"security/03-type-cosplay/secure",
+	"security/04-initialization/secure",
+	"security/05-arbitrary-cpi/secure",
+	"security/06-duplicate-mutable-accounts/secure",
+	"security/07-bump-seed-canonicalization/secure",
+	"security/08-pda-sharing/secure",
+	"security/09-closing-accounts/secure",
+	"security/10-sysvar-address-checking/secure",
+]
+exclude = [
+	"security/00-signer-authorization/insecure",
+	"security/01-account-data-matching/insecure",
+	"security/02-owner-checks/insecure",
+	"security/03-type-cosplay/insecure",
+	"security/04-initialization/insecure",
+	"security/05-arbitrary-cpi/insecure",
+	"security/06-duplicate-mutable-accounts/insecure",
+	"security/07-bump-seed-canonicalization/insecure",
+	"security/08-pda-sharing/insecure",
+	"security/09-closing-accounts/insecure",
+	"security/10-sysvar-address-checking/insecure",
+	"lints/require_owner_before_token_cast",
+	"lints/require_empty_before_init",
+	"lints/require_program_check_before_cpi",
 ]
 
 [workspace.package]
@@ -46,6 +73,13 @@ wasm_client_solana = { default-features = false, version = "^0.10" }
 pina = { default-features = false, path = "crates/pina", version = "0.2.0" }
 pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.2.0" }
 pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.2.0" }
+
+[workspace.metadata.dylint]
+libraries = [
+	{ path = "lints/require_owner_before_token_cast" },
+	{ path = "lints/require_empty_before_init" },
+	{ path = "lints/require_program_check_before_cpi" },
+]
 
 [workspace.metadata.bin]
 cargo-dylint = { version = "5.0.0" }

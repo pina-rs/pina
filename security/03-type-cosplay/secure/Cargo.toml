@@ -1,0 +1,17 @@
+[package]
+name = "security_03_type_cosplay_secure"
+version = "0.0.0"
+edition.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[features]
+bpf-entrypoint = []
+
+[dependencies]
+pina = { workspace = true, features = ["logs", "derive"] }
+
+[lints]
+workspace = true
