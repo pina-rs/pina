@@ -10,8 +10,16 @@ use crate::ProgramError;
 /// Validates the discriminator and reinterprets the byte slice as `&Self`
 /// (or `&mut Self`) without copying. The blanket implementation covers all
 /// types that implement both [`HasDiscriminator`] and [`Pod`].
+///
+/// **Note:** This trait is used by `#[account]` types and by
+/// [`AsAccount::as_account`]. The `#[instruction]` macro generates its own
+/// `try_from_bytes` that does **not** check the discriminator — instruction
+/// data is already validated by [`parse_instruction`](crate::parse_instruction)
+/// at the entrypoint level, so a second discriminator check would be redundant.
 pub trait AccountDeserialize {
+	/// Validate the discriminator and reinterpret `data` as `&Self`.
 	fn try_from_bytes(data: &[u8]) -> Result<&Self, ProgramError>;
+	/// Validate the discriminator and reinterpret `data` as `&mut Self`.
 	fn try_from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, ProgramError>;
 }
 
@@ -140,7 +148,7 @@ macro_rules! primitive_into_discriminator {
 
 			fn write_discriminator(&self, bytes: &mut [u8]) {
 				assert!(bytes.len() >= Self::BYTES);
-				bytes.copy_from_slice(&self.to_le_bytes());
+				bytes[..Self::BYTES].copy_from_slice(&self.to_le_bytes());
 			}
 
 			fn matches_discriminator(&self, bytes: &[u8]) -> bool {
@@ -282,10 +290,16 @@ pub trait HasDiscriminator: Sized {
 /// 2. Discriminator byte check
 /// 3. Checked bytemuck conversion of account data to `&T` or `&mut T`.
 pub trait AsAccount {
+	/// Validate ownership and deserialize the account data into an immutable
+	/// reference of type `T`. Returns `InvalidAccountData` if the
+	/// discriminator doesn't match or the data is the wrong size.
 	fn as_account<T>(&self, program_id: &Address) -> Result<&T, ProgramError>
 	where
 		T: AccountDeserialize + HasDiscriminator + Pod;
 
+	/// Validate ownership and deserialize the account data into a mutable
+	/// reference of type `T`. The Solana runtime guarantees exclusive access
+	/// when the mutable borrow succeeds.
 	#[allow(clippy::mut_from_ref)]
 	fn as_account_mut<T>(&self, program_id: &Address) -> Result<&mut T, ProgramError>
 	where
@@ -294,14 +308,24 @@ pub trait AsAccount {
 
 /// Convenience methods for interpreting `AccountView` as SPL token account
 /// types.
+///
+/// Callers should verify account ownership before trusting the returned
+/// reference, since these methods perform layout casts without owner checks.
 #[cfg(feature = "token")]
 pub trait AsTokenAccount {
+	/// Interpret the account data as an SPL Token mint.
 	fn as_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError>;
+	/// Interpret the account data as an SPL Token account.
 	fn as_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError>;
+	/// Interpret the account data as a Token-2022 mint.
 	fn as_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError>;
+	/// Interpret the account data as a Token-2022 token account.
 	fn as_token_2022_account(
 		&self,
 	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError>;
+	/// Interpret the account data as an associated token account, verifying
+	/// the address matches the derived ATA for the given wallet, mint, and
+	/// token program.
 	fn as_associated_token_account(
 		&self,
 		owner: &Address,
@@ -311,23 +335,25 @@ pub trait AsTokenAccount {
 }
 
 /// Direct lamport transfer between accounts.
+///
+/// `send` directly manipulates lamport balances (no CPI). This only works
+/// when the sender is owned by the executing program. `collect` uses a system
+/// program CPI transfer and works with any signer account.
 pub trait LamportTransfer<'a> {
+	/// Debit `lamports` from this account and credit them to `to` by directly
+	/// mutating both accounts' lamport balances. The sender must be owned by
+	/// the executing program.
 	fn send(&'a self, lamports: u64, to: &'a AccountView) -> ProgramResult;
+	/// Transfer `lamports` from the `from` account to this account via a
+	/// system program CPI. The `from` account must be a signer.
 	fn collect(&'a self, lamports: u64, from: &'a AccountView) -> ProgramResult;
 }
 
+/// Close an account and reclaim its rent lamports.
 pub trait CloseAccountWithRecipient<'a> {
-	/// Close the account and transfer all rent lamports to the recipient.
-	/// The account must be writable to be closed.
+	/// Close the account, transfer all remaining lamports to the recipient,
+	/// and zero the account data.
 	fn close_with_recipient(&'a self, recipient: &'a AccountView) -> ProgramResult;
-}
-
-/// Types that can emit themselves as a log or return-data message.
-pub trait Loggable {
-	/// Emit a log message.
-	fn log(&self);
-	/// Emit via `sol_set_return_data`.
-	fn log_return(&self);
 }
 
 /// Destructures a slice of `AccountView` into a named accounts struct.
