@@ -1,0 +1,12 @@
+[package]
+name = "security_03_type_cosplay_insecure"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+bytemuck = { version = "1", features = ["derive"] }
+pina = { path = "../../../crates/pina", features = ["logs", "derive"] }

@@ -1,0 +1,11 @@
+[package]
+name = "security_02_owner_checks_insecure"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+pina = { path = "../../../crates/pina", features = ["logs", "derive", "token"] }

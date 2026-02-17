@@ -1834,6 +1834,83 @@ dependencies = [
 ]
 
 [[package]]
+name = "security_00_signer_authorization_secure"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "security_01_account_data_matching_secure"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "security_02_owner_checks_secure"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "security_03_type_cosplay_secure"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "security_04_initialization_secure"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "security_05_arbitrary_cpi_secure"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "security_06_duplicate_mutable_accounts_secure"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "security_07_bump_seed_canonicalization_secure"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "security_08_pda_sharing_secure"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "security_09_closing_accounts_secure"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "security_10_sysvar_address_checking_secure"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "semver"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"

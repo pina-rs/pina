@@ -403,7 +403,35 @@ cargo nextest run  # Faster parallel test execution
 
 ## Examples
 
-See the [escrow program](examples/escrow_program) for a complete reference implementation of a token escrow using pina.
+| Example                                       | Description                                        |
+| --------------------------------------------- | -------------------------------------------------- |
+| [`hello_solana`](examples/hello_solana)       | Minimal program — entrypoint, accounts, logging    |
+| [`counter_program`](examples/counter_program) | PDA state management with initialize and increment |
+| [`transfer_sol`](examples/transfer_sol)       | CPI and direct lamport transfers                   |
+| [`escrow_program`](examples/escrow_program)   | Full token escrow with SPL token operations        |
+
+## Security
+
+Pina provides strong built-in protections against common Solana vulnerabilities through its validation chain API, discriminator system, and CPI helpers. Follow these best practices:
+
+- **Always call `assert_signer()`** before trusting authority accounts
+- **Always call `assert_owner()` / `assert_owners()`** before `as_token_*()` methods — these perform layout casts without owner verification
+- **Always call `assert_empty()`** before account initialization to prevent reinitialization attacks
+- **Always verify program accounts** with `assert_address()` / `assert_program()` before CPI invocations
+- **Use `assert_type::<T>()`** to prevent type cosplay — it checks discriminator, owner, and data size in one call
+- **Use `close_with_recipient()` with `zeroed()`** to safely close accounts and prevent revival attacks
+- **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
+- **Namespace PDA seeds** with type-specific prefixes (e.g. `b"config"`, `b"vault"`) to prevent PDA sharing across account types
+
+See the [security guide](security/) for detailed examples of all 11 common Solana attack categories with vulnerable and secure code patterns.
+
+### Custom lints
+
+Enable pina's custom dylint lints to catch common security mistakes at compile time:
+
+- `require_owner_before_token_cast` — warns when `as_token_*()` is called without a preceding `assert_owner()`
+- `require_empty_before_init` — warns when `create_program_account*()` is called without a preceding `assert_empty()`
+- `require_program_check_before_cpi` — warns when `.invoke()` / `.invoke_signed()` is called without program address verification
 
 ## Contributing
 

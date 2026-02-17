@@ -1,0 +1,17 @@
+[package]
+name = "require_empty_before_init"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+dylint_linting = "5.0.0"
+
+[dev-dependencies]
+dylint_testing = "5.0.0"
+
+[package.metadata.rust-analyzer]
+rustc_private = true
