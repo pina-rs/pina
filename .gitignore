@@ -1,5 +1,9 @@
 /target
 /programs/target
+**/lints/**/target
+**/lints/**/Cargo.lock
+**/security/**/target
+**/security/**/Cargo.lock
 /.helix
 /result
 /.direnv
