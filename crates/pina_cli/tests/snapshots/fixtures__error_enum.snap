@@ -1,0 +1,40 @@
+---
+source: crates/pina_cli/tests/fixtures.rs
+expression: idl
+---
+{
+  "kind": "rootNode",
+  "standard": "codama",
+  "version": "1.0.0",
+  "program": {
+    "kind": "programNode",
+    "name": "errorEnum",
+    "publicKey": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+    "version": "",
+    "accounts": [],
+    "instructions": [],
+    "definedTypes": [],
+    "pdas": [],
+    "errors": [
+      {
+        "kind": "errorNode",
+        "name": "invalidState",
+        "code": 6000,
+        "message": "The account state is invalid for this operation.",
+        "docs": [
+          "The account state is invalid for this operation."
+        ]
+      },
+      {
+        "kind": "errorNode",
+        "name": "missingSigner",
+        "code": 6001,
+        "message": "The instruction requires a signer that was not provided.",
+        "docs": [
+          "The instruction requires a signer that was not provided."
+        ]
+      }
+    ]
+  },
+  "additionalPrograms": []
+}

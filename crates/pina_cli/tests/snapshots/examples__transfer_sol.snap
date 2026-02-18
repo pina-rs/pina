@@ -1,0 +1,168 @@
+---
+source: crates/pina_cli/tests/examples.rs
+expression: idl
+---
+{
+  "kind": "rootNode",
+  "standard": "codama",
+  "version": "1.0.0",
+  "program": {
+    "kind": "programNode",
+    "name": "transferSol",
+    "publicKey": "BuXKn8EiVMKF8zYThuea3xhLq3jUHTTwDDLfCoehq7WG",
+    "version": "",
+    "accounts": [],
+    "instructions": [
+      {
+        "kind": "instructionNode",
+        "name": "cpiTransfer",
+        "docs": [
+          "Instruction data for `CpiTransfer`.",
+          "",
+          "Layout:",
+          "```text",
+          "| offset | size | field         |",
+          "|--------|------|---------------|",
+          "| 0      | 1    | discriminator |",
+          "| 1      | 8    | amount (u64)  |",
+          "```"
+        ],
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "sender",
+            "isWritable": true,
+            "isSigner": true,
+            "docs": [
+              "The sender. Must be a signer and writable (lamports will be debited)."
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "recipient",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "The recipient. Must be writable (lamports will be credited)."
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "systemProgram",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "The system program."
+            ],
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "11111111111111111111111111111111"
+            }
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "amount",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u64",
+              "endian": "le"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "kind": "instructionNode",
+        "name": "directTransfer",
+        "docs": [
+          "Instruction data for `DirectTransfer`.",
+          "",
+          "Same layout as `CpiTransferInstruction` but with a different discriminator",
+          "byte."
+        ],
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "sender",
+            "isWritable": true,
+            "isSigner": true,
+            "docs": [
+              "The sender. Must be owned by this program, writable, and a signer."
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "recipient",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "The recipient. Must be writable."
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "amount",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u64",
+              "endian": "le"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 1
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "definedTypes": [],
+    "pdas": [],
+    "errors": [
+      {
+        "kind": "errorNode",
+        "name": "insufficientFunds",
+        "code": 0,
+        "message": "The sender does not have enough lamports for the transfer.",
+        "docs": [
+          "The sender does not have enough lamports for the transfer."
+        ]
+      }
+    ]
+  },
+  "additionalPrograms": []
+}

@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
 	"crates/pina",
+	"crates/pina_cli",
 	"crates/pina_macros",
 	"crates/pina_sdk_ids",
 	"examples/counter_program",
@@ -48,8 +49,11 @@ rust-version = "1.86.0"
 
 [workspace.dependencies]
 bytemuck = { default-features = false, version = "^1" }
+clap = { default-features = false, version = "^4", features = ["derive", "std"] }
+codama-nodes = { default-features = false, version = "^0.7" }
 darling = { default-features = false, version = "^0.21" }
 heck = { default-features = false, version = "^0.5" }
+insta = { default-features = false, version = "^1" }
 mollusk-svm = { default-features = false, version = "^0.8" }
 paste = { default-features = false, version = "^1" }
 pinocchio = { default-features = false, version = "^0.10", features = ["cpi"] }
@@ -60,6 +64,8 @@ pinocchio-token = { default-features = false, version = "^0.5" }
 pinocchio-token-2022 = { default-features = false, version = "^0.2" }
 proc-macro2 = { default-features = false, version = "^1" }
 quote = { default-features = false, version = "^1" }
+serde = { default-features = false, version = "^1" }
+serde_json = { default-features = false, version = "^1", features = ["std"] }
 solana-address = { default-features = false, version = "^2.0", features = ["bytemuck", "decode"] }
 solana-program-log = { default-features = false, version = "^1.1" }
 syn = { default-features = false, version = "^2", features = ["full"] }
@@ -67,6 +73,7 @@ test_utils_solana = { default-features = false, version = "^0.8" }
 thiserror = { default-features = false, version = "^2" }
 tokio = { default-features = false, version = "^1" }
 typed-builder = { default-features = false, version = "^0.23" }
+walkdir = { default-features = false, version = "^2" }
 wasm_client_solana = { default-features = false, version = "^0.10" }
 
 # publishable crates
