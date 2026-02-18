@@ -1,0 +1,240 @@
+---
+source: crates/pina_cli/tests/examples.rs
+expression: idl
+---
+{
+  "kind": "rootNode",
+  "standard": "codama",
+  "version": "1.0.0",
+  "program": {
+    "kind": "programNode",
+    "name": "counterProgram",
+    "publicKey": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+    "version": "",
+    "accounts": [
+      {
+        "kind": "accountNode",
+        "name": "counterState",
+        "docs": [
+          "On-chain counter state.",
+          "",
+          "The `#[account]` macro generates:",
+          "- A discriminator field (`CounterAccountType::CounterState`) as the first",
+          "byte.",
+          "- `Pod` + `Zeroable` derives for zero-copy (de)serialization.",
+          "- `HasDiscriminator` linking this struct to",
+          "`CounterAccountType::CounterState`.",
+          "- `TypedBuilder` for ergonomic construction.",
+          "",
+          "Layout (10 bytes total):",
+          "```text",
+          "| offset | size | field         |",
+          "|--------|------|---------------|",
+          "| 0      | 1    | discriminator |",
+          "| 1      | 1    | bump          |",
+          "| 2      | 8    | count (PodU64)|",
+          "```"
+        ],
+        "data": {
+          "kind": "structTypeNode",
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "bump",
+              "docs": [
+                "The PDA bump seed, stored on-chain so we don't need to re-derive it."
+              ],
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "count",
+              "docs": [
+                "The current counter value. Uses `PodU64` (a little-endian `u64`",
+                "wrapper) for safe alignment in `#[repr(C)]` structs."
+              ],
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u64",
+                "endian": "le"
+              }
+            }
+          ]
+        },
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 1
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "instructions": [
+      {
+        "kind": "instructionNode",
+        "name": "initialize",
+        "docs": [
+          "Instruction data for `Initialize`.",
+          "",
+          "Contains the PDA bump seed so the client can pass a pre-computed bump",
+          "(avoids the cost of `find_program_address` on-chain)."
+        ],
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "authority",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "The wallet creating the counter. Pays for account creation and becomes",
+              "the authority whose address seeds the PDA."
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "counter",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "The counter PDA account (must be empty — not yet created)."
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "systemProgram",
+            "isWritable": false,
+            "isSigner": false,
+            "docs": [
+              "The system program, required for `CreateAccount` CPI."
+            ],
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "11111111111111111111111111111111"
+            }
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "bump",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "kind": "instructionNode",
+        "name": "increment",
+        "docs": [
+          "Instruction data for `Increment`. No extra payload beyond the",
+          "discriminator byte."
+        ],
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "authority",
+            "isWritable": false,
+            "isSigner": true,
+            "docs": [
+              "The counter's authority. Must sign to prove ownership."
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "counter",
+            "isWritable": true,
+            "isSigner": false,
+            "docs": [
+              "The counter PDA account (must already exist and be writable)."
+            ]
+          }
+        ],
+        "arguments": [],
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 1
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "definedTypes": [],
+    "pdas": [
+      {
+        "kind": "pdaNode",
+        "name": "counter",
+        "seeds": [
+          {
+            "kind": "constantPdaSeedNode",
+            "type": {
+              "kind": "stringTypeNode",
+              "encoding": "utf8"
+            },
+            "value": {
+              "kind": "stringValueNode",
+              "string": "counter"
+            }
+          },
+          {
+            "kind": "variablePdaSeedNode",
+            "name": "authority",
+            "type": {
+              "kind": "publicKeyTypeNode"
+            }
+          }
+        ]
+      }
+    ],
+    "errors": []
+  },
+  "additionalPrograms": []
+}

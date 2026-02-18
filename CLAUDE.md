@@ -166,6 +166,14 @@ Detailed description of the change.
 
 A single changeset file can reference multiple packages. Always run `dprint fmt .changeset/* --allow-no-files` after creating changeset files.
 
+## Git & PR Workflow
+
+- Create a dedicated branch for the change before committing.
+- Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
+- Push the branch and open a pull request for review.
+- After review, apply any requested fixes (including breaking-change fixes) on the same branch.
+- Merge only after approvals are complete.
+
 ## Cargo Aliases
 
 Defined in `.cargo/config.toml` — these proxy to `cargo-run-bin`:

@@ -1,0 +1,31 @@
+[package]
+name = "pina_cli"
+version = "0.1.0"
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme = "readme.md"
+repository.workspace = true
+description = "CLI tool for Pina Solana programs (IDL generation and more)"
+
+[[bin]]
+name = "pina"
+path = "src/main.rs"
+
+[dependencies]
+clap = { workspace = true }
+codama-nodes = { workspace = true }
+heck = { workspace = true, default-features = true }
+proc-macro2 = { workspace = true, default-features = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+syn = { workspace = true, default-features = true, features = ["full", "extra-traits", "visit"] }
+thiserror = { workspace = true, default-features = true }
+walkdir = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true, features = ["json"] }
+
+[lints]
+workspace = true
