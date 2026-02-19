@@ -435,6 +435,8 @@ macro_rules! impl_account_validation {
 }
 
 #[cfg(feature = "token")]
+impl_account_validation!(crate::token::state::Mint, "Mint account data is invalid");
+#[cfg(feature = "token")]
 impl_account_validation!(
 	crate::token_2022::state::Mint,
 	"Mint account data is invalid"
@@ -442,6 +444,11 @@ impl_account_validation!(
 #[cfg(feature = "token")]
 impl_account_validation!(
 	crate::token::state::TokenAccount,
+	"Token account data is invalid"
+);
+#[cfg(feature = "token")]
+impl_account_validation!(
+	crate::token_2022::state::TokenAccount,
 	"Token account data is invalid"
 );
 

@@ -35,6 +35,10 @@ jobs:
         run: lint:format
         shell: devenv shell -c -- bash -e {0}
 
+      - name: verify docs
+        run: verify:docs
+        shell: devenv shell -c -- bash -e {0}
+
   test:
     timeout-minutes: 60
     runs-on: blacksmith-2vcpu-ubuntu-2404
