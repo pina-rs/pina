@@ -36,8 +36,9 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 		self.depositor.assert_signer()?;
 
 		// SECURE: Verify ownership before deserialization.
-		self.token_account.assert_owners(&SPL_PROGRAM_IDS)?;
-		let token = self.token_account.as_token_account()?;
+		let token = self
+			.token_account
+			.as_token_account_checked_with_owners(&SPL_PROGRAM_IDS)?;
 		let balance = token.amount();
 
 		let amount: u64 = args.amount.into();

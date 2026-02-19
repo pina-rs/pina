@@ -39,6 +39,12 @@ pub struct WithdrawAccounts<'a> {
 	pub vault: &'a AccountView,
 }
 
+fn checked_withdraw_balance(current: u64, amount: u64) -> Result<u64, ProgramError> {
+	current
+		.checked_sub(amount)
+		.ok_or(ProgramError::InsufficientFunds)
+}
+
 impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
 		let args = WithdrawInstruction::try_from_bytes(data)?;
@@ -57,8 +63,25 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 		let vault = self.vault.as_account_mut::<VaultState>(&ID)?;
 		let current: u64 = vault.balance.into();
 		let amount: u64 = args.amount.into();
-		vault.balance = PodU64::from_primitive(current.saturating_sub(amount));
+		vault.balance = PodU64::from_primitive(checked_withdraw_balance(current, amount)?);
 
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn checked_withdraw_balance_rejects_insufficient_funds() {
+		let result = checked_withdraw_balance(5, 6);
+		assert_eq!(result, Err(ProgramError::InsufficientFunds));
+	}
+
+	#[test]
+	fn checked_withdraw_balance_allows_exact_balance() {
+		let result = checked_withdraw_balance(7, 7);
+		assert_eq!(result, Ok(0));
 	}
 }
