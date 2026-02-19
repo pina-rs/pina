@@ -98,7 +98,7 @@ impl_int_conversion!(PodU64, u64);
 /// `i64` type that can be used in Pods
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
 #[repr(transparent)]
-pub struct PodI64([u8; 8]);
+pub struct PodI64(pub [u8; 8]);
 impl_int_conversion!(PodI64, i64);
 
 /// `u128` type that can be used in Pods

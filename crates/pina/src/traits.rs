@@ -342,18 +342,49 @@ pub trait AsTokenAccount {
 
 	/// Interpret the account data as an SPL Token mint after verifying
 	/// the account is owned by the SPL Token program.
-	fn as_checked_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError>;
+	///
+	/// The default implementation delegates to
+	/// [`as_token_mint`](Self::as_token_mint) without an ownership check. The
+	/// [`AccountView`] implementation overrides this to assert that the
+	/// account is owned by the SPL Token program.
+	fn as_checked_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError> {
+		self.as_token_mint()
+	}
+
 	/// Interpret the account data as an SPL Token account after verifying
 	/// the account is owned by the SPL Token program.
-	fn as_checked_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError>;
+	///
+	/// The default implementation delegates to
+	/// [`as_token_account`](Self::as_token_account) without an ownership
+	/// check. The [`AccountView`] implementation overrides this to assert that
+	/// the account is owned by the SPL Token program.
+	fn as_checked_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError> {
+		self.as_token_account()
+	}
+
 	/// Interpret the account data as a Token-2022 mint after verifying
 	/// the account is owned by the Token-2022 program.
-	fn as_checked_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError>;
+	///
+	/// The default implementation delegates to
+	/// [`as_token_2022_mint`](Self::as_token_2022_mint) without an ownership
+	/// check. The [`AccountView`] implementation overrides this to assert that
+	/// the account is owned by the Token-2022 program.
+	fn as_checked_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError> {
+		self.as_token_2022_mint()
+	}
+
 	/// Interpret the account data as a Token-2022 token account after
 	/// verifying the account is owned by the Token-2022 program.
+	///
+	/// The default implementation delegates to
+	/// [`as_token_2022_account`](Self::as_token_2022_account) without an
+	/// ownership check. The [`AccountView`] implementation overrides this to
+	/// assert that the account is owned by the Token-2022 program.
 	fn as_checked_token_2022_account(
 		&self,
-	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError>;
+	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
+		self.as_token_2022_account()
+	}
 }
 
 /// Direct lamport transfer between accounts.
