@@ -21,6 +21,11 @@ pub fn try_find_program_address(seeds: &[&[u8]], program_id: &Address) -> Option
 /// Panics if no valid PDA exists.
 ///
 /// Prefer [`try_find_program_address`] for recoverable error handling.
+#[deprecated(
+	since = "0.3.0",
+	note = "use `try_find_program_address` instead, which returns `Option` and avoids panicking \
+	        on-chain"
+)]
 #[inline]
 pub fn find_program_address(seeds: &[&[u8]], program_id: &Address) -> (Address, u8) {
 	try_find_program_address(seeds, program_id)

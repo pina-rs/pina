@@ -190,10 +190,15 @@ pub fn allocate_account_with_bump<'a>(
 
 /// Closes an account and returns the remaining rent lamports to the provided
 /// recipient.
+///
+/// Zeroes account data before closing to prevent stale data from being read
+/// by subsequent transactions.
 #[inline(always)]
 pub fn close_account(account_info: &AccountView, recipient: &AccountView) -> ProgramResult {
 	// Return rent lamports.
 	account_info.send(account_info.lamports(), recipient)?;
+	// Zero account data before closing.
+	account_info.resize(0)?;
 	// Close the account.
 	account_info.close()
 }

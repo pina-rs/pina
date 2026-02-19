@@ -542,4 +542,70 @@ mod tests {
 		bytes[0] = 0;
 		assert!(!TestType::matches_discriminator(&bytes));
 	}
+
+	#[test]
+	fn discriminator_from_bytes_empty_slice_u8() {
+		let result = u8::discriminator_from_bytes(&[]);
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidInstructionData);
+	}
+
+	#[test]
+	fn discriminator_from_bytes_empty_slice_u16() {
+		let result = u16::discriminator_from_bytes(&[]);
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidInstructionData);
+
+		// Also too short (1 byte for a u16).
+		let result = u16::discriminator_from_bytes(&[0x01]);
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidInstructionData);
+	}
+
+	#[test]
+	fn discriminator_from_bytes_empty_slice_u32() {
+		let result = u32::discriminator_from_bytes(&[]);
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidInstructionData);
+
+		// 3 bytes is too short for u32.
+		let result = u32::discriminator_from_bytes(&[0, 0, 0]);
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidInstructionData);
+	}
+
+	#[test]
+	fn discriminator_from_bytes_empty_slice_u64() {
+		let result = u64::discriminator_from_bytes(&[]);
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidInstructionData);
+
+		// 7 bytes is too short for u64.
+		let result = u64::discriminator_from_bytes(&[0; 7]);
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidInstructionData);
+	}
+
+	#[test]
+	fn matches_discriminator_short_data() {
+		// Should return false (not panic) for short data.
+		let val_u8: u8 = 42;
+		assert!(!val_u8.matches_discriminator(&[]));
+
+		let val_u16: u16 = 0x0102;
+		assert!(!val_u16.matches_discriminator(&[]));
+		assert!(!val_u16.matches_discriminator(&[0x02]));
+
+		let val_u32: u32 = 0xDEAD_BEEF;
+		assert!(!val_u32.matches_discriminator(&[]));
+		assert!(!val_u32.matches_discriminator(&[0xEF, 0xBE]));
+
+		let val_u64: u64 = 1;
+		assert!(!val_u64.matches_discriminator(&[]));
+		assert!(!val_u64.matches_discriminator(&[1, 0, 0]));
+	}
+
+	#[test]
+	fn has_discriminator_matches_short_data() {
+		// HasDiscriminator::matches_discriminator delegates to the primitive
+		// and should also handle short data gracefully.
+		assert!(!TestType::matches_discriminator(&[]));
+	}
 }

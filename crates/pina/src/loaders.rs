@@ -348,9 +348,10 @@ impl AsAccount for AccountView {
 
 		// SAFETY: `try_borrow` returns a reference whose lifetime is tied to
 		// `self`. We create a raw-parts slice of exactly `size_of::<T>()` bytes
-		// from the same pointer. `T::try_from_bytes` then validates the
-		// discriminator and performs a bytemuck cast — no uninitialized memory is
-		// read.
+		// from the same pointer. The `assert_data_len` check above guarantees
+		// the account data is exactly `size_of::<T>()` bytes.
+		// `T::try_from_bytes` then validates the discriminator and performs a
+		// bytemuck cast.
 		unsafe { T::try_from_bytes(from_raw_parts(self.try_borrow()?.as_ptr(), size_of::<T>())) }
 	}
 
@@ -363,8 +364,9 @@ impl AsAccount for AccountView {
 		self.assert_data_len(size_of::<T>())?;
 
 		// SAFETY: Same reasoning as `as_account` above, but with a mutable
-		// borrow. The Solana runtime guarantees exclusive access when
-		// `try_borrow_mut` succeeds.
+		// borrow. The `assert_data_len` check above guarantees the account data
+		// is exactly `size_of::<T>()` bytes. The Solana runtime guarantees
+		// exclusive access when `try_borrow_mut` succeeds.
 		unsafe {
 			T::try_from_bytes_mut(from_raw_parts_mut(
 				self.try_borrow_mut()?.as_mut_ptr(),
