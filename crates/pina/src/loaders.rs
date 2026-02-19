@@ -660,8 +660,8 @@ impl<'a> CloseAccountWithRecipient<'a> for AccountView {
 			return Err(ProgramError::InvalidArgument);
 		}
 
-		let new_balance =
-			checked_close_balance(self.lamports(), recipient.lamports()).inspect_err(|_| {
+		let new_balance = checked_close_balance(self.lamports(), recipient.lamports())
+			.inspect_err(|_| {
 				log!("Could not close account: lamport overflow");
 				log_caller();
 			})?;
