@@ -77,17 +77,17 @@ impl_int_conversion!(PodU16, u16);
 pub struct PodI16(pub [u8; 2]);
 impl_int_conversion!(PodI16, i16);
 
-/// `i32` type that can be used in `Pod`s
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
-#[repr(transparent)]
-pub struct PodI32(pub [u8; 4]);
-impl_int_conversion!(PodI32, i32);
-
 /// `u32` type that can be used in `Pod`s
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct PodU32(pub [u8; 4]);
 impl_int_conversion!(PodU32, u32);
+
+/// `i32` type that can be used in `Pod`s
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
+#[repr(transparent)]
+pub struct PodI32(pub [u8; 4]);
+impl_int_conversion!(PodI32, i32);
 
 /// `u64` type that can be used in Pods
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]

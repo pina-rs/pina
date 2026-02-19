@@ -550,7 +550,7 @@ mod tests {
 
 		// Also too short (1 byte for a u16).
 		let result = u16::discriminator_from_bytes(&[0x01]);
-		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
 	}
 
 	#[test]
@@ -561,7 +561,7 @@ mod tests {
 
 		// 3 bytes is too short for u32.
 		let result = u32::discriminator_from_bytes(&[0, 0, 0]);
-		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
 	}
 
 	#[test]
@@ -572,7 +572,7 @@ mod tests {
 
 		// 7 bytes is too short for u64.
 		let result = u64::discriminator_from_bytes(&[0; 7]);
-		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
 	}
 
 	#[test]
