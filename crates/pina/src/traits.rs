@@ -138,7 +138,7 @@ macro_rules! primitive_into_discriminator {
 		impl IntoDiscriminator for $type {
 			fn discriminator_from_bytes(bytes: &[u8]) -> Result<Self, $crate::ProgramError> {
 				if bytes.len() < Self::BYTES {
-					return Err($crate::ProgramError::InvalidAccountData);
+					return Err(ProgramError::InvalidInstructionData);
 				}
 
 				let sliced_bytes = &bytes[..Self::BYTES];
@@ -149,7 +149,10 @@ macro_rules! primitive_into_discriminator {
 			}
 
 			fn write_discriminator(&self, bytes: &mut [u8]) {
-				assert!(bytes.len() >= Self::BYTES);
+				debug_assert!(bytes.len() >= Self::BYTES);
+				if bytes.len() < Self::BYTES {
+					return;
+				}
 				bytes[..Self::BYTES].copy_from_slice(&self.to_le_bytes());
 			}
 
@@ -313,22 +316,54 @@ pub trait AsAccount {
 /// Convenience methods for interpreting `AccountView` as SPL token account
 /// types.
 ///
-/// Callers should verify account ownership before trusting the returned
-/// reference, since these methods perform layout casts without owner checks.
-///
-/// For safer alternatives that verify token program ownership before casting,
-/// use the `as_checked_*` methods.
+/// The `*_checked` variants enforce owner checks before casting. The raw
+/// variants are lower-level and assume caller-side owner validation.
 #[cfg(feature = "token")]
 pub trait AsTokenAccount {
 	/// Interpret the account data as an SPL Token mint.
 	fn as_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError>;
+	/// Interpret the account data as an SPL Token mint, validating owner.
+	fn as_token_mint_checked(&self) -> Result<&crate::token::state::Mint, ProgramError>;
+	/// Interpret the account data as an SPL Token mint, validating owner is one
+	/// of the provided program ids.
+	fn as_token_mint_checked_with_owners(
+		&self,
+		owners: &[Address],
+	) -> Result<&crate::token::state::Mint, ProgramError>;
 	/// Interpret the account data as an SPL Token account.
 	fn as_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError>;
+	/// Interpret the account data as an SPL Token account, validating owner.
+	fn as_token_account_checked(&self) -> Result<&crate::token::state::TokenAccount, ProgramError>;
+	/// Interpret the account data as an SPL Token account, validating owner is
+	/// one of the provided program ids.
+	fn as_token_account_checked_with_owners(
+		&self,
+		owners: &[Address],
+	) -> Result<&crate::token::state::TokenAccount, ProgramError>;
 	/// Interpret the account data as a Token-2022 mint.
 	fn as_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError>;
+	/// Interpret the account data as a Token-2022 mint, validating owner.
+	fn as_token_2022_mint_checked(&self) -> Result<&crate::token_2022::state::Mint, ProgramError>;
+	/// Interpret the account data as a Token-2022 mint, validating owner is one
+	/// of the provided program ids.
+	fn as_token_2022_mint_checked_with_owners(
+		&self,
+		owners: &[Address],
+	) -> Result<&crate::token_2022::state::Mint, ProgramError>;
 	/// Interpret the account data as a Token-2022 token account.
 	fn as_token_2022_account(
 		&self,
+	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError>;
+	/// Interpret the account data as a Token-2022 token account, validating
+	/// owner.
+	fn as_token_2022_account_checked(
+		&self,
+	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError>;
+	/// Interpret the account data as a Token-2022 token account, validating
+	/// owner is one of the provided program ids.
+	fn as_token_2022_account_checked_with_owners(
+		&self,
+		owners: &[Address],
 	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError>;
 	/// Interpret the account data as an associated token account, verifying
 	/// the address matches the derived ATA for the given wallet, mint, and
@@ -339,52 +374,14 @@ pub trait AsTokenAccount {
 		mint: &Address,
 		token_program: &Address,
 	) -> Result<&crate::token::state::TokenAccount, ProgramError>;
-
-	/// Interpret the account data as an SPL Token mint after verifying
-	/// the account is owned by the SPL Token program.
-	///
-	/// The default implementation delegates to
-	/// [`as_token_mint`](Self::as_token_mint) without an ownership check. The
-	/// [`AccountView`] implementation overrides this to assert that the
-	/// account is owned by the SPL Token program.
-	fn as_checked_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError> {
-		self.as_token_mint()
-	}
-
-	/// Interpret the account data as an SPL Token account after verifying
-	/// the account is owned by the SPL Token program.
-	///
-	/// The default implementation delegates to
-	/// [`as_token_account`](Self::as_token_account) without an ownership
-	/// check. The [`AccountView`] implementation overrides this to assert that
-	/// the account is owned by the SPL Token program.
-	fn as_checked_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError> {
-		self.as_token_account()
-	}
-
-	/// Interpret the account data as a Token-2022 mint after verifying
-	/// the account is owned by the Token-2022 program.
-	///
-	/// The default implementation delegates to
-	/// [`as_token_2022_mint`](Self::as_token_2022_mint) without an ownership
-	/// check. The [`AccountView`] implementation overrides this to assert that
-	/// the account is owned by the Token-2022 program.
-	fn as_checked_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError> {
-		self.as_token_2022_mint()
-	}
-
-	/// Interpret the account data as a Token-2022 token account after
-	/// verifying the account is owned by the Token-2022 program.
-	///
-	/// The default implementation delegates to
-	/// [`as_token_2022_account`](Self::as_token_2022_account) without an
-	/// ownership check. The [`AccountView`] implementation overrides this to
-	/// assert that the account is owned by the Token-2022 program.
-	fn as_checked_token_2022_account(
+	/// Interpret the account data as an associated token account, validating
+	/// both owner and ATA derivation.
+	fn as_associated_token_account_checked(
 		&self,
-	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
-		self.as_token_2022_account()
-	}
+		owner: &Address,
+		mint: &Address,
+		token_program: &Address,
+	) -> Result<&crate::token::state::TokenAccount, ProgramError>;
 }
 
 /// Direct lamport transfer between accounts.
@@ -525,6 +522,17 @@ mod tests {
 	}
 
 	#[test]
+	fn discriminator_from_bytes_short_input_returns_err() {
+		let err = u16::discriminator_from_bytes(&[7]).unwrap_err();
+		assert_eq!(err, ProgramError::InvalidInstructionData);
+	}
+
+	#[test]
+	fn discriminator_matches_short_input_returns_false() {
+		assert!(!42u16.matches_discriminator(&[42]));
+	}
+
+	#[test]
 	fn has_discriminator_matches_and_writes() {
 		let mut bytes = [0u8; 1];
 		TestType::write_discriminator(&mut bytes);
@@ -539,40 +547,40 @@ mod tests {
 	fn discriminator_from_bytes_empty_slice_u8() {
 		let result = u8::discriminator_from_bytes(&[]);
 		assert!(result.is_err());
-		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidInstructionData);
 	}
 
 	#[test]
 	fn discriminator_from_bytes_empty_slice_u16() {
 		let result = u16::discriminator_from_bytes(&[]);
 		assert!(result.is_err());
-		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidInstructionData);
 
 		// Also too short (1 byte for a u16).
 		let result = u16::discriminator_from_bytes(&[0x01]);
-		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidInstructionData);
 	}
 
 	#[test]
 	fn discriminator_from_bytes_empty_slice_u32() {
 		let result = u32::discriminator_from_bytes(&[]);
 		assert!(result.is_err());
-		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidInstructionData);
 
 		// 3 bytes is too short for u32.
 		let result = u32::discriminator_from_bytes(&[0, 0, 0]);
-		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidInstructionData);
 	}
 
 	#[test]
 	fn discriminator_from_bytes_empty_slice_u64() {
 		let result = u64::discriminator_from_bytes(&[]);
 		assert!(result.is_err());
-		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidInstructionData);
 
 		// 7 bytes is too short for u64.
 		let result = u64::discriminator_from_bytes(&[0; 7]);
-		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidInstructionData);
 	}
 
 	#[test]

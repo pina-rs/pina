@@ -64,8 +64,10 @@ impl<'a> ProcessAccountInfos<'a> for AdminActionAccounts<'a> {
 		let data = self.config.try_borrow()?;
 		let config: &AdminConfig =
 			bytemuck::try_from_bytes(&data).or(Err(ProgramError::InvalidAccountData))?;
+		let authority = config.authority;
+		drop(data);
 
-		self.authority.assert_address(&config.authority)?;
+		self.authority.assert_address(&authority)?;
 
 		let mut data_mut = self.config.try_borrow_mut()?;
 		let config_mut: &mut AdminConfig = bytemuck::try_from_bytes_mut(&mut data_mut)

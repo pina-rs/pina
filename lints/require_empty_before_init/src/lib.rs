@@ -81,6 +81,10 @@ fn visit_expr(expr: &Expr<'_>, calls: &mut Vec<CallInfo>) {
 			});
 		}
 		ExprKind::Call(callee, args) => {
+			visit_expr(callee, calls);
+			for arg in *args {
+				visit_expr(arg, calls);
+			}
 			if let ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) = &callee.kind {
 				if let Some(seg) = path.segments.last() {
 					let target = args.first().and_then(receiver_name);
@@ -90,10 +94,6 @@ fn visit_expr(expr: &Expr<'_>, calls: &mut Vec<CallInfo>) {
 						target,
 					});
 				}
-			}
-			visit_expr(callee, calls);
-			for arg in *args {
-				visit_expr(arg, calls);
 			}
 		}
 		ExprKind::Block(block, _) => {

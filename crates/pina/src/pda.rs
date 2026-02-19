@@ -1,40 +1,26 @@
 //! PDA (Program Derived Address) functions.
 //!
-//! These wrapper functions provide PDA derivation that compiles on both native
-//! and Solana targets. On-chain (Solana BPF), the runtime syscalls are used.
-//! On native targets, these return stub values (`None`/`Err`) since the
-//! syscalls are not available.
+//! These wrapper functions provide PDA derivation across native and Solana
+//! targets.
 
 use crate::Address;
 use crate::ProgramError;
 
 /// Find a valid program derived address and its corresponding bump seed.
 ///
-/// Returns `None` if no valid PDA exists. On native targets (non-Solana), this
-/// always returns `None` since PDA derivation requires Solana runtime syscalls.
+/// Returns `None` if no valid PDA exists.
 #[inline]
 pub fn try_find_program_address(seeds: &[&[u8]], program_id: &Address) -> Option<(Address, u8)> {
-	#[cfg(any(target_os = "solana", target_arch = "bpf"))]
-	{
-		Address::try_find_program_address(seeds, program_id)
-	}
-
-	#[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
-	{
-		core::hint::black_box((seeds, program_id));
-		None
-	}
+	Address::try_find_program_address(seeds, program_id)
 }
 
 /// Find a valid program derived address and its corresponding bump seed.
 ///
 /// # Panics
 ///
-/// Panics if no valid PDA exists. On native targets (non-Solana), this always
-/// panics since PDA derivation requires Solana runtime syscalls.
+/// Panics if no valid PDA exists.
 ///
-/// Prefer [`try_find_program_address`] which returns `Option` instead of
-/// panicking.
+/// Prefer [`try_find_program_address`] for recoverable error handling.
 #[deprecated(
 	since = "0.3.0",
 	note = "use `try_find_program_address` instead, which returns `Option` and avoids panicking \
@@ -47,22 +33,30 @@ pub fn find_program_address(seeds: &[&[u8]], program_id: &Address) -> (Address, 
 }
 
 /// Create a valid program derived address without searching for a bump seed.
-///
-/// On native targets (non-Solana), this always returns
-/// `Err(ProgramError::InvalidSeeds)`.
 #[inline]
 pub fn create_program_address(
 	seeds: &[&[u8]],
 	program_id: &Address,
 ) -> Result<Address, ProgramError> {
-	#[cfg(any(target_os = "solana", target_arch = "bpf"))]
-	{
-		Address::create_program_address(seeds, program_id).map_err(|_| ProgramError::InvalidSeeds)
-	}
+	Address::create_program_address(seeds, program_id).map_err(|_| ProgramError::InvalidSeeds)
+}
 
-	#[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
-	{
-		core::hint::black_box((seeds, program_id));
-		Err(ProgramError::InvalidSeeds)
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn native_find_and_create_program_address_roundtrip() {
+		let seeds: &[&[u8]] = &[b"pina-test"];
+		let (pda, bump) =
+			try_find_program_address(seeds, &crate::system::ID).unwrap_or_else(|| {
+				panic!("expected to derive pda");
+			});
+		let bump_seed = [bump];
+		let seeds_with_bump: &[&[u8]] = &[b"pina-test", &bump_seed];
+		let recreated = create_program_address(seeds_with_bump, &crate::system::ID)
+			.unwrap_or_else(|err| panic!("failed to recreate pda: {err:?}"));
+
+		assert_eq!(pda, recreated);
 	}
 }
