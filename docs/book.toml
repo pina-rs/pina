@@ -1,0 +1,18 @@
+[book]
+title = "Pina Book"
+authors = ["pina-rs contributors"]
+language = "en"
+multilingual = false
+src = "src"
+description = "Comprehensive project documentation for the Pina Solana framework."
+
+[build]
+build-dir = "book"
+create-missing = false
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/pina-rs/pina"
+edit-url-template = "https://github.com/pina-rs/pina/edit/main/docs/{path}"
+site-url = "/docs/"

@@ -21,6 +21,7 @@ in
       eget
       gcc
       libiconv
+      mdbook
       llvm.bintools
       llvm.clang
       llvm.clang-tools
@@ -212,8 +213,17 @@ in
         set -e
         lint:clippy
         lint:format
+        verify:docs
       '';
       description = "Run all checks.";
+      binary = "bash";
+    };
+    "docs:build" = {
+      exec = ''
+        set -e
+        mdbook build "$DEVENV_ROOT/docs"
+      '';
+      description = "Build the mdBook documentation.";
       binary = "bash";
     };
     "lint:format" = {
@@ -222,6 +232,16 @@ in
         dprint check
       '';
       description = "Check that all files are formatted.";
+      binary = "bash";
+    };
+    "verify:docs" = {
+      exec = ''
+        set -e
+        [ -f "$DEVENV_ROOT/docs/book.toml" ]
+        [ -f "$DEVENV_ROOT/docs/src/SUMMARY.md" ]
+        mdbook build "$DEVENV_ROOT/docs" -d "$DEVENV_ROOT/target/mdbook"
+      '';
+      description = "Verify docs folder structure and build docs.";
       binary = "bash";
     };
     "lint:clippy" = {
