@@ -46,6 +46,21 @@ pub struct TransferAccounts<'a> {
 	pub dest: &'a AccountView,
 }
 
+fn checked_transfer_balances(
+	source_amount: u64,
+	dest_amount: u64,
+	amount: u64,
+) -> Result<(u64, u64), ProgramError> {
+	let new_source = source_amount
+		.checked_sub(amount)
+		.ok_or(ProgramError::InsufficientFunds)?;
+	let new_dest = dest_amount
+		.checked_add(amount)
+		.ok_or(ProgramError::ArithmeticOverflow)?;
+
+	Ok((new_source, new_dest))
+}
+
 impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
 		let args = TransferInstruction::try_from_bytes(data)?;
@@ -63,12 +78,36 @@ impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
 
 		let source = self.source.as_account_mut::<Balance>(&ID)?;
 		let source_amount: u64 = source.amount.into();
-		source.amount = PodU64::from_primitive(source_amount.saturating_sub(amount));
 
 		let dest = self.dest.as_account_mut::<Balance>(&ID)?;
 		let dest_amount: u64 = dest.amount.into();
-		dest.amount = PodU64::from_primitive(dest_amount.saturating_add(amount));
+		let (new_source, new_dest) = checked_transfer_balances(source_amount, dest_amount, amount)?;
+		source.amount = PodU64::from_primitive(new_source);
+		dest.amount = PodU64::from_primitive(new_dest);
 
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn checked_transfer_balances_rejects_insufficient_funds() {
+		let result = checked_transfer_balances(3, 10, 4);
+		assert_eq!(result, Err(ProgramError::InsufficientFunds));
+	}
+
+	#[test]
+	fn checked_transfer_balances_rejects_destination_overflow() {
+		let result = checked_transfer_balances(10, u64::MAX, 1);
+		assert_eq!(result, Err(ProgramError::ArithmeticOverflow));
+	}
+
+	#[test]
+	fn checked_transfer_balances_transfers_exact_amount() {
+		let result = checked_transfer_balances(10, 4, 3);
+		assert_eq!(result, Ok((7, 7)));
 	}
 }
