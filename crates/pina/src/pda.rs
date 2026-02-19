@@ -32,6 +32,14 @@ pub fn try_find_program_address(seeds: &[&[u8]], program_id: &Address) -> Option
 ///
 /// Panics if no valid PDA exists. On native targets (non-Solana), this always
 /// panics since PDA derivation requires Solana runtime syscalls.
+///
+/// Prefer [`try_find_program_address`] which returns `Option` instead of
+/// panicking.
+#[deprecated(
+	since = "0.3.0",
+	note = "use `try_find_program_address` instead, which returns `Option` and avoids panicking \
+	        on-chain"
+)]
 #[inline]
 pub fn find_program_address(seeds: &[&[u8]], program_id: &Address) -> (Address, u8) {
 	try_find_program_address(seeds, program_id)

@@ -345,11 +345,22 @@ impl AsAccount for AccountView {
 	{
 		self.assert_owner(program_id)?;
 
+		if self.data_len() < size_of::<T>() {
+			log!(
+				"address: {} data too small: {} < {}",
+				self.address().as_ref(),
+				self.data_len(),
+				size_of::<T>()
+			);
+			log_caller();
+			return Err(ProgramError::AccountDataTooSmall);
+		}
+
 		// SAFETY: `try_borrow` returns a reference whose lifetime is tied to
 		// `self`. We create a raw-parts slice of exactly `size_of::<T>()` bytes
-		// from the same pointer. `T::try_from_bytes` then validates the
-		// discriminator and performs a bytemuck cast — no uninitialized memory is
-		// read.
+		// from the same pointer. The length check above guarantees the account
+		// data is at least `size_of::<T>()` bytes. `T::try_from_bytes` then
+		// validates the discriminator and performs a bytemuck cast.
 		unsafe { T::try_from_bytes(from_raw_parts(self.try_borrow()?.as_ptr(), size_of::<T>())) }
 	}
 
@@ -360,9 +371,21 @@ impl AsAccount for AccountView {
 	{
 		self.assert_owner(program_id)?;
 
+		if self.data_len() < size_of::<T>() {
+			log!(
+				"address: {} data too small: {} < {}",
+				self.address().as_ref(),
+				self.data_len(),
+				size_of::<T>()
+			);
+			log_caller();
+			return Err(ProgramError::AccountDataTooSmall);
+		}
+
 		// SAFETY: Same reasoning as `as_account` above, but with a mutable
-		// borrow. The Solana runtime guarantees exclusive access when
-		// `try_borrow_mut` succeeds.
+		// borrow. The length check above guarantees the account data is at
+		// least `size_of::<T>()` bytes. The Solana runtime guarantees exclusive
+		// access when `try_borrow_mut` succeeds.
 		unsafe {
 			T::try_from_bytes_mut(from_raw_parts_mut(
 				self.try_borrow_mut()?.as_mut_ptr(),
@@ -502,6 +525,32 @@ impl AsTokenAccount for AccountView {
 				self.assert_associated_token_address(owner, mint, token_program)?,
 			)
 		}
+	}
+
+	#[track_caller]
+	fn as_checked_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError> {
+		self.assert_owner(&crate::token::ID)?;
+		self.as_token_mint()
+	}
+
+	#[track_caller]
+	fn as_checked_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError> {
+		self.assert_owner(&crate::token::ID)?;
+		self.as_token_account()
+	}
+
+	#[track_caller]
+	fn as_checked_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError> {
+		self.assert_owner(&crate::token_2022::ID)?;
+		self.as_token_2022_mint()
+	}
+
+	#[track_caller]
+	fn as_checked_token_2022_account(
+		&self,
+	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
+		self.assert_owner(&crate::token_2022::ID)?;
+		self.as_token_2022_account()
 	}
 }
 

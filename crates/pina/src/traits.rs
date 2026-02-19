@@ -137,8 +137,10 @@ macro_rules! primitive_into_discriminator {
 	($type:ty) => {
 		impl IntoDiscriminator for $type {
 			fn discriminator_from_bytes(bytes: &[u8]) -> Result<Self, $crate::ProgramError> {
-				// SECURITY: panics if `bytes.len() < Self::BYTES`. Callers must
-				// ensure the slice is at least `BYTES` long.
+				if bytes.len() < Self::BYTES {
+					return Err($crate::ProgramError::InvalidAccountData);
+				}
+
 				let sliced_bytes = &bytes[..Self::BYTES];
 				let mut discriminator_bytes = [0u8; Self::BYTES];
 				discriminator_bytes.copy_from_slice(sliced_bytes);
@@ -152,7 +154,9 @@ macro_rules! primitive_into_discriminator {
 			}
 
 			fn matches_discriminator(&self, bytes: &[u8]) -> bool {
-				assert!(bytes.len() >= Self::BYTES);
+				if bytes.len() < Self::BYTES {
+					return false;
+				}
 				self.to_le_bytes().eq(&bytes[..Self::BYTES])
 			}
 		}
@@ -311,6 +315,9 @@ pub trait AsAccount {
 ///
 /// Callers should verify account ownership before trusting the returned
 /// reference, since these methods perform layout casts without owner checks.
+///
+/// For safer alternatives that verify token program ownership before casting,
+/// use the `as_checked_*` methods.
 #[cfg(feature = "token")]
 pub trait AsTokenAccount {
 	/// Interpret the account data as an SPL Token mint.
@@ -332,6 +339,21 @@ pub trait AsTokenAccount {
 		mint: &Address,
 		token_program: &Address,
 	) -> Result<&crate::token::state::TokenAccount, ProgramError>;
+
+	/// Interpret the account data as an SPL Token mint after verifying
+	/// the account is owned by the SPL Token program.
+	fn as_checked_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError>;
+	/// Interpret the account data as an SPL Token account after verifying
+	/// the account is owned by the SPL Token program.
+	fn as_checked_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError>;
+	/// Interpret the account data as a Token-2022 mint after verifying
+	/// the account is owned by the Token-2022 program.
+	fn as_checked_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError>;
+	/// Interpret the account data as a Token-2022 token account after
+	/// verifying the account is owned by the Token-2022 program.
+	fn as_checked_token_2022_account(
+		&self,
+	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError>;
 }
 
 /// Direct lamport transfer between accounts.
@@ -480,5 +502,71 @@ mod tests {
 
 		bytes[0] = 0;
 		assert!(!TestType::matches_discriminator(&bytes));
+	}
+
+	#[test]
+	fn discriminator_from_bytes_empty_slice_u8() {
+		let result = u8::discriminator_from_bytes(&[]);
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+	}
+
+	#[test]
+	fn discriminator_from_bytes_empty_slice_u16() {
+		let result = u16::discriminator_from_bytes(&[]);
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+
+		// Also too short (1 byte for a u16).
+		let result = u16::discriminator_from_bytes(&[0x01]);
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn discriminator_from_bytes_empty_slice_u32() {
+		let result = u32::discriminator_from_bytes(&[]);
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+
+		// 3 bytes is too short for u32.
+		let result = u32::discriminator_from_bytes(&[0, 0, 0]);
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn discriminator_from_bytes_empty_slice_u64() {
+		let result = u64::discriminator_from_bytes(&[]);
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+
+		// 7 bytes is too short for u64.
+		let result = u64::discriminator_from_bytes(&[0; 7]);
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn matches_discriminator_short_data() {
+		// Should return false (not panic) for short data.
+		let val_u8: u8 = 42;
+		assert!(!val_u8.matches_discriminator(&[]));
+
+		let val_u16: u16 = 0x0102;
+		assert!(!val_u16.matches_discriminator(&[]));
+		assert!(!val_u16.matches_discriminator(&[0x02]));
+
+		let val_u32: u32 = 0xDEAD_BEEF;
+		assert!(!val_u32.matches_discriminator(&[]));
+		assert!(!val_u32.matches_discriminator(&[0xEF, 0xBE]));
+
+		let val_u64: u64 = 1;
+		assert!(!val_u64.matches_discriminator(&[]));
+		assert!(!val_u64.matches_discriminator(&[1, 0, 0]));
+	}
+
+	#[test]
+	fn has_discriminator_matches_short_data() {
+		// HasDiscriminator::matches_discriminator delegates to the primitive
+		// and should also handle short data gracefully.
+		assert!(!TestType::matches_discriminator(&[]));
 	}
 }
