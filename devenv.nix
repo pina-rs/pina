@@ -203,7 +203,7 @@ in
     "fix:clippy" = {
       exec = ''
         set -e
-        cargo clippy --fix --allow-dirty --allow-staged --all-features
+        cargo clippy --fix --allow-dirty --allow-staged --all-features --locked
       '';
       description = "Fix clippy lints for rust.";
       binary = "bash";
@@ -247,7 +247,7 @@ in
     "lint:clippy" = {
       exec = ''
         set -e
-        cargo clippy --all-features
+        cargo clippy --all-features --locked
       '';
       description = "Check that all rust lints are passing.";
       binary = "bash";
