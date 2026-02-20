@@ -1,0 +1,65 @@
+{
+	"kind": "rootNode",
+	"standard": "codama",
+	"version": "1.0.0",
+	"program": {
+		"kind": "programNode",
+		"name": "helloSolana",
+		"publicKey": "DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A",
+		"version": "",
+		"accounts": [],
+		"instructions": [
+			{
+				"kind": "instructionNode",
+				"name": "hello",
+				"docs": [
+					"The `#[instruction]` attribute macro generates:",
+					"",
+					"- A discriminator field as the first byte of the struct.",
+					"- `HasDiscriminator` implementation linking this struct to",
+					"`HelloInstruction::Hello`.",
+					"- `Pod` and `Zeroable` derives for zero-copy deserialization.",
+					"- `TypedBuilder` for ergonomic construction in tests.",
+					"",
+					"`HelloInstructionData` has no payload fields — only the discriminator byte",
+					"is needed to identify the instruction."
+				],
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "user",
+						"isWritable": false,
+						"isSigner": true,
+						"docs": [
+							"The user invoking the program. Must be a signer so we can trust the",
+							"address is authentic."
+						]
+					}
+				],
+				"arguments": [],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			}
+		],
+		"definedTypes": [],
+		"pdas": [],
+		"errors": []
+	},
+	"additionalPrograms": []
+}
