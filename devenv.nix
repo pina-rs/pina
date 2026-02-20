@@ -35,7 +35,10 @@ in
       pkg-config
       protobuf # needed for `solana-test-validator` in tests
       rust-jemalloc-sys
-      rustup
+      # Upstream rustup check suite is network-sensitive (e.g. socks proxy test) and flakes in CI.
+      (rustup.overrideAttrs (_: {
+        doCheck = false;
+      }))
       shfmt
       zstd
     ]
