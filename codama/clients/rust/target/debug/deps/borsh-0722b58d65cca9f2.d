@@ -1,0 +1,11 @@
+/Users/ifiokjr/Developer/projects/pina-rs/pina/codama/clients/rust/target/debug/deps/borsh-0722b58d65cca9f2.d: /Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/lib.rs /Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/de/mod.rs /Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/de/hint.rs /Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/ser/mod.rs /Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/ser/helpers.rs /Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/error.rs /Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/../docs/rustdoc_include/borsh_crate_top_level.md
+
+/Users/ifiokjr/Developer/projects/pina-rs/pina/codama/clients/rust/target/debug/deps/libborsh-0722b58d65cca9f2.rmeta: /Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/lib.rs /Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/de/mod.rs /Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/de/hint.rs /Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/ser/mod.rs /Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/ser/helpers.rs /Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/error.rs /Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/../docs/rustdoc_include/borsh_crate_top_level.md
+
+/Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/lib.rs:
+/Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/de/mod.rs:
+/Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/de/hint.rs:
+/Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/ser/mod.rs:
+/Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/ser/helpers.rs:
+/Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/error.rs:
+/Users/ifiokjr/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-1.6.0/src/../docs/rustdoc_include/borsh_crate_top_level.md:

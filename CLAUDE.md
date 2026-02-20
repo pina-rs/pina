@@ -168,8 +168,10 @@ A single changeset file can reference multiple packages. Always run `dprint fmt 
 
 ## Git & PR Workflow
 
-- Create a dedicated branch for the change before committing.
-- Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
+- Create a dedicated branch for each change before committing.
+- Branch names must use `feat/<description>` for features or `fix/<description>` for bug fixes.
+- Do not use the `codex/` branch prefix.
+- Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/).
 - Push the branch and open a pull request for review.
 - After review, apply any requested fixes (including breaking-change fixes) on the same branch.
 - Merge only after approvals are complete.
