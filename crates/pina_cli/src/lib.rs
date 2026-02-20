@@ -1,5 +1,6 @@
 pub mod codegen;
 pub mod error;
+pub mod init;
 pub mod ir;
 pub mod parse;
 
@@ -9,6 +10,7 @@ use codama_nodes::RootNode;
 
 use crate::codegen::ir_to_root_node;
 use crate::error::IdlError;
+pub use crate::init::init_project;
 use crate::parse::parse_program;
 
 /// Generate a Codama IDL `RootNode` from a Pina program crate.

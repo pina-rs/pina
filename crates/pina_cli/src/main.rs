@@ -31,6 +31,21 @@ enum Commands {
 		#[arg(long, default_value_t = true)]
 		pretty: bool,
 	},
+	/// Initialize a new Pina program project.
+	Init {
+		/// Package name for the new project (for example: `my_program`).
+		name: String,
+
+		/// Target directory for the generated project.
+		///
+		/// Defaults to `./<name>`.
+		#[arg(short, long)]
+		path: Option<PathBuf>,
+
+		/// Overwrite scaffold files when they already exist.
+		#[arg(long, default_value_t = false)]
+		force: bool,
+	},
 }
 
 fn main() {
@@ -43,6 +58,7 @@ fn main() {
 			name,
 			pretty,
 		} => run_idl(path.as_path(), output.as_deref(), name.as_deref(), pretty),
+		Commands::Init { name, path, force } => run_init(name.as_str(), path.as_deref(), force),
 	}
 }
 
@@ -82,4 +98,15 @@ fn run_idl(
 	} else {
 		println!("{json}");
 	}
+}
+
+fn run_init(name: &str, path: Option<&std::path::Path>, force: bool) {
+	let project_path = path.map_or_else(|| PathBuf::from(name), PathBuf::from);
+
+	if let Err(err) = pina_cli::init_project(&project_path, name, force) {
+		eprintln!("Error: {err}");
+		std::process::exit(1);
+	}
+
+	println!("Initialized new Pina project at {}", project_path.display());
 }
