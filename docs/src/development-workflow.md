@@ -21,6 +21,16 @@ verify:docs
 update:deps
 ```
 
+## Coverage
+
+Generate workspace coverage locally:
+
+```bash
+coverage:all
+```
+
+This produces an LCOV report at `target/coverage/lcov.info`.
+
 ## Changesets
 
 Any code changes in `crates/` or `examples/` should include a file in `.changeset/` describing impact and release type.

@@ -190,8 +190,10 @@ in
     "coverage:all" = {
       exec = ''
         set -e
+        mkdir -p "$DEVENV_ROOT/target/coverage"
+        cargo llvm-cov --workspace --all-features --locked --lcov --output-path "$DEVENV_ROOT/target/coverage/lcov.info"
       '';
-      description = "Run coverage across the crates";
+      description = "Run workspace coverage and generate an lcov report.";
       binary = "bash";
     };
     "fix:all" = {
