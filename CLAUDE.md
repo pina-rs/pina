@@ -50,6 +50,8 @@ cargo llvm-cov                    # Code coverage via cargo-llvm-cov
 cargo semver-checks               # Check for semver violations
 ```
 
+When using `devenv`, `pina ...` is available as a shortcut for `cargo run -p pina_cli -- ...`.
+
 ### Formatting
 
 Formatting is handled by `dprint` (not `cargo fmt` directly). dprint delegates to `rustfmt` for `.rs` files, `nixfmt` for `.nix`, and `shfmt` for shell scripts. Always use `fix:format` or `dprint fmt` rather than running `rustfmt` directly.

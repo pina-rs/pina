@@ -110,6 +110,14 @@ in
       description = "The `solana-verify` executable";
       binary = "bash";
     };
+    "pina" = {
+      exec = ''
+        set -e
+        cargo run -p pina_cli -- $@
+      '';
+      description = "Run the `pina` CLI from source.";
+      binary = "bash";
+    };
     "generate:keypair" = {
       exec = ''
         set -e
