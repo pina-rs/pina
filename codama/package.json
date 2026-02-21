@@ -1,0 +1,20 @@
+{
+	"name": "pina-codama-tests",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"generate": "node generate.mjs",
+		"check:js": "tsc --noEmit",
+		"test": "node generate.mjs && tsc --noEmit"
+	},
+	"dependencies": {
+		"@codama/renderers-js": "^2.0.2",
+		"@codama/renderers-rust": "^2.0.0",
+		"codama": "^1.5.1"
+	},
+	"devDependencies": {
+		"@solana/kit": "^2.1.0",
+		"@types/node": "^25.3.0",
+		"typescript": "^5.7.0"
+	}
+}
