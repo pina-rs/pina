@@ -13,6 +13,14 @@ The GitHub CI workflow verifies:
 
 This keeps code quality, behavior, and documentation build health aligned.
 
+## Coverage
+
+The `coverage` workflow runs workspace coverage with `cargo llvm-cov` and publishes an LCOV artifact:
+
+- Command: `coverage:all`
+- Artifact: `target/coverage/lcov.info`
+- Optional upload: Codecov (`fail_ci_if_error: false`)
+
 ## Docs publishing
 
 The `docs-pages` workflow publishes the mdBook to GitHub Pages:
