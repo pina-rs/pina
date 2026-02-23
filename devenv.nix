@@ -118,6 +118,14 @@ in
       description = "Run the `pina` CLI from source.";
       binary = "bash";
     };
+    "mdt" = {
+      exec = ''
+        set -e
+        cargo bin mdt $@
+      '';
+      description = "Run the pinned `mdt` CLI used for reusable docs.";
+      binary = "bash";
+    };
     "generate:keypair" = {
       exec = ''
         set -e
@@ -207,8 +215,9 @@ in
       exec = ''
         set -e
         dprint fmt --config "$DEVENV_ROOT/dprint.json"
+        docs:sync
       '';
-      description = "Format files with dprint.";
+      description = "Format files with dprint, then re-sync mdt-managed docs.";
       binary = "bash";
     };
     "fix:clippy" = {
@@ -217,6 +226,35 @@ in
         cargo clippy --fix --allow-dirty --allow-staged --all-features --locked
       '';
       description = "Fix clippy lints for rust.";
+      binary = "bash";
+    };
+    "security:deny" = {
+      exec = ''
+        set -e
+        cargo bin cargo-deny check --config "$DEVENV_ROOT/deny.toml" bans licenses sources
+      '';
+      description = "Run cargo-deny checks (bans, licenses, sources).";
+      binary = "bash";
+    };
+    "security:audit" = {
+      exec = ''
+        set -e
+        cargo bin cargo-audit \
+          --db "$DEVENV_ROOT/target/advisory-db-audit" \
+          --url "https://github.com/RustSec/advisory-db.git" \
+          --deny yanked \
+          --file "$DEVENV_ROOT/Cargo.lock"
+      '';
+      description = "Run RustSec advisory audit for Cargo.lock.";
+      binary = "bash";
+    };
+    "verify:security" = {
+      exec = ''
+        set -e
+        security:deny
+        security:audit
+      '';
+      description = "Run all dependency security checks.";
       binary = "bash";
     };
     "lint:all" = {
@@ -237,6 +275,22 @@ in
       description = "Build the mdBook documentation.";
       binary = "bash";
     };
+    "docs:sync" = {
+      exec = ''
+        set -e
+        mdt update --path "$DEVENV_ROOT"
+      '';
+      description = "Sync reusable documentation blocks with mdt.";
+      binary = "bash";
+    };
+    "docs:check" = {
+      exec = ''
+        set -e
+        mdt check --path "$DEVENV_ROOT"
+      '';
+      description = "Check reusable documentation blocks are synchronized.";
+      binary = "bash";
+    };
     "lint:format" = {
       exec = ''
         set -e
@@ -250,6 +304,7 @@ in
         set -e
         [ -f "$DEVENV_ROOT/docs/book.toml" ]
         [ -f "$DEVENV_ROOT/docs/src/SUMMARY.md" ]
+        docs:check
         mdbook build "$DEVENV_ROOT/docs" -d "$DEVENV_ROOT/target/mdbook"
       '';
       description = "Verify docs folder structure and build docs.";

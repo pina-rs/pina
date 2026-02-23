@@ -4,6 +4,7 @@ The `examples/` workspace members demonstrate practical usage patterns:
 
 - `hello_solana`: minimal program structure and instruction dispatch.
 - `counter_program`: PDA creation, mutation, and account validation.
+- `todo_program`: PDA-backed state with boolean + digest updates.
 - `transfer_sol`: lamport transfers and account checks.
 - `escrow_program`: richer multi-account flow and token-oriented logic.
 

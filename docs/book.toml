@@ -2,7 +2,6 @@
 title = "Pina Book"
 authors = ["pina-rs contributors"]
 language = "en"
-multilingual = false
 src = "src"
 description = "Comprehensive project documentation for the Pina Solana framework."
 

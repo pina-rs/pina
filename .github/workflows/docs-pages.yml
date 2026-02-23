@@ -1,6 +1,16 @@
 name: "docs-pages"
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - "template.t.md"
+      - "api-docs.t.md"
+      - "readme.md"
+      - "devenv.nix"
+      - ".github/workflows/docs-pages.yml"
   release:
     types: [published]
   workflow_dispatch:
@@ -29,6 +39,10 @@ jobs:
 
       - name: configure github pages
         uses: actions/configure-pages@v5
+
+      - name: verify docs
+        run: verify:docs
+        shell: devenv shell -c -- bash -e {0}
 
       - name: build mdBook docs
         run: docs:build
