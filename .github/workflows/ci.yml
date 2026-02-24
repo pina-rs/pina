@@ -38,6 +38,22 @@ jobs:
         run: verify:docs
         shell: devenv shell -c -- bash -e {0}
 
+  security:
+    timeout-minutes: 60
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: verify dependency security
+        run: verify:security
+        shell: devenv shell -c -- bash -e {0}
+
   test:
     timeout-minutes: 60
     runs-on: blacksmith-2vcpu-ubuntu-2404
