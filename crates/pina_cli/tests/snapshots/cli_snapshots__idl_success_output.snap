@@ -1,0 +1,31 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - idl
+    - "--path"
+    - examples/anchor_declare_id
+---
+success: true
+exit_code: 0
+----- stdout -----
+{
+  "kind": "rootNode",
+  "standard": "codama",
+  "version": "1.0.0",
+  "program": {
+    "kind": "programNode",
+    "name": "anchorDeclareId",
+    "publicKey": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
+    "version": "",
+    "accounts": [],
+    "instructions": [],
+    "definedTypes": [],
+    "pdas": [],
+    "errors": []
+  },
+  "additionalPrograms": []
+}
+
+----- stderr -----

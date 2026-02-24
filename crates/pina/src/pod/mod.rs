@@ -8,4 +8,5 @@
 
 mod primitives;
 
+pub use pina_pod_primitives::*;
 pub use primitives::*;

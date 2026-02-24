@@ -23,6 +23,7 @@ derive = ["dep:pina_macros"]
 bytemuck = { workspace = true, features = ["derive", "const_zeroed", "align_offset"] }
 paste = { workspace = true }
 pina_macros = { workspace = true, optional = true }
+pina_pod_primitives = { workspace = true }
 pinocchio = { workspace = true }
 pinocchio-associated-token-account = { workspace = true, optional = true }
 pinocchio-system = { workspace = true }

@@ -1,0 +1,26 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - codama
+    - generate
+    - "--examples-dir"
+    - examples
+    - "--idls-dir"
+    - target/cli-snapshot-temp/codama_generate_unknown_example/idls
+    - "--rust-out"
+    - target/cli-snapshot-temp/codama_generate_unknown_example/rust
+    - "--js-out"
+    - target/cli-snapshot-temp/codama_generate_unknown_example/js
+    - "--example"
+    - does_not_exist
+    - "--npx"
+    - target/cli-snapshot-temp/codama_generate_unknown_example/fake-npx.sh
+---
+success: false
+exit_code: 1
+----- stdout -----
+
+----- stderr -----
+Error: Unknown example `does_not_exist`. Available examples: anchor_declare_id, anchor_declare_program, anchor_duplicate_mutable_accounts, anchor_errors, anchor_events, anchor_floats, anchor_realloc, anchor_system_accounts, anchor_sysvars, counter_program, escrow_program, hello_solana, pina_bpf, todo_program, transfer_sol

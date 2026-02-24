@@ -31,7 +31,7 @@ pub struct CounterState {
 	pub bump: u8,
 	/// The current counter value. Uses `PodU64` (a little-endian `u64`
 	/// wrapper) for safe alignment in `#[repr(C)]` structs.
-	pub count: crate::generated::shared::PodU64,
+	pub count: pina_pod_primitives::PodU64,
 }
 
 pub const COUNTER_STATE_DISCRIMINATOR: u8 = 1u8;
@@ -39,7 +39,7 @@ pub const COUNTER_STATE_DISCRIMINATOR: u8 = 1u8;
 impl CounterState {
 	pub const LEN: usize = core::mem::size_of::<Self>();
 
-	pub const fn new(bump: u8, count: crate::generated::shared::PodU64) -> Self {
+	pub const fn new(bump: u8, count: pina_pod_primitives::PodU64) -> Self {
 		Self {
 			discriminator: COUNTER_STATE_DISCRIMINATOR,
 			bump,
@@ -48,7 +48,8 @@ impl CounterState {
 	}
 
 	pub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {
-		let account = crate::generated::shared::pod_from_bytes::<Self>(data)?;
+		let account = bytemuck::try_from_bytes::<Self>(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != COUNTER_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
@@ -56,7 +57,8 @@ impl CounterState {
 	}
 
 	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, solana_program_error::ProgramError> {
-		let account = crate::generated::shared::pod_from_bytes_mut::<Self>(data)?;
+		let account = bytemuck::try_from_bytes_mut::<Self>(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != COUNTER_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}

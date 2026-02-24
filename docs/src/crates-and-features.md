@@ -38,6 +38,7 @@ Commands:
 
 - `pina init`: scaffold a new Pina program crate.
 - `pina idl`: parse a Pina program and output Codama JSON.
+- `pina codama generate`: generate Codama IDLs plus Rust/JS clients for examples.
 
 Library surface:
 
@@ -50,7 +51,11 @@ Library surface:
 
 Use this crate to avoid hardcoded base58 literals in validation logic.
 
-## `codama/pina_codama_renderer`
+## `crates/pina_pod_primitives`
+
+`no_std` crate containing alignment-safe POD primitive wrappers (`PodBool`, `PodU*`, `PodI*`) and conversion macro helpers shared by `pina` and generated clients.
+
+## `crates/pina_codama_renderer`
 
 Repository-local renderer binary that generates Pina-style Rust client code from Codama JSON.
 

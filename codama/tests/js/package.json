@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"test": "node validate-anchor-idls.mjs"
+		"test": "node validate-idls.mjs"
 	},
 	"devDependencies": {
 		"codama": "1.5.1"

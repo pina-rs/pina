@@ -5,6 +5,5 @@
 pub mod errors;
 pub mod instructions;
 pub mod programs;
-pub mod shared;
 
 pub(crate) use programs::*;

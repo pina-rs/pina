@@ -46,6 +46,7 @@
 		"**/node_modules",
 		"**/pnpm-lock.yaml",
 		"codama/idls/**",
+		"codama/clients/rust/**",
 		"codama/clients/**/src/generated/**",
 		"api-docs.t.md",
 		"template.t.md",

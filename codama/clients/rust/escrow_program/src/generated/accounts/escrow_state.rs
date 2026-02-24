@@ -13,10 +13,10 @@ pub struct EscrowState {
 	pub mint_a: solana_pubkey::Pubkey,
 	pub mint_b: solana_pubkey::Pubkey,
 	/// The amount of token A that was sent by sender.
-	pub amount_a: crate::generated::shared::PodU64,
+	pub amount_a: pina_pod_primitives::PodU64,
 	/// The amount of token B to be received by the recipient.
-	pub amount_b: crate::generated::shared::PodU64,
-	pub seed: crate::generated::shared::PodU64,
+	pub amount_b: pina_pod_primitives::PodU64,
+	pub seed: pina_pod_primitives::PodU64,
 	pub bump: u8,
 }
 
@@ -25,7 +25,7 @@ pub const ESCROW_STATE_DISCRIMINATOR: u8 = 1u8;
 impl EscrowState {
 	pub const LEN: usize = core::mem::size_of::<Self>();
 
-	pub const fn new(maker: solana_pubkey::Pubkey, mint_a: solana_pubkey::Pubkey, mint_b: solana_pubkey::Pubkey, amount_a: crate::generated::shared::PodU64, amount_b: crate::generated::shared::PodU64, seed: crate::generated::shared::PodU64, bump: u8) -> Self {
+	pub const fn new(maker: solana_pubkey::Pubkey, mint_a: solana_pubkey::Pubkey, mint_b: solana_pubkey::Pubkey, amount_a: pina_pod_primitives::PodU64, amount_b: pina_pod_primitives::PodU64, seed: pina_pod_primitives::PodU64, bump: u8) -> Self {
 		Self {
 			discriminator: ESCROW_STATE_DISCRIMINATOR,
 			maker,
@@ -39,7 +39,8 @@ impl EscrowState {
 	}
 
 	pub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {
-		let account = crate::generated::shared::pod_from_bytes::<Self>(data)?;
+		let account = bytemuck::try_from_bytes::<Self>(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != ESCROW_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
@@ -47,7 +48,8 @@ impl EscrowState {
 	}
 
 	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, solana_program_error::ProgramError> {
-		let account = crate::generated::shared::pod_from_bytes_mut::<Self>(data)?;
+		let account = bytemuck::try_from_bytes_mut::<Self>(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != ESCROW_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}

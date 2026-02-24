@@ -1,10 +1,26 @@
 [workspace]
 resolver = "2"
 members = [
-	"codama/pina_codama_renderer",
+	"codama/clients/rust/anchor_declare_id",
+	"codama/clients/rust/anchor_declare_program",
+	"codama/clients/rust/anchor_duplicate_mutable_accounts",
+	"codama/clients/rust/anchor_errors",
+	"codama/clients/rust/anchor_events",
+	"codama/clients/rust/anchor_floats",
+	"codama/clients/rust/anchor_realloc",
+	"codama/clients/rust/anchor_system_accounts",
+	"codama/clients/rust/anchor_sysvars",
+	"codama/clients/rust/counter_program",
+	"codama/clients/rust/escrow_program",
+	"codama/clients/rust/hello_solana",
+	"codama/clients/rust/pina_bpf",
+	"codama/clients/rust/todo_program",
+	"codama/clients/rust/transfer_sol",
 	"crates/pina",
 	"crates/pina_cli",
+	"crates/pina_codama_renderer",
 	"crates/pina_macros",
+	"crates/pina_pod_primitives",
 	"crates/pina_sdk_ids",
 	"examples/anchor_declare_id",
 	"examples/anchor_declare_program",
@@ -67,7 +83,10 @@ darling = { default-features = false, version = "^0.21" }
 heck = { default-features = false, version = "^0.5" }
 insta = { default-features = false, version = "^1" }
 mollusk-svm = { default-features = false, version = "^0.8" }
+num-derive = { version = "^0.4" }
+num-traits = { version = "^0.2" }
 paste = { default-features = false, version = "^1" }
+pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer" }
 pinocchio = { default-features = false, version = "^0.10", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.3" }
 pinocchio-memo = { default-features = false, version = "^0.3" }
@@ -78,8 +97,13 @@ proc-macro2 = { default-features = false, version = "^1" }
 quote = { default-features = false, version = "^1" }
 serde = { default-features = false, version = "^1" }
 serde_json = { default-features = false, version = "^1", features = ["std"] }
+solana-account-info = { version = "^3" }
 solana-address = { default-features = false, version = "^2.0", features = ["bytemuck", "curve25519", "decode"] }
+solana-cpi = { version = "^3" }
+solana-instruction = { version = "^3" }
+solana-program-error = { version = "^3" }
 solana-program-log = { default-features = false, version = "^1.1" }
+solana-pubkey = { version = "^4", features = ["bytemuck"] }
 syn = { default-features = false, version = "^2", features = ["full"] }
 test_utils_solana = { default-features = false, version = "^0.8" }
 thiserror = { default-features = false, version = "^2" }
@@ -91,6 +115,7 @@ wasm_client_solana = { default-features = false, version = "^0.10" }
 # publishable crates
 pina = { default-features = false, path = "crates/pina", version = "0.3.0" }
 pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.3.0" }
+pina_pod_primitives = { default-features = false, path = "crates/pina_pod_primitives", version = "0.3.0" }
 pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.3.0" }
 
 [workspace.metadata.dylint]

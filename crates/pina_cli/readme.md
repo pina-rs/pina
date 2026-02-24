@@ -44,6 +44,15 @@ pina init my_program
 pina init my_program --path ./programs/my_program --force
 ```
 
+### `pina codama generate`
+
+Generate Codama IDLs and Rust/JS clients from one or more example program crates.
+
+```bash
+pina codama generate
+pina codama generate --example counter_program --example todo_program
+```
+
 ## Library API
 
 `pina_cli` can also be embedded directly:
@@ -78,10 +87,10 @@ await codama.accept(renderJsVisitor("./clients/js/my_program"));
 
 ### Pina-style Rust clients
 
-This repository includes `codama/pina_codama_renderer`, which renders discriminator-first/bytemuck Rust client models from Codama JSON.
+This repository includes `crates/pina_codama_renderer`, which renders discriminator-first/bytemuck Rust client models from Codama JSON.
 
 ```bash
-cargo run --manifest-path ./codama/pina_codama_renderer/Cargo.toml -- \
+cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
   --idl ./idls/my_program.json \
   --output ./clients/rust
 ```

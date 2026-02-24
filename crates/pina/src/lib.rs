@@ -42,6 +42,7 @@ pub use bytemuck::Pod;
 pub use bytemuck::Zeroable;
 #[cfg(feature = "derive")]
 pub use pina_macros::*;
+pub use pina_pod_primitives::impl_int_conversion;
 pub use pinocchio;
 pub use pinocchio::AccountView;
 pub use pinocchio::Address;

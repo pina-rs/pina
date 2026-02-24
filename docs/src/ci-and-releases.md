@@ -10,7 +10,7 @@ The GitHub CI workflow verifies:
 - `verify:security`
 - `test:all` (`cargo test --all-features --locked`)
 - `test:anchor-parity` (Anchor parity examples + `pina_bpf` nightly build (`-Z build-std=core,alloc`) + ignored BPF artifact verification tests)
-- `test:idl` (regenerate + diff `codama/idls/anchor_*.json`, then validate via Codama Rust and JS libraries)
+- `test:idl` (regenerate `codama/idls`, `codama/clients/rust`, `codama/clients/js`, validate outputs, and fail on any diff)
 - `cargo build --locked`
 - `cargo build --all-features --locked`
 
@@ -18,7 +18,7 @@ This keeps code quality, behavior, and documentation build health aligned.
 
 ## Coverage
 
-The `coverage` workflow runs workspace coverage with `cargo llvm-cov` and publishes an LCOV artifact:
+The `coverage` workflow runs focused coverage with `cargo llvm-cov` and publishes an LCOV artifact:
 
 - Command: `coverage:all`
 - Artifact: `target/coverage/lcov.info`

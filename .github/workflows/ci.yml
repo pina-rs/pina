@@ -100,7 +100,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: verify codama idls
+      - name: verify codama generation
         run: test:idl
         shell: devenv shell -c -- bash -e {0}
 

@@ -65,14 +65,14 @@ impl Make {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct MakeInstructionData {
 	pub discriminator: u8,
-	pub seed: crate::generated::shared::PodU64,
-	pub amount_a: crate::generated::shared::PodU64,
-	pub amount_b: crate::generated::shared::PodU64,
+	pub seed: pina_pod_primitives::PodU64,
+	pub amount_a: pina_pod_primitives::PodU64,
+	pub amount_b: pina_pod_primitives::PodU64,
 	pub bump: u8,
 }
 
 impl MakeInstructionData {
-	pub const fn new(seed: crate::generated::shared::PodU64, amount_a: crate::generated::shared::PodU64, amount_b: crate::generated::shared::PodU64, bump: u8) -> Self {
+	pub const fn new(seed: pina_pod_primitives::PodU64, amount_a: pina_pod_primitives::PodU64, amount_b: pina_pod_primitives::PodU64, bump: u8) -> Self {
 		Self {
 			discriminator: MAKE_DISCRIMINATOR,
 			seed,

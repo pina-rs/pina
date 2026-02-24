@@ -19,6 +19,9 @@ codama:idl:all
 # Generate Rust + JS clients.
 codama:clients:generate
 
+# Generate IDLs + Rust/JS clients in one command.
+pina codama generate
+
 # Run the complete Codama pipeline.
 codama:test
 
@@ -28,8 +31,8 @@ test:idl
 
 Supporting scripts:
 
-- `scripts/generate-codama-idls.sh`: regenerates `codama/idls/anchor_*.json` fixtures.
-- `scripts/verify-codama-idls.sh`: verifies fixtures via Rust and JS tests.
+- `scripts/generate-codama-idls.sh`: regenerates `codama/idls/*.json` fixtures for all examples.
+- `scripts/verify-codama-idls.sh`: regenerates IDLs/clients, verifies fixtures via Rust and JS tests, and enforces deterministic no-diff output.
 
 ## In a Separate Project
 
@@ -57,10 +60,10 @@ await codama.accept(renderJsVisitor("./clients/js/my_program"));
 
 ### 3. Generate Pina-style Rust clients (optional)
 
-This repository ships `codama/pina_codama_renderer`, which emits Rust models aligned with Pina's discriminator-first, fixed-size POD layouts.
+This repository ships `crates/pina_codama_renderer`, which emits Rust models aligned with Pina's discriminator-first, fixed-size POD layouts.
 
 ```bash
-cargo run --manifest-path ./codama/pina_codama_renderer/Cargo.toml -- \
+cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
   --idl ./idls/my_program.json \
   --output ./clients/rust
 ```

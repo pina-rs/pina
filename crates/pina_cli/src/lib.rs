@@ -1,3 +1,4 @@
+pub mod codama;
 pub mod codegen;
 pub mod error;
 pub mod init;
@@ -8,6 +9,8 @@ use std::path::Path;
 
 use codama_nodes::RootNode;
 
+pub use crate::codama::CodamaGenerateOptions;
+pub use crate::codama::generate_codama;
 use crate::codegen::ir_to_root_node;
 use crate::error::IdlError;
 pub use crate::init::init_project;

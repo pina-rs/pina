@@ -1,17 +1,17 @@
 {
-	"kind": "rootNode",
-	"standard": "codama",
-	"version": "1.0.0",
-	"program": {
-		"kind": "programNode",
-		"name": "anchorEvents",
-		"publicKey": "2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy",
-		"version": "",
-		"accounts": [],
-		"instructions": [],
-		"definedTypes": [],
-		"pdas": [],
-		"errors": []
-	},
-	"additionalPrograms": []
+  "kind": "rootNode",
+  "standard": "codama",
+  "version": "1.0.0",
+  "program": {
+    "kind": "programNode",
+    "name": "anchorEvents",
+    "publicKey": "2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy",
+    "version": "",
+    "accounts": [],
+    "instructions": [],
+    "definedTypes": [],
+    "pdas": [],
+    "errors": []
+  },
+  "additionalPrograms": []
 }

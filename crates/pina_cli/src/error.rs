@@ -49,3 +49,60 @@ impl IdlError {
 		}
 	}
 }
+
+/// Errors produced during end-to-end Codama generation.
+#[derive(Debug, thiserror::Error)]
+pub enum CodamaError {
+	#[error("Failed to read examples directory at {path}: {source}")]
+	ReadExamples {
+		path: PathBuf,
+		source: std::io::Error,
+	},
+
+	#[error("No examples found in {path}")]
+	NoExamples { path: PathBuf },
+
+	#[error("Unknown example `{example}`. Available examples: {available}")]
+	UnknownExample { example: String, available: String },
+
+	#[error("Failed to create directory {path}: {source}")]
+	CreateDir {
+		path: PathBuf,
+		source: std::io::Error,
+	},
+
+	#[error("IDL generation failed for `{example}` ({path}): {source}")]
+	GenerateIdl {
+		example: String,
+		path: PathBuf,
+		source: IdlError,
+	},
+
+	#[error("Failed to serialize generated IDL for `{example}`: {source}")]
+	SerializeIdl {
+		example: String,
+		source: serde_json::Error,
+	},
+
+	#[error("Failed to write generated IDL to {path}: {source}")]
+	WriteIdl {
+		path: PathBuf,
+		source: std::io::Error,
+	},
+
+	#[error("Rust client rendering failed for {path}: {source}")]
+	RenderRust {
+		path: PathBuf,
+		source: pina_codama_renderer::RenderError,
+	},
+
+	#[error("Failed to run `{cmd}`: {source}")]
+	RunCommand { cmd: String, source: std::io::Error },
+
+	#[error("`{cmd}` failed with status {status}{details}")]
+	CommandFailed {
+		cmd: String,
+		status: i32,
+		details: String,
+	},
+}
