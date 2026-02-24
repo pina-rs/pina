@@ -414,7 +414,7 @@ When the `logs` feature is disabled, `log!` compiles to nothing.
 Programs are compiled to the `bpfel-unknown-none` target using `sbpf-linker`:
 
 ```sh
-cargo build --release --target bpfel-unknown-none -p my_program -Z build-std -F bpf-entrypoint
+cargo +nightly-2025-10-15 build --release --target bpfel-unknown-none -p my_program -Z build-std=core,alloc -F bpf-entrypoint
 ```
 
 The `bpf-entrypoint` feature gate separates the on-chain entrypoint from the library code used in tests.
@@ -450,7 +450,7 @@ cargo nextest run  # Faster parallel test execution
 | [`counter_program`](examples/counter_program)                                     | PDA state management with initialize and increment                          |
 | [`transfer_sol`](examples/transfer_sol)                                           | CPI and direct lamport transfers                                            |
 | [`escrow_program`](examples/escrow_program)                                       | Full token escrow with SPL token operations                                 |
-| [`pinocchio_bpf_starter`](examples/pinocchio_bpf_starter)                         | Upstream BPF starter-style hello world with `sbpf-linker`                   |
+| [`pina_bpf`](examples/pina_bpf)                                                   | Minimal pina-native BPF hello world (nightly + `build-std=core,alloc`)      |
 | [`anchor_declare_id`](examples/anchor_declare_id)                                 | Anchor `declare-id` test parity port for program-id mismatch                |
 | [`anchor_declare_program`](examples/anchor_declare_program)                       | Anchor `declare-program` parity port for external-program ID checks         |
 | [`anchor_duplicate_mutable_accounts`](examples/anchor_duplicate_mutable_accounts) | Anchor duplicate mutable account checks adapted to explicit pina validation |

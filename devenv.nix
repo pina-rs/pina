@@ -243,12 +243,13 @@ in
           -p anchor_realloc \
           -p anchor_system_accounts \
           -p anchor_sysvars \
-          -p escrow_program
+          -p escrow_program \
+          -p pina_bpf
         rustup component add rust-src --toolchain nightly-2025-10-15
         cargo +nightly-2025-10-15 build-bpf
-        cargo test --locked -p pinocchio_bpf_starter hello_world -- --ignored
+        cargo test --locked -p pina_bpf bpf_build_ -- --ignored
       '';
-      description = "Run Anchor parity example tests and starter BPF execution checks.";
+      description = "Run Anchor parity example tests and pina_bpf artifact checks.";
       binary = "bash";
     };
     "idl:generate" = {
