@@ -1,22 +1,22 @@
-# `anchor_realloc`
+# anchor_realloc
 
-Anchor parity example for realloc safety constraints.
+Pina parity port of Anchor's account reallocation safety checks.
 
-## What it covers
+## What this demonstrates
 
-- Maximum permitted account data increase checks.
+- Reallocation growth-limit enforcement.
 - Duplicate realloc target detection.
-- Multi-account realloc validation patterns.
+- Controlled resize flows across one or multiple accounts.
+
+## Differences From Anchor
+
+- Realloc limits are explicit constants (`MAX_PERMITTED_DATA_INCREASE`) and helper guards.
+- Duplicate-account prevention is explicit (`validate_distinct_realloc_targets`).
+- Resizing is done with direct `AccountView::resize` calls after validations.
 
 ## Run
 
-```bash
+```sh
 cargo test -p anchor_realloc
 pina idl --path examples/anchor_realloc --output codama/idls/anchor_realloc.json
-```
-
-## Optional SBF build
-
-```bash
-cargo build --release --target bpfel-unknown-none -p anchor_realloc -Z build-std -F bpf-entrypoint
 ```

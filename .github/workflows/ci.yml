@@ -117,9 +117,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: build
-        run: cargo build --locked
+        run: build:default
         shell: devenv shell -c -- bash -e {0}
 
       - name: build all features
-        run: cargo build --all-features --locked
+        run: build:all
         shell: devenv shell -c -- bash -e {0}

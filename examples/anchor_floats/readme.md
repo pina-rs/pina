@@ -1,22 +1,22 @@
-# `anchor_floats`
+# anchor_floats
 
-Anchor parity example for float account fields.
+Pina parity port of Anchor's float account-data patterns.
 
-## What it covers
+## What this demonstrates
 
-- Creating and updating account state with `f32`/`f64` values.
+- Float storage in account data using `PodU32`/`PodU64` bit patterns.
 - Authority-gated updates.
-- Bit-level conversion through `PodU32`/`PodU64`.
+- Account initialization and mutation flows.
+
+## Differences From Anchor
+
+- Float values are explicitly converted with `to_bits`/`from_bits` for `Pod` safety.
+- Authority checks and update rules are explicit in `apply_update`.
+- Account creation is performed with explicit `create_account` + type validation calls.
 
 ## Run
 
-```bash
+```sh
 cargo test -p anchor_floats
 pina idl --path examples/anchor_floats --output codama/idls/anchor_floats.json
-```
-
-## Optional SBF build
-
-```bash
-cargo build --release --target bpfel-unknown-none -p anchor_floats -Z build-std -F bpf-entrypoint
 ```

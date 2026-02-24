@@ -1,21 +1,22 @@
-# `anchor_declare_id`
+# anchor_declare_id
 
-Anchor parity example for the `declare-id` test case.
+Pina parity port of Anchor's `declare-id` example.
 
-## What it covers
+## What this demonstrates
 
-- Program ID verification through `parse_instruction`.
-- Accepting matching `program_id` and rejecting mismatches.
+- Program ID declaration via `declare_id!`.
+- Instruction decoding with `parse_instruction`.
+- Rejection of program ID mismatches.
+
+## Differences From Anchor
+
+- Program ID mismatch validation is handled directly by `parse_instruction(program_id, &ID, data)`.
+- There is no Anchor `Context` type. The instruction entrypoint receives raw account views.
+- The example keeps a minimal `Initialize` instruction and tests behavior directly.
 
 ## Run
 
-```bash
+```sh
 cargo test -p anchor_declare_id
 pina idl --path examples/anchor_declare_id --output codama/idls/anchor_declare_id.json
-```
-
-## Optional SBF build
-
-```bash
-cargo build --release --target bpfel-unknown-none -p anchor_declare_id -Z build-std -F bpf-entrypoint
 ```

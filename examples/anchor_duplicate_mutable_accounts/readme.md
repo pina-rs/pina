@@ -1,22 +1,22 @@
-# `anchor_duplicate_mutable_accounts`
+# anchor_duplicate_mutable_accounts
 
-Anchor parity example for duplicate mutable account checks.
+Pina parity port of Anchor's duplicate mutable account checks.
 
-## What it covers
+## What this demonstrates
 
-- Explicit duplicate mutable account detection in program logic.
-- Separate behavior for duplicate read-only accounts.
-- Custom error mapping (`ConstraintDuplicateMutableAccount`).
+- Detecting duplicate mutable accounts.
+- Returning deterministic custom error codes.
+- Allowing duplicate readonly accounts where appropriate.
+
+## Differences From Anchor
+
+- Duplicate mutable detection is explicit (`ensure_distinct`) instead of implicit parser behavior.
+- Validation is coded per instruction path so allowed/disallowed cases are clear.
+- Error mapping uses `#[error]` enums and explicit `ProgramError::Custom` values.
 
 ## Run
 
-```bash
+```sh
 cargo test -p anchor_duplicate_mutable_accounts
 pina idl --path examples/anchor_duplicate_mutable_accounts --output codama/idls/anchor_duplicate_mutable_accounts.json
-```
-
-## Optional SBF build
-
-```bash
-cargo build --release --target bpfel-unknown-none -p anchor_duplicate_mutable_accounts -Z build-std -F bpf-entrypoint
 ```
