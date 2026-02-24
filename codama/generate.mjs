@@ -1,8 +1,8 @@
-import { createFromJson } from "codama";
-import { renderVisitor as renderRustVisitor } from "@codama/renderers-rust";
 import { renderVisitor as renderJsVisitor } from "@codama/renderers-js";
-import { readFileSync, readdirSync } from "node:fs";
-import { join, basename } from "node:path";
+import { renderVisitor as renderRustVisitor } from "@codama/renderers-rust";
+import { createFromJson } from "codama";
+import { readdirSync, readFileSync } from "node:fs";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
@@ -61,7 +61,9 @@ for (const program of programs) {
 				},
 			}),
 		);
-		console.log(`  [ok] Rust client generated at clients/rust/${program.name}/`);
+		console.log(
+			`  [ok] Rust client generated at clients/rust/${program.name}/`,
+		);
 	} catch (err) {
 		console.error(`  [FAIL] Rust generation error: ${err.message}`);
 		hasErrors = true;
