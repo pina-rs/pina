@@ -49,7 +49,7 @@ jobs:
         shell: devenv shell -c -- bash -e {0}
 
       - name: upload pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: docs/book
 
