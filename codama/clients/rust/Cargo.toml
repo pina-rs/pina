@@ -1,0 +1,19 @@
+[workspace]
+resolver = "2"
+members = [
+	"counter_program",
+	"escrow_program",
+	"hello_solana",
+	"transfer_sol",
+]
+
+[workspace.dependencies]
+borsh = { version = "^1", features = ["derive"] }
+num-derive = "^0.4"
+num-traits = "^0.2"
+solana-account-info = "^3"
+solana-cpi = "^3"
+solana-instruction = "^3"
+solana-program-error = "^3"
+solana-pubkey = { version = "^4", features = ["borsh"] }
+thiserror = "^2"
