@@ -1,11 +1,12 @@
 import { renderVisitor as renderJsVisitor } from "@codama/renderers-js";
-import { renderVisitor as renderRustVisitor } from "@codama/renderers-rust";
 import { createFromJson } from "codama";
+import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
+const workspaceRoot = join(__dirname, "..");
 const idlsDir = join(__dirname, "idls");
 const clientsDir = join(__dirname, "clients");
 
@@ -20,6 +21,36 @@ console.log(`Found ${programs.length} IDL files to process.\n`);
 
 let hasErrors = false;
 
+console.log("--- rust clients ---");
+try {
+	const args = [
+		"run",
+		"-p",
+		"pina_codama_renderer",
+		"--",
+		"--output",
+		join(clientsDir, "rust"),
+		...programs.flatMap((program) => ["--idl", program.idlPath]),
+	];
+	execFileSync("cargo", args, {
+		cwd: workspaceRoot,
+		encoding: "utf-8",
+		stdio: "pipe",
+	});
+	for (const program of programs) {
+		console.log(
+			`  [ok] Rust client generated at clients/rust/${program.name}/`,
+		);
+	}
+} catch (err) {
+	const stderr = typeof err?.stderr === "string" ? err.stderr.trim() : "";
+	const stdout = typeof err?.stdout === "string" ? err.stdout.trim() : "";
+	const details = stderr || stdout || err.message;
+	console.error(`  [FAIL] Rust generation error: ${details}`);
+	hasErrors = true;
+}
+console.log();
+
 for (const program of programs) {
 	console.log(`--- ${program.name} ---`);
 
@@ -33,40 +64,6 @@ for (const program of programs) {
 		console.error(`  [FAIL] IDL parse error: ${err.message}`);
 		hasErrors = true;
 		continue;
-	}
-
-	// Generate Rust client
-	try {
-		const rustDir = join(clientsDir, "rust", program.name);
-		codama.accept(
-			renderRustVisitor(rustDir, {
-				formatCode: false,
-				deleteFolderBeforeRendering: true,
-				anchorTraits: false,
-				traitOptions: {
-					baseDefaults: [
-						"borsh::BorshSerialize",
-						"borsh::BorshDeserialize",
-						"Clone",
-						"Debug",
-						"Eq",
-						"PartialEq",
-					],
-					scalarEnumDefaults: [
-						"Copy",
-						"PartialOrd",
-						"Hash",
-						"num_derive::FromPrimitive",
-					],
-				},
-			}),
-		);
-		console.log(
-			`  [ok] Rust client generated at clients/rust/${program.name}/`,
-		);
-	} catch (err) {
-		console.error(`  [FAIL] Rust generation error: ${err.message}`);
-		hasErrors = true;
 	}
 
 	// Generate JavaScript client

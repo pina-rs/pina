@@ -5,7 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-borsh = { workspace = true }
+bytemuck = { workspace = true }
 solana-account-info = { workspace = true }
 solana-cpi = { workspace = true }
 solana-instruction = { workspace = true }

@@ -6,54 +6,31 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	isProgramError,
-	type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
-	type SolanaError,
-} from "@solana/kit";
-import { ESCROW_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { isProgramError, type Address, type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM, type SolanaError } from '@solana/kit';
+import { ESCROW_PROGRAM_PROGRAM_ADDRESS } from '../programs';
 
 export const ESCROW_PROGRAM_ERROR__OFFER_KEY_MISMATCH = 0x0; // 0
 export const ESCROW_PROGRAM_ERROR__TOKEN_ACCOUNT_MISMATCH = 0x1; // 1
 
-export type EscrowProgramError =
-	| typeof ESCROW_PROGRAM_ERROR__OFFER_KEY_MISMATCH
-	| typeof ESCROW_PROGRAM_ERROR__TOKEN_ACCOUNT_MISMATCH;
+export type EscrowProgramError = typeof ESCROW_PROGRAM_ERROR__OFFER_KEY_MISMATCH | typeof ESCROW_PROGRAM_ERROR__TOKEN_ACCOUNT_MISMATCH;
 
 let escrowProgramErrorMessages: Record<EscrowProgramError, string> | undefined;
-if (process.env.NODE_ENV !== "production") {
-	escrowProgramErrorMessages = {
-		[ESCROW_PROGRAM_ERROR__OFFER_KEY_MISMATCH]: ``,
-		[ESCROW_PROGRAM_ERROR__TOKEN_ACCOUNT_MISMATCH]: ``,
-	};
+if (process.env.NODE_ENV !== 'production') {
+  escrowProgramErrorMessages = { [ESCROW_PROGRAM_ERROR__OFFER_KEY_MISMATCH]: ``, [ESCROW_PROGRAM_ERROR__TOKEN_ACCOUNT_MISMATCH]: `` };
 }
 
 export function getEscrowProgramErrorMessage(code: EscrowProgramError): string {
-	if (process.env.NODE_ENV !== "production") {
-		return (escrowProgramErrorMessages as Record<EscrowProgramError, string>)[
-			code
-		];
-	}
+  if (process.env.NODE_ENV !== 'production') {
+    return (escrowProgramErrorMessages as Record<EscrowProgramError, string>)[code];
+  }
 
-	return "Error message not available in production bundles.";
+  return 'Error message not available in production bundles.';
 }
 
-export function isEscrowProgramError<
-	TProgramErrorCode extends EscrowProgramError,
->(
-	error: unknown,
-	transactionMessage: {
-		instructions: Record<number, { programAddress: Address }>;
-	},
-	code?: TProgramErrorCode,
-): error is
-	& SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM>
-	& Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
-	return isProgramError<TProgramErrorCode>(
-		error,
-		transactionMessage,
-		ESCROW_PROGRAM_PROGRAM_ADDRESS,
-		code,
-	);
+export function isEscrowProgramError<TProgramErrorCode extends EscrowProgramError>(
+    error: unknown,
+    transactionMessage: { instructions: Record<number, { programAddress: Address }> },
+    code?: TProgramErrorCode,
+): error is SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM> & Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
+  return isProgramError<TProgramErrorCode>(error, transactionMessage, ESCROW_PROGRAM_PROGRAM_ADDRESS, code);
 }

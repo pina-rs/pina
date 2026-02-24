@@ -1822,6 +1822,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pina_codama_renderer"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "codama-nodes",
+ "heck",
+ "insta",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "pina_macros"
 version = "0.3.0"
 dependencies = [

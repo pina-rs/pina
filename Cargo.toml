@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+	"codama/pina_codama_renderer",
 	"crates/pina",
 	"crates/pina_cli",
 	"crates/pina_macros",

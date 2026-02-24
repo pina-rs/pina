@@ -50,6 +50,8 @@ codama:clients:generate
 codama:test
 ```
 
+Rust client generation in this repository uses the custom `pina_codama_renderer` crate (`codama/pina_codama_renderer`) instead of Codama's default Rust renderer. The generated Rust models are Pina-compatible: discriminator-first layouts and bytemuck-based POD wrappers, without `borsh` serialization requirements.
+
 End-to-end setup steps:
 
 1. Enter the dev environment: `devenv shell`

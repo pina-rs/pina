@@ -1,0 +1,23 @@
+[package]
+name = "pina_codama_renderer"
+version = "0.1.0"
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+publish = false
+repository.workspace = true
+description = "Codama Rust renderer that generates Pina-style bytemuck models and discriminator-first layouts"
+
+[dependencies]
+clap = { workspace = true, features = ["derive", "std"] }
+codama-nodes = { workspace = true }
+heck = { workspace = true, default-features = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true, default-features = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+
+[lints]
+workspace = true
