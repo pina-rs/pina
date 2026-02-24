@@ -48,8 +48,8 @@ pnpm add -D codama @codama/renderers-js
 ```
 
 ```js
-import { createFromFile } from "codama";
 import { renderVisitor as renderJsVisitor } from "@codama/renderers-js";
+import { createFromFile } from "codama";
 
 const codama = await createFromFile("./idls/my_program.json");
 await codama.accept(renderJsVisitor("./clients/js/my_program"));
