@@ -244,6 +244,7 @@ in
           -p anchor_system_accounts \
           -p anchor_sysvars \
           -p escrow_program
+        rustup component add rust-src --toolchain nightly-2025-10-15
         cargo +nightly-2025-10-15 build-bpf
         cargo test --locked -p pinocchio_bpf_starter hello_world -- --ignored
       '';
