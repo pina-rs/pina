@@ -118,9 +118,7 @@ docs:build
 
 <!-- {/docsBuildCommand} -->
 
-Use `verify:docs` to validate documentation structure and build output in CI.
-Use `test:idl` to verify `codama/idls/anchor_*.json` against fresh output and Codama Rust/JS validators.
-Reusable command snippets are managed by `mdt`; run `docs:sync` after changing `template.t.md`.
+Use `verify:docs` to validate documentation structure and build output in CI. Use `test:idl` to verify `codama/idls/anchor_*.json` against fresh output and Codama Rust/JS validators. Reusable command snippets are managed by `mdt`; run `docs:sync` after changing `template.t.md`.
 
 ## Quick start
 
