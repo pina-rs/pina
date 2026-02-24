@@ -5,6 +5,7 @@
 	"scripts": {
 		"generate": "node generate.mjs",
 		"check:js": "tsc --noEmit",
+		"test:nodes-from-pina": "pnpm --filter codama-nodes-from-pina test",
 		"test": "node generate.mjs && tsc --noEmit"
 	},
 	"dependencies": {
