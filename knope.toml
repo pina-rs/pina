@@ -33,12 +33,14 @@ scopes = ["pina_sdk_ids"]
 changelog = "crates/pina_sdk_ids/changelog.md"
 extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
 
+[changes]
+ignore_conventional_commits = true
+
 [[workflows]]
 name = "release"
 
 [[workflows.steps]]
 type = "PrepareRelease"
-ignore_conventional_commits = true
 
 [[workflows.steps]]
 type = "Command"
