@@ -15,6 +15,13 @@ A performant Solana smart contract framework built on top of [pinocchio](https:/
 - **Proc-macro sugar** — `#[account]`, `#[instruction]`, `#[event]`, `#[error]`, `#[discriminator]`, and `#[derive(Accounts)]` eliminate boilerplate.
 - **CPI helpers** — PDA account creation, lamport transfers, and token operations.
 
+## Workspace packages
+
+- `crates/pina` — core runtime crate (`no_std`, account validation/loaders, CPI helpers, entrypoint).
+- `crates/pina_macros` — proc macros (`#[account]`, `#[instruction]`, `#[event]`, `#[error]`, `#[discriminator]`, `#[derive(Accounts)]`).
+- `crates/pina_cli` — CLI/library for IDL generation and project scaffolding (`pina idl`, `pina init`).
+- `crates/pina_sdk_ids` — typed constants for well-known Solana program/sysvar IDs.
+
 ## Installation
 
 ```sh
@@ -59,6 +66,37 @@ End-to-end setup steps:
 3. Generate all IDLs: `codama:idl:all`
 4. Generate clients from the IDLs: `codama:clients:generate`
 5. Run the full validation pipeline: `codama:test`
+
+### Using Codama in separate projects
+
+You can use `pina idl` outside this repository to bootstrap clients in another codebase.
+
+```sh
+# Generate a Codama JSON file from your Pina program crate.
+pina idl --path ./programs/my_program --output ./idls/my_program.json
+```
+
+Then render clients in your destination project:
+
+```sh
+pnpm add -D codama @codama/renderers-js
+```
+
+```js
+import { createFromFile } from "codama";
+import { renderVisitor as renderJsVisitor } from "@codama/renderers-js";
+
+const codama = await createFromFile("./idls/my_program.json");
+await codama.accept(renderJsVisitor("./clients/js/my_program"));
+```
+
+For Pina-style Rust client generation (discriminator-first, bytemuck POD types), use this repository's renderer:
+
+```sh
+cargo run --manifest-path ./codama/pina_codama_renderer/Cargo.toml -- \
+  --idl ./idls/my_program.json \
+  --output ./clients/rust
+```
 
 ### Crate features
 

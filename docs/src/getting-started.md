@@ -28,6 +28,14 @@ lint:format
 verify:docs
 ```
 
+## Generate a Codama IDL
+
+```bash
+pina idl --path ./examples/counter_program --output ./codama/idls/counter_program.json
+```
+
+See [Codama Workflow](./codama-workflow.md) for end-to-end generation and external-project usage.
+
 ## Build this documentation
 
 ```bash
