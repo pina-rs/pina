@@ -27,6 +27,37 @@ To enable SPL token support:
 cargo add pina --features token
 ```
 
+## Codama IDL Support
+
+Pina ships with first-class Codama integration through the `pina` CLI and the `codama/` test harness in this repository.
+
+The CLI command below generates a Codama-compatible IDL from a Pina program:
+
+```sh
+pina idl --path examples/counter_program --output codama/idls/counter_program.json
+```
+
+With `devenv`, the full workflow is available via built-in scripts:
+
+```sh
+# Generate IDLs for all example programs into codama/idls/.
+codama:idl:all
+
+# Generate Rust + JS clients from codama/idls/.
+codama:clients:generate
+
+# Run the full integration pipeline (build CLI, generate IDLs, generate clients, validate outputs).
+codama:test
+```
+
+End-to-end setup steps:
+
+1. Enter the dev environment: `devenv shell`
+2. Install pinned binaries and external tools: `install:all`
+3. Generate all IDLs: `codama:idl:all`
+4. Generate clients from the IDLs: `codama:clients:generate`
+5. Run the full validation pipeline: `codama:test`
+
 ### Crate features
 
 | Feature  | Default | Description                                                |
