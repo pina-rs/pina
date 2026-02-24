@@ -2,30 +2,56 @@
 
 ## `crates/pina`
 
-Core runtime crate with:
+Core runtime crate for on-chain program logic.
 
-- Validation traits and helper methods
-- PDA and CPI helpers
-- `nostd_entrypoint!` and dispatch helpers
-- Optional token integrations
+Includes:
 
-### Main features
+- `AccountView` and validation chain helpers.
+- Typed account loaders and discriminator checks.
+- CPI/system/token helper utilities.
+- `nostd_entrypoint!` and instruction parsing helpers.
 
-- `derive` (default): enables proc-macro integration
-- `logs` (default): on-chain log support
-- `token`: SPL token/token-2022 helpers and typed conversions
+Feature flags:
+
+- `derive` (default): enables proc macro re-exports from `pina_macros`.
+- `logs` (default): on-chain logging support.
+- `token`: SPL token/token-2022 + ATA helper APIs.
 
 ## `crates/pina_macros`
 
-Proc-macro crate that defines:
+Proc-macro crate used by `pina`.
 
+Provides:
+
+- `#[discriminator]`
 - `#[account]`
 - `#[instruction]`
 - `#[event]`
 - `#[error]`
-- `#[discriminator]`
 - `#[derive(Accounts)]`
+
+## `crates/pina_cli`
+
+Developer CLI and library.
+
+Commands:
+
+- `pina init`: scaffold a new Pina program crate.
+- `pina idl`: parse a Pina program and output Codama JSON.
+
+Library surface:
+
+- `pina_cli::generate_idl(program_path, name_override)`
+- `pina_cli::init_project(path, package_name, force)`
 
 ## `crates/pina_sdk_ids`
 
-Shared Solana IDs for known programs/sysvars to keep address usage centralized and typed.
+`no_std` crate that exports well-known Solana program/sysvar IDs as typed constants.
+
+Use this crate to avoid hardcoded base58 literals in validation logic.
+
+## `codama/pina_codama_renderer`
+
+Repository-local renderer binary that generates Pina-style Rust client code from Codama JSON.
+
+Use this when you want generated Rust models to match Pina's fixed-size discriminator-first/bytemuck conventions.

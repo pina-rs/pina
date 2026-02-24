@@ -5,6 +5,7 @@
 - [Getting Started](./getting-started.md)
 - [Core Concepts](./core-concepts.md)
 - [Crates and Features](./crates-and-features.md)
+- [Codama Workflow](./codama-workflow.md)
 - [Examples](./examples.md)
 - [Anchor Test Porting](./anchor-test-porting.md)
 - [Security Model](./security-model.md)

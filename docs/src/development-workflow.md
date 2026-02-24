@@ -33,6 +33,22 @@ test:idl
 update:deps
 ```
 
+## Codama/IDL workflow
+
+```bash
+# Regenerate all example IDLs.
+codama:idl:all
+
+# Generate clients from Codama JSON.
+codama:clients:generate
+
+# Full Codama pipeline (build CLI, generate IDLs, generate clients, checks).
+codama:test
+
+# CI-oriented IDL validation.
+test:idl
+```
+
 ## Dependency security
 
 - `security:deny` runs policy checks (license allow-list, source restrictions, dependency bans).
