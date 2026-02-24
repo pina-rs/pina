@@ -22,6 +22,8 @@ Use examples as reference implementations for account layout, instruction parsin
 
 Anchor test-suite parity progress is tracked in [Anchor Test Porting](./anchor-test-porting.md).
 
+Every example directory includes a local `readme.md` with purpose, coverage, and run commands.
+
 When adding new examples:
 
 - Keep instruction/account discriminator handling explicit.
