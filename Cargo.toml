@@ -17,7 +17,7 @@ members = [
 	"examples/counter_program",
 	"examples/escrow_program",
 	"examples/hello_solana",
-	"examples/pinocchio_bpf_starter",
+	"examples/pina_bpf",
 	"examples/todo_program",
 	"examples/transfer_sol",
 	"security/00-signer-authorization/secure",
