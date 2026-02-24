@@ -86,7 +86,7 @@ mollusk-svm = { default-features = false, version = "^0.8" }
 num-derive = { version = "^0.4" }
 num-traits = { version = "^0.2" }
 paste = { default-features = false, version = "^1" }
-pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer" }
+pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.1.0" }
 pinocchio = { default-features = false, version = "^0.10", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.3" }
 pinocchio-memo = { default-features = false, version = "^0.3" }
