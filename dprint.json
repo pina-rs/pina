@@ -47,6 +47,8 @@
 		"**/pnpm-lock.yaml",
 		"codama/idls/**",
 		"codama/clients/**/src/generated/**",
+		"api-docs.t.md",
+		"template.t.md",
 		".bin/",
 		".local-cache/",
 		"**/dist/**",
