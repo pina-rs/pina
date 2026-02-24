@@ -1,21 +1,22 @@
-# `anchor_sysvars`
+# anchor_sysvars
 
-Anchor parity example for sysvar account validation.
+Pina parity port of Anchor's sysvar-address validation checks.
 
-## What it covers
+## What this demonstrates
 
-- Clock, rent, and stake-history sysvar address checks.
-- Instruction dispatch and program-id mismatch checks.
+- Verifying Clock, Rent, and Stake History sysvar addresses.
+- Routing a dedicated sysvar-check instruction.
+- Deterministic sysvar mismatch failures.
+
+## Differences From Anchor
+
+- Sysvar IDs are explicit constants in program code.
+- Validation uses direct `assert_sysvar` checks instead of declarative constraints.
+- Unit tests include direct checks for expected constant separation and parser behavior.
 
 ## Run
 
-```bash
+```sh
 cargo test -p anchor_sysvars
 pina idl --path examples/anchor_sysvars --output codama/idls/anchor_sysvars.json
-```
-
-## Optional SBF build
-
-```bash
-cargo build --release --target bpfel-unknown-none -p anchor_sysvars -Z build-std -F bpf-entrypoint
 ```

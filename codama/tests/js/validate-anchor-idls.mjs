@@ -50,6 +50,24 @@ for (const filename of anchorIdlFiles) {
 				.join("\n")
 		}`,
 	);
+
+	const instructionNodes = idl.program?.instructions ?? [];
+
+	for (const instruction of instructionNodes) {
+		assert.ok(
+			Array.isArray(instruction.discriminators) &&
+				instruction.discriminators.length > 0,
+			`${filename}: instruction ${instruction.name} is missing discriminator metadata`,
+		);
+	}
+
+	for (const account of idl.program?.accounts ?? []) {
+		assert.ok(
+			Array.isArray(account.discriminators) &&
+				account.discriminators.length > 0,
+			`${filename}: account ${account.name} is missing discriminator metadata`,
+		);
+	}
 }
 
 console.log(

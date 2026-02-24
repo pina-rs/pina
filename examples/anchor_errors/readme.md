@@ -1,22 +1,22 @@
-# `anchor_errors`
+# anchor_errors
 
-Anchor parity example for custom error behavior.
+Pina parity port of Anchor's custom error handling patterns.
 
-## What it covers
+## What this demonstrates
 
-- Deterministic custom error code mapping.
-- Guard helper behavior (`require_eq`, `require_neq`, `require_gt`, `require_gte`).
-- Instruction variant to error-code parity checks.
+- Stable custom error numbering.
+- Guard helpers (`require_eq`, `require_neq`, etc.).
+- Deterministic mapping from instruction variants to errors.
+
+## Differences From Anchor
+
+- Error checks are plain Rust helper functions rather than Anchor macros.
+- Instruction behavior is centralized in `process_instruction_variant`.
+- Numeric error-code expectations are asserted in unit tests.
 
 ## Run
 
-```bash
+```sh
 cargo test -p anchor_errors
 pina idl --path examples/anchor_errors --output codama/idls/anchor_errors.json
-```
-
-## Optional SBF build
-
-```bash
-cargo build --release --target bpfel-unknown-none -p anchor_errors -Z build-std -F bpf-entrypoint
 ```

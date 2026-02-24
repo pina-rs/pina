@@ -1,21 +1,22 @@
-# `anchor_declare_program`
+# anchor_declare_program
 
-Anchor parity example for `declare-program` behavior.
+Pina parity port of Anchor's `declare-program` behavior.
 
-## What it covers
+## What this demonstrates
 
-- Validating an external program account against an expected ID.
-- Requiring the external program account to be executable.
+- Modeling external program IDs.
+- Validating executable program accounts.
+- Guarding CPI-style paths with explicit program checks.
+
+## Differences From Anchor
+
+- External program validation is explicit (`assert_external_program_id`) instead of framework constraints.
+- Account checks are performed manually via chained `AccountView` assertions.
+- Instruction routing is explicit `match`-based dispatch.
 
 ## Run
 
-```bash
+```sh
 cargo test -p anchor_declare_program
 pina idl --path examples/anchor_declare_program --output codama/idls/anchor_declare_program.json
-```
-
-## Optional SBF build
-
-```bash
-cargo build --release --target bpfel-unknown-none -p anchor_declare_program -Z build-std -F bpf-entrypoint
 ```

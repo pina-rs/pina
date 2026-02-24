@@ -1,0 +1,36 @@
+name: "surfpool"
+permissions:
+  contents: read
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  surfpool-idl-smoke:
+    timeout-minutes: 120
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: install external binaries
+        run: install:eget
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: run surfpool idl smoke test
+        run: test:surfpool-idl
+        shell: devenv shell -c -- bash -e {0}

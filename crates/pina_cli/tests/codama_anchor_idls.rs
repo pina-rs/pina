@@ -83,6 +83,30 @@ fn anchor_idl_fixtures_match_generated_output() {
 		});
 		let fixture_json = read_fixture(&fixture_path);
 
+		let generated_root: RootNode = serde_json::from_value(generated_json.clone())
+			.unwrap_or_else(|e| {
+				panic!(
+					"failed to deserialize generated IDL for {}: {e}",
+					example_name
+				)
+			});
+		for instruction in &generated_root.program.instructions {
+			assert!(
+				!instruction.discriminators.is_empty(),
+				"instruction '{:?}' in {} is missing discriminator metadata",
+				instruction.name,
+				example_name
+			);
+		}
+		for account in &generated_root.program.accounts {
+			assert!(
+				!account.discriminators.is_empty(),
+				"account '{:?}' in {} is missing discriminator metadata",
+				account.name,
+				example_name
+			);
+		}
+
 		assert_eq!(
 			generated_json, fixture_json,
 			"IDL fixture drift detected for {}. Run `scripts/generate-codama-idls.sh` and commit \

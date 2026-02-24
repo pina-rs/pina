@@ -1,22 +1,22 @@
-# `anchor_events`
+# anchor_events
 
-Anchor parity example for event modeling.
+Pina parity port of Anchor's event definitions and serialization semantics.
 
-## What it covers
+## What this demonstrates
 
-- Event discriminator definitions.
-- Deterministic event payload construction.
-- Event serialization round-trip checks.
+- Event discriminators with `#[event]`.
+- Deterministic event payload encoding/decoding.
+- Instruction-to-event mapping logic.
+
+## Differences From Anchor
+
+- This example focuses on event type/data behavior, not Anchor's `emit!`/`emit_cpi!` transport.
+- Event emission is modeled as pure Rust value construction (`build_event`).
+- Tests validate byte-level roundtrips and expected payload values.
 
 ## Run
 
-```bash
+```sh
 cargo test -p anchor_events
 pina idl --path examples/anchor_events --output codama/idls/anchor_events.json
-```
-
-## Optional SBF build
-
-```bash
-cargo build --release --target bpfel-unknown-none -p anchor_events -Z build-std -F bpf-entrypoint
 ```

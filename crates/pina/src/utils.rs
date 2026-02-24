@@ -1,3 +1,4 @@
+#[cfg(feature = "logs")]
 use core::panic::Location;
 
 use crate::Address;
@@ -69,6 +70,9 @@ pub fn assert(v: bool, err: impl Into<ProgramError>, msg: &str) -> ProgramResult
 	if v {
 		Ok(())
 	} else {
+		#[cfg(not(feature = "logs"))]
+		let _ = msg;
+
 		log!("{}", msg);
 		log_caller();
 		Err(err.into())

@@ -179,10 +179,17 @@ in
     };
     "install:eget" = {
       exec = ''
-        HASH=$(nix hash path --base32 ./.eget/.eget.toml)
+        set -e
+        if command -v nix >/dev/null 2>&1; then
+          HASH=$(nix hash path --base32 ./.eget/.eget.toml)
+        else
+          HASH=$(shasum -a 256 ./.eget/.eget.toml | awk '{print $1}')
+        fi
         echo "HASH: $HASH"
         if [ ! -f ./.eget/bin/hash ] || [ "$HASH" != "$(cat ./.eget/bin/hash)" ]; then
           echo "Updating eget binaries"
+          rm -rf "$DEVENV_ROOT/.eget/bin"
+          mkdir -p "$DEVENV_ROOT/.eget/bin"
           eget -D --to "$DEVENV_ROOT/.eget/bin"
           echo "$HASH" > ./.eget/bin/hash
         else
@@ -220,6 +227,14 @@ in
         fi
       '';
       description = "Build all crates with all features activated.";
+      binary = "bash";
+    };
+    "build:default" = {
+      exec = ''
+        set -e
+        cargo build --locked
+      '';
+      description = "Build workspace crates with the default feature set.";
       binary = "bash";
     };
     "test:all" = {
@@ -274,6 +289,15 @@ in
         verify:idls
       '';
       description = "Run IDL fixture drift + Rust/JS Codama validation tests.";
+      binary = "bash";
+    };
+    "test:surfpool-idl" = {
+      exec = ''
+        set -e
+        pnpm --dir "$DEVENV_ROOT/codama" install --frozen-lockfile
+        "$DEVENV_ROOT/scripts/test-surfpool-idl-smoke.sh"
+      '';
+      description = "Deploy a generated program to Surfpool and invoke it using generated IDL metadata.";
       binary = "bash";
     };
     "coverage:all" = {
