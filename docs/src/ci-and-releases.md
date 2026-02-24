@@ -8,7 +8,9 @@ The GitHub CI workflow verifies:
 - `lint:format`
 - `verify:docs`
 - `verify:security`
-- `cargo test --all-features --locked`
+- `test:all` (`cargo test --all-features --locked`)
+- `test:anchor-parity` (Anchor parity examples + starter `build-bpf` + ignored mollusk execution test)
+- `test:idl` (regenerate + diff `codama/idls/anchor_*.json`, then validate via Codama Rust and JS libraries)
 - `cargo build --locked`
 - `cargo build --all-features --locked`
 

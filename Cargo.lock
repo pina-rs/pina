@@ -88,6 +88,69 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "anchor_declare_id"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "anchor_declare_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "anchor_duplicate_mutable_accounts"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "anchor_errors"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "anchor_events"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "anchor_floats"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "anchor_realloc"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "anchor_system_accounts"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "anchor_sysvars"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "anstream"
 version = "0.6.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1011,7 +1074,7 @@ dependencies = [
 name = "escrow_program"
 version = "0.0.0"
 dependencies = [
- "mollusk-svm",
+ "mollusk-svm 0.8.1",
  "pina",
  "tokio",
 ]
@@ -1434,9 +1497,9 @@ dependencies = [
  "agave-feature-set",
  "agave-syscalls",
  "bincode",
- "mollusk-svm-error",
+ "mollusk-svm-error 0.8.1",
  "mollusk-svm-keys",
- "mollusk-svm-result",
+ "mollusk-svm-result 0.8.1",
  "solana-account",
  "solana-bpf-loader-program",
  "solana-clock",
@@ -1468,10 +1531,64 @@ dependencies = [
 ]
 
 [[package]]
+name = "mollusk-svm"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3cac6d1c886dc3f907f615e80b66de6400a45d5f8f13f99c0b1c962ef614a5b0"
+dependencies = [
+ "agave-feature-set",
+ "agave-syscalls",
+ "bincode",
+ "mollusk-svm-error 0.10.3",
+ "mollusk-svm-result 0.10.3",
+ "solana-account",
+ "solana-bpf-loader-program",
+ "solana-clock",
+ "solana-compute-budget",
+ "solana-epoch-rewards",
+ "solana-epoch-schedule",
+ "solana-hash 3.1.0",
+ "solana-instruction",
+ "solana-instruction-error",
+ "solana-instructions-sysvar",
+ "solana-loader-v3-interface",
+ "solana-loader-v4-interface",
+ "solana-logger",
+ "solana-message",
+ "solana-precompile-error",
+ "solana-program-error",
+ "solana-program-runtime",
+ "solana-pubkey 4.1.0",
+ "solana-rent",
+ "solana-sdk-ids",
+ "solana-slot-hashes",
+ "solana-stake-interface",
+ "solana-svm-callback",
+ "solana-svm-log-collector",
+ "solana-svm-timings",
+ "solana-svm-transaction",
+ "solana-system-program",
+ "solana-sysvar",
+ "solana-sysvar-id",
+ "solana-transaction-context",
+ "solana-transaction-error",
+]
+
+[[package]]
 name = "mollusk-svm-error"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "602cd9544daaebe5c408925ce6b6a85575f30f177ddbf105638308c2061b3951"
+dependencies = [
+ "solana-pubkey 4.1.0",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "mollusk-svm-error"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d23fa709c14bfe0d8266508eedc2138aa7e6417d6f860d88cdc5cfa5346b357"
 dependencies = [
  "solana-pubkey 4.1.0",
  "thiserror 1.0.69",
@@ -1483,7 +1600,7 @@ version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0f96ad1a13cb40fa9edabc805b3ff126f560493036883ac763d77f080e085c0"
 dependencies = [
- "mollusk-svm-error",
+ "mollusk-svm-error 0.8.1",
  "solana-account",
  "solana-instruction",
  "solana-pubkey 4.1.0",
@@ -1501,6 +1618,20 @@ dependencies = [
  "solana-program-error",
  "solana-pubkey 4.1.0",
  "solana-rent",
+]
+
+[[package]]
+name = "mollusk-svm-result"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "088825f3c0c1f820eafd1f10efd3606c58a5edec4accdb68eb1d9ce357d2ecac"
+dependencies = [
+ "solana-account",
+ "solana-instruction",
+ "solana-program-error",
+ "solana-pubkey 4.1.0",
+ "solana-rent",
+ "solana-transaction-error",
 ]
 
 [[package]]
@@ -1766,6 +1897,17 @@ dependencies = [
  "solana-address 2.2.0",
  "solana-instruction-view",
  "solana-program-error",
+]
+
+[[package]]
+name = "pinocchio_bpf_starter"
+version = "0.0.0"
+dependencies = [
+ "mollusk-svm 0.10.3",
+ "pinocchio",
+ "solana-define-syscall 4.0.1",
+ "solana-instruction",
+ "solana-program-log",
 ]
 
 [[package]]

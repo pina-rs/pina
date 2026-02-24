@@ -74,7 +74,7 @@ Comprehensive project documentation now lives in the mdBook under `docs/`.
 docs:build
 ```
 
-Use `verify:docs` to validate documentation structure and build output in CI.
+Use `verify:docs` to validate documentation structure and build output in CI. Use `test:idl` to verify `codama/idls/anchor_*.json` against fresh output and Codama Rust/JS validators.
 
 ## Quick start
 
@@ -444,12 +444,22 @@ cargo nextest run  # Faster parallel test execution
 
 ## Examples
 
-| Example                                       | Description                                        |
-| --------------------------------------------- | -------------------------------------------------- |
-| [`hello_solana`](examples/hello_solana)       | Minimal program — entrypoint, accounts, logging    |
-| [`counter_program`](examples/counter_program) | PDA state management with initialize and increment |
-| [`transfer_sol`](examples/transfer_sol)       | CPI and direct lamport transfers                   |
-| [`escrow_program`](examples/escrow_program)   | Full token escrow with SPL token operations        |
+| Example                                                                           | Description                                                                 |
+| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| [`hello_solana`](examples/hello_solana)                                           | Minimal program — entrypoint, accounts, logging                             |
+| [`counter_program`](examples/counter_program)                                     | PDA state management with initialize and increment                          |
+| [`transfer_sol`](examples/transfer_sol)                                           | CPI and direct lamport transfers                                            |
+| [`escrow_program`](examples/escrow_program)                                       | Full token escrow with SPL token operations                                 |
+| [`pinocchio_bpf_starter`](examples/pinocchio_bpf_starter)                         | Upstream BPF starter-style hello world with `sbpf-linker`                   |
+| [`anchor_declare_id`](examples/anchor_declare_id)                                 | Anchor `declare-id` test parity port for program-id mismatch                |
+| [`anchor_declare_program`](examples/anchor_declare_program)                       | Anchor `declare-program` parity port for external-program ID checks         |
+| [`anchor_duplicate_mutable_accounts`](examples/anchor_duplicate_mutable_accounts) | Anchor duplicate mutable account checks adapted to explicit pina validation |
+| [`anchor_errors`](examples/anchor_errors)                                         | Anchor custom error-code parity and guard helper checks                     |
+| [`anchor_events`](examples/anchor_events)                                         | Anchor event schema parity via deterministic event serialization            |
+| [`anchor_floats`](examples/anchor_floats)                                         | Anchor float account/update behavior with authority checks                  |
+| [`anchor_system_accounts`](examples/anchor_system_accounts)                       | Anchor system-owned account constraint parity                               |
+| [`anchor_sysvars`](examples/anchor_sysvars)                                       | Anchor sysvar account validation parity                                     |
+| [`anchor_realloc`](examples/anchor_realloc)                                       | Anchor realloc constraint parity for growth-limit and duplicate checks      |
 
 ## Security
 

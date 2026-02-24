@@ -5,7 +5,7 @@
   ...
 }:
 let
-  llvm = pkgs.llvmPackages_19;
+  llvm = pkgs.llvmPackages_21;
 in
 
 {
@@ -24,6 +24,8 @@ in
       nodejs
       pnpm
       mdbook
+      nodejs
+      pnpm
       llvm.bintools
       llvm.clang
       llvm.clang-tools
@@ -223,8 +225,54 @@ in
     "test:all" = {
       exec = ''
         set -e
+        cargo test --all-features --locked
       '';
       description = "Run all tests across the crates";
+      binary = "bash";
+    };
+    "test:anchor-parity" = {
+      exec = ''
+        set -e
+        cargo test --locked \
+          -p anchor_declare_id \
+          -p anchor_declare_program \
+          -p anchor_duplicate_mutable_accounts \
+          -p anchor_errors \
+          -p anchor_events \
+          -p anchor_floats \
+          -p anchor_realloc \
+          -p anchor_system_accounts \
+          -p anchor_sysvars \
+          -p escrow_program
+        rustup component add rust-src --toolchain nightly-2025-10-15
+        cargo +nightly-2025-10-15 build-bpf
+        cargo test --locked -p pinocchio_bpf_starter hello_world -- --ignored
+      '';
+      description = "Run Anchor parity example tests and starter BPF execution checks.";
+      binary = "bash";
+    };
+    "idl:generate" = {
+      exec = ''
+        set -e
+        "$DEVENV_ROOT/scripts/generate-codama-idls.sh"
+      '';
+      description = "Generate Codama IDLs for all anchor_* examples.";
+      binary = "bash";
+    };
+    "verify:idls" = {
+      exec = ''
+        set -e
+        "$DEVENV_ROOT/scripts/verify-codama-idls.sh"
+      '';
+      description = "Verify Codama IDL fixtures and JS/Rust IDL validation tests.";
+      binary = "bash";
+    };
+    "test:idl" = {
+      exec = ''
+        set -e
+        verify:idls
+      '';
+      description = "Run IDL fixture drift + Rust/JS Codama validation tests.";
       binary = "bash";
     };
     "coverage:all" = {

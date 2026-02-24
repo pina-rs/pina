@@ -11,6 +11,7 @@ cargo test
 lint:all
 verify:docs
 verify:security
+test:idl
 ```
 
 <!-- {/dailyDevelopmentLoop} -->

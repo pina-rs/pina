@@ -6,6 +6,7 @@
 - [Core Concepts](./core-concepts.md)
 - [Crates and Features](./crates-and-features.md)
 - [Examples](./examples.md)
+- [Anchor Test Porting](./anchor-test-porting.md)
 - [Security Model](./security-model.md)
 - [Development Workflow](./development-workflow.md)
 - [CI and Releases](./ci-and-releases.md)
