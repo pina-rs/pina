@@ -23,6 +23,7 @@ in
       libiconv
       nodejs
       pnpm
+      mdbook
       llvm.bintools
       llvm.clang
       llvm.clang-tools
@@ -36,7 +37,10 @@ in
       pkg-config
       protobuf # needed for `solana-test-validator` in tests
       rust-jemalloc-sys
-      rustup
+      # Upstream rustup check suite is network-sensitive (e.g. socks proxy test) and flakes in CI.
+      (rustup.overrideAttrs (_: {
+        doCheck = false;
+      }))
       shfmt
       zstd
     ]
@@ -218,8 +222,10 @@ in
     "coverage:all" = {
       exec = ''
         set -e
+        mkdir -p "$DEVENV_ROOT/target/coverage"
+        cargo llvm-cov --workspace --all-features --locked --lcov --output-path "$DEVENV_ROOT/target/coverage/lcov.info"
       '';
-      description = "Run coverage across the crates";
+      description = "Run workspace coverage and generate an lcov report.";
       binary = "bash";
     };
     "fix:all" = {
@@ -242,7 +248,7 @@ in
     "fix:clippy" = {
       exec = ''
         set -e
-        cargo clippy --fix --allow-dirty --allow-staged --all-features
+        cargo clippy --fix --allow-dirty --allow-staged --all-features --locked
       '';
       description = "Fix clippy lints for rust.";
       binary = "bash";
@@ -252,8 +258,17 @@ in
         set -e
         lint:clippy
         lint:format
+        verify:docs
       '';
       description = "Run all checks.";
+      binary = "bash";
+    };
+    "docs:build" = {
+      exec = ''
+        set -e
+        mdbook build "$DEVENV_ROOT/docs"
+      '';
+      description = "Build the mdBook documentation.";
       binary = "bash";
     };
     "lint:format" = {
@@ -264,10 +279,20 @@ in
       description = "Check that all files are formatted.";
       binary = "bash";
     };
+    "verify:docs" = {
+      exec = ''
+        set -e
+        [ -f "$DEVENV_ROOT/docs/book.toml" ]
+        [ -f "$DEVENV_ROOT/docs/src/SUMMARY.md" ]
+        mdbook build "$DEVENV_ROOT/docs" -d "$DEVENV_ROOT/target/mdbook"
+      '';
+      description = "Verify docs folder structure and build docs.";
+      binary = "bash";
+    };
     "lint:clippy" = {
       exec = ''
         set -e
-        cargo clippy --all-features
+        cargo clippy --all-features --locked
       '';
       description = "Check that all rust lints are passing.";
       binary = "bash";

@@ -83,6 +83,12 @@ impl_int_conversion!(PodI16, i16);
 pub struct PodU32(pub [u8; 4]);
 impl_int_conversion!(PodU32, u32);
 
+/// `i32` type that can be used in `Pod`s
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
+#[repr(transparent)]
+pub struct PodI32(pub [u8; 4]);
+impl_int_conversion!(PodI32, i32);
+
 /// `u64` type that can be used in Pods
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
 #[repr(transparent)]
@@ -92,7 +98,7 @@ impl_int_conversion!(PodU64, u64);
 /// `i64` type that can be used in Pods
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
 #[repr(transparent)]
-pub struct PodI64([u8; 8]);
+pub struct PodI64(pub [u8; 8]);
 impl_int_conversion!(PodI64, i64);
 
 /// `u128` type that can be used in Pods
@@ -100,6 +106,12 @@ impl_int_conversion!(PodI64, i64);
 #[repr(transparent)]
 pub struct PodU128(pub [u8; 16]);
 impl_int_conversion!(PodU128, u128);
+
+/// `i128` type that can be used in Pods
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
+#[repr(transparent)]
+pub struct PodI128(pub [u8; 16]);
+impl_int_conversion!(PodI128, i128);
 
 /// Reinterprets a byte slice as `&T` (zero-copy). Returns an error if the
 /// slice has incorrect length or alignment.
@@ -157,12 +169,46 @@ mod tests {
 	}
 
 	#[test]
+	fn test_pod_i32() {
+		assert!(pod_from_bytes::<PodI32>(&[]).is_err());
+		assert_eq!(
+			-1i32,
+			i32::from(*pod_from_bytes::<PodI32>(&[255, 255, 255, 255]).unwrap())
+		);
+		assert_eq!(
+			1i32,
+			i32::from(*pod_from_bytes::<PodI32>(&[1, 0, 0, 0]).unwrap())
+		);
+	}
+
+	#[test]
 	fn test_pod_u128() {
 		assert!(pod_from_bytes::<PodU128>(&[]).is_err());
 		assert_eq!(
 			1u128,
 			u128::from(
 				*pod_from_bytes::<PodU128>(&[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+					.unwrap()
+			)
+		);
+	}
+
+	#[test]
+	fn test_pod_i128() {
+		assert!(pod_from_bytes::<PodI128>(&[]).is_err());
+		assert_eq!(
+			-1i128,
+			i128::from(
+				*pod_from_bytes::<PodI128>(&[
+					255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255
+				])
+				.unwrap()
+			)
+		);
+		assert_eq!(
+			1i128,
+			i128::from(
+				*pod_from_bytes::<PodI128>(&[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 					.unwrap()
 			)
 		);

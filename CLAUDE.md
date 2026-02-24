@@ -50,6 +50,8 @@ cargo llvm-cov                    # Code coverage via cargo-llvm-cov
 cargo semver-checks               # Check for semver violations
 ```
 
+When using `devenv`, `pina ...` is available as a shortcut for `cargo run -p pina_cli -- ...`.
+
 ### Formatting
 
 Formatting is handled by `dprint` (not `cargo fmt` directly). dprint delegates to `rustfmt` for `.rs` files, `nixfmt` for `.nix`, and `shfmt` for shell scripts. Always use `fix:format` or `dprint fmt` rather than running `rustfmt` directly.
@@ -168,8 +170,10 @@ A single changeset file can reference multiple packages. Always run `dprint fmt 
 
 ## Git & PR Workflow
 
-- Create a dedicated branch for the change before committing.
-- Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages.
+- Create a dedicated branch for each change before committing.
+- Branch names must use `feat/<description>` for features or `fix/<description>` for bug fixes.
+- Do not use the `codex/` branch prefix.
+- Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/).
 - Push the branch and open a pull request for review.
 - After review, apply any requested fixes (including breaking-change fixes) on the same branch.
 - Merge only after approvals are complete.

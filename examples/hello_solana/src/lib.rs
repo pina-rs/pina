@@ -97,7 +97,7 @@ pub struct HelloAccounts<'a> {
 ///
 /// 1. Validate the discriminator via `HelloInstructionData::try_from_bytes`.
 /// 2. Assert the user account is a signer.
-/// 3. Log a greeting with the user's address.
+/// 3. Log a greeting.
 impl<'a> ProcessAccountInfos<'a> for HelloAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
 		// Validate instruction data (checks the discriminator byte).

@@ -66,6 +66,16 @@ End-to-end setup steps:
 | `logs`   | Yes     | Enables on-chain logging via `solana-program-log`          |
 | `token`  | No      | Enables SPL token / token-2022 helpers and ATA utilities   |
 
+## Documentation
+
+Comprehensive project documentation now lives in the mdBook under `docs/`.
+
+```sh
+docs:build
+```
+
+Use `verify:docs` to validate documentation structure and build output in CI.
+
 ## Quick start
 
 ```rust

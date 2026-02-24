@@ -1,11 +1,11 @@
 [package]
 name = "pina_sdk_ids"
-version = "0.2.0"
+version = "0.3.0"
 edition.workspace = true
 homepage.workspace = true
 keywords.workspace = true
 license.workspace = true
-readme.workspace = true
+readme = "readme.md"
 repository.workspace = true
 rust-version.workspace = true
 description = "pina compatible sdk id's"

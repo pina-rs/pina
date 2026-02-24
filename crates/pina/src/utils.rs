@@ -29,6 +29,11 @@ pub fn parse_instruction<'a, T: IntoDiscriminator>(
 		return Err(ProgramError::IncorrectProgramId);
 	}
 
+	// Defense-in-depth: reject data that is too short for the discriminator.
+	if data.len() < T::BYTES {
+		return Err(ProgramError::InvalidInstructionData);
+	}
+
 	// Get instruction for discriminator.
 	T::discriminator_from_bytes(data).map_err(|error| {
 		match error {

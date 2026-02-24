@@ -344,12 +344,14 @@ impl AsAccount for AccountView {
 		T: AccountDeserialize + HasDiscriminator + Pod,
 	{
 		self.assert_owner(program_id)?;
+		self.assert_data_len(size_of::<T>())?;
 
 		// SAFETY: `try_borrow` returns a reference whose lifetime is tied to
 		// `self`. We create a raw-parts slice of exactly `size_of::<T>()` bytes
-		// from the same pointer. `T::try_from_bytes` then validates the
-		// discriminator and performs a bytemuck cast — no uninitialized memory is
-		// read.
+		// from the same pointer. The `assert_data_len` check above guarantees
+		// the account data is exactly `size_of::<T>()` bytes.
+		// `T::try_from_bytes` then validates the discriminator and performs a
+		// bytemuck cast.
 		unsafe { T::try_from_bytes(from_raw_parts(self.try_borrow()?.as_ptr(), size_of::<T>())) }
 	}
 
@@ -359,10 +361,12 @@ impl AsAccount for AccountView {
 		T: AccountDeserialize + HasDiscriminator + Pod,
 	{
 		self.assert_owner(program_id)?;
+		self.assert_data_len(size_of::<T>())?;
 
 		// SAFETY: Same reasoning as `as_account` above, but with a mutable
-		// borrow. The Solana runtime guarantees exclusive access when
-		// `try_borrow_mut` succeeds.
+		// borrow. The `assert_data_len` check above guarantees the account data
+		// is exactly `size_of::<T>()` bytes. The Solana runtime guarantees
+		// exclusive access when `try_borrow_mut` succeeds.
 		unsafe {
 			T::try_from_bytes_mut(from_raw_parts_mut(
 				self.try_borrow_mut()?.as_mut_ptr(),
@@ -435,6 +439,8 @@ macro_rules! impl_account_validation {
 }
 
 #[cfg(feature = "token")]
+impl_account_validation!(crate::token::state::Mint, "Mint account data is invalid");
+#[cfg(feature = "token")]
 impl_account_validation!(
 	crate::token_2022::state::Mint,
 	"Mint account data is invalid"
@@ -442,6 +448,11 @@ impl_account_validation!(
 #[cfg(feature = "token")]
 impl_account_validation!(
 	crate::token::state::TokenAccount,
+	"Token account data is invalid"
+);
+#[cfg(feature = "token")]
+impl_account_validation!(
+	crate::token_2022::state::TokenAccount,
 	"Token account data is invalid"
 );
 
@@ -457,11 +468,39 @@ impl AsTokenAccount for AccountView {
 		unsafe { crate::token::state::Mint::from_account_view_unchecked(self) }
 	}
 
+	#[track_caller]
+	fn as_token_mint_checked(&self) -> Result<&crate::token::state::Mint, ProgramError> {
+		self.as_token_mint_checked_with_owners(&[crate::token::ID])
+	}
+
+	#[track_caller]
+	fn as_token_mint_checked_with_owners(
+		&self,
+		owners: &[Address],
+	) -> Result<&crate::token::state::Mint, ProgramError> {
+		self.assert_owners(owners)?;
+		self.as_token_mint()
+	}
+
 	fn as_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError> {
 		self.check_borrow()?;
 
 		// SECURITY: see `as_token_mint` above.
 		unsafe { crate::token::state::TokenAccount::from_account_view_unchecked(self) }
+	}
+
+	#[track_caller]
+	fn as_token_account_checked(&self) -> Result<&crate::token::state::TokenAccount, ProgramError> {
+		self.as_token_account_checked_with_owners(&[crate::token::ID])
+	}
+
+	#[track_caller]
+	fn as_token_account_checked_with_owners(
+		&self,
+		owners: &[Address],
+	) -> Result<&crate::token::state::TokenAccount, ProgramError> {
+		self.assert_owners(owners)?;
+		self.as_token_account()
 	}
 
 	fn as_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError> {
@@ -471,6 +510,20 @@ impl AsTokenAccount for AccountView {
 		unsafe { crate::token_2022::state::Mint::from_account_view_unchecked(self) }
 	}
 
+	#[track_caller]
+	fn as_token_2022_mint_checked(&self) -> Result<&crate::token_2022::state::Mint, ProgramError> {
+		self.as_token_2022_mint_checked_with_owners(&[crate::token_2022::ID])
+	}
+
+	#[track_caller]
+	fn as_token_2022_mint_checked_with_owners(
+		&self,
+		owners: &[Address],
+	) -> Result<&crate::token_2022::state::Mint, ProgramError> {
+		self.assert_owners(owners)?;
+		self.as_token_2022_mint()
+	}
+
 	fn as_token_2022_account(
 		&self,
 	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
@@ -478,6 +531,22 @@ impl AsTokenAccount for AccountView {
 
 		// SECURITY: see `as_token_mint` above.
 		unsafe { crate::token_2022::state::TokenAccount::from_account_view_unchecked(self) }
+	}
+
+	#[track_caller]
+	fn as_token_2022_account_checked(
+		&self,
+	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
+		self.as_token_2022_account_checked_with_owners(&[crate::token_2022::ID])
+	}
+
+	#[track_caller]
+	fn as_token_2022_account_checked_with_owners(
+		&self,
+		owners: &[Address],
+	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
+		self.assert_owners(owners)?;
+		self.as_token_2022_account()
 	}
 
 	fn as_associated_token_account(
@@ -496,6 +565,38 @@ impl AsTokenAccount for AccountView {
 			)
 		}
 	}
+
+	#[track_caller]
+	fn as_associated_token_account_checked(
+		&self,
+		owner: &Address,
+		mint: &Address,
+		token_program: &Address,
+	) -> Result<&crate::token::state::TokenAccount, ProgramError> {
+		self.assert_owner(token_program)?;
+		self.as_associated_token_account(owner, mint, token_program)
+	}
+}
+
+fn checked_send_balances(
+	current: u64,
+	recipient_balance: u64,
+	lamports: u64,
+) -> Result<(u64, u64), ProgramError> {
+	let new_balance = current
+		.checked_sub(lamports)
+		.ok_or(ProgramError::InsufficientFunds)?;
+	let new_recipient_balance = recipient_balance
+		.checked_add(lamports)
+		.ok_or(ProgramError::ArithmeticOverflow)?;
+
+	Ok((new_balance, new_recipient_balance))
+}
+
+fn checked_close_balance(sender_balance: u64, recipient_balance: u64) -> Result<u64, ProgramError> {
+	recipient_balance
+		.checked_add(sender_balance)
+		.ok_or(ProgramError::ArithmeticOverflow)
 }
 
 impl<'a> LamportTransfer<'a> for AccountView {
@@ -504,19 +605,31 @@ impl<'a> LamportTransfer<'a> for AccountView {
 	#[inline(always)]
 	#[track_caller]
 	fn send(&'a self, lamports: u64, recipient: &'a AccountView) -> ProgramResult {
-		let current = self.lamports();
-		let new_balance = current.checked_sub(lamports).ok_or_else(|| {
-			log!("Could not subtract lamports: insufficient funds");
-			log_caller();
-			ProgramError::InsufficientFunds
-		})?;
+		self.assert_writable()?;
+		recipient.assert_writable()?;
 
-		let recipient_balance = recipient.lamports();
-		let new_recipient_balance = recipient_balance.checked_add(lamports).ok_or_else(|| {
-			log!("Could not add lamports: arithmetic overflow");
+		if self.address() == recipient.address() {
+			log!("Could not send lamports: sender and recipient must differ");
 			log_caller();
-			ProgramError::ArithmeticOverflow
-		})?;
+			return Err(ProgramError::InvalidArgument);
+		}
+
+		let current = self.lamports();
+		let recipient_balance = recipient.lamports();
+		let (new_balance, new_recipient_balance) =
+			checked_send_balances(current, recipient_balance, lamports).map_err(|error| {
+				match error {
+					ProgramError::InsufficientFunds => {
+						log!("Could not subtract lamports: insufficient funds");
+					}
+					ProgramError::ArithmeticOverflow => {
+						log!("Could not add lamports: arithmetic overflow");
+					}
+					_ => {}
+				}
+				log_caller();
+				error
+			})?;
 
 		self.set_lamports(new_balance);
 		recipient.set_lamports(new_recipient_balance);
@@ -540,17 +653,60 @@ impl<'a> LamportTransfer<'a> for AccountView {
 impl<'a> CloseAccountWithRecipient<'a> for AccountView {
 	#[track_caller]
 	fn close_with_recipient(&'a self, recipient: &'a AccountView) -> ProgramResult {
-		let new_balance = recipient
-			.lamports()
-			.checked_add(self.lamports())
-			.ok_or_else(|| {
+		self.assert_writable()?;
+		recipient.assert_writable()?;
+
+		if self.address() == recipient.address() {
+			log!("Could not close account: recipient must differ from account");
+			log_caller();
+			return Err(ProgramError::InvalidArgument);
+		}
+
+		let new_balance = checked_close_balance(self.lamports(), recipient.lamports())
+			.inspect_err(|_| {
 				log!("Could not close account: lamport overflow");
 				log_caller();
-				ProgramError::ArithmeticOverflow
 			})?;
 		recipient.set_lamports(new_balance);
 		self.set_lamports(0);
 		self.resize(0)?;
 		self.close()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn checked_send_balances_rejects_insufficient_funds() {
+		let result = checked_send_balances(3, 10, 4);
+		assert_eq!(result, Err(ProgramError::InsufficientFunds));
+	}
+
+	#[test]
+	fn checked_send_balances_rejects_destination_overflow() {
+		let result = checked_send_balances(10, u64::MAX, 1);
+		assert_eq!(result, Err(ProgramError::ArithmeticOverflow));
+	}
+
+	#[test]
+	fn checked_send_balances_conserves_lamports() {
+		let (sender, recipient) = checked_send_balances(10, 4, 3)
+			.unwrap_or_else(|err| panic!("expected valid transfer: {err:?}"));
+		assert_eq!(sender + recipient, 14);
+	}
+
+	#[test]
+	fn checked_close_balance_rejects_overflow() {
+		let result = checked_close_balance(1, u64::MAX);
+		assert_eq!(result, Err(ProgramError::ArithmeticOverflow));
+	}
+
+	#[test]
+	fn checked_close_balance_moves_all_lamports() {
+		let result = checked_close_balance(7, 2)
+			.unwrap_or_else(|err| panic!("expected valid close balance: {err:?}"));
+		assert_eq!(result, 9);
 	}
 }

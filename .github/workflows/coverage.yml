@@ -1,0 +1,44 @@
+name: "coverage"
+permissions:
+  contents: read
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  coverage:
+    timeout-minutes: 90
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: run coverage
+        run: coverage:all
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: upload lcov artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: coverage-lcov
+          path: target/coverage/lcov.info
+
+      - name: upload codecov report
+        uses: codecov/codecov-action@v5
+        with:
+          files: target/coverage/lcov.info
+          fail_ci_if_error: false

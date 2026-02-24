@@ -1659,7 +1659,7 @@ checksum = "3b3cff922bd51709b605d9ead9aa71031d81447142d828eb4a6eba76fe619f9b"
 
 [[package]]
 name = "pina"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bytemuck",
  "paste",
@@ -1676,7 +1676,7 @@ dependencies = [
 
 [[package]]
 name = "pina_cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clap",
  "codama-nodes",
@@ -1692,7 +1692,7 @@ dependencies = [
 
 [[package]]
 name = "pina_macros"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "darling",
  "heck",
@@ -1704,7 +1704,7 @@ dependencies = [
 
 [[package]]
 name = "pina_sdk_ids"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "solana-address 2.2.0",
 ]

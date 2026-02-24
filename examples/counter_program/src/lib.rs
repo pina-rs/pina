@@ -250,7 +250,11 @@ impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 
 		let counter = self.counter.as_account_mut::<CounterState>(&ID)?;
 		let current: u64 = counter.count.into();
-		counter.count = PodU64::from_primitive(current + 1);
+		counter.count = PodU64::from_primitive(
+			current
+				.checked_add(1)
+				.ok_or(ProgramError::ArithmeticOverflow)?,
+		);
 
 		log!("Counter incremented");
 

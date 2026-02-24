@@ -20,6 +20,7 @@ use crate::ir::AccountIr;
 use crate::ir::DiscriminatorIr;
 use crate::ir::InstructionAccountIr;
 use crate::ir::InstructionIr;
+use crate::ir::PdaIr;
 use crate::ir::ProgramIr;
 
 /// Parse a program crate directory and assemble a `ProgramIr`.
@@ -107,7 +108,7 @@ pub fn assemble_program_ir(file: &syn::File, program_name: &str) -> Result<Progr
 
 					// Check if this field is a PDA from the pdas we found.
 					let pda_name = if props.is_pda {
-						pdas_ir.iter().find(|_| true).map(|p| p.name.clone())
+						infer_pda_name_for_field(&field.name, &pdas_ir)
 					} else {
 						None
 					};
@@ -240,4 +241,58 @@ pub fn build_discriminator_map(
 		}
 	}
 	map
+}
+
+fn infer_pda_name_for_field(field_name: &str, pdas: &[PdaIr]) -> Option<String> {
+	let candidates = [
+		field_name.to_owned(),
+		field_name.trim_end_matches("_account").to_owned(),
+		field_name.trim_end_matches("_pda").to_owned(),
+	];
+
+	for candidate in candidates {
+		if candidate.is_empty() {
+			continue;
+		}
+
+		if let Some(pda) = pdas.iter().find(|p| p.name == candidate) {
+			return Some(pda.name.clone());
+		}
+	}
+
+	None
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::ir::PdaSeedIr;
+
+	#[test]
+	fn infer_pda_name_for_field_matches_exact_name() {
+		let pdas = vec![
+			PdaIr {
+				name: "counter".to_owned(),
+				seeds: vec![PdaSeedIr::Constant {
+					value: b"counter".to_vec(),
+				}],
+			},
+			PdaIr {
+				name: "vault".to_owned(),
+				seeds: vec![PdaSeedIr::Constant {
+					value: b"vault".to_vec(),
+				}],
+			},
+		];
+
+		assert_eq!(
+			infer_pda_name_for_field("counter", &pdas),
+			Some("counter".to_owned())
+		);
+		assert_eq!(
+			infer_pda_name_for_field("vault_account", &pdas),
+			Some("vault".to_owned())
+		);
+		assert_eq!(infer_pda_name_for_field("unknown", &pdas), None);
+	}
 }
