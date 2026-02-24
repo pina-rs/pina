@@ -5,9 +5,19 @@ members = [
 	"crates/pina_cli",
 	"crates/pina_macros",
 	"crates/pina_sdk_ids",
+	"examples/anchor_declare_id",
+	"examples/anchor_declare_program",
+	"examples/anchor_duplicate_mutable_accounts",
+	"examples/anchor_errors",
+	"examples/anchor_events",
+	"examples/anchor_floats",
+	"examples/anchor_realloc",
+	"examples/anchor_system_accounts",
+	"examples/anchor_sysvars",
 	"examples/counter_program",
 	"examples/escrow_program",
 	"examples/hello_solana",
+	"examples/pinocchio_bpf_starter",
 	"examples/todo_program",
 	"examples/transfer_sol",
 	"security/00-signer-authorization/secure",
@@ -101,7 +111,7 @@ cargo-workspaces = { version = "0.4.2" }
 mdt_cli = { version = "0.0.1", git = "https://github.com/ifiokjr/mdt", rev = "036caa93b77c40fe68890416497cefdaf08f96a1", bins = ["mdt"], locked = true }
 dylint-link = { version = "5.0.0", bins = ["dylint-link"] }
 knope = { version = "0.22.3", bins = ["knope"] }
-sbpf-linker = { version = "0.1.5", bins = ["sbpf-linker"] }
+sbpf-linker = { version = "0.1.8", bins = ["sbpf-linker"] }
 solana-verify = { version = "0.4.11", bins = ["solana-verify"] }
 
 [workspace.lints.rust]

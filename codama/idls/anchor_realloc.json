@@ -1,0 +1,151 @@
+{
+	"kind": "rootNode",
+	"standard": "codama",
+	"version": "1.0.0",
+	"program": {
+		"kind": "programNode",
+		"name": "anchorRealloc",
+		"publicKey": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
+		"version": "",
+		"accounts": [],
+		"instructions": [
+			{
+				"kind": "instructionNode",
+				"name": "realloc",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": false,
+						"isSigner": true
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "sample",
+						"isWritable": true,
+						"isSigner": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "len",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u16",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "realloc2",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": false,
+						"isSigner": true
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "sample1",
+						"isWritable": true,
+						"isSigner": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "sample2",
+						"isWritable": true,
+						"isSigner": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "len",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u16",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			}
+		],
+		"definedTypes": [],
+		"pdas": [],
+		"errors": [
+			{
+				"kind": "errorNode",
+				"name": "accountReallocExceedsLimit",
+				"code": 3016,
+				"message": ""
+			},
+			{
+				"kind": "errorNode",
+				"name": "accountDuplicateReallocs",
+				"code": 3017,
+				"message": ""
+			}
+		]
+	},
+	"additionalPrograms": []
+}

@@ -1,0 +1,93 @@
+use std::fs;
+use std::path::Path;
+
+use codama_nodes::RootNode;
+use pina_cli::generate_idl;
+use serde_json::Value;
+
+fn workspace_root() -> &'static Path {
+	Path::new(env!("CARGO_MANIFEST_DIR"))
+		.parent()
+		.and_then(|p| p.parent())
+		.unwrap_or_else(|| Path::new("."))
+}
+
+fn anchor_examples(root: &Path) -> Vec<String> {
+	let examples_dir = root.join("examples");
+	let mut examples = fs::read_dir(examples_dir)
+		.unwrap_or_else(|e| panic!("failed to read examples directory: {e}"))
+		.filter_map(|entry| entry.ok())
+		.filter_map(|entry| {
+			let file_name = entry.file_name();
+			let name = file_name.to_str()?;
+			if entry.path().is_dir() && name.starts_with("anchor_") {
+				Some(name.to_owned())
+			} else {
+				None
+			}
+		})
+		.collect::<Vec<_>>();
+
+	examples.sort();
+	examples
+}
+
+fn read_fixture(fixture_path: &Path) -> Value {
+	let fixture_json = fs::read_to_string(fixture_path)
+		.unwrap_or_else(|e| panic!("failed to read fixture {}: {e}", fixture_path.display()));
+	let root: RootNode = serde_json::from_str(&fixture_json)
+		.unwrap_or_else(|e| panic!("invalid Codama fixture {}: {e}", fixture_path.display()));
+	serde_json::to_value(root).unwrap_or_else(|e| {
+		panic!(
+			"failed to normalize fixture JSON {}: {e}",
+			fixture_path.display()
+		)
+	})
+}
+
+#[test]
+fn anchor_idl_fixtures_match_generated_output() {
+	let root = workspace_root();
+	let anchor_examples = anchor_examples(root);
+	assert!(
+		!anchor_examples.is_empty(),
+		"expected at least one anchor_* example"
+	);
+
+	for example_name in anchor_examples {
+		let example_path = root.join("examples").join(&example_name);
+		let fixture_path = root
+			.join("codama")
+			.join("idls")
+			.join(format!("{example_name}.json"));
+
+		assert!(
+			fixture_path.is_file(),
+			"missing fixture for {}: {}",
+			example_name,
+			fixture_path.display()
+		);
+
+		let generated_root = generate_idl(&example_path, None).unwrap_or_else(|e| {
+			panic!(
+				"IDL generation failed for {} ({}): {e}",
+				example_name,
+				example_path.display()
+			)
+		});
+		let generated_json = serde_json::to_value(generated_root).unwrap_or_else(|e| {
+			panic!(
+				"failed to serialize generated IDL for {}: {e}",
+				example_name
+			)
+		});
+		let fixture_json = read_fixture(&fixture_path);
+
+		assert_eq!(
+			generated_json, fixture_json,
+			"IDL fixture drift detected for {}. Run `scripts/generate-codama-idls.sh` and commit \
+			 the updated fixture.",
+			example_name,
+		);
+	}
+}

@@ -324,3 +324,47 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		self.escrow.close_with_recipient(self.maker)
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn instruction_discriminators_are_stable() {
+		assert_eq!(EscrowInstruction::Make as u8, 1);
+		assert_eq!(EscrowInstruction::Take as u8, 2);
+	}
+
+	#[test]
+	fn spl_program_ids_are_expected() {
+		assert_eq!(SPL_PROGRAM_IDS, [token::ID, token_2022::ID]);
+	}
+
+	#[test]
+	fn seeds_macro_builds_expected_seed_arrays() {
+		let maker = [3u8; 32];
+		let seed = PodU64::from_primitive(42);
+		let bump = 7u8;
+
+		let seeds = seeds_escrow!(&maker, &seed.0);
+		assert_eq!(seeds.len(), 3);
+		assert_eq!(seeds[0], SEED_PREFIX);
+		assert_eq!(seeds[1], &maker);
+		assert_eq!(seeds[2], &seed.0);
+
+		let seeds_with_bump = seeds_escrow!(&maker, &seed.0, bump);
+		assert_eq!(seeds_with_bump.len(), 4);
+		assert_eq!(seeds_with_bump[0], SEED_PREFIX);
+		assert_eq!(seeds_with_bump[1], &maker);
+		assert_eq!(seeds_with_bump[2], &seed.0);
+		assert_eq!(seeds_with_bump[3], &[bump]);
+	}
+
+	#[test]
+	fn parse_instruction_rejects_program_id_mismatch() {
+		let wrong_program_id: Address = [9u8; 32].into();
+		let data = [EscrowInstruction::Make as u8];
+		let result = parse_instruction::<EscrowInstruction>(&wrong_program_id, &ID, &data);
+		assert!(matches!(result, Err(ProgramError::IncorrectProgramId)));
+	}
+}

@@ -13,6 +13,7 @@ rustflags = [
 ]
 
 [alias]
+build-bpf = "build --release --target bpfel-unknown-none -p pinocchio_bpf_starter -Z build-std"
 build-escrow-program = "build --release --target bpfel-unknown-none -p escrow_program -Z build-std -F bpf-entrypoint"
 dylint = ["bin", "cargo-dylint"]
 insta = ["bin", "cargo-insta"]

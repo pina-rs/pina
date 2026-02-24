@@ -69,8 +69,40 @@ jobs:
       - name: run tests
         run: |
           sudo prlimit --pid $$ --nofile=1000000:1000000
-          cargo test --all-features --locked
+          test:all
         shell: devenv shell -- bash -e {0}
+
+  anchor-parity:
+    timeout-minutes: 60
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: run anchor parity tests
+        run: test:anchor-parity
+        shell: devenv shell -c -- bash -e {0}
+
+  idl:
+    timeout-minutes: 60
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: verify codama idls
+        run: test:idl
+        shell: devenv shell -c -- bash -e {0}
 
   build:
     timeout-minutes: 60
