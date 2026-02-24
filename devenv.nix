@@ -21,6 +21,8 @@ in
       eget
       gcc
       libiconv
+      nodejs
+      pnpm
       mdbook
       llvm.bintools
       llvm.clang
@@ -116,6 +118,36 @@ in
         cargo run -p pina_cli -- $@
       '';
       description = "Run the `pina` CLI from source.";
+      binary = "bash";
+    };
+    "codama:idl:all" = {
+      exec = ''
+        set -e
+        mkdir -p "$DEVENV_ROOT/codama/idls"
+        for program_dir in "$DEVENV_ROOT"/examples/*/; do
+          program_name=$(basename "$program_dir")
+          echo "Generating IDL for $program_name"
+          pina idl --path "$program_dir" --output "$DEVENV_ROOT/codama/idls/$program_name.json"
+        done
+      '';
+      description = "Generate Codama IDLs for all example programs.";
+      binary = "bash";
+    };
+    "codama:clients:generate" = {
+      exec = ''
+        set -e
+        pnpm --dir "$DEVENV_ROOT/codama" install --frozen-lockfile
+        pnpm --dir "$DEVENV_ROOT/codama" run generate
+      '';
+      description = "Generate Codama Rust and JS clients from IDLs.";
+      binary = "bash";
+    };
+    "codama:test" = {
+      exec = ''
+        set -e
+        bash "$DEVENV_ROOT/codama/test.sh"
+      '';
+      description = "Run the full Codama integration pipeline.";
       binary = "bash";
     };
     "generate:keypair" = {
