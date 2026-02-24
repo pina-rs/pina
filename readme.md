@@ -110,11 +110,17 @@ cargo run --manifest-path ./codama/pina_codama_renderer/Cargo.toml -- \
 
 Comprehensive project documentation now lives in the mdBook under `docs/`.
 
-```sh
+<!-- {=docsBuildCommand} -->
+
+```bash
 docs:build
 ```
 
-Use `verify:docs` to validate documentation structure and build output in CI. Use `test:idl` to verify `codama/idls/anchor_*.json` against fresh output and Codama Rust/JS validators.
+<!-- {/docsBuildCommand} -->
+
+Use `verify:docs` to validate documentation structure and build output in CI.
+Use `test:idl` to verify `codama/idls/anchor_*.json` against fresh output and Codama Rust/JS validators.
+Reusable command snippets are managed by `mdt`; run `docs:sync` after changing `template.t.md`.
 
 ## Quick start
 

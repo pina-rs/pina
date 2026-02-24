@@ -385,9 +385,9 @@ in
     "verify:docs" = {
       exec = ''
         set -e
+        docs:check
         [ -f "$DEVENV_ROOT/docs/book.toml" ]
         [ -f "$DEVENV_ROOT/docs/src/SUMMARY.md" ]
-        docs:check
         mdbook build "$DEVENV_ROOT/docs" -d "$DEVENV_ROOT/target/mdbook"
       '';
       description = "Verify docs folder structure and build docs.";

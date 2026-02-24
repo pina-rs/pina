@@ -43,6 +43,11 @@ fix:all                           # Auto-fix all (clippy + format)
 fix:clippy                        # cargo clippy --fix
 fix:format                        # dprint fmt
 
+# Reusable docs (mdt)
+docs:sync                         # mdt update over the repo
+docs:check                        # mdt check over the repo
+verify:docs                       # docs:check + mdbook build
+
 # Coverage
 cargo llvm-cov                    # Code coverage via cargo-llvm-cov
 
@@ -50,7 +55,7 @@ cargo llvm-cov                    # Code coverage via cargo-llvm-cov
 cargo semver-checks               # Check for semver violations
 ```
 
-When using `devenv`, `pina ...` is available as a shortcut for `cargo run -p pina_cli -- ...`.
+When using `devenv`, `pina ...` is available as a shortcut for `cargo run -p pina_cli -- ...`. Reusable docs providers live in `template.t.md`.
 
 ### Formatting
 

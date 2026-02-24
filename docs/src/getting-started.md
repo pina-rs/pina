@@ -8,25 +8,37 @@
 
 ## Setup
 
+<!-- {=devEnvironmentSetupCommands} -->
+
 ```bash
 devenv shell
 install:all
 ```
 
+<!-- {/devEnvironmentSetupCommands} -->
+
 ## Build and test
+
+<!-- {=buildAndTestCommands} -->
 
 ```bash
 cargo build --all-features
 cargo test
 ```
 
+<!-- {/buildAndTestCommands} -->
+
 ## Common quality checks
+
+<!-- {=commonQualityChecksCommands} -->
 
 ```bash
 lint:clippy
 lint:format
 verify:docs
 ```
+
+<!-- {/commonQualityChecksCommands} -->
 
 ## Generate a Codama IDL
 
@@ -38,8 +50,12 @@ See [Codama Workflow](./codama-workflow.md) for end-to-end generation and extern
 
 ## Build this documentation
 
+<!-- {=docsBuildCommand} -->
+
 ```bash
 docs:build
 ```
+
+<!-- {/docsBuildCommand} -->
 
 The generated site is written to `docs/book/`.

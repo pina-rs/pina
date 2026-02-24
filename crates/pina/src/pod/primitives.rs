@@ -1,13 +1,19 @@
 //! Alignment-safe primitive wrappers that can be used in `Pod` structs.
+//!
+//! All `Pod*` numeric wrappers use little-endian byte encoding and
+//! `#[repr(transparent)]` wrappers so they can be embedded safely in `Pod`
+//! account layouts without alignment traps.
 use bytemuck::Pod;
 use bytemuck::Zeroable;
 use pinocchio::error::ProgramError;
 
-/// The standard `bool` is not a `Pod`, define a replacement that is
+/// `bool` is not `Pod`-safe by default. `PodBool` stores `0`/`1` in a single
+/// byte so it can be embedded in zero-copy account structs.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct PodBool(pub u8);
 impl PodBool {
+	/// Converts a Rust `bool` into its `PodBool` representation (`0` or `1`).
 	pub const fn from_bool(b: bool) -> Self {
 		Self(if b { 1 } else { 0 })
 	}
@@ -48,6 +54,7 @@ impl From<PodBool> for bool {
 macro_rules! impl_int_conversion {
 	($P:ty, $I:ty) => {
 		impl $P {
+			/// Converts a primitive integer into this little-endian `Pod*` type.
 			pub const fn from_primitive(n: $I) -> Self {
 				Self(n.to_le_bytes())
 			}
