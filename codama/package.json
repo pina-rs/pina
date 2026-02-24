@@ -9,11 +9,11 @@
 	},
 	"dependencies": {
 		"@codama/renderers-js": "^2.0.2",
-		"@codama/renderers-rust": "^2.0.0",
 		"codama": "^1.5.1"
 	},
 	"devDependencies": {
-		"@solana/kit": "^2.1.0",
+		"@solana/kit": "^6.1.0",
+		"@solana/program-client-core": "^6.1.0",
 		"@types/node": "^25.3.0",
 		"typescript": "^5.7.0"
 	}

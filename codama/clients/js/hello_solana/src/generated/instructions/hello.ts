@@ -6,118 +6,58 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type AccountMeta,
-	type AccountSignerMeta,
-	type Address,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithAccounts,
-	type ReadonlySignerAccount,
-	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-	SolanaError,
-	type TransactionSigner,
-} from "@solana/kit";
-import {
-	getAccountMetaFactory,
-	type ResolvedInstructionAccount,
-} from "@solana/program-client-core";
-import { HELLO_SOLANA_PROGRAM_ADDRESS } from "../programs";
+import { getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, type AccountMeta, type AccountSignerMeta, type Address, type Instruction, type InstructionWithAccounts, type ReadonlySignerAccount, type TransactionSigner } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
+import { HELLO_SOLANA_PROGRAM_ADDRESS } from '../programs';
 
 export const HELLO_DISCRIMINATOR = 0;
 
-export function getHelloDiscriminatorBytes() {
-	return getU8Encoder().encode(HELLO_DISCRIMINATOR);
+export function getHelloDiscriminatorBytes() { return getU8Encoder().encode(HELLO_DISCRIMINATOR); }
+
+export type HelloInstruction<TProgram extends string = typeof HELLO_SOLANA_PROGRAM_ADDRESS, TAccountUser extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithAccounts<[TAccountUser extends string ? ReadonlySignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser> : TAccountUser, ...TRemainingAccounts]>;
+
+export type HelloInput<TAccountUser extends string = string> =  {
+  /**
+ * The user invoking the program. Must be a signer so we can trust the
+ * address is authentic.
+ */
+user: TransactionSigner<TAccountUser>;
 }
 
-export type HelloInstruction<
-	TProgram extends string = typeof HELLO_SOLANA_PROGRAM_ADDRESS,
-	TAccountUser extends string | AccountMeta<string> = string,
-	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> =
-	& Instruction<TProgram>
-	& InstructionWithAccounts<
-		[
-			TAccountUser extends string
-				? ReadonlySignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
-				: TAccountUser,
-			...TRemainingAccounts,
-		]
-	>;
+export function getHelloInstruction<TAccountUser extends string, TProgramAddress extends Address = typeof HELLO_SOLANA_PROGRAM_ADDRESS>(input: HelloInput<TAccountUser>, config?: { programAddress?: TProgramAddress } ): HelloInstruction<TProgramAddress, TAccountUser> {
+  // Program address.
+const programAddress = config?.programAddress ?? HELLO_SOLANA_PROGRAM_ADDRESS;
 
-export type HelloInput<TAccountUser extends string = string> = {
-	/**
-	 * The user invoking the program. Must be a signer so we can trust the
-	 * address is authentic.
-	 */
-	user: TransactionSigner<TAccountUser>;
-};
+ // Original accounts.
+const originalAccounts = { user: { value: input.user ?? null, isWritable: false } }
+const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
-export function getHelloInstruction<
-	TAccountUser extends string,
-	TProgramAddress extends Address = typeof HELLO_SOLANA_PROGRAM_ADDRESS,
->(
-	input: HelloInput<TAccountUser>,
-	config?: { programAddress?: TProgramAddress },
-): HelloInstruction<TProgramAddress, TAccountUser> {
-	// Program address.
-	const programAddress = config?.programAddress ?? HELLO_SOLANA_PROGRAM_ADDRESS;
 
-	// Original accounts.
-	const originalAccounts = {
-		user: { value: input.user ?? null, isWritable: false },
-	};
-	const accounts = originalAccounts as Record<
-		keyof typeof originalAccounts,
-		ResolvedInstructionAccount
-	>;
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze(
-		{
-			accounts: [getAccountMeta("user", accounts.user)],
-			programAddress,
-		} as HelloInstruction<TProgramAddress, TAccountUser>,
-	);
+
+const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+return Object.freeze({ accounts: [getAccountMeta("user", accounts.user)], programAddress } as HelloInstruction<TProgramAddress, TAccountUser>);
 }
 
-export type ParsedHelloInstruction<
-	TProgram extends string = typeof HELLO_SOLANA_PROGRAM_ADDRESS,
-	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
-> = {
-	programAddress: Address<TProgram>;
-	accounts: {
-		/**
-		 * The user invoking the program. Must be a signer so we can trust the
-		 * address is authentic.
-		 */
-		user: TAccountMetas[0];
-	};
-};
+export type ParsedHelloInstruction<TProgram extends string = typeof HELLO_SOLANA_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
+accounts: {
+/**
+ * The user invoking the program. Must be a signer so we can trust the
+ * address is authentic.
+ */
+user: TAccountMetas[0];
+}; };
 
-export function parseHelloInstruction<
-	TProgram extends string,
-	TAccountMetas extends readonly AccountMeta[],
->(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
-): ParsedHelloInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 1) {
-		throw new SolanaError(
-			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-			{
-				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 1,
-			},
-		);
-	}
-	let accountIndex = 0;
-	const getNextAccount = () => {
-		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-		accountIndex += 1;
-		return accountMeta;
-	};
-	return {
-		programAddress: instruction.programAddress,
-		accounts: { user: getNextAccount() },
-	};
+export function parseHelloInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>): ParsedHelloInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 1) {
+  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 1 });
+}
+let accountIndex = 0;
+const getNextAccount = () => {
+  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+  accountIndex += 1;
+  return accountMeta;
+}
+  return { programAddress: instruction.programAddress, accounts: { user: getNextAccount() } };
 }

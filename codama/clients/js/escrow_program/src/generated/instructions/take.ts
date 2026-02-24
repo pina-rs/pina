@@ -6,258 +6,70 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type AccountMeta,
-	type AccountSignerMeta,
-	type Address,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithAccounts,
-	type ReadonlyAccount,
-	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-	SolanaError,
-	type TransactionSigner,
-	type WritableAccount,
-	type WritableSignerAccount,
-} from "@solana/kit";
-import {
-	getAccountMetaFactory,
-	type ResolvedInstructionAccount,
-} from "@solana/program-client-core";
-import { ESCROW_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, type AccountMeta, type AccountSignerMeta, type Address, type Instruction, type InstructionWithAccounts, type ReadonlyAccount, type TransactionSigner, type WritableAccount, type WritableSignerAccount } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
+import { ESCROW_PROGRAM_PROGRAM_ADDRESS } from '../programs';
 
 export const TAKE_DISCRIMINATOR = 2;
 
-export function getTakeDiscriminatorBytes() {
-	return getU8Encoder().encode(TAKE_DISCRIMINATOR);
+export function getTakeDiscriminatorBytes() { return getU8Encoder().encode(TAKE_DISCRIMINATOR); }
+
+export type TakeInstruction<TProgram extends string = typeof ESCROW_PROGRAM_PROGRAM_ADDRESS, TAccountTaker extends string | AccountMeta<string> = string, TAccountMintA extends string | AccountMeta<string> = string, TAccountMintB extends string | AccountMeta<string> = string, TAccountTakerAtaA extends string | AccountMeta<string> = string, TAccountTakerAtaB extends string | AccountMeta<string> = string, TAccountMaker extends string | AccountMeta<string> = string, TAccountMakerAtaB extends string | AccountMeta<string> = string, TAccountEscrow extends string | AccountMeta<string> = string, TAccountVault extends string | AccountMeta<string> = string, TAccountTokenProgram extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithAccounts<[TAccountTaker extends string ? WritableSignerAccount<TAccountTaker> & AccountSignerMeta<TAccountTaker> : TAccountTaker, TAccountMintA extends string ? ReadonlyAccount<TAccountMintA> : TAccountMintA, TAccountMintB extends string ? ReadonlyAccount<TAccountMintB> : TAccountMintB, TAccountTakerAtaA extends string ? ReadonlyAccount<TAccountTakerAtaA> : TAccountTakerAtaA, TAccountTakerAtaB extends string ? ReadonlyAccount<TAccountTakerAtaB> : TAccountTakerAtaB, TAccountMaker extends string ? ReadonlyAccount<TAccountMaker> : TAccountMaker, TAccountMakerAtaB extends string ? ReadonlyAccount<TAccountMakerAtaB> : TAccountMakerAtaB, TAccountEscrow extends string ? WritableAccount<TAccountEscrow> : TAccountEscrow, TAccountVault extends string ? WritableAccount<TAccountVault> : TAccountVault, TAccountTokenProgram extends string ? ReadonlyAccount<TAccountTokenProgram> : TAccountTokenProgram, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, ...TRemainingAccounts]>;
+
+export type TakeInput<TAccountTaker extends string = string, TAccountMintA extends string = string, TAccountMintB extends string = string, TAccountTakerAtaA extends string = string, TAccountTakerAtaB extends string = string, TAccountMaker extends string = string, TAccountMakerAtaB extends string = string, TAccountEscrow extends string = string, TAccountVault extends string = string, TAccountTokenProgram extends string = string, TAccountSystemProgram extends string = string> =  {
+  taker: TransactionSigner<TAccountTaker>;
+mintA: Address<TAccountMintA>;
+mintB: Address<TAccountMintB>;
+takerAtaA: Address<TAccountTakerAtaA>;
+takerAtaB: Address<TAccountTakerAtaB>;
+maker: Address<TAccountMaker>;
+makerAtaB: Address<TAccountMakerAtaB>;
+escrow: Address<TAccountEscrow>;
+vault: Address<TAccountVault>;
+tokenProgram: Address<TAccountTokenProgram>;
+systemProgram: Address<TAccountSystemProgram>;
 }
 
-export type TakeInstruction<
-	TProgram extends string = typeof ESCROW_PROGRAM_PROGRAM_ADDRESS,
-	TAccountTaker extends string | AccountMeta<string> = string,
-	TAccountMintA extends string | AccountMeta<string> = string,
-	TAccountMintB extends string | AccountMeta<string> = string,
-	TAccountTakerAtaA extends string | AccountMeta<string> = string,
-	TAccountTakerAtaB extends string | AccountMeta<string> = string,
-	TAccountMaker extends string | AccountMeta<string> = string,
-	TAccountMakerAtaB extends string | AccountMeta<string> = string,
-	TAccountEscrow extends string | AccountMeta<string> = string,
-	TAccountVault extends string | AccountMeta<string> = string,
-	TAccountTokenProgram extends string | AccountMeta<string> = string,
-	TAccountSystemProgram extends string | AccountMeta<string> = string,
-	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> =
-	& Instruction<TProgram>
-	& InstructionWithAccounts<
-		[
-			TAccountTaker extends string ?
-					& WritableSignerAccount<TAccountTaker>
-					& AccountSignerMeta<TAccountTaker>
-				: TAccountTaker,
-			TAccountMintA extends string ? ReadonlyAccount<TAccountMintA>
-				: TAccountMintA,
-			TAccountMintB extends string ? ReadonlyAccount<TAccountMintB>
-				: TAccountMintB,
-			TAccountTakerAtaA extends string ? ReadonlyAccount<TAccountTakerAtaA>
-				: TAccountTakerAtaA,
-			TAccountTakerAtaB extends string ? ReadonlyAccount<TAccountTakerAtaB>
-				: TAccountTakerAtaB,
-			TAccountMaker extends string ? ReadonlyAccount<TAccountMaker>
-				: TAccountMaker,
-			TAccountMakerAtaB extends string ? ReadonlyAccount<TAccountMakerAtaB>
-				: TAccountMakerAtaB,
-			TAccountEscrow extends string ? WritableAccount<TAccountEscrow>
-				: TAccountEscrow,
-			TAccountVault extends string ? WritableAccount<TAccountVault>
-				: TAccountVault,
-			TAccountTokenProgram extends string
-				? ReadonlyAccount<TAccountTokenProgram>
-				: TAccountTokenProgram,
-			TAccountSystemProgram extends string
-				? ReadonlyAccount<TAccountSystemProgram>
-				: TAccountSystemProgram,
-			...TRemainingAccounts,
-		]
-	>;
+export function getTakeInstruction<TAccountTaker extends string, TAccountMintA extends string, TAccountMintB extends string, TAccountTakerAtaA extends string, TAccountTakerAtaB extends string, TAccountMaker extends string, TAccountMakerAtaB extends string, TAccountEscrow extends string, TAccountVault extends string, TAccountTokenProgram extends string, TAccountSystemProgram extends string, TProgramAddress extends Address = typeof ESCROW_PROGRAM_PROGRAM_ADDRESS>(input: TakeInput<TAccountTaker, TAccountMintA, TAccountMintB, TAccountTakerAtaA, TAccountTakerAtaB, TAccountMaker, TAccountMakerAtaB, TAccountEscrow, TAccountVault, TAccountTokenProgram, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): TakeInstruction<TProgramAddress, TAccountTaker, TAccountMintA, TAccountMintB, TAccountTakerAtaA, TAccountTakerAtaB, TAccountMaker, TAccountMakerAtaB, TAccountEscrow, TAccountVault, TAccountTokenProgram, TAccountSystemProgram> {
+  // Program address.
+const programAddress = config?.programAddress ?? ESCROW_PROGRAM_PROGRAM_ADDRESS;
 
-export type TakeInput<
-	TAccountTaker extends string = string,
-	TAccountMintA extends string = string,
-	TAccountMintB extends string = string,
-	TAccountTakerAtaA extends string = string,
-	TAccountTakerAtaB extends string = string,
-	TAccountMaker extends string = string,
-	TAccountMakerAtaB extends string = string,
-	TAccountEscrow extends string = string,
-	TAccountVault extends string = string,
-	TAccountTokenProgram extends string = string,
-	TAccountSystemProgram extends string = string,
-> = {
-	taker: TransactionSigner<TAccountTaker>;
-	mintA: Address<TAccountMintA>;
-	mintB: Address<TAccountMintB>;
-	takerAtaA: Address<TAccountTakerAtaA>;
-	takerAtaB: Address<TAccountTakerAtaB>;
-	maker: Address<TAccountMaker>;
-	makerAtaB: Address<TAccountMakerAtaB>;
-	escrow: Address<TAccountEscrow>;
-	vault: Address<TAccountVault>;
-	tokenProgram: Address<TAccountTokenProgram>;
-	systemProgram: Address<TAccountSystemProgram>;
-};
+ // Original accounts.
+const originalAccounts = { taker: { value: input.taker ?? null, isWritable: true }, mintA: { value: input.mintA ?? null, isWritable: false }, mintB: { value: input.mintB ?? null, isWritable: false }, takerAtaA: { value: input.takerAtaA ?? null, isWritable: false }, takerAtaB: { value: input.takerAtaB ?? null, isWritable: false }, maker: { value: input.maker ?? null, isWritable: false }, makerAtaB: { value: input.makerAtaB ?? null, isWritable: false }, escrow: { value: input.escrow ?? null, isWritable: true }, vault: { value: input.vault ?? null, isWritable: true }, tokenProgram: { value: input.tokenProgram ?? null, isWritable: false }, systemProgram: { value: input.systemProgram ?? null, isWritable: false } }
+const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
-export function getTakeInstruction<
-	TAccountTaker extends string,
-	TAccountMintA extends string,
-	TAccountMintB extends string,
-	TAccountTakerAtaA extends string,
-	TAccountTakerAtaB extends string,
-	TAccountMaker extends string,
-	TAccountMakerAtaB extends string,
-	TAccountEscrow extends string,
-	TAccountVault extends string,
-	TAccountTokenProgram extends string,
-	TAccountSystemProgram extends string,
-	TProgramAddress extends Address = typeof ESCROW_PROGRAM_PROGRAM_ADDRESS,
->(
-	input: TakeInput<
-		TAccountTaker,
-		TAccountMintA,
-		TAccountMintB,
-		TAccountTakerAtaA,
-		TAccountTakerAtaB,
-		TAccountMaker,
-		TAccountMakerAtaB,
-		TAccountEscrow,
-		TAccountVault,
-		TAccountTokenProgram,
-		TAccountSystemProgram
-	>,
-	config?: { programAddress?: TProgramAddress },
-): TakeInstruction<
-	TProgramAddress,
-	TAccountTaker,
-	TAccountMintA,
-	TAccountMintB,
-	TAccountTakerAtaA,
-	TAccountTakerAtaB,
-	TAccountMaker,
-	TAccountMakerAtaB,
-	TAccountEscrow,
-	TAccountVault,
-	TAccountTokenProgram,
-	TAccountSystemProgram
-> {
-	// Program address.
-	const programAddress = config?.programAddress ??
-		ESCROW_PROGRAM_PROGRAM_ADDRESS;
 
-	// Original accounts.
-	const originalAccounts = {
-		taker: { value: input.taker ?? null, isWritable: true },
-		mintA: { value: input.mintA ?? null, isWritable: false },
-		mintB: { value: input.mintB ?? null, isWritable: false },
-		takerAtaA: { value: input.takerAtaA ?? null, isWritable: false },
-		takerAtaB: { value: input.takerAtaB ?? null, isWritable: false },
-		maker: { value: input.maker ?? null, isWritable: false },
-		makerAtaB: { value: input.makerAtaB ?? null, isWritable: false },
-		escrow: { value: input.escrow ?? null, isWritable: true },
-		vault: { value: input.vault ?? null, isWritable: true },
-		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-	};
-	const accounts = originalAccounts as Record<
-		keyof typeof originalAccounts,
-		ResolvedInstructionAccount
-	>;
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze({
-		accounts: [
-			getAccountMeta("taker", accounts.taker),
-			getAccountMeta("mintA", accounts.mintA),
-			getAccountMeta("mintB", accounts.mintB),
-			getAccountMeta("takerAtaA", accounts.takerAtaA),
-			getAccountMeta("takerAtaB", accounts.takerAtaB),
-			getAccountMeta("maker", accounts.maker),
-			getAccountMeta("makerAtaB", accounts.makerAtaB),
-			getAccountMeta("escrow", accounts.escrow),
-			getAccountMeta("vault", accounts.vault),
-			getAccountMeta("tokenProgram", accounts.tokenProgram),
-			getAccountMeta("systemProgram", accounts.systemProgram),
-		],
-		programAddress,
-	} as TakeInstruction<
-		TProgramAddress,
-		TAccountTaker,
-		TAccountMintA,
-		TAccountMintB,
-		TAccountTakerAtaA,
-		TAccountTakerAtaB,
-		TAccountMaker,
-		TAccountMakerAtaB,
-		TAccountEscrow,
-		TAccountVault,
-		TAccountTokenProgram,
-		TAccountSystemProgram
-	>);
+
+const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+return Object.freeze({ accounts: [getAccountMeta("taker", accounts.taker), getAccountMeta("mintA", accounts.mintA), getAccountMeta("mintB", accounts.mintB), getAccountMeta("takerAtaA", accounts.takerAtaA), getAccountMeta("takerAtaB", accounts.takerAtaB), getAccountMeta("maker", accounts.maker), getAccountMeta("makerAtaB", accounts.makerAtaB), getAccountMeta("escrow", accounts.escrow), getAccountMeta("vault", accounts.vault), getAccountMeta("tokenProgram", accounts.tokenProgram), getAccountMeta("systemProgram", accounts.systemProgram)], programAddress } as TakeInstruction<TProgramAddress, TAccountTaker, TAccountMintA, TAccountMintB, TAccountTakerAtaA, TAccountTakerAtaB, TAccountMaker, TAccountMakerAtaB, TAccountEscrow, TAccountVault, TAccountTokenProgram, TAccountSystemProgram>);
 }
 
-export type ParsedTakeInstruction<
-	TProgram extends string = typeof ESCROW_PROGRAM_PROGRAM_ADDRESS,
-	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
-> = {
-	programAddress: Address<TProgram>;
-	accounts: {
-		taker: TAccountMetas[0];
-		mintA: TAccountMetas[1];
-		mintB: TAccountMetas[2];
-		takerAtaA: TAccountMetas[3];
-		takerAtaB: TAccountMetas[4];
-		maker: TAccountMetas[5];
-		makerAtaB: TAccountMetas[6];
-		escrow: TAccountMetas[7];
-		vault: TAccountMetas[8];
-		tokenProgram: TAccountMetas[9];
-		systemProgram: TAccountMetas[10];
-	};
-};
+export type ParsedTakeInstruction<TProgram extends string = typeof ESCROW_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
+accounts: {
+taker: TAccountMetas[0];
+mintA: TAccountMetas[1];
+mintB: TAccountMetas[2];
+takerAtaA: TAccountMetas[3];
+takerAtaB: TAccountMetas[4];
+maker: TAccountMetas[5];
+makerAtaB: TAccountMetas[6];
+escrow: TAccountMetas[7];
+vault: TAccountMetas[8];
+tokenProgram: TAccountMetas[9];
+systemProgram: TAccountMetas[10];
+}; };
 
-export function parseTakeInstruction<
-	TProgram extends string,
-	TAccountMetas extends readonly AccountMeta[],
->(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
-): ParsedTakeInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 11) {
-		throw new SolanaError(
-			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-			{
-				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 11,
-			},
-		);
-	}
-	let accountIndex = 0;
-	const getNextAccount = () => {
-		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-		accountIndex += 1;
-		return accountMeta;
-	};
-	return {
-		programAddress: instruction.programAddress,
-		accounts: {
-			taker: getNextAccount(),
-			mintA: getNextAccount(),
-			mintB: getNextAccount(),
-			takerAtaA: getNextAccount(),
-			takerAtaB: getNextAccount(),
-			maker: getNextAccount(),
-			makerAtaB: getNextAccount(),
-			escrow: getNextAccount(),
-			vault: getNextAccount(),
-			tokenProgram: getNextAccount(),
-			systemProgram: getNextAccount(),
-		},
-	};
+export function parseTakeInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>): ParsedTakeInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 11) {
+  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 11 });
+}
+let accountIndex = 0;
+const getNextAccount = () => {
+  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+  accountIndex += 1;
+  return accountMeta;
+}
+  return { programAddress: instruction.programAddress, accounts: { taker: getNextAccount(), mintA: getNextAccount(), mintB: getNextAccount(), takerAtaA: getNextAccount(), takerAtaB: getNextAccount(), maker: getNextAccount(), makerAtaB: getNextAccount(), escrow: getNextAccount(), vault: getNextAccount(), tokenProgram: getNextAccount(), systemProgram: getNextAccount() } };
 }
