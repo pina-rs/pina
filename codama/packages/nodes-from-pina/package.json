@@ -1,0 +1,45 @@
+{
+	"name": "codama-nodes-from-pina",
+	"version": "0.1.0",
+	"description": "Helpers for converting Pina IDLs into Codama RootNodes",
+	"license": "MIT",
+	"type": "commonjs",
+	"sideEffects": false,
+	"main": "./dist/index.node.cjs",
+	"module": "./dist/index.node.mjs",
+	"react-native": "./dist/index.react-native.mjs",
+	"types": "./dist/types/index.d.ts",
+	"exports": {
+		"types": "./dist/types/index.d.ts",
+		"react-native": "./dist/index.react-native.mjs",
+		"browser": {
+			"import": "./dist/index.browser.mjs",
+			"require": "./dist/index.browser.cjs"
+		},
+		"node": {
+			"import": "./dist/index.node.mjs",
+			"require": "./dist/index.node.cjs"
+		}
+	},
+	"files": [
+		"./dist/types",
+		"./dist/index.*"
+	],
+	"scripts": {
+		"build": "rimraf dist && tsup && tsc -p ./tsconfig.declarations.json",
+		"dev": "vitest --project node",
+		"test": "pnpm test:types && pnpm test:unit",
+		"test:types": "tsc --noEmit",
+		"test:unit": "vitest run"
+	},
+	"dependencies": {
+		"codama": "^1.5.1"
+	},
+	"devDependencies": {
+		"@types/node": "^25.3.0",
+		"rimraf": "^6.1.2",
+		"tsup": "^8.5.0",
+		"typescript": "^5.7.0",
+		"vitest": "^4.0.1"
+	}
+}
