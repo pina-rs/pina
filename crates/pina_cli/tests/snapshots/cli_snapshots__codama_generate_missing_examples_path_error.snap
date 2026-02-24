@@ -1,0 +1,24 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - codama
+    - generate
+    - "--examples-dir"
+    - target/cli-snapshot-temp/codama_generate_missing_examples/missing_examples
+    - "--idls-dir"
+    - target/cli-snapshot-temp/codama_generate_missing_examples/idls
+    - "--rust-out"
+    - target/cli-snapshot-temp/codama_generate_missing_examples/rust
+    - "--js-out"
+    - target/cli-snapshot-temp/codama_generate_missing_examples/js
+    - "--npx"
+    - target/cli-snapshot-temp/codama_generate_missing_examples/fake-npx.sh
+---
+success: false
+exit_code: 1
+----- stdout -----
+
+----- stderr -----
+Error: Failed to read examples directory at target/cli-snapshot-temp/codama_generate_missing_examples/missing_examples: No such file or directory (os error 2)

@@ -1,0 +1,22 @@
+{
+	"name": "pina-codama-tests",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"generate": "cargo run -p pina_cli -- codama generate --npx node",
+		"check:js": "tsc --noEmit -p codama/tsconfig.json",
+		"test:nodes-from-pina": "pnpm --filter codama-nodes-from-pina test",
+		"test:idls": "pnpm --filter pina-codama-idl-tests test",
+		"test": "pnpm run generate && pnpm run check:js"
+	},
+	"dependencies": {
+		"@codama/renderers-js": "^2.0.2",
+		"codama": "^1.5.1"
+	},
+	"devDependencies": {
+		"@solana/kit": "^6.1.0",
+		"@solana/program-client-core": "^6.1.0",
+		"@types/node": "^25.3.0",
+		"typescript": "^5.7.0"
+	}
+}

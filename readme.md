@@ -19,7 +19,9 @@ A performant Solana smart contract framework built on top of [pinocchio](https:/
 
 - `crates/pina` — core runtime crate (`no_std`, account validation/loaders, CPI helpers, entrypoint).
 - `crates/pina_macros` — proc macros (`#[account]`, `#[instruction]`, `#[event]`, `#[error]`, `#[discriminator]`, `#[derive(Accounts)]`).
-- `crates/pina_cli` — CLI/library for IDL generation and project scaffolding (`pina idl`, `pina init`).
+- `crates/pina_cli` — CLI/library for IDL and Codama generation (`pina idl`, `pina codama generate`, `pina init`).
+- `crates/pina_codama_renderer` — repository-local Rust renderer used by Codama generation.
+- `crates/pina_pod_primitives` — shared `no_std` POD primitive wrappers for generated clients and `pina`.
 - `crates/pina_sdk_ids` — typed constants for well-known Solana program/sysvar IDs.
 
 ## Installation
@@ -53,11 +55,14 @@ codama:idl:all
 # Generate Rust + JS clients from codama/idls/.
 codama:clients:generate
 
+# Generate IDLs and Rust + JS clients in one step.
+pina codama generate
+
 # Run the full integration pipeline (build CLI, generate IDLs, generate clients, validate outputs).
 codama:test
 ```
 
-Rust client generation in this repository uses the custom `pina_codama_renderer` crate (`codama/pina_codama_renderer`) instead of Codama's default Rust renderer. The generated Rust models are Pina-compatible: discriminator-first layouts and bytemuck-based POD wrappers, without `borsh` serialization requirements. Because these clients are generated as fixed-size POD layouts, unsupported Codama patterns (e.g. variable-length strings/bytes, big-endian numbers, floats, non-UTF8 constant byte seeds, and non-fixed arrays) will fail generation with explicit renderer errors.
+Rust client generation in this repository uses the custom `pina_codama_renderer` crate (`crates/pina_codama_renderer`) instead of Codama's default Rust renderer. The generated Rust models are Pina-compatible: discriminator-first layouts and bytemuck-based POD wrappers, without `borsh` serialization requirements. Because these clients are generated as fixed-size POD layouts, unsupported Codama patterns (e.g. variable-length strings/bytes, big-endian numbers, floats, non-UTF8 constant byte seeds, and non-fixed arrays) will fail generation with explicit renderer errors.
 
 End-to-end setup steps:
 
@@ -93,7 +98,7 @@ await codama.accept(renderJsVisitor("./clients/js/my_program"));
 For Pina-style Rust client generation (discriminator-first, bytemuck POD types), use this repository's renderer:
 
 ```sh
-cargo run --manifest-path ./codama/pina_codama_renderer/Cargo.toml -- \
+cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
   --idl ./idls/my_program.json \
   --output ./clients/rust
 ```
@@ -118,7 +123,7 @@ docs:build
 
 <!-- {/docsBuildCommand} -->
 
-Use `verify:docs` to validate documentation structure and build output in CI. Use `test:idl` to verify `codama/idls/anchor_*.json` against fresh output and Codama Rust/JS validators. Reusable command snippets are managed by `mdt`; run `docs:sync` after changing `template.t.md`.
+Use `verify:docs` to validate documentation structure and build output in CI. Use `test:idl` to regenerate and verify `codama/idls/*.json`, `codama/clients/rust/*`, and `codama/clients/js/*` against all examples. Reusable command snippets are managed by `mdt`; run `docs:sync` after changing `template.t.md`.
 
 ## Quick start
 

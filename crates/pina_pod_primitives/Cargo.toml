@@ -1,0 +1,16 @@
+[package]
+name = "pina_pod_primitives"
+version = "0.3.0"
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme = "readme.md"
+repository.workspace = true
+description = "Alignment-safe POD primitive wrappers for Solana account layouts"
+
+[dependencies]
+bytemuck = { workspace = true, features = ["derive"] }
+
+[lints]
+workspace = true

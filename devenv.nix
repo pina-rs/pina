@@ -20,6 +20,7 @@ in
       dprint
       eget
       gcc
+      git
       libiconv
       nodejs
       pnpm
@@ -133,12 +134,7 @@ in
     "codama:idl:all" = {
       exec = ''
         set -e
-        mkdir -p "$DEVENV_ROOT/codama/idls"
-        for program_dir in "$DEVENV_ROOT"/examples/*/; do
-          program_name=$(basename "$program_dir")
-          echo "Generating IDL for $program_name"
-          pina idl --path "$program_dir" --output "$DEVENV_ROOT/codama/idls/$program_name.json"
-        done
+        "$DEVENV_ROOT/scripts/generate-codama-idls.sh"
       '';
       description = "Generate Codama IDLs for all example programs.";
       binary = "bash";
@@ -146,10 +142,15 @@ in
     "codama:clients:generate" = {
       exec = ''
         set -e
-        pnpm --dir "$DEVENV_ROOT/codama" install --frozen-lockfile
-        pnpm --dir "$DEVENV_ROOT/codama" run generate
+        pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
+        pina codama generate \
+          --examples-dir "$DEVENV_ROOT/examples" \
+          --idls-dir "$DEVENV_ROOT/codama/idls" \
+          --rust-out "$DEVENV_ROOT/codama/clients/rust" \
+          --js-out "$DEVENV_ROOT/codama/clients/js" \
+          --npx node
       '';
-      description = "Generate Codama Rust and JS clients from IDLs.";
+      description = "Generate Codama IDLs and Rust/JS clients for all examples.";
       binary = "bash";
     };
     "codama:test" = {
@@ -272,7 +273,7 @@ in
         set -e
         "$DEVENV_ROOT/scripts/generate-codama-idls.sh"
       '';
-      description = "Generate Codama IDLs for all anchor_* examples.";
+      description = "Generate Codama IDLs for all examples.";
       binary = "bash";
     };
     "verify:idls" = {
@@ -280,7 +281,7 @@ in
         set -e
         "$DEVENV_ROOT/scripts/verify-codama-idls.sh"
       '';
-      description = "Verify Codama IDL fixtures and JS/Rust IDL validation tests.";
+      description = "Verify Codama generation, fixture drift, validation, and deterministic output.";
       binary = "bash";
     };
     "test:idl" = {
@@ -288,7 +289,7 @@ in
         set -e
         verify:idls
       '';
-      description = "Run IDL fixture drift + Rust/JS Codama validation tests.";
+      description = "Run full Codama integration and deterministic generation checks.";
       binary = "bash";
     };
     "test:surfpool-idl" = {
@@ -304,9 +305,35 @@ in
       exec = ''
         set -e
         mkdir -p "$DEVENV_ROOT/target/coverage"
-        cargo llvm-cov --workspace --all-features --locked --lcov --output-path "$DEVENV_ROOT/target/coverage/lcov.info"
+        cargo llvm-cov \
+          --all-features \
+          --locked \
+          -p pina \
+          -p pina_cli \
+          --lcov \
+          --output-path "$DEVENV_ROOT/target/coverage/lcov.info"
       '';
-      description = "Run workspace coverage and generate an lcov report.";
+      description = "Run coverage for pina + pina_cli and generate an lcov report.";
+      binary = "bash";
+    };
+    "coverage:vm:experimental" = {
+      exec = ''
+        set -e
+        if ! command -v mucho >/dev/null 2>&1; then
+          echo "Skipping VM coverage: mucho is not installed."
+          exit 0
+        fi
+
+        set +e
+        mucho coverage
+        status=$?
+        set -e
+
+        if [ "$status" -ne 0 ]; then
+          echo "Experimental VM coverage failed with status $status (non-blocking)."
+        fi
+      '';
+      description = "Run experimental Solana VM coverage via mucho when available (non-blocking).";
       binary = "bash";
     };
     "fix:all" = {
@@ -330,7 +357,16 @@ in
     "fix:clippy" = {
       exec = ''
         set -e
-        cargo clippy --fix --allow-dirty --allow-staged --all-features --locked
+        mapfile -t generated_client_manifests < <(find "$DEVENV_ROOT/codama/clients/rust" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
+        exclude_args=()
+        for manifest in "''${generated_client_manifests[@]}"; do
+          package_name="$(sed -n 's/^name = "\(.*\)"$/\1/p' "$manifest" | head -n 1)"
+          if [ -n "$package_name" ]; then
+            exclude_args+=(--exclude "$package_name")
+          fi
+        done
+
+        cargo clippy --fix --allow-dirty --allow-staged --workspace --all-features --locked ''${exclude_args[@]}
       '';
       description = "Fix clippy lints for rust.";
       binary = "bash";
@@ -420,7 +456,16 @@ in
     "lint:clippy" = {
       exec = ''
         set -e
-        cargo clippy --all-features --locked
+        mapfile -t generated_client_manifests < <(find "$DEVENV_ROOT/codama/clients/rust" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
+        exclude_args=()
+        for manifest in "''${generated_client_manifests[@]}"; do
+          package_name="$(sed -n 's/^name = "\(.*\)"$/\1/p' "$manifest" | head -n 1)"
+          if [ -n "$package_name" ]; then
+            exclude_args+=(--exclude "$package_name")
+          fi
+        done
+
+        cargo clippy --workspace --all-features --locked ''${exclude_args[@]}
       '';
       description = "Check that all rust lints are passing.";
       binary = "bash";

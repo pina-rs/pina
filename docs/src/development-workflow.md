@@ -57,13 +57,19 @@ test:idl
 
 ## Coverage
 
-Generate workspace coverage locally:
+Generate coverage locally for `pina` and `pina_cli`:
 
 ```bash
 coverage:all
 ```
 
 This produces an LCOV report at `target/coverage/lcov.info`.
+
+For experimental Solana-VM coverage collection (non-blocking), run:
+
+```bash
+coverage:vm:experimental
+```
 
 ## Changesets
 

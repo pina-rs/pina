@@ -46,6 +46,41 @@ enum Commands {
 		#[arg(long, default_value_t = false)]
 		force: bool,
 	},
+	/// Codama generation workflows.
+	Codama {
+		#[command(subcommand)]
+		command: CodamaCommands,
+	},
+}
+
+#[derive(Subcommand, Debug)]
+enum CodamaCommands {
+	/// Generate IDLs and Rust/JS clients for one or more examples.
+	Generate {
+		/// Directory containing example program crates.
+		#[arg(long, default_value = "examples")]
+		examples_dir: PathBuf,
+
+		/// Output directory for generated IDL JSON files.
+		#[arg(long, default_value = "codama/idls")]
+		idls_dir: PathBuf,
+
+		/// Output directory for generated Rust clients.
+		#[arg(long, default_value = "codama/clients/rust")]
+		rust_out: PathBuf,
+
+		/// Output directory for generated JS clients.
+		#[arg(long, default_value = "codama/clients/js")]
+		js_out: PathBuf,
+
+		/// Example name filter. Repeat to generate a subset.
+		#[arg(long = "example")]
+		examples: Vec<String>,
+
+		/// Executable used to invoke npx.
+		#[arg(long, default_value = "npx")]
+		npx: String,
+	},
 }
 
 fn main() {
@@ -59,6 +94,18 @@ fn main() {
 			pretty,
 		} => run_idl(path.as_path(), output.as_deref(), name.as_deref(), pretty),
 		Commands::Init { name, path, force } => run_init(name.as_str(), path.as_deref(), force),
+		Commands::Codama { command } => {
+			match command {
+				CodamaCommands::Generate {
+					examples_dir,
+					idls_dir,
+					rust_out,
+					js_out,
+					examples,
+					npx,
+				} => run_codama_generate(examples_dir, idls_dir, rust_out, js_out, examples, npx),
+			}
+		}
 	}
 }
 
@@ -109,4 +156,36 @@ fn run_init(name: &str, path: Option<&std::path::Path>, force: bool) {
 	}
 
 	println!("Initialized new Pina project at {}", project_path.display());
+}
+
+fn run_codama_generate(
+	examples_dir: PathBuf,
+	idls_dir: PathBuf,
+	rust_out: PathBuf,
+	js_out: PathBuf,
+	examples: Vec<String>,
+	npx: String,
+) {
+	let options = pina_cli::CodamaGenerateOptions {
+		examples_dir,
+		idls_dir,
+		rust_out,
+		js_out,
+		examples,
+		npx,
+	};
+
+	let generated_examples = match pina_cli::generate_codama(&options) {
+		Ok(examples) => examples,
+		Err(err) => {
+			eprintln!("Error: {err}");
+			std::process::exit(1);
+		}
+	};
+
+	println!(
+		"Generated Codama IDLs and Rust/JS clients for {} example(s): {}",
+		generated_examples.len(),
+		generated_examples.join(", "),
+	);
 }

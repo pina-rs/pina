@@ -1,0 +1,26 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - codama
+    - generate
+    - "--examples-dir"
+    - examples
+    - "--idls-dir"
+    - target/cli-snapshot-temp/codama_generate_success/idls
+    - "--rust-out"
+    - target/cli-snapshot-temp/codama_generate_success/rust
+    - "--js-out"
+    - target/cli-snapshot-temp/codama_generate_success/js
+    - "--example"
+    - counter_program
+    - "--npx"
+    - target/cli-snapshot-temp/codama_generate_success/fake-npx.sh
+---
+success: true
+exit_code: 0
+----- stdout -----
+Generated Codama IDLs and Rust/JS clients for 1 example(s): counter_program
+
+----- stderr -----

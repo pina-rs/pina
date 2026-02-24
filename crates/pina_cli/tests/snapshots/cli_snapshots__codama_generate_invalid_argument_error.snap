@@ -1,0 +1,15 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - codama
+    - generate
+    - "--example"
+---
+success: false
+exit_code: 2
+----- stdout -----
+
+----- stderr -----
+error: one of the values isn't valid for an argument
