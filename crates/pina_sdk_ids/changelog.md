@@ -1,3 +1,24 @@
+## 0.3.1 (2026-02-25)
+
+### Fixes
+
+#### Documentation and release-quality updates across crates:
+
+- Standardized crate README badges to explicitly show crates.io and docs.rs links with current versions.
+- Added a dedicated `pina_sdk_ids` crate README with crates.io/docs.rs badges and switched the crate manifest to use it.
+- Added workspace coverage tooling with `coverage:all` and a CI `coverage` workflow that produces an LCOV artifact and uploads to Codecov.
+
+### Documentation
+
+- Refresh the `pina_sdk_ids` crate README with usage examples, module coverage, and guidance for safer typed program/sysvar ID imports.
+
+#### Improve API and developer documentation coverage for the `pina` and `pina_sdk_ids` crates.
+
+- Added reusable `mdt` template snippets for public API contracts and command examples.
+- Expanded inline rustdoc across CPI, PDA, validation traits, utilities, and pod primitives.
+- Added module-level and per-module ID documentation for `pina_sdk_ids`.
+- Updated docs references to document the reusable template workflow (`template.t.md`, `api-docs.t.md`).
+
 ## 0.3.0 (2026-02-20)
 
 ### Breaking Changes

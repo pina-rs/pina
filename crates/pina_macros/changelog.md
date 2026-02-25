@@ -1,3 +1,17 @@
+## 0.3.1 (2026-02-25)
+
+### Fixes
+
+#### Documentation and release-quality updates across crates:
+
+- Standardized crate README badges to explicitly show crates.io and docs.rs links with current versions.
+- Added a dedicated `pina_sdk_ids` crate README with crates.io/docs.rs badges and switched the crate manifest to use it.
+- Added workspace coverage tooling with `coverage:all` and a CI `coverage` workflow that produces an LCOV artifact and uploads to Codecov.
+
+### Documentation
+
+- Refresh the `pina_macros` crate README with current macro coverage, attribute options, derive behavior, and practical usage examples aligned with the latest macro API.
+
 ## 0.3.0 (2026-02-20)
 
 ### Breaking Changes

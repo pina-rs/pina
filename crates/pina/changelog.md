@@ -1,3 +1,119 @@
+## 0.3.1 (2026-02-25)
+
+### Features
+
+#### Extract POD primitive wrappers into a new publishable `pina_pod_primitives` crate and re-export them from `pina` to preserve API compatibility.
+
+Move `pina_codama_renderer` into `crates/`, update generated Rust clients to depend on `pina_pod_primitives`, reuse instruction docs in rendered output, and remove embedded shared primitive modules.
+
+Add `pina codama generate` for end-to-end Codama IDL/Rust/JS generation with example filtering and configurable JS renderer command.
+
+Expand Codama verification to all examples, move the pnpm workspace to repository root, add CLI snapshot tests with `insta-cmd`, and enforce deterministic regeneration checks for IDLs and generated clients.
+
+### Fixes
+
+#### Release and publishing pipeline hardening updates:
+
+- Added a `docs-pages` GitHub Actions workflow that builds mdBook docs and deploys them to GitHub Pages on each published release.
+- Tightened CI defaults by reducing workflow permissions to read-only where write access is not required.
+- Updated CI test coverage to run `cargo test --all-features --locked` for closer release parity.
+- Updated the pinned `knope` tool version to `0.22.3` so `knope` commands validate and run reliably in this toolchain.
+
+#### Harden no-logs builds and release workflow compatibility.
+
+- Gate `core::panic::Location` behind the `logs` feature and explicitly mark assertion messages as used in non-logs builds so `pina` compiles cleanly in no-logs paths (including Surfpool smoke builds).
+- Move `ignore_conventional_commits` from `PrepareRelease` to the `[changes]` section in `knope.toml` to match current `knope` configuration expectations.
+
+#### Documentation and release-quality updates across crates:
+
+- Standardized crate README badges to explicitly show crates.io and docs.rs links with current versions.
+- Added a dedicated `pina_sdk_ids` crate README with crates.io/docs.rs badges and switched the crate manifest to use it.
+- Added workspace coverage tooling with `coverage:all` and a CI `coverage` workflow that produces an LCOV artifact and uploads to Codecov.
+
+#### Improved release and security hardening with additional example/test coverage:
+
+- Added `cargo-deny` and `cargo-audit` tooling plus `security:deny`, `security:audit`, and `verify:security` commands.
+- Added a CI security job and a dependency policy (`deny.toml`) for license/source/dependency-ban enforcement.
+- Hardened release workflows by validating `pina_cli` release tags against `crates/pina_cli/Cargo.toml` and scoping binary builds to the `pina_cli` package.
+- Expanded docs publishing triggers to include docs changes on `main` and added docs verification in the Pages workflow.
+- Added a new `todo_program` example, generated Codama IDL output, and Rust snapshot tests to keep generated IDLs aligned with committed `codama/idls/*.json` artifacts.
+
+### Notes
+
+#### Expand Anchor parity documentation and add Surfpool-based IDL smoke coverage.
+
+- Add dedicated `readme.md` files for each `examples/anchor_*` crate documenting intent and key differences from Anchor.
+- Update each Anchor example crate manifest to point its `readme` field at the local example README.
+- Strengthen IDL verification checks to assert discriminator metadata is present for generated anchor instructions/accounts.
+- Add a Surfpool smoke test script that patches a test program ID, generates IDL, deploys the compiled program to Surfpool, and invokes it using generated IDL discriminator metadata.
+- Add a dedicated `surfpool` GitHub Actions workflow for these longer-running deployment/invocation checks.
+- Update pinned Surfpool binary from `v0.12.0` to `v1.0.1` in `.eget/.eget.toml`.
+- Update pinned Agave release from `v3.0.12` to `v3.1.8` so `cargo-build-sbf` can build workspace edition-2024 programs for Surfpool smoke tests.
+
+#### Migrate `examples/pinocchio_bpf_starter` to `examples/pina_bpf` and convert the program to the `pina` API surface.
+
+- Replace the starter implementation with `declare_id!`, `#[discriminator]`, `#[instruction]`, `parse_instruction`, and `nostd_entrypoint!`.
+- Add a dedicated README for the example with explicit nightly build instructions using `-Z build-std=core,alloc`.
+- Update workspace wiring (`Cargo.toml`, cargo aliases, docs, and CI scripts) to use `pina_bpf`.
+- Add additional host tests and ignored BPF artifact verification tests, and run those artifact checks in `test:anchor-parity`.
+
+#### Added new example coverage and upstream BPF tooling updates:
+
+- Added `examples/pinocchio_bpf_starter` based on the upstream `pinocchio-bpf-starter` template pattern.
+- Added sequential Anchor parity examples:
+  - `examples/anchor_declare_id`
+  - `examples/anchor_declare_program`
+  - `examples/anchor_duplicate_mutable_accounts`
+  - `examples/anchor_errors`
+  - `examples/anchor_events`
+  - `examples/anchor_floats`
+  - `examples/anchor_system_accounts`
+  - `examples/anchor_sysvars`
+  - `examples/anchor_realloc`
+- Extended `examples/escrow_program` with parity-focused tests aligned with Anchor's escrow coverage.
+- Updated `sbpf-linker` in `[workspace.metadata.bin]` to `0.1.8`.
+- Added a `build-bpf` cargo alias for the starter example and documented Anchor porting progress in the mdBook docs, including explicit notes for suites that are Anchor-CLI-specific.
+- Added Codama IDL fixtures for all `anchor_*` example programs under `codama/idls/` and new Rust/JS IDL verification tests (`test:idl`) that run in CI.
+
+### Documentation
+
+- Add dedicated `readme.md` files to all example program directories with focused coverage notes and local run commands (`cargo test`, `pina idl`, and optional SBF build commands).
+- Fix markdown JS snippet import ordering so `dprint` formatting checks pass in CI.
+- Refresh the `pina` crate README with up-to-date runtime features, feature flags, installation guidance, a minimal program skeleton, and Codama workflow pointers.
+
+#### Added `PodBool::is_canonical()` method to detect non-canonical boolean values (2–255) that pass `bytemuck` deserialization but fail `PartialEq` comparison against canonical `PodBool(0)` or `PodBool(1)`. Programs should call `is_canonical()` at deserialization boundaries to validate account data integrity.
+
+Added badges (crates.io, docs.rs, CI, license, codecov) to `pina_pod_primitives` readme and root workspace readme. Created readme for `pina_codama_renderer` crate.
+
+Added 50+ new tests across pina and pina_pod_primitives covering:
+
+- `parse_instruction` (valid/invalid discriminators, wrong program ID, empty data, error remapping)
+- `PinaProgramError` error codes (correct discriminants, reserved range, uniqueness)
+- `assert` function (true/false conditions, custom error types)
+- PDA functions (determinism, seed variations, roundtrip, wrong bump)
+- Pod types (boundary values, endianness, bytemuck deserialization, defaults)
+- PodBool canonical validation (non-canonical equality mismatch detection)
+- AccountDeserialize trait (field preservation, mutable modification, wrong offset)
+- Discriminator write/read roundtrips for all primitive sizes
+- Lamport helper edge cases (exact balance, zero transfer, max values)
+
+Updated book chapters to use mdt shared blocks for codama workflow commands, release workflow commands, and feature flags table. Added three new mdt providers (`codamaWorkflowCommands`, `releaseWorkflowCommands`, `pinaFeatureFlags`) to `template.t.md`.
+
+#### Use `linePrefix:"/// ":true` in all mdt consumer blocks so the `///` prefix is applied to every line, including blank lines. Previously, blank lines within mdt-generated doc comments were left empty, which broke the `///` doc-comment continuity.
+
+Upgraded `mdt_cli` from `0.0.1` (git) to `0.4.0` (crates.io) to gain the `:true` second argument for the `linePrefix` transformer.
+
+Set `wrap_comments = false` in `rustfmt.toml` to prevent rustfmt from reflowing mdt-generated comment lines and splitting HTML closing tags across multiple lines.
+
+Removed unused provider blocks (`pinaPodEndianContract`, `pinaSdkIdModuleContract`) and stale "Generated by mdt." header lines from `api-docs.t.md`.
+
+#### Improve API and developer documentation coverage for the `pina` and `pina_sdk_ids` crates.
+
+- Added reusable `mdt` template snippets for public API contracts and command examples.
+- Expanded inline rustdoc across CPI, PDA, validation traits, utilities, and pod primitives.
+- Added module-level and per-module ID documentation for `pina_sdk_ids`.
+- Updated docs references to document the reusable template workflow (`template.t.md`, `api-docs.t.md`).
+
 ## 0.3.0 (2026-02-20)
 
 ### Breaking Changes
