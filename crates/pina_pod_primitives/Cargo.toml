@@ -1,6 +1,6 @@
 [package]
 name = "pina_pod_primitives"
-version = "0.3.1"
+version = "0.5.0"
 edition.workspace = true
 homepage.workspace = true
 keywords.workspace = true
