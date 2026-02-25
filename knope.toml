@@ -54,6 +54,10 @@ type = "PrepareRelease"
 
 [[workflows.steps]]
 type = "Command"
+command = "mdt update"
+
+[[workflows.steps]]
+type = "Command"
 command = "dprint fmt"
 
 [[workflows.steps]]
