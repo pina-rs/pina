@@ -118,7 +118,7 @@ in
     "pina" = {
       exec = ''
         set -e
-        cargo run -p pina_cli -- $@
+        cargo run --clean -p pina_cli -- $@
       '';
       description = "Run the `pina` CLI from source.";
       binary = "bash";

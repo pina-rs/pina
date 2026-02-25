@@ -86,7 +86,6 @@ mollusk-svm = { default-features = false, version = "^0.8" }
 num-derive = { version = "^0.4" }
 num-traits = { version = "^0.2" }
 paste = { default-features = false, version = "^1" }
-pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.1.0" }
 pinocchio = { default-features = false, version = "^0.10", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.3" }
 pinocchio-memo = { default-features = false, version = "^0.3" }
@@ -114,6 +113,7 @@ wasm_client_solana = { default-features = false, version = "^0.10" }
 
 # publishable crates
 pina = { default-features = false, path = "crates/pina", version = "0.3.0" }
+pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.3.0" }
 pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.3.0" }
 pina_pod_primitives = { default-features = false, path = "crates/pina_pod_primitives", version = "0.3.0" }
 pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.3.0" }
