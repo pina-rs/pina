@@ -1,3 +1,13 @@
+[packages.pina]
+versioned_files = [
+	"crates/pina/Cargo.toml",
+	{ path = "Cargo.toml", dependency = "pina" },
+	"Cargo.lock",
+]
+scopes = ["pina"]
+changelog = "changelog.md"
+extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
+
 [packages.pina_cli]
 versioned_files = [
 	"crates/pina_cli/Cargo.toml",
@@ -5,7 +15,7 @@ versioned_files = [
 	"Cargo.lock",
 ]
 scopes = ["pina_cli"]
-changelog = "crates/pina_cli/changelog.md"
+changelog = "changelog.md"
 extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
 
 [packages.pina_codama_renderer]
@@ -15,17 +25,7 @@ versioned_files = [
 	"Cargo.lock",
 ]
 scopes = ["pina_codama_renderer"]
-changelog = "crates/pina_codama_renderer/changelog.md"
-extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
-
-[packages.pina]
-versioned_files = [
-	"crates/pina/Cargo.toml",
-	{ path = "Cargo.toml", dependency = "pina" },
-	"Cargo.lock",
-]
-scopes = ["pina"]
-changelog = "crates/pina/changelog.md"
+changelog = "changelog.md"
 extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
 
 [packages.pina_macros]
@@ -35,17 +35,7 @@ versioned_files = [
 	"Cargo.lock",
 ]
 scopes = ["pina_macros"]
-changelog = "crates/pina_macros/changelog.md"
-extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
-
-[packages.pina_sdk_ids]
-versioned_files = [
-	"crates/pina_sdk_ids/Cargo.toml",
-	{ path = "Cargo.toml", dependency = "pina_sdk_ids" },
-	"Cargo.lock",
-]
-scopes = ["pina_sdk_ids"]
-changelog = "crates/pina_sdk_ids/changelog.md"
+changelog = "changelog.md"
 extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
 
 [packages.pina_pod_primitives]
@@ -55,7 +45,17 @@ versioned_files = [
 	"Cargo.lock",
 ]
 scopes = ["pina_pod_primitives"]
-changelog = "crates/pina_pod_primitives/changelog.md"
+changelog = "changelog.md"
+extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
+
+[packages.pina_sdk_ids]
+versioned_files = [
+	"crates/pina_sdk_ids/Cargo.toml",
+	{ path = "Cargo.toml", dependency = "pina_sdk_ids" },
+	"Cargo.lock",
+]
+scopes = ["pina_sdk_ids"]
+changelog = "changelog.md"
 extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
 
 [changes]
