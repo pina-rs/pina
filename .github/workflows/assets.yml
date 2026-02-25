@@ -43,7 +43,7 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ github.event.release.tag_name }}"
-          CLI_VERSION="$(sed -n 's/^version = \"\\(.*\\)\"/\\1/p' crates/pina_cli/Cargo.toml | head -n 1)"
+          CLI_VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' crates/pina_cli/Cargo.toml | head -n 1)"
           EXPECTED_TAG="pina_cli/v${CLI_VERSION}"
 
           if [[ -z "${CLI_VERSION}" ]]; then
