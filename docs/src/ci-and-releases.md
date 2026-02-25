@@ -44,10 +44,14 @@ The `assets` workflow only publishes binaries for CLI tags:
 
 Use `knope` for changelog/release management:
 
+<!-- {=releaseWorkflowCommands} -->
+
 ```bash
 knope document-change
 knope release
 knope publish
 ```
+
+<!-- {/releaseWorkflowCommands} -->
 
 Keep changeset descriptions explicit and user-impact focused.

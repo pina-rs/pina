@@ -2,6 +2,8 @@
 
 A performant Solana smart contract framework built on top of [pinocchio](https://github.com/anza-xyz/pinocchio) — a zero-dependency alternative to `solana-program` that massively reduces compute units and dependency bloat.
 
+[![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][unlicense-image]][unlicense-link] [![codecov][codecov-image]][codecov-link]
+
 ## Features
 
 - **Zero-copy deserialization** — account data is reinterpreted in place via `bytemuck`, with no heap allocation.
@@ -540,3 +542,14 @@ Contributions are welcome! Please open an issue or pull request on [GitHub](http
 ## License
 
 Licensed under the [Apache License, Version 2.0](license).
+
+[crate-image]: https://img.shields.io/crates/v/pina.svg?style=flat-square
+[crate-link]: https://crates.io/crates/pina
+[docs-image]: https://docs.rs/pina/badge.svg
+[docs-link]: https://docs.rs/pina/
+[ci-status-image]: https://github.com/pina-rs/pina/workflows/ci/badge.svg
+[ci-status-link]: https://github.com/pina-rs/pina/actions?query=workflow:ci
+[unlicense-image]: https://img.shields.io/badge/license-Unlicense-blue.svg?style=flat-square
+[unlicense-link]: https://opensource.org/license/unlicense
+[codecov-image]: https://codecov.io/github/pina-rs/pina/graph/badge.svg?token=87K799Q78I
+[codecov-link]: https://codecov.io/github/pina-rs/pina

@@ -657,4 +657,139 @@ mod tests {
 		// and should also handle short data gracefully.
 		assert!(!TestType::matches_discriminator(&[]));
 	}
+
+	// ---- Additional coverage tests ----
+
+	#[test]
+	fn account_deserialize_exact_size_match() {
+		let mut data = [0u8; 17]; // size_of::<TestType>() == 17
+		data[0] = 7;
+		data[1] = 1; // field0 = 1
+		let result = TestType::try_from_bytes(&data);
+		assert!(result.is_ok());
+	}
+
+	#[test]
+	fn account_deserialize_all_zeros_wrong_discriminator() {
+		let data = [0u8; 17]; // discriminator is 0, TestType expects 7
+		let result = TestType::try_from_bytes(&data);
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+	}
+
+	#[test]
+	fn account_deserialize_mut_wrong_discriminator() {
+		let mut data = [0u8; 17];
+		data[0] = 99; // wrong discriminator
+		let result = TestType::try_from_bytes_mut(&mut data);
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+	}
+
+	#[test]
+	fn account_deserialize_mut_undersized() {
+		let mut data = [7u8, 0, 0];
+		let result = TestType::try_from_bytes_mut(&mut data);
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn account_deserialize_mut_oversized() {
+		let mut data = [0u8; 20];
+		data[0] = 7;
+		let result = TestType::try_from_bytes_mut(&mut data);
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn discriminator_write_u8() {
+		let val: u8 = 42;
+		let mut bytes = [0u8; 1];
+		val.write_discriminator(&mut bytes);
+		assert_eq!(bytes[0], 42);
+	}
+
+	#[test]
+	fn discriminator_write_u16() {
+		let val: u16 = 0x0102;
+		let mut bytes = [0u8; 2];
+		val.write_discriminator(&mut bytes);
+		assert_eq!(bytes, [0x02, 0x01]); // little-endian
+	}
+
+	#[test]
+	fn discriminator_write_u64() {
+		let val: u64 = 1;
+		let mut bytes = [0u8; 8];
+		val.write_discriminator(&mut bytes);
+		assert_eq!(bytes, [1, 0, 0, 0, 0, 0, 0, 0]);
+	}
+
+	#[test]
+	fn discriminator_roundtrip_u32() {
+		let original: u32 = 0xCAFE_BABE;
+		let mut bytes = [0u8; 4];
+		original.write_discriminator(&mut bytes);
+
+		let decoded = u32::discriminator_from_bytes(&bytes).unwrap();
+		assert_eq!(decoded, original);
+		assert!(original.matches_discriminator(&bytes));
+	}
+
+	#[test]
+	fn discriminator_roundtrip_u64() {
+		let original: u64 = 0x0123_4567_89AB_CDEF;
+		let mut bytes = [0u8; 8];
+		original.write_discriminator(&mut bytes);
+
+		let decoded = u64::discriminator_from_bytes(&bytes).unwrap();
+		assert_eq!(decoded, original);
+		assert!(original.matches_discriminator(&bytes));
+	}
+
+	#[test]
+	fn max_discriminator_space_is_u64_size() {
+		assert_eq!(crate::MAX_DISCRIMINATOR_SPACE, 8);
+		assert_eq!(crate::MAX_DISCRIMINATOR_SPACE, size_of::<u64>());
+	}
+
+	/// Verify that field values round-trip through AccountDeserialize.
+	#[test]
+	fn account_deserialize_field_values_preserved() {
+		let mut data = [0u8; 17];
+		data[0] = 7; // discriminator
+		// field0 = 1000 (little-endian u64)
+		data[1..9].copy_from_slice(&1000u64.to_le_bytes());
+		// field1 = u64::MAX (little-endian u64)
+		data[9..17].copy_from_slice(&u64::MAX.to_le_bytes());
+
+		let foo = TestType::try_from_bytes(&data).unwrap();
+		assert_eq!(u64::from(foo.field0), 1000);
+		assert_eq!(u64::from(foo.field1), u64::MAX);
+	}
+
+	/// Verify that mutable deserialization allows in-place modification.
+	#[test]
+	fn account_deserialize_mut_allows_modification() {
+		let mut data = [0u8; 17];
+		data[0] = 7;
+		data[1..9].copy_from_slice(&42u64.to_le_bytes());
+
+		let foo = TestType::try_from_bytes_mut(&mut data).unwrap();
+		foo.field0 = PodU64::from_primitive(999);
+		foo.field1 = PodU64::from_primitive(888);
+
+		// Verify the underlying bytes were modified.
+		let reread = TestType::try_from_bytes(&data).unwrap();
+		assert_eq!(u64::from(reread.field0), 999);
+		assert_eq!(u64::from(reread.field1), 888);
+	}
+
+	/// Discriminator should not match when embedded in the wrong position.
+	#[test]
+	fn discriminator_does_not_match_at_wrong_offset() {
+		// bytes: [0, 7, ...] — the 7 is at offset 1, not 0
+		let data = [0u8, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+		assert!(!TestType::matches_discriminator(&data));
+	}
 }

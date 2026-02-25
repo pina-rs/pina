@@ -709,4 +709,51 @@ mod tests {
 			.unwrap_or_else(|err| panic!("expected valid close balance: {err:?}"));
 		assert_eq!(result, 9);
 	}
+
+	#[test]
+	fn checked_send_balances_exact_balance() {
+		let (sender, recipient) = checked_send_balances(5, 3, 5)
+			.unwrap_or_else(|err| panic!("expected valid transfer: {err:?}"));
+		assert_eq!(sender, 0);
+		assert_eq!(recipient, 8);
+	}
+
+	#[test]
+	fn checked_send_balances_zero_transfer() {
+		let (sender, recipient) = checked_send_balances(10, 5, 0)
+			.unwrap_or_else(|err| panic!("expected valid transfer: {err:?}"));
+		assert_eq!(sender, 10);
+		assert_eq!(recipient, 5);
+	}
+
+	#[test]
+	fn checked_send_balances_max_values() {
+		// Test with large values near u64::MAX boundaries.
+		let result = checked_send_balances(u64::MAX, 0, u64::MAX);
+		let (sender, recipient) =
+			result.unwrap_or_else(|err| panic!("expected valid transfer: {err:?}"));
+		assert_eq!(sender, 0);
+		assert_eq!(recipient, u64::MAX);
+	}
+
+	#[test]
+	fn checked_close_balance_zero_sender() {
+		let result = checked_close_balance(0, 5)
+			.unwrap_or_else(|err| panic!("expected valid close: {err:?}"));
+		assert_eq!(result, 5);
+	}
+
+	#[test]
+	fn checked_close_balance_both_zero() {
+		let result = checked_close_balance(0, 0)
+			.unwrap_or_else(|err| panic!("expected valid close: {err:?}"));
+		assert_eq!(result, 0);
+	}
+
+	#[test]
+	fn checked_close_balance_max_sender_zero_recipient() {
+		let result = checked_close_balance(u64::MAX, 0)
+			.unwrap_or_else(|err| panic!("expected valid close: {err:?}"));
+		assert_eq!(result, u64::MAX);
+	}
 }

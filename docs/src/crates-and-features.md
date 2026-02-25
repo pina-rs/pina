@@ -13,9 +13,15 @@ Includes:
 
 Feature flags:
 
-- `derive` (default): enables proc macro re-exports from `pina_macros`.
-- `logs` (default): on-chain logging support.
-- `token`: SPL token/token-2022 + ATA helper APIs.
+<!-- {=pinaFeatureFlags} -->
+
+| Feature  | Default | Description                                                |
+| -------- | ------- | ---------------------------------------------------------- |
+| `derive` | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.) |
+| `logs`   | Yes     | Enables on-chain logging via `solana-program-log`          |
+| `token`  | No      | Enables SPL token / token-2022 helpers and ATA utilities   |
+
+<!-- {/pinaFeatureFlags} -->
 
 ## `crates/pina_macros`
 
