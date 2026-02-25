@@ -28,7 +28,11 @@ changelog = "crates/pina_macros/changelog.md"
 extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
 
 [packages.pina_sdk_ids]
-versioned_files = ["crates/pina_sdk_ids/Cargo.toml", { path = "Cargo.toml", dependency = "pina_sdk_ids" }, "Cargo.lock"]
+versioned_files = [
+	"crates/pina_sdk_ids/Cargo.toml",
+	{ path = "Cargo.toml", dependency = "pina_sdk_ids" },
+	"Cargo.lock",
+]
 scopes = ["pina_sdk_ids"]
 changelog = "crates/pina_sdk_ids/changelog.md"
 extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
@@ -41,24 +45,6 @@ versioned_files = [
 ]
 scopes = ["pina_pod_primitives"]
 changelog = "crates/pina_pod_primitives/changelog.md"
-extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
-
-[packages.pina_codama_renderer]
-versioned_files = [
-	"crates/pina_codama_renderer/Cargo.toml",
-	{ path = "Cargo.toml", dependency = "pina_codama_renderer" },
-	"Cargo.lock",
-]
-scopes = ["codama"]
-changelog = "crates/pina_codama_renderer/changelog.md"
-extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
-
-[packages.codama-nodes-from-pina]
-versioned_files = [
-	"packages/nodes-from-pina/package.json",
-]
-scopes = ["codama"]
-changelog = "packages/nodes-from-pina/changelog.md"
 extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
 
 [changes]
@@ -114,7 +100,7 @@ name = "publish"
 
 [[workflows.steps]]
 type = "Command"
-command = "cargo workspaces publish --from-git --yes"
+command = "cargo workspaces publish --from-git --yes --no-verify"
 
 [github]
 owner = "pina-rs"
