@@ -5,7 +5,7 @@ edition.workspace = true
 homepage.workspace = true
 keywords.workspace = true
 license.workspace = true
-publish = false
+publish = true
 repository.workspace = true
 description = "Codama Rust renderer that generates Pina-style bytemuck models and discriminator-first layouts"
 

@@ -111,11 +111,10 @@ typed-builder = { default-features = false, version = "^0.23" }
 walkdir = { default-features = false, version = "^2" }
 wasm_client_solana = { default-features = false, version = "^0.10" }
 
-# non-published workspace crates (path-only, no version for crates.io)
-pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer" }
-
 # publishable crates
 pina = { default-features = false, path = "crates/pina", version = "0.3.1" }
+pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.1.2" }
+pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.1.0" }
 pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.3.1" }
 pina_pod_primitives = { default-features = false, path = "crates/pina_pod_primitives", version = "0.3.1" }
 pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.3.1" }
