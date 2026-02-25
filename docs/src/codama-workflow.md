@@ -12,6 +12,8 @@ The flow has three stages:
 
 Generate and validate the whole workspace flow with `devenv` scripts:
 
+<!-- {=codamaWorkflowCommands} -->
+
 ```bash
 # Generate Codama IDLs for all examples.
 codama:idl:all
@@ -28,6 +30,8 @@ codama:test
 # Run IDL fixture drift + validation checks used by CI.
 test:idl
 ```
+
+<!-- {/codamaWorkflowCommands} -->
 
 Supporting scripts:
 
