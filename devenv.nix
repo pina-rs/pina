@@ -27,7 +27,8 @@ in
       mdbook
       nodejs
       ifiokjr-pkgs.knope
-      ifiokjr-pkgs.pnpm-standalone
+      # pnpm-standalone works on macOS but fails on Linux CI, so use nixpkgs pnpm on Linux
+      (if stdenv.isDarwin then ifiokjr-pkgs.pnpm-standalone else pnpm)
       llvm.bintools
       llvm.clang
       llvm.clang-tools
@@ -84,14 +85,6 @@ in
   dotenv.disableHint = true;
 
   scripts = {
-    "knope" = {
-      exec = ''
-        set -e
-        cargo bin knope $@
-      '';
-      description = "The `knope` executable";
-      binary = "bash";
-    };
     "query-security-txt" = {
       exec = ''
         set -e
