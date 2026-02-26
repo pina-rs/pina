@@ -46,4 +46,4 @@ jobs:
               echo "| \`$name\` | $size | $human |" >> "$GITHUB_STEP_SUMMARY"
             fi
           done
-        shell: devenv shell -c -- bash -e {0}
+        shell: devenv shell -- bash -e {0}
