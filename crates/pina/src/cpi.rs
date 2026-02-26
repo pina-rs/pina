@@ -36,6 +36,15 @@ use crate::ProgramResult;
 ///
 /// Returns errors from rent sysvar access, rent minimum-balance computation,
 /// or the underlying system-program CPI.
+///
+/// # Examples
+///
+/// ```ignore
+/// use pina::cpi::create_account;
+///
+/// // Create a new account with 128 bytes of space owned by `program_id`:
+/// create_account(payer, new_account, 128, &program_id)?;
+/// ```
 #[inline(always)]
 pub fn create_account<'a>(
 	from: &'a AccountView,
@@ -72,6 +81,15 @@ pub fn create_account<'a>(
 ///
 /// Returns `InvalidSeeds` when no valid PDA can be derived, plus any errors
 /// from allocation/assignment steps.
+///
+/// # Examples
+///
+/// ```ignore
+/// // Create a PDA-backed escrow account:
+/// let seeds: &[&[u8]] = &[b"escrow", authority.address().as_ref()];
+/// let (address, bump) =
+/// 	create_program_account::<EscrowState>(escrow_account, payer, &program_id, seeds)?;
+/// ```
 #[inline(always)]
 pub fn create_program_account<'a, T: HasDiscriminator + Pod>(
 	target_account: &'a AccountView,
@@ -105,6 +123,16 @@ pub fn create_program_account<'a, T: HasDiscriminator + Pod>(
 ///
 /// Returns any error produced by [`allocate_account_with_bump`], including
 /// invalid seed layouts and system-program CPI failures.
+///
+/// # Examples
+///
+/// ```ignore
+/// // Create a PDA-backed account when you already know the bump:
+/// let seeds: &[&[u8]] = &[b"escrow", authority.address().as_ref()];
+/// create_program_account_with_bump::<EscrowState>(
+/// 	escrow_account, payer, &program_id, seeds, bump,
+/// )?;
+/// ```
 #[inline(always)]
 pub fn create_program_account_with_bump<'a, T: HasDiscriminator + Pod>(
 	target_account: &'a AccountView,
@@ -137,6 +165,15 @@ pub fn create_program_account_with_bump<'a, T: HasDiscriminator + Pod>(
 ///
 /// Returns `InvalidSeeds` when no canonical PDA can be derived, plus any
 /// allocation errors surfaced by [`allocate_account_with_bump`].
+///
+/// # Examples
+///
+/// ```ignore
+/// // Allocate raw space for manual initialization:
+/// let seeds: &[&[u8]] = &[b"vault"];
+/// let (address, bump) =
+/// 	allocate_account(vault_account, payer, 64, &program_id, seeds)?;
+/// ```
 #[inline(always)]
 pub fn allocate_account<'a>(
 	target_account: &'a AccountView,
@@ -168,6 +205,15 @@ pub fn allocate_account<'a>(
 /// When a bump is required, prefer canonical bump derivation.
 ///
 /// Use explicit bumps when needed.<!-- {/pinaPdaSeedContract} -->
+///
+/// # Examples
+///
+/// ```ignore
+/// let seeds: &[&[u8]] = &[b"escrow", authority.address().as_ref()];
+/// let bump_bytes = [bump];
+/// let combined = combine_seeds_with_bump(seeds, &bump_bytes)?;
+/// let signer = Signer::from(&combined[..=seeds.len()]);
+/// ```
 pub fn combine_seeds_with_bump<'a>(
 	seeds: &[&'a [u8]],
 	bump: &'a [u8; 1],
@@ -196,8 +242,8 @@ pub fn combine_seeds_with_bump<'a>(
 /// Two paths are taken depending on whether the target account already has
 /// lamports:
 ///
-/// - **Zero balance** — a single `CreateAccount` CPI is issued.
-/// - **Non-zero balance** — a `Transfer` (to top up rent), `Allocate`, and
+/// - **Zero balance** -- a single `CreateAccount` CPI is issued.
+/// - **Non-zero balance** -- a `Transfer` (to top up rent), `Allocate`, and
 ///   `Assign` are issued separately. This covers the case where the account was
 ///   pre-funded (e.g. by a previous failed transaction).
 ///
@@ -214,6 +260,13 @@ pub fn combine_seeds_with_bump<'a>(
 /// Returns seed-validation errors, rent sysvar access errors, and any
 /// system-program CPI failure from `CreateAccount`, `Transfer`, `Allocate`, or
 /// `Assign`.
+///
+/// # Examples
+///
+/// ```ignore
+/// let seeds: &[&[u8]] = &[b"vault"];
+/// allocate_account_with_bump(vault_account, payer, 64, &program_id, seeds, bump)?;
+/// ```
 #[inline(always)]
 pub fn allocate_account_with_bump<'a>(
 	target_account: &'a AccountView,
@@ -293,6 +346,13 @@ pub fn allocate_account_with_bump<'a>(
 ///
 /// Returns errors from lamport transfer, data resize, or account close
 /// operations.
+///
+/// # Examples
+///
+/// ```ignore
+/// // Close the escrow account and return rent to the authority:
+/// close_account(escrow_account, authority)?;
+/// ```
 #[inline(always)]
 pub fn close_account(account_info: &AccountView, recipient: &AccountView) -> ProgramResult {
 	// Return rent lamports.

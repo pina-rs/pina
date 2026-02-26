@@ -15,6 +15,20 @@ use crate::ProgramError;
 ///
 /// This is the preferred PDA derivation API in `pina` because it is explicit
 /// about failure and avoids panics in on-chain code paths.
+///
+/// # Examples
+///
+/// ```
+/// use pina::try_find_program_address;
+///
+/// let program_id = pina::address!("11111111111111111111111111111111");
+/// let seeds: &[&[u8]] = &[b"vault"];
+///
+/// if let Some((pda, bump)) = try_find_program_address(seeds, &program_id) {
+/// 	// `pda` is the derived address, `bump` is the canonical bump seed.
+/// 	assert!(bump <= 255);
+/// }
+/// ```
 #[inline]
 pub fn try_find_program_address(seeds: &[&[u8]], program_id: &Address) -> Option<(Address, u8)> {
 	Address::try_find_program_address(seeds, program_id)
@@ -50,6 +64,26 @@ pub fn find_program_address(seeds: &[&[u8]], program_id: &Address) -> (Address, 
 /// When a bump is required, prefer canonical bump derivation.
 ///
 /// Use explicit bumps when needed.<!-- {/pinaPdaSeedContract} -->
+///
+/// # Examples
+///
+/// ```
+/// use pina::create_program_address;
+/// use pina::try_find_program_address;
+///
+/// let program_id = pina::address!("11111111111111111111111111111111");
+/// let seeds: &[&[u8]] = &[b"vault"];
+///
+/// // First derive the canonical PDA and bump:
+/// let (pda, bump) =
+/// 	try_find_program_address(seeds, &program_id).unwrap_or_else(|| panic!("no valid PDA"));
+///
+/// // Then recreate the address using the known bump:
+/// let bump_seed = [bump];
+/// let recreated = create_program_address(&[b"vault", &bump_seed], &program_id)
+/// 	.unwrap_or_else(|e| panic!("failed to recreate: {e:?}"));
+/// assert_eq!(pda, recreated);
+/// ```
 #[inline]
 pub fn create_program_address(
 	seeds: &[&[u8]],

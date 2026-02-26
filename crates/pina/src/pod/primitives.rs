@@ -3,6 +3,20 @@ use pinocchio::error::ProgramError;
 
 /// Reinterprets a byte slice as `&T` (zero-copy). Returns an error if the
 /// slice has incorrect length or alignment.
+///
+/// # Examples
+///
+/// ```
+/// use pina::PodU64;
+/// use pina::pod_from_bytes;
+///
+/// let bytes = [42u8, 0, 0, 0, 0, 0, 0, 0];
+/// let value = pod_from_bytes::<PodU64>(&bytes).unwrap_or_else(|e| panic!("failed: {e:?}"));
+/// assert_eq!(u64::from(*value), 42);
+///
+/// // Empty or wrong-sized slices produce an error:
+/// assert!(pod_from_bytes::<PodU64>(&[]).is_err());
+/// ```
 pub fn pod_from_bytes<T: Pod>(bytes: &[u8]) -> Result<&T, ProgramError> {
 	bytemuck::try_from_bytes(bytes).map_err(|_| ProgramError::InvalidArgument)
 }

@@ -16,6 +16,38 @@ use crate::ProgramError;
 /// `try_from_bytes` that does **not** check the discriminator — instruction
 /// data is already validated by [`parse_instruction`](crate::parse_instruction)
 /// at the entrypoint level, so a second discriminator check would be redundant.
+///
+/// # Examples
+///
+/// ```
+/// use bytemuck::Pod;
+/// use bytemuck::Zeroable;
+/// use pina::AccountDeserialize;
+/// use pina::HasDiscriminator;
+/// use pina::IntoDiscriminator;
+/// use pina::PodU64;
+///
+/// #[repr(C)]
+/// #[derive(Copy, Clone, Pod, Zeroable)]
+/// struct MyAccount {
+/// 	discriminator: [u8; 1],
+/// 	value: PodU64,
+/// }
+///
+/// impl HasDiscriminator for MyAccount {
+/// 	type Type = u8;
+///
+/// 	const VALUE: u8 = 1;
+/// }
+///
+/// let mut data = [0u8; 9];
+/// data[0] = 1; // discriminator
+/// data[1] = 42; // value (little-endian)
+///
+/// let account = MyAccount::try_from_bytes(&data)
+/// 	.unwrap_or_else(|e| panic!("deserialization failed: {e:?}"));
+/// assert_eq!(u64::from(account.value), 42);
+/// ```
 pub trait AccountDeserialize {
 	/// Validate the discriminator and reinterpret `data` as `&Self`.
 	fn try_from_bytes(data: &[u8]) -> Result<&Self, ProgramError>;
@@ -56,6 +88,17 @@ where
 /// They return `ProgramError` values for caller-side propagation with `?`.
 ///
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
+///
+/// # Examples
+///
+/// ```ignore
+/// // Inside an instruction handler with a deserialized `escrow: &EscrowState`:
+/// escrow.assert(|e| e.is_active.into())?;
+/// escrow.assert_msg(
+/// 	|e| u64::from(e.amount) > 0,
+/// 	"escrow amount must be positive",
+/// )?;
+/// ```
 pub trait AccountValidation {
 	/// Assert an immutable condition on the account data.
 	fn assert<F>(&self, condition: F) -> Result<&Self, ProgramError>
@@ -87,6 +130,21 @@ pub trait AccountValidation {
 ///
 /// <!-- {=pinaValidationChainSnippet|trim|linePrefix:"/// ":true} -->/// Validation methods are intentionally chainable: `account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?`.<!-- {/pinaValidationChainSnippet} -->
 /// <!-- {=pinaMdtManagedDocNote|trim|linePrefix:"/// ":true} -->/// This section is synchronized by `mdt` from `api-docs.t.md`.<!-- {/pinaMdtManagedDocNote} -->
+///
+/// # Examples
+///
+/// ```ignore
+/// // Validate an account before using it in an instruction handler:
+/// let authority = &accounts[0];
+/// authority
+/// 	.assert_signer()?
+/// 	.assert_writable()?
+/// 	.assert_owner(&program_id)?;
+///
+/// // Validate a PDA account:
+/// let vault = &accounts[1];
+/// vault.assert_seeds(&[b"vault", authority.address().as_ref()], &program_id)?;
+/// ```
 pub trait AccountInfoValidation {
 	/// Assert that the account is a signer.
 	fn assert_signer(&self) -> Result<&Self, ProgramError>;
@@ -259,6 +317,23 @@ macro_rules! into_discriminator {
 /// Implemented for the primitive types (`u8`, `u16`, `u32`, `u64`) and for
 /// user-defined discriminator enums via the [`into_discriminator!`] macro or
 /// the `#[discriminator]` attribute macro.
+///
+/// # Examples
+///
+/// ```
+/// use pina::IntoDiscriminator;
+///
+/// // Read a u8 discriminator from raw bytes:
+/// let data = [7u8, 0, 0, 0];
+/// let disc = u8::discriminator_from_bytes(&data).unwrap_or_else(|e| panic!("failed: {e:?}"));
+/// assert_eq!(disc, 7);
+///
+/// // Write and verify a u32 discriminator:
+/// let val: u32 = 0xDEAD_BEEF;
+/// let mut buf = [0u8; 4];
+/// val.write_discriminator(&mut buf);
+/// assert!(val.matches_discriminator(&buf));
+/// ```
 pub trait IntoDiscriminator: Sized {
 	/// The number of bytes required to store this discriminator.
 	const BYTES: usize = size_of::<Self>();
@@ -278,10 +353,48 @@ pub trait IntoDiscriminator: Sized {
 /// prevent alignment issues. Since the largest alignment size is `u64`
 /// (8 bytes), this constant ensures the discriminator never causes alignment
 /// errors.
+///
+/// # Examples
+///
+/// ```
+/// use pina::MAX_DISCRIMINATOR_SPACE;
+///
+/// assert_eq!(MAX_DISCRIMINATOR_SPACE, 8);
+/// assert_eq!(MAX_DISCRIMINATOR_SPACE, core::mem::size_of::<u64>());
+/// ```
 pub const MAX_DISCRIMINATOR_SPACE: usize = 8;
 
 /// Associates a concrete type (account / instruction / event struct) with its
 /// discriminator enum variant.
+///
+/// # Examples
+///
+/// ```
+/// use bytemuck::Pod;
+/// use bytemuck::Zeroable;
+/// use pina::HasDiscriminator;
+/// use pina::IntoDiscriminator;
+/// use pina::PodU64;
+///
+/// #[repr(C)]
+/// #[derive(Copy, Clone, Pod, Zeroable)]
+/// struct MyAccount {
+/// 	discriminator: [u8; 1],
+/// 	value: PodU64,
+/// }
+///
+/// impl HasDiscriminator for MyAccount {
+/// 	type Type = u8;
+///
+/// 	const VALUE: u8 = 5;
+/// }
+///
+/// // Write and check the discriminator on raw bytes:
+/// let mut buf = [0u8; 9];
+/// MyAccount::write_discriminator(&mut buf);
+/// assert_eq!(buf[0], 5);
+/// assert!(MyAccount::matches_discriminator(&buf));
+/// ```
 pub trait HasDiscriminator: Sized {
 	/// The underlying type of the discriminator.
 	type Type: IntoDiscriminator;
@@ -313,6 +426,18 @@ pub trait HasDiscriminator: Sized {
 /// They return `ProgramError` values for caller-side propagation with `?`.
 ///
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
+///
+/// # Examples
+///
+/// ```ignore
+/// // Inside an instruction handler:
+/// let escrow_account = &accounts[0];
+/// let escrow: &EscrowState = escrow_account.as_account(&program_id)?;
+///
+/// // For mutable access:
+/// let escrow_mut: &mut EscrowState = escrow_account.as_account_mut(&program_id)?;
+/// escrow_mut.amount = PodU64::from(100u64);
+/// ```
 pub trait AsAccount {
 	/// Validate ownership and deserialize the account data into an immutable
 	/// reference of type `T`. Returns `InvalidAccountData` if the
@@ -414,6 +539,16 @@ pub trait AsTokenAccount {
 /// They return `ProgramError` values for caller-side propagation with `?`.
 ///
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
+///
+/// # Examples
+///
+/// ```ignore
+/// // Direct lamport transfer (sender must be owned by the executing program):
+/// vault_account.send(1_000_000, recipient_account)?;
+///
+/// // CPI transfer via system program (from must be a signer):
+/// vault_account.collect(500_000, payer_account)?;
+/// ```
 pub trait LamportTransfer<'a> {
 	/// Debit `lamports` from this account and credit them to `to` by directly
 	/// mutating both accounts' lamport balances. The sender must be owned by
@@ -431,6 +566,13 @@ pub trait LamportTransfer<'a> {
 /// They return `ProgramError` values for caller-side propagation with `?`.
 ///
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
+///
+/// # Examples
+///
+/// ```ignore
+/// // Close the escrow account and return rent to the authority:
+/// escrow_account.close_with_recipient(authority_account)?;
+/// ```
 pub trait CloseAccountWithRecipient<'a> {
 	/// Close the account, transfer all remaining lamports to the recipient,
 	/// and zero the account data.
@@ -446,6 +588,22 @@ pub trait CloseAccountWithRecipient<'a> {
 /// They return `ProgramError` values for caller-side propagation with `?`.
 ///
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
+///
+/// # Examples
+///
+/// ```ignore
+/// // Typically derived via `#[derive(Accounts)]`:
+/// #[derive(Accounts)]
+/// pub struct InitEscrow<'a> {
+/// 	#[account(signer, writable)]
+/// 	pub authority: &'a AccountView,
+/// 	#[account(writable)]
+/// 	pub escrow: &'a AccountView,
+/// }
+///
+/// // Then used in the entrypoint:
+/// let accounts = InitEscrow::try_from_account_infos(accounts)?;
+/// ```
 pub trait TryFromAccountInfos<'a>: Sized {
 	/// Convert the raw instruction account slice into a typed accounts struct.
 	///
@@ -463,6 +621,20 @@ pub trait TryFromAccountInfos<'a>: Sized {
 /// They return `ProgramError` values for caller-side propagation with `?`.
 ///
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
+///
+/// # Examples
+///
+/// ```ignore
+/// impl<'a> ProcessAccountInfos<'a> for InitEscrow<'a> {
+/// 	fn process(&self, data: &[u8]) -> ProgramResult {
+/// 		// Parse instruction data, create accounts, etc.
+/// 		Ok(())
+/// 	}
+/// }
+///
+/// // Called from the entrypoint:
+/// InitEscrow::try_from_account_infos(accounts)?.process(data)?;
+/// ```
 pub trait ProcessAccountInfos<'a>: TryFromAccountInfos<'a> {
 	/// Execute the instruction logic after accounts have been validated and
 	/// parsed into the implementor type.
