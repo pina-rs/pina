@@ -47,4 +47,4 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           knope release --dry-run 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || true
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-        shell: devenv shell -c -- bash -e {0}
+        shell: devenv shell -- bash -e {0}
