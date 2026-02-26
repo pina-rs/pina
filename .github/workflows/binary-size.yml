@@ -1,0 +1,50 @@
+name: "binary-size"
+permissions:
+  contents: read
+  pull-requests: write
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    timeout-minutes: 30
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: build SBF programs
+        run: |
+          rm -rf .bin/rust-nightly/sbpf-linker
+          cargo bin --install
+          cargo build-bpf
+        shell: devenv shell -- bash -e {0}
+
+      - name: measure binary sizes
+        id: sizes
+        run: |
+          echo "## SBF Binary Sizes" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Program | Size (bytes) | Size |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| ------- | -----------: | ---: |" >> "$GITHUB_STEP_SUMMARY"
+          for so in target/bpfel-unknown-none/release/*.so; do
+            if [ -f "$so" ]; then
+              name=$(basename "$so" .so)
+              size=$(stat -c%s "$so" 2>/dev/null || stat -f%z "$so")
+              human=$(numfmt --to=iec-i --suffix=B "$size" 2>/dev/null || echo "${size}B")
+              echo "| \`$name\` | $size | $human |" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+        shell: devenv shell -- bash -e {0}
