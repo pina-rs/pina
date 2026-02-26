@@ -139,7 +139,6 @@ cargo-insta = { version = "1.44.3" }
 cargo-llvm-cov = { version = "0.8.4" }
 cargo-nextest = { version = "0.9.129" }
 cargo-semver-checks = { version = "0.46.0" }
-mdt_cli = { version = "0.4.1", bins = ["mdt"] }
 dylint-link = { version = "5.0.0", bins = ["dylint-link"] }
 sbpf-linker = { version = "0.1.8", bins = ["sbpf-linker"] }
 solana-verify = { version = "0.4.11", bins = ["solana-verify"] }

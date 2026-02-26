@@ -26,6 +26,7 @@ in
       libiconv
       mdbook
       custom.knope
+      custom.mdt
       custom.pnpm-standalone
       llvm.bintools
       llvm.clang
@@ -120,14 +121,6 @@ in
         cargo run --clean -p pina_cli -- $@
       '';
       description = "Run the `pina` CLI from source.";
-      binary = "bash";
-    };
-    "mdt" = {
-      exec = ''
-        set -e
-        cargo bin mdt $@
-      '';
-      description = "Run the pinned `mdt` CLI used for reusable docs.";
       binary = "bash";
     };
     "codama:idl:all" = {
