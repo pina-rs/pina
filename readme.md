@@ -511,7 +511,7 @@ When the `logs` feature is disabled, `log!` compiles to nothing.
 Programs are compiled to the `bpfel-unknown-none` target using `sbpf-linker`:
 
 ```sh
-cargo +nightly-2025-10-15 build --release --target bpfel-unknown-none -p my_program -Z build-std=core,alloc -F bpf-entrypoint
+cargo +nightly build --release --target bpfel-unknown-none -p my_program -Z build-std=core,alloc -F bpf-entrypoint
 ```
 
 The `bpf-entrypoint` feature gate separates the on-chain entrypoint from the library code used in tests.
