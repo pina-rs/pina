@@ -946,7 +946,13 @@ dependencies = [
 name = "counter_program"
 version = "0.0.0"
 dependencies = [
+ "mollusk-svm",
  "pina",
+ "solana-account",
+ "solana-instruction",
+ "solana-pubkey 4.1.0",
+ "solana-sdk-ids",
+ "solana-system-interface",
 ]
 
 [[package]]

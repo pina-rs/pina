@@ -98,6 +98,7 @@ proptest = { default-features = false, version = "^1", features = ["std"] }
 quote = { default-features = false, version = "^1" }
 serde = { default-features = false, version = "^1" }
 serde_json = { default-features = false, version = "^1", features = ["std"] }
+solana-account = { version = "^3" }
 solana-account-info = { version = "^3" }
 solana-address = { default-features = false, version = "^2.0", features = ["bytemuck", "curve25519", "decode"] }
 solana-cpi = { version = "^3" }
@@ -105,6 +106,8 @@ solana-instruction = { version = "^3" }
 solana-program-error = { version = "^3" }
 solana-program-log = { default-features = false, version = "^1.1" }
 solana-pubkey = { version = "^4", features = ["bytemuck"] }
+solana-sdk-ids = { version = "^3" }
+solana-system-interface = { version = "^2" }
 syn = { default-features = false, version = "^2", features = ["full"] }
 test_utils_solana = { default-features = false, version = "^0.8" }
 thiserror = { default-features = false, version = "^2" }
