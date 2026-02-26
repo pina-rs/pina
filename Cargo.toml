@@ -67,7 +67,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 homepage = "https://pina.rs"
 keywords = ["solana", "pinocchio"]
@@ -118,7 +118,7 @@ wasm_client_solana = { default-features = false, version = "^0.10" }
 
 # publishable crates
 pina = { default-features = false, path = "crates/pina", version = "0.6.0" }
-pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.5.0" }
+pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.6.0" }
 pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.6.0" }
 pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.6.0" }
 pina_pod_primitives = { default-features = false, path = "crates/pina_pod_primitives", version = "0.6.0" }

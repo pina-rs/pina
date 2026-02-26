@@ -1,8 +1,10 @@
 [package]
 versioned_files = [
+	"Cargo.toml",
 	{ dependency = "pina", path = "Cargo.lock" },
 	{ dependency = "pina", path = "Cargo.toml" },
 	{ dependency = "pina_cli", path = "Cargo.lock" },
+	{ dependency = "pina_cli", path = "Cargo.toml" },
 	{ dependency = "pina_codama_renderer", path = "Cargo.lock" },
 	{ dependency = "pina_codama_renderer", path = "Cargo.toml" },
 	{ dependency = "pina_macros", path = "Cargo.lock" },
@@ -46,7 +48,7 @@ command = "dprint fmt"
 
 [[workflows.steps]]
 type = "Command"
-command = "git add --all"
+command = "git add --all -- ':!.claude/worktrees'"
 
 [[workflows.steps]]
 type = "Command"
