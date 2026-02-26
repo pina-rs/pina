@@ -156,6 +156,7 @@ fn run_init(name: &str, path: Option<&std::path::Path>, force: bool) {
 	}
 
 	println!("Initialized new Pina project at {}", project_path.display());
+	pina_cli::print_next_steps(&project_path, name);
 }
 
 fn run_codama_generate(

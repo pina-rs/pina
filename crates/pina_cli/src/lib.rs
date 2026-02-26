@@ -14,6 +14,7 @@ pub use crate::codama::generate_codama;
 use crate::codegen::ir_to_root_node;
 use crate::error::IdlError;
 pub use crate::init::init_project;
+pub use crate::init::print_next_steps;
 use crate::parse::parse_program;
 
 /// Generate a Codama IDL `RootNode` from a Pina program crate.
