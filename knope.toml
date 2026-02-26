@@ -1,62 +1,31 @@
-[packages.pina]
+[package]
 versioned_files = [
-	"crates/pina/Cargo.toml",
-	{ path = "Cargo.toml", dependency = "pina" },
-	"Cargo.lock",
+	{ dependency = "pina", path = "Cargo.lock" },
+	{ dependency = "pina", path = "Cargo.toml" },
+	{ dependency = "pina_cli", path = "Cargo.lock" },
+	{ dependency = "pina_codama_renderer", path = "Cargo.lock" },
+	{ dependency = "pina_codama_renderer", path = "Cargo.toml" },
+	{ dependency = "pina_macros", path = "Cargo.lock" },
+	{ dependency = "pina_macros", path = "Cargo.toml" },
+	{ dependency = "pina_pod_primitives", path = "Cargo.lock" },
+	{ dependency = "pina_pod_primitives", path = "Cargo.toml" },
+	{ dependency = "pina_sdk_ids", path = "Cargo.lock" },
+	{ dependency = "pina_sdk_ids", path = "Cargo.toml" },
+	"packages/nodes-from-pina/package.json",
 ]
-scopes = ["pina"]
-changelog = "changelog.md"
-extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
-
-[packages.pina_cli]
-versioned_files = [
-	"crates/pina_cli/Cargo.toml",
-	{ path = "Cargo.toml", dependency = "pina_cli" },
-	"Cargo.lock",
+scopes = [
+	"pina",
+	"cli",
+	"codama_renderer",
+	"macros",
+	"pod_primitives",
+	"sdk_ids",
 ]
-scopes = ["pina_cli"]
 changelog = "changelog.md"
-extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
-
-[packages.pina_codama_renderer]
-versioned_files = [
-	"crates/pina_codama_renderer/Cargo.toml",
-	{ path = "Cargo.toml", dependency = "pina_codama_renderer" },
-	"Cargo.lock",
+extra_changelog_sections = [
+	{ name = "Notes", types = ["note"] },
+	{ name = "Documentation", types = ["docs"] },
 ]
-scopes = ["pina_codama_renderer"]
-changelog = "changelog.md"
-extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
-
-[packages.pina_macros]
-versioned_files = [
-	"crates/pina_macros/Cargo.toml",
-	{ path = "Cargo.toml", dependency = "pina_macros" },
-	"Cargo.lock",
-]
-scopes = ["pina_macros"]
-changelog = "changelog.md"
-extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
-
-[packages.pina_pod_primitives]
-versioned_files = [
-	"crates/pina_pod_primitives/Cargo.toml",
-	{ path = "Cargo.toml", dependency = "pina_pod_primitives" },
-	"Cargo.lock",
-]
-scopes = ["pina_pod_primitives"]
-changelog = "changelog.md"
-extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
-
-[packages.pina_sdk_ids]
-versioned_files = [
-	"crates/pina_sdk_ids/Cargo.toml",
-	{ path = "Cargo.toml", dependency = "pina_sdk_ids" },
-	"Cargo.lock",
-]
-scopes = ["pina_sdk_ids"]
-changelog = "changelog.md"
-extra_changelog_sections = [{ name = "Notes", types = ["note"] }, { name = "Documentation", types = ["docs"] }]
 
 [changes]
 ignore_conventional_commits = true
@@ -81,7 +50,7 @@ command = "git add --all"
 
 [[workflows.steps]]
 type = "Command"
-command = 'git commit -m "chore: prepare releases"'
+command = 'git commit -m "chore: prepare releases $version"'
 
 [[workflows.steps]]
 type = "Command"
@@ -111,7 +80,11 @@ name = "publish"
 
 [[workflows.steps]]
 type = "Command"
-command = "cargo workspaces publish --from-git --yes --no-verify"
+command = "cargo publish --workspace"
+
+[[workflows.steps]]
+type = "Command"
+command = "pnpm --recursive publish"
 
 [github]
 owner = "pina-rs"

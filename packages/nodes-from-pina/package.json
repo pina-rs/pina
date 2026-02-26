@@ -1,6 +1,6 @@
 {
 	"name": "codama-nodes-from-pina",
-	"version": "0.1.0",
+	"version": "0.5.0",
 	"description": "Helpers for converting Pina IDLs into Codama RootNodes",
 	"license": "MIT",
 	"type": "commonjs",

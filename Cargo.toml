@@ -67,6 +67,7 @@ exclude = [
 ]
 
 [workspace.package]
+version = "0.5.0"
 edition = "2024"
 homepage = "https://pina.rs"
 keywords = ["solana", "pinocchio"]
@@ -131,11 +132,10 @@ cargo-dylint = { version = "5.0.0" }
 cargo-audit = { version = "0.22.1" }
 cargo-deny = { version = "0.19.0" }
 cargo-insta = { version = "1.44.3" }
-cargo-llvm-cov = { version = "0.6.21" }
-cargo-nextest = { version = "0.9.114" }
-cargo-semver-checks = { version = "0.45.0" }
-cargo-workspaces = { version = "0.4.2" }
-mdt_cli = { version = "0.4.0", bins = ["mdt"] }
+cargo-llvm-cov = { version = "0.8.4" }
+cargo-nextest = { version = "0.9.129" }
+cargo-semver-checks = { version = "0.46.0" }
+mdt_cli = { version = "0.4.1", bins = ["mdt"] }
 dylint-link = { version = "5.0.0", bins = ["dylint-link"] }
 knope = { version = "0.22.3", bins = ["knope"] }
 sbpf-linker = { version = "0.1.8", bins = ["sbpf-linker"] }
