@@ -26,6 +26,7 @@ in
       libiconv
       mdbook
       nodejs
+      ifiokjr-pkgs.knope
       ifiokjr-pkgs.pnpm-standalone
       llvm.bintools
       llvm.clang
