@@ -84,14 +84,6 @@ in
   dotenv.disableHint = true;
 
   scripts = {
-    "knope" = {
-      exec = ''
-        set -e
-        cargo bin knope $@
-      '';
-      description = "The `knope` executable";
-      binary = "bash";
-    };
     "query-security-txt" = {
       exec = ''
         set -e
