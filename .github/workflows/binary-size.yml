@@ -26,8 +26,11 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: build SBF programs
-        run: cargo build-bpf
-        shell: devenv shell -c -- bash -e {0}
+        run: |
+          rm -rf .bin/rust-nightly/sbpf-linker
+          cargo bin --install
+          cargo build-bpf
+        shell: devenv shell -- bash -e {0}
 
       - name: measure binary sizes
         id: sizes
