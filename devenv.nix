@@ -40,9 +40,16 @@ in
       pkg-config
       protobuf # needed for `solana-test-validator` in tests
       rust-jemalloc-sys
-      # Upstream rustup check suite is network-sensitive (e.g. socks proxy test) and flakes in CI.
-      (rustup.overrideAttrs (_: {
+      # Upstream rustup 1.28+ fails in nix builds: check suite is network-sensitive
+      # and the install phase fails generating shell completions because the sandbox
+      # creates an empty settings.toml missing the required `version` field.
+      (rustup.overrideAttrs (old: {
         doCheck = false;
+        preInstall = (old.preInstall or "") + ''
+          export HOME="$(mktemp -d)"
+          mkdir -p "$HOME/.rustup"
+          echo 'version = "12"' > "$HOME/.rustup/settings.toml"
+        '';
       }))
       shfmt
       zstd
