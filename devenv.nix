@@ -7,7 +7,7 @@
 }:
 let
   llvm = pkgs.llvmPackages_21;
-  ifiokjr-pkgs = inputs.ifiokjr-nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system};
+  ifiokjr-pkgs = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.hostPlatform.system};
 in
 
 {
