@@ -1,0 +1,42 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+#[derive(
+    Debug,
+    ::core::clone::Clone,
+    ::core::marker::Copy,
+    ::core::cmp::PartialEq,
+    ::core::cmp::Eq
+)]
+#[repr(u8)]
+pub enum FinalDiscriminator {
+    Only = 0,
+}
+impl ::core::convert::From<FinalDiscriminator> for u8 {
+    #[inline]
+    fn from(enum_value: FinalDiscriminator) -> Self {
+        enum_value as Self
+    }
+}
+impl ::core::convert::TryFrom<u8> for FinalDiscriminator {
+    type Error = ::pina::ProgramError;
+    #[inline]
+    fn try_from(number: u8) -> ::core::result::Result<Self, ::pina::ProgramError> {
+        #![allow(non_upper_case_globals)]
+        const __ONLY: u8 = 0;
+        #[deny(unreachable_patterns)]
+        match number {
+            __ONLY => ::core::result::Result::Ok(Self::Only),
+            #[allow(unreachable_patterns)]
+            _ => {
+                ::core::result::Result::Err(
+                    ::pina::PinaProgramError::InvalidDiscriminator.into(),
+                )
+            }
+        }
+    }
+}
+unsafe impl ::pina::Zeroable for FinalDiscriminator {}
+unsafe impl ::pina::Pod for FinalDiscriminator {}
+::pina::into_discriminator!(FinalDiscriminator, u8);

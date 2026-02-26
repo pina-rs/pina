@@ -16,12 +16,14 @@ use syn::Fields;
 use syn::ItemEnum;
 use syn::ItemStruct;
 use syn::Token;
-use syn::parse_macro_input;
 use syn::punctuated::Punctuated;
 
 use crate::args::InstructionArgs;
 
 mod args;
+
+#[cfg(test)]
+mod tests;
 
 /// Derives the [`TryFromAccountInfos`] trait for a named-field struct.
 ///
@@ -29,12 +31,19 @@ mod args;
 /// `#[pina(remaining)]` to capture all trailing accounts as a slice.
 #[proc_macro_derive(Accounts, attributes(pina))]
 pub fn accounts_derive(input: TokenStream) -> TokenStream {
-	let input = parse_macro_input!(input as DeriveInput);
+	accounts_derive_impl(input.into()).into()
+}
+
+fn accounts_derive_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+	let input: DeriveInput = match syn::parse2(input) {
+		Ok(v) => v,
+		Err(e) => return e.to_compile_error(),
+	};
 
 	let args = match AccountsInput::from_derive_input(&input) {
 		Ok(v) => v,
 		Err(e) => {
-			return e.write_errors().into();
+			return e.write_errors();
 		}
 	};
 
@@ -52,8 +61,7 @@ pub fn accounts_derive(input: TokenStream) -> TokenStream {
 				&args.ident,
 				"Accounts struct must have **ONE** lifetime parameter",
 			)
-			.to_compile_error()
-			.into();
+			.to_compile_error();
 		}
 	};
 
@@ -68,8 +76,7 @@ pub fn accounts_derive(input: TokenStream) -> TokenStream {
 				&field.ident,
 				"Only one field can be marked as `remaining`",
 			)
-			.to_compile_error()
-			.into();
+			.to_compile_error();
 		}
 
 		remaining_field = field.ident.as_ref();
@@ -93,7 +100,7 @@ pub fn accounts_derive(input: TokenStream) -> TokenStream {
 	let not_enough_accounts_error = quote! {
 		return ::core::result::Result::Err(#crate_path::ProgramError::NotEnoughAccountKeys);
 	};
-	let try_from_impl = quote! {
+	quote! {
 		impl #impl_generics #crate_path::TryFromAccountInfos #ty_generics for #struct_name #ty_generics #where_clause {
 			fn try_from_account_infos(
 				accounts: & #lifetime [#crate_path::AccountView],
@@ -117,9 +124,7 @@ pub fn accounts_derive(input: TokenStream) -> TokenStream {
 				<Self as #crate_path::TryFromAccountInfos>::try_from_account_infos(accounts)
 			}
 		}
-	};
-
-	try_from_impl.into()
+	}
 }
 
 /// `#[error]` is a lightweight modification to the provided enum acting as
@@ -177,21 +182,31 @@ pub fn accounts_derive(input: TokenStream) -> TokenStream {
 ///   `final` flag will remove this.
 #[proc_macro_attribute]
 pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
-	let nested_metas = match NestedMeta::parse_meta_list(args.into()) {
+	error_impl(args.into(), input.into()).into()
+}
+
+fn error_impl(
+	args: proc_macro2::TokenStream,
+	input: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+	let nested_metas = match NestedMeta::parse_meta_list(args) {
 		Ok(value) => value,
 		Err(e) => {
-			return e.into_compile_error().into();
+			return e.into_compile_error();
 		}
 	};
 
 	let args = match ErrorArgs::from_list(&nested_metas) {
 		Ok(v) => v,
 		Err(e) => {
-			return e.write_errors().into();
+			return e.write_errors();
 		}
 	};
 
-	let mut item_enum = parse_macro_input!(input as ItemEnum);
+	let mut item_enum: ItemEnum = match syn::parse2(input) {
+		Ok(v) => v,
+		Err(e) => return e.to_compile_error(),
+	};
 
 	let ErrorArgs {
 		crate_path,
@@ -217,12 +232,10 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 		}
 	};
 
-	let output = quote! {
+	quote! {
 		#item_enum
 		#impls
-	};
-
-	output.into()
+	}
 }
 
 /// This attribute macro should be used for annotating the globally shared
@@ -310,21 +323,31 @@ pub fn error(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
-	let nested_metas = match NestedMeta::parse_meta_list(args.into()) {
+	discriminator_impl(args.into(), input.into()).into()
+}
+
+fn discriminator_impl(
+	args: proc_macro2::TokenStream,
+	input: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+	let nested_metas = match NestedMeta::parse_meta_list(args) {
 		Ok(value) => value,
 		Err(e) => {
-			return e.into_compile_error().into();
+			return e.into_compile_error();
 		}
 	};
 
 	let args = match DiscriminatorArgs::from_list(&nested_metas) {
 		Ok(v) => v,
 		Err(e) => {
-			return e.write_errors().into();
+			return e.write_errors();
 		}
 	};
 
-	let mut item_enum = parse_macro_input!(input as ItemEnum);
+	let mut item_enum: ItemEnum = match syn::parse2(input) {
+		Ok(v) => v,
+		Err(e) => return e.to_compile_error(),
+	};
 	let enum_name = &item_enum.ident;
 
 	let DiscriminatorArgs {
@@ -404,8 +427,7 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 				variant,
 				"Enum variant for discriminator must have an explicit value.",
 			)
-			.to_compile_error()
-			.into();
+			.to_compile_error();
 		}
 	}
 
@@ -438,12 +460,10 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 		#crate_path::into_discriminator!(#enum_name, #primitive);
 	};
 
-	let output = quote! {
+	quote! {
 		#item_enum
 		#implementations
-	};
-
-	output.into()
+	}
 }
 
 /// The account macro is used to annotate account data that will exist within a
@@ -650,21 +670,31 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
-	let nested_metas = match NestedMeta::parse_meta_list(args.into()) {
+	account_impl(args.into(), input.into()).into()
+}
+
+fn account_impl(
+	args: proc_macro2::TokenStream,
+	input: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+	let nested_metas = match NestedMeta::parse_meta_list(args) {
 		Ok(value) => value,
 		Err(e) => {
-			return e.into_compile_error().into();
+			return e.into_compile_error();
 		}
 	};
 
 	let args = match AccountArgs::from_list(&nested_metas) {
 		Ok(v) => v,
 		Err(e) => {
-			return e.write_errors().into();
+			return e.write_errors();
 		}
 	};
 
-	let mut item_struct = parse_macro_input!(input as ItemStruct);
+	let mut item_struct: ItemStruct = match syn::parse2(input) {
+		Ok(v) => v,
+		Err(e) => return e.to_compile_error(),
+	};
 	let struct_name = &item_struct.ident;
 	let builder_name = format_ident!("{}Builder", struct_name);
 
@@ -744,8 +774,7 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 		named_fields.named.insert(0, discriminator_field);
 	} else {
 		return syn::Error::new_spanned(item_struct, "Account structs must have named fields")
-			.to_compile_error()
-			.into();
+			.to_compile_error();
 	}
 
 	let assertions = if let Fields::Named(named_fields) = &item_struct.fields {
@@ -880,12 +909,10 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 		}
 	};
 
-	let output = quote! {
+	quote! {
 		#item_struct
 		#implementations
-	};
-
-	output.into()
+	}
 }
 
 /// The instruction macro is used to annotate instruction data that will exist
@@ -998,21 +1025,31 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
-	let nested_metas = match NestedMeta::parse_meta_list(args.into()) {
+	instruction_impl(args.into(), input.into()).into()
+}
+
+fn instruction_impl(
+	args: proc_macro2::TokenStream,
+	input: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+	let nested_metas = match NestedMeta::parse_meta_list(args) {
 		Ok(value) => value,
 		Err(e) => {
-			return e.into_compile_error().into();
+			return e.into_compile_error();
 		}
 	};
 
 	let args = match InstructionArgs::from_list(&nested_metas) {
 		Ok(v) => v,
 		Err(e) => {
-			return e.write_errors().into();
+			return e.write_errors();
 		}
 	};
 
-	let mut item_struct = parse_macro_input!(input as ItemStruct);
+	let mut item_struct: ItemStruct = match syn::parse2(input) {
+		Ok(v) => v,
+		Err(e) => return e.to_compile_error(),
+	};
 	let struct_name = &item_struct.ident;
 	let builder_name = format_ident!("{}Builder", struct_name);
 
@@ -1092,8 +1129,7 @@ pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
 		named_fields.named.insert(0, discriminator_field);
 	} else {
 		return syn::Error::new_spanned(item_struct, "Instruction structs must have named fields")
-			.to_compile_error()
-			.into();
+			.to_compile_error();
 	}
 
 	let assertions = if let Fields::Named(named_fields) = &item_struct.fields {
@@ -1163,12 +1199,10 @@ pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
 		}
 	};
 
-	let output = quote! {
+	quote! {
 		#item_struct
 		#implementations
-	};
-
-	output.into()
+	}
 }
 
 /// The event macro is used to annotate event data that will be emitted from a
@@ -1255,21 +1289,31 @@ pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
-	let nested_metas = match NestedMeta::parse_meta_list(args.into()) {
+	event_impl(args.into(), input.into()).into()
+}
+
+fn event_impl(
+	args: proc_macro2::TokenStream,
+	input: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+	let nested_metas = match NestedMeta::parse_meta_list(args) {
 		Ok(value) => value,
 		Err(e) => {
-			return e.into_compile_error().into();
+			return e.into_compile_error();
 		}
 	};
 
 	let args = match EventArgs::from_list(&nested_metas) {
 		Ok(v) => v,
 		Err(e) => {
-			return e.write_errors().into();
+			return e.write_errors();
 		}
 	};
 
-	let mut item_struct = parse_macro_input!(input as ItemStruct);
+	let mut item_struct: ItemStruct = match syn::parse2(input) {
+		Ok(v) => v,
+		Err(e) => return e.to_compile_error(),
+	};
 	let struct_name = &item_struct.ident;
 	let builder_name = format_ident!("{}Builder", struct_name);
 
@@ -1350,8 +1394,7 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
 		named_fields.named.insert(0, discriminator_field);
 	} else {
 		return syn::Error::new_spanned(item_struct, "Event structs must have named fields")
-			.to_compile_error()
-			.into();
+			.to_compile_error();
 	}
 
 	let assertions = if let Fields::Named(named_fields) = &item_struct.fields {
@@ -1420,10 +1463,8 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
 		}
 	};
 
-	let output = quote! {
+	quote! {
 		#item_struct
 		#implementations
-	};
-
-	output.into()
+	}
 }

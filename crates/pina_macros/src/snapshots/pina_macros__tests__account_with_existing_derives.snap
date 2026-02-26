@@ -1,0 +1,122 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+#[derive(
+    Debug,
+    ::pina::TypedBuilder,
+    ::pina::Pod,
+    ::pina::Zeroable,
+    ::core::clone::Clone,
+    ::core::marker::Copy,
+    ::core::cmp::PartialEq,
+    ::core::cmp::Eq
+)]
+#[repr(C)]
+#[builder(builder_method(vis = "", name = __builder))]
+#[bytemuck(crate = "::pina::bytemuck")]
+pub struct GameState {
+    discriminator: [u8; MyAccount::BYTES],
+    pub score: u8,
+    pub level: u8,
+}
+#[allow(dead_code)]
+type GameStateBuilderType = GameStateBuilder<(([u8; MyAccount::BYTES],), (), ())>;
+const __GAMESTATE_ALIGNMENT_ASSERTIONS__: () = {
+    ::core::assert!(
+        ::core::mem::align_of:: < [u8; MyAccount::BYTES] > () == 1,
+        concat!("The alignment of field `", "discriminator", "` with type `",
+        stringify!([u8; MyAccount::BYTES]),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
+        "score", "` with type `", stringify!(u8),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
+        "level", "` with type `", stringify!(u8),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+};
+impl GameState {
+    /// Zero out all bytes in the struct including padding bytes. This can be useful when closing an account.
+    pub fn zeroed(&mut self) {
+        ::pina::bytemuck::write_zeroes(self);
+    }
+    pub fn to_bytes(&self) -> &[u8] {
+        ::pina::bytemuck::bytes_of(self)
+    }
+    pub fn builder() -> GameStateBuilderType {
+        let mut bytes = [0u8; MyAccount::BYTES];
+        <Self as ::pina::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
+        Self::__builder().discriminator(bytes)
+    }
+}
+impl ::pina::HasDiscriminator for GameState {
+    type Type = MyAccount;
+    const VALUE: Self::Type = MyAccount::GameState;
+}
+impl ::pina::AccountValidation for GameState {
+    #[track_caller]
+    fn assert<F>(&self, condition: F) -> Result<&Self, ::pina::ProgramError>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        if condition(self) {
+            return Ok(self);
+        }
+        ::pina::log!("Account is invalid");
+        ::pina::log_caller();
+        Err(::pina::ProgramError::InvalidAccountData)
+    }
+    #[track_caller]
+    fn assert_msg<F>(
+        &self,
+        condition: F,
+        msg: &str,
+    ) -> Result<&Self, ::pina::ProgramError>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        match ::pina::assert(
+            condition(self),
+            ::pina::ProgramError::InvalidAccountData,
+            msg,
+        ) {
+            Err(err) => Err(err),
+            Ok(()) => Ok(self),
+        }
+    }
+    #[track_caller]
+    fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, ::pina::ProgramError>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        if condition(self) {
+            return Ok(self);
+        }
+        ::pina::log!("Account is invalid");
+        ::pina::log_caller();
+        Err(::pina::ProgramError::InvalidAccountData)
+    }
+    #[track_caller]
+    fn assert_mut_msg<F>(
+        &mut self,
+        condition: F,
+        msg: &str,
+    ) -> Result<&mut Self, ::pina::ProgramError>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        match ::pina::assert(
+            condition(self),
+            ::pina::ProgramError::InvalidAccountData,
+            msg,
+        ) {
+            Err(err) => Err(err),
+            Ok(()) => Ok(self),
+        }
+    }
+}

@@ -1,0 +1,135 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+#[repr(C)]
+#[derive(
+    ::pina::TypedBuilder,
+    ::pina::Pod,
+    ::pina::Zeroable,
+    ::core::clone::Clone,
+    ::core::marker::Copy,
+    ::core::cmp::PartialEq,
+    ::core::cmp::Eq
+)]
+#[builder(builder_method(vis = "", name = __builder))]
+#[bytemuck(crate = "::pina::bytemuck")]
+pub struct BalanceAccount {
+    discriminator: [u8; MyDiscriminator::BYTES],
+    pub owner: [u8; 32],
+    pub amount: PodU64,
+    pub decimals: u8,
+    pub is_frozen: PodBool,
+}
+#[allow(dead_code)]
+type BalanceAccountBuilderType = BalanceAccountBuilder<
+    (([u8; MyDiscriminator::BYTES],), (), (), (), ()),
+>;
+const __BALANCEACCOUNT_ALIGNMENT_ASSERTIONS__: () = {
+    ::core::assert!(
+        ::core::mem::align_of:: < [u8; MyDiscriminator::BYTES] > () == 1,
+        concat!("The alignment of field `", "discriminator", "` with type `",
+        stringify!([u8; MyDiscriminator::BYTES]),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < [u8; 32] > () == 1, concat!("The alignment of field `",
+        "owner", "` with type `", stringify!([u8; 32]),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < PodU64 > () == 1, concat!("The alignment of field `",
+        "amount", "` with type `", stringify!(PodU64),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
+        "decimals", "` with type `", stringify!(u8),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < PodBool > () == 1, concat!("The alignment of field `",
+        "is_frozen", "` with type `", stringify!(PodBool),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+};
+impl BalanceAccount {
+    /// Zero out all bytes in the struct including padding bytes. This can be useful when closing an account.
+    pub fn zeroed(&mut self) {
+        ::pina::bytemuck::write_zeroes(self);
+    }
+    pub fn to_bytes(&self) -> &[u8] {
+        ::pina::bytemuck::bytes_of(self)
+    }
+    pub fn builder() -> BalanceAccountBuilderType {
+        let mut bytes = [0u8; MyDiscriminator::BYTES];
+        <Self as ::pina::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
+        Self::__builder().discriminator(bytes)
+    }
+}
+impl ::pina::HasDiscriminator for BalanceAccount {
+    type Type = MyDiscriminator;
+    const VALUE: Self::Type = MyDiscriminator::BalanceAccount;
+}
+impl ::pina::AccountValidation for BalanceAccount {
+    #[track_caller]
+    fn assert<F>(&self, condition: F) -> Result<&Self, ::pina::ProgramError>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        if condition(self) {
+            return Ok(self);
+        }
+        ::pina::log!("Account is invalid");
+        ::pina::log_caller();
+        Err(::pina::ProgramError::InvalidAccountData)
+    }
+    #[track_caller]
+    fn assert_msg<F>(
+        &self,
+        condition: F,
+        msg: &str,
+    ) -> Result<&Self, ::pina::ProgramError>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        match ::pina::assert(
+            condition(self),
+            ::pina::ProgramError::InvalidAccountData,
+            msg,
+        ) {
+            Err(err) => Err(err),
+            Ok(()) => Ok(self),
+        }
+    }
+    #[track_caller]
+    fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, ::pina::ProgramError>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        if condition(self) {
+            return Ok(self);
+        }
+        ::pina::log!("Account is invalid");
+        ::pina::log_caller();
+        Err(::pina::ProgramError::InvalidAccountData)
+    }
+    #[track_caller]
+    fn assert_mut_msg<F>(
+        &mut self,
+        condition: F,
+        msg: &str,
+    ) -> Result<&mut Self, ::pina::ProgramError>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        match ::pina::assert(
+            condition(self),
+            ::pina::ProgramError::InvalidAccountData,
+            msg,
+        ) {
+            Err(err) => Err(err),
+            Ok(()) => Ok(self),
+        }
+    }
+}

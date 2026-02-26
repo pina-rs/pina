@@ -1,0 +1,14 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+#[repr(u32)]
+#[non_exhaustive]
+pub enum DefaultCrateError {
+    Something = 0,
+}
+impl ::core::convert::From<DefaultCrateError> for ::pina::ProgramError {
+    fn from(e: DefaultCrateError) -> Self {
+        ::pina::ProgramError::Custom(e as u32)
+    }
+}
