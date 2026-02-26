@@ -12,5 +12,8 @@ description = "Alignment-safe POD primitive wrappers for Solana account layouts"
 [dependencies]
 bytemuck = { workspace = true, features = ["derive"] }
 
+[dev-dependencies]
+proptest = { workspace = true }
+
 [lints]
 workspace = true
