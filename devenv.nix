@@ -27,7 +27,8 @@ in
       mdbook
       nodejs
       ifiokjr-pkgs.knope
-      ifiokjr-pkgs.pnpm-standalone
+      # pnpm-standalone works on macOS but fails on Linux CI, so use nixpkgs pnpm on Linux
+      (if stdenv.isDarwin then ifiokjr-pkgs.pnpm-standalone else pnpm)
       llvm.bintools
       llvm.clang
       llvm.clang-tools
