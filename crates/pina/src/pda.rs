@@ -57,12 +57,12 @@ pub fn find_program_address(seeds: &[&[u8]], program_id: &Address) -> (Address, 
 /// Use this when your instruction already carries a bump and you want to
 /// verify exact PDA derivation against user-provided seeds.
 ///
-/// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->///// Seed-based APIs require deterministic seed ordering.
-
+/// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->/// Seed-based APIs require deterministic seed ordering.
+///
 /// Program IDs must stay consistent across derivation and verification.
-
+///
 /// When a bump is required, prefer canonical bump derivation.
-
+///
 /// Use explicit bumps when needed.<!-- {/pinaPdaSeedContract} -->
 ///
 /// # Examples

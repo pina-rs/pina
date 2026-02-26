@@ -266,7 +266,7 @@ pub fn process_instruction(
 
 fn entrypoint_template(program_title: &str) -> String {
 	format!(
-		r#"use pina::*;
+		r"use pina::*;
 
 use crate::*;
 
@@ -285,7 +285,7 @@ pub fn process_instruction(
 		}}
 	}}
 }}
-"#
+"
 	)
 }
 
