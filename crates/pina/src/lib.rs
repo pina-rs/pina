@@ -36,6 +36,7 @@ mod loaders;
 mod pda;
 mod pod;
 mod traits;
+pub mod transaction;
 mod utils;
 
 /// Re-export of the [`bytemuck`] crate for zero-copy serialization.
@@ -128,6 +129,8 @@ pub use crate::pda::*;
 /// Core traits for account validation, deserialization, and instruction
 /// processing.
 pub use crate::traits::*;
+/// Typed instruction construction and account metadata helpers.
+pub use crate::transaction::InstructionBuilder;
 /// Utility functions for instruction parsing, assertions, and token address
 /// derivation.
 pub use crate::utils::*;
