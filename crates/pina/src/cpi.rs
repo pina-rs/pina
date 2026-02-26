@@ -330,6 +330,132 @@ pub fn allocate_account_with_bump<'a>(
 	Ok(())
 }
 
+/// Maximum number of bytes an account may grow by in a single instruction.
+///
+/// This limit is enforced by the Solana runtime. Attempting to grow an account
+/// by more than this amount will cause `resize` to return
+/// `ProgramError::InvalidRealloc`.
+pub const MAX_PERMITTED_DATA_INCREASE: usize = 10_240;
+
+/// Reallocates an account to `new_size` bytes, adjusting rent automatically.
+///
+/// When **growing**, transfers the additional rent-exempt lamports required from
+/// `payer` to `account` via a system-program CPI. When **shrinking**, returns
+/// excess rent lamports from `account` to `payer` by direct lamport
+/// manipulation (the account must be owned by the executing program for this
+/// path).
+///
+/// New bytes are zero-initialized by the Solana runtime.
+///
+/// # Limits
+///
+/// The Solana runtime limits account growth to [`MAX_PERMITTED_DATA_INCREASE`]
+/// (10 KiB) per top-level instruction. Exceeding this limit returns
+/// `ProgramError::InvalidRealloc`.
+///
+/// # Errors
+///
+/// Returns `ProgramError::InvalidAccountData` if the account is not writable,
+/// `ProgramError::InvalidAccountOwner` if the account is not owned by
+/// `program_id`, and propagates any errors from rent sysvar access, lamport
+/// transfer, or the runtime `resize` call.
+#[inline(always)]
+pub fn realloc_account<'a>(
+	account: &'a AccountView,
+	new_size: usize,
+	payer: &'a AccountView,
+	program_id: &Address,
+) -> ProgramResult {
+	realloc_account_inner(account, new_size, payer, program_id)
+}
+
+/// Reallocates an account to `new_size` bytes with explicit zero-initialization,
+/// adjusting rent automatically.
+///
+/// This function behaves identically to [`realloc_account`]. In the current
+/// Solana runtime, new bytes are always zero-initialized regardless of which
+/// variant is called. This function exists for API symmetry with the runtime's
+/// `realloc(new_len, zero_init)` parameter and to make zero-initialization
+/// intent explicit at the call site.
+///
+/// When **growing**, transfers the additional rent-exempt lamports required from
+/// `payer` to `account` via a system-program CPI. When **shrinking**, returns
+/// excess rent lamports from `account` to `payer` by direct lamport
+/// manipulation (the account must be owned by the executing program for this
+/// path).
+///
+/// # Limits
+///
+/// The Solana runtime limits account growth to [`MAX_PERMITTED_DATA_INCREASE`]
+/// (10 KiB) per top-level instruction. Exceeding this limit returns
+/// `ProgramError::InvalidRealloc`.
+///
+/// # Errors
+///
+/// Returns `ProgramError::InvalidAccountData` if the account is not writable,
+/// `ProgramError::InvalidAccountOwner` if the account is not owned by
+/// `program_id`, and propagates any errors from rent sysvar access, lamport
+/// transfer, or the runtime `resize` call.
+#[inline(always)]
+pub fn realloc_account_zero<'a>(
+	account: &'a AccountView,
+	new_size: usize,
+	payer: &'a AccountView,
+	program_id: &Address,
+) -> ProgramResult {
+	realloc_account_inner(account, new_size, payer, program_id)
+}
+
+/// Shared implementation for [`realloc_account`] and [`realloc_account_zero`].
+///
+/// Validates the account, computes the rent delta, performs the lamport
+/// transfer, and resizes the account data.
+#[inline(always)]
+fn realloc_account_inner<'a>(
+	account: &'a AccountView,
+	new_size: usize,
+	payer: &'a AccountView,
+	program_id: &Address,
+) -> ProgramResult {
+	use crate::AccountInfoValidation;
+
+	// Validate the account is writable and owned by the program.
+	account.assert_writable()?.assert_owner(program_id)?;
+
+	let current_size = account.data_len();
+
+	// Early return when the size is unchanged.
+	if new_size == current_size {
+		return Ok(());
+	}
+
+	let rent = Rent::get()?;
+	let new_minimum_balance = rent.try_minimum_balance(new_size)?;
+	let current_lamports = account.lamports();
+
+	if new_size > current_size {
+		// Growing: transfer additional rent from payer to account.
+		let required_lamports = new_minimum_balance.saturating_sub(current_lamports);
+		if required_lamports > 0 {
+			Transfer {
+				from: payer,
+				to: account,
+				lamports: required_lamports,
+			}
+			.invoke()?;
+		}
+	} else {
+		// Shrinking: return excess rent from account to payer.
+		let excess_lamports = current_lamports.saturating_sub(new_minimum_balance);
+		if excess_lamports > 0 {
+			account.send(excess_lamports, payer)?;
+		}
+	}
+
+	// Resize the account data. The runtime zero-initializes new bytes.
+	account.resize(new_size)
+}
+
 /// Closes an account and returns the remaining rent lamports to the provided
 /// recipient.
 ///
