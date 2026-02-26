@@ -31,6 +31,7 @@
 
 mod cpi;
 mod error;
+pub mod introspection;
 mod loaders;
 mod pda;
 mod pod;
