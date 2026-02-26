@@ -16,7 +16,7 @@
 	"devDependencies": {
 		"@solana/kit": "^6.1.0",
 		"@solana/program-client-core": "^6.1.0",
-		"@types/node": "^25.3.0",
-		"typescript": "^5.7.0"
+		"@types/node": "^25.3.1",
+		"typescript": "^5.9.3"
 	}
 }

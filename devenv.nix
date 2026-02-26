@@ -2,10 +2,12 @@
   pkgs,
   lib,
   config,
+  inputs,
   ...
 }:
 let
   llvm = pkgs.llvmPackages_21;
+  ifiokjr-pkgs = inputs.ifiokjr-nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system};
 in
 
 {
@@ -22,11 +24,9 @@ in
       gcc
       git
       libiconv
-      nodejs
-      pnpm
       mdbook
       nodejs
-      pnpm
+      ifiokjr-pkgs.pnpm-standalone
       llvm.bintools
       llvm.clang
       llvm.clang-tools
