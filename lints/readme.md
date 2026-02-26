@@ -1,8 +1,12 @@
 # Custom Dylint Lints
 
+<br>
+
 Pina ships three custom [dylint](https://github.com/trailofbits/dylint) lints that catch common Solana smart contract vulnerabilities at compile time. Each lint maps directly to a vulnerability in the [Pina Security Guide](../security/readme.md).
 
 ## Setup
+
+<br>
 
 The lints are registered in the workspace `Cargo.toml`:
 
@@ -23,7 +27,11 @@ cargo dylint --all -- --all-targets
 
 ## Lint Reference
 
+<br>
+
 ### `require_owner_before_token_cast`
+
+<br>
 
 |                       |                                                           |
 | --------------------- | --------------------------------------------------------- |
@@ -77,6 +85,8 @@ fn process(&mut self, _data: &[u8]) -> ProgramResult {
 ---
 
 ### `require_empty_before_init`
+
+<br>
 
 |                       |                                                               |
 | --------------------- | ------------------------------------------------------------- |
@@ -136,6 +146,8 @@ fn process(&mut self, _data: &[u8]) -> ProgramResult {
 ---
 
 ### `require_program_check_before_cpi`
+
+<br>
 
 |                       |                                                             |
 | --------------------- | ----------------------------------------------------------- |

@@ -1,5 +1,7 @@
 # `pina_sdk_ids`
 
+<br>
+
 Typed constants for well-known Solana program IDs and sysvar IDs.
 
 Each module exposes an `ID` constant declared via `solana_address::declare_id!`.
@@ -8,11 +10,15 @@ Each module exposes an `ID` constant declared via `solana_address::declare_id!`.
 
 ## Installation
 
+<br>
+
 ```bash
 cargo add pina_sdk_ids
 ```
 
 ## Usage
+
+<br>
 
 ```rust
 use pina_sdk_ids::system_program;
@@ -24,6 +30,8 @@ let clock_sysvar_id = sysvar::clock::ID;
 
 ## Included IDs
 
+<br>
+
 - Core programs: `system_program`, `stake`, `vote`, `config`, `feature`, loaders.
 - Signature verification programs: `ed25519_program`, `secp256k1_program`, `secp256r1_program`.
 - Sysvars: `sysvar::clock`, `sysvar::rent`, `sysvar::stake_history`, and more.
@@ -31,11 +39,15 @@ let clock_sysvar_id = sysvar::clock::ID;
 
 ## Why Use This Crate
 
+<br>
+
 - Avoid hard-coded base58 strings across codebases.
 - Keep ID imports centralized and typed.
 - Make account/program validation checks more readable.
 
 ## `no_std`
+
+<br>
 
 `pina_sdk_ids` is `#![no_std]` and safe for on-chain program crates.
 

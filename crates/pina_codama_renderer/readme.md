@@ -1,5 +1,7 @@
 # `pina_codama_renderer`
 
+<br>
+
 Repository-local Codama Rust renderer that generates Pina-style bytemuck models and discriminator-first layouts from Codama JSON IDLs.
 
 [![CI][ci-status-image]][ci-status-link] [![License][unlicense-image]][unlicense-link]
@@ -7,6 +9,8 @@ Repository-local Codama Rust renderer that generates Pina-style bytemuck models 
 > **Note:** This crate is not published to crates.io. It is used internally by the `pina codama generate` workflow.
 
 ## Usage
+
+<br>
 
 ```bash
 cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
@@ -16,12 +20,16 @@ cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
 
 ## What It Generates
 
+<br>
+
 - Discriminator-first `#[repr(C)]` account/instruction/event structs
 - `bytemuck::Pod` + `bytemuck::Zeroable` derives (no `borsh` serialization)
 - `pina_pod_primitives` types for alignment-safe integer fields
 - Type-safe instruction builders
 
 ## Constraints
+
+<br>
 
 The renderer only supports fixed-size layouts. The following Codama patterns will produce explicit errors:
 

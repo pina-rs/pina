@@ -1,5 +1,7 @@
 # `pina`
 
+<br>
+
 Core runtime crate for building Solana programs on top of [`pinocchio`](https://github.com/anza-xyz/pinocchio).
 
 It provides zero-copy account loaders, discriminator-aware account/instruction/event modeling, account validation traits, and `no_std` entrypoint helpers.
@@ -7,6 +9,8 @@ It provides zero-copy account loaders, discriminator-aware account/instruction/e
 [![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][unlicense-image]][unlicense-link] [![codecov][codecov-image]][codecov-link]
 
 ## Installation
+
+<br>
 
 ```bash
 cargo add pina
@@ -20,6 +24,8 @@ cargo add pina --features token
 
 ## What This Crate Includes
 
+<br>
+
 - `nostd_entrypoint!` for `no_std` Solana entrypoint wiring.
 - `#[account]`, `#[instruction]`, `#[event]`, `#[error]`, `#[discriminator]`, and `#[derive(Accounts)]` integration via the default `derive` feature.
 - Validation chains on `AccountView` (`assert_signer`, `assert_writable`, `assert_owner`, PDA checks, sysvar checks, and more).
@@ -28,11 +34,15 @@ cargo add pina --features token
 
 ## Feature Flags
 
+<br>
+
 - `derive` (default): enables `pina_macros` re-exports.
 - `logs` (default): enables Solana log macros via `solana-program-log`.
 - `token`: enables SPL token/token-2022 and ATA helpers.
 
 ## Minimal Program Skeleton
+
+<br>
 
 ```rust
 #![no_std]
@@ -69,11 +79,15 @@ fn process_instruction(
 
 ## Related Crates
 
+<br>
+
 - [`pina_macros`](https://docs.rs/pina_macros): proc-macro implementations for the attributes and derives used here.
 - [`pina_cli`](https://docs.rs/pina_cli): CLI/library used to generate Codama IDLs from Pina programs.
 - [`pina_sdk_ids`](https://docs.rs/pina_sdk_ids): shared Solana program/sysvar IDs.
 
 ## Codama IDLs
+
+<br>
 
 `pina` models are designed to be extracted into Codama IDLs through `pina_cli`.
 

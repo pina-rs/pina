@@ -1,8 +1,12 @@
 # pina_bpf
 
+<br>
+
 A minimal BPF-targeted example migrated from `pinocchio-bpf-starter` to `pina`.
 
 ## What Changed
+
+<br>
 
 Compared to the original pinocchio starter style:
 
@@ -14,6 +18,8 @@ Compared to the original pinocchio starter style:
   - the generated artifact is a valid ELF binary
 
 ## Build Requirements
+
+<br>
 
 This example must be built with nightly Rust and `build-std` for `core,alloc`.
 
@@ -33,6 +39,8 @@ cargo +nightly-2025-10-15 build-bpf
 ```
 
 ## Tests
+
+<br>
 
 Run normal unit tests:
 

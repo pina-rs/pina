@@ -1,5 +1,7 @@
 # Pina Security Guide
 
+<br>
+
 This guide covers the most common Solana smart contract vulnerabilities and how pina mitigates them. Each category includes:
 
 - A **readme** explaining the vulnerability and pina's mitigations
@@ -9,6 +11,8 @@ This guide covers the most common Solana smart contract vulnerabilities and how 
 Based on the [sealevel-attacks](https://github.com/coral-xyz/sealevel-attacks) taxonomy.
 
 ## Categories
+
+<br>
 
 | #                                    | Attack                     | Key Pina Mitigation                                 |
 | ------------------------------------ | -------------------------- | --------------------------------------------------- |
@@ -25,6 +29,8 @@ Based on the [sealevel-attacks](https://github.com/coral-xyz/sealevel-attacks) t
 | [10](10-sysvar-address-checking/)    | Sysvar Address Checking    | `assert_sysvar()`                                   |
 
 ## How to Use
+
+<br>
 
 Each **secure** crate is a workspace member and compiles with `cargo build`. Each **insecure** crate is excluded from the workspace but can be built independently:
 

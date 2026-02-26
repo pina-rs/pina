@@ -1,6 +1,10 @@
 # 07: Bump Seed Canonicalization
 
+<br>
+
 ## The Vulnerability
+
+<br>
 
 Program Derived Addresses (PDAs) are derived with a "bump seed" — the runtime tries bump values from 255 down to 0 and returns the first one that produces a valid PDA. This first-found bump is the "canonical" bump.
 
@@ -8,9 +12,13 @@ If a program accepts any user-provided bump without verifying it's canonical, an
 
 ## Insecure Example
 
+<br>
+
 See [`insecure/src/lib.rs`](insecure/src/lib.rs). The program accepts a user-provided bump and uses `assert_seeds_with_bump` without verifying canonicality. An attacker can use a non-canonical bump to create duplicate state.
 
 ## Why This Is Dangerous
+
+<br>
 
 An attacker can:
 
@@ -20,9 +28,13 @@ An attacker can:
 
 ## Secure Example
 
+<br>
+
 See [`secure/src/lib.rs`](secure/src/lib.rs). The program uses `assert_seeds()` which internally calls `try_find_program_address` to find and verify the canonical bump.
 
 ## Pina API Reference
+
+<br>
 
 - `AccountInfoValidation::assert_seeds()` — finds the canonical bump via `try_find_program_address` and verifies the address matches
 - `AccountInfoValidation::assert_canonical_bump()` — same as `assert_seeds()` but also returns the canonical bump value

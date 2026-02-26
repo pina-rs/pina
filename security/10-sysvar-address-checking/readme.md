@@ -1,14 +1,22 @@
 # 10: Sysvar Address Checking
 
+<br>
+
 ## The Vulnerability
+
+<br>
 
 Solana sysvars (Rent, Clock, etc.) are special accounts at well-known addresses. If a program reads a sysvar account without verifying both its address and owner, an attacker can create a fake account with spoofed sysvar data. This can manipulate rent calculations, clock readings, or other sysvar-dependent logic.
 
 ## Insecure Example
 
+<br>
+
 See [`insecure/src/lib.rs`](insecure/src/lib.rs). The program reads the rent sysvar account without verifying its address or owner. An attacker can pass a fake account with manipulated rent data.
 
 ## Why This Is Dangerous
+
+<br>
 
 An attacker can:
 
@@ -18,8 +26,12 @@ An attacker can:
 
 ## Secure Example
 
+<br>
+
 See [`secure/src/lib.rs`](secure/src/lib.rs). The program calls `assert_sysvar(&RENT_SYSVAR_ID)?` which checks both the owner (Sysvar program) and the address.
 
 ## Pina API Reference
+
+<br>
 
 - `AccountInfoValidation::assert_sysvar(sysvar_id)` — checks both the owner (Sysvar1111111111111111111111111111111111111) and the address match the expected sysvar

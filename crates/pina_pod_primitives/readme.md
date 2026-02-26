@@ -1,5 +1,7 @@
 # `pina_pod_primitives`
 
+<br>
+
 Alignment-safe primitive POD wrappers used by Pina and generated Codama Rust clients.
 
 [![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][unlicense-image]][unlicense-link] [![codecov][codecov-image]][codecov-link]
@@ -8,11 +10,15 @@ This crate provides `PodBool`, `PodU16`, `PodI16`, `PodU32`, `PodI32`, `PodU64`,
 
 ## Installation
 
+<br>
+
 ```bash
 cargo add pina_pod_primitives
 ```
 
 ## Types
+
+<br>
 
 | Type      | Wraps  | Size     |
 | --------- | ------ | -------- |

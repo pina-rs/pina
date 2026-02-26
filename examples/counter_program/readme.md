@@ -1,8 +1,12 @@
 # `counter_program`
 
+<br>
+
 Reference counter example built with Pina.
 
 ## What it covers
+
+<br>
 
 - PDA-backed account creation.
 - Counter state mutation (`Initialize`, `Increment`).
@@ -10,12 +14,16 @@ Reference counter example built with Pina.
 
 ## Run
 
+<br>
+
 ```bash
 cargo test -p counter_program
 pina idl --path examples/counter_program --output codama/idls/counter_program.json
 ```
 
 ## Optional SBF build
+
+<br>
 
 ```bash
 cargo build --release --target bpfel-unknown-none -p counter_program -Z build-std -F bpf-entrypoint

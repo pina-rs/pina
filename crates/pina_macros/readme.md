@@ -1,5 +1,7 @@
 # `pina_macros`
 
+<br>
+
 Procedural macros for building Pina programs with less boilerplate.
 
 This crate powers the attributes/derives re-exported by `pina`.
@@ -7,6 +9,8 @@ This crate powers the attributes/derives re-exported by `pina`.
 [![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][unlicense-image]][unlicense-link] [![codecov][codecov-image]][codecov-link]
 
 ## Installation
+
+<br>
 
 Most projects should depend on `pina` and use the re-exported macros.
 
@@ -18,6 +22,8 @@ cargo add pina_macros
 
 ## Macros
 
+<br>
+
 - `#[discriminator]`: defines a typed discriminator enum (`u8`, `u16`, `u32`, `u64`).
 - `#[account]`: defines discriminator-first account POD structs and generated builders.
 - `#[instruction]`: defines discriminator-first instruction data POD structs.
@@ -26,6 +32,8 @@ cargo add pina_macros
 - `#[derive(Accounts)]`: parses `&[AccountView]` into a named struct.
 
 ## Common Usage
+
+<br>
 
 ```rust
 use pina::*;
@@ -56,7 +64,11 @@ pub enum ExampleError {
 
 ## Attribute Options
 
+<br>
+
 ### `#[discriminator(...)]`
+
+<br>
 
 - `primitive = u8|u16|u32|u64`
 - `crate = ::pina` (defaults to `::pina`)
@@ -64,22 +76,30 @@ pub enum ExampleError {
 
 ### `#[account(...)]`, `#[instruction(...)]`, `#[event(...)]`
 
+<br>
+
 - `discriminator = PathToEnum`
 - `variant = EnumVariant` (optional; defaults to inferred struct name)
 - `crate = ::pina` (optional)
 
 ### `#[error(...)]`
 
+<br>
+
 - `crate = ::pina` (optional)
 - `final` (omits `#[non_exhaustive]`)
 
 ### `#[derive(Accounts)]`
+
+<br>
 
 - Supports one lifetime parameter.
 - Supports `#[pina(remaining)]` on a single trailing field to capture remaining accounts.
 - Supports `#[pina(crate = ::pina)]` on the struct to override the crate path.
 
 ## Notes
+
+<br>
 
 - Generated account/instruction/event structs are intended for fixed-size, bytemuck-safe layouts.
 - The macros are designed for `no_std` Solana program crates.

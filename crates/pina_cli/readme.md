@@ -1,5 +1,7 @@
 # `pina_cli`
 
+<br>
+
 CLI and library for generating Codama IDLs from Pina programs.
 
 The binary name is `pina`.
@@ -7,6 +9,8 @@ The binary name is `pina`.
 [![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][unlicense-image]][unlicense-link] [![codecov][codecov-image]][codecov-link]
 
 ## Installation
+
+<br>
 
 ```bash
 cargo install pina_cli
@@ -20,7 +24,11 @@ cargo run -p pina_cli -- --help
 
 ## Commands
 
+<br>
+
 ### `pina idl`
+
+<br>
 
 Generate a Codama `rootNode` JSON from a Pina program crate.
 
@@ -37,6 +45,8 @@ pina idl --path ./examples/counter_program --name my_program_alias
 
 ### `pina init`
 
+<br>
+
 Scaffold a new Pina program project.
 
 ```bash
@@ -46,6 +56,8 @@ pina init my_program --path ./programs/my_program --force
 
 ### `pina codama generate`
 
+<br>
+
 Generate Codama IDLs and Rust/JS clients from one or more example program crates.
 
 ```bash
@@ -54,6 +66,8 @@ pina codama generate --example counter_program --example todo_program
 ```
 
 ## Library API
+
+<br>
 
 `pina_cli` can also be embedded directly:
 
@@ -67,10 +81,14 @@ println!("{}", serde_json::to_string_pretty(&root)?);
 
 ## Codama Workflow
 
+<br>
+
 1. Generate IDL with `pina idl`.
 2. Feed the JSON into Codama renderers.
 
 ### JavaScript clients in another project
+
+<br>
 
 ```bash
 pina idl --path ./programs/my_program --output ./idls/my_program.json
@@ -87,6 +105,8 @@ await codama.accept(renderJsVisitor("./clients/js/my_program"));
 
 ### Pina-style Rust clients
 
+<br>
+
 This repository includes `crates/pina_codama_renderer`, which renders discriminator-first/bytemuck Rust client models from Codama JSON.
 
 ```bash
@@ -96,6 +116,8 @@ cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
 ```
 
 ## Parser Expectations
+
+<br>
 
 For best IDL extraction fidelity, follow the rules documented in [`crates/pina_cli/rules.md`](./rules.md).
 
