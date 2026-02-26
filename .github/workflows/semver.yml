@@ -27,14 +27,12 @@ jobs:
 
       - name: run semver-checks
         id: semver
-        run: |
-          set +e
-          cargo semver-checks check-release --workspace 2>&1
-          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
-        shell: devenv shell -c -- bash {0}
+        continue-on-error: true
+        run: cargo semver-checks check-release --workspace
+        shell: devenv shell -c -- bash -e {0}
 
       - name: evaluate semver results
-        if: steps.semver.outputs.exit_code != '0'
+        if: steps.semver.outcome == 'failure'
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
