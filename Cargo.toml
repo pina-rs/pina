@@ -94,6 +94,7 @@ pinocchio-system = { default-features = false, version = "^0.5" }
 pinocchio-token = { default-features = false, version = "^0.5" }
 pinocchio-token-2022 = { default-features = false, version = "^0.2" }
 proc-macro2 = { default-features = false, version = "^1" }
+proptest = { default-features = false, version = "^1", features = ["std"] }
 quote = { default-features = false, version = "^1" }
 serde = { default-features = false, version = "^1" }
 serde_json = { default-features = false, version = "^1", features = ["std"] }
