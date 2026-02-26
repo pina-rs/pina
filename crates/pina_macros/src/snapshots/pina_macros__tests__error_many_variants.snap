@@ -1,0 +1,24 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+#[derive(Debug)]
+#[repr(u32)]
+#[non_exhaustive]
+pub enum DetailedError {
+    /// Not enough funds to complete the transaction.
+    InsufficientFunds = 0,
+    /// The account has already been initialized.
+    AlreadyInitialized = 1,
+    /// The provided authority does not match.
+    InvalidAuthority = 2,
+    /// The mint does not match.
+    InvalidMint = 3,
+    /// Arithmetic overflow occurred.
+    Overflow = 4,
+}
+impl ::core::convert::From<DetailedError> for ::pina::ProgramError {
+    fn from(e: DetailedError) -> Self {
+        ::pina::ProgramError::Custom(e as u32)
+    }
+}

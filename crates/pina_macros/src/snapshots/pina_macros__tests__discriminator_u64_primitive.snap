@@ -1,0 +1,45 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+#[repr(u64)]
+#[non_exhaustive]
+#[derive(
+    ::core::clone::Clone,
+    ::core::marker::Copy,
+    ::core::cmp::PartialEq,
+    ::core::cmp::Eq
+)]
+pub enum HugeDiscriminator {
+    Mint = 0,
+    Transfer = 1,
+}
+impl ::core::convert::From<HugeDiscriminator> for u64 {
+    #[inline]
+    fn from(enum_value: HugeDiscriminator) -> Self {
+        enum_value as Self
+    }
+}
+impl ::core::convert::TryFrom<u64> for HugeDiscriminator {
+    type Error = ::pina::ProgramError;
+    #[inline]
+    fn try_from(number: u64) -> ::core::result::Result<Self, ::pina::ProgramError> {
+        #![allow(non_upper_case_globals)]
+        const __MINT: u64 = 0;
+        const __TRANSFER: u64 = 1;
+        #[deny(unreachable_patterns)]
+        match number {
+            __MINT => ::core::result::Result::Ok(Self::Mint),
+            __TRANSFER => ::core::result::Result::Ok(Self::Transfer),
+            #[allow(unreachable_patterns)]
+            _ => {
+                ::core::result::Result::Err(
+                    ::pina::PinaProgramError::InvalidDiscriminator.into(),
+                )
+            }
+        }
+    }
+}
+unsafe impl ::pina::Zeroable for HugeDiscriminator {}
+unsafe impl ::pina::Pod for HugeDiscriminator {}
+::pina::into_discriminator!(HugeDiscriminator, u64);

@@ -1,0 +1,45 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+#[repr(u16)]
+#[non_exhaustive]
+#[derive(
+    ::core::clone::Clone,
+    ::core::marker::Copy,
+    ::core::cmp::PartialEq,
+    ::core::cmp::Eq
+)]
+pub enum WideDiscriminator {
+    Alpha = 100,
+    Beta = 200,
+}
+impl ::core::convert::From<WideDiscriminator> for u16 {
+    #[inline]
+    fn from(enum_value: WideDiscriminator) -> Self {
+        enum_value as Self
+    }
+}
+impl ::core::convert::TryFrom<u16> for WideDiscriminator {
+    type Error = ::pina::ProgramError;
+    #[inline]
+    fn try_from(number: u16) -> ::core::result::Result<Self, ::pina::ProgramError> {
+        #![allow(non_upper_case_globals)]
+        const __ALPHA: u16 = 100;
+        const __BETA: u16 = 200;
+        #[deny(unreachable_patterns)]
+        match number {
+            __ALPHA => ::core::result::Result::Ok(Self::Alpha),
+            __BETA => ::core::result::Result::Ok(Self::Beta),
+            #[allow(unreachable_patterns)]
+            _ => {
+                ::core::result::Result::Err(
+                    ::pina::PinaProgramError::InvalidDiscriminator.into(),
+                )
+            }
+        }
+    }
+}
+unsafe impl ::pina::Zeroable for WideDiscriminator {}
+unsafe impl ::pina::Pod for WideDiscriminator {}
+::pina::into_discriminator!(WideDiscriminator, u16);

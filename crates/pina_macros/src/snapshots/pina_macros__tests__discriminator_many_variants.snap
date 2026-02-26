@@ -1,0 +1,64 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+#[derive(
+    Debug,
+    ::core::clone::Clone,
+    ::core::marker::Copy,
+    ::core::cmp::PartialEq,
+    ::core::cmp::Eq
+)]
+#[repr(u16)]
+#[non_exhaustive]
+pub enum ManyVariants {
+    Create = 0,
+    Read = 1,
+    Update = 2,
+    Delete = 3,
+    List = 4,
+    Search = 5,
+    Export = 6,
+    Import = 7,
+}
+impl ::core::convert::From<ManyVariants> for u16 {
+    #[inline]
+    fn from(enum_value: ManyVariants) -> Self {
+        enum_value as Self
+    }
+}
+impl ::core::convert::TryFrom<u16> for ManyVariants {
+    type Error = ::pina::ProgramError;
+    #[inline]
+    fn try_from(number: u16) -> ::core::result::Result<Self, ::pina::ProgramError> {
+        #![allow(non_upper_case_globals)]
+        const __CREATE: u16 = 0;
+        const __READ: u16 = 1;
+        const __UPDATE: u16 = 2;
+        const __DELETE: u16 = 3;
+        const __LIST: u16 = 4;
+        const __SEARCH: u16 = 5;
+        const __EXPORT: u16 = 6;
+        const __IMPORT: u16 = 7;
+        #[deny(unreachable_patterns)]
+        match number {
+            __CREATE => ::core::result::Result::Ok(Self::Create),
+            __READ => ::core::result::Result::Ok(Self::Read),
+            __UPDATE => ::core::result::Result::Ok(Self::Update),
+            __DELETE => ::core::result::Result::Ok(Self::Delete),
+            __LIST => ::core::result::Result::Ok(Self::List),
+            __SEARCH => ::core::result::Result::Ok(Self::Search),
+            __EXPORT => ::core::result::Result::Ok(Self::Export),
+            __IMPORT => ::core::result::Result::Ok(Self::Import),
+            #[allow(unreachable_patterns)]
+            _ => {
+                ::core::result::Result::Err(
+                    ::pina::PinaProgramError::InvalidDiscriminator.into(),
+                )
+            }
+        }
+    }
+}
+unsafe impl ::pina::Zeroable for ManyVariants {}
+unsafe impl ::pina::Pod for ManyVariants {}
+::pina::into_discriminator!(ManyVariants, u16);

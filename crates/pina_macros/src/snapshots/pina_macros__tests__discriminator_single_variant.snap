@@ -1,0 +1,42 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+#[repr(u8)]
+#[non_exhaustive]
+#[derive(
+    ::core::clone::Clone,
+    ::core::marker::Copy,
+    ::core::cmp::PartialEq,
+    ::core::cmp::Eq
+)]
+pub enum SingleVariant {
+    Singleton = 42,
+}
+impl ::core::convert::From<SingleVariant> for u8 {
+    #[inline]
+    fn from(enum_value: SingleVariant) -> Self {
+        enum_value as Self
+    }
+}
+impl ::core::convert::TryFrom<u8> for SingleVariant {
+    type Error = ::pina::ProgramError;
+    #[inline]
+    fn try_from(number: u8) -> ::core::result::Result<Self, ::pina::ProgramError> {
+        #![allow(non_upper_case_globals)]
+        const __SINGLETON: u8 = 42;
+        #[deny(unreachable_patterns)]
+        match number {
+            __SINGLETON => ::core::result::Result::Ok(Self::Singleton),
+            #[allow(unreachable_patterns)]
+            _ => {
+                ::core::result::Result::Err(
+                    ::pina::PinaProgramError::InvalidDiscriminator.into(),
+                )
+            }
+        }
+    }
+}
+unsafe impl ::pina::Zeroable for SingleVariant {}
+unsafe impl ::pina::Pod for SingleVariant {}
+::pina::into_discriminator!(SingleVariant, u8);

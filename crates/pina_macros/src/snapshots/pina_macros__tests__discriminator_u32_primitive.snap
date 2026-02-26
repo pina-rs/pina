@@ -1,0 +1,48 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+#[repr(u32)]
+#[non_exhaustive]
+#[derive(
+    ::core::clone::Clone,
+    ::core::marker::Copy,
+    ::core::cmp::PartialEq,
+    ::core::cmp::Eq
+)]
+pub enum U32Discriminator {
+    A = 0,
+    B = 1000,
+    C = 2000,
+}
+impl ::core::convert::From<U32Discriminator> for u32 {
+    #[inline]
+    fn from(enum_value: U32Discriminator) -> Self {
+        enum_value as Self
+    }
+}
+impl ::core::convert::TryFrom<u32> for U32Discriminator {
+    type Error = ::pina::ProgramError;
+    #[inline]
+    fn try_from(number: u32) -> ::core::result::Result<Self, ::pina::ProgramError> {
+        #![allow(non_upper_case_globals)]
+        const __A: u32 = 0;
+        const __B: u32 = 1000;
+        const __C: u32 = 2000;
+        #[deny(unreachable_patterns)]
+        match number {
+            __A => ::core::result::Result::Ok(Self::A),
+            __B => ::core::result::Result::Ok(Self::B),
+            __C => ::core::result::Result::Ok(Self::C),
+            #[allow(unreachable_patterns)]
+            _ => {
+                ::core::result::Result::Err(
+                    ::pina::PinaProgramError::InvalidDiscriminator.into(),
+                )
+            }
+        }
+    }
+}
+unsafe impl ::pina::Zeroable for U32Discriminator {}
+unsafe impl ::pina::Pod for U32Discriminator {}
+::pina::into_discriminator!(U32Discriminator, u32);

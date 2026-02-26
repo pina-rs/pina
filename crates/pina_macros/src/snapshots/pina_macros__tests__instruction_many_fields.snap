@@ -1,0 +1,74 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+#[repr(C)]
+#[derive(
+    ::pina::TypedBuilder,
+    ::pina::Pod,
+    ::pina::Zeroable,
+    ::core::clone::Clone,
+    ::core::marker::Copy,
+    ::core::cmp::PartialEq,
+    ::core::cmp::Eq,
+    ::core::fmt::Debug
+)]
+#[builder(builder_method(vis = "", name = __builder))]
+#[bytemuck(crate = "::pina::bytemuck")]
+pub struct FlipBit {
+    discriminator: [u8; MyInstruction::BYTES],
+    pub section_index: u8,
+    pub array_index: u8,
+    pub offset: u8,
+    pub value: u8,
+}
+#[allow(dead_code)]
+type FlipBitBuilderType = FlipBitBuilder<
+    (([u8; MyInstruction::BYTES],), (), (), (), ()),
+>;
+const __FLIPBIT_ALIGNMENT_ASSERTIONS__: () = {
+    ::core::assert!(
+        ::core::mem::align_of:: < [u8; MyInstruction::BYTES] > () == 1,
+        concat!("The alignment of field `", "discriminator", "` with type `",
+        stringify!([u8; MyInstruction::BYTES]),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
+        "section_index", "` with type `", stringify!(u8),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
+        "array_index", "` with type `", stringify!(u8),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
+        "offset", "` with type `", stringify!(u8),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
+        "value", "` with type `", stringify!(u8),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+};
+impl FlipBit {
+    pub fn to_bytes(&self) -> &[u8] {
+        ::pina::bytemuck::bytes_of(self)
+    }
+    pub fn try_from_bytes(data: &[u8]) -> Result<&Self, ::pina::ProgramError> {
+        ::pina::bytemuck::try_from_bytes::<Self>(data)
+            .or(Err(::pina::ProgramError::InvalidInstructionData))
+    }
+    pub fn builder() -> FlipBitBuilderType {
+        let mut bytes = [0u8; MyInstruction::BYTES];
+        <Self as ::pina::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
+        Self::__builder().discriminator(bytes)
+    }
+}
+impl ::pina::HasDiscriminator for FlipBit {
+    type Type = MyInstruction;
+    const VALUE: Self::Type = MyInstruction::FlipBit;
+}

@@ -1,0 +1,49 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+#[derive(
+    Debug,
+    ::core::clone::Clone,
+    ::core::marker::Copy,
+    ::core::cmp::PartialEq,
+    ::core::cmp::Eq
+)]
+#[repr(u8)]
+#[non_exhaustive]
+pub enum MyDiscriminator {
+    First = 0,
+    Second = 1,
+    Third = 2,
+}
+impl ::core::convert::From<MyDiscriminator> for u8 {
+    #[inline]
+    fn from(enum_value: MyDiscriminator) -> Self {
+        enum_value as Self
+    }
+}
+impl ::core::convert::TryFrom<u8> for MyDiscriminator {
+    type Error = ::pina::ProgramError;
+    #[inline]
+    fn try_from(number: u8) -> ::core::result::Result<Self, ::pina::ProgramError> {
+        #![allow(non_upper_case_globals)]
+        const __FIRST: u8 = 0;
+        const __SECOND: u8 = 1;
+        const __THIRD: u8 = 2;
+        #[deny(unreachable_patterns)]
+        match number {
+            __FIRST => ::core::result::Result::Ok(Self::First),
+            __SECOND => ::core::result::Result::Ok(Self::Second),
+            __THIRD => ::core::result::Result::Ok(Self::Third),
+            #[allow(unreachable_patterns)]
+            _ => {
+                ::core::result::Result::Err(
+                    ::pina::PinaProgramError::InvalidDiscriminator.into(),
+                )
+            }
+        }
+    }
+}
+unsafe impl ::pina::Zeroable for MyDiscriminator {}
+unsafe impl ::pina::Pod for MyDiscriminator {}
+::pina::into_discriminator!(MyDiscriminator, u8);

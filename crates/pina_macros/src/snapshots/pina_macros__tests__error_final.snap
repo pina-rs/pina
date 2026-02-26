@@ -1,0 +1,14 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+#[derive(Debug)]
+#[repr(u32)]
+pub enum FinalError {
+    Unauthorized = 0,
+}
+impl ::core::convert::From<FinalError> for ::pina::ProgramError {
+    fn from(e: FinalError) -> Self {
+        ::pina::ProgramError::Custom(e as u32)
+    }
+}

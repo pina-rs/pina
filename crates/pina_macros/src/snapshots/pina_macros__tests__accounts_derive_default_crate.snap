@@ -1,0 +1,30 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+impl<'a> ::pina::TryFromAccountInfos<'a> for DefaultCrateAccounts<'a> {
+    fn try_from_account_infos(
+        accounts: &'a [::pina::AccountView],
+    ) -> ::core::result::Result<Self, ::pina::ProgramError> {
+        if accounts.len() > 2usize {
+            return ::core::result::Result::Err(
+                ::pina::PinaProgramError::TooManyAccountKeys.into(),
+            );
+        }
+        let [authority, data] = accounts else {
+            return ::core::result::Result::Err(
+                ::pina::ProgramError::NotEnoughAccountKeys,
+            );
+        };
+        Ok(Self { authority, data })
+    }
+}
+impl<'a> ::core::convert::TryFrom<&'a [::pina::AccountView]>
+for DefaultCrateAccounts<'a> {
+    type Error = ::pina::ProgramError;
+    fn try_from(
+        accounts: &'a [::pina::AccountView],
+    ) -> ::core::result::Result<Self, Self::Error> {
+        <Self as ::pina::TryFromAccountInfos>::try_from_account_infos(accounts)
+    }
+}

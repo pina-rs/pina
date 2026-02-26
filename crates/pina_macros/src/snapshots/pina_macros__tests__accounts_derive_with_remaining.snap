@@ -1,0 +1,29 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+impl<'a> ::pina::TryFromAccountInfos<'a> for TransferAccounts<'a> {
+    fn try_from_account_infos(
+        accounts: &'a [::pina::AccountView],
+    ) -> ::core::result::Result<Self, ::pina::ProgramError> {
+        let [authority, source, destination, extra @ ..] = accounts else {
+            return ::core::result::Result::Err(
+                ::pina::ProgramError::NotEnoughAccountKeys,
+            );
+        };
+        Ok(Self {
+            authority,
+            source,
+            destination,
+            extra,
+        })
+    }
+}
+impl<'a> ::core::convert::TryFrom<&'a [::pina::AccountView]> for TransferAccounts<'a> {
+    type Error = ::pina::ProgramError;
+    fn try_from(
+        accounts: &'a [::pina::AccountView],
+    ) -> ::core::result::Result<Self, Self::Error> {
+        <Self as ::pina::TryFromAccountInfos>::try_from_account_infos(accounts)
+    }
+}

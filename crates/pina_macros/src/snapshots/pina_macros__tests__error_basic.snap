@@ -1,0 +1,16 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+#[non_exhaustive]
+pub enum MyError {
+    Invalid = 0,
+    Duplicate = 1,
+}
+impl ::core::convert::From<MyError> for ::pina::ProgramError {
+    fn from(e: MyError) -> Self {
+        ::pina::ProgramError::Custom(e as u32)
+    }
+}

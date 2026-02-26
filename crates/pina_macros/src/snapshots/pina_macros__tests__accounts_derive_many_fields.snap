@@ -1,0 +1,40 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+impl<'a> ::pina::TryFromAccountInfos<'a> for EscrowAccounts<'a> {
+    fn try_from_account_infos(
+        accounts: &'a [::pina::AccountView],
+    ) -> ::core::result::Result<Self, ::pina::ProgramError> {
+        if accounts.len() > 9usize {
+            return ::core::result::Result::Err(
+                ::pina::PinaProgramError::TooManyAccountKeys.into(),
+            );
+        }
+        let [maker, escrow, mint_a, mint_b, maker_ata_a, vault, token_program,
+        associated_token_program, system_program] = accounts else {
+            return ::core::result::Result::Err(
+                ::pina::ProgramError::NotEnoughAccountKeys,
+            );
+        };
+        Ok(Self {
+            maker,
+            escrow,
+            mint_a,
+            mint_b,
+            maker_ata_a,
+            vault,
+            token_program,
+            associated_token_program,
+            system_program,
+        })
+    }
+}
+impl<'a> ::core::convert::TryFrom<&'a [::pina::AccountView]> for EscrowAccounts<'a> {
+    type Error = ::pina::ProgramError;
+    fn try_from(
+        accounts: &'a [::pina::AccountView],
+    ) -> ::core::result::Result<Self, Self::Error> {
+        <Self as ::pina::TryFromAccountInfos>::try_from_account_infos(accounts)
+    }
+}

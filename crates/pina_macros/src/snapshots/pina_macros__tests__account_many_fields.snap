@@ -1,0 +1,159 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+#[repr(C)]
+#[derive(
+    ::pina::TypedBuilder,
+    ::pina::Pod,
+    ::pina::Zeroable,
+    ::core::clone::Clone,
+    ::core::marker::Copy,
+    ::core::cmp::PartialEq,
+    ::core::cmp::Eq
+)]
+#[builder(builder_method(vis = "", name = __builder))]
+#[bytemuck(crate = "::pina::bytemuck")]
+pub struct LargeState {
+    discriminator: [u8; MyAccount::BYTES],
+    pub authority: [u8; 32],
+    pub bump: u8,
+    pub treasury_bump: u8,
+    pub mint_bump: u8,
+    pub version: u8,
+    pub padding: [u8; 3],
+    pub total_supply: PodU64,
+    pub name: [u8; 32],
+}
+#[allow(dead_code)]
+type LargeStateBuilderType = LargeStateBuilder<
+    (([u8; MyAccount::BYTES],), (), (), (), (), (), (), (), ()),
+>;
+const __LARGESTATE_ALIGNMENT_ASSERTIONS__: () = {
+    ::core::assert!(
+        ::core::mem::align_of:: < [u8; MyAccount::BYTES] > () == 1,
+        concat!("The alignment of field `", "discriminator", "` with type `",
+        stringify!([u8; MyAccount::BYTES]),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < [u8; 32] > () == 1, concat!("The alignment of field `",
+        "authority", "` with type `", stringify!([u8; 32]),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
+        "bump", "` with type `", stringify!(u8),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
+        "treasury_bump", "` with type `", stringify!(u8),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
+        "mint_bump", "` with type `", stringify!(u8),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
+        "version", "` with type `", stringify!(u8),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < [u8; 3] > () == 1, concat!("The alignment of field `",
+        "padding", "` with type `", stringify!([u8; 3]),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < PodU64 > () == 1, concat!("The alignment of field `",
+        "total_supply", "` with type `", stringify!(PodU64),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+    ::core::assert!(
+        ::core::mem::align_of:: < [u8; 32] > () == 1, concat!("The alignment of field `",
+        "name", "` with type `", stringify!([u8; 32]),
+        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+    );
+};
+impl LargeState {
+    /// Zero out all bytes in the struct including padding bytes. This can be useful when closing an account.
+    pub fn zeroed(&mut self) {
+        ::pina::bytemuck::write_zeroes(self);
+    }
+    pub fn to_bytes(&self) -> &[u8] {
+        ::pina::bytemuck::bytes_of(self)
+    }
+    pub fn builder() -> LargeStateBuilderType {
+        let mut bytes = [0u8; MyAccount::BYTES];
+        <Self as ::pina::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
+        Self::__builder().discriminator(bytes)
+    }
+}
+impl ::pina::HasDiscriminator for LargeState {
+    type Type = MyAccount;
+    const VALUE: Self::Type = MyAccount::LargeState;
+}
+impl ::pina::AccountValidation for LargeState {
+    #[track_caller]
+    fn assert<F>(&self, condition: F) -> Result<&Self, ::pina::ProgramError>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        if condition(self) {
+            return Ok(self);
+        }
+        ::pina::log!("Account is invalid");
+        ::pina::log_caller();
+        Err(::pina::ProgramError::InvalidAccountData)
+    }
+    #[track_caller]
+    fn assert_msg<F>(
+        &self,
+        condition: F,
+        msg: &str,
+    ) -> Result<&Self, ::pina::ProgramError>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        match ::pina::assert(
+            condition(self),
+            ::pina::ProgramError::InvalidAccountData,
+            msg,
+        ) {
+            Err(err) => Err(err),
+            Ok(()) => Ok(self),
+        }
+    }
+    #[track_caller]
+    fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, ::pina::ProgramError>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        if condition(self) {
+            return Ok(self);
+        }
+        ::pina::log!("Account is invalid");
+        ::pina::log_caller();
+        Err(::pina::ProgramError::InvalidAccountData)
+    }
+    #[track_caller]
+    fn assert_mut_msg<F>(
+        &mut self,
+        condition: F,
+        msg: &str,
+    ) -> Result<&mut Self, ::pina::ProgramError>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        match ::pina::assert(
+            condition(self),
+            ::pina::ProgramError::InvalidAccountData,
+            msg,
+        ) {
+            Err(err) => Err(err),
+            Ok(()) => Ok(self),
+        }
+    }
+}
