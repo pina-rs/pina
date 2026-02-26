@@ -70,3 +70,6 @@ devenv.local.nix
 .pre-commit-config.yaml
 
 .eget/bin
+
+# Claude Code worktrees
+.claude/worktrees/
