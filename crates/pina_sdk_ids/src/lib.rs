@@ -157,7 +157,7 @@ pub mod zk_token_proof_program {
 	solana_address::declare_id!("ZkTokenProof1111111111111111111111111111111");
 }
 
-/// Zero-knowledge ElGamal proof program ID.
+/// Zero-knowledge `ElGamal` proof program ID.
 pub mod zk_elgamal_proof_program {
 	solana_address::declare_id!("ZkE1Gama1Proof11111111111111111111111111111");
 }

@@ -12,7 +12,7 @@ if ! command -v git >/dev/null 2>&1; then
 fi
 
 echo "Installing pnpm workspace dependencies..."
-pnpm --dir "$ROOT" install --frozen-lockfile
+pnpm install --frozen-lockfile
 
 echo "Generating Codama IDLs and clients for all examples..."
 cargo run -p pina_cli --quiet -- codama generate \
