@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.6.0 (2026-02-26)
+
+### Breaking Changes
+
+#### Unify all crate and package versions under a single `[workspace.package] version` field. All publishable crates (`pina`, `pina_macros`, `pina_pod_primitives`, `pina_sdk_ids`, `pina_cli`, `pina_codama_renderer`) and the `codama-nodes-from-pina` JS package now share the same version, managed by a single `[package]` entry in `knope.toml`. This replaces the previous per-crate `[packages.*]` configuration and ensures all crates are released together with a single version bump.
+
+Simplify the assets workflow to match the new unified release tag format and remove the per-crate version validation step. Update tooling versions for `cargo-llvm-cov`, `cargo-nextest`, `cargo-semver-checks`, and `mdt_cli`. Switch publishing from `cargo-workspaces` to `cargo publish --workspace`.
+
+### Notes
+
+- Add a `binary-size` CI workflow that builds SBF programs and reports their binary sizes in the GitHub Actions job summary for pull requests.
+- Remove `mdt` from `cargo-run-bin` management (`[workspace.metadata.bin]`) and the devenv script wrapper. `mdt` is now provided directly as a nix package from `ifiokjr-nixpkgs`.
+- Use `pnpm-standalone` from `ifiokjr/nixpkgs` on all platforms after the upstream Linux fix (ifiokjr/nixpkgs#4), removing the macOS-only conditional.
+- Add a `release-preview` CI workflow that runs `knope release --dry-run` on pull requests and outputs a summary of pending version bumps and changelog entries.
+- Remove `knope` from `cargo-run-bin` management (`[workspace.metadata.bin]`) and the devenv script wrapper. `knope` is now provided directly as a nix package from `ifiokjr-nixpkgs`.
+- Harden the rustup nix override to fix intermittent CI failures caused by rustup 1.28+ requiring a `version` field in `settings.toml` during shell completion generation in the install phase.
+- Add a CI workflow that runs `cargo semver-checks` on pull requests to detect accidental semver violations before merge.
+
+### Documentation
+
+- Add comprehensive doc comments with examples to public API items in the `pina` crate.
+- Add a parity tracking document for `pina_codama_renderer` listing supported and unsupported Codama node types.
+- Add tutorial chapters to the mdBook: "Your First Program", "Token Escrow Tutorial", and "Migrating from Anchor".
+- Add `<br>` tags after h1-h3 headings in all sub-crate, example, security, and lint readme files for improved visual spacing.
+
 ## 0.3.1 (2026-02-25)
 
 ### Features
