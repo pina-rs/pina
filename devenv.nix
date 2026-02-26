@@ -7,7 +7,7 @@
 }:
 let
   llvm = pkgs.llvmPackages_21;
-  ifiokjr-pkgs = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.hostPlatform.system};
+  custom = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.hostPlatform.system};
 in
 
 {
@@ -25,10 +25,8 @@ in
       git
       libiconv
       mdbook
-      nodejs
-      ifiokjr-pkgs.knope
-      # pnpm-standalone works on macOS but fails on Linux CI, so use nixpkgs pnpm on Linux
-      (if stdenv.isDarwin then ifiokjr-pkgs.pnpm-standalone else pnpm)
+      custom.knope
+      custom.pnpm-standalone
       llvm.bintools
       llvm.clang
       llvm.clang-tools

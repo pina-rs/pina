@@ -1,10 +1,12 @@
 # pina
+<br>
 
 A performant Solana smart contract framework built on top of [pinocchio](https://github.com/anza-xyz/pinocchio) — a zero-dependency alternative to `solana-program` that massively reduces compute units and dependency bloat.
 
 [![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][unlicense-image]][unlicense-link] [![codecov][codecov-image]][codecov-link]
 
 ## Features
+<br>
 
 - **Zero-copy deserialization** — account data is reinterpreted in place via `bytemuck`, with no heap allocation.
 - **`no_std` compatible** — all crates compile to the `bpfel-unknown-none` SBF target for on-chain deployment.
@@ -18,6 +20,7 @@ A performant Solana smart contract framework built on top of [pinocchio](https:/
 - **CPI helpers** — PDA account creation, lamport transfers, and token operations.
 
 ## Workspace packages
+<br>
 
 - `crates/pina` — core runtime crate (`no_std`, account validation/loaders, CPI helpers, entrypoint).
 - `crates/pina_macros` — proc macros (`#[account]`, `#[instruction]`, `#[event]`, `#[error]`, `#[discriminator]`, `#[derive(Accounts)]`).
@@ -27,6 +30,7 @@ A performant Solana smart contract framework built on top of [pinocchio](https:/
 - `crates/pina_sdk_ids` — typed constants for well-known Solana program/sysvar IDs.
 
 ## Installation
+<br>
 
 ```sh
 cargo add pina
@@ -39,6 +43,7 @@ cargo add pina --features token
 ```
 
 ## Codama IDL Support
+<br>
 
 Pina ships with first-class Codama integration through the `pina` CLI and the `codama/` test harness in this repository.
 
@@ -57,7 +62,7 @@ codama:idl:all
 # Generate Rust + JS clients from codama/idls/.
 codama:clients:generate
 
-# Generate IDLs and Rust + JS clients in one step.
+# Generate Rust + JS clients in one step.
 pina codama generate
 
 # Run the full integration pipeline (build CLI, generate IDLs, generate clients, validate outputs).
@@ -75,6 +80,7 @@ End-to-end setup steps:
 5. Run the full validation pipeline: `codama:test`
 
 ### Using Codama in separate projects
+<br>
 
 You can use `pina idl` outside this repository to bootstrap clients in another codebase.
 
@@ -106,6 +112,7 @@ cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
 ```
 
 ### Crate features
+<br>
 
 | Feature  | Default | Description                                                |
 | -------- | ------- | ---------------------------------------------------------- |
@@ -114,6 +121,7 @@ cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
 | `token`  | No      | Enables SPL token / token-2022 helpers and ATA utilities   |
 
 ## Documentation
+<br>
 
 Comprehensive project documentation now lives in the mdBook under `docs/`.
 
@@ -128,6 +136,7 @@ docs:build
 Use `verify:docs` to validate documentation structure and build output in CI. Use `test:idl` to regenerate and verify `codama/idls/*.json`, `codama/clients/rust/*`, and `codama/clients/js/*` against all examples. Reusable command snippets are managed by `mdt`; run `docs:sync` after changing `template.t.md`.
 
 ## Quick start
+<br>
 
 ```rust
 use pina::*;
@@ -176,8 +185,10 @@ fn process_instruction(
 ```
 
 ## Core concepts
+<br>
 
 ### Entrypoint
+<br>
 
 The `nostd_entrypoint!` macro sets up the BPF entrypoint, disables the default allocator, and installs a minimal panic handler:
 
@@ -197,6 +208,7 @@ fn process_instruction(
 An optional second argument overrides the maximum number of transaction accounts (defaults to `pinocchio::MAX_TX_ACCOUNTS`).
 
 ### Discriminators
+<br>
 
 Every account, instruction, and event type carries a discriminator enum as its first field. This enables safe type identification at runtime.
 
@@ -224,6 +236,7 @@ Optional attributes:
 - `final` — marks the enum as a final discriminator (generates a `BYTES` constant)
 
 ### Accounts (on-chain state)
+<br>
 
 The `#[account]` macro wraps a struct with a discriminator field and derives `Pod`, `Zeroable`, `TypedBuilder`, and `HasDiscriminator`:
 
@@ -246,6 +259,7 @@ pub struct Config {
 The generated struct has an auto-injected `discriminator` field as the first field.
 
 ### Instructions
+<br>
 
 The `#[instruction]` macro works the same as `#[account]` but for instruction data:
 
@@ -265,6 +279,7 @@ pub struct Initialize {
 ```
 
 ### Events
+<br>
 
 ```rust
 use pina::*;
@@ -281,6 +296,7 @@ pub struct Transfer {
 ```
 
 ### Errors
+<br>
 
 The `#[error]` macro creates a custom error enum that converts to `ProgramError::Custom(code)`:
 
@@ -296,6 +312,7 @@ pub enum MyError {
 ```
 
 ### Account validation chains
+<br>
 
 Chain assertions on `AccountView` references. Each method returns `Result<&AccountView, ProgramError>` for fluent chaining:
 
@@ -333,6 +350,7 @@ Available assertions:
 - `assert_associated_token_address(wallet, mint, token_program)` — ATA check (requires `token` feature)
 
 ### Typed account assertion
+<br>
 
 On deserialized account data, chain assertions using the `AccountValidation` trait:
 
@@ -343,6 +361,7 @@ state.assert_msg(|s| s.bump == 255, "bump must be 255")?;
 ```
 
 ### `#[derive(Accounts)]`
+<br>
 
 Automatically destructures a slice of `AccountView` into a named struct:
 
@@ -371,6 +390,7 @@ pub struct MyAccounts<'a> {
 ```
 
 ### Pod types
+<br>
 
 Alignment-safe primitive wrappers for use in `#[repr(C)]` account structs. Solana account data is byte-aligned, so standard Rust integers cannot be placed directly in `Pod` structs.
 
@@ -404,6 +424,7 @@ let raw: u64 = amount.into();
 ```
 
 ### CPI helpers
+<br>
 
 #### Account creation
 
@@ -449,6 +470,7 @@ let signer = Signer::from(&combined[..3]);
 ```
 
 ### Logging
+<br>
 
 The `log!` macro logs messages to the Solana runtime (requires the `logs` feature):
 
@@ -461,6 +483,7 @@ log!("simple message");
 When the `logs` feature is disabled, `log!` compiles to nothing.
 
 ## Building for SBF (on-chain)
+<br>
 
 Programs are compiled to the `bpfel-unknown-none` target using `sbpf-linker`:
 
@@ -471,6 +494,7 @@ cargo +nightly-2025-10-15 build --release --target bpfel-unknown-none -p my_prog
 The `bpf-entrypoint` feature gate separates the on-chain entrypoint from the library code used in tests.
 
 ## Testing
+<br>
 
 Programs are tested as regular Rust libraries (without the `bpf-entrypoint` feature) using [mollusk-svm](https://docs.rs/mollusk-svm) for Solana VM simulation:
 
@@ -480,6 +504,7 @@ cargo nextest run  # Faster parallel test execution
 ```
 
 ## Crates
+<br>
 
 | Crate                                 | Description                                                                |
 | ------------------------------------- | -------------------------------------------------------------------------- |
@@ -488,12 +513,14 @@ cargo nextest run  # Faster parallel test execution
 | [`pina_sdk_ids`](crates/pina_sdk_ids) | Well-known Solana program and sysvar IDs.                                  |
 
 ## Ideology
+<br>
 
 - Macros are minimal syntactic sugar to reduce repetition of code.
 - IDL generation is automated based on code you write, rather than annotations. So `payer.assert_signer()?` will generate an IDL that specifies that the account is a signer.
 - Everything in Rust from the on-chain program to the client code used on the browser — this project strives to make it possible to build everything in your favourite language.
 
 ## Examples
+<br>
 
 | Example                                                                           | Description                                                                 |
 | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -513,6 +540,7 @@ cargo nextest run  # Faster parallel test execution
 | [`anchor_realloc`](examples/anchor_realloc)                                       | Anchor realloc constraint parity for growth-limit and duplicate checks      |
 
 ## Security
+<br>
 
 Pina provides strong built-in protections against common Solana vulnerabilities through its validation chain API, discriminator system, and CPI helpers. Follow these best practices:
 
@@ -528,6 +556,7 @@ Pina provides strong built-in protections against common Solana vulnerabilities 
 See the [security guide](security/) for detailed examples of all 11 common Solana attack categories with vulnerable and secure code patterns.
 
 ### Custom lints
+<br>
 
 Enable pina's custom dylint lints to catch common security mistakes at compile time:
 
@@ -536,10 +565,12 @@ Enable pina's custom dylint lints to catch common security mistakes at compile t
 - `require_program_check_before_cpi` — warns when `.invoke()` / `.invoke_signed()` is called without program address verification
 
 ## Contributing
+<br>
 
 Contributions are welcome! Please open an issue or pull request on [GitHub](https://github.com/pina-rs/pina).
 
 ## License
+<br>
 
 Licensed under the [Apache License, Version 2.0](license).
 
