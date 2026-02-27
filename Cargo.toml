@@ -138,6 +138,7 @@ cargo-deny = { version = "0.19.0" }
 cargo-insta = { version = "1.44.3" }
 cargo-llvm-cov = { version = "0.8.4" }
 cargo-nextest = { version = "0.9.129" }
+cargo-workspaces = { version = "0.4.2" }
 cargo-semver-checks = { version = "0.46.0" }
 dylint-link = { version = "5.0.0", bins = ["dylint-link"] }
 sbpf-linker = { version = "0.1.8", bins = ["sbpf-linker"] }

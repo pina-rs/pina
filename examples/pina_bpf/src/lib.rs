@@ -103,17 +103,17 @@ mod tests {
 	}
 
 	#[test]
-	#[ignore = "requires `cargo +nightly-2025-10-15 build-bpf` artifact"]
+	#[ignore = "requires `cargo +nightly build-bpf` artifact"]
 	fn bpf_build_produces_artifact() {
 		let artifact = bpf_binary_path();
 		assert!(
 			Path::new(&artifact).is_file(),
-			"missing BPF artifact at {artifact}; run `cargo +nightly-2025-10-15 build-bpf`"
+			"missing BPF artifact at {artifact}; run `cargo +nightly build-bpf`"
 		);
 	}
 
 	#[test]
-	#[ignore = "requires `cargo +nightly-2025-10-15 build-bpf` artifact"]
+	#[ignore = "requires `cargo +nightly build-bpf` artifact"]
 	fn bpf_build_artifact_is_elf() {
 		let artifact = bpf_binary_path();
 		let bytes = fs::read(&artifact)

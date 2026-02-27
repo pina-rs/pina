@@ -24,8 +24,8 @@ Compared to the original pinocchio starter style:
 This example must be built with nightly Rust and `build-std` for `core,alloc`.
 
 ```bash
-rustup component add rust-src --toolchain nightly-2025-10-15
-cargo +nightly-2025-10-15 build --release \
+rustup component add rust-src --toolchain nightly
+cargo +nightly build --release \
   --target bpfel-unknown-none \
   -p pina_bpf \
   -F bpf-entrypoint \
@@ -35,7 +35,7 @@ cargo +nightly-2025-10-15 build --release \
 The workspace provides an alias for the same command:
 
 ```bash
-cargo +nightly-2025-10-15 build-bpf
+cargo +nightly build-bpf
 ```
 
 ## Tests

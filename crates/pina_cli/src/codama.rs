@@ -117,7 +117,7 @@ fn collect_examples(options: &CodamaGenerateOptions) -> Result<Vec<String>, Coda
 				source,
 			}
 		})?
-		.filter_map(std::result::Result::ok)
+		.filter_map(Result::ok)
 		.filter(|entry| entry.path().is_dir())
 		.filter_map(|entry| entry.file_name().into_string().ok())
 		.collect::<Vec<_>>();
