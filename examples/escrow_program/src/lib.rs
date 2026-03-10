@@ -153,7 +153,6 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		self.vault
 			.assert_empty()?
 			.assert_writable()?
-			.assert_owner(token_program)?
 			.assert_associated_token_address(
 				self.escrow.address(),
 				self.mint_a.address(),
@@ -169,16 +168,18 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			args.bump,
 		)?;
 
-		let mut escrow = self.escrow.as_account_mut::<EscrowState>(&ID)?;
-		*escrow = EscrowState::builder()
-			.maker(*self.maker.address())
-			.mint_a(*self.mint_a.address())
-			.mint_b(*self.mint_b.address())
-			.amount_a(args.amount_a)
-			.amount_b(args.amount_b)
-			.seed(args.seed)
-			.bump(args.bump)
-			.build();
+		{
+			let mut escrow = self.escrow.as_account_mut::<EscrowState>(&ID)?;
+			*escrow = EscrowState::builder()
+				.maker(*self.maker.address())
+				.mint_a(*self.mint_a.address())
+				.mint_b(*self.mint_b.address())
+				.amount_a(args.amount_a)
+				.amount_b(args.amount_b)
+				.seed(args.seed)
+				.bump(args.bump)
+				.build();
+		}
 
 		associated_token_account::instructions::Create {
 			account: self.vault,
