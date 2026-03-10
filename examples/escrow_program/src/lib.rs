@@ -245,13 +245,17 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			.assert_writable()?
 			.assert_type::<EscrowState>(&ID)?;
 
-		let escrow = self.escrow.as_account::<EscrowState>(&ID)?;
-		let maker = escrow.maker;
-		let mint_a = escrow.mint_a;
-		let mint_b = escrow.mint_b;
-		let amount_b = escrow.amount_b;
-		let seed = escrow.seed;
-		let bump = escrow.bump;
+		let (maker, mint_a, mint_b, amount_b, seed, bump) = {
+			let escrow = self.escrow.as_account::<EscrowState>(&ID)?;
+			(
+				escrow.maker,
+				escrow.mint_a,
+				escrow.mint_b,
+				escrow.amount_b,
+				escrow.seed,
+				escrow.bump,
+			)
+		};
 		let escrow_seeds_with_bump =
 			seeds_escrow!(self.maker.address().as_ref(), &seed.0, bump);
 

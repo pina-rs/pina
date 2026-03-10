@@ -1,5 +1,5 @@
 ---
-pina: minor
+pina: major
 ---
 
 Keep typed account and token loaders borrow-guarded so runtime borrow checks remain active
