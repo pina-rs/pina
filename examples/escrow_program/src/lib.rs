@@ -132,16 +132,19 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		let escrow_seeds = seeds_escrow!(self.maker.address().as_ref(), &args.seed.0);
 		let escrow_seeds_with_bump =
 			seeds_escrow!(self.maker.address().as_ref(), &args.seed.0, args.bump);
+		let token_program = self.token_program.address();
 
 		// assertions
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.maker.assert_signer()?;
-		self.mint_a.assert_owners(&SPL_PROGRAM_IDS)?;
-		self.mint_b.assert_owners(&SPL_PROGRAM_IDS)?;
-		self.maker_ata_a.assert_associated_token_address(
+		self.mint_a.assert_owner(token_program)?;
+		self.mint_b.assert_owner(token_program)?;
+		self.maker_ata_a
+			.assert_owner(token_program)?
+			.assert_associated_token_address(
 			self.maker.address(),
 			self.mint_a.address(),
-			self.token_program.address(),
+			token_program,
 		)?;
 		self.escrow
 			.assert_empty()?
@@ -150,10 +153,11 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		self.vault
 			.assert_empty()?
 			.assert_writable()?
+			.assert_owner(token_program)?
 			.assert_associated_token_address(
 				self.escrow.address(),
 				self.mint_a.address(),
-				self.token_program.address(),
+				token_program,
 			)?;
 
 		// create the program account
@@ -221,24 +225,25 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
 		// Validate the discriminator; TakeInstruction has no payload fields.
 		let _ = TakeInstruction::try_from_bytes(data)?;
+		let token_program = self.token_program.address();
 
 		// -- assertions --
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.taker.assert_signer()?.assert_writable()?;
 		self.taker_ata_b
-			.assert_owners(&SPL_PROGRAM_IDS)?
+			.assert_owner(token_program)?
 			.assert_associated_token_address(
 				self.taker.address(),
 				self.mint_b.address(),
-				self.token_program.address(),
+				token_program,
 			)?;
 		self.taker_ata_a
-			.assert_owners(&SPL_PROGRAM_IDS)?
+			.assert_owner(token_program)?
 			.assert_data_len(token::state::TokenAccount::LEN)?
 			.assert_associated_token_address(
 				self.taker.address(),
 				self.mint_a.address(),
-				self.token_program.address(),
+				token_program,
 			)?;
 		self.escrow
 			.assert_not_empty()?
@@ -262,20 +267,17 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		self.escrow
 			.assert_seeds_with_bump(escrow_seeds_with_bump, &ID)?;
 		self.maker.assert_address(&maker)?;
-		self.mint_a
-			.assert_owners(&SPL_PROGRAM_IDS)?
-			.assert_address(&mint_a)?;
-		self.mint_b
-			.assert_owners(&SPL_PROGRAM_IDS)?
-			.assert_address(&mint_b)?;
+		self.mint_a.assert_owner(token_program)?.assert_address(&mint_a)?;
+		self.mint_b.assert_owner(token_program)?.assert_address(&mint_b)?;
 
 		self.vault
 			.assert_not_empty()?
 			.assert_writable()?
+			.assert_owner(token_program)?
 			.assert_associated_token_address(
 				self.escrow.address(),
 				self.mint_a.address(),
-				self.token_program.address(),
+				token_program,
 			)?;
 
 		// create token account if none exists
