@@ -103,8 +103,8 @@ impl<'a> ProcessAccountInfos<'a> for CreateAccounts<'a> {
 			&ID,
 		)?;
 
-		let account = self.account.as_account_mut::<FloatDataAccount>(&ID)?;
-		apply_create(account, self.authority.address(), data_f32, data_f64);
+		let mut account = self.account.as_account_mut::<FloatDataAccount>(&ID)?;
+		apply_create(&mut account, self.authority.address(), data_f32, data_f64);
 
 		Ok(())
 	}
@@ -121,8 +121,8 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 			.assert_writable()?
 			.assert_type::<FloatDataAccount>(&ID)?;
 
-		let account = self.account.as_account_mut::<FloatDataAccount>(&ID)?;
-		apply_update(account, self.authority.address(), data_f32, data_f64)
+		let mut account = self.account.as_account_mut::<FloatDataAccount>(&ID)?;
+		apply_update(&mut account, self.authority.address(), data_f32, data_f64)
 	}
 }
 

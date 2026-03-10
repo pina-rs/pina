@@ -165,7 +165,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			args.bump,
 		)?;
 
-		let escrow = self.escrow.as_account_mut::<EscrowState>(&ID)?;
+		let mut escrow = self.escrow.as_account_mut::<EscrowState>(&ID)?;
 		*escrow = EscrowState::builder()
 			.maker(*self.maker.address())
 			.mint_a(*self.mint_a.address())
@@ -225,9 +225,13 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		// -- assertions --
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.taker.assert_signer()?.assert_writable()?;
-		// TODO: add validation for `self.taker_ata_b` — currently it is only
-		// validated implicitly by the token program during the transfer CPI. An
-		// explicit ATA address check here would catch mismatches earlier.
+		self.taker_ata_b
+			.assert_owners(&SPL_PROGRAM_IDS)?
+			.assert_associated_token_address(
+				self.taker.address(),
+				self.mint_b.address(),
+				self.token_program.address(),
+			)?;
 		self.taker_ata_a
 			.assert_owners(&SPL_PROGRAM_IDS)?
 			.assert_data_len(token::state::TokenAccount::LEN)?
@@ -241,26 +245,25 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			.assert_writable()?
 			.assert_type::<EscrowState>(&ID)?;
 
-		let EscrowState {
-			maker,
-			mint_a,
-			mint_b,
-			amount_b,
-			seed,
-			bump,
-			..
-		} = self.escrow.as_account::<EscrowState>(&ID)?;
-		let escrow_seeds_with_bump = seeds_escrow!(self.maker.address().as_ref(), &seed.0, *bump);
+		let escrow = self.escrow.as_account::<EscrowState>(&ID)?;
+		let maker = escrow.maker;
+		let mint_a = escrow.mint_a;
+		let mint_b = escrow.mint_b;
+		let amount_b = escrow.amount_b;
+		let seed = escrow.seed;
+		let bump = escrow.bump;
+		let escrow_seeds_with_bump =
+			seeds_escrow!(self.maker.address().as_ref(), &seed.0, bump);
 
 		self.escrow
 			.assert_seeds_with_bump(escrow_seeds_with_bump, &ID)?;
-		self.maker.assert_address(maker)?;
+		self.maker.assert_address(&maker)?;
 		self.mint_a
 			.assert_owners(&SPL_PROGRAM_IDS)?
-			.assert_address(mint_a)?;
+			.assert_address(&mint_a)?;
 		self.mint_b
 			.assert_owners(&SPL_PROGRAM_IDS)?
-			.assert_address(mint_b)?;
+			.assert_address(&mint_b)?;
 
 		self.vault
 			.assert_not_empty()?
@@ -287,13 +290,13 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			mint: self.mint_b,
 			to: self.maker_ata_b,
 			authority: self.taker,
-			amount: (*amount_b).into(),
+			amount: amount_b.into(),
 			decimals: self.mint_b.as_token_2022_mint()?.decimals(),
 			token_program: self.token_program.address(),
 		}
 		.invoke()?;
 
-		let bump_as_seeds = [*bump];
+		let bump_as_seeds = [bump];
 		let escrow_seeds =
 			seeds_escrow!(true, self.maker.address().as_ref(), &seed.0, &bump_as_seeds);
 		let escrow_signer = Signer::from(&escrow_seeds);
@@ -317,9 +320,7 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		}
 		.invoke_signed(&signers)?;
 
-		{
-			self.escrow.as_account_mut::<EscrowState>(&ID)?.zeroed();
-		}
+		self.escrow.as_account_mut::<EscrowState>(&ID)?.zeroed();
 
 		self.escrow.close_with_recipient(self.maker)
 	}

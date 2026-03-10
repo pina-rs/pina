@@ -211,7 +211,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 
 		// `as_account_mut` deserializes the raw account bytes into a mutable
 		// reference to `CounterState`, verifying the owner and discriminator.
-		let counter = self.counter.as_account_mut::<CounterState>(&ID)?;
+		let mut counter = self.counter.as_account_mut::<CounterState>(&ID)?;
 		*counter = CounterState::builder()
 			.bump(args.bump)
 			.count(PodU64::from_primitive(0))
@@ -248,7 +248,7 @@ impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 
 		// --- Mutate state ---
 
-		let counter = self.counter.as_account_mut::<CounterState>(&ID)?;
+		let mut counter = self.counter.as_account_mut::<CounterState>(&ID)?;
 		let current: u64 = counter.count.into();
 		counter.count = PodU64::from_primitive(
 			current

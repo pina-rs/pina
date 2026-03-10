@@ -14,6 +14,7 @@
 #![allow(unsafe_code, dead_code)]
 
 use core::alloc::Layout;
+use core::mem::size_of;
 use core::mem::MaybeUninit;
 use core::ptr::copy_nonoverlapping;
 use std::alloc::alloc;
@@ -153,7 +154,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 			.assert_type::<TestState>(&TEST_PROGRAM_ID)?;
 
 		// Update state.
-		let state = self
+		let mut state = self
 			.state_account
 			.as_account_mut::<TestState>(&TEST_PROGRAM_ID)?;
 		state.value = args.new_value;
@@ -174,7 +175,7 @@ impl<'a> ProcessAccountInfos<'a> for CloseAccounts<'a> {
 			.assert_type::<TestState>(&TEST_PROGRAM_ID)?;
 
 		// Zero account data before closing.
-		let state = self
+		let mut state = self
 			.state_account
 			.as_account_mut::<TestState>(&TEST_PROGRAM_ID)?;
 		state.zeroed();
@@ -1433,7 +1434,7 @@ fn account_data_mutation_persists() {
 
 	// Mutate value.
 	{
-		let state = account_views[0]
+		let mut state = account_views[0]
 			.as_account_mut::<TestState>(&TEST_PROGRAM_ID)
 			.unwrap_or_else(|e| panic!("write failed: {e:?}"));
 		state.value = PodU64::from_primitive(12345);
@@ -1445,6 +1446,66 @@ fn account_data_mutation_persists() {
 		.unwrap_or_else(|e| panic!("read failed: {e:?}"));
 	assert_eq!(u64::from(state.value), 12345);
 	assert_eq!(state.bump, 10, "bump should be unchanged");
+}
+
+#[test]
+fn mutable_typed_borrow_blocks_second_mutable_borrow() {
+	let key: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let state_bytes = build_test_state_bytes(10, 500);
+
+	let accounts = [AccountBuilder::new()
+		.address(key)
+		.owner(TEST_PROGRAM_ID)
+		.lamports(1_000_000)
+		.data(&state_bytes)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let first = account_views[0]
+		.as_account_mut::<TestState>(&TEST_PROGRAM_ID)
+		.unwrap_or_else(|e| panic!("first mutable borrow failed: {e:?}"));
+	let second = account_views[0].as_account_mut::<TestState>(&TEST_PROGRAM_ID);
+
+	assert!(matches!(second, Err(ProgramError::AccountBorrowFailed)));
+	drop(first);
+	assert!(account_views[0].as_account_mut::<TestState>(&TEST_PROGRAM_ID).is_ok());
+}
+
+#[test]
+fn immutable_typed_borrow_blocks_mutation_and_resize() {
+	let key: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let state_bytes = build_test_state_bytes(10, 500);
+
+	let accounts = [AccountBuilder::new()
+		.address(key)
+		.owner(TEST_PROGRAM_ID)
+		.lamports(1_000_000)
+		.data(&state_bytes)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let state = account_views[0]
+		.as_account::<TestState>(&TEST_PROGRAM_ID)
+		.unwrap_or_else(|e| panic!("immutable borrow failed: {e:?}"));
+
+	assert!(matches!(
+		account_views[0].as_account_mut::<TestState>(&TEST_PROGRAM_ID),
+		Err(ProgramError::AccountBorrowFailed)
+	));
+	assert_eq!(
+		account_views[0].resize(size_of::<TestState>() + 1),
+		Err(ProgramError::AccountBorrowFailed)
+	);
+	drop(state);
+	assert!(account_views[0].as_account_mut::<TestState>(&TEST_PROGRAM_ID).is_ok());
 }
 
 // ---------------------------------------------------------------------------

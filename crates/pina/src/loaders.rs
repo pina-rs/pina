@@ -3,11 +3,15 @@
 use core::slice::from_raw_parts;
 use core::slice::from_raw_parts_mut;
 
+use pinocchio::account::Ref;
+use pinocchio::account::RefMut;
 use pinocchio::ProgramResult;
 use pinocchio_system::instructions::Transfer;
 
 use crate::AccountDeserialize;
 use crate::AccountInfoValidation;
+use crate::AccountRef;
+use crate::AccountRefMut;
 #[cfg(feature = "token")]
 use crate::AccountValidation;
 use crate::AccountView;
@@ -339,40 +343,37 @@ impl AccountInfoValidation for AccountView {
 
 impl AsAccount for AccountView {
 	#[track_caller]
-	fn as_account<T>(&self, program_id: &Address) -> Result<&T, ProgramError>
+	fn as_account<T>(&self, program_id: &Address) -> Result<AccountRef<'_, T>, ProgramError>
 	where
 		T: AccountDeserialize + HasDiscriminator + Pod,
 	{
 		self.assert_owner(program_id)?;
 		self.assert_data_len(size_of::<T>())?;
 
-		// SAFETY: `try_borrow` returns a reference whose lifetime is tied to
-		// `self`. We create a raw-parts slice of exactly `size_of::<T>()` bytes
-		// from the same pointer. The `assert_data_len` check above guarantees
-		// the account data is exactly `size_of::<T>()` bytes.
-		// `T::try_from_bytes` then validates the discriminator and performs a
-		// bytemuck cast.
-		unsafe { T::try_from_bytes(from_raw_parts(self.try_borrow()?.as_ptr(), size_of::<T>())) }
+		Ref::try_map(self.try_borrow()?, |data| {
+			// SAFETY: `assert_data_len` above guarantees the account data is
+			// exactly `size_of::<T>()` bytes. We re-slice to that exact length
+			// and delegate discriminator/layout validation to `T`.
+			unsafe { T::try_from_bytes(from_raw_parts(data.as_ptr(), size_of::<T>())) }
+		})
+		.map_err(|(_borrow, err)| err)
 	}
 
 	#[track_caller]
-	fn as_account_mut<T>(&self, program_id: &Address) -> Result<&mut T, ProgramError>
+	fn as_account_mut<T>(&self, program_id: &Address) -> Result<AccountRefMut<'_, T>, ProgramError>
 	where
 		T: AccountDeserialize + HasDiscriminator + Pod,
 	{
 		self.assert_owner(program_id)?;
 		self.assert_data_len(size_of::<T>())?;
 
-		// SAFETY: Same reasoning as `as_account` above, but with a mutable
-		// borrow. The `assert_data_len` check above guarantees the account data
-		// is exactly `size_of::<T>()` bytes. The Solana runtime guarantees
-		// exclusive access when `try_borrow_mut` succeeds.
-		unsafe {
-			T::try_from_bytes_mut(from_raw_parts_mut(
-				self.try_borrow_mut()?.as_mut_ptr(),
-				size_of::<T>(),
-			))
-		}
+		RefMut::try_map(self.try_borrow_mut()?, |data| {
+			// SAFETY: Same reasoning as `as_account` above, but with a mutable
+			// borrow. The returned guard keeps the runtime borrow state active
+			// for as long as the typed view is alive.
+			unsafe { T::try_from_bytes_mut(from_raw_parts_mut(data.as_mut_ptr(), size_of::<T>())) }
+		})
+		.map_err(|(_borrow, err)| err)
 	}
 }
 
@@ -459,17 +460,23 @@ impl_account_validation!(
 #[cfg(feature = "token")]
 impl AsTokenAccount for AccountView {
 	#[track_caller]
-	fn as_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError> {
-		self.check_borrow()?;
+	fn as_token_mint(&self) -> Result<AccountRef<'_, crate::token::state::Mint>, ProgramError> {
+		Ref::try_map(self.try_borrow()?, |data| {
+			if data.len() != crate::token::state::Mint::LEN {
+				return Err(ProgramError::InvalidAccountData);
+			}
 
-		// SECURITY: relies on pinocchio's internal layout validation inside
-		// `from_account_view_unchecked`. Callers should verify ownership before
-		// trusting the result.
-		unsafe { crate::token::state::Mint::from_account_view_unchecked(self) }
+			// SECURITY: caller-side ownership validation still applies; the
+			// borrow guard now remains live for the returned typed view.
+			Ok(unsafe { crate::token::state::Mint::from_bytes_unchecked(data) })
+		})
+		.map_err(|(_borrow, err)| err)
 	}
 
 	#[track_caller]
-	fn as_token_mint_checked(&self) -> Result<&crate::token::state::Mint, ProgramError> {
+	fn as_token_mint_checked(
+		&self,
+	) -> Result<AccountRef<'_, crate::token::state::Mint>, ProgramError> {
 		self.as_token_mint_checked_with_owners(&[crate::token::ID])
 	}
 
@@ -477,20 +484,29 @@ impl AsTokenAccount for AccountView {
 	fn as_token_mint_checked_with_owners(
 		&self,
 		owners: &[Address],
-	) -> Result<&crate::token::state::Mint, ProgramError> {
+	) -> Result<AccountRef<'_, crate::token::state::Mint>, ProgramError> {
 		self.assert_owners(owners)?;
 		self.as_token_mint()
 	}
 
-	fn as_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError> {
-		self.check_borrow()?;
+	fn as_token_account(
+		&self,
+	) -> Result<AccountRef<'_, crate::token::state::TokenAccount>, ProgramError> {
+		Ref::try_map(self.try_borrow()?, |data| {
+			if data.len() != crate::token::state::TokenAccount::LEN {
+				return Err(ProgramError::InvalidAccountData);
+			}
 
-		// SECURITY: see `as_token_mint` above.
-		unsafe { crate::token::state::TokenAccount::from_account_view_unchecked(self) }
+			// SECURITY: see `as_token_mint` above.
+			Ok(unsafe { crate::token::state::TokenAccount::from_bytes_unchecked(data) })
+		})
+		.map_err(|(_borrow, err)| err)
 	}
 
 	#[track_caller]
-	fn as_token_account_checked(&self) -> Result<&crate::token::state::TokenAccount, ProgramError> {
+	fn as_token_account_checked(
+		&self,
+	) -> Result<AccountRef<'_, crate::token::state::TokenAccount>, ProgramError> {
 		self.as_token_account_checked_with_owners(&[crate::token::ID])
 	}
 
@@ -498,20 +514,29 @@ impl AsTokenAccount for AccountView {
 	fn as_token_account_checked_with_owners(
 		&self,
 		owners: &[Address],
-	) -> Result<&crate::token::state::TokenAccount, ProgramError> {
+	) -> Result<AccountRef<'_, crate::token::state::TokenAccount>, ProgramError> {
 		self.assert_owners(owners)?;
 		self.as_token_account()
 	}
 
-	fn as_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError> {
-		self.check_borrow()?;
+	fn as_token_2022_mint(
+		&self,
+	) -> Result<AccountRef<'_, crate::token_2022::state::Mint>, ProgramError> {
+		Ref::try_map(self.try_borrow()?, |data| {
+			if data.len() < crate::token_2022::state::Mint::BASE_LEN {
+				return Err(ProgramError::InvalidAccountData);
+			}
 
-		// SECURITY: see `as_token_mint` above.
-		unsafe { crate::token_2022::state::Mint::from_account_view_unchecked(self) }
+			// SECURITY: see `as_token_mint` above.
+			Ok(unsafe { crate::token_2022::state::Mint::from_bytes_unchecked(data) })
+		})
+		.map_err(|(_borrow, err)| err)
 	}
 
 	#[track_caller]
-	fn as_token_2022_mint_checked(&self) -> Result<&crate::token_2022::state::Mint, ProgramError> {
+	fn as_token_2022_mint_checked(
+		&self,
+	) -> Result<AccountRef<'_, crate::token_2022::state::Mint>, ProgramError> {
 		self.as_token_2022_mint_checked_with_owners(&[crate::token_2022::ID])
 	}
 
@@ -519,24 +544,29 @@ impl AsTokenAccount for AccountView {
 	fn as_token_2022_mint_checked_with_owners(
 		&self,
 		owners: &[Address],
-	) -> Result<&crate::token_2022::state::Mint, ProgramError> {
+	) -> Result<AccountRef<'_, crate::token_2022::state::Mint>, ProgramError> {
 		self.assert_owners(owners)?;
 		self.as_token_2022_mint()
 	}
 
 	fn as_token_2022_account(
 		&self,
-	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
-		self.check_borrow()?;
+	) -> Result<AccountRef<'_, crate::token_2022::state::TokenAccount>, ProgramError> {
+		Ref::try_map(self.try_borrow()?, |data| {
+			if data.len() < crate::token_2022::state::TokenAccount::BASE_LEN {
+				return Err(ProgramError::InvalidAccountData);
+			}
 
-		// SECURITY: see `as_token_mint` above.
-		unsafe { crate::token_2022::state::TokenAccount::from_account_view_unchecked(self) }
+			// SECURITY: see `as_token_mint` above.
+			Ok(unsafe { crate::token_2022::state::TokenAccount::from_bytes_unchecked(data) })
+		})
+		.map_err(|(_borrow, err)| err)
 	}
 
 	#[track_caller]
 	fn as_token_2022_account_checked(
 		&self,
-	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
+	) -> Result<AccountRef<'_, crate::token_2022::state::TokenAccount>, ProgramError> {
 		self.as_token_2022_account_checked_with_owners(&[crate::token_2022::ID])
 	}
 
@@ -544,7 +574,7 @@ impl AsTokenAccount for AccountView {
 	fn as_token_2022_account_checked_with_owners(
 		&self,
 		owners: &[Address],
-	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
+	) -> Result<AccountRef<'_, crate::token_2022::state::TokenAccount>, ProgramError> {
 		self.assert_owners(owners)?;
 		self.as_token_2022_account()
 	}
@@ -554,16 +584,9 @@ impl AsTokenAccount for AccountView {
 		owner: &Address,
 		mint: &Address,
 		token_program: &Address,
-	) -> Result<&crate::token::state::TokenAccount, ProgramError> {
-		self.check_borrow()?;
-
-		// SECURITY: see `as_token_mint` above. Additionally, the address is
-		// verified against the derived ATA address before the unchecked cast.
-		unsafe {
-			crate::token::state::TokenAccount::from_account_view_unchecked(
-				self.assert_associated_token_address(owner, mint, token_program)?,
-			)
-		}
+	) -> Result<AccountRef<'_, crate::token::state::TokenAccount>, ProgramError> {
+		self.assert_associated_token_address(owner, mint, token_program)?;
+		self.as_token_account()
 	}
 
 	#[track_caller]
@@ -572,7 +595,7 @@ impl AsTokenAccount for AccountView {
 		owner: &Address,
 		mint: &Address,
 		token_program: &Address,
-	) -> Result<&crate::token::state::TokenAccount, ProgramError> {
+	) -> Result<AccountRef<'_, crate::token::state::TokenAccount>, ProgramError> {
 		self.assert_owner(token_program)?;
 		self.as_associated_token_account(owner, mint, token_program)
 	}

@@ -397,6 +397,7 @@ in
       exec = ''
         set -e
         lint:clippy
+        lint:dylint
         lint:format
         verify:docs
       '';
@@ -461,6 +462,14 @@ in
         cargo clippy --workspace --all-features --locked ''${exclude_args[@]}
       '';
       description = "Check that all rust lints are passing.";
+      binary = "bash";
+    };
+    "lint:dylint" = {
+      exec = ''
+        set -e
+        cargo dylint --all -- --all-targets
+      '';
+      description = "Run custom security dylints.";
       binary = "bash";
     };
     "setup:vscode" = {

@@ -64,7 +64,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			args.bump,
 		)?;
 
-		let config = self.config.as_account_mut::<Config>(&ID)?;
+		let mut config = self.config.as_account_mut::<Config>(&ID)?;
 		*config = Config::builder()
 			.authority(*self.authority.address())
 			.value(args.value)
