@@ -30,6 +30,10 @@ jobs:
         run: lint:clippy
         shell: devenv shell -c -- bash -e {0}
 
+      - name: lint dylint
+        run: lint:dylint
+        shell: devenv shell -c -- bash -e {0}
+
       - name: lint formatting
         run: lint:format
         shell: devenv shell -c -- bash -e {0}
