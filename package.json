@@ -10,7 +10,7 @@
 		"test": "pnpm run generate && pnpm run check:js"
 	},
 	"dependencies": {
-		"@codama/renderers-js": "^2.0.2",
+		"@codama/renderers-js": "^2.0.3",
 		"codama": "^1.5.1"
 	},
 	"devDependencies": {

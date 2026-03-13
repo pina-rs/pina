@@ -52,7 +52,7 @@ fn parse_instruction_empty_data() {
 }
 
 /// Invalid discriminator byte (e.g. 99) should be remapped from
-/// ProgramError::Custom (InvalidDiscriminator) to InvalidInstructionData.
+/// `ProgramError::Custom` (`InvalidDiscriminator`) to `InvalidInstructionData`.
 #[test]
 fn parse_instruction_invalid_discriminator_remapped() {
 	let data = [99u8];

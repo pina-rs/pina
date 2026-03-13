@@ -135,6 +135,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 
 		// assertions
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
+		self.system_program.assert_address(&system::ID)?;
 		self.maker.assert_signer()?;
 		self.mint_a.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.mint_b.assert_owners(&SPL_PROGRAM_IDS)?;
@@ -224,16 +225,22 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 
 		// -- assertions --
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
+		self.system_program.assert_address(&system::ID)?;
 		self.taker.assert_signer()?.assert_writable()?;
-		// TODO: add validation for `self.taker_ata_b` — currently it is only
-		// validated implicitly by the token program during the transfer CPI. An
-		// explicit ATA address check here would catch mismatches earlier.
 		self.taker_ata_a
 			.assert_owners(&SPL_PROGRAM_IDS)?
 			.assert_data_len(token::state::TokenAccount::LEN)?
 			.assert_associated_token_address(
 				self.taker.address(),
 				self.mint_a.address(),
+				self.token_program.address(),
+			)?;
+		self.taker_ata_b
+			.assert_writable()?
+			.assert_owners(&SPL_PROGRAM_IDS)?
+			.assert_associated_token_address(
+				self.taker.address(),
+				self.mint_b.address(),
 				self.token_program.address(),
 			)?;
 		self.escrow
@@ -265,9 +272,17 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		self.vault
 			.assert_not_empty()?
 			.assert_writable()?
+			.assert_owners(&SPL_PROGRAM_IDS)?
 			.assert_associated_token_address(
 				self.escrow.address(),
 				self.mint_a.address(),
+				self.token_program.address(),
+			)?;
+		self.maker_ata_b
+			.assert_writable()?
+			.assert_associated_token_address(
+				self.maker.address(),
+				self.mint_b.address(),
 				self.token_program.address(),
 			)?;
 

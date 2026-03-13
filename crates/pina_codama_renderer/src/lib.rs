@@ -277,6 +277,7 @@ fn render_root_mod(program: &ProgramNode) -> String {
 		lines.push("pub mod types;".to_string());
 	}
 	lines.push(String::new());
+	lines.push("#[allow(unused_imports)]".to_string());
 	lines.push("pub(crate) use programs::*;".to_string());
 
 	lines.join("\n")
@@ -1661,6 +1662,15 @@ mod tests {
 		assert!(content.contains("pub digest: [u8; 32],"));
 		assert!(content.contains("let data = bytemuck::bytes_of(&data).to_vec();"));
 		insta::assert_snapshot!("todo_initialize_instruction_rs", content);
+	}
+
+	#[test]
+	fn renders_root_mod_with_unused_program_reexport_allowance() {
+		let crate_dir = render_fixture_program("anchor_declare_id", "pina-codama-render-root-mod");
+		let content = read_generated_file(&crate_dir, "mod.rs");
+
+		assert!(content.contains("#[allow(unused_imports)]"));
+		assert!(content.contains("pub(crate) use programs::*;"));
 	}
 
 	#[test]

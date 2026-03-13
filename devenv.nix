@@ -213,7 +213,7 @@ in
       exec = ''
         set -e
         if [ -z "$CI" ]; then
-          echo "Builing project locally"
+          echo "Building project locally"
           cargo build --all-features
         else
           echo "Building in CI"
@@ -229,6 +229,17 @@ in
         cargo build --locked
       '';
       description = "Build workspace crates with the default feature set.";
+      binary = "bash";
+    };
+    "build:pina:no-default" = {
+      exec = ''
+        set -e
+        cargo check -p pina --no-default-features --locked
+        cargo check -p pina --no-default-features --features derive --locked
+        cargo check -p pina --no-default-features --features token --locked
+        cargo check -p pina --no-default-features --features token,derive --locked
+      '';
+      description = "Verify `pina` builds without default features and across feature subsets.";
       binary = "bash";
     };
     "test:all" = {

@@ -4,4 +4,5 @@
 
 pub mod programs;
 
+#[allow(unused_imports)]
 pub(crate) use programs::*;

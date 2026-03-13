@@ -21,7 +21,7 @@ pub struct Take {
 }
 
 impl Take {
-	pub fn new(taker: solana_pubkey::Pubkey, mint_a: solana_pubkey::Pubkey, mint_b: solana_pubkey::Pubkey, taker_ata_a: solana_pubkey::Pubkey, taker_ata_b: solana_pubkey::Pubkey, maker: solana_pubkey::Pubkey, maker_ata_b: solana_pubkey::Pubkey, escrow: solana_pubkey::Pubkey, vault: solana_pubkey::Pubkey, token_program: solana_pubkey::Pubkey, system_program: solana_pubkey::Pubkey) -> Self {
+	pub fn new(taker: solana_pubkey::Pubkey, mint_a: solana_pubkey::Pubkey, mint_b: solana_pubkey::Pubkey, taker_ata_a: solana_pubkey::Pubkey, taker_ata_b: solana_pubkey::Pubkey, maker: solana_pubkey::Pubkey, maker_ata_b: solana_pubkey::Pubkey, escrow: solana_pubkey::Pubkey, vault: solana_pubkey::Pubkey, token_program: solana_pubkey::Pubkey) -> Self {
 		Self {
 			taker,
 			mint_a,
@@ -33,7 +33,7 @@ impl Take {
 			escrow,
 			vault,
 			token_program,
-			system_program,
+			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}
 
@@ -52,9 +52,9 @@ impl Take {
 		accounts.push(solana_instruction::AccountMeta::new_readonly(self.mint_a, false));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(self.mint_b, false));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(self.taker_ata_a, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.taker_ata_b, false));
+		accounts.push(solana_instruction::AccountMeta::new(self.taker_ata_b, false));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(self.maker, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.maker_ata_b, false));
+		accounts.push(solana_instruction::AccountMeta::new(self.maker_ata_b, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.escrow, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.vault, false));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(self.token_program, false));

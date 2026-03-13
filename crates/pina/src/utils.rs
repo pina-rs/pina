@@ -14,12 +14,12 @@ use crate::log;
 ///
 /// # Error mapping
 ///
-/// If `discriminator_from_bytes` returns a `ProgramError::Custom(_)` (i.e.
-/// `InvalidDiscriminator`), it is mapped to `InvalidInstructionData` so the
-/// caller sees a generic "bad data" error instead of an internal framework
-/// error.
-// TODO: the error remapping above suppresses detail that could be useful
-// for debugging. Consider preserving the original error or logging it.
+/// To preserve external compatibility, `ProgramError::Custom(_)` from
+/// discriminator parsing is remapped to `InvalidInstructionData`.
+///
+/// When the `logs` feature is enabled, the original custom error code is
+/// emitted before remapping so diagnostic detail is still available during
+/// development.
 /// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->/// All APIs in this section are designed for on-chain determinism.
 ///
 /// They return `ProgramError` values for caller-side propagation with `?`.
@@ -63,7 +63,19 @@ pub fn parse_instruction<'a, T: IntoDiscriminator>(
 	// Get instruction for discriminator.
 	T::discriminator_from_bytes(data).map_err(|error| {
 		match error {
-			ProgramError::Custom(_) => ProgramError::InvalidInstructionData,
+			ProgramError::Custom(code) => {
+				#[cfg(feature = "logs")]
+				{
+					log!(
+						"parse_instruction: remapping ProgramError::Custom({}) to \
+						 InvalidInstructionData",
+						code
+					);
+				}
+				#[cfg(not(feature = "logs"))]
+				let _ = code;
+				ProgramError::InvalidInstructionData
+			}
 			error => error,
 		}
 	})

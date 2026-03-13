@@ -1,5 +1,3 @@
-use pina_macros::error;
-
 /// Built-in pina framework errors.
 ///
 /// These occupy the top end of the `u32` range (`0xFFFF_0000..=0xFFFF_FFFF`)
@@ -11,7 +9,8 @@ use pina_macros::error;
 /// They return `ProgramError` values for caller-side propagation with `?`.
 ///
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
-#[error(crate = crate)]
+#[repr(u32)]
+#[non_exhaustive]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PinaProgramError {
 	/// Account or instruction data is shorter than the expected minimum.
@@ -26,4 +25,10 @@ pub enum PinaProgramError {
 	TooManyAccountKeys = 0xFFFF_FFFE,
 	/// The discriminator bytes do not match any known variant.
 	InvalidDiscriminator = 0xFFFF_FFFF,
+}
+
+impl From<PinaProgramError> for crate::ProgramError {
+	fn from(error: PinaProgramError) -> Self {
+		crate::ProgramError::Custom(error as u32)
+	}
 }
