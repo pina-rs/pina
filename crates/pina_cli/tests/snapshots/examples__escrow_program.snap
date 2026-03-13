@@ -1,5 +1,6 @@
 ---
 source: crates/pina_cli/tests/examples.rs
+assertion_line: 49
 expression: idl
 ---
 {
@@ -148,7 +149,11 @@ expression: idl
             "kind": "instructionAccountNode",
             "name": "systemProgram",
             "isWritable": false,
-            "isSigner": false
+            "isSigner": false,
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "11111111111111111111111111111111"
+            }
           },
           {
             "kind": "instructionAccountNode",
@@ -245,7 +250,7 @@ expression: idl
           {
             "kind": "instructionAccountNode",
             "name": "takerAtaB",
-            "isWritable": false,
+            "isWritable": true,
             "isSigner": false
           },
           {
@@ -257,7 +262,7 @@ expression: idl
           {
             "kind": "instructionAccountNode",
             "name": "makerAtaB",
-            "isWritable": false,
+            "isWritable": true,
             "isSigner": false
           },
           {
@@ -282,7 +287,11 @@ expression: idl
             "kind": "instructionAccountNode",
             "name": "systemProgram",
             "isWritable": false,
-            "isSigner": false
+            "isSigner": false,
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "11111111111111111111111111111111"
+            }
           }
         ],
         "arguments": [],
