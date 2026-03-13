@@ -207,8 +207,8 @@ fn boundary_values_u64() {
 		256,
 		65535,
 		65536,
-		u32::MAX as u64,
-		(u32::MAX as u64) + 1,
+		u64::from(u32::MAX),
+		u64::from(u32::MAX) + 1,
 		u64::MAX - 1,
 		u64::MAX,
 	] {
