@@ -18,7 +18,7 @@ pub struct Make {
 }
 
 impl Make {
-	pub fn new(maker: solana_pubkey::Pubkey, mint_a: solana_pubkey::Pubkey, mint_b: solana_pubkey::Pubkey, maker_ata_a: solana_pubkey::Pubkey, escrow: solana_pubkey::Pubkey, vault: solana_pubkey::Pubkey, system_program: solana_pubkey::Pubkey, token_program: solana_pubkey::Pubkey) -> Self {
+	pub fn new(maker: solana_pubkey::Pubkey, mint_a: solana_pubkey::Pubkey, mint_b: solana_pubkey::Pubkey, maker_ata_a: solana_pubkey::Pubkey, escrow: solana_pubkey::Pubkey, vault: solana_pubkey::Pubkey, token_program: solana_pubkey::Pubkey) -> Self {
 		Self {
 			maker,
 			mint_a,
@@ -26,7 +26,7 @@ impl Make {
 			maker_ata_a,
 			escrow,
 			vault,
-			system_program,
+			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 			token_program,
 		}
 	}

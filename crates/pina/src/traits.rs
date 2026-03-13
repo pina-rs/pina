@@ -921,11 +921,11 @@ mod tests {
 
 	#[test]
 	fn max_discriminator_space_is_u64_size() {
-		assert_eq!(crate::MAX_DISCRIMINATOR_SPACE, 8);
-		assert_eq!(crate::MAX_DISCRIMINATOR_SPACE, size_of::<u64>());
+		assert_eq!(MAX_DISCRIMINATOR_SPACE, 8);
+		assert_eq!(MAX_DISCRIMINATOR_SPACE, size_of::<u64>());
 	}
 
-	/// Verify that field values round-trip through AccountDeserialize.
+	/// Verify that field values round-trip through `AccountDeserialize`.
 	#[test]
 	fn account_deserialize_field_values_preserved() {
 		let mut data = [0u8; 17];

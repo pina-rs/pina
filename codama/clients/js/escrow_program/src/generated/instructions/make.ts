@@ -14,7 +14,7 @@ export const MAKE_DISCRIMINATOR = 1;
 
 export function getMakeDiscriminatorBytes() { return getU8Encoder().encode(MAKE_DISCRIMINATOR); }
 
-export type MakeInstruction<TProgram extends string = typeof ESCROW_PROGRAM_PROGRAM_ADDRESS, TAccountMaker extends string | AccountMeta<string> = string, TAccountMintA extends string | AccountMeta<string> = string, TAccountMintB extends string | AccountMeta<string> = string, TAccountMakerAtaA extends string | AccountMeta<string> = string, TAccountEscrow extends string | AccountMeta<string> = string, TAccountVault extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = string, TAccountTokenProgram extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+export type MakeInstruction<TProgram extends string = typeof ESCROW_PROGRAM_PROGRAM_ADDRESS, TAccountMaker extends string | AccountMeta<string> = string, TAccountMintA extends string | AccountMeta<string> = string, TAccountMintB extends string | AccountMeta<string> = string, TAccountMakerAtaA extends string | AccountMeta<string> = string, TAccountEscrow extends string | AccountMeta<string> = string, TAccountVault extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = "11111111111111111111111111111111", TAccountTokenProgram extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
 Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountMaker extends string ? ReadonlySignerAccount<TAccountMaker> & AccountSignerMeta<TAccountMaker> : TAccountMaker, TAccountMintA extends string ? ReadonlyAccount<TAccountMintA> : TAccountMintA, TAccountMintB extends string ? ReadonlyAccount<TAccountMintB> : TAccountMintB, TAccountMakerAtaA extends string ? ReadonlyAccount<TAccountMakerAtaA> : TAccountMakerAtaA, TAccountEscrow extends string ? WritableAccount<TAccountEscrow> : TAccountEscrow, TAccountVault extends string ? WritableAccount<TAccountVault> : TAccountVault, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, TAccountTokenProgram extends string ? ReadonlyAccount<TAccountTokenProgram> : TAccountTokenProgram, ...TRemainingAccounts]>;
 
 export type MakeInstructionData = { seed: bigint; amountA: bigint; amountB: bigint; bump: number;  };
@@ -40,7 +40,7 @@ mintB: Address<TAccountMintB>;
 makerAtaA: Address<TAccountMakerAtaA>;
 escrow: Address<TAccountEscrow>;
 vault: Address<TAccountVault>;
-systemProgram: Address<TAccountSystemProgram>;
+systemProgram?: Address<TAccountSystemProgram>;
 tokenProgram: Address<TAccountTokenProgram>;
 seed: MakeInstructionDataArgs["seed"];
 amountA: MakeInstructionDataArgs["amountA"];
@@ -61,7 +61,10 @@ const accounts = originalAccounts as Record<keyof typeof originalAccounts, Resol
 const args = { ...input,  };
 
 
-
+// Resolve default values.
+if (!accounts.systemProgram.value) {
+accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+}
 
 const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
 return Object.freeze({ accounts: [getAccountMeta("maker", accounts.maker), getAccountMeta("mintA", accounts.mintA), getAccountMeta("mintB", accounts.mintB), getAccountMeta("makerAtaA", accounts.makerAtaA), getAccountMeta("escrow", accounts.escrow), getAccountMeta("vault", accounts.vault), getAccountMeta("systemProgram", accounts.systemProgram), getAccountMeta("tokenProgram", accounts.tokenProgram)], data: getMakeInstructionDataEncoder().encode(args as MakeInstructionDataArgs), programAddress } as MakeInstruction<TProgramAddress, TAccountMaker, TAccountMintA, TAccountMintB, TAccountMakerAtaA, TAccountEscrow, TAccountVault, TAccountSystemProgram, TAccountTokenProgram>);

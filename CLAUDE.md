@@ -28,6 +28,7 @@ Cargo binaries are managed via `cargo-run-bin` (versions pinned in `[workspace.m
 # Build
 cargo build --all-features        # Build all crates
 cargo build-escrow-program        # Build escrow example for SBF target
+build:pina:no-default             # Check `pina` with no-default feature subsets
 
 # Test
 cargo test                        # Run all tests

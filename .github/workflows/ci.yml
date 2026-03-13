@@ -120,6 +120,10 @@ jobs:
         run: build:default
         shell: devenv shell -c -- bash -e {0}
 
+      - name: build pina no-default matrix
+        run: build:pina:no-default
+        shell: devenv shell -c -- bash -e {0}
+
       - name: build all features
         run: build:all
         shell: devenv shell -c -- bash -e {0}

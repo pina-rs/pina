@@ -1,3 +1,5 @@
+use core::mem::size_of;
+
 use pina::PinaProgramError;
 use pina::ProgramError;
 
@@ -9,8 +11,8 @@ fn error_to_code(variant: PinaProgramError) -> u32 {
 	}
 }
 
-/// Verify that all PinaProgramError variants have the correct error codes
-/// in the top end of the u32 range (0xFFFF_0000..=0xFFFF_FFFF).
+/// Verify that all `PinaProgramError` variants have the correct error codes
+/// in the top end of the u32 range (`0xFFFF_0000..=0xFFFF_FFFF`).
 #[test]
 fn error_codes_match_expected_discriminants() {
 	assert_eq!(error_to_code(PinaProgramError::DataTooShort), 0xFFFF_FFFA);
@@ -79,14 +81,14 @@ fn error_codes_are_unique() {
 	}
 }
 
-/// PartialEq works correctly for all variants.
+/// `PartialEq` works correctly for all variants.
 #[test]
 fn error_variant_equality() {
 	assert!(PinaProgramError::DataTooShort == PinaProgramError::DataTooShort);
 	assert!(PinaProgramError::DataTooShort != PinaProgramError::InvalidDiscriminator);
 }
 
-/// Verify that conversion to ProgramError::Custom is consistent.
+/// Verify that conversion to `ProgramError::Custom` is consistent.
 #[test]
 fn error_into_program_error_is_custom() {
 	let variants = [
@@ -102,4 +104,10 @@ fn error_into_program_error_is_custom() {
 		let pe: ProgramError = (*variant).into();
 		assert!(matches!(pe, ProgramError::Custom(_)));
 	}
+}
+
+/// The built-in error enum must remain a `u32`-sized repr for stable wire codes.
+#[test]
+fn error_enum_size_matches_u32() {
+	assert_eq!(size_of::<PinaProgramError>(), size_of::<u32>());
 }
