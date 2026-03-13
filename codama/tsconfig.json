@@ -8,5 +8,5 @@
 		"skipLibCheck": true,
 		"rootDir": "clients/js"
 	},
-	"include": ["clients/js/**/src/**/*.ts"]
+	"include": ["clients/js/**/src/**/*.ts", "clients/js/**/*.d.ts"]
 }
