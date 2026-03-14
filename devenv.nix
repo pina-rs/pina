@@ -278,6 +278,21 @@ in
           export CXXSTDLIB_PATH="${llvm.libcxx}/lib"
           export ZLIB_PATH="${pkgs.zlib}/lib"
           export LIBZSTD_PATH="${pkgs.zstd}/lib"
+        elif [ "$(uname)" = "Linux" ]; then
+          # bpf-linker static linking expects libstdc++.a to be discoverable.
+          # On Nix-based CI, that path may not be present in compiler
+          # search dirs, so resolve it explicitly.
+          CXXSTDLIB_ARCHIVE="$(gcc -print-file-name=libstdc++.a 2>/dev/null || true)"
+          if [ -z "$CXXSTDLIB_ARCHIVE" ] || [ "$CXXSTDLIB_ARCHIVE" = "libstdc++.a" ] || [ ! -f "$CXXSTDLIB_ARCHIVE" ]; then
+            CXXSTDLIB_ARCHIVE="$(g++ -print-file-name=libstdc++.a 2>/dev/null || true)"
+          fi
+
+          if [ -n "$CXXSTDLIB_ARCHIVE" ] && [ "$CXXSTDLIB_ARCHIVE" != "libstdc++.a" ] && [ -f "$CXXSTDLIB_ARCHIVE" ]; then
+            export CXXSTDLIB_PATH="$(dirname "$CXXSTDLIB_ARCHIVE")"
+          else
+            echo "warning: failed to locate libstdc++.a via gcc/g++; falling back to Nix GCC lib path"
+            export CXXSTDLIB_PATH="${pkgs.gcc.cc.lib}/lib"
+          fi
         fi
 
         LLVM_PREFIX="$LLVM_INSTALL" \
