@@ -73,7 +73,7 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
   anchor-parity:
-    timeout-minutes: 60
+    timeout-minutes: 120
     runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - name: checkout repository
@@ -83,6 +83,17 @@ jobs:
         uses: ./.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: cache sbpf gallery toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/sbpf-linker-upstream-gallery/llvm-install
+            ~/.cache/sbpf-linker-upstream-gallery/bin
+            ~/.cache/sbpf-linker-upstream-gallery/sbpf-linker
+          key: ${{ runner.os }}-sbpf-gallery-v1-${{ hashFiles('devenv.nix', 'rust-toolchain.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-sbpf-gallery-v1-
 
       - name: run anchor parity tests
         run: test:anchor-parity

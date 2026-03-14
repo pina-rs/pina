@@ -34,6 +34,7 @@ in
       llvm.lld
       llvm.llvm
       llvm.mlir
+      ninja
       nixfmt-rfc-style
       nodejs
       openssl
@@ -41,6 +42,7 @@ in
       pnpm
       pkg-config
       protobuf
+      python3
       rust-jemalloc-sys
       # Upstream rustup 1.28+ fails in nix builds: check suite is network-sensitive
       # and the install phase fails generating shell completions because the sandbox
@@ -54,6 +56,7 @@ in
         '';
       }))
       shfmt
+      zlib
       zstd
     ]
     ++ lib.optionals stdenv.isDarwin [
@@ -200,6 +203,119 @@ in
       description = "Install cargo binaries locally.";
       binary = "bash";
     };
+    "install:sbpf-gallery" = {
+      exec = ''
+        set -e
+
+        CACHE_DIR="''${XDG_CACHE_HOME:-$HOME/.cache}/sbpf-linker-upstream-gallery"
+        LLVM_SRC="$CACHE_DIR/llvm-project"
+        LLVM_BUILD="$CACHE_DIR/llvm-build"
+        LLVM_INSTALL="$CACHE_DIR/llvm-install"
+        LLVM_CONFIG="$LLVM_INSTALL/bin/llvm-config"
+        SBPF_SRC="$CACHE_DIR/sbpf-linker"
+        SBPF_BIN="$CACHE_DIR/bin/sbpf-linker"
+
+        mkdir -p "$CACHE_DIR"
+
+        # Step 1: Build custom LLVM (BPF target only)
+        if [ ! -f "$LLVM_CONFIG" ]; then
+          if [ ! -d "$LLVM_SRC" ]; then
+            echo "=== [1/3] Cloning Blueshift LLVM fork ==="
+            git clone --depth 1 --branch upstream-gallery-21 \
+              https://github.com/blueshift-gg/llvm-project.git "$LLVM_SRC"
+          fi
+
+          mkdir -p "$LLVM_BUILD" "$LLVM_INSTALL"
+
+          echo "=== [2/3] Building LLVM (BPF target only, this may take 30+ minutes) ==="
+          cmake -S "$LLVM_SRC/llvm" -B "$LLVM_BUILD" \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$LLVM_INSTALL" \
+            -DLLVM_ENABLE_PROJECTS= \
+            -DLLVM_ENABLE_RUNTIMES= \
+            -DLLVM_TARGETS_TO_BUILD=BPF \
+            -DLLVM_BUILD_LLVM_DYLIB=OFF \
+            -DLLVM_LINK_LLVM_DYLIB=OFF \
+            -DLLVM_BUILD_TESTS=OFF \
+            -DLLVM_INCLUDE_TESTS=OFF \
+            -DLLVM_ENABLE_ASSERTIONS=ON \
+            -DLLVM_ENABLE_ZLIB=OFF \
+            -DLLVM_ENABLE_ZSTD=OFF \
+            -DLLVM_INSTALL_UTILS=ON
+
+          NUM_CPUS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+          cmake --build "$LLVM_BUILD" --target install -- -j"$NUM_CPUS"
+
+          echo "LLVM installed: $("$LLVM_CONFIG" --version)"
+        else
+          echo "LLVM already built at $LLVM_INSTALL ($("$LLVM_CONFIG" --version))"
+        fi
+
+        # Step 2: Clone sbpf-linker
+        if [ ! -d "$SBPF_SRC" ]; then
+          echo "=== Cloning sbpf-linker ==="
+          git clone --depth 1 https://github.com/blueshift-gg/sbpf-linker.git "$SBPF_SRC"
+        else
+          echo "Updating sbpf-linker..."
+          git -C "$SBPF_SRC" pull --ff-only 2>/dev/null || true
+        fi
+
+        # Step 3: Build sbpf-linker with gallery features
+        echo "=== Building sbpf-linker with upstream-gallery-21 ==="
+        if [ "$(uname)" = "Darwin" ]; then
+          # On macOS, point to Nix-provided static libs for the link step.
+          # CXXSTDLIB_PATH: libc++ from the Nix LLVM toolchain
+          # ZLIB_PATH / LIBZSTD_PATH: compression libs for the linker
+          export CXXSTDLIB_PATH="${llvm.libcxx}/lib"
+          export ZLIB_PATH="${pkgs.zlib}/lib"
+          export LIBZSTD_PATH="${pkgs.zstd}/lib"
+        fi
+
+        LLVM_PREFIX="$LLVM_INSTALL" \
+          cargo install \
+            --path "$SBPF_SRC" \
+            --root "$CACHE_DIR" \
+            --no-default-features \
+            --features "upstream-gallery-21,bpf-linker/llvm-link-static" \
+            --force
+
+        # Symlink into .eget/bin so it takes precedence on PATH for cargo
+        # linker invocation (linker=sbpf-linker in .cargo/config.toml).
+        mkdir -p "$DEVENV_ROOT/.eget/bin"
+        ln -sf "$SBPF_BIN" "$DEVENV_ROOT/.eget/bin/sbpf-linker"
+
+        echo ""
+        echo "Done! sbpf-linker (gallery) installed and linked to .eget/bin/"
+        echo "Cache directory: $CACHE_DIR"
+        "$SBPF_BIN" --version 2>/dev/null || echo "(binary ready)"
+      '';
+      description = "Build sbpf-linker with custom Blueshift LLVM (upstream-gallery-21). First run builds LLVM from source (~30 min).";
+      binary = "bash";
+    };
+    "clean:sbpf-gallery" = {
+      exec = ''
+        set -e
+
+        CACHE_DIR="''${XDG_CACHE_HOME:-$HOME/.cache}/sbpf-linker-upstream-gallery"
+
+        if [ -d "$CACHE_DIR" ]; then
+          echo "Removing $CACHE_DIR ..."
+          rm -rf "$CACHE_DIR"
+          echo "Cleaned."
+        else
+          echo "Nothing to clean (no cache at $CACHE_DIR)."
+        fi
+
+        # Remove the symlink from .eget/bin if present
+        if [ -L "$DEVENV_ROOT/.eget/bin/sbpf-linker" ]; then
+          rm -f "$DEVENV_ROOT/.eget/bin/sbpf-linker"
+          echo "Removed .eget/bin/sbpf-linker symlink."
+        fi
+      '';
+      description = "Remove the cached Blueshift LLVM build and gallery sbpf-linker binary.";
+      binary = "bash";
+    };
     "update:deps" = {
       exec = ''
         set -e
@@ -253,6 +369,10 @@ in
     "test:anchor-parity" = {
       exec = ''
         set -e
+
+        # Ensure sbpf-linker is built against the Blueshift LLVM upstream gallery.
+        install:sbpf-gallery
+
         cargo test --locked \
           -p anchor_declare_id \
           -p anchor_declare_program \
@@ -265,11 +385,11 @@ in
           -p anchor_sysvars \
           -p escrow_program \
           -p pina_bpf
-        # TODO: re-enable once sbpf-linker LLVM 22 / nix LLVM conflict is resolved
-        # cargo build-bpf
-        # cargo test --locked -p pina_bpf bpf_build_ -- --ignored
+
+        cargo build-bpf
+        cargo test --locked -p pina_bpf bpf_build_ -- --ignored
       '';
-      description = "Run Anchor parity example tests and pina_bpf artifact checks.";
+      description = "Run Anchor parity tests plus pina_bpf build artifact checks using the gallery sbpf-linker.";
       binary = "bash";
     };
     "idl:generate" = {
