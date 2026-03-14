@@ -417,7 +417,17 @@ in
           -p escrow_program \
           -p pina_bpf
 
-        cargo build-bpf
+        # Blueshift's upstream-gallery-21 linker is LLVM 21-based.
+        # Build the BPF artifact with a Rust toolchain that also uses LLVM 21
+        # to avoid producer/reader attribute mismatches at link time.
+        BPF_TOOLCHAIN="nightly-2025-11-20"
+        if ! rustup toolchain list | grep -q "^$BPF_TOOLCHAIN"; then
+          rustup toolchain install "$BPF_TOOLCHAIN" --profile minimal --component rust-src
+        else
+          rustup component add rust-src --toolchain "$BPF_TOOLCHAIN"
+        fi
+
+        cargo +"$BPF_TOOLCHAIN" build-bpf
         cargo test --locked -p pina_bpf bpf_build_ -- --ignored
       '';
       description = "Run Anchor parity tests plus pina_bpf build artifact checks using the gallery sbpf-linker.";
