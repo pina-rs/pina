@@ -207,7 +207,15 @@ in
       exec = ''
         set -e
 
-        CACHE_DIR="''${XDG_CACHE_HOME:-$HOME/.cache}/sbpf-linker-upstream-gallery"
+        if [ -n "''${XDG_CACHE_HOME:-}" ]; then
+          CACHE_BASE="$XDG_CACHE_HOME"
+        elif [ -n "''${HOME:-}" ] && [ "$HOME" != "/" ]; then
+          CACHE_BASE="$HOME/.cache"
+        else
+          CACHE_BASE="$DEVENV_ROOT/.cache"
+        fi
+
+        CACHE_DIR="$CACHE_BASE/sbpf-linker-upstream-gallery"
         LLVM_SRC="$CACHE_DIR/llvm-project"
         LLVM_BUILD="$CACHE_DIR/llvm-build"
         LLVM_INSTALL="$CACHE_DIR/llvm-install"
@@ -297,7 +305,15 @@ in
       exec = ''
         set -e
 
-        CACHE_DIR="''${XDG_CACHE_HOME:-$HOME/.cache}/sbpf-linker-upstream-gallery"
+        if [ -n "''${XDG_CACHE_HOME:-}" ]; then
+          CACHE_BASE="$XDG_CACHE_HOME"
+        elif [ -n "''${HOME:-}" ] && [ "$HOME" != "/" ]; then
+          CACHE_BASE="$HOME/.cache"
+        else
+          CACHE_BASE="$DEVENV_ROOT/.cache"
+        fi
+
+        CACHE_DIR="$CACHE_BASE/sbpf-linker-upstream-gallery"
 
         if [ -d "$CACHE_DIR" ]; then
           echo "Removing $CACHE_DIR ..."
