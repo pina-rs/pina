@@ -10,6 +10,7 @@ import { assertIsInstructionWithAccounts, containsBytes, getU8Encoder, SOLANA_ER
 import { addSelfFetchFunctions, addSelfPlanAndSendFunctions, type SelfFetchFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
 import { getTodoStateCodec, type TodoState, type TodoStateArgs } from '../accounts';
 import { getInitializeInstruction, parseInitializeInstruction, type InitializeInput, type ParsedInitializeInstruction } from '../instructions';
+import { findTodoPda } from '../pdas';
 
 export const TODO_PROGRAM_PROGRAM_ADDRESS = 'Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd' as Address<'Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd'>;
 
@@ -45,16 +46,18 @@ return { instructionType: TodoProgramInstruction.Initialize, ...parseInitializeI
             }
         }
 
-export type TodoProgramPlugin = { accounts: TodoProgramPluginAccounts; instructions: TodoProgramPluginInstructions; }
+export type TodoProgramPlugin = { accounts: TodoProgramPluginAccounts; instructions: TodoProgramPluginInstructions; pdas: TodoProgramPluginPdas; }
 
 export type TodoProgramPluginAccounts = { todoState: ReturnType<typeof getTodoStateCodec> & SelfFetchFunctions<TodoStateArgs, TodoState>; }
 
 export type TodoProgramPluginInstructions = { initialize: (input: InitializeInput) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions; }
 
+export type TodoProgramPluginPdas = { todo: typeof findTodoPda; }
+
 export type TodoProgramPluginRequirements = ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi> & ClientWithTransactionPlanning & ClientWithTransactionSending
 
 export function todoProgramProgram() {
     return <T extends TodoProgramPluginRequirements>(client: T) => {
-        return { ...client, todoProgram: <TodoProgramPlugin>{ accounts: { todoState: addSelfFetchFunctions(client, getTodoStateCodec()) }, instructions: { initialize: input => addSelfPlanAndSendFunctions(client, getInitializeInstruction(input)) } } };
+        return { ...client, todoProgram: <TodoProgramPlugin>{ accounts: { todoState: addSelfFetchFunctions(client, getTodoStateCodec()) }, instructions: { initialize: input => addSelfPlanAndSendFunctions(client, getInitializeInstruction(input)) }, pdas: { todo: findTodoPda } } };
     };
 }

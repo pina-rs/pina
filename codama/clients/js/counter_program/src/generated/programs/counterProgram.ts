@@ -10,6 +10,7 @@ import { assertIsInstructionWithAccounts, containsBytes, getU8Encoder, SOLANA_ER
 import { addSelfFetchFunctions, addSelfPlanAndSendFunctions, type SelfFetchFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
 import { getCounterStateCodec, type CounterState, type CounterStateArgs } from '../accounts';
 import { getIncrementInstruction, getInitializeInstruction, parseIncrementInstruction, parseInitializeInstruction, type IncrementInput, type InitializeInput, type ParsedIncrementInstruction, type ParsedInitializeInstruction } from '../instructions';
+import { findCounterPda } from '../pdas';
 
 export const COUNTER_PROGRAM_PROGRAM_ADDRESS = 'GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS' as Address<'GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS'>;
 
@@ -49,16 +50,18 @@ return { instructionType: CounterProgramInstruction.Increment, ...parseIncrement
             }
         }
 
-export type CounterProgramPlugin = { accounts: CounterProgramPluginAccounts; instructions: CounterProgramPluginInstructions; }
+export type CounterProgramPlugin = { accounts: CounterProgramPluginAccounts; instructions: CounterProgramPluginInstructions; pdas: CounterProgramPluginPdas; }
 
 export type CounterProgramPluginAccounts = { counterState: ReturnType<typeof getCounterStateCodec> & SelfFetchFunctions<CounterStateArgs, CounterState>; }
 
 export type CounterProgramPluginInstructions = { initialize: (input: InitializeInput) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions; increment: (input: IncrementInput) => ReturnType<typeof getIncrementInstruction> & SelfPlanAndSendFunctions; }
 
+export type CounterProgramPluginPdas = { counter: typeof findCounterPda; }
+
 export type CounterProgramPluginRequirements = ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi> & ClientWithTransactionPlanning & ClientWithTransactionSending
 
 export function counterProgramProgram() {
     return <T extends CounterProgramPluginRequirements>(client: T) => {
-        return { ...client, counterProgram: <CounterProgramPlugin>{ accounts: { counterState: addSelfFetchFunctions(client, getCounterStateCodec()) }, instructions: { initialize: input => addSelfPlanAndSendFunctions(client, getInitializeInstruction(input)), increment: input => addSelfPlanAndSendFunctions(client, getIncrementInstruction(input)) } } };
+        return { ...client, counterProgram: <CounterProgramPlugin>{ accounts: { counterState: addSelfFetchFunctions(client, getCounterStateCodec()) }, instructions: { initialize: input => addSelfPlanAndSendFunctions(client, getInitializeInstruction(input)), increment: input => addSelfPlanAndSendFunctions(client, getIncrementInstruction(input)) }, pdas: { counter: findCounterPda } } };
     };
 }
