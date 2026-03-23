@@ -10,6 +10,7 @@ import { assertIsInstructionWithAccounts, containsBytes, getU8Encoder, SOLANA_ER
 import { addSelfFetchFunctions, addSelfPlanAndSendFunctions, type SelfFetchFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
 import { getEscrowStateCodec, type EscrowState, type EscrowStateArgs } from '../accounts';
 import { getMakeInstruction, getTakeInstruction, parseMakeInstruction, parseTakeInstruction, type MakeInput, type ParsedMakeInstruction, type ParsedTakeInstruction, type TakeInput } from '../instructions';
+import { findEscrowPda } from '../pdas';
 
 export const ESCROW_PROGRAM_PROGRAM_ADDRESS = '4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT' as Address<'4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT'>;
 
@@ -49,16 +50,18 @@ return { instructionType: EscrowProgramInstruction.Take, ...parseTakeInstruction
             }
         }
 
-export type EscrowProgramPlugin = { accounts: EscrowProgramPluginAccounts; instructions: EscrowProgramPluginInstructions; }
+export type EscrowProgramPlugin = { accounts: EscrowProgramPluginAccounts; instructions: EscrowProgramPluginInstructions; pdas: EscrowProgramPluginPdas; }
 
 export type EscrowProgramPluginAccounts = { escrowState: ReturnType<typeof getEscrowStateCodec> & SelfFetchFunctions<EscrowStateArgs, EscrowState>; }
 
 export type EscrowProgramPluginInstructions = { make: (input: MakeInput) => ReturnType<typeof getMakeInstruction> & SelfPlanAndSendFunctions; take: (input: TakeInput) => ReturnType<typeof getTakeInstruction> & SelfPlanAndSendFunctions; }
 
+export type EscrowProgramPluginPdas = { escrow: typeof findEscrowPda; }
+
 export type EscrowProgramPluginRequirements = ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi> & ClientWithTransactionPlanning & ClientWithTransactionSending
 
 export function escrowProgramProgram() {
     return <T extends EscrowProgramPluginRequirements>(client: T) => {
-        return { ...client, escrowProgram: <EscrowProgramPlugin>{ accounts: { escrowState: addSelfFetchFunctions(client, getEscrowStateCodec()) }, instructions: { make: input => addSelfPlanAndSendFunctions(client, getMakeInstruction(input)), take: input => addSelfPlanAndSendFunctions(client, getTakeInstruction(input)) } } };
+        return { ...client, escrowProgram: <EscrowProgramPlugin>{ accounts: { escrowState: addSelfFetchFunctions(client, getEscrowStateCodec()) }, instructions: { make: input => addSelfPlanAndSendFunctions(client, getMakeInstruction(input)), take: input => addSelfPlanAndSendFunctions(client, getTakeInstruction(input)) }, pdas: { escrow: findEscrowPda } } };
     };
 }
