@@ -8,6 +8,10 @@ inputs:
     description: The version of the cache to use.
     required: false
     default: "v1"
+  setup-retries:
+    description: Number of retries for transient nix/devenv setup failures.
+    required: false
+    default: "3"
 
 runs:
   using: composite
@@ -40,11 +44,64 @@ runs:
 
     - name: setup nix environment
       run: |
-        nix profile add --accept-flake-config nixpkgs#cachix
-        cachix use devenv
-        nix profile add nixpkgs#devenv
+        retry() {
+          local attempts="$1"
+          shift
+
+          local attempt=1
+          local delay=5
+          while true; do
+            if "$@"; then
+              return 0
+            fi
+
+            local exit_code=$?
+            if [ "$attempt" -ge "$attempts" ]; then
+              echo "Command failed after ${attempt} attempt(s): $*"
+              return "$exit_code"
+            fi
+
+            echo "Command failed with exit code ${exit_code}: $*"
+            echo "Retrying (${attempt}/${attempts}) in ${delay}s..."
+            sleep "$delay"
+            attempt=$((attempt + 1))
+            delay=$((delay * 2))
+          done
+        }
+
+        attempts="${{ inputs.setup-retries }}"
+        retry "$attempts" nix profile add --accept-flake-config nixpkgs#cachix
+        retry "$attempts" cachix use devenv
+        retry "$attempts" nix profile add nixpkgs#devenv
       shell: bash
 
     - name: install dependencies
-      run: install:cargo:bin
-      shell: devenv shell -- bash -e {0}
+      run: |
+        retry() {
+          local attempts="$1"
+          shift
+
+          local attempt=1
+          local delay=5
+          while true; do
+            if "$@"; then
+              return 0
+            fi
+
+            local exit_code=$?
+            if [ "$attempt" -ge "$attempts" ]; then
+              echo "Command failed after ${attempt} attempt(s): $*"
+              return "$exit_code"
+            fi
+
+            echo "Command failed with exit code ${exit_code}: $*"
+            echo "Retrying (${attempt}/${attempts}) in ${delay}s..."
+            sleep "$delay"
+            attempt=$((attempt + 1))
+            delay=$((delay * 2))
+          done
+        }
+
+        attempts="${{ inputs.setup-retries }}"
+        retry "$attempts" devenv shell -- bash -e -c "install:cargo:bin"
+      shell: bash

@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   preview:
-    timeout-minutes: 15
+    timeout-minutes: 45
     runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - name: checkout repository
