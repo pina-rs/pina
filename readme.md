@@ -84,6 +84,8 @@ End-to-end setup steps:
 4. Generate clients from the IDLs: `codama:clients:generate`
 5. Run the full validation pipeline: `codama:test`
 
+If `pnpm-workspace.yaml` sets `useNodeVersion`, `devenv shell` activates the matching pnpm-managed `node`/`npm`/`npx`/`corepack` toolchain automatically via `pnpm-activate-env`.
+
 ### Using Codama in separate projects
 
 <br>

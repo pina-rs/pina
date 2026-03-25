@@ -2005,7 +2005,7 @@ name = "pina"
 version = "0.6.0"
 dependencies = [
  "bytemuck",
- "paste",
+ "pastey",
  "pina_macros",
  "pina_pod_primitives",
  "pinocchio",
