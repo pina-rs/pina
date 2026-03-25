@@ -17,7 +17,7 @@ install:all
 
 <!-- {/devEnvironmentSetupCommands} -->
 
-If `pnpm-workspace.yaml` sets `useNodeVersion`, `devenv shell` activates the matching pnpm-managed `node`/`npm`/`npx`/`corepack` toolchain automatically via `pnpm-activate-env`.
+If `pnpm-workspace.yaml` sets `useNodeVersion`, `devenv shell` activates the matching pnpm-managed `node`/`npm`/`npx`/`corepack` toolchain automatically.
 
 ## Build and test
 

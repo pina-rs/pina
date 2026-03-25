@@ -101,11 +101,12 @@ in
     export LDFLAGS="$NIX_LDFLAGS";
   ''
   + lib.optionalString (pnpmNodeVersion != null) ''
-        # Respect pnpm-workspace.yaml's `useNodeVersion` through pnpm's
-        # activation helper. This keeps devenv's standalone `pnpm` binary
-        # active while activating the matching pnpm-managed Node.js runtime.
-        command -v pnpm-activate-env >/dev/null 2>&1
-        eval "$(pnpm-activate-env --print-export --workspace-file \"$DEVENV_ROOT/pnpm-workspace.yaml\")"
+        # Respect pnpm-workspace.yaml's `useNodeVersion` without mutating the
+        # user's globally active Node.js version. `pnpm env use --global`
+        # updates pnpm's shared global shim, so we instead install the
+        # requested version with `pnpm env add --global` and expose it through
+        # devenv-local shims only.
+        export DEVENV_PNPM_NODE_VERSION="${pnpmNodeVersion}"
 
         if [ -z "''${PNPM_HOME:-}" ]; then
           if [ -n "''${XDG_DATA_HOME:-}" ]; then
@@ -121,18 +122,39 @@ in
           fi
         fi
 
-        export DEVENV_PNPM_NODE_BIN="$PNPM_HOME/nodejs/${pnpmNodeVersion}/bin"
-        export DEVENV_PNPM_NODE_ROOT="$PNPM_HOME/nodejs/${pnpmNodeVersion}"
-        export DEVENV_PNPM_NODE_SHIM_DIR="$DEVENV_ROOT/.devenv/pnpm-node-shims/${pnpmNodeVersion}"
+        mkdir -p "$PNPM_HOME"
+
+        # `pnpm env add --global` requires PNPM_HOME to be present in PATH, but
+        # we append it so devenv's standalone `pnpm` remains the active binary.
         case ":$PATH:" in
-          *":$DEVENV_PNPM_NODE_BIN:"*) ;;
-          *) export PATH="$DEVENV_PNPM_NODE_BIN:$PATH" ;;
+          *":$PNPM_HOME:"*) ;;
+          *) export PATH="$PATH:$PNPM_HOME" ;;
         esac
+
+        export DEVENV_PNPM_NODE_ROOT="$PNPM_HOME/nodejs/$DEVENV_PNPM_NODE_VERSION"
+        export DEVENV_PNPM_NODE_BIN="$DEVENV_PNPM_NODE_ROOT/bin"
+
+        if [ ! -x "$DEVENV_PNPM_NODE_BIN/node" ]; then
+          echo "Installing pnpm-managed Node.js $DEVENV_PNPM_NODE_VERSION..."
+          pnpm env add --global "$DEVENV_PNPM_NODE_VERSION"
+        fi
+
+        if [ ! -x "$DEVENV_PNPM_NODE_BIN/node" ]; then
+          echo "Failed to find pnpm-managed Node.js $DEVENV_PNPM_NODE_VERSION at $DEVENV_PNPM_NODE_BIN" >&2
+          exit 1
+        fi
+
+        export DEVENV_PNPM_NODE_SHIM_DIR="$DEVENV_ROOT/.devenv/pnpm-node-shims/$DEVENV_PNPM_NODE_VERSION"
         export DEVENV_PNPM_COREPACK_CLI="$DEVENV_PNPM_NODE_ROOT/lib/node_modules/corepack/dist/corepack.js"
         export DEVENV_PNPM_NPM_CLI="$DEVENV_PNPM_NODE_ROOT/lib/node_modules/npm/bin/npm-cli.js"
         export DEVENV_PNPM_NPX_CLI="$DEVENV_PNPM_NODE_ROOT/lib/node_modules/npm/bin/npx-cli.js"
         mkdir -p "$DEVENV_PNPM_NODE_SHIM_DIR"
-        rm -f "$DEVENV_PNPM_NODE_SHIM_DIR/node"
+
+        if [ -x "$DEVENV_PNPM_NODE_BIN/node" ]; then
+          ln -sfn "$DEVENV_PNPM_NODE_BIN/node" "$DEVENV_PNPM_NODE_SHIM_DIR/node"
+        else
+          rm -f "$DEVENV_PNPM_NODE_SHIM_DIR/node"
+        fi
 
         if [ -f "$DEVENV_PNPM_COREPACK_CLI" ]; then
           cat > "$DEVENV_PNPM_NODE_SHIM_DIR/corepack" <<EOF
