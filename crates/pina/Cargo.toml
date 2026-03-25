@@ -21,7 +21,7 @@ derive = ["dep:pina_macros"]
 
 [dependencies]
 bytemuck = { workspace = true, features = ["derive", "const_zeroed", "align_offset"] }
-paste = { workspace = true }
+pastey = { workspace = true }
 pina_macros = { workspace = true, optional = true }
 pina_pod_primitives = { workspace = true }
 pinocchio = { workspace = true }

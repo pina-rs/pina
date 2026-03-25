@@ -36,7 +36,7 @@ dylint_linting::declare_late_lint! {
 	/// let token = account.as_token_account()?;
 	/// ```
 	pub REQUIRE_OWNER_BEFORE_TOKEN_CAST,
-	Warn,
+	Deny,
 	"calls to `as_token_*()` methods should be preceded by `assert_owner()` or `assert_owners()`"
 }
 

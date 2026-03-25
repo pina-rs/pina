@@ -35,7 +35,7 @@ cargo dylint --all -- --all-targets
 
 |                       |                                                           |
 | --------------------- | --------------------------------------------------------- |
-| **Level**             | `warn`                                                    |
+| **Level**             | `deny`                                                    |
 | **Security category** | [#02 Owner Checks](../security/02-owner-checks/readme.md) |
 
 #### What it does
@@ -90,7 +90,7 @@ fn process(&mut self, _data: &[u8]) -> ProgramResult {
 
 |                       |                                                               |
 | --------------------- | ------------------------------------------------------------- |
-| **Level**             | `warn`                                                        |
+| **Level**             | `deny`                                                        |
 | **Security category** | [#04 Initialization](../security/04-initialization/readme.md) |
 
 #### What it does
@@ -151,7 +151,7 @@ fn process(&mut self, _data: &[u8]) -> ProgramResult {
 
 |                       |                                                             |
 | --------------------- | ----------------------------------------------------------- |
-| **Level**             | `warn`                                                      |
+| **Level**             | `deny`                                                      |
 | **Security category** | [#05 Arbitrary CPI](../security/05-arbitrary-cpi/readme.md) |
 
 #### What it does

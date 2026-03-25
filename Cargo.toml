@@ -86,7 +86,7 @@ insta = { default-features = false, version = "^1" }
 mollusk-svm = { default-features = false, version = "^0.8" }
 num-derive = { version = "^0.4" }
 num-traits = { version = "^0.2" }
-paste = { default-features = false, version = "^1" }
+pastey = { default-features = false, version = "^0.2" }
 pinocchio = { default-features = false, version = "^0.10", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.3" }
 pinocchio-memo = { default-features = false, version = "^0.3" }

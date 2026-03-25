@@ -36,7 +36,7 @@ dylint_linting::declare_late_lint! {
 	/// system::instructions::Transfer { from, to, lamports }.invoke()?;
 	/// ```
 	pub REQUIRE_PROGRAM_CHECK_BEFORE_CPI,
-	Warn,
+	Deny,
 	"CPI invocations should be preceded by program address verification"
 }
 

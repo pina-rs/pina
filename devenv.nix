@@ -102,10 +102,10 @@ in
   ''
   + lib.optionalString (pnpmNodeVersion != null) ''
         # Respect pnpm-workspace.yaml's `useNodeVersion` without mutating the
-        # user's globally active Node.js version. `pnpm env use --global` updates
-        # pnpm's shared global shim, so we instead install the requested version
-        # with `pnpm env add --global` and prepend its bin directory to PATH for
-        # this devenv shell only.
+        # user's globally active Node.js version. `pnpm env use --global`
+        # updates pnpm's shared global shim, so we instead install the
+        # requested version with `pnpm env add --global` and expose it through
+        # devenv-local shims only.
         export DEVENV_PNPM_NODE_VERSION="${pnpmNodeVersion}"
 
         if [ -z "''${PNPM_HOME:-}" ]; then
@@ -124,16 +124,16 @@ in
 
         mkdir -p "$PNPM_HOME"
 
-        # `pnpm env add --global` requires PNPM_HOME to be present in PATH, but we
-        # append it so devenv's standalone pnpm remains the active `pnpm` binary.
+        # `pnpm env add --global` requires PNPM_HOME to be present in PATH, but
+        # we append it so devenv's standalone `pnpm` remains the active binary.
         case ":$PATH:" in
           *":$PNPM_HOME:"*) ;;
           *) export PATH="$PATH:$PNPM_HOME" ;;
         esac
 
-        export DEVENV_PNPM_NODE_BIN="$PNPM_HOME/nodejs/$DEVENV_PNPM_NODE_VERSION/bin"
+        export DEVENV_PNPM_NODE_ROOT="$PNPM_HOME/nodejs/$DEVENV_PNPM_NODE_VERSION"
+        export DEVENV_PNPM_NODE_BIN="$DEVENV_PNPM_NODE_ROOT/bin"
 
-        # Install the requested version without switching pnpm's global active Node.
         if [ ! -x "$DEVENV_PNPM_NODE_BIN/node" ]; then
           echo "Installing pnpm-managed Node.js $DEVENV_PNPM_NODE_VERSION..."
           pnpm env add --global "$DEVENV_PNPM_NODE_VERSION"
@@ -144,26 +144,32 @@ in
           exit 1
         fi
 
-        # Only expose the Node.js toolchain from the pnpm-managed install. This
-        # keeps `node`, `npm`, `npx`, and `corepack` aligned to useNodeVersion
-        # while leaving `pnpm` resolved from the devenv package set.
         export DEVENV_PNPM_NODE_SHIM_DIR="$DEVENV_ROOT/.devenv/pnpm-node-shims/$DEVENV_PNPM_NODE_VERSION"
-        export DEVENV_PNPM_NPM_CLI="$PNPM_HOME/nodejs/$DEVENV_PNPM_NODE_VERSION/lib/node_modules/npm/bin/npm-cli.js"
-        export DEVENV_PNPM_NPX_CLI="$PNPM_HOME/nodejs/$DEVENV_PNPM_NODE_VERSION/lib/node_modules/npm/bin/npx-cli.js"
+        export DEVENV_PNPM_COREPACK_CLI="$DEVENV_PNPM_NODE_ROOT/lib/node_modules/corepack/dist/corepack.js"
+        export DEVENV_PNPM_NPM_CLI="$DEVENV_PNPM_NODE_ROOT/lib/node_modules/npm/bin/npm-cli.js"
+        export DEVENV_PNPM_NPX_CLI="$DEVENV_PNPM_NODE_ROOT/lib/node_modules/npm/bin/npx-cli.js"
         mkdir -p "$DEVENV_PNPM_NODE_SHIM_DIR"
 
-        for executable in node corepack; do
-          if [ -x "$DEVENV_PNPM_NODE_BIN/$executable" ]; then
-            ln -sfn "$DEVENV_PNPM_NODE_BIN/$executable" "$DEVENV_PNPM_NODE_SHIM_DIR/$executable"
-          else
-            rm -f "$DEVENV_PNPM_NODE_SHIM_DIR/$executable"
-          fi
-        done
+        if [ -x "$DEVENV_PNPM_NODE_BIN/node" ]; then
+          ln -sfn "$DEVENV_PNPM_NODE_BIN/node" "$DEVENV_PNPM_NODE_SHIM_DIR/node"
+        else
+          rm -f "$DEVENV_PNPM_NODE_SHIM_DIR/node"
+        fi
+
+        if [ -f "$DEVENV_PNPM_COREPACK_CLI" ]; then
+          cat > "$DEVENV_PNPM_NODE_SHIM_DIR/corepack" <<EOF
+    #!/usr/bin/env sh
+    exec "$DEVENV_PNPM_NODE_BIN/node" "$DEVENV_PNPM_COREPACK_CLI" "\$@"
+    EOF
+          chmod +x "$DEVENV_PNPM_NODE_SHIM_DIR/corepack"
+        else
+          rm -f "$DEVENV_PNPM_NODE_SHIM_DIR/corepack"
+        fi
 
         if [ -f "$DEVENV_PNPM_NPM_CLI" ]; then
-          cat > "$DEVENV_PNPM_NODE_SHIM_DIR/npm" <<'EOF'
+          cat > "$DEVENV_PNPM_NODE_SHIM_DIR/npm" <<EOF
     #!/usr/bin/env sh
-    exec "$DEVENV_PNPM_NODE_BIN/node" "$DEVENV_PNPM_NPM_CLI" "$@"
+    exec "$DEVENV_PNPM_NODE_BIN/node" "$DEVENV_PNPM_NPM_CLI" "\$@"
     EOF
           chmod +x "$DEVENV_PNPM_NODE_SHIM_DIR/npm"
         else
@@ -171,18 +177,13 @@ in
         fi
 
         if [ -f "$DEVENV_PNPM_NPX_CLI" ]; then
-          cat > "$DEVENV_PNPM_NODE_SHIM_DIR/npx" <<'EOF'
+          cat > "$DEVENV_PNPM_NODE_SHIM_DIR/npx" <<EOF
     #!/usr/bin/env sh
-    exec "$DEVENV_PNPM_NODE_BIN/node" "$DEVENV_PNPM_NPX_CLI" "$@"
+    exec "$DEVENV_PNPM_NODE_BIN/node" "$DEVENV_PNPM_NPX_CLI" "\$@"
     EOF
           chmod +x "$DEVENV_PNPM_NODE_SHIM_DIR/npx"
         else
           rm -f "$DEVENV_PNPM_NODE_SHIM_DIR/npx"
-        fi
-
-        if [ ! -x "$DEVENV_PNPM_NODE_SHIM_DIR/node" ]; then
-          echo "Failed to prepare Node.js shims in $DEVENV_PNPM_NODE_SHIM_DIR" >&2
-          exit 1
         fi
 
         case ":$PATH:" in
@@ -299,8 +300,35 @@ in
     };
     "install:cargo:bin" = {
       exec = ''
-        set -e
+        set -euo pipefail
+
         cargo bin --install
+
+        ensure_local_cargo_bin() {
+          local crate="$1"
+          local version="$2"
+          local expected_glob="$3"
+          shift 3
+
+          if find "$DEVENV_ROOT/.bin" -path "$expected_glob" -print -quit | grep -q .; then
+            return 0
+          fi
+
+          local root="$DEVENV_ROOT/.bin/manual/$crate/$version"
+          rm -rf "$root"
+          mkdir -p "$root"
+
+          echo "Installing fallback tool $crate@$version into $root"
+          cargo install "$crate" --version "$version" --root "$root" --locked "$@"
+
+          if ! find "$DEVENV_ROOT/.bin" -path "$expected_glob" -print -quit | grep -q .; then
+            echo "Failed to install fallback tool $crate@$version" >&2
+            exit 1
+          fi
+        }
+
+        ensure_local_cargo_bin cargo-dylint 5.0.0 '*/cargo-dylint/*/bin/cargo-dylint'
+        ensure_local_cargo_bin dylint-link 5.0.0 '*/dylint-link/*/bin/dylint-link' --bin dylint-link
       '';
       description = "Install cargo binaries locally.";
       binary = "bash";
@@ -638,6 +666,43 @@ in
       description = "Fix clippy lints for rust.";
       binary = "bash";
     };
+    "security:dylint" = {
+      exec = ''
+        set -e
+
+        cargo_dylint_bin="$(find "$DEVENV_ROOT/.bin" -path '*/cargo-dylint/*/bin/cargo-dylint' | sort | tail -n 1)"
+        dylint_link_bin="$(find "$DEVENV_ROOT/.bin" -path '*/dylint-link/*/bin/dylint-link' | sort | tail -n 1)"
+
+        if [ -z "$cargo_dylint_bin" ] || [ -z "$dylint_link_bin" ]; then
+          echo "Missing cargo-dylint or dylint-link in $DEVENV_ROOT/.bin. Run 'install:cargo:bin'." >&2
+          exit 1
+        fi
+
+        mapfile -t target_manifests < <(
+          find "$DEVENV_ROOT/examples" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort
+          find "$DEVENV_ROOT/security" -mindepth 3 -maxdepth 3 -path '*/secure/Cargo.toml' | sort
+        )
+
+        package_args=()
+        for manifest in "''${target_manifests[@]}"; do
+          package_name="$(sed -n 's/^name = "\(.*\)"$/\1/p' "$manifest" | head -n 1)"
+          if [ -n "$package_name" ]; then
+            package_args+=(--package "$package_name")
+          fi
+        done
+
+        if [ "''${#package_args[@]}" -eq 0 ]; then
+          echo "Could not discover any example or security packages to lint." >&2
+          exit 1
+        fi
+
+        PATH="$(dirname "$dylint_link_bin"):$PATH" \
+          CARGO_INCREMENTAL=0 \
+          "$cargo_dylint_bin" dylint --all --no-deps "''${package_args[@]}" -- --all-features --all-targets --locked
+      '';
+      description = "Run custom security dylint checks against the example and security program crates.";
+      binary = "bash";
+    };
     "security:deny" = {
       exec = ''
         set -e
@@ -661,10 +726,11 @@ in
     "verify:security" = {
       exec = ''
         set -e
+        security:dylint
         security:deny
         security:audit
       '';
-      description = "Run all dependency security checks.";
+      description = "Run all custom and dependency security checks.";
       binary = "bash";
     };
     "lint:all" = {

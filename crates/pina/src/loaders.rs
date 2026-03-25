@@ -346,12 +346,15 @@ impl AsAccount for AccountView {
 		self.assert_owner(program_id)?;
 		self.assert_data_len(size_of::<T>())?;
 
-		// SAFETY: `try_borrow` returns a reference whose lifetime is tied to
-		// `self`. We create a raw-parts slice of exactly `size_of::<T>()` bytes
-		// from the same pointer. The `assert_data_len` check above guarantees
-		// the account data is exactly `size_of::<T>()` bytes.
-		// `T::try_from_bytes` then validates the discriminator and performs a
+		// SAFETY: `try_borrow` yields a guard-backed slice of the account data.
+		// We rebuild a raw-parts slice from the same pointer with exactly
+		// `size_of::<T>()` bytes, which is guaranteed by `assert_data_len` above.
+		// `T::try_from_bytes` then validates the discriminator and performs the
 		// bytemuck cast.
+		//
+		// The returned `&T` intentionally outlives the temporary borrow guard, so
+		// callers must not create overlapping mutable borrows of the same account
+		// while the reference is still in use.
 		unsafe { T::try_from_bytes(from_raw_parts(self.try_borrow()?.as_ptr(), size_of::<T>())) }
 	}
 
@@ -363,10 +366,14 @@ impl AsAccount for AccountView {
 		self.assert_owner(program_id)?;
 		self.assert_data_len(size_of::<T>())?;
 
-		// SAFETY: Same reasoning as `as_account` above, but with a mutable
-		// borrow. The `assert_data_len` check above guarantees the account data
-		// is exactly `size_of::<T>()` bytes. The Solana runtime guarantees
-		// exclusive access when `try_borrow_mut` succeeds.
+		// SAFETY: `try_borrow_mut` yields exclusive access to the backing bytes,
+		// and `assert_data_len` guarantees the slice is exactly `size_of::<T>()`
+		// bytes. `T::try_from_bytes_mut` then validates the discriminator and
+		// performs the bytemuck cast.
+		//
+		// The returned `&mut T` intentionally outlives the temporary borrow
+		// guard, so callers must not create any overlapping borrows or aliasing
+		// mutable views of the same account while the reference is still in use.
 		unsafe {
 			T::try_from_bytes_mut(from_raw_parts_mut(
 				self.try_borrow_mut()?.as_mut_ptr(),
@@ -601,7 +608,7 @@ fn checked_close_balance(sender_balance: u64, recipient_balance: u64) -> Result<
 
 impl<'a> LamportTransfer<'a> for AccountView {
 	/// Send the specified lamports to the `recipient` account.
-	/// The sender must be a mutable signer for this to be possible.
+	/// The sender must be writable and owned by the executing program.
 	#[inline(always)]
 	#[track_caller]
 	fn send(&'a self, lamports: u64, recipient: &'a AccountView) -> ProgramResult {

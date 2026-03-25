@@ -36,7 +36,7 @@ dylint_linting::declare_late_lint! {
 	/// create_program_account::<State>(target, payer, &ID, seeds)?;
 	/// ```
 	pub REQUIRE_EMPTY_BEFORE_INIT,
-	Warn,
+	Deny,
 	"calls to `create_program_account*()` should be preceded by `assert_empty()` on the target"
 }
 
