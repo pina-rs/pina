@@ -300,8 +300,35 @@ in
     };
     "install:cargo:bin" = {
       exec = ''
-        set -e
+        set -euo pipefail
+
         cargo bin --install
+
+        ensure_local_cargo_bin() {
+          local crate="$1"
+          local version="$2"
+          local expected_glob="$3"
+          shift 3
+
+          if find "$DEVENV_ROOT/.bin" -path "$expected_glob" -print -quit | grep -q .; then
+            return 0
+          fi
+
+          local root="$DEVENV_ROOT/.bin/manual/$crate/$version"
+          rm -rf "$root"
+          mkdir -p "$root"
+
+          echo "Installing fallback tool $crate@$version into $root"
+          cargo install "$crate" --version "$version" --root "$root" --locked "$@"
+
+          if ! find "$DEVENV_ROOT/.bin" -path "$expected_glob" -print -quit | grep -q .; then
+            echo "Failed to install fallback tool $crate@$version" >&2
+            exit 1
+          fi
+        }
+
+        ensure_local_cargo_bin cargo-dylint 5.0.0 '*/cargo-dylint/*/bin/cargo-dylint'
+        ensure_local_cargo_bin dylint-link 5.0.0 '*/dylint-link/*/bin/dylint-link' --bin dylint-link
       '';
       description = "Install cargo binaries locally.";
       binary = "bash";
