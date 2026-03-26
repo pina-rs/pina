@@ -1,5 +1,6 @@
 //! Property-based fuzz tests for Pod type deserialization, round-trip
-//! correctness, and safety under arbitrary byte patterns.
+//! correctness, arithmetic operations, and safety under arbitrary byte
+//! patterns.
 
 use bytemuck::try_from_bytes;
 use pina_pod_primitives::PodBool;
@@ -305,5 +306,226 @@ proptest! {
 		.into();
 		let re_encoded = PodU128::from_primitive(val);
 		prop_assert_eq!(re_encoded.0, bytes);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Arithmetic property tests: Pod ops match native ops
+// ---------------------------------------------------------------------------
+
+/// Helper macro to generate arithmetic property tests for a Pod type.
+macro_rules! arithmetic_property_tests {
+	($mod_name:ident, $pod:ty, $native:ty) => {
+		mod $mod_name {
+			use super::*;
+			use proptest::prelude::*;
+
+			proptest! {
+				/// checked_add on Pod matches checked_add on native.
+				#[test]
+				fn checked_add_matches_native(a: $native, b: $native) {
+					let pod_result = <$pod>::from(a).checked_add(b);
+					let native_result = a.checked_add(b);
+					match (pod_result, native_result) {
+						(Some(pod_val), Some(native_val)) => {
+							prop_assert_eq!(pod_val.get(), native_val);
+						}
+						(None, None) => {} // both overflow
+						_ => {
+							prop_assert!(false, "checked_add mismatch: pod={pod_result:?}, native={native_result:?}");
+						}
+					}
+				}
+
+				/// checked_sub on Pod matches checked_sub on native.
+				#[test]
+				fn checked_sub_matches_native(a: $native, b: $native) {
+					let pod_result = <$pod>::from(a).checked_sub(b);
+					let native_result = a.checked_sub(b);
+					match (pod_result, native_result) {
+						(Some(pod_val), Some(native_val)) => {
+							prop_assert_eq!(pod_val.get(), native_val);
+						}
+						(None, None) => {}
+						_ => {
+							prop_assert!(false, "checked_sub mismatch");
+						}
+					}
+				}
+
+				/// checked_mul on Pod matches checked_mul on native.
+				#[test]
+				fn checked_mul_matches_native(a: $native, b: $native) {
+					let pod_result = <$pod>::from(a).checked_mul(b);
+					let native_result = a.checked_mul(b);
+					match (pod_result, native_result) {
+						(Some(pod_val), Some(native_val)) => {
+							prop_assert_eq!(pod_val.get(), native_val);
+						}
+						(None, None) => {}
+						_ => {
+							prop_assert!(false, "checked_mul mismatch");
+						}
+					}
+				}
+
+				/// checked_div on Pod matches checked_div on native.
+				#[test]
+				fn checked_div_matches_native(a: $native, b: $native) {
+					let pod_result = <$pod>::from(a).checked_div(b);
+					let native_result = a.checked_div(b);
+					match (pod_result, native_result) {
+						(Some(pod_val), Some(native_val)) => {
+							prop_assert_eq!(pod_val.get(), native_val);
+						}
+						(None, None) => {}
+						_ => {
+							prop_assert!(false, "checked_div mismatch");
+						}
+					}
+				}
+
+				/// saturating_add on Pod matches saturating_add on native.
+				#[test]
+				fn saturating_add_matches_native(a: $native, b: $native) {
+					let pod_result = <$pod>::from(a).saturating_add(b);
+					let native_result = a.saturating_add(b);
+					prop_assert_eq!(pod_result.get(), native_result);
+				}
+
+				/// saturating_sub on Pod matches saturating_sub on native.
+				#[test]
+				fn saturating_sub_matches_native(a: $native, b: $native) {
+					let pod_result = <$pod>::from(a).saturating_sub(b);
+					let native_result = a.saturating_sub(b);
+					prop_assert_eq!(pod_result.get(), native_result);
+				}
+
+				/// saturating_mul on Pod matches saturating_mul on native.
+				#[test]
+				fn saturating_mul_matches_native(a: $native, b: $native) {
+					let pod_result = <$pod>::from(a).saturating_mul(b);
+					let native_result = a.saturating_mul(b);
+					prop_assert_eq!(pod_result.get(), native_result);
+				}
+
+				/// Bitwise AND on Pod matches native.
+				#[test]
+				fn bitand_matches_native(a: $native, b: $native) {
+					let result = (<$pod>::from(a) & b).get();
+					prop_assert_eq!(result, a & b);
+				}
+
+				/// Bitwise OR on Pod matches native.
+				#[test]
+				fn bitor_matches_native(a: $native, b: $native) {
+					let result = (<$pod>::from(a) | b).get();
+					prop_assert_eq!(result, a | b);
+				}
+
+				/// Bitwise XOR on Pod matches native.
+				#[test]
+				fn bitxor_matches_native(a: $native, b: $native) {
+					let result = (<$pod>::from(a) ^ b).get();
+					prop_assert_eq!(result, a ^ b);
+				}
+
+				/// NOT on Pod matches native.
+				#[test]
+				fn not_matches_native(a: $native) {
+					let result = (!<$pod>::from(a)).get();
+					prop_assert_eq!(result, !a);
+				}
+
+				/// Ordering on Pod matches native.
+				#[test]
+				fn ordering_matches_native(a: $native, b: $native) {
+					let pod_a = <$pod>::from(a);
+					let pod_b = <$pod>::from(b);
+					prop_assert_eq!(pod_a.cmp(&pod_b), a.cmp(&b));
+				}
+
+				/// is_zero correctness.
+				#[test]
+				fn is_zero_correctness(a: $native) {
+					let pod = <$pod>::from(a);
+					prop_assert_eq!(pod.is_zero(), a == 0);
+				}
+			}
+		}
+	};
+}
+
+arithmetic_property_tests!(arith_u16, PodU16, u16);
+arithmetic_property_tests!(arith_i16, PodI16, i16);
+arithmetic_property_tests!(arith_u32, PodU32, u32);
+arithmetic_property_tests!(arith_i32, PodI32, i32);
+arithmetic_property_tests!(arith_u64, PodU64, u64);
+arithmetic_property_tests!(arith_i64, PodI64, i64);
+arithmetic_property_tests!(arith_u128, PodU128, u128);
+arithmetic_property_tests!(arith_i128, PodI128, i128);
+
+// ---------------------------------------------------------------------------
+// Neg property tests for signed types
+// ---------------------------------------------------------------------------
+
+proptest! {
+	#[test]
+	fn neg_i16_matches_native(a: i16) {
+		// Skip i16::MIN because checked_neg overflows
+		prop_assume!(a != i16::MIN);
+		let result = (-PodI16::from(a)).get();
+		prop_assert_eq!(result, -a);
+	}
+
+	#[test]
+	fn neg_i32_matches_native(a: i32) {
+		prop_assume!(a != i32::MIN);
+		let result = (-PodI32::from(a)).get();
+		prop_assert_eq!(result, -a);
+	}
+
+	#[test]
+	fn neg_i64_matches_native(a: i64) {
+		prop_assume!(a != i64::MIN);
+		let result = (-PodI64::from(a)).get();
+		prop_assert_eq!(result, -a);
+	}
+
+	#[test]
+	fn neg_i128_matches_native(a: i128) {
+		prop_assume!(a != i128::MIN);
+		let result = (-PodI128::from(a)).get();
+		prop_assert_eq!(result, -a);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Shift property tests
+// ---------------------------------------------------------------------------
+
+proptest! {
+	#[test]
+	fn shl_u64_matches_native(a: u64, shift in 0u32..64) {
+		let result = (PodU64::from(a) << shift).get();
+		prop_assert_eq!(result, a << shift);
+	}
+
+	#[test]
+	fn shr_u64_matches_native(a: u64, shift in 0u32..64) {
+		let result = (PodU64::from(a) >> shift).get();
+		prop_assert_eq!(result, a >> shift);
+	}
+
+	#[test]
+	fn shl_i64_matches_native(a: i64, shift in 0u32..64) {
+		let result = (PodI64::from(a) << shift).get();
+		prop_assert_eq!(result, a << shift);
+	}
+
+	#[test]
+	fn shr_i64_matches_native(a: i64, shift in 0u32..64) {
+		let result = (PodI64::from(a) >> shift).get();
+		prop_assert_eq!(result, a >> shift);
 	}
 }
