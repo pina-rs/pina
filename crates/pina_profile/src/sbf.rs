@@ -71,19 +71,25 @@ pub fn analyze_functions(elf: &ElfInfo) -> Vec<FunctionProfile> {
 			next_offset.saturating_sub(sym_offset)
 		};
 
-		// Clamp to .text bounds.
-		let func_size = func_size.min(text_len.saturating_sub(sym_offset));
-		let instruction_count = func_size / SBF_INSTRUCTION_SIZE;
+		// Clamp to the uncovered part of `.text` to avoid double-counting
+		// overlapping or nested symbols.
+		let func_end = sym_offset.saturating_add(func_size).min(text_len);
+		let func_start = sym_offset.max(covered_up_to);
+		if func_start >= func_end {
+			continue;
+		}
+		let clamped_size = func_end - func_start;
+		let instruction_count = clamped_size / SBF_INSTRUCTION_SIZE;
 
 		functions.push(FunctionProfile {
 			name: sym.name.clone(),
-			offset: sym_offset,
-			size: func_size,
+			offset: func_start,
+			size: clamped_size,
 			instruction_count,
 			estimated_cu: instruction_count * CU_PER_INSTRUCTION,
 		});
 
-		covered_up_to = sym_offset + func_size;
+		covered_up_to = func_end;
 	}
 
 	// Trailing bytes after the last symbol.
@@ -279,6 +285,55 @@ mod tests {
 		let result = analyze_functions(&elf);
 		assert_eq!(result.len(), 1);
 		assert_eq!(result[0].instruction_count, 1); // 13 / 8 = 1
+	}
+
+	#[test]
+	fn overlapping_symbols_not_double_counted() {
+		// Two symbols overlap: func_a covers [0, 80) and func_b covers [40, 120).
+		// Total .text is 120 bytes = 15 instructions.
+		// Without dedup: 10 + 10 = 20 (wrong). With dedup: 10 + 5 = 15 (correct).
+		let elf = make_elf(
+			120,
+			vec![
+				Symbol {
+					name: "func_a".to_owned(),
+					address: 0x1000,
+					size: 80,
+				},
+				Symbol {
+					name: "func_b".to_owned(),
+					address: 0x1028, // overlaps func_a
+					size: 80,
+				},
+			],
+		);
+		let result = analyze_functions(&elf);
+		let total: u64 = result.iter().map(|f| f.instruction_count).sum();
+		// Total should never exceed actual instructions in .text.
+		assert_eq!(total, 120 / SBF_INSTRUCTION_SIZE);
+	}
+
+	#[test]
+	fn nested_symbol_skipped() {
+		// func_b is entirely inside func_a.
+		let elf = make_elf(
+			160,
+			vec![
+				Symbol {
+					name: "func_a".to_owned(),
+					address: 0x1000,
+					size: 160,
+				},
+				Symbol {
+					name: "func_b".to_owned(),
+					address: 0x1010, // inside func_a
+					size: 16,
+				},
+			],
+		);
+		let result = analyze_functions(&elf);
+		let total: u64 = result.iter().map(|f| f.instruction_count).sum();
+		assert_eq!(total, 160 / SBF_INSTRUCTION_SIZE);
 	}
 
 	#[test]

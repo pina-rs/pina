@@ -174,6 +174,13 @@ fn run_init(name: &str, path: Option<&std::path::Path>, force: bool) {
 }
 
 fn run_profile(path: &std::path::Path, json: bool, output: Option<&std::path::Path>) {
+	if let Some(output_path) = output {
+		if output_path == path {
+			eprintln!("Refusing to overwrite input binary {}", path.display());
+			std::process::exit(1);
+		}
+	}
+
 	let profile = match pina_profile::profile_program(path) {
 		Ok(p) => p,
 		Err(e) => {

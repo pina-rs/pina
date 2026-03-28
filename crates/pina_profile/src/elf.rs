@@ -5,6 +5,8 @@
 
 use std::path::Path;
 
+use object::Architecture;
+use object::BinaryFormat;
 use object::Object;
 use object::ObjectSection;
 use object::ObjectSymbol;
@@ -47,6 +49,24 @@ pub fn parse_elf(data: &[u8], path: &Path) -> Result<ElfInfo, ProfileError> {
 		}
 	})?;
 
+	// Validate this is an ELF targeting SBF/BPF.
+	if obj.format() != BinaryFormat::Elf {
+		return Err(ProfileError::Elf {
+			path: path.to_path_buf(),
+			message: format!("expected ELF format, got {:?}", obj.format()),
+		});
+	}
+
+	match obj.architecture() {
+		Architecture::Bpf | Architecture::Sbf => {}
+		arch => {
+			return Err(ProfileError::Elf {
+				path: path.to_path_buf(),
+				message: format!("expected SBF/BPF architecture, got {arch:?}"),
+			});
+		}
+	}
+
 	// Find the .text section.
 	let text_section = obj.section_by_name(".text").ok_or_else(|| {
 		ProfileError::NoTextSection {
@@ -64,17 +84,24 @@ pub fn parse_elf(data: &[u8], path: &Path) -> Result<ElfInfo, ProfileError> {
 	let text_size = text_bytes.len() as u64;
 
 	// Extract function symbols sorted by address.
+	// Keep zero-sized symbols so downstream span inference can run.
+	// Filter to the `.text` virtual address range.
+	let text_end = text_vaddr.saturating_add(text_size);
 	let mut symbols: Vec<Symbol> = obj
 		.symbols()
-		.filter(|sym| sym.kind() == SymbolKind::Text && sym.size() > 0)
+		.filter(|sym| sym.kind() == SymbolKind::Text)
 		.filter_map(|sym| {
 			let name = sym.name().ok()?;
 			if name.is_empty() {
 				return None;
 			}
+			let address = sym.address();
+			if !(text_vaddr..text_end).contains(&address) {
+				return None;
+			}
 			Some(Symbol {
 				name: name.to_owned(),
-				address: sym.address(),
+				address,
 				size: sym.size(),
 			})
 		})

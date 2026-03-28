@@ -69,8 +69,8 @@ fn check_collisions_within<T>(
 	for (i, item_a) in items.iter().enumerate() {
 		let (name_a, val_a, repr_a) = extract(item_a);
 		for item_b in &items[(i + 1)..] {
-			let (name_b, val_b, _repr_b) = extract(item_b);
-			if val_a == val_b {
+			let (name_b, val_b, repr_b) = extract(item_b);
+			if val_a == val_b && repr_a == repr_b {
 				collisions.push(DiscriminatorCollision {
 					kind,
 					name_a: name_a.to_owned(),
@@ -160,12 +160,16 @@ mod tests {
 	use crate::ir::InstructionIr;
 
 	fn make_account(name: &str, disc_value: u64) -> AccountIr {
+		make_account_with_repr(name, disc_value, 1)
+	}
+
+	fn make_account_with_repr(name: &str, disc_value: u64, repr_size: usize) -> AccountIr {
 		AccountIr {
 			name: name.to_owned(),
 			fields: vec![],
 			discriminator: DiscriminatorIr {
 				value: disc_value,
-				repr_size: 1,
+				repr_size,
 			},
 			docs: vec![],
 		}
@@ -262,6 +266,19 @@ mod tests {
 		let ir = make_program(
 			vec![make_account("AccountA", 0)],
 			vec![make_instruction("init", 0, &["authority"], &[])],
+		);
+		assert!(find_discriminator_collisions(&ir).is_empty());
+	}
+
+	#[test]
+	fn different_repr_size_no_collision() {
+		// Same numeric value but different repr sizes should NOT collide.
+		let ir = make_program(
+			vec![
+				make_account_with_repr("A", 1, 1), // u8 discriminator
+				make_account_with_repr("B", 1, 2), // u16 discriminator
+			],
+			vec![],
 		);
 		assert!(find_discriminator_collisions(&ir).is_empty());
 	}

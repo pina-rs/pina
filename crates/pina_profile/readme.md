@@ -18,7 +18,7 @@ Solana's SBF instruction set has deterministic CU costs. This tool:
 
 1. Parses the ELF binary to extract `.text` sections
 2. Walks the SBF instruction stream, counting instructions per symbol
-3. Estimates CU cost based on the known per-opcode cost model
+3. Estimates CU cost using a static per-instruction baseline model
 4. Outputs a summary (text or JSON) with per-function breakdowns
 
 ## Limitations
