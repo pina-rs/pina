@@ -16,6 +16,7 @@ serde_json = { workspace = true }
 thiserror = { workspace = true, default-features = true }
 
 [dev-dependencies]
+object = { version = "0.36", features = ["read", "elf", "std", "write"] }
 tempfile = "3"
 
 [lints]
