@@ -2,8 +2,7 @@
 
 Static CU (Compute Unit) profiler for Solana SBF programs.
 
-Analyzes compiled `.so` ELF binaries to estimate per-function compute unit
-costs without requiring a running validator.
+Analyzes compiled `.so` ELF binaries to estimate per-function compute unit costs without requiring a running validator.
 
 ## Usage
 

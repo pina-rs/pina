@@ -18,11 +18,12 @@
 //!
 //! Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 
-use bytemuck::Pod;
-use bytemuck::Zeroable;
 use core::fmt;
 use core::mem::align_of;
 use core::mem::size_of;
+
+use bytemuck::Pod;
+use bytemuck::Zeroable;
 
 /// The standard `bool` is not a `Pod`, define a replacement that is.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
@@ -127,22 +128,12 @@ macro_rules! impl_int_conversion {
 macro_rules! impl_pod_common {
 	($name:ident, $native:ty, $size:expr) => {
 		impl $name {
+			/// The largest value representable by the underlying integer type.
+			pub const MAX: Self = Self(<$native>::MAX.to_le_bytes());
+			/// The smallest value representable by the underlying integer type.
+			pub const MIN: Self = Self(<$native>::MIN.to_le_bytes());
 			/// The zero value.
 			pub const ZERO: Self = Self([0u8; $size]);
-
-			#[doc = concat!(
-				"The largest value representable by [`",
-				stringify!($native),
-				"`]."
-			)]
-			pub const MAX: Self = Self(<$native>::MAX.to_le_bytes());
-
-			#[doc = concat!(
-				"The smallest value representable by [`",
-				stringify!($native),
-				"`]."
-			)]
-			pub const MIN: Self = Self(<$native>::MIN.to_le_bytes());
 
 			/// Returns `true` if the value is zero.
 			#[inline]
@@ -662,64 +653,64 @@ define_pod_unsigned!(
 	PodU16,
 	u16,
 	2,
-	"An alignment-1 wrapper around `u16` stored as `[u8; 2]`.\n\n\
-	 Enables safe zero-copy access inside `#[repr(C)]` account structs."
+	"An alignment-1 wrapper around `u16` stored as `[u8; 2]`.\n\nEnables safe zero-copy access \
+	 inside `#[repr(C)]` account structs."
 );
 
 define_pod_signed!(
 	PodI16,
 	i16,
 	2,
-	"An alignment-1 wrapper around `i16` stored as `[u8; 2]`.\n\n\
-	 Enables safe zero-copy access inside `#[repr(C)]` account structs."
+	"An alignment-1 wrapper around `i16` stored as `[u8; 2]`.\n\nEnables safe zero-copy access \
+	 inside `#[repr(C)]` account structs."
 );
 
 define_pod_unsigned!(
 	PodU32,
 	u32,
 	4,
-	"An alignment-1 wrapper around `u32` stored as `[u8; 4]`.\n\n\
-	 Enables safe zero-copy access inside `#[repr(C)]` account structs."
+	"An alignment-1 wrapper around `u32` stored as `[u8; 4]`.\n\nEnables safe zero-copy access \
+	 inside `#[repr(C)]` account structs."
 );
 
 define_pod_signed!(
 	PodI32,
 	i32,
 	4,
-	"An alignment-1 wrapper around `i32` stored as `[u8; 4]`.\n\n\
-	 Enables safe zero-copy access inside `#[repr(C)]` account structs."
+	"An alignment-1 wrapper around `i32` stored as `[u8; 4]`.\n\nEnables safe zero-copy access \
+	 inside `#[repr(C)]` account structs."
 );
 
 define_pod_unsigned!(
 	PodU64,
 	u64,
 	8,
-	"An alignment-1 wrapper around `u64` stored as `[u8; 8]`.\n\n\
-	 Enables safe zero-copy access inside `#[repr(C)]` account structs."
+	"An alignment-1 wrapper around `u64` stored as `[u8; 8]`.\n\nEnables safe zero-copy access \
+	 inside `#[repr(C)]` account structs."
 );
 
 define_pod_signed!(
 	PodI64,
 	i64,
 	8,
-	"An alignment-1 wrapper around `i64` stored as `[u8; 8]`.\n\n\
-	 Enables safe zero-copy access inside `#[repr(C)]` account structs."
+	"An alignment-1 wrapper around `i64` stored as `[u8; 8]`.\n\nEnables safe zero-copy access \
+	 inside `#[repr(C)]` account structs."
 );
 
 define_pod_unsigned!(
 	PodU128,
 	u128,
 	16,
-	"An alignment-1 wrapper around `u128` stored as `[u8; 16]`.\n\n\
-	 Enables safe zero-copy access inside `#[repr(C)]` account structs."
+	"An alignment-1 wrapper around `u128` stored as `[u8; 16]`.\n\nEnables safe zero-copy access \
+	 inside `#[repr(C)]` account structs."
 );
 
 define_pod_signed!(
 	PodI128,
 	i128,
 	16,
-	"An alignment-1 wrapper around `i128` stored as `[u8; 16]`.\n\n\
-	 Enables safe zero-copy access inside `#[repr(C)]` account structs."
+	"An alignment-1 wrapper around `i128` stored as `[u8; 16]`.\n\nEnables safe zero-copy access \
+	 inside `#[repr(C)]` account structs."
 );
 
 // Compile-time invariant: all Pod types must have alignment 1 and correct
@@ -1313,7 +1304,10 @@ mod tests {
 
 	#[test]
 	fn pod_checked_add_ok() {
-		assert_eq!(PodU64::from(10u64).checked_add(5u64), Some(PodU64::from(15u64)));
+		assert_eq!(
+			PodU64::from(10u64).checked_add(5u64),
+			Some(PodU64::from(15u64))
+		);
 	}
 
 	#[test]
@@ -1331,7 +1325,10 @@ mod tests {
 
 	#[test]
 	fn pod_checked_sub_ok() {
-		assert_eq!(PodU64::from(10u64).checked_sub(5u64), Some(PodU64::from(5u64)));
+		assert_eq!(
+			PodU64::from(10u64).checked_sub(5u64),
+			Some(PodU64::from(5u64))
+		);
 	}
 
 	#[test]
@@ -1341,7 +1338,10 @@ mod tests {
 
 	#[test]
 	fn pod_checked_mul_ok() {
-		assert_eq!(PodU64::from(6u64).checked_mul(7u64), Some(PodU64::from(42u64)));
+		assert_eq!(
+			PodU64::from(6u64).checked_mul(7u64),
+			Some(PodU64::from(42u64))
+		);
 	}
 
 	#[test]
@@ -1351,7 +1351,10 @@ mod tests {
 
 	#[test]
 	fn pod_checked_div_ok() {
-		assert_eq!(PodU64::from(42u64).checked_div(7u64), Some(PodU64::from(6u64)));
+		assert_eq!(
+			PodU64::from(42u64).checked_div(7u64),
+			Some(PodU64::from(6u64))
+		);
 	}
 
 	#[test]
@@ -1372,7 +1375,10 @@ mod tests {
 	#[test]
 	fn pod_saturating_add() {
 		assert_eq!(PodU64::MAX.saturating_add(100u64), PodU64::MAX);
-		assert_eq!(PodU64::from(10u64).saturating_add(5u64), PodU64::from(15u64));
+		assert_eq!(
+			PodU64::from(10u64).saturating_add(5u64),
+			PodU64::from(15u64)
+		);
 	}
 
 	#[test]

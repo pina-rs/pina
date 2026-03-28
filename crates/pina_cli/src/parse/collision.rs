@@ -99,10 +99,7 @@ pub fn find_duplicate_input_fields(ir: &ProgramIr) -> Vec<DuplicateInputField> {
 		}
 
 		for arg in &instruction.arguments {
-			field_sources
-				.entry(&arg.name)
-				.or_default()
-				.push("argument");
+			field_sources.entry(&arg.name).or_default().push("argument");
 		}
 
 		for (name, sources) in &field_sources {
@@ -155,13 +152,12 @@ pub fn format_duplicate_field_errors(duplicates: &[DuplicateInputField]) -> Vec<
 
 #[cfg(test)]
 mod tests {
+	use super::*;
 	use crate::ir::AccountIr;
 	use crate::ir::DiscriminatorIr;
 	use crate::ir::FieldIr;
 	use crate::ir::InstructionAccountIr;
 	use crate::ir::InstructionIr;
-
-	use super::*;
 
 	fn make_account(name: &str, disc_value: u64) -> AccountIr {
 		AccountIr {
@@ -185,23 +181,27 @@ mod tests {
 			name: name.to_owned(),
 			accounts: account_names
 				.iter()
-				.map(|n| InstructionAccountIr {
-					name: (*n).to_owned(),
-					is_writable: false,
-					is_signer: false,
-					is_optional: false,
-					default_value: None,
-					is_pda: false,
-					pda_name: None,
-					docs: vec![],
+				.map(|n| {
+					InstructionAccountIr {
+						name: (*n).to_owned(),
+						is_writable: false,
+						is_signer: false,
+						is_optional: false,
+						default_value: None,
+						is_pda: false,
+						pda_name: None,
+						docs: vec![],
+					}
 				})
 				.collect(),
 			arguments: arg_names
 				.iter()
-				.map(|n| FieldIr {
-					name: (*n).to_owned(),
-					rust_type: "u64".to_owned(),
-					docs: vec![],
+				.map(|n| {
+					FieldIr {
+						name: (*n).to_owned(),
+						rust_type: "u64".to_owned(),
+						docs: vec![],
+					}
 				})
 				.collect(),
 			discriminator: DiscriminatorIr {
@@ -227,19 +227,13 @@ mod tests {
 
 	#[test]
 	fn no_collisions_when_discriminators_differ() {
-		let ir = make_program(
-			vec![make_account("A", 0), make_account("B", 1)],
-			vec![],
-		);
+		let ir = make_program(vec![make_account("A", 0), make_account("B", 1)], vec![]);
 		assert!(find_discriminator_collisions(&ir).is_empty());
 	}
 
 	#[test]
 	fn detects_account_discriminator_collision() {
-		let ir = make_program(
-			vec![make_account("A", 0), make_account("B", 0)],
-			vec![],
-		);
+		let ir = make_program(vec![make_account("A", 0), make_account("B", 0)], vec![]);
 		let collisions = find_discriminator_collisions(&ir);
 		assert_eq!(collisions.len(), 1);
 		assert_eq!(collisions[0].kind, "account");

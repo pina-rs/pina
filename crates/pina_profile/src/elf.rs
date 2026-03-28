@@ -40,22 +40,26 @@ pub struct ElfInfo {
 
 /// Parse an ELF binary and extract profiling-relevant information.
 pub fn parse_elf(data: &[u8], path: &Path) -> Result<ElfInfo, ProfileError> {
-	let obj = object::File::parse(data).map_err(|e| ProfileError::Elf {
-		path: path.to_path_buf(),
-		message: e.to_string(),
+	let obj = object::File::parse(data).map_err(|e| {
+		ProfileError::Elf {
+			path: path.to_path_buf(),
+			message: e.to_string(),
+		}
 	})?;
 
 	// Find the .text section.
-	let text_section = obj
-		.section_by_name(".text")
-		.ok_or_else(|| ProfileError::NoTextSection {
+	let text_section = obj.section_by_name(".text").ok_or_else(|| {
+		ProfileError::NoTextSection {
 			path: path.to_path_buf(),
-		})?;
+		}
+	})?;
 
 	let text_vaddr = text_section.address();
-	let text_bytes = text_section.data().map_err(|e| ProfileError::Elf {
-		path: path.to_path_buf(),
-		message: format!("Failed to read .text section data: {e}"),
+	let text_bytes = text_section.data().map_err(|e| {
+		ProfileError::Elf {
+			path: path.to_path_buf(),
+			message: format!("Failed to read .text section data: {e}"),
+		}
 	})?;
 	let text_size = text_bytes.len() as u64;
 

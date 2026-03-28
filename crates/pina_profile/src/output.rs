@@ -90,9 +90,8 @@ pub enum OutputError {
 
 #[cfg(test)]
 mod tests {
-	use crate::cost::FunctionProfile;
-
 	use super::*;
+	use crate::cost::FunctionProfile;
 
 	fn sample_profile() -> ProgramProfile {
 		ProgramProfile {

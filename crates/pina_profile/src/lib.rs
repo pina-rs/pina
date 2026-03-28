@@ -24,9 +24,11 @@ pub use output::OutputFormat;
 /// Returns a [`ProfileError`] if the file cannot be read, is not a valid ELF,
 /// or contains no SBF text sections.
 pub fn profile_program(path: &Path) -> Result<ProgramProfile, ProfileError> {
-	let data = std::fs::read(path).map_err(|e| ProfileError::Io {
-		path: path.to_path_buf(),
-		source: e,
+	let data = std::fs::read(path).map_err(|e| {
+		ProfileError::Io {
+			path: path.to_path_buf(),
+			source: e,
+		}
 	})?;
 
 	let elf_info = elf::parse_elf(&data, path)?;

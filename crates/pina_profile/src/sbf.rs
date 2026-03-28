@@ -109,10 +109,9 @@ pub fn analyze_functions(elf: &ElfInfo) -> Vec<FunctionProfile> {
 
 #[cfg(test)]
 mod tests {
+	use super::*;
 	use crate::elf::ElfInfo;
 	use crate::elf::Symbol;
-
-	use super::*;
 
 	fn make_elf(text_size: u64, symbols: Vec<Symbol>) -> ElfInfo {
 		ElfInfo {
