@@ -46,6 +46,19 @@ enum Commands {
 		#[arg(long, default_value_t = false)]
 		force: bool,
 	},
+	/// Static CU profiler for compiled SBF programs.
+	Profile {
+		/// Path to the compiled SBF `.so` file.
+		path: PathBuf,
+
+		/// Output as JSON instead of text.
+		#[arg(long, default_value_t = false)]
+		json: bool,
+
+		/// Write output to a file instead of stdout.
+		#[arg(short, long)]
+		output: Option<PathBuf>,
+	},
 	/// Codama generation workflows.
 	Codama {
 		#[command(subcommand)]
@@ -94,6 +107,7 @@ fn main() {
 			pretty,
 		} => run_idl(path.as_path(), output.as_deref(), name.as_deref(), pretty),
 		Commands::Init { name, path, force } => run_init(name.as_str(), path.as_deref(), force),
+		Commands::Profile { path, json, output } => run_profile(&path, json, output.as_deref()),
 		Commands::Codama { command } => {
 			match command {
 				CodamaCommands::Generate {
@@ -157,6 +171,49 @@ fn run_init(name: &str, path: Option<&std::path::Path>, force: bool) {
 
 	println!("Initialized new Pina project at {}", project_path.display());
 	pina_cli::print_next_steps(&project_path, name);
+}
+
+fn run_profile(path: &std::path::Path, json: bool, output: Option<&std::path::Path>) {
+	if let Some(output_path) = output {
+		if output_path == path {
+			eprintln!("Refusing to overwrite input binary {}", path.display());
+			std::process::exit(1);
+		}
+	}
+
+	let profile = match pina_profile::profile_program(path) {
+		Ok(p) => p,
+		Err(e) => {
+			eprintln!("Error: {e}");
+			std::process::exit(1);
+		}
+	};
+
+	let format = if json {
+		pina_profile::OutputFormat::Json
+	} else {
+		pina_profile::OutputFormat::Text
+	};
+
+	if let Some(output_path) = output {
+		let mut file = match std::fs::File::create(output_path) {
+			Ok(f) => f,
+			Err(e) => {
+				eprintln!("Failed to create {}: {e}", output_path.display());
+				std::process::exit(1);
+			}
+		};
+		if let Err(e) = pina_profile::output::write_profile(&profile, format, &mut file) {
+			eprintln!("Failed to write profile: {e}");
+			std::process::exit(1);
+		}
+	} else {
+		let mut stdout = std::io::stdout().lock();
+		if let Err(e) = pina_profile::output::write_profile(&profile, format, &mut stdout) {
+			eprintln!("Failed to write profile: {e}");
+			std::process::exit(1);
+		}
+	}
 }
 
 fn run_codama_generate(

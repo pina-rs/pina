@@ -1,5 +1,6 @@
 pub mod account_state;
 pub mod accounts_struct;
+pub mod collision;
 pub mod discriminator;
 pub mod doc_comments;
 pub mod entrypoint;
@@ -139,14 +140,50 @@ pub fn assemble_program_ir(file: &syn::File, program_name: &str) -> Result<Progr
 		})
 		.collect();
 
-	Ok(ProgramIr {
+	let ir = ProgramIr {
 		name: program_name.to_owned(),
 		public_key,
 		accounts,
 		instructions,
 		errors,
 		pdas: pdas_ir,
-	})
+	};
+
+	// Step 4: Validate the assembled IR for collisions and duplicates.
+	validate_program_ir(&ir)?;
+
+	Ok(ir)
+}
+
+/// Run static validation checks on a fully assembled [`ProgramIr`].
+///
+/// Currently checks:
+/// - Discriminator collisions within accounts and within instructions.
+/// - Duplicate input field names within instructions (account names vs
+///   argument names).
+///
+/// Returns `Ok(())` when the IR is valid, or an [`IdlError`] describing the
+/// first set of violations found.
+pub fn validate_program_ir(ir: &ProgramIr) -> Result<(), IdlError> {
+	let collisions = collision::find_discriminator_collisions(ir);
+	if !collisions.is_empty() {
+		let messages = collision::format_collision_errors(&collisions);
+		return Err(IdlError::Other(format!(
+			"Discriminator collisions detected:\n  {}",
+			messages.join("\n  "),
+		)));
+	}
+
+	let duplicates = collision::find_duplicate_input_fields(ir);
+	if !duplicates.is_empty() {
+		let messages = collision::format_duplicate_field_errors(&duplicates);
+		return Err(IdlError::Other(format!(
+			"Duplicate instruction input field names detected:\n  {}",
+			messages.join("\n  "),
+		)));
+	}
+
+	Ok(())
 }
 
 /// Find the discriminator value for an account struct by matching the struct
