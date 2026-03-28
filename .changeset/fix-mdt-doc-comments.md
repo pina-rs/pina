@@ -1,4 +1,5 @@
 ---
+default: patch
 pina: patch
 pina_cli: patch
 ---
