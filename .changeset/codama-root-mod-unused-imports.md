@@ -1,4 +1,5 @@
 ---
+default: patch
 pina_codama_renderer: patch
 ---
 

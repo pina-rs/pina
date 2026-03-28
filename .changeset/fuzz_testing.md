@@ -1,4 +1,5 @@
 ---
+default: patch
 pina_pod_primitives: patch
 pina: patch
 ---

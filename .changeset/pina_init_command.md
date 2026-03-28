@@ -1,4 +1,5 @@
 ---
+default: minor
 pina_cli: minor
 ---
 

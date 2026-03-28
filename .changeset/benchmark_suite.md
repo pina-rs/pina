@@ -1,4 +1,5 @@
 ---
+default: note
 pina: note
 ---
 
