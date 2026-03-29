@@ -48,7 +48,7 @@ command = "dprint fmt"
 
 [[workflows.steps]]
 type = "Command"
-command = "git add --all -- ':!.claude/worktrees'"
+command = "git add --all"
 
 [[workflows.steps]]
 type = "Command"
