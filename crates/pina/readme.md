@@ -36,9 +36,15 @@ cargo add pina --features token
 
 <br>
 
-- `derive` (default): enables `pina_macros` re-exports.
-- `logs` (default): enables Solana log macros via `solana-program-log`.
-- `token`: enables SPL token/token-2022 and ATA helpers.
+<!-- {=pinaFeatureFlags} -->
+
+| Feature  | Default | Description                                                |
+| -------- | ------- | ---------------------------------------------------------- |
+| `derive` | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.) |
+| `logs`   | Yes     | Enables on-chain logging via `solana-program-log`          |
+| `token`  | No      | Enables SPL token / token-2022 helpers and ATA utilities   |
+
+<!-- {/pinaFeatureFlags} -->
 
 ## Minimal Program Skeleton
 
@@ -97,6 +103,8 @@ pina idl --path ./my_program --output ./idls/my_program.json
 
 From there you can generate JS clients with Codama renderers, or Pina-style Rust clients using this repository's `pina_codama_renderer` tool.
 
+<!-- {=pinaBadgeLinks} -->
+
 [crate-image]: https://img.shields.io/crates/v/pina.svg?style=flat-square
 [crate-link]: https://crates.io/crates/pina
 [docs-image]: https://docs.rs/pina/badge.svg
@@ -107,3 +115,5 @@ From there you can generate JS clients with Codama renderers, or Pina-style Rust
 [unlicense-link]: https://opensource.org/license/unlicense
 [codecov-image]: https://codecov.io/github/pina-rs/pina/graph/badge.svg?token=87K799Q78I
 [codecov-link]: https://codecov.io/github/pina-rs/pina
+
+<!-- {/pinaBadgeLinks} -->

@@ -15,6 +15,21 @@ Pina's safety posture is built around explicit validation and predictable state 
 - Ensure all token account types used by helper traits implement `AccountValidation`.
 - Keep close/transfer helpers conservation-safe (no temporary double-crediting).
 
+## Best practices
+
+<!-- {=pinaSecurityBestPractices} -->
+
+- **Always call `assert_signer()`** before trusting authority accounts
+- **Always call `assert_owner()` / `assert_owners()`** before `as_token_*()` methods
+- **Always call `assert_empty()`** before account initialization to prevent reinitialization attacks
+- **Always verify program accounts** with `assert_address()` / `assert_program()` before CPI invocations
+- **Use `assert_type::<T>()`** to prevent type cosplay — it checks discriminator, owner, and data size
+- **Use `close_with_recipient()` with `zeroed()`** to safely close accounts and prevent revival attacks
+- **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
+- **Namespace PDA seeds** with type-specific prefixes to prevent PDA sharing across account types
+
+<!-- {/pinaSecurityBestPractices} -->
+
 ## Testing strategy
 
 - Unit tests for negative validation cases.
