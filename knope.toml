@@ -84,7 +84,7 @@ name = "publish"
 
 [[workflows.steps]]
 type = "Command"
-command = "cargo publish --workspace"
+command = "cargo workspaces publish --from-git --allow-dirty --yes"
 
 [[workflows.steps]]
 type = "Command"
