@@ -2,7 +2,11 @@
 
 <br>
 
+<!-- {=pinaProjectDescription} -->
+
 A performant Solana smart contract framework built on top of [pinocchio](https://github.com/anza-xyz/pinocchio) — a zero-dependency alternative to `solana-program` that massively reduces compute units and dependency bloat.
+
+<!-- {/pinaProjectDescription} -->
 
 [![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][unlicense-image]][unlicense-link] [![codecov][codecov-image]][codecov-link]
 
@@ -10,31 +14,41 @@ A performant Solana smart contract framework built on top of [pinocchio](https:/
 
 <br>
 
+<!-- {=pinaFeatureHighlights} -->
+
 - **Zero-copy deserialization** — account data is reinterpreted in place via `bytemuck`, with no heap allocation.
 - **`no_std` compatible** — all crates compile to the `bpfel-unknown-none` SBF target for on-chain deployment.
 - **Low compute units** — built on `pinocchio` instead of `solana-program`, saving thousands of CU per instruction.
 - **Discriminator system** — every account, instruction, and event type carries a typed discriminator as its first field.
-- **Validation chaining** — chain assertions on `AccountView` references:
-  ```rust
-  account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?;
-  ```
+- **Validation chaining** — chain assertions on `AccountView` references.
 - **Proc-macro sugar** — `#[account]`, `#[instruction]`, `#[event]`, `#[error]`, `#[discriminator]`, and `#[derive(Accounts)]` eliminate boilerplate.
 - **CPI helpers** — PDA account creation, lamport transfers, and token operations.
+
+<!-- {/pinaFeatureHighlights} -->
 
 ## Workspace packages
 
 <br>
 
-- `crates/pina` — core runtime crate (`no_std`, account validation/loaders, CPI helpers, entrypoint).
-- `crates/pina_macros` — proc macros (`#[account]`, `#[instruction]`, `#[event]`, `#[error]`, `#[discriminator]`, `#[derive(Accounts)]`).
-- `crates/pina_cli` — CLI/library for IDL and Codama generation (`pina idl`, `pina codama generate`, `pina init`).
-- `crates/pina_codama_renderer` — repository-local Rust renderer used by Codama generation.
-- `crates/pina_pod_primitives` — shared `no_std` POD primitive wrappers for generated clients and `pina`.
-- `crates/pina_sdk_ids` — typed constants for well-known Solana program/sysvar IDs.
+<!-- {=pinaWorkspacePackages} -->
+
+| Crate                  | Path                         | Description                                                        |
+| ---------------------- | ---------------------------- | ------------------------------------------------------------------ |
+| `pina`                 | `crates/pina`                | Core framework — traits, account loaders, CPI helpers, Pod types.  |
+| `pina_macros`          | `crates/pina_macros`         | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.     |
+| `pina_cli`             | `crates/pina_cli`            | CLI/library for IDL generation, Codama integration, scaffolding.   |
+| `pina_codama_renderer` | `crates/pina_codama_renderer`| Repository-local Codama Rust renderer for Pina-style clients.      |
+| `pina_pod_primitives`  | `crates/pina_pod_primitives` | Alignment-safe `no_std` POD primitive wrappers.                    |
+| `pina_profile`         | `crates/pina_profile`        | Static CU profiler for compiled SBF programs.                      |
+| `pina_sdk_ids`         | `crates/pina_sdk_ids`        | Typed constants for well-known Solana program/sysvar IDs.          |
+
+<!-- {/pinaWorkspacePackages} -->
 
 ## Installation
 
 <br>
+
+<!-- {=pinaInstallation} -->
 
 ```sh
 cargo add pina
@@ -45,6 +59,8 @@ To enable SPL token support:
 ```sh
 cargo add pina --features token
 ```
+
+<!-- {/pinaInstallation} -->
 
 ## Codama IDL Support
 
@@ -123,11 +139,15 @@ cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
 
 <br>
 
+<!-- {=pinaFeatureFlags} -->
+
 | Feature  | Default | Description                                                |
 | -------- | ------- | ---------------------------------------------------------- |
 | `derive` | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.) |
 | `logs`   | Yes     | Enables on-chain logging via `solana-program-log`          |
 | `token`  | No      | Enables SPL token / token-2022 helpers and ATA utilities   |
+
+<!-- {/pinaFeatureFlags} -->
 
 ## Documentation
 
@@ -416,15 +436,26 @@ pub struct MyAccounts<'a> {
 
 Alignment-safe primitive wrappers for use in `#[repr(C)]` account structs. Solana account data is byte-aligned, so standard Rust integers cannot be placed directly in `Pod` structs.
 
+| Type | Wraps | Size |
+| ---- | ----- | ---- |
+
+<!-- {=podTypesTable} -->
+
 | Type      | Wraps  | Size     |
 | --------- | ------ | -------- |
 | `PodBool` | `bool` | 1 byte   |
 | `PodU16`  | `u16`  | 2 bytes  |
-| `PodU32`  | `u32`  | 4 bytes  |
-| `PodU64`  | `u64`  | 8 bytes  |
-| `PodU128` | `u128` | 16 bytes |
 | `PodI16`  | `i16`  | 2 bytes  |
+| `PodU32`  | `u32`  | 4 bytes  |
+| `PodI32`  | `i32`  | 4 bytes  |
+| `PodU64`  | `u64`  | 8 bytes  |
 | `PodI64`  | `i64`  | 8 bytes  |
+| `PodU128` | `u128` | 16 bytes |
+| `PodI128` | `i128` | 16 bytes |
+
+All types are `#[repr(transparent)]` over byte arrays (or `u8` for `PodBool`) and implement `bytemuck::Pod` + `bytemuck::Zeroable`.
+
+<!-- {/podTypesTable} -->
 
 Usage:
 
@@ -510,6 +541,8 @@ When the `logs` feature is disabled, `log!` compiles to nothing.
 
 <br>
 
+<!-- {=sbfBuildInstructions} -->
+
 Programs are compiled to the `bpfel-unknown-none` target using `sbpf-linker`:
 
 ```sh
@@ -518,9 +551,13 @@ cargo +nightly build --release --target bpfel-unknown-none -p my_program -Z buil
 
 The `bpf-entrypoint` feature gate separates the on-chain entrypoint from the library code used in tests.
 
+<!-- {/sbfBuildInstructions} -->
+
 ## Testing
 
 <br>
+
+<!-- {=pinaTestingInstructions} -->
 
 Programs are tested as regular Rust libraries (without the `bpf-entrypoint` feature) using [mollusk-svm](https://docs.rs/mollusk-svm) for Solana VM simulation:
 
@@ -528,6 +565,8 @@ Programs are tested as regular Rust libraries (without the `bpf-entrypoint` feat
 cargo test
 cargo nextest run  # Faster parallel test execution
 ```
+
+<!-- {/pinaTestingInstructions} -->
 
 ## Crates
 
@@ -574,14 +613,18 @@ cargo nextest run  # Faster parallel test execution
 
 Pina provides strong built-in protections against common Solana vulnerabilities through its validation chain API, discriminator system, and CPI helpers. Follow these best practices:
 
+<!-- {=pinaSecurityBestPractices} -->
+
 - **Always call `assert_signer()`** before trusting authority accounts
-- **Always call `assert_owner()` / `assert_owners()`** before `as_token_*()` methods — these perform layout casts without owner verification
+- **Always call `assert_owner()` / `assert_owners()`** before `as_token_*()` methods
 - **Always call `assert_empty()`** before account initialization to prevent reinitialization attacks
 - **Always verify program accounts** with `assert_address()` / `assert_program()` before CPI invocations
-- **Use `assert_type::<T>()`** to prevent type cosplay — it checks discriminator, owner, and data size in one call
+- **Use `assert_type::<T>()`** to prevent type cosplay — it checks discriminator, owner, and data size
 - **Use `close_with_recipient()` with `zeroed()`** to safely close accounts and prevent revival attacks
 - **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
-- **Namespace PDA seeds** with type-specific prefixes (e.g. `b"config"`, `b"vault"`) to prevent PDA sharing across account types
+- **Namespace PDA seeds** with type-specific prefixes to prevent PDA sharing across account types
+
+<!-- {/pinaSecurityBestPractices} -->
 
 See the [security guide](security/) for detailed examples of all 11 common Solana attack categories with vulnerable and secure code patterns.
 
@@ -607,6 +650,8 @@ Contributions are welcome! Please open an issue or pull request on [GitHub](http
 
 Licensed under the [Apache License, Version 2.0](license).
 
+<!-- {=pinaBadgeLinks} -->
+
 [crate-image]: https://img.shields.io/crates/v/pina.svg?style=flat-square
 [crate-link]: https://crates.io/crates/pina
 [docs-image]: https://docs.rs/pina/badge.svg
@@ -617,3 +662,5 @@ Licensed under the [Apache License, Version 2.0](license).
 [unlicense-link]: https://opensource.org/license/unlicense
 [codecov-image]: https://codecov.io/github/pina-rs/pina/graph/badge.svg?token=87K799Q78I
 [codecov-link]: https://codecov.io/github/pina-rs/pina
+
+<!-- {/pinaBadgeLinks} -->

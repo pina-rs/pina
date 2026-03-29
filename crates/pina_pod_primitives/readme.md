@@ -8,6 +8,16 @@ Alignment-safe primitive POD wrappers used by Pina and generated Codama Rust cli
 
 This crate provides `PodBool`, `PodU16`, `PodI16`, `PodU32`, `PodI32`, `PodU64`, `PodI64`, `PodU128`, and `PodI128` for use in `#[repr(C)]` zero-copy layouts.
 
+## Arithmetic
+
+<!-- {=podArithmeticDescription} -->
+
+Arithmetic operators (`+`, `-`, `*`) use **wrapping** semantics in release builds for CU efficiency and **panic on overflow** in debug builds. Use `checked_add`, `checked_sub`, `checked_mul`, `checked_div` where overflow must be detected in all build profiles.
+
+Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
+
+<!-- {/podArithmeticDescription} -->
+
 ## Installation
 
 <br>
@@ -19,6 +29,8 @@ cargo add pina_pod_primitives
 ## Types
 
 <br>
+
+<!-- {=podTypesTable} -->
 
 | Type      | Wraps  | Size     |
 | --------- | ------ | -------- |
@@ -33,6 +45,8 @@ cargo add pina_pod_primitives
 | `PodI128` | `i128` | 16 bytes |
 
 All types are `#[repr(transparent)]` over byte arrays (or `u8` for `PodBool`) and implement `bytemuck::Pod` + `bytemuck::Zeroable`.
+
+<!-- {/podTypesTable} -->
 
 [crate-image]: https://img.shields.io/crates/v/pina_pod_primitives.svg?style=flat-square
 [crate-link]: https://crates.io/crates/pina_pod_primitives

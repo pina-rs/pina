@@ -73,3 +73,5 @@ devenv.local.nix
 
 # Claude Code worktrees
 .claude/worktrees/
+.ant-colony/
+.mdt/
