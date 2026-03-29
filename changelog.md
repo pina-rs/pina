@@ -2,6 +2,145 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.7.0 (2026-03-29)
+
+### Breaking Changes
+
+#### Pod Arithmetic (pina_pod_primitives)
+
+Add full Quasar-style arithmetic, bitwise, ordering, and display traits to all Pod integer types (`PodU16`, `PodU32`, `PodU64`, `PodU128`, `PodI16`, `PodI32`, `PodI64`, `PodI128`).
+
+**Arithmetic operators** (`Add`, `Sub`, `Mul`, `Div`, `Rem`) work between Pod types and between Pod + native types. Assign variants (`AddAssign`, `SubAssign`, etc.) allow ergonomic in-place mutation like `my_account.count += 1u64;`.
+
+**Arithmetic semantics**: debug builds panic on overflow (checked), release builds use wrapping for CU efficiency on Solana.
+
+**Bitwise operators**: `BitAnd`, `BitOr`, `BitXor`, `Shl`, `Shr`, `Not` with assign variants.
+
+**Signed types** get `Neg` for unary negation.
+
+**Checked arithmetic**: `checked_add`, `checked_sub`, `checked_mul`, `checked_div` return `Option` for explicit overflow detection.
+
+**Saturating arithmetic**: `saturating_add`, `saturating_sub`, `saturating_mul` clamp at bounds.
+
+**Constants**: `ZERO`, `MIN`, `MAX` for all types.
+
+**Helpers**: `get()` method, `is_zero()`, improved `Debug` (e.g. `PodU64(42)`), `Display`, `Ord`, `PartialOrd`, `PartialEq<native>`, `PartialOrd<native>`.
+
+**PodBool**: `Not` operator and `Display` added.
+
+**Backward compatible**: all existing APIs preserved, no breaking changes.
+
+#### IDL Parser Hardening (pina_cli)
+
+Add static validation to the IDL parser that runs after IR assembly:
+
+- **Discriminator collision detection**: checks within accounts and within instructions for duplicate discriminator values. Three-way collisions produce all pairwise diagnostics.
+- **Duplicate input field detection**: checks within each instruction for name collisions between account names and argument names.
+- **Human-readable error formatting** for both collision types.
+
+Validation is automatically run during `assemble_program_ir()`.
+
+#### Static CU Profiler (pina profile)
+
+Add a new `pina profile` CLI command for static compute unit profiling of compiled SBF programs.
+
+- `pina profile <path-to-so>` — text summary with per-function CU estimates
+- `pina profile <path-to-so> --json` — JSON output for CI integration
+- `pina profile <path-to-so> --output report.json` — write to file
+
+The profiler parses ELF binaries to extract `.text` sections and symbol tables, counts SBF instructions per function, and estimates CU costs without requiring a running validator. Works best with unstripped binaries.
+
+v1 scope: text/JSON output, per-function breakdown, best-effort symbol resolution. Flamegraph/browser UI planned for v2.
+
+### Features
+
+- Add `realloc_account` and `realloc_account_zero` CPI helpers for safe account reallocation with automatic rent recalculation.
+- Add instruction introspection helpers for reading the sysvar instructions account: `assert_no_cpi`, `get_instruction_count`, `get_current_instruction_index`, `has_instruction_before`, and `has_instruction_after`.
+- Add `pina init <name>` scaffolding command that generates a new Pina program project with a minimal program structure, tests, and build configuration.
+- Add `InstructionBuilder` and account metadata helper functions (`writable_signer`, `writable`, `readonly_signer`, `readonly`) for typed client-side instruction construction.
+
+### Fixes
+
+- Expand snapshot test coverage for proc macros including edge cases for `#[account]`, `#[instruction]`, `#[event]`, `#[error]`, `#[discriminator]`, and `#[derive(Accounts)]`.
+- Add property-based fuzz tests using `proptest` for Pod type deserialization, round-trip correctness, and discriminator parsing safety.
+- Enforce the workspace's custom security dylints in CI, align `devenv` with the Node.js version selected by `pnpm-workspace.yaml` without a separate install step, and replace the `paste` dependency in `pina` with `pastey`.
+
+#### Reduce warning noise and restore local Codama client verification ergonomics.
+
+- Annotate the generated Rust root `mod.rs` re-export of `programs::*` with `#[allow(unused_imports)]`.
+- Add regression coverage for the generated root module allowance.
+- Update the repository Codama JS test harness to type-check generated clients against the current `@solana/kit` dependency layout using a local compatibility shim.
+
+This keeps crate-internal program ID constants available at `crate::<PROGRAM>_ID` for generated instruction modules, while avoiding warnings for IDLs that only generate a `programs` module and keeping `pnpm run check:js` green.
+
+#### Fix broken doc comments produced by `mdt` template expansion. The line-prefix mode was emitting `-->//` instead of `-->` followed by `///`, and blank lines inside reusable doc blocks were missing the `///` prefix. This caused rustdoc warnings and broken documentation rendering.
+
+Also simplifies a raw string literal in `pina_cli` init templates and shortens a fully-qualified `std::result::Result::ok` path to `Result::ok`.
+
+#### Add comprehensive end-to-end integration tests for the pina crate. The test suite covers:
+
+- Full account lifecycle (create, write state, read/validate, update, close with rent return)
+- Multi-instruction flows (Initialize then Update, verify state after each step)
+- Error handling (invalid signer, wrong owner, discriminator mismatch, data length mismatch, invalid instruction discriminator, empty instruction data, wrong program ID, insufficient accounts, non-writable account, empty account rejection)
+- Lamport transfer operations (send, insufficient funds, same-account rejection, close with recipient)
+- PDA seed verification (derive and verify roundtrip, canonical bump assertion, assert_seeds_with_bump on AccountView)
+- AccountView validation chains (chained assertions, short-circuit behavior)
+- Discriminator dispatch across all instruction variants
+- TryFromAccountInfos derive mapping and rejection of excess accounts
+- Address assertion (single address and multi-address matching)
+
+Tests use raw SVM input buffer construction to create AccountView instances without requiring compiled BPF programs, following the same memory layout as the pinocchio entrypoint deserializer.
+
+#### Expand mdt documentation reuse across the workspace.
+
+Added 10 new mdt provider blocks in `template.t.md`:
+
+- `pinaProjectDescription` — single-source project tagline
+- `pinaInstallation` — cargo add instructions
+- `podTypesTable` — Pod types reference table
+- `podArithmeticDescription` — Pod arithmetic semantics
+- `pinaWorkspacePackages` — workspace crate table
+- `pinaFeatureHighlights` — feature bullet list
+- `sbfBuildInstructions` — SBF build commands
+- `pinaTestingInstructions` — testing commands
+- `pinaBadgeLinks` — shared badge link references
+- `pinaSecurityBestPractices` — security checklist
+
+Wired 15 new consumers across:
+
+- `readme.md` (root) — 10 consumer blocks
+- `crates/pina/readme.md` — feature flags table + badge links
+- `crates/pina_pod_primitives/readme.md` — pod types table + arithmetic description
+- `docs/src/security-model.md` — security best practices
+
+Provider/consumer counts: 13/31 → 23/46.
+
+#### Improve diagnostics and validation ergonomics in `pina`.
+
+- `parse_instruction` still remaps `ProgramError::Custom(_)` discriminator errors to `InvalidInstructionData` for compatibility, but now logs the original custom error code when the `logs` feature is enabled.
+- The escrow example now adds stronger account checks in both `Make` and `Take` flows, including explicit system program ID validation, vault owner validation, and associated-token-address validation for `taker_ata_b` and `maker_ata_b` before CPIs.
+- Regenerated escrow Codama IDL and generated clients to reflect account metadata changes (default `systemProgram` and writable ATA fields where required).
+- Clean up internal test assertions in `traits.rs` to avoid unnecessary qualification warnings.
+- Make `PinaProgramError` independent from proc-macro expansion so `pina` now compiles with `--no-default-features` (without requiring the `derive` feature), and add regression coverage to keep the enum wire-size aligned to `u32`.
+- Add a dedicated CI/devenv build gate (`build:pina:no-default`) to continuously verify `pina` no-default feature compatibility across key feature subsets.
+
+#### Update the committed `escrow_program` CLI example snapshot to match the regenerated Codama IDL.
+
+This keeps the `pina_cli` example snapshot tests aligned with the generated escrow metadata after account validation changes introduced writable ATA requirements and default `systemProgram` addresses.
+
+### Notes
+
+- Add compute unit benchmark tests measuring CU consumption for key Pina operations including account validation, PDA derivation, and CPI helpers.
+- Document the workspace tooling refresh that updates the Codama JavaScript dependencies, adds `useNodeVersion` to `pnpm-workspace.yaml`, and makes `devenv` honor that pnpm workspace Node version via shell-local `node`/`npm`/`npx`/`corepack` shims while keeping the standalone `pnpm` binary active.
+
+#### Harden CI setup reliability by adding retries to the shared `./.github/actions/devenv` action for transient Nix/devenv failures.
+
+Also increase workflow timeouts for `release-preview`, `semver`, and `binary-size` so slow cold-cache environment provisioning does not cancel jobs before they execute their main steps.
+
+#### Re-enable the anchor parity BPF artifact checks in CI by building `sbpf-linker` with the Blueshift `upstream-gallery-21` LLVM toolchain.
+
+This adds a cached `install:sbpf-gallery` devenv script and restores `cargo build-bpf` plus the ignored `pina_bpf` `bpf_build_` tests in `test:anchor-parity`.
+
 ## 0.6.0 (2026-02-26)
 
 ### Breaking Changes
