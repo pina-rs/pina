@@ -11,6 +11,8 @@ versioned_files = [
 	{ dependency = "pina_macros", path = "Cargo.toml" },
 	{ dependency = "pina_pod_primitives", path = "Cargo.lock" },
 	{ dependency = "pina_pod_primitives", path = "Cargo.toml" },
+	{ dependency = "pina_profile", path = "Cargo.lock" },
+	{ dependency = "pina_profile", path = "Cargo.toml" },
 	{ dependency = "pina_sdk_ids", path = "Cargo.lock" },
 	{ dependency = "pina_sdk_ids", path = "Cargo.toml" },
 	"packages/nodes-from-pina/package.json",
