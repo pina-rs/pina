@@ -48,12 +48,29 @@ fn program_id() -> Pubkey {
 /// Try to create a mollusk instance for the counter program.
 ///
 /// Returns `None` if the BPF binary cannot be found (e.g. the program has not
-/// been compiled for SBF yet). This allows the tests to be skipped gracefully.
+/// been compiled for SBF yet). This allows the tests to be skipped gracefully
+/// without triggering a panic-abort from the `no_std` panic handler.
 fn try_create_mollusk() -> Option<Mollusk> {
-	// mollusk looks for the .so in SBF_OUT_DIR, BPF_OUT_DIR, tests/fixtures,
-	// or CWD.
-	let result = std::panic::catch_unwind(|| Mollusk::new(&program_id(), "counter_program"));
-	result.ok()
+	// Check known search paths for the .so binary before calling Mollusk::new,
+	// which panics if the file is missing. The panic would abort the process
+	// under #![no_std] crates that install a no-unwind panic handler.
+	let so_name = "counter_program.so";
+	let search_dirs: Vec<std::path::PathBuf> = [
+		std::env::var("SBF_OUT_DIR").ok(),
+		std::env::var("BPF_OUT_DIR").ok(),
+		Some("tests/fixtures".to_owned()),
+	]
+	.into_iter()
+	.flatten()
+	.map(std::path::PathBuf::from)
+	.collect();
+
+	let found = search_dirs.iter().any(|dir| dir.join(so_name).is_file());
+	if !found {
+		return None;
+	}
+
+	Some(Mollusk::new(&program_id(), "counter_program"))
 }
 
 /// Derive the counter PDA for a given authority.
