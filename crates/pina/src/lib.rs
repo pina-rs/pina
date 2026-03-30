@@ -31,8 +31,8 @@
 
 mod cpi;
 mod error;
-pub mod introspection;
 mod impls;
+pub mod introspection;
 mod pda;
 mod pod;
 mod traits;
