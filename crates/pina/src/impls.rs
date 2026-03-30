@@ -492,7 +492,11 @@ impl AsTokenAccount for AccountView {
 	fn as_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError> {
 		self.check_borrow()?;
 
-		// SECURITY: see `as_token_mint` above.
+		// SAFETY: `check_borrow()` verified the account is not already mutably
+		// borrowed. `from_account_view_unchecked` performs a pointer cast from
+		// the account data to the target type layout. The caller is responsible
+		// for verifying ownership before trusting the result — the `_checked`
+		// variants handle this automatically.
 		unsafe { crate::token::state::TokenAccount::from_account_view_unchecked(self) }
 	}
 
@@ -513,7 +517,11 @@ impl AsTokenAccount for AccountView {
 	fn as_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError> {
 		self.check_borrow()?;
 
-		// SECURITY: see `as_token_mint` above.
+		// SAFETY: `check_borrow()` verified the account is not already mutably
+		// borrowed. `from_account_view_unchecked` performs a pointer cast from
+		// the account data to the target type layout. The caller is responsible
+		// for verifying ownership before trusting the result — the `_checked`
+		// variants handle this automatically.
 		unsafe { crate::token_2022::state::Mint::from_account_view_unchecked(self) }
 	}
 
@@ -536,7 +544,11 @@ impl AsTokenAccount for AccountView {
 	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
 		self.check_borrow()?;
 
-		// SECURITY: see `as_token_mint` above.
+		// SAFETY: `check_borrow()` verified the account is not already mutably
+		// borrowed. `from_account_view_unchecked` performs a pointer cast from
+		// the account data to the target type layout. The caller is responsible
+		// for verifying ownership before trusting the result — the `_checked`
+		// variants handle this automatically.
 		unsafe { crate::token_2022::state::TokenAccount::from_account_view_unchecked(self) }
 	}
 
@@ -564,7 +576,11 @@ impl AsTokenAccount for AccountView {
 	) -> Result<&crate::token::state::TokenAccount, ProgramError> {
 		self.check_borrow()?;
 
-		// SECURITY: see `as_token_mint` above. Additionally, the address is
+		// SAFETY: `check_borrow()` verified the account is not already mutably
+		// borrowed. `from_account_view_unchecked` performs a pointer cast from
+		// the account data to the target type layout. The caller is responsible
+		// for verifying ownership before trusting the result — the `_checked`
+		// variants handle this automatically. Additionally, the address is
 		// verified against the derived ATA address before the unchecked cast.
 		unsafe {
 			crate::token::state::TokenAccount::from_account_view_unchecked(
