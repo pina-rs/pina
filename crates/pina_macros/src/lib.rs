@@ -25,7 +25,7 @@ mod args;
 #[cfg(test)]
 mod tests;
 
-/// Derives the [`TryFromAccountInfos`] trait for a named-field struct.
+/// Derives the `TryFromAccountInfos` trait for a named-field struct.
 ///
 /// Each field must be `&'a AccountView`. One field may be annotated with
 /// `#[pina(remaining)]` to capture all trailing accounts as a slice.
