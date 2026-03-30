@@ -34,6 +34,7 @@ pub fn profile_program(path: &Path) -> Result<ProgramProfile, ProfileError> {
 	let elf_info = elf::parse_elf(&data, path)?;
 	let functions = sbf::analyze_functions(&elf_info);
 	let total_instructions = functions.iter().map(|f| f.instruction_count).sum();
+	let total_syscalls = functions.iter().map(|f| f.syscall_count).sum();
 	let total_cu = functions.iter().map(|f| f.estimated_cu).sum();
 
 	Ok(ProgramProfile {
@@ -41,6 +42,7 @@ pub fn profile_program(path: &Path) -> Result<ProgramProfile, ProfileError> {
 		binary_size: data.len() as u64,
 		text_size: elf_info.text_size,
 		total_instructions,
+		total_syscalls,
 		total_cu,
 		functions,
 	})
