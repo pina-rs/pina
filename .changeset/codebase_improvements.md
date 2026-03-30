@@ -1,8 +1,8 @@
 ---
-default: patch
-pina: patch
-pina_cli: patch
-pina_codama_renderer: patch
+default: major
+pina: major
+pina_cli: major
+pina_codama_renderer: major
 ---
 
 Codebase quality improvements:
