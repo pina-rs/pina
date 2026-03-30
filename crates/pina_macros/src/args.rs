@@ -1,3 +1,6 @@
+// darling's derive expansions emit `continue` in generated code.
+#![allow(clippy::needless_continue)]
+
 use darling::FromDeriveInput;
 use darling::FromField;
 use darling::FromMeta;

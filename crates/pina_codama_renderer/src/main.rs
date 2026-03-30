@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -89,7 +90,7 @@ fn collect_idl_paths(args: &Args) -> Result<Vec<PathBuf>, RenderError> {
 	Ok(idl_paths)
 }
 
-fn file_stem(path: &PathBuf) -> Result<String, RenderError> {
+fn file_stem(path: &Path) -> Result<String, RenderError> {
 	let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) else {
 		return Err(RenderError::UnsupportedValue {
 			context: format!("path `{}`", path.display()),

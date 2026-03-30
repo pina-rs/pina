@@ -78,7 +78,6 @@ pub mod secp256r1_program {
 
 /// Stake program IDs.
 pub mod stake {
-	//! Canonical stake program IDs.
 
 	/// Stake config account program ID.
 	pub mod config {
