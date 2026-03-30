@@ -32,7 +32,7 @@
 mod cpi;
 mod error;
 pub mod introspection;
-mod loaders;
+mod impls;
 mod pda;
 mod pod;
 mod traits;
