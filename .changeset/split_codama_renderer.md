@@ -15,8 +15,6 @@ Refactor `pina_codama_renderer`: split monolithic `lib.rs` into focused render m
 - `render/scaffold.rs` — crate scaffold creation and file writing
 - `render/mods.rs` — root mod and programs mod rendering
 
-`lib.rs` retains only the public API (`RenderConfig`, `read_root_node`,
-`render_idl_file`, `render_root_node`, `render_program`) and the
-orchestrator `render_program_to_files`.
+`lib.rs` retains only the public API (`RenderConfig`, `read_root_node`, `render_idl_file`, `render_root_node`, `render_program`) and the orchestrator `render_program_to_files`.
 
 All 13 existing tests continue to pass.
