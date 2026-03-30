@@ -54,6 +54,18 @@ pina init my_program
 pina init my_program --path ./programs/my_program --force
 ```
 
+### `pina profile`
+
+<br>
+
+Static CU profiler for compiled SBF programs.
+
+```bash
+pina profile target/deploy/my_program.so
+pina profile target/deploy/my_program.so --json
+pina profile target/deploy/my_program.so --output report.json
+```
+
 ### `pina codama generate`
 
 <br>
@@ -118,6 +130,8 @@ cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
 ## Parser Expectations
 
 <br>
+
+The IDL parser supports multi-file programs — it follows `mod` declarations from `src/lib.rs` to discover accounts, instructions, and discriminators across all source files.
 
 For best IDL extraction fidelity, follow the rules documented in [`crates/pina_cli/rules.md`](./rules.md).
 

@@ -5,9 +5,7 @@ pina: patch
 
 Add 12 integration tests for `pina::introspection` module (previously 0% coverage).
 
-Tests construct fake Instructions sysvar account data following the exact binary
-layout that pinocchio's `Instructions` parser expects, then exercise each
-introspection function end-to-end:
+Tests construct fake Instructions sysvar account data following the exact binary layout that pinocchio's `Instructions` parser expects, then exercise each introspection function end-to-end:
 
 - `get_instruction_count`: single and multiple instructions
 - `get_current_instruction_index`: correct index returned

@@ -436,9 +436,6 @@ pub struct MyAccounts<'a> {
 
 Alignment-safe primitive wrappers for use in `#[repr(C)]` account structs. Solana account data is byte-aligned, so standard Rust integers cannot be placed directly in `Pod` structs.
 
-| Type | Wraps | Size |
-| ---- | ----- | ---- |
-
 <!-- {=podTypesTable} -->
 
 | Type      | Wraps  | Size     |
@@ -474,7 +471,23 @@ let amount = PodU64::from_primitive(1_000_000);
 
 // Convert back.
 let raw: u64 = amount.into();
+
+// Ergonomic arithmetic (debug: checked, release: wrapping).
+let mut count = PodU64::from(0u64);
+count += 1u64;
+
+// Checked/saturating variants for explicit overflow handling.
+let fee = amount.checked_mul(3u64);
+let clamped = amount.saturating_add(PodU64::MAX);
 ```
+
+<!-- {=podArithmeticDescription} -->
+
+Arithmetic operators (`+`, `-`, `*`) use **wrapping** semantics in release builds for CU efficiency and **panic on overflow** in debug builds. Use `checked_add`, `checked_sub`, `checked_mul`, `checked_div` where overflow must be detected in all build profiles.
+
+Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
+
+<!-- {/podArithmeticDescription} -->
 
 ### CPI helpers
 
@@ -568,15 +581,41 @@ cargo nextest run  # Faster parallel test execution
 
 <!-- {/pinaTestingInstructions} -->
 
+## Static CU Profiling
+
+<br>
+
+<!-- {=pinaProfileDescription} -->
+
+The `pina profile` command analyzes compiled SBF `.so` binaries to estimate per-function compute unit costs without requiring a running validator.
+
+```sh
+pina profile target/deploy/my_program.so          # text summary
+pina profile target/deploy/my_program.so --json    # JSON for CI
+pina profile target/deploy/my_program.so -o r.json # write to file
+```
+
+The profiler decodes each SBF instruction opcode and assigns costs: regular instructions cost 1 CU, syscalls cost 100 CU.
+
+<!-- {/pinaProfileDescription} -->
+
 ## Crates
 
 <br>
 
-| Crate                                 | Description                                                                |
-| ------------------------------------- | -------------------------------------------------------------------------- |
-| [`pina`](crates/pina)                 | Core framework — traits, account loaders, CPI helpers, Pod types, macros.  |
-| [`pina_macros`](crates/pina_macros)   | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, `#[error]`, etc. |
-| [`pina_sdk_ids`](crates/pina_sdk_ids) | Well-known Solana program and sysvar IDs.                                  |
+<!-- {=pinaWorkspacePackages} -->
+
+| Crate                  | Path                          | Description                                                       |
+| ---------------------- | ----------------------------- | ----------------------------------------------------------------- |
+| `pina`                 | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types. |
+| `pina_macros`          | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.    |
+| `pina_cli`             | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding.  |
+| `pina_codama_renderer` | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.     |
+| `pina_pod_primitives`  | `crates/pina_pod_primitives`  | Alignment-safe `no_std` POD primitive wrappers.                   |
+| `pina_profile`         | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                     |
+| `pina_sdk_ids`         | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.         |
+
+<!-- {/pinaWorkspacePackages} -->
 
 ## Ideology
 

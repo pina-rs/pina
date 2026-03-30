@@ -199,6 +199,41 @@ cargo nextest run  # Faster parallel test execution
 
 <!-- {/pinaBadgeLinks} -->
 
+<!-- {@pinaCliCommands} -->
+
+| Command                  | Description                                           |
+| ------------------------ | ----------------------------------------------------- |
+| `pina init <name>`       | Scaffold a new Pina program project                   |
+| `pina idl --path <dir>`  | Generate a Codama IDL JSON from a Pina program        |
+| `pina profile <path.so>` | Static CU profiler for compiled SBF binaries          |
+| `pina codama generate`   | Generate Codama IDLs and Rust/JS clients for examples |
+
+<!-- {/pinaCliCommands} -->
+
+<!-- {@pinaIntrospectionDescription} -->
+
+The `pina::introspection` module provides helpers for reading the Instructions sysvar at runtime. This enables:
+
+- **Flash loan guards** — verify the current instruction is not being invoked via CPI (`assert_no_cpi`)
+- **Transaction inspection** — count instructions (`get_instruction_count`) or find the current index (`get_current_instruction_index`)
+- **Sandwich detection** — check whether a specific program appears before or after the current instruction (`has_instruction_before`, `has_instruction_after`)
+
+<!-- {/pinaIntrospectionDescription} -->
+
+<!-- {@pinaProfileDescription} -->
+
+The `pina profile` command analyzes compiled SBF `.so` binaries to estimate per-function compute unit costs without requiring a running validator.
+
+```sh
+pina profile target/deploy/my_program.so          # text summary
+pina profile target/deploy/my_program.so --json    # JSON for CI
+pina profile target/deploy/my_program.so -o r.json # write to file
+```
+
+The profiler decodes each SBF instruction opcode and assigns costs: regular instructions cost 1 CU, syscalls cost 100 CU.
+
+<!-- {/pinaProfileDescription} -->
+
 <!-- {@pinaSecurityBestPractices} -->
 
 - **Always call `assert_signer()`** before trusting authority accounts

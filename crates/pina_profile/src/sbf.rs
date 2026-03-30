@@ -151,6 +151,7 @@ pub fn analyze_functions(elf: &ElfInfo) -> Vec<FunctionProfile> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::cost::CU_PER_INSTRUCTION;
 	use crate::cost::CU_PER_SYSCALL;
 	use crate::elf::ElfInfo;
 	use crate::elf::Symbol;
