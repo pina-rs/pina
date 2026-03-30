@@ -38,7 +38,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: configure github pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: verify docs
         run: verify:docs
