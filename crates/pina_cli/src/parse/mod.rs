@@ -6,6 +6,7 @@ pub mod doc_comments;
 pub mod entrypoint;
 pub mod error_enum;
 pub mod instruction_data;
+pub mod module_resolver;
 pub mod program_id;
 pub mod seeds;
 pub mod types;
@@ -19,12 +20,17 @@ use heck::ToSnakeCase;
 use crate::error::IdlError;
 use crate::ir::AccountIr;
 use crate::ir::DiscriminatorIr;
+use crate::ir::ErrorIr;
 use crate::ir::InstructionAccountIr;
 use crate::ir::InstructionIr;
 use crate::ir::PdaIr;
 use crate::ir::ProgramIr;
 
 /// Parse a program crate directory and assemble a `ProgramIr`.
+///
+/// Resolves all source files starting from `src/lib.rs`, following `mod`
+/// declarations to discover additional files. All discovered files are
+/// parsed and their contents merged for IDL extraction.
 pub fn parse_program(
 	program_path: &Path,
 	name_override: Option<&str>,
@@ -36,27 +42,94 @@ pub fn parse_program(
 	let package_name =
 		extract_package_name(&cargo_contents).unwrap_or_else(|| "unknown_program".to_owned());
 
-	let src_path = program_path.join("src/lib.rs");
-	let source = std::fs::read_to_string(&src_path).map_err(|e| IdlError::io(&src_path, e))?;
-	let file = syn::parse_file(&source).map_err(|e| IdlError::parse(&src_path, &e))?;
+	let src_dir = program_path.join("src");
+	let lib_path = src_dir.join("lib.rs");
 
-	assemble_program_ir(&file, name_override.unwrap_or(&package_name))
+	let resolved_files = module_resolver::resolve_crate(&src_dir, &lib_path)?;
+	let syn_files: Vec<&syn::File> = resolved_files.iter().map(|rf| &rf.file).collect();
+
+	assemble_program_ir_multi(&syn_files, name_override.unwrap_or(&package_name))
 }
 
-/// Assemble a `ProgramIr` from a parsed syn `File`.
-pub fn assemble_program_ir(file: &syn::File, program_name: &str) -> Result<ProgramIr, IdlError> {
-	// Step 1: Extract all pieces.
-	let public_key = program_id::extract_program_id(file).ok_or(IdlError::NoProgramId)?;
-	let disc_enums = discriminator::extract_discriminator_enums(file);
-	let account_structs = account_state::extract_account_structs(file);
-	let instruction_structs = instruction_data::extract_instruction_structs(file);
-	let ix_accounts_structs = accounts_struct::extract_accounts_structs(file);
-	let errors = error_enum::extract_error_enums(file);
-	let dispatch = entrypoint::extract_dispatch_map(file);
-	let validation_props = validation::extract_validation_properties(file);
-	let seed_constants = seeds::extract_seed_constants(file);
-	let pdas_ir = seeds::extract_pda_from_seed_macros(file, &seed_constants);
+/// Assemble a `ProgramIr` from multiple parsed syn `File`s.
+///
+/// Merges extractions from all files. The first file should be `lib.rs`
+/// (containing `declare_id!` and the entrypoint dispatch).
+pub fn assemble_program_ir_multi(
+	files: &[&syn::File],
+	program_name: &str,
+) -> Result<ProgramIr, IdlError> {
+	let mut all_disc_enums = Vec::new();
+	let mut all_account_structs = Vec::new();
+	let mut all_instruction_structs = Vec::new();
+	let mut all_ix_accounts_structs = Vec::new();
+	let mut all_errors = Vec::new();
+	let mut all_seed_constants = Vec::new();
+	let mut dispatch = Vec::new();
+	let mut all_validation_props = HashMap::new();
+	let mut public_key = None;
+	let mut pdas_ir = Vec::new();
 
+	for file in files {
+		if public_key.is_none() {
+			public_key = program_id::extract_program_id(file);
+		}
+
+		all_disc_enums.extend(discriminator::extract_discriminator_enums(file));
+		all_account_structs.extend(account_state::extract_account_structs(file));
+		all_instruction_structs.extend(instruction_data::extract_instruction_structs(file));
+		all_ix_accounts_structs.extend(accounts_struct::extract_accounts_structs(file));
+		all_errors.extend(error_enum::extract_error_enums(file));
+
+		let file_dispatch = entrypoint::extract_dispatch_map(file);
+		if !file_dispatch.is_empty() {
+			dispatch = file_dispatch;
+		}
+
+		let file_validation_props = validation::extract_validation_properties(file);
+		all_validation_props.extend(file_validation_props);
+
+		let file_seed_constants = seeds::extract_seed_constants(file);
+		let file_pdas = seeds::extract_pda_from_seed_macros(file, &file_seed_constants);
+		all_seed_constants.extend(file_seed_constants);
+		pdas_ir.extend(file_pdas);
+	}
+
+	let public_key = public_key.ok_or(IdlError::NoProgramId)?;
+
+	return assemble_from_extracted(
+		program_name,
+		public_key,
+		&all_disc_enums,
+		&all_account_structs,
+		&all_instruction_structs,
+		&all_ix_accounts_structs,
+		&all_errors,
+		&dispatch,
+		&all_validation_props,
+		&pdas_ir,
+	);
+}
+
+/// Assemble a `ProgramIr` from a single parsed syn `File`.
+pub fn assemble_program_ir(file: &syn::File, program_name: &str) -> Result<ProgramIr, IdlError> {
+	assemble_program_ir_multi(&[file], program_name)
+}
+
+/// Internal assembly from pre-extracted components.
+#[allow(clippy::too_many_arguments)]
+fn assemble_from_extracted(
+	program_name: &str,
+	public_key: String,
+	disc_enums: &[discriminator::DiscriminatorEnum],
+	account_structs: &[account_state::AccountStruct],
+	instruction_structs: &[instruction_data::InstructionStruct],
+	ix_accounts_structs: &[accounts_struct::AccountsStruct],
+	errors: &[ErrorIr],
+	dispatch: &[entrypoint::DispatchEntry],
+	validation_props: &HashMap<String, HashMap<String, validation::AccountProperties>>,
+	pdas_ir: &[PdaIr],
+) -> Result<ProgramIr, IdlError> {
 	// Step 2: Build accounts IR.
 	let accounts: Vec<AccountIr> = account_structs
 		.iter()
@@ -145,8 +218,8 @@ pub fn assemble_program_ir(file: &syn::File, program_name: &str) -> Result<Progr
 		public_key,
 		accounts,
 		instructions,
-		errors,
-		pdas: pdas_ir,
+		errors: errors.to_vec(),
+		pdas: pdas_ir.to_vec(),
 	};
 
 	// Step 4: Validate the assembled IR for collisions and duplicates.
