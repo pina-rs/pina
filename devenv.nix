@@ -782,8 +782,33 @@ in
         [ -f "$DEVENV_ROOT/docs/book.toml" ]
         [ -f "$DEVENV_ROOT/docs/src/SUMMARY.md" ]
         mdbook build "$DEVENV_ROOT/docs" -d "$DEVENV_ROOT/target/mdbook"
+        docs:api
       '';
-      description = "Verify docs folder structure and build docs.";
+      description = "Verify docs folder structure, build mdBook, and check API docs.";
+      binary = "bash";
+    };
+    "docs:api" = {
+      exec = ''
+        set -e
+
+        mapfile -t generated_client_manifests < <(find "$DEVENV_ROOT/codama/clients/rust" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
+        exclude_args=()
+        for manifest in "''${generated_client_manifests[@]}"; do
+          package_name="$(sed -n 's/^name = "\(.*\)"$/\1/p' "$manifest" | head -n 1)"
+          if [ -n "$package_name" ]; then
+            exclude_args+=(--exclude "$package_name")
+          fi
+        done
+
+        RUSTDOCFLAGS="-D warnings" cargo doc \
+          --workspace \
+          --all-features \
+          --no-deps \
+          --locked \
+          --document-private-items \
+          ''${exclude_args[@]}
+      '';
+      description = "Build API documentation and fail on broken doc links.";
       binary = "bash";
     };
     "lint:clippy" = {
