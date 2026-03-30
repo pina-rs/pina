@@ -106,3 +106,107 @@ pub enum CodamaError {
 		details: String,
 	},
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	fn dummy_io_error() -> std::io::Error {
+		std::io::Error::new(std::io::ErrorKind::NotFound, "not found")
+	}
+
+	#[test]
+	fn idl_error_io_display() {
+		let err = IdlError::io("/tmp/test.rs", dummy_io_error());
+		let msg = err.to_string();
+		assert!(msg.contains("/tmp/test.rs"));
+		assert!(msg.contains("not found"));
+	}
+
+	#[test]
+	fn idl_error_parse_display() {
+		let syn_err = syn::Error::new(proc_macro2::Span::call_site(), "bad syntax");
+		let err = IdlError::parse("/tmp/lib.rs", &syn_err);
+		let msg = err.to_string();
+		assert!(msg.contains("/tmp/lib.rs"));
+		assert!(msg.contains("bad syntax"));
+	}
+
+	#[test]
+	fn idl_error_no_program_id_display() {
+		let msg = IdlError::NoProgramId.to_string();
+		assert!(msg.contains("declare_id!"));
+	}
+
+	#[test]
+	fn idl_error_no_entrypoint_display() {
+		let msg = IdlError::NoEntrypoint.to_string();
+		assert!(msg.contains("process_instruction"));
+	}
+
+	#[test]
+	fn idl_error_unresolved_accounts_display() {
+		let err = IdlError::UnresolvedAccounts {
+			name: "MyAccounts".to_owned(),
+		};
+		assert!(err.to_string().contains("MyAccounts"));
+	}
+
+	#[test]
+	fn idl_error_unresolved_instruction_display() {
+		let err = IdlError::UnresolvedInstruction {
+			discriminator: "MyIx".to_owned(),
+			variant: "Init".to_owned(),
+		};
+		let msg = err.to_string();
+		assert!(msg.contains("MyIx"));
+		assert!(msg.contains("Init"));
+	}
+
+	#[test]
+	fn idl_error_other_display() {
+		let err = IdlError::Other("something went wrong".to_owned());
+		assert_eq!(err.to_string(), "something went wrong");
+	}
+
+	#[test]
+	fn codama_error_read_examples_display() {
+		let err = CodamaError::ReadExamples {
+			path: PathBuf::from("/tmp/examples"),
+			source: dummy_io_error(),
+		};
+		assert!(err.to_string().contains("/tmp/examples"));
+	}
+
+	#[test]
+	fn codama_error_no_examples_display() {
+		let err = CodamaError::NoExamples {
+			path: PathBuf::from("/tmp/examples"),
+		};
+		assert!(err.to_string().contains("/tmp/examples"));
+	}
+
+	#[test]
+	fn codama_error_unknown_example_display() {
+		let err = CodamaError::UnknownExample {
+			example: "missing".to_owned(),
+			available: "a, b, c".to_owned(),
+		};
+		let msg = err.to_string();
+		assert!(msg.contains("missing"));
+		assert!(msg.contains("a, b, c"));
+	}
+
+	#[test]
+	fn codama_error_command_failed_display() {
+		let err = CodamaError::CommandFailed {
+			cmd: "npx codama".to_owned(),
+			status: 1,
+			details: ": permission denied".to_owned(),
+		};
+		let msg = err.to_string();
+		assert!(msg.contains("npx codama"));
+		assert!(msg.contains("1"));
+		assert!(msg.contains("permission denied"));
+	}
+}
