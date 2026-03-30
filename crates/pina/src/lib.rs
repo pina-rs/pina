@@ -113,11 +113,17 @@ pub use solana_program_log::Logger;
 /// Logs the current compute unit usage to the Solana runtime.
 #[cfg(feature = "logs")]
 pub use solana_program_log::log_cu_usage;
-/// Re-export of the [`typed_builder`] crate for compile-time checked builder
-/// patterns.
+/// Re-export of the [`typed_builder`] crate used by macro-generated code.
+///
+/// **Not part of the stable public API.** The underlying `typed_builder`
+/// version may change in minor releases. Do not depend on this re-export
+/// directly — add `typed_builder` to your own `Cargo.toml` if you need it.
+#[doc(hidden)]
 pub use typed_builder;
-/// Derive macro that generates a type-safe builder with compile-time field
-/// checking.
+/// Derive macro used by `#[account]` generated code.
+///
+/// **Not part of the stable public API.** See [`typed_builder`] for details.
+#[doc(hidden)]
 pub use typed_builder::TypedBuilder;
 
 /// CPI helpers for account creation, PDA allocation, and account closure.
