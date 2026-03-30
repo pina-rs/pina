@@ -35,6 +35,7 @@ fn write_text(profile: &ProgramProfile, w: &mut dyn Write) -> Result<(), OutputE
 	writeln!(w, "Binary size: {} bytes", profile.binary_size)?;
 	writeln!(w, "Text section: {} bytes", profile.text_size)?;
 	writeln!(w, "Total instructions: {}", profile.total_instructions)?;
+	writeln!(w, "Total syscalls: {}", profile.total_syscalls)?;
 	writeln!(w, "Total estimated CU: {}", profile.total_cu)?;
 	writeln!(w)?;
 
@@ -44,15 +45,20 @@ fn write_text(profile: &ProgramProfile, w: &mut dyn Write) -> Result<(), OutputE
 	}
 
 	// Column header.
-	writeln!(w, "{:<50} {:>10} {:>10}", "Function", "Instrs", "Est. CU")?;
-	writeln!(w, "{}", "-".repeat(72))?;
+	writeln!(
+		w,
+		"{:<50} {:>10} {:>8} {:>10}",
+		"Function", "Instrs", "Syscall", "Est. CU"
+	)?;
+	writeln!(w, "{}", "-".repeat(80))?;
 
 	for func in &profile.functions {
 		writeln!(
 			w,
-			"{:<50} {:>10} {:>10}",
+			"{:<50} {:>10} {:>8} {:>10}",
 			truncate_name(&func.name, 50),
 			func.instruction_count,
+			func.syscall_count,
 			func.estimated_cu,
 		)?;
 	}
@@ -99,20 +105,23 @@ mod tests {
 			binary_size: 1024,
 			text_size: 800,
 			total_instructions: 100,
-			total_cu: 100,
+			total_syscalls: 2,
+			total_cu: 298,
 			functions: vec![
 				FunctionProfile {
 					name: "process_instruction".to_owned(),
 					offset: 0,
 					size: 640,
 					instruction_count: 80,
-					estimated_cu: 80,
+					syscall_count: 2,
+					estimated_cu: 278,
 				},
 				FunctionProfile {
 					name: "helper".to_owned(),
 					offset: 640,
 					size: 160,
 					instruction_count: 20,
+					syscall_count: 0,
 					estimated_cu: 20,
 				},
 			],
@@ -138,7 +147,8 @@ mod tests {
 		write_profile(&profile, OutputFormat::Text, &mut buf).unwrap();
 		let output = String::from_utf8(buf).unwrap();
 		assert!(output.contains("Total instructions: 100"));
-		assert!(output.contains("Total estimated CU: 100"));
+		assert!(output.contains("Total syscalls: 2"));
+		assert!(output.contains("Total estimated CU: 298"));
 	}
 
 	#[test]
@@ -150,7 +160,7 @@ mod tests {
 		let parsed: serde_json::Value =
 			serde_json::from_str(&output).unwrap_or_else(|e| panic!("Invalid JSON: {e}"));
 		assert_eq!(parsed["program_name"], "my_program");
-		assert_eq!(parsed["total_cu"], 100);
+		assert_eq!(parsed["total_cu"], 298);
 		assert!(parsed["functions"].is_array());
 	}
 
@@ -161,6 +171,7 @@ mod tests {
 			binary_size: 0,
 			text_size: 0,
 			total_instructions: 0,
+			total_syscalls: 0,
 			total_cu: 0,
 			functions: vec![],
 		};
