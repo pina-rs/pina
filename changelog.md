@@ -2,6 +2,88 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.8.0 (2026-03-30)
+
+### Breaking Changes
+
+#### Codebase quality improvements:
+
+- Fix cu_benchmarks test crash by checking for SBF binary before loading mollusk
+- Mark `typed_builder` re-export as `#[doc(hidden)]` non-stable API
+- Add 11 tests for `pina_cli` error type Display impls
+- Add `cargo doc` API docs check to `verify:docs` CI
+- Rename `loaders.rs` → `impls.rs` for clarity
+- Improve SAFETY documentation for all unsafe blocks in impls.rs
+
+### Features
+
+#### Add multi-file module resolution to the IDL parser.
+
+`parse_program()` now follows `mod` declarations from `src/lib.rs` to discover and parse additional source files. This enables IDL generation for programs that split code across multiple modules (e.g. `src/state.rs`, `src/instructions/mod.rs`).
+
+New module: `crates/pina_cli/src/parse/module_resolver.rs` with 5 unit tests covering single-file crates, child modules, `mod.rs` style, missing modules, and inline modules.
+
+The existing `assemble_program_ir()` function is preserved for backward compatibility and now delegates to the new `assemble_program_ir_multi()`.
+
+#### Implement opcode-aware CU cost model for the static profiler.
+
+The profiler now decodes each 8-byte SBF instruction's opcode and assigns costs based on the instruction class:
+
+- Regular instructions (ALU, memory, branch): 1 CU each
+- Syscall instructions (`call imm` with `src_reg=0`): 100 CU each
+
+Per-function profiles now include `syscall_count` and the text output shows a Syscall column. The JSON output includes `total_syscalls` and per-function `syscall_count`.
+
+This replaces the previous flat 1-CU-per-instruction model which could underestimate programs with heavy syscall usage by 10-100x.
+
+### Fixes
+
+#### Comprehensive documentation update across workspace.
+
+New mdt providers (template.t.md):
+
+- `pinaCliCommands` — CLI command reference table
+- `pinaIntrospectionDescription` — introspection module overview
+- `pinaProfileDescription` — static CU profiler overview
+
+Updated documentation:
+
+- `docs/src/crates-and-features.md` — added `pina_profile`, CLI commands table, multi-file parser note, pod arithmetic, codama renderer module structure
+- `docs/src/core-concepts.md` — added Pod types table, arithmetic description, introspection section; fixed stale `loaders.rs` → `impls.rs` reference
+- `readme.md` — added Pod arithmetic examples, static CU profiler section, replaced outdated 3-crate table with full workspace packages table
+- `crates/pina_cli/readme.md` — added `pina profile` command, multi-file note
+- Fixed missing `CU_PER_INSTRUCTION` import in profiler tests
+
+mdt provider/consumer counts: 23/46 → 26/56.
+
+#### Add 12 integration tests for `pina::introspection` module (previously 0% coverage).
+
+Tests construct fake Instructions sysvar account data following the exact binary layout that pinocchio's `Instructions` parser expects, then exercise each introspection function end-to-end:
+
+- `get_instruction_count`: single and multiple instructions
+- `get_current_instruction_index`: correct index returned
+- `assert_no_cpi`: passes for top-level, fails for CPI, checks correct index
+- `has_instruction_before`: finds earlier programs, returns false when first
+- `has_instruction_after`: finds later programs, returns false when last
+- Instructions with account metas and data
+- Wrong sysvar address rejection
+
+#### Refactor `pina_codama_renderer`: split monolithic `lib.rs` into focused render modules.
+
+- `render/helpers.rs` — string utilities, docs rendering, numeric casts
+- `render/discriminator.rs` — discriminator type/value resolution
+- `render/types.rs` — POD type rendering and defined-type pages
+- `render/accounts.rs` — account struct, PDA helpers, accounts mod
+- `render/instructions.rs` — instruction struct, account metas, data struct
+- `render/seeds.rs` — variable and constant PDA seed expression rendering
+- `render/errors.rs` — error enum pages and errors mod
+- `render/scaffold.rs` — crate scaffold creation and file writing
+- `render/mods.rs` — root mod and programs mod rendering
+
+`lib.rs` retains only the public API (`RenderConfig`, `read_root_node`, `render_idl_file`, `render_root_node`, `render_program`) and the orchestrator `render_program_to_files`.
+
+All 13 existing tests continue to pass.
+
 ## 0.7.0 (2026-03-29)
 
 ### Breaking Changes

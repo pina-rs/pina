@@ -2051,7 +2051,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "pina"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "bytemuck",
  "pastey",
@@ -2093,7 +2093,7 @@ dependencies = [
 
 [[package]]
 name = "pina_cli"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "clap",
  "codama-nodes",
@@ -2114,7 +2114,7 @@ dependencies = [
 
 [[package]]
 name = "pina_codama_renderer"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "clap",
  "codama-nodes",
@@ -2126,7 +2126,7 @@ dependencies = [
 
 [[package]]
 name = "pina_macros"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "darling",
  "heck",
@@ -2140,7 +2140,7 @@ dependencies = [
 
 [[package]]
 name = "pina_pod_primitives"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "bytemuck",
  "proptest",
@@ -2148,7 +2148,7 @@ dependencies = [
 
 [[package]]
 name = "pina_profile"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "object",
  "serde",
@@ -2159,7 +2159,7 @@ dependencies = [
 
 [[package]]
 name = "pina_sdk_ids"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "solana-address 2.4.0",
 ]
