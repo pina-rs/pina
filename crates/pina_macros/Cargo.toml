@@ -20,9 +20,9 @@ quote = { workspace = true, default-features = true }
 syn = { workspace = true, default-features = true, features = ["full"] }
 
 [dev-dependencies]
-insta = { workspace = true }
+insta = { workspace = true, default-features = true }
 pina = { workspace = true, default-features = true }
-prettyplease = "0.2"
+prettyplease = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

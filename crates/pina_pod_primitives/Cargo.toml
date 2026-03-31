@@ -10,10 +10,10 @@ repository.workspace = true
 description = "Alignment-safe POD primitive wrappers for Solana account layouts"
 
 [dependencies]
-bytemuck = { workspace = true, features = ["derive"] }
+bytemuck = { workspace = true, features = ["derive"], default-features = true }
 
 [dev-dependencies]
-proptest = { workspace = true }
+proptest = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

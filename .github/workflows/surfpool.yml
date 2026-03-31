@@ -27,10 +27,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: install external binaries
-        run: install:eget
-        shell: devenv shell -c -- bash -e {0}
-
       - name: run surfpool idl smoke test
         run: test:surfpool-idl
         shell: devenv shell -c -- bash -e {0}

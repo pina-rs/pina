@@ -19,9 +19,11 @@ in
       cargo-run-bin
       chromedriver
       cmake
+      curl
+      custom.agave
       custom.mdt
+      custom.surfpool
       dprint
-      eget
       gcc
       git
       libiconv
@@ -67,7 +69,6 @@ in
     ];
 
   env = {
-    EGET_CONFIG = "${config.env.DEVENV_ROOT}/.eget/.eget.toml";
     OPENSSL_NO_VENDOR = "1";
     LIBCLANG_PATH = "${llvm.libclang.lib}/lib";
     CC = "${llvm.clang}/bin/clang";
@@ -86,9 +87,10 @@ in
 
   enterShell = ''
     set -e
-    export PATH="$DEVENV_ROOT/.eget/bin:$PATH";
     export LDFLAGS="$NIX_LDFLAGS";
-    eval "$(pnpm-activate-env)"
+    if command -v pnpm-activate-env >/dev/null 2>&1; then
+      eval "$(pnpm-activate-env)"
+    fi
   '';
 
   # disable dotenv since it breaks the variable interpolation supported by `direnv`
@@ -169,31 +171,9 @@ in
       exec = ''
         set -e
         install:cargo:bin
-        install:eget
       '';
       description = "Install all packages.";
       binary = "bash";
-    };
-    "install:eget" = {
-      exec = ''
-        set -e
-        if command -v nix >/dev/null 2>&1; then
-          HASH=$(nix hash path --base32 ./.eget/.eget.toml)
-        else
-          HASH=$(shasum -a 256 ./.eget/.eget.toml | awk '{print $1}')
-        fi
-        echo "HASH: $HASH"
-        if [ ! -f ./.eget/bin/hash ] || [ "$HASH" != "$(cat ./.eget/bin/hash)" ]; then
-          echo "Updating eget binaries"
-          rm -rf "$DEVENV_ROOT/.eget/bin"
-          mkdir -p "$DEVENV_ROOT/.eget/bin"
-          eget -D --to "$DEVENV_ROOT/.eget/bin"
-          echo "$HASH" > ./.eget/bin/hash
-        else
-          echo "eget binaries are up to date"
-        fi
-      '';
-      description = "Install github binaries with eget.";
     };
     "install:cargo:bin" = {
       exec = ''
@@ -330,13 +310,13 @@ in
             --features "upstream-gallery-21,bpf-linker/llvm-link-static" \
             --force
 
-        # Symlink into .eget/bin so it takes precedence on PATH for cargo
-        # linker invocation (linker=sbpf-linker in .cargo/config.toml).
-        mkdir -p "$DEVENV_ROOT/.eget/bin"
-        ln -sf "$SBPF_BIN" "$DEVENV_ROOT/.eget/bin/sbpf-linker"
+        # Symlink into the cache bin directory so it's discoverable on PATH.
+        mkdir -p "$CACHE_DIR/bin"
+        ln -sf "$SBPF_BIN" "$CACHE_DIR/bin/sbpf-linker"
+        export PATH="$CACHE_DIR/bin:$PATH"
 
         echo ""
-        echo "Done! sbpf-linker (gallery) installed and linked to .eget/bin/"
+        echo "Done! sbpf-linker (gallery) installed."
         echo "Cache directory: $CACHE_DIR"
         "$SBPF_BIN" --version 2>/dev/null || echo "(binary ready)"
       '';
@@ -365,10 +345,10 @@ in
           echo "Nothing to clean (no cache at $CACHE_DIR)."
         fi
 
-        # Remove the symlink from .eget/bin if present
-        if [ -L "$DEVENV_ROOT/.eget/bin/sbpf-linker" ]; then
-          rm -f "$DEVENV_ROOT/.eget/bin/sbpf-linker"
-          echo "Removed .eget/bin/sbpf-linker symlink."
+        # Remove the symlink from cache bin if present
+        if [ -L "$CACHE_DIR/bin/sbpf-linker" ]; then
+          rm -f "$CACHE_DIR/bin/sbpf-linker"
+          echo "Removed cached sbpf-linker symlink."
         fi
       '';
       description = "Remove the cached Blueshift LLVM build and gallery sbpf-linker binary.";

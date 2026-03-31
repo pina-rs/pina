@@ -12,10 +12,10 @@ SURFPOOL_LOG_DIR="$ROOT/target/surfpool"
 SURFPOOL_LOG="$SURFPOOL_LOG_DIR/surfpool.log"
 RPC_URL="http://127.0.0.1:8899"
 WS_URL="ws://127.0.0.1:8900"
-SURFPOOL_BIN="$ROOT/.eget/bin/surfpool"
-SOLANA_BIN="$ROOT/.eget/bin/solana"
-SOLANA_KEYGEN_BIN="$ROOT/.eget/bin/solana-keygen"
-CARGO_BUILD_SBF_BIN="$ROOT/.eget/bin/cargo-build-sbf"
+SURFPOOL_BIN="$(command -v surfpool)"
+SOLANA_BIN="$(command -v solana)"
+SOLANA_KEYGEN_BIN="$(command -v solana-keygen)"
+CARGO_BUILD_SBF_BIN="$(command -v cargo-build-sbf)"
 SBF_SDK_DIR="$SURFPOOL_LOG_DIR/platform-tools-sdk/sbf"
 
 mkdir -p "$SURFPOOL_LOG_DIR"
@@ -44,7 +44,7 @@ if [[ ! -x "$SURFPOOL_BIN" ]]; then
 fi
 
 if [[ ! -x "$SOLANA_BIN" ]] || [[ ! -x "$SOLANA_KEYGEN_BIN" ]] || [[ ! -x "$CARGO_BUILD_SBF_BIN" ]]; then
-	echo "missing solana binaries in .eget/bin" >&2
+	echo "missing solana binaries on PATH (need agave + surfpool from devenv)" >&2
 	exit 1
 fi
 
@@ -71,7 +71,7 @@ cargo run -p pina_cli --quiet -- idl --path "$EXAMPLE_DIR" --output "$IDL_PATH"
 
 mkdir -p "$SBF_SDK_DIR/scripts"
 for script_name in install.sh dump.sh objcopy.sh package.sh strip.sh; do
-	ln -sf "$ROOT/.eget/bin/$script_name" "$SBF_SDK_DIR/scripts/$script_name"
+	ln -sf "$(command -v "$script_name")" "$SBF_SDK_DIR/scripts/$script_name"
 done
 
 cat >"$SBF_SDK_DIR/env.sh" <<'EOF'

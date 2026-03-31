@@ -19,12 +19,12 @@ bpf-entrypoint = []
 pina = { workspace = true, features = ["logs", "derive"] }
 
 [dev-dependencies]
-mollusk-svm = { workspace = true }
-solana-account = { workspace = true }
-solana-instruction = { workspace = true }
-solana-pubkey = { workspace = true }
-solana-sdk-ids = { workspace = true }
-solana-system-interface = { workspace = true }
+mollusk-svm = { workspace = true, default-features = true }
+solana-account = { workspace = true, default-features = true }
+solana-instruction = { workspace = true, default-features = true }
+solana-pubkey = { workspace = true, default-features = true }
+solana-sdk-ids = { workspace = true, default-features = true }
+solana-system-interface = { workspace = true, default-features = true }
 
 [lints]
 workspace = true
