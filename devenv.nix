@@ -8,17 +8,6 @@
 let
   llvm = pkgs.llvmPackages_21;
   custom = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.hostPlatform.system};
-  pnpmWorkspaceLines = lib.splitString "\n" (builtins.readFile ./pnpm-workspace.yaml);
-  pnpmNodeVersionLine = lib.findFirst (
-    line: builtins.match "^[[:space:]]*useNodeVersion:[[:space:]].*$" line != null
-  ) null pnpmWorkspaceLines;
-  pnpmNodeVersionMatch =
-    if pnpmNodeVersionLine == null then
-      null
-    else
-      builtins.match "^[[:space:]]*useNodeVersion:[[:space:]]*['\"]?([^'\"#[:space:]]+)['\"]?[[:space:]]*(#.*)?$" pnpmNodeVersionLine;
-  pnpmNodeVersion =
-    if pnpmNodeVersionMatch == null then null else builtins.elemAt pnpmNodeVersionMatch 0;
 in
 
 {
@@ -30,9 +19,11 @@ in
       cargo-run-bin
       chromedriver
       cmake
+      curl
+      custom.agave
       custom.mdt
+      custom.surfpool
       dprint
-      eget
       gcc
       git
       libiconv
@@ -78,7 +69,6 @@ in
     ];
 
   env = {
-    EGET_CONFIG = "${config.env.DEVENV_ROOT}/.eget/.eget.toml";
     OPENSSL_NO_VENDOR = "1";
     LIBCLANG_PATH = "${llvm.libclang.lib}/lib";
     CC = "${llvm.clang}/bin/clang";
@@ -97,101 +87,10 @@ in
 
   enterShell = ''
     set -e
-    export PATH="$DEVENV_ROOT/.eget/bin:$PATH";
     export LDFLAGS="$NIX_LDFLAGS";
-  ''
-  + lib.optionalString (pnpmNodeVersion != null) ''
-        # Respect pnpm-workspace.yaml's `useNodeVersion` without mutating the
-        # user's globally active Node.js version. `pnpm env use --global`
-        # updates pnpm's shared global shim, so we instead install the
-        # requested version with `pnpm env add --global` and expose it through
-        # devenv-local shims only.
-        export DEVENV_PNPM_NODE_VERSION="${pnpmNodeVersion}"
-
-        if [ -z "''${PNPM_HOME:-}" ]; then
-          if [ -n "''${XDG_DATA_HOME:-}" ]; then
-            export PNPM_HOME="$XDG_DATA_HOME/pnpm"
-          elif [ -n "''${HOME:-}" ]; then
-            if [ "$(uname -s)" = "Darwin" ]; then
-              export PNPM_HOME="$HOME/Library/pnpm"
-            else
-              export PNPM_HOME="$HOME/.local/share/pnpm"
-            fi
-          else
-            export PNPM_HOME="$DEVENV_ROOT/.devenv/pnpm"
-          fi
-        fi
-
-        mkdir -p "$PNPM_HOME"
-
-        # `pnpm env add --global` requires PNPM_HOME to be present in PATH, but
-        # we append it so devenv's standalone `pnpm` remains the active binary.
-        case ":$PATH:" in
-          *":$PNPM_HOME:"*) ;;
-          *) export PATH="$PATH:$PNPM_HOME" ;;
-        esac
-
-        export DEVENV_PNPM_NODE_ROOT="$PNPM_HOME/nodejs/$DEVENV_PNPM_NODE_VERSION"
-        export DEVENV_PNPM_NODE_BIN="$DEVENV_PNPM_NODE_ROOT/bin"
-
-        if [ ! -x "$DEVENV_PNPM_NODE_BIN/node" ]; then
-          echo "Installing pnpm-managed Node.js $DEVENV_PNPM_NODE_VERSION..."
-          pnpm env add --global "$DEVENV_PNPM_NODE_VERSION"
-        fi
-
-        if [ ! -x "$DEVENV_PNPM_NODE_BIN/node" ]; then
-          echo "Failed to find pnpm-managed Node.js $DEVENV_PNPM_NODE_VERSION at $DEVENV_PNPM_NODE_BIN" >&2
-          exit 1
-        fi
-
-        export DEVENV_PNPM_NODE_SHIM_DIR="$DEVENV_ROOT/.devenv/pnpm-node-shims/$DEVENV_PNPM_NODE_VERSION"
-        export DEVENV_PNPM_COREPACK_CLI="$DEVENV_PNPM_NODE_ROOT/lib/node_modules/corepack/dist/corepack.js"
-        export DEVENV_PNPM_NPM_CLI="$DEVENV_PNPM_NODE_ROOT/lib/node_modules/npm/bin/npm-cli.js"
-        export DEVENV_PNPM_NPX_CLI="$DEVENV_PNPM_NODE_ROOT/lib/node_modules/npm/bin/npx-cli.js"
-        mkdir -p "$DEVENV_PNPM_NODE_SHIM_DIR"
-
-        if [ -x "$DEVENV_PNPM_NODE_BIN/node" ]; then
-          ln -sfn "$DEVENV_PNPM_NODE_BIN/node" "$DEVENV_PNPM_NODE_SHIM_DIR/node"
-        else
-          rm -f "$DEVENV_PNPM_NODE_SHIM_DIR/node"
-        fi
-
-        if [ -f "$DEVENV_PNPM_COREPACK_CLI" ]; then
-          cat > "$DEVENV_PNPM_NODE_SHIM_DIR/corepack" <<EOF
-    #!/usr/bin/env sh
-    exec "$DEVENV_PNPM_NODE_BIN/node" "$DEVENV_PNPM_COREPACK_CLI" "\$@"
-    EOF
-          chmod +x "$DEVENV_PNPM_NODE_SHIM_DIR/corepack"
-        else
-          rm -f "$DEVENV_PNPM_NODE_SHIM_DIR/corepack"
-        fi
-
-        if [ -f "$DEVENV_PNPM_NPM_CLI" ]; then
-          cat > "$DEVENV_PNPM_NODE_SHIM_DIR/npm" <<EOF
-    #!/usr/bin/env sh
-    exec "$DEVENV_PNPM_NODE_BIN/node" "$DEVENV_PNPM_NPM_CLI" "\$@"
-    EOF
-          chmod +x "$DEVENV_PNPM_NODE_SHIM_DIR/npm"
-        else
-          rm -f "$DEVENV_PNPM_NODE_SHIM_DIR/npm"
-        fi
-
-        if [ -f "$DEVENV_PNPM_NPX_CLI" ]; then
-          cat > "$DEVENV_PNPM_NODE_SHIM_DIR/npx" <<EOF
-    #!/usr/bin/env sh
-    exec "$DEVENV_PNPM_NODE_BIN/node" "$DEVENV_PNPM_NPX_CLI" "\$@"
-    EOF
-          chmod +x "$DEVENV_PNPM_NODE_SHIM_DIR/npx"
-        else
-          rm -f "$DEVENV_PNPM_NODE_SHIM_DIR/npx"
-        fi
-
-        case ":$PATH:" in
-          *":$DEVENV_PNPM_NODE_SHIM_DIR:"*) ;;
-          *) export PATH="$DEVENV_PNPM_NODE_SHIM_DIR:$PATH" ;;
-        esac
-
-        hash -r
+    if command -v pnpm-activate-env >/dev/null 2>&1; then
+      eval "$(pnpm-activate-env)"
+    fi
   '';
 
   # disable dotenv since it breaks the variable interpolation supported by `direnv`
@@ -272,31 +171,9 @@ in
       exec = ''
         set -e
         install:cargo:bin
-        install:eget
       '';
       description = "Install all packages.";
       binary = "bash";
-    };
-    "install:eget" = {
-      exec = ''
-        set -e
-        if command -v nix >/dev/null 2>&1; then
-          HASH=$(nix hash path --base32 ./.eget/.eget.toml)
-        else
-          HASH=$(shasum -a 256 ./.eget/.eget.toml | awk '{print $1}')
-        fi
-        echo "HASH: $HASH"
-        if [ ! -f ./.eget/bin/hash ] || [ "$HASH" != "$(cat ./.eget/bin/hash)" ]; then
-          echo "Updating eget binaries"
-          rm -rf "$DEVENV_ROOT/.eget/bin"
-          mkdir -p "$DEVENV_ROOT/.eget/bin"
-          eget -D --to "$DEVENV_ROOT/.eget/bin"
-          echo "$HASH" > ./.eget/bin/hash
-        else
-          echo "eget binaries are up to date"
-        fi
-      '';
-      description = "Install github binaries with eget.";
     };
     "install:cargo:bin" = {
       exec = ''
@@ -433,13 +310,13 @@ in
             --features "upstream-gallery-21,bpf-linker/llvm-link-static" \
             --force
 
-        # Symlink into .eget/bin so it takes precedence on PATH for cargo
-        # linker invocation (linker=sbpf-linker in .cargo/config.toml).
-        mkdir -p "$DEVENV_ROOT/.eget/bin"
-        ln -sf "$SBPF_BIN" "$DEVENV_ROOT/.eget/bin/sbpf-linker"
+        # Symlink into the cache bin directory so it's discoverable on PATH.
+        mkdir -p "$CACHE_DIR/bin"
+        ln -sf "$SBPF_BIN" "$CACHE_DIR/bin/sbpf-linker"
+        export PATH="$CACHE_DIR/bin:$PATH"
 
         echo ""
-        echo "Done! sbpf-linker (gallery) installed and linked to .eget/bin/"
+        echo "Done! sbpf-linker (gallery) installed."
         echo "Cache directory: $CACHE_DIR"
         "$SBPF_BIN" --version 2>/dev/null || echo "(binary ready)"
       '';
@@ -468,10 +345,10 @@ in
           echo "Nothing to clean (no cache at $CACHE_DIR)."
         fi
 
-        # Remove the symlink from .eget/bin if present
-        if [ -L "$DEVENV_ROOT/.eget/bin/sbpf-linker" ]; then
-          rm -f "$DEVENV_ROOT/.eget/bin/sbpf-linker"
-          echo "Removed .eget/bin/sbpf-linker symlink."
+        # Remove the symlink from cache bin if present
+        if [ -L "$CACHE_DIR/bin/sbpf-linker" ]; then
+          rm -f "$CACHE_DIR/bin/sbpf-linker"
+          echo "Removed cached sbpf-linker symlink."
         fi
       '';
       description = "Remove the cached Blueshift LLVM build and gallery sbpf-linker binary.";

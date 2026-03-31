@@ -11,7 +11,7 @@ rust-version.workspace = true
 description = "pina compatible sdk id's"
 
 [dependencies]
-solana-address = { workspace = true }
+solana-address = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

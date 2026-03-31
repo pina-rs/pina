@@ -10,14 +10,14 @@ repository.workspace = true
 description = "Static CU profiler for Solana SBF programs"
 
 [dependencies]
-object = { version = "0.36", default-features = false, features = ["read", "elf", "std"] }
-serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
+object = { default-features = false, features = ["read", "elf", "std"], workspace = true }
+serde = { workspace = true, features = ["derive"], default-features = true }
+serde_json = { workspace = true, default-features = true }
 thiserror = { workspace = true, default-features = true }
 
 [dev-dependencies]
-object = { version = "0.36", features = ["read", "elf", "std", "write"] }
-tempfile = "3"
+object = { features = ["read", "elf", "std", "write"], workspace = true, default-features = true }
+tempfile = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

@@ -3,7 +3,7 @@ inputs:
   nixpkgs:
     url: github:NixOS/nixpkgs/nixpkgs-unstable
   ifiokjr-nixpkgs:
-    url: github:ifiokjr/nixpkgs
+    url: github:ifiokjr/nixpkgs/07b49a3dc6259c243d550b1edeead6c7617ebbb0
   rust-overlay:
     url: github:oxalica/rust-overlay
     overlays:

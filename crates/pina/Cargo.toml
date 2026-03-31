@@ -20,21 +20,21 @@ token = [
 derive = ["dep:pina_macros"]
 
 [dependencies]
-bytemuck = { workspace = true, features = ["derive", "const_zeroed", "align_offset"] }
-pastey = { workspace = true }
+bytemuck = { workspace = true, features = ["derive", "const_zeroed", "align_offset"], default-features = true }
+pastey = { workspace = true, default-features = true }
 pina_macros = { workspace = true, optional = true }
 pina_pod_primitives = { workspace = true }
-pinocchio = { workspace = true }
-pinocchio-associated-token-account = { workspace = true, optional = true }
-pinocchio-system = { workspace = true }
-pinocchio-token = { workspace = true, optional = true }
-pinocchio-token-2022 = { workspace = true, optional = true }
-solana-address = { workspace = true }
-solana-program-log = { workspace = true, optional = true, features = ["macro"] }
-typed-builder = { workspace = true }
+pinocchio = { workspace = true, default-features = true }
+pinocchio-associated-token-account = { workspace = true, optional = true, default-features = true }
+pinocchio-system = { workspace = true, default-features = true }
+pinocchio-token = { workspace = true, optional = true, default-features = true }
+pinocchio-token-2022 = { workspace = true, optional = true, default-features = true }
+solana-address = { workspace = true, default-features = true }
+solana-program-log = { workspace = true, optional = true, features = ["macro"], default-features = true }
+typed-builder = { workspace = true, default-features = true }
 
 [dev-dependencies]
-proptest = { workspace = true }
+proptest = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

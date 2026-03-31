@@ -15,24 +15,24 @@ name = "pina"
 path = "src/main.rs"
 
 [dependencies]
-clap = { workspace = true }
-codama-nodes = { workspace = true }
+clap = { workspace = true, default-features = true }
+codama-nodes = { workspace = true, default-features = true }
 heck = { workspace = true, default-features = true }
 pina_codama_renderer = { workspace = true }
 pina_profile = { workspace = true }
 proc-macro2 = { workspace = true, default-features = true }
-serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
+serde = { workspace = true, features = ["derive"], default-features = true }
+serde_json = { workspace = true, default-features = true }
 syn = { workspace = true, default-features = true, features = ["full", "extra-traits", "visit"] }
 thiserror = { workspace = true, default-features = true }
-walkdir = { workspace = true }
+walkdir = { workspace = true, default-features = true }
 
 [dev-dependencies]
-insta = { workspace = true, features = ["json"] }
-insta-cmd = "0.6.0"
-object = { version = "0.36", features = ["write", "elf", "std"] }
-serde_json = { workspace = true }
-tempfile = "3"
+insta = { workspace = true, features = ["json"], default-features = true }
+insta-cmd = { workspace = true, default-features = true }
+object = { features = ["write", "elf", "std"], workspace = true, default-features = true }
+serde_json = { workspace = true, default-features = true }
+tempfile = { workspace = true, default-features = true }
 
 [lints]
 workspace = true
