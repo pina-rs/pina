@@ -70,8 +70,18 @@ perl -0pi -e "s/declare_id!\(\"[^\"]+\"\);/declare_id!(\"$PROGRAM_ID\");/" "$EXA
 cargo run -p pina_cli --quiet -- idl --path "$EXAMPLE_DIR" --output "$IDL_PATH"
 
 mkdir -p "$SBF_SDK_DIR/scripts"
+# Create stub SDK scripts. These are expected by cargo-build-sbf but are not
+# invoked during the smoke test. When agave is installed from nixpkgs, the
+# SDK scripts directory may not exist as a standalone path.
 for script_name in install.sh dump.sh objcopy.sh package.sh strip.sh; do
-	ln -sf "$(command -v "$script_name")" "$SBF_SDK_DIR/scripts/$script_name"
+	local_bin="$(command -v "$script_name" 2>/dev/null || true)"
+	if [ -n "$local_bin" ]; then
+		ln -sf "$local_bin" "$SBF_SDK_DIR/scripts/$script_name"
+	else
+		# Create a no-op stub so cargo-build-sbf doesn't fail looking for it.
+		printf '#!/usr/bin/env bash\nexit 0\n' > "$SBF_SDK_DIR/scripts/$script_name"
+		chmod +x "$SBF_SDK_DIR/scripts/$script_name"
+	fi
 done
 
 cat >"$SBF_SDK_DIR/env.sh" <<'EOF'
