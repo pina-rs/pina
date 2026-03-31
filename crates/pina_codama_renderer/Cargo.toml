@@ -10,14 +10,14 @@ repository.workspace = true
 description = "Codama Rust renderer that generates Pina-style bytemuck models and discriminator-first layouts"
 
 [dependencies]
-clap = { workspace = true, features = ["derive", "std"], default-features = true }
-codama-nodes = { workspace = true, default-features = true }
+clap = { workspace = true, features = ["derive", "std"] }
+codama-nodes = { workspace = true }
 heck = { workspace = true, default-features = true }
-serde_json = { workspace = true, default-features = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true, default-features = true }
 
 [dev-dependencies]
-insta = { workspace = true, default-features = true }
+insta = { workspace = true }
 
 [lints]
 workspace = true

@@ -19,8 +19,8 @@ bpf-entrypoint = []
 pina = { workspace = true, features = ["logs", "token", "derive"] }
 
 [dev-dependencies]
-mollusk-svm = { workspace = true, default-features = true }
-tokio = { workspace = true, features = ["full"], default-features = true }
+mollusk-svm = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
 
 [lints]
 workspace = true

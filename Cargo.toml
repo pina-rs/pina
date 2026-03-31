@@ -80,16 +80,17 @@ rust-version = "1.86.0"
 [workspace.dependencies]
 bytemuck = { default-features = false, version = "^1" }
 clap = { default-features = false, version = "^4", features = ["derive", "std"] }
-codama-nodes = { default-features = false, version = "0.8.0" }
-darling = { default-features = false, version = "0.23.0" }
+codama-nodes = { default-features = false, version = "^0.7" }
+darling = { default-features = false, version = "^0.21" }
 heck = { default-features = false, version = "^0.5" }
 insta = { default-features = false, version = "^1" }
-mollusk-svm = { default-features = false, version = "0.11.0" }
-num-derive = { version = "^0.4", default-features = false }
-num-traits = { version = "^0.2", default-features = false }
+mollusk-svm = { default-features = false, version = "^0.8" }
+num-derive = { version = "^0.4" }
+num-traits = { version = "^0.2" }
 pastey = { default-features = false, version = "^0.2" }
 pinocchio = { default-features = false, version = "^0.10", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.3" }
+pinocchio-memo = { default-features = false, version = "^0.3" }
 pinocchio-system = { default-features = false, version = "^0.5" }
 pinocchio-token = { default-features = false, version = "^0.5" }
 pinocchio-token-2022 = { default-features = false, version = "^0.2" }
@@ -98,25 +99,25 @@ proptest = { default-features = false, version = "^1", features = ["std"] }
 quote = { default-features = false, version = "^1" }
 serde = { default-features = false, version = "^1" }
 serde_json = { default-features = false, version = "^1", features = ["std"] }
-solana-account = { version = "^3", default-features = false }
-solana-account-info = { version = "^3", default-features = false }
+solana-account = { version = "^3" }
+solana-account-info = { version = "^3" }
 solana-address = { default-features = false, version = "^2.0", features = ["bytemuck", "curve25519", "decode"] }
-solana-cpi = { version = "^3", default-features = false }
-solana-instruction = { version = "^3", default-features = false }
-solana-program-error = { version = "^3", default-features = false }
+solana-cpi = { version = "^3" }
+solana-instruction = { version = "^3" }
+solana-program-error = { version = "^3" }
 solana-program-log = { default-features = false, version = "^1.1" }
-solana-pubkey = { version = "^4", features = ["bytemuck"], default-features = false }
-solana-sdk-ids = { version = "^3", default-features = false }
-solana-system-interface = { version = "^2", default-features = false }
+solana-pubkey = { version = "^4", features = ["bytemuck"] }
+solana-sdk-ids = { version = "^3" }
+solana-system-interface = { version = "^2" }
 syn = { default-features = false, version = "^2", features = ["full"] }
+test_utils_solana = { default-features = false, version = "^0.8" }
 thiserror = { default-features = false, version = "^2" }
 tokio = { default-features = false, version = "^1" }
 typed-builder = { default-features = false, version = "^0.23" }
 walkdir = { default-features = false, version = "^2" }
+wasm_client_solana = { default-features = false, version = "^0.10" }
 
 # publishable crates
-insta-cmd = { default-features = false, version = "^0.6.0" }
-object = { default-features = false, version = "^0.39.0" }
 pina = { default-features = false, path = "crates/pina", version = "0.8.0" }
 pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.8.0" }
 pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.8.0" }
@@ -124,8 +125,6 @@ pina_macros = { default-features = false, path = "crates/pina_macros", version =
 pina_pod_primitives = { default-features = false, path = "crates/pina_pod_primitives", version = "0.8.0" }
 pina_profile = { default-features = false, path = "crates/pina_profile", version = "0.8.0" }
 pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.8.0" }
-prettyplease = { default-features = false, version = "^0.2" }
-tempfile = { default-features = false, version = "^3" }
 
 [workspace.metadata.dylint]
 libraries = [
