@@ -8,17 +8,6 @@
 let
   llvm = pkgs.llvmPackages_21;
   custom = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.hostPlatform.system};
-  pnpmWorkspaceLines = lib.splitString "\n" (builtins.readFile ./pnpm-workspace.yaml);
-  pnpmNodeVersionLine = lib.findFirst (
-    line: builtins.match "^[[:space:]]*useNodeVersion:[[:space:]].*$" line != null
-  ) null pnpmWorkspaceLines;
-  pnpmNodeVersionMatch =
-    if pnpmNodeVersionLine == null then
-      null
-    else
-      builtins.match "^[[:space:]]*useNodeVersion:[[:space:]]*['\"]?([^'\"#[:space:]]+)['\"]?[[:space:]]*(#.*)?$" pnpmNodeVersionLine;
-  pnpmNodeVersion =
-    if pnpmNodeVersionMatch == null then null else builtins.elemAt pnpmNodeVersionMatch 0;
 in
 
 {
@@ -99,99 +88,7 @@ in
     set -e
     export PATH="$DEVENV_ROOT/.eget/bin:$PATH";
     export LDFLAGS="$NIX_LDFLAGS";
-  ''
-  + lib.optionalString (pnpmNodeVersion != null) ''
-        # Respect pnpm-workspace.yaml's `useNodeVersion` without mutating the
-        # user's globally active Node.js version. `pnpm env use --global`
-        # updates pnpm's shared global shim, so we instead install the
-        # requested version with `pnpm env add --global` and expose it through
-        # devenv-local shims only.
-        export DEVENV_PNPM_NODE_VERSION="${pnpmNodeVersion}"
-
-        if [ -z "''${PNPM_HOME:-}" ]; then
-          if [ -n "''${XDG_DATA_HOME:-}" ]; then
-            export PNPM_HOME="$XDG_DATA_HOME/pnpm"
-          elif [ -n "''${HOME:-}" ]; then
-            if [ "$(uname -s)" = "Darwin" ]; then
-              export PNPM_HOME="$HOME/Library/pnpm"
-            else
-              export PNPM_HOME="$HOME/.local/share/pnpm"
-            fi
-          else
-            export PNPM_HOME="$DEVENV_ROOT/.devenv/pnpm"
-          fi
-        fi
-
-        mkdir -p "$PNPM_HOME"
-
-        # `pnpm env add --global` requires PNPM_HOME to be present in PATH, but
-        # we append it so devenv's standalone `pnpm` remains the active binary.
-        case ":$PATH:" in
-          *":$PNPM_HOME:"*) ;;
-          *) export PATH="$PATH:$PNPM_HOME" ;;
-        esac
-
-        export DEVENV_PNPM_NODE_ROOT="$PNPM_HOME/nodejs/$DEVENV_PNPM_NODE_VERSION"
-        export DEVENV_PNPM_NODE_BIN="$DEVENV_PNPM_NODE_ROOT/bin"
-
-        if [ ! -x "$DEVENV_PNPM_NODE_BIN/node" ]; then
-          echo "Installing pnpm-managed Node.js $DEVENV_PNPM_NODE_VERSION..."
-          pnpm env add --global "$DEVENV_PNPM_NODE_VERSION"
-        fi
-
-        if [ ! -x "$DEVENV_PNPM_NODE_BIN/node" ]; then
-          echo "Failed to find pnpm-managed Node.js $DEVENV_PNPM_NODE_VERSION at $DEVENV_PNPM_NODE_BIN" >&2
-          exit 1
-        fi
-
-        export DEVENV_PNPM_NODE_SHIM_DIR="$DEVENV_ROOT/.devenv/pnpm-node-shims/$DEVENV_PNPM_NODE_VERSION"
-        export DEVENV_PNPM_COREPACK_CLI="$DEVENV_PNPM_NODE_ROOT/lib/node_modules/corepack/dist/corepack.js"
-        export DEVENV_PNPM_NPM_CLI="$DEVENV_PNPM_NODE_ROOT/lib/node_modules/npm/bin/npm-cli.js"
-        export DEVENV_PNPM_NPX_CLI="$DEVENV_PNPM_NODE_ROOT/lib/node_modules/npm/bin/npx-cli.js"
-        mkdir -p "$DEVENV_PNPM_NODE_SHIM_DIR"
-
-        if [ -x "$DEVENV_PNPM_NODE_BIN/node" ]; then
-          ln -sfn "$DEVENV_PNPM_NODE_BIN/node" "$DEVENV_PNPM_NODE_SHIM_DIR/node"
-        else
-          rm -f "$DEVENV_PNPM_NODE_SHIM_DIR/node"
-        fi
-
-        if [ -f "$DEVENV_PNPM_COREPACK_CLI" ]; then
-          cat > "$DEVENV_PNPM_NODE_SHIM_DIR/corepack" <<EOF
-    #!/usr/bin/env sh
-    exec "$DEVENV_PNPM_NODE_BIN/node" "$DEVENV_PNPM_COREPACK_CLI" "\$@"
-    EOF
-          chmod +x "$DEVENV_PNPM_NODE_SHIM_DIR/corepack"
-        else
-          rm -f "$DEVENV_PNPM_NODE_SHIM_DIR/corepack"
-        fi
-
-        if [ -f "$DEVENV_PNPM_NPM_CLI" ]; then
-          cat > "$DEVENV_PNPM_NODE_SHIM_DIR/npm" <<EOF
-    #!/usr/bin/env sh
-    exec "$DEVENV_PNPM_NODE_BIN/node" "$DEVENV_PNPM_NPM_CLI" "\$@"
-    EOF
-          chmod +x "$DEVENV_PNPM_NODE_SHIM_DIR/npm"
-        else
-          rm -f "$DEVENV_PNPM_NODE_SHIM_DIR/npm"
-        fi
-
-        if [ -f "$DEVENV_PNPM_NPX_CLI" ]; then
-          cat > "$DEVENV_PNPM_NODE_SHIM_DIR/npx" <<EOF
-    #!/usr/bin/env sh
-    exec "$DEVENV_PNPM_NODE_BIN/node" "$DEVENV_PNPM_NPX_CLI" "\$@"
-    EOF
-          chmod +x "$DEVENV_PNPM_NODE_SHIM_DIR/npx"
-        else
-          rm -f "$DEVENV_PNPM_NODE_SHIM_DIR/npx"
-        fi
-
-        case ":$PATH:" in
-          *":$DEVENV_PNPM_NODE_SHIM_DIR:"*) ;;
-          *) export PATH="$DEVENV_PNPM_NODE_SHIM_DIR:$PATH" ;;
-        esac
-
-        hash -r
+    eval "$(pnpm-activate-env)"
   '';
 
   # disable dotenv since it breaks the variable interpolation supported by `direnv`
