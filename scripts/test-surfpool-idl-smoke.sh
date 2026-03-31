@@ -79,7 +79,7 @@ for script_name in install.sh dump.sh objcopy.sh package.sh strip.sh; do
 		ln -sf "$local_bin" "$SBF_SDK_DIR/scripts/$script_name"
 	else
 		# Create a no-op stub so cargo-build-sbf doesn't fail looking for it.
-		printf '#!/usr/bin/env bash\nexit 0\n' > "$SBF_SDK_DIR/scripts/$script_name"
+		printf '#!/usr/bin/env bash\nexit 0\n' >"$SBF_SDK_DIR/scripts/$script_name"
 		chmod +x "$SBF_SDK_DIR/scripts/$script_name"
 	fi
 done
