@@ -22,6 +22,7 @@ in
       curl
       custom.agave
       custom.mdt
+      custom.pnpm-standalone
       custom.surfpool
       dprint
       gcc
@@ -29,7 +30,6 @@ in
       libiconv
       mdbook
       custom.knope
-      custom.pnpm-standalone
       llvm.bintools
       llvm.clang
       llvm.clang-tools
@@ -88,9 +88,7 @@ in
   enterShell = ''
     set -e
     export LDFLAGS="$NIX_LDFLAGS";
-    if command -v pnpm-activate-env >/dev/null 2>&1; then
-      eval "$(pnpm-activate-env)"
-    fi
+    eval "$(pnpm-activate-env)"
   '';
 
   # disable dotenv since it breaks the variable interpolation supported by `direnv`
