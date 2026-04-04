@@ -2574,6 +2574,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "role-registry-program-client"
+version = "0.0.0"
+dependencies = [
+ "bytemuck",
+ "num-derive",
+ "num-traits",
+ "pina_pod_primitives",
+ "solana-account-info",
+ "solana-cpi",
+ "solana-instruction",
+ "solana-program-error",
+ "solana-pubkey 4.1.0",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "role_registry_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3873,6 +3896,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "staking-rewards-program-client"
+version = "0.0.0"
+dependencies = [
+ "bytemuck",
+ "num-derive",
+ "num-traits",
+ "pina_pod_primitives",
+ "solana-account-info",
+ "solana-cpi",
+ "solana-instruction",
+ "solana-program-error",
+ "solana-pubkey 4.1.0",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "staking_rewards_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4189,6 +4235,29 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "vesting-program-client"
+version = "0.0.0"
+dependencies = [
+ "bytemuck",
+ "num-derive",
+ "num-traits",
+ "pina_pod_primitives",
+ "solana-account-info",
+ "solana-cpi",
+ "solana-instruction",
+ "solana-program-error",
+ "solana-pubkey 4.1.0",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "vesting_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
 
 [[package]]
 name = "void"
