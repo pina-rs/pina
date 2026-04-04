@@ -107,8 +107,23 @@ in
     };
     "sbpf-linker" = {
       exec = ''
-        set -e
-        cargo bin sbpf-linker $@
+        set -euo pipefail
+
+        if [ -n "''${XDG_CACHE_HOME:-}" ]; then
+          CACHE_BASE="$XDG_CACHE_HOME"
+        elif [ -n "''${HOME:-}" ] && [ "$HOME" != "/" ]; then
+          CACHE_BASE="$HOME/.cache"
+        else
+          CACHE_BASE="$DEVENV_ROOT/.cache"
+        fi
+
+        gallery_sbpf_linker="$CACHE_BASE/sbpf-linker-upstream-gallery/bin/sbpf-linker"
+        if [ -x "$gallery_sbpf_linker" ]; then
+          "$gallery_sbpf_linker" "$@"
+          exit 0
+        fi
+
+        cargo bin sbpf-linker "$@"
       '';
       description = "The `sbpf-linker` executable";
       binary = "bash";
@@ -125,10 +140,12 @@ in
       exec = ''
         set -euo pipefail
 
-        dylint_link_bin="$(find "$DEVENV_ROOT/.bin" -path '*/dylint-link/*/bin/dylint-link' | sort | tail -n 1)"
-        if [ -z "$dylint_link_bin" ]; then
-          echo "Missing dylint-link in $DEVENV_ROOT/.bin. Run 'install:cargo:bin'." >&2
-          exit 1
+        manual_root="$DEVENV_ROOT/.bin/manual/dylint-link/5.0.0"
+        dylint_link_bin="$manual_root/bin/dylint-link"
+
+        if [ ! -x "$dylint_link_bin" ]; then
+          mkdir -p "$manual_root"
+          cargo install dylint-link --version 5.0.0 --root "$manual_root" --locked --bin dylint-link
         fi
 
         "$dylint_link_bin" "$@"
