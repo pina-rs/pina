@@ -75,3 +75,4 @@ devenv.local.nix
 .claude/worktrees/
 .ant-colony/
 .mdt/
+**/.cache/
