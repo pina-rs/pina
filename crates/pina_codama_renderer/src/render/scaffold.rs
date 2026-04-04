@@ -37,16 +37,16 @@ edition = "2021"
 publish = false
 
 	[dependencies]
-	bytemuck = {{ workspace = true }}
-	num-derive = {{ workspace = true }}
-	num-traits = {{ workspace = true }}
+	bytemuck = {{ workspace = true , default-features = true }}
+	num-derive = {{ workspace = true , default-features = true }}
+	num-traits = {{ workspace = true , default-features = true }}
 	pina_pod_primitives = {{ workspace = true }}
-	solana-account-info = {{ workspace = true }}
-	solana-cpi = {{ workspace = true }}
-	solana-instruction = {{ workspace = true }}
-solana-program-error = {{ workspace = true }}
-solana-pubkey = {{ workspace = true }}
-thiserror = {{ workspace = true }}
+	solana-account-info = {{ workspace = true , default-features = true }}
+	solana-cpi = {{ workspace = true , default-features = true }}
+	solana-instruction = {{ workspace = true , default-features = true }}
+solana-program-error = {{ workspace = true , default-features = true }}
+solana-pubkey = {{ workspace = true , default-features = true }}
+thiserror = {{ workspace = true , default-features = true }}
 "#
 	);
 	fs::write(&cargo_toml_path, cargo_toml).map_err(|source| {
