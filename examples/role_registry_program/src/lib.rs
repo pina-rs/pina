@@ -37,13 +37,19 @@ pub mod entrypoint {
 		let instruction: RegistryInstruction = parse_instruction(program_id, &ID, data)?;
 
 		match instruction {
-			RegistryInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
+			RegistryInstruction::Initialize => {
+				InitializeAccounts::try_from(accounts)?.process(data)
+			}
 			RegistryInstruction::AddRole => AddRoleAccounts::try_from(accounts)?.process(data),
-			RegistryInstruction::UpdateRole => UpdateRoleAccounts::try_from(accounts)?.process(data),
+			RegistryInstruction::UpdateRole => {
+				UpdateRoleAccounts::try_from(accounts)?.process(data)
+			}
 			RegistryInstruction::DeactivateRole => {
 				DeactivateRoleAccounts::try_from(accounts)?.process(data)
 			}
-			RegistryInstruction::RotateAdmin => RotateAdminAccounts::try_from(accounts)?.process(data),
+			RegistryInstruction::RotateAdmin => {
+				RotateAdminAccounts::try_from(accounts)?.process(data)
+			}
 		}
 	}
 }
@@ -175,7 +181,8 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
 		let args = InitializeInstruction::try_from_bytes(data)?;
 		let registry_seeds = registry_config_seeds!(self.admin.address().as_ref());
-		let registry_seeds_with_bump = registry_config_seeds!(self.admin.address().as_ref(), args.bump);
+		let registry_seeds_with_bump =
+			registry_config_seeds!(self.admin.address().as_ref(), args.bump);
 
 		self.admin.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
@@ -206,7 +213,8 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
 		let args = AddRoleInstruction::try_from_bytes(data)?;
-		let role_entry_seeds = role_entry_seeds!(self.registry_config.address().as_ref(), &args.role_id.0);
+		let role_entry_seeds =
+			role_entry_seeds!(self.registry_config.address().as_ref(), &args.role_id.0);
 		let role_entry_seeds_with_bump = role_entry_seeds!(
 			self.registry_config.address().as_ref(),
 			&args.role_id.0,
@@ -215,7 +223,10 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 
 		self.admin.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
-		self.registry_config.assert_not_empty()?.assert_writable()?.assert_type::<RegistryConfig>(&ID)?;
+		self.registry_config
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_type::<RegistryConfig>(&ID)?;
 		self.role_entry
 			.assert_empty()?
 			.assert_writable()?
@@ -255,13 +266,19 @@ impl<'a> ProcessAccountInfos<'a> for UpdateRoleAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
 		let args = UpdateRoleInstruction::try_from_bytes(data)?;
 		self.admin.assert_signer()?;
-		self.registry_config.assert_not_empty()?.assert_writable()?.assert_type::<RegistryConfig>(&ID)?;
-		self.role_entry.assert_not_empty()?.assert_writable()?.assert_type::<RoleEntry>(&ID)?;
+		self.registry_config
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_type::<RegistryConfig>(&ID)?;
+		self.role_entry
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_type::<RoleEntry>(&ID)?;
 
 		let registry_config = self.registry_config.as_account::<RegistryConfig>(&ID)?;
 		let role_entry = self.role_entry.as_account::<RoleEntry>(&ID)?;
 		self.admin.assert_address(&registry_config.admin)?;
-				if !bool::from(role_entry.active) {
+		if !bool::from(role_entry.active) {
 			return Err(RegistryError::RoleInactive.into());
 		}
 		if role_entry.registry != *self.registry_config.address() {
@@ -277,8 +294,14 @@ impl<'a> ProcessAccountInfos<'a> for UpdateRoleAccounts<'a> {
 impl<'a> ProcessAccountInfos<'a> for DeactivateRoleAccounts<'a> {
 	fn process(&self, _data: &[u8]) -> ProgramResult {
 		self.admin.assert_signer()?;
-		self.registry_config.assert_not_empty()?.assert_writable()?.assert_type::<RegistryConfig>(&ID)?;
-		self.role_entry.assert_not_empty()?.assert_writable()?.assert_type::<RoleEntry>(&ID)?;
+		self.registry_config
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_type::<RegistryConfig>(&ID)?;
+		self.role_entry
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_type::<RoleEntry>(&ID)?;
 
 		let registry_config = self.registry_config.as_account::<RegistryConfig>(&ID)?;
 		let role_entry = self.role_entry.as_account::<RoleEntry>(&ID)?;
@@ -299,7 +322,10 @@ impl<'a> ProcessAccountInfos<'a> for DeactivateRoleAccounts<'a> {
 impl<'a> ProcessAccountInfos<'a> for RotateAdminAccounts<'a> {
 	fn process(&self, _data: &[u8]) -> ProgramResult {
 		self.admin.assert_signer()?;
-		self.registry_config.assert_not_empty()?.assert_writable()?.assert_type::<RegistryConfig>(&ID)?;
+		self.registry_config
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_type::<RegistryConfig>(&ID)?;
 
 		let registry_config = self.registry_config.as_account::<RegistryConfig>(&ID)?;
 		self.admin.assert_address(&registry_config.admin)?;

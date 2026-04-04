@@ -235,7 +235,10 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		self.mint.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
-		self.vesting_state.assert_not_empty()?.assert_writable()?.assert_type::<VestingState>(&ID)?;
+		self.vesting_state
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_type::<VestingState>(&ID)?;
 		self.vault
 			.assert_not_empty()?
 			.assert_writable()?
@@ -254,7 +257,8 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 			)?;
 
 		let vesting_state = self.vesting_state.as_account::<VestingState>(&ID)?;
-		self.beneficiary.assert_address(&vesting_state.beneficiary)?;
+		self.beneficiary
+			.assert_address(&vesting_state.beneficiary)?;
 		self.mint.assert_address(&vesting_state.mint)?;
 		self.vesting_state.assert_seeds_with_bump(
 			vesting_seeds!(
@@ -301,7 +305,10 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		self.admin.assert_signer()?;
 		self.mint.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
-		self.vesting_state.assert_not_empty()?.assert_writable()?.assert_type::<VestingState>(&ID)?;
+		self.vesting_state
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_type::<VestingState>(&ID)?;
 		self.vault
 			.assert_not_empty()?
 			.assert_writable()?

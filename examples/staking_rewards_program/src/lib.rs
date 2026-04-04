@@ -41,8 +41,12 @@ pub mod entrypoint {
 		let instruction: StakingInstruction = parse_instruction(program_id, &ID, data)?;
 
 		match instruction {
-			StakingInstruction::InitializePool => InitializePoolAccounts::try_from(accounts)?.process(data),
-			StakingInstruction::OpenPosition => OpenPositionAccounts::try_from(accounts)?.process(data),
+			StakingInstruction::InitializePool => {
+				InitializePoolAccounts::try_from(accounts)?.process(data)
+			}
+			StakingInstruction::OpenPosition => {
+				OpenPositionAccounts::try_from(accounts)?.process(data)
+			}
 			StakingInstruction::Deposit => DepositAccounts::try_from(accounts)?.process(data),
 			StakingInstruction::Withdraw => WithdrawAccounts::try_from(accounts)?.process(data),
 			StakingInstruction::Claim => ClaimAccounts::try_from(accounts)?.process(data),
@@ -197,7 +201,10 @@ macro_rules! position_seeds {
 impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
 		let args = InitializePoolInstruction::try_from_bytes(data)?;
-		let pool_seeds = pool_seeds!(self.stake_mint.address().as_ref(), self.reward_mint.address().as_ref());
+		let pool_seeds = pool_seeds!(
+			self.stake_mint.address().as_ref(),
+			self.reward_mint.address().as_ref()
+		);
 		let pool_seeds_with_bump = pool_seeds!(
 			self.stake_mint.address().as_ref(),
 			self.reward_mint.address().as_ref(),
@@ -276,7 +283,10 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
 		let args = OpenPositionInstruction::try_from_bytes(data)?;
-		let position_seeds = position_seeds!(self.pool_state.address().as_ref(), self.user.address().as_ref());
+		let position_seeds = position_seeds!(
+			self.pool_state.address().as_ref(),
+			self.user.address().as_ref()
+		);
 		let position_seeds_with_bump = position_seeds!(
 			self.pool_state.address().as_ref(),
 			self.user.address().as_ref(),
@@ -285,7 +295,10 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 
 		self.user.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
-		self.pool_state.assert_not_empty()?.assert_writable()?.assert_type::<PoolState>(&ID)?;
+		self.pool_state
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_type::<PoolState>(&ID)?;
 		self.position_state
 			.assert_empty()?
 			.assert_writable()?
@@ -327,8 +340,14 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 		self.stake_mint.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
-		self.pool_state.assert_not_empty()?.assert_writable()?.assert_type::<PoolState>(&ID)?;
-		self.position_state.assert_not_empty()?.assert_writable()?.assert_type::<PositionState>(&ID)?;
+		self.pool_state
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_type::<PoolState>(&ID)?;
+		self.position_state
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_type::<PositionState>(&ID)?;
 		self.user_stake_ata
 			.assert_writable()?
 			.assert_associated_token_address(
@@ -359,7 +378,11 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 
 		let position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 		position_state.staked_amount = PodU64::from_primitive(next_staked);
-		position_state.reward_debt = PodU64::from_primitive(u64::from(position_state.reward_debt).checked_add(amount).ok_or(ProgramError::ArithmeticOverflow)?);
+		position_state.reward_debt = PodU64::from_primitive(
+			u64::from(position_state.reward_debt)
+				.checked_add(amount)
+				.ok_or(ProgramError::ArithmeticOverflow)?,
+		);
 
 		let pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
 		pool_state.total_staked = PodU64::from_primitive(total_staked);
@@ -387,8 +410,14 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 		self.stake_mint.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
-		self.pool_state.assert_not_empty()?.assert_writable()?.assert_type::<PoolState>(&ID)?;
-		self.position_state.assert_not_empty()?.assert_writable()?.assert_type::<PositionState>(&ID)?;
+		self.pool_state
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_type::<PoolState>(&ID)?;
+		self.position_state
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_type::<PositionState>(&ID)?;
 		self.user_stake_ata
 			.assert_writable()?
 			.assert_associated_token_address(
@@ -411,7 +440,8 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 		position_state.staked_amount = PodU64::from_primitive(staked_amount - amount);
 
 		let pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
-		pool_state.total_staked = PodU64::from_primitive(u64::from(pool_state.total_staked) - amount);
+		pool_state.total_staked =
+			PodU64::from_primitive(u64::from(pool_state.total_staked) - amount);
 
 		Ok(())
 	}
@@ -423,8 +453,14 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		self.reward_mint.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
-		self.pool_state.assert_not_empty()?.assert_writable()?.assert_type::<PoolState>(&ID)?;
-		self.position_state.assert_not_empty()?.assert_writable()?.assert_type::<PositionState>(&ID)?;
+		self.pool_state
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_type::<PoolState>(&ID)?;
+		self.position_state
+			.assert_not_empty()?
+			.assert_writable()?
+			.assert_type::<PositionState>(&ID)?;
 		self.user_reward_ata
 			.assert_writable()?
 			.assert_associated_token_address(
