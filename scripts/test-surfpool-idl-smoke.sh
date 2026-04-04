@@ -16,6 +16,8 @@ SURFPOOL_BIN="$(command -v surfpool)"
 SOLANA_BIN="$(command -v solana)"
 SOLANA_KEYGEN_BIN="$(command -v solana-keygen)"
 CARGO_BUILD_SBF_BIN="$(command -v cargo-build-sbf)"
+AGAVE_ROOT="$(cd "$(dirname "$CARGO_BUILD_SBF_BIN")/.." && pwd)"
+SBF_SDK_TEMPLATE_DIR="$AGAVE_ROOT/lib/platform-tools-sdk/sbf"
 SBF_SDK_DIR="$SURFPOOL_LOG_DIR/platform-tools-sdk/sbf"
 
 mkdir -p "$SURFPOOL_LOG_DIR"
@@ -69,39 +71,18 @@ perl -0pi -e "s/declare_id!\(\"[^\"]+\"\);/declare_id!(\"$PROGRAM_ID\");/" "$EXA
 
 cargo run -p pina_cli --quiet -- idl --path "$EXAMPLE_DIR" --output "$IDL_PATH"
 
-mkdir -p "$SBF_SDK_DIR/scripts"
-# Create stub SDK scripts. These are expected by cargo-build-sbf but are not
-# invoked during the smoke test. When agave is installed from nixpkgs, the
-# SDK scripts directory may not exist as a standalone path.
-for script_name in install.sh dump.sh objcopy.sh package.sh strip.sh; do
-	local_bin="$(command -v "$script_name" 2>/dev/null || true)"
-	if [ -n "$local_bin" ]; then
-		ln -sf "$local_bin" "$SBF_SDK_DIR/scripts/$script_name"
-	else
-		# Create a no-op stub so cargo-build-sbf doesn't fail looking for it.
-		printf '#!/usr/bin/env bash\nexit 0\n' >"$SBF_SDK_DIR/scripts/$script_name"
-		chmod +x "$SBF_SDK_DIR/scripts/$script_name"
-	fi
-done
-
-cat >"$SBF_SDK_DIR/env.sh" <<'EOF'
-#
-# Configures the SBF SDK environment
-#
-
-if [ -z "$sbf_sdk" ]; then
-  sbf_sdk=.
+if [[ ! -d "$SBF_SDK_TEMPLATE_DIR" ]]; then
+	echo "missing agave SBF SDK at $SBF_SDK_TEMPLATE_DIR" >&2
+	exit 1
 fi
 
-# Ensure the sdk is installed
-"$sbf_sdk"/scripts/install.sh
-
-# Use the SDK's version of llvm to build the compiler-builtins for SBF
-export CC="$sbf_sdk/dependencies/platform-tools/llvm/bin/clang"
-export AR="$sbf_sdk/dependencies/platform-tools/llvm/bin/llvm-ar"
-export OBJDUMP="$sbf_sdk/dependencies/platform-tools/llvm/bin/llvm-objdump"
-export OBJCOPY="$sbf_sdk/dependencies/platform-tools/llvm/bin/llvm-objcopy"
-EOF
+if [[ -d "$SURFPOOL_LOG_DIR/platform-tools-sdk" ]]; then
+	chmod -R u+w "$SURFPOOL_LOG_DIR/platform-tools-sdk" || true
+	rm -rf "$SURFPOOL_LOG_DIR/platform-tools-sdk"
+fi
+mkdir -p "$SURFPOOL_LOG_DIR/platform-tools-sdk"
+cp -R "$SBF_SDK_TEMPLATE_DIR" "$SBF_SDK_DIR"
+chmod -R u+w "$SURFPOOL_LOG_DIR/platform-tools-sdk"
 
 "$CARGO_BUILD_SBF_BIN" \
 	--manifest-path "$EXAMPLE_DIR/Cargo.toml" \

@@ -123,8 +123,15 @@ in
     };
     "dylint-link" = {
       exec = ''
-        set -e
-        cargo bin dylint-link $@
+        set -euo pipefail
+
+        dylint_link_bin="$(find "$DEVENV_ROOT/.bin" -path '*/dylint-link/*/bin/dylint-link' | sort | tail -n 1)"
+        if [ -z "$dylint_link_bin" ]; then
+          echo "Missing dylint-link in $DEVENV_ROOT/.bin. Run 'install:cargo:bin'." >&2
+          exit 1
+        fi
+
+        "$dylint_link_bin" "$@"
       '';
       description = "The `dylint-link` executable";
       binary = "bash";
@@ -320,7 +327,9 @@ in
 
         # Symlink into the cache bin directory so it's discoverable on PATH.
         mkdir -p "$CACHE_DIR/bin"
-        ln -sf "$SBPF_BIN" "$CACHE_DIR/bin/sbpf-linker"
+        if [ "$SBPF_BIN" != "$CACHE_DIR/bin/sbpf-linker" ]; then
+          ln -sf "$SBPF_BIN" "$CACHE_DIR/bin/sbpf-linker"
+        fi
         export PATH="$CACHE_DIR/bin:$PATH"
 
         echo ""
@@ -485,6 +494,7 @@ in
       exec = ''
         set -e
         mkdir -p "$DEVENV_ROOT/target/coverage"
+        rm -rf "$DEVENV_ROOT/target/llvm-cov-target"
         cargo llvm-cov \
           --all-features \
           --locked \

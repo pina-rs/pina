@@ -12,4 +12,6 @@ exit_code: 2
 ----- stdout -----
 
 ----- stderr -----
-error: one of the values isn't valid for an argument
+error: a value is required for '--example <EXAMPLES>' but none was supplied
+
+For more information, try '--help'.
