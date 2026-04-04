@@ -107,8 +107,23 @@ in
     };
     "sbpf-linker" = {
       exec = ''
-        set -e
-        cargo bin sbpf-linker $@
+        set -euo pipefail
+
+        if [ -n "''${XDG_CACHE_HOME:-}" ]; then
+          CACHE_BASE="$XDG_CACHE_HOME"
+        elif [ -n "''${HOME:-}" ] && [ "$HOME" != "/" ]; then
+          CACHE_BASE="$HOME/.cache"
+        else
+          CACHE_BASE="$DEVENV_ROOT/.cache"
+        fi
+
+        gallery_sbpf_linker="$CACHE_BASE/sbpf-linker-upstream-gallery/bin/sbpf-linker"
+        if [ -x "$gallery_sbpf_linker" ]; then
+          "$gallery_sbpf_linker" "$@"
+          exit 0
+        fi
+
+        cargo bin sbpf-linker "$@"
       '';
       description = "The `sbpf-linker` executable";
       binary = "bash";
@@ -119,6 +134,23 @@ in
         cargo bin solana-verify $@
       '';
       description = "The `solana-verify` executable";
+      binary = "bash";
+    };
+    "dylint-link" = {
+      exec = ''
+        set -euo pipefail
+
+        manual_root="$DEVENV_ROOT/.bin/manual/dylint-link/5.0.0"
+        dylint_link_bin="$manual_root/bin/dylint-link"
+
+        if [ ! -x "$dylint_link_bin" ]; then
+          mkdir -p "$manual_root"
+          cargo install dylint-link --version 5.0.0 --root "$manual_root" --locked --bin dylint-link
+        fi
+
+        "$dylint_link_bin" "$@"
+      '';
+      description = "The `dylint-link` executable";
       binary = "bash";
     };
     "pina" = {
@@ -312,7 +344,9 @@ in
 
         # Symlink into the cache bin directory so it's discoverable on PATH.
         mkdir -p "$CACHE_DIR/bin"
-        ln -sf "$SBPF_BIN" "$CACHE_DIR/bin/sbpf-linker"
+        if [ "$SBPF_BIN" != "$CACHE_DIR/bin/sbpf-linker" ]; then
+          ln -sf "$SBPF_BIN" "$CACHE_DIR/bin/sbpf-linker"
+        fi
         export PATH="$CACHE_DIR/bin:$PATH"
 
         echo ""
@@ -477,6 +511,7 @@ in
       exec = ''
         set -e
         mkdir -p "$DEVENV_ROOT/target/coverage"
+        rm -rf "$DEVENV_ROOT/target/llvm-cov-target"
         cargo llvm-cov \
           --all-features \
           --locked \
@@ -548,10 +583,14 @@ in
         set -e
 
         cargo_dylint_bin="$(find "$DEVENV_ROOT/.bin" -path '*/cargo-dylint/*/bin/cargo-dylint' | sort | tail -n 1)"
-        dylint_link_bin="$(find "$DEVENV_ROOT/.bin" -path '*/dylint-link/*/bin/dylint-link' | sort | tail -n 1)"
 
-        if [ -z "$cargo_dylint_bin" ] || [ -z "$dylint_link_bin" ]; then
-          echo "Missing cargo-dylint or dylint-link in $DEVENV_ROOT/.bin. Run 'install:cargo:bin'." >&2
+        if [ -z "$cargo_dylint_bin" ]; then
+          echo "Missing cargo-dylint in $DEVENV_ROOT/.bin. Run 'install:cargo:bin'." >&2
+          exit 1
+        fi
+
+        if ! command -v dylint-link >/dev/null 2>&1; then
+          echo "Missing dylint-link command. Run 'install:cargo:bin'." >&2
           exit 1
         fi
 
@@ -573,8 +612,7 @@ in
           exit 1
         fi
 
-        PATH="$(dirname "$dylint_link_bin"):$PATH" \
-          CARGO_INCREMENTAL=0 \
+        CARGO_INCREMENTAL=0 \
           "$cargo_dylint_bin" dylint --all --no-deps "''${package_args[@]}" -- --all-features --all-targets --locked
       '';
       description = "Run custom security dylint checks against the example and security program crates.";

@@ -559,7 +559,8 @@ mod tests {
 				cargo_toml_path.display()
 			)
 		});
-		assert!(cargo_toml.contains("bytemuck = { workspace = true }"));
+		assert!(cargo_toml.contains("bytemuck = { workspace = true , default-features = true }"));
+		assert!(cargo_toml.contains("solana-cpi = { workspace = true , default-features = true }"));
 		assert!(cargo_toml.contains("pina_pod_primitives = { workspace = true }"));
 		assert!(!cargo_toml.contains("borsh = { workspace = true }"));
 	}

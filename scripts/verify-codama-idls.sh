@@ -11,6 +11,26 @@ if ! command -v git >/dev/null 2>&1; then
 	exit 1
 fi
 
+show_codama_diff() {
+	echo >&2
+	echo "Codama output status:" >&2
+	git -C "$ROOT" --no-pager status --short -- "$IDL_DIR" "$RUST_CLIENTS_DIR" "$JS_CLIENTS_DIR" >&2 || true
+	echo >&2
+	echo "Codama output diff stat:" >&2
+	git -C "$ROOT" --no-pager diff --stat -- "$IDL_DIR" "$RUST_CLIENTS_DIR" "$JS_CLIENTS_DIR" >&2 || true
+	echo >&2
+	echo "Codama output diff:" >&2
+	git -C "$ROOT" --no-pager diff -- "$IDL_DIR" "$RUST_CLIENTS_DIR" "$JS_CLIENTS_DIR" >&2 || true
+}
+
+trap '
+	status=$?
+	if [ "$status" -ne 0 ]; then
+		echo "verify-codama-idls.sh failed with exit code $status" >&2
+		show_codama_diff
+	fi
+' EXIT
+
 echo "Installing pnpm workspace dependencies..."
 pnpm install --frozen-lockfile
 
@@ -65,7 +85,7 @@ diff_status="$(
 )"
 if [ -n "$diff_status" ]; then
 	echo "Detected Codama output diff after regeneration. Output must be committed and deterministic." >&2
-	git -C "$ROOT" --no-pager status --short -- "$IDL_DIR" "$RUST_CLIENTS_DIR" "$JS_CLIENTS_DIR" >&2
+	show_codama_diff
 	exit 1
 fi
 

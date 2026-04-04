@@ -117,6 +117,16 @@ jobs:
         run: test:idl
         shell: devenv shell -c -- bash -e {0}
 
+      - name: show codama diff on failure
+        if: failure()
+        run: |
+          git --no-pager status --short -- codama/idls codama/clients/rust codama/clients/js
+          echo
+          git --no-pager diff --stat -- codama/idls codama/clients/rust codama/clients/js
+          echo
+          git --no-pager diff -- codama/idls codama/clients/rust codama/clients/js
+        shell: bash
+
   build:
     timeout-minutes: 60
     runs-on: blacksmith-2vcpu-ubuntu-2404
