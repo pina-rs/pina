@@ -121,6 +121,14 @@ in
       description = "The `solana-verify` executable";
       binary = "bash";
     };
+    "dylint-link" = {
+      exec = ''
+        set -e
+        cargo bin dylint-link $@
+      '';
+      description = "The `dylint-link` executable";
+      binary = "bash";
+    };
     "pina" = {
       exec = ''
         set -e
@@ -548,10 +556,14 @@ in
         set -e
 
         cargo_dylint_bin="$(find "$DEVENV_ROOT/.bin" -path '*/cargo-dylint/*/bin/cargo-dylint' | sort | tail -n 1)"
-        dylint_link_bin="$(find "$DEVENV_ROOT/.bin" -path '*/dylint-link/*/bin/dylint-link' | sort | tail -n 1)"
 
-        if [ -z "$cargo_dylint_bin" ] || [ -z "$dylint_link_bin" ]; then
-          echo "Missing cargo-dylint or dylint-link in $DEVENV_ROOT/.bin. Run 'install:cargo:bin'." >&2
+        if [ -z "$cargo_dylint_bin" ]; then
+          echo "Missing cargo-dylint in $DEVENV_ROOT/.bin. Run 'install:cargo:bin'." >&2
+          exit 1
+        fi
+
+        if ! command -v dylint-link >/dev/null 2>&1; then
+          echo "Missing dylint-link command. Run 'install:cargo:bin'." >&2
           exit 1
         fi
 
@@ -573,8 +585,7 @@ in
           exit 1
         fi
 
-        PATH="$(dirname "$dylint_link_bin"):$PATH" \
-          CARGO_INCREMENTAL=0 \
+        CARGO_INCREMENTAL=0 \
           "$cargo_dylint_bin" dylint --all --no-deps "''${package_args[@]}" -- --all-features --all-targets --locked
       '';
       description = "Run custom security dylint checks against the example and security program crates.";
