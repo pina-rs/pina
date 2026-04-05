@@ -115,11 +115,7 @@ fn derive_ata(wallet: &Pubkey, mint: &Pubkey) -> Pubkey {
 	let token_program = spl_token_program_id();
 	let ata_program = spl_ata_program_id();
 	let (ata, _bump) = Pubkey::find_program_address(
-		&[
-			wallet.as_ref(),
-			token_program.as_ref(),
-			mint.as_ref(),
-		],
+		&[wallet.as_ref(), token_program.as_ref(), mint.as_ref()],
 		&ata_program,
 	);
 	ata
@@ -206,7 +202,13 @@ fn claim_ix_data(amount: u64) -> Vec<u8> {
 }
 
 /// Build instruction data for Initialize.
-fn initialize_ix_data(total_amount: u64, start_ts: u64, cliff_ts: u64, end_ts: u64, bump: u8) -> Vec<u8> {
+fn initialize_ix_data(
+	total_amount: u64,
+	start_ts: u64,
+	cliff_ts: u64,
+	end_ts: u64,
+	bump: u8,
+) -> Vec<u8> {
 	let ix = InitializeInstruction::builder()
 		.total_amount(PodU64::from_primitive(total_amount))
 		.start_ts(PodU64::from_primitive(start_ts))
@@ -232,9 +234,9 @@ fn token_program_account() -> (Pubkey, Account) {
 	)
 }
 
-const SKIP_MSG: &str = "[SKIP] vesting_program SBF binary not found. Build it first with \
-	`cargo build --release --target bpfel-unknown-none -p vesting_program -Z build-std -F \
-	bpf-entrypoint`.";
+const SKIP_MSG: &str = "[SKIP] vesting_program SBF binary not found. Build it first with `cargo \
+                        build --release --target bpfel-unknown-none -p vesting_program -Z \
+                        build-std -F bpf-entrypoint`.";
 
 // ---------------------------------------------------------------------------
 // Cancel Tests
@@ -262,16 +264,19 @@ fn cancel_sets_cancelled_flag() {
 		program_id(),
 		&cancel_ix_data(),
 		vec![
-			AccountMeta::new_readonly(admin, true),          // admin (signer)
-			AccountMeta::new_readonly(mint, false),           // mint
-			AccountMeta::new(vesting_pda, false),             // vesting_state (writable)
-			AccountMeta::new(vault, false),                   // vault (writable)
+			AccountMeta::new_readonly(admin, true), // admin (signer)
+			AccountMeta::new_readonly(mint, false), // mint
+			AccountMeta::new(vesting_pda, false),   // vesting_state (writable)
+			AccountMeta::new(vault, false),         // vault (writable)
 			AccountMeta::new_readonly(spl_token_program_id(), false), // token_program
 		],
 	);
 
 	let accounts = vec![
-		(admin, Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id())),
+		(
+			admin,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
 		(mint, mock_mint_account(1_000_000)),
 		(
 			vesting_pda,
@@ -343,7 +348,10 @@ fn cancel_already_cancelled_fails() {
 	);
 
 	let accounts = vec![
-		(admin, Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id())),
+		(
+			admin,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
 		(mint, mock_mint_account(1_000_000)),
 		(
 			vesting_pda,
@@ -405,7 +413,10 @@ fn cancel_wrong_admin_fails() {
 	);
 
 	let accounts = vec![
-		(wrong_admin, Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id())),
+		(
+			wrong_admin,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
 		(mint, mock_mint_account(1_000_000)),
 		(
 			vesting_pda,
@@ -466,18 +477,21 @@ fn claim_already_cancelled_fails() {
 		program_id(),
 		&claim_ix_data(100),
 		vec![
-			AccountMeta::new_readonly(beneficiary, true),     // beneficiary (signer)
-			AccountMeta::new_readonly(mint, false),            // mint
-			AccountMeta::new(vesting_pda, false),              // vesting_state (writable)
-			AccountMeta::new(beneficiary_ata, false),          // beneficiary_ata (writable)
-			AccountMeta::new(vault, false),                    // vault (writable)
+			AccountMeta::new_readonly(beneficiary, true), // beneficiary (signer)
+			AccountMeta::new_readonly(mint, false),       // mint
+			AccountMeta::new(vesting_pda, false),         // vesting_state (writable)
+			AccountMeta::new(beneficiary_ata, false),     // beneficiary_ata (writable)
+			AccountMeta::new(vault, false),               // vault (writable)
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 		],
 	);
 
 	let accounts = vec![
-		(beneficiary, Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id())),
+		(
+			beneficiary,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
 		(mint, mock_mint_account(1_000_000)),
 		(
 			vesting_pda,
@@ -543,7 +557,10 @@ fn claim_too_large_fails() {
 	);
 
 	let accounts = vec![
-		(beneficiary, Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id())),
+		(
+			beneficiary,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
 		(mint, mock_mint_account(1_000_000)),
 		(
 			vesting_pda,
@@ -551,8 +568,8 @@ fn claim_too_large_fails() {
 				&admin,
 				&beneficiary,
 				&mint,
-				1_000,  // total_amount
-				500,    // already claimed
+				1_000, // total_amount
+				500,   // already claimed
 				100,
 				200,
 				300,
@@ -610,7 +627,10 @@ fn claim_wrong_beneficiary_fails() {
 	);
 
 	let accounts = vec![
-		(wrong_beneficiary, Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id())),
+		(
+			wrong_beneficiary,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
 		(mint, mock_mint_account(1_000_000)),
 		(
 			vesting_pda,
@@ -678,8 +698,14 @@ fn initialize_invalid_schedule_start_after_cliff() {
 	);
 
 	let accounts = vec![
-		(admin, Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id())),
-		(beneficiary, Account::new(0, 0, &solana_sdk_ids::system_program::id())),
+		(
+			admin,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
+		(
+			beneficiary,
+			Account::new(0, 0, &solana_sdk_ids::system_program::id()),
+		),
 		(mint, mock_mint_account(1_000_000)),
 		(vesting_pda, Account::default()),
 		(vault, Account::default()),
@@ -723,8 +749,14 @@ fn initialize_invalid_schedule_cliff_after_end() {
 	);
 
 	let accounts = vec![
-		(admin, Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id())),
-		(beneficiary, Account::new(0, 0, &solana_sdk_ids::system_program::id())),
+		(
+			admin,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
+		(
+			beneficiary,
+			Account::new(0, 0, &solana_sdk_ids::system_program::id()),
+		),
 		(mint, mock_mint_account(1_000_000)),
 		(vesting_pda, Account::default()),
 		(vault, Account::default()),
@@ -774,7 +806,10 @@ fn benchmark_cu_cancel() {
 	);
 
 	let accounts = vec![
-		(admin, Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id())),
+		(
+			admin,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
 		(mint, mock_mint_account(1_000_000)),
 		(
 			vesting_pda,
