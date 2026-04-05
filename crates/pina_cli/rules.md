@@ -2,19 +2,13 @@
 
 These rules describe the source shapes Pina's IDL extractor recognizes most reliably. If you stay inside them, `pina idl` and `pina codama generate` should produce stable, complete output.
 
-## 1. Start from `src/lib.rs`, but do not force a single-file crate
+## 1. Parser entrypoint and module graph
 
 - Keep `declare_id!` in the crate once and only once.
-- The parser starts at `src/lib.rs` and follows normal `mod` declarations.
-- Multi-file programs are supported and recommended for anything beyond a toy example.
-- A clean split is usually:
-  - `lib.rs` for entrypoint wiring and top-level exports.
-  - `accounts.rs` for `#[derive(Accounts)]` structs.
-  - `instructions.rs` for instruction payloads and discriminators.
-  - `state.rs` for `#[account]` types.
-  - `errors.rs` for custom errors.
-  - `pda.rs` or `seeds.rs` for PDA helpers and seed constants.
-  - `entrypoint.rs` for `process_instruction` if you want to keep `lib.rs` small.
+- Pina starts parsing from `src/lib.rs` and recursively follows `mod` declarations.
+- The parser does **not** require a single-file layout, but it only sees files that are reachable from this module graph.
+- Any module names are fine (for example `accounts`, `instructions`, `state`, or custom names) as long as they’re connected from `lib.rs`.
+- Avoid placing IDL-relevant definitions behind `mod` paths the parser never visits.
 
 ## 2. Make instruction and account discriminators explicit
 
