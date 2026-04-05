@@ -22,13 +22,13 @@ The discriminator-first model makes byte layout part of protocol compatibility. 
 
 ## Discriminator and payload versioning
 
-| Change | Compatibility impact |
-| --- | --- |
-| Add a new enum variant | Usually backward-compatible if old clients ignore unknown variants |
-| Change an existing variant value | **Breaking** for every historical byte slice |
-| Reorder or remove struct fields | **Breaking** (offsets change) |
-| Append fields to a struct | Mostly non-breaking, but consumers must accept the larger size |
-| Switch primitive width (`u8` → `u16`, etc.) | **Breaking** for serialized payloads at that boundary |
+| Change                                      | Compatibility impact                                               |
+| ------------------------------------------- | ------------------------------------------------------------------ |
+| Add a new enum variant                      | Usually backward-compatible if old clients ignore unknown variants |
+| Change an existing variant value            | **Breaking** for every historical byte slice                       |
+| Reorder or remove struct fields             | **Breaking** (offsets change)                                      |
+| Append fields to a struct                   | Mostly non-breaking, but consumers must accept the larger size     |
+| Switch primitive width (`u8` → `u16`, etc.) | **Breaking** for serialized payloads at that boundary              |
 
 For on-chain accounts, treat layout as part of protocol ABI:
 
