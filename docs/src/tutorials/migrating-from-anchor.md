@@ -206,6 +206,101 @@ Benefits of explicit discriminators:
 - Single byte by default (configurable to u16/u32/u64), saving space.
 - No hidden behavior -- you control the exact values.
 
+## Migration from fixed 8-byte prefixes (Anchor-compatible data)
+
+If you are coming from Anchor/Borsh with implicit 8-byte discriminators, there are two practical migration paths:
+
+### 1) Keep old on-chain layouts and add compatibility readers
+
+Use a lightweight adapter struct for legacy decoding, then convert into a pinned Pina struct in memory. This is useful when you cannot migrate all existing accounts immediately.
+
+```rust
+#[repr(C)]
+pub struct LegacyAccountV0 {
+	discriminator: [u8; 8],
+	owner: [u8; 32],
+	value: PodU64,
+}
+
+#[discriminator]
+pub enum MyAccountType {
+	MyAccountV0 = 0,
+	MyAccount = 1,
+}
+
+impl LegacyAccountV0 {
+	pub fn into_live(self) -> Result<MyAccount, ProgramError> {
+		if self.discriminator != LEGACY_ACCOUNT_DISCRIMINATOR {
+			return Err(ProgramError::InvalidAccountData);
+		}
+		Ok(MyAccount {
+			discriminator: [MyAccountType::MyAccount as u8],
+			owner: self.owner,
+			value: self.value,
+		})
+	}
+}
+```
+
+### 2) Migrate state in place (recommended for production)
+
+For long-lived accounts, add a migration instruction that rewrites every stored account from the legacy header to the new first-field discriminator layout. This gives you one canonical on-chain schema thereafter.
+
+<!-- {=pinaDiscriminatorLayoutDecisionMatrix} -->
+
+## Discriminator layout decision matrix
+
+The discriminator strategy determines byte layout, parser guarantees, and cross-protocol compatibility.
+
+| Goal | Recommended layout |
+| --- | --- |
+| Keep layout **minimal and zero-copy** while staying explicit | **Current Pina model**: discriminator bytes are the first field inside `#[account]`, `#[instruction]`, and `#[event]` structs. |
+| Preserve compatibility with existing Anchor-account payloads (SHA-256 hash prefixes) | **Legacy adapter model**: custom raw wrapper types parse/write the existing 8-byte external prefix before converting to typed structs. |
+| Minimize account size growth when you have many types | **Use `u8`** (default) discriminator width. |
+| You need more than 256 route variants | **Use `u16` / `u32` / `u64`** by setting `#[discriminator(primitive = ...)]`. |
+| Avoid schema migrations across existing serialized data | Keep existing field order and discriminator values; only append fields. |
+
+### Raw discriminator width by use-case
+
+| Width | Max variants | Storage cost (bytes) | Recommended when |
+| --- | --- | --- | --- |
+| `u8` | 256 | 1 | Most programs and instructions |
+| `u16` | 65,536 | 2 | Medium-large routing tables and explicit version partitioning |
+| `u32` | 4,294,967,296 | 4 | Very large enums, rarely needed |
+| `u64` | 18,446,744,073,709,551,616 | 8 | Legacy interoperability shims or reserved growth |
+
+- Discriminator width only affects the first field bytes.
+- Widths above 8 are rejected at macro expansion time.
+- Wider discriminators improve variant space, but increase CPI payload and account rent by the exact number of bytes.
+
+<!-- {/pinaDiscriminatorLayoutDecisionMatrix} -->
+
+<!-- {=pinaDiscriminatorVersionCompatibility} -->
+
+## Discriminator and payload versioning
+
+| Change | Compatibility impact |
+| --- | --- |
+| Add a new enum variant | Usually backward-compatible if old clients ignore unknown variants |
+| Change an existing variant value | **Breaking** for every historical byte slice |
+| Reorder or remove struct fields | **Breaking** (offsets change) |
+| Append fields to a struct | Mostly non-breaking, but consumers must accept the larger size |
+| Switch primitive width (`u8` → `u16`, etc.) | **Breaking** for serialized payloads at that boundary |
+
+For on-chain accounts, treat layout as part of protocol ABI:
+
+- Keep field order stable.
+- Introduce optional `version` fields at the tail for in-place migration strategies.
+- Never change existing discriminator values in place.
+- When incompatible layout changes are required, perform explicit migration with a new account version and an operator upgrade flow.
+
+For instruction payloads:
+
+- Prefer additive migration: add a new variant and keep legacy handlers for a release cycle.
+- Reject stale payload shapes with explicit errors rather than silently reinterpreting bytes.
+
+<!-- {/pinaDiscriminatorVersionCompatibility} -->
+
 ## Errors
 
 <br>

@@ -27,6 +27,16 @@ const __EMPTYEVENT_ALIGNMENT_ASSERTIONS__: () = {
         stringify!([u8; EventDisc::BYTES]),
         "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
     );
+    ::core::assert!(
+        ::core::mem::align_of:: < EmptyEvent > () == 1,
+        concat!("The alignment of struct `", stringify!(EmptyEvent),
+        "` should be one so it can be used for zero-copy Pod casts.")
+    );
+    ::core::assert!(
+        ::core::mem::size_of:: < EmptyEvent > () == (0usize + ::core::mem::size_of:: <
+        [u8; EventDisc::BYTES] > ()), concat!("`", stringify!(EmptyEvent),
+        "` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed.")
+    );
 };
 impl EmptyEvent {
     pub fn to_bytes(&self) -> &[u8] {

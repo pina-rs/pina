@@ -52,6 +52,18 @@ const __BALANCEACCOUNT_ALIGNMENT_ASSERTIONS__: () = {
         "is_frozen", "` with type `", stringify!(PodBool),
         "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
     );
+    ::core::assert!(
+        ::core::mem::align_of:: < BalanceAccount > () == 1,
+        concat!("The alignment of struct `", stringify!(BalanceAccount),
+        "` should be one so it can be used for zero-copy Pod casts.")
+    );
+    ::core::assert!(
+        ::core::mem::size_of:: < BalanceAccount > () == (0usize + ::core::mem::size_of::
+        < [u8; MyDiscriminator::BYTES] > () + ::core::mem::size_of:: < [u8; 32] > () +
+        ::core::mem::size_of:: < PodU64 > () + ::core::mem::size_of:: < u8 > () +
+        ::core::mem::size_of:: < PodBool > ()), concat!("`", stringify!(BalanceAccount),
+        "` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed.")
+    );
 };
 impl BalanceAccount {
     /// Zero out all bytes in the struct including padding bytes. This can be useful when closing an account.

@@ -39,6 +39,17 @@ const __TRANSFERDATA_ALIGNMENT_ASSERTIONS__: () = {
         "destination", "` with type `", stringify!([u8; 32]),
         "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
     );
+    ::core::assert!(
+        ::core::mem::align_of:: < TransferData > () == 1,
+        concat!("The alignment of struct `", stringify!(TransferData),
+        "` should be one so it can be used for zero-copy Pod casts.")
+    );
+    ::core::assert!(
+        ::core::mem::size_of:: < TransferData > () == (0usize + ::core::mem::size_of:: <
+        [u8; OpCode::BYTES] > () + ::core::mem::size_of:: < PodU64 > () +
+        ::core::mem::size_of:: < [u8; 32] > ()), concat!("`", stringify!(TransferData),
+        "` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed.")
+    );
 };
 impl TransferData {
     pub fn to_bytes(&self) -> &[u8] {

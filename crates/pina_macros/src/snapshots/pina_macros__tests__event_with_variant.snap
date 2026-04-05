@@ -35,6 +35,17 @@ const __INITIALIZEEVENT_ALIGNMENT_ASSERTIONS__: () = {
         "choice", "` with type `", stringify!(u8),
         "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
     );
+    ::core::assert!(
+        ::core::mem::align_of:: < InitializeEvent > () == 1,
+        concat!("The alignment of struct `", stringify!(InitializeEvent),
+        "` should be one so it can be used for zero-copy Pod casts.")
+    );
+    ::core::assert!(
+        ::core::mem::size_of:: < InitializeEvent > () == (0usize + ::core::mem::size_of::
+        < [u8; EventKind::BYTES] > () + ::core::mem::size_of:: < u8 > ()), concat!("`",
+        stringify!(InitializeEvent),
+        "` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed.")
+    );
 };
 impl InitializeEvent {
     pub fn to_bytes(&self) -> &[u8] {

@@ -53,6 +53,19 @@ const __COMPLEXINSTRUCTION_ALIGNMENT_ASSERTIONS__: () = {
         "flags", "` with type `", stringify!([u8; 4]),
         "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
     );
+    ::core::assert!(
+        ::core::mem::align_of:: < ComplexInstruction > () == 1,
+        concat!("The alignment of struct `", stringify!(ComplexInstruction),
+        "` should be one so it can be used for zero-copy Pod casts.")
+    );
+    ::core::assert!(
+        ::core::mem::size_of:: < ComplexInstruction > () == (0usize +
+        ::core::mem::size_of:: < [u8; MyInstruction::BYTES] > () + ::core::mem::size_of::
+        < [u8; 32] > () + ::core::mem::size_of:: < PodU64 > () + ::core::mem::size_of:: <
+        u8 > () + ::core::mem::size_of:: < [u8; 4] > ()), concat!("`",
+        stringify!(ComplexInstruction),
+        "` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed.")
+    );
 };
 impl ComplexInstruction {
     pub fn to_bytes(&self) -> &[u8] {

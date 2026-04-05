@@ -15,6 +15,13 @@ pub enum U32Discriminator {
     B = 1000,
     C = 2000,
 }
+const _: () = {
+    ::core::assert!(
+        ::core::mem::size_of:: < u32 > () <= ::pina::MAX_DISCRIMINATOR_SPACE,
+        concat!("A discriminator with primitive `", stringify!(u32),
+        "` exceeds `MAX_DISCRIMINATOR_SPACE` and cannot be safely used for zero-copy layouts.")
+    );
+};
 impl ::core::convert::From<U32Discriminator> for u32 {
     #[inline]
     fn from(enum_value: U32Discriminator) -> Self {
