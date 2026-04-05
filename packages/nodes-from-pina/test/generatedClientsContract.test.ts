@@ -1,75 +1,76 @@
 import { describe, expect, test } from "vitest";
 
 import {
+	CANCEL_DISCRIMINATOR as VESTING_CANCEL_DISCRIMINATOR,
+	CLAIM_DISCRIMINATOR as VESTING_CLAIM_DISCRIMINATOR,
 	getCancelInstruction,
+	getClaimInstruction,
+	getClaimInstructionDataDecoder,
+	getInitializeInstruction as getVestingInitializeInstruction,
+	getInitializeInstructionDataDecoder,
+	INITIALIZE_DISCRIMINATOR as VESTING_INITIALIZE_DISCRIMINATOR,
 	parseCancelInstruction,
 	parseClaimInstruction,
 	parseInitializeInstruction,
-	getClaimInstruction,
-	getInitializeInstruction as getVestingInitializeInstruction,
-	getClaimInstructionDataDecoder,
-	getInitializeInstructionDataDecoder,
-	INITIALIZE_DISCRIMINATOR as VESTING_INITIALIZE_DISCRIMINATOR,
-	CLAIM_DISCRIMINATOR as VESTING_CLAIM_DISCRIMINATOR,
-	CANCEL_DISCRIMINATOR as VESTING_CANCEL_DISCRIMINATOR,
 } from "../../../codama/clients/js/vesting_program/src/generated/instructions";
 import {
 	identifyVestingProgramInstruction,
-	VestingProgramInstruction,
 	VESTING_PROGRAM_PROGRAM_ADDRESS,
+	VestingProgramInstruction,
 } from "../../../codama/clients/js/vesting_program/src/generated/programs";
 
 import {
-	getInitializeInstruction as getRoleInitializeInstruction,
-	parseInitializeInstruction as parseRoleInitializeInstruction,
-	parseAddRoleInstruction,
-	parseDeactivateRoleInstruction,
-	parseRotateAdminInstruction,
-	parseUpdateRoleInstruction,
+	ADD_ROLE_DISCRIMINATOR as ROLE_ADD_ROLE_DISCRIMINATOR,
+	DEACTIVATE_ROLE_DISCRIMINATOR as ROLE_DEACTIVATE_ROLE_DISCRIMINATOR,
 	getAddRoleInstruction,
-	getUpdateRoleInstruction,
-	getDeactivateRoleInstruction,
-	getRotateAdminInstruction,
-	getInitializeInstructionDataDecoder as getRoleInitializeInstructionDataDecoder,
 	getAddRoleInstructionDataDecoder,
+	getDeactivateRoleInstruction,
+	getInitializeInstruction as getRoleInitializeInstruction,
+	getInitializeInstructionDataDecoder
+		as getRoleInitializeInstructionDataDecoder,
+	getRotateAdminInstruction,
+	getUpdateRoleInstruction,
 	getUpdateRoleInstructionDataDecoder,
 	INITIALIZE_DISCRIMINATOR as ROLE_INITIALIZE_DISCRIMINATOR,
-	ADD_ROLE_DISCRIMINATOR as ROLE_ADD_ROLE_DISCRIMINATOR,
-	UPDATE_ROLE_DISCRIMINATOR as ROLE_UPDATE_ROLE_DISCRIMINATOR,
-	DEACTIVATE_ROLE_DISCRIMINATOR as ROLE_DEACTIVATE_ROLE_DISCRIMINATOR,
+	parseAddRoleInstruction,
+	parseDeactivateRoleInstruction,
+	parseInitializeInstruction as parseRoleInitializeInstruction,
+	parseRotateAdminInstruction,
+	parseUpdateRoleInstruction,
 	ROTATE_ADMIN_DISCRIMINATOR as ROLE_ROTATE_ADMIN_DISCRIMINATOR,
+	UPDATE_ROLE_DISCRIMINATOR as ROLE_UPDATE_ROLE_DISCRIMINATOR,
 } from "../../../codama/clients/js/role_registry_program/src/generated/instructions";
 import {
 	identifyRoleRegistryProgramInstruction,
-	RoleRegistryProgramInstruction,
 	ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS,
+	RoleRegistryProgramInstruction,
 } from "../../../codama/clients/js/role_registry_program/src/generated/programs";
 
 import {
-	getInitializePoolInstruction,
-	getOpenPositionInstruction,
-	getDepositInstruction,
-	getWithdrawInstruction,
+	CLAIM_DISCRIMINATOR as STAKING_CLAIM_DISCRIMINATOR,
+	DEPOSIT_DISCRIMINATOR as STAKING_DEPOSIT_DISCRIMINATOR,
 	getClaimInstruction as getStakingClaimInstruction,
-	parseInitializePoolInstruction,
-	parseOpenPositionInstruction,
-	parseDepositInstruction,
-	parseWithdrawInstruction,
-	parseClaimInstruction as parseStakingClaimInstruction,
-	getInitializePoolInstructionDataDecoder,
-	getOpenPositionInstructionDataDecoder,
+	getDepositInstruction,
 	getDepositInstructionDataDecoder,
+	getInitializePoolInstruction,
+	getInitializePoolInstructionDataDecoder,
+	getOpenPositionInstruction,
+	getOpenPositionInstructionDataDecoder,
+	getWithdrawInstruction,
 	getWithdrawInstructionDataDecoder,
 	INITIALIZE_POOL_DISCRIMINATOR as STAKING_INITIALIZE_POOL_DISCRIMINATOR,
 	OPEN_POSITION_DISCRIMINATOR as STAKING_OPEN_POSITION_DISCRIMINATOR,
-	DEPOSIT_DISCRIMINATOR as STAKING_DEPOSIT_DISCRIMINATOR,
+	parseClaimInstruction as parseStakingClaimInstruction,
+	parseDepositInstruction,
+	parseInitializePoolInstruction,
+	parseOpenPositionInstruction,
+	parseWithdrawInstruction,
 	WITHDRAW_DISCRIMINATOR as STAKING_WITHDRAW_DISCRIMINATOR,
-	CLAIM_DISCRIMINATOR as STAKING_CLAIM_DISCRIMINATOR,
 } from "../../../codama/clients/js/staking_rewards_program/src/generated/instructions";
 import {
 	identifyStakingRewardsProgramInstruction,
-	StakingRewardsProgramInstruction,
 	STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
+	StakingRewardsProgramInstruction,
 } from "../../../codama/clients/js/staking_rewards_program/src/generated/programs";
 
 const SYSTEM_PROGRAM_ADDRESS = "11111111111111111111111111111111";
@@ -77,10 +78,11 @@ const SYSTEM_PROGRAM_ADDRESS = "11111111111111111111111111111111";
 const READONLY = 0;
 const WRITABLE = 1;
 
-
 type AccountExpectation = { address: string; role: number };
 
-function accountRole(account: { role?: number; isSigner?: boolean; isWritable?: boolean }): number {
+function accountRole(
+	account: { role?: number; isSigner?: boolean; isWritable?: boolean },
+): number {
 	if (typeof account.role === "number") return account.role;
 	if (account.isSigner === true && account.isWritable === true) return 3;
 	if (account.isSigner === true) return 2;
@@ -89,7 +91,12 @@ function accountRole(account: { role?: number; isSigner?: boolean; isWritable?: 
 }
 
 function expectAccountsMatch(
-	accounts: readonly { address: string; role?: number; isSigner?: boolean; isWritable?: boolean }[],
+	accounts: readonly {
+		address: string;
+		role?: number;
+		isSigner?: boolean;
+		isWritable?: boolean;
+	}[],
 	expectations: readonly AccountExpectation[],
 ) {
 	expect(accounts).toHaveLength(expectations.length);
@@ -132,7 +139,9 @@ describe("vesting JS client contracts", () => {
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
 		]);
-		const initializeData = getInitializeInstructionDataDecoder().decode(initialize.data);
+		const initializeData = getInitializeInstructionDataDecoder().decode(
+			initialize.data,
+		);
 		expect(initializeData.totalAmount).toBe(500n);
 		expect(initializeData.startTs).toBe(111n);
 		expect(initializeData.bump).toBe(9);
@@ -156,7 +165,9 @@ describe("vesting JS client contracts", () => {
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
 		]);
-		expect(getClaimInstructionDataDecoder().decode(claim.data).amount).toBe(25n);
+		expect(getClaimInstructionDataDecoder().decode(claim.data).amount).toBe(
+			25n,
+		);
 		expect(parseClaimInstruction(claim).data.amount).toBe(25n);
 
 		const cancel = getCancelInstruction({
@@ -178,13 +189,25 @@ describe("vesting JS client contracts", () => {
 	});
 
 	test("vesting discriminators are identified by instruction helpers", () => {
-		expect(identifyVestingProgramInstruction({ data: new Uint8Array([VESTING_INITIALIZE_DISCRIMINATOR]) })).toBe(
+		expect(
+			identifyVestingProgramInstruction({
+				data: new Uint8Array([VESTING_INITIALIZE_DISCRIMINATOR]),
+			}),
+		).toBe(
 			VestingProgramInstruction.Initialize,
 		);
-		expect(identifyVestingProgramInstruction({ data: new Uint8Array([VESTING_CLAIM_DISCRIMINATOR]) })).toBe(
+		expect(
+			identifyVestingProgramInstruction({
+				data: new Uint8Array([VESTING_CLAIM_DISCRIMINATOR]),
+			}),
+		).toBe(
 			VestingProgramInstruction.Claim,
 		);
-		expect(identifyVestingProgramInstruction({ data: new Uint8Array([VESTING_CANCEL_DISCRIMINATOR]) })).toBe(
+		expect(
+			identifyVestingProgramInstruction({
+				data: new Uint8Array([VESTING_CANCEL_DISCRIMINATOR]),
+			}),
+		).toBe(
 			VestingProgramInstruction.Cancel,
 		);
 	});
@@ -213,7 +236,8 @@ describe("role registry JS client contracts", () => {
 			{ address: registryConfig, role: WRITABLE },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 		]);
-		expect(getRoleInitializeInstructionDataDecoder().decode(init.data).bump).toBe(8);
+		expect(getRoleInitializeInstructionDataDecoder().decode(init.data).bump)
+			.toBe(8);
 		expect(parseRoleInitializeInstruction(init).data.bump).toBe(8);
 
 		const addRole = getAddRoleInstruction({
@@ -249,7 +273,9 @@ describe("role registry JS client contracts", () => {
 			{ address: registryConfig, role: WRITABLE },
 			{ address: roleEntry, role: WRITABLE },
 		]);
-		expect(getUpdateRoleInstructionDataDecoder().decode(updateRole.data).permissions).toBe(
+		expect(
+			getUpdateRoleInstructionDataDecoder().decode(updateRole.data).permissions,
+		).toBe(
 			42n,
 		);
 		expect(parseUpdateRoleInstruction(updateRole).data.permissions).toBe(42n);
@@ -264,7 +290,9 @@ describe("role registry JS client contracts", () => {
 			{ address: registryConfig, role: WRITABLE },
 			{ address: roleEntry, role: WRITABLE },
 		]);
-		expect(parseDeactivateRoleInstruction(deactivateRole).accounts.roleEntry.address).toBe(roleEntry);
+		expect(
+			parseDeactivateRoleInstruction(deactivateRole).accounts.roleEntry.address,
+		).toBe(roleEntry);
 		expect(deactivateRole).not.toHaveProperty("data");
 
 		const rotateAdmin = getRotateAdminInstruction({
@@ -277,24 +305,43 @@ describe("role registry JS client contracts", () => {
 			{ address: newAdmin, role: READONLY },
 			{ address: registryConfig, role: WRITABLE },
 		]);
-		expect(parseRotateAdminInstruction(rotateAdmin).accounts.newAdmin.address).toBe(newAdmin);
+		expect(parseRotateAdminInstruction(rotateAdmin).accounts.newAdmin.address)
+			.toBe(newAdmin);
 		expect(rotateAdmin).not.toHaveProperty("data");
 	});
 
 	test("role discriminators are identified by instruction helpers", () => {
-		expect(identifyRoleRegistryProgramInstruction({ data: new Uint8Array([ROLE_INITIALIZE_DISCRIMINATOR]) })).toBe(
+		expect(
+			identifyRoleRegistryProgramInstruction({
+				data: new Uint8Array([ROLE_INITIALIZE_DISCRIMINATOR]),
+			}),
+		).toBe(
 			RoleRegistryProgramInstruction.Initialize,
 		);
-		expect(identifyRoleRegistryProgramInstruction({ data: new Uint8Array([ROLE_ADD_ROLE_DISCRIMINATOR]) })).toBe(
+		expect(
+			identifyRoleRegistryProgramInstruction({
+				data: new Uint8Array([ROLE_ADD_ROLE_DISCRIMINATOR]),
+			}),
+		).toBe(
 			RoleRegistryProgramInstruction.AddRole,
 		);
-		expect(identifyRoleRegistryProgramInstruction({ data: new Uint8Array([ROLE_UPDATE_ROLE_DISCRIMINATOR]) })).toBe(
+		expect(
+			identifyRoleRegistryProgramInstruction({
+				data: new Uint8Array([ROLE_UPDATE_ROLE_DISCRIMINATOR]),
+			}),
+		).toBe(
 			RoleRegistryProgramInstruction.UpdateRole,
 		);
 		expect(
-			identifyRoleRegistryProgramInstruction({ data: new Uint8Array([ROLE_DEACTIVATE_ROLE_DISCRIMINATOR]) }),
+			identifyRoleRegistryProgramInstruction({
+				data: new Uint8Array([ROLE_DEACTIVATE_ROLE_DISCRIMINATOR]),
+			}),
 		).toBe(RoleRegistryProgramInstruction.DeactivateRole);
-		expect(identifyRoleRegistryProgramInstruction({ data: new Uint8Array([ROLE_ROTATE_ADMIN_DISCRIMINATOR]) })).toBe(
+		expect(
+			identifyRoleRegistryProgramInstruction({
+				data: new Uint8Array([ROLE_ROTATE_ADMIN_DISCRIMINATOR]),
+			}),
+		).toBe(
 			RoleRegistryProgramInstruction.RotateAdmin,
 		);
 	});
@@ -338,7 +385,8 @@ describe("staking rewards JS client contracts", () => {
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
 		]);
-		expect(getInitializePoolInstructionDataDecoder().decode(init.data).bump).toBe(5);
+		expect(getInitializePoolInstructionDataDecoder().decode(init.data).bump)
+			.toBe(5);
 		expect(parseInitializePoolInstruction(init).data.bump).toBe(5);
 
 		const openPosition = getOpenPositionInstruction({
@@ -353,7 +401,9 @@ describe("staking rewards JS client contracts", () => {
 			{ address: positionState, role: WRITABLE },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 		]);
-		expect(getOpenPositionInstructionDataDecoder().decode(openPosition.data).bump).toBe(4);
+		expect(
+			getOpenPositionInstructionDataDecoder().decode(openPosition.data).bump,
+		).toBe(4);
 		expect(parseOpenPositionInstruction(openPosition).data.bump).toBe(4);
 
 		const deposit = getDepositInstruction({
@@ -374,7 +424,9 @@ describe("staking rewards JS client contracts", () => {
 			{ address: tokenProgram, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 		]);
-		expect(getDepositInstructionDataDecoder().decode(deposit.data).amount).toBe(42n);
+		expect(getDepositInstructionDataDecoder().decode(deposit.data).amount).toBe(
+			42n,
+		);
 		expect(parseDepositInstruction(deposit).data.amount).toBe(42n);
 
 		const withdraw = getWithdrawInstruction({
@@ -395,7 +447,8 @@ describe("staking rewards JS client contracts", () => {
 			{ address: tokenProgram, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 		]);
-		expect(getWithdrawInstructionDataDecoder().decode(withdraw.data).amount).toBe(7n);
+		expect(getWithdrawInstructionDataDecoder().decode(withdraw.data).amount)
+			.toBe(7n);
 		expect(parseWithdrawInstruction(withdraw).data.amount).toBe(7n);
 
 		const claim = getStakingClaimInstruction({
@@ -415,7 +468,9 @@ describe("staking rewards JS client contracts", () => {
 			{ address: tokenProgram, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 		]);
-		expect(parseStakingClaimInstruction(claim).accounts.user.address).toBe(admin);
+		expect(parseStakingClaimInstruction(claim).accounts.user.address).toBe(
+			admin,
+		);
 		expect(claim).not.toHaveProperty("data");
 	});
 
@@ -441,7 +496,9 @@ describe("staking rewards JS client contracts", () => {
 			}),
 		).toBe(StakingRewardsProgramInstruction.Withdraw);
 		expect(
-			identifyStakingRewardsProgramInstruction({ data: new Uint8Array([STAKING_CLAIM_DISCRIMINATOR]) }),
+			identifyStakingRewardsProgramInstruction({
+				data: new Uint8Array([STAKING_CLAIM_DISCRIMINATOR]),
+			}),
 		).toBe(StakingRewardsProgramInstruction.Claim);
 	});
 });

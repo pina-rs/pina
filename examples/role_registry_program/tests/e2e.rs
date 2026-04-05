@@ -195,8 +195,8 @@ fn role_entry_account(
 }
 
 const SKIP_MSG: &str = "[SKIP] role_registry_program SBF binary not found. Build it first with \
-	`cargo build --release --target bpfel-unknown-none -p role_registry_program -Z build-std -F \
-	bpf-entrypoint`.";
+                        `cargo build --release --target bpfel-unknown-none -p \
+                        role_registry_program -Z build-std -F bpf-entrypoint`.";
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -225,7 +225,10 @@ fn initialize_creates_registry_config() {
 	);
 
 	let accounts = vec![
-		(admin, Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id())),
+		(
+			admin,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
 		(registry_pda, Account::default()),
 		keyed_account_for_system_program(),
 	];
@@ -248,7 +251,10 @@ fn initialize_creates_registry_config() {
 		0,
 		"role_count should start at 0"
 	);
-	assert_eq!(registry_config.bump, bump, "bump should be stored correctly");
+	assert_eq!(
+		registry_config.bump, bump,
+		"bump should be stored correctly"
+	);
 
 	eprintln!(
 		"[CU] Initialize registry: {} compute units consumed",
@@ -363,10 +369,17 @@ fn full_flow_initialize_add_update_deactivate() {
 
 	// Verify role_count incremented to 1 and role entry is active.
 	let registry_config: &RegistryConfig = bytemuck::from_bytes(&registry_after_add.data);
-	assert_eq!(u64::from(registry_config.role_count), 1, "role_count should be 1 after AddRole");
+	assert_eq!(
+		u64::from(registry_config.role_count),
+		1,
+		"role_count should be 1 after AddRole"
+	);
 
 	let role_entry: &RoleEntry = bytemuck::from_bytes(&role_entry_after_add.data);
-	assert!(bool::from(role_entry.active), "role should be active after AddRole");
+	assert!(
+		bool::from(role_entry.active),
+		"role should be active after AddRole"
+	);
 	assert_eq!(u64::from(role_entry.permissions), 0b0000_0111);
 	assert_eq!(u64::from(role_entry.role_id), role_id);
 
@@ -417,7 +430,10 @@ fn full_flow_initialize_add_update_deactivate() {
 		0b1111_1111,
 		"permissions should be updated after UpdateRole"
 	);
-	assert!(bool::from(role_entry.active), "role should still be active after UpdateRole");
+	assert!(
+		bool::from(role_entry.active),
+		"role should still be active after UpdateRole"
+	);
 
 	// ----- Step 4: DeactivateRole -----
 
@@ -492,7 +508,10 @@ fn rotate_admin_changes_admin() {
 	let init_result = mollusk.process_and_validate_instruction(
 		&init_ix,
 		&[
-			(admin, Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id())),
+			(
+				admin,
+				Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+			),
 			(registry_pda, Account::default()),
 			keyed_account_for_system_program(),
 		],
@@ -572,14 +591,10 @@ fn deactivate_inactive_role_fails() {
 		.sysvars
 		.rent
 		.minimum_balance(size_of::<RegistryConfig>());
-	let role_entry_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<RoleEntry>());
+	let role_entry_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<RoleEntry>());
 
 	// Pre-built accounts: active=false on the RoleEntry.
-	let registry_acct =
-		registry_config_account(&admin, 1, registry_bump, registry_lamports);
+	let registry_acct = registry_config_account(&admin, 1, registry_bump, registry_lamports);
 	let role_entry_acct = role_entry_account(
 		&registry_pda,
 		role_id,
@@ -603,7 +618,10 @@ fn deactivate_inactive_role_fails() {
 	mollusk.process_and_validate_instruction(
 		&instruction,
 		&[
-			(admin, Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id())),
+			(
+				admin,
+				Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+			),
 			(registry_pda, registry_acct),
 			(role_entry_pda, role_entry_acct),
 		],
@@ -634,8 +652,7 @@ fn wrong_admin_cannot_add_role() {
 		.minimum_balance(size_of::<RegistryConfig>());
 
 	// Pre-built RegistryConfig with admin = admin_a.
-	let registry_acct =
-		registry_config_account(&admin_a, 0, registry_bump, registry_lamports);
+	let registry_acct = registry_config_account(&admin_a, 0, registry_bump, registry_lamports);
 
 	// admin_b signs the AddRole instruction, but RegistryConfig stores admin_a.
 	let instruction = Instruction::new_with_bytes(
@@ -653,8 +670,14 @@ fn wrong_admin_cannot_add_role() {
 	mollusk.process_and_validate_instruction(
 		&instruction,
 		&[
-			(admin_b, Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id())),
-			(grantee, Account::new(0, 0, &solana_sdk_ids::system_program::id())),
+			(
+				admin_b,
+				Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+			),
+			(
+				grantee,
+				Account::new(0, 0, &solana_sdk_ids::system_program::id()),
+			),
 			(registry_pda, registry_acct),
 			(role_entry_pda, Account::default()),
 			keyed_account_for_system_program(),
@@ -695,18 +718,13 @@ fn update_role_on_wrong_registry_fails() {
 		.sysvars
 		.rent
 		.minimum_balance(size_of::<RegistryConfig>());
-	let role_entry_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<RoleEntry>());
+	let role_entry_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<RoleEntry>());
 
 	// Registry A account (correct registry for the role entry).
-	let _registry_a_acct =
-		registry_config_account(&admin, 1, registry_a_bump, registry_lamports);
+	let _registry_a_acct = registry_config_account(&admin, 1, registry_a_bump, registry_lamports);
 
 	// Registry B account (wrong registry, but same admin so admin check passes).
-	let registry_b_acct =
-		registry_config_account(&admin, 0, registry_b_bump, registry_lamports);
+	let registry_b_acct = registry_config_account(&admin, 0, registry_b_bump, registry_lamports);
 
 	// RoleEntry whose `registry` field points to registry A.
 	let role_entry_acct = role_entry_account(
@@ -733,7 +751,10 @@ fn update_role_on_wrong_registry_fails() {
 	mollusk.process_and_validate_instruction(
 		&instruction,
 		&[
-			(admin, Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id())),
+			(
+				admin,
+				Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+			),
 			(registry_b_pda, registry_b_acct),
 			(role_entry_pda, role_entry_acct),
 		],
