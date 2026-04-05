@@ -53,6 +53,18 @@ const __FLIPBIT_ALIGNMENT_ASSERTIONS__: () = {
         "value", "` with type `", stringify!(u8),
         "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
     );
+    ::core::assert!(
+        ::core::mem::align_of:: < FlipBit > () == 1, concat!("The alignment of struct `",
+        stringify!(FlipBit),
+        "` should be one so it can be used for zero-copy Pod casts.")
+    );
+    ::core::assert!(
+        ::core::mem::size_of:: < FlipBit > () == (0usize + ::core::mem::size_of:: < [u8;
+        MyInstruction::BYTES] > () + ::core::mem::size_of:: < u8 > () +
+        ::core::mem::size_of:: < u8 > () + ::core::mem::size_of:: < u8 > () +
+        ::core::mem::size_of:: < u8 > ()), concat!("`", stringify!(FlipBit),
+        "` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed.")
+    );
 };
 impl FlipBit {
     pub fn to_bytes(&self) -> &[u8] {

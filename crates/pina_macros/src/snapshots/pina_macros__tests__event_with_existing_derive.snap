@@ -39,6 +39,17 @@ const __AUDITEVENT_ALIGNMENT_ASSERTIONS__: () = {
         "timestamp", "` with type `", stringify!(PodU64),
         "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
     );
+    ::core::assert!(
+        ::core::mem::align_of:: < AuditEvent > () == 1,
+        concat!("The alignment of struct `", stringify!(AuditEvent),
+        "` should be one so it can be used for zero-copy Pod casts.")
+    );
+    ::core::assert!(
+        ::core::mem::size_of:: < AuditEvent > () == (0usize + ::core::mem::size_of:: <
+        [u8; EvtDisc::BYTES] > () + ::core::mem::size_of:: < u8 > () +
+        ::core::mem::size_of:: < PodU64 > ()), concat!("`", stringify!(AuditEvent),
+        "` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed.")
+    );
 };
 impl AuditEvent {
     pub fn to_bytes(&self) -> &[u8] {

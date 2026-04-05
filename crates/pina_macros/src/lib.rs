@@ -407,6 +407,20 @@ fn discriminator_impl(
 		item_enum.attrs.push(new_derive_attr);
 	}
 
+	let primitive_width_assertion = quote! {
+		const _: () = {
+			::core::assert!(
+				::core::mem::size_of::<#primitive>()
+					<= #crate_path::MAX_DISCRIMINATOR_SPACE,
+				concat!(
+					"A discriminator with primitive `",
+					stringify!(#primitive),
+					"` exceeds `MAX_DISCRIMINATOR_SPACE` and cannot be safely used for zero-copy layouts."
+				)
+			);
+		};
+	};
+
 	let mut consts = Vec::new();
 	let mut match_arms = Vec::new();
 	for variant in &item_enum.variants {
@@ -432,6 +446,8 @@ fn discriminator_impl(
 	}
 
 	let implementations = quote! {
+		#primitive_width_assertion
+
 		impl ::core::convert::From<#enum_name> for #primitive {
 			#[inline]
 			fn from(enum_value: #enum_name) -> Self {
@@ -785,10 +801,22 @@ fn account_impl(
 			quote! {
 				::core::assert!(
 					::core::mem::align_of::<#field_type>() == 1,
-					concat!("The alignment of field `", #field_name_str, "` with type `", stringify!(#field_type), "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+					concat!(
+						"The alignment of field `",
+						#field_name_str,
+						"` with type `",
+						stringify!(#field_type),
+						"` should be one. Consider using one of the exported `Pod*` types from the `pina` crate."
+					)
 				);
 			}
 		});
+
+		let mut struct_size_expr = quote! { 0usize };
+		for field in named_fields.named.iter() {
+			let field_type = &field.ty;
+			struct_size_expr = quote! { #struct_size_expr + ::core::mem::size_of::<#field_type>() };
+		}
 
 		let assertion_const_name = format_ident!(
 			"__{}_ALIGNMENT_ASSERTIONS__",
@@ -797,6 +825,22 @@ fn account_impl(
 		quote! {
 			const #assertion_const_name: () = {
 				#(#field_assertions)*
+				::core::assert!(
+					::core::mem::align_of::<#struct_name>() == 1,
+					concat!(
+						"The alignment of struct `",
+						stringify!(#struct_name),
+						"` should be one so it can be used for zero-copy Pod casts."
+					)
+				);
+				::core::assert!(
+					::core::mem::size_of::<#struct_name>() == (#struct_size_expr),
+					concat!(
+						"`",
+						stringify!(#struct_name),
+						"` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed."
+					)
+				);
 			};
 		}
 	} else {
@@ -1140,10 +1184,22 @@ fn instruction_impl(
 			quote! {
 				::core::assert!(
 					::core::mem::align_of::<#field_type>() == 1,
-					concat!("The alignment of field `", #field_name_str, "` with type `", stringify!(#field_type), "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+					concat!(
+						"The alignment of field `",
+						#field_name_str,
+						"` with type `",
+						stringify!(#field_type),
+						"` should be one. Consider using one of the exported `Pod*` types from the `pina` crate."
+					)
 				);
 			}
 		});
+
+		let mut struct_size_expr = quote! { 0usize };
+		for field in named_fields.named.iter() {
+			let field_type = &field.ty;
+			struct_size_expr = quote! { #struct_size_expr + ::core::mem::size_of::<#field_type>() };
+		}
 
 		let assertion_const_name = format_ident!(
 			"__{}_ALIGNMENT_ASSERTIONS__",
@@ -1152,6 +1208,22 @@ fn instruction_impl(
 		quote! {
 			const #assertion_const_name: () = {
 				#(#field_assertions)*
+				::core::assert!(
+					::core::mem::align_of::<#struct_name>() == 1,
+					concat!(
+						"The alignment of struct `",
+						stringify!(#struct_name),
+						"` should be one so it can be used for zero-copy Pod casts."
+					)
+				);
+				::core::assert!(
+					::core::mem::size_of::<#struct_name>() == (#struct_size_expr),
+					concat!(
+						"`",
+						stringify!(#struct_name),
+						"` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed."
+					)
+				);
 			};
 		}
 	} else {
@@ -1405,10 +1477,22 @@ fn event_impl(
 			quote! {
 				::core::assert!(
 					::core::mem::align_of::<#field_type>() == 1,
-					concat!("The alignment of field `", #field_name_str, "` with type `", stringify!(#field_type), "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
+					concat!(
+						"The alignment of field `",
+						#field_name_str,
+						"` with type `",
+						stringify!(#field_type),
+						"` should be one. Consider using one of the exported `Pod*` types from the `pina` crate."
+					)
 				);
 			}
 		});
+
+		let mut struct_size_expr = quote! { 0usize };
+		for field in named_fields.named.iter() {
+			let field_type = &field.ty;
+			struct_size_expr = quote! { #struct_size_expr + ::core::mem::size_of::<#field_type>() };
+		}
 
 		let assertion_const_name = format_ident!(
 			"__{}_ALIGNMENT_ASSERTIONS__",
@@ -1417,6 +1501,22 @@ fn event_impl(
 		quote! {
 			const #assertion_const_name: () = {
 				#(#field_assertions)*
+				::core::assert!(
+					::core::mem::align_of::<#struct_name>() == 1,
+					concat!(
+						"The alignment of struct `",
+						stringify!(#struct_name),
+						"` should be one so it can be used for zero-copy Pod casts."
+					)
+				);
+				::core::assert!(
+					::core::mem::size_of::<#struct_name>() == (#struct_size_expr),
+					concat!(
+						"`",
+						stringify!(#struct_name),
+						"` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed."
+					)
+				);
 			};
 		}
 	} else {

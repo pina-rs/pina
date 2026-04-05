@@ -47,6 +47,18 @@ const __TRANSFEREVENT_ALIGNMENT_ASSERTIONS__: () = {
         "amount", "` with type `", stringify!(PodU64),
         "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
     );
+    ::core::assert!(
+        ::core::mem::align_of:: < TransferEvent > () == 1,
+        concat!("The alignment of struct `", stringify!(TransferEvent),
+        "` should be one so it can be used for zero-copy Pod casts.")
+    );
+    ::core::assert!(
+        ::core::mem::size_of:: < TransferEvent > () == (0usize + ::core::mem::size_of:: <
+        [u8; EventDisc::BYTES] > () + ::core::mem::size_of:: < [u8; 32] > () +
+        ::core::mem::size_of:: < [u8; 32] > () + ::core::mem::size_of:: < PodU64 > ()),
+        concat!("`", stringify!(TransferEvent),
+        "` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed.")
+    );
 };
 impl TransferEvent {
     pub fn to_bytes(&self) -> &[u8] {

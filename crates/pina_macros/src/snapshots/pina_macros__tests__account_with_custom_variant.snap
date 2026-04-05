@@ -32,6 +32,17 @@ const __MYSTRUCT_ALIGNMENT_ASSERTIONS__: () = {
         "value", "` with type `", stringify!(u8),
         "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
     );
+    ::core::assert!(
+        ::core::mem::align_of:: < MyStruct > () == 1,
+        concat!("The alignment of struct `", stringify!(MyStruct),
+        "` should be one so it can be used for zero-copy Pod casts.")
+    );
+    ::core::assert!(
+        ::core::mem::size_of:: < MyStruct > () == (0usize + ::core::mem::size_of:: < [u8;
+        AcctDisc::BYTES] > () + ::core::mem::size_of:: < u8 > ()), concat!("`",
+        stringify!(MyStruct),
+        "` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed.")
+    );
 };
 impl MyStruct {
     /// Zero out all bytes in the struct including padding bytes. This can be useful when closing an account.
