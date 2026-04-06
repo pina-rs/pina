@@ -1,0 +1,5 @@
+---
+source: crates/pina_codama_renderer/src/__tests.rs
+expression: err.to_string()
+---
+unsupported type `stringTypeNode` at `State.memo`: variable-size strings are not POD
