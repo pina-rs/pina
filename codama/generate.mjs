@@ -19,6 +19,54 @@ const programs = readdirSync(idlsDir)
 
 console.log(`Found ${programs.length} IDL files to process.\n`);
 
+function getCommandErrorDetails(err) {
+	const stderr = typeof err?.stderr === "string" ? err.stderr.trim() : "";
+	const stdout = typeof err?.stdout === "string" ? err.stdout.trim() : "";
+	return stderr || stdout || err.message;
+}
+
+function formatRustClient(programName) {
+	const rustProgramDir = join(clientsDir, "rust", programName);
+
+	execFileSync("dprint", [
+		"fmt",
+		"--config",
+		join(workspaceRoot, "dprint.json"),
+		"--excludes-override",
+		"",
+		"--includes-override",
+		"Cargo.toml",
+		"src",
+		"Cargo.toml",
+		"src",
+	], {
+		cwd: rustProgramDir,
+		encoding: "utf-8",
+		stdio: "pipe",
+	});
+}
+
+function formatJsClient(programName) {
+	const jsProgramDir = join(clientsDir, "js", programName);
+
+	execFileSync("dprint", [
+		"fmt",
+		"--config",
+		join(workspaceRoot, "dprint.json"),
+		"--excludes-override",
+		"",
+		"--includes-override",
+		"package.json",
+		"src",
+		"package.json",
+		"src",
+	], {
+		cwd: jsProgramDir,
+		encoding: "utf-8",
+		stdio: "pipe",
+	});
+}
+
 let hasErrors = false;
 
 console.log("--- rust clients ---");
@@ -37,16 +85,17 @@ try {
 		encoding: "utf-8",
 		stdio: "pipe",
 	});
+
 	for (const program of programs) {
+		formatRustClient(program.name);
 		console.log(
 			`  [ok] Rust client generated at clients/rust/${program.name}/`,
 		);
 	}
 } catch (err) {
-	const stderr = typeof err?.stderr === "string" ? err.stderr.trim() : "";
-	const stdout = typeof err?.stdout === "string" ? err.stdout.trim() : "";
-	const details = stderr || stdout || err.message;
-	console.error(`  [FAIL] Rust generation error: ${details}`);
+	console.error(
+		`  [FAIL] Rust generation error: ${getCommandErrorDetails(err)}`,
+	);
 	hasErrors = true;
 }
 console.log();
@@ -75,9 +124,12 @@ for (const program of programs) {
 				deleteFolderBeforeRendering: true,
 			}),
 		);
+		formatJsClient(program.name);
 		console.log(`  [ok] JS client generated at clients/js/${program.name}/`);
 	} catch (err) {
-		console.error(`  [FAIL] JS generation error: ${err.message}`);
+		console.error(
+			`  [FAIL] JS generation error: ${getCommandErrorDetails(err)}`,
+		);
 		hasErrors = true;
 	}
 
