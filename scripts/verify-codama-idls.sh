@@ -2,12 +2,18 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IDL_DIR="$ROOT/codama/idls"
-RUST_CLIENTS_DIR="$ROOT/codama/clients/rust"
-JS_CLIENTS_DIR="$ROOT/codama/clients/js"
+CODAMA_DIR="$ROOT/codama"
+IDL_DIR="$CODAMA_DIR/idls"
+RUST_CLIENTS_DIR="$CODAMA_DIR/clients/rust"
+JS_CLIENTS_DIR="$CODAMA_DIR/clients/js"
 
 if ! command -v git >/dev/null 2>&1; then
 	echo "git is required to verify deterministic Codama output." >&2
+	exit 1
+fi
+
+if ! command -v dprint >/dev/null 2>&1; then
+	echo "dprint is required to perform format-neutral Codama drift checks." >&2
 	exit 1
 fi
 
@@ -21,6 +27,36 @@ show_codama_diff() {
 	echo >&2
 	echo "Codama output diff:" >&2
 	git -C "$ROOT" --no-pager diff -- "$IDL_DIR" "$RUST_CLIENTS_DIR" "$JS_CLIENTS_DIR" >&2 || true
+}
+
+compare_normalized_file() {
+	local relative_path="$1"
+	local absolute_path="$ROOT/$relative_path"
+	local diff_file
+
+	if [ ! -f "$absolute_path" ]; then
+		echo "Missing regenerated file: $relative_path" >&2
+		return 1
+	fi
+
+	if ! git -C "$ROOT" cat-file -e "HEAD:$relative_path" 2>/dev/null; then
+		echo "Committed file not found for comparison: $relative_path" >&2
+		return 1
+	fi
+
+	diff_file="$(mktemp)"
+	if ! diff -u \
+		<(git -C "$ROOT" show "HEAD:$relative_path" | dprint fmt --config "$ROOT/dprint.json" --stdin "$relative_path") \
+		<(dprint fmt --config "$ROOT/dprint.json" --stdin "$relative_path" <"$absolute_path") \
+		>"$diff_file"; then
+		echo "Detected non-formatting drift in: $relative_path" >&2
+		cat "$diff_file" >&2
+		rm -f "$diff_file"
+		return 1
+	fi
+
+	rm -f "$diff_file"
+	return 0
 }
 
 trap '
@@ -41,6 +77,8 @@ cargo run -p pina_cli --quiet -- codama generate \
 	--rust-out "$RUST_CLIENTS_DIR" \
 	--js-out "$JS_CLIENTS_DIR" \
 	--npx node
+
+dprint fmt "$CODAMA_DIR/**"
 
 if ! find "$IDL_DIR" -mindepth 1 -maxdepth 1 -type f -name "*.json" | grep -q .; then
 	echo "No *.json fixtures were generated in $IDL_DIR" >&2
@@ -80,13 +118,26 @@ done
 cargo check --locked "${CLIENT_ARGS[@]}"
 
 echo "Checking deterministic Codama output regeneration..."
-diff_status="$(
-	git -C "$ROOT" status --porcelain -- "$IDL_DIR" "$RUST_CLIENTS_DIR" "$JS_CLIENTS_DIR"
-)"
-if [ -n "$diff_status" ]; then
-	echo "Detected Codama output diff after regeneration. Output must be committed and deterministic." >&2
-	show_codama_diff
-	exit 1
+mapfile -t GENERATED_FILES < <(
+	git -C "$ROOT" diff --name-only -- "$IDL_DIR" "$RUST_CLIENTS_DIR" "$JS_CLIENTS_DIR"
+)
+
+if [ "${#GENERATED_FILES[@]}" -gt 0 ]; then
+	has_real_drift=0
+	for generated_file in "${GENERATED_FILES[@]}"; do
+		if ! compare_normalized_file "$generated_file"; then
+			has_real_drift=1
+			echo "  [drift] $generated_file" >&2
+		fi
+	done
+
+	if [ "$has_real_drift" -ne 0 ]; then
+		echo "Detected non-formatting Codama output drift after regeneration. Output must be committed and deterministic." >&2
+		show_codama_diff
+		exit 1
+	fi
+
+	echo "Codama output differs only by formatting after regeneration; formatting differences were ignored."
 fi
 
 echo "Codama generation and validation checks passed."

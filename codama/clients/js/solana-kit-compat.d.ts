@@ -26,23 +26,31 @@ declare module "@solana/kit" {
 	export type GetMultipleAccountsApi = unknown;
 
 	/** Compatibility shim for Codama-generated clients. */
-	export const SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS: SolanaErrorCode;
+	export const SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS:
+		SolanaErrorCode;
 
 	/** Compatibility shim for Codama-generated clients. */
-	export const SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT: SolanaErrorCode;
+	export const SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT:
+		SolanaErrorCode;
 
 	/** Compatibility shim for Codama-generated clients. */
-	export const SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION: SolanaErrorCode;
+	export const SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION:
+		SolanaErrorCode;
 
 	/** Compatibility shim for Codama-generated clients. */
-	export const SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE: SolanaErrorCode;
+	export const SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE:
+		SolanaErrorCode;
 }
 
 declare module "@solana/program-client-core" {
 	/**
 	 * Compatibility overload that accepts generated codecs from current Codama output.
 	 */
-	export function addSelfFetchFunctions<TInput = unknown, TOutput = unknown, TCodec = unknown>(
+	export function addSelfFetchFunctions<
+		TInput = unknown,
+		TOutput = unknown,
+		TCodec = unknown,
+	>(
 		client: unknown,
 		codec: TCodec,
 	): SelfFetchFunctions<TInput, TOutput> & TCodec;

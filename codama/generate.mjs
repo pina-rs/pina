@@ -19,9 +19,15 @@ const programs = readdirSync(idlsDir)
 
 console.log(`Found ${programs.length} IDL files to process.\n`);
 
-let hasErrors = false;
+function getCommandErrorDetails(err) {
+	const stderr = typeof err?.stderr === "string" ? err.stderr.trim() : "";
+	const stdout = typeof err?.stdout === "string" ? err.stdout.trim() : "";
+	return stderr || stdout || err.message;
+}
 
+let hasErrors = false;
 console.log("--- rust clients ---");
+
 try {
 	const args = [
 		"run",
@@ -37,26 +43,25 @@ try {
 		encoding: "utf-8",
 		stdio: "pipe",
 	});
+
 	for (const program of programs) {
 		console.log(
 			`  [ok] Rust client generated at clients/rust/${program.name}/`,
 		);
 	}
 } catch (err) {
-	const stderr = typeof err?.stderr === "string" ? err.stderr.trim() : "";
-	const stdout = typeof err?.stdout === "string" ? err.stdout.trim() : "";
-	const details = stderr || stdout || err.message;
-	console.error(`  [FAIL] Rust generation error: ${details}`);
+	console.error(
+		`  [FAIL] Rust generation error: ${getCommandErrorDetails(err)}`,
+	);
 	hasErrors = true;
 }
 console.log();
 
 for (const program of programs) {
 	console.log(`--- ${program.name} ---`);
-
 	const json = readFileSync(program.idlPath, "utf-8");
-
 	let codama;
+
 	try {
 		codama = createFromJson(json);
 		console.log(`  [ok] IDL parsed successfully`);
@@ -77,7 +82,9 @@ for (const program of programs) {
 		);
 		console.log(`  [ok] JS client generated at clients/js/${program.name}/`);
 	} catch (err) {
-		console.error(`  [FAIL] JS generation error: ${err.message}`);
+		console.error(
+			`  [FAIL] JS generation error: ${getCommandErrorDetails(err)}`,
+		);
 		hasErrors = true;
 	}
 

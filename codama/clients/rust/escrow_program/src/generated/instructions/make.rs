@@ -24,7 +24,15 @@ pub struct Make {
 }
 
 impl Make {
-	pub fn new(maker: solana_pubkey::Pubkey, mint_a: solana_pubkey::Pubkey, mint_b: solana_pubkey::Pubkey, maker_ata_a: solana_pubkey::Pubkey, escrow: solana_pubkey::Pubkey, vault: solana_pubkey::Pubkey, token_program: solana_pubkey::Pubkey) -> Self {
+	pub fn new(
+		maker: solana_pubkey::Pubkey,
+		mint_a: solana_pubkey::Pubkey,
+		mint_b: solana_pubkey::Pubkey,
+		maker_ata_a: solana_pubkey::Pubkey,
+		escrow: solana_pubkey::Pubkey,
+		vault: solana_pubkey::Pubkey,
+		token_program: solana_pubkey::Pubkey,
+	) -> Self {
 		Self {
 			maker,
 			mint_a,
@@ -48,14 +56,31 @@ impl Make {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.maker, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.mint_a, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.mint_b, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.maker_ata_a, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.maker, true,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.mint_a,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.mint_b,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.maker_ata_a,
+			false,
+		));
 		accounts.push(solana_instruction::AccountMeta::new(self.escrow, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.vault, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.token_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.token_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();
 
@@ -78,7 +103,12 @@ pub struct MakeInstructionData {
 }
 
 impl MakeInstructionData {
-	pub const fn new(seed: pina_pod_primitives::PodU64, amount_a: pina_pod_primitives::PodU64, amount_b: pina_pod_primitives::PodU64, bump: u8) -> Self {
+	pub const fn new(
+		seed: pina_pod_primitives::PodU64,
+		amount_a: pina_pod_primitives::PodU64,
+		amount_b: pina_pod_primitives::PodU64,
+		bump: u8,
+	) -> Self {
 		Self {
 			discriminator: MAKE_DISCRIMINATOR,
 			seed,

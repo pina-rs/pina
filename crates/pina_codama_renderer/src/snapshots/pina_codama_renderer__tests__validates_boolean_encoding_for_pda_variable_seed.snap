@@ -1,0 +1,5 @@
+---
+source: crates/pina_codama_renderer/src/__tests.rs
+expression: err.to_string()
+---
+unsupported type `booleanTypeNode` at `pda boolean seed test`: booleans must use little-endian u8 for PDA seeds

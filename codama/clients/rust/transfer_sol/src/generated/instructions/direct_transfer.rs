@@ -9,7 +9,7 @@
 )]
 
 /// Instruction data for `DirectTransfer`.
-/// 
+///
 /// Same layout as `CpiTransferInstruction` but with a different discriminator
 /// byte.
 pub const DIRECT_TRANSFER_DISCRIMINATOR: u8 = 1u8;
@@ -25,13 +25,13 @@ pub struct DirectTransfer {
 
 impl DirectTransfer {
 	pub fn new(sender: solana_pubkey::Pubkey, recipient: solana_pubkey::Pubkey) -> Self {
-		Self {
-			sender,
-			recipient,
-		}
+		Self { sender, recipient }
 	}
 
-	pub fn instruction(&self, data: DirectTransferInstructionData) -> solana_instruction::Instruction {
+	pub fn instruction(
+		&self,
+		data: DirectTransferInstructionData,
+	) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
