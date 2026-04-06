@@ -72,7 +72,7 @@ jobs:
           test:all
         shell: devenv shell -- bash -e {0}
 
-  anchor-parity:
+  program-e2e:
     timeout-minutes: 120
     runs-on: blacksmith-2vcpu-ubuntu-2404
     env:
@@ -97,8 +97,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sbpf-gallery-v1-
 
-      - name: run anchor parity tests
-        run: test:anchor-parity
+      - name: run program e2e tests
+        run: test:program-e2e
         shell: devenv shell -c -- bash -e {0}
 
   idl:
