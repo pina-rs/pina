@@ -98,7 +98,7 @@ pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, C
 		let crate_dir = options.rust_out.join(example);
 		render_idl_file(idl_path, &crate_dir, &render_config).map_err(|source| {
 			CodamaError::RenderRust {
-				path: crate_dir,
+				path: crate_dir.clone(),
 				source,
 			}
 		})?;
