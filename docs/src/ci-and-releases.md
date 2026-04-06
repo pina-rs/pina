@@ -9,7 +9,7 @@ The GitHub CI workflow verifies:
 - `verify:docs`
 - `verify:security`
 - `test:all` (`cargo test --all-features --locked`)
-- `test:anchor-parity` (Anchor parity examples + `pina_bpf` nightly build (`-Z build-std=core,alloc`) + ignored BPF artifact verification tests)
+- `test:program-e2e` (Example program tests, SBF builds, mollusk-svm integration tests, and BPF artifact verification)
 - `test:idl` (regenerate `codama/idls`, `codama/clients/rust`, `codama/clients/js`, validate outputs, and fail on any diff)
 - `cargo build --locked`
 - `cargo build --all-features --locked`
