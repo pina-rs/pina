@@ -19,10 +19,7 @@ pub struct Update {
 
 impl Update {
 	pub fn new(account: solana_pubkey::Pubkey, authority: solana_pubkey::Pubkey) -> Self {
-		Self {
-			account,
-			authority,
-		}
+		Self { account, authority }
 	}
 
 	pub fn instruction(&self, data: UpdateInstructionData) -> solana_instruction::Instruction {
@@ -37,7 +34,10 @@ impl Update {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.account, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.authority, true));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.authority,
+			true,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();
 
@@ -58,7 +58,10 @@ pub struct UpdateInstructionData {
 }
 
 impl UpdateInstructionData {
-	pub const fn new(data_f32: pina_pod_primitives::PodU32, data_f64: pina_pod_primitives::PodU64) -> Self {
+	pub const fn new(
+		data_f32: pina_pod_primitives::PodU32,
+		data_f64: pina_pod_primitives::PodU64,
+	) -> Self {
 		Self {
 			discriminator: UPDATE_DISCRIMINATOR,
 			data_f32,

@@ -6,31 +6,54 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { isProgramError, type Address, type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM, type SolanaError } from '@solana/kit';
-import { ANCHOR_REALLOC_PROGRAM_ADDRESS } from '../programs';
+import {
+	type Address,
+	isProgramError,
+	type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
+	type SolanaError,
+} from "@solana/kit";
+import { ANCHOR_REALLOC_PROGRAM_ADDRESS } from "../programs";
 
 export const ANCHOR_REALLOC_ERROR__ACCOUNT_REALLOC_EXCEEDS_LIMIT = 0xbc8; // 3016
 export const ANCHOR_REALLOC_ERROR__ACCOUNT_DUPLICATE_REALLOCS = 0xbc9; // 3017
 
-export type AnchorReallocError = typeof ANCHOR_REALLOC_ERROR__ACCOUNT_DUPLICATE_REALLOCS | typeof ANCHOR_REALLOC_ERROR__ACCOUNT_REALLOC_EXCEEDS_LIMIT;
+export type AnchorReallocError =
+	| typeof ANCHOR_REALLOC_ERROR__ACCOUNT_DUPLICATE_REALLOCS
+	| typeof ANCHOR_REALLOC_ERROR__ACCOUNT_REALLOC_EXCEEDS_LIMIT;
 
 let anchorReallocErrorMessages: Record<AnchorReallocError, string> | undefined;
-if (process.env.NODE_ENV !== 'production') {
-  anchorReallocErrorMessages = { [ANCHOR_REALLOC_ERROR__ACCOUNT_DUPLICATE_REALLOCS]: ``, [ANCHOR_REALLOC_ERROR__ACCOUNT_REALLOC_EXCEEDS_LIMIT]: `` };
+if (process.env.NODE_ENV !== "production") {
+	anchorReallocErrorMessages = {
+		[ANCHOR_REALLOC_ERROR__ACCOUNT_DUPLICATE_REALLOCS]: ``,
+		[ANCHOR_REALLOC_ERROR__ACCOUNT_REALLOC_EXCEEDS_LIMIT]: ``,
+	};
 }
 
 export function getAnchorReallocErrorMessage(code: AnchorReallocError): string {
-  if (process.env.NODE_ENV !== 'production') {
-    return (anchorReallocErrorMessages as Record<AnchorReallocError, string>)[code];
-  }
+	if (process.env.NODE_ENV !== "production") {
+		return (anchorReallocErrorMessages as Record<AnchorReallocError, string>)[
+			code
+		];
+	}
 
-  return 'Error message not available in production bundles.';
+	return "Error message not available in production bundles.";
 }
 
-export function isAnchorReallocError<TProgramErrorCode extends AnchorReallocError>(
-    error: unknown,
-    transactionMessage: { instructions: Record<number, { programAddress: Address }> },
-    code?: TProgramErrorCode,
-): error is SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM> & Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
-  return isProgramError<TProgramErrorCode>(error, transactionMessage, ANCHOR_REALLOC_PROGRAM_ADDRESS, code);
+export function isAnchorReallocError<
+	TProgramErrorCode extends AnchorReallocError,
+>(
+	error: unknown,
+	transactionMessage: {
+		instructions: Record<number, { programAddress: Address }>;
+	},
+	code?: TProgramErrorCode,
+): error is
+	& SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM>
+	& Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
+	return isProgramError<TProgramErrorCode>(
+		error,
+		transactionMessage,
+		ANCHOR_REALLOC_PROGRAM_ADDRESS,
+		code,
+	);
 }

@@ -6,6 +6,9 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { type Address } from '@solana/kit';
+import { type Address } from "@solana/kit";
 
-export const ANCHOR_ERRORS_PROGRAM_ADDRESS = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS' as Address<'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'>;
+export const ANCHOR_ERRORS_PROGRAM_ADDRESS =
+	"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS" as Address<
+		"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+	>;

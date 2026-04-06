@@ -2,9 +2,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IDL_DIR="$ROOT/codama/idls"
-RUST_CLIENTS_DIR="$ROOT/codama/clients/rust"
-JS_CLIENTS_DIR="$ROOT/codama/clients/js"
+CODAMA_DIR="$ROOT/codama"
+IDL_DIR="$CODAMA_DIR/idls"
+RUST_CLIENTS_DIR="$CODAMA_DIR/clients/rust"
+JS_CLIENTS_DIR="$CODAMA_DIR/clients/js"
 
 if ! command -v git >/dev/null 2>&1; then
 	echo "git is required to verify deterministic Codama output." >&2
@@ -47,7 +48,7 @@ compare_normalized_file() {
 	if ! diff -u \
 		<(git -C "$ROOT" show "HEAD:$relative_path" | dprint fmt --config "$ROOT/dprint.json" --stdin "$relative_path") \
 		<(dprint fmt --config "$ROOT/dprint.json" --stdin "$relative_path" <"$absolute_path") \
-		> "$diff_file"; then
+		>"$diff_file"; then
 		echo "Detected non-formatting drift in: $relative_path" >&2
 		cat "$diff_file" >&2
 		rm -f "$diff_file"
@@ -76,6 +77,8 @@ cargo run -p pina_cli --quiet -- codama generate \
 	--rust-out "$RUST_CLIENTS_DIR" \
 	--js-out "$JS_CLIENTS_DIR" \
 	--npx node
+
+dprint fmt "$CODAMA_DIR/**"
 
 if ! find "$IDL_DIR" -mindepth 1 -maxdepth 1 -type f -name "*.json" | grep -q .; then
 	echo "No *.json fixtures were generated in $IDL_DIR" >&2
@@ -136,6 +139,5 @@ if [ "${#GENERATED_FILES[@]}" -gt 0 ]; then
 
 	echo "Codama output differs only by formatting after regeneration; formatting differences were ignored."
 fi
-
 
 echo "Codama generation and validation checks passed."

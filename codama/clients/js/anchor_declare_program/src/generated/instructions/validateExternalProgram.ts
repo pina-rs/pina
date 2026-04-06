@@ -6,52 +6,145 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, type AccountMeta, type AccountSignerMeta, type Address, type Instruction, type InstructionWithAccounts, type ReadonlyAccount, type ReadonlySignerAccount, type TransactionSigner } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { ANCHOR_DECLARE_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type ReadonlyAccount,
+	type ReadonlySignerAccount,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	type TransactionSigner,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
+import { ANCHOR_DECLARE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const VALIDATE_EXTERNAL_PROGRAM_DISCRIMINATOR = 0;
 
-export function getValidateExternalProgramDiscriminatorBytes() { return getU8Encoder().encode(VALIDATE_EXTERNAL_PROGRAM_DISCRIMINATOR); }
-
-export type ValidateExternalProgramInstruction<TProgram extends string = typeof ANCHOR_DECLARE_PROGRAM_PROGRAM_ADDRESS, TAccountAuthority extends string | AccountMeta<string> = string, TAccountExternalProgram extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithAccounts<[TAccountAuthority extends string ? ReadonlySignerAccount<TAccountAuthority> & AccountSignerMeta<TAccountAuthority> : TAccountAuthority, TAccountExternalProgram extends string ? ReadonlyAccount<TAccountExternalProgram> : TAccountExternalProgram, ...TRemainingAccounts]>;
-
-export type ValidateExternalProgramInput<TAccountAuthority extends string = string, TAccountExternalProgram extends string = string> =  {
-  authority: TransactionSigner<TAccountAuthority>;
-externalProgram: Address<TAccountExternalProgram>;
+export function getValidateExternalProgramDiscriminatorBytes() {
+	return getU8Encoder().encode(VALIDATE_EXTERNAL_PROGRAM_DISCRIMINATOR);
 }
 
-export function getValidateExternalProgramInstruction<TAccountAuthority extends string, TAccountExternalProgram extends string, TProgramAddress extends Address = typeof ANCHOR_DECLARE_PROGRAM_PROGRAM_ADDRESS>(input: ValidateExternalProgramInput<TAccountAuthority, TAccountExternalProgram>, config?: { programAddress?: TProgramAddress } ): ValidateExternalProgramInstruction<TProgramAddress, TAccountAuthority, TAccountExternalProgram> {
-  // Program address.
-const programAddress = config?.programAddress ?? ANCHOR_DECLARE_PROGRAM_PROGRAM_ADDRESS;
+export type ValidateExternalProgramInstruction<
+	TProgram extends string = typeof ANCHOR_DECLARE_PROGRAM_PROGRAM_ADDRESS,
+	TAccountAuthority extends string | AccountMeta<string> = string,
+	TAccountExternalProgram extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithAccounts<
+		[
+			TAccountAuthority extends string ?
+					& ReadonlySignerAccount<TAccountAuthority>
+					& AccountSignerMeta<TAccountAuthority>
+				: TAccountAuthority,
+			TAccountExternalProgram extends string
+				? ReadonlyAccount<TAccountExternalProgram>
+				: TAccountExternalProgram,
+			...TRemainingAccounts,
+		]
+	>;
 
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isWritable: false }, externalProgram: { value: input.externalProgram ?? null, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
+export type ValidateExternalProgramInput<
+	TAccountAuthority extends string = string,
+	TAccountExternalProgram extends string = string,
+> = {
+	authority: TransactionSigner<TAccountAuthority>;
+	externalProgram: Address<TAccountExternalProgram>;
+};
 
+export function getValidateExternalProgramInstruction<
+	TAccountAuthority extends string,
+	TAccountExternalProgram extends string,
+	TProgramAddress extends Address =
+		typeof ANCHOR_DECLARE_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: ValidateExternalProgramInput<
+		TAccountAuthority,
+		TAccountExternalProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): ValidateExternalProgramInstruction<
+	TProgramAddress,
+	TAccountAuthority,
+	TAccountExternalProgram
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		ANCHOR_DECLARE_PROGRAM_PROGRAM_ADDRESS;
 
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: false },
+		externalProgram: {
+			value: input.externalProgram ?? null,
+			isWritable: false,
+		},
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
 
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("externalProgram", accounts.externalProgram)], programAddress } as ValidateExternalProgramInstruction<TProgramAddress, TAccountAuthority, TAccountExternalProgram>);
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze(
+		{
+			accounts: [
+				getAccountMeta("authority", accounts.authority),
+				getAccountMeta("externalProgram", accounts.externalProgram),
+			],
+			programAddress,
+		} as ValidateExternalProgramInstruction<
+			TProgramAddress,
+			TAccountAuthority,
+			TAccountExternalProgram
+		>,
+	);
 }
 
-export type ParsedValidateExternalProgramInstruction<TProgram extends string = typeof ANCHOR_DECLARE_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-authority: TAccountMetas[0];
-externalProgram: TAccountMetas[1];
-}; };
+export type ParsedValidateExternalProgramInstruction<
+	TProgram extends string = typeof ANCHOR_DECLARE_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		authority: TAccountMetas[0];
+		externalProgram: TAccountMetas[1];
+	};
+};
 
-export function parseValidateExternalProgramInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>): ParsedValidateExternalProgramInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 2) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 2 });
-}
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
-}
-  return { programAddress: instruction.programAddress, accounts: { authority: getNextAccount(), externalProgram: getNextAccount() } };
+export function parseValidateExternalProgramInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
+): ParsedValidateExternalProgramInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 2) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 2,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: {
+			authority: getNextAccount(),
+			externalProgram: getNextAccount(),
+		},
+	};
 }
