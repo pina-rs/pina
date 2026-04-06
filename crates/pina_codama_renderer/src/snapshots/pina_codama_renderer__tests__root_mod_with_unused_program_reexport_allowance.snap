@@ -12,4 +12,7 @@ expression: content
 	clippy::too_many_arguments
 )]
 
-pub type Counter = pina_pod_primitives::PodU64;
+pub mod programs;
+
+#[allow(unused_imports)]
+pub(crate) use programs::*;
