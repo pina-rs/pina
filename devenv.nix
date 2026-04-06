@@ -481,6 +481,13 @@ in
             -p staking_rewards_program --test e2e \
             -p vesting_program --test e2e \
             -- --nocapture
+
+        # Run LiteSVM e2e tests with the generated TypeScript clients.
+        # These verify that TS instruction builders with pina's discriminator
+        # model produce transactions the on-chain programs accept.
+        pnpm --dir "$DEVENV_ROOT/codama/tests/litesvm" install --frozen-lockfile
+        SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
+          pnpm --dir "$DEVENV_ROOT/codama/tests/litesvm" test
       '';
       description = "Build SBF binaries and run end-to-end program tests including mollusk-svm integration.";
       binary = "bash";

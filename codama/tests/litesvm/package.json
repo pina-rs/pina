@@ -1,0 +1,16 @@
+{
+	"name": "pina-litesvm-e2e",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"test": "vitest run"
+	},
+	"devDependencies": {
+		"@solana/kit": "^6.5.0",
+		"@solana/program-client-core": "^6.5.0",
+		"litesvm": "^1.0.0",
+		"vitest": "^4.1.1",
+		"typescript": "^5.9.3",
+		"@types/node": "^25.5.0"
+	}
+}
