@@ -23,10 +23,7 @@ pub struct Increment {
 
 impl Increment {
 	pub fn new(authority: solana_pubkey::Pubkey, counter: solana_pubkey::Pubkey) -> Self {
-		Self {
-			authority,
-			counter,
-		}
+		Self { authority, counter }
 	}
 
 	pub fn instruction(&self, data: IncrementInstructionData) -> solana_instruction::Instruction {
@@ -40,7 +37,10 @@ impl Increment {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.authority, true));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.authority,
+			true,
+		));
 		accounts.push(solana_instruction::AccountMeta::new(self.counter, false));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();

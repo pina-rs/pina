@@ -27,7 +27,18 @@ pub struct Take {
 }
 
 impl Take {
-	pub fn new(taker: solana_pubkey::Pubkey, mint_a: solana_pubkey::Pubkey, mint_b: solana_pubkey::Pubkey, taker_ata_a: solana_pubkey::Pubkey, taker_ata_b: solana_pubkey::Pubkey, maker: solana_pubkey::Pubkey, maker_ata_b: solana_pubkey::Pubkey, escrow: solana_pubkey::Pubkey, vault: solana_pubkey::Pubkey, token_program: solana_pubkey::Pubkey) -> Self {
+	pub fn new(
+		taker: solana_pubkey::Pubkey,
+		mint_a: solana_pubkey::Pubkey,
+		mint_b: solana_pubkey::Pubkey,
+		taker_ata_a: solana_pubkey::Pubkey,
+		taker_ata_b: solana_pubkey::Pubkey,
+		maker: solana_pubkey::Pubkey,
+		maker_ata_b: solana_pubkey::Pubkey,
+		escrow: solana_pubkey::Pubkey,
+		vault: solana_pubkey::Pubkey,
+		token_program: solana_pubkey::Pubkey,
+	) -> Self {
 		Self {
 			taker,
 			mint_a,
@@ -55,16 +66,39 @@ impl Take {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(11 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.taker, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.mint_a, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.mint_b, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.taker_ata_a, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.taker_ata_b, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.maker, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.maker_ata_b, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.mint_a,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.mint_b,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.taker_ata_a,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.taker_ata_b,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.maker, false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.maker_ata_b,
+			false,
+		));
 		accounts.push(solana_instruction::AccountMeta::new(self.escrow, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.vault, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.token_program, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.token_program,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();
 

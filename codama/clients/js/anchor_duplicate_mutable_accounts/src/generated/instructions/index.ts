@@ -6,5 +6,5 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from './allowsDuplicateReadonly';
-export * from './failsDuplicateMutable';
+export * from "./allowsDuplicateReadonly";
+export * from "./failsDuplicateMutable";

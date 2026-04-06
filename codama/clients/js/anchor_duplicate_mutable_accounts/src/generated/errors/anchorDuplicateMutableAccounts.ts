@@ -6,30 +6,58 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { isProgramError, type Address, type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM, type SolanaError } from '@solana/kit';
-import { ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ADDRESS } from '../programs';
+import {
+	type Address,
+	isProgramError,
+	type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
+	type SolanaError,
+} from "@solana/kit";
+import { ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ADDRESS } from "../programs";
 
-export const ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_ERROR__CONSTRAINT_DUPLICATE_MUTABLE_ACCOUNT = 0x7f8; // 2040
+export const ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_ERROR__CONSTRAINT_DUPLICATE_MUTABLE_ACCOUNT =
+	0x7f8; // 2040
 
-export type AnchorDuplicateMutableAccountsError = typeof ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_ERROR__CONSTRAINT_DUPLICATE_MUTABLE_ACCOUNT;
+export type AnchorDuplicateMutableAccountsError =
+	typeof ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_ERROR__CONSTRAINT_DUPLICATE_MUTABLE_ACCOUNT;
 
-let anchorDuplicateMutableAccountsErrorMessages: Record<AnchorDuplicateMutableAccountsError, string> | undefined;
-if (process.env.NODE_ENV !== 'production') {
-  anchorDuplicateMutableAccountsErrorMessages = { [ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_ERROR__CONSTRAINT_DUPLICATE_MUTABLE_ACCOUNT]: `` };
+let anchorDuplicateMutableAccountsErrorMessages:
+	| Record<AnchorDuplicateMutableAccountsError, string>
+	| undefined;
+if (process.env.NODE_ENV !== "production") {
+	anchorDuplicateMutableAccountsErrorMessages = {
+		[ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_ERROR__CONSTRAINT_DUPLICATE_MUTABLE_ACCOUNT]:
+			``,
+	};
 }
 
-export function getAnchorDuplicateMutableAccountsErrorMessage(code: AnchorDuplicateMutableAccountsError): string {
-  if (process.env.NODE_ENV !== 'production') {
-    return (anchorDuplicateMutableAccountsErrorMessages as Record<AnchorDuplicateMutableAccountsError, string>)[code];
-  }
+export function getAnchorDuplicateMutableAccountsErrorMessage(
+	code: AnchorDuplicateMutableAccountsError,
+): string {
+	if (process.env.NODE_ENV !== "production") {
+		return (anchorDuplicateMutableAccountsErrorMessages as Record<
+			AnchorDuplicateMutableAccountsError,
+			string
+		>)[code];
+	}
 
-  return 'Error message not available in production bundles.';
+	return "Error message not available in production bundles.";
 }
 
-export function isAnchorDuplicateMutableAccountsError<TProgramErrorCode extends AnchorDuplicateMutableAccountsError>(
-    error: unknown,
-    transactionMessage: { instructions: Record<number, { programAddress: Address }> },
-    code?: TProgramErrorCode,
-): error is SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM> & Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
-  return isProgramError<TProgramErrorCode>(error, transactionMessage, ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ADDRESS, code);
+export function isAnchorDuplicateMutableAccountsError<
+	TProgramErrorCode extends AnchorDuplicateMutableAccountsError,
+>(
+	error: unknown,
+	transactionMessage: {
+		instructions: Record<number, { programAddress: Address }>;
+	},
+	code?: TProgramErrorCode,
+): error is
+	& SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM>
+	& Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
+	return isProgramError<TProgramErrorCode>(
+		error,
+		transactionMessage,
+		ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ADDRESS,
+		code,
+	);
 }

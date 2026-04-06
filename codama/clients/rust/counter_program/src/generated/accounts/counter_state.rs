@@ -14,24 +14,24 @@ use bytemuck::Zeroable;
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Pod, Zeroable)]
 pub struct CounterState {
-/// On-chain counter state.
-/// 
-/// The `#[account]` macro generates:
-/// - A discriminator field (`CounterAccountType::CounterState`) as the first
-/// byte.
-/// - `Pod` + `Zeroable` derives for zero-copy (de)serialization.
-/// - `HasDiscriminator` linking this struct to
-/// `CounterAccountType::CounterState`.
-/// - `TypedBuilder` for ergonomic construction.
-/// 
-/// Layout (10 bytes total):
-/// ```text
-/// | offset | size | field         |
-/// |--------|------|---------------|
-/// | 0      | 1    | discriminator |
-/// | 1      | 1    | bump          |
-/// | 2      | 8    | count (PodU64)|
-/// ```
+	/// On-chain counter state.
+	///
+	/// The `#[account]` macro generates:
+	/// - A discriminator field (`CounterAccountType::CounterState`) as the first
+	/// byte.
+	/// - `Pod` + `Zeroable` derives for zero-copy (de)serialization.
+	/// - `HasDiscriminator` linking this struct to
+	/// `CounterAccountType::CounterState`.
+	/// - `TypedBuilder` for ergonomic construction.
+	///
+	/// Layout (10 bytes total):
+	/// ```text
+	/// | offset | size | field         |
+	/// |--------|------|---------------|
+	/// | 0      | 1    | discriminator |
+	/// | 1      | 1    | bump          |
+	/// | 2      | 8    | count (PodU64)|
+	/// ```
 	pub discriminator: u8,
 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
 	pub bump: u8,
@@ -62,7 +62,9 @@ impl CounterState {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(
+		data: &mut [u8],
+	) -> Result<&mut Self, solana_program_error::ProgramError> {
 		let account = bytemuck::try_from_bytes_mut::<Self>(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != COUNTER_STATE_DISCRIMINATOR {

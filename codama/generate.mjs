@@ -25,51 +25,9 @@ function getCommandErrorDetails(err) {
 	return stderr || stdout || err.message;
 }
 
-function formatRustClient(programName) {
-	const rustProgramDir = join(clientsDir, "rust", programName);
-
-	execFileSync("dprint", [
-		"fmt",
-		"--config",
-		join(workspaceRoot, "dprint.json"),
-		"--excludes-override",
-		"",
-		"--includes-override",
-		"Cargo.toml",
-		"src",
-		"Cargo.toml",
-		"src",
-	], {
-		cwd: rustProgramDir,
-		encoding: "utf-8",
-		stdio: "pipe",
-	});
-}
-
-function formatJsClient(programName) {
-	const jsProgramDir = join(clientsDir, "js", programName);
-
-	execFileSync("dprint", [
-		"fmt",
-		"--config",
-		join(workspaceRoot, "dprint.json"),
-		"--excludes-override",
-		"",
-		"--includes-override",
-		"package.json",
-		"src",
-		"package.json",
-		"src",
-	], {
-		cwd: jsProgramDir,
-		encoding: "utf-8",
-		stdio: "pipe",
-	});
-}
-
 let hasErrors = false;
-
 console.log("--- rust clients ---");
+
 try {
 	const args = [
 		"run",
@@ -87,7 +45,6 @@ try {
 	});
 
 	for (const program of programs) {
-		formatRustClient(program.name);
 		console.log(
 			`  [ok] Rust client generated at clients/rust/${program.name}/`,
 		);
@@ -102,10 +59,9 @@ console.log();
 
 for (const program of programs) {
 	console.log(`--- ${program.name} ---`);
-
 	const json = readFileSync(program.idlPath, "utf-8");
-
 	let codama;
+
 	try {
 		codama = createFromJson(json);
 		console.log(`  [ok] IDL parsed successfully`);
@@ -124,7 +80,6 @@ for (const program of programs) {
 				deleteFolderBeforeRendering: true,
 			}),
 		);
-		formatJsClient(program.name);
 		console.log(`  [ok] JS client generated at clients/js/${program.name}/`);
 	} catch (err) {
 		console.error(
