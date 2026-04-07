@@ -6,5 +6,5 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./increment";
-export * from "./initialize";
+export * from './increment';
+export * from './initialize';

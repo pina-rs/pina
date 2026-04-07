@@ -6,5 +6,5 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./create";
-export * from "./update";
+export * from './create';
+export * from './update';

@@ -13,10 +13,10 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum AnchorReallocError {
-	/// 3016 -
+	/// 3016 - 
 	#[error("")]
 	AccountReallocExceedsLimit = 0xBC8,
-	/// 3017 -
+	/// 3017 - 
 	#[error("")]
 	AccountDuplicateReallocs = 0xBC9,
 }

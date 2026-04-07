@@ -26,12 +26,7 @@ pub const TODO_STATE_DISCRIMINATOR: u8 = 1u8;
 impl TodoState {
 	pub const LEN: usize = core::mem::size_of::<Self>();
 
-	pub const fn new(
-		owner: solana_pubkey::Pubkey,
-		bump: u8,
-		completed: pina_pod_primitives::PodBool,
-		digest: [u8; 32],
-	) -> Self {
+	pub const fn new(owner: solana_pubkey::Pubkey, bump: u8, completed: pina_pod_primitives::PodBool, digest: [u8; 32]) -> Self {
 		Self {
 			discriminator: TODO_STATE_DISCRIMINATOR,
 			owner,
@@ -50,9 +45,7 @@ impl TodoState {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(
-		data: &mut [u8],
-	) -> Result<&mut Self, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, solana_program_error::ProgramError> {
 		let account = bytemuck::try_from_bytes_mut::<Self>(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != TODO_STATE_DISCRIMINATOR {

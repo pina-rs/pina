@@ -19,13 +19,13 @@ pub struct AllowsDuplicateReadonly {
 
 impl AllowsDuplicateReadonly {
 	pub fn new(account1: solana_pubkey::Pubkey, account2: solana_pubkey::Pubkey) -> Self {
-		Self { account1, account2 }
+		Self {
+			account1,
+			account2,
+		}
 	}
 
-	pub fn instruction(
-		&self,
-		data: AllowsDuplicateReadonlyInstructionData,
-	) -> solana_instruction::Instruction {
+	pub fn instruction(&self, data: AllowsDuplicateReadonlyInstructionData) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -36,14 +36,8 @@ impl AllowsDuplicateReadonly {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.account1,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.account2,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.account1, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.account2, false));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();
 

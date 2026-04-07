@@ -6,145 +6,54 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type AccountMeta,
-	type Address,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithAccounts,
-	type ReadonlyAccount,
-	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-	SolanaError,
-} from "@solana/kit";
-import {
-	getAccountMetaFactory,
-	type ResolvedInstructionAccount,
-} from "@solana/program-client-core";
-import { ANCHOR_SYSVARS_PROGRAM_ADDRESS } from "../programs";
+import { getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, type AccountMeta, type Address, type Instruction, type InstructionWithAccounts, type ReadonlyAccount } from '@solana/kit';
+import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
+import { ANCHOR_SYSVARS_PROGRAM_ADDRESS } from '../programs';
 
 export const SYSVARS_DISCRIMINATOR = 0;
 
-export function getSysvarsDiscriminatorBytes() {
-	return getU8Encoder().encode(SYSVARS_DISCRIMINATOR);
+export function getSysvarsDiscriminatorBytes() { return getU8Encoder().encode(SYSVARS_DISCRIMINATOR); }
+
+export type SysvarsInstruction<TProgram extends string = typeof ANCHOR_SYSVARS_PROGRAM_ADDRESS, TAccountClock extends string | AccountMeta<string> = string, TAccountRent extends string | AccountMeta<string> = string, TAccountStakeHistory extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithAccounts<[TAccountClock extends string ? ReadonlyAccount<TAccountClock> : TAccountClock, TAccountRent extends string ? ReadonlyAccount<TAccountRent> : TAccountRent, TAccountStakeHistory extends string ? ReadonlyAccount<TAccountStakeHistory> : TAccountStakeHistory, ...TRemainingAccounts]>;
+
+export type SysvarsInput<TAccountClock extends string = string, TAccountRent extends string = string, TAccountStakeHistory extends string = string> =  {
+  clock: Address<TAccountClock>;
+rent: Address<TAccountRent>;
+stakeHistory: Address<TAccountStakeHistory>;
 }
 
-export type SysvarsInstruction<
-	TProgram extends string = typeof ANCHOR_SYSVARS_PROGRAM_ADDRESS,
-	TAccountClock extends string | AccountMeta<string> = string,
-	TAccountRent extends string | AccountMeta<string> = string,
-	TAccountStakeHistory extends string | AccountMeta<string> = string,
-	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> =
-	& Instruction<TProgram>
-	& InstructionWithAccounts<
-		[
-			TAccountClock extends string ? ReadonlyAccount<TAccountClock>
-				: TAccountClock,
-			TAccountRent extends string ? ReadonlyAccount<TAccountRent>
-				: TAccountRent,
-			TAccountStakeHistory extends string
-				? ReadonlyAccount<TAccountStakeHistory>
-				: TAccountStakeHistory,
-			...TRemainingAccounts,
-		]
-	>;
+export function getSysvarsInstruction<TAccountClock extends string, TAccountRent extends string, TAccountStakeHistory extends string, TProgramAddress extends Address = typeof ANCHOR_SYSVARS_PROGRAM_ADDRESS>(input: SysvarsInput<TAccountClock, TAccountRent, TAccountStakeHistory>, config?: { programAddress?: TProgramAddress } ): SysvarsInstruction<TProgramAddress, TAccountClock, TAccountRent, TAccountStakeHistory> {
+  // Program address.
+const programAddress = config?.programAddress ?? ANCHOR_SYSVARS_PROGRAM_ADDRESS;
 
-export type SysvarsInput<
-	TAccountClock extends string = string,
-	TAccountRent extends string = string,
-	TAccountStakeHistory extends string = string,
-> = {
-	clock: Address<TAccountClock>;
-	rent: Address<TAccountRent>;
-	stakeHistory: Address<TAccountStakeHistory>;
-};
+ // Original accounts.
+const originalAccounts = { clock: { value: input.clock ?? null, isWritable: false }, rent: { value: input.rent ?? null, isWritable: false }, stakeHistory: { value: input.stakeHistory ?? null, isWritable: false } }
+const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
 
-export function getSysvarsInstruction<
-	TAccountClock extends string,
-	TAccountRent extends string,
-	TAccountStakeHistory extends string,
-	TProgramAddress extends Address = typeof ANCHOR_SYSVARS_PROGRAM_ADDRESS,
->(
-	input: SysvarsInput<TAccountClock, TAccountRent, TAccountStakeHistory>,
-	config?: { programAddress?: TProgramAddress },
-): SysvarsInstruction<
-	TProgramAddress,
-	TAccountClock,
-	TAccountRent,
-	TAccountStakeHistory
-> {
-	// Program address.
-	const programAddress = config?.programAddress ??
-		ANCHOR_SYSVARS_PROGRAM_ADDRESS;
 
-	// Original accounts.
-	const originalAccounts = {
-		clock: { value: input.clock ?? null, isWritable: false },
-		rent: { value: input.rent ?? null, isWritable: false },
-		stakeHistory: { value: input.stakeHistory ?? null, isWritable: false },
-	};
-	const accounts = originalAccounts as Record<
-		keyof typeof originalAccounts,
-		ResolvedInstructionAccount
-	>;
 
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze(
-		{
-			accounts: [
-				getAccountMeta("clock", accounts.clock),
-				getAccountMeta("rent", accounts.rent),
-				getAccountMeta("stakeHistory", accounts.stakeHistory),
-			],
-			programAddress,
-		} as SysvarsInstruction<
-			TProgramAddress,
-			TAccountClock,
-			TAccountRent,
-			TAccountStakeHistory
-		>,
-	);
+
+const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+return Object.freeze({ accounts: [getAccountMeta("clock", accounts.clock), getAccountMeta("rent", accounts.rent), getAccountMeta("stakeHistory", accounts.stakeHistory)], programAddress } as SysvarsInstruction<TProgramAddress, TAccountClock, TAccountRent, TAccountStakeHistory>);
 }
 
-export type ParsedSysvarsInstruction<
-	TProgram extends string = typeof ANCHOR_SYSVARS_PROGRAM_ADDRESS,
-	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
-> = {
-	programAddress: Address<TProgram>;
-	accounts: {
-		clock: TAccountMetas[0];
-		rent: TAccountMetas[1];
-		stakeHistory: TAccountMetas[2];
-	};
-};
+export type ParsedSysvarsInstruction<TProgram extends string = typeof ANCHOR_SYSVARS_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
+accounts: {
+clock: TAccountMetas[0];
+rent: TAccountMetas[1];
+stakeHistory: TAccountMetas[2];
+}; };
 
-export function parseSysvarsInstruction<
-	TProgram extends string,
-	TAccountMetas extends readonly AccountMeta[],
->(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
-): ParsedSysvarsInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 3) {
-		throw new SolanaError(
-			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-			{
-				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 3,
-			},
-		);
-	}
-	let accountIndex = 0;
-	const getNextAccount = () => {
-		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-		accountIndex += 1;
-		return accountMeta;
-	};
-	return {
-		programAddress: instruction.programAddress,
-		accounts: {
-			clock: getNextAccount(),
-			rent: getNextAccount(),
-			stakeHistory: getNextAccount(),
-		},
-	};
+export function parseSysvarsInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>): ParsedSysvarsInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 3) {
+  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 3 });
+}
+let accountIndex = 0;
+const getNextAccount = () => {
+  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+  accountIndex += 1;
+  return accountMeta;
+}
+  return { programAddress: instruction.programAddress, accounts: { clock: getNextAccount(), rent: getNextAccount(), stakeHistory: getNextAccount() } };
 }

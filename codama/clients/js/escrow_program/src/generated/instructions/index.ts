@@ -6,5 +6,5 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./make";
-export * from "./take";
+export * from './make';
+export * from './take';

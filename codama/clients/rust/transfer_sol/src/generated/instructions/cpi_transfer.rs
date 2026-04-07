@@ -9,7 +9,7 @@
 )]
 
 /// Instruction data for `CpiTransfer`.
-///
+/// 
 /// Layout:
 /// ```text
 /// | offset | size | field         |
@@ -52,10 +52,7 @@ impl CpiTransfer {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.sender, true));
 		accounts.push(solana_instruction::AccountMeta::new(self.recipient, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.system_program,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();
 

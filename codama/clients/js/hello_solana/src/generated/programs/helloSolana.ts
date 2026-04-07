@@ -6,106 +6,44 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	assertIsInstructionWithAccounts,
-	type ClientWithTransactionPlanning,
-	type ClientWithTransactionSending,
-	containsBytes,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithData,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
-	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
-	SolanaError,
-} from "@solana/kit";
-import {
-	addSelfPlanAndSendFunctions,
-	type SelfPlanAndSendFunctions,
-} from "@solana/program-client-core";
-import {
-	getHelloInstruction,
-	type HelloInput,
-	type ParsedHelloInstruction,
-	parseHelloInstruction,
-} from "../instructions";
+import { assertIsInstructionWithAccounts, containsBytes, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
+import { addSelfPlanAndSendFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
+import { getHelloInstruction, parseHelloInstruction, type HelloInput, type ParsedHelloInstruction } from '../instructions';
 
-export const HELLO_SOLANA_PROGRAM_ADDRESS =
-	"DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A" as Address<
-		"DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A"
-	>;
+export const HELLO_SOLANA_PROGRAM_ADDRESS = 'DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A' as Address<'DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A'>;
 
-export enum HelloSolanaInstruction {
-	Hello,
+export enum HelloSolanaInstruction { Hello }
+
+export function identifyHelloSolanaInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): HelloSolanaInstruction {
+    const data = 'data' in instruction ? instruction.data : instruction;
+    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return HelloSolanaInstruction.Hello; }
+    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "helloSolana" });
 }
 
-export function identifyHelloSolanaInstruction(
-	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
-): HelloSolanaInstruction {
-	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return HelloSolanaInstruction.Hello;
-	}
-	throw new SolanaError(
-		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
-		{ instructionData: data, programName: "helloSolana" },
-	);
-}
+export type ParsedHelloSolanaInstruction<TProgram extends string = 'DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A'> =
+| { instructionType: HelloSolanaInstruction.Hello } & ParsedHelloInstruction<TProgram>
 
-export type ParsedHelloSolanaInstruction<
-	TProgram extends string = "DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A",
-> =
-	& { instructionType: HelloSolanaInstruction.Hello }
-	& ParsedHelloInstruction<TProgram>;
 
-export function parseHelloSolanaInstruction<TProgram extends string>(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedHelloSolanaInstruction<TProgram> {
-	const instructionType = identifyHelloSolanaInstruction(instruction);
-	switch (instructionType) {
-		case HelloSolanaInstruction.Hello: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: HelloSolanaInstruction.Hello,
-				...parseHelloInstruction(instruction),
-			};
-		}
-		default:
-			throw new SolanaError(
-				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
-				{
-					instructionType: instructionType as string,
-					programName: "helloSolana",
-				},
-			);
-	}
-}
+        export function parseHelloSolanaInstruction<TProgram extends string>(
+            instruction: Instruction<TProgram> 
+                & InstructionWithData<ReadonlyUint8Array>
+        ): ParsedHelloSolanaInstruction<TProgram> {
+            const instructionType = identifyHelloSolanaInstruction(instruction);
+            switch (instructionType) {
+                case HelloSolanaInstruction.Hello: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: HelloSolanaInstruction.Hello, ...parseHelloInstruction(instruction) }; }
+                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "helloSolana" });
+            }
+        }
 
-export type HelloSolanaPlugin = { instructions: HelloSolanaPluginInstructions };
+export type HelloSolanaPlugin = { instructions: HelloSolanaPluginInstructions; }
 
-export type HelloSolanaPluginInstructions = {
-	hello: (
-		input: HelloInput,
-	) => ReturnType<typeof getHelloInstruction> & SelfPlanAndSendFunctions;
-};
+export type HelloSolanaPluginInstructions = { hello: (input: HelloInput) => ReturnType<typeof getHelloInstruction> & SelfPlanAndSendFunctions; }
 
-export type HelloSolanaPluginRequirements =
-	& ClientWithTransactionPlanning
-	& ClientWithTransactionSending;
+export type HelloSolanaPluginRequirements = ClientWithTransactionPlanning & ClientWithTransactionSending
 
 export function helloSolanaProgram() {
-	return <T extends HelloSolanaPluginRequirements>(client: T) => {
-		return {
-			...client,
-			helloSolana: <HelloSolanaPlugin> {
-				instructions: {
-					hello: (input) =>
-						addSelfPlanAndSendFunctions(client, getHelloInstruction(input)),
-				},
-			},
-		};
-	};
+    return <T extends HelloSolanaPluginRequirements>(client: T) => {
+        return { ...client, helloSolana: <HelloSolanaPlugin>{ instructions: { hello: input => addSelfPlanAndSendFunctions(client, getHelloInstruction(input)) } } };
+    };
 }

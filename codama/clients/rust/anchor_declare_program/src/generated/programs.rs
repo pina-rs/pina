@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use solana_pubkey::Pubkey;
-use solana_pubkey::pubkey;
+use solana_pubkey::{pubkey, Pubkey};
 
-pub const ANCHOR_DECLARE_PROGRAM_ID: Pubkey =
-	pubkey!("Dec1areProgram11111111111111111111111111111");
+pub const ANCHOR_DECLARE_PROGRAM_ID: Pubkey = pubkey!("Dec1areProgram11111111111111111111111111111");

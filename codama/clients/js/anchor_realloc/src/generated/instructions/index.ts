@@ -6,5 +6,5 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./realloc";
-export * from "./realloc2";
+export * from './realloc';
+export * from './realloc2';

@@ -6,13 +6,8 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	isProgramError,
-	type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
-	type SolanaError,
-} from "@solana/kit";
-import { ANCHOR_ERRORS_PROGRAM_ADDRESS } from "../programs";
+import { isProgramError, type Address, type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM, type SolanaError } from '@solana/kit';
+import { ANCHOR_ERRORS_PROGRAM_ADDRESS } from '../programs';
 
 export const ANCHOR_ERRORS_ERROR__HELLO = 0x1770; // 6000
 export const ANCHOR_ERRORS_ERROR__HELLO_NO_MSG = 0x17eb; // 6123
@@ -23,55 +18,25 @@ export const ANCHOR_ERRORS_ERROR__VALUE_MATCH = 0x17ef; // 6127
 export const ANCHOR_ERRORS_ERROR__VALUE_LESS = 0x17f0; // 6128
 export const ANCHOR_ERRORS_ERROR__VALUE_LESS_OR_EQUAL = 0x17f1; // 6129
 
-export type AnchorErrorsError =
-	| typeof ANCHOR_ERRORS_ERROR__HELLO
-	| typeof ANCHOR_ERRORS_ERROR__HELLO_CUSTOM
-	| typeof ANCHOR_ERRORS_ERROR__HELLO_NEXT
-	| typeof ANCHOR_ERRORS_ERROR__HELLO_NO_MSG
-	| typeof ANCHOR_ERRORS_ERROR__VALUE_LESS
-	| typeof ANCHOR_ERRORS_ERROR__VALUE_LESS_OR_EQUAL
-	| typeof ANCHOR_ERRORS_ERROR__VALUE_MATCH
-	| typeof ANCHOR_ERRORS_ERROR__VALUE_MISMATCH;
+export type AnchorErrorsError = typeof ANCHOR_ERRORS_ERROR__HELLO | typeof ANCHOR_ERRORS_ERROR__HELLO_CUSTOM | typeof ANCHOR_ERRORS_ERROR__HELLO_NEXT | typeof ANCHOR_ERRORS_ERROR__HELLO_NO_MSG | typeof ANCHOR_ERRORS_ERROR__VALUE_LESS | typeof ANCHOR_ERRORS_ERROR__VALUE_LESS_OR_EQUAL | typeof ANCHOR_ERRORS_ERROR__VALUE_MATCH | typeof ANCHOR_ERRORS_ERROR__VALUE_MISMATCH;
 
 let anchorErrorsErrorMessages: Record<AnchorErrorsError, string> | undefined;
-if (process.env.NODE_ENV !== "production") {
-	anchorErrorsErrorMessages = {
-		[ANCHOR_ERRORS_ERROR__HELLO]: ``,
-		[ANCHOR_ERRORS_ERROR__HELLO_CUSTOM]: ``,
-		[ANCHOR_ERRORS_ERROR__HELLO_NEXT]: ``,
-		[ANCHOR_ERRORS_ERROR__HELLO_NO_MSG]: ``,
-		[ANCHOR_ERRORS_ERROR__VALUE_LESS]: ``,
-		[ANCHOR_ERRORS_ERROR__VALUE_LESS_OR_EQUAL]: ``,
-		[ANCHOR_ERRORS_ERROR__VALUE_MATCH]: ``,
-		[ANCHOR_ERRORS_ERROR__VALUE_MISMATCH]: ``,
-	};
+if (process.env.NODE_ENV !== 'production') {
+  anchorErrorsErrorMessages = { [ANCHOR_ERRORS_ERROR__HELLO]: ``, [ANCHOR_ERRORS_ERROR__HELLO_CUSTOM]: ``, [ANCHOR_ERRORS_ERROR__HELLO_NEXT]: ``, [ANCHOR_ERRORS_ERROR__HELLO_NO_MSG]: ``, [ANCHOR_ERRORS_ERROR__VALUE_LESS]: ``, [ANCHOR_ERRORS_ERROR__VALUE_LESS_OR_EQUAL]: ``, [ANCHOR_ERRORS_ERROR__VALUE_MATCH]: ``, [ANCHOR_ERRORS_ERROR__VALUE_MISMATCH]: `` };
 }
 
 export function getAnchorErrorsErrorMessage(code: AnchorErrorsError): string {
-	if (process.env.NODE_ENV !== "production") {
-		return (anchorErrorsErrorMessages as Record<AnchorErrorsError, string>)[
-			code
-		];
-	}
+  if (process.env.NODE_ENV !== 'production') {
+    return (anchorErrorsErrorMessages as Record<AnchorErrorsError, string>)[code];
+  }
 
-	return "Error message not available in production bundles.";
+  return 'Error message not available in production bundles.';
 }
 
-export function isAnchorErrorsError<
-	TProgramErrorCode extends AnchorErrorsError,
->(
-	error: unknown,
-	transactionMessage: {
-		instructions: Record<number, { programAddress: Address }>;
-	},
-	code?: TProgramErrorCode,
-): error is
-	& SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM>
-	& Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
-	return isProgramError<TProgramErrorCode>(
-		error,
-		transactionMessage,
-		ANCHOR_ERRORS_PROGRAM_ADDRESS,
-		code,
-	);
+export function isAnchorErrorsError<TProgramErrorCode extends AnchorErrorsError>(
+    error: unknown,
+    transactionMessage: { instructions: Record<number, { programAddress: Address }> },
+    code?: TProgramErrorCode,
+): error is SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM> & Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
+  return isProgramError<TProgramErrorCode>(error, transactionMessage, ANCHOR_ERRORS_PROGRAM_ADDRESS, code);
 }

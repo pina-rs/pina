@@ -6,34 +6,14 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	getAddressEncoder,
-	getProgramDerivedAddress,
-	getUtf8Encoder,
-	type ProgramDerivedAddress,
-} from "@solana/kit";
+import { getAddressEncoder, getProgramDerivedAddress, getUtf8Encoder, type Address, type ProgramDerivedAddress } from '@solana/kit';
 
 export type EscrowSeeds = {
-	maker: Address;
-	seed: Address;
+maker: Address;
+seed: Address;
 };
 
-export async function findEscrowPda(
-	seeds: EscrowSeeds,
-	config: { programAddress?: Address | undefined } = {},
-): Promise<ProgramDerivedAddress> {
-	const {
-		programAddress = "4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT" as Address<
-			"4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT"
-		>,
-	} = config;
-	return await getProgramDerivedAddress({
-		programAddress,
-		seeds: [
-			getUtf8Encoder().encode("escrow"),
-			getAddressEncoder().encode(seeds.maker),
-			getAddressEncoder().encode(seeds.seed),
-		],
-	});
+export async function findEscrowPda(seeds: EscrowSeeds, config: { programAddress?: Address | undefined } = {}): Promise<ProgramDerivedAddress> {
+  const { programAddress = '4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT' as Address<'4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT'> } = config;
+  return await getProgramDerivedAddress({ programAddress, seeds: [getUtf8Encoder().encode("escrow"), getAddressEncoder().encode(seeds.maker), getAddressEncoder().encode(seeds.seed)]});
 }
