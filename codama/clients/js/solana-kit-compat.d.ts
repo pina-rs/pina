@@ -46,14 +46,10 @@ declare module "@solana/program-client-core" {
 	/**
 	 * Compatibility overload that accepts generated codecs from current Codama output.
 	 */
-	export function addSelfFetchFunctions<
-		TInput = unknown,
-		TOutput = unknown,
-		TCodec = unknown,
-	>(
+	export function addSelfFetchFunctions<TCodec>(
 		client: unknown,
 		codec: TCodec,
-	): SelfFetchFunctions<TInput, TOutput> & TCodec;
+	): SelfFetchFunctions<any, any> & TCodec;
 
 	/**
 	 * Compatibility overload that relaxes client constraints for generated program plugins.

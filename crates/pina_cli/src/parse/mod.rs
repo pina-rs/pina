@@ -97,7 +97,7 @@ pub fn assemble_program_ir_multi(
 
 	let public_key = public_key.ok_or(IdlError::NoProgramId)?;
 
-	return assemble_from_extracted(
+	assemble_from_extracted(
 		program_name,
 		public_key,
 		&all_disc_enums,
@@ -108,7 +108,7 @@ pub fn assemble_program_ir_multi(
 		&dispatch,
 		&all_validation_props,
 		&pdas_ir,
-	);
+	)
 }
 
 /// Assemble a `ProgramIr` from a single parsed syn `File`.
@@ -135,7 +135,7 @@ fn assemble_from_extracted(
 		.iter()
 		.map(|acct| {
 			let disc_value =
-				find_discriminator_value(&disc_enums, &acct.discriminator_enum, &acct.name);
+				find_discriminator_value(disc_enums, &acct.discriminator_enum, &acct.name);
 			AccountIr {
 				name: acct.name.clone(),
 				fields: acct.fields.clone(),
@@ -165,7 +165,7 @@ fn assemble_from_extracted(
 
 			// Find discriminator value.
 			let disc_value = find_discriminator_value_by_variant(
-				&disc_enums,
+				disc_enums,
 				&ix_struct.discriminator_enum,
 				&entry.variant,
 			);
@@ -182,7 +182,7 @@ fn assemble_from_extracted(
 
 					// Check if this field is a PDA from the pdas we found.
 					let pda_name = if props.is_pda {
-						infer_pda_name_for_field(&field.name, &pdas_ir)
+						infer_pda_name_for_field(&field.name, pdas_ir)
 					} else {
 						None
 					};

@@ -96,9 +96,10 @@ echo "Type-checking generated JS clients..."
 pnpm --dir "$ROOT" run check:js
 
 echo "Compile-checking generated Rust client crates..."
-mapfile -t CLIENT_MANIFESTS < <(
-	find "$RUST_CLIENTS_DIR" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort
-)
+CLIENT_MANIFESTS=()
+while IFS= read -r manifest; do
+	CLIENT_MANIFESTS+=("$manifest")
+done < <(find "$RUST_CLIENTS_DIR" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
 
 if [ "${#CLIENT_MANIFESTS[@]}" -eq 0 ]; then
 	echo "No generated Rust client manifests found in $RUST_CLIENTS_DIR" >&2
@@ -118,8 +119,11 @@ done
 cargo check --locked "${CLIENT_ARGS[@]}"
 
 echo "Checking deterministic Codama output regeneration..."
-mapfile -t GENERATED_FILES < <(
-	git -C "$ROOT" diff --name-only -- "$IDL_DIR" "$RUST_CLIENTS_DIR" "$JS_CLIENTS_DIR"
+GENERATED_FILES=()
+while IFS= read -r generated_file; do
+	GENERATED_FILES+=("$generated_file")
+done < <(
+	git -C "$ROOT" diff --name-only HEAD -- "$IDL_DIR" "$RUST_CLIENTS_DIR" "$JS_CLIENTS_DIR"
 )
 
 if [ "${#GENERATED_FILES[@]}" -gt 0 ]; then
