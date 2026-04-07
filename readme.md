@@ -694,6 +694,9 @@ The profiler decodes each SBF instruction opcode and assigns costs: regular inst
 | [`counter_program`](examples/counter_program)                                     | PDA state management with initialize and increment                          |
 | [`transfer_sol`](examples/transfer_sol)                                           | CPI and direct lamport transfers                                            |
 | [`escrow_program`](examples/escrow_program)                                       | Full token escrow with SPL token operations                                 |
+| [`vesting_program`](examples/vesting_program)                                     | Token vesting / lockup scaffold with vault ATA setup and schedule state     |
+| [`role_registry_program`](examples/role_registry_program)                         | Role-based configuration and registry PDAs                                  |
+| [`staking_rewards_program`](examples/staking_rewards_program)                     | Staking pool and user-position accounting scaffold                          |
 | [`pina_bpf`](examples/pina_bpf)                                                   | Minimal pina-native BPF hello world (nightly + `build-std=core,alloc`)      |
 | [`anchor_declare_id`](examples/anchor_declare_id)                                 | Anchor `declare-id` test parity port for program-id mismatch                |
 | [`anchor_declare_program`](examples/anchor_declare_program)                       | Anchor `declare-program` parity port for external-program ID checks         |

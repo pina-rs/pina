@@ -438,13 +438,14 @@ in
       description = "Run all tests across the crates";
       binary = "bash";
     };
-    "test:anchor-parity" = {
+    "test:program-e2e" = {
       exec = ''
         set -e
 
         # Ensure sbpf-linker is built against the Blueshift LLVM upstream gallery.
         install:sbpf-gallery
 
+        # Run unit and parity tests for all example programs.
         cargo test --locked \
           -p anchor_declare_id \
           -p anchor_declare_program \
@@ -470,8 +471,25 @@ in
 
         cargo +"$BPF_TOOLCHAIN" build-bpf
         cargo test --locked -p pina_bpf bpf_build_ -- --ignored
+
+        # Run mollusk-svm e2e tests against the compiled SBF binaries.
+        # These verify that generated clients produce valid instructions
+        # that the on-chain programs accept and process correctly.
+        SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
+          cargo test --locked \
+            -p role_registry_program --test e2e \
+            -p staking_rewards_program --test e2e \
+            -p vesting_program --test e2e \
+            -- --nocapture
+
+        # Run LiteSVM e2e tests with the generated TypeScript clients.
+        # These verify that TS instruction builders with pina's discriminator
+        # model produce transactions the on-chain programs accept.
+        pnpm --dir "$DEVENV_ROOT/codama/tests/litesvm" install --frozen-lockfile
+        SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
+          pnpm --dir "$DEVENV_ROOT/codama/tests/litesvm" test
       '';
-      description = "Run Anchor parity tests plus pina_bpf build artifact checks using the gallery sbpf-linker.";
+      description = "Build SBF binaries and run end-to-end program tests including mollusk-svm integration.";
       binary = "bash";
     };
     "idl:generate" = {

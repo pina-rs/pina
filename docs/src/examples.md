@@ -7,6 +7,9 @@ The `examples/` workspace members demonstrate practical usage patterns:
 - `todo_program`: PDA-backed state with boolean + digest updates.
 - `transfer_sol`: lamport transfers and account checks.
 - `escrow_program`: richer multi-account flow and token-oriented logic.
+- `vesting_program`: token vesting / lockup scaffold with vault ATA setup and claim/cancel state.
+- `role_registry_program`: role-based configuration and registry PDAs with admin rotation.
+- `staking_rewards_program`: staking pool and user-position accounting scaffold with reward bookkeeping.
 - `pina_bpf`: minimal pina-native BPF hello world with nightly `build-std=core,alloc`.
 - `anchor_declare_id`: first Anchor test parity port, focused on program-id mismatch checks.
 - `anchor_declare_program`: Anchor `declare-program` parity for external-program ID checks.
