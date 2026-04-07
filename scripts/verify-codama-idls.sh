@@ -78,7 +78,9 @@ cargo run -p pina_cli --quiet -- codama generate \
 	--js-out "$JS_CLIENTS_DIR" \
 	--npx node
 
-if ! find "$IDL_DIR" -mindepth 1 -maxdepth 1 -type f -name "*.json" | grep -q .; then
+if find "$IDL_DIR" -mindepth 1 -maxdepth 1 -type f -name "*.json" | grep -q .; then
+	dprint fmt --config "$ROOT/dprint.json" "$IDL_DIR/*.json"
+else
 	echo "No *.json fixtures were generated in $IDL_DIR" >&2
 	exit 1
 fi
