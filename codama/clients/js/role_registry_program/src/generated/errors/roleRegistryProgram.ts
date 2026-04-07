@@ -6,32 +6,62 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { isProgramError, type Address, type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM, type SolanaError } from '@solana/kit';
-import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import {
+	type Address,
+	isProgramError,
+	type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
+	type SolanaError,
+} from "@solana/kit";
+import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const ROLE_REGISTRY_PROGRAM_ERROR__INVALID_PERMISSIONS = 0x0; // 0
 export const ROLE_REGISTRY_PROGRAM_ERROR__ROLE_ALREADY_EXISTS = 0x1; // 1
 export const ROLE_REGISTRY_PROGRAM_ERROR__ROLE_INACTIVE = 0x2; // 2
 
-export type RoleRegistryProgramError = typeof ROLE_REGISTRY_PROGRAM_ERROR__INVALID_PERMISSIONS | typeof ROLE_REGISTRY_PROGRAM_ERROR__ROLE_ALREADY_EXISTS | typeof ROLE_REGISTRY_PROGRAM_ERROR__ROLE_INACTIVE;
+export type RoleRegistryProgramError =
+	| typeof ROLE_REGISTRY_PROGRAM_ERROR__INVALID_PERMISSIONS
+	| typeof ROLE_REGISTRY_PROGRAM_ERROR__ROLE_ALREADY_EXISTS
+	| typeof ROLE_REGISTRY_PROGRAM_ERROR__ROLE_INACTIVE;
 
-let roleRegistryProgramErrorMessages: Record<RoleRegistryProgramError, string> | undefined;
-if (process.env.NODE_ENV !== 'production') {
-  roleRegistryProgramErrorMessages = { [ROLE_REGISTRY_PROGRAM_ERROR__INVALID_PERMISSIONS]: ``, [ROLE_REGISTRY_PROGRAM_ERROR__ROLE_ALREADY_EXISTS]: ``, [ROLE_REGISTRY_PROGRAM_ERROR__ROLE_INACTIVE]: `` };
+let roleRegistryProgramErrorMessages:
+	| Record<RoleRegistryProgramError, string>
+	| undefined;
+if (process.env.NODE_ENV !== "production") {
+	roleRegistryProgramErrorMessages = {
+		[ROLE_REGISTRY_PROGRAM_ERROR__INVALID_PERMISSIONS]: ``,
+		[ROLE_REGISTRY_PROGRAM_ERROR__ROLE_ALREADY_EXISTS]: ``,
+		[ROLE_REGISTRY_PROGRAM_ERROR__ROLE_INACTIVE]: ``,
+	};
 }
 
-export function getRoleRegistryProgramErrorMessage(code: RoleRegistryProgramError): string {
-  if (process.env.NODE_ENV !== 'production') {
-    return (roleRegistryProgramErrorMessages as Record<RoleRegistryProgramError, string>)[code];
-  }
+export function getRoleRegistryProgramErrorMessage(
+	code: RoleRegistryProgramError,
+): string {
+	if (process.env.NODE_ENV !== "production") {
+		return (roleRegistryProgramErrorMessages as Record<
+			RoleRegistryProgramError,
+			string
+		>)[code];
+	}
 
-  return 'Error message not available in production bundles.';
+	return "Error message not available in production bundles.";
 }
 
-export function isRoleRegistryProgramError<TProgramErrorCode extends RoleRegistryProgramError>(
-    error: unknown,
-    transactionMessage: { instructions: Record<number, { programAddress: Address }> },
-    code?: TProgramErrorCode,
-): error is SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM> & Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
-  return isProgramError<TProgramErrorCode>(error, transactionMessage, ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS, code);
+export function isRoleRegistryProgramError<
+	TProgramErrorCode extends RoleRegistryProgramError,
+>(
+	error: unknown,
+	transactionMessage: {
+		instructions: Record<number, { programAddress: Address }>;
+	},
+	code?: TProgramErrorCode,
+): error is
+	& SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM>
+	& Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
+	return isProgramError<TProgramErrorCode>(
+		error,
+		transactionMessage,
+		ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS,
+		code,
+	);
 }

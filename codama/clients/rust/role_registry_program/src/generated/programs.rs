@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
-use solana_pubkey::{pubkey, Pubkey};
+use solana_pubkey::Pubkey;
+use solana_pubkey::pubkey;
 
-pub const ROLE_REGISTRY_PROGRAM_ID: Pubkey = pubkey!("3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX");
+pub const ROLE_REGISTRY_PROGRAM_ID: Pubkey =
+	pubkey!("3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX");

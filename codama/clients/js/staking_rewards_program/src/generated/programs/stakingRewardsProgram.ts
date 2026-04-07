@@ -6,75 +6,262 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { assertIsInstructionWithAccounts, containsBytes, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithRpc, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type GetAccountInfoApi, type GetMultipleAccountsApi, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
-import { addSelfFetchFunctions, addSelfPlanAndSendFunctions, type SelfFetchFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
-import { getPoolStateCodec, getPositionStateCodec, type PoolState, type PoolStateArgs, type PositionState, type PositionStateArgs } from '../accounts';
-import { getClaimInstruction, getDepositInstruction, getInitializePoolInstruction, getOpenPositionInstruction, getWithdrawInstruction, parseClaimInstruction, parseDepositInstruction, parseInitializePoolInstruction, parseOpenPositionInstruction, parseWithdrawInstruction, type ClaimInput, type DepositInput, type InitializePoolInput, type OpenPositionInput, type ParsedClaimInstruction, type ParsedDepositInstruction, type ParsedInitializePoolInstruction, type ParsedOpenPositionInstruction, type ParsedWithdrawInstruction, type WithdrawInput } from '../instructions';
-import { findPoolPda, findPositionPda } from '../pdas';
+import {
+	type Address,
+	assertIsInstructionWithAccounts,
+	type ClientWithRpc,
+	type ClientWithTransactionPlanning,
+	type ClientWithTransactionSending,
+	containsBytes,
+	type GetAccountInfoApi,
+	type GetMultipleAccountsApi,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+	SolanaError,
+} from "@solana/kit";
+import {
+	addSelfFetchFunctions,
+	addSelfPlanAndSendFunctions,
+	type SelfFetchFunctions,
+	type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import {
+	getPoolStateCodec,
+	getPositionStateCodec,
+	type PoolState,
+	type PoolStateArgs,
+	type PositionState,
+	type PositionStateArgs,
+} from "../accounts";
+import {
+	type ClaimInput,
+	type DepositInput,
+	getClaimInstruction,
+	getDepositInstruction,
+	getInitializePoolInstruction,
+	getOpenPositionInstruction,
+	getWithdrawInstruction,
+	type InitializePoolInput,
+	type OpenPositionInput,
+	parseClaimInstruction,
+	type ParsedClaimInstruction,
+	type ParsedDepositInstruction,
+	parseDepositInstruction,
+	type ParsedInitializePoolInstruction,
+	type ParsedOpenPositionInstruction,
+	type ParsedWithdrawInstruction,
+	parseInitializePoolInstruction,
+	parseOpenPositionInstruction,
+	parseWithdrawInstruction,
+	type WithdrawInput,
+} from "../instructions";
+import { findPoolPda, findPositionPda } from "../pdas";
 
-export const STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS = '9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr' as Address<'9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr'>;
+export const STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS =
+	"9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr" as Address<
+		"9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr"
+	>;
 
-export enum StakingRewardsProgramAccount { PoolState, PositionState }
-
-export function identifyStakingRewardsProgramAccount(account: { data: ReadonlyUint8Array } | ReadonlyUint8Array): StakingRewardsProgramAccount {
-    const data = 'data' in account ? account.data : account;
-    if (containsBytes(data, getU8Encoder().encode(1), 0)) { return StakingRewardsProgramAccount.PoolState; }
-if (containsBytes(data, getU8Encoder().encode(2), 0)) { return StakingRewardsProgramAccount.PositionState; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, { accountData: data, programName: "stakingRewardsProgram" });
+export enum StakingRewardsProgramAccount {
+	PoolState,
+	PositionState,
 }
 
-export enum StakingRewardsProgramInstruction { InitializePool, OpenPosition, Deposit, Withdraw, Claim }
-
-export function identifyStakingRewardsProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): StakingRewardsProgramInstruction {
-    const data = 'data' in instruction ? instruction.data : instruction;
-    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return StakingRewardsProgramInstruction.InitializePool; }
-if (containsBytes(data, getU8Encoder().encode(1), 0)) { return StakingRewardsProgramInstruction.OpenPosition; }
-if (containsBytes(data, getU8Encoder().encode(2), 0)) { return StakingRewardsProgramInstruction.Deposit; }
-if (containsBytes(data, getU8Encoder().encode(3), 0)) { return StakingRewardsProgramInstruction.Withdraw; }
-if (containsBytes(data, getU8Encoder().encode(4), 0)) { return StakingRewardsProgramInstruction.Claim; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "stakingRewardsProgram" });
+export function identifyStakingRewardsProgramAccount(
+	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): StakingRewardsProgramAccount {
+	const data = "data" in account ? account.data : account;
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return StakingRewardsProgramAccount.PoolState;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return StakingRewardsProgramAccount.PositionState;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+		{ accountData: data, programName: "stakingRewardsProgram" },
+	);
 }
 
-export type ParsedStakingRewardsProgramInstruction<TProgram extends string = '9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr'> =
-| { instructionType: StakingRewardsProgramInstruction.InitializePool } & ParsedInitializePoolInstruction<TProgram>
-| { instructionType: StakingRewardsProgramInstruction.OpenPosition } & ParsedOpenPositionInstruction<TProgram>
-| { instructionType: StakingRewardsProgramInstruction.Deposit } & ParsedDepositInstruction<TProgram>
-| { instructionType: StakingRewardsProgramInstruction.Withdraw } & ParsedWithdrawInstruction<TProgram>
-| { instructionType: StakingRewardsProgramInstruction.Claim } & ParsedClaimInstruction<TProgram>
+export enum StakingRewardsProgramInstruction {
+	InitializePool,
+	OpenPosition,
+	Deposit,
+	Withdraw,
+	Claim,
+}
 
+export function identifyStakingRewardsProgramInstruction(
+	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): StakingRewardsProgramInstruction {
+	const data = "data" in instruction ? instruction.data : instruction;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return StakingRewardsProgramInstruction.InitializePool;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return StakingRewardsProgramInstruction.OpenPosition;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return StakingRewardsProgramInstruction.Deposit;
+	}
+	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+		return StakingRewardsProgramInstruction.Withdraw;
+	}
+	if (containsBytes(data, getU8Encoder().encode(4), 0)) {
+		return StakingRewardsProgramInstruction.Claim;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+		{ instructionData: data, programName: "stakingRewardsProgram" },
+	);
+}
 
-        export function parseStakingRewardsProgramInstruction<TProgram extends string>(
-            instruction: Instruction<TProgram> 
-                & InstructionWithData<ReadonlyUint8Array>
-        ): ParsedStakingRewardsProgramInstruction<TProgram> {
-            const instructionType = identifyStakingRewardsProgramInstruction(instruction);
-            switch (instructionType) {
-                case StakingRewardsProgramInstruction.InitializePool: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: StakingRewardsProgramInstruction.InitializePool, ...parseInitializePoolInstruction(instruction) }; }
-case StakingRewardsProgramInstruction.OpenPosition: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: StakingRewardsProgramInstruction.OpenPosition, ...parseOpenPositionInstruction(instruction) }; }
-case StakingRewardsProgramInstruction.Deposit: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: StakingRewardsProgramInstruction.Deposit, ...parseDepositInstruction(instruction) }; }
-case StakingRewardsProgramInstruction.Withdraw: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: StakingRewardsProgramInstruction.Withdraw, ...parseWithdrawInstruction(instruction) }; }
-case StakingRewardsProgramInstruction.Claim: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: StakingRewardsProgramInstruction.Claim, ...parseClaimInstruction(instruction) }; }
-                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "stakingRewardsProgram" });
-            }
-        }
+export type ParsedStakingRewardsProgramInstruction<
+	TProgram extends string = "9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr",
+> =
+	| { instructionType: StakingRewardsProgramInstruction.InitializePool }
+		& ParsedInitializePoolInstruction<TProgram>
+	| { instructionType: StakingRewardsProgramInstruction.OpenPosition }
+		& ParsedOpenPositionInstruction<TProgram>
+	| { instructionType: StakingRewardsProgramInstruction.Deposit }
+		& ParsedDepositInstruction<TProgram>
+	| { instructionType: StakingRewardsProgramInstruction.Withdraw }
+		& ParsedWithdrawInstruction<TProgram>
+	| { instructionType: StakingRewardsProgramInstruction.Claim }
+		& ParsedClaimInstruction<TProgram>;
 
-export type StakingRewardsProgramPlugin = { accounts: StakingRewardsProgramPluginAccounts; instructions: StakingRewardsProgramPluginInstructions; pdas: StakingRewardsProgramPluginPdas; }
+export function parseStakingRewardsProgramInstruction<TProgram extends string>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedStakingRewardsProgramInstruction<TProgram> {
+	const instructionType = identifyStakingRewardsProgramInstruction(instruction);
+	switch (instructionType) {
+		case StakingRewardsProgramInstruction.InitializePool: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: StakingRewardsProgramInstruction.InitializePool,
+				...parseInitializePoolInstruction(instruction),
+			};
+		}
+		case StakingRewardsProgramInstruction.OpenPosition: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: StakingRewardsProgramInstruction.OpenPosition,
+				...parseOpenPositionInstruction(instruction),
+			};
+		}
+		case StakingRewardsProgramInstruction.Deposit: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: StakingRewardsProgramInstruction.Deposit,
+				...parseDepositInstruction(instruction),
+			};
+		}
+		case StakingRewardsProgramInstruction.Withdraw: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: StakingRewardsProgramInstruction.Withdraw,
+				...parseWithdrawInstruction(instruction),
+			};
+		}
+		case StakingRewardsProgramInstruction.Claim: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: StakingRewardsProgramInstruction.Claim,
+				...parseClaimInstruction(instruction),
+			};
+		}
+		default:
+			throw new SolanaError(
+				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+				{
+					instructionType: instructionType as string,
+					programName: "stakingRewardsProgram",
+				},
+			);
+	}
+}
 
-export type StakingRewardsProgramPluginAccounts = { poolState: ReturnType<typeof getPoolStateCodec> & SelfFetchFunctions<PoolStateArgs, PoolState>; positionState: ReturnType<typeof getPositionStateCodec> & SelfFetchFunctions<PositionStateArgs, PositionState>; }
+export type StakingRewardsProgramPlugin = {
+	accounts: StakingRewardsProgramPluginAccounts;
+	instructions: StakingRewardsProgramPluginInstructions;
+	pdas: StakingRewardsProgramPluginPdas;
+};
 
-export type StakingRewardsProgramPluginInstructions = { initializePool: (input: InitializePoolInput) => ReturnType<typeof getInitializePoolInstruction> & SelfPlanAndSendFunctions; openPosition: (input: OpenPositionInput) => ReturnType<typeof getOpenPositionInstruction> & SelfPlanAndSendFunctions; deposit: (input: DepositInput) => ReturnType<typeof getDepositInstruction> & SelfPlanAndSendFunctions; withdraw: (input: WithdrawInput) => ReturnType<typeof getWithdrawInstruction> & SelfPlanAndSendFunctions; claim: (input: ClaimInput) => ReturnType<typeof getClaimInstruction> & SelfPlanAndSendFunctions; }
+export type StakingRewardsProgramPluginAccounts = {
+	poolState:
+		& ReturnType<typeof getPoolStateCodec>
+		& SelfFetchFunctions<PoolStateArgs, PoolState>;
+	positionState:
+		& ReturnType<typeof getPositionStateCodec>
+		& SelfFetchFunctions<PositionStateArgs, PositionState>;
+};
 
-export type StakingRewardsProgramPluginPdas = { pool: typeof findPoolPda; position: typeof findPositionPda; }
+export type StakingRewardsProgramPluginInstructions = {
+	initializePool: (
+		input: InitializePoolInput,
+	) =>
+		& ReturnType<typeof getInitializePoolInstruction>
+		& SelfPlanAndSendFunctions;
+	openPosition: (
+		input: OpenPositionInput,
+	) => ReturnType<typeof getOpenPositionInstruction> & SelfPlanAndSendFunctions;
+	deposit: (
+		input: DepositInput,
+	) => ReturnType<typeof getDepositInstruction> & SelfPlanAndSendFunctions;
+	withdraw: (
+		input: WithdrawInput,
+	) => ReturnType<typeof getWithdrawInstruction> & SelfPlanAndSendFunctions;
+	claim: (
+		input: ClaimInput,
+	) => ReturnType<typeof getClaimInstruction> & SelfPlanAndSendFunctions;
+};
 
-export type StakingRewardsProgramPluginRequirements = ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi> & ClientWithTransactionPlanning & ClientWithTransactionSending
+export type StakingRewardsProgramPluginPdas = {
+	pool: typeof findPoolPda;
+	position: typeof findPositionPda;
+};
+
+export type StakingRewardsProgramPluginRequirements =
+	& ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi>
+	& ClientWithTransactionPlanning
+	& ClientWithTransactionSending;
 
 export function stakingRewardsProgramProgram() {
-    return <T extends StakingRewardsProgramPluginRequirements>(client: T) => {
-        return { ...client, stakingRewardsProgram: <StakingRewardsProgramPlugin>{ accounts: { poolState: addSelfFetchFunctions(client, getPoolStateCodec()), positionState: addSelfFetchFunctions(client, getPositionStateCodec()) }, instructions: { initializePool: input => addSelfPlanAndSendFunctions(client, getInitializePoolInstruction(input)), openPosition: input => addSelfPlanAndSendFunctions(client, getOpenPositionInstruction(input)), deposit: input => addSelfPlanAndSendFunctions(client, getDepositInstruction(input)), withdraw: input => addSelfPlanAndSendFunctions(client, getWithdrawInstruction(input)), claim: input => addSelfPlanAndSendFunctions(client, getClaimInstruction(input)) }, pdas: { pool: findPoolPda, position: findPositionPda } } };
-    };
+	return <T extends StakingRewardsProgramPluginRequirements>(client: T) => {
+		return {
+			...client,
+			stakingRewardsProgram: <StakingRewardsProgramPlugin> {
+				accounts: {
+					poolState: addSelfFetchFunctions(client, getPoolStateCodec()),
+					positionState: addSelfFetchFunctions(client, getPositionStateCodec()),
+				},
+				instructions: {
+					initializePool: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getInitializePoolInstruction(input),
+						),
+					openPosition: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getOpenPositionInstruction(input),
+						),
+					deposit: (input) =>
+						addSelfPlanAndSendFunctions(client, getDepositInstruction(input)),
+					withdraw: (input) =>
+						addSelfPlanAndSendFunctions(client, getWithdrawInstruction(input)),
+					claim: (input) =>
+						addSelfPlanAndSendFunctions(client, getClaimInstruction(input)),
+				},
+				pdas: { pool: findPoolPda, position: findPositionPda },
+			},
+		};
+	};
 }

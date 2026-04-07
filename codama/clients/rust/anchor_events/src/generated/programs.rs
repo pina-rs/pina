@@ -8,6 +8,7 @@
 	clippy::too_many_arguments
 )]
 
-use solana_pubkey::{pubkey, Pubkey};
+use solana_pubkey::Pubkey;
+use solana_pubkey::pubkey;
 
 pub const ANCHOR_EVENTS_ID: Pubkey = pubkey!("2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy");

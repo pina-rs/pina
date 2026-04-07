@@ -6,6 +6,6 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from './cancel';
-export * from './claim';
-export * from './initialize';
+export * from "./cancel";
+export * from "./claim";
+export * from "./initialize";

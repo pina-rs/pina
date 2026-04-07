@@ -19,7 +19,11 @@ pub struct DeactivateRole {
 }
 
 impl DeactivateRole {
-	pub fn new(admin: solana_pubkey::Pubkey, registry_config: solana_pubkey::Pubkey, role_entry: solana_pubkey::Pubkey) -> Self {
+	pub fn new(
+		admin: solana_pubkey::Pubkey,
+		registry_config: solana_pubkey::Pubkey,
+		role_entry: solana_pubkey::Pubkey,
+	) -> Self {
 		Self {
 			admin,
 			registry_config,
@@ -27,7 +31,10 @@ impl DeactivateRole {
 		}
 	}
 
-	pub fn instruction(&self, data: DeactivateRoleInstructionData) -> solana_instruction::Instruction {
+	pub fn instruction(
+		&self,
+		data: DeactivateRoleInstructionData,
+	) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -38,8 +45,13 @@ impl DeactivateRole {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.admin, true));
-		accounts.push(solana_instruction::AccountMeta::new(self.registry_config, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.admin, true,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.registry_config,
+			false,
+		));
 		accounts.push(solana_instruction::AccountMeta::new(self.role_entry, false));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();

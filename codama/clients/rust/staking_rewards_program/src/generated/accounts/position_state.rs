@@ -28,7 +28,14 @@ pub const POSITION_STATE_DISCRIMINATOR: u8 = 2u8;
 impl PositionState {
 	pub const LEN: usize = core::mem::size_of::<Self>();
 
-	pub const fn new(pool: solana_pubkey::Pubkey, owner: solana_pubkey::Pubkey, staked_amount: pina_pod_primitives::PodU64, reward_debt: pina_pod_primitives::PodU64, pending_rewards: pina_pod_primitives::PodU64, bump: u8) -> Self {
+	pub const fn new(
+		pool: solana_pubkey::Pubkey,
+		owner: solana_pubkey::Pubkey,
+		staked_amount: pina_pod_primitives::PodU64,
+		reward_debt: pina_pod_primitives::PodU64,
+		pending_rewards: pina_pod_primitives::PodU64,
+		bump: u8,
+	) -> Self {
 		Self {
 			discriminator: POSITION_STATE_DISCRIMINATOR,
 			pool,
@@ -49,7 +56,9 @@ impl PositionState {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(
+		data: &mut [u8],
+	) -> Result<&mut Self, solana_program_error::ProgramError> {
 		let account = bytemuck::try_from_bytes_mut::<Self>(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != POSITION_STATE_DISCRIMINATOR {

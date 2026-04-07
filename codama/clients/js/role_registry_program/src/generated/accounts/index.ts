@@ -6,5 +6,5 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from './registryConfig';
-export * from './roleEntry';
+export * from "./registryConfig";
+export * from "./roleEntry";

@@ -13,13 +13,13 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum StakingRewardsProgramError {
-	/// 0 - 
+	/// 0 -
 	#[error("")]
 	InvalidAmount = 0x0,
-	/// 1 - 
+	/// 1 -
 	#[error("")]
 	PoolPaused = 0x1,
-	/// 2 - 
+	/// 2 -
 	#[error("")]
 	InsufficientBalance = 0x2,
 }

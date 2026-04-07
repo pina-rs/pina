@@ -13,13 +13,13 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum VestingProgramError {
-	/// 0 - 
+	/// 0 -
 	#[error("")]
 	InvalidSchedule = 0x0,
-	/// 1 - 
+	/// 1 -
 	#[error("")]
 	ClaimTooLarge = 0x1,
-	/// 2 - 
+	/// 2 -
 	#[error("")]
 	AlreadyCancelled = 0x2,
 }

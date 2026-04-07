@@ -19,13 +19,13 @@ pub struct FailsDuplicateMutable {
 
 impl FailsDuplicateMutable {
 	pub fn new(account1: solana_pubkey::Pubkey, account2: solana_pubkey::Pubkey) -> Self {
-		Self {
-			account1,
-			account2,
-		}
+		Self { account1, account2 }
 	}
 
-	pub fn instruction(&self, data: FailsDuplicateMutableInstructionData) -> solana_instruction::Instruction {
+	pub fn instruction(
+		&self,
+		data: FailsDuplicateMutableInstructionData,
+	) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 

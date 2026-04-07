@@ -39,8 +39,14 @@ impl Create {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.account, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.authority, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.authority,
+			true,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();
 
@@ -61,7 +67,10 @@ pub struct CreateInstructionData {
 }
 
 impl CreateInstructionData {
-	pub const fn new(data_f32: pina_pod_primitives::PodU32, data_f64: pina_pod_primitives::PodU64) -> Self {
+	pub const fn new(
+		data_f32: pina_pod_primitives::PodU32,
+		data_f64: pina_pod_primitives::PodU64,
+	) -> Self {
 		Self {
 			discriminator: CREATE_DISCRIMINATOR,
 			data_f32,

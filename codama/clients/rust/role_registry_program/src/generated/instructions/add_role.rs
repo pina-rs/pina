@@ -21,7 +21,12 @@ pub struct AddRole {
 }
 
 impl AddRole {
-	pub fn new(admin: solana_pubkey::Pubkey, grantee: solana_pubkey::Pubkey, registry_config: solana_pubkey::Pubkey, role_entry: solana_pubkey::Pubkey) -> Self {
+	pub fn new(
+		admin: solana_pubkey::Pubkey,
+		grantee: solana_pubkey::Pubkey,
+		registry_config: solana_pubkey::Pubkey,
+		role_entry: solana_pubkey::Pubkey,
+	) -> Self {
 		Self {
 			admin,
 			grantee,
@@ -42,11 +47,22 @@ impl AddRole {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(5 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.admin, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.grantee, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.registry_config, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.admin, true,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.grantee,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.registry_config,
+			false,
+		));
 		accounts.push(solana_instruction::AccountMeta::new(self.role_entry, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();
 
@@ -68,7 +84,11 @@ pub struct AddRoleInstructionData {
 }
 
 impl AddRoleInstructionData {
-	pub const fn new(role_id: pina_pod_primitives::PodU64, permissions: pina_pod_primitives::PodU64, bump: u8) -> Self {
+	pub const fn new(
+		role_id: pina_pod_primitives::PodU64,
+		permissions: pina_pod_primitives::PodU64,
+		bump: u8,
+	) -> Self {
 		Self {
 			discriminator: ADD_ROLE_DISCRIMINATOR,
 			role_id,

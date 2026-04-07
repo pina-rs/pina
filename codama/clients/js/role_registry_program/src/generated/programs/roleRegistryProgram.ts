@@ -6,75 +6,274 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { assertIsInstructionWithAccounts, containsBytes, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithRpc, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type GetAccountInfoApi, type GetMultipleAccountsApi, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
-import { addSelfFetchFunctions, addSelfPlanAndSendFunctions, type SelfFetchFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
-import { getRegistryConfigCodec, getRoleEntryCodec, type RegistryConfig, type RegistryConfigArgs, type RoleEntry, type RoleEntryArgs } from '../accounts';
-import { getAddRoleInstruction, getDeactivateRoleInstruction, getInitializeInstruction, getRotateAdminInstruction, getUpdateRoleInstruction, parseAddRoleInstruction, parseDeactivateRoleInstruction, parseInitializeInstruction, parseRotateAdminInstruction, parseUpdateRoleInstruction, type AddRoleInput, type DeactivateRoleInput, type InitializeInput, type ParsedAddRoleInstruction, type ParsedDeactivateRoleInstruction, type ParsedInitializeInstruction, type ParsedRotateAdminInstruction, type ParsedUpdateRoleInstruction, type RotateAdminInput, type UpdateRoleInput } from '../instructions';
-import { findRegistryConfigPda, findRoleEntryPda } from '../pdas';
+import {
+	type Address,
+	assertIsInstructionWithAccounts,
+	type ClientWithRpc,
+	type ClientWithTransactionPlanning,
+	type ClientWithTransactionSending,
+	containsBytes,
+	type GetAccountInfoApi,
+	type GetMultipleAccountsApi,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+	SolanaError,
+} from "@solana/kit";
+import {
+	addSelfFetchFunctions,
+	addSelfPlanAndSendFunctions,
+	type SelfFetchFunctions,
+	type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import {
+	getRegistryConfigCodec,
+	getRoleEntryCodec,
+	type RegistryConfig,
+	type RegistryConfigArgs,
+	type RoleEntry,
+	type RoleEntryArgs,
+} from "../accounts";
+import {
+	type AddRoleInput,
+	type DeactivateRoleInput,
+	getAddRoleInstruction,
+	getDeactivateRoleInstruction,
+	getInitializeInstruction,
+	getRotateAdminInstruction,
+	getUpdateRoleInstruction,
+	type InitializeInput,
+	parseAddRoleInstruction,
+	type ParsedAddRoleInstruction,
+	type ParsedDeactivateRoleInstruction,
+	parseDeactivateRoleInstruction,
+	type ParsedInitializeInstruction,
+	type ParsedRotateAdminInstruction,
+	type ParsedUpdateRoleInstruction,
+	parseInitializeInstruction,
+	parseRotateAdminInstruction,
+	parseUpdateRoleInstruction,
+	type RotateAdminInput,
+	type UpdateRoleInput,
+} from "../instructions";
+import { findRegistryConfigPda, findRoleEntryPda } from "../pdas";
 
-export const ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS = '3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX' as Address<'3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX'>;
+export const ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS =
+	"3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX" as Address<
+		"3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX"
+	>;
 
-export enum RoleRegistryProgramAccount { RegistryConfig, RoleEntry }
-
-export function identifyRoleRegistryProgramAccount(account: { data: ReadonlyUint8Array } | ReadonlyUint8Array): RoleRegistryProgramAccount {
-    const data = 'data' in account ? account.data : account;
-    if (containsBytes(data, getU8Encoder().encode(1), 0)) { return RoleRegistryProgramAccount.RegistryConfig; }
-if (containsBytes(data, getU8Encoder().encode(2), 0)) { return RoleRegistryProgramAccount.RoleEntry; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, { accountData: data, programName: "roleRegistryProgram" });
+export enum RoleRegistryProgramAccount {
+	RegistryConfig,
+	RoleEntry,
 }
 
-export enum RoleRegistryProgramInstruction { Initialize, AddRole, UpdateRole, DeactivateRole, RotateAdmin }
-
-export function identifyRoleRegistryProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): RoleRegistryProgramInstruction {
-    const data = 'data' in instruction ? instruction.data : instruction;
-    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return RoleRegistryProgramInstruction.Initialize; }
-if (containsBytes(data, getU8Encoder().encode(1), 0)) { return RoleRegistryProgramInstruction.AddRole; }
-if (containsBytes(data, getU8Encoder().encode(2), 0)) { return RoleRegistryProgramInstruction.UpdateRole; }
-if (containsBytes(data, getU8Encoder().encode(3), 0)) { return RoleRegistryProgramInstruction.DeactivateRole; }
-if (containsBytes(data, getU8Encoder().encode(4), 0)) { return RoleRegistryProgramInstruction.RotateAdmin; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "roleRegistryProgram" });
+export function identifyRoleRegistryProgramAccount(
+	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): RoleRegistryProgramAccount {
+	const data = "data" in account ? account.data : account;
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return RoleRegistryProgramAccount.RegistryConfig;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return RoleRegistryProgramAccount.RoleEntry;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+		{ accountData: data, programName: "roleRegistryProgram" },
+	);
 }
 
-export type ParsedRoleRegistryProgramInstruction<TProgram extends string = '3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX'> =
-| { instructionType: RoleRegistryProgramInstruction.Initialize } & ParsedInitializeInstruction<TProgram>
-| { instructionType: RoleRegistryProgramInstruction.AddRole } & ParsedAddRoleInstruction<TProgram>
-| { instructionType: RoleRegistryProgramInstruction.UpdateRole } & ParsedUpdateRoleInstruction<TProgram>
-| { instructionType: RoleRegistryProgramInstruction.DeactivateRole } & ParsedDeactivateRoleInstruction<TProgram>
-| { instructionType: RoleRegistryProgramInstruction.RotateAdmin } & ParsedRotateAdminInstruction<TProgram>
+export enum RoleRegistryProgramInstruction {
+	Initialize,
+	AddRole,
+	UpdateRole,
+	DeactivateRole,
+	RotateAdmin,
+}
 
+export function identifyRoleRegistryProgramInstruction(
+	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): RoleRegistryProgramInstruction {
+	const data = "data" in instruction ? instruction.data : instruction;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return RoleRegistryProgramInstruction.Initialize;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return RoleRegistryProgramInstruction.AddRole;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return RoleRegistryProgramInstruction.UpdateRole;
+	}
+	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+		return RoleRegistryProgramInstruction.DeactivateRole;
+	}
+	if (containsBytes(data, getU8Encoder().encode(4), 0)) {
+		return RoleRegistryProgramInstruction.RotateAdmin;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+		{ instructionData: data, programName: "roleRegistryProgram" },
+	);
+}
 
-        export function parseRoleRegistryProgramInstruction<TProgram extends string>(
-            instruction: Instruction<TProgram> 
-                & InstructionWithData<ReadonlyUint8Array>
-        ): ParsedRoleRegistryProgramInstruction<TProgram> {
-            const instructionType = identifyRoleRegistryProgramInstruction(instruction);
-            switch (instructionType) {
-                case RoleRegistryProgramInstruction.Initialize: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: RoleRegistryProgramInstruction.Initialize, ...parseInitializeInstruction(instruction) }; }
-case RoleRegistryProgramInstruction.AddRole: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: RoleRegistryProgramInstruction.AddRole, ...parseAddRoleInstruction(instruction) }; }
-case RoleRegistryProgramInstruction.UpdateRole: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: RoleRegistryProgramInstruction.UpdateRole, ...parseUpdateRoleInstruction(instruction) }; }
-case RoleRegistryProgramInstruction.DeactivateRole: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: RoleRegistryProgramInstruction.DeactivateRole, ...parseDeactivateRoleInstruction(instruction) }; }
-case RoleRegistryProgramInstruction.RotateAdmin: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: RoleRegistryProgramInstruction.RotateAdmin, ...parseRotateAdminInstruction(instruction) }; }
-                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "roleRegistryProgram" });
-            }
-        }
+export type ParsedRoleRegistryProgramInstruction<
+	TProgram extends string = "3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX",
+> =
+	| { instructionType: RoleRegistryProgramInstruction.Initialize }
+		& ParsedInitializeInstruction<TProgram>
+	| { instructionType: RoleRegistryProgramInstruction.AddRole }
+		& ParsedAddRoleInstruction<TProgram>
+	| { instructionType: RoleRegistryProgramInstruction.UpdateRole }
+		& ParsedUpdateRoleInstruction<TProgram>
+	| { instructionType: RoleRegistryProgramInstruction.DeactivateRole }
+		& ParsedDeactivateRoleInstruction<TProgram>
+	| { instructionType: RoleRegistryProgramInstruction.RotateAdmin }
+		& ParsedRotateAdminInstruction<TProgram>;
 
-export type RoleRegistryProgramPlugin = { accounts: RoleRegistryProgramPluginAccounts; instructions: RoleRegistryProgramPluginInstructions; pdas: RoleRegistryProgramPluginPdas; }
+export function parseRoleRegistryProgramInstruction<TProgram extends string>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedRoleRegistryProgramInstruction<TProgram> {
+	const instructionType = identifyRoleRegistryProgramInstruction(instruction);
+	switch (instructionType) {
+		case RoleRegistryProgramInstruction.Initialize: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: RoleRegistryProgramInstruction.Initialize,
+				...parseInitializeInstruction(instruction),
+			};
+		}
+		case RoleRegistryProgramInstruction.AddRole: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: RoleRegistryProgramInstruction.AddRole,
+				...parseAddRoleInstruction(instruction),
+			};
+		}
+		case RoleRegistryProgramInstruction.UpdateRole: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: RoleRegistryProgramInstruction.UpdateRole,
+				...parseUpdateRoleInstruction(instruction),
+			};
+		}
+		case RoleRegistryProgramInstruction.DeactivateRole: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: RoleRegistryProgramInstruction.DeactivateRole,
+				...parseDeactivateRoleInstruction(instruction),
+			};
+		}
+		case RoleRegistryProgramInstruction.RotateAdmin: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: RoleRegistryProgramInstruction.RotateAdmin,
+				...parseRotateAdminInstruction(instruction),
+			};
+		}
+		default:
+			throw new SolanaError(
+				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+				{
+					instructionType: instructionType as string,
+					programName: "roleRegistryProgram",
+				},
+			);
+	}
+}
 
-export type RoleRegistryProgramPluginAccounts = { registryConfig: ReturnType<typeof getRegistryConfigCodec> & SelfFetchFunctions<RegistryConfigArgs, RegistryConfig>; roleEntry: ReturnType<typeof getRoleEntryCodec> & SelfFetchFunctions<RoleEntryArgs, RoleEntry>; }
+export type RoleRegistryProgramPlugin = {
+	accounts: RoleRegistryProgramPluginAccounts;
+	instructions: RoleRegistryProgramPluginInstructions;
+	pdas: RoleRegistryProgramPluginPdas;
+};
 
-export type RoleRegistryProgramPluginInstructions = { initialize: (input: InitializeInput) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions; addRole: (input: AddRoleInput) => ReturnType<typeof getAddRoleInstruction> & SelfPlanAndSendFunctions; updateRole: (input: UpdateRoleInput) => ReturnType<typeof getUpdateRoleInstruction> & SelfPlanAndSendFunctions; deactivateRole: (input: DeactivateRoleInput) => ReturnType<typeof getDeactivateRoleInstruction> & SelfPlanAndSendFunctions; rotateAdmin: (input: RotateAdminInput) => ReturnType<typeof getRotateAdminInstruction> & SelfPlanAndSendFunctions; }
+export type RoleRegistryProgramPluginAccounts = {
+	registryConfig:
+		& ReturnType<typeof getRegistryConfigCodec>
+		& SelfFetchFunctions<RegistryConfigArgs, RegistryConfig>;
+	roleEntry:
+		& ReturnType<typeof getRoleEntryCodec>
+		& SelfFetchFunctions<RoleEntryArgs, RoleEntry>;
+};
 
-export type RoleRegistryProgramPluginPdas = { registryConfig: typeof findRegistryConfigPda; roleEntry: typeof findRoleEntryPda; }
+export type RoleRegistryProgramPluginInstructions = {
+	initialize: (
+		input: InitializeInput,
+	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
+	addRole: (
+		input: AddRoleInput,
+	) => ReturnType<typeof getAddRoleInstruction> & SelfPlanAndSendFunctions;
+	updateRole: (
+		input: UpdateRoleInput,
+	) => ReturnType<typeof getUpdateRoleInstruction> & SelfPlanAndSendFunctions;
+	deactivateRole: (
+		input: DeactivateRoleInput,
+	) =>
+		& ReturnType<typeof getDeactivateRoleInstruction>
+		& SelfPlanAndSendFunctions;
+	rotateAdmin: (
+		input: RotateAdminInput,
+	) => ReturnType<typeof getRotateAdminInstruction> & SelfPlanAndSendFunctions;
+};
 
-export type RoleRegistryProgramPluginRequirements = ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi> & ClientWithTransactionPlanning & ClientWithTransactionSending
+export type RoleRegistryProgramPluginPdas = {
+	registryConfig: typeof findRegistryConfigPda;
+	roleEntry: typeof findRoleEntryPda;
+};
+
+export type RoleRegistryProgramPluginRequirements =
+	& ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi>
+	& ClientWithTransactionPlanning
+	& ClientWithTransactionSending;
 
 export function roleRegistryProgramProgram() {
-    return <T extends RoleRegistryProgramPluginRequirements>(client: T) => {
-        return { ...client, roleRegistryProgram: <RoleRegistryProgramPlugin>{ accounts: { registryConfig: addSelfFetchFunctions(client, getRegistryConfigCodec()), roleEntry: addSelfFetchFunctions(client, getRoleEntryCodec()) }, instructions: { initialize: input => addSelfPlanAndSendFunctions(client, getInitializeInstruction(input)), addRole: input => addSelfPlanAndSendFunctions(client, getAddRoleInstruction(input)), updateRole: input => addSelfPlanAndSendFunctions(client, getUpdateRoleInstruction(input)), deactivateRole: input => addSelfPlanAndSendFunctions(client, getDeactivateRoleInstruction(input)), rotateAdmin: input => addSelfPlanAndSendFunctions(client, getRotateAdminInstruction(input)) }, pdas: { registryConfig: findRegistryConfigPda, roleEntry: findRoleEntryPda } } };
-    };
+	return <T extends RoleRegistryProgramPluginRequirements>(client: T) => {
+		return {
+			...client,
+			roleRegistryProgram: <RoleRegistryProgramPlugin> {
+				accounts: {
+					registryConfig: addSelfFetchFunctions(
+						client,
+						getRegistryConfigCodec(),
+					),
+					roleEntry: addSelfFetchFunctions(client, getRoleEntryCodec()),
+				},
+				instructions: {
+					initialize: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getInitializeInstruction(input),
+						),
+					addRole: (input) =>
+						addSelfPlanAndSendFunctions(client, getAddRoleInstruction(input)),
+					updateRole: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getUpdateRoleInstruction(input),
+						),
+					deactivateRole: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getDeactivateRoleInstruction(input),
+						),
+					rotateAdmin: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getRotateAdminInstruction(input),
+						),
+				},
+				pdas: {
+					registryConfig: findRegistryConfigPda,
+					roleEntry: findRoleEntryPda,
+				},
+			},
+		};
+	};
 }

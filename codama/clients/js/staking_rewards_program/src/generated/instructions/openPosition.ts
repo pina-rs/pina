@@ -6,81 +6,224 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlySignerAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyAccount,
+	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	type TransactionSigner,
+	type WritableAccount,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
+import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const OPEN_POSITION_DISCRIMINATOR = 1;
 
-export function getOpenPositionDiscriminatorBytes() { return getU8Encoder().encode(OPEN_POSITION_DISCRIMINATOR); }
+export function getOpenPositionDiscriminatorBytes() {
+	return getU8Encoder().encode(OPEN_POSITION_DISCRIMINATOR);
+}
 
-export type OpenPositionInstruction<TProgram extends string = typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS, TAccountUser extends string | AccountMeta<string> = string, TAccountPoolState extends string | AccountMeta<string> = string, TAccountPositionState extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = "11111111111111111111111111111111", TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountUser extends string ? ReadonlySignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser> : TAccountUser, TAccountPoolState extends string ? WritableAccount<TAccountPoolState> : TAccountPoolState, TAccountPositionState extends string ? WritableAccount<TAccountPositionState> : TAccountPositionState, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, ...TRemainingAccounts]>;
+export type OpenPositionInstruction<
+	TProgram extends string = typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
+	TAccountUser extends string | AccountMeta<string> = string,
+	TAccountPoolState extends string | AccountMeta<string> = string,
+	TAccountPositionState extends string | AccountMeta<string> = string,
+	TAccountSystemProgram extends string | AccountMeta<string> =
+		"11111111111111111111111111111111",
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountUser extends string
+				? ReadonlySignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
+				: TAccountUser,
+			TAccountPoolState extends string ? WritableAccount<TAccountPoolState>
+				: TAccountPoolState,
+			TAccountPositionState extends string
+				? WritableAccount<TAccountPositionState>
+				: TAccountPositionState,
+			TAccountSystemProgram extends string
+				? ReadonlyAccount<TAccountSystemProgram>
+				: TAccountSystemProgram,
+			...TRemainingAccounts,
+		]
+	>;
 
-export type OpenPositionInstructionData = { bump: number;  };
+export type OpenPositionInstructionData = { bump: number };
 
 export type OpenPositionInstructionDataArgs = OpenPositionInstructionData;
 
-export function getOpenPositionInstructionDataEncoder(): FixedSizeEncoder<OpenPositionInstructionDataArgs> {
-    return getStructEncoder([['bump', getU8Encoder()]]);
+export function getOpenPositionInstructionDataEncoder(): FixedSizeEncoder<
+	OpenPositionInstructionDataArgs
+> {
+	return getStructEncoder([["bump", getU8Encoder()]]);
 }
 
-export function getOpenPositionInstructionDataDecoder(): FixedSizeDecoder<OpenPositionInstructionData> {
-    return getStructDecoder([['bump', getU8Decoder()]]);
+export function getOpenPositionInstructionDataDecoder(): FixedSizeDecoder<
+	OpenPositionInstructionData
+> {
+	return getStructDecoder([["bump", getU8Decoder()]]);
 }
 
-export function getOpenPositionInstructionDataCodec(): FixedSizeCodec<OpenPositionInstructionDataArgs, OpenPositionInstructionData> {
-    return combineCodec(getOpenPositionInstructionDataEncoder(), getOpenPositionInstructionDataDecoder());
+export function getOpenPositionInstructionDataCodec(): FixedSizeCodec<
+	OpenPositionInstructionDataArgs,
+	OpenPositionInstructionData
+> {
+	return combineCodec(
+		getOpenPositionInstructionDataEncoder(),
+		getOpenPositionInstructionDataDecoder(),
+	);
 }
 
-export type OpenPositionInput<TAccountUser extends string = string, TAccountPoolState extends string = string, TAccountPositionState extends string = string, TAccountSystemProgram extends string = string> =  {
-  user: TransactionSigner<TAccountUser>;
-poolState: Address<TAccountPoolState>;
-positionState: Address<TAccountPositionState>;
-systemProgram?: Address<TAccountSystemProgram>;
-bump: OpenPositionInstructionDataArgs["bump"];
-}
-
-export function getOpenPositionInstruction<TAccountUser extends string, TAccountPoolState extends string, TAccountPositionState extends string, TAccountSystemProgram extends string, TProgramAddress extends Address = typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS>(input: OpenPositionInput<TAccountUser, TAccountPoolState, TAccountPositionState, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): OpenPositionInstruction<TProgramAddress, TAccountUser, TAccountPoolState, TAccountPositionState, TAccountSystemProgram> {
-  // Program address.
-const programAddress = config?.programAddress ?? STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { user: { value: input.user ?? null, isWritable: false }, poolState: { value: input.poolState ?? null, isWritable: true }, positionState: { value: input.positionState ?? null, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-// Resolve default values.
-if (!accounts.systemProgram.value) {
-accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
-}
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("user", accounts.user), getAccountMeta("poolState", accounts.poolState), getAccountMeta("positionState", accounts.positionState), getAccountMeta("systemProgram", accounts.systemProgram)], data: getOpenPositionInstructionDataEncoder().encode(args as OpenPositionInstructionDataArgs), programAddress } as OpenPositionInstruction<TProgramAddress, TAccountUser, TAccountPoolState, TAccountPositionState, TAccountSystemProgram>);
-}
-
-export type ParsedOpenPositionInstruction<TProgram extends string = typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-user: TAccountMetas[0];
-poolState: TAccountMetas[1];
-positionState: TAccountMetas[2];
-systemProgram: TAccountMetas[3];
+export type OpenPositionInput<
+	TAccountUser extends string = string,
+	TAccountPoolState extends string = string,
+	TAccountPositionState extends string = string,
+	TAccountSystemProgram extends string = string,
+> = {
+	user: TransactionSigner<TAccountUser>;
+	poolState: Address<TAccountPoolState>;
+	positionState: Address<TAccountPositionState>;
+	systemProgram?: Address<TAccountSystemProgram>;
+	bump: OpenPositionInstructionDataArgs["bump"];
 };
-data: OpenPositionInstructionData; };
 
-export function parseOpenPositionInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedOpenPositionInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 4) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 4 });
+export function getOpenPositionInstruction<
+	TAccountUser extends string,
+	TAccountPoolState extends string,
+	TAccountPositionState extends string,
+	TAccountSystemProgram extends string,
+	TProgramAddress extends Address =
+		typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: OpenPositionInput<
+		TAccountUser,
+		TAccountPoolState,
+		TAccountPositionState,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): OpenPositionInstruction<
+	TProgramAddress,
+	TAccountUser,
+	TAccountPoolState,
+	TAccountPositionState,
+	TAccountSystemProgram
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		user: { value: input.user ?? null, isWritable: false },
+		poolState: { value: input.poolState ?? null, isWritable: true },
+		positionState: { value: input.positionState ?? null, isWritable: true },
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("user", accounts.user),
+			getAccountMeta("poolState", accounts.poolState),
+			getAccountMeta("positionState", accounts.positionState),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getOpenPositionInstructionDataEncoder().encode(
+			args as OpenPositionInstructionDataArgs,
+		),
+		programAddress,
+	} as OpenPositionInstruction<
+		TProgramAddress,
+		TAccountUser,
+		TAccountPoolState,
+		TAccountPositionState,
+		TAccountSystemProgram
+	>);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
-}
-  return { programAddress: instruction.programAddress, accounts: { user: getNextAccount(), poolState: getNextAccount(), positionState: getNextAccount(), systemProgram: getNextAccount() }, data: getOpenPositionInstructionDataDecoder().decode(instruction.data) };
+
+export type ParsedOpenPositionInstruction<
+	TProgram extends string = typeof STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		user: TAccountMetas[0];
+		poolState: TAccountMetas[1];
+		positionState: TAccountMetas[2];
+		systemProgram: TAccountMetas[3];
+	};
+	data: OpenPositionInstructionData;
+};
+
+export function parseOpenPositionInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedOpenPositionInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 4) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 4,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: {
+			user: getNextAccount(),
+			poolState: getNextAccount(),
+			positionState: getNextAccount(),
+			systemProgram: getNextAccount(),
+		},
+		data: getOpenPositionInstructionDataDecoder().decode(instruction.data),
+	};
 }
