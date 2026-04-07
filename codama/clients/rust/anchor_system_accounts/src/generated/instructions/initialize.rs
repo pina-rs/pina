@@ -19,7 +19,10 @@ pub struct Initialize {
 
 impl Initialize {
 	pub fn new(authority: solana_pubkey::Pubkey, wallet: solana_pubkey::Pubkey) -> Self {
-		Self { authority, wallet }
+		Self {
+			authority,
+			wallet,
+		}
 	}
 
 	pub fn instruction(&self, data: InitializeInstructionData) -> solana_instruction::Instruction {
@@ -33,14 +36,8 @@ impl Initialize {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.authority,
-			true,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.wallet,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.authority, true));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.wallet, false));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();
 

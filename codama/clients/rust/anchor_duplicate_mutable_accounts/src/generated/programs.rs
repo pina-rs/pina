@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use solana_pubkey::Pubkey;
-use solana_pubkey::pubkey;
+use solana_pubkey::{pubkey, Pubkey};
 
-pub const ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_ID: Pubkey =
-	pubkey!("4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH");
+pub const ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_ID: Pubkey = pubkey!("4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH");

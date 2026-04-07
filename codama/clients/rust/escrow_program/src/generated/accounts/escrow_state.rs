@@ -31,15 +31,7 @@ pub const ESCROW_STATE_DISCRIMINATOR: u8 = 1u8;
 impl EscrowState {
 	pub const LEN: usize = core::mem::size_of::<Self>();
 
-	pub const fn new(
-		maker: solana_pubkey::Pubkey,
-		mint_a: solana_pubkey::Pubkey,
-		mint_b: solana_pubkey::Pubkey,
-		amount_a: pina_pod_primitives::PodU64,
-		amount_b: pina_pod_primitives::PodU64,
-		seed: pina_pod_primitives::PodU64,
-		bump: u8,
-	) -> Self {
+	pub const fn new(maker: solana_pubkey::Pubkey, mint_a: solana_pubkey::Pubkey, mint_b: solana_pubkey::Pubkey, amount_a: pina_pod_primitives::PodU64, amount_b: pina_pod_primitives::PodU64, seed: pina_pod_primitives::PodU64, bump: u8) -> Self {
 		Self {
 			discriminator: ESCROW_STATE_DISCRIMINATOR,
 			maker,
@@ -61,9 +53,7 @@ impl EscrowState {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(
-		data: &mut [u8],
-	) -> Result<&mut Self, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, solana_program_error::ProgramError> {
 		let account = bytemuck::try_from_bytes_mut::<Self>(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != ESCROW_STATE_DISCRIMINATOR {

@@ -25,11 +25,7 @@ pub const FLOAT_DATA_ACCOUNT_DISCRIMINATOR: u8 = 1u8;
 impl FloatDataAccount {
 	pub const LEN: usize = core::mem::size_of::<Self>();
 
-	pub const fn new(
-		data_f64: pina_pod_primitives::PodU64,
-		data_f32: pina_pod_primitives::PodU32,
-		authority: solana_pubkey::Pubkey,
-	) -> Self {
+	pub const fn new(data_f64: pina_pod_primitives::PodU64, data_f32: pina_pod_primitives::PodU32, authority: solana_pubkey::Pubkey) -> Self {
 		Self {
 			discriminator: FLOAT_DATA_ACCOUNT_DISCRIMINATOR,
 			data_f64,
@@ -47,9 +43,7 @@ impl FloatDataAccount {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(
-		data: &mut [u8],
-	) -> Result<&mut Self, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, solana_program_error::ProgramError> {
 		let account = bytemuck::try_from_bytes_mut::<Self>(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != FLOAT_DATA_ACCOUNT_DISCRIMINATOR {

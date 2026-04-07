@@ -6,9 +6,6 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { type Address } from "@solana/kit";
+import { type Address } from '@solana/kit';
 
-export const PINA_BPF_PROGRAM_ADDRESS =
-	"2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe" as Address<
-		"2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe"
-	>;
+export const PINA_BPF_PROGRAM_ADDRESS = '2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe' as Address<'2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe'>;

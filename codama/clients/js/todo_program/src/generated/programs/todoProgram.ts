@@ -6,155 +6,58 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	assertIsInstructionWithAccounts,
-	type ClientWithRpc,
-	type ClientWithTransactionPlanning,
-	type ClientWithTransactionSending,
-	containsBytes,
-	type GetAccountInfoApi,
-	type GetMultipleAccountsApi,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithData,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
-	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
-	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
-	SolanaError,
-} from "@solana/kit";
-import {
-	addSelfFetchFunctions,
-	addSelfPlanAndSendFunctions,
-	type SelfFetchFunctions,
-	type SelfPlanAndSendFunctions,
-} from "@solana/program-client-core";
-import {
-	getTodoStateCodec,
-	type TodoState,
-	type TodoStateArgs,
-} from "../accounts";
-import {
-	getInitializeInstruction,
-	type InitializeInput,
-	type ParsedInitializeInstruction,
-	parseInitializeInstruction,
-} from "../instructions";
-import { findTodoPda } from "../pdas";
+import { assertIsInstructionWithAccounts, containsBytes, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithRpc, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type GetAccountInfoApi, type GetMultipleAccountsApi, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
+import { addSelfFetchFunctions, addSelfPlanAndSendFunctions, type SelfFetchFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
+import { getTodoStateCodec, type TodoState, type TodoStateArgs } from '../accounts';
+import { getInitializeInstruction, parseInitializeInstruction, type InitializeInput, type ParsedInitializeInstruction } from '../instructions';
+import { findTodoPda } from '../pdas';
 
-export const TODO_PROGRAM_PROGRAM_ADDRESS =
-	"Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd" as Address<
-		"Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd"
-	>;
+export const TODO_PROGRAM_PROGRAM_ADDRESS = 'Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd' as Address<'Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd'>;
 
-export enum TodoProgramAccount {
-	TodoState,
+export enum TodoProgramAccount { TodoState }
+
+export function identifyTodoProgramAccount(account: { data: ReadonlyUint8Array } | ReadonlyUint8Array): TodoProgramAccount {
+    const data = 'data' in account ? account.data : account;
+    if (containsBytes(data, getU8Encoder().encode(1), 0)) { return TodoProgramAccount.TodoState; }
+    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, { accountData: data, programName: "todoProgram" });
 }
 
-export function identifyTodoProgramAccount(
-	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
-): TodoProgramAccount {
-	const data = "data" in account ? account.data : account;
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return TodoProgramAccount.TodoState;
-	}
-	throw new SolanaError(
-		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
-		{ accountData: data, programName: "todoProgram" },
-	);
+export enum TodoProgramInstruction { Initialize }
+
+export function identifyTodoProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): TodoProgramInstruction {
+    const data = 'data' in instruction ? instruction.data : instruction;
+    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return TodoProgramInstruction.Initialize; }
+    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "todoProgram" });
 }
 
-export enum TodoProgramInstruction {
-	Initialize,
-}
+export type ParsedTodoProgramInstruction<TProgram extends string = 'Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd'> =
+| { instructionType: TodoProgramInstruction.Initialize } & ParsedInitializeInstruction<TProgram>
 
-export function identifyTodoProgramInstruction(
-	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
-): TodoProgramInstruction {
-	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return TodoProgramInstruction.Initialize;
-	}
-	throw new SolanaError(
-		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
-		{ instructionData: data, programName: "todoProgram" },
-	);
-}
 
-export type ParsedTodoProgramInstruction<
-	TProgram extends string = "Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd",
-> =
-	& { instructionType: TodoProgramInstruction.Initialize }
-	& ParsedInitializeInstruction<TProgram>;
+        export function parseTodoProgramInstruction<TProgram extends string>(
+            instruction: Instruction<TProgram> 
+                & InstructionWithData<ReadonlyUint8Array>
+        ): ParsedTodoProgramInstruction<TProgram> {
+            const instructionType = identifyTodoProgramInstruction(instruction);
+            switch (instructionType) {
+                case TodoProgramInstruction.Initialize: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: TodoProgramInstruction.Initialize, ...parseInitializeInstruction(instruction) }; }
+                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "todoProgram" });
+            }
+        }
 
-export function parseTodoProgramInstruction<TProgram extends string>(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedTodoProgramInstruction<TProgram> {
-	const instructionType = identifyTodoProgramInstruction(instruction);
-	switch (instructionType) {
-		case TodoProgramInstruction.Initialize: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: TodoProgramInstruction.Initialize,
-				...parseInitializeInstruction(instruction),
-			};
-		}
-		default:
-			throw new SolanaError(
-				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
-				{
-					instructionType: instructionType as string,
-					programName: "todoProgram",
-				},
-			);
-	}
-}
+export type TodoProgramPlugin = { accounts: TodoProgramPluginAccounts; instructions: TodoProgramPluginInstructions; pdas: TodoProgramPluginPdas; }
 
-export type TodoProgramPlugin = {
-	accounts: TodoProgramPluginAccounts;
-	instructions: TodoProgramPluginInstructions;
-	pdas: TodoProgramPluginPdas;
-};
+export type TodoProgramPluginAccounts = { todoState: ReturnType<typeof getTodoStateCodec> & SelfFetchFunctions<TodoStateArgs, TodoState>; }
 
-export type TodoProgramPluginAccounts = {
-	todoState:
-		& ReturnType<typeof getTodoStateCodec>
-		& SelfFetchFunctions<TodoStateArgs, TodoState>;
-};
+export type TodoProgramPluginInstructions = { initialize: (input: InitializeInput) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions; }
 
-export type TodoProgramPluginInstructions = {
-	initialize: (
-		input: InitializeInput,
-	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
-};
+export type TodoProgramPluginPdas = { todo: typeof findTodoPda; }
 
-export type TodoProgramPluginPdas = { todo: typeof findTodoPda };
-
-export type TodoProgramPluginRequirements =
-	& ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi>
-	& ClientWithTransactionPlanning
-	& ClientWithTransactionSending;
+export type TodoProgramPluginRequirements = ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi> & ClientWithTransactionPlanning & ClientWithTransactionSending
 
 export function todoProgramProgram() {
-	return <T extends TodoProgramPluginRequirements>(client: T) => {
-		return {
-			...client,
-			todoProgram: <TodoProgramPlugin> {
-				accounts: {
-					todoState: addSelfFetchFunctions(client, getTodoStateCodec()),
-				},
-				instructions: {
-					initialize: (input) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getInitializeInstruction(input),
-						),
-				},
-				pdas: { todo: findTodoPda },
-			},
-		};
-	};
+    return <T extends TodoProgramPluginRequirements>(client: T) => {
+        return { ...client, todoProgram: <TodoProgramPlugin>{ accounts: { todoState: addSelfFetchFunctions(client, getTodoStateCodec()) }, instructions: { initialize: input => addSelfPlanAndSendFunctions(client, getInitializeInstruction(input)) }, pdas: { todo: findTodoPda } } };
+    };
 }

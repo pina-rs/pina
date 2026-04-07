@@ -13,7 +13,7 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum AnchorFloatsError {
-	/// 0 -
+	/// 0 - 
 	#[error("")]
 	AuthorityMismatch = 0x0,
 }

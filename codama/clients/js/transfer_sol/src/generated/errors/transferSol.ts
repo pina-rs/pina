@@ -6,13 +6,8 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	isProgramError,
-	type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
-	type SolanaError,
-} from "@solana/kit";
-import { TRANSFER_SOL_PROGRAM_ADDRESS } from "../programs";
+import { isProgramError, type Address, type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM, type SolanaError } from '@solana/kit';
+import { TRANSFER_SOL_PROGRAM_ADDRESS } from '../programs';
 
 /** The sender does not have enough lamports for the transfer. */
 export const TRANSFER_SOL_ERROR__INSUFFICIENT_FUNDS = 0x0; // 0
@@ -20,34 +15,22 @@ export const TRANSFER_SOL_ERROR__INSUFFICIENT_FUNDS = 0x0; // 0
 export type TransferSolError = typeof TRANSFER_SOL_ERROR__INSUFFICIENT_FUNDS;
 
 let transferSolErrorMessages: Record<TransferSolError, string> | undefined;
-if (process.env.NODE_ENV !== "production") {
-	transferSolErrorMessages = {
-		[TRANSFER_SOL_ERROR__INSUFFICIENT_FUNDS]:
-			`The sender does not have enough lamports for the transfer.`,
-	};
+if (process.env.NODE_ENV !== 'production') {
+  transferSolErrorMessages = { [TRANSFER_SOL_ERROR__INSUFFICIENT_FUNDS]: `The sender does not have enough lamports for the transfer.` };
 }
 
 export function getTransferSolErrorMessage(code: TransferSolError): string {
-	if (process.env.NODE_ENV !== "production") {
-		return (transferSolErrorMessages as Record<TransferSolError, string>)[code];
-	}
+  if (process.env.NODE_ENV !== 'production') {
+    return (transferSolErrorMessages as Record<TransferSolError, string>)[code];
+  }
 
-	return "Error message not available in production bundles.";
+  return 'Error message not available in production bundles.';
 }
 
 export function isTransferSolError<TProgramErrorCode extends TransferSolError>(
-	error: unknown,
-	transactionMessage: {
-		instructions: Record<number, { programAddress: Address }>;
-	},
-	code?: TProgramErrorCode,
-): error is
-	& SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM>
-	& Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
-	return isProgramError<TProgramErrorCode>(
-		error,
-		transactionMessage,
-		TRANSFER_SOL_PROGRAM_ADDRESS,
-		code,
-	);
+    error: unknown,
+    transactionMessage: { instructions: Record<number, { programAddress: Address }> },
+    code?: TProgramErrorCode,
+): error is SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM> & Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
+  return isProgramError<TProgramErrorCode>(error, transactionMessage, TRANSFER_SOL_PROGRAM_ADDRESS, code);
 }

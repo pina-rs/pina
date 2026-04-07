@@ -50,7 +50,9 @@
 		".bin/",
 		".local-cache/",
 		"**/dist/**",
-		"**/pkg/"
+		"**/pkg/",
+		"codama/clients/rust/**",
+		"codama/clients/js/**"
 	],
 	"plugins": [
 		"https://plugins.dprint.dev/typescript-0.95.13.wasm",

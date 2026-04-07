@@ -13,28 +13,28 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum AnchorErrorsError {
-	/// 6000 -
+	/// 6000 - 
 	#[error("")]
 	Hello = 0x1770,
-	/// 6123 -
+	/// 6123 - 
 	#[error("")]
 	HelloNoMsg = 0x17EB,
-	/// 6124 -
+	/// 6124 - 
 	#[error("")]
 	HelloNext = 0x17EC,
-	/// 6125 -
+	/// 6125 - 
 	#[error("")]
 	HelloCustom = 0x17ED,
-	/// 6126 -
+	/// 6126 - 
 	#[error("")]
 	ValueMismatch = 0x17EE,
-	/// 6127 -
+	/// 6127 - 
 	#[error("")]
 	ValueMatch = 0x17EF,
-	/// 6128 -
+	/// 6128 - 
 	#[error("")]
 	ValueLess = 0x17F0,
-	/// 6129 -
+	/// 6129 - 
 	#[error("")]
 	ValueLessOrEqual = 0x17F1,
 }

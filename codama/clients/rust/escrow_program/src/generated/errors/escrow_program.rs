@@ -13,10 +13,10 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum EscrowProgramError {
-	/// 0 -
+	/// 0 - 
 	#[error("")]
 	OfferKeyMismatch = 0x0,
-	/// 1 -
+	/// 1 - 
 	#[error("")]
 	TokenAccountMismatch = 0x1,
 }

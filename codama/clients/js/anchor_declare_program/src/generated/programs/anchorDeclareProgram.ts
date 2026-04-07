@@ -6,114 +6,44 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	assertIsInstructionWithAccounts,
-	type ClientWithTransactionPlanning,
-	type ClientWithTransactionSending,
-	containsBytes,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithData,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
-	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
-	SolanaError,
-} from "@solana/kit";
-import {
-	addSelfPlanAndSendFunctions,
-	type SelfPlanAndSendFunctions,
-} from "@solana/program-client-core";
-import {
-	getValidateExternalProgramInstruction,
-	type ParsedValidateExternalProgramInstruction,
-	parseValidateExternalProgramInstruction,
-	type ValidateExternalProgramInput,
-} from "../instructions";
+import { assertIsInstructionWithAccounts, containsBytes, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
+import { addSelfPlanAndSendFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
+import { getValidateExternalProgramInstruction, parseValidateExternalProgramInstruction, type ParsedValidateExternalProgramInstruction, type ValidateExternalProgramInput } from '../instructions';
 
-export const ANCHOR_DECLARE_PROGRAM_PROGRAM_ADDRESS =
-	"Dec1areProgram11111111111111111111111111111" as Address<
-		"Dec1areProgram11111111111111111111111111111"
-	>;
+export const ANCHOR_DECLARE_PROGRAM_PROGRAM_ADDRESS = 'Dec1areProgram11111111111111111111111111111' as Address<'Dec1areProgram11111111111111111111111111111'>;
 
-export enum AnchorDeclareProgramInstruction {
-	ValidateExternalProgram,
+export enum AnchorDeclareProgramInstruction { ValidateExternalProgram }
+
+export function identifyAnchorDeclareProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): AnchorDeclareProgramInstruction {
+    const data = 'data' in instruction ? instruction.data : instruction;
+    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return AnchorDeclareProgramInstruction.ValidateExternalProgram; }
+    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "anchorDeclareProgram" });
 }
 
-export function identifyAnchorDeclareProgramInstruction(
-	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
-): AnchorDeclareProgramInstruction {
-	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return AnchorDeclareProgramInstruction.ValidateExternalProgram;
-	}
-	throw new SolanaError(
-		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
-		{ instructionData: data, programName: "anchorDeclareProgram" },
-	);
-}
+export type ParsedAnchorDeclareProgramInstruction<TProgram extends string = 'Dec1areProgram11111111111111111111111111111'> =
+| { instructionType: AnchorDeclareProgramInstruction.ValidateExternalProgram } & ParsedValidateExternalProgramInstruction<TProgram>
 
-export type ParsedAnchorDeclareProgramInstruction<
-	TProgram extends string = "Dec1areProgram11111111111111111111111111111",
-> =
-	& { instructionType: AnchorDeclareProgramInstruction.ValidateExternalProgram }
-	& ParsedValidateExternalProgramInstruction<TProgram>;
 
-export function parseAnchorDeclareProgramInstruction<TProgram extends string>(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedAnchorDeclareProgramInstruction<TProgram> {
-	const instructionType = identifyAnchorDeclareProgramInstruction(instruction);
-	switch (instructionType) {
-		case AnchorDeclareProgramInstruction.ValidateExternalProgram: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType:
-					AnchorDeclareProgramInstruction.ValidateExternalProgram,
-				...parseValidateExternalProgramInstruction(instruction),
-			};
-		}
-		default:
-			throw new SolanaError(
-				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
-				{
-					instructionType: instructionType as string,
-					programName: "anchorDeclareProgram",
-				},
-			);
-	}
-}
+        export function parseAnchorDeclareProgramInstruction<TProgram extends string>(
+            instruction: Instruction<TProgram> 
+                & InstructionWithData<ReadonlyUint8Array>
+        ): ParsedAnchorDeclareProgramInstruction<TProgram> {
+            const instructionType = identifyAnchorDeclareProgramInstruction(instruction);
+            switch (instructionType) {
+                case AnchorDeclareProgramInstruction.ValidateExternalProgram: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: AnchorDeclareProgramInstruction.ValidateExternalProgram, ...parseValidateExternalProgramInstruction(instruction) }; }
+                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "anchorDeclareProgram" });
+            }
+        }
 
-export type AnchorDeclareProgramPlugin = {
-	instructions: AnchorDeclareProgramPluginInstructions;
-};
+export type AnchorDeclareProgramPlugin = { instructions: AnchorDeclareProgramPluginInstructions; }
 
-export type AnchorDeclareProgramPluginInstructions = {
-	validateExternalProgram: (
-		input: ValidateExternalProgramInput,
-	) =>
-		& ReturnType<typeof getValidateExternalProgramInstruction>
-		& SelfPlanAndSendFunctions;
-};
+export type AnchorDeclareProgramPluginInstructions = { validateExternalProgram: (input: ValidateExternalProgramInput) => ReturnType<typeof getValidateExternalProgramInstruction> & SelfPlanAndSendFunctions; }
 
-export type AnchorDeclareProgramPluginRequirements =
-	& ClientWithTransactionPlanning
-	& ClientWithTransactionSending;
+export type AnchorDeclareProgramPluginRequirements = ClientWithTransactionPlanning & ClientWithTransactionSending
 
 export function anchorDeclareProgramProgram() {
-	return <T extends AnchorDeclareProgramPluginRequirements>(client: T) => {
-		return {
-			...client,
-			anchorDeclareProgram: <AnchorDeclareProgramPlugin> {
-				instructions: {
-					validateExternalProgram: (input) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getValidateExternalProgramInstruction(input),
-						),
-				},
-			},
-		};
-	};
+    return <T extends AnchorDeclareProgramPluginRequirements>(client: T) => {
+        return { ...client, anchorDeclareProgram: <AnchorDeclareProgramPlugin>{ instructions: { validateExternalProgram: input => addSelfPlanAndSendFunctions(client, getValidateExternalProgramInstruction(input)) } } };
+    };
 }
