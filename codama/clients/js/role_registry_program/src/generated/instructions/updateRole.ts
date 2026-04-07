@@ -6,76 +6,202 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { combineCodec, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlySignerAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount } from '@solana/kit';
-import { getAccountMetaFactory, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU64Decoder,
+	getU64Encoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	type TransactionSigner,
+	type WritableAccount,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
+import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const UPDATE_ROLE_DISCRIMINATOR = 2;
 
-export function getUpdateRoleDiscriminatorBytes() { return getU8Encoder().encode(UPDATE_ROLE_DISCRIMINATOR); }
-
-export type UpdateRoleInstruction<TProgram extends string = typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS, TAccountAdmin extends string | AccountMeta<string> = string, TAccountRegistryConfig extends string | AccountMeta<string> = string, TAccountRoleEntry extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAdmin extends string ? ReadonlySignerAccount<TAccountAdmin> & AccountSignerMeta<TAccountAdmin> : TAccountAdmin, TAccountRegistryConfig extends string ? WritableAccount<TAccountRegistryConfig> : TAccountRegistryConfig, TAccountRoleEntry extends string ? WritableAccount<TAccountRoleEntry> : TAccountRoleEntry, ...TRemainingAccounts]>;
-
-export type UpdateRoleInstructionData = { permissions: bigint;  };
-
-export type UpdateRoleInstructionDataArgs = { permissions: number | bigint;  };
-
-export function getUpdateRoleInstructionDataEncoder(): FixedSizeEncoder<UpdateRoleInstructionDataArgs> {
-    return getStructEncoder([['permissions', getU64Encoder()]]);
+export function getUpdateRoleDiscriminatorBytes() {
+	return getU8Encoder().encode(UPDATE_ROLE_DISCRIMINATOR);
 }
 
-export function getUpdateRoleInstructionDataDecoder(): FixedSizeDecoder<UpdateRoleInstructionData> {
-    return getStructDecoder([['permissions', getU64Decoder()]]);
+export type UpdateRoleInstruction<
+	TProgram extends string = typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS,
+	TAccountAdmin extends string | AccountMeta<string> = string,
+	TAccountRegistryConfig extends string | AccountMeta<string> = string,
+	TAccountRoleEntry extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountAdmin extends string ?
+					& ReadonlySignerAccount<TAccountAdmin>
+					& AccountSignerMeta<TAccountAdmin>
+				: TAccountAdmin,
+			TAccountRegistryConfig extends string
+				? WritableAccount<TAccountRegistryConfig>
+				: TAccountRegistryConfig,
+			TAccountRoleEntry extends string ? WritableAccount<TAccountRoleEntry>
+				: TAccountRoleEntry,
+			...TRemainingAccounts,
+		]
+	>;
+
+export type UpdateRoleInstructionData = { permissions: bigint };
+
+export type UpdateRoleInstructionDataArgs = { permissions: number | bigint };
+
+export function getUpdateRoleInstructionDataEncoder(): FixedSizeEncoder<
+	UpdateRoleInstructionDataArgs
+> {
+	return getStructEncoder([["permissions", getU64Encoder()]]);
 }
 
-export function getUpdateRoleInstructionDataCodec(): FixedSizeCodec<UpdateRoleInstructionDataArgs, UpdateRoleInstructionData> {
-    return combineCodec(getUpdateRoleInstructionDataEncoder(), getUpdateRoleInstructionDataDecoder());
+export function getUpdateRoleInstructionDataDecoder(): FixedSizeDecoder<
+	UpdateRoleInstructionData
+> {
+	return getStructDecoder([["permissions", getU64Decoder()]]);
 }
 
-export type UpdateRoleInput<TAccountAdmin extends string = string, TAccountRegistryConfig extends string = string, TAccountRoleEntry extends string = string> =  {
-  admin: TransactionSigner<TAccountAdmin>;
-registryConfig: Address<TAccountRegistryConfig>;
-roleEntry: Address<TAccountRoleEntry>;
-permissions: UpdateRoleInstructionDataArgs["permissions"];
+export function getUpdateRoleInstructionDataCodec(): FixedSizeCodec<
+	UpdateRoleInstructionDataArgs,
+	UpdateRoleInstructionData
+> {
+	return combineCodec(
+		getUpdateRoleInstructionDataEncoder(),
+		getUpdateRoleInstructionDataDecoder(),
+	);
 }
 
-export function getUpdateRoleInstruction<TAccountAdmin extends string, TAccountRegistryConfig extends string, TAccountRoleEntry extends string, TProgramAddress extends Address = typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS>(input: UpdateRoleInput<TAccountAdmin, TAccountRegistryConfig, TAccountRoleEntry>, config?: { programAddress?: TProgramAddress } ): UpdateRoleInstruction<TProgramAddress, TAccountAdmin, TAccountRegistryConfig, TAccountRoleEntry> {
-  // Program address.
-const programAddress = config?.programAddress ?? ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { admin: { value: input.admin ?? null, isWritable: false }, registryConfig: { value: input.registryConfig ?? null, isWritable: true }, roleEntry: { value: input.roleEntry ?? null, isWritable: true } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("admin", accounts.admin), getAccountMeta("registryConfig", accounts.registryConfig), getAccountMeta("roleEntry", accounts.roleEntry)], data: getUpdateRoleInstructionDataEncoder().encode(args as UpdateRoleInstructionDataArgs), programAddress } as UpdateRoleInstruction<TProgramAddress, TAccountAdmin, TAccountRegistryConfig, TAccountRoleEntry>);
-}
-
-export type ParsedUpdateRoleInstruction<TProgram extends string = typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-admin: TAccountMetas[0];
-registryConfig: TAccountMetas[1];
-roleEntry: TAccountMetas[2];
+export type UpdateRoleInput<
+	TAccountAdmin extends string = string,
+	TAccountRegistryConfig extends string = string,
+	TAccountRoleEntry extends string = string,
+> = {
+	admin: TransactionSigner<TAccountAdmin>;
+	registryConfig: Address<TAccountRegistryConfig>;
+	roleEntry: Address<TAccountRoleEntry>;
+	permissions: UpdateRoleInstructionDataArgs["permissions"];
 };
-data: UpdateRoleInstructionData; };
 
-export function parseUpdateRoleInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedUpdateRoleInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 3) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 3 });
+export function getUpdateRoleInstruction<
+	TAccountAdmin extends string,
+	TAccountRegistryConfig extends string,
+	TAccountRoleEntry extends string,
+	TProgramAddress extends Address =
+		typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: UpdateRoleInput<
+		TAccountAdmin,
+		TAccountRegistryConfig,
+		TAccountRoleEntry
+	>,
+	config?: { programAddress?: TProgramAddress },
+): UpdateRoleInstruction<
+	TProgramAddress,
+	TAccountAdmin,
+	TAccountRegistryConfig,
+	TAccountRoleEntry
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		admin: { value: input.admin ?? null, isWritable: false },
+		registryConfig: { value: input.registryConfig ?? null, isWritable: true },
+		roleEntry: { value: input.roleEntry ?? null, isWritable: true },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("admin", accounts.admin),
+			getAccountMeta("registryConfig", accounts.registryConfig),
+			getAccountMeta("roleEntry", accounts.roleEntry),
+		],
+		data: getUpdateRoleInstructionDataEncoder().encode(
+			args as UpdateRoleInstructionDataArgs,
+		),
+		programAddress,
+	} as UpdateRoleInstruction<
+		TProgramAddress,
+		TAccountAdmin,
+		TAccountRegistryConfig,
+		TAccountRoleEntry
+	>);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
-}
-  return { programAddress: instruction.programAddress, accounts: { admin: getNextAccount(), registryConfig: getNextAccount(), roleEntry: getNextAccount() }, data: getUpdateRoleInstructionDataDecoder().decode(instruction.data) };
+
+export type ParsedUpdateRoleInstruction<
+	TProgram extends string = typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		admin: TAccountMetas[0];
+		registryConfig: TAccountMetas[1];
+		roleEntry: TAccountMetas[2];
+	};
+	data: UpdateRoleInstructionData;
+};
+
+export function parseUpdateRoleInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedUpdateRoleInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 3) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 3,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: {
+			admin: getNextAccount(),
+			registryConfig: getNextAccount(),
+			roleEntry: getNextAccount(),
+		},
+		data: getUpdateRoleInstructionDataDecoder().decode(instruction.data),
+	};
 }

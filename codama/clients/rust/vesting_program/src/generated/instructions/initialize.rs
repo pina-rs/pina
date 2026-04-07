@@ -23,7 +23,14 @@ pub struct Initialize {
 }
 
 impl Initialize {
-	pub fn new(admin: solana_pubkey::Pubkey, beneficiary: solana_pubkey::Pubkey, mint: solana_pubkey::Pubkey, vesting_state: solana_pubkey::Pubkey, vault: solana_pubkey::Pubkey, token_program: solana_pubkey::Pubkey) -> Self {
+	pub fn new(
+		admin: solana_pubkey::Pubkey,
+		beneficiary: solana_pubkey::Pubkey,
+		mint: solana_pubkey::Pubkey,
+		vesting_state: solana_pubkey::Pubkey,
+		vault: solana_pubkey::Pubkey,
+		token_program: solana_pubkey::Pubkey,
+	) -> Self {
 		Self {
 			admin,
 			beneficiary,
@@ -46,13 +53,29 @@ impl Initialize {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(7 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.admin, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.beneficiary, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.mint, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.vesting_state, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.admin, true,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.beneficiary,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.mint, false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.vesting_state,
+			false,
+		));
 		accounts.push(solana_instruction::AccountMeta::new(self.vault, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.token_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.token_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();
 
@@ -76,7 +99,13 @@ pub struct InitializeInstructionData {
 }
 
 impl InitializeInstructionData {
-	pub const fn new(total_amount: pina_pod_primitives::PodU64, start_ts: pina_pod_primitives::PodU64, cliff_ts: pina_pod_primitives::PodU64, end_ts: pina_pod_primitives::PodU64, bump: u8) -> Self {
+	pub const fn new(
+		total_amount: pina_pod_primitives::PodU64,
+		start_ts: pina_pod_primitives::PodU64,
+		cliff_ts: pina_pod_primitives::PodU64,
+		end_ts: pina_pod_primitives::PodU64,
+		bump: u8,
+	) -> Self {
 		Self {
 			discriminator: INITIALIZE_DISCRIMINATOR,
 			total_amount,

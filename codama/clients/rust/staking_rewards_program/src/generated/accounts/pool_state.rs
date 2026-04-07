@@ -29,7 +29,15 @@ pub const POOL_STATE_DISCRIMINATOR: u8 = 1u8;
 impl PoolState {
 	pub const LEN: usize = core::mem::size_of::<Self>();
 
-	pub const fn new(admin: solana_pubkey::Pubkey, stake_mint: solana_pubkey::Pubkey, reward_mint: solana_pubkey::Pubkey, total_staked: pina_pod_primitives::PodU64, reward_index: pina_pod_primitives::PodU64, paused: pina_pod_primitives::PodBool, bump: u8) -> Self {
+	pub const fn new(
+		admin: solana_pubkey::Pubkey,
+		stake_mint: solana_pubkey::Pubkey,
+		reward_mint: solana_pubkey::Pubkey,
+		total_staked: pina_pod_primitives::PodU64,
+		reward_index: pina_pod_primitives::PodU64,
+		paused: pina_pod_primitives::PodBool,
+		bump: u8,
+	) -> Self {
 		Self {
 			discriminator: POOL_STATE_DISCRIMINATOR,
 			admin,
@@ -51,7 +59,9 @@ impl PoolState {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(
+		data: &mut [u8],
+	) -> Result<&mut Self, solana_program_error::ProgramError> {
 		let account = bytemuck::try_from_bytes_mut::<Self>(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != POOL_STATE_DISCRIMINATOR {

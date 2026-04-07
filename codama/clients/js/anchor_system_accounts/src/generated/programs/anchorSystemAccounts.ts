@@ -6,44 +6,111 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { assertIsInstructionWithAccounts, containsBytes, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
-import { addSelfPlanAndSendFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
-import { getInitializeInstruction, parseInitializeInstruction, type InitializeInput, type ParsedInitializeInstruction } from '../instructions';
+import {
+	type Address,
+	assertIsInstructionWithAccounts,
+	type ClientWithTransactionPlanning,
+	type ClientWithTransactionSending,
+	containsBytes,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+	SolanaError,
+} from "@solana/kit";
+import {
+	addSelfPlanAndSendFunctions,
+	type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import {
+	getInitializeInstruction,
+	type InitializeInput,
+	type ParsedInitializeInstruction,
+	parseInitializeInstruction,
+} from "../instructions";
 
-export const ANCHOR_SYSTEM_ACCOUNTS_PROGRAM_ADDRESS = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS' as Address<'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'>;
+export const ANCHOR_SYSTEM_ACCOUNTS_PROGRAM_ADDRESS =
+	"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS" as Address<
+		"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+	>;
 
-export enum AnchorSystemAccountsInstruction { Initialize }
-
-export function identifyAnchorSystemAccountsInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): AnchorSystemAccountsInstruction {
-    const data = 'data' in instruction ? instruction.data : instruction;
-    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return AnchorSystemAccountsInstruction.Initialize; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "anchorSystemAccounts" });
+export enum AnchorSystemAccountsInstruction {
+	Initialize,
 }
 
-export type ParsedAnchorSystemAccountsInstruction<TProgram extends string = 'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS'> =
-| { instructionType: AnchorSystemAccountsInstruction.Initialize } & ParsedInitializeInstruction<TProgram>
+export function identifyAnchorSystemAccountsInstruction(
+	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): AnchorSystemAccountsInstruction {
+	const data = "data" in instruction ? instruction.data : instruction;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return AnchorSystemAccountsInstruction.Initialize;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+		{ instructionData: data, programName: "anchorSystemAccounts" },
+	);
+}
 
+export type ParsedAnchorSystemAccountsInstruction<
+	TProgram extends string = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
+> =
+	& { instructionType: AnchorSystemAccountsInstruction.Initialize }
+	& ParsedInitializeInstruction<TProgram>;
 
-        export function parseAnchorSystemAccountsInstruction<TProgram extends string>(
-            instruction: Instruction<TProgram> 
-                & InstructionWithData<ReadonlyUint8Array>
-        ): ParsedAnchorSystemAccountsInstruction<TProgram> {
-            const instructionType = identifyAnchorSystemAccountsInstruction(instruction);
-            switch (instructionType) {
-                case AnchorSystemAccountsInstruction.Initialize: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: AnchorSystemAccountsInstruction.Initialize, ...parseInitializeInstruction(instruction) }; }
-                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "anchorSystemAccounts" });
-            }
-        }
+export function parseAnchorSystemAccountsInstruction<TProgram extends string>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedAnchorSystemAccountsInstruction<TProgram> {
+	const instructionType = identifyAnchorSystemAccountsInstruction(instruction);
+	switch (instructionType) {
+		case AnchorSystemAccountsInstruction.Initialize: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: AnchorSystemAccountsInstruction.Initialize,
+				...parseInitializeInstruction(instruction),
+			};
+		}
+		default:
+			throw new SolanaError(
+				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+				{
+					instructionType: instructionType as string,
+					programName: "anchorSystemAccounts",
+				},
+			);
+	}
+}
 
-export type AnchorSystemAccountsPlugin = { instructions: AnchorSystemAccountsPluginInstructions; }
+export type AnchorSystemAccountsPlugin = {
+	instructions: AnchorSystemAccountsPluginInstructions;
+};
 
-export type AnchorSystemAccountsPluginInstructions = { initialize: (input: InitializeInput) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions; }
+export type AnchorSystemAccountsPluginInstructions = {
+	initialize: (
+		input: InitializeInput,
+	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
+};
 
-export type AnchorSystemAccountsPluginRequirements = ClientWithTransactionPlanning & ClientWithTransactionSending
+export type AnchorSystemAccountsPluginRequirements =
+	& ClientWithTransactionPlanning
+	& ClientWithTransactionSending;
 
 export function anchorSystemAccountsProgram() {
-    return <T extends AnchorSystemAccountsPluginRequirements>(client: T) => {
-        return { ...client, anchorSystemAccounts: <AnchorSystemAccountsPlugin>{ instructions: { initialize: input => addSelfPlanAndSendFunctions(client, getInitializeInstruction(input)) } } };
-    };
+	return <T extends AnchorSystemAccountsPluginRequirements>(client: T) => {
+		return {
+			...client,
+			anchorSystemAccounts: <AnchorSystemAccountsPlugin> {
+				instructions: {
+					initialize: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getInitializeInstruction(input),
+						),
+				},
+			},
+		};
+	};
 }

@@ -28,7 +28,14 @@ pub const ROLE_ENTRY_DISCRIMINATOR: u8 = 2u8;
 impl RoleEntry {
 	pub const LEN: usize = core::mem::size_of::<Self>();
 
-	pub const fn new(registry: solana_pubkey::Pubkey, role_id: pina_pod_primitives::PodU64, grantee: solana_pubkey::Pubkey, permissions: pina_pod_primitives::PodU64, active: pina_pod_primitives::PodBool, bump: u8) -> Self {
+	pub const fn new(
+		registry: solana_pubkey::Pubkey,
+		role_id: pina_pod_primitives::PodU64,
+		grantee: solana_pubkey::Pubkey,
+		permissions: pina_pod_primitives::PodU64,
+		active: pina_pod_primitives::PodBool,
+		bump: u8,
+	) -> Self {
 		Self {
 			discriminator: ROLE_ENTRY_DISCRIMINATOR,
 			registry,
@@ -49,7 +56,9 @@ impl RoleEntry {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(
+		data: &mut [u8],
+	) -> Result<&mut Self, solana_program_error::ProgramError> {
 		let account = bytemuck::try_from_bytes_mut::<Self>(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != ROLE_ENTRY_DISCRIMINATOR {

@@ -6,66 +6,199 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { assertIsInstructionWithAccounts, containsBytes, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithRpc, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type GetAccountInfoApi, type GetMultipleAccountsApi, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
-import { addSelfFetchFunctions, addSelfPlanAndSendFunctions, type SelfFetchFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
-import { getVestingStateCodec, type VestingState, type VestingStateArgs } from '../accounts';
-import { getCancelInstruction, getClaimInstruction, getInitializeInstruction, parseCancelInstruction, parseClaimInstruction, parseInitializeInstruction, type CancelInput, type ClaimInput, type InitializeInput, type ParsedCancelInstruction, type ParsedClaimInstruction, type ParsedInitializeInstruction } from '../instructions';
-import { findVestingPda } from '../pdas';
+import {
+	type Address,
+	assertIsInstructionWithAccounts,
+	type ClientWithRpc,
+	type ClientWithTransactionPlanning,
+	type ClientWithTransactionSending,
+	containsBytes,
+	type GetAccountInfoApi,
+	type GetMultipleAccountsApi,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+	SolanaError,
+} from "@solana/kit";
+import {
+	addSelfFetchFunctions,
+	addSelfPlanAndSendFunctions,
+	type SelfFetchFunctions,
+	type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import {
+	getVestingStateCodec,
+	type VestingState,
+	type VestingStateArgs,
+} from "../accounts";
+import {
+	type CancelInput,
+	type ClaimInput,
+	getCancelInstruction,
+	getClaimInstruction,
+	getInitializeInstruction,
+	type InitializeInput,
+	parseCancelInstruction,
+	parseClaimInstruction,
+	type ParsedCancelInstruction,
+	type ParsedClaimInstruction,
+	type ParsedInitializeInstruction,
+	parseInitializeInstruction,
+} from "../instructions";
+import { findVestingPda } from "../pdas";
 
-export const VESTING_PROGRAM_PROGRAM_ADDRESS = 'FEa5fqN6NACrhWUZSBdGKybJKNxkdw8cdLvRvTARsFHh' as Address<'FEa5fqN6NACrhWUZSBdGKybJKNxkdw8cdLvRvTARsFHh'>;
+export const VESTING_PROGRAM_PROGRAM_ADDRESS =
+	"FEa5fqN6NACrhWUZSBdGKybJKNxkdw8cdLvRvTARsFHh" as Address<
+		"FEa5fqN6NACrhWUZSBdGKybJKNxkdw8cdLvRvTARsFHh"
+	>;
 
-export enum VestingProgramAccount { VestingState }
-
-export function identifyVestingProgramAccount(account: { data: ReadonlyUint8Array } | ReadonlyUint8Array): VestingProgramAccount {
-    const data = 'data' in account ? account.data : account;
-    if (containsBytes(data, getU8Encoder().encode(1), 0)) { return VestingProgramAccount.VestingState; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, { accountData: data, programName: "vestingProgram" });
+export enum VestingProgramAccount {
+	VestingState,
 }
 
-export enum VestingProgramInstruction { Initialize, Claim, Cancel }
-
-export function identifyVestingProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): VestingProgramInstruction {
-    const data = 'data' in instruction ? instruction.data : instruction;
-    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return VestingProgramInstruction.Initialize; }
-if (containsBytes(data, getU8Encoder().encode(1), 0)) { return VestingProgramInstruction.Claim; }
-if (containsBytes(data, getU8Encoder().encode(2), 0)) { return VestingProgramInstruction.Cancel; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "vestingProgram" });
+export function identifyVestingProgramAccount(
+	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): VestingProgramAccount {
+	const data = "data" in account ? account.data : account;
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return VestingProgramAccount.VestingState;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+		{ accountData: data, programName: "vestingProgram" },
+	);
 }
 
-export type ParsedVestingProgramInstruction<TProgram extends string = 'FEa5fqN6NACrhWUZSBdGKybJKNxkdw8cdLvRvTARsFHh'> =
-| { instructionType: VestingProgramInstruction.Initialize } & ParsedInitializeInstruction<TProgram>
-| { instructionType: VestingProgramInstruction.Claim } & ParsedClaimInstruction<TProgram>
-| { instructionType: VestingProgramInstruction.Cancel } & ParsedCancelInstruction<TProgram>
+export enum VestingProgramInstruction {
+	Initialize,
+	Claim,
+	Cancel,
+}
 
+export function identifyVestingProgramInstruction(
+	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): VestingProgramInstruction {
+	const data = "data" in instruction ? instruction.data : instruction;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return VestingProgramInstruction.Initialize;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return VestingProgramInstruction.Claim;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return VestingProgramInstruction.Cancel;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+		{ instructionData: data, programName: "vestingProgram" },
+	);
+}
 
-        export function parseVestingProgramInstruction<TProgram extends string>(
-            instruction: Instruction<TProgram> 
-                & InstructionWithData<ReadonlyUint8Array>
-        ): ParsedVestingProgramInstruction<TProgram> {
-            const instructionType = identifyVestingProgramInstruction(instruction);
-            switch (instructionType) {
-                case VestingProgramInstruction.Initialize: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: VestingProgramInstruction.Initialize, ...parseInitializeInstruction(instruction) }; }
-case VestingProgramInstruction.Claim: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: VestingProgramInstruction.Claim, ...parseClaimInstruction(instruction) }; }
-case VestingProgramInstruction.Cancel: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: VestingProgramInstruction.Cancel, ...parseCancelInstruction(instruction) }; }
-                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "vestingProgram" });
-            }
-        }
+export type ParsedVestingProgramInstruction<
+	TProgram extends string = "FEa5fqN6NACrhWUZSBdGKybJKNxkdw8cdLvRvTARsFHh",
+> =
+	| { instructionType: VestingProgramInstruction.Initialize }
+		& ParsedInitializeInstruction<TProgram>
+	| { instructionType: VestingProgramInstruction.Claim }
+		& ParsedClaimInstruction<TProgram>
+	| { instructionType: VestingProgramInstruction.Cancel }
+		& ParsedCancelInstruction<TProgram>;
 
-export type VestingProgramPlugin = { accounts: VestingProgramPluginAccounts; instructions: VestingProgramPluginInstructions; pdas: VestingProgramPluginPdas; }
+export function parseVestingProgramInstruction<TProgram extends string>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedVestingProgramInstruction<TProgram> {
+	const instructionType = identifyVestingProgramInstruction(instruction);
+	switch (instructionType) {
+		case VestingProgramInstruction.Initialize: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: VestingProgramInstruction.Initialize,
+				...parseInitializeInstruction(instruction),
+			};
+		}
+		case VestingProgramInstruction.Claim: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: VestingProgramInstruction.Claim,
+				...parseClaimInstruction(instruction),
+			};
+		}
+		case VestingProgramInstruction.Cancel: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: VestingProgramInstruction.Cancel,
+				...parseCancelInstruction(instruction),
+			};
+		}
+		default:
+			throw new SolanaError(
+				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+				{
+					instructionType: instructionType as string,
+					programName: "vestingProgram",
+				},
+			);
+	}
+}
 
-export type VestingProgramPluginAccounts = { vestingState: ReturnType<typeof getVestingStateCodec> & SelfFetchFunctions<VestingStateArgs, VestingState>; }
+export type VestingProgramPlugin = {
+	accounts: VestingProgramPluginAccounts;
+	instructions: VestingProgramPluginInstructions;
+	pdas: VestingProgramPluginPdas;
+};
 
-export type VestingProgramPluginInstructions = { initialize: (input: InitializeInput) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions; claim: (input: ClaimInput) => ReturnType<typeof getClaimInstruction> & SelfPlanAndSendFunctions; cancel: (input: CancelInput) => ReturnType<typeof getCancelInstruction> & SelfPlanAndSendFunctions; }
+export type VestingProgramPluginAccounts = {
+	vestingState:
+		& ReturnType<typeof getVestingStateCodec>
+		& SelfFetchFunctions<VestingStateArgs, VestingState>;
+};
 
-export type VestingProgramPluginPdas = { vesting: typeof findVestingPda; }
+export type VestingProgramPluginInstructions = {
+	initialize: (
+		input: InitializeInput,
+	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
+	claim: (
+		input: ClaimInput,
+	) => ReturnType<typeof getClaimInstruction> & SelfPlanAndSendFunctions;
+	cancel: (
+		input: CancelInput,
+	) => ReturnType<typeof getCancelInstruction> & SelfPlanAndSendFunctions;
+};
 
-export type VestingProgramPluginRequirements = ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi> & ClientWithTransactionPlanning & ClientWithTransactionSending
+export type VestingProgramPluginPdas = { vesting: typeof findVestingPda };
+
+export type VestingProgramPluginRequirements =
+	& ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi>
+	& ClientWithTransactionPlanning
+	& ClientWithTransactionSending;
 
 export function vestingProgramProgram() {
-    return <T extends VestingProgramPluginRequirements>(client: T) => {
-        return { ...client, vestingProgram: <VestingProgramPlugin>{ accounts: { vestingState: addSelfFetchFunctions(client, getVestingStateCodec()) }, instructions: { initialize: input => addSelfPlanAndSendFunctions(client, getInitializeInstruction(input)), claim: input => addSelfPlanAndSendFunctions(client, getClaimInstruction(input)), cancel: input => addSelfPlanAndSendFunctions(client, getCancelInstruction(input)) }, pdas: { vesting: findVestingPda } } };
-    };
+	return <T extends VestingProgramPluginRequirements>(client: T) => {
+		return {
+			...client,
+			vestingProgram: <VestingProgramPlugin> {
+				accounts: {
+					vestingState: addSelfFetchFunctions(client, getVestingStateCodec()),
+				},
+				instructions: {
+					initialize: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getInitializeInstruction(input),
+						),
+					claim: (input) =>
+						addSelfPlanAndSendFunctions(client, getClaimInstruction(input)),
+					cancel: (input) =>
+						addSelfPlanAndSendFunctions(client, getCancelInstruction(input)),
+				},
+				pdas: { vesting: findVestingPda },
+			},
+		};
+	};
 }

@@ -9,13 +9,13 @@
 )]
 
 /// The `#[instruction]` attribute macro generates:
-/// 
+///
 /// - A discriminator field as the first byte of the struct.
 /// - `HasDiscriminator` implementation linking this struct to
 /// `HelloInstruction::Hello`.
 /// - `Pod` and `Zeroable` derives for zero-copy deserialization.
 /// - `TypedBuilder` for ergonomic construction in tests.
-/// 
+///
 /// `HelloInstructionData` has no payload fields — only the discriminator byte
 /// is needed to identify the instruction.
 pub const HELLO_DISCRIMINATOR: u8 = 0u8;
@@ -30,9 +30,7 @@ pub struct Hello {
 
 impl Hello {
 	pub fn new(user: solana_pubkey::Pubkey) -> Self {
-		Self {
-			user,
-		}
+		Self { user }
 	}
 
 	pub fn instruction(&self, data: HelloInstructionData) -> solana_instruction::Instruction {
@@ -46,7 +44,9 @@ impl Hello {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(1 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.user, true));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.user, true,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();
 

@@ -8,6 +8,7 @@
 	clippy::too_many_arguments
 )]
 
-use solana_pubkey::{pubkey, Pubkey};
+use solana_pubkey::Pubkey;
+use solana_pubkey::pubkey;
 
 pub const TRANSFER_SOL_ID: Pubkey = pubkey!("BuXKn8EiVMKF8zYThuea3xhLq3jUHTTwDDLfCoehq7WG");

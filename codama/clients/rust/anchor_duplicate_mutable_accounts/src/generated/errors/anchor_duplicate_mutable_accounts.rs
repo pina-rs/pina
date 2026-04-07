@@ -13,7 +13,7 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum AnchorDuplicateMutableAccountsError {
-	/// 2040 - 
+	/// 2040 -
 	#[error("")]
 	ConstraintDuplicateMutableAccount = 0x7F8,
 }

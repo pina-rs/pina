@@ -24,7 +24,15 @@ pub struct InitializePool {
 }
 
 impl InitializePool {
-	pub fn new(admin: solana_pubkey::Pubkey, stake_mint: solana_pubkey::Pubkey, reward_mint: solana_pubkey::Pubkey, pool_state: solana_pubkey::Pubkey, stake_vault: solana_pubkey::Pubkey, reward_vault: solana_pubkey::Pubkey, token_program: solana_pubkey::Pubkey) -> Self {
+	pub fn new(
+		admin: solana_pubkey::Pubkey,
+		stake_mint: solana_pubkey::Pubkey,
+		reward_mint: solana_pubkey::Pubkey,
+		pool_state: solana_pubkey::Pubkey,
+		stake_vault: solana_pubkey::Pubkey,
+		reward_vault: solana_pubkey::Pubkey,
+		token_program: solana_pubkey::Pubkey,
+	) -> Self {
 		Self {
 			admin,
 			stake_mint,
@@ -37,7 +45,10 @@ impl InitializePool {
 		}
 	}
 
-	pub fn instruction(&self, data: InitializePoolInstructionData) -> solana_instruction::Instruction {
+	pub fn instruction(
+		&self,
+		data: InitializePoolInstructionData,
+	) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -48,14 +59,34 @@ impl InitializePool {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.admin, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.stake_mint, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.reward_mint, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.admin, true,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.stake_mint,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.reward_mint,
+			false,
+		));
 		accounts.push(solana_instruction::AccountMeta::new(self.pool_state, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.stake_vault, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.reward_vault, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.token_program, false));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.stake_vault,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.reward_vault,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.token_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();
 

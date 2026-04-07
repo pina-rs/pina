@@ -20,7 +20,11 @@ pub struct OpenPosition {
 }
 
 impl OpenPosition {
-	pub fn new(user: solana_pubkey::Pubkey, pool_state: solana_pubkey::Pubkey, position_state: solana_pubkey::Pubkey) -> Self {
+	pub fn new(
+		user: solana_pubkey::Pubkey,
+		pool_state: solana_pubkey::Pubkey,
+		position_state: solana_pubkey::Pubkey,
+	) -> Self {
 		Self {
 			user,
 			pool_state,
@@ -29,7 +33,10 @@ impl OpenPosition {
 		}
 	}
 
-	pub fn instruction(&self, data: OpenPositionInstructionData) -> solana_instruction::Instruction {
+	pub fn instruction(
+		&self,
+		data: OpenPositionInstructionData,
+	) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -40,10 +47,18 @@ impl OpenPosition {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.user, true));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.user, true,
+		));
 		accounts.push(solana_instruction::AccountMeta::new(self.pool_state, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.position_state, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.position_state,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();
 
