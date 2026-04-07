@@ -65,6 +65,9 @@ codama:test
 
 # Run IDL fixture drift + validation checks used by CI.
 test:idl
+
+# Run Quasar SVM generated-client e2e checks alongside LiteSVM.
+pnpm run test:quasar-svm
 ```
 
 <!-- {/codamaWorkflowCommands} -->
