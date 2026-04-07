@@ -3,6 +3,7 @@ packages:
   - packages/*
   - codama/tests/js
   - codama/tests/litesvm
+  - codama/tests/quasar-svm
 
 onlyBuiltDependencies:
   - esbuild

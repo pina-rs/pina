@@ -488,6 +488,14 @@ in
         pnpm --dir "$DEVENV_ROOT/codama/tests/litesvm" install --frozen-lockfile
         SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
           pnpm --dir "$DEVENV_ROOT/codama/tests/litesvm" test
+
+        # Run Quasar SVM tests alongside LiteSVM. These execute generated
+        # instructions directly against the compiled program ELF in-process,
+        # which is useful for fast instruction/account-cycle validation
+        # without a validator.
+        pnpm --dir "$DEVENV_ROOT/codama/tests/quasar-svm" install --frozen-lockfile
+        SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
+          pnpm --dir "$DEVENV_ROOT/codama/tests/quasar-svm" test
       '';
       description = "Build SBF binaries and run end-to-end program tests including mollusk-svm integration.";
       binary = "bash";

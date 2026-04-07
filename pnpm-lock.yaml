@@ -55,6 +55,30 @@ importers:
         specifier: ^4.1.1
         version: 4.1.1(@types/node@25.5.0)(vite@7.3.1(@types/node@25.5.0))
 
+  codama/tests/quasar-svm:
+    devDependencies:
+      '@blueshift-gg/quasar-svm':
+        specifier: ^0.1.12
+        version: 0.1.12(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+      '@solana-program/token':
+        specifier: ^0.13.0
+        version: 0.13.0(@solana/kit@6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
+      '@solana/kit':
+        specifier: ^6.5.0
+        version: 6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+      '@solana/program-client-core':
+        specifier: ^6.5.0
+        version: 6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.5.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.1
+        version: 4.1.1(@types/node@25.5.0)(vite@7.3.1(@types/node@25.5.0))
+
   packages/nodes-from-pina:
     dependencies:
       codama:
@@ -78,6 +102,40 @@ importers:
         version: 4.1.1(@types/node@25.5.0)(vite@7.3.1(@types/node@25.5.0))
 
 packages:
+
+  '@blueshift-gg/quasar-svm-darwin-arm64@0.1.5':
+    resolution: {integrity: sha512-ty7RUgWRf2ive7BQOydPEq5+119oVP16vK4ugsbEI21bDVp0avgikoNh6I+j7zx8jTPcv90vx/FCMS5Ld5tl9w==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@blueshift-gg/quasar-svm-darwin-x64@0.1.5':
+    resolution: {integrity: sha512-IipaN9A6X1MbKRr6mPs5cn9ImcODCNLPb8VCiQP4CXwv5n3YtZDftOGvT/sSpvzhSByGBuxmbdHO8slyVLCJxA==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@blueshift-gg/quasar-svm-linux-arm64-gnu@0.1.5':
+    resolution: {integrity: sha512-+hKg595AKMSMBySplyczxeKQpM3UkdwvvULM7wE63/UB0Js6/UVi6mc0v59pcReErQGx46yXTNip7wthlXhrBg==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@blueshift-gg/quasar-svm-linux-x64-gnu@0.1.5':
+    resolution: {integrity: sha512-b7LhZU4jIFNp3o49qLgVBUjntyFnewWE93l6+OJnEApUzQm+nCaIu5aRueG101Nn5Xomw23rVKduRskWrUgFCg==}
+    cpu: [x64]
+    os: [linux]
+
+  '@blueshift-gg/quasar-svm-win32-x64-msvc@0.1.5':
+    resolution: {integrity: sha512-+T8giW1+1/u4Mv0EgIohkWA2t5g8py1ZTHZxIu5U4TWI3mU70DBHG2GkdhudSBOl/OhVErE13+WZfvwM3QL2ew==}
+    cpu: [x64]
+    os: [win32]
+
+  '@blueshift-gg/quasar-svm@0.1.12':
+    resolution: {integrity: sha512-1Rv8pmDbeslxsFLvoTg28VDmpds+oRjr1LtruTrtEjMk5iZJChBUXImeB58PThUKBhBEj7kWhKuv3PLu+CLHXw==}
+    engines: {node: '>=22.13.0'}
+    peerDependencies:
+      '@solana/web3.js': git:blueshift-gg/solana-web3.js#v2
+    peerDependenciesMeta:
+      '@solana/web3.js':
+        optional: true
 
   '@codama/cli@1.5.0':
     resolution: {integrity: sha512-+q62IvEA6o7ji/mcnGgAvyPWyiFx3cojVGrFNG8NSm0zFXrBk1lT3n/qg+2Ag8C8aHwno9boXgDTxV+P5VCDYw==}
@@ -720,6 +778,11 @@ packages:
     peerDependencies:
       '@solana/kit': ^6.1.0
 
+  '@solana-program/token@0.13.0':
+    resolution: {integrity: sha512-/Apjrd5lwOJGrPB0J5Rv7EBeclvyEBQPAGA85Scm7wBH+GpkbdLDM9uK3TNg8jjFKyWQYai/JtPHbrx7VgFLSg==}
+    peerDependencies:
+      '@solana/kit': ^6.5.0
+
   '@solana/accounts@6.5.0':
     resolution: {integrity: sha512-h3zQFjwZjmy+YxgTGOEna6g74Tsn4hTBaBCslwPT4QjqWhywe2JrM2Ab0ANfJcj7g/xrHF5QJ/FnUIcyUTeVfQ==}
     engines: {node: '>=20.18.0'}
@@ -1330,6 +1393,9 @@ packages:
     resolution: {integrity: sha512-eTIzlVOSUR+JxdDFepEYcBMtZ9Qqdef+rnzWdRZuMbOywu5tO2w2N7rqjoANZ5k9vywhL6Br1VRjUIgTQx4E8w==}
     engines: {node: '>=6'}
 
+  koffi@2.15.5:
+    resolution: {integrity: sha512-4/35/oOpnH9tzrpWAC3ObjAERBSe0Q0Dh2NP1eBBPRGpohEj4vFw2+7tej9W9MTExvk0vtF0PjMqIGG4rf6feQ==}
+
   lilconfig@3.1.3:
     resolution: {integrity: sha512-/vlFKAoH5Cgt3Ie+JLhRbwOsCQePABiU3tJ1egGvyQ+33R/vcwM2Zl2QR/LzjsBeItPt3oSVXapn+m4nQDvpzw==}
     engines: {node: '>=14'}
@@ -1704,6 +1770,44 @@ packages:
         optional: true
 
 snapshots:
+
+  '@blueshift-gg/quasar-svm-darwin-arm64@0.1.5':
+    optional: true
+
+  '@blueshift-gg/quasar-svm-darwin-x64@0.1.5':
+    optional: true
+
+  '@blueshift-gg/quasar-svm-linux-arm64-gnu@0.1.5':
+    optional: true
+
+  '@blueshift-gg/quasar-svm-linux-x64-gnu@0.1.5':
+    optional: true
+
+  '@blueshift-gg/quasar-svm-win32-x64-msvc@0.1.5':
+    optional: true
+
+  '@blueshift-gg/quasar-svm@0.1.12(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)':
+    dependencies:
+      '@solana-program/system': 0.12.0(@solana/kit@6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
+      '@solana-program/token': 0.12.0(@solana/kit@6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
+      '@solana/accounts': 6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+      '@solana/addresses': 6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+      '@solana/codecs-core': 6.5.0(typescript@5.9.3)
+      '@solana/instructions': 6.5.0(typescript@5.9.3)
+      '@solana/kit': 6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+      '@solana/rpc-types': 6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+      koffi: 2.15.5
+    optionalDependencies:
+      '@blueshift-gg/quasar-svm-darwin-arm64': 0.1.5
+      '@blueshift-gg/quasar-svm-darwin-x64': 0.1.5
+      '@blueshift-gg/quasar-svm-linux-arm64-gnu': 0.1.5
+      '@blueshift-gg/quasar-svm-linux-x64-gnu': 0.1.5
+      '@blueshift-gg/quasar-svm-win32-x64-msvc': 0.1.5
+    transitivePeerDependencies:
+      - bufferutil
+      - fastestsmallesttextencoderdecoder
+      - typescript
+      - utf-8-validate
 
   '@codama/cli@1.5.0':
     dependencies:
@@ -2089,6 +2193,11 @@ snapshots:
       '@solana/kit': 6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
 
   '@solana-program/token@0.12.0(@solana/kit@6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))':
+    dependencies:
+      '@solana-program/system': 0.12.0(@solana/kit@6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
+      '@solana/kit': 6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
+
+  '@solana-program/token@0.13.0(@solana/kit@6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))':
     dependencies:
       '@solana-program/system': 0.12.0(@solana/kit@6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))
       '@solana/kit': 6.5.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
@@ -2829,6 +2938,8 @@ snapshots:
   jsonify@0.0.1: {}
 
   kleur@3.0.3: {}
+
+  koffi@2.15.5: {}
 
   lilconfig@3.1.3: {}
 
