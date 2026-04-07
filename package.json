@@ -7,6 +7,7 @@
 		"check:js": "tsc --noEmit -p codama/tsconfig.json",
 		"test:nodes-from-pina": "pnpm --filter codama-nodes-from-pina test",
 		"test:idls": "pnpm --filter pina-codama-idl-tests test",
+		"test:quasar-svm": "pnpm --filter pina-quasar-svm-e2e test",
 		"test": "pnpm run generate && pnpm run check:js"
 	},
 	"dependencies": {
