@@ -190,8 +190,12 @@ fn renders_optional_accounts_with_program_fallback_strategy() {
 	};
 	let output_dir = unique_temp_dir("pina-codama-render-optional-fallback");
 	let crate_dir = output_dir.join("optional_program");
-	render_root_node(&RootNode::new(program), &crate_dir, &RenderConfig::default())
-		.unwrap_or_else(|e| panic!("render failed: {e}"));
+	render_root_node(
+		&RootNode::new(program),
+		&crate_dir,
+		&RenderConfig::default(),
+	)
+	.unwrap_or_else(|e| panic!("render failed: {e}"));
 
 	let content = read_generated_file(&crate_dir, "instructions/maybe.rs");
 	insta::assert_snapshot!("optional_accounts_with_program_fallback_strategy", content);
@@ -351,7 +355,10 @@ fn rejects_missing_instruction_discriminators() {
 	.err()
 	.unwrap_or_else(|| panic!("expected render to fail"));
 
-	insta::assert_snapshot!("rejects_missing_instruction_discriminators", err.to_string());
+	insta::assert_snapshot!(
+		"rejects_missing_instruction_discriminators",
+		err.to_string()
+	);
 }
 
 #[test]
@@ -391,7 +398,10 @@ fn validates_boolean_encoding_for_pda_variable_seed() {
 	.err()
 	.unwrap_or_else(|| panic!("expected invalid boolean encoding error"));
 
-	insta::assert_snapshot!("validates_boolean_encoding_for_pda_variable_seed", err.to_string());
+	insta::assert_snapshot!(
+		"validates_boolean_encoding_for_pda_variable_seed",
+		err.to_string()
+	);
 }
 
 #[test]

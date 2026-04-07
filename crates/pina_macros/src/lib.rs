@@ -813,7 +813,7 @@ fn account_impl(
 		});
 
 		let mut struct_size_expr = quote! { 0usize };
-		for field in named_fields.named.iter() {
+		for field in &named_fields.named {
 			let field_type = &field.ty;
 			struct_size_expr = quote! { #struct_size_expr + ::core::mem::size_of::<#field_type>() };
 		}
@@ -1196,7 +1196,7 @@ fn instruction_impl(
 		});
 
 		let mut struct_size_expr = quote! { 0usize };
-		for field in named_fields.named.iter() {
+		for field in &named_fields.named {
 			let field_type = &field.ty;
 			struct_size_expr = quote! { #struct_size_expr + ::core::mem::size_of::<#field_type>() };
 		}
@@ -1489,7 +1489,7 @@ fn event_impl(
 		});
 
 		let mut struct_size_expr = quote! { 0usize };
-		for field in named_fields.named.iter() {
+		for field in &named_fields.named {
 			let field_type = &field.ty;
 			struct_size_expr = quote! { #struct_size_expr + ::core::mem::size_of::<#field_type>() };
 		}
