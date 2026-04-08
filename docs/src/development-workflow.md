@@ -23,7 +23,7 @@ test:idl
 
 ## Reusable documentation blocks
 
-- Template providers live in `template.t.md`.
+- Template providers live in `.templates/*.t.md`.
 - Run `docs:sync` after changing provider blocks to refresh all consumer blocks.
 - Run `docs:check` (or `verify:docs`) in CI to ensure docs stay synchronized.
 
