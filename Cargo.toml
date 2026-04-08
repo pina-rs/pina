@@ -152,6 +152,7 @@ cargo-semver-checks = { version = "0.46.0" }
 dylint-link = { version = "5.0.0", bins = ["dylint-link"] }
 sbpf-linker = { version = "0.1.8", bins = ["sbpf-linker"] }
 solana-verify = { version = "0.4.11", bins = ["solana-verify"] }
+wait-for-them = { version = "0.5.1", bins = ["wait-for-them"] }
 
 [workspace.lints.rust]
 # Group lints

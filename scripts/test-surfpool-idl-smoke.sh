@@ -5,25 +5,58 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EXAMPLE_NAME="anchor_system_accounts"
 EXAMPLE_DIR="$ROOT/examples/$EXAMPLE_NAME"
 EXAMPLE_SOURCE="$EXAMPLE_DIR/src/lib.rs"
-IDL_PATH="$ROOT/target/surfpool/$EXAMPLE_NAME.idl.json"
-PAYER_KEYPAIR="$ROOT/target/surfpool/payer.json"
-PROGRAM_KEYPAIR="$ROOT/target/surfpool/program.json"
-SURFPOOL_LOG_DIR="$ROOT/target/surfpool"
-SURFPOOL_LOG="$SURFPOOL_LOG_DIR/surfpool.log"
-RPC_URL="http://127.0.0.1:8899"
-WS_URL="ws://127.0.0.1:8900"
-SURFPOOL_BIN="$(command -v surfpool)"
-SOLANA_BIN="$(command -v solana)"
-SOLANA_KEYGEN_BIN="$(command -v solana-keygen)"
-CARGO_BUILD_SBF_BIN="$(command -v cargo-build-sbf)"
-AGAVE_ROOT="$(cd "$(dirname "$CARGO_BUILD_SBF_BIN")/.." && pwd)"
-SBF_SDK_TEMPLATE_DIR="$AGAVE_ROOT/lib/platform-tools-sdk/sbf"
-SBF_SDK_DIR="$SURFPOOL_LOG_DIR/platform-tools-sdk/sbf"
+SURFPOOL_DIR="$ROOT/target/surfpool"
+IDL_PATH="$SURFPOOL_DIR/$EXAMPLE_NAME.idl.json"
+PAYER_KEYPAIR="$SURFPOOL_DIR/payer.json"
+PROGRAM_KEYPAIR="$SURFPOOL_DIR/program.json"
+SURFPOOL_LOG="$SURFPOOL_DIR/surfpool.log"
+RPC_HOST_PORT="127.0.0.1:8899"
+WS_HOST_PORT="127.0.0.1:8900"
+RPC_URL="http://$RPC_HOST_PORT"
+WS_URL="ws://$WS_HOST_PORT"
 
-mkdir -p "$SURFPOOL_LOG_DIR"
-BACKUP_FILE="$(mktemp "$SURFPOOL_LOG_DIR/$EXAMPLE_NAME.lib.rs.XXXXXX")"
+require_bin() {
+	local name="$1"
+	local path
+	path="$(command -v "$name" || true)"
+	if [[ -z "$path" ]]; then
+		echo "missing required binary on PATH: $name" >&2
+		exit 1
+	fi
+	printf '%s\n' "$path"
+}
+
+find_sbf_sdk_template_dir() {
+	local cargo_build_sbf_bin="$1"
+	local cargo_bin_dir agave_root candidate
+	cargo_bin_dir="$(cd "$(dirname "$cargo_build_sbf_bin")" && pwd)"
+	agave_root="$(cd "$cargo_bin_dir/.." && pwd)"
+
+	for candidate in \
+		"$cargo_bin_dir/platform-tools-sdk/sbf" \
+		"$agave_root/bin/platform-tools-sdk/sbf" \
+		"$agave_root/lib/platform-tools-sdk/sbf"; do
+		if [[ -d "$candidate" ]]; then
+			printf '%s\n' "$candidate"
+			return 0
+		fi
+	done
+
+	echo "missing agave SBF SDK next to cargo-build-sbf under $cargo_bin_dir or $agave_root" >&2
+	exit 1
+}
+
+SURFPOOL_BIN="$(require_bin surfpool)"
+WAIT_FOR_THEM_BIN="$(require_bin wait-for-them)"
+SOLANA_BIN="$(require_bin solana)"
+SOLANA_KEYGEN_BIN="$(require_bin solana-keygen)"
+CARGO_BUILD_SBF_BIN="$(require_bin cargo-build-sbf)"
+SBF_SDK_TEMPLATE_DIR="$(find_sbf_sdk_template_dir "$CARGO_BUILD_SBF_BIN")"
+SBF_SDK_DIR="$SURFPOOL_DIR/platform-tools-sdk/sbf"
+
+mkdir -p "$SURFPOOL_DIR"
+BACKUP_FILE="$(mktemp "$SURFPOOL_DIR/$EXAMPLE_NAME.lib.rs.XXXXXX")"
 cp "$EXAMPLE_SOURCE" "$BACKUP_FILE"
-
 SURFPOOL_PID=""
 
 cleanup() {
@@ -37,74 +70,58 @@ cleanup() {
 		sleep 1
 		kill -9 "$SURFPOOL_PID" >/dev/null 2>&1 || true
 	fi
+
+	pkill -x surfpool >/dev/null 2>&1 || true
+	for port in 8899 8900; do
+		lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | xargs -r kill >/dev/null 2>&1 || true
+		lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | xargs -r kill -9 >/dev/null 2>&1 || true
+	done
 }
 trap cleanup EXIT
 
-if [[ ! -x "$SURFPOOL_BIN" ]]; then
-	echo "missing surfpool binary: $SURFPOOL_BIN" >&2
-	exit 1
-fi
-
-if [[ ! -x "$SOLANA_BIN" ]] || [[ ! -x "$SOLANA_KEYGEN_BIN" ]] || [[ ! -x "$CARGO_BUILD_SBF_BIN" ]]; then
-	echo "missing solana binaries on PATH (need agave + surfpool from devenv)" >&2
-	exit 1
-fi
-
 rm -f "$PAYER_KEYPAIR" "$PROGRAM_KEYPAIR" "$IDL_PATH" "$SURFPOOL_LOG"
-
 "$SOLANA_KEYGEN_BIN" new -s --no-bip39-passphrase -o "$PAYER_KEYPAIR" >/dev/null
 "$SOLANA_KEYGEN_BIN" new -s --no-bip39-passphrase -o "$PROGRAM_KEYPAIR" >/dev/null
 PROGRAM_ID="$("$SOLANA_KEYGEN_BIN" pubkey "$PROGRAM_KEYPAIR")"
 PAYER_PUBKEY="$("$SOLANA_KEYGEN_BIN" pubkey "$PAYER_KEYPAIR")"
 
 if [[ -z "${HOME:-}" ]]; then
-	CANDIDATE_HOME="/Users/$(whoami)"
-	if [[ -d "$CANDIDATE_HOME" ]]; then
-		export HOME="$CANDIDATE_HOME"
-	else
-		export HOME="$SURFPOOL_LOG_DIR/home"
-	fi
+	export HOME="$SURFPOOL_DIR/home"
 fi
 mkdir -p "$HOME"
 
 perl -0pi -e "s/declare_id!\(\"[^\"]+\"\);/declare_id!(\"$PROGRAM_ID\");/" "$EXAMPLE_SOURCE"
-
 cargo run -p pina_cli --quiet -- idl --path "$EXAMPLE_DIR" --output "$IDL_PATH"
 
-if [[ ! -d "$SBF_SDK_TEMPLATE_DIR" ]]; then
-	echo "missing agave SBF SDK at $SBF_SDK_TEMPLATE_DIR" >&2
-	exit 1
-fi
-
-if [[ -d "$SURFPOOL_LOG_DIR/platform-tools-sdk" ]]; then
-	chmod -R u+w "$SURFPOOL_LOG_DIR/platform-tools-sdk" || true
-	rm -rf "$SURFPOOL_LOG_DIR/platform-tools-sdk"
-fi
-mkdir -p "$SURFPOOL_LOG_DIR/platform-tools-sdk"
+rm -rf "$SURFPOOL_DIR/platform-tools-sdk"
+mkdir -p "$SURFPOOL_DIR/platform-tools-sdk"
 cp -R "$SBF_SDK_TEMPLATE_DIR" "$SBF_SDK_DIR"
-chmod -R u+w "$SURFPOOL_LOG_DIR/platform-tools-sdk"
+chmod -R u+w "$SURFPOOL_DIR/platform-tools-sdk"
 
 "$CARGO_BUILD_SBF_BIN" \
 	--manifest-path "$EXAMPLE_DIR/Cargo.toml" \
 	--features bpf-entrypoint \
-	--sbf-out-dir "$SURFPOOL_LOG_DIR" \
+	--sbf-out-dir "$SURFPOOL_DIR" \
 	--arch v0 \
 	--sbf-sdk "$SBF_SDK_DIR"
 
-PROGRAM_SO="$SURFPOOL_LOG_DIR/${EXAMPLE_NAME}.so"
+PROGRAM_SO="$SURFPOOL_DIR/${EXAMPLE_NAME}.so"
 if [[ ! -f "$PROGRAM_SO" ]]; then
-	PROGRAM_SO="$SURFPOOL_LOG_DIR/lib${EXAMPLE_NAME}.so"
+	PROGRAM_SO="$SURFPOOL_DIR/lib${EXAMPLE_NAME}.so"
 fi
 if [[ ! -f "$PROGRAM_SO" ]]; then
-	echo "missing built program artifact for ${EXAMPLE_NAME}.so in $SURFPOOL_LOG_DIR" >&2
+	echo "missing built program artifact for ${EXAMPLE_NAME}.so in $SURFPOOL_DIR" >&2
 	exit 1
 fi
 
-# Stop any stale local surfpool process from previous runs.
-pkill -f "${SURFPOOL_BIN//\//\/} start" >/dev/null 2>&1 || true
-
+# Clear any stale Surfpool processes that may still own the fixed test ports.
+pkill -x surfpool >/dev/null 2>&1 || true
+for port in 8899 8900; do
+	lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | xargs -r kill >/dev/null 2>&1 || true
+	lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | xargs -r kill -9 >/dev/null 2>&1 || true
+done
 (
-	cd "$SURFPOOL_LOG_DIR"
+	cd "$SURFPOOL_DIR"
 	"$SURFPOOL_BIN" start \
 		--no-tui \
 		--offline \
@@ -116,21 +133,11 @@ pkill -f "${SURFPOOL_BIN//\//\/} start" >/dev/null 2>&1 || true
 		--port 8899 \
 		--ws-port 8900 \
 		--log-level warn \
-		--log-path "$SURFPOOL_LOG_DIR/.surfpool/logs" \
+		--log-path "$SURFPOOL_DIR/.surfpool/logs" \
 		>"$SURFPOOL_LOG" 2>&1
 ) &
 SURFPOOL_PID=$!
-
-ready=0
-for _ in $(seq 1 60); do
-	if "$SOLANA_BIN" -u "$RPC_URL" cluster-version >/dev/null 2>&1; then
-		ready=1
-		break
-	fi
-	sleep 1
-done
-
-if [[ "$ready" -ne 1 ]]; then
+if ! "$WAIT_FOR_THEM_BIN" --silent --timeout 60000 "$RPC_HOST_PORT"; then
 	echo "surfpool RPC did not become ready in time" >&2
 	if [[ -f "$SURFPOOL_LOG" ]]; then
 		echo "--- surfpool.log ---" >&2
@@ -140,7 +147,6 @@ if [[ "$ready" -ne 1 ]]; then
 fi
 
 "$SOLANA_BIN" -u "$RPC_URL" airdrop 100 --keypair "$PAYER_KEYPAIR" >/dev/null
-
 "$SOLANA_BIN" -u "$RPC_URL" program deploy "$PROGRAM_SO" \
 	--program-id "$PROGRAM_KEYPAIR" \
 	--keypair "$PAYER_KEYPAIR" \

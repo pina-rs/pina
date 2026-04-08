@@ -105,6 +105,14 @@ in
       description = "The `query-security-txt` executable";
       binary = "bash";
     };
+    "wait-for-them" = {
+      exec = ''
+        set -e
+        cargo bin wait-for-them $@
+      '';
+      description = "The `wait-for-them` executable";
+      binary = "bash";
+    };
     "sbpf-linker" = {
       exec = ''
         set -euo pipefail
@@ -527,7 +535,7 @@ in
     "test:surfpool-idl" = {
       exec = ''
         set -e
-        pnpm --dir "$DEVENV_ROOT/codama" install --frozen-lockfile
+        pnpm install --frozen-lockfile
         "$DEVENV_ROOT/scripts/test-surfpool-idl-smoke.sh"
       '';
       description = "Deploy a generated program to Surfpool and invoke it using generated IDL metadata.";
