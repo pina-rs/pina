@@ -87,160 +87,47 @@ in
     hooks = {
       "secrets:commit" = {
         enable = true;
-        name = "secrets:commit";
+        verbose = true;
+        pass_filenames = false;
+        name = "secrets";
         description = "Scan staged changes for leaked secrets with gitleaks.";
         entry = "${pkgs.gitleaks}/bin/gitleaks protect --staged --verbose --redact";
-        pass_filenames = false;
+        stages = [ "pre-commit" ];
+      };
+      dprint = {
+        enable = true;
+        verbose = true;
+        pass_filenames = true;
+        name = "dprint fmt";
+        description = "Format changed files with dprint before commit.";
+        entry = "${pkgs.dprint}/bin/dprint fmt --allow-no-files";
         stages = [ "pre-commit" ];
       };
       "secrets:push" = {
         enable = true;
-        name = "secrets:push";
-        description = "Check git history for leaked secrets with gitleaks.";
-        entry = "${pkgs.gitleaks}/bin/gitleaks detect --verbose --redact";
+        verbose = true;
         pass_filenames = false;
+        name = "secrets";
+        description = "Scan repository history for leaked secrets with gitleaks before push.";
+        entry = "${pkgs.gitleaks}/bin/gitleaks detect --verbose --redact";
         stages = [ "pre-push" ];
       };
-      format = {
+      lint = {
         enable = true;
-        name = "format";
-        description = "Format staged files with dprint before commit.";
-        entry = ''
-          ${pkgs.bash}/bin/bash -lc '
-            set -euo pipefail
-            root="''${DEVENV_ROOT:-$(git rev-parse --show-toplevel)}"
-            cd "$root"
-
-            if [ "$#" -eq 0 ]; then
-              exit 0
-            fi
-
-            if ! dprint fmt --config "$root/dprint.json" --allow-no-files "$@"; then
-              fix:format
-            fi
-
-            git add -- "$@"
-            dprint check --config "$root/dprint.json" "$@"
-          ' --
-        '';
-        pass_filenames = true;
-        stages = [ "pre-commit" ];
-      };
-      "lint:fix" = {
-        enable = true;
-        name = "lint:fix";
-        description = "Apply package-scoped clippy autofixes for staged Rust changes.";
-        entry = ''
-                    ${pkgs.bash}/bin/bash -lc '
-                      set -euo pipefail
-                      root="''${DEVENV_ROOT:-$(git rev-parse --show-toplevel)}"
-                      cd "$root"
-
-                      if [ "$#" -eq 0 ]; then
-                        exit 0
-                      fi
-
-                      rust_files=()
-                      for file in "$@"; do
-                        case "$file" in
-                          *.rs | Cargo.toml | */Cargo.toml | build.rs)
-                            if [ -f "$file" ]; then
-                              rust_files+=("$file")
-                            fi
-                            ;;
-                        esac
-                      done
-
-                      if [ "''${#rust_files[@]}" -eq 0 ]; then
-                        exit 0
-                      fi
-
-                      mapfile -t packages < <(
-                        python3 - "$root" "''${rust_files[@]}" <<'PY'
-          import json
-          import subprocess
-          import sys
-          from pathlib import Path
-
-          root = Path(sys.argv[1]).resolve()
-          files = [(root / path).resolve() for path in sys.argv[2:]]
-          metadata = json.loads(
-              subprocess.check_output(
-                  ["cargo", "metadata", "--no-deps", "--format-version", "1"],
-                  cwd=root,
-                  text=True,
-              )
-          )
-          packages = []
-          for package in metadata["packages"]:
-              manifest_dir = Path(package["manifest_path"]).resolve().parent
-              try:
-                  relative_manifest_dir = manifest_dir.relative_to(root)
-              except ValueError:
-                  continue
-              if str(relative_manifest_dir).startswith("codama/clients/rust/"):
-                  continue
-              for file in files:
-                  try:
-                      file.relative_to(manifest_dir)
-                  except ValueError:
-                      continue
-                  packages.append(package["name"])
-                  break
-          for package in sorted(set(packages)):
-              print(package)
-          PY
-                      )
-
-                      if [ "''${#packages[@]}" -eq 0 ]; then
-                        exit 0
-                      fi
-
-                      package_args=()
-                      for package in "''${packages[@]}"; do
-                        package_args+=(-p "$package")
-                      done
-
-                      cargo clippy --fix --allow-dirty --allow-staged --all-features --locked "''${package_args[@]}"
-                      cargo clippy --all-features --locked "''${package_args[@]}"
-                      git add -- "''${rust_files[@]}"
-                    ' --
-        '';
-        pass_filenames = true;
-        stages = [ "pre-commit" ];
-      };
-      "pre-push:ci" = {
-        enable = true;
-        name = "pre-push:ci";
-        description = "Run the current CI-equivalent checks before push.";
-        entry = ''
-          ${pkgs.bash}/bin/bash -lc '
-            set -euo pipefail
-            export CI=1
-
-            install:all
-
-            steps=(
-              lint:clippy
-              lint:format
-              verify:docs
-              verify:security
-              test:all
-              test:program-e2e
-              test:idl
-              build:default
-              build:pina:no-default
-              build:all
-            )
-
-            for step in "''${steps[@]}"; do
-              echo
-              echo "=== pre-push: running ''${step} ==="
-              "$step"
-            done
-          '
-        '';
+        verbose = true;
         pass_filenames = false;
+        name = "lint";
+        description = "Run the local CI lint rules suite before push.";
+        entry = "${config.env.DEVENV_PROFILE}/bin/lint:all";
+        stages = [ "pre-push" ];
+      };
+      test = {
+        enable = true;
+        verbose = true;
+        pass_filenames = false;
+        name = "test";
+        description = "Run the local CI validation suite before push.";
+        entry = "${pkgs.bash}/bin/bash -lc '${config.env.DEVENV_PROFILE}/bin/install:all && ${config.env.DEVENV_PROFILE}/bin/verify:security && ${config.env.DEVENV_PROFILE}/bin/test:all && ${config.env.DEVENV_PROFILE}/bin/test:program-e2e && ${config.env.DEVENV_PROFILE}/bin/test:idl && ${config.env.DEVENV_PROFILE}/bin/build:default && ${config.env.DEVENV_PROFILE}/bin/build:pina:no-default && ${config.env.DEVENV_PROFILE}/bin/build:all'";
         stages = [ "pre-push" ];
       };
     };
@@ -254,8 +141,8 @@ in
 
     ${pkgs.git}/bin/git config --local --unset-all core.hooksPath 2>/dev/null || true
 
-    GIT_CONFIG_GLOBAL=/dev/null ${pkgs.prek}/bin/prek install -c .pre-commit-config.yaml -t pre-commit
-    GIT_CONFIG_GLOBAL=/dev/null ${pkgs.prek}/bin/prek install -c .pre-commit-config.yaml -t pre-push
+    GIT_CONFIG_GLOBAL=/dev/null ${pkgs.prek}/bin/prek install -f -c .pre-commit-config.yaml -t pre-commit
+    GIT_CONFIG_GLOBAL=/dev/null ${pkgs.prek}/bin/prek install -f -c .pre-commit-config.yaml -t pre-push
   '';
 
   # Use the stdenv conditionally.
