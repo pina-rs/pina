@@ -53,6 +53,7 @@ pub mod entrypoint {
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: SystemAccountsInstruction = parse_instruction(program_id, &ID, data)?;
+
 		match instruction {
 			SystemAccountsInstruction::Initialize => {
 				InitializeAccounts::try_from(accounts)?.process(data)
@@ -85,6 +86,7 @@ mod tests {
 		let wrong_program_id: Address = [9u8; 32].into();
 		let data = [SystemAccountsInstruction::Initialize as u8];
 		let result = parse_instruction::<SystemAccountsInstruction>(&wrong_program_id, &ID, &data);
+
 		assert!(matches!(result, Err(ProgramError::IncorrectProgramId)));
 	}
 

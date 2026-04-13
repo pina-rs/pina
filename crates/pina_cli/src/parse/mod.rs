@@ -91,6 +91,7 @@ pub fn assemble_program_ir_multi(
 
 		let file_seed_constants = seeds::extract_seed_constants(file);
 		let file_pdas = seeds::extract_pda_from_seed_macros(file, &file_seed_constants);
+
 		all_seed_constants.extend(file_seed_constants);
 		pdas_ir.extend(file_pdas);
 	}
@@ -239,8 +240,10 @@ fn assemble_from_extracted(
 /// first set of violations found.
 pub fn validate_program_ir(ir: &ProgramIr) -> Result<(), IdlError> {
 	let collisions = collision::find_discriminator_collisions(ir);
+
 	if !collisions.is_empty() {
 		let messages = collision::format_collision_errors(&collisions);
+
 		return Err(IdlError::Other(format!(
 			"Discriminator collisions detected:\n  {}",
 			messages.join("\n  "),
@@ -248,8 +251,10 @@ pub fn validate_program_ir(ir: &ProgramIr) -> Result<(), IdlError> {
 	}
 
 	let duplicates = collision::find_duplicate_input_fields(ir);
+
 	if !duplicates.is_empty() {
 		let messages = collision::format_duplicate_field_errors(&duplicates);
+
 		return Err(IdlError::Other(format!(
 			"Duplicate instruction input field names detected:\n  {}",
 			messages.join("\n  "),

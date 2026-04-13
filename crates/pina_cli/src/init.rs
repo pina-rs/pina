@@ -440,6 +440,7 @@ mod tests {
 		.unwrap_or_else(|err| panic!("expected seed file write to succeed: {err}"));
 
 		let result = init_project(&dir.path, "my_program", false);
+
 		match result {
 			Err(InitError::DestinationExists { path }) => {
 				assert!(path.ends_with("Cargo.toml"));

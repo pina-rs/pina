@@ -62,8 +62,10 @@ fn ensure_distinct(account1: &Address, account2: &Address) -> ProgramResult {
 impl<'a> ProcessAccountInfos<'a> for DuplicateMutableAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
 		let _ = FailsDuplicateMutableInstruction::try_from_bytes(data)?;
+
 		self.account1.assert_writable()?;
 		self.account2.assert_writable()?;
+
 		ensure_distinct(self.account1.address(), self.account2.address())
 	}
 }
@@ -93,10 +95,12 @@ pub mod entrypoint {
 			DuplicateMutableInstruction::FailsDuplicateMutable => {
 				DuplicateMutableAccounts::try_from(accounts)?.process(data)
 			}
+
 			DuplicateMutableInstruction::AllowsDuplicateMutable => {
 				let _ = AllowsDuplicateMutableInstruction::try_from_bytes(data)?;
 				Ok(())
 			}
+
 			DuplicateMutableInstruction::AllowsDuplicateReadonly => {
 				DuplicateReadonlyAccounts::try_from(accounts)?.process(data)
 			}

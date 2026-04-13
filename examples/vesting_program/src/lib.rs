@@ -159,6 +159,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		let start_ts = u64::from(args.start_ts);
 		let cliff_ts = u64::from(args.cliff_ts);
 		let end_ts = u64::from(args.end_ts);
+
 		validate_schedule(start_ts, cliff_ts, end_ts)?;
 
 		let vesting_seeds = vesting_seeds!(
@@ -320,8 +321,10 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 			)?;
 
 		let vesting_state = self.vesting_state.as_account::<VestingState>(&ID)?;
+
 		self.admin.assert_address(&vesting_state.admin)?;
 		self.mint.assert_address(&vesting_state.mint)?;
+
 		self.vesting_state.assert_seeds_with_bump(
 			vesting_seeds!(
 				vesting_state.admin.as_ref(),
@@ -338,6 +341,7 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 
 		let vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
 		vesting_state.cancelled = PodBool::from_bool(true);
+
 		Ok(())
 	}
 }

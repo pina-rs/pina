@@ -21,6 +21,7 @@ pub struct ConfigState {
 #[test]
 fn test_account_macro() {
 	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+
 	let config_state = ConfigState::builder()
 		.version(1)
 		.authority(authority)
@@ -40,6 +41,7 @@ fn test_account_macro() {
 #[test]
 fn test_account_assert_returns_ok_when_condition_true() {
 	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+
 	let config_state = ConfigState::builder()
 		.version(1)
 		.authority(authority)
@@ -47,12 +49,14 @@ fn test_account_assert_returns_ok_when_condition_true() {
 		.build();
 
 	let result = config_state.assert(|s| s.version == 1);
+
 	assert!(result.is_ok());
 }
 
 #[test]
 fn test_account_assert_returns_err_when_condition_false() {
 	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+
 	let config_state = ConfigState::builder()
 		.version(1)
 		.authority(authority)
@@ -60,6 +64,7 @@ fn test_account_assert_returns_err_when_condition_false() {
 		.build();
 
 	let result = config_state.assert(|s| s.version == 99);
+
 	assert!(result.is_err());
 	assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
 }
@@ -67,6 +72,7 @@ fn test_account_assert_returns_err_when_condition_false() {
 #[test]
 fn test_account_assert_mut_returns_ok_when_condition_true() {
 	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+
 	let mut config_state = ConfigState::builder()
 		.version(1)
 		.authority(authority)
@@ -74,12 +80,14 @@ fn test_account_assert_mut_returns_ok_when_condition_true() {
 		.build();
 
 	let result = config_state.assert_mut(|s| s.version == 1);
+
 	assert!(result.is_ok());
 }
 
 #[test]
 fn test_account_assert_mut_returns_err_when_condition_false() {
 	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+
 	let mut config_state = ConfigState::builder()
 		.version(1)
 		.authority(authority)
@@ -87,6 +95,7 @@ fn test_account_assert_mut_returns_err_when_condition_false() {
 		.build();
 
 	let result = config_state.assert_mut(|s| s.version == 99);
+
 	assert!(result.is_err());
 	assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
 }
@@ -94,6 +103,7 @@ fn test_account_assert_mut_returns_err_when_condition_false() {
 #[test]
 fn test_account_assert_msg_returns_ok_when_condition_true() {
 	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+
 	let config_state = ConfigState::builder()
 		.version(1)
 		.authority(authority)
@@ -101,12 +111,14 @@ fn test_account_assert_msg_returns_ok_when_condition_true() {
 		.build();
 
 	let result = config_state.assert_msg(|s| s.bump == 255, "bump must be 255");
+
 	assert!(result.is_ok());
 }
 
 #[test]
 fn test_account_assert_msg_returns_err_when_condition_false() {
 	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+
 	let config_state = ConfigState::builder()
 		.version(1)
 		.authority(authority)
@@ -114,6 +126,7 @@ fn test_account_assert_msg_returns_err_when_condition_false() {
 		.build();
 
 	let result = config_state.assert_msg(|s| s.bump == 0, "bump must be 0");
+
 	assert!(result.is_err());
 	assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
 }

@@ -32,7 +32,6 @@ fn test_accounts_derive_exact() {
 	let ix_data = [3u8; 100];
 
 	// Input with 2 accounts.
-
 	let mut input = unsafe { create_input(2, &ix_data) };
 	let mut accounts = [UNINIT; 2];
 
@@ -50,7 +49,6 @@ fn test_accounts_derive_exact_not_enough() {
 	let ix_data = [3u8; 100];
 
 	// Input with 1 account
-
 	let mut input = unsafe { create_input(1, &ix_data) };
 	let mut accounts = [UNINIT; 1];
 
@@ -67,7 +65,6 @@ fn test_accounts_derive_exact_excess() {
 	let ix_data = [3u8; 100];
 
 	// Input with 4 accounts
-
 	let mut input = unsafe { create_input(4, &ix_data) };
 	let mut accounts = [UNINIT; 4];
 

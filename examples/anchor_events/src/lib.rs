@@ -78,6 +78,7 @@ fn build_event(instruction: EventsInstruction) -> EmittedEvent {
 					.build(),
 			)
 		}
+
 		EventsInstruction::TestEvent => {
 			EmittedEvent::MyOtherEvent(
 				MyOtherEvent::builder()
@@ -86,6 +87,7 @@ fn build_event(instruction: EventsInstruction) -> EmittedEvent {
 					.build(),
 			)
 		}
+
 		EventsInstruction::TestEventCpi => {
 			EmittedEvent::MyOtherEvent(
 				MyOtherEvent::builder()

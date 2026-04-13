@@ -67,6 +67,7 @@ fn require_eq(left: u64, right: u64, error: MyError) -> ProgramResult {
 	if left != right {
 		return Err(error.into());
 	}
+
 	Ok(())
 }
 
@@ -75,6 +76,7 @@ fn require_neq(left: u64, right: u64, error: MyError) -> ProgramResult {
 	if left == right {
 		return Err(error.into());
 	}
+
 	Ok(())
 }
 
@@ -83,6 +85,7 @@ fn require_gt(left: u64, right: u64, error: MyError) -> ProgramResult {
 	if left <= right {
 		return Err(error.into());
 	}
+
 	Ok(())
 }
 
@@ -91,6 +94,7 @@ fn require_gte(left: u64, right: u64, error: MyError) -> ProgramResult {
 	if left < right {
 		return Err(error.into());
 	}
+
 	Ok(())
 }
 

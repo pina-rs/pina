@@ -35,6 +35,7 @@ pub fn accounts_derive(input: TokenStream) -> TokenStream {
 }
 
 fn accounts_derive_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+	// Parse input
 	let input: DeriveInput = match syn::parse2(input) {
 		Ok(v) => v,
 		Err(e) => return e.to_compile_error(),
@@ -42,18 +43,16 @@ fn accounts_derive_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenSt
 
 	let args = match AccountsInput::from_derive_input(&input) {
 		Ok(v) => v,
-		Err(e) => {
-			return e.write_errors();
-		}
+		Err(e) => return e.write_errors(),
 	};
 
+	// Extract configuration
 	let struct_name = &args.ident;
 	let (impl_generics, ty_generics, where_clause) = args.generics.split_for_impl();
 	let crate_path = &args.crate_path;
 	let fields = args.data.take_struct().unwrap();
-	let mut field_idents = Vec::new();
-	let mut remaining_field = None;
 
+	// Get lifetime parameter
 	let lifetime = match args.generics.lifetimes().next() {
 		Some(lt) => &lt.lifetime,
 		None => {
@@ -64,6 +63,10 @@ fn accounts_derive_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenSt
 			.to_compile_error();
 		}
 	};
+
+	// Process fields
+	let mut field_idents = Vec::new();
+	let mut remaining_field = None;
 
 	for field in fields.iter() {
 		if !field.remaining.is_present() {
@@ -191,16 +194,12 @@ fn error_impl(
 ) -> proc_macro2::TokenStream {
 	let nested_metas = match NestedMeta::parse_meta_list(args) {
 		Ok(value) => value,
-		Err(e) => {
-			return e.into_compile_error();
-		}
+		Err(e) => return e.into_compile_error(),
 	};
 
 	let args = match ErrorArgs::from_list(&nested_metas) {
 		Ok(v) => v,
-		Err(e) => {
-			return e.write_errors();
-		}
+		Err(e) => return e.write_errors(),
 	};
 
 	let mut item_enum: ItemEnum = match syn::parse2(input) {
@@ -332,22 +331,19 @@ fn discriminator_impl(
 ) -> proc_macro2::TokenStream {
 	let nested_metas = match NestedMeta::parse_meta_list(args) {
 		Ok(value) => value,
-		Err(e) => {
-			return e.into_compile_error();
-		}
+		Err(e) => return e.into_compile_error(),
 	};
 
 	let args = match DiscriminatorArgs::from_list(&nested_metas) {
 		Ok(v) => v,
-		Err(e) => {
-			return e.write_errors();
-		}
+		Err(e) => return e.write_errors(),
 	};
 
 	let mut item_enum: ItemEnum = match syn::parse2(input) {
 		Ok(v) => v,
 		Err(e) => return e.to_compile_error(),
 	};
+
 	let enum_name = &item_enum.ident;
 
 	let DiscriminatorArgs {
@@ -374,33 +370,40 @@ fn discriminator_impl(
 		syn::parse_quote!(::core::cmp::Eq),
 	];
 
-	if let Some(derive_attr) = item_enum
+	let derive_attr = item_enum
 		.attrs
 		.iter_mut()
-		.find(|attr| attr.path().is_ident("derive"))
-	{
+		.find(|attr| attr.path().is_ident("derive"));
+
+	if let Some(derive_attr) = derive_attr {
 		let existing_derives_result =
 			derive_attr.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated);
 
-		if let Ok(mut existing_derives) = existing_derives_result {
-			let existing_derive_names: std::collections::HashSet<String> = existing_derives
-				.iter()
-				.map(|p| p.segments.last().unwrap().ident.to_string())
-				.collect();
+		let Ok(mut existing_derives) = existing_derives_result else {
+			// No derive attribute exists, so create one
+			let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
+			item_enum.attrs.push(new_derive_attr);
 
-			for derive_to_add in &derives_to_add {
-				let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
-				if !existing_derive_names.contains(&to_add_name) {
-					existing_derives.push(derive_to_add.clone());
-				}
+			return quote! { #item_enum };
+		};
+
+		let existing_derive_names: std::collections::HashSet<String> = existing_derives
+			.iter()
+			.map(|p| p.segments.last().unwrap().ident.to_string())
+			.collect();
+
+		for derive_to_add in &derives_to_add {
+			let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
+			if !existing_derive_names.contains(&to_add_name) {
+				existing_derives.push(derive_to_add.clone());
 			}
-
-			let new_derive_attr: Attribute = syn::parse_quote! {
-				#[derive(#existing_derives)]
-			};
-
-			*derive_attr = new_derive_attr;
 		}
+
+		let new_derive_attr: Attribute = syn::parse_quote! {
+			#[derive(#existing_derives)]
+		};
+
+		*derive_attr = new_derive_attr;
 	} else {
 		// No derive attribute exists, so create one
 		let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
@@ -693,24 +696,24 @@ fn account_impl(
 	args: proc_macro2::TokenStream,
 	input: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
+	// Parse macro arguments
 	let nested_metas = match NestedMeta::parse_meta_list(args) {
 		Ok(value) => value,
-		Err(e) => {
-			return e.into_compile_error();
-		}
+		Err(e) => return e.into_compile_error(),
 	};
 
 	let args = match AccountArgs::from_list(&nested_metas) {
 		Ok(v) => v,
-		Err(e) => {
-			return e.write_errors();
-		}
+		Err(e) => return e.write_errors(),
 	};
 
+	// Parse input struct
 	let mut item_struct: ItemStruct = match syn::parse2(input) {
 		Ok(v) => v,
 		Err(e) => return e.to_compile_error(),
 	};
+
+	// Extract configuration
 	let struct_name = &item_struct.ident;
 	let builder_name = format_ident!("{}Builder", struct_name);
 
@@ -719,7 +722,6 @@ fn account_impl(
 		discriminator,
 		variant,
 	} = args;
-
 	let variant = variant.unwrap_or(struct_name.clone());
 
 	// Add #[repr(C)]
@@ -737,33 +739,40 @@ fn account_impl(
 		syn::parse_quote!(::core::cmp::Eq),
 	];
 
-	if let Some(derive_attr) = item_struct
+	let derive_attr = item_struct
 		.attrs
 		.iter_mut()
-		.find(|attr| attr.path().is_ident("derive"))
-	{
+		.find(|attr| attr.path().is_ident("derive"));
+
+	if let Some(derive_attr) = derive_attr {
 		let existing_derives_result =
 			derive_attr.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated);
 
-		if let Ok(mut existing_derives) = existing_derives_result {
-			let existing_derive_names: std::collections::HashSet<String> = existing_derives
-				.iter()
-				.map(|p| p.segments.last().unwrap().ident.to_string())
-				.collect();
+		let Ok(mut existing_derives) = existing_derives_result else {
+			// Failed to parse derives, create new one
+			let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
+			item_struct.attrs.push(new_derive_attr);
 
-			for derive_to_add in &derives_to_add {
-				let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
-				if !existing_derive_names.contains(&to_add_name) {
-					existing_derives.push(derive_to_add.clone());
-				}
+			return quote! { #item_struct };
+		};
+
+		let existing_derive_names: std::collections::HashSet<String> = existing_derives
+			.iter()
+			.map(|p| p.segments.last().unwrap().ident.to_string())
+			.collect();
+
+		for derive_to_add in &derives_to_add {
+			let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
+			if !existing_derive_names.contains(&to_add_name) {
+				existing_derives.push(derive_to_add.clone());
 			}
-
-			let new_derive_attr: Attribute = syn::parse_quote! {
-				#[derive(#existing_derives)]
-			};
-
-			*derive_attr = new_derive_attr;
 		}
+
+		let new_derive_attr: Attribute = syn::parse_quote! {
+			#[derive(#existing_derives)]
+		};
+
+		*derive_attr = new_derive_attr;
 	} else {
 		// No derive attribute exists, so create one
 		let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
@@ -783,16 +792,17 @@ fn account_impl(
 	item_struct.attrs.push(bytemuck_attr);
 
 	// Add discriminator field
-	if let Fields::Named(named_fields) = &mut item_struct.fields {
-		let discriminator_field = syn::parse_quote! {
-			discriminator: [u8; #discriminator::BYTES]
-		};
-		named_fields.named.insert(0, discriminator_field);
-	} else {
+	let Fields::Named(named_fields) = &mut item_struct.fields else {
 		return syn::Error::new_spanned(item_struct, "Account structs must have named fields")
 			.to_compile_error();
-	}
+	};
 
+	let discriminator_field = syn::parse_quote! {
+		discriminator: [u8; #discriminator::BYTES]
+	};
+	named_fields.named.insert(0, discriminator_field);
+
+	// Generate assertions
 	let assertions = if let Fields::Named(named_fields) = &item_struct.fields {
 		let field_assertions = named_fields.named.iter().map(|field| {
 			let field_name = field.ident.as_ref().unwrap();
@@ -822,6 +832,7 @@ fn account_impl(
 			"__{}_ALIGNMENT_ASSERTIONS__",
 			struct_name.to_string().to_uppercase()
 		);
+
 		quote! {
 			const #assertion_const_name: () = {
 				#(#field_assertions)*
@@ -1076,24 +1087,24 @@ fn instruction_impl(
 	args: proc_macro2::TokenStream,
 	input: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
+	// Parse macro arguments
 	let nested_metas = match NestedMeta::parse_meta_list(args) {
 		Ok(value) => value,
-		Err(e) => {
-			return e.into_compile_error();
-		}
+		Err(e) => return e.into_compile_error(),
 	};
 
 	let args = match InstructionArgs::from_list(&nested_metas) {
 		Ok(v) => v,
-		Err(e) => {
-			return e.write_errors();
-		}
+		Err(e) => return e.write_errors(),
 	};
 
+	// Parse input struct
 	let mut item_struct: ItemStruct = match syn::parse2(input) {
 		Ok(v) => v,
 		Err(e) => return e.to_compile_error(),
 	};
+
+	// Extract configuration
 	let struct_name = &item_struct.ident;
 	let builder_name = format_ident!("{}Builder", struct_name);
 
@@ -1102,7 +1113,6 @@ fn instruction_impl(
 		discriminator,
 		variant,
 	} = args;
-
 	let variant = variant.unwrap_or(struct_name.clone());
 
 	// Add #[repr(C)]
@@ -1121,33 +1131,40 @@ fn instruction_impl(
 		syn::parse_quote!(::core::fmt::Debug),
 	];
 
-	if let Some(derive_attr) = item_struct
+	let derive_attr = item_struct
 		.attrs
 		.iter_mut()
-		.find(|attr| attr.path().is_ident("derive"))
-	{
+		.find(|attr| attr.path().is_ident("derive"));
+
+	if let Some(derive_attr) = derive_attr {
 		let existing_derives_result =
 			derive_attr.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated);
 
-		if let Ok(mut existing_derives) = existing_derives_result {
-			let existing_derive_names: std::collections::HashSet<String> = existing_derives
-				.iter()
-				.map(|p| p.segments.last().unwrap().ident.to_string())
-				.collect();
+		let Ok(mut existing_derives) = existing_derives_result else {
+			// Failed to parse derives, create new one
+			let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
+			item_struct.attrs.push(new_derive_attr);
 
-			for derive_to_add in &derives_to_add {
-				let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
-				if !existing_derive_names.contains(&to_add_name) {
-					existing_derives.push(derive_to_add.clone());
-				}
+			return quote! { #item_struct };
+		};
+
+		let existing_derive_names: std::collections::HashSet<String> = existing_derives
+			.iter()
+			.map(|p| p.segments.last().unwrap().ident.to_string())
+			.collect();
+
+		for derive_to_add in &derives_to_add {
+			let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
+			if !existing_derive_names.contains(&to_add_name) {
+				existing_derives.push(derive_to_add.clone());
 			}
-
-			let new_derive_attr: Attribute = syn::parse_quote! {
-				#[derive(#existing_derives)]
-			};
-
-			*derive_attr = new_derive_attr;
 		}
+
+		let new_derive_attr: Attribute = syn::parse_quote! {
+			#[derive(#existing_derives)]
+		};
+
+		*derive_attr = new_derive_attr;
 	} else {
 		// No derive attribute exists, so create one
 		let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
@@ -1158,6 +1175,7 @@ fn instruction_impl(
 	let builder_attr: Attribute =
 		syn::parse_quote!(#[builder(builder_method(vis = "", name = __builder))]);
 	item_struct.attrs.push(builder_attr);
+
 	let bytemuck_crate_str = format!(
 		"{}::bytemuck",
 		quote!(#crate_path).to_string().replace(' ', "")
@@ -1166,16 +1184,17 @@ fn instruction_impl(
 	item_struct.attrs.push(bytemuck_attr);
 
 	// Add discriminator field
-	if let Fields::Named(named_fields) = &mut item_struct.fields {
-		let discriminator_field = syn::parse_quote! {
-			discriminator: [u8; #discriminator::BYTES]
-		};
-		named_fields.named.insert(0, discriminator_field);
-	} else {
+	let Fields::Named(named_fields) = &mut item_struct.fields else {
 		return syn::Error::new_spanned(item_struct, "Instruction structs must have named fields")
 			.to_compile_error();
-	}
+	};
 
+	let discriminator_field = syn::parse_quote! {
+		discriminator: [u8; #discriminator::BYTES]
+	};
+	named_fields.named.insert(0, discriminator_field);
+
+	// Generate assertions
 	let assertions = if let Fields::Named(named_fields) = &item_struct.fields {
 		let field_assertions = named_fields.named.iter().map(|field| {
 			let field_name = field.ident.as_ref().unwrap();
@@ -1205,6 +1224,7 @@ fn instruction_impl(
 			"__{}_ALIGNMENT_ASSERTIONS__",
 			struct_name.to_string().to_uppercase()
 		);
+
 		quote! {
 			const #assertion_const_name: () = {
 				#(#field_assertions)*
@@ -1246,7 +1266,6 @@ fn instruction_impl(
 		#assertions
 
 		impl #struct_name {
-
 			pub fn to_bytes(&self) -> &[u8] {
 				#crate_path::bytemuck::bytes_of(self)
 			}
@@ -1368,24 +1387,24 @@ fn event_impl(
 	args: proc_macro2::TokenStream,
 	input: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
+	// Parse macro arguments
 	let nested_metas = match NestedMeta::parse_meta_list(args) {
 		Ok(value) => value,
-		Err(e) => {
-			return e.into_compile_error();
-		}
+		Err(e) => return e.into_compile_error(),
 	};
 
 	let args = match EventArgs::from_list(&nested_metas) {
 		Ok(v) => v,
-		Err(e) => {
-			return e.write_errors();
-		}
+		Err(e) => return e.write_errors(),
 	};
 
+	// Parse input struct
 	let mut item_struct: ItemStruct = match syn::parse2(input) {
 		Ok(v) => v,
 		Err(e) => return e.to_compile_error(),
 	};
+
+	// Extract configuration
 	let struct_name = &item_struct.ident;
 	let builder_name = format_ident!("{}Builder", struct_name);
 
@@ -1394,7 +1413,6 @@ fn event_impl(
 		discriminator,
 		variant,
 	} = args;
-
 	let variant = variant.unwrap_or(struct_name.clone());
 
 	// Add #[repr(C)]
@@ -1418,33 +1436,40 @@ fn event_impl(
 		syn::parse_quote!(::core::fmt::Debug),
 	];
 
-	if let Some(derive_attr) = item_struct
+	let derive_attr = item_struct
 		.attrs
 		.iter_mut()
-		.find(|attr| attr.path().is_ident("derive"))
-	{
+		.find(|attr| attr.path().is_ident("derive"));
+
+	if let Some(derive_attr) = derive_attr {
 		let existing_derives_result =
 			derive_attr.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated);
 
-		if let Ok(mut existing_derives) = existing_derives_result {
-			let existing_derive_names: std::collections::HashSet<String> = existing_derives
-				.iter()
-				.map(|p| p.segments.last().unwrap().ident.to_string())
-				.collect();
+		let Ok(mut existing_derives) = existing_derives_result else {
+			// Failed to parse derives, create new one
+			let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
+			item_struct.attrs.push(new_derive_attr);
 
-			for derive_to_add in &derives_to_add {
-				let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
-				if !existing_derive_names.contains(&to_add_name) {
-					existing_derives.push(derive_to_add.clone());
-				}
+			return quote! { #item_struct };
+		};
+
+		let existing_derive_names: std::collections::HashSet<String> = existing_derives
+			.iter()
+			.map(|p| p.segments.last().unwrap().ident.to_string())
+			.collect();
+
+		for derive_to_add in &derives_to_add {
+			let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
+			if !existing_derive_names.contains(&to_add_name) {
+				existing_derives.push(derive_to_add.clone());
 			}
-
-			let new_derive_attr: Attribute = syn::parse_quote! {
-				#[derive(#existing_derives)]
-			};
-
-			*derive_attr = new_derive_attr;
 		}
+
+		let new_derive_attr: Attribute = syn::parse_quote! {
+			#[derive(#existing_derives)]
+		};
+
+		*derive_attr = new_derive_attr;
 	} else {
 		// No derive attribute exists, so create one
 		let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
@@ -1459,16 +1484,17 @@ fn event_impl(
 	item_struct.attrs.push(bytemuck_attr);
 
 	// Add discriminator field
-	if let Fields::Named(named_fields) = &mut item_struct.fields {
-		let discriminator_field = syn::parse_quote! {
-			discriminator: [u8; #discriminator::BYTES]
-		};
-		named_fields.named.insert(0, discriminator_field);
-	} else {
+	let Fields::Named(named_fields) = &mut item_struct.fields else {
 		return syn::Error::new_spanned(item_struct, "Event structs must have named fields")
 			.to_compile_error();
-	}
+	};
 
+	let discriminator_field = syn::parse_quote! {
+		discriminator: [u8; #discriminator::BYTES]
+	};
+	named_fields.named.insert(0, discriminator_field);
+
+	// Generate assertions
 	let assertions = if let Fields::Named(named_fields) = &item_struct.fields {
 		let field_assertions = named_fields.named.iter().map(|field| {
 			let field_name = field.ident.as_ref().unwrap();

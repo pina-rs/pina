@@ -48,6 +48,7 @@ pub fn extract_validation_properties(
 		let Some(trait_path) = item_impl.trait_.as_ref().map(|(_, path, _)| path) else {
 			continue;
 		};
+
 		if !path_ends_with(trait_path, "ProcessAccountInfos") {
 			continue;
 		}
@@ -83,24 +84,30 @@ fn collect_assertions_from_stmt(stmt: &Stmt, props: &mut HashMap<String, Account
 		Stmt::Expr(expr, _) => {
 			collect_assertions_from_expr(expr, props);
 		}
+
 		Stmt::Local(syn::Local {
 			init: Some(init), ..
 		}) => {
 			collect_assertions_from_expr(&init.expr, props);
+
 			if let Some((_, diverge)) = &init.diverge {
 				collect_assertions_from_expr(diverge, props);
 			}
 		}
+
 		Stmt::Item(Item::Impl(item_impl)) => {
 			// Nested impl blocks (unlikely but handle gracefully).
 			for ii in &item_impl.items {
-				if let ImplItem::Fn(f) = ii {
-					for s in &f.block.stmts {
-						collect_assertions_from_stmt(s, props);
-					}
+				let ImplItem::Fn(f) = ii else {
+					continue;
+				};
+
+				for s in &f.block.stmts {
+					collect_assertions_from_stmt(s, props);
 				}
 			}
 		}
+
 		_ => {}
 	}
 }
@@ -109,49 +116,63 @@ fn collect_assertions_from_expr(expr: &Expr, props: &mut HashMap<String, Account
 	match expr {
 		Expr::MethodCall(mc) => {
 			let method = mc.method.to_string();
+
 			if let Some(field_name) = resolve_self_field(&mc.receiver) {
 				let entry = props.entry(field_name).or_default();
 				apply_assertion(&method, &mc.args, entry);
 			}
+
 			// Also recurse into the receiver (for chained calls).
 			collect_assertions_from_expr(&mc.receiver, props);
+
 			// And recurse into arguments.
 			for arg in &mc.args {
 				collect_assertions_from_expr(arg, props);
 			}
 		}
+
 		Expr::Try(t) => {
 			collect_assertions_from_expr(&t.expr, props);
 		}
+
 		Expr::Block(b) => {
 			for stmt in &b.block.stmts {
 				collect_assertions_from_stmt(stmt, props);
 			}
 		}
+
 		Expr::If(if_expr) => {
 			collect_assertions_from_expr(&if_expr.cond, props);
+
 			for stmt in &if_expr.then_branch.stmts {
 				collect_assertions_from_stmt(stmt, props);
 			}
+
 			if let Some((_, else_expr)) = &if_expr.else_branch {
 				collect_assertions_from_expr(else_expr, props);
 			}
 		}
+
 		Expr::Let(let_expr) => {
 			collect_assertions_from_expr(&let_expr.expr, props);
 		}
+
 		Expr::Call(call) => {
 			collect_assertions_from_expr(&call.func, props);
+
 			for arg in &call.args {
 				collect_assertions_from_expr(arg, props);
 			}
 		}
+
 		Expr::Paren(p) => {
 			collect_assertions_from_expr(&p.expr, props);
 		}
+
 		Expr::Reference(r) => {
 			collect_assertions_from_expr(&r.expr, props);
 		}
+
 		_ => {}
 	}
 }

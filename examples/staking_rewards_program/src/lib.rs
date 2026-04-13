@@ -200,6 +200,7 @@ macro_rules! position_seeds {
 
 impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
+		// Parse instruction and prepare PDA seeds
 		let args = InitializePoolInstruction::try_from_bytes(data)?;
 		let pool_seeds = pool_seeds!(
 			self.stake_mint.address().as_ref(),
@@ -211,6 +212,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 			args.bump
 		);
 
+		// Validate accounts
 		self.admin.assert_signer()?;
 		self.stake_mint.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.reward_mint.assert_owners(&SPL_PROGRAM_IDS)?;
@@ -237,6 +239,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 				self.token_program.address(),
 			)?;
 
+		// Create the pool state account
 		create_program_account_with_bump::<PoolState>(
 			self.pool_state,
 			self.admin,
@@ -245,6 +248,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 			args.bump,
 		)?;
 
+		// Initialize pool state
 		let pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
 		*pool_state = PoolState::builder()
 			.admin(*self.admin.address())
@@ -256,6 +260,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 			.bump(args.bump)
 			.build();
 
+		// Create stake vault
 		associated_token_account::instructions::Create {
 			account: self.stake_vault,
 			funding_account: self.admin,
@@ -266,6 +271,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 		}
 		.invoke()?;
 
+		// Create reward vault
 		associated_token_account::instructions::Create {
 			account: self.reward_vault,
 			funding_account: self.admin,
@@ -282,6 +288,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 
 impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
+		// Parse instruction and prepare PDA seeds
 		let args = OpenPositionInstruction::try_from_bytes(data)?;
 		let position_seeds = position_seeds!(
 			self.pool_state.address().as_ref(),
@@ -293,6 +300,7 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 			args.bump
 		);
 
+		// Validate accounts
 		self.user.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
 		self.pool_state
@@ -304,11 +312,13 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 			.assert_writable()?
 			.assert_seeds_with_bump(position_seeds_with_bump, &ID)?;
 
+		// Check pool is not paused
 		let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
 		if bool::from(pool_state.paused) {
 			return Err(StakingError::PoolPaused.into());
 		}
 
+		// Create the position account
 		create_program_account_with_bump::<PositionState>(
 			self.position_state,
 			self.user,
@@ -317,6 +327,7 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 			args.bump,
 		)?;
 
+		// Initialize position state
 		let position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 		*position_state = PositionState::builder()
 			.pool(*self.pool_state.address())
@@ -333,9 +344,11 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 
 impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
+		// Parse instruction data
 		let args = DepositInstruction::try_from_bytes(data)?;
 		let amount: u64 = args.amount.into();
 
+		// Validate accounts
 		self.user.assert_signer()?;
 		self.stake_mint.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.system_program.assert_address(&system::ID)?;
@@ -356,8 +369,10 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 				self.token_program.address(),
 			)?;
 
+		// Validate pool and position state
 		let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
 		let position_state = self.position_state.as_account::<PositionState>(&ID)?;
+
 		if bool::from(pool_state.paused) {
 			return Err(StakingError::PoolPaused.into());
 		}
@@ -368,6 +383,7 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 			return Err(StakingError::InvalidAmount.into());
 		}
 
+		// Calculate updated amounts
 		let staked_amount = u64::from(position_state.staked_amount);
 		let next_staked = staked_amount
 			.checked_add(amount)
@@ -376,6 +392,7 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 			.checked_add(amount)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
 
+		// Update position state
 		let position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 		position_state.staked_amount = PodU64::from_primitive(next_staked);
 		position_state.reward_debt = PodU64::from_primitive(
@@ -384,9 +401,11 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 				.ok_or(ProgramError::ArithmeticOverflow)?,
 		);
 
+		// Update pool state
 		let pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
 		pool_state.total_staked = PodU64::from_primitive(total_staked);
 
+		// Ensure user's stake ATA exists
 		associated_token_account::instructions::CreateIdempotent {
 			funding_account: self.user,
 			account: self.user_stake_ata,
@@ -403,9 +422,11 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 
 impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
+		// Parse instruction data
 		let args = WithdrawInstruction::try_from_bytes(data)?;
 		let amount: u64 = args.amount.into();
 
+		// Validate accounts
 		self.user.assert_signer()?;
 		self.stake_mint.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.system_program.assert_address(&system::ID)?;
@@ -426,19 +447,24 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 				self.token_program.address(),
 			)?;
 
+		// Validate pool and position state
 		let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
 		let position_state = self.position_state.as_account::<PositionState>(&ID)?;
+
 		if bool::from(pool_state.paused) {
 			return Err(StakingError::PoolPaused.into());
 		}
+
 		let staked_amount = u64::from(position_state.staked_amount);
 		if amount > staked_amount {
 			return Err(StakingError::InsufficientBalance.into());
 		}
 
+		// Update position state
 		let position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 		position_state.staked_amount = PodU64::from_primitive(staked_amount - amount);
 
+		// Update pool state
 		let pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
 		pool_state.total_staked =
 			PodU64::from_primitive(u64::from(pool_state.total_staked) - amount);
@@ -449,6 +475,7 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 
 impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 	fn process(&self, _data: &[u8]) -> ProgramResult {
+		// Validate accounts
 		self.user.assert_signer()?;
 		self.reward_mint.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.system_program.assert_address(&system::ID)?;
@@ -469,8 +496,10 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 				self.token_program.address(),
 			)?;
 
+		// Validate pool and position state
 		let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
 		let position_state = self.position_state.as_account::<PositionState>(&ID)?;
+
 		if bool::from(pool_state.paused) {
 			return Err(StakingError::PoolPaused.into());
 		}
@@ -478,12 +507,15 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 			return Err(StakingError::InvalidAmount.into());
 		}
 
+		// Calculate and update pending rewards
 		let next_pending = u64::from(position_state.pending_rewards)
 			.checked_add(u64::from(pool_state.reward_index))
 			.ok_or(ProgramError::ArithmeticOverflow)?;
+
 		let position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 		position_state.pending_rewards = PodU64::from_primitive(next_pending);
 
+		// Ensure user's reward ATA exists
 		associated_token_account::instructions::CreateIdempotent {
 			funding_account: self.user,
 			account: self.user_reward_ata,

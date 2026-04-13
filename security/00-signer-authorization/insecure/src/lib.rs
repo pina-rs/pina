@@ -57,6 +57,7 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 		let vault = self.vault.as_account_mut::<VaultState>(&ID)?;
 		let current: u64 = vault.balance.into();
 		let amount: u64 = args.amount.into();
+
 		vault.balance = PodU64::from_primitive(current.saturating_sub(amount));
 
 		Ok(())

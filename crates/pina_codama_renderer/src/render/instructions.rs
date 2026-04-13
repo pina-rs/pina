@@ -17,19 +17,23 @@ use crate::error::Result;
 
 pub(crate) fn render_instructions_mod(instructions: &[InstructionNode]) -> String {
 	let mut lines = Vec::new();
+
 	for instruction in instructions {
 		lines.push(format!(
 			"pub(crate) mod r#{};",
 			snake(instruction.name.as_ref())
 		));
 	}
+
 	lines.push(String::new());
+
 	for instruction in instructions {
 		lines.push(format!(
 			"pub use self::r#{}::*;",
 			snake(instruction.name.as_ref())
 		));
 	}
+
 	lines.join("\n")
 }
 
@@ -52,9 +56,11 @@ pub(crate) fn render_instruction_page(
 	})?;
 
 	let mut lines = Vec::new();
+
 	for doc_line in render_docs(&instruction.docs, 0) {
 		lines.push(doc_line);
 	}
+
 	lines.push(format!(
 		"pub const {}: {} = {};",
 		discriminator.name, discriminator.ty, discriminator.value
@@ -63,22 +69,27 @@ pub(crate) fn render_instruction_page(
 	lines.push("/// Accounts.".to_string());
 	lines.push("#[derive(Clone, Debug)]".to_string());
 	lines.push(format!("pub struct {instruction_name} {{"));
+
 	for account in &instruction.accounts {
 		let (field_type, _) = render_instruction_account_field_type(account);
+
 		for doc_line in render_docs(&account.docs, 1) {
 			lines.push(doc_line);
 		}
+
 		lines.push(format!(
 			"\tpub {}: {},",
 			snake(account.name.as_ref()),
 			field_type
 		));
 	}
+
 	lines.push("}".to_string());
 	lines.push(String::new());
 
 	let mut new_params = Vec::new();
 	let mut new_inits = Vec::new();
+
 	for account in &instruction.accounts {
 		let field_name = snake(account.name.as_ref());
 		let (field_type, base_type) = render_instruction_account_field_type(account);
@@ -88,6 +99,7 @@ pub(crate) fn render_instruction_page(
 			primary_program_const,
 			program,
 		)?;
+
 		if let Some(default_expr) = default_value {
 			new_inits.push(format!("\t\t\t{field_name}: {default_expr},"));
 		} else {
@@ -95,6 +107,7 @@ pub(crate) fn render_instruction_page(
 			new_inits.push(format!("\t\t\t{field_name},"));
 		}
 	}
+
 	lines.push(format!("impl {instruction_name} {{"));
 	lines.push(format!(
 		"\tpub fn new({}) -> Self {{",
@@ -140,6 +153,7 @@ pub(crate) fn render_instruction_page(
 
 	let mut data_fields = Vec::new();
 	data_fields.push(format!("\tpub discriminator: {},", discriminator.ty));
+
 	let mut data_new_args = Vec::new();
 	let mut data_inits = Vec::new();
 	data_inits.push(format!("\t\t\tdiscriminator: {},", discriminator.name));
@@ -148,9 +162,11 @@ pub(crate) fn render_instruction_page(
 		let argument_name = snake(argument.name.as_ref());
 		let field_context = format!("{instruction_name}.{argument_name}");
 		let argument_type = render_type_for_pod(&argument.r#type, &field_context)?;
+
 		for doc_line in render_docs(&argument.docs, 1) {
 			data_fields.push(doc_line);
 		}
+
 		data_fields.push(format!("\tpub {argument_name}: {argument_type},"));
 		data_new_args.push(format!("{argument_name}: {argument_type}"));
 		data_inits.push(format!("\t\t\t{argument_name},"));
@@ -184,6 +200,7 @@ fn render_instruction_account_metas(
 	primary_program_const: &str,
 ) -> Vec<String> {
 	let mut lines = Vec::new();
+
 	for account in &instruction.accounts {
 		let field_name = snake(account.name.as_ref());
 		let meta_ctor = if account.is_writable {
@@ -233,6 +250,7 @@ fn render_instruction_account_metas(
 				));
 				lines.push("\t\t}".to_string());
 			}
+
 			continue;
 		}
 
@@ -240,6 +258,7 @@ fn render_instruction_account_metas(
 			"\t\taccounts.push({meta_ctor}({key_expr}, {signer_expr}));"
 		));
 	}
+
 	lines
 }
 
@@ -257,7 +276,7 @@ fn render_instruction_account_field_type(account: &InstructionAccountNode) -> (S
 
 fn render_instruction_account_default_value(
 	account: &InstructionAccountNode,
-	base_type: &str,
+	_base_type: &str,
 	primary_program_const: &str,
 	program: &ProgramNode,
 ) -> Result<Option<String>> {
@@ -273,7 +292,9 @@ fn render_instruction_account_default_value(
 		InstructionInputValueNode::PublicKey(public_key) => {
 			format!("solana_pubkey::pubkey!(\"{}\")", public_key.public_key)
 		}
-		InstructionInputValueNode::ProgramId(_) => format!("crate::{primary_program_const}"),
+		InstructionInputValueNode::ProgramId(_) => {
+			format!("crate::{primary_program_const}")
+		}
 		InstructionInputValueNode::ProgramLink(program_link) => {
 			format!(
 				"crate::{}",
@@ -294,9 +315,8 @@ fn render_instruction_account_default_value(
 	};
 
 	if matches!(account.is_signer, IsAccountSigner::Either) {
-		Ok(Some(format!("({value}, false)")))
-	} else {
-		let _ = base_type;
-		Ok(Some(value))
+		return Ok(Some(format!("({value}, false)")));
 	}
+
+	Ok(Some(value))
 }

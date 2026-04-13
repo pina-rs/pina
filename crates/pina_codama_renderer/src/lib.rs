@@ -49,6 +49,7 @@ pub fn render_idl_file(path: &Path, crate_dir: &Path, config: &RenderConfig) -> 
 
 pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig) -> Result<()> {
 	ensure_crate_scaffold(crate_dir, root.program.name.as_ref())?;
+
 	let generated_dir = crate_dir.join(&config.generated_folder);
 
 	if config.delete_folder_before_rendering && generated_dir.exists() {
@@ -61,6 +62,7 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 	}
 
 	let files = render_program_to_files(root)?;
+
 	write_files(&generated_dir, files)
 }
 
@@ -77,6 +79,7 @@ fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>>
 	let program = &root.program;
 	let mut files = BTreeMap::new();
 
+	// Build program metadata
 	let program_constants = std::iter::once(&root.program)
 		.chain(root.additional_programs.iter())
 		.collect::<Vec<_>>();
@@ -88,12 +91,14 @@ fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>>
 		.map(|pda| (pda.name.as_ref().to_string(), pda))
 		.collect::<BTreeMap<_, _>>();
 
+	// Core module files
 	files.insert(PathBuf::from("mod.rs"), page(&render_root_mod(program)));
 	files.insert(
 		PathBuf::from("programs.rs"),
 		page(&render_programs_mod(&program_constants)),
 	);
 
+	// Account files
 	if !program.accounts.is_empty() {
 		files.insert(
 			PathBuf::from("accounts/mod.rs"),
@@ -102,42 +107,47 @@ fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>>
 
 		for account in &program.accounts {
 			let filename = format!("accounts/{}.rs", snake(account.name.as_ref()));
-			let account_content = render_account_page(
-				account,
-				&primary_program_const,
-				pdas_by_name
-					.get(account.pda.as_ref().map_or("", |p| p.name.as_ref()))
-					.copied(),
-			)?;
+			let pda = pdas_by_name
+				.get(account.pda.as_ref().map_or("", |p| p.name.as_ref()))
+				.copied();
+			let account_content = render_account_page(account, &primary_program_const, pda)?;
+
 			files.insert(PathBuf::from(filename), page(&account_content));
 		}
 	}
 
+	// Instruction files
 	if !program.instructions.is_empty() {
 		files.insert(
 			PathBuf::from("instructions/mod.rs"),
 			page(&render_instructions_mod(&program.instructions)),
 		);
+
 		for instruction in &program.instructions {
 			let filename = format!("instructions/{}.rs", snake(instruction.name.as_ref()));
 			let instruction_content =
 				render_instruction_page(instruction, program, &primary_program_const)?;
+
 			files.insert(PathBuf::from(filename), page(&instruction_content));
 		}
 	}
 
+	// Type definitions
 	if !program.defined_types.is_empty() {
 		files.insert(
 			PathBuf::from("types/mod.rs"),
 			page(&render_defined_types_mod(&program.defined_types)),
 		);
+
 		for defined_type in &program.defined_types {
 			let filename = format!("types/{}.rs", snake(defined_type.name.as_ref()));
 			let defined_type_content = render_defined_type_page(defined_type)?;
+
 			files.insert(PathBuf::from(filename), page(&defined_type_content));
 		}
 	}
 
+	// Error definitions
 	if !program.errors.is_empty() {
 		files.insert(
 			PathBuf::from("errors/mod.rs"),

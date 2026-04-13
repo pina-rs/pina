@@ -60,6 +60,7 @@ pub struct Realloc2Accounts<'a> {
 fn validate_realloc_delta(current_len: usize, new_len: usize) -> ProgramResult {
 	if new_len > current_len {
 		let delta = new_len - current_len;
+
 		if delta > MAX_PERMITTED_DATA_INCREASE {
 			return Err(ReallocError::AccountReallocExceedsLimit.into());
 		}
@@ -86,6 +87,7 @@ impl<'a> ProcessAccountInfos<'a> for ReallocAccounts<'a> {
 		self.system_program.assert_address(&system::ID)?;
 
 		validate_realloc_delta(self.sample.data_len(), target_len)?;
+
 		self.sample.resize(target_len)
 	}
 }
@@ -108,6 +110,7 @@ impl<'a> ProcessAccountInfos<'a> for Realloc2Accounts<'a> {
 		validate_realloc_delta(self.sample2.data_len(), second_target_len)?;
 
 		self.sample1.resize(base_len)?;
+
 		self.sample2.resize(second_target_len)
 	}
 }
@@ -125,6 +128,7 @@ pub mod entrypoint {
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: ReallocInstruction = parse_instruction(program_id, &ID, data)?;
+
 		match instruction {
 			ReallocInstruction::Realloc => ReallocAccounts::try_from(accounts)?.process(data),
 			ReallocInstruction::Realloc2 => Realloc2Accounts::try_from(accounts)?.process(data),

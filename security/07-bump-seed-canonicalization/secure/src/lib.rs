@@ -61,6 +61,7 @@ impl<'a> ProcessAccountInfos<'a> for CreateAccounts<'a> {
 			create_program_account::<Data>(self.data, self.authority, &ID, seeds)?;
 
 		let data_account = self.data.as_account_mut::<Data>(&ID)?;
+
 		*data_account = Data::builder()
 			.authority(*self.authority.address())
 			.value(args.value)

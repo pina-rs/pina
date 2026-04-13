@@ -57,12 +57,14 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 			.assert_type::<VaultState>(&ID)?;
 
 		let vault = self.vault.as_account::<VaultState>(&ID)?;
+
 		// Also verify the authority matches the vault's stored authority.
 		self.authority.assert_address(&vault.authority)?;
 
 		let vault = self.vault.as_account_mut::<VaultState>(&ID)?;
 		let current: u64 = vault.balance.into();
 		let amount: u64 = args.amount.into();
+
 		vault.balance = PodU64::from_primitive(checked_withdraw_balance(current, amount)?);
 
 		Ok(())

@@ -50,9 +50,11 @@ pub fn extract_dispatch_map(file: &File) -> Vec<DispatchEntry> {
 
 fn extract_from_fn_body(stmts: &[Stmt], entries: &mut Vec<DispatchEntry>) {
 	for stmt in stmts {
-		if let Stmt::Expr(expr, _) = stmt {
-			extract_from_expr(expr, entries);
-		}
+		let Stmt::Expr(expr, _) = stmt else {
+			continue;
+		};
+
+		extract_from_expr(expr, entries);
 	}
 }
 
@@ -60,18 +62,24 @@ fn extract_from_expr(expr: &Expr, entries: &mut Vec<DispatchEntry>) {
 	match expr {
 		Expr::Match(m) => {
 			for arm in &m.arms {
-				if let Some(entry) = parse_match_arm(arm) {
-					entries.push(entry);
-				}
+				let Some(entry) = parse_match_arm(arm) else {
+					continue;
+				};
+
+				entries.push(entry);
 			}
 		}
+
 		Expr::Block(b) => {
 			for stmt in &b.block.stmts {
-				if let Stmt::Expr(expr, _) = stmt {
-					extract_from_expr(expr, entries);
-				}
+				let Stmt::Expr(expr, _) = stmt else {
+					continue;
+				};
+
+				extract_from_expr(expr, entries);
 			}
 		}
+
 		_ => {}
 	}
 }

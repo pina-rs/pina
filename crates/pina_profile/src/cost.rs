@@ -62,10 +62,10 @@ pub fn estimate_instruction_cu(instruction_bytes: &[u8; 8]) -> u64 {
 	let src_reg = instruction_bytes[1] >> 4;
 
 	if opcode == BPF_CALL_IMM && src_reg == 0 {
-		CU_PER_SYSCALL
-	} else {
-		CU_PER_INSTRUCTION
+		return CU_PER_SYSCALL;
 	}
+
+	CU_PER_INSTRUCTION
 }
 
 /// Per-function CU profile.

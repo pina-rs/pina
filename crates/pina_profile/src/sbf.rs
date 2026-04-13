@@ -55,10 +55,12 @@ fn estimate_range(text_bytes: &[u8], start: u64, size: u64) -> (u64, u64, u64) {
 pub fn analyze_functions(elf: &ElfInfo) -> Vec<FunctionProfile> {
 	let text_len = elf.text_bytes.len() as u64;
 
+	// Handle empty text section
 	if text_len == 0 {
 		return vec![];
 	}
 
+	// No symbols: report entire text as a single function
 	if elf.symbols.is_empty() {
 		let (instruction_count, syscall_count, estimated_cu) =
 			estimate_range(&elf.text_bytes, 0, text_len);
@@ -75,6 +77,7 @@ pub fn analyze_functions(elf: &ElfInfo) -> Vec<FunctionProfile> {
 	let mut functions = Vec::new();
 	let mut covered_up_to: u64 = 0;
 
+	// Process each symbol in address order
 	for (i, sym) in elf.symbols.iter().enumerate() {
 		let sym_offset = sym.address.saturating_sub(elf.text_vaddr);
 
@@ -143,6 +146,7 @@ pub fn analyze_functions(elf: &ElfInfo) -> Vec<FunctionProfile> {
 		}
 	}
 
+	// Sort by estimated CU (highest first)
 	functions.sort_by_key(|f| Reverse(f.estimated_cu));
 
 	functions

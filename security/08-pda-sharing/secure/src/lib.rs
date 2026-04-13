@@ -74,6 +74,7 @@ impl<'a> ProcessAccountInfos<'a> for CreateConfigAccounts<'a> {
 			create_program_account::<UserConfig>(self.config, self.authority, &ID, seeds)?;
 
 		let config = self.config.as_account_mut::<UserConfig>(&ID)?;
+
 		*config = UserConfig::builder()
 			.authority(*self.authority.address())
 			.setting(args.setting)
