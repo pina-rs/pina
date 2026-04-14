@@ -1,6 +1,6 @@
 # Pina Coding Style Guide
 
-This guide defines the visual organization and aesthetic patterns for the Pina codebase. It complements the automated formatters (`dprint`, `rustfmt`) and focuses on readability, maintainability, and consistency.
+This guide defines the visual organization and aesthetic patterns for the Pina codebase. It complements the automated formatting workflow (`fix:format`, `dprint fmt`) and focuses on readability, maintainability, and consistency.
 
 ## Philosophy
 
@@ -18,7 +18,7 @@ Code is read far more often than it is written. Optimize for the reader.
 ### Rust
 
 - **Edition**: 2024
-- **Formatter**: `rustfmt` with `rustfmt.toml` configuration
+- **Formatter**: `fix:format` or `dprint fmt` (do not run `rustfmt` directly)
 - **Style Edition**: 2024
 - **Tabs**: Hard tabs (indent width: 2 for dprint, configured in rustfmt)
 - **Max Width**: 100 characters
@@ -402,7 +402,7 @@ dprint fmt <file-path>
 
 ### Rust Formatting
 
-The project uses `rustfmt.toml` with these key settings:
+The project uses `rustfmt.toml` settings through the repository formatting workflow:
 
 - `hard_tabs = true` - Use tabs for indentation
 - `max_width = 100` - Wrap lines at 100 characters

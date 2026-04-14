@@ -379,31 +379,29 @@ fn discriminator_impl(
 		let existing_derives_result =
 			derive_attr.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated);
 
-		let Ok(mut existing_derives) = existing_derives_result else {
-			// No derive attribute exists, so create one
-			let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
-			item_enum.attrs.push(new_derive_attr);
+		if let Ok(mut existing_derives) = existing_derives_result {
+			let existing_derive_names: std::collections::HashSet<String> = existing_derives
+				.iter()
+				.map(|p| p.segments.last().unwrap().ident.to_string())
+				.collect();
 
-			return quote! { #item_enum };
-		};
-
-		let existing_derive_names: std::collections::HashSet<String> = existing_derives
-			.iter()
-			.map(|p| p.segments.last().unwrap().ident.to_string())
-			.collect();
-
-		for derive_to_add in &derives_to_add {
-			let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
-			if !existing_derive_names.contains(&to_add_name) {
-				existing_derives.push(derive_to_add.clone());
+			for derive_to_add in &derives_to_add {
+				let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
+				if !existing_derive_names.contains(&to_add_name) {
+					existing_derives.push(derive_to_add.clone());
+				}
 			}
+
+			let new_derive_attr: Attribute = syn::parse_quote! {
+				#[derive(#existing_derives)]
+			};
+
+			*derive_attr = new_derive_attr;
+		} else {
+			// Derive attribute exists but failed to parse; replace with defaults
+			let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
+			*derive_attr = new_derive_attr;
 		}
-
-		let new_derive_attr: Attribute = syn::parse_quote! {
-			#[derive(#existing_derives)]
-		};
-
-		*derive_attr = new_derive_attr;
 	} else {
 		// No derive attribute exists, so create one
 		let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
@@ -748,31 +746,29 @@ fn account_impl(
 		let existing_derives_result =
 			derive_attr.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated);
 
-		let Ok(mut existing_derives) = existing_derives_result else {
-			// Failed to parse derives, create new one
-			let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
-			item_struct.attrs.push(new_derive_attr);
+		if let Ok(mut existing_derives) = existing_derives_result {
+			let existing_derive_names: std::collections::HashSet<String> = existing_derives
+				.iter()
+				.map(|p| p.segments.last().unwrap().ident.to_string())
+				.collect();
 
-			return quote! { #item_struct };
-		};
-
-		let existing_derive_names: std::collections::HashSet<String> = existing_derives
-			.iter()
-			.map(|p| p.segments.last().unwrap().ident.to_string())
-			.collect();
-
-		for derive_to_add in &derives_to_add {
-			let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
-			if !existing_derive_names.contains(&to_add_name) {
-				existing_derives.push(derive_to_add.clone());
+			for derive_to_add in &derives_to_add {
+				let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
+				if !existing_derive_names.contains(&to_add_name) {
+					existing_derives.push(derive_to_add.clone());
+				}
 			}
+
+			let new_derive_attr: Attribute = syn::parse_quote! {
+				#[derive(#existing_derives)]
+			};
+
+			*derive_attr = new_derive_attr;
+		} else {
+			// Derive attribute exists but failed to parse; replace with defaults
+			let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
+			*derive_attr = new_derive_attr;
 		}
-
-		let new_derive_attr: Attribute = syn::parse_quote! {
-			#[derive(#existing_derives)]
-		};
-
-		*derive_attr = new_derive_attr;
 	} else {
 		// No derive attribute exists, so create one
 		let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
@@ -1140,31 +1136,29 @@ fn instruction_impl(
 		let existing_derives_result =
 			derive_attr.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated);
 
-		let Ok(mut existing_derives) = existing_derives_result else {
-			// Failed to parse derives, create new one
-			let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
-			item_struct.attrs.push(new_derive_attr);
+		if let Ok(mut existing_derives) = existing_derives_result {
+			let existing_derive_names: std::collections::HashSet<String> = existing_derives
+				.iter()
+				.map(|p| p.segments.last().unwrap().ident.to_string())
+				.collect();
 
-			return quote! { #item_struct };
-		};
-
-		let existing_derive_names: std::collections::HashSet<String> = existing_derives
-			.iter()
-			.map(|p| p.segments.last().unwrap().ident.to_string())
-			.collect();
-
-		for derive_to_add in &derives_to_add {
-			let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
-			if !existing_derive_names.contains(&to_add_name) {
-				existing_derives.push(derive_to_add.clone());
+			for derive_to_add in &derives_to_add {
+				let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
+				if !existing_derive_names.contains(&to_add_name) {
+					existing_derives.push(derive_to_add.clone());
+				}
 			}
+
+			let new_derive_attr: Attribute = syn::parse_quote! {
+				#[derive(#existing_derives)]
+			};
+
+			*derive_attr = new_derive_attr;
+		} else {
+			// Derive attribute exists but failed to parse; replace with defaults
+			let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
+			*derive_attr = new_derive_attr;
 		}
-
-		let new_derive_attr: Attribute = syn::parse_quote! {
-			#[derive(#existing_derives)]
-		};
-
-		*derive_attr = new_derive_attr;
 	} else {
 		// No derive attribute exists, so create one
 		let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
@@ -1445,31 +1439,29 @@ fn event_impl(
 		let existing_derives_result =
 			derive_attr.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated);
 
-		let Ok(mut existing_derives) = existing_derives_result else {
-			// Failed to parse derives, create new one
-			let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
-			item_struct.attrs.push(new_derive_attr);
+		if let Ok(mut existing_derives) = existing_derives_result {
+			let existing_derive_names: std::collections::HashSet<String> = existing_derives
+				.iter()
+				.map(|p| p.segments.last().unwrap().ident.to_string())
+				.collect();
 
-			return quote! { #item_struct };
-		};
-
-		let existing_derive_names: std::collections::HashSet<String> = existing_derives
-			.iter()
-			.map(|p| p.segments.last().unwrap().ident.to_string())
-			.collect();
-
-		for derive_to_add in &derives_to_add {
-			let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
-			if !existing_derive_names.contains(&to_add_name) {
-				existing_derives.push(derive_to_add.clone());
+			for derive_to_add in &derives_to_add {
+				let to_add_name = derive_to_add.segments.last().unwrap().ident.to_string();
+				if !existing_derive_names.contains(&to_add_name) {
+					existing_derives.push(derive_to_add.clone());
+				}
 			}
+
+			let new_derive_attr: Attribute = syn::parse_quote! {
+				#[derive(#existing_derives)]
+			};
+
+			*derive_attr = new_derive_attr;
+		} else {
+			// Derive attribute exists but failed to parse; replace with defaults
+			let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
+			*derive_attr = new_derive_attr;
 		}
-
-		let new_derive_attr: Attribute = syn::parse_quote! {
-			#[derive(#existing_derives)]
-		};
-
-		*derive_attr = new_derive_attr;
 	} else {
 		// No derive attribute exists, so create one
 		let new_derive_attr: Attribute = syn::parse_quote!(#[derive(#(#derives_to_add),*)]);
