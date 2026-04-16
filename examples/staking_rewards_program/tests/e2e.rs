@@ -3,7 +3,7 @@
 //! These tests exercise the OpenPosition instruction (which performs a
 //! system-program CPI to create the position PDA), the Withdraw instruction
 //! (which only updates on-chain state — no token CPI), and various validation
-//! error paths for Deposit and Withdraw.
+//! error paths for Deposit, Withdraw, and Claim.
 //!
 //! ## Prerequisites
 //!
@@ -37,6 +37,7 @@ use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
 use solana_pubkey::Pubkey;
+use staking_rewards_program::ClaimInstruction;
 use staking_rewards_program::DepositInstruction;
 use staking_rewards_program::OpenPositionInstruction;
 use staking_rewards_program::PoolState;
@@ -236,6 +237,12 @@ fn withdraw_ix_data(amount: u64) -> Vec<u8> {
 	let ix = WithdrawInstruction::builder()
 		.amount(PodU64::from_primitive(amount))
 		.build();
+	ix.to_bytes().to_vec()
+}
+
+/// Instruction bytes for `Claim`.
+fn claim_ix_data() -> Vec<u8> {
+	let ix = ClaimInstruction::builder().build();
 	ix.to_bytes().to_vec()
 }
 
@@ -608,6 +615,156 @@ fn withdraw_from_paused_pool_fails() {
 	);
 }
 
+/// Trying to withdraw from a position owned by a different signer must fail
+/// with `Unauthorized`.
+#[test]
+fn withdraw_wrong_owner_fails() {
+	let Some(mollusk) = try_create_mollusk() else {
+		eprintln!("{SKIP_MSG}");
+		return;
+	};
+
+	let user_a = Pubkey::new_unique();
+	let user_b = Pubkey::new_unique();
+	let stake_mint = Pubkey::new_unique();
+	let pool_state_key = Pubkey::new_unique();
+	let position_state_key = Pubkey::new_unique();
+	let admin = Pubkey::new_unique();
+	let reward_mint = Pubkey::new_unique();
+	let user_b_stake_ata = derive_ata(&user_b, &stake_mint);
+
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
+	let pos_lamports = mollusk
+		.sysvars
+		.rent
+		.minimum_balance(size_of::<PositionState>());
+
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&withdraw_ix_data(25),
+		vec![
+			AccountMeta::new(user_b, true),
+			AccountMeta::new_readonly(stake_mint, false),
+			AccountMeta::new(pool_state_key, false),
+			AccountMeta::new(position_state_key, false),
+			AccountMeta::new(user_b_stake_ata, false),
+			AccountMeta::new_readonly(spl_token_program_id(), false),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+		],
+	);
+
+	let accounts = vec![
+		(
+			user_b,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
+		(stake_mint, mock_mint_account(1_000_000)),
+		(
+			pool_state_key,
+			pool_state_account(
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				200,
+				false,
+				0,
+				pool_lamports,
+			),
+		),
+		(
+			position_state_key,
+			position_state_account(&pool_state_key, &user_a, 100, 0, 0, 0, pos_lamports),
+		),
+		(
+			user_b_stake_ata,
+			Account::new(1, 165, &spl_token_program_id()),
+		),
+		token_program_account(),
+		keyed_account_for_system_program(),
+	];
+
+	mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(StakingError::Unauthorized.into())],
+	);
+}
+
+/// Trying to withdraw from a position bound to a different pool must fail
+/// with `InvalidPool`.
+#[test]
+fn withdraw_wrong_pool_fails() {
+	let Some(mollusk) = try_create_mollusk() else {
+		eprintln!("{SKIP_MSG}");
+		return;
+	};
+
+	let user = Pubkey::new_unique();
+	let stake_mint = Pubkey::new_unique();
+	let pool_state_key = Pubkey::new_unique();
+	let other_pool_key = Pubkey::new_unique();
+	let position_state_key = Pubkey::new_unique();
+	let admin = Pubkey::new_unique();
+	let reward_mint = Pubkey::new_unique();
+	let user_stake_ata = derive_ata(&user, &stake_mint);
+
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
+	let pos_lamports = mollusk
+		.sysvars
+		.rent
+		.minimum_balance(size_of::<PositionState>());
+
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&withdraw_ix_data(25),
+		vec![
+			AccountMeta::new(user, true),
+			AccountMeta::new_readonly(stake_mint, false),
+			AccountMeta::new(pool_state_key, false),
+			AccountMeta::new(position_state_key, false),
+			AccountMeta::new(user_stake_ata, false),
+			AccountMeta::new_readonly(spl_token_program_id(), false),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+		],
+	);
+
+	let accounts = vec![
+		(
+			user,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
+		(stake_mint, mock_mint_account(1_000_000)),
+		(
+			pool_state_key,
+			pool_state_account(
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				200,
+				false,
+				0,
+				pool_lamports,
+			),
+		),
+		(
+			position_state_key,
+			position_state_account(&other_pool_key, &user, 100, 0, 0, 0, pos_lamports),
+		),
+		(
+			user_stake_ata,
+			Account::new(1, 165, &spl_token_program_id()),
+		),
+		token_program_account(),
+		keyed_account_for_system_program(),
+	];
+
+	mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(StakingError::InvalidPool.into())],
+	);
+}
+
 // ---------------------------------------------------------------------------
 // Deposit Error Path Tests
 //
@@ -762,5 +919,87 @@ fn deposit_wrong_owner_fails() {
 		&instruction,
 		&accounts,
 		&[Check::err(StakingError::InvalidAmount.into())],
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Claim Error Path Tests
+//
+// Full `Claim` execution also ends with an ATA CPI (`CreateIdempotent`), so we
+// exercise only validation paths that fire before that CPI.
+// ---------------------------------------------------------------------------
+
+/// Claiming rewards for a position bound to a different pool must fail with
+/// `InvalidPool` before any ATA CPI is attempted.
+#[test]
+fn claim_wrong_pool_fails() {
+	let Some(mollusk) = try_create_mollusk() else {
+		eprintln!("{SKIP_MSG}");
+		return;
+	};
+
+	let user = Pubkey::new_unique();
+	let reward_mint = Pubkey::new_unique();
+	let pool_state_key = Pubkey::new_unique();
+	let other_pool_key = Pubkey::new_unique();
+	let position_state_key = Pubkey::new_unique();
+	let admin = Pubkey::new_unique();
+	let stake_mint = Pubkey::new_unique();
+	let user_reward_ata = derive_ata(&user, &reward_mint);
+
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
+	let pos_lamports = mollusk
+		.sysvars
+		.rent
+		.minimum_balance(size_of::<PositionState>());
+
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&claim_ix_data(),
+		vec![
+			AccountMeta::new(user, true),
+			AccountMeta::new_readonly(reward_mint, false),
+			AccountMeta::new(pool_state_key, false),
+			AccountMeta::new(position_state_key, false),
+			AccountMeta::new(user_reward_ata, false),
+			AccountMeta::new_readonly(spl_token_program_id(), false),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+		],
+	);
+
+	let accounts = vec![
+		(
+			user,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
+		(reward_mint, mock_mint_account(1_000_000)),
+		(
+			pool_state_key,
+			pool_state_account(
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				0,
+				false,
+				0,
+				pool_lamports,
+			),
+		),
+		(
+			position_state_key,
+			position_state_account(&other_pool_key, &user, 0, 0, 0, 0, pos_lamports),
+		),
+		(
+			user_reward_ata,
+			Account::new(1, 165, &spl_token_program_id()),
+		),
+		token_program_account(),
+		keyed_account_for_system_program(),
+	];
+
+	mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(StakingError::InvalidPool.into())],
 	);
 }

@@ -60,6 +60,8 @@ pub enum StakingError {
 	InvalidAmount = 0,
 	PoolPaused = 1,
 	InsufficientBalance = 2,
+	Unauthorized = 3,
+	InvalidPool = 4,
 }
 
 #[discriminator]
@@ -454,6 +456,12 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 		if bool::from(pool_state.paused) {
 			return Err(StakingError::PoolPaused.into());
 		}
+		self.pool_state
+			.assert_address(&position_state.pool)
+			.map_err(|_| ProgramError::from(StakingError::InvalidPool))?;
+		self.user
+			.assert_address(&position_state.owner)
+			.map_err(|_| ProgramError::from(StakingError::Unauthorized))?;
 
 		let staked_amount = u64::from(position_state.staked_amount);
 		if amount > staked_amount {
@@ -503,9 +511,12 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		if bool::from(pool_state.paused) {
 			return Err(StakingError::PoolPaused.into());
 		}
-		if position_state.owner != *self.user.address() {
-			return Err(StakingError::InvalidAmount.into());
-		}
+		self.pool_state
+			.assert_address(&position_state.pool)
+			.map_err(|_| ProgramError::from(StakingError::InvalidPool))?;
+		self.user
+			.assert_address(&position_state.owner)
+			.map_err(|_| ProgramError::from(StakingError::Unauthorized))?;
 
 		// Calculate and update pending rewards
 		let next_pending = u64::from(position_state.pending_rewards)

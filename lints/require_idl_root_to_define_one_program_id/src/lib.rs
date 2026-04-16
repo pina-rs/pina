@@ -11,9 +11,12 @@ use std::cell::Cell;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
 use rustc_lint::LintContext;
+use rustc_span::hygiene::ExpnKind;
+use rustc_span::hygiene::MacroKind;
 
 thread_local! {
 	static DECLARE_ID_COUNT: Cell<usize> = const { Cell::new(0) };
+	static HAS_MATCHED_ITEMS: Cell<bool> = const { Cell::new(false) };
 }
 
 dylint_linting::declare_late_lint! {
@@ -36,6 +39,17 @@ dylint_linting::declare_late_lint! {
 	"IDL-oriented example crates should define exactly one program ID at the crate root"
 }
 
+fn is_declare_id_expansion(item: &rustc_hir::Item<'_>, def_path: &str) -> bool {
+	if !def_path.ends_with("::ID") || !item.span.from_expansion() {
+		return false;
+	}
+
+	matches!(
+		item.span.ctxt().outer_expn_data().kind,
+		ExpnKind::Macro(MacroKind::Bang, macro_name) if macro_name.as_str() == "declare_id"
+	)
+}
+
 impl<'tcx> LateLintPass<'tcx> for RequireIdlRootToDefineOneProgramId {
 	fn check_item(&mut self, cx: &LateContext<'tcx>, item: &'tcx rustc_hir::Item<'tcx>) {
 		let def_path = cx.tcx.def_path_str(item.owner_id.def_id.to_def_id());
@@ -43,16 +57,19 @@ impl<'tcx> LateLintPass<'tcx> for RequireIdlRootToDefineOneProgramId {
 			return;
 		}
 
-		if let Ok(snippet) = cx.sess().source_map().span_to_snippet(item.span) {
-			if snippet.contains("declare_id!") {
-				DECLARE_ID_COUNT.with(|count| count.set(count.get() + 1));
-			}
+		HAS_MATCHED_ITEMS.with(|flag| flag.set(true));
+		if is_declare_id_expansion(item, &def_path) {
+			DECLARE_ID_COUNT.with(|count| count.set(count.get() + 1));
 		}
 	}
 
 	fn check_crate_post(&mut self, cx: &LateContext<'tcx>) {
 		let declare_id_count = DECLARE_ID_COUNT.with(Cell::get);
-		if declare_id_count == 1 {
+		let has_matched_items = HAS_MATCHED_ITEMS.with(Cell::get);
+		DECLARE_ID_COUNT.with(|count| count.set(0));
+		HAS_MATCHED_ITEMS.with(|flag| flag.set(false));
+
+		if !has_matched_items || declare_id_count == 1 {
 			return;
 		}
 
@@ -66,6 +83,5 @@ impl<'tcx> LateLintPass<'tcx> for RequireIdlRootToDefineOneProgramId {
 				 modules",
 			);
 		});
-		DECLARE_ID_COUNT.with(|count| count.set(0));
 	}
 }

@@ -31,13 +31,51 @@ dylint_linting::declare_late_lint! {
 }
 
 const TARGET_NEEDLES: &[&str] = &["process", "process_instruction", "instruction", "sysvar"];
-const REQUIRED_METHODS: &[&str] = &["assert_sysvar"];
+const KNOWN_SYSVAR_NAMES: &[&str] = &[
+	"clock",
+	"epoch_rewards",
+	"epoch_schedule",
+	"fees",
+	"instructions",
+	"last_restart_slot",
+	"recent_blockhashes",
+	"rent",
+	"rewards",
+	"slot_hashes",
+	"slot_history",
+	"stake_history",
+];
+
+fn terminal_identifier(value: &str) -> &str {
+	value.rsplit(['.', ':']).next().unwrap_or(value)
+}
+
+fn normalized_tokens(value: &str) -> Vec<String> {
+	value
+		.split(|c: char| !c.is_ascii_alphanumeric())
+		.filter(|token| !token.is_empty())
+		.map(|token| token.to_ascii_lowercase())
+		.collect()
+}
+
+fn matches_sysvar_id(receiver: &str, asserted_id: &str) -> bool {
+	let expected_tokens = normalized_tokens(terminal_identifier(receiver));
+	let asserted_tokens = normalized_tokens(asserted_id);
+	if expected_tokens.is_empty() || asserted_tokens.is_empty() {
+		return false;
+	}
+
+	let mut asserted_iter = asserted_tokens.iter();
+	expected_tokens
+		.iter()
+		.all(|token| asserted_iter.by_ref().any(|candidate| candidate == token))
+}
+
 fn is_sysvar_receiver(name: &str) -> bool {
-	name == "clock"
-		|| name == "rent"
-		|| name == "instructions"
-		|| name.ends_with("_sysvar")
-		|| name.ends_with("_instructions")
+	let terminal = terminal_identifier(name).to_ascii_lowercase();
+	KNOWN_SYSVAR_NAMES.contains(&terminal.as_str())
+		|| terminal.ends_with("_sysvar")
+		|| terminal.ends_with("_instructions")
 }
 
 impl<'tcx> LateLintPass<'tcx> for RequireSysvarAssertBeforeSysvarUse {
@@ -65,22 +103,30 @@ impl<'tcx> LateLintPass<'tcx> for RequireSysvarAssertBeforeSysvarUse {
 
 			let looks_like_sysvar_use = call.receiver.as_deref().is_some_and(is_sysvar_receiver)
 				|| call.path.as_deref().is_some_and(|path| {
-					path.contains("load_current_index")
-						|| path.contains("load_instruction_at")
-						|| path.contains("rent")
-						|| path.contains("clock")
+					let terminal = terminal_identifier(path).to_ascii_lowercase();
+					matches!(
+						terminal.as_str(),
+						"load_current_index" | "load_instruction_at"
+					) || KNOWN_SYSVAR_NAMES.contains(&terminal.as_str())
+						|| terminal.ends_with("_sysvar")
+						|| terminal.ends_with("_instructions")
 				});
 
 			if !looks_like_sysvar_use {
 				continue;
 			}
 
-			let has_guard = shared::has_prior_method_with_receiver_match(
-				&facts.calls,
-				index,
-				REQUIRED_METHODS,
-				&call.receiver,
-			);
+			let has_guard = call.receiver.as_deref().is_some_and(|receiver| {
+				facts.calls[..index].iter().any(|prior| {
+					prior.method == "assert_sysvar"
+						&& prior.receiver.as_deref() == Some(receiver)
+						&& prior
+							.args
+							.first()
+							.and_then(Option::as_deref)
+							.is_some_and(|arg| matches_sysvar_id(receiver, arg))
+				})
+			});
 			if !has_guard {
 				cx.lint(REQUIRE_SYSVAR_ASSERT_BEFORE_SYSVAR_USE, |diag| {
 					diag.span(call.span);

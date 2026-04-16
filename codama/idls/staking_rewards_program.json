@@ -641,6 +641,18 @@
 				"name": "insufficientBalance",
 				"code": 2,
 				"message": ""
+			},
+			{
+				"kind": "errorNode",
+				"name": "unauthorized",
+				"code": 3,
+				"message": ""
+			},
+			{
+				"kind": "errorNode",
+				"name": "invalidPool",
+				"code": 4,
+				"message": ""
 			}
 		]
 	},

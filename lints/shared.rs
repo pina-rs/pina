@@ -16,6 +16,7 @@ pub struct CallInfo {
 	pub method: String,
 	pub receiver: Option<String>,
 	pub path: Option<String>,
+	pub args: Vec<Option<String>>,
 }
 
 #[derive(Debug, Default)]
@@ -32,28 +33,49 @@ pub fn collect_function_facts(body: &Body<'_>) -> FunctionFacts {
 }
 
 pub fn receiver_name(expr: &Expr<'_>) -> Option<String> {
+	expression_identity(expr)
+}
+
+pub fn expression_identity(expr: &Expr<'_>) -> Option<String> {
 	match &expr.kind {
-		ExprKind::Field(_, ident) => Some(ident.name.as_str().to_string()),
-		ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) => {
-			path.segments
-				.last()
-				.map(|seg| seg.ident.name.as_str().to_string())
+		ExprKind::Field(base, ident) => {
+			expression_identity(base).map(|base| format!("{base}.{}", ident.name.as_str()))
 		}
-		ExprKind::MethodCall(_, receiver, ..) => receiver_name(receiver),
-		ExprKind::Match(scrutinee, ..) => receiver_name(scrutinee),
+		ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) => {
+			Some(
+				path.segments
+					.iter()
+					.map(|seg| seg.ident.name.as_str())
+					.collect::<Vec<_>>()
+					.join("::"),
+			)
+		}
+		ExprKind::MethodCall(_, receiver, ..) => expression_identity(receiver),
+		ExprKind::Match(scrutinee, ..) => expression_identity(scrutinee),
+		ExprKind::Unary(_, expr)
+		| ExprKind::Cast(expr, _)
+		| ExprKind::DropTemps(expr)
+		| ExprKind::AddrOf(_, _, expr)
+		| ExprKind::Index(expr, ..) => expression_identity(expr),
+		ExprKind::Block(block, _) => block.expr.and_then(expression_identity),
+		ExprKind::Call(callee, args) => {
+			args.first()
+				.and_then(expression_identity)
+				.or_else(|| expression_identity(callee))
+		}
 		_ => None,
 	}
 }
 
 pub fn has_prior_method_with_receiver_match(
 	calls: &[CallInfo],
-	_index: usize,
+	index: usize,
 	methods: &[&str],
-	_receiver: &Option<String>,
+	receiver: &Option<String>,
 ) -> bool {
-	calls
+	calls[..index]
 		.iter()
-		.any(|call| methods.contains(&call.method.as_str()))
+		.any(|call| methods.contains(&call.method.as_str()) && &call.receiver == receiver)
 }
 
 pub fn should_skip_def_path(def_path: &str) -> bool {
@@ -79,8 +101,9 @@ fn collect_from_expr(expr: &Expr<'_>, facts: &mut FunctionFacts) {
 			facts.calls.push(CallInfo {
 				span: expr.span,
 				method: path_segment.ident.name.as_str().to_string(),
-				receiver: receiver_name(receiver),
+				receiver: expression_identity(receiver),
 				path: None,
+				args: args.iter().map(expression_identity).collect(),
 			});
 		}
 		ExprKind::Call(callee, args) => {
@@ -105,6 +128,7 @@ fn collect_from_expr(expr: &Expr<'_>, facts: &mut FunctionFacts) {
 					method,
 					receiver: None,
 					path: Some(path_name),
+					args: args.iter().map(expression_identity).collect(),
 				});
 			}
 		}
@@ -140,12 +164,12 @@ fn collect_from_expr(expr: &Expr<'_>, facts: &mut FunctionFacts) {
 				collect_from_expr(el, facts);
 			}
 		}
-		ExprKind::Unary(_, e)
-		| ExprKind::Cast(e, _)
-		| ExprKind::DropTemps(e)
-		| ExprKind::AddrOf(_, _, e)
-		| ExprKind::Field(e, _) => {
-			collect_from_expr(e, facts);
+		ExprKind::Unary(_, expr)
+		| ExprKind::Cast(expr, _)
+		| ExprKind::DropTemps(expr)
+		| ExprKind::AddrOf(_, _, expr)
+		| ExprKind::Field(expr, _) => {
+			collect_from_expr(expr, facts);
 		}
 		ExprKind::Binary(_, lhs, rhs) | ExprKind::Assign(lhs, rhs, _) => {
 			collect_from_expr(lhs, facts);

@@ -395,7 +395,7 @@ dprint fmt <file-path>
 ### Pre-commit Checklist
 
 1. **Format**: Run `dprint fmt` on all modified files
-2. **Lint**: Run `cargo clippy --fix` and address remaining warnings
+2. **Lint**: Run `lint:clippy` for clippy-only verification or `lint:all` for the full lint suite, then address remaining warnings
 3. **Test**: Run `cargo test` to ensure changes don't break tests
 
 ## Language-Specific Formatting
