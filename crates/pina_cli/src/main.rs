@@ -156,9 +156,11 @@ fn run_idl(
 			eprintln!("Failed to write {}: {e}", output.display());
 			std::process::exit(1);
 		}
-	} else {
-		println!("{json}");
+
+		return;
 	}
+
+	println!("{json}");
 }
 
 fn run_init(name: &str, path: Option<&std::path::Path>, force: bool) {
@@ -203,16 +205,20 @@ fn run_profile(path: &std::path::Path, json: bool, output: Option<&std::path::Pa
 				std::process::exit(1);
 			}
 		};
+
 		if let Err(e) = pina_profile::output::write_profile(&profile, format, &mut file) {
 			eprintln!("Failed to write profile: {e}");
 			std::process::exit(1);
 		}
-	} else {
-		let mut stdout = std::io::stdout().lock();
-		if let Err(e) = pina_profile::output::write_profile(&profile, format, &mut stdout) {
-			eprintln!("Failed to write profile: {e}");
-			std::process::exit(1);
-		}
+
+		return;
+	}
+
+	let mut stdout = std::io::stdout().lock();
+
+	if let Err(e) = pina_profile::output::write_profile(&profile, format, &mut stdout) {
+		eprintln!("Failed to write profile: {e}");
+		std::process::exit(1);
 	}
 }
 

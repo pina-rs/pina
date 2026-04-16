@@ -100,21 +100,25 @@ fn parse_seed_macro_tokens(tokens: &str, seed_constants: &[SeedConstant]) -> Vec
 	let Some(start) = start else {
 		return Vec::new();
 	};
+
 	// Skip past `& [` or `&[`.
 	let skip = if tokens[start..].starts_with("& [") {
 		3
 	} else {
 		2
 	};
+
 	let rest = &tokens[start + skip..];
 	let Some(end) = find_matching_bracket(rest) else {
 		return Vec::new();
 	};
-	let body = &rest[..end];
 
+	let body = &rest[..end];
 	let mut seeds = Vec::new();
+
 	for element in body.split(',') {
 		let element = element.trim();
+
 		if element.is_empty() {
 			continue;
 		}
@@ -133,8 +137,11 @@ fn parse_seed_macro_tokens(tokens: &str, seed_constants: &[SeedConstant]) -> Vec
 			seeds.push(PdaSeedIr::Constant {
 				value: constant.value.clone(),
 			});
-		} else if element.starts_with('$') || element.starts_with("$ ") {
-			// It's a macro variable — extract the name.
+			continue;
+		}
+
+		// It's a macro variable — extract the name.
+		if element.starts_with('$') || element.starts_with("$ ") {
 			// Tokenized form may be `$ authority` (with space).
 			let var_name = element
 				.trim_start_matches('$')
@@ -144,6 +151,7 @@ fn parse_seed_macro_tokens(tokens: &str, seed_constants: &[SeedConstant]) -> Vec
 				.unwrap_or("unknown")
 				.trim()
 				.to_owned();
+
 			// Default to Address/PublicKey type for variable seeds.
 			seeds.push(PdaSeedIr::Variable {
 				name: var_name,

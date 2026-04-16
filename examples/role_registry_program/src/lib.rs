@@ -40,13 +40,17 @@ pub mod entrypoint {
 			RegistryInstruction::Initialize => {
 				InitializeAccounts::try_from(accounts)?.process(data)
 			}
+
 			RegistryInstruction::AddRole => AddRoleAccounts::try_from(accounts)?.process(data),
+
 			RegistryInstruction::UpdateRole => {
 				UpdateRoleAccounts::try_from(accounts)?.process(data)
 			}
+
 			RegistryInstruction::DeactivateRole => {
 				DeactivateRoleAccounts::try_from(accounts)?.process(data)
 			}
+
 			RegistryInstruction::RotateAdmin => {
 				RotateAdminAccounts::try_from(accounts)?.process(data)
 			}
@@ -234,6 +238,7 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 
 		let registry_config = self.registry_config.as_account::<RegistryConfig>(&ID)?;
 		self.admin.assert_address(&registry_config.admin)?;
+
 		create_program_account_with_bump::<RoleEntry>(
 			self.role_entry,
 			self.admin,
@@ -245,6 +250,7 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 		let role_count = u64::from(registry_config.role_count)
 			.checked_add(1)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
+
 		let role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
 		*role_entry = RoleEntry::builder()
 			.registry(*self.registry_config.address())
@@ -265,6 +271,7 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 impl<'a> ProcessAccountInfos<'a> for UpdateRoleAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
 		let args = UpdateRoleInstruction::try_from_bytes(data)?;
+
 		self.admin.assert_signer()?;
 		self.registry_config
 			.assert_not_empty()?
@@ -277,16 +284,20 @@ impl<'a> ProcessAccountInfos<'a> for UpdateRoleAccounts<'a> {
 
 		let registry_config = self.registry_config.as_account::<RegistryConfig>(&ID)?;
 		let role_entry = self.role_entry.as_account::<RoleEntry>(&ID)?;
+
 		self.admin.assert_address(&registry_config.admin)?;
+
 		if !bool::from(role_entry.active) {
 			return Err(RegistryError::RoleInactive.into());
 		}
+
 		if role_entry.registry != *self.registry_config.address() {
 			return Err(RegistryError::InvalidPermissions.into());
 		}
 
 		let role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
 		role_entry.permissions = args.permissions;
+
 		Ok(())
 	}
 }
@@ -305,16 +316,20 @@ impl<'a> ProcessAccountInfos<'a> for DeactivateRoleAccounts<'a> {
 
 		let registry_config = self.registry_config.as_account::<RegistryConfig>(&ID)?;
 		let role_entry = self.role_entry.as_account::<RoleEntry>(&ID)?;
+
 		self.admin.assert_address(&registry_config.admin)?;
+
 		if role_entry.registry != *self.registry_config.address() {
 			return Err(RegistryError::InvalidPermissions.into());
 		}
+
 		if !bool::from(role_entry.active) {
 			return Err(RegistryError::RoleInactive.into());
 		}
 
 		let role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
 		role_entry.active = PodBool::from_bool(false);
+
 		Ok(())
 	}
 }
@@ -328,9 +343,12 @@ impl<'a> ProcessAccountInfos<'a> for RotateAdminAccounts<'a> {
 			.assert_type::<RegistryConfig>(&ID)?;
 
 		let registry_config = self.registry_config.as_account::<RegistryConfig>(&ID)?;
+
 		self.admin.assert_address(&registry_config.admin)?;
+
 		let registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
 		registry_config.admin = *self.new_admin.address();
+
 		Ok(())
 	}
 }

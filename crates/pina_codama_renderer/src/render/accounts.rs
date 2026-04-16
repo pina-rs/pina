@@ -14,19 +14,23 @@ use crate::error::Result;
 
 pub(crate) fn render_accounts_mod(accounts: &[AccountNode]) -> String {
 	let mut lines = Vec::new();
+
 	for account in accounts {
 		lines.push(format!(
 			"pub(crate) mod r#{};",
 			snake(account.name.as_ref())
 		));
 	}
+
 	lines.push(String::new());
+
 	for account in accounts {
 		lines.push(format!(
 			"pub use self::r#{}::*;",
 			snake(account.name.as_ref())
 		));
 	}
+
 	lines.join("\n")
 }
 
@@ -91,9 +95,11 @@ pub(crate) fn render_account_page(
 	if ctor_args.is_empty() {
 		lines.push("\tpub const fn new() -> Self {".to_string());
 		lines.push("\t\tSelf {".to_string());
+
 		if let Some(discriminator) = &discriminator {
 			lines.push(format!("\t\t\tdiscriminator: {},", discriminator.name));
 		}
+
 		lines.push("\t\t}".to_string());
 		lines.push("\t}".to_string());
 	} else {
@@ -102,9 +108,11 @@ pub(crate) fn render_account_page(
 			ctor_args.join(", ")
 		));
 		lines.push("\t\tSelf {".to_string());
+
 		if let Some(discriminator) = &discriminator {
 			lines.push(format!("\t\t\tdiscriminator: {},", discriminator.name));
 		}
+
 		lines.extend(ctor_inits);
 		lines.push("\t\t}".to_string());
 		lines.push("\t}".to_string());
@@ -198,6 +206,7 @@ fn render_account_pda_helpers(
 				let context = format!("PDA `{}` variable seed `{seed_name}`", pda.name.as_ref());
 				let (param_type, seed_expr) =
 					render_variable_seed_parameter(&seed_name, &variable.r#type, &context)?;
+
 				params.push(format!("{seed_name}: {param_type}"));
 				seed_exprs.push(seed_expr);
 			}
@@ -221,9 +230,11 @@ fn render_account_pda_helpers(
 	));
 	lines.push("\t\tsolana_pubkey::Pubkey::find_program_address(".to_string());
 	lines.push("\t\t\t&[".to_string());
+
 	for seed_expr in &seed_exprs {
 		lines.push(format!("\t\t\t\t{seed_expr},"));
 	}
+
 	lines.push("\t\t\t],".to_string());
 	lines.push(format!("\t\t\t&crate::{primary_program_const},"));
 	lines.push("\t\t)".to_string());
@@ -238,9 +249,11 @@ fn render_account_pda_helpers(
 	));
 	lines.push("\t\tsolana_pubkey::Pubkey::create_program_address(".to_string());
 	lines.push("\t\t\t&[".to_string());
+
 	for seed_expr in &seed_exprs {
 		lines.push(format!("\t\t\t\t{seed_expr},"));
 	}
+
 	lines.push("\t\t\t\t&[bump],".to_string());
 	lines.push("\t\t\t],".to_string());
 	lines.push(format!("\t\t\t&crate::{primary_program_const},"));

@@ -47,6 +47,7 @@ pub struct CodamaGenerateOptions {
 pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, CodamaError> {
 	let examples = collect_examples(options)?;
 
+	// Create output directories.
 	std::fs::create_dir_all(&options.idls_dir).map_err(|source| {
 		CodamaError::CreateDir {
 			path: options.idls_dir.clone(),
@@ -66,6 +67,7 @@ pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, C
 		}
 	})?;
 
+	// Generate IDL JSON files.
 	let mut idl_paths = Vec::with_capacity(examples.len());
 	for example in &examples {
 		let program_path = options.examples_dir.join(example);
@@ -93,6 +95,7 @@ pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, C
 		idl_paths.push(idl_path);
 	}
 
+	// Render Rust clients.
 	let render_config = RenderConfig::default();
 	for (example, idl_path) in examples.iter().zip(idl_paths.iter()) {
 		let crate_dir = options.rust_out.join(example);
@@ -104,6 +107,7 @@ pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, C
 		})?;
 	}
 
+	// Generate JavaScript clients.
 	run_js_generation(options, &idl_paths)?;
 
 	Ok(examples)
@@ -144,14 +148,15 @@ fn collect_examples(options: &CodamaGenerateOptions) -> Result<Vec<String>, Coda
 		}
 	}
 
-	let mut selected = options
+	let mut selected: Vec<_> = options
 		.examples
 		.iter()
 		.cloned()
 		.collect::<BTreeSet<_>>()
 		.into_iter()
-		.collect::<Vec<_>>();
+		.collect();
 	selected.sort();
+
 	Ok(selected)
 }
 
@@ -184,6 +189,7 @@ fn run_js_generation(
 
 	let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
 	let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+
 	let details = if !stderr.is_empty() {
 		format!(": {stderr}")
 	} else if !stdout.is_empty() {
@@ -192,12 +198,14 @@ fn run_js_generation(
 		String::new()
 	};
 
+	let cmd = if options.npx == "npx" {
+		"npx (or fallback pnpm dlx)".to_string()
+	} else {
+		options.npx.clone()
+	};
+
 	Err(CodamaError::CommandFailed {
-		cmd: if options.npx == "npx" {
-			"npx (or fallback pnpm dlx)".to_string()
-		} else {
-			options.npx.clone()
-		},
+		cmd,
 		status: output.status.code().unwrap_or(-1),
 		details,
 	})
@@ -208,6 +216,7 @@ fn run_js_generation_with_npx(
 	idl_paths: &[PathBuf],
 ) -> std::io::Result<Output> {
 	let mut command = Command::new(&options.npx);
+
 	command
 		.arg("-y")
 		.arg("-p")

@@ -103,13 +103,15 @@ pub fn find_duplicate_input_fields(ir: &ProgramIr) -> Vec<DuplicateInputField> {
 		}
 
 		for (name, sources) in &field_sources {
-			if sources.len() > 1 {
-				duplicates.push(DuplicateInputField {
-					instruction: instruction.name.clone(),
-					field_name: (*name).to_owned(),
-					sources: sources.clone(),
-				});
+			if sources.len() <= 1 {
+				continue;
 			}
+
+			duplicates.push(DuplicateInputField {
+				instruction: instruction.name.clone(),
+				field_name: (*name).to_owned(),
+				sources: sources.clone(),
+			});
 		}
 	}
 

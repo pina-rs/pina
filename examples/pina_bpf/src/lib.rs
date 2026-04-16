@@ -46,6 +46,7 @@ pub mod entrypoint {
 		instruction_data: &[u8],
 	) -> ProgramResult {
 		let instruction: PinaBpfInstruction = parse_instruction(program_id, &ID, instruction_data)?;
+
 		match instruction {
 			PinaBpfInstruction::Hello => process_hello(instruction_data),
 		}

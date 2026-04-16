@@ -45,49 +45,52 @@ fn resolve_modules(
 	files: &mut Vec<ResolvedFile>,
 ) -> Result<(), IdlError> {
 	for item in &file.items {
-		if let syn::Item::Mod(item_mod) = item {
-			// Skip inline modules (they're already in the parent file's AST).
-			if item_mod.content.is_some() {
-				continue;
-			}
+		let syn::Item::Mod(item_mod) = item else {
+			continue;
+		};
 
-			let mod_name = item_mod.ident.to_string();
-
-			// Try mod_name.rs first, then mod_name/mod.rs.
-			let candidates = [
-				base_dir.join(format!("{mod_name}.rs")),
-				base_dir.join(&mod_name).join("mod.rs"),
-			];
-
-			let mod_path = candidates.iter().find(|p| p.is_file());
-
-			let Some(mod_path) = mod_path else {
-				// Module file not found — skip silently (could be a cfg-gated
-				// or external module).
-				continue;
-			};
-
-			let source =
-				std::fs::read_to_string(mod_path).map_err(|e| IdlError::io(mod_path, e))?;
-			let mod_file = syn::parse_file(&source).map_err(|e| IdlError::parse(mod_path, &e))?;
-
-			files.push(ResolvedFile {
-				path: mod_path.clone(),
-				file: mod_file.clone(),
-			});
-
-			// Recurse into the resolved module's directory for nested modules.
-			let child_dir = if mod_path.file_name().is_some_and(|n| n == "mod.rs") {
-				mod_path.parent().unwrap_or(base_dir).to_path_buf()
-			} else {
-				// For foo.rs, child modules would be in foo/ directory.
-				base_dir.join(&mod_name)
-			};
-
-			if child_dir.is_dir() {
-				resolve_modules(&child_dir, &mod_file, files)?;
-			}
+		// Skip inline modules (they're already in the parent file's AST).
+		if item_mod.content.is_some() {
+			continue;
 		}
+
+		let mod_name = item_mod.ident.to_string();
+
+		// Try mod_name.rs first, then mod_name/mod.rs.
+		let candidates = [
+			base_dir.join(format!("{mod_name}.rs")),
+			base_dir.join(&mod_name).join("mod.rs"),
+		];
+
+		let mod_path = candidates.iter().find(|p| p.is_file());
+
+		let Some(mod_path) = mod_path else {
+			// Module file not found — skip silently (could be a cfg-gated
+			// or external module).
+			continue;
+		};
+
+		let source = std::fs::read_to_string(mod_path).map_err(|e| IdlError::io(mod_path, e))?;
+		let mod_file = syn::parse_file(&source).map_err(|e| IdlError::parse(mod_path, &e))?;
+
+		files.push(ResolvedFile {
+			path: mod_path.clone(),
+			file: mod_file.clone(),
+		});
+
+		// Recurse into the resolved module's directory for nested modules.
+		let child_dir = if mod_path.file_name().is_some_and(|n| n == "mod.rs") {
+			mod_path.parent().unwrap_or(base_dir).to_path_buf()
+		} else {
+			// For foo.rs, child modules would be in foo/ directory.
+			base_dir.join(&mod_name)
+		};
+
+		if !child_dir.is_dir() {
+			continue;
+		}
+
+		resolve_modules(&child_dir, &mod_file, files)?;
 	}
 
 	Ok(())

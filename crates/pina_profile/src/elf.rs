@@ -42,6 +42,7 @@ pub struct ElfInfo {
 
 /// Parse an ELF binary and extract profiling-relevant information.
 pub fn parse_elf(data: &[u8], path: &Path) -> Result<ElfInfo, ProfileError> {
+	// Parse the ELF file
 	let obj = object::File::parse(data).map_err(|e| {
 		ProfileError::Elf {
 			path: path.to_path_buf(),
@@ -74,6 +75,7 @@ pub fn parse_elf(data: &[u8], path: &Path) -> Result<ElfInfo, ProfileError> {
 		}
 	})?;
 
+	// Extract section metadata
 	let text_vaddr = text_section.address();
 	let text_bytes = text_section.data().map_err(|e| {
 		ProfileError::Elf {
@@ -109,6 +111,7 @@ pub fn parse_elf(data: &[u8], path: &Path) -> Result<ElfInfo, ProfileError> {
 
 	symbols.sort_by_key(|s| s.address);
 
+	// Extract program name from path
 	let program_name = path
 		.file_stem()
 		.and_then(|s| s.to_str())

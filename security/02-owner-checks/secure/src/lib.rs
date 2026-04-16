@@ -42,6 +42,7 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 		let balance = token.amount();
 
 		let amount: u64 = args.amount.into();
+
 		if balance < amount {
 			return Err(ProgramError::InsufficientFunds);
 		}

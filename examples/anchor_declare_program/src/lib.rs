@@ -53,6 +53,7 @@ impl<'a> ProcessAccountInfos<'a> for ValidateExternalProgramAccounts<'a> {
 
 		self.authority.assert_signer()?;
 		assert_external_program_id(self.external_program.address())?;
+
 		self.external_program
 			.assert_address(&external::ID)?
 			.assert_executable()?;

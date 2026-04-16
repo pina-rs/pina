@@ -83,6 +83,7 @@ fn apply_update(
 
 	account.data_f32 = PodU32::from_primitive(data_f32.to_bits());
 	account.data_f64 = PodU64::from_primitive(data_f64.to_bits());
+
 	Ok(())
 }
 

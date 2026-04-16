@@ -128,12 +128,13 @@ macro_rules! seeds_escrow {
 
 impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
+		// Parse instruction and prepare PDA seeds
 		let args = MakeInstruction::try_from_bytes(data)?;
 		let escrow_seeds = seeds_escrow!(self.maker.address().as_ref(), &args.seed.0);
 		let escrow_seeds_with_bump =
 			seeds_escrow!(self.maker.address().as_ref(), &args.seed.0, args.bump);
 
-		// assertions
+		// Validate accounts
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.maker.assert_signer()?;
@@ -157,7 +158,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 				self.token_program.address(),
 			)?;
 
-		// create the program account
+		// Create the escrow account
 		create_program_account_with_bump::<EscrowState>(
 			self.escrow,
 			self.maker,
@@ -166,6 +167,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			args.bump,
 		)?;
 
+		// Initialize escrow state
 		let escrow = self.escrow.as_account_mut::<EscrowState>(&ID)?;
 		*escrow = EscrowState::builder()
 			.maker(*self.maker.address())
@@ -177,6 +179,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			.bump(args.bump)
 			.build();
 
+		// Create the vault token account
 		associated_token_account::instructions::Create {
 			account: self.vault,
 			funding_account: self.maker,
@@ -187,6 +190,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		}
 		.invoke()?;
 
+		// Transfer tokens to vault
 		let decimals = self.mint_a.as_token_mint()?.decimals();
 		token_2022::instructions::TransferChecked {
 			from: self.maker_ata_a,
@@ -220,12 +224,14 @@ pub struct TakeAccounts<'a> {
 
 impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
-		// Validate the discriminator; TakeInstruction has no payload fields.
+		// Parse instruction data
 		let _ = TakeInstruction::try_from_bytes(data)?;
 
-		// -- assertions --
+		// Validate program accounts
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.system_program.assert_address(&system::ID)?;
+
+		// Validate taker accounts
 		self.taker.assert_signer()?.assert_writable()?;
 		self.taker_ata_a
 			.assert_owners(&SPL_PROGRAM_IDS)?
@@ -243,6 +249,8 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 				self.mint_b.address(),
 				self.token_program.address(),
 			)?;
+
+		// Validate escrow state
 		self.escrow
 			.assert_not_empty()?
 			.assert_writable()?
@@ -257,10 +265,12 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			bump,
 			..
 		} = self.escrow.as_account::<EscrowState>(&ID)?;
-		let escrow_seeds_with_bump = seeds_escrow!(self.maker.address().as_ref(), &seed.0, *bump);
 
+		let escrow_seeds_with_bump = seeds_escrow!(self.maker.address().as_ref(), &seed.0, *bump);
 		self.escrow
 			.assert_seeds_with_bump(escrow_seeds_with_bump, &ID)?;
+
+		// Validate maker and mint accounts
 		self.maker.assert_address(maker)?;
 		self.mint_a
 			.assert_owners(&SPL_PROGRAM_IDS)?
@@ -269,6 +279,7 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			.assert_owners(&SPL_PROGRAM_IDS)?
 			.assert_address(mint_b)?;
 
+		// Validate vault and maker ATA
 		self.vault
 			.assert_not_empty()?
 			.assert_writable()?
@@ -286,7 +297,7 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 				self.token_program.address(),
 			)?;
 
-		// create token account if none exists
+		// Create maker's token B account if needed
 		associated_token_account::instructions::CreateIdempotent {
 			funding_account: self.taker,
 			account: self.maker_ata_b,
@@ -297,6 +308,7 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		}
 		.invoke()?;
 
+		// Transfer token B from taker to maker
 		token_2022::instructions::TransferChecked {
 			from: self.taker_ata_b,
 			mint: self.mint_b,
@@ -308,12 +320,14 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		}
 		.invoke()?;
 
+		// Prepare escrow signer for vault operations
 		let bump_as_seeds = [*bump];
 		let escrow_seeds =
 			seeds_escrow!(true, self.maker.address().as_ref(), &seed.0, &bump_as_seeds);
 		let escrow_signer = Signer::from(&escrow_seeds);
 		let signers = [escrow_signer];
 
+		// Transfer token A from vault to taker
 		token_2022::instructions::TransferChecked {
 			from: self.vault,
 			mint: self.mint_a,
@@ -324,6 +338,8 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			token_program: self.token_program.address(),
 		}
 		.invoke_signed(&signers)?;
+
+		// Close vault account
 		token_2022::instructions::CloseAccount {
 			account: self.vault,
 			destination: self.maker,
@@ -332,9 +348,8 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		}
 		.invoke_signed(&signers)?;
 
-		{
-			self.escrow.as_account_mut::<EscrowState>(&ID)?.zeroed();
-		}
+		// Zero out escrow state and close
+		self.escrow.as_account_mut::<EscrowState>(&ID)?.zeroed();
 
 		self.escrow.close_with_recipient(self.maker)
 	}

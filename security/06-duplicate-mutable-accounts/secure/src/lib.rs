@@ -54,6 +54,7 @@ fn checked_transfer_balances(
 	let new_source = source_amount
 		.checked_sub(amount)
 		.ok_or(ProgramError::InsufficientFunds)?;
+
 	let new_dest = dest_amount
 		.checked_add(amount)
 		.ok_or(ProgramError::ArithmeticOverflow)?;
@@ -81,6 +82,7 @@ impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
 
 		let dest = self.dest.as_account_mut::<Balance>(&ID)?;
 		let dest_amount: u64 = dest.amount.into();
+
 		let (new_source, new_dest) = checked_transfer_balances(source_amount, dest_amount, amount)?;
 		source.amount = PodU64::from_primitive(new_source);
 		dest.amount = PodU64::from_primitive(new_dest);

@@ -48,11 +48,13 @@ fn get_account_discriminator_enum(attrs: &[syn::Attribute]) -> Option<String> {
 		if !attr.path().is_ident("account") {
 			continue;
 		}
+
 		let Ok(meta_list) = attr.parse_args_with(
 			syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
 		) else {
 			continue;
 		};
+
 		for meta in &meta_list {
 			if let syn::Meta::NameValue(nv) = meta {
 				if nv.path.is_ident("discriminator") {
@@ -61,6 +63,7 @@ fn get_account_discriminator_enum(attrs: &[syn::Attribute]) -> Option<String> {
 			}
 		}
 	}
+
 	None
 }
 
@@ -93,6 +96,7 @@ fn extract_named_fields(fields: &syn::Fields) -> Vec<FieldIr> {
 				.map_or_else(|| "unknown".to_owned(), ToString::to_string);
 			let rust_type = type_to_string(&f.ty);
 			let docs = extract_docs(&f.attrs);
+
 			FieldIr {
 				name,
 				rust_type,

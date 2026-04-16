@@ -24,6 +24,7 @@ Pina is a Rust workspace for building performant, `no_std` Solana programs on to
 ## Task-specific guidance
 
 - [Build and tooling](./docs/agents/build-and-tooling.md)
+- [Coding style guide](./docs/agents/coding-style.md) — visual organization, whitespace patterns, and code aesthetics
 - [Workspace architecture](./docs/agents/workspace-architecture.md)
 - [Testing and SBF builds](./docs/agents/testing-and-sbf.md)
 - [Release process and changesets](./docs/agents/release-and-changesets.md)

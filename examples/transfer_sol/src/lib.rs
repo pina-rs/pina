@@ -234,6 +234,7 @@ pub mod entrypoint {
 			TransferInstruction::CpiTransfer => {
 				CpiTransferAccounts::try_from(accounts)?.process(data)
 			}
+
 			TransferInstruction::DirectTransfer => {
 				DirectTransferAccounts::try_from(accounts)?.process(data)
 			}

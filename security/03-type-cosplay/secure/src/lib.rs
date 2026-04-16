@@ -58,6 +58,7 @@ impl<'a> ProcessAccountInfos<'a> for AdminActionAccounts<'a> {
 		self.config.assert_type::<AdminConfig>(&ID)?;
 
 		let config = self.config.as_account::<AdminConfig>(&ID)?;
+
 		self.authority.assert_address(&config.authority)?;
 
 		let config_mut = self.config.as_account_mut::<AdminConfig>(&ID)?;

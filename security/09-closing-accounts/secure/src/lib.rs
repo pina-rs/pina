@@ -48,6 +48,7 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAndCloseAccounts<'a> {
 			.assert_type::<RewardState>(&ID)?;
 
 		let reward = self.reward.as_account::<RewardState>(&ID)?;
+
 		self.authority.assert_address(&reward.authority)?;
 
 		// SECURE: Zero the account data first, then close properly.
@@ -56,6 +57,7 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAndCloseAccounts<'a> {
 		{
 			self.reward.as_account_mut::<RewardState>(&ID)?.zeroed();
 		}
+
 		self.reward.close_with_recipient(self.recipient)
 	}
 }

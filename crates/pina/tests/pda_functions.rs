@@ -7,6 +7,7 @@ const SYSTEM_ID: pina::Address = pina::address!("1111111111111111111111111111111
 #[test]
 fn try_find_program_address_returns_some_for_valid_seeds() {
 	let result = try_find_program_address(&[b"test-seed"], &SYSTEM_ID);
+
 	assert!(result.is_some(), "expected to derive a PDA");
 }
 
@@ -74,11 +75,13 @@ fn create_program_address_wrong_bump_fails() {
 #[test]
 fn try_find_program_address_empty_seeds() {
 	let result = try_find_program_address(&[], &SYSTEM_ID);
+
 	assert!(result.is_some(), "empty seeds should still derive a PDA");
 }
 
 #[test]
 fn try_find_program_address_multiple_seeds() {
 	let result = try_find_program_address(&[b"prefix", b"middle", b"suffix"], &SYSTEM_ID);
+
 	assert!(result.is_some(), "multi-seed PDA should derive");
 }

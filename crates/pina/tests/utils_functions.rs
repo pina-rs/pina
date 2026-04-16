@@ -18,6 +18,7 @@ fn parse_instruction_valid_discriminator() {
 	let data = [0u8]; // Initialize = 0
 	let result: TestInstruction = parse_instruction(&PROGRAM_ID, &PROGRAM_ID, &data)
 		.unwrap_or_else(|e| panic!("expected valid parse: {e:?}"));
+
 	assert_eq!(result, TestInstruction::Initialize);
 }
 

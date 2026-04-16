@@ -117,6 +117,7 @@ impl AccountInfoValidation for AccountView {
 		program_id: &Address,
 	) -> Result<&Self, ProgramError> {
 		self.assert_owner(program_id)?;
+
 		let data = self.try_borrow()?;
 
 		if !T::matches_discriminator(&data) {
@@ -172,6 +173,7 @@ impl AccountInfoValidation for AccountView {
 	fn assert_owners(&self, owners: &[Address]) -> Result<&Self, ProgramError> {
 		// SAFETY: see `assert_owner` above.
 		let account_owner = unsafe { self.owner() };
+
 		if owners.contains(account_owner) {
 			return Ok(self);
 		}
@@ -222,6 +224,7 @@ impl AccountInfoValidation for AccountView {
 				program_id.as_ref()
 			);
 			log_caller();
+
 			return Err(ProgramError::InvalidSeeds);
 		};
 
@@ -398,8 +401,10 @@ macro_rules! impl_account_validation {
 				if !condition(self) {
 					log!($label);
 					log_caller();
+
 					return Err(ProgramError::InvalidAccountData);
 				}
+
 				Ok(self)
 			}
 
@@ -408,10 +413,9 @@ macro_rules! impl_account_validation {
 			where
 				F: Fn(&Self) -> bool,
 			{
-				match crate::assert(condition(self), ProgramError::InvalidAccountData, log) {
-					Err(err) => Err(err),
-					Ok(()) => Ok(self),
-				}
+				crate::assert(condition(self), ProgramError::InvalidAccountData, log)?;
+
+				Ok(self)
 			}
 
 			#[track_caller]
@@ -422,8 +426,10 @@ macro_rules! impl_account_validation {
 				if !condition(self) {
 					log!($label);
 					log_caller();
+
 					return Err(ProgramError::InvalidAccountData);
 				}
+
 				Ok(self)
 			}
 
@@ -436,10 +442,9 @@ macro_rules! impl_account_validation {
 			where
 				F: Fn(&Self) -> bool,
 			{
-				match crate::assert(condition(self), ProgramError::InvalidAccountData, log) {
-					Err(err) => Err(err),
-					Ok(()) => Ok(self),
-				}
+				crate::assert(condition(self), ProgramError::InvalidAccountData, log)?;
+
+				Ok(self)
 			}
 		}
 	};
@@ -447,16 +452,19 @@ macro_rules! impl_account_validation {
 
 #[cfg(feature = "token")]
 impl_account_validation!(crate::token::state::Mint, "Mint account data is invalid");
+
 #[cfg(feature = "token")]
 impl_account_validation!(
 	crate::token_2022::state::Mint,
 	"Mint account data is invalid"
 );
+
 #[cfg(feature = "token")]
 impl_account_validation!(
 	crate::token::state::TokenAccount,
 	"Token account data is invalid"
 );
+
 #[cfg(feature = "token")]
 impl_account_validation!(
 	crate::token_2022::state::TokenAccount,
@@ -634,6 +642,7 @@ impl<'a> LamportTransfer<'a> for AccountView {
 		if self.address() == recipient.address() {
 			log!("Could not send lamports: sender and recipient must differ");
 			log_caller();
+
 			return Err(ProgramError::InvalidArgument);
 		}
 

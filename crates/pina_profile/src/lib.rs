@@ -24,6 +24,7 @@ pub use output::OutputFormat;
 /// Returns a [`ProfileError`] if the file cannot be read, is not a valid ELF,
 /// or contains no SBF text sections.
 pub fn profile_program(path: &Path) -> Result<ProgramProfile, ProfileError> {
+	// Read the binary file
 	let data = std::fs::read(path).map_err(|e| {
 		ProfileError::Io {
 			path: path.to_path_buf(),
@@ -31,8 +32,11 @@ pub fn profile_program(path: &Path) -> Result<ProgramProfile, ProfileError> {
 		}
 	})?;
 
+	// Parse ELF and analyze functions
 	let elf_info = elf::parse_elf(&data, path)?;
 	let functions = sbf::analyze_functions(&elf_info);
+
+	// Calculate totals
 	let total_instructions = functions.iter().map(|f| f.instruction_count).sum();
 	let total_syscalls = functions.iter().map(|f| f.syscall_count).sum();
 	let total_cu = functions.iter().map(|f| f.estimated_cu).sum();

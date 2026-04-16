@@ -282,6 +282,7 @@ pub fn allocate_account_with_bump<'a>(
 	let seeds_slice = &combined_seeds[..=seeds.len()];
 	let signer = Signer::from(seeds_slice);
 	let signers = &[signer];
+
 	// Allocate space for account
 	let rent = Rent::get()?;
 
@@ -296,36 +297,39 @@ pub fn allocate_account_with_bump<'a>(
 			owner,
 		}
 		.invoke_signed(signers)?;
-	} else {
-		// Otherwise, if balance is nonzero:
 
-		// 1) transfer sufficient lamports for rent exemption
-		let rent_exempt_balance = rent
-			.try_minimum_balance(space)?
-			.saturating_sub(target_account.lamports());
-		if rent_exempt_balance > 0 {
-			Transfer {
-				from: payer,
-				to: target_account,
-				lamports: rent_exempt_balance,
-			}
-			.invoke_signed(signers)?;
-		}
+		return Ok(());
+	}
 
-		// 2) allocate space for the account
-		Allocate {
-			account: target_account,
-			space: space as u64,
-		}
-		.invoke_signed(signers)?;
+	// Otherwise, if balance is nonzero:
 
-		// 3) assign our program as the owner
-		Assign {
-			account: target_account,
-			owner,
+	// 1) transfer sufficient lamports for rent exemption
+	let rent_exempt_balance = rent
+		.try_minimum_balance(space)?
+		.saturating_sub(target_account.lamports());
+
+	if rent_exempt_balance > 0 {
+		Transfer {
+			from: payer,
+			to: target_account,
+			lamports: rent_exempt_balance,
 		}
 		.invoke_signed(signers)?;
 	}
+
+	// 2) allocate space for the account
+	Allocate {
+		account: target_account,
+		space: space as u64,
+	}
+	.invoke_signed(signers)?;
+
+	// 3) assign our program as the owner
+	Assign {
+		account: target_account,
+		owner,
+	}
+	.invoke_signed(signers)?;
 
 	Ok(())
 }

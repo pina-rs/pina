@@ -178,6 +178,7 @@ pub fn has_instruction_before(
 
 	for i in 0..current_index {
 		let ix = instructions.load_instruction_at(i)?;
+
 		if ix.get_program_id() == program_id {
 			return Ok(true);
 		}

@@ -36,6 +36,7 @@ pub(crate) fn render_constant_discriminator(
 	};
 
 	let (ty, value) = render_constant_discriminator_value(constant_discriminator, context)?;
+
 	Ok(Some(DiscriminatorInfo {
 		name: format!("{}_DISCRIMINATOR", shouty(prefix)),
 		ty,

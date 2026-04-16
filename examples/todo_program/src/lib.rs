@@ -81,11 +81,13 @@ pub struct UpdateAccounts<'a> {
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
+		// Parse instruction and prepare PDA seeds
 		let args = InitializeInstruction::try_from_bytes(data)?;
 		let owner = self.owner.address();
 		let seeds = todo_seeds!(owner.as_ref());
 		let seeds_with_bump = todo_seeds!(owner.as_ref(), args.bump);
 
+		// Validate accounts
 		self.owner.assert_signer()?;
 		self.todo
 			.assert_empty()?
@@ -93,10 +95,12 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			.assert_seeds_with_bump(seeds_with_bump, &ID)?;
 		self.system_program.assert_address(&system::ID)?;
 
+		// Create the PDA account
 		create_program_account_with_bump::<TodoState>(
 			self.todo, self.owner, &ID, seeds, args.bump,
 		)?;
 
+		// Initialize account data
 		let todo = self.todo.as_account_mut::<TodoState>(&ID)?;
 		*todo = TodoState::builder()
 			.owner(*owner)
@@ -111,8 +115,16 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 
 impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
+		// Parse instruction data
 		let owner = self.owner.address();
+		let instruction = parse_instruction::<TodoInstruction>(&ID, &ID, data)?;
 
+		// Reject invalid instruction for this context
+		if instruction == TodoInstruction::Initialize {
+			return Err(ProgramError::InvalidInstructionData);
+		}
+
+		// Validate accounts
 		self.owner.assert_signer()?;
 		self.todo
 			.assert_not_empty()?
@@ -121,22 +133,29 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 
 		let todo = self.todo.as_account::<TodoState>(&ID)?;
 		self.owner.assert_address(&todo.owner)?;
+
 		let seeds_with_bump = todo_seeds!(owner.as_ref(), todo.bump);
 		self.todo.assert_seeds_with_bump(seeds_with_bump, &ID)?;
 
-		match parse_instruction::<TodoInstruction>(&ID, &ID, data)? {
+		// Execute instruction
+		match instruction {
 			TodoInstruction::ToggleCompleted => {
 				let _ = ToggleCompletedInstruction::try_from_bytes(data)?;
 				let todo = self.todo.as_account_mut::<TodoState>(&ID)?;
 				let completed = bool::from(todo.completed);
+
 				todo.completed = PodBool::from_bool(!completed);
 			}
 			TodoInstruction::UpdateDigest => {
 				let args = UpdateDigestInstruction::try_from_bytes(data)?;
 				let todo = self.todo.as_account_mut::<TodoState>(&ID)?;
+
 				todo.digest = args.digest;
 			}
-			TodoInstruction::Initialize => return Err(ProgramError::InvalidInstructionData),
+			TodoInstruction::Initialize => {
+				// Already handled above; unreachable
+				return Err(ProgramError::InvalidInstructionData);
+			}
 		}
 
 		Ok(())

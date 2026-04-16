@@ -172,33 +172,21 @@ pub struct IncrementAccounts<'a> {
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
+		// Parse instruction and prepare PDA seeds
 		let args = InitializeInstruction::try_from_bytes(data)?;
 		let authority_key = self.authority.address();
-
-		// Build the PDA seeds with the bump from instruction data.
 		let seeds = counter_seeds!(authority_key.as_ref());
 		let seeds_with_bump = counter_seeds!(authority_key.as_ref(), args.bump);
 
-		// --- Validate accounts ---
-
-		// The authority must sign the transaction and is the rent payer.
+		// Validate accounts
 		self.authority.assert_signer()?;
-
-		// The counter account must be empty (not yet allocated) and writable.
-		// We also verify the PDA derivation matches the expected seeds + bump.
 		self.counter
 			.assert_empty()?
 			.assert_writable()?
 			.assert_seeds_with_bump(seeds_with_bump, &ID)?;
-
-		// Verify the system program address.
 		self.system_program.assert_address(&system::ID)?;
 
-		// --- Create the PDA account ---
-
-		// `create_program_account_with_bump` issues a `CreateAccount` CPI
-		// to the system program, allocating `size_of::<CounterState>()` bytes
-		// and assigning ownership to this program.
+		// Create the PDA account
 		create_program_account_with_bump::<CounterState>(
 			self.counter,
 			self.authority,
@@ -207,10 +195,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			args.bump,
 		)?;
 
-		// --- Initialize account data ---
-
-		// `as_account_mut` deserializes the raw account bytes into a mutable
-		// reference to `CounterState`, verifying the owner and discriminator.
+		// Initialize account data
 		let counter = self.counter.as_account_mut::<CounterState>(&ID)?;
 		*counter = CounterState::builder()
 			.bump(args.bump)
@@ -225,36 +210,30 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 
 impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
-		// Validate the instruction discriminator.
+		// Validate instruction discriminator
 		let _ = IncrementInstruction::try_from_bytes(data)?;
 
-		// --- Validate accounts ---
-
-		// The authority must sign to prove they own this counter.
+		// Validate accounts
 		self.authority.assert_signer()?;
 
-		// The counter must exist, be writable, be the correct type, and
-		// derive from the expected PDA seeds.
 		let authority_key = self.authority.address();
 		self.counter
 			.assert_not_empty()?
 			.assert_writable()?
 			.assert_type::<CounterState>(&ID)?;
 
-		// Read the current state to get the bump for seed verification.
 		let counter = self.counter.as_account::<CounterState>(&ID)?;
 		let seeds_with_bump = counter_seeds!(authority_key.as_ref(), counter.bump);
 		self.counter.assert_seeds_with_bump(seeds_with_bump, &ID)?;
 
-		// --- Mutate state ---
-
+		// Mutate state
 		let counter = self.counter.as_account_mut::<CounterState>(&ID)?;
 		let current: u64 = counter.count.into();
-		counter.count = PodU64::from_primitive(
-			current
-				.checked_add(1)
-				.ok_or(ProgramError::ArithmeticOverflow)?,
-		);
+		let next = current
+			.checked_add(1)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+
+		counter.count = PodU64::from_primitive(next);
 
 		log!("Counter incremented");
 

@@ -41,6 +41,7 @@ fn run() -> Result<(), RenderError> {
 	for idl_path in &idl_paths {
 		let root = read_root_node(idl_path)?;
 		let output_crate_dir = args.output.join(file_stem(idl_path)?);
+
 		render_root_node(&root, &output_crate_dir, &config)?;
 	}
 

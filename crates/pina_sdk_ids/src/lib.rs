@@ -3,8 +3,6 @@
 //! Each sub-module declares a single `ID` constant via
 //! [`solana_address::declare_id!`]. Import the module and use `module::ID` to
 //! reference the address.
-//! Each module below declares a canonical Solana `ID` constant using
-//! `solana_address::declare_id!`.
 
 #![no_std]
 
