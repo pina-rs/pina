@@ -1,5 +1,5 @@
 [package]
-name = "require_program_check_before_cpi"
+name = "deny_heap_allocations_in_onchain_instruction_handlers"
 version = "0.0.0"
 edition = "2024"
 publish = false

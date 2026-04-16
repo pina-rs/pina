@@ -1,5 +1,5 @@
 [package]
-name = "require_program_check_before_cpi"
+name = "require_canonical_instruction_dispatch_for_idl"
 version = "0.0.0"
 edition = "2024"
 publish = false

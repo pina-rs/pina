@@ -1,5 +1,5 @@
 [package]
-name = "require_program_check_before_cpi"
+name = "require_sysvar_assert_before_sysvar_use"
 version = "0.0.0"
 edition = "2024"
 publish = false

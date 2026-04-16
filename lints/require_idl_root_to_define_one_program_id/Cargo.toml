@@ -1,5 +1,5 @@
 [package]
-name = "require_program_check_before_cpi"
+name = "require_idl_root_to_define_one_program_id"
 version = "0.0.0"
 edition = "2024"
 publish = false

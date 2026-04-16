@@ -138,6 +138,16 @@ libraries = [
 	{ path = "lints/require_owner_before_token_cast" },
 	{ path = "lints/require_empty_before_init" },
 	{ path = "lints/require_program_check_before_cpi" },
+	{ path = "lints/deny_heap_allocations_in_onchain_instruction_handlers" },
+	{ path = "lints/require_program_owned_before_lamport_mutation" },
+	{ path = "lints/require_writable_before_account_resize" },
+	{ path = "lints/require_zeroed_before_close" },
+	{ path = "lints/require_sysvar_assert_before_sysvar_use" },
+	{ path = "lints/require_type_assert_before_zero_copy_cast" },
+	{ path = "lints/require_associated_token_address_before_ata_cast" },
+	{ path = "lints/require_idl_root_to_define_one_program_id" },
+	{ path = "lints/require_canonical_instruction_dispatch_for_idl" },
+	{ path = "lints/require_explicit_discriminators_and_seed_namespaces" },
 ]
 
 [workspace.metadata.bin]
