@@ -30,12 +30,35 @@ pub mod entrypoint {
 	) -> ProgramResult {
 		let ix: MyInstruction = parse_instruction(program_id, &ID, data)?;
 
-		// Add one arm per instruction variant.
+		// Prefer one routed arm per variant when possible.
 		match ix {
 			MyInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
 			MyInstruction::Update => UpdateAccounts::try_from(accounts)?.process(data),
 		}
 	}
+}
+```
+
+### Grouped dispatch with shared accounts
+
+```rust
+match ix {
+	MyInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
+	MyInstruction::Toggle | MyInstruction::Update => {
+		UpdateAccounts::try_from(accounts)?.process(data)
+	}
+}
+```
+
+### Accountless dispatch
+
+```rust
+match ix {
+	MyInstruction::Ping => {
+		let _ = PingInstruction::try_from_bytes(data)?;
+		Ok(())
+	}
+	MyInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
 }
 ```
 
@@ -110,6 +133,40 @@ pub struct MyState {
 ```
 
 <!-- {/pinaIdlCanonicalExamples} -->
+
+<!-- {@pinaIdlDispatchSupport} -->
+
+The extractor currently supports these dispatch shapes:
+
+- Canonical routed arms: `Variant => Accounts::try_from(accounts)?.process(data)`
+- Grouped routed arms: `VariantA | VariantB => SharedAccounts::try_from(accounts)?.process(data)`
+- Accountless arms: `Variant => { let _ = Payload::try_from_bytes(data)?; Ok(()) }`
+- Instruction-only fallback: if Pina finds `#[instruction]` structs but no recognizable dispatch map, it still emits zero-account instruction nodes from those payload structs.
+
+Keep in mind:
+
+- Account metadata is only inferred for routed `Accounts::try_from(accounts)` arms.
+- Signer/writable/PDA/default-account inference still depends on direct `self.field.assert_*()` chains inside `impl ProcessAccountInfos`.
+- If you hide routing or validation behind helper layers, instruction nodes may still exist, but account metadata becomes less complete.
+
+<!-- {/pinaIdlDispatchSupport} -->
+
+<!-- {@pinaIdlVerificationContract} -->
+
+`test:idl` treats the generated IDL as an API contract. It checks that:
+
+- every example regenerates deterministically into `codama/idls`, `codama/clients/js`, and `codama/clients/rust`
+- generated JSON passes Codama's JS validator
+- generated JS clients typecheck
+- generated Rust clients compile
+- for every example, generated instruction/account/error counts match the source declarations:
+  - `#[instruction]`
+  - `#[account]`
+  - `#[error]`
+
+That last count-parity check is important because it catches silent extraction regressions where a program still produces valid JSON, but one or more instruction surfaces disappear.
+
+<!-- {/pinaIdlVerificationContract} -->
 
 <!-- {@pinaDiscriminatorLayoutDecisionMatrix} -->
 

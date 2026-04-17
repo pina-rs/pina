@@ -23,7 +23,7 @@ test:idl
 
 ## Reusable documentation blocks
 
-- Template providers live in `.templates/*.t.md`.
+- Template providers live in `templates/*.t.md`.
 - Run `docs:sync` after changing provider blocks to refresh all consumer blocks.
 - Run `docs:check` (or `verify:docs`) in CI to ensure docs stay synchronized.
 
@@ -35,19 +35,29 @@ update:deps
 
 ## Codama/IDL workflow
 
+<!-- {=codamaWorkflowCommands} -->
+
 ```bash
-# Regenerate all example IDLs.
+# Generate Codama IDLs for all examples.
 codama:idl:all
 
-# Generate clients from Codama JSON.
+# Generate Rust + JS clients.
 codama:clients:generate
 
-# Full Codama pipeline (build CLI, generate IDLs, generate clients, checks).
+# Generate IDLs + Rust/JS clients in one command.
+pina codama generate
+
+# Run the complete Codama pipeline.
 codama:test
 
-# CI-oriented IDL validation.
+# Run IDL fixture drift + validation checks used by CI.
 test:idl
+
+# Run Quasar SVM generated-client e2e checks alongside LiteSVM.
+pnpm run test:quasar-svm
 ```
+
+<!-- {/codamaWorkflowCommands} -->
 
 ## Dependency security
 

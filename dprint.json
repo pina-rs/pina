@@ -46,7 +46,7 @@
 		"**/node_modules",
 		"**/pnpm-lock.yaml",
 		"api-docs.t.md",
-		".templates/**/*.t.md",
+		"templates/**/*.t.md",
 		".bin/",
 		".local-cache/",
 		"**/dist/**",

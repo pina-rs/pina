@@ -76,19 +76,29 @@ pina idl --path examples/counter_program --output codama/idls/counter_program.js
 
 With `devenv`, the full workflow is available via built-in scripts:
 
-```sh
-# Generate IDLs for all example programs into codama/idls/.
+<!-- {=codamaWorkflowCommands} -->
+
+```bash
+# Generate Codama IDLs for all examples.
 codama:idl:all
 
-# Generate Rust + JS clients from codama/idls/.
+# Generate Rust + JS clients.
 codama:clients:generate
 
-# Generate Rust + JS clients in one step.
+# Generate IDLs + Rust/JS clients in one command.
 pina codama generate
 
-# Run the full integration pipeline (build CLI, generate IDLs, generate clients, validate outputs).
+# Run the complete Codama pipeline.
 codama:test
+
+# Run IDL fixture drift + validation checks used by CI.
+test:idl
+
+# Run Quasar SVM generated-client e2e checks alongside LiteSVM.
+pnpm run test:quasar-svm
 ```
+
+<!-- {/codamaWorkflowCommands} -->
 
 Rust client generation in this repository uses the custom `pina_codama_renderer` crate (`crates/pina_codama_renderer`) instead of Codama's default Rust renderer. The generated Rust models are Pina-compatible: discriminator-first layouts and bytemuck-based POD wrappers, without `borsh` serialization requirements. Because these clients are generated as fixed-size POD layouts, unsupported Codama patterns (e.g. variable-length strings/bytes, big-endian numbers, floats, non-UTF8 constant byte seeds, and non-fixed arrays) will fail generation with explicit renderer errors.
 
@@ -135,6 +145,23 @@ cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
   --output ./clients/rust
 ```
 
+<!-- {=pinaIdlVerificationContract} -->
+
+`test:idl` treats the generated IDL as an API contract. It checks that:
+
+- every example regenerates deterministically into `codama/idls`, `codama/clients/js`, and `codama/clients/rust`
+- generated JSON passes Codama's JS validator
+- generated JS clients typecheck
+- generated Rust clients compile
+- for every example, generated instruction/account/error counts match the source declarations:
+  - `#[instruction]`
+  - `#[account]`
+  - `#[error]`
+
+That last count-parity check is important because it catches silent extraction regressions where a program still produces valid JSON, but one or more instruction surfaces disappear.
+
+<!-- {/pinaIdlVerificationContract} -->
+
 ### Crate features
 
 <br>
@@ -163,7 +190,7 @@ docs:build
 
 <!-- {/docsBuildCommand} -->
 
-Use `verify:docs` to validate documentation structure and build output in CI. Use `test:idl` to regenerate and verify `codama/idls/*.json`, `codama/clients/rust/*`, and `codama/clients/js/*` against all examples. Reusable command snippets are managed by `mdt`; run `docs:sync` after changing files in `.templates/`.
+Use `verify:docs` to validate documentation structure and build output in CI. Use `test:idl` to regenerate and verify `codama/idls/*.json`, `codama/clients/rust/*`, and `codama/clients/js/*` against all examples. Reusable command snippets are managed by `mdt`; run `docs:sync` after changing files in `templates/`.
 
 ## Quick start
 

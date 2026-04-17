@@ -94,4 +94,4 @@ When using `devenv`, `pina ...` is available as a shortcut for:
 cargo run -p pina_cli -- ...
 ```
 
-Reusable docs providers live in `.templates/*.t.md`.
+Reusable docs providers live in `templates/*.t.md`.
