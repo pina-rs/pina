@@ -117,6 +117,7 @@ solana-system-interface = { version = "^2", default-features = false }
 syn = { default-features = false, version = "^2", features = ["full"] }
 thiserror = { default-features = false, version = "^2" }
 tokio = { default-features = false, version = "^1" }
+trybuild = { default-features = false, version = "^1" }
 typed-builder = { default-features = false, version = "^0.23" }
 walkdir = { default-features = false, version = "^2" }
 

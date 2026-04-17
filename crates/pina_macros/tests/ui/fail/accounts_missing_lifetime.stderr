@@ -1,0 +1,5 @@
+error: Accounts struct must have **ONE** lifetime parameter
+ --> tests/ui/fail/accounts_missing_lifetime.rs:4:12
+  |
+4 | pub struct MissingLifetimeAccounts {
+  |            ^^^^^^^^^^^^^^^^^^^^^^^

@@ -1,0 +1,5 @@
+error: Only one field can be marked as `remaining`
+ --> tests/ui/fail/accounts_multiple_remaining.rs:9:6
+  |
+9 |     pub trailing: &'a [AccountView],
+  |         ^^^^^^^^
