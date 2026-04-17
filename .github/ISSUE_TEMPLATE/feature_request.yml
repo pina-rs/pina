@@ -1,0 +1,51 @@
+name: Feature request
+description: Propose a new feature or workflow improvement for Pina.
+title: "Sentence case summary of the feature"
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please write the issue title in **sentence case**.
+
+        Good: `Add Miri coverage for account loader aliasing rules`
+        Avoid: `feat: add miri coverage for account loader aliasing rules`
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are we trying to solve?
+      description: Describe the gap in the current behavior or workflow.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the feature at a high level.
+    validations:
+      required: true
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation sketch
+      description: Outline the likely design, files, workflows, or components involved.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why is this needed?
+      description: Explain the user, security, DX, or performance benefit.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] Add implementation
+        - [ ] Add tests or verification
+        - [ ] Update docs if behavior changes
+    validations:
+      required: true

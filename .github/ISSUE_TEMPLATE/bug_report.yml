@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a defect or regression in Pina.
+title: "Sentence case summary of the bug"
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please write the issue title in **sentence case**.
+
+        Good: `Account loaders should preserve the borrow guard lifetime`
+        Avoid: `fix: account loaders preserve borrow guard lifetime`
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the bug and why it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How can we reproduce it?
+      description: Include code, commands, fixtures, or a minimal reproduction.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Why is this important?
+      description: Explain the safety, correctness, DX, or performance impact.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Describe the observable behaviors that should be true when this is fixed.
+      placeholder: |
+        - [ ] Add regression coverage for the failing path
+        - [ ] Update docs/examples if the public API changes
+    validations:
+      required: true
