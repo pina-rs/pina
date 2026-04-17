@@ -672,6 +672,11 @@ in
         done
 
         cargo clippy --fix --allow-dirty --allow-staged --workspace --all-features --locked ''${exclude_args[@]}
+
+        mapfile -t lint_manifests < <(find "$DEVENV_ROOT/lints" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
+        for manifest in "''${lint_manifests[@]}"; do
+          cargo clippy --fix --allow-dirty --allow-staged --manifest-path "$manifest" --all-features --all-targets --locked
+        done
       '';
       description = "Fix clippy lints for rust.";
       binary = "bash";
@@ -752,8 +757,9 @@ in
         lint:clippy
         lint:format
         verify:docs
+        security:dylint
       '';
-      description = "Run all checks.";
+      description = "Run all checks, including all custom dylint rules.";
       binary = "bash";
     };
     "docs:build" = {
@@ -837,6 +843,11 @@ in
         done
 
         cargo clippy --workspace --all-features --locked ''${exclude_args[@]}
+
+        mapfile -t lint_manifests < <(find "$DEVENV_ROOT/lints" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
+        for manifest in "''${lint_manifests[@]}"; do
+          cargo clippy --manifest-path "$manifest" --all-features --all-targets --locked
+        done
       '';
       description = "Check that all rust lints are passing.";
       binary = "bash";

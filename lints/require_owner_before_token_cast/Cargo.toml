@@ -15,3 +15,5 @@ dylint_testing = "5.0.0"
 
 [package.metadata.rust-analyzer]
 rustc_private = true
+
+[workspace]

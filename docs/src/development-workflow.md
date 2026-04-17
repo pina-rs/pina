@@ -19,7 +19,7 @@ test:idl
 ## Formatting and linting
 
 - Rust and markdown formatting are enforced through `dprint`.
-- Clippy runs with strict workspace lint settings.
+- Clippy runs with strict workspace lint settings, and `lint:clippy` also checks the custom Dylint crates under `lints/`.
 
 ## Reusable documentation blocks
 

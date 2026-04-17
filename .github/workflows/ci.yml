@@ -26,16 +26,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: lint clippy
-        run: lint:clippy
-        shell: devenv shell -c -- bash -e {0}
-
-      - name: lint formatting
-        run: lint:format
-        shell: devenv shell -c -- bash -e {0}
-
-      - name: verify docs
-        run: verify:docs
+      - name: lint all
+        run: lint:all
         shell: devenv shell -c -- bash -e {0}
 
   security:
