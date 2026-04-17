@@ -64,6 +64,22 @@ jobs:
           test:all
         shell: devenv shell -- bash -e {0}
 
+  miri:
+    timeout-minutes: 90
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: run miri loader regressions
+        run: test:miri
+        shell: devenv shell -c -- bash -e {0}
+
   program-e2e:
     timeout-minutes: 120
     runs-on: blacksmith-2vcpu-ubuntu-2404

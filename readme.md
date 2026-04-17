@@ -671,6 +671,17 @@ cargo nextest run  # Faster parallel test execution
 
 <!-- {/pinaTestingInstructions} -->
 
+For host-side undefined-behavior and borrow-model checks on the loader layer, run the dedicated Miri suite:
+
+```sh
+rustup component add miri --toolchain nightly-2026-02-20
+MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-symbolic-alignment-check" \
+  cargo +nightly-2026-02-20 miri test -p pina --test miri_loader_guards --all-features
+
+# Or, inside `devenv shell`:
+test:miri
+```
+
 ## Static CU Profiling
 
 <br>
