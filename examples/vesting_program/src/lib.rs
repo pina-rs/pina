@@ -199,7 +199,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			args.bump,
 		)?;
 
-		let vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
+		let mut vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
 		*vesting_state = VestingState::builder()
 			.admin(*self.admin.address())
 			.beneficiary(*self.beneficiary.address())
@@ -284,7 +284,7 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 			return Err(VestingError::ClaimTooLarge.into());
 		}
 
-		let vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
+		let mut vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
 		vesting_state.claimed_amount = PodU64::from_primitive(next_claimed);
 
 		associated_token_account::instructions::CreateIdempotent {
@@ -339,7 +339,7 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 			return Err(VestingError::AlreadyCancelled.into());
 		}
 
-		let vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
+		let mut vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
 		vesting_state.cancelled = PodBool::from_bool(true);
 
 		Ok(())

@@ -203,7 +203,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			args.bump,
 		)?;
 
-		let registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
+		let mut registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
 		*registry_config = RegistryConfig::builder()
 			.admin(*self.admin.address())
 			.role_count(PodU64::from_primitive(0))
@@ -251,7 +251,7 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 			.checked_add(1)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
 
-		let role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
+		let mut role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
 		*role_entry = RoleEntry::builder()
 			.registry(*self.registry_config.address())
 			.role_id(args.role_id)
@@ -261,7 +261,7 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 			.bump(args.bump)
 			.build();
 
-		let registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
+		let mut registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
 		registry_config.role_count = PodU64::from_primitive(role_count);
 
 		Ok(())
@@ -295,7 +295,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateRoleAccounts<'a> {
 			return Err(RegistryError::InvalidPermissions.into());
 		}
 
-		let role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
+		let mut role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
 		role_entry.permissions = args.permissions;
 
 		Ok(())
@@ -327,7 +327,7 @@ impl<'a> ProcessAccountInfos<'a> for DeactivateRoleAccounts<'a> {
 			return Err(RegistryError::RoleInactive.into());
 		}
 
-		let role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
+		let mut role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
 		role_entry.active = PodBool::from_bool(false);
 
 		Ok(())
@@ -346,7 +346,7 @@ impl<'a> ProcessAccountInfos<'a> for RotateAdminAccounts<'a> {
 
 		self.admin.assert_address(&registry_config.admin)?;
 
-		let registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
+		let mut registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
 		registry_config.admin = *self.new_admin.address();
 
 		Ok(())

@@ -196,7 +196,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		)?;
 
 		// Initialize account data
-		let counter = self.counter.as_account_mut::<CounterState>(&ID)?;
+		let mut counter = self.counter.as_account_mut::<CounterState>(&ID)?;
 		*counter = CounterState::builder()
 			.bump(args.bump)
 			.count(PodU64::from_primitive(0))
@@ -227,7 +227,7 @@ impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 		self.counter.assert_seeds_with_bump(seeds_with_bump, &ID)?;
 
 		// Mutate state
-		let counter = self.counter.as_account_mut::<CounterState>(&ID)?;
+		let mut counter = self.counter.as_account_mut::<CounterState>(&ID)?;
 		let current: u64 = counter.count.into();
 		let next = current
 			.checked_add(1)

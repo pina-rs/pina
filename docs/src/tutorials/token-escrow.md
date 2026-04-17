@@ -218,7 +218,7 @@ create_program_account_with_bump::<EscrowState>(
 	args.bump,
 )?;
 
-let escrow = self.escrow.as_account_mut::<EscrowState>(&ID)?;
+let mut escrow = self.escrow.as_account_mut::<EscrowState>(&ID)?;
 *escrow = EscrowState::builder()
 	.maker(*self.maker.address())
 	.mint_a(*self.mint_a.address())
@@ -286,13 +286,10 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 
 		// ... validation omitted for brevity ...
 
-		let EscrowState {
-			maker,
-			seed,
-			bump,
-			amount_b,
-			..
-		} = self.escrow.as_account::<EscrowState>(&ID)?;
+		let (maker, seed, bump, amount_b) = {
+			let escrow = self.escrow.as_account::<EscrowState>(&ID)?;
+			(escrow.maker, escrow.seed, escrow.bump, escrow.amount_b)
+		};
 
 		// Transfer token B: taker -> maker
 		token_2022::instructions::TransferChecked {
@@ -300,14 +297,14 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			mint: self.mint_b,
 			to: self.maker_ata_b,
 			authority: self.taker,
-			amount: (*amount_b).into(),
+			amount: amount_b.into(),
 			decimals: self.mint_b.as_token_2022_mint()?.decimals(),
 			token_program: self.token_program.address(),
 		}
 		.invoke()?;
 
 		// Transfer token A: vault -> taker (PDA-signed)
-		let bump_as_seeds = [*bump];
+		let bump_as_seeds = [bump];
 		let escrow_seeds =
 			seeds_escrow!(true, self.maker.address().as_ref(), &seed.0, &bump_as_seeds);
 		let escrow_signer = Signer::from(&escrow_seeds);
@@ -341,7 +338,7 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 
 The PDA signer is constructed from the same seeds used to derive the escrow address. `invoke_signed` passes these seeds to the runtime so it can verify the PDA signature.
 
-`close_with_recipient` transfers remaining lamports to the maker and zeros the account data, reclaiming the rent.
+`as_account()` returns a guard-backed wrapper, so the example extracts the needed fields inside a small block before taking a later mutable borrow. `close_with_recipient` transfers remaining lamports to the maker and zeros the account data, reclaiming the rent.
 
 ## Entrypoint
 

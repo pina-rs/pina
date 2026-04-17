@@ -77,10 +77,10 @@ impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
 
 		let amount: u64 = args.amount.into();
 
-		let source = self.source.as_account_mut::<Balance>(&ID)?;
+		let mut source = self.source.as_account_mut::<Balance>(&ID)?;
 		let source_amount: u64 = source.amount.into();
 
-		let dest = self.dest.as_account_mut::<Balance>(&ID)?;
+		let mut dest = self.dest.as_account_mut::<Balance>(&ID)?;
 		let dest_amount: u64 = dest.amount.into();
 
 		let (new_source, new_dest) = checked_transfer_balances(source_amount, dest_amount, amount)?;

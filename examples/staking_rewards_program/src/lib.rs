@@ -279,7 +279,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 		)?;
 
 		// Initialize pool state
-		let pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
+		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
 		*pool_state = PoolState::builder()
 			.admin(*self.admin.address())
 			.stake_mint(*self.stake_mint.address())
@@ -358,7 +358,7 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 		)?;
 
 		// Initialize position state
-		let position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
+		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 		*position_state = PositionState::builder()
 			.pool(*self.pool_state.address())
 			.owner(*self.user.address())
@@ -409,8 +409,8 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 		if amount == 0 {
 			return Err(StakingError::InvalidAmount.into());
 		}
-		assert_pool_stake_mint(pool_state, self.stake_mint)?;
-		assert_position_access(self.pool_state, self.user, position_state)?;
+		assert_pool_stake_mint(&pool_state, self.stake_mint)?;
+		assert_position_access(self.pool_state, self.user, &position_state)?;
 
 		// Calculate updated amounts
 		let staked_amount = u64::from(position_state.staked_amount);
@@ -421,8 +421,11 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 			.checked_add(amount)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
 
+		drop(position_state);
+		drop(pool_state);
+
 		// Update position state
-		let position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
+		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 		position_state.staked_amount = PodU64::from_primitive(next_staked);
 		position_state.reward_debt = PodU64::from_primitive(
 			u64::from(position_state.reward_debt)
@@ -431,7 +434,7 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 		);
 
 		// Update pool state
-		let pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
+		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
 		pool_state.total_staked = PodU64::from_primitive(total_staked);
 
 		// Ensure user's stake ATA exists
@@ -486,20 +489,23 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 		if amount == 0 {
 			return Err(StakingError::InvalidAmount.into());
 		}
-		assert_pool_stake_mint(pool_state, self.stake_mint)?;
-		assert_position_access(self.pool_state, self.user, position_state)?;
+		assert_pool_stake_mint(&pool_state, self.stake_mint)?;
+		assert_position_access(self.pool_state, self.user, &position_state)?;
 
 		let staked_amount = u64::from(position_state.staked_amount);
 		if amount > staked_amount {
 			return Err(StakingError::InsufficientBalance.into());
 		}
 
+		drop(position_state);
+		drop(pool_state);
+
 		// Update position state
-		let position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
+		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 		position_state.staked_amount = PodU64::from_primitive(staked_amount - amount);
 
 		// Update pool state
-		let pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
+		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
 		pool_state.total_staked =
 			PodU64::from_primitive(u64::from(pool_state.total_staked) - amount);
 
@@ -537,15 +543,18 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		if bool::from(pool_state.paused) {
 			return Err(StakingError::PoolPaused.into());
 		}
-		assert_pool_reward_mint(pool_state, self.reward_mint)?;
-		assert_position_access(self.pool_state, self.user, position_state)?;
+		assert_pool_reward_mint(&pool_state, self.reward_mint)?;
+		assert_position_access(self.pool_state, self.user, &position_state)?;
 
 		// Calculate and update pending rewards
 		let next_pending = u64::from(position_state.pending_rewards)
 			.checked_add(u64::from(pool_state.reward_index))
 			.ok_or(ProgramError::ArithmeticOverflow)?;
 
-		let position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
+		drop(position_state);
+		drop(pool_state);
+
+		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 		position_state.pending_rewards = PodU64::from_primitive(next_pending);
 
 		// Ensure user's reward ATA exists
