@@ -112,22 +112,13 @@ in
         entry = "${pkgs.gitleaks}/bin/gitleaks detect --verbose --redact";
         stages = [ "pre-push" ];
       };
-      lint = {
+      "lint:test" = {
         enable = true;
         verbose = true;
         pass_filenames = false;
-        name = "lint";
+        name = "lint and test";
         description = "Run the local CI lint rules suite before push.";
-        entry = "${config.env.DEVENV_PROFILE}/bin/lint:all";
-        stages = [ "pre-push" ];
-      };
-      test = {
-        enable = true;
-        verbose = true;
-        pass_filenames = false;
-        name = "test";
-        description = "Run the local CI validation suite before push.";
-        entry = "${pkgs.bash}/bin/bash -lc '${config.env.DEVENV_PROFILE}/bin/install:all && ${config.env.DEVENV_PROFILE}/bin/verify:security && ${config.env.DEVENV_PROFILE}/bin/test:all && ${config.env.DEVENV_PROFILE}/bin/test:program-e2e && ${config.env.DEVENV_PROFILE}/bin/test:idl && ${config.env.DEVENV_PROFILE}/bin/build:default && ${config.env.DEVENV_PROFILE}/bin/build:pina:no-default && ${config.env.DEVENV_PROFILE}/bin/build:all'";
+        entry = "${config.env.DEVENV_PROFILE}/bin/lint:all && ${config.env.DEVENV_PROFILE}/bin/test:all";
         stages = [ "pre-push" ];
       };
     };
@@ -237,6 +228,7 @@ in
       exec = ''
         set -e
         "$DEVENV_ROOT/scripts/generate-codama-idls.sh"
+        dprint fmt "codama/**"
       '';
       description = "Generate Codama IDLs for all example programs.";
       binary = "bash";
@@ -251,6 +243,7 @@ in
           --rust-out "$DEVENV_ROOT/codama/clients/rust" \
           --js-out "$DEVENV_ROOT/codama/clients/js" \
           --npx node
+        dprint fmt "codama/**"
       '';
       description = "Generate Codama IDLs and Rust/JS clients for all examples.";
       binary = "bash";
@@ -646,6 +639,8 @@ in
         set -e
         fix:clippy
         fix:format
+        codama:idl:all
+        codama:clients:generate
       '';
       description = "Fix all autofixable problems.";
       binary = "bash";

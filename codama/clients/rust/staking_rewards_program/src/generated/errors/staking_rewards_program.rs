@@ -22,6 +22,12 @@ pub enum StakingRewardsProgramError {
 	/// 2 -
 	#[error("")]
 	InsufficientBalance = 0x2,
+	/// 3 -
+	#[error("")]
+	Unauthorized = 0x3,
+	/// 4 -
+	#[error("")]
+	InvalidPool = 0x4,
 }
 
 impl From<StakingRewardsProgramError> for solana_program_error::ProgramError {
