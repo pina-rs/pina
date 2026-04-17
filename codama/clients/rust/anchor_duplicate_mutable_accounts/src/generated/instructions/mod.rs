@@ -8,8 +8,10 @@
 	clippy::too_many_arguments
 )]
 
+pub(crate) mod r#allows_duplicate_mutable;
 pub(crate) mod r#allows_duplicate_readonly;
 pub(crate) mod r#fails_duplicate_mutable;
 
+pub use self::r#allows_duplicate_mutable::*;
 pub use self::r#allows_duplicate_readonly::*;
 pub use self::r#fails_duplicate_mutable::*;

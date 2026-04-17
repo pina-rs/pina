@@ -3,6 +3,10 @@ use std::path::Path;
 
 use codama_nodes::RootNode;
 use pina_cli::generate_idl;
+use pina_cli::parse::account_state::extract_account_structs;
+use pina_cli::parse::error_enum::extract_error_enums;
+use pina_cli::parse::instruction_data::extract_instruction_structs;
+use pina_cli::parse::module_resolver::resolve_crate;
 use serde_json::Value;
 
 fn workspace_root() -> &'static Path {
@@ -43,6 +47,25 @@ fn read_fixture(fixture_path: &Path) -> Value {
 			fixture_path.display()
 		)
 	})
+}
+
+fn extracted_definition_counts(example_path: &Path) -> (usize, usize, usize) {
+	let src_dir = example_path.join("src");
+	let lib_path = src_dir.join("lib.rs");
+	let resolved = resolve_crate(&src_dir, &lib_path)
+		.unwrap_or_else(|e| panic!("resolve {}: {e}", lib_path.display()));
+
+	let mut instruction_count = 0;
+	let mut account_count = 0;
+	let mut error_count = 0;
+
+	for file in &resolved {
+		instruction_count += extract_instruction_structs(&file.file).len();
+		account_count += extract_account_structs(&file.file).len();
+		error_count += extract_error_enums(&file.file).len();
+	}
+
+	(instruction_count, account_count, error_count)
 }
 
 #[test]
@@ -120,6 +143,27 @@ fn codama_idl_fixtures_match_generated_output() {
 				example_name
 			);
 		}
+
+		let (declared_instructions, declared_accounts, declared_errors) =
+			extracted_definition_counts(&example_path);
+		assert_eq!(
+			generated_root.program.instructions.len(),
+			declared_instructions,
+			"generated instruction count for {} diverged from declared #[instruction] structs",
+			example_name,
+		);
+		assert_eq!(
+			generated_root.program.accounts.len(),
+			declared_accounts,
+			"generated account count for {} diverged from declared #[account] structs",
+			example_name,
+		);
+		assert_eq!(
+			generated_root.program.errors.len(),
+			declared_errors,
+			"generated error count for {} diverged from declared #[error] variants",
+			example_name,
+		);
 
 		assert_eq!(
 			generated_json, fixture_json,

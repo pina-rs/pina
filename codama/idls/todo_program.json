@@ -143,6 +143,92 @@
 						}
 					}
 				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "toggleCompleted",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "owner",
+						"isWritable": false,
+						"isSigner": true
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "todo",
+						"isWritable": true,
+						"isSigner": false
+					}
+				],
+				"arguments": [],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "updateDigest",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "owner",
+						"isWritable": false,
+						"isSigner": true
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "todo",
+						"isWritable": true,
+						"isSigner": false
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "digest",
+						"type": {
+							"kind": "fixedSizeTypeNode",
+							"size": 32,
+							"type": {
+								"kind": "bytesTypeNode"
+							}
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 2
+							}
+						}
+					}
+				]
 			}
 		],
 		"definedTypes": [],

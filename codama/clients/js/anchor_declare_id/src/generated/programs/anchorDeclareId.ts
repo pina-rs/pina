@@ -6,9 +6,109 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { type Address } from "@solana/kit";
+import {
+	type Address,
+	type ClientWithTransactionPlanning,
+	type ClientWithTransactionSending,
+	containsBytes,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+	SolanaError,
+} from "@solana/kit";
+import {
+	addSelfPlanAndSendFunctions,
+	type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import {
+	getInitializeInstruction,
+	type InitializeInput,
+	type ParsedInitializeInstruction,
+	parseInitializeInstruction,
+} from "../instructions";
 
 export const ANCHOR_DECLARE_ID_PROGRAM_ADDRESS =
 	"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS" as Address<
 		"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
 	>;
+
+export enum AnchorDeclareIdInstruction {
+	Initialize,
+}
+
+export function identifyAnchorDeclareIdInstruction(
+	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): AnchorDeclareIdInstruction {
+	const data = "data" in instruction ? instruction.data : instruction;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return AnchorDeclareIdInstruction.Initialize;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+		{ instructionData: data, programName: "anchorDeclareId" },
+	);
+}
+
+export type ParsedAnchorDeclareIdInstruction<
+	TProgram extends string = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
+> =
+	& { instructionType: AnchorDeclareIdInstruction.Initialize }
+	& ParsedInitializeInstruction<TProgram>;
+
+export function parseAnchorDeclareIdInstruction<TProgram extends string>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedAnchorDeclareIdInstruction<TProgram> {
+	const instructionType = identifyAnchorDeclareIdInstruction(instruction);
+	switch (instructionType) {
+		case AnchorDeclareIdInstruction.Initialize: {
+			return {
+				instructionType: AnchorDeclareIdInstruction.Initialize,
+				...parseInitializeInstruction(instruction),
+			};
+		}
+		default:
+			throw new SolanaError(
+				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+				{
+					instructionType: instructionType as string,
+					programName: "anchorDeclareId",
+				},
+			);
+	}
+}
+
+export type AnchorDeclareIdPlugin = {
+	instructions: AnchorDeclareIdPluginInstructions;
+};
+
+export type AnchorDeclareIdPluginInstructions = {
+	initialize: (
+		input: InitializeInput,
+	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
+};
+
+export type AnchorDeclareIdPluginRequirements =
+	& ClientWithTransactionPlanning
+	& ClientWithTransactionSending;
+
+export function anchorDeclareIdProgram() {
+	return <T extends AnchorDeclareIdPluginRequirements>(client: T) => {
+		return {
+			...client,
+			anchorDeclareId: <AnchorDeclareIdPlugin> {
+				instructions: {
+					initialize: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getInitializeInstruction(input),
+						),
+				},
+			},
+		};
+	};
+}

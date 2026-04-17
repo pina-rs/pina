@@ -9,6 +9,7 @@
 )]
 
 pub mod errors;
+pub mod instructions;
 pub mod programs;
 
 #[allow(unused_imports)]

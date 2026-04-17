@@ -7,3 +7,5 @@
  */
 
 export * from "./initialize";
+export * from "./toggleCompleted";
+export * from "./updateDigest";

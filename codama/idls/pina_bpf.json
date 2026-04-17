@@ -8,7 +8,32 @@
 		"publicKey": "2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe",
 		"version": "",
 		"accounts": [],
-		"instructions": [],
+		"instructions": [
+			{
+				"kind": "instructionNode",
+				"name": "hello",
+				"accounts": [],
+				"arguments": [],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			}
+		],
 		"definedTypes": [],
 		"pdas": [],
 		"errors": []

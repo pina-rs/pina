@@ -6,9 +6,241 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { type Address } from "@solana/kit";
+import {
+	type Address,
+	type ClientWithTransactionPlanning,
+	type ClientWithTransactionSending,
+	containsBytes,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+	SolanaError,
+} from "@solana/kit";
+import {
+	addSelfPlanAndSendFunctions,
+	type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import {
+	getHelloInstruction,
+	getHelloNextInstruction,
+	getHelloNoMsgInstruction,
+	getRequireEqInstruction,
+	getRequireGteInstruction,
+	getRequireGtInstruction,
+	getRequireNeqInstruction,
+	type HelloInput,
+	type HelloNextInput,
+	type HelloNoMsgInput,
+	type ParsedHelloInstruction,
+	type ParsedHelloNextInstruction,
+	type ParsedHelloNoMsgInstruction,
+	type ParsedRequireEqInstruction,
+	type ParsedRequireGteInstruction,
+	type ParsedRequireGtInstruction,
+	type ParsedRequireNeqInstruction,
+	parseHelloInstruction,
+	parseHelloNextInstruction,
+	parseHelloNoMsgInstruction,
+	parseRequireEqInstruction,
+	parseRequireGteInstruction,
+	parseRequireGtInstruction,
+	parseRequireNeqInstruction,
+	type RequireEqInput,
+	type RequireGteInput,
+	type RequireGtInput,
+	type RequireNeqInput,
+} from "../instructions";
 
 export const ANCHOR_ERRORS_PROGRAM_ADDRESS =
 	"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS" as Address<
 		"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
 	>;
+
+export enum AnchorErrorsInstruction {
+	Hello,
+	HelloNoMsg,
+	HelloNext,
+	RequireEq,
+	RequireNeq,
+	RequireGt,
+	RequireGte,
+}
+
+export function identifyAnchorErrorsInstruction(
+	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): AnchorErrorsInstruction {
+	const data = "data" in instruction ? instruction.data : instruction;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return AnchorErrorsInstruction.Hello;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return AnchorErrorsInstruction.HelloNoMsg;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return AnchorErrorsInstruction.HelloNext;
+	}
+	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+		return AnchorErrorsInstruction.RequireEq;
+	}
+	if (containsBytes(data, getU8Encoder().encode(4), 0)) {
+		return AnchorErrorsInstruction.RequireNeq;
+	}
+	if (containsBytes(data, getU8Encoder().encode(5), 0)) {
+		return AnchorErrorsInstruction.RequireGt;
+	}
+	if (containsBytes(data, getU8Encoder().encode(6), 0)) {
+		return AnchorErrorsInstruction.RequireGte;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+		{ instructionData: data, programName: "anchorErrors" },
+	);
+}
+
+export type ParsedAnchorErrorsInstruction<
+	TProgram extends string = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
+> =
+	| { instructionType: AnchorErrorsInstruction.Hello }
+		& ParsedHelloInstruction<TProgram>
+	| { instructionType: AnchorErrorsInstruction.HelloNoMsg }
+		& ParsedHelloNoMsgInstruction<TProgram>
+	| { instructionType: AnchorErrorsInstruction.HelloNext }
+		& ParsedHelloNextInstruction<TProgram>
+	| { instructionType: AnchorErrorsInstruction.RequireEq }
+		& ParsedRequireEqInstruction<TProgram>
+	| { instructionType: AnchorErrorsInstruction.RequireNeq }
+		& ParsedRequireNeqInstruction<TProgram>
+	| { instructionType: AnchorErrorsInstruction.RequireGt }
+		& ParsedRequireGtInstruction<TProgram>
+	| { instructionType: AnchorErrorsInstruction.RequireGte }
+		& ParsedRequireGteInstruction<TProgram>;
+
+export function parseAnchorErrorsInstruction<TProgram extends string>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedAnchorErrorsInstruction<TProgram> {
+	const instructionType = identifyAnchorErrorsInstruction(instruction);
+	switch (instructionType) {
+		case AnchorErrorsInstruction.Hello: {
+			return {
+				instructionType: AnchorErrorsInstruction.Hello,
+				...parseHelloInstruction(instruction),
+			};
+		}
+		case AnchorErrorsInstruction.HelloNoMsg: {
+			return {
+				instructionType: AnchorErrorsInstruction.HelloNoMsg,
+				...parseHelloNoMsgInstruction(instruction),
+			};
+		}
+		case AnchorErrorsInstruction.HelloNext: {
+			return {
+				instructionType: AnchorErrorsInstruction.HelloNext,
+				...parseHelloNextInstruction(instruction),
+			};
+		}
+		case AnchorErrorsInstruction.RequireEq: {
+			return {
+				instructionType: AnchorErrorsInstruction.RequireEq,
+				...parseRequireEqInstruction(instruction),
+			};
+		}
+		case AnchorErrorsInstruction.RequireNeq: {
+			return {
+				instructionType: AnchorErrorsInstruction.RequireNeq,
+				...parseRequireNeqInstruction(instruction),
+			};
+		}
+		case AnchorErrorsInstruction.RequireGt: {
+			return {
+				instructionType: AnchorErrorsInstruction.RequireGt,
+				...parseRequireGtInstruction(instruction),
+			};
+		}
+		case AnchorErrorsInstruction.RequireGte: {
+			return {
+				instructionType: AnchorErrorsInstruction.RequireGte,
+				...parseRequireGteInstruction(instruction),
+			};
+		}
+		default:
+			throw new SolanaError(
+				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+				{
+					instructionType: instructionType as string,
+					programName: "anchorErrors",
+				},
+			);
+	}
+}
+
+export type AnchorErrorsPlugin = {
+	instructions: AnchorErrorsPluginInstructions;
+};
+
+export type AnchorErrorsPluginInstructions = {
+	hello: (
+		input: HelloInput,
+	) => ReturnType<typeof getHelloInstruction> & SelfPlanAndSendFunctions;
+	helloNoMsg: (
+		input: HelloNoMsgInput,
+	) => ReturnType<typeof getHelloNoMsgInstruction> & SelfPlanAndSendFunctions;
+	helloNext: (
+		input: HelloNextInput,
+	) => ReturnType<typeof getHelloNextInstruction> & SelfPlanAndSendFunctions;
+	requireEq: (
+		input: RequireEqInput,
+	) => ReturnType<typeof getRequireEqInstruction> & SelfPlanAndSendFunctions;
+	requireNeq: (
+		input: RequireNeqInput,
+	) => ReturnType<typeof getRequireNeqInstruction> & SelfPlanAndSendFunctions;
+	requireGt: (
+		input: RequireGtInput,
+	) => ReturnType<typeof getRequireGtInstruction> & SelfPlanAndSendFunctions;
+	requireGte: (
+		input: RequireGteInput,
+	) => ReturnType<typeof getRequireGteInstruction> & SelfPlanAndSendFunctions;
+};
+
+export type AnchorErrorsPluginRequirements =
+	& ClientWithTransactionPlanning
+	& ClientWithTransactionSending;
+
+export function anchorErrorsProgram() {
+	return <T extends AnchorErrorsPluginRequirements>(client: T) => {
+		return {
+			...client,
+			anchorErrors: <AnchorErrorsPlugin> {
+				instructions: {
+					hello: (input) =>
+						addSelfPlanAndSendFunctions(client, getHelloInstruction(input)),
+					helloNoMsg: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getHelloNoMsgInstruction(input),
+						),
+					helloNext: (input) =>
+						addSelfPlanAndSendFunctions(client, getHelloNextInstruction(input)),
+					requireEq: (input) =>
+						addSelfPlanAndSendFunctions(client, getRequireEqInstruction(input)),
+					requireNeq: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getRequireNeqInstruction(input),
+						),
+					requireGt: (input) =>
+						addSelfPlanAndSendFunctions(client, getRequireGtInstruction(input)),
+					requireGte: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getRequireGteInstruction(input),
+						),
+				},
+			},
+		};
+	};
+}

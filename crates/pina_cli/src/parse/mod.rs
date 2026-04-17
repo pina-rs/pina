@@ -148,71 +148,18 @@ fn assemble_from_extracted(
 
 	// Step 3: Build instructions IR by connecting dispatch, accounts structs,
 	// instruction data, and validation properties.
-	let instructions: Vec<InstructionIr> = dispatch
-		.iter()
-		.filter_map(|entry| {
-			// Find the instruction data struct for this variant.
-			let ix_struct = instruction_structs
-				.iter()
-				.find(|ix| ix.variant == entry.variant)?;
-
-			// Find the accounts struct.
-			let accts_struct = ix_accounts_structs
-				.iter()
-				.find(|a| a.name == entry.accounts_struct)?;
-
-			// Find validation properties for this accounts struct.
-			let val_props = validation_props.get(&entry.accounts_struct);
-
-			// Find discriminator value.
-			let disc_value = find_discriminator_value_by_variant(
-				disc_enums,
-				&ix_struct.discriminator_enum,
-				&entry.variant,
-			);
-
-			// Build instruction accounts with merged validation properties.
-			let instruction_accounts: Vec<InstructionAccountIr> = accts_struct
-				.fields
-				.iter()
-				.map(|field| {
-					let props = val_props
-						.and_then(|m| m.get(&field.name))
-						.cloned()
-						.unwrap_or_default();
-
-					// Check if this field is a PDA from the pdas we found.
-					let pda_name = if props.is_pda {
-						infer_pda_name_for_field(&field.name, pdas_ir)
-					} else {
-						None
-					};
-
-					InstructionAccountIr {
-						name: field.name.clone(),
-						is_writable: props.is_writable,
-						is_signer: props.is_signer,
-						is_optional: false,
-						default_value: props.default_value,
-						is_pda: props.is_pda,
-						pda_name,
-						docs: field.docs.clone(),
-					}
-				})
-				.collect();
-
-			// Use the variant name (snake_case) as the instruction name.
-			let instruction_name = entry.variant.to_snake_case();
-
-			Some(InstructionIr {
-				name: instruction_name,
-				accounts: instruction_accounts,
-				arguments: ix_struct.fields.clone(),
-				discriminator: disc_value,
-				docs: ix_struct.docs.clone(),
-			})
-		})
-		.collect();
+	let instructions = if dispatch.is_empty() {
+		build_accountless_instructions_from_structs(instruction_structs, disc_enums)
+	} else {
+		build_instructions_from_dispatch(
+			disc_enums,
+			instruction_structs,
+			ix_accounts_structs,
+			dispatch,
+			validation_props,
+			pdas_ir,
+		)?
+	};
 
 	let ir = ProgramIr {
 		name: program_name.to_owned(),
@@ -358,6 +305,115 @@ pub fn build_discriminator_map(
 	map
 }
 
+fn build_accountless_instructions_from_structs(
+	instruction_structs: &[instruction_data::InstructionStruct],
+	disc_enums: &[discriminator::DiscriminatorEnum],
+) -> Vec<InstructionIr> {
+	instruction_structs
+		.iter()
+		.map(|ix_struct| {
+			InstructionIr {
+				name: ix_struct.variant.to_snake_case(),
+				accounts: Vec::new(),
+				arguments: ix_struct.fields.clone(),
+				discriminator: find_discriminator_value_by_variant(
+					disc_enums,
+					&ix_struct.discriminator_enum,
+					&ix_struct.variant,
+				),
+				docs: ix_struct.docs.clone(),
+			}
+		})
+		.collect()
+}
+
+fn build_instructions_from_dispatch(
+	disc_enums: &[discriminator::DiscriminatorEnum],
+	instruction_structs: &[instruction_data::InstructionStruct],
+	ix_accounts_structs: &[accounts_struct::AccountsStruct],
+	dispatch: &[entrypoint::DispatchEntry],
+	validation_props: &HashMap<String, HashMap<String, validation::AccountProperties>>,
+	pdas_ir: &[PdaIr],
+) -> Result<Vec<InstructionIr>, IdlError> {
+	let mut instructions = Vec::with_capacity(dispatch.len());
+
+	for entry in dispatch {
+		let ix_struct = instruction_structs
+			.iter()
+			.find(|ix| ix.variant == entry.variant)
+			.ok_or_else(|| {
+				IdlError::UnresolvedInstruction {
+					discriminator: "unknown".to_owned(),
+					variant: entry.variant.clone(),
+				}
+			})?;
+
+		let instruction_accounts = if let Some(accounts_struct_name) = &entry.accounts_struct {
+			let accts_struct = ix_accounts_structs
+				.iter()
+				.find(|a| a.name == *accounts_struct_name)
+				.ok_or_else(|| {
+					IdlError::UnresolvedAccounts {
+						name: accounts_struct_name.clone(),
+					}
+				})?;
+
+			let val_props = validation_props.get(accounts_struct_name);
+			build_instruction_accounts(accts_struct, val_props, pdas_ir)
+		} else {
+			Vec::new()
+		};
+
+		instructions.push(InstructionIr {
+			name: entry.variant.to_snake_case(),
+			accounts: instruction_accounts,
+			arguments: ix_struct.fields.clone(),
+			discriminator: find_discriminator_value_by_variant(
+				disc_enums,
+				&ix_struct.discriminator_enum,
+				&entry.variant,
+			),
+			docs: ix_struct.docs.clone(),
+		});
+	}
+
+	Ok(instructions)
+}
+
+fn build_instruction_accounts(
+	accts_struct: &accounts_struct::AccountsStruct,
+	val_props: Option<&HashMap<String, validation::AccountProperties>>,
+	pdas_ir: &[PdaIr],
+) -> Vec<InstructionAccountIr> {
+	accts_struct
+		.fields
+		.iter()
+		.map(|field| {
+			let props = val_props
+				.and_then(|m| m.get(&field.name))
+				.cloned()
+				.unwrap_or_default();
+
+			let pda_name = if props.is_pda {
+				infer_pda_name_for_field(&field.name, pdas_ir)
+			} else {
+				None
+			};
+
+			InstructionAccountIr {
+				name: field.name.clone(),
+				is_writable: props.is_writable,
+				is_signer: props.is_signer,
+				is_optional: false,
+				default_value: props.default_value,
+				is_pda: props.is_pda,
+				pda_name,
+				docs: field.docs.clone(),
+			}
+		})
+		.collect()
+}
+
 fn infer_pda_name_for_field(field_name: &str, pdas: &[PdaIr]) -> Option<String> {
 	let candidates = [
 		field_name.to_owned(),
@@ -409,5 +465,94 @@ mod tests {
 			Some("vault".to_owned())
 		);
 		assert_eq!(infer_pda_name_for_field("unknown", &pdas), None);
+	}
+
+	#[test]
+	fn assemble_program_ir_falls_back_to_accountless_instruction_structs() {
+		let source = r#"
+			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+
+			#[discriminator]
+			pub enum EventsInstruction {
+				Initialize = 0,
+				TestEvent = 1,
+			}
+
+			#[instruction(discriminator = EventsInstruction, variant = Initialize)]
+			pub struct InitializeInstruction {}
+
+			#[instruction(discriminator = EventsInstruction, variant = TestEvent)]
+			pub struct TestEventInstruction {}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let ir = assemble_program_ir(&file, "events").unwrap_or_else(|e| panic!("assemble: {e}"));
+
+		assert_eq!(ir.instructions.len(), 2);
+		assert_eq!(ir.instructions[0].name, "initialize");
+		assert_eq!(ir.instructions[0].accounts.len(), 0);
+		assert_eq!(ir.instructions[1].name, "test_event");
+		assert_eq!(ir.instructions[1].accounts.len(), 0);
+	}
+
+	#[test]
+	fn assemble_program_ir_keeps_accountless_dispatch_arms() {
+		let source = r#"
+			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+
+			#[discriminator]
+			pub enum DuplicateMutableInstruction {
+				FailsDuplicateMutable = 0,
+				AllowsDuplicateMutable = 1,
+			}
+
+			#[instruction(discriminator = DuplicateMutableInstruction, variant = FailsDuplicateMutable)]
+			pub struct FailsDuplicateMutableInstruction {}
+
+			#[instruction(discriminator = DuplicateMutableInstruction, variant = AllowsDuplicateMutable)]
+			pub struct AllowsDuplicateMutableInstruction {}
+
+			#[derive(Accounts, Debug)]
+			pub struct DuplicateMutableAccounts<'a> {
+				pub account1: &'a AccountView,
+				pub account2: &'a AccountView,
+			}
+
+			impl<'a> ProcessAccountInfos<'a> for DuplicateMutableAccounts<'a> {
+				fn process(&self, _data: &[u8]) -> ProgramResult {
+					Ok(())
+				}
+			}
+
+			pub mod entrypoint {
+				use super::*;
+
+				pub fn process_instruction(
+					program_id: &Address,
+					accounts: &[AccountView],
+					data: &[u8],
+				) -> ProgramResult {
+					let instruction: DuplicateMutableInstruction = parse_instruction(program_id, &ID, data)?;
+
+					match instruction {
+						DuplicateMutableInstruction::FailsDuplicateMutable => {
+							DuplicateMutableAccounts::try_from(accounts)?.process(data)
+						}
+						DuplicateMutableInstruction::AllowsDuplicateMutable => {
+							let _ = AllowsDuplicateMutableInstruction::try_from_bytes(data)?;
+							Ok(())
+						}
+					}
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let ir =
+			assemble_program_ir(&file, "duplicate").unwrap_or_else(|e| panic!("assemble: {e}"));
+
+		assert_eq!(ir.instructions.len(), 2);
+		assert_eq!(ir.instructions[0].name, "fails_duplicate_mutable");
+		assert_eq!(ir.instructions[0].accounts.len(), 2);
+		assert_eq!(ir.instructions[1].name, "allows_duplicate_mutable");
+		assert!(ir.instructions[1].accounts.is_empty());
 	}
 }

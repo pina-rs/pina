@@ -6,9 +6,101 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { type Address } from "@solana/kit";
+import {
+	type Address,
+	type ClientWithTransactionPlanning,
+	type ClientWithTransactionSending,
+	containsBytes,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+	SolanaError,
+} from "@solana/kit";
+import {
+	addSelfPlanAndSendFunctions,
+	type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import {
+	getHelloInstruction,
+	type HelloInput,
+	type ParsedHelloInstruction,
+	parseHelloInstruction,
+} from "../instructions";
 
 export const PINA_BPF_PROGRAM_ADDRESS =
 	"2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe" as Address<
 		"2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe"
 	>;
+
+export enum PinaBpfInstruction {
+	Hello,
+}
+
+export function identifyPinaBpfInstruction(
+	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): PinaBpfInstruction {
+	const data = "data" in instruction ? instruction.data : instruction;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return PinaBpfInstruction.Hello;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+		{ instructionData: data, programName: "pinaBpf" },
+	);
+}
+
+export type ParsedPinaBpfInstruction<
+	TProgram extends string = "2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe",
+> =
+	& { instructionType: PinaBpfInstruction.Hello }
+	& ParsedHelloInstruction<TProgram>;
+
+export function parsePinaBpfInstruction<TProgram extends string>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedPinaBpfInstruction<TProgram> {
+	const instructionType = identifyPinaBpfInstruction(instruction);
+	switch (instructionType) {
+		case PinaBpfInstruction.Hello: {
+			return {
+				instructionType: PinaBpfInstruction.Hello,
+				...parseHelloInstruction(instruction),
+			};
+		}
+		default:
+			throw new SolanaError(
+				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+				{ instructionType: instructionType as string, programName: "pinaBpf" },
+			);
+	}
+}
+
+export type PinaBpfPlugin = { instructions: PinaBpfPluginInstructions };
+
+export type PinaBpfPluginInstructions = {
+	hello: (
+		input: HelloInput,
+	) => ReturnType<typeof getHelloInstruction> & SelfPlanAndSendFunctions;
+};
+
+export type PinaBpfPluginRequirements =
+	& ClientWithTransactionPlanning
+	& ClientWithTransactionSending;
+
+export function pinaBpfProgram() {
+	return <T extends PinaBpfPluginRequirements>(client: T) => {
+		return {
+			...client,
+			pinaBpf: <PinaBpfPlugin> {
+				instructions: {
+					hello: (input) =>
+						addSelfPlanAndSendFunctions(client, getHelloInstruction(input)),
+				},
+			},
+		};
+	};
+}

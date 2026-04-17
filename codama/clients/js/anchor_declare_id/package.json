@@ -10,5 +10,8 @@
 	"author": "",
 	"peerDependencies": {
 		"@solana/kit": "^6.1.0"
+	},
+	"dependencies": {
+		"@solana/program-client-core": "^6.1.0"
 	}
 }

@@ -6,9 +6,154 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { type Address } from "@solana/kit";
+import {
+	type Address,
+	type ClientWithTransactionPlanning,
+	type ClientWithTransactionSending,
+	containsBytes,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+	SolanaError,
+} from "@solana/kit";
+import {
+	addSelfPlanAndSendFunctions,
+	type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import {
+	getInitializeInstruction,
+	getTestEventCpiInstruction,
+	getTestEventInstruction,
+	type InitializeInput,
+	type ParsedInitializeInstruction,
+	type ParsedTestEventCpiInstruction,
+	type ParsedTestEventInstruction,
+	parseInitializeInstruction,
+	parseTestEventCpiInstruction,
+	parseTestEventInstruction,
+	type TestEventCpiInput,
+	type TestEventInput,
+} from "../instructions";
 
 export const ANCHOR_EVENTS_PROGRAM_ADDRESS =
 	"2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy" as Address<
 		"2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy"
 	>;
+
+export enum AnchorEventsInstruction {
+	Initialize,
+	TestEvent,
+	TestEventCpi,
+}
+
+export function identifyAnchorEventsInstruction(
+	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): AnchorEventsInstruction {
+	const data = "data" in instruction ? instruction.data : instruction;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return AnchorEventsInstruction.Initialize;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return AnchorEventsInstruction.TestEvent;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return AnchorEventsInstruction.TestEventCpi;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+		{ instructionData: data, programName: "anchorEvents" },
+	);
+}
+
+export type ParsedAnchorEventsInstruction<
+	TProgram extends string = "2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy",
+> =
+	| { instructionType: AnchorEventsInstruction.Initialize }
+		& ParsedInitializeInstruction<TProgram>
+	| { instructionType: AnchorEventsInstruction.TestEvent }
+		& ParsedTestEventInstruction<TProgram>
+	| { instructionType: AnchorEventsInstruction.TestEventCpi }
+		& ParsedTestEventCpiInstruction<TProgram>;
+
+export function parseAnchorEventsInstruction<TProgram extends string>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedAnchorEventsInstruction<TProgram> {
+	const instructionType = identifyAnchorEventsInstruction(instruction);
+	switch (instructionType) {
+		case AnchorEventsInstruction.Initialize: {
+			return {
+				instructionType: AnchorEventsInstruction.Initialize,
+				...parseInitializeInstruction(instruction),
+			};
+		}
+		case AnchorEventsInstruction.TestEvent: {
+			return {
+				instructionType: AnchorEventsInstruction.TestEvent,
+				...parseTestEventInstruction(instruction),
+			};
+		}
+		case AnchorEventsInstruction.TestEventCpi: {
+			return {
+				instructionType: AnchorEventsInstruction.TestEventCpi,
+				...parseTestEventCpiInstruction(instruction),
+			};
+		}
+		default:
+			throw new SolanaError(
+				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+				{
+					instructionType: instructionType as string,
+					programName: "anchorEvents",
+				},
+			);
+	}
+}
+
+export type AnchorEventsPlugin = {
+	instructions: AnchorEventsPluginInstructions;
+};
+
+export type AnchorEventsPluginInstructions = {
+	initialize: (
+		input: InitializeInput,
+	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
+	testEvent: (
+		input: TestEventInput,
+	) => ReturnType<typeof getTestEventInstruction> & SelfPlanAndSendFunctions;
+	testEventCpi: (
+		input: TestEventCpiInput,
+	) => ReturnType<typeof getTestEventCpiInstruction> & SelfPlanAndSendFunctions;
+};
+
+export type AnchorEventsPluginRequirements =
+	& ClientWithTransactionPlanning
+	& ClientWithTransactionSending;
+
+export function anchorEventsProgram() {
+	return <T extends AnchorEventsPluginRequirements>(client: T) => {
+		return {
+			...client,
+			anchorEvents: <AnchorEventsPlugin> {
+				instructions: {
+					initialize: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getInitializeInstruction(input),
+						),
+					testEvent: (input) =>
+						addSelfPlanAndSendFunctions(client, getTestEventInstruction(input)),
+					testEventCpi: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getTestEventCpiInstruction(input),
+						),
+				},
+			},
+		};
+	};
+}

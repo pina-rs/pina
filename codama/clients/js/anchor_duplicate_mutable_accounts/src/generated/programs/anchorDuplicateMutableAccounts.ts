@@ -25,11 +25,15 @@ import {
 	type SelfPlanAndSendFunctions,
 } from "@solana/program-client-core";
 import {
+	type AllowsDuplicateMutableInput,
 	type AllowsDuplicateReadonlyInput,
 	type FailsDuplicateMutableInput,
+	getAllowsDuplicateMutableInstruction,
 	getAllowsDuplicateReadonlyInstruction,
 	getFailsDuplicateMutableInstruction,
+	parseAllowsDuplicateMutableInstruction,
 	parseAllowsDuplicateReadonlyInstruction,
+	type ParsedAllowsDuplicateMutableInstruction,
 	type ParsedAllowsDuplicateReadonlyInstruction,
 	type ParsedFailsDuplicateMutableInstruction,
 	parseFailsDuplicateMutableInstruction,
@@ -42,6 +46,7 @@ export const ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ADDRESS =
 
 export enum AnchorDuplicateMutableAccountsInstruction {
 	FailsDuplicateMutable,
+	AllowsDuplicateMutable,
 	AllowsDuplicateReadonly,
 }
 
@@ -51,6 +56,9 @@ export function identifyAnchorDuplicateMutableAccountsInstruction(
 	const data = "data" in instruction ? instruction.data : instruction;
 	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
 		return AnchorDuplicateMutableAccountsInstruction.FailsDuplicateMutable;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return AnchorDuplicateMutableAccountsInstruction.AllowsDuplicateMutable;
 	}
 	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
 		return AnchorDuplicateMutableAccountsInstruction.AllowsDuplicateReadonly;
@@ -68,6 +76,10 @@ export type ParsedAnchorDuplicateMutableAccountsInstruction<
 		instructionType:
 			AnchorDuplicateMutableAccountsInstruction.FailsDuplicateMutable;
 	} & ParsedFailsDuplicateMutableInstruction<TProgram>
+	| {
+		instructionType:
+			AnchorDuplicateMutableAccountsInstruction.AllowsDuplicateMutable;
+	} & ParsedAllowsDuplicateMutableInstruction<TProgram>
 	| {
 		instructionType:
 			AnchorDuplicateMutableAccountsInstruction.AllowsDuplicateReadonly;
@@ -90,6 +102,13 @@ export function parseAnchorDuplicateMutableAccountsInstruction<
 				instructionType:
 					AnchorDuplicateMutableAccountsInstruction.FailsDuplicateMutable,
 				...parseFailsDuplicateMutableInstruction(instruction),
+			};
+		}
+		case AnchorDuplicateMutableAccountsInstruction.AllowsDuplicateMutable: {
+			return {
+				instructionType:
+					AnchorDuplicateMutableAccountsInstruction.AllowsDuplicateMutable,
+				...parseAllowsDuplicateMutableInstruction(instruction),
 			};
 		}
 		case AnchorDuplicateMutableAccountsInstruction.AllowsDuplicateReadonly: {
@@ -121,6 +140,11 @@ export type AnchorDuplicateMutableAccountsPluginInstructions = {
 	) =>
 		& ReturnType<typeof getFailsDuplicateMutableInstruction>
 		& SelfPlanAndSendFunctions;
+	allowsDuplicateMutable: (
+		input: AllowsDuplicateMutableInput,
+	) =>
+		& ReturnType<typeof getAllowsDuplicateMutableInstruction>
+		& SelfPlanAndSendFunctions;
 	allowsDuplicateReadonly: (
 		input: AllowsDuplicateReadonlyInput,
 	) =>
@@ -144,6 +168,11 @@ export function anchorDuplicateMutableAccountsProgram() {
 						addSelfPlanAndSendFunctions(
 							client,
 							getFailsDuplicateMutableInstruction(input),
+						),
+					allowsDuplicateMutable: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getAllowsDuplicateMutableInstruction(input),
 						),
 					allowsDuplicateReadonly: (input) =>
 						addSelfPlanAndSendFunctions(

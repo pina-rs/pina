@@ -37,9 +37,17 @@ import {
 } from "../accounts";
 import {
 	getInitializeInstruction,
+	getToggleCompletedInstruction,
+	getUpdateDigestInstruction,
 	type InitializeInput,
 	type ParsedInitializeInstruction,
+	type ParsedToggleCompletedInstruction,
+	type ParsedUpdateDigestInstruction,
 	parseInitializeInstruction,
+	parseToggleCompletedInstruction,
+	parseUpdateDigestInstruction,
+	type ToggleCompletedInput,
+	type UpdateDigestInput,
 } from "../instructions";
 import { findTodoPda } from "../pdas";
 
@@ -67,6 +75,8 @@ export function identifyTodoProgramAccount(
 
 export enum TodoProgramInstruction {
 	Initialize,
+	ToggleCompleted,
+	UpdateDigest,
 }
 
 export function identifyTodoProgramInstruction(
@@ -75,6 +85,12 @@ export function identifyTodoProgramInstruction(
 	const data = "data" in instruction ? instruction.data : instruction;
 	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
 		return TodoProgramInstruction.Initialize;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return TodoProgramInstruction.ToggleCompleted;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return TodoProgramInstruction.UpdateDigest;
 	}
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
@@ -85,8 +101,12 @@ export function identifyTodoProgramInstruction(
 export type ParsedTodoProgramInstruction<
 	TProgram extends string = "Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd",
 > =
-	& { instructionType: TodoProgramInstruction.Initialize }
-	& ParsedInitializeInstruction<TProgram>;
+	| { instructionType: TodoProgramInstruction.Initialize }
+		& ParsedInitializeInstruction<TProgram>
+	| { instructionType: TodoProgramInstruction.ToggleCompleted }
+		& ParsedToggleCompletedInstruction<TProgram>
+	| { instructionType: TodoProgramInstruction.UpdateDigest }
+		& ParsedUpdateDigestInstruction<TProgram>;
 
 export function parseTodoProgramInstruction<TProgram extends string>(
 	instruction:
@@ -100,6 +120,20 @@ export function parseTodoProgramInstruction<TProgram extends string>(
 			return {
 				instructionType: TodoProgramInstruction.Initialize,
 				...parseInitializeInstruction(instruction),
+			};
+		}
+		case TodoProgramInstruction.ToggleCompleted: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: TodoProgramInstruction.ToggleCompleted,
+				...parseToggleCompletedInstruction(instruction),
+			};
+		}
+		case TodoProgramInstruction.UpdateDigest: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: TodoProgramInstruction.UpdateDigest,
+				...parseUpdateDigestInstruction(instruction),
 			};
 		}
 		default:
@@ -129,6 +163,14 @@ export type TodoProgramPluginInstructions = {
 	initialize: (
 		input: InitializeInput,
 	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
+	toggleCompleted: (
+		input: ToggleCompletedInput,
+	) =>
+		& ReturnType<typeof getToggleCompletedInstruction>
+		& SelfPlanAndSendFunctions;
+	updateDigest: (
+		input: UpdateDigestInput,
+	) => ReturnType<typeof getUpdateDigestInstruction> & SelfPlanAndSendFunctions;
 };
 
 export type TodoProgramPluginPdas = { todo: typeof findTodoPda };
@@ -151,6 +193,16 @@ export function todoProgramProgram() {
 						addSelfPlanAndSendFunctions(
 							client,
 							getInitializeInstruction(input),
+						),
+					toggleCompleted: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getToggleCompletedInstruction(input),
+						),
+					updateDigest: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getUpdateDigestInstruction(input),
 						),
 				},
 				pdas: { todo: findTodoPda },

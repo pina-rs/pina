@@ -10,7 +10,11 @@ pub struct DispatchEntry {
 	/// The discriminator enum variant name (e.g. `"Initialize"`).
 	pub variant: String,
 	/// The accounts struct name (e.g. `"InitializeAccounts"`).
-	pub accounts_struct: String,
+	///
+	/// `None` means the instruction arm does not route through a
+	/// `StructName::try_from(accounts)?.process(data)` pattern and therefore has
+	/// no extractable accounts metadata.
+	pub accounts_struct: Option<String>,
 }
 
 /// Extract the instruction dispatch map from `process_instruction` functions.
@@ -62,11 +66,7 @@ fn extract_from_expr(expr: &Expr, entries: &mut Vec<DispatchEntry>) {
 	match expr {
 		Expr::Match(m) => {
 			for arm in &m.arms {
-				let Some(entry) = parse_match_arm(arm) else {
-					continue;
-				};
-
-				entries.push(entry);
+				entries.extend(parse_match_arm(arm));
 			}
 		}
 
@@ -86,23 +86,58 @@ fn extract_from_expr(expr: &Expr, entries: &mut Vec<DispatchEntry>) {
 
 /// Parse a single match arm like:
 /// `Enum::Variant => StructName::try_from(accounts)?.process(data)`
-fn parse_match_arm(arm: &syn::Arm) -> Option<DispatchEntry> {
-	let variant = extract_variant_name(&arm.pat)?;
-	let accounts_struct = extract_accounts_struct_from_body(&arm.body)?;
+fn parse_match_arm(arm: &syn::Arm) -> Vec<DispatchEntry> {
+	let variants = extract_variant_names(&arm.pat);
+	if variants.is_empty() {
+		return Vec::new();
+	}
 
-	Some(DispatchEntry {
-		variant,
-		accounts_struct,
-	})
+	let accounts_struct = extract_accounts_struct_from_body(&arm.body);
+
+	variants
+		.into_iter()
+		.map(|variant| {
+			DispatchEntry {
+				variant,
+				accounts_struct: accounts_struct.clone(),
+			}
+		})
+		.collect()
 }
 
-/// Extract the variant name from a pattern like `Enum::Variant`.
-fn extract_variant_name(pat: &syn::Pat) -> Option<String> {
+/// Extract one or more variant names from a pattern like `Enum::Variant` or an
+/// or-pattern like `Enum::A | Enum::B`.
+fn extract_variant_names(pat: &syn::Pat) -> Vec<String> {
 	match pat {
-		syn::Pat::Path(pp) => pp.path.segments.last().map(|s| s.ident.to_string()),
-		syn::Pat::TupleStruct(ts) => ts.path.segments.last().map(|s| s.ident.to_string()),
-		syn::Pat::Struct(ps) => ps.path.segments.last().map(|s| s.ident.to_string()),
-		_ => None,
+		syn::Pat::Path(pp) => {
+			pp.path
+				.segments
+				.last()
+				.map(|s| vec![s.ident.to_string()])
+				.unwrap_or_default()
+		}
+		syn::Pat::TupleStruct(ts) => {
+			ts.path
+				.segments
+				.last()
+				.map(|s| vec![s.ident.to_string()])
+				.unwrap_or_default()
+		}
+		syn::Pat::Struct(ps) => {
+			ps.path
+				.segments
+				.last()
+				.map(|s| vec![s.ident.to_string()])
+				.unwrap_or_default()
+		}
+		syn::Pat::Or(or_pat) => {
+			or_pat
+				.cases
+				.iter()
+				.flat_map(extract_variant_names)
+				.collect()
+		}
+		_ => Vec::new(),
 	}
 }
 
@@ -165,9 +200,15 @@ mod tests {
 		let dispatch = extract_dispatch_map(&file);
 		assert_eq!(dispatch.len(), 2);
 		assert_eq!(dispatch[0].variant, "Initialize");
-		assert_eq!(dispatch[0].accounts_struct, "InitializeAccounts");
+		assert_eq!(
+			dispatch[0].accounts_struct,
+			Some("InitializeAccounts".to_owned())
+		);
 		assert_eq!(dispatch[1].variant, "Increment");
-		assert_eq!(dispatch[1].accounts_struct, "IncrementAccounts");
+		assert_eq!(
+			dispatch[1].accounts_struct,
+			Some("IncrementAccounts".to_owned())
+		);
 	}
 
 	#[test]
@@ -190,6 +231,77 @@ mod tests {
 		let dispatch = extract_dispatch_map(&file);
 		assert_eq!(dispatch.len(), 1);
 		assert_eq!(dispatch[0].variant, "Hello");
-		assert_eq!(dispatch[0].accounts_struct, "HelloAccounts");
+		assert_eq!(
+			dispatch[0].accounts_struct,
+			Some("HelloAccounts".to_owned())
+		);
+	}
+
+	#[test]
+	fn extracts_or_pattern_dispatch_entries() {
+		let source = r#"
+			mod entrypoint {
+				pub fn process_instruction(
+					program_id: &Address,
+					accounts: &[AccountView],
+					data: &[u8],
+				) -> ProgramResult {
+					let instruction: TodoInstruction = parse_instruction(program_id, &ID, data)?;
+					match instruction {
+						TodoInstruction::Initialize => {
+							InitializeAccounts::try_from(accounts)?.process(data)
+						}
+						TodoInstruction::ToggleCompleted | TodoInstruction::UpdateDigest => {
+							UpdateAccounts::try_from(accounts)?.process(data)
+						}
+					}
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let dispatch = extract_dispatch_map(&file);
+		assert_eq!(dispatch.len(), 3);
+		assert_eq!(dispatch[0].variant, "Initialize");
+		assert_eq!(dispatch[1].variant, "ToggleCompleted");
+		assert_eq!(dispatch[2].variant, "UpdateDigest");
+		assert!(dispatch.iter().all(|entry| {
+			matches!(
+				entry.accounts_struct.as_deref(),
+				Some("InitializeAccounts") | Some("UpdateAccounts")
+			)
+		}));
+	}
+
+	#[test]
+	fn extracts_accountless_dispatch_entries() {
+		let source = r#"
+			mod entrypoint {
+				pub fn process_instruction(
+					program_id: &Address,
+					accounts: &[AccountView],
+					data: &[u8],
+				) -> ProgramResult {
+					let instruction: DuplicateMutableInstruction = parse_instruction(program_id, &ID, data)?;
+					match instruction {
+						DuplicateMutableInstruction::AllowsDuplicateMutable => {
+							let _ = AllowsDuplicateMutableInstruction::try_from_bytes(data)?;
+							Ok(())
+						}
+						DuplicateMutableInstruction::AllowsDuplicateReadonly => {
+							DuplicateReadonlyAccounts::try_from(accounts)?.process(data)
+						}
+					}
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let dispatch = extract_dispatch_map(&file);
+		assert_eq!(dispatch.len(), 2);
+		assert_eq!(dispatch[0].variant, "AllowsDuplicateMutable");
+		assert_eq!(dispatch[0].accounts_struct, None);
+		assert_eq!(
+			dispatch[1].accounts_struct,
+			Some("DuplicateReadonlyAccounts".to_owned())
+		);
 	}
 }
