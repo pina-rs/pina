@@ -615,6 +615,80 @@ fn withdraw_from_paused_pool_fails() {
 	);
 }
 
+/// Withdrawing zero tokens must fail with `InvalidAmount` before any state
+/// mutation occurs.
+#[test]
+fn withdraw_zero_amount_fails() {
+	let Some(mollusk) = try_create_mollusk() else {
+		eprintln!("{SKIP_MSG}");
+		return;
+	};
+
+	let user = Pubkey::new_unique();
+	let stake_mint = Pubkey::new_unique();
+	let pool_state_key = Pubkey::new_unique();
+	let position_state_key = Pubkey::new_unique();
+	let admin = Pubkey::new_unique();
+	let reward_mint = Pubkey::new_unique();
+	let user_stake_ata = derive_ata(&user, &stake_mint);
+
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
+	let pos_lamports = mollusk
+		.sysvars
+		.rent
+		.minimum_balance(size_of::<PositionState>());
+
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&withdraw_ix_data(0),
+		vec![
+			AccountMeta::new(user, true),
+			AccountMeta::new_readonly(stake_mint, false),
+			AccountMeta::new(pool_state_key, false),
+			AccountMeta::new(position_state_key, false),
+			AccountMeta::new(user_stake_ata, false),
+			AccountMeta::new_readonly(spl_token_program_id(), false),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+		],
+	);
+
+	let accounts = vec![
+		(
+			user,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
+		(stake_mint, mock_mint_account(1_000_000)),
+		(
+			pool_state_key,
+			pool_state_account(
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				200,
+				false,
+				0,
+				pool_lamports,
+			),
+		),
+		(
+			position_state_key,
+			position_state_account(&pool_state_key, &user, 100, 0, 0, 0, pos_lamports),
+		),
+		(
+			user_stake_ata,
+			Account::new(1, 165, &spl_token_program_id()),
+		),
+		token_program_account(),
+		keyed_account_for_system_program(),
+	];
+
+	mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(StakingError::InvalidAmount.into())],
+	);
+}
+
 /// Trying to withdraw from a position owned by a different signer must fail
 /// with `Unauthorized`.
 #[test]
@@ -840,6 +914,155 @@ fn deposit_paused_pool_fails() {
 	);
 }
 
+/// Depositing zero tokens must fail with `InvalidAmount` before the ATA CPI is
+/// attempted.
+#[test]
+fn deposit_zero_amount_fails() {
+	let Some(mollusk) = try_create_mollusk() else {
+		eprintln!("{SKIP_MSG}");
+		return;
+	};
+
+	let user = Pubkey::new_unique();
+	let stake_mint = Pubkey::new_unique();
+	let pool_state_key = Pubkey::new_unique();
+	let position_state_key = Pubkey::new_unique();
+	let admin = Pubkey::new_unique();
+	let reward_mint = Pubkey::new_unique();
+	let user_stake_ata = derive_ata(&user, &stake_mint);
+
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
+	let pos_lamports = mollusk
+		.sysvars
+		.rent
+		.minimum_balance(size_of::<PositionState>());
+
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&deposit_ix_data(0),
+		vec![
+			AccountMeta::new(user, true),
+			AccountMeta::new_readonly(stake_mint, false),
+			AccountMeta::new(pool_state_key, false),
+			AccountMeta::new(position_state_key, false),
+			AccountMeta::new(user_stake_ata, false),
+			AccountMeta::new_readonly(spl_token_program_id(), false),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+		],
+	);
+
+	let accounts = vec![
+		(
+			user,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
+		(stake_mint, mock_mint_account(1_000_000)),
+		(
+			pool_state_key,
+			pool_state_account(
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				0,
+				false,
+				0,
+				pool_lamports,
+			),
+		),
+		(
+			position_state_key,
+			position_state_account(&pool_state_key, &user, 0, 0, 0, 0, pos_lamports),
+		),
+		(
+			user_stake_ata,
+			Account::new(1, 165, &spl_token_program_id()),
+		),
+		token_program_account(),
+		keyed_account_for_system_program(),
+	];
+
+	mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(StakingError::InvalidAmount.into())],
+	);
+}
+
+/// Depositing with a stake mint that does not match the pool configuration
+/// must fail with `InvalidPool`.
+#[test]
+fn deposit_wrong_stake_mint_fails() {
+	let Some(mollusk) = try_create_mollusk() else {
+		eprintln!("{SKIP_MSG}");
+		return;
+	};
+
+	let user = Pubkey::new_unique();
+	let pool_stake_mint = Pubkey::new_unique();
+	let wrong_stake_mint = Pubkey::new_unique();
+	let pool_state_key = Pubkey::new_unique();
+	let position_state_key = Pubkey::new_unique();
+	let admin = Pubkey::new_unique();
+	let reward_mint = Pubkey::new_unique();
+	let user_stake_ata = derive_ata(&user, &wrong_stake_mint);
+
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
+	let pos_lamports = mollusk
+		.sysvars
+		.rent
+		.minimum_balance(size_of::<PositionState>());
+
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&deposit_ix_data(10),
+		vec![
+			AccountMeta::new(user, true),
+			AccountMeta::new_readonly(wrong_stake_mint, false),
+			AccountMeta::new(pool_state_key, false),
+			AccountMeta::new(position_state_key, false),
+			AccountMeta::new(user_stake_ata, false),
+			AccountMeta::new_readonly(spl_token_program_id(), false),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+		],
+	);
+
+	let accounts = vec![
+		(
+			user,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
+		(wrong_stake_mint, mock_mint_account(1_000_000)),
+		(
+			pool_state_key,
+			pool_state_account(
+				&admin,
+				&pool_stake_mint,
+				&reward_mint,
+				0,
+				false,
+				0,
+				pool_lamports,
+			),
+		),
+		(
+			position_state_key,
+			position_state_account(&pool_state_key, &user, 0, 0, 0, 0, pos_lamports),
+		),
+		(
+			user_stake_ata,
+			Account::new(1, 165, &spl_token_program_id()),
+		),
+		token_program_account(),
+		keyed_account_for_system_program(),
+	];
+
+	mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(StakingError::InvalidPool.into())],
+	);
+}
+
 /// Depositing into a position that belongs to a different owner must fail with
 /// `InvalidAmount`.
 ///
@@ -988,6 +1211,81 @@ fn claim_wrong_pool_fails() {
 		(
 			position_state_key,
 			position_state_account(&other_pool_key, &user, 0, 0, 0, 0, pos_lamports),
+		),
+		(
+			user_reward_ata,
+			Account::new(1, 165, &spl_token_program_id()),
+		),
+		token_program_account(),
+		keyed_account_for_system_program(),
+	];
+
+	mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(StakingError::InvalidPool.into())],
+	);
+}
+
+/// Claiming with a reward mint that does not match the pool configuration must
+/// fail with `InvalidPool` before any ATA CPI is attempted.
+#[test]
+fn claim_wrong_reward_mint_fails() {
+	let Some(mollusk) = try_create_mollusk() else {
+		eprintln!("{SKIP_MSG}");
+		return;
+	};
+
+	let user = Pubkey::new_unique();
+	let pool_reward_mint = Pubkey::new_unique();
+	let wrong_reward_mint = Pubkey::new_unique();
+	let pool_state_key = Pubkey::new_unique();
+	let position_state_key = Pubkey::new_unique();
+	let admin = Pubkey::new_unique();
+	let stake_mint = Pubkey::new_unique();
+	let user_reward_ata = derive_ata(&user, &wrong_reward_mint);
+
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
+	let pos_lamports = mollusk
+		.sysvars
+		.rent
+		.minimum_balance(size_of::<PositionState>());
+
+	let instruction = Instruction::new_with_bytes(
+		program_id(),
+		&claim_ix_data(),
+		vec![
+			AccountMeta::new(user, true),
+			AccountMeta::new_readonly(wrong_reward_mint, false),
+			AccountMeta::new(pool_state_key, false),
+			AccountMeta::new(position_state_key, false),
+			AccountMeta::new(user_reward_ata, false),
+			AccountMeta::new_readonly(spl_token_program_id(), false),
+			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+		],
+	);
+
+	let accounts = vec![
+		(
+			user,
+			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+		),
+		(wrong_reward_mint, mock_mint_account(1_000_000)),
+		(
+			pool_state_key,
+			pool_state_account(
+				&admin,
+				&stake_mint,
+				&pool_reward_mint,
+				0,
+				false,
+				0,
+				pool_lamports,
+			),
+		),
+		(
+			position_state_key,
+			position_state_account(&pool_state_key, &user, 0, 0, 0, 0, pos_lamports),
 		),
 		(
 			user_reward_ata,

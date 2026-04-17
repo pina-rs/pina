@@ -200,6 +200,34 @@ macro_rules! position_seeds {
 	};
 }
 
+fn assert_pool_stake_mint(pool_state: &PoolState, stake_mint: &AccountView) -> ProgramResult {
+	stake_mint
+		.assert_address(&pool_state.stake_mint)
+		.map(|_| ())
+		.map_err(|_| ProgramError::from(StakingError::InvalidPool))
+}
+
+fn assert_pool_reward_mint(pool_state: &PoolState, reward_mint: &AccountView) -> ProgramResult {
+	reward_mint
+		.assert_address(&pool_state.reward_mint)
+		.map(|_| ())
+		.map_err(|_| ProgramError::from(StakingError::InvalidPool))
+}
+
+fn assert_position_access(
+	pool_state: &AccountView,
+	user: &AccountView,
+	position_state: &PositionState,
+) -> ProgramResult {
+	pool_state
+		.assert_address(&position_state.pool)
+		.map(|_| ())
+		.map_err(|_| ProgramError::from(StakingError::InvalidPool))?;
+	user.assert_address(&position_state.owner)
+		.map(|_| ())
+		.map_err(|_| ProgramError::from(StakingError::Unauthorized))
+}
+
 impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
 		// Parse instruction and prepare PDA seeds
@@ -378,12 +406,11 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 		if bool::from(pool_state.paused) {
 			return Err(StakingError::PoolPaused.into());
 		}
-		if position_state.pool != *self.pool_state.address() {
+		if amount == 0 {
 			return Err(StakingError::InvalidAmount.into());
 		}
-		if position_state.owner != *self.user.address() {
-			return Err(StakingError::InvalidAmount.into());
-		}
+		assert_pool_stake_mint(pool_state, self.stake_mint)?;
+		assert_position_access(self.pool_state, self.user, position_state)?;
 
 		// Calculate updated amounts
 		let staked_amount = u64::from(position_state.staked_amount);
@@ -456,12 +483,11 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 		if bool::from(pool_state.paused) {
 			return Err(StakingError::PoolPaused.into());
 		}
-		self.pool_state
-			.assert_address(&position_state.pool)
-			.map_err(|_| ProgramError::from(StakingError::InvalidPool))?;
-		self.user
-			.assert_address(&position_state.owner)
-			.map_err(|_| ProgramError::from(StakingError::Unauthorized))?;
+		if amount == 0 {
+			return Err(StakingError::InvalidAmount.into());
+		}
+		assert_pool_stake_mint(pool_state, self.stake_mint)?;
+		assert_position_access(self.pool_state, self.user, position_state)?;
 
 		let staked_amount = u64::from(position_state.staked_amount);
 		if amount > staked_amount {
@@ -511,12 +537,8 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		if bool::from(pool_state.paused) {
 			return Err(StakingError::PoolPaused.into());
 		}
-		self.pool_state
-			.assert_address(&position_state.pool)
-			.map_err(|_| ProgramError::from(StakingError::InvalidPool))?;
-		self.user
-			.assert_address(&position_state.owner)
-			.map_err(|_| ProgramError::from(StakingError::Unauthorized))?;
+		assert_pool_reward_mint(pool_state, self.reward_mint)?;
+		assert_position_access(self.pool_state, self.user, position_state)?;
 
 		// Calculate and update pending rewards
 		let next_pending = u64::from(position_state.pending_rewards)
