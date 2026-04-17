@@ -78,6 +78,10 @@ pub fn has_prior_method_with_receiver_match(
 		.any(|call| methods.contains(&call.method.as_str()) && &call.receiver == receiver)
 }
 
+pub const CONTROL_FLOW_LIMITATION_HELP: &str = "heuristic limitation: this lint tracks lexical \
+                                                call order and merges `if`/`match` branches, so \
+                                                review branch-sensitive code manually";
+
 pub fn should_skip_def_path(def_path: &str) -> bool {
 	def_path.contains("tests")
 		|| def_path.contains("benchmarks")

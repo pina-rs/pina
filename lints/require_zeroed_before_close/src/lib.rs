@@ -72,6 +72,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireZeroedBeforeClose {
 					diag.help(
 						"call `account.zeroed()?` before closing to reduce stale-data reuse risk",
 					);
+					diag.help(shared::CONTROL_FLOW_LIMITATION_HELP);
 				});
 			}
 		}

@@ -73,6 +73,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireAssociatedTokenAddressBeforeAtaCast {
 						"call `account.assert_associated_token_address(owner, mint, \
 						 token_program)?` before `as_associated_token_account()`",
 					);
+					diag.help(shared::CONTROL_FLOW_LIMITATION_HELP);
 				});
 			}
 		}

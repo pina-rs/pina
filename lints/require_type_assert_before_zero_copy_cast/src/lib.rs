@@ -104,6 +104,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireTypeAssertBeforeZeroCopyCast {
 						"prefer `assert_type::<T>()` or `as_account::<T>()` over raw \
 						 `bytemuck::try_from_bytes` casts",
 					);
+					diag.help(shared::CONTROL_FLOW_LIMITATION_HELP);
 				});
 			}
 		}

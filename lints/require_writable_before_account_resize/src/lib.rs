@@ -71,6 +71,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireWritableBeforeAccountResize {
 						 account",
 					);
 					diag.help("call `account.assert_writable()?` before `resize()`");
+					diag.help(shared::CONTROL_FLOW_LIMITATION_HELP);
 				});
 			}
 		}

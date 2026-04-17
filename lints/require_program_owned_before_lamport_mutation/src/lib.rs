@@ -74,6 +74,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireProgramOwnedBeforeLamportMutation {
 						"add `account.assert_owner(&program_id)?` or \
 						 `account.assert_owners(&[...])?` before mutating lamports",
 					);
+					diag.help(shared::CONTROL_FLOW_LIMITATION_HELP);
 				});
 			}
 		}
