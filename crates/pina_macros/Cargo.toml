@@ -23,6 +23,7 @@ syn = { workspace = true, default-features = true, features = ["full"] }
 insta = { workspace = true, default-features = true }
 pina = { workspace = true, default-features = true }
 prettyplease = { workspace = true, default-features = true }
+trybuild = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

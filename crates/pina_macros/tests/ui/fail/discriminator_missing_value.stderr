@@ -1,0 +1,5 @@
+error: Enum variant for discriminator must have an explicit value.
+ --> tests/ui/fail/discriminator_missing_value.rs:5:2
+  |
+5 |     Value,
+  |     ^^^^^

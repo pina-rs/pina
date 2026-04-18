@@ -1,0 +1,7 @@
+error: Account structs must have named fields
+ --> tests/ui/fail/account_tuple_struct.rs:8:1
+  |
+8 | #[account(discriminator = AccountKind, variant = TupleAccount)]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `account` (in Nightly builds, run with -Z macro-backtrace for more info)
