@@ -39,6 +39,8 @@ Feature flags:
 
 <!-- {/pinaFeatureFlags} -->
 
+See [ADR 0004](./adrs/0004-no-std-and-no-allocator-boundary.md) and [ADR 0005](./adrs/0005-token-feature-boundaries.md) for the architectural rationale behind these feature and runtime boundaries.
+
 ## `crates/pina_macros`
 
 Proc-macro crate used by `pina`.

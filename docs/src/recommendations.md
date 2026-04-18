@@ -34,12 +34,13 @@ Goal alignment: developer experience.
 - Improve error messages to include expected/actual forms and actionable fix text.
 - Maintain a docs page mapping macro attributes to generated behaviors.
 
-## 5. Centralize architecture decision records
+## 5. Keep architecture decision records current
 
 Goal alignment: maintainability.
 
-- Add ADR-style markdown files (for example, discriminator approach, token feature boundaries, no-allocator policy).
-- Require new architecture-impacting PRs to link/update an ADR.
+- Link architecture-impacting pull requests to the ADR they follow or update.
+- Add a new ADR when a public invariant, compatibility contract, or verification policy changes materially.
+- Periodically review older ADRs and mark them superseded when the project direction changes.
 
 ## 6. Publish a migration guide from Anchor-style patterns
 
