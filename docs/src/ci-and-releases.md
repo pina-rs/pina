@@ -9,12 +9,17 @@ The GitHub CI workflow verifies:
 - `verify:docs`
 - `verify:security`
 - `test:all` (`cargo test --all-features --locked`)
+- `feature-matrix` for `pina` across explicit configurations:
+  - `default` (`build:pina:default` + `test:pina:default`)
+  - `no-default` (`build:pina:no-default-only` + `test:pina:no-default` + `doc:pina:no-default`)
+  - `token-only` (`build:pina:token-only` + `test:pina:token-only`)
+  - `all-features` (`build:pina:all-features` + `test:pina:all-features`)
 - `test:program-e2e` (Example program tests, SBF builds, mollusk-svm integration tests, and BPF artifact verification)
 - `test:idl` (regenerate `codama/idls`, `codama/clients/rust`, `codama/clients/js`, validate outputs, and fail on any diff)
 - `cargo build --locked`
 - `cargo build --all-features --locked`
 
-This keeps code quality, behavior, and documentation build health aligned.
+This keeps code quality, behavior, documentation build health, and feature-flag compatibility aligned.
 
 ## Coverage
 
