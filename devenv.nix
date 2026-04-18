@@ -118,7 +118,7 @@ in
         pass_filenames = false;
         name = "lint and test";
         description = "Run the local CI lint rules suite before push.";
-        entry = "${config.env.DEVENV_PROFILE}/bin/lint:all && ${config.env.DEVENV_PROFILE}/bin/test:all";
+        entry = "${config.env.DEVENV_PROFILE}/bin/lint:all && ${config.env.DEVENV_PROFILE}/bin/test:all ${config.env.DEVENV_PROFILE}/bin/test:idl";
         stages = [ "pre-push" ];
       };
     };
