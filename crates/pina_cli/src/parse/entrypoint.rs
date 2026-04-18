@@ -145,21 +145,12 @@ fn extract_variant_names(pat: &syn::Pat) -> Vec<String> {
 /// `StructName::try_from(accounts)?.process(data)`
 fn extract_accounts_struct_from_body(expr: &Expr) -> Option<String> {
 	match expr {
-		// .process(data)
-		Expr::MethodCall(mc) => extract_accounts_struct_from_body(&mc.receiver),
-		// StructName::try_from(accounts)?
-		Expr::Try(t) => extract_accounts_struct_from_body(&t.expr),
-		// StructName::try_from(accounts)
-		Expr::Call(call) => {
-			if let Expr::Path(p) = &*call.func {
-				// The first segment before `::try_from` is the struct name.
-				if p.path.segments.len() >= 2 {
-					return Some(p.path.segments[0].ident.to_string());
-				}
-			}
-			None
+		Expr::MethodCall(mc) if mc.method == "process" => {
+			extract_accounts_struct_from_body(&mc.receiver)
 		}
-		// Blocks wrapping the expression
+		Expr::MethodCall(_) => None,
+		Expr::Try(t) => extract_accounts_struct_from_body(&t.expr),
+		Expr::Call(call) => extract_accounts_struct_from_call(call),
 		Expr::Block(b) => {
 			if let Some(Stmt::Expr(expr, _)) = b.block.stmts.last() {
 				extract_accounts_struct_from_body(expr)
@@ -169,6 +160,30 @@ fn extract_accounts_struct_from_body(expr: &Expr) -> Option<String> {
 		}
 		_ => None,
 	}
+}
+
+fn extract_accounts_struct_from_call(call: &syn::ExprCall) -> Option<String> {
+	let Expr::Path(path) = &*call.func else {
+		return None;
+	};
+
+	if path.path.segments.len() != 2 {
+		return None;
+	}
+
+	if path.path.segments.last()?.ident != "try_from" {
+		return None;
+	}
+
+	if call.args.len() != 1 || !expr_is_ident(call.args.first()?, "accounts") {
+		return None;
+	}
+
+	Some(path.path.segments.first()?.ident.to_string())
+}
+
+fn expr_is_ident(expr: &Expr, ident: &str) -> bool {
+	matches!(expr, Expr::Path(path) if path.path.is_ident(ident))
 }
 
 #[cfg(test)]
@@ -303,5 +318,31 @@ mod tests {
 			dispatch[1].accounts_struct,
 			Some("DuplicateReadonlyAccounts".to_owned())
 		);
+	}
+
+	#[test]
+	fn ignores_non_try_from_associated_calls() {
+		let source = r#"
+			mod entrypoint {
+				pub fn process_instruction(
+					program_id: &Address,
+					accounts: &[AccountView],
+					data: &[u8],
+				) -> ProgramResult {
+					let instruction: ExampleInstruction = parse_instruction(program_id, &ID, data)?;
+					match instruction {
+						ExampleInstruction::ParseOnly => Payload::parse(data),
+						ExampleInstruction::HelperProcess => Handler::helper(data)?.process(data),
+					}
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let dispatch = extract_dispatch_map(&file);
+		assert_eq!(dispatch.len(), 2);
+		assert_eq!(dispatch[0].variant, "ParseOnly");
+		assert_eq!(dispatch[0].accounts_struct, None);
+		assert_eq!(dispatch[1].variant, "HelperProcess");
+		assert_eq!(dispatch[1].accounts_struct, None);
 	}
 }
