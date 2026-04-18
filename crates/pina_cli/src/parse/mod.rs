@@ -131,28 +131,36 @@ fn assemble_from_extracted(
 	validation_props: &HashMap<String, HashMap<String, validation::AccountProperties>>,
 	pdas_ir: &[PdaIr],
 ) -> Result<ProgramIr, IdlError> {
+	let discriminator_map = build_discriminator_map(disc_enums);
+
 	// Step 2: Build accounts IR.
 	let accounts: Vec<AccountIr> = account_structs
 		.iter()
 		.map(|acct| {
-			let disc_value =
-				find_discriminator_value(disc_enums, &acct.discriminator_enum, &acct.name);
-			AccountIr {
-				name: acct.name.clone(),
-				fields: acct.fields.clone(),
-				discriminator: disc_value,
-				docs: acct.docs.clone(),
-			}
+			resolve_discriminator_value(
+				&discriminator_map,
+				&acct.discriminator_enum,
+				&acct.name,
+				"account",
+			)
+			.map(|disc_value| {
+				AccountIr {
+					name: acct.name.clone(),
+					fields: acct.fields.clone(),
+					discriminator: disc_value,
+					docs: acct.docs.clone(),
+				}
+			})
 		})
-		.collect();
+		.collect::<Result<_, _>>()?;
 
 	// Step 3: Build instructions IR by connecting dispatch, accounts structs,
 	// instruction data, and validation properties.
 	let instructions = if dispatch.is_empty() {
-		build_accountless_instructions_from_structs(instruction_structs, disc_enums)
+		build_accountless_instructions_from_structs(instruction_structs, &discriminator_map)?
 	} else {
 		build_instructions_from_dispatch(
-			disc_enums,
+			&discriminator_map,
 			instruction_structs,
 			ix_accounts_structs,
 			dispatch,
@@ -211,54 +219,21 @@ pub fn validate_program_ir(ir: &ProgramIr) -> Result<(), IdlError> {
 	Ok(())
 }
 
-/// Find the discriminator value for an account struct by matching the struct
-/// name to a variant in the discriminator enum.
-fn find_discriminator_value(
-	disc_enums: &[discriminator::DiscriminatorEnum],
-	enum_name: &str,
-	struct_name: &str,
-) -> DiscriminatorIr {
-	for disc in disc_enums {
-		if disc.name == enum_name {
-			for variant in &disc.variants {
-				if variant.name == struct_name {
-					return DiscriminatorIr {
-						value: variant.value,
-						repr_size: disc.repr_size,
-					};
-				}
-			}
-		}
-	}
-	// Fallback
-	DiscriminatorIr {
-		value: 0,
-		repr_size: 1,
-	}
-}
-
-/// Find the discriminator value by variant name.
-fn find_discriminator_value_by_variant(
-	disc_enums: &[discriminator::DiscriminatorEnum],
+fn resolve_discriminator_value(
+	discriminator_map: &HashMap<(String, String), DiscriminatorIr>,
 	enum_name: &str,
 	variant_name: &str,
-) -> DiscriminatorIr {
-	for disc in disc_enums {
-		if disc.name == enum_name {
-			for variant in &disc.variants {
-				if variant.name == variant_name {
-					return DiscriminatorIr {
-						value: variant.value,
-						repr_size: disc.repr_size,
-					};
-				}
-			}
-		}
-	}
-	DiscriminatorIr {
-		value: 0,
-		repr_size: 1,
-	}
+	kind: &str,
+) -> Result<DiscriminatorIr, IdlError> {
+	discriminator_map
+		.get(&(enum_name.to_owned(), variant_name.to_owned()))
+		.cloned()
+		.ok_or_else(|| {
+			IdlError::Other(format!(
+				"Could not resolve {kind} discriminator for variant `{variant_name}` of \
+				 discriminator `{enum_name}`"
+			))
+		})
 }
 
 /// Simple Cargo.toml parser to extract `name = "..."` from `[package]`.
@@ -307,28 +282,32 @@ pub fn build_discriminator_map(
 
 fn build_accountless_instructions_from_structs(
 	instruction_structs: &[instruction_data::InstructionStruct],
-	disc_enums: &[discriminator::DiscriminatorEnum],
-) -> Vec<InstructionIr> {
+	discriminator_map: &HashMap<(String, String), DiscriminatorIr>,
+) -> Result<Vec<InstructionIr>, IdlError> {
 	instruction_structs
 		.iter()
 		.map(|ix_struct| {
-			InstructionIr {
-				name: ix_struct.variant.to_snake_case(),
-				accounts: Vec::new(),
-				arguments: ix_struct.fields.clone(),
-				discriminator: find_discriminator_value_by_variant(
-					disc_enums,
-					&ix_struct.discriminator_enum,
-					&ix_struct.variant,
-				),
-				docs: ix_struct.docs.clone(),
-			}
+			resolve_discriminator_value(
+				discriminator_map,
+				&ix_struct.discriminator_enum,
+				&ix_struct.variant,
+				"instruction",
+			)
+			.map(|discriminator| {
+				InstructionIr {
+					name: ix_struct.variant.to_snake_case(),
+					accounts: Vec::new(),
+					arguments: ix_struct.fields.clone(),
+					discriminator,
+					docs: ix_struct.docs.clone(),
+				}
+			})
 		})
 		.collect()
 }
 
 fn build_instructions_from_dispatch(
-	disc_enums: &[discriminator::DiscriminatorEnum],
+	discriminator_map: &HashMap<(String, String), DiscriminatorIr>,
 	instruction_structs: &[instruction_data::InstructionStruct],
 	ix_accounts_structs: &[accounts_struct::AccountsStruct],
 	dispatch: &[entrypoint::DispatchEntry],
@@ -364,15 +343,18 @@ fn build_instructions_from_dispatch(
 			Vec::new()
 		};
 
+		let discriminator = resolve_discriminator_value(
+			discriminator_map,
+			&ix_struct.discriminator_enum,
+			&entry.variant,
+			"instruction",
+		)?;
+
 		instructions.push(InstructionIr {
 			name: entry.variant.to_snake_case(),
 			accounts: instruction_accounts,
 			arguments: ix_struct.fields.clone(),
-			discriminator: find_discriminator_value_by_variant(
-				disc_enums,
-				&ix_struct.discriminator_enum,
-				&entry.variant,
-			),
+			discriminator,
 			docs: ix_struct.docs.clone(),
 		});
 	}
@@ -554,5 +536,51 @@ mod tests {
 		assert_eq!(ir.instructions[0].accounts.len(), 2);
 		assert_eq!(ir.instructions[1].name, "allows_duplicate_mutable");
 		assert!(ir.instructions[1].accounts.is_empty());
+	}
+
+	#[test]
+	fn assemble_program_ir_rejects_missing_instruction_discriminator_variant() {
+		let source = r#"
+			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+
+			#[discriminator]
+			pub enum ExampleInstruction {
+				Initialize = 0,
+			}
+
+			#[instruction(discriminator = ExampleInstruction, variant = Missing)]
+			pub struct MissingInstruction {}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let error = assemble_program_ir(&file, "example").unwrap_err();
+		let message = error.to_string();
+
+		assert!(message.contains("Could not resolve instruction discriminator"));
+		assert!(message.contains("Missing"));
+		assert!(message.contains("ExampleInstruction"));
+	}
+
+	#[test]
+	fn assemble_program_ir_rejects_missing_account_discriminator_variant() {
+		let source = r#"
+			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+
+			#[discriminator]
+			pub enum ExampleAccount {
+				Config = 0,
+			}
+
+			#[account(discriminator = ExampleAccount)]
+			pub struct MissingState {
+				pub bump: u8,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let error = assemble_program_ir(&file, "example").unwrap_err();
+		let message = error.to_string();
+
+		assert!(message.contains("Could not resolve account discriminator"));
+		assert!(message.contains("MissingState"));
+		assert!(message.contains("ExampleAccount"));
 	}
 }
