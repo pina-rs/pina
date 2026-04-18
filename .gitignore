@@ -38,6 +38,10 @@ node_modules/
 .DS_Store
 *.pem
 
+# Python
+__pycache__/
+*.pyc
+
 **/*.tsbuildinfo
 /prisma.db
 

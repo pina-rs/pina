@@ -674,6 +674,56 @@ in
       description = "Build SBF binaries and run end-to-end program tests including mollusk-svm integration.";
       binary = "bash";
     };
+    "profile:cu:tracked" = {
+      exec = ''
+        set -e
+        rm -rf "$DEVENV_ROOT/target/cu/current"
+        "$DEVENV_ROOT/scripts/profile-tracked-examples.sh" \
+          "$DEVENV_ROOT" \
+          "$DEVENV_ROOT/target/cu/current"
+      '';
+      description = "Build tracked SBF example programs and capture static CU profiles for the current checkout.";
+      binary = "bash";
+    };
+    "report:cu:compare:main" = {
+      exec = ''
+        set -euo pipefail
+
+        git -C "$DEVENV_ROOT" fetch origin
+
+        worktree_dir=$(mktemp -d "''${TMPDIR:-/tmp}/pina-cu-main-XXXXXX")
+
+        cleanup() {
+          git -C "$DEVENV_ROOT" worktree remove --force "$worktree_dir" >/dev/null 2>&1 || true
+          rm -rf "$worktree_dir"
+        }
+
+        trap cleanup EXIT
+
+        git -C "$DEVENV_ROOT" worktree add --detach "$worktree_dir" origin/main
+
+        rm -rf "$DEVENV_ROOT/target/cu/base" "$DEVENV_ROOT/target/cu/head"
+
+        "$DEVENV_ROOT/scripts/profile-tracked-examples.sh" \
+          "$worktree_dir" \
+          "$DEVENV_ROOT/target/cu/base"
+
+        "$DEVENV_ROOT/scripts/profile-tracked-examples.sh" \
+          "$DEVENV_ROOT" \
+          "$DEVENV_ROOT/target/cu/head"
+
+        python3 "$DEVENV_ROOT/scripts/compare-compute-units.py" \
+          --policy-file "$DEVENV_ROOT/scripts/compute-unit-policy.json" \
+          --base-dir "$DEVENV_ROOT/target/cu/base" \
+          --head-dir "$DEVENV_ROOT/target/cu/head" \
+          --markdown-output "$DEVENV_ROOT/target/cu/comparison.md" \
+          --json-output "$DEVENV_ROOT/target/cu/comparison.json"
+
+        cat "$DEVENV_ROOT/target/cu/comparison.md"
+      '';
+      description = "Compare tracked static CU profiles for the current checkout against origin/main.";
+      binary = "bash";
+    };
     "idl:generate" = {
       exec = ''
         set -e
