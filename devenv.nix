@@ -484,15 +484,58 @@ in
       description = "Build workspace crates with the default feature set.";
       binary = "bash";
     };
-    "build:pina:no-default" = {
+    "build:pina:default" = {
+      exec = ''
+        set -e
+        cargo check -p pina --locked
+      '';
+      description = "Verify `pina` builds with the default feature set.";
+      binary = "bash";
+    };
+    "build:pina:no-default-only" = {
       exec = ''
         set -e
         cargo check -p pina --no-default-features --locked
-        cargo check -p pina --no-default-features --features derive --locked
+      '';
+      description = "Verify `pina` builds with `--no-default-features`.";
+      binary = "bash";
+    };
+    "build:pina:token-only" = {
+      exec = ''
+        set -e
         cargo check -p pina --no-default-features --features token --locked
+      '';
+      description = "Verify `pina` builds with only the `token` feature enabled.";
+      binary = "bash";
+    };
+    "build:pina:all-features" = {
+      exec = ''
+        set -e
+        cargo check -p pina --all-features --locked
+      '';
+      description = "Verify `pina` builds with all features enabled.";
+      binary = "bash";
+    };
+    "build:pina:no-default" = {
+      exec = ''
+        set -e
+        build:pina:no-default-only
+        cargo check -p pina --no-default-features --features derive --locked
+        build:pina:token-only
         cargo check -p pina --no-default-features --features token,derive --locked
       '';
-      description = "Verify `pina` builds without default features and across feature subsets.";
+      description = "Verify `pina` builds without default features and across key feature subsets.";
+      binary = "bash";
+    };
+    "build:pina:feature-matrix" = {
+      exec = ''
+        set -e
+        build:pina:default
+        build:pina:no-default-only
+        build:pina:token-only
+        build:pina:all-features
+      '';
+      description = "Verify the explicit `pina` feature matrix used in CI.";
       binary = "bash";
     };
     "test:all" = {
@@ -515,6 +558,58 @@ in
           cargo +"$TOOLCHAIN" miri test --locked -p pina --test miri_loader_guards --all-features
       '';
       description = "Run the dedicated Miri regression suite for guard-backed loader behavior.";
+      binary = "bash";
+    };
+    "test:pina:default" = {
+      exec = ''
+        set -e
+        cargo test -p pina --lib --locked
+      '';
+      description = "Run `pina` library tests with the default feature set.";
+      binary = "bash";
+    };
+    "test:pina:no-default" = {
+      exec = ''
+        set -e
+        cargo test -p pina --no-default-features --lib --locked
+      '';
+      description = "Run `pina` library tests with `--no-default-features`.";
+      binary = "bash";
+    };
+    "test:pina:token-only" = {
+      exec = ''
+        set -e
+        cargo test -p pina --no-default-features --features token --lib --locked
+      '';
+      description = "Run `pina` library tests with only the `token` feature enabled.";
+      binary = "bash";
+    };
+    "test:pina:all-features" = {
+      exec = ''
+        set -e
+        cargo test -p pina --all-features --lib --locked
+      '';
+      description = "Run `pina` library tests with all features enabled.";
+      binary = "bash";
+    };
+    "doc:pina:no-default" = {
+      exec = ''
+        set -e
+        cargo doc -p pina --no-default-features --no-deps --locked
+      '';
+      description = "Build `pina` docs without default features to catch hidden default-feature coupling.";
+      binary = "bash";
+    };
+    "test:pina:feature-matrix" = {
+      exec = ''
+        set -e
+        test:pina:default
+        test:pina:no-default
+        doc:pina:no-default
+        test:pina:token-only
+        test:pina:all-features
+      '';
+      description = "Run the explicit `pina` feature matrix used in CI.";
       binary = "bash";
     };
     "test:program-e2e" = {

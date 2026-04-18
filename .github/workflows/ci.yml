@@ -80,6 +80,52 @@ jobs:
         run: test:miri
         shell: devenv shell -c -- bash -e {0}
 
+  feature-matrix:
+    timeout-minutes: 60
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: default
+            build_task: build:pina:default
+            test_task: test:pina:default
+            doc_task: ""
+          - label: no-default
+            build_task: build:pina:no-default-only
+            test_task: test:pina:no-default
+            doc_task: doc:pina:no-default
+          - label: token-only
+            build_task: build:pina:token-only
+            test_task: test:pina:token-only
+            doc_task: ""
+          - label: all-features
+            build_task: build:pina:all-features
+            test_task: test:pina:all-features
+            doc_task: ""
+    name: feature-matrix (${{ matrix.label }})
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: build `pina` for ${{ matrix.label }}
+        run: ${{ matrix.build_task }}
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: test `pina` for ${{ matrix.label }}
+        run: ${{ matrix.test_task }}
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: build `pina` docs for ${{ matrix.label }}
+        if: ${{ matrix.doc_task != '' }}
+        run: ${{ matrix.doc_task }}
+        shell: devenv shell -c -- bash -e {0}
+
   program-e2e:
     timeout-minutes: 120
     runs-on: blacksmith-2vcpu-ubuntu-2404
@@ -147,14 +193,10 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: build
+      - name: build workspace default features
         run: build:default
         shell: devenv shell -c -- bash -e {0}
 
-      - name: build pina no-default matrix
-        run: build:pina:no-default
-        shell: devenv shell -c -- bash -e {0}
-
-      - name: build all features
+      - name: build workspace all features
         run: build:all
         shell: devenv shell -c -- bash -e {0}
