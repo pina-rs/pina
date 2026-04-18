@@ -10,6 +10,8 @@ A performant Solana smart contract framework built on top of [pinocchio](https:/
 
 [![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][unlicense-image]][unlicense-link] [![codecov][codecov-image]][codecov-link]
 
+> Pina is currently unaudited and still hardening. See [SECURITY.md](./SECURITY.md) for the current readiness statement, supported versions, and private vulnerability reporting instructions.
+
 ## Features
 
 <br>
@@ -181,6 +183,8 @@ That last count-parity check is important because it catches silent extraction r
 <br>
 
 Comprehensive project documentation now lives in the mdBook under `docs/`.
+
+For repository-level security posture and reporting guidance, see [SECURITY.md](./SECURITY.md). For example-driven guidance, see [security/readme.md](./security/readme.md).
 
 <!-- {=docsBuildCommand} -->
 
