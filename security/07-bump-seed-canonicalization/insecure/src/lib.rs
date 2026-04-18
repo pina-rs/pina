@@ -69,7 +69,7 @@ impl<'a> ProcessAccountInfos<'a> for CreateAccounts<'a> {
 		let seeds = &[SEED, self.authority.address().as_ref()];
 		create_program_account_with_bump::<Data>(self.data, self.authority, &ID, seeds, args.bump)?;
 
-		let data_account = self.data.as_account_mut::<Data>(&ID)?;
+		let mut data_account = self.data.as_account_mut::<Data>(&ID)?;
 		*data_account = Data::builder()
 			.authority(*self.authority.address())
 			.value(args.value)

@@ -54,7 +54,7 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 			.assert_writable()?
 			.assert_type::<VaultState>(&ID)?;
 
-		let vault = self.vault.as_account_mut::<VaultState>(&ID)?;
+		let mut vault = self.vault.as_account_mut::<VaultState>(&ID)?;
 		let current: u64 = vault.balance.into();
 		let amount: u64 = args.amount.into();
 

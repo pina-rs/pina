@@ -168,7 +168,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		)?;
 
 		// Initialize escrow state
-		let escrow = self.escrow.as_account_mut::<EscrowState>(&ID)?;
+		let mut escrow = self.escrow.as_account_mut::<EscrowState>(&ID)?;
 		*escrow = EscrowState::builder()
 			.maker(*self.maker.address())
 			.mint_a(*self.mint_a.address())
@@ -256,28 +256,31 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			.assert_writable()?
 			.assert_type::<EscrowState>(&ID)?;
 
-		let EscrowState {
-			maker,
-			mint_a,
-			mint_b,
-			amount_b,
-			seed,
-			bump,
-			..
-		} = self.escrow.as_account::<EscrowState>(&ID)?;
+		let (maker, mint_a, mint_b, amount_b, seed, bump) = {
+			let escrow = self.escrow.as_account::<EscrowState>(&ID)?;
 
-		let escrow_seeds_with_bump = seeds_escrow!(self.maker.address().as_ref(), &seed.0, *bump);
+			(
+				escrow.maker,
+				escrow.mint_a,
+				escrow.mint_b,
+				escrow.amount_b,
+				escrow.seed,
+				escrow.bump,
+			)
+		};
+
+		let escrow_seeds_with_bump = seeds_escrow!(self.maker.address().as_ref(), &seed.0, bump);
 		self.escrow
 			.assert_seeds_with_bump(escrow_seeds_with_bump, &ID)?;
 
 		// Validate maker and mint accounts
-		self.maker.assert_address(maker)?;
+		self.maker.assert_address(&maker)?;
 		self.mint_a
 			.assert_owners(&SPL_PROGRAM_IDS)?
-			.assert_address(mint_a)?;
+			.assert_address(&mint_a)?;
 		self.mint_b
 			.assert_owners(&SPL_PROGRAM_IDS)?
-			.assert_address(mint_b)?;
+			.assert_address(&mint_b)?;
 
 		// Validate vault and maker ATA
 		self.vault
@@ -314,14 +317,14 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			mint: self.mint_b,
 			to: self.maker_ata_b,
 			authority: self.taker,
-			amount: (*amount_b).into(),
+			amount: amount_b.into(),
 			decimals: self.mint_b.as_token_2022_mint()?.decimals(),
 			token_program: self.token_program.address(),
 		}
 		.invoke()?;
 
 		// Prepare escrow signer for vault operations
-		let bump_as_seeds = [*bump];
+		let bump_as_seeds = [bump];
 		let escrow_seeds =
 			seeds_escrow!(true, self.maker.address().as_ref(), &seed.0, &bump_as_seeds);
 		let escrow_signer = Signer::from(&escrow_seeds);

@@ -61,7 +61,7 @@ impl<'a> ProcessAccountInfos<'a> for AdminActionAccounts<'a> {
 
 		self.authority.assert_address(&config.authority)?;
 
-		let config_mut = self.config.as_account_mut::<AdminConfig>(&ID)?;
+		let mut config_mut = self.config.as_account_mut::<AdminConfig>(&ID)?;
 		config_mut.fee = args.new_fee;
 
 		Ok(())

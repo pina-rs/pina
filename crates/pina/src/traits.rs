@@ -1,3 +1,6 @@
+use core::ops::Deref;
+use core::ops::DerefMut;
+
 use bytemuck::Pod;
 use pinocchio::ProgramResult;
 
@@ -414,12 +417,68 @@ pub trait HasDiscriminator: Sized {
 	}
 }
 
-/// Deserializes raw `AccountView` data into a typed account reference.
+/// Guard-backed immutable access to typed account data.
+///
+/// This wrapper keeps the underlying runtime borrow guard alive for as long as
+/// the typed access exists, preventing later overlapping borrows of the same
+/// account data from succeeding prematurely.
+#[derive(Debug)]
+#[must_use]
+pub struct LoadedAccount<'a, T: ?Sized> {
+	inner: pinocchio::account::Ref<'a, T>,
+}
+
+impl<'a, T: ?Sized> LoadedAccount<'a, T> {
+	pub(crate) fn new(inner: pinocchio::account::Ref<'a, T>) -> Self {
+		Self { inner }
+	}
+}
+
+impl<T: ?Sized> Deref for LoadedAccount<'_, T> {
+	type Target = T;
+
+	fn deref(&self) -> &Self::Target {
+		&self.inner
+	}
+}
+
+/// Guard-backed mutable access to typed account data.
+///
+/// This wrapper keeps the underlying runtime mutable borrow guard alive for as
+/// long as the typed access exists, preventing overlapping immutable or
+/// mutable borrows until the wrapper is dropped.
+#[derive(Debug)]
+#[must_use]
+pub struct LoadedAccountMut<'a, T: ?Sized> {
+	inner: pinocchio::account::RefMut<'a, T>,
+}
+
+impl<'a, T: ?Sized> LoadedAccountMut<'a, T> {
+	pub(crate) fn new(inner: pinocchio::account::RefMut<'a, T>) -> Self {
+		Self { inner }
+	}
+}
+
+impl<T: ?Sized> Deref for LoadedAccountMut<'_, T> {
+	type Target = T;
+
+	fn deref(&self) -> &Self::Target {
+		&self.inner
+	}
+}
+
+impl<T: ?Sized> DerefMut for LoadedAccountMut<'_, T> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.inner
+	}
+}
+
+/// Deserializes raw `AccountView` data into guard-backed typed account access.
 ///
 /// Performs:
 /// 1. Program owner check
 /// 2. Discriminator byte check
-/// 3. Checked bytemuck conversion of account data to `&T` or `&mut T`.
+/// 3. Checked bytemuck conversion of account data into a guard-backed wrapper.
 ///
 /// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->/// All APIs in this section are designed for on-chain determinism.
 ///
@@ -432,25 +491,27 @@ pub trait HasDiscriminator: Sized {
 /// ```ignore
 /// // Inside an instruction handler:
 /// let escrow_account = &accounts[0];
-/// let escrow: &EscrowState = escrow_account.as_account(&program_id)?;
+/// let escrow = escrow_account.as_account::<EscrowState>(&program_id)?;
 ///
 /// // For mutable access:
-/// let escrow_mut: &mut EscrowState = escrow_account.as_account_mut(&program_id)?;
-/// escrow_mut.amount = PodU64::from(100u64);
+/// let mut escrow = escrow_account.as_account_mut::<EscrowState>(&program_id)?;
+/// escrow.amount = PodU64::from(100u64);
 /// ```
 pub trait AsAccount {
 	/// Validate ownership and deserialize the account data into an immutable
-	/// reference of type `T`. Returns `InvalidAccountData` if the
+	/// guard-backed view of type `T`. Returns `InvalidAccountData` if the
 	/// discriminator doesn't match or the data is the wrong size.
-	fn as_account<T>(&self, program_id: &Address) -> Result<&T, ProgramError>
+	fn as_account<T>(&self, program_id: &Address) -> Result<LoadedAccount<'_, T>, ProgramError>
 	where
 		T: AccountDeserialize + HasDiscriminator + Pod;
 
 	/// Validate ownership and deserialize the account data into a mutable
-	/// reference of type `T`. The Solana runtime guarantees exclusive access
-	/// when the mutable borrow succeeds.
-	#[allow(clippy::mut_from_ref)]
-	fn as_account_mut<T>(&self, program_id: &Address) -> Result<&mut T, ProgramError>
+	/// guard-backed view of type `T`. The Solana runtime keeps the mutable
+	/// borrow active until the returned wrapper is dropped.
+	fn as_account_mut<T>(
+		&self,
+		program_id: &Address,
+	) -> Result<LoadedAccountMut<'_, T>, ProgramError>
 	where
 		T: AccountDeserialize + HasDiscriminator + Pod;
 }

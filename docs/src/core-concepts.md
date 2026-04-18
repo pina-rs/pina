@@ -16,7 +16,7 @@ N      | ...  | payload fields
 This contract is what enables:
 
 - deterministic `size_of::<T>()` checks,
-- zero-copy validation with `as_account()` / `try_from_bytes()`,
+- guard-backed zero-copy validation with `as_account()` / `try_from_bytes()`,
 - alignment-safe offsets for fixed-size Pod fields.
 
 ### Why this is safer than implicit external headers
@@ -102,7 +102,7 @@ This pattern improves readability while keeping checks explicit and audit-able.
 
 ## Typed account conversions
 
-Traits in `crates/pina/src/impls.rs` provide typed conversion paths from raw `AccountView` values into strongly typed account states.
+Traits in `crates/pina/src/impls.rs` provide guard-backed typed conversion paths from raw `AccountView` values into strongly typed account states. `as_account()` and `as_account_mut()` keep the runtime borrow alive until the returned wrapper is dropped.
 
 ## Entrypoint model
 

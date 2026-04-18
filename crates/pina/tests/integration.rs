@@ -153,7 +153,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 			.assert_type::<TestState>(&TEST_PROGRAM_ID)?;
 
 		// Update state.
-		let state = self
+		let mut state = self
 			.state_account
 			.as_account_mut::<TestState>(&TEST_PROGRAM_ID)?;
 		state.value = args.new_value;
@@ -174,7 +174,7 @@ impl<'a> ProcessAccountInfos<'a> for CloseAccounts<'a> {
 			.assert_type::<TestState>(&TEST_PROGRAM_ID)?;
 
 		// Zero account data before closing.
-		let state = self
+		let mut state = self
 			.state_account
 			.as_account_mut::<TestState>(&TEST_PROGRAM_ID)?;
 		state.zeroed();
@@ -1433,7 +1433,7 @@ fn account_data_mutation_persists() {
 
 	// Mutate value.
 	{
-		let state = account_views[0]
+		let mut state = account_views[0]
 			.as_account_mut::<TestState>(&TEST_PROGRAM_ID)
 			.unwrap_or_else(|e| panic!("write failed: {e:?}"));
 		state.value = PodU64::from_primitive(12345);
@@ -1445,6 +1445,82 @@ fn account_data_mutation_persists() {
 		.unwrap_or_else(|e| panic!("read failed: {e:?}"));
 	assert_eq!(u64::from(state.value), 12345);
 	assert_eq!(state.bump, 10, "bump should be unchanged");
+}
+
+/// Tests that as_account keeps the runtime borrow active until drop.
+#[test]
+fn as_account_keeps_borrow_guard_alive_until_drop() {
+	let key: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let state_bytes = build_test_state_bytes(7, 900);
+
+	let accounts = [AccountBuilder::new()
+		.address(key)
+		.owner(TEST_PROGRAM_ID)
+		.lamports(1_000_000)
+		.data(&state_bytes)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let state = account_views[0]
+		.as_account::<TestState>(&TEST_PROGRAM_ID)
+		.unwrap_or_else(|e| panic!("read failed: {e:?}"));
+
+	assert_eq!(state.bump, 7);
+	assert!(matches!(
+		account_views[0].try_borrow_mut(),
+		Err(ProgramError::AccountBorrowFailed)
+	));
+
+	drop(state);
+
+	let borrow = account_views[0]
+		.try_borrow_mut()
+		.unwrap_or_else(|e| panic!("mutable borrow should succeed after drop: {e:?}"));
+	assert_eq!(borrow.len(), size_of::<TestState>());
+}
+
+/// Tests that as_account_mut blocks overlapping borrows until drop.
+#[test]
+fn as_account_mut_blocks_overlapping_borrows_until_drop() {
+	let key: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let state_bytes = build_test_state_bytes(11, 77);
+
+	let accounts = [AccountBuilder::new()
+		.address(key)
+		.owner(TEST_PROGRAM_ID)
+		.lamports(1_000_000)
+		.data(&state_bytes)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let mut state = account_views[0]
+		.as_account_mut::<TestState>(&TEST_PROGRAM_ID)
+		.unwrap_or_else(|e| panic!("write failed: {e:?}"));
+	state.value = PodU64::from_primitive(88);
+
+	assert!(matches!(
+		account_views[0].try_borrow(),
+		Err(ProgramError::AccountBorrowFailed)
+	));
+	assert!(matches!(
+		account_views[0].try_borrow_mut(),
+		Err(ProgramError::AccountBorrowFailed)
+	));
+
+	drop(state);
+
+	let state = account_views[0]
+		.as_account::<TestState>(&TEST_PROGRAM_ID)
+		.unwrap_or_else(|e| panic!("read after drop failed: {e:?}"));
+	assert_eq!(u64::from(state.value), 88);
 }
 
 // ---------------------------------------------------------------------------

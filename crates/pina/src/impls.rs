@@ -1,9 +1,10 @@
 #![allow(unsafe_code)]
 
-use core::slice::from_raw_parts;
-use core::slice::from_raw_parts_mut;
+use core::mem::size_of;
 
 use pinocchio::ProgramResult;
+use pinocchio::account::Ref as AccountRef;
+use pinocchio::account::RefMut as AccountRefMut;
 use pinocchio_system::instructions::Transfer;
 
 use crate::AccountDeserialize;
@@ -18,6 +19,8 @@ use crate::AsTokenAccount;
 use crate::CloseAccountWithRecipient;
 use crate::HasDiscriminator;
 use crate::LamportTransfer;
+use crate::LoadedAccount;
+use crate::LoadedAccountMut;
 use crate::Pod;
 use crate::ProgramError;
 use crate::log;
@@ -342,47 +345,36 @@ impl AccountInfoValidation for AccountView {
 
 impl AsAccount for AccountView {
 	#[track_caller]
-	fn as_account<T>(&self, program_id: &Address) -> Result<&T, ProgramError>
+	fn as_account<T>(&self, program_id: &Address) -> Result<LoadedAccount<'_, T>, ProgramError>
 	where
 		T: AccountDeserialize + HasDiscriminator + Pod,
 	{
 		self.assert_owner(program_id)?;
 		self.assert_data_len(size_of::<T>())?;
 
-		// SAFETY: `try_borrow` yields a guard-backed slice of the account data.
-		// We rebuild a raw-parts slice from the same pointer with exactly
-		// `size_of::<T>()` bytes, which is guaranteed by `assert_data_len` above.
-		// `T::try_from_bytes` then validates the discriminator and performs the
-		// bytemuck cast.
-		//
-		// The returned `&T` intentionally outlives the temporary borrow guard, so
-		// callers must not create overlapping mutable borrows of the same account
-		// while the reference is still in use.
-		unsafe { T::try_from_bytes(from_raw_parts(self.try_borrow()?.as_ptr(), size_of::<T>())) }
+		let bytes = self.try_borrow()?;
+		let account = AccountRef::try_map(bytes, |data| T::try_from_bytes(data))
+			.map_err(|(_, error)| error)?;
+
+		Ok(LoadedAccount::new(account))
 	}
 
 	#[track_caller]
-	fn as_account_mut<T>(&self, program_id: &Address) -> Result<&mut T, ProgramError>
+	fn as_account_mut<T>(
+		&self,
+		program_id: &Address,
+	) -> Result<LoadedAccountMut<'_, T>, ProgramError>
 	where
 		T: AccountDeserialize + HasDiscriminator + Pod,
 	{
 		self.assert_owner(program_id)?;
 		self.assert_data_len(size_of::<T>())?;
 
-		// SAFETY: `try_borrow_mut` yields exclusive access to the backing bytes,
-		// and `assert_data_len` guarantees the slice is exactly `size_of::<T>()`
-		// bytes. `T::try_from_bytes_mut` then validates the discriminator and
-		// performs the bytemuck cast.
-		//
-		// The returned `&mut T` intentionally outlives the temporary borrow
-		// guard, so callers must not create any overlapping borrows or aliasing
-		// mutable views of the same account while the reference is still in use.
-		unsafe {
-			T::try_from_bytes_mut(from_raw_parts_mut(
-				self.try_borrow_mut()?.as_mut_ptr(),
-				size_of::<T>(),
-			))
-		}
+		let bytes = self.try_borrow_mut()?;
+		let account = AccountRefMut::try_map(bytes, |data| T::try_from_bytes_mut(data))
+			.map_err(|(_, error)| error)?;
+
+		Ok(LoadedAccountMut::new(account))
 	}
 }
 

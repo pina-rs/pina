@@ -101,7 +101,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		)?;
 
 		// Initialize account data
-		let todo = self.todo.as_account_mut::<TodoState>(&ID)?;
+		let mut todo = self.todo.as_account_mut::<TodoState>(&ID)?;
 		*todo = TodoState::builder()
 			.owner(*owner)
 			.bump(args.bump)
@@ -141,14 +141,14 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 		match instruction {
 			TodoInstruction::ToggleCompleted => {
 				let _ = ToggleCompletedInstruction::try_from_bytes(data)?;
-				let todo = self.todo.as_account_mut::<TodoState>(&ID)?;
+				let mut todo = self.todo.as_account_mut::<TodoState>(&ID)?;
 				let completed = bool::from(todo.completed);
 
 				todo.completed = PodBool::from_bool(!completed);
 			}
 			TodoInstruction::UpdateDigest => {
 				let args = UpdateDigestInstruction::try_from_bytes(data)?;
-				let todo = self.todo.as_account_mut::<TodoState>(&ID)?;
+				let mut todo = self.todo.as_account_mut::<TodoState>(&ID)?;
 
 				todo.digest = args.digest;
 			}
