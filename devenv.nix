@@ -503,6 +503,20 @@ in
       description = "Run all tests across the crates";
       binary = "bash";
     };
+    "test:miri" = {
+      exec = ''
+        set -euo pipefail
+
+        TOOLCHAIN="nightly-2026-02-20"
+        rustup component add miri --toolchain "$TOOLCHAIN"
+        cargo +"$TOOLCHAIN" miri setup
+
+        MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-symbolic-alignment-check" \
+          cargo +"$TOOLCHAIN" miri test --locked -p pina --test miri_loader_guards --all-features
+      '';
+      description = "Run the dedicated Miri regression suite for guard-backed loader behavior.";
+      binary = "bash";
+    };
     "test:program-e2e" = {
       exec = ''
         set -e
