@@ -19,7 +19,45 @@ The GitHub CI workflow verifies:
 - `cargo build --locked`
 - `cargo build --all-features --locked`
 
-This keeps code quality, behavior, documentation build health, and feature-flag compatibility aligned.
+Separate PR workflows also verify:
+
+- `binary-size` for SBF artifact size reporting
+- `compute-units` for tracked static CU regression reporting vs the PR base revision
+
+This keeps code quality, behavior, documentation build health, feature-flag compatibility, and performance visibility aligned.
+
+## Compute-unit regression policy
+
+The `compute-units` workflow builds tracked SBF example programs on both the PR head and the PR base, runs `pina profile --json` on each `.so`, and compares the resulting static `total_cu` estimates.
+
+Tracked programs are defined in `scripts/compute-unit-policy.json`:
+
+- `counter_program`
+- `escrow_program`
+- `vesting_program`
+- `role_registry_program`
+- `staking_rewards_program`
+
+Current policy:
+
+- warn when `total_cu` increases by at least `+250` CU and `+5.0%`
+- fail when `total_cu` increases by at least `+500` CU and `+10.0%`
+- decreases and smaller increases are informational
+
+Notes:
+
+- this workflow intentionally uses **static** SBF estimates from `pina profile`, not runtime validator traces
+- the tradeoff is deliberate: static profiling is deterministic and stable for PR-vs-base comparison
+- if the tracked set or thresholds need to change, update `scripts/compute-unit-policy.json`
+
+Local reproduction:
+
+```bash
+profile:cu:tracked
+report:cu:compare:main
+```
+
+The comparison writes artifacts to `target/cu/`, including a markdown summary and a machine-readable JSON report.
 
 ## Coverage
 

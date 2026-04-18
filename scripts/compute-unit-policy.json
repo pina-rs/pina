@@ -1,0 +1,17 @@
+{
+	"trackedPrograms": [
+		"counter_program",
+		"escrow_program",
+		"vesting_program",
+		"role_registry_program",
+		"staking_rewards_program"
+	],
+	"warn": {
+		"deltaCu": 250,
+		"deltaPercent": 5.0
+	},
+	"fail": {
+		"deltaCu": 500,
+		"deltaPercent": 10.0
+	}
+}
