@@ -6,63 +6,199 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { assertIsInstructionWithAccounts, containsBytes, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithRpc, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type GetAccountInfoApi, type GetMultipleAccountsApi, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
-import { addSelfFetchFunctions, addSelfPlanAndSendFunctions, type SelfFetchFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
-import { getOracleStateCodec, type OracleState, type OracleStateArgs } from '../accounts';
-import { getInitializeInstruction, getRotateAuthorityInstruction, getUpdateInstruction, parseInitializeInstruction, parseRotateAuthorityInstruction, parseUpdateInstruction, type InitializeInput, type ParsedInitializeInstruction, type ParsedRotateAuthorityInstruction, type ParsedUpdateInstruction, type RotateAuthorityInput, type UpdateInput } from '../instructions';
+import {
+	type Address,
+	assertIsInstructionWithAccounts,
+	type ClientWithRpc,
+	type ClientWithTransactionPlanning,
+	type ClientWithTransactionSending,
+	containsBytes,
+	type GetAccountInfoApi,
+	type GetMultipleAccountsApi,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithData,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+	SolanaError,
+} from "@solana/kit";
+import {
+	addSelfFetchFunctions,
+	addSelfPlanAndSendFunctions,
+	type SelfFetchFunctions,
+	type SelfPlanAndSendFunctions,
+} from "@solana/program-client-core";
+import {
+	getOracleStateCodec,
+	type OracleState,
+	type OracleStateArgs,
+} from "../accounts";
+import {
+	getInitializeInstruction,
+	getRotateAuthorityInstruction,
+	getUpdateInstruction,
+	type InitializeInput,
+	type ParsedInitializeInstruction,
+	type ParsedRotateAuthorityInstruction,
+	type ParsedUpdateInstruction,
+	parseInitializeInstruction,
+	parseRotateAuthorityInstruction,
+	parseUpdateInstruction,
+	type RotateAuthorityInput,
+	type UpdateInput,
+} from "../instructions";
 
-export const PROP_AMM_PROGRAM_PROGRAM_ADDRESS = '55555555555555555555555555555555555555555555' as Address<'55555555555555555555555555555555555555555555'>;
+export const PROP_AMM_PROGRAM_PROGRAM_ADDRESS =
+	"55555555555555555555555555555555555555555555" as Address<
+		"55555555555555555555555555555555555555555555"
+	>;
 
-export enum PropAmmProgramAccount { OracleState }
-
-export function identifyPropAmmProgramAccount(account: { data: ReadonlyUint8Array } | ReadonlyUint8Array): PropAmmProgramAccount {
-    const data = 'data' in account ? account.data : account;
-    if (containsBytes(data, getU8Encoder().encode(1), 0)) { return PropAmmProgramAccount.OracleState; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, { accountData: data, programName: "propAmmProgram" });
+export enum PropAmmProgramAccount {
+	OracleState,
 }
 
-export enum PropAmmProgramInstruction { Initialize, Update, RotateAuthority }
-
-export function identifyPropAmmProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): PropAmmProgramInstruction {
-    const data = 'data' in instruction ? instruction.data : instruction;
-    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return PropAmmProgramInstruction.Initialize; }
-if (containsBytes(data, getU8Encoder().encode(1), 0)) { return PropAmmProgramInstruction.Update; }
-if (containsBytes(data, getU8Encoder().encode(2), 0)) { return PropAmmProgramInstruction.RotateAuthority; }
-    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "propAmmProgram" });
+export function identifyPropAmmProgramAccount(
+	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): PropAmmProgramAccount {
+	const data = "data" in account ? account.data : account;
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return PropAmmProgramAccount.OracleState;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+		{ accountData: data, programName: "propAmmProgram" },
+	);
 }
 
-export type ParsedPropAmmProgramInstruction<TProgram extends string = '55555555555555555555555555555555555555555555'> =
-| { instructionType: PropAmmProgramInstruction.Initialize } & ParsedInitializeInstruction<TProgram>
-| { instructionType: PropAmmProgramInstruction.Update } & ParsedUpdateInstruction<TProgram>
-| { instructionType: PropAmmProgramInstruction.RotateAuthority } & ParsedRotateAuthorityInstruction<TProgram>
+export enum PropAmmProgramInstruction {
+	Initialize,
+	Update,
+	RotateAuthority,
+}
 
+export function identifyPropAmmProgramInstruction(
+	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): PropAmmProgramInstruction {
+	const data = "data" in instruction ? instruction.data : instruction;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return PropAmmProgramInstruction.Initialize;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return PropAmmProgramInstruction.Update;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return PropAmmProgramInstruction.RotateAuthority;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
+		{ instructionData: data, programName: "propAmmProgram" },
+	);
+}
 
-        export function parsePropAmmProgramInstruction<TProgram extends string>(
-            instruction: Instruction<TProgram> 
-                & InstructionWithData<ReadonlyUint8Array>
-        ): ParsedPropAmmProgramInstruction<TProgram> {
-            const instructionType = identifyPropAmmProgramInstruction(instruction);
-            switch (instructionType) {
-                case PropAmmProgramInstruction.Initialize: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: PropAmmProgramInstruction.Initialize, ...parseInitializeInstruction(instruction) }; }
-case PropAmmProgramInstruction.Update: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: PropAmmProgramInstruction.Update, ...parseUpdateInstruction(instruction) }; }
-case PropAmmProgramInstruction.RotateAuthority: { assertIsInstructionWithAccounts(instruction);
-return { instructionType: PropAmmProgramInstruction.RotateAuthority, ...parseRotateAuthorityInstruction(instruction) }; }
-                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "propAmmProgram" });
-            }
-        }
+export type ParsedPropAmmProgramInstruction<
+	TProgram extends string = "55555555555555555555555555555555555555555555",
+> =
+	| { instructionType: PropAmmProgramInstruction.Initialize }
+		& ParsedInitializeInstruction<TProgram>
+	| { instructionType: PropAmmProgramInstruction.Update }
+		& ParsedUpdateInstruction<TProgram>
+	| { instructionType: PropAmmProgramInstruction.RotateAuthority }
+		& ParsedRotateAuthorityInstruction<TProgram>;
 
-export type PropAmmProgramPlugin = { accounts: PropAmmProgramPluginAccounts; instructions: PropAmmProgramPluginInstructions; }
+export function parsePropAmmProgramInstruction<TProgram extends string>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedPropAmmProgramInstruction<TProgram> {
+	const instructionType = identifyPropAmmProgramInstruction(instruction);
+	switch (instructionType) {
+		case PropAmmProgramInstruction.Initialize: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: PropAmmProgramInstruction.Initialize,
+				...parseInitializeInstruction(instruction),
+			};
+		}
+		case PropAmmProgramInstruction.Update: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: PropAmmProgramInstruction.Update,
+				...parseUpdateInstruction(instruction),
+			};
+		}
+		case PropAmmProgramInstruction.RotateAuthority: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: PropAmmProgramInstruction.RotateAuthority,
+				...parseRotateAuthorityInstruction(instruction),
+			};
+		}
+		default:
+			throw new SolanaError(
+				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
+				{
+					instructionType: instructionType as string,
+					programName: "propAmmProgram",
+				},
+			);
+	}
+}
 
-export type PropAmmProgramPluginAccounts = { oracleState: ReturnType<typeof getOracleStateCodec> & SelfFetchFunctions<OracleStateArgs, OracleState>; }
+export type PropAmmProgramPlugin = {
+	accounts: PropAmmProgramPluginAccounts;
+	instructions: PropAmmProgramPluginInstructions;
+};
 
-export type PropAmmProgramPluginInstructions = { initialize: (input: InitializeInput) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions; update: (input: UpdateInput) => ReturnType<typeof getUpdateInstruction> & SelfPlanAndSendFunctions; rotateAuthority: (input: RotateAuthorityInput) => ReturnType<typeof getRotateAuthorityInstruction> & SelfPlanAndSendFunctions; }
+export type PropAmmProgramPluginAccounts = {
+	oracleState:
+		& ReturnType<typeof getOracleStateCodec>
+		& SelfFetchFunctions<OracleStateArgs, OracleState>;
+};
 
-export type PropAmmProgramPluginRequirements = ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi> & ClientWithTransactionPlanning & ClientWithTransactionSending
+export type PropAmmProgramPluginInstructions = {
+	initialize: (
+		input: InitializeInput,
+	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
+	update: (
+		input: UpdateInput,
+	) => ReturnType<typeof getUpdateInstruction> & SelfPlanAndSendFunctions;
+	rotateAuthority: (
+		input: RotateAuthorityInput,
+	) =>
+		& ReturnType<typeof getRotateAuthorityInstruction>
+		& SelfPlanAndSendFunctions;
+};
+
+export type PropAmmProgramPluginRequirements =
+	& ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi>
+	& ClientWithTransactionPlanning
+	& ClientWithTransactionSending;
 
 export function propAmmProgramProgram() {
-    return <T extends PropAmmProgramPluginRequirements>(client: T) => {
-        return { ...client, propAmmProgram: <PropAmmProgramPlugin>{ accounts: { oracleState: addSelfFetchFunctions(client, getOracleStateCodec()) }, instructions: { initialize: input => addSelfPlanAndSendFunctions(client, getInitializeInstruction(input)), update: input => addSelfPlanAndSendFunctions(client, getUpdateInstruction(input)), rotateAuthority: input => addSelfPlanAndSendFunctions(client, getRotateAuthorityInstruction(input)) } } };
-    };
+	return <T extends PropAmmProgramPluginRequirements>(client: T) => {
+		return {
+			...client,
+			propAmmProgram: <PropAmmProgramPlugin> {
+				accounts: {
+					oracleState: addSelfFetchFunctions(client, getOracleStateCodec()),
+				},
+				instructions: {
+					initialize: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getInitializeInstruction(input),
+						),
+					update: (input) =>
+						addSelfPlanAndSendFunctions(client, getUpdateInstruction(input)),
+					rotateAuthority: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getRotateAuthorityInstruction(input),
+						),
+				},
+			},
+		};
+	};
 }

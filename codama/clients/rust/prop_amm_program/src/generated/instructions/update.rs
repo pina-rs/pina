@@ -19,10 +19,7 @@ pub struct Update {
 
 impl Update {
 	pub fn new(oracle: solana_pubkey::Pubkey, authority: solana_pubkey::Pubkey) -> Self {
-		Self {
-			oracle,
-			authority,
-		}
+		Self { oracle, authority }
 	}
 
 	pub fn instruction(&self, data: UpdateInstructionData) -> solana_instruction::Instruction {
@@ -37,7 +34,10 @@ impl Update {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.oracle, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.authority, true));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.authority,
+			true,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();
 

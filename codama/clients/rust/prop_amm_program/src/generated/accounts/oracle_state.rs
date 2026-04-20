@@ -41,7 +41,9 @@ impl OracleState {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(
+		data: &mut [u8],
+	) -> Result<&mut Self, solana_program_error::ProgramError> {
 		let account = bytemuck::try_from_bytes_mut::<Self>(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != ORACLE_STATE_DISCRIMINATOR {
