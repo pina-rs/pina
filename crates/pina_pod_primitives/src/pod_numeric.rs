@@ -1,4 +1,4 @@
-//! Pod integer type definitions (PodU16, PodI16, …, PodU128, PodI128).
+//! Pod integer type definitions (`PodU16`, `PodI16`, …, `PodU128`, `PodI128`).
 
 use bytemuck::Pod;
 use bytemuck::Zeroable;
@@ -72,19 +72,19 @@ define_pod_signed!(
 
 // Compile-time invariant: all numeric Pod types must have alignment 1 and
 // correct size.
-const _: () = assert!(core::mem::align_of::<PodU16>() == 1);
-const _: () = assert!(core::mem::size_of::<PodU16>() == 2);
-const _: () = assert!(core::mem::align_of::<PodI16>() == 1);
-const _: () = assert!(core::mem::size_of::<PodI16>() == 2);
-const _: () = assert!(core::mem::align_of::<PodU32>() == 1);
-const _: () = assert!(core::mem::size_of::<PodU32>() == 4);
-const _: () = assert!(core::mem::align_of::<PodI32>() == 1);
-const _: () = assert!(core::mem::size_of::<PodI32>() == 4);
-const _: () = assert!(core::mem::align_of::<PodU64>() == 1);
-const _: () = assert!(core::mem::size_of::<PodU64>() == 8);
-const _: () = assert!(core::mem::align_of::<PodI64>() == 1);
-const _: () = assert!(core::mem::size_of::<PodI64>() == 8);
-const _: () = assert!(core::mem::align_of::<PodU128>() == 1);
-const _: () = assert!(core::mem::size_of::<PodU128>() == 16);
-const _: () = assert!(core::mem::align_of::<PodI128>() == 1);
-const _: () = assert!(core::mem::size_of::<PodI128>() == 16);
+const _: () = assert!(align_of::<PodU16>() == 1);
+const _: () = assert!(size_of::<PodU16>() == 2);
+const _: () = assert!(align_of::<PodI16>() == 1);
+const _: () = assert!(size_of::<PodI16>() == 2);
+const _: () = assert!(align_of::<PodU32>() == 1);
+const _: () = assert!(size_of::<PodU32>() == 4);
+const _: () = assert!(align_of::<PodI32>() == 1);
+const _: () = assert!(size_of::<PodI32>() == 4);
+const _: () = assert!(align_of::<PodU64>() == 1);
+const _: () = assert!(size_of::<PodU64>() == 8);
+const _: () = assert!(align_of::<PodI64>() == 1);
+const _: () = assert!(size_of::<PodI64>() == 8);
+const _: () = assert!(align_of::<PodU128>() == 1);
+const _: () = assert!(size_of::<PodU128>() == 16);
+const _: () = assert!(align_of::<PodI128>() == 1);
+const _: () = assert!(size_of::<PodI128>() == 16);

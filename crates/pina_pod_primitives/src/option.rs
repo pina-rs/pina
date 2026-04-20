@@ -12,7 +12,7 @@ use bytemuck::Zeroable;
 ///
 /// # Layout
 /// - Byte 0: discriminant (`0` or `1`)
-/// - Bytes 1..1+size_of::<T>(): value (uninitialized if `None`)
+/// - Bytes `1..1+size_of::<T>()`: value (uninitialized if `None`)
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct PodOption<T: Pod> {
@@ -96,7 +96,7 @@ impl<T: Pod> PodOption<T> {
 	/// # Safety
 	/// Caller must ensure this is `Some`, otherwise returns uninitialized data.
 	pub unsafe fn assume_init(&self) -> &T {
-		&*self.value.as_ptr()
+		unsafe { &*self.value.as_ptr() }
 	}
 }
 

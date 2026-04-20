@@ -19,7 +19,7 @@ use crate::error::max_n_for_pfx;
 ///
 /// # Layout
 /// - Bytes 0..PFX: element count prefix (little-endian)
-/// - Bytes PFX..PFX+(N*size_of::<T>()): element data (may be partially uninitialized)
+/// - Bytes PFX..PFX+(N*`size_of::`<T>()): element data (may be partially uninitialized)
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct PodVec<T: Pod, const N: usize, const PFX: usize = 2> {
@@ -45,7 +45,7 @@ impl<T: Pod, const N: usize, const PFX: usize> PodVec<T, N, PFX> {
 }
 
 impl<T: Pod, const N: usize, const PFX: usize> PodVec<T, N, PFX> {
-	#[inline(always)]
+	#[inline]
 	fn decode_len(&self) -> usize {
 		match PFX {
 			1 => self.len[0] as usize,
@@ -67,7 +67,7 @@ impl<T: Pod, const N: usize, const PFX: usize> PodVec<T, N, PFX> {
 		}
 	}
 
-	#[inline(always)]
+	#[inline]
 	fn encode_len(&mut self, n: usize) {
 		match PFX {
 			1 => self.len[0] = n as u8,
@@ -88,13 +88,13 @@ impl<T: Pod, const N: usize, const PFX: usize> PodVec<T, N, PFX> {
 	}
 
 	/// Returns the number of elements (clamped to capacity).
-	#[inline(always)]
+	#[inline]
 	pub fn len(&self) -> usize {
 		self.decode_len().min(N)
 	}
 
 	/// Returns `true` if the vector is empty.
-	#[inline(always)]
+	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.len() == 0
 	}
@@ -107,13 +107,13 @@ impl<T: Pod, const N: usize, const PFX: usize> PodVec<T, N, PFX> {
 	/// Returns a slice of the initialized elements.
 	pub fn as_slice(&self) -> &[T] {
 		let len = self.len();
-		unsafe { core::slice::from_raw_parts(self.data.as_ptr() as *const T, len) }
+		unsafe { core::slice::from_raw_parts(self.data.as_ptr().cast::<T>(), len) }
 	}
 
 	/// Returns a mutable slice of the initialized elements.
 	pub fn as_mut_slice(&mut self) -> &mut [T] {
 		let len = self.len();
-		unsafe { core::slice::from_raw_parts_mut(self.data.as_mut_ptr() as *mut T, len) }
+		unsafe { core::slice::from_raw_parts_mut(self.data.as_mut_ptr().cast::<T>(), len) }
 	}
 
 	/// Returns the element at the given index.

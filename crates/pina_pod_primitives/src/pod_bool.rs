@@ -65,5 +65,5 @@ impl fmt::Display for PodBool {
 	}
 }
 
-const _: () = assert!(core::mem::align_of::<PodBool>() == 1);
-const _: () = assert!(core::mem::size_of::<PodBool>() == 1);
+const _: () = assert!(align_of::<PodBool>() == 1);
+const _: () = assert!(size_of::<PodBool>() == 1);

@@ -44,7 +44,7 @@ impl<const N: usize, const PFX: usize> PodString<N, PFX> {
 }
 
 impl<const N: usize, const PFX: usize> PodString<N, PFX> {
-	#[inline(always)]
+	#[inline]
 	fn decode_len(&self) -> usize {
 		match PFX {
 			1 => self.len[0] as usize,
@@ -66,7 +66,7 @@ impl<const N: usize, const PFX: usize> PodString<N, PFX> {
 		}
 	}
 
-	#[inline(always)]
+	#[inline]
 	fn encode_len(&mut self, n: usize) {
 		match PFX {
 			1 => self.len[0] = n as u8,
@@ -87,13 +87,13 @@ impl<const N: usize, const PFX: usize> PodString<N, PFX> {
 	}
 
 	/// Returns the logical length of the string (clamped to capacity).
-	#[inline(always)]
+	#[inline]
 	pub fn len(&self) -> usize {
 		self.decode_len().min(N)
 	}
 
 	/// Returns `true` if the string is empty.
-	#[inline(always)]
+	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.len() == 0
 	}
@@ -108,24 +108,26 @@ impl<const N: usize, const PFX: usize> PodString<N, PFX> {
 	/// # Safety
 	/// This assumes the stored bytes are valid UTF-8. For untrusted account
 	/// data, use `try_as_str()` instead.
-	#[inline(always)]
+	#[inline]
 	pub unsafe fn as_str_unchecked(&self) -> &str {
-		let len = self.len();
-		let bytes = core::slice::from_raw_parts(self.data.as_ptr() as *const u8, len);
-		core::str::from_utf8_unchecked(bytes)
+		unsafe {
+			let len = self.len();
+			let bytes = core::slice::from_raw_parts(self.data.as_ptr().cast::<u8>(), len);
+			core::str::from_utf8_unchecked(bytes)
+		}
 	}
 
 	/// Returns the string as a `&str`, validating UTF-8.
 	pub fn try_as_str(&self) -> Result<&str, PodCollectionError> {
 		let len = self.len();
-		let bytes = unsafe { core::slice::from_raw_parts(self.data.as_ptr() as *const u8, len) };
+		let bytes = unsafe { core::slice::from_raw_parts(self.data.as_ptr().cast::<u8>(), len) };
 		core::str::from_utf8(bytes).map_err(|_| PodCollectionError::InvalidUtf8)
 	}
 
 	/// Returns the raw bytes (may include trailing garbage — use `len()` for valid slice).
 	pub fn as_bytes(&self) -> &[u8] {
 		let len = self.len();
-		unsafe { core::slice::from_raw_parts(self.data.as_ptr() as *const u8, len) }
+		unsafe { core::slice::from_raw_parts(self.data.as_ptr().cast::<u8>(), len) }
 	}
 
 	/// Sets the string to a new value, returning error if too long.
@@ -135,7 +137,11 @@ impl<const N: usize, const PFX: usize> PodString<N, PFX> {
 			return Err(PodCollectionError::Overflow);
 		}
 		unsafe {
-			core::ptr::copy_nonoverlapping(value.as_ptr(), self.data.as_mut_ptr() as *mut u8, vlen);
+			core::ptr::copy_nonoverlapping(
+				value.as_ptr(),
+				self.data.as_mut_ptr().cast::<u8>(),
+				vlen,
+			);
 		}
 		self.encode_len(vlen);
 		Ok(())
@@ -160,7 +166,7 @@ impl<const N: usize, const PFX: usize> PodString<N, PFX> {
 		unsafe {
 			core::ptr::copy_nonoverlapping(
 				value.as_ptr(),
-				(self.data.as_mut_ptr() as *mut u8).add(cur),
+				self.data.as_mut_ptr().cast::<u8>().add(cur),
 				vlen,
 			);
 		}
