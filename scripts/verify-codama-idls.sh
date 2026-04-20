@@ -30,10 +30,21 @@ show_codama_diff() {
 }
 
 format_codama_outputs() {
-	dprint fmt --config "$ROOT/dprint.json" \
-		"$IDL_DIR/*.json" \
-		"$RUST_CLIENTS_DIR/**" \
-		"$JS_CLIENTS_DIR/**"
+	(
+		cd "$ROOT"
+
+		FORMAT_FILES=()
+		while IFS= read -r file; do
+			FORMAT_FILES+=("$file")
+		done < <(find codama/idls codama/clients/rust codama/clients/js -type f | sort)
+
+		if [ "${#FORMAT_FILES[@]}" -eq 0 ]; then
+			echo "No Codama output files found to format." >&2
+			exit 1
+		fi
+
+		dprint fmt --config "$ROOT/dprint.json" "${FORMAT_FILES[@]}"
+	)
 }
 
 trap '
