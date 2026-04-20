@@ -7,7 +7,7 @@ This page tracks sequential parity ports from `solana-foundation/anchor/tests` i
 - [ ] `anchor-cli-account` (no direct parity yet; Anchor CLI account decoding over dynamic `Vec`/`String` data is not a direct pina/no-std match)
 - [ ] `anchor-cli-idl` (no direct parity yet; Anchor CLI IDL account lifecycle is Anchor-CLI-specific)
 - [ ] `auction-house`
-- [ ] `bench`
+- [x] `bench` -> `examples/prop_amm_program` (adapted from `bench/programs/prop-amm/anchor-v2`; asm fast path intentionally not ported)
 - [ ] `bpf-upgradeable-state`
 - [ ] `cashiers-check`
 - [ ] `cfo`

@@ -2357,6 +2357,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "prop-amm-program-client"
+version = "0.0.0"
+dependencies = [
+ "bytemuck",
+ "num-derive",
+ "num-traits",
+ "pina_pod_primitives",
+ "solana-account-info",
+ "solana-cpi",
+ "solana-instruction",
+ "solana-program-error",
+ "solana-pubkey 4.2.0",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "prop_amm_program"
+version = "0.0.0"
+dependencies = [
+ "mollusk-svm",
+ "pina",
+ "solana-account",
+ "solana-instruction",
+ "solana-pubkey 4.2.0",
+ "solana-sdk-ids",
+]
+
+[[package]]
 name = "proptest"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
