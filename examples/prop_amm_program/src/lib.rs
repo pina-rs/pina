@@ -32,6 +32,8 @@ use core::mem::size_of;
 
 use pina::*;
 
+pub mod cpi;
+
 declare_id!("55555555555555555555555555555555555555555555");
 
 /// Matches the Anchor v2 benchmark's hard-coded updater key.

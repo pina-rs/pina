@@ -13,6 +13,7 @@ A Pina-native port of Anchor `anchor-next` benchmark example `bench/programs/pro
 - Global update-authority checks modeled after Anchor `prop-amm` v2.
 - Authority rotation validated against stored account state.
 - Native unit tests plus Mollusk e2e coverage.
+- A generated-style `src/cpi.rs` module showing how typed `CpiHandle` account structs can drive allocator-free on-chain CPI helpers.
 
 ## Important adaptation notes
 
