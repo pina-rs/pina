@@ -94,8 +94,32 @@ pub mod accounts {
 	}
 }
 
+#[derive(Clone, Copy, Debug)]
+struct ProgramAddressCheck<'a> {
+	address: &'a Address,
+}
+
+impl<'a> ProgramAddressCheck<'a> {
+	#[inline(always)]
+	const fn new(address: &'a Address) -> Self {
+		Self { address }
+	}
+
+	#[inline(always)]
+	fn assert_address(&self, expected: &Address) -> ProgramResult {
+		if self.address != expected {
+			return Err(ProgramError::IncorrectProgramId);
+		}
+
+		Ok(())
+	}
+}
+
 #[inline(always)]
 pub fn initialize<'a>(ctx: &CpiContext<'a, accounts::Initialize<'a>, 3>) -> ProgramResult {
+	let program_account = ProgramAddressCheck::new(ctx.program);
+	program_account.assert_address(&ID)?;
+
 	let data = InitializeInstruction::builder().build();
 	ctx.invoke(data.to_bytes(), &[])
 }
@@ -105,6 +129,9 @@ pub fn update<'a>(
 	ctx: &CpiContext<'a, accounts::Update<'a>, 2>,
 	new_price: PodU64,
 ) -> ProgramResult {
+	let program_account = ProgramAddressCheck::new(ctx.program);
+	program_account.assert_address(&ID)?;
+
 	let data = UpdateInstruction::builder().new_price(new_price).build();
 	ctx.invoke(data.to_bytes(), &[])
 }
@@ -114,6 +141,9 @@ pub fn rotate_authority<'a>(
 	ctx: &CpiContext<'a, accounts::RotateAuthority<'a>, 2>,
 	new_authority: Address,
 ) -> ProgramResult {
+	let program_account = ProgramAddressCheck::new(ctx.program);
+	program_account.assert_address(&ID)?;
+
 	let data = RotateAuthorityInstruction::builder()
 		.new_authority(new_authority)
 		.build();
@@ -166,5 +196,16 @@ mod tests {
 			.unwrap_or_else(|e| panic!("decode rotate cpi bytes: {e:?}"));
 
 		assert_eq!(decoded.new_authority, next_authority);
+	}
+
+	#[test]
+	fn program_address_check_rejects_wrong_program() {
+		let wrong_program = Address::new_from_array([3u8; ADDRESS_BYTES]);
+		let program_account = ProgramAddressCheck::new(&wrong_program);
+		let error = program_account
+			.assert_address(&ID)
+			.expect_err("reject wrong cpi program id");
+
+		assert_eq!(error, ProgramError::IncorrectProgramId);
 	}
 }
