@@ -20,6 +20,7 @@
   - [Migrating from Anchor](./tutorials/migrating-from-anchor.md)
 - [Anchor Test Porting](./anchor-test-porting.md)
 - [Anchor `lang-v2` review](./anchor-next-review.md)
+- [Accounts cursor runtime draft](./accounts-cursor-runtime-draft.md)
 - [Security Model](./security-model.md)
 - [Development Workflow](./development-workflow.md)
 - [CI and Releases](./ci-and-releases.md)

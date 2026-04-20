@@ -68,6 +68,8 @@ Do not copy directly from Anchor:
 
 ### P1 — Rework `#[derive(Accounts)]` around a cursor-based loader/runtime ([#143](https://github.com/pina-rs/pina/issues/143))
 
+See also: [Accounts cursor runtime draft](./accounts-cursor-runtime-draft.md).
+
 Why this matters:
 
 - `lang-v2/src/cursor.rs`, `lang-v2/src/loader.rs`, and `lang-v2/src/dispatch.rs` expose a stronger runtime model than today's simple slice destructuring.
