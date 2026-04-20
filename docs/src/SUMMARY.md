@@ -19,6 +19,7 @@
   - [Token Escrow Tutorial](./tutorials/token-escrow.md)
   - [Migrating from Anchor](./tutorials/migrating-from-anchor.md)
 - [Anchor Test Porting](./anchor-test-porting.md)
+- [Anchor `lang-v2` review](./anchor-next-review.md)
 - [Security Model](./security-model.md)
 - [Development Workflow](./development-workflow.md)
 - [CI and Releases](./ci-and-releases.md)
