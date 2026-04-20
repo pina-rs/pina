@@ -18,9 +18,17 @@
 //!
 //! Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 
+// Allow unsafe code for the collection types that need MaybeUninit.
+// Safety is guaranteed by:
+// - All types are #[repr(C)] with alignment 1
+// - MaybeUninit allows any bit pattern (satisfying Pod requirements)
+// - Length prefixes prevent reading uninitialized data as initialized
+#![allow(unsafe_code)]
+
 use core::fmt;
 use core::mem::align_of;
 use core::mem::size_of;
+use core::mem::MaybeUninit;
 
 use bytemuck::Pod;
 use bytemuck::Zeroable;
@@ -735,11 +743,651 @@ const _: () = assert!(size_of::<PodI128>() == 16);
 const _: () = assert!(align_of::<PodBool>() == 1);
 const _: () = assert!(size_of::<PodBool>() == 1);
 
+// ==========================================================================
+// Fixed-capacity collection types for bytemuck-compatible zero-copy access
+// ==========================================================================
+
+
+/// Error type for collection operations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PodCollectionError {
+	/// Value exceeds capacity.
+	Overflow,
+	/// Invalid UTF-8 in string data.
+	InvalidUtf8,
+	/// Index out of bounds.
+	OutOfBounds,
+}
+
+impl fmt::Display for PodCollectionError {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			Self::Overflow => write!(f, "value exceeds capacity"),
+			Self::InvalidUtf8 => write!(f, "invalid UTF-8"),
+			Self::OutOfBounds => write!(f, "index out of bounds"),
+		}
+	}
+}
+
+// ==========================================================================
+// PodOption: Fixed-size optional type
+// ==========================================================================
+
+/// Returns the maximum `N` value representable by a `PFX`-byte length prefix.
+const fn max_n_for_pfx(pfx: usize) -> usize {
+	match pfx {
+		1 => u8::MAX as usize,
+		2 => u16::MAX as usize,
+		4 => u32::MAX as usize,
+		8 => usize::MAX,
+		_ => 0,
+	}
+}
+
+/// A fixed-size optional value with `1` byte discriminant (`0=None`, `1=Some`).
+///
+/// # Layout
+/// - Byte 0: discriminant (`0` or `1`)
+/// - Bytes 1..1+size_of::<T>(): value (uninitialized if `None`)
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct PodOption<T: Pod> {
+	tag: u8,
+	// MaybeUninit allows any bit pattern, satisfying Pod requirements
+	value: MaybeUninit<T>,
+}
+
+impl<T: Pod> PodOption<T> {
+	/// Creates a `None` value.
+	pub const fn none() -> Self {
+		Self {
+			tag: 0,
+			value: MaybeUninit::uninit(),
+		}
+	}
+
+	/// Creates a `Some` value.
+	pub const fn some(value: T) -> Self {
+		Self {
+			tag: 1,
+			value: MaybeUninit::new(value),
+		}
+	}
+
+	/// Returns `true` if the option is `None`.
+	pub const fn is_none(&self) -> bool {
+		self.tag == 0
+	}
+
+	/// Returns `true` if the option is `Some`.
+	pub const fn is_some(&self) -> bool {
+		self.tag == 1
+	}
+
+	/// Returns the value if `Some`, otherwise `None`.
+	pub fn get(&self) -> Option<T> {
+		if self.tag == 1 {
+			// SAFETY: tag == 1 means value was initialized
+			Some(unsafe { self.value.assume_init() })
+		} else {
+			None
+		}
+	}
+
+	/// Returns a reference to the value if `Some`.
+	pub fn as_ref(&self) -> Option<&T> {
+		if self.tag == 1 {
+			// SAFETY: tag == 1 means value was initialized
+			Some(unsafe { &*self.value.as_ptr() })
+		} else {
+			None
+		}
+	}
+
+	/// Returns a mutable reference to the value if `Some`.
+	pub fn as_mut(&mut self) -> Option<&mut T> {
+		if self.tag == 1 {
+			// SAFETY: tag == 1 means value was initialized
+			Some(unsafe { &mut *self.value.as_mut_ptr() })
+		} else {
+			None
+		}
+	}
+
+	/// Sets the value to `Some`.
+	pub fn set(&mut self, value: T) {
+		self.value = MaybeUninit::new(value);
+		self.tag = 1;
+	}
+
+	/// Sets the value to `None`.
+	pub fn clear(&mut self) {
+		self.tag = 0;
+		// value is now logically uninitialized
+	}
+
+	/// Returns the raw tag byte.
+	pub const fn raw_tag(&self) -> u8 {
+		self.tag
+	}
+
+	/// # Safety
+	/// Caller must ensure this is `Some`, otherwise returns uninitialized data.
+	pub unsafe fn assume_init(&self) -> &T {
+		&*self.value.as_ptr()
+	}
+}
+
+impl<T: Pod> Default for PodOption<T> {
+	fn default() -> Self {
+		Self::none()
+	}
+}
+
+impl<T: Pod + PartialEq> PartialEq for PodOption<T> {
+	fn eq(&self, other: &Self) -> bool {
+		match (self.tag, other.tag) {
+			(0, 0) => true,
+			(1, 1) => unsafe { self.value.assume_init() == other.value.assume_init() },
+			_ => false,
+		}
+	}
+}
+
+impl<T: Pod + Eq> Eq for PodOption<T> {}
+
+impl<T: Pod> fmt::Debug for PodOption<T>
+where
+	T: fmt::Debug,
+{
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self.get() {
+			Some(v) => f.debug_tuple("PodOption::Some").field(&v).finish(),
+			None => write!(f, "PodOption::None"),
+		}
+	}
+}
+
+// SAFETY: PodOption is #[repr(C)] with tag: u8 + MaybeUninit<T> where T: Pod.
+// T: Pod guarantees T is align-1 and valid for any bit pattern, so the
+// MaybeUninit doesn't violate Pod requirements.
+unsafe impl<T: Pod> Zeroable for PodOption<T> {}
+unsafe impl<T: Pod> Pod for PodOption<T> {}
+
+// SAFETY: MaybeUninit<T> is always Zeroable (no validity requirements)
+
+// Compile-time layout assertions for PodOption
+const _: () = assert!(align_of::<PodOption<u8>>() == 1);
+const _: () = assert!(size_of::<PodOption<u8>>() == 2); // 1 tag + 1 value
+const _: () = assert!(size_of::<PodOption<PodU64>>() == 9); // 1 tag + 8 value
+
+// ==========================================================================
+// PodString: Fixed-capacity string with length prefix
+// ==========================================================================
+
+/// A fixed-capacity string stored inline with a length prefix.
+///
+/// Default prefix size is `1` byte (u8), supporting strings up to 255 bytes.
+/// Use `PodString<N, 2>` for up to 65,535 bytes, etc.
+///
+/// # Layout
+/// - Bytes 0..PFX: length prefix (little-endian)
+/// - Bytes PFX..PFX+N: UTF-8 data (may be partially uninitialized)
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct PodString<const N: usize, const PFX: usize = 1> {
+	len: [u8; PFX],
+	// MaybeUninit allows any bit pattern (required for Pod)
+	data: [MaybeUninit<u8>; N],
+}
+
+// Compile-time validation of PFX
+impl<const N: usize, const PFX: usize> PodString<N, PFX> {
+	const _CAP_CHECK: () = {
+		assert!(
+			PFX == 1 || PFX == 2 || PFX == 4 || PFX == 8,
+			"PodString<N, PFX>: PFX must be 1, 2, 4, or 8"
+		);
+		assert!(
+			N <= max_n_for_pfx(PFX),
+			"PodString<N, PFX>: N exceeds the maximum value representable by the PFX-byte length prefix"
+		);
+	};
+
+	/// Use this const to trigger the compile-time assertions.
+	pub const VALID: () = Self::_CAP_CHECK;
+}
+
+impl<const N: usize, const PFX: usize> PodString<N, PFX> {
+	#[inline(always)]
+	fn decode_len(&self) -> usize {
+		match PFX {
+			1 => self.len[0] as usize,
+			2 => u16::from_le_bytes([self.len[0], self.len[1]]) as usize,
+			4 => u32::from_le_bytes([self.len[0], self.len[1], self.len[2], self.len[3]]) as usize,
+			8 => u64::from_le_bytes([
+				self.len[0], self.len[1], self.len[2], self.len[3],
+				self.len[4], self.len[5], self.len[6], self.len[7],
+			]) as usize,
+			_ => unreachable!(),
+		}
+	}
+
+	#[inline(always)]
+	fn encode_len(&mut self, n: usize) {
+		match PFX {
+			1 => self.len[0] = n as u8,
+			2 => {
+				let bytes = (n as u16).to_le_bytes();
+				self.len.copy_from_slice(&bytes);
+			}
+			4 => {
+				let bytes = (n as u32).to_le_bytes();
+				self.len.copy_from_slice(&bytes);
+			}
+			8 => {
+				let bytes = (n as u64).to_le_bytes();
+				self.len.copy_from_slice(&bytes);
+			}
+			_ => unreachable!(),
+		}
+	}
+
+	/// Returns the logical length of the string (clamped to capacity).
+	#[inline(always)]
+	pub fn len(&self) -> usize {
+		self.decode_len().min(N)
+	}
+
+	/// Returns `true` if the string is empty.
+	#[inline(always)]
+	pub fn is_empty(&self) -> bool {
+		self.len() == 0
+	}
+
+	/// Returns the maximum capacity.
+	pub const fn capacity(&self) -> usize {
+		N
+	}
+
+	/// Returns the string as a `&str`.
+	///
+	/// # Safety
+	/// This assumes the stored bytes are valid UTF-8. For untrusted account
+	/// data, use `try_as_str()` instead.
+	#[inline(always)]
+	pub unsafe fn as_str_unchecked(&self) -> &str {
+		let len = self.len();
+		let bytes = core::slice::from_raw_parts(self.data.as_ptr() as *const u8, len);
+		core::str::from_utf8_unchecked(bytes)
+	}
+
+	/// Returns the string as a `&str`, validating UTF-8.
+	pub fn try_as_str(&self) -> Result<&str, PodCollectionError> {
+		let len = self.len();
+		let bytes = unsafe { core::slice::from_raw_parts(self.data.as_ptr() as *const u8, len) };
+		core::str::from_utf8(bytes).map_err(|_| PodCollectionError::InvalidUtf8)
+	}
+
+	/// Returns the raw bytes (may include trailing garbage — use `len()` for valid slice).
+	pub fn as_bytes(&self) -> &[u8] {
+		let len = self.len();
+		unsafe { core::slice::from_raw_parts(self.data.as_ptr() as *const u8, len) }
+	}
+
+	/// Sets the string to a new value, returning error if too long.
+	pub fn try_set(&mut self, value: &str) -> Result<(), PodCollectionError> {
+		let vlen = value.len();
+		if vlen > N {
+			return Err(PodCollectionError::Overflow);
+		}
+		unsafe {
+			core::ptr::copy_nonoverlapping(
+				value.as_ptr(),
+				self.data.as_mut_ptr() as *mut u8,
+				vlen,
+			);
+		}
+		self.encode_len(vlen);
+		Ok(())
+	}
+
+	/// Sets the string to a new value.
+	///
+	/// Returns `false` if the value was truncated due to exceeding capacity.
+	#[must_use = "returns false if value exceeds capacity"]
+	pub fn set(&mut self, value: &str) -> bool {
+		self.try_set(value).is_ok()
+	}
+
+	/// Appends a string slice, returning error if capacity exceeded.
+	pub fn try_push_str(&mut self, value: &str) -> Result<(), PodCollectionError> {
+		let cur = self.len();
+		let vlen = value.len();
+		let new_len = cur + vlen;
+		if new_len > N {
+			return Err(PodCollectionError::Overflow);
+		}
+		unsafe {
+			core::ptr::copy_nonoverlapping(
+				value.as_ptr(),
+				(self.data.as_mut_ptr() as *mut u8).add(cur),
+				vlen,
+			);
+		}
+		self.encode_len(new_len);
+		Ok(())
+	}
+
+	/// Appends a string slice.
+	///
+	/// Returns `false` if appending would exceed capacity.
+	#[must_use = "returns false if append would exceed capacity"]
+	pub fn push_str(&mut self, value: &str) -> bool {
+		self.try_push_str(value).is_ok()
+	}
+
+	/// Clears the string (sets length to 0).
+	pub fn clear(&mut self) {
+		self.len = [0u8; PFX];
+	}
+}
+
+impl<const N: usize, const PFX: usize> Default for PodString<N, PFX> {
+	fn default() -> Self {
+		Self {
+			len: [0u8; PFX],
+			data: [MaybeUninit::uninit(); N],
+		}
+	}
+}
+
+impl<const N: usize, const PFX: usize> core::ops::Deref for PodString<N, PFX> {
+	type Target = str;
+
+	fn deref(&self) -> &str {
+		// SAFETY: We assume valid UTF-8 for deref (caller should validate)
+		unsafe { self.as_str_unchecked() }
+	}
+}
+
+impl<const N: usize, const PFX: usize> AsRef<str> for PodString<N, PFX> {
+	fn as_ref(&self) -> &str {
+		// SAFETY: Same as Deref
+		unsafe { self.as_str_unchecked() }
+	}
+}
+
+impl<const N: usize, const PFX: usize> AsRef<[u8]> for PodString<N, PFX> {
+	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
+	}
+}
+
+impl<const N: usize, const PFX: usize> PartialEq for PodString<N, PFX> {
+	fn eq(&self, other: &Self) -> bool {
+		self.as_bytes() == other.as_bytes()
+	}
+}
+
+impl<const N: usize, const PFX: usize> Eq for PodString<N, PFX> {}
+
+impl<const N: usize, const PFX: usize> PartialEq<str> for PodString<N, PFX> {
+	fn eq(&self, other: &str) -> bool {
+		self.as_bytes() == other.as_bytes()
+	}
+}
+
+impl<const N: usize, const PFX: usize> fmt::Debug for PodString<N, PFX> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self.try_as_str() {
+			Ok(s) => fmt::Debug::fmt(s, f),
+			Err(_) => f.debug_struct("PodString").field("len", &self.len()).finish(),
+		}
+	}
+}
+
+impl<const N: usize, const PFX: usize> fmt::Display for PodString<N, PFX> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self.try_as_str() {
+			Ok(s) => f.write_str(s),
+			Err(_) => write!(f, "<invalid utf8>"),
+		}
+	}
+}
+
+
+
+// Compile-time layout assertions
+const _: () = assert!(align_of::<PodString<0>>() == 1);
+const _: () = assert!(size_of::<PodString<0>>() == 1); // 1 byte len prefix, 0 data
+const _: () = assert!(size_of::<PodString<32>>() == 33); // 1 + 32
+const _: () = assert!(size_of::<PodString<255>>() == 256);
+const _: () = assert!(size_of::<PodString<0, 2>>() == 2); // 2 byte len prefix
+const _: () = assert!(size_of::<PodString<100, 2>>() == 102); // 2 + 100
+
+// ==========================================================================
+// PodVec: Fixed-capacity vector with length prefix
+// ==========================================================================
+
+/// A fixed-capacity vector stored inline with a length prefix.
+///
+/// Default prefix size is `2` bytes (u16), supporting up to 65,535 elements.
+/// Use `PodVec<T, N, 1>` for up to 255 elements, etc.
+///
+/// # Layout
+/// - Bytes 0..PFX: element count prefix (little-endian)
+/// - Bytes PFX..PFX+(N*size_of::<T>()): element data (may be partially uninitialized)
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct PodVec<T: Pod, const N: usize, const PFX: usize = 2> {
+	len: [u8; PFX],
+	// MaybeUninit allows any bit pattern (required for Pod)
+	data: [MaybeUninit<T>; N],
+}
+
+// Compile-time validation of PFX
+impl<T: Pod, const N: usize, const PFX: usize> PodVec<T, N, PFX> {
+	const _CAP_CHECK: () = {
+		assert!(
+			PFX == 1 || PFX == 2 || PFX == 4 || PFX == 8,
+			"PodVec<T, N, PFX>: PFX must be 1, 2, 4, or 8"
+		);
+		assert!(
+			N <= max_n_for_pfx(PFX),
+			"PodVec<T, N, PFX>: N exceeds the maximum value representable by the PFX-byte length prefix"
+		);
+	};
+
+	/// Use this const to trigger the compile-time assertions.
+	pub const VALID: () = Self::_CAP_CHECK;
+}
+
+impl<T: Pod, const N: usize, const PFX: usize> PodVec<T, N, PFX> {
+	#[inline(always)]
+	fn decode_len(&self) -> usize {
+		match PFX {
+			1 => self.len[0] as usize,
+			2 => u16::from_le_bytes([self.len[0], self.len[1]]) as usize,
+			4 => u32::from_le_bytes([self.len[0], self.len[1], self.len[2], self.len[3]]) as usize,
+			8 => u64::from_le_bytes([
+				self.len[0], self.len[1], self.len[2], self.len[3],
+				self.len[4], self.len[5], self.len[6], self.len[7],
+			]) as usize,
+			_ => unreachable!(),
+		}
+	}
+
+	#[inline(always)]
+	fn encode_len(&mut self, n: usize) {
+		match PFX {
+			1 => self.len[0] = n as u8,
+			2 => {
+				let bytes = (n as u16).to_le_bytes();
+				self.len.copy_from_slice(&bytes);
+			}
+			4 => {
+				let bytes = (n as u32).to_le_bytes();
+				self.len.copy_from_slice(&bytes);
+			}
+			8 => {
+				let bytes = (n as u64).to_le_bytes();
+				self.len.copy_from_slice(&bytes);
+			}
+			_ => unreachable!(),
+		}
+	}
+
+	/// Returns the number of elements (clamped to capacity).
+	#[inline(always)]
+	pub fn len(&self) -> usize {
+		self.decode_len().min(N)
+	}
+
+	/// Returns `true` if the vector is empty.
+	#[inline(always)]
+	pub fn is_empty(&self) -> bool {
+		self.len() == 0
+	}
+
+	/// Returns the maximum capacity.
+	pub const fn capacity(&self) -> usize {
+		N
+	}
+
+	/// Returns a slice of the initialized elements.
+	pub fn as_slice(&self) -> &[T] {
+		let len = self.len();
+		unsafe {
+			core::slice::from_raw_parts(self.data.as_ptr() as *const T, len)
+		}
+	}
+
+	/// Returns a mutable slice of the initialized elements.
+	pub fn as_mut_slice(&mut self) -> &mut [T] {
+		let len = self.len();
+		unsafe {
+			core::slice::from_raw_parts_mut(self.data.as_mut_ptr() as *mut T, len)
+		}
+	}
+
+	/// Returns the element at the given index.
+	pub fn get(&self, index: usize) -> Option<&T> {
+		if index < self.len() {
+			Some(unsafe { &*self.data.as_ptr().add(index).cast::<T>() })
+		} else {
+			None
+		}
+	}
+
+	/// Returns a mutable reference to the element at the given index.
+	pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
+		if index < self.len() {
+			Some(unsafe { &mut *self.data.as_mut_ptr().add(index).cast::<T>() })
+		} else {
+			None
+		}
+	}
+
+	/// Pushes an element, returning error if at capacity.
+	pub fn try_push(&mut self, value: T) -> Result<(), PodCollectionError> {
+		let len = self.len();
+		if len >= N {
+			return Err(PodCollectionError::Overflow);
+		}
+		unsafe {
+			self.data.as_mut_ptr().add(len).cast::<T>().write(value);
+		}
+		self.encode_len(len + 1);
+		Ok(())
+	}
+
+	/// Pushes an element.
+	///
+	/// Returns `false` if at capacity.
+	#[must_use = "returns false if at capacity"]
+	pub fn push(&mut self, value: T) -> bool {
+		self.try_push(value).is_ok()
+	}
+
+	/// Pops the last element.
+	pub fn pop(&mut self) -> Option<T> {
+		let len = self.len();
+		if len == 0 {
+			return None;
+		}
+		let value = unsafe { self.data.as_ptr().add(len - 1).cast::<T>().read() };
+		self.encode_len(len - 1);
+		Some(value)
+	}
+
+	/// Clears the vector (sets length to 0).
+	pub fn clear(&mut self) {
+		self.len = [0u8; PFX];
+	}
+}
+
+impl<T: Pod, const N: usize, const PFX: usize> Default for PodVec<T, N, PFX> {
+	fn default() -> Self {
+		Self {
+			len: [0u8; PFX],
+			data: [MaybeUninit::uninit(); N],
+		}
+	}
+}
+
+impl<T: Pod, const N: usize, const PFX: usize> core::ops::Deref for PodVec<T, N, PFX> {
+	type Target = [T];
+
+	fn deref(&self) -> &[T] {
+		self.as_slice()
+	}
+}
+
+impl<T: Pod, const N: usize, const PFX: usize> core::ops::DerefMut for PodVec<T, N, PFX> {
+	fn deref_mut(&mut self) -> &mut [T] {
+		self.as_mut_slice()
+	}
+}
+
+impl<T: Pod, const N: usize, const PFX: usize> AsRef<[T]> for PodVec<T, N, PFX> {
+	fn as_ref(&self) -> &[T] {
+		self.as_slice()
+	}
+}
+
+impl<T: Pod + PartialEq, const N: usize, const PFX: usize> PartialEq for PodVec<T, N, PFX> {
+	fn eq(&self, other: &Self) -> bool {
+		self.as_slice() == other.as_slice()
+	}
+}
+
+impl<T: Pod + Eq, const N: usize, const PFX: usize> Eq for PodVec<T, N, PFX> {}
+
+impl<T: Pod + fmt::Debug, const N: usize, const PFX: usize> fmt::Debug for PodVec<T, N, PFX> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.debug_list().entries(self.as_slice().iter()).finish()
+	}
+}
+
+// SAFETY: PodVec is #[repr(C)] with len: [u8; PFX] + data: [MaybeUninit<T>; N] where T: Pod.
+// Both have align 1 and any bit pattern is valid.
+unsafe impl<T: Pod, const N: usize, const PFX: usize> Zeroable for PodVec<T, N, PFX> {}
+unsafe impl<T: Pod, const N: usize, const PFX: usize> Pod for PodVec<T, N, PFX> {}
+
+// Compile-time layout assertions
+const _: () = assert!(align_of::<PodVec<u8, 0>>() == 1);
+const _: () = assert!(size_of::<PodVec<u8, 10>>() == 2 + 10); // 2 len + 10 data
+const _: () = assert!(size_of::<PodVec<PodU64, 10>>() == 2 + 80); // 2 len + 80 data
+
 #[cfg(test)]
 extern crate std;
 
 #[cfg(test)]
 mod tests {
+	use std::vec::Vec;
+	use std::vec;
+
 	use bytemuck::try_from_bytes;
 
 	use super::*;
@@ -1482,5 +2130,193 @@ mod tests {
 		let fee = PodU64::from(25u64);
 		balance -= fee;
 		assert_eq!(balance.get(), 975);
+	}
+
+	// =======================================================================
+	// Collection type tests
+	// =======================================================================
+
+	// =======================================================================
+	// PodOption tests
+	// =======================================================================
+
+	#[test]
+	fn pod_option_none() {
+		let opt = PodOption::<PodU64>::none();
+		assert!(opt.is_none());
+		assert!(!opt.is_some());
+		assert_eq!(opt.get(), None);
+	}
+
+	#[test]
+	fn pod_option_some() {
+		let opt = PodOption::some(PodU64::from(42u64));
+		assert!(!opt.is_none());
+		assert!(opt.is_some());
+		assert_eq!(opt.get(), Some(PodU64::from(42u64)));
+	}
+
+	#[test]
+	fn pod_option_set_and_clear() {
+		let mut opt = PodOption::<PodU64>::none();
+		opt.set(PodU64::from(100u64));
+		assert!(opt.is_some());
+		assert_eq!(opt.get(), Some(PodU64::from(100u64)));
+		opt.clear();
+		assert!(opt.is_none());
+	}
+
+	#[test]
+	fn pod_option_default_is_none() {
+		let opt = PodOption::<PodU64>::default();
+		assert!(opt.is_none());
+	}
+
+	#[test]
+	fn pod_option_bytemuck_roundtrip() {
+		let opt = PodOption::some(PodU64::from(0xDEAD_BEEF_u64));
+		// Verify byte layout via pointer cast: tag (1) + value (8 in LE)
+		let bytes: &[u8] = unsafe { core::slice::from_raw_parts(&opt as *const _ as *const u8, size_of::<PodOption<PodU64>>()) };
+		assert_eq!(bytes[0], 1); // Some tag
+		assert_eq!(bytes[1..9], 0xDEAD_BEEF_u64.to_le_bytes());
+		// Roundtrip via pointer cast
+		let restored = unsafe { &*(bytes.as_ptr() as *const PodOption<PodU64>) };
+		assert_eq!(restored.get(), Some(PodU64::from(0xDEAD_BEEF_u64)));
+	}
+
+	// =======================================================================
+	// PodString tests
+	// =======================================================================
+
+	#[test]
+	fn pod_string_empty() {
+		let s = PodString::<32>::default();
+		assert!(s.is_empty());
+		assert_eq!(s.len(), 0);
+		assert_eq!(s.capacity(), 32);
+		assert_eq!(s.as_bytes(), b"");
+	}
+
+	#[test]
+	fn pod_string_set_and_get() {
+		let mut s = PodString::<32>::default();
+		assert!(s.try_set("hello").is_ok());
+		assert_eq!(s.len(), 5);
+		assert_eq!(s.as_bytes(), b"hello");
+		assert_eq!(s.try_as_str().unwrap(), "hello");
+	}
+
+	#[test]
+	fn pod_string_push_str() {
+		let mut s = PodString::<32>::default();
+		s.set("hello");
+		assert!(s.try_push_str(" world").is_ok());
+		assert_eq!(s.try_as_str().unwrap(), "hello world");
+	}
+
+	#[test]
+	fn pod_string_overflow_rejected() {
+		let mut s = PodString::<4>::default();
+		assert!(s.try_set("hello").is_err()); // 5 bytes > 4 capacity
+		assert!(s.is_empty()); // unchanged
+	}
+
+	#[test]
+	fn pod_string_clear() {
+		let mut s = PodString::<32>::default();
+		s.set("test");
+		assert!(!s.is_empty());
+		s.clear();
+		assert!(s.is_empty());
+	}
+
+	#[test]
+	fn pod_string_bytemuck_roundtrip() {
+		let mut s = PodString::<32>::default();
+		s.set("test");
+		// Verify byte layout via pointer cast: len prefix (1) + "test"
+		let bytes: &[u8] = unsafe { core::slice::from_raw_parts(&s as *const _ as *const u8, size_of::<PodString<32>>()) };
+		assert_eq!(bytes[0], 4); // len = 4
+		assert_eq!(&bytes[1..5], b"test");
+		// Roundtrip via pointer cast
+		let restored = unsafe { &*(bytes.as_ptr() as *const PodString<32>) };
+		assert_eq!(restored.try_as_str().unwrap(), "test");
+	}
+
+	// =======================================================================
+	// PodVec tests
+	// =======================================================================
+
+	#[test]
+	fn pod_vec_empty() {
+		let v = PodVec::<PodU64, 10>::default();
+		assert!(v.is_empty());
+		assert_eq!(v.len(), 0);
+		assert_eq!(v.capacity(), 10);
+		assert_eq!(v.as_slice(), &[] as &[PodU64]);
+	}
+
+	#[test]
+	fn pod_vec_push_and_get() {
+		let mut v = PodVec::<PodU64, 10>::default();
+		assert!(v.try_push(PodU64::from(1u64)).is_ok());
+		assert!(v.try_push(PodU64::from(2u64)).is_ok());
+		assert_eq!(v.len(), 2);
+		assert_eq!(v.get(0), Some(&PodU64::from(1u64)));
+		assert_eq!(v.get(1), Some(&PodU64::from(2u64)));
+		assert_eq!(v.get(2), None);
+	}
+
+	#[test]
+	fn pod_vec_as_slice() {
+		let mut v = PodVec::<PodU64, 10>::default();
+		v.push(PodU64::from(100u64));
+		v.push(PodU64::from(200u64));
+		let slice: Vec<u64> = v.as_slice().iter().map(|x| x.get()).collect();
+		assert_eq!(slice, vec![100, 200]);
+	}
+
+	#[test]
+	fn pod_vec_overflow_rejected() {
+		let mut v = PodVec::<PodU64, 2>::default();
+		assert!(v.try_push(PodU64::from(1u64)).is_ok());
+		assert!(v.try_push(PodU64::from(2u64)).is_ok());
+		assert!(v.try_push(PodU64::from(3u64)).is_err()); // at capacity
+		assert_eq!(v.len(), 2);
+	}
+
+	#[test]
+	fn pod_vec_pop() {
+		let mut v = PodVec::<PodU64, 10>::default();
+		v.push(PodU64::from(42u64));
+		v.push(PodU64::from(99u64));
+		assert_eq!(v.pop(), Some(PodU64::from(99u64)));
+		assert_eq!(v.pop(), Some(PodU64::from(42u64)));
+		assert_eq!(v.pop(), None);
+	}
+
+	#[test]
+	fn pod_vec_clear() {
+		let mut v = PodVec::<PodU64, 10>::default();
+		v.push(PodU64::from(1u64));
+		v.push(PodU64::from(2u64));
+		v.clear();
+		assert!(v.is_empty());
+		assert_eq!(v.len(), 0);
+	}
+
+	#[test]
+	fn pod_vec_bytemuck_roundtrip() {
+		let mut v = PodVec::<PodU64, 10>::default();
+		v.push(PodU64::from(100u64));
+		v.push(PodU64::from(200u64));
+		// Verify byte layout via pointer cast: len prefix (2) + data
+		let bytes: &[u8] = unsafe { core::slice::from_raw_parts(&v as *const _ as *const u8, size_of::<PodVec<PodU64, 10>>()) };
+		assert_eq!(bytes[0..2], [2, 0]); // len = 2 in LE
+		// Roundtrip via pointer cast
+		let restored = unsafe { &*(bytes.as_ptr() as *const PodVec<PodU64, 10>) };
+		assert_eq!(restored.len(), 2);
+		assert_eq!(restored.get(0), Some(&PodU64::from(100u64)));
+		assert_eq!(restored.get(1), Some(&PodU64::from(200u64)));
 	}
 }
