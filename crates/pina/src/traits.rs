@@ -4,6 +4,8 @@ use pinocchio::ProgramResult;
 use crate::AccountView;
 use crate::Address;
 use crate::ProgramError;
+use crate::Ref;
+use crate::RefMut;
 
 /// Zero-copy deserialization for on-chain account data.
 ///
@@ -123,7 +125,8 @@ pub trait AccountValidation {
 
 /// Validation trait for raw `AccountView` references.
 ///
-/// Methods return `Result<&Self, ProgramError>` to enable chaining:
+/// Methods return `Result<Self, ProgramError>` so shared account references
+/// stay shared and mutable account references stay mutable while chaining:
 /// ```ignore
 /// account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?;
 /// ```
@@ -145,49 +148,48 @@ pub trait AccountValidation {
 /// let vault = &accounts[1];
 /// vault.assert_seeds(&[b"vault", authority.address().as_ref()], &program_id)?;
 /// ```
-pub trait AccountInfoValidation {
+pub trait AccountInfoValidation: Sized {
 	/// Assert that the account is a signer.
-	fn assert_signer(&self) -> Result<&Self, ProgramError>;
+	fn assert_signer(self) -> Result<Self, ProgramError>;
 	/// Assert that the account is writable.
-	fn assert_writable(&self) -> Result<&Self, ProgramError>;
+	fn assert_writable(self) -> Result<Self, ProgramError>;
 	/// Assert that the account is executable.
-	fn assert_executable(&self) -> Result<&Self, ProgramError>;
+	fn assert_executable(self) -> Result<Self, ProgramError>;
 	/// Assert that the data held by the account is of the specified length.
-	fn assert_data_len(&self, len: usize) -> Result<&Self, ProgramError>;
+	fn assert_data_len(self, len: usize) -> Result<Self, ProgramError>;
 	/// Assert that the account is empty.
-	fn assert_empty(&self) -> Result<&Self, ProgramError>;
+	fn assert_empty(self) -> Result<Self, ProgramError>;
 	/// Assert that the account is not empty.
-	fn assert_not_empty(&self) -> Result<&Self, ProgramError>;
+	fn assert_not_empty(self) -> Result<Self, ProgramError>;
 	/// Assert that the account is of the type provided.
-	fn assert_type<T: HasDiscriminator>(&self, program_id: &Address)
-	-> Result<&Self, ProgramError>;
+	fn assert_type<T: HasDiscriminator>(self, program_id: &Address) -> Result<Self, ProgramError>;
 	/// Assert that the account is a program.
-	fn assert_program(&self, program_id: &Address) -> Result<&Self, ProgramError>;
+	fn assert_program(self, program_id: &Address) -> Result<Self, ProgramError>;
 	/// Assert that the account is a system variable.
-	fn assert_sysvar(&self, sysvar_id: &Address) -> Result<&Self, ProgramError>;
+	fn assert_sysvar(self, sysvar_id: &Address) -> Result<Self, ProgramError>;
 	/// Assert that the account has the address provided.
-	fn assert_address(&self, address: &Address) -> Result<&Self, ProgramError>;
+	fn assert_address(self, address: &Address) -> Result<Self, ProgramError>;
 	/// Assert that the account has any of the address provided.
-	fn assert_addresses(&self, addresses: &[Address]) -> Result<&Self, ProgramError>;
+	fn assert_addresses(self, addresses: &[Address]) -> Result<Self, ProgramError>;
 	/// Assert that the account is owned by the address provided.
-	fn assert_owner(&self, owner: &Address) -> Result<&Self, ProgramError>;
+	fn assert_owner(self, owner: &Address) -> Result<Self, ProgramError>;
 	/// Assert that the account is owned by one of the owner (program) ids
 	/// provided.
-	fn assert_owners(&self, owners: &[Address]) -> Result<&Self, ProgramError>;
+	fn assert_owners(self, owners: &[Address]) -> Result<Self, ProgramError>;
 	/// Assert that the account has the seeds provided and uses the canonical
 	/// bump.
-	fn assert_seeds(&self, seeds: &[&[u8]], program_id: &Address) -> Result<&Self, ProgramError>;
+	fn assert_seeds(self, seeds: &[&[u8]], program_id: &Address) -> Result<Self, ProgramError>;
 	/// Assert that the account matches a PDA derived from the provided seed
 	/// array, where the bump byte is already included in `seeds`.
 	fn assert_seeds_with_bump(
-		&self,
+		self,
 		seeds: &[&[u8]],
 		program_id: &Address,
-	) -> Result<&Self, ProgramError>;
+	) -> Result<Self, ProgramError>;
 	/// Assert that the account uses the canonical bump for the seeds provided.
 	/// Returns the bump.
 	fn assert_canonical_bump(
-		&self,
+		self,
 		seeds: &[&[u8]],
 		program_id: &Address,
 	) -> Result<u8, ProgramError>;
@@ -195,11 +197,11 @@ pub trait AccountInfoValidation {
 	/// derived from `wallet`, `mint`, and `token_program`.
 	#[cfg(feature = "token")]
 	fn assert_associated_token_address(
-		&self,
+		self,
 		wallet: &Address,
 		mint: &Address,
 		token_program: &Address,
-	) -> Result<&Self, ProgramError>;
+	) -> Result<Self, ProgramError>;
 }
 
 macro_rules! primitive_into_discriminator {
@@ -419,7 +421,8 @@ pub trait HasDiscriminator: Sized {
 /// Performs:
 /// 1. Program owner check
 /// 2. Discriminator byte check
-/// 3. Checked bytemuck conversion of account data to `&T` or `&mut T`.
+/// 3. Checked borrow-guard conversion of account data to [`Ref<T>`] or
+///    [`RefMut<T>`].
 ///
 /// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->/// All APIs in this section are designed for on-chain determinism.
 ///
@@ -432,25 +435,24 @@ pub trait HasDiscriminator: Sized {
 /// ```ignore
 /// // Inside an instruction handler:
 /// let escrow_account = &accounts[0];
-/// let escrow: &EscrowState = escrow_account.as_account(&program_id)?;
+/// let escrow = escrow_account.as_account::<EscrowState>(&program_id)?;
 ///
 /// // For mutable access:
-/// let escrow_mut: &mut EscrowState = escrow_account.as_account_mut(&program_id)?;
-/// escrow_mut.amount = PodU64::from(100u64);
+/// let mut escrow = accounts[0].as_account_mut::<EscrowState>(&program_id)?;
+/// escrow.amount = PodU64::from(100u64);
 /// ```
 pub trait AsAccount {
 	/// Validate ownership and deserialize the account data into an immutable
-	/// reference of type `T`. Returns `InvalidAccountData` if the
+	/// borrow guard of type `T`. Returns `InvalidAccountData` if the
 	/// discriminator doesn't match or the data is the wrong size.
-	fn as_account<T>(&self, program_id: &Address) -> Result<&T, ProgramError>
+	fn as_account<T>(&self, program_id: &Address) -> Result<Ref<'_, T>, ProgramError>
 	where
 		T: AccountDeserialize + HasDiscriminator + Pod;
 
 	/// Validate ownership and deserialize the account data into a mutable
-	/// reference of type `T`. The Solana runtime guarantees exclusive access
+	/// borrow guard of type `T`. The Solana runtime guarantees exclusive access
 	/// when the mutable borrow succeeds.
-	#[allow(clippy::mut_from_ref)]
-	fn as_account_mut<T>(&self, program_id: &Address) -> Result<&mut T, ProgramError>
+	fn as_account_mut<T>(&mut self, program_id: &Address) -> Result<RefMut<'_, T>, ProgramError>
 	where
 		T: AccountDeserialize + HasDiscriminator + Pod;
 }
@@ -549,14 +551,14 @@ pub trait AsTokenAccount {
 /// // CPI transfer via system program (from must be a signer):
 /// vault_account.collect(500_000, payer_account)?;
 /// ```
-pub trait LamportTransfer<'a> {
+pub trait LamportTransfer {
 	/// Debit `lamports` from this account and credit them to `to` by directly
 	/// mutating both accounts' lamport balances. The sender must be owned by
 	/// the executing program.
-	fn send(&'a self, lamports: u64, to: &'a AccountView) -> ProgramResult;
+	fn send(&mut self, lamports: u64, to: &mut AccountView) -> ProgramResult;
 	/// Transfer `lamports` from the `from` account to this account via a
 	/// system program CPI. The `from` account must be a signer.
-	fn collect(&'a self, lamports: u64, from: &'a AccountView) -> ProgramResult;
+	fn collect(&self, lamports: u64, from: &AccountView) -> ProgramResult;
 }
 
 /// Close an account and reclaim its rent lamports.
@@ -573,10 +575,9 @@ pub trait LamportTransfer<'a> {
 /// // Close the escrow account and return rent to the authority:
 /// escrow_account.close_with_recipient(authority_account)?;
 /// ```
-pub trait CloseAccountWithRecipient<'a> {
-	/// Close the account, transfer all remaining lamports to the recipient,
-	/// and zero the account data.
-	fn close_with_recipient(&'a self, recipient: &'a AccountView) -> ProgramResult;
+pub trait CloseAccountWithRecipient {
+	/// Close the account and transfer all remaining lamports to the recipient.
+	fn close_with_recipient(&mut self, recipient: &mut AccountView) -> ProgramResult;
 }
 
 /// Destructures a slice of `AccountView` into a named accounts struct.
@@ -609,7 +610,7 @@ pub trait TryFromAccountInfos<'a>: Sized {
 	///
 	/// Implementations should validate account order, count, and invariants
 	/// required by the instruction before returning `Self`.
-	fn try_from_account_infos(accounts: &'a [AccountView]) -> Result<Self, ProgramError>;
+	fn try_from_account_infos(accounts: &'a mut [AccountView]) -> Result<Self, ProgramError>;
 }
 
 /// Instruction processor.
@@ -626,7 +627,7 @@ pub trait TryFromAccountInfos<'a>: Sized {
 ///
 /// ```ignore
 /// impl<'a> ProcessAccountInfos<'a> for InitEscrow<'a> {
-/// 	fn process(&self, data: &[u8]) -> ProgramResult {
+/// 	fn process(self, data: &[u8]) -> ProgramResult {
 /// 		// Parse instruction data, create accounts, etc.
 /// 		Ok(())
 /// 	}
@@ -638,7 +639,7 @@ pub trait TryFromAccountInfos<'a>: Sized {
 pub trait ProcessAccountInfos<'a>: TryFromAccountInfos<'a> {
 	/// Execute the instruction logic after accounts have been validated and
 	/// parsed into the implementor type.
-	fn process(&self, data: &[u8]) -> ProgramResult;
+	fn process(self, data: &[u8]) -> ProgramResult;
 }
 
 #[cfg(test)]

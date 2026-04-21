@@ -12,6 +12,8 @@
 use bytemuck::Pod;
 use pinocchio::AccountView;
 use pinocchio::Address;
+#[cfg(feature = "account-resize")]
+use pinocchio::Resize;
 use pinocchio::cpi::Seed;
 use pinocchio::cpi::Signer;
 use pinocchio::error::ProgramError;
@@ -339,6 +341,7 @@ pub fn allocate_account_with_bump<'a>(
 /// This limit is enforced by the Solana runtime. Attempting to grow an account
 /// by more than this amount will cause `resize` to return
 /// `ProgramError::InvalidRealloc`.
+#[cfg(feature = "account-resize")]
 pub const MAX_PERMITTED_DATA_INCREASE: usize = 10_240;
 
 /// Reallocates an account to `new_size` bytes, adjusting rent automatically.
@@ -363,11 +366,12 @@ pub const MAX_PERMITTED_DATA_INCREASE: usize = 10_240;
 /// `ProgramError::InvalidAccountOwner` if the account is not owned by
 /// `program_id`, and propagates any errors from rent sysvar access, lamport
 /// transfer, or the runtime `resize` call.
+#[cfg(feature = "account-resize")]
 #[inline(always)]
-pub fn realloc_account<'a>(
-	account: &'a AccountView,
+pub fn realloc_account(
+	account: &mut AccountView,
 	new_size: usize,
-	payer: &'a AccountView,
+	payer: &mut AccountView,
 	program_id: &Address,
 ) -> ProgramResult {
 	realloc_account_inner(account, new_size, payer, program_id)
@@ -400,11 +404,12 @@ pub fn realloc_account<'a>(
 /// `ProgramError::InvalidAccountOwner` if the account is not owned by
 /// `program_id`, and propagates any errors from rent sysvar access, lamport
 /// transfer, or the runtime `resize` call.
+#[cfg(feature = "account-resize")]
 #[inline(always)]
-pub fn realloc_account_zero<'a>(
-	account: &'a AccountView,
+pub fn realloc_account_zero(
+	account: &mut AccountView,
 	new_size: usize,
-	payer: &'a AccountView,
+	payer: &mut AccountView,
 	program_id: &Address,
 ) -> ProgramResult {
 	realloc_account_inner(account, new_size, payer, program_id)
@@ -414,11 +419,12 @@ pub fn realloc_account_zero<'a>(
 ///
 /// Validates the account, computes the rent delta, performs the lamport
 /// transfer, and resizes the account data.
+#[cfg(feature = "account-resize")]
 #[inline(always)]
-fn realloc_account_inner<'a>(
-	account: &'a AccountView,
+fn realloc_account_inner(
+	account: &mut AccountView,
 	new_size: usize,
-	payer: &'a AccountView,
+	payer: &mut AccountView,
 	program_id: &Address,
 ) -> ProgramResult {
 	use crate::AccountInfoValidation;
@@ -463,8 +469,8 @@ fn realloc_account_inner<'a>(
 /// Closes an account and returns the remaining rent lamports to the provided
 /// recipient.
 ///
-/// Zeroes account data before closing to prevent stale data from being read
-/// by subsequent transactions.
+/// Callers should clear any program-owned account state before closing when
+/// stale data reuse matters for their threat model.
 ///
 /// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->/// All APIs in this section are designed for on-chain determinism.
 ///
@@ -474,8 +480,7 @@ fn realloc_account_inner<'a>(
 ///
 /// # Errors
 ///
-/// Returns errors from lamport transfer, data resize, or account close
-/// operations.
+/// Returns errors from lamport transfer or account close operations.
 ///
 /// # Examples
 ///
@@ -484,11 +489,7 @@ fn realloc_account_inner<'a>(
 /// close_account(escrow_account, authority)?;
 /// ```
 #[inline(always)]
-pub fn close_account(account_info: &AccountView, recipient: &AccountView) -> ProgramResult {
-	// Return rent lamports.
+pub fn close_account(account_info: &mut AccountView, recipient: &mut AccountView) -> ProgramResult {
 	account_info.send(account_info.lamports(), recipient)?;
-	// Zero account data before closing.
-	account_info.resize(0)?;
-	// Close the account.
 	account_info.close()
 }

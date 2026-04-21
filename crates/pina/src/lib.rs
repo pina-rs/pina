@@ -69,6 +69,10 @@ pub use pinocchio::Address;
 /// The result type returned by Solana program entrypoints and instruction
 /// handlers.
 pub use pinocchio::ProgramResult;
+/// An immutable borrow guard for account-backed data.
+pub use pinocchio::account::Ref;
+/// A mutable borrow guard for account-backed data.
+pub use pinocchio::account::RefMut;
 /// Number of bytes in a Solana address (32).
 pub use pinocchio::address::ADDRESS_BYTES;
 /// Maximum length in bytes of a single PDA seed.
