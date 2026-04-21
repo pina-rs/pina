@@ -484,15 +484,58 @@ in
       description = "Build workspace crates with the default feature set.";
       binary = "bash";
     };
-    "build:pina:no-default" = {
+    "build:pina:default" = {
+      exec = ''
+        set -e
+        cargo check -p pina --locked
+      '';
+      description = "Verify `pina` builds with the default feature set.";
+      binary = "bash";
+    };
+    "build:pina:no-default-only" = {
       exec = ''
         set -e
         cargo check -p pina --no-default-features --locked
-        cargo check -p pina --no-default-features --features derive --locked
+      '';
+      description = "Verify `pina` builds with `--no-default-features`.";
+      binary = "bash";
+    };
+    "build:pina:token-only" = {
+      exec = ''
+        set -e
         cargo check -p pina --no-default-features --features token --locked
+      '';
+      description = "Verify `pina` builds with only the `token` feature enabled.";
+      binary = "bash";
+    };
+    "build:pina:all-features" = {
+      exec = ''
+        set -e
+        cargo check -p pina --all-features --locked
+      '';
+      description = "Verify `pina` builds with all features enabled.";
+      binary = "bash";
+    };
+    "build:pina:no-default" = {
+      exec = ''
+        set -e
+        build:pina:no-default-only
+        cargo check -p pina --no-default-features --features derive --locked
+        build:pina:token-only
         cargo check -p pina --no-default-features --features token,derive --locked
       '';
-      description = "Verify `pina` builds without default features and across feature subsets.";
+      description = "Verify `pina` builds without default features and across key feature subsets.";
+      binary = "bash";
+    };
+    "build:pina:feature-matrix" = {
+      exec = ''
+        set -e
+        build:pina:default
+        build:pina:no-default-only
+        build:pina:token-only
+        build:pina:all-features
+      '';
+      description = "Verify the explicit `pina` feature matrix used in CI.";
       binary = "bash";
     };
     "test:all" = {
@@ -501,6 +544,72 @@ in
         cargo test --all-features --locked
       '';
       description = "Run all tests across the crates";
+      binary = "bash";
+    };
+    "test:miri" = {
+      exec = ''
+        set -euo pipefail
+
+        TOOLCHAIN="nightly-2026-02-20"
+        rustup component add miri --toolchain "$TOOLCHAIN"
+        cargo +"$TOOLCHAIN" miri setup
+
+        MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-symbolic-alignment-check" \
+          cargo +"$TOOLCHAIN" miri test --locked -p pina --test miri_loader_guards --all-features
+      '';
+      description = "Run the dedicated Miri regression suite for guard-backed loader behavior.";
+      binary = "bash";
+    };
+    "test:pina:default" = {
+      exec = ''
+        set -e
+        cargo test -p pina --lib --locked
+      '';
+      description = "Run `pina` library tests with the default feature set.";
+      binary = "bash";
+    };
+    "test:pina:no-default" = {
+      exec = ''
+        set -e
+        cargo test -p pina --no-default-features --lib --locked
+      '';
+      description = "Run `pina` library tests with `--no-default-features`.";
+      binary = "bash";
+    };
+    "test:pina:token-only" = {
+      exec = ''
+        set -e
+        cargo test -p pina --no-default-features --features token --lib --locked
+      '';
+      description = "Run `pina` library tests with only the `token` feature enabled.";
+      binary = "bash";
+    };
+    "test:pina:all-features" = {
+      exec = ''
+        set -e
+        cargo test -p pina --all-features --lib --locked
+      '';
+      description = "Run `pina` library tests with all features enabled.";
+      binary = "bash";
+    };
+    "doc:pina:no-default" = {
+      exec = ''
+        set -e
+        cargo doc -p pina --no-default-features --no-deps --locked
+      '';
+      description = "Build `pina` docs without default features to catch hidden default-feature coupling.";
+      binary = "bash";
+    };
+    "test:pina:feature-matrix" = {
+      exec = ''
+        set -e
+        test:pina:default
+        test:pina:no-default
+        doc:pina:no-default
+        test:pina:token-only
+        test:pina:all-features
+      '';
+      description = "Run the explicit `pina` feature matrix used in CI.";
       binary = "bash";
     };
     "test:program-e2e" = {
@@ -563,6 +672,56 @@ in
           pnpm --dir "$DEVENV_ROOT/codama/tests/quasar-svm" test
       '';
       description = "Build SBF binaries and run end-to-end program tests including mollusk-svm integration.";
+      binary = "bash";
+    };
+    "profile:cu:tracked" = {
+      exec = ''
+        set -e
+        rm -rf "$DEVENV_ROOT/target/cu/current"
+        "$DEVENV_ROOT/scripts/profile-tracked-examples.sh" \
+          "$DEVENV_ROOT" \
+          "$DEVENV_ROOT/target/cu/current"
+      '';
+      description = "Build tracked SBF example programs and capture static CU profiles for the current checkout.";
+      binary = "bash";
+    };
+    "report:cu:compare:main" = {
+      exec = ''
+        set -euo pipefail
+
+        git -C "$DEVENV_ROOT" fetch origin
+
+        worktree_dir=$(mktemp -d "''${TMPDIR:-/tmp}/pina-cu-main-XXXXXX")
+
+        cleanup() {
+          git -C "$DEVENV_ROOT" worktree remove --force "$worktree_dir" >/dev/null 2>&1 || true
+          rm -rf "$worktree_dir"
+        }
+
+        trap cleanup EXIT
+
+        git -C "$DEVENV_ROOT" worktree add --detach "$worktree_dir" origin/main
+
+        rm -rf "$DEVENV_ROOT/target/cu/base" "$DEVENV_ROOT/target/cu/head"
+
+        "$DEVENV_ROOT/scripts/profile-tracked-examples.sh" \
+          "$worktree_dir" \
+          "$DEVENV_ROOT/target/cu/base"
+
+        "$DEVENV_ROOT/scripts/profile-tracked-examples.sh" \
+          "$DEVENV_ROOT" \
+          "$DEVENV_ROOT/target/cu/head"
+
+        python3 "$DEVENV_ROOT/scripts/compare-compute-units.py" \
+          --policy-file "$DEVENV_ROOT/scripts/compute-unit-policy.json" \
+          --base-dir "$DEVENV_ROOT/target/cu/base" \
+          --head-dir "$DEVENV_ROOT/target/cu/head" \
+          --markdown-output "$DEVENV_ROOT/target/cu/comparison.md" \
+          --json-output "$DEVENV_ROOT/target/cu/comparison.json"
+
+        cat "$DEVENV_ROOT/target/cu/comparison.md"
+      '';
+      description = "Compare tracked static CU profiles for the current checkout against origin/main.";
       binary = "bash";
     };
     "idl:generate" = {

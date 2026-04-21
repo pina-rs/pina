@@ -9,6 +9,8 @@ Pina's safety posture is built around explicit validation and predictable state 
 - PDA correctness: seed and bump checks must gate PDA-bound operations.
 - Value correctness: arithmetic and balance mutations must be checked.
 
+See [ADR 0001](./adrs/0001-discriminator-first-layout.md), [ADR 0002](./adrs/0002-zero-copy-account-model.md), and [ADR 0003](./adrs/0003-guard-backed-typed-account-loaders.md) for the durable rationale behind these invariants.
+
 ## Version-safe binary layout and compatibility
 
 The discriminator-first model makes byte layout part of protocol compatibility. Treat every `#[account]` struct as ABI:

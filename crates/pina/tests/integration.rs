@@ -478,6 +478,34 @@ fn build_test_state_bytes(bump: u8, value: u64) -> Vec<u8> {
 	bytemuck::bytes_of(&state).to_vec()
 }
 
+#[cfg(feature = "token")]
+fn write_address_bytes(data: &mut [u8], offset: usize, address: &Address) {
+	data[offset..offset + ADDRESS_BYTES].copy_from_slice(address.as_ref());
+}
+
+#[cfg(feature = "token")]
+fn build_token_mint_bytes(decimals: u8, supply: u64) -> Vec<u8> {
+	let mut data = vec![0u8; token::state::Mint::LEN];
+	data[0] = 1;
+	write_address_bytes(&mut data, 4, &system::ID);
+	data[36..44].copy_from_slice(&supply.to_le_bytes());
+	data[44] = decimals;
+	data[45] = 1;
+	data[46] = 1;
+	write_address_bytes(&mut data, 50, &TEST_PROGRAM_ID);
+	data
+}
+
+#[cfg(feature = "token")]
+fn build_token_account_bytes(mint: &Address, owner: &Address, amount: u64) -> Vec<u8> {
+	let mut data = vec![0u8; token::state::TokenAccount::LEN];
+	write_address_bytes(&mut data, 0, mint);
+	write_address_bytes(&mut data, 32, owner);
+	data[64..72].copy_from_slice(&amount.to_le_bytes());
+	data[104] = 1;
+	data
+}
+
 // ---------------------------------------------------------------------------
 // Test: Full account lifecycle
 // ---------------------------------------------------------------------------
@@ -1453,6 +1481,312 @@ fn account_data_mutation_persists() {
 		.unwrap_or_else(|e| panic!("read failed: {e:?}"));
 	assert_eq!(u64::from(state.value), 12345);
 	assert_eq!(state.bump, 10, "bump should be unchanged");
+}
+
+/// Tests that as_account keeps the runtime borrow active until drop.
+#[test]
+fn as_account_keeps_borrow_guard_alive_until_drop() {
+	let key: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let state_bytes = build_test_state_bytes(7, 900);
+
+	let accounts = [AccountBuilder::new()
+		.address(key)
+		.owner(TEST_PROGRAM_ID)
+		.lamports(1_000_000)
+		.data(&state_bytes)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let mut account = account_views[0];
+	let mut shadow = account_views[0];
+	let state = account
+		.as_account::<TestState>(&TEST_PROGRAM_ID)
+		.unwrap_or_else(|e| panic!("read failed: {e:?}"));
+
+	assert_eq!(state.bump, 7);
+	assert!(matches!(
+		shadow.try_borrow_mut(),
+		Err(ProgramError::AccountBorrowFailed)
+	));
+
+	drop(state);
+
+	let borrow = shadow
+		.try_borrow_mut()
+		.unwrap_or_else(|e| panic!("mutable borrow should succeed after drop: {e:?}"));
+	assert_eq!(borrow.len(), size_of::<TestState>());
+}
+
+/// Tests that as_account_mut blocks overlapping borrows until drop.
+#[test]
+fn as_account_mut_blocks_overlapping_borrows_until_drop() {
+	let key: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let state_bytes = build_test_state_bytes(11, 77);
+
+	let accounts = [AccountBuilder::new()
+		.address(key)
+		.owner(TEST_PROGRAM_ID)
+		.lamports(1_000_000)
+		.data(&state_bytes)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let mut account = account_views[0];
+	let mut shadow = account_views[0];
+	let mut state = account
+		.as_account_mut::<TestState>(&TEST_PROGRAM_ID)
+		.unwrap_or_else(|e| panic!("write failed: {e:?}"));
+	state.value = PodU64::from_primitive(88);
+
+	assert!(matches!(
+		shadow.try_borrow(),
+		Err(ProgramError::AccountBorrowFailed)
+	));
+	assert!(matches!(
+		shadow.try_borrow_mut(),
+		Err(ProgramError::AccountBorrowFailed)
+	));
+
+	drop(state);
+
+	let state = account
+		.as_account::<TestState>(&TEST_PROGRAM_ID)
+		.unwrap_or_else(|e| panic!("read after drop failed: {e:?}"));
+	assert_eq!(u64::from(state.value), 88);
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_token_mint_keeps_borrow_guard_alive_until_drop() {
+	let mint_key: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let mint_data = build_token_mint_bytes(6, 1_000);
+
+	let accounts = [AccountBuilder::new()
+		.address(mint_key)
+		.owner(token::ID)
+		.lamports(1_000_000)
+		.data(&mint_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let mut account = account_views[0];
+	let mut shadow = account_views[0];
+	let mint = account
+		.as_token_mint()
+		.unwrap_or_else(|e| panic!("mint load failed: {e:?}"));
+	assert_eq!(mint.decimals(), 6);
+	assert_eq!(mint.supply(), 1_000);
+
+	assert!(matches!(
+		shadow.try_borrow_mut(),
+		Err(ProgramError::AccountBorrowFailed)
+	));
+
+	drop(mint);
+
+	assert!(shadow.try_borrow_mut().is_ok());
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_token_account_keeps_borrow_guard_alive_until_drop() {
+	let token_account_key: Address = address!("3Jiy8N6ZGv3ueH9k3svLRaHscmQbE6v7W9FHJaGH2mki");
+	let mint: Address = address!("4hT5gDpr9HMmXzttW2Kz7LxyzKDn5XxhxL7sRKqGZo4x");
+	let owner: Address = address!("6QWeT6FpJrm8AF1btu6WH2k2Xhq6t5vbheKVfQavmeoZ");
+	let token_account_data = build_token_account_bytes(&mint, &owner, 77);
+
+	let accounts = [AccountBuilder::new()
+		.address(token_account_key)
+		.owner(token::ID)
+		.lamports(1_000_000)
+		.data(&token_account_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let mut account = account_views[0];
+	let mut shadow = account_views[0];
+	let token_account = account
+		.as_token_account()
+		.unwrap_or_else(|e| panic!("token account load failed: {e:?}"));
+	assert_eq!(token_account.amount(), 77);
+	assert_eq!(token_account.mint(), &mint);
+	assert_eq!(token_account.owner(), &owner);
+
+	assert!(matches!(
+		shadow.try_borrow_mut(),
+		Err(ProgramError::AccountBorrowFailed)
+	));
+
+	drop(token_account);
+
+	assert!(shadow.try_borrow_mut().is_ok());
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_token_2022_mint_keeps_borrow_guard_alive_until_drop() {
+	let mint_key: Address = address!("8qbHbw2BbbTHBW1sK7d7Yx4Z4DccnE9vrFica8FWHQrP");
+	let mint_data = build_token_mint_bytes(9, 42);
+
+	let accounts = [AccountBuilder::new()
+		.address(mint_key)
+		.owner(token_2022::ID)
+		.lamports(1_000_000)
+		.data(&mint_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let mut account = account_views[0];
+	let mut shadow = account_views[0];
+	let mint = account
+		.as_token_2022_mint()
+		.unwrap_or_else(|e| panic!("token-2022 mint load failed: {e:?}"));
+	assert_eq!(mint.decimals(), 9);
+	assert_eq!(mint.supply(), 42);
+
+	assert!(matches!(
+		shadow.try_borrow_mut(),
+		Err(ProgramError::AccountBorrowFailed)
+	));
+
+	drop(mint);
+
+	assert!(shadow.try_borrow_mut().is_ok());
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_token_2022_account_keeps_borrow_guard_alive_until_drop() {
+	let token_account_key: Address = address!("4vJ9JU1bJJE96FWSJKv9J5xBqHkM7SspGq2pZ7uS5k4x");
+	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
+	let owner: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
+	let token_account_data = build_token_account_bytes(&mint, &owner, 123);
+
+	let accounts = [AccountBuilder::new()
+		.address(token_account_key)
+		.owner(token_2022::ID)
+		.lamports(1_000_000)
+		.data(&token_account_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let mut account = account_views[0];
+	let mut shadow = account_views[0];
+	let token_account = account
+		.as_token_2022_account()
+		.unwrap_or_else(|e| panic!("token-2022 account load failed: {e:?}"));
+	assert_eq!(token_account.amount(), 123);
+	assert_eq!(token_account.mint(), &mint);
+	assert_eq!(token_account.owner(), &owner);
+
+	assert!(matches!(
+		shadow.try_borrow_mut(),
+		Err(ProgramError::AccountBorrowFailed)
+	));
+
+	drop(token_account);
+
+	assert!(shadow.try_borrow_mut().is_ok());
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_token_account_checked_with_owners_accepts_token_2022_owner() {
+	let token_account_key: Address = address!("6QWeT6FpJrm8AF1btu6WH2k2Xhq6t5vbheKVfQavmeoZ");
+	let mint: Address = address!("4hT5gDpr9HMmXzttW2Kz7LxyzKDn5XxhxL7sRKqGZo4x");
+	let owner: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let token_account_data = build_token_account_bytes(&mint, &owner, 88);
+
+	let accounts = [AccountBuilder::new()
+		.address(token_account_key)
+		.owner(token_2022::ID)
+		.lamports(1_000_000)
+		.data(&token_account_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let mut account = account_views[0];
+	let mut shadow = account_views[0];
+	let token_account = account
+		.as_token_account_checked_with_owners(&[token::ID, token_2022::ID])
+		.unwrap_or_else(|e| panic!("multi-owner token account load failed: {e:?}"));
+	assert_eq!(token_account.amount(), 88);
+
+	assert!(matches!(
+		shadow.try_borrow_mut(),
+		Err(ProgramError::AccountBorrowFailed)
+	));
+
+	drop(token_account);
+
+	assert!(shadow.try_borrow_mut().is_ok());
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_associated_token_account_checked_accepts_token_2022_owner() {
+	let wallet: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
+	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
+	let (ata_address, _bump) = try_get_associated_token_address(&wallet, &mint, &token_2022::ID)
+		.unwrap_or_else(|| panic!("failed to derive ata"));
+	let token_account_data = build_token_account_bytes(&mint, &wallet, 99);
+
+	let accounts = [AccountBuilder::new()
+		.address(ata_address)
+		.owner(token_2022::ID)
+		.lamports(1_000_000)
+		.data(&token_account_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let mut account = account_views[0];
+	let mut shadow = account_views[0];
+	let token_account = account
+		.as_associated_token_account_checked(&wallet, &mint, &token_2022::ID)
+		.unwrap_or_else(|e| panic!("associated token account load failed: {e:?}"));
+	assert_eq!(token_account.amount(), 99);
+	assert_eq!(token_account.owner(), &wallet);
+
+	assert!(matches!(
+		shadow.try_borrow_mut(),
+		Err(ProgramError::AccountBorrowFailed)
+	));
+
+	drop(token_account);
+
+	assert!(shadow.try_borrow_mut().is_ok());
 }
 
 // ---------------------------------------------------------------------------

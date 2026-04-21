@@ -1,0 +1,123 @@
+name: "compute-units"
+permissions:
+  contents: read
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    timeout-minutes: 180
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    env:
+      XDG_CACHE_HOME: ${{ github.workspace }}/.cache
+      PINA_BPF_TOOLCHAIN: nightly-2025-11-20
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: cache sbpf gallery toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ github.workspace }}/.cache/sbpf-linker-upstream-gallery/llvm-install
+            ${{ github.workspace }}/.cache/sbpf-linker-upstream-gallery/bin
+            ${{ github.workspace }}/.cache/sbpf-linker-upstream-gallery/sbpf-linker
+          key: ${{ runner.os }}-sbpf-gallery-v1-${{ hashFiles('devenv.nix', 'rust-toolchain.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-sbpf-gallery-v1-
+
+      - name: create base worktree
+        run: |
+          git worktree add --detach ../pina-base ${{ github.event.pull_request.base.sha }}
+        shell: bash
+
+      - name: profile base revision
+        run: |
+          bash ./scripts/profile-tracked-examples.sh \
+            "${{ github.workspace }}/../pina-base" \
+            "${{ github.workspace }}/target/cu/base"
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: profile head revision
+        run: |
+          bash ./scripts/profile-tracked-examples.sh \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}/target/cu/head"
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: compare compute-unit reports
+        run: |
+          set +e
+          python3 ./scripts/compare-compute-units.py \
+            --policy-file ./scripts/compute-unit-policy.json \
+            --base-dir ./target/cu/base \
+            --head-dir ./target/cu/head \
+            --markdown-output ./target/cu/comparison.md \
+            --json-output ./target/cu/comparison.json
+          status=$?
+          set -e
+
+          mkdir -p ./target/cu
+          printf '%s\n' "$status" > ./target/cu/compare.status
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: publish compute-unit summary
+        id: compare
+        if: always()
+        run: |
+          status=''
+
+          if [ -f ./target/cu/compare.status ]; then
+            status="$(tr -d '\n' < ./target/cu/compare.status)"
+          fi
+
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+          if [ -f ./target/cu/comparison.md ]; then
+            cat ./target/cu/comparison.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+        shell: bash
+
+      - name: upload compute-unit artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compute-unit-report
+          path: target/cu
+          if-no-files-found: ignore
+
+      - name: enforce regression threshold
+        if: always()
+        run: |
+          status='${{ steps.compare.outputs.status }}'
+
+          if [ -z "$status" ]; then
+            echo "compute-unit comparison did not run because an earlier step failed" >&2
+            exit 1
+          fi
+
+          if [ "$status" -eq 0 ]; then
+            exit 0
+          fi
+
+          echo "compute-unit regression check failed with status $status" >&2
+          exit "$status"
+        shell: bash
+
+      - name: remove base worktree
+        if: always()
+        run: git worktree remove --force ../pina-base || true
+        shell: bash

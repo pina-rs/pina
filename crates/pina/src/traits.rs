@@ -416,7 +416,13 @@ pub trait HasDiscriminator: Sized {
 	}
 }
 
-/// Deserializes raw `AccountView` data into a typed account reference.
+/// Backward-compatible alias for guard-backed immutable typed account access.
+pub type LoadedAccount<'a, T> = Ref<'a, T>;
+
+/// Backward-compatible alias for guard-backed mutable typed account access.
+pub type LoadedAccountMut<'a, T> = RefMut<'a, T>;
+
+/// Deserializes raw `AccountView` data into guard-backed typed account access.
 ///
 /// Performs:
 /// 1. Program owner check
@@ -460,57 +466,65 @@ pub trait AsAccount {
 /// Convenience methods for interpreting `AccountView` as SPL token account
 /// types.
 ///
-/// The `*_checked` variants enforce owner checks before casting. The raw
-/// variants are lower-level and assume caller-side owner validation.
+/// All token loaders return guard-backed typed access so the runtime borrow
+/// stays active for the full lifetime of the token view.
+///
+/// The raw variants validate the canonical owner for the loader they expose.
+/// The `*_checked_with_owners` variants accept a custom owner allowlist before
+/// reinterpreting the shared token base layout.
 ///
 /// <!-- {=pinaTokenFeatureGateContract|trim|linePrefix:"/// ":true} -->/// This API is gated behind the `token` feature. Keep token-specific code behind `#[cfg(feature = "token")]` so on-chain programs that do not use SPL token interfaces can avoid extra dependencies.<!-- {/pinaTokenFeatureGateContract} -->
 #[cfg(feature = "token")]
 pub trait AsTokenAccount {
 	/// Interpret the account data as an SPL Token mint.
-	fn as_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError>;
+	fn as_token_mint(&self) -> Result<Ref<'_, crate::token::state::Mint>, ProgramError>;
 	/// Interpret the account data as an SPL Token mint, validating owner.
-	fn as_token_mint_checked(&self) -> Result<&crate::token::state::Mint, ProgramError>;
+	fn as_token_mint_checked(&self) -> Result<Ref<'_, crate::token::state::Mint>, ProgramError>;
 	/// Interpret the account data as an SPL Token mint, validating owner is one
 	/// of the provided program ids.
 	fn as_token_mint_checked_with_owners(
 		&self,
 		owners: &[Address],
-	) -> Result<&crate::token::state::Mint, ProgramError>;
+	) -> Result<Ref<'_, crate::token::state::Mint>, ProgramError>;
 	/// Interpret the account data as an SPL Token account.
-	fn as_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError>;
+	fn as_token_account(&self) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError>;
 	/// Interpret the account data as an SPL Token account, validating owner.
-	fn as_token_account_checked(&self) -> Result<&crate::token::state::TokenAccount, ProgramError>;
+	fn as_token_account_checked(
+		&self,
+	) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError>;
 	/// Interpret the account data as an SPL Token account, validating owner is
 	/// one of the provided program ids.
 	fn as_token_account_checked_with_owners(
 		&self,
 		owners: &[Address],
-	) -> Result<&crate::token::state::TokenAccount, ProgramError>;
+	) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError>;
 	/// Interpret the account data as a Token-2022 mint.
-	fn as_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError>;
+	fn as_token_2022_mint(&self) -> Result<Ref<'_, crate::token_2022::state::Mint>, ProgramError>;
 	/// Interpret the account data as a Token-2022 mint, validating owner.
-	fn as_token_2022_mint_checked(&self) -> Result<&crate::token_2022::state::Mint, ProgramError>;
+	fn as_token_2022_mint_checked(
+		&self,
+	) -> Result<Ref<'_, crate::token_2022::state::Mint>, ProgramError>;
 	/// Interpret the account data as a Token-2022 mint, validating owner is one
 	/// of the provided program ids.
 	fn as_token_2022_mint_checked_with_owners(
 		&self,
 		owners: &[Address],
-	) -> Result<&crate::token_2022::state::Mint, ProgramError>;
+	) -> Result<Ref<'_, crate::token_2022::state::Mint>, ProgramError>;
 	/// Interpret the account data as a Token-2022 token account.
 	fn as_token_2022_account(
 		&self,
-	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError>;
+	) -> Result<Ref<'_, crate::token_2022::state::TokenAccount>, ProgramError>;
 	/// Interpret the account data as a Token-2022 token account, validating
 	/// owner.
 	fn as_token_2022_account_checked(
 		&self,
-	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError>;
+	) -> Result<Ref<'_, crate::token_2022::state::TokenAccount>, ProgramError>;
 	/// Interpret the account data as a Token-2022 token account, validating
 	/// owner is one of the provided program ids.
 	fn as_token_2022_account_checked_with_owners(
 		&self,
 		owners: &[Address],
-	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError>;
+	) -> Result<Ref<'_, crate::token_2022::state::TokenAccount>, ProgramError>;
 	/// Interpret the account data as an associated token account, verifying
 	/// the address matches the derived ATA for the given wallet, mint, and
 	/// token program.
@@ -519,7 +533,7 @@ pub trait AsTokenAccount {
 		owner: &Address,
 		mint: &Address,
 		token_program: &Address,
-	) -> Result<&crate::token::state::TokenAccount, ProgramError>;
+	) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError>;
 	/// Interpret the account data as an associated token account, validating
 	/// both owner and ATA derivation.
 	fn as_associated_token_account_checked(
@@ -527,7 +541,7 @@ pub trait AsTokenAccount {
 		owner: &Address,
 		mint: &Address,
 		token_program: &Address,
-	) -> Result<&crate::token::state::TokenAccount, ProgramError>;
+	) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError>;
 }
 
 /// Direct lamport transfer between accounts.

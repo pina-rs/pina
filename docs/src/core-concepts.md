@@ -130,7 +130,7 @@ All types are `#[repr(transparent)]` over byte arrays (or `u8` for `PodBool`) an
 
 <!-- {=podArithmeticDescription} -->
 
-Arithmetic operators (`+`, `-`, `*`) use **wrapping** semantics in release builds for CU efficiency and **panic on overflow** in debug builds. Use `checked_add`, `checked_sub`, `checked_mul`, `checked_div` where overflow must be detected in all build profiles.
+Arithmetic operators (`+`, `-`, `*`) on Pod **integer** types use **wrapping** semantics in release builds for CU efficiency and **panic on overflow** in debug builds. Use `checked_add`, `checked_sub`, `checked_mul`, `checked_div` where overflow must be detected in all build profiles.
 
 Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 

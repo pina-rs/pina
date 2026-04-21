@@ -1,6 +1,9 @@
 #![allow(unsafe_code)]
 
+use core::mem::size_of;
+
 use pinocchio::ProgramResult;
+use pinocchio::account::Ref as AccountRef;
 use pinocchio_system::instructions::Transfer;
 
 use crate::AccountDeserialize;
@@ -597,19 +600,46 @@ impl_account_validation!(
 );
 
 #[cfg(feature = "token")]
+#[track_caller]
+fn load_token_state<'a, T: ?Sized>(
+	account: &'a AccountView,
+	owners: &[Address],
+	minimum_len: usize,
+	from_bytes: unsafe fn(&[u8]) -> &T,
+) -> Result<Ref<'a, T>, ProgramError> {
+	account.assert_owners(owners)?;
+
+	if account.data_len() < minimum_len {
+		log!(
+			"address: {} has an incorrect length",
+			account.address().as_ref()
+		);
+		log_caller();
+
+		return Err(ProgramError::InvalidAccountData);
+	}
+
+	let bytes = account.try_borrow()?;
+	let state = AccountRef::map(bytes, |data| {
+		// SAFETY: the base layout length was validated above, the allowed owner
+		// set was validated above, and the returned borrow guard keeps the
+		// underlying runtime borrow alive for the entire lifetime of the typed
+		// access.
+		unsafe { from_bytes(data) }
+	});
+
+	Ok(state)
+}
+
+#[cfg(feature = "token")]
 impl AsTokenAccount for AccountView {
 	#[track_caller]
-	fn as_token_mint(&self) -> Result<&crate::token::state::Mint, ProgramError> {
-		self.check_borrow()?;
-
-		// SECURITY: relies on pinocchio's internal layout validation inside
-		// `from_account_view_unchecked`. Callers should verify ownership before
-		// trusting the result.
-		unsafe { crate::token::state::Mint::from_account_view_unchecked(self) }
+	fn as_token_mint(&self) -> Result<Ref<'_, crate::token::state::Mint>, ProgramError> {
+		crate::token::state::Mint::from_account_view(self)
 	}
 
 	#[track_caller]
-	fn as_token_mint_checked(&self) -> Result<&crate::token::state::Mint, ProgramError> {
+	fn as_token_mint_checked(&self) -> Result<Ref<'_, crate::token::state::Mint>, ProgramError> {
 		self.as_token_mint_checked_with_owners(&[crate::token::ID])
 	}
 
@@ -617,24 +647,24 @@ impl AsTokenAccount for AccountView {
 	fn as_token_mint_checked_with_owners(
 		&self,
 		owners: &[Address],
-	) -> Result<&crate::token::state::Mint, ProgramError> {
-		self.assert_owners(owners)?;
-		self.as_token_mint()
-	}
-
-	fn as_token_account(&self) -> Result<&crate::token::state::TokenAccount, ProgramError> {
-		self.check_borrow()?;
-
-		// SAFETY: `check_borrow()` verified the account is not already mutably
-		// borrowed. `from_account_view_unchecked` performs a pointer cast from
-		// the account data to the target type layout. The caller is responsible
-		// for verifying ownership before trusting the result — the `_checked`
-		// variants handle this automatically.
-		unsafe { crate::token::state::TokenAccount::from_account_view_unchecked(self) }
+	) -> Result<Ref<'_, crate::token::state::Mint>, ProgramError> {
+		load_token_state(
+			self,
+			owners,
+			crate::token::state::Mint::LEN,
+			crate::token::state::Mint::from_bytes_unchecked,
+		)
 	}
 
 	#[track_caller]
-	fn as_token_account_checked(&self) -> Result<&crate::token::state::TokenAccount, ProgramError> {
+	fn as_token_account(&self) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError> {
+		crate::token::state::TokenAccount::from_account_view(self)
+	}
+
+	#[track_caller]
+	fn as_token_account_checked(
+		&self,
+	) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError> {
 		self.as_token_account_checked_with_owners(&[crate::token::ID])
 	}
 
@@ -642,24 +672,24 @@ impl AsTokenAccount for AccountView {
 	fn as_token_account_checked_with_owners(
 		&self,
 		owners: &[Address],
-	) -> Result<&crate::token::state::TokenAccount, ProgramError> {
-		self.assert_owners(owners)?;
-		self.as_token_account()
-	}
-
-	fn as_token_2022_mint(&self) -> Result<&crate::token_2022::state::Mint, ProgramError> {
-		self.check_borrow()?;
-
-		// SAFETY: `check_borrow()` verified the account is not already mutably
-		// borrowed. `from_account_view_unchecked` performs a pointer cast from
-		// the account data to the target type layout. The caller is responsible
-		// for verifying ownership before trusting the result — the `_checked`
-		// variants handle this automatically.
-		unsafe { crate::token_2022::state::Mint::from_account_view_unchecked(self) }
+	) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError> {
+		load_token_state(
+			self,
+			owners,
+			crate::token::state::TokenAccount::LEN,
+			crate::token::state::TokenAccount::from_bytes_unchecked,
+		)
 	}
 
 	#[track_caller]
-	fn as_token_2022_mint_checked(&self) -> Result<&crate::token_2022::state::Mint, ProgramError> {
+	fn as_token_2022_mint(&self) -> Result<Ref<'_, crate::token_2022::state::Mint>, ProgramError> {
+		crate::token_2022::state::Mint::from_account_view(self)
+	}
+
+	#[track_caller]
+	fn as_token_2022_mint_checked(
+		&self,
+	) -> Result<Ref<'_, crate::token_2022::state::Mint>, ProgramError> {
 		self.as_token_2022_mint_checked_with_owners(&[crate::token_2022::ID])
 	}
 
@@ -667,28 +697,26 @@ impl AsTokenAccount for AccountView {
 	fn as_token_2022_mint_checked_with_owners(
 		&self,
 		owners: &[Address],
-	) -> Result<&crate::token_2022::state::Mint, ProgramError> {
-		self.assert_owners(owners)?;
-		self.as_token_2022_mint()
+	) -> Result<Ref<'_, crate::token_2022::state::Mint>, ProgramError> {
+		load_token_state(
+			self,
+			owners,
+			crate::token_2022::state::Mint::BASE_LEN,
+			crate::token_2022::state::Mint::from_bytes_unchecked,
+		)
 	}
 
+	#[track_caller]
 	fn as_token_2022_account(
 		&self,
-	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
-		self.check_borrow()?;
-
-		// SAFETY: `check_borrow()` verified the account is not already mutably
-		// borrowed. `from_account_view_unchecked` performs a pointer cast from
-		// the account data to the target type layout. The caller is responsible
-		// for verifying ownership before trusting the result — the `_checked`
-		// variants handle this automatically.
-		unsafe { crate::token_2022::state::TokenAccount::from_account_view_unchecked(self) }
+	) -> Result<Ref<'_, crate::token_2022::state::TokenAccount>, ProgramError> {
+		crate::token_2022::state::TokenAccount::from_account_view(self)
 	}
 
 	#[track_caller]
 	fn as_token_2022_account_checked(
 		&self,
-	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
+	) -> Result<Ref<'_, crate::token_2022::state::TokenAccount>, ProgramError> {
 		self.as_token_2022_account_checked_with_owners(&[crate::token_2022::ID])
 	}
 
@@ -696,30 +724,31 @@ impl AsTokenAccount for AccountView {
 	fn as_token_2022_account_checked_with_owners(
 		&self,
 		owners: &[Address],
-	) -> Result<&crate::token_2022::state::TokenAccount, ProgramError> {
-		self.assert_owners(owners)?;
-		self.as_token_2022_account()
+	) -> Result<Ref<'_, crate::token_2022::state::TokenAccount>, ProgramError> {
+		load_token_state(
+			self,
+			owners,
+			crate::token_2022::state::TokenAccount::BASE_LEN,
+			crate::token_2022::state::TokenAccount::from_bytes_unchecked,
+		)
 	}
 
+	#[track_caller]
 	fn as_associated_token_account(
 		&self,
 		owner: &Address,
 		mint: &Address,
 		token_program: &Address,
-	) -> Result<&crate::token::state::TokenAccount, ProgramError> {
-		self.check_borrow()?;
+	) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError> {
+		let owners = [*token_program];
+		let account = self.assert_associated_token_address(owner, mint, token_program)?;
 
-		// SAFETY: `check_borrow()` verified the account is not already mutably
-		// borrowed. `from_account_view_unchecked` performs a pointer cast from
-		// the account data to the target type layout. The caller is responsible
-		// for verifying ownership before trusting the result — the `_checked`
-		// variants handle this automatically. Additionally, the address is
-		// verified against the derived ATA address before the unchecked cast.
-		unsafe {
-			crate::token::state::TokenAccount::from_account_view_unchecked(
-				self.assert_associated_token_address(owner, mint, token_program)?,
-			)
-		}
+		load_token_state(
+			account,
+			&owners,
+			crate::token::state::TokenAccount::LEN,
+			crate::token::state::TokenAccount::from_bytes_unchecked,
+		)
 	}
 
 	#[track_caller]
@@ -728,7 +757,7 @@ impl AsTokenAccount for AccountView {
 		owner: &Address,
 		mint: &Address,
 		token_program: &Address,
-	) -> Result<&crate::token::state::TokenAccount, ProgramError> {
+	) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError> {
 		self.assert_owner(token_program)?;
 		self.as_associated_token_account(owner, mint, token_program)
 	}

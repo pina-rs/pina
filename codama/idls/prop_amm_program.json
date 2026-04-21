@@ -1,0 +1,214 @@
+{
+	"kind": "rootNode",
+	"standard": "codama",
+	"version": "1.0.0",
+	"program": {
+		"kind": "programNode",
+		"name": "propAmmProgram",
+		"publicKey": "55555555555555555555555555555555555555555555",
+		"version": "",
+		"accounts": [
+			{
+				"kind": "accountNode",
+				"name": "oracleState",
+				"data": {
+					"kind": "structTypeNode",
+					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "authority",
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "price",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u64",
+								"endian": "le"
+							}
+						}
+					]
+				},
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			}
+		],
+		"instructions": [
+			{
+				"kind": "instructionNode",
+				"name": "initialize",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "payer",
+						"isWritable": true,
+						"isSigner": true
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "oracle",
+						"isWritable": true,
+						"isSigner": true
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					}
+				],
+				"arguments": [],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "update",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "oracle",
+						"isWritable": true,
+						"isSigner": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": false,
+						"isSigner": true
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "newPrice",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u64",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "rotateAuthority",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "oracle",
+						"isWritable": true,
+						"isSigner": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": false,
+						"isSigner": true
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "newAuthority",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 2
+							}
+						}
+					}
+				]
+			}
+		],
+		"definedTypes": [],
+		"pdas": [],
+		"errors": [
+			{
+				"kind": "errorNode",
+				"name": "unauthorizedUpdateAuthority",
+				"code": 0,
+				"message": ""
+			},
+			{
+				"kind": "errorNode",
+				"name": "unauthorizedOracleAuthority",
+				"code": 1,
+				"message": ""
+			}
+		]
+	},
+	"additionalPrograms": []
+}

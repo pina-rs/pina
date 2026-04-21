@@ -17,6 +17,8 @@ use pinocchio::Resize;
 use pinocchio::cpi::Seed;
 use pinocchio::cpi::Signer;
 use pinocchio::error::ProgramError;
+use pinocchio::instruction::InstructionAccount;
+use pinocchio::instruction::InstructionView;
 use pinocchio::sysvars::Sysvar;
 use pinocchio::sysvars::rent::Rent;
 use pinocchio_system::instructions::Allocate;
@@ -492,4 +494,135 @@ fn realloc_account_inner(
 pub fn close_account(account_info: &mut AccountView, recipient: &mut AccountView) -> ProgramResult {
 	account_info.send(account_info.lamports(), recipient)?;
 	account_info.close()
+}
+
+/// Typed handle for passing validated accounts into CPI builders.
+///
+/// This is a lightweight, allocator-free wrapper around `&AccountView` plus the
+/// writable bit the callee should observe. It is intentionally separate from
+/// the raw `AccountView` so callers can build typed CPI account structs without
+/// immediately reaching for unchecked runtime APIs.
+///
+/// This prototype keeps Pina's current architecture constraints intact:
+///
+/// - no heap allocation in the on-chain CPI path
+/// - no `unsafe` in the wrapper layer
+/// - const-generic account counts instead of `Vec`
+/// - checked `pinocchio::cpi::invoke_signed` as the execution path for now
+#[derive(Clone, Copy, Debug)]
+#[must_use]
+pub struct CpiHandle<'a> {
+	view: &'a AccountView,
+	writable: bool,
+}
+
+impl<'a> CpiHandle<'a> {
+	/// Construct a read-only CPI handle.
+	#[inline(always)]
+	pub const fn readonly(view: &'a AccountView) -> Self {
+		Self {
+			view,
+			writable: false,
+		}
+	}
+
+	/// Construct a writable CPI handle.
+	///
+	/// Returns `InvalidAccountData` when the source account was not declared
+	/// writable in the current instruction.
+	#[inline(always)]
+	pub fn writable(view: &'a AccountView) -> Result<Self, ProgramError> {
+		if !view.is_writable() {
+			return Err(ProgramError::InvalidAccountData);
+		}
+
+		Ok(Self {
+			view,
+			writable: true,
+		})
+	}
+
+	/// Return the account address with the original borrow lifetime.
+	#[inline(always)]
+	pub fn address(&self) -> &'a Address {
+		self.view.address()
+	}
+
+	/// Whether this handle should be passed to the callee as writable.
+	#[inline(always)]
+	pub const fn is_writable(&self) -> bool {
+		self.writable
+	}
+
+	/// Whether the underlying account signed the current instruction.
+	#[inline(always)]
+	pub fn is_signer(&self) -> bool {
+		self.view.is_signer()
+	}
+
+	#[inline(always)]
+	fn instruction_account(self) -> InstructionAccount<'a> {
+		InstructionAccount::new(self.address(), self.is_writable(), self.is_signer())
+	}
+
+	#[inline(always)]
+	fn account_view(self) -> &'a AccountView {
+		self.view
+	}
+}
+
+/// Convert a typed CPI accounts struct into a fixed-size array of handles.
+///
+/// This is the no-allocation counterpart to Anchor lang-v2's `ToCpiAccounts`.
+/// The const generic keeps the final account count explicit at compile time so
+/// Pina can stay within its allocator-free on-chain boundary.
+pub trait ToCpiAccounts<'a, const ACCOUNTS: usize> {
+	/// Collect the handles in the exact order expected by the callee
+	/// instruction.
+	fn to_cpi_handles(&self) -> [CpiHandle<'a>; ACCOUNTS];
+}
+
+/// Minimal typed CPI context built around [`CpiHandle`] and const generics.
+///
+/// This prototype intentionally omits heap-backed remaining-account lists.
+/// Callers should include every required account in the typed accounts struct
+/// for now. A future cursor-based account runtime can extend this with richer
+/// remaining-account support while preserving `no_std` compatibility.
+#[derive(Clone, Copy, Debug)]
+#[must_use]
+pub struct CpiContext<'a, T, const ACCOUNTS: usize>
+where
+	T: ToCpiAccounts<'a, ACCOUNTS>,
+{
+	pub accounts: T,
+	pub program: &'a Address,
+}
+
+impl<'a, T, const ACCOUNTS: usize> CpiContext<'a, T, ACCOUNTS>
+where
+	T: ToCpiAccounts<'a, ACCOUNTS>,
+{
+	#[inline(always)]
+	pub const fn new(program: &'a Address, accounts: T) -> Self {
+		Self { accounts, program }
+	}
+
+	/// Invoke the CPI using pinocchio's checked static-array path.
+	///
+	/// This keeps the prototype allocator-free and avoids introducing unsafe
+	/// unchecked invocation until Pina has a stronger typed account runtime for
+	/// duplicate-account and alias analysis.
+	#[inline(always)]
+	pub fn invoke(&self, data: &[u8], signers: &[Signer<'_, '_>]) -> ProgramResult {
+		let handles = self.accounts.to_cpi_handles();
+		let instruction_accounts = handles.map(CpiHandle::instruction_account);
+		let account_views = handles.map(CpiHandle::account_view);
+		let instruction = InstructionView {
+			program_id: self.program,
+			data,
+			accounts: &instruction_accounts,
+		};
+
+		pinocchio::cpi::invoke_signed::<ACCOUNTS, _>(&instruction, &account_views, signers)
+	}
 }
