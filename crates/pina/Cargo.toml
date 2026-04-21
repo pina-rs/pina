@@ -17,6 +17,8 @@ token = [
 	"dep:pinocchio-token",
 	"dep:pinocchio-token-2022",
 ]
+memo = ["dep:pinocchio-memo"]
+account-resize = ["pinocchio/account-resize", "pinocchio-system/account-resize"]
 derive = ["dep:pina_macros"]
 
 [dependencies]
@@ -26,6 +28,7 @@ pina_macros = { workspace = true, optional = true }
 pina_pod_primitives = { workspace = true }
 pinocchio = { workspace = true, default-features = true }
 pinocchio-associated-token-account = { workspace = true, optional = true, default-features = true }
+pinocchio-memo = { workspace = true, optional = true, default-features = true }
 pinocchio-system = { workspace = true, default-features = true }
 pinocchio-token = { workspace = true, optional = true, default-features = true }
 pinocchio-token-2022 = { workspace = true, optional = true, default-features = true }

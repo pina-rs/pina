@@ -25,6 +25,9 @@
 //! - `derive` *(default)* — enables the `pina_macros` proc-macro crate.
 //! - `token` — enables SPL token / token-2022 helpers and associated token
 //!   account utilities.
+//! - `memo` — enables memo program helpers.
+//! - `account-resize` — enables account realloc helpers on top of Pinocchio's
+//!   safe account resize support.
 
 #![no_std]
 #![allow(clippy::inline_always)]
@@ -35,6 +38,10 @@ mod impls;
 pub mod introspection;
 mod pda;
 mod pod;
+#[cfg(feature = "token")]
+pub mod token;
+#[cfg(feature = "token")]
+pub mod token_2022;
 mod traits;
 pub mod transaction;
 mod utils;
@@ -87,14 +94,11 @@ pub use pinocchio::sysvars;
 /// Re-export of `pinocchio_associated_token_account` for ATA operations.
 #[cfg(feature = "token")]
 pub use pinocchio_associated_token_account as associated_token_account;
+/// Re-export of `pinocchio_memo` for memo program helpers.
+#[cfg(feature = "memo")]
+pub use pinocchio_memo as memo;
 /// Re-export of `pinocchio_system` for system program CPI helpers.
 pub use pinocchio_system as system;
-/// Re-export of `pinocchio_token` for SPL Token program CPI helpers.
-#[cfg(feature = "token")]
-pub use pinocchio_token as token;
-/// Re-export of `pinocchio_token_2022` for Token-2022 program CPI helpers.
-#[cfg(feature = "token")]
-pub use pinocchio_token_2022 as token_2022;
 /// Alignment-safe Pod primitive wrappers (`PodBool`, `PodU16`, `PodU64`,
 /// etc.).
 pub use pod::*;
