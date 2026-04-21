@@ -188,6 +188,7 @@ level = "warn"
 check-cfg = [
 	'cfg(target_os, values("solana"))',
 	'cfg(target_feature, values("static-syscalls"))',
+	'cfg(kani)',
 ]
 
 [workspace.lints.clippy]

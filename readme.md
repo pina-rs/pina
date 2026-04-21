@@ -34,15 +34,15 @@ A performant Solana smart contract framework built on top of [pinocchio](https:/
 
 <!-- {=pinaWorkspacePackages} -->
 
-| Crate                  | Path                          | Description                                                       |
-| ---------------------- | ----------------------------- | ----------------------------------------------------------------- |
-| `pina`                 | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types. |
-| `pina_macros`          | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.    |
-| `pina_cli`             | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding.  |
-| `pina_codama_renderer` | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.     |
-| `pina_pod_primitives`  | `crates/pina_pod_primitives`  | Alignment-safe `no_std` POD primitive wrappers.                   |
-| `pina_profile`         | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                     |
-| `pina_sdk_ids`         | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.         |
+| Crate                  | Path                          | Description                                                                  |
+| ---------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
+| `pina`                 | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types.            |
+| `pina_macros`          | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.               |
+| `pina_cli`             | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding.             |
+| `pina_codama_renderer` | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.                |
+| `pina_pod_primitives`  | `crates/pina_pod_primitives`  | `no_std` POD primitives — integer/bool wrappers, fixed-capacity collections. |
+| `pina_profile`         | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                                |
+| `pina_sdk_ids`         | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.                    |
 
 <!-- {/pinaWorkspacePackages} -->
 
@@ -573,11 +573,37 @@ let clamped = amount.saturating_add(PodU64::MAX);
 
 <!-- {=podArithmeticDescription} -->
 
-Arithmetic operators (`+`, `-`, `*`) use **wrapping** semantics in release builds for CU efficiency and **panic on overflow** in debug builds. Use `checked_add`, `checked_sub`, `checked_mul`, `checked_div` where overflow must be detected in all build profiles.
+Arithmetic operators (`+`, `-`, `*`) on Pod **integer** types use **wrapping** semantics in release builds for CU efficiency and **panic on overflow** in debug builds. Use `checked_add`, `checked_sub`, `checked_mul`, `checked_div` where overflow must be detected in all build profiles.
 
 Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 
 <!-- {/podArithmeticDescription} -->
+
+### Pod collection types
+
+<br>
+
+Fixed-capacity collections that store data inline with a length prefix, enabling zero-copy access inside `#[repr(C)]` account structs.
+
+<!-- {=podCollectionTypesTable} -->
+
+| Type                       | Purpose                | Layout                                    |
+| -------------------------- | ---------------------- | ----------------------------------------- |
+| `PodOption<T: Pod>`        | Fixed-size `Option<T>` | 1-byte discriminant + `T`                 |
+| `PodString<N, PFX=1>`      | Fixed-capacity string  | `PFX`-byte length prefix + `N` data bytes |
+| `PodVec<T: Pod, N, PFX=2>` | Fixed-capacity vec     | `PFX`-byte length prefix + `N` elements   |
+
+All collection types are `#[repr(C)]`, alignment-1, and implement `bytemuck::Pod` + `bytemuck::Zeroable`. Length prefixes (`PFX`) default to 1 byte for strings (max 255) and 2 bytes for vectors (max 65 535 elements).
+
+<!-- {/podCollectionTypesTable} -->
+
+<!-- {=podCollectionDescription} -->
+
+Collection types store data inline with a length prefix, enabling zero-copy access inside `#[repr(C)]` account structs. Overflow is detected at insertion time — `try_set` / `try_push` return `Err(PodCollectionError::Overflow)` when capacity is exceeded.
+
+`PodString` provides UTF-8 validation via `try_as_str()`, while `PodVec` offers slice-based access via `as_slice()` / `as_mut_slice()`. `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`.
+
+<!-- {/podCollectionDescription} -->
 
 ### CPI helpers
 
@@ -706,15 +732,15 @@ The profiler decodes each SBF instruction opcode and assigns costs: regular inst
 
 <!-- {=pinaWorkspacePackages} -->
 
-| Crate                  | Path                          | Description                                                       |
-| ---------------------- | ----------------------------- | ----------------------------------------------------------------- |
-| `pina`                 | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types. |
-| `pina_macros`          | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.    |
-| `pina_cli`             | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding.  |
-| `pina_codama_renderer` | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.     |
-| `pina_pod_primitives`  | `crates/pina_pod_primitives`  | Alignment-safe `no_std` POD primitive wrappers.                   |
-| `pina_profile`         | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                     |
-| `pina_sdk_ids`         | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.         |
+| Crate                  | Path                          | Description                                                                  |
+| ---------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
+| `pina`                 | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types.            |
+| `pina_macros`          | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.               |
+| `pina_cli`             | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding.             |
+| `pina_codama_renderer` | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.                |
+| `pina_pod_primitives`  | `crates/pina_pod_primitives`  | `no_std` POD primitives — integer/bool wrappers, fixed-capacity collections. |
+| `pina_profile`         | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                                |
+| `pina_sdk_ids`         | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.                    |
 
 <!-- {/pinaWorkspacePackages} -->
 
