@@ -295,7 +295,7 @@ mod tests {
 	fn extracts_signer_and_writable() {
 		let source = r#"
 			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
-				fn process(&self, data: &[u8]) -> ProgramResult {
+				fn process(self, data: &[u8]) -> ProgramResult {
 					self.authority.assert_signer()?;
 					self.counter.assert_writable()?;
 					Ok(())
@@ -315,7 +315,7 @@ mod tests {
 	fn extracts_chained_assertions() {
 		let source = r#"
 			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
-				fn process(&self, data: &[u8]) -> ProgramResult {
+				fn process(self, data: &[u8]) -> ProgramResult {
 					self.sender.assert_signer()?.assert_writable()?;
 					Ok(())
 				}
@@ -332,7 +332,7 @@ mod tests {
 	fn extracts_pda() {
 		let source = r#"
 			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
-				fn process(&self, data: &[u8]) -> ProgramResult {
+				fn process(self, data: &[u8]) -> ProgramResult {
 					self.counter
 						.assert_empty()?
 						.assert_writable()?
@@ -352,7 +352,7 @@ mod tests {
 	fn extracts_known_address() {
 		let source = r#"
 			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
-				fn process(&self, data: &[u8]) -> ProgramResult {
+				fn process(self, data: &[u8]) -> ProgramResult {
 					self.system_program.assert_address(&system::ID)?;
 					Ok(())
 				}

@@ -85,7 +85,7 @@ pub struct CloseInstr {}
 #[pina(crate = pina)]
 pub struct InitializeAccounts<'a> {
 	pub authority: &'a AccountView,
-	pub state_account: &'a AccountView,
+	pub state_account: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 }
 
@@ -94,15 +94,15 @@ pub struct InitializeAccounts<'a> {
 #[pina(crate = pina)]
 pub struct UpdateAccounts<'a> {
 	pub authority: &'a AccountView,
-	pub state_account: &'a AccountView,
+	pub state_account: &'a mut AccountView,
 }
 
 /// Accounts for Close.
 #[derive(Accounts, Debug)]
 #[pina(crate = pina)]
 pub struct CloseAccounts<'a> {
-	pub authority: &'a AccountView,
-	pub state_account: &'a AccountView,
+	pub authority: &'a mut AccountView,
+	pub state_account: &'a mut AccountView,
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +153,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 			.assert_type::<TestState>(&TEST_PROGRAM_ID)?;
 
 		// Update state.
-		let state = self
+		let mut state = self
 			.state_account
 			.as_account_mut::<TestState>(&TEST_PROGRAM_ID)?;
 		state.value = args.new_value;
@@ -174,15 +174,16 @@ impl<'a> ProcessAccountInfos<'a> for CloseAccounts<'a> {
 			.assert_type::<TestState>(&TEST_PROGRAM_ID)?;
 
 		// Zero account data before closing.
-		let state = self
+		let mut state = self
 			.state_account
 			.as_account_mut::<TestState>(&TEST_PROGRAM_ID)?;
 		state.zeroed();
+		drop(state);
 
 		// Transfer lamports back to authority (simulated via direct lamport
 		// manipulation).
-		self.state_account
-			.send(self.state_account.lamports(), self.authority)?;
+		let lamports = self.state_account.lamports();
+		self.state_account.send(lamports, self.authority)?;
 
 		Ok(())
 	}
@@ -455,14 +456,14 @@ unsafe fn deserialize_test_input<const MAX_ACCOUNTS: usize>(
 	accounts: &mut [MaybeUninit<AccountView>; MAX_ACCOUNTS],
 ) -> (
 	&'static Address,
-	&'static [AccountView],
+	&'static mut [AccountView],
 	&'static [u8],
 	usize,
 ) {
 	let (program_id, count, ix_data) =
 		unsafe { entrypoint::deserialize::<MAX_ACCOUNTS>(input.as_mut_ptr(), accounts) };
 	let accounts: &mut [AccountView] =
-		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
+		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
 	(program_id, accounts, ix_data, count)
 }
 
@@ -1172,18 +1173,17 @@ fn lamport_transfer_send() {
 	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+	let (sender_accounts, recipient_accounts) = account_views.split_at_mut(1);
+	let sender = &mut sender_accounts[0];
+	let recipient = &mut recipient_accounts[0];
 
 	// Transfer 300_000 lamports from sender to recipient.
-	let result = account_views[0].send(300_000, &account_views[1]);
+	let result = sender.send(300_000, recipient);
 	assert!(result.is_ok(), "send should succeed: {result:?}");
 
+	assert_eq!(sender.lamports(), 700_000, "sender should have 700_000");
 	assert_eq!(
-		account_views[0].lamports(),
-		700_000,
-		"sender should have 700_000"
-	);
-	assert_eq!(
-		account_views[1].lamports(),
+		recipient.lamports(),
 		800_000,
 		"recipient should have 800_000"
 	);
@@ -1213,8 +1213,11 @@ fn lamport_transfer_insufficient_funds() {
 	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+	let (sender_accounts, recipient_accounts) = account_views.split_at_mut(1);
+	let sender = &mut sender_accounts[0];
+	let recipient = &mut recipient_accounts[0];
 
-	let result = account_views[0].send(101, &account_views[1]);
+	let result = sender.send(101, recipient);
 	assert!(result.is_err(), "should fail with insufficient funds");
 	assert_eq!(
 		result.unwrap_err(),
@@ -1223,8 +1226,8 @@ fn lamport_transfer_insufficient_funds() {
 	);
 
 	// Balances should be unchanged.
-	assert_eq!(account_views[0].lamports(), 100);
-	assert_eq!(account_views[1].lamports(), 0);
+	assert_eq!(sender.lamports(), 100);
+	assert_eq!(recipient.lamports(), 0);
 }
 
 /// Tests that sending to the same account fails with InvalidArgument.
@@ -1242,8 +1245,10 @@ fn lamport_transfer_same_account_rejected() {
 	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+	let account = &mut account_views[0];
+	let account_ptr: *mut AccountView = account;
 
-	let result = account_views[0].send(500, &account_views[0]);
+	let result = unsafe { (&mut *account_ptr).send(500, &mut *account_ptr) };
 	assert!(result.is_err(), "should fail sending to self");
 	assert_eq!(
 		result.unwrap_err(),
@@ -1278,17 +1283,20 @@ fn close_account_with_recipient() {
 	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+	let (closed_accounts, recipient_accounts) = account_views.split_at_mut(1);
+	let closed_account = &mut closed_accounts[0];
+	let recipient = &mut recipient_accounts[0];
 
-	let result = account_views[0].close_with_recipient(&account_views[1]);
+	let result = closed_account.close_with_recipient(recipient);
 	assert!(result.is_ok(), "close should succeed: {result:?}");
 
 	assert_eq!(
-		account_views[0].lamports(),
+		closed_account.lamports(),
 		0,
 		"closed account should have 0 lamports"
 	);
 	assert_eq!(
-		account_views[1].lamports(),
+		recipient.lamports(),
 		1_500_000,
 		"recipient should have 1_500_000 lamports"
 	);
@@ -1433,7 +1441,7 @@ fn account_data_mutation_persists() {
 
 	// Mutate value.
 	{
-		let state = account_views[0]
+		let mut state = account_views[0]
 			.as_account_mut::<TestState>(&TEST_PROGRAM_ID)
 			.unwrap_or_else(|e| panic!("write failed: {e:?}"));
 		state.value = PodU64::from_primitive(12345);

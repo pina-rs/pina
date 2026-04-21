@@ -4,7 +4,7 @@ expression: output
 ---
 impl<'a> ::pina::TryFromAccountInfos<'a> for SingleAccount<'a> {
     fn try_from_account_infos(
-        accounts: &'a [::pina::AccountView],
+        accounts: &'a mut [::pina::AccountView],
     ) -> ::core::result::Result<Self, ::pina::ProgramError> {
         if accounts.len() > 1usize {
             return ::core::result::Result::Err(
@@ -19,10 +19,10 @@ impl<'a> ::pina::TryFromAccountInfos<'a> for SingleAccount<'a> {
         Ok(Self { account })
     }
 }
-impl<'a> ::core::convert::TryFrom<&'a [::pina::AccountView]> for SingleAccount<'a> {
+impl<'a> ::core::convert::TryFrom<&'a mut [::pina::AccountView]> for SingleAccount<'a> {
     type Error = ::pina::ProgramError;
     fn try_from(
-        accounts: &'a [::pina::AccountView],
+        accounts: &'a mut [::pina::AccountView],
     ) -> ::core::result::Result<Self, Self::Error> {
         <Self as ::pina::TryFromAccountInfos>::try_from_account_infos(accounts)
     }

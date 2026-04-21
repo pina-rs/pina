@@ -1,6 +1,9 @@
+#[cfg(feature = "account-resize")]
 use pina::MAX_PERMITTED_DATA_INCREASE;
 use pina::combine_seeds_with_bump;
+#[cfg(feature = "account-resize")]
 use pina::realloc_account;
+#[cfg(feature = "account-resize")]
 use pina::realloc_account_zero;
 use pinocchio::address::MAX_SEEDS;
 
@@ -73,6 +76,7 @@ fn combine_seeds_with_bump_too_many_seeds_fails() {
 	assert!(result.is_err());
 }
 
+#[cfg(feature = "account-resize")]
 #[test]
 fn max_permitted_data_increase_is_10_kib() {
 	assert_eq!(MAX_PERMITTED_DATA_INCREASE, 10_240);
@@ -81,21 +85,22 @@ fn max_permitted_data_increase_is_10_kib() {
 /// Verify that `realloc_account` and `realloc_account_zero` are exported and
 /// have the expected function signatures. This is a compilation-level check;
 /// the actual runtime behavior requires a Solana VM (e.g. mollusk-svm).
+#[cfg(feature = "account-resize")]
 #[test]
 fn realloc_functions_are_exported() {
 	// Confirm that both symbols resolve to function pointers with compatible
 	// signatures. We only inspect the type — calling them requires a live
 	// AccountView which cannot be safely constructed outside the runtime.
 	let _grow: fn(
-		&pinocchio::AccountView,
+		&mut pinocchio::AccountView,
 		usize,
-		&pinocchio::AccountView,
+		&mut pinocchio::AccountView,
 		&pinocchio::Address,
 	) -> pinocchio::ProgramResult = realloc_account;
 	let _grow_zero: fn(
-		&pinocchio::AccountView,
+		&mut pinocchio::AccountView,
 		usize,
-		&pinocchio::AccountView,
+		&mut pinocchio::AccountView,
 		&pinocchio::Address,
 	) -> pinocchio::ProgramResult = realloc_account_zero;
 }
