@@ -1,10 +1,11 @@
 {
 	"trackedPrograms": [
-		"counter_program",
-		"escrow_program",
-		"vesting_program",
-		"role_registry_program",
-		"staking_rewards_program"
+		"hello_solana",
+		"anchor_duplicate_mutable_accounts",
+		"anchor_events",
+		"anchor_sysvars",
+		"anchor_system_accounts",
+		"anchor_realloc"
 	],
 	"warn": {
 		"deltaCu": 250,

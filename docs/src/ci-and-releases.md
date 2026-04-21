@@ -32,11 +32,12 @@ The `compute-units` workflow builds tracked SBF example programs on both the PR 
 
 Tracked programs are defined in `scripts/compute-unit-policy.json`:
 
-- `counter_program`
-- `escrow_program`
-- `vesting_program`
-- `role_registry_program`
-- `staking_rewards_program`
+- `hello_solana`
+- `anchor_duplicate_mutable_accounts`
+- `anchor_events`
+- `anchor_sysvars`
+- `anchor_system_accounts`
+- `anchor_realloc`
 
 Current policy:
 
@@ -48,6 +49,7 @@ Notes:
 
 - this workflow intentionally uses **static** SBF estimates from `pina profile`, not runtime validator traces
 - the tradeoff is deliberate: static profiling is deterministic and stable for PR-vs-base comparison
+- the tracked set should favor example programs that build reliably on both the PR head and the PR base with the gallery linker used in CI; richer CPI-heavy and token-heavy flows remain covered by the main `ci` and program E2E jobs
 - if the tracked set or thresholds need to change, update `scripts/compute-unit-policy.json`
 
 Local reproduction:
