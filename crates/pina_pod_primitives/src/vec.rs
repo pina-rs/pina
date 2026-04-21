@@ -19,7 +19,7 @@ use crate::error::max_n_for_pfx;
 ///
 /// # Layout
 /// - Bytes 0..PFX: element count prefix (little-endian)
-/// - Bytes PFX..PFX+(N*`size_of::`<T>()): element data (may be partially uninitialized)
+/// - Bytes `PFX..PFX+(N*size_of::<T>())`: element data (may be partially uninitialized)
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct PodVec<T: Pod, const N: usize, const PFX: usize = 2> {
