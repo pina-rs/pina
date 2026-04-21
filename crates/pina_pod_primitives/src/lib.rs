@@ -1,22 +1,32 @@
 #![no_std]
 
-//! Alignment-safe primitive wrappers that can be used in `Pod` structs.
+//! Alignment-safe primitive wrappers and fixed-capacity collection types
+//! for use in `Pod` structs.
 //!
-//! Pod types (`PodU64`, `PodU32`, etc.) wrap native integers in `[u8; N]`
-//! arrays, guaranteeing alignment 1. This allows direct pointer casts from
-//! account data without alignment concerns — critical for `#[repr(C)]`
+//! Pod integer types (`PodU64`, `PodU32`, etc.) wrap native integers in
+//! `[u8; N]` arrays, guaranteeing alignment 1. This allows direct pointer casts
+//! from account data without alignment concerns — critical for `#[repr(C)]`
 //! zero-copy structs on Solana.
 //!
 //! # Arithmetic
 //!
-//! Arithmetic operators (`+`, `-`, `*`) use **wrapping** semantics in release
-//! builds for CU efficiency and **panic on overflow** in debug builds. Use
-//! `checked_add`, `checked_sub`, `checked_mul`, `checked_div` where overflow
-//! must be detected in all build profiles.
+//! Arithmetic operators (`+`, `-`, `*`) on Pod **integer** types use **wrapping**
+//! semantics in release builds for CU efficiency and **panic on overflow** in
+//! debug builds. Use `checked_add`, `checked_sub`, `checked_mul`,
+//! `checked_div` where overflow must be detected in all build profiles.
 //!
 //! # Constants
 //!
 //! Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
+//!
+//! # Collection types
+//!
+//! `PodOption<T>`, `PodString<N, PFX>`, and `PodVec<T, N, PFX>` are
+//! fixed-capacity, alignment-1 types that store data inline with a length
+//! prefix. They implement `bytemuck::Pod` + `bytemuck::Zeroable` and can be
+//! embedded directly in `#[repr(C)]` account structs. Overflow is detected at
+//! insertion time via `try_set` / `try_push`, which return
+//! `Err(PodCollectionError::Overflow)` when capacity is exceeded.
 
 // Allow unsafe code for the collection types that need MaybeUninit.
 // Safety is guaranteed by:

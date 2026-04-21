@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Features
+
+#### Add PodOption, PodString, and PodVec collection types (pina_pod_primitives)
+
+Fixed-capacity, alignment-1 collection types for zero-copy Solana account layouts:
+
+- `PodOption<T: Pod>` — fixed-size optional with 1-byte discriminant
+- `PodString<N, PFX=1>` — fixed-capacity string with length prefix
+- `PodVec<T: Pod, N, PFX=2>` — fixed-capacity vector with length prefix
+
+All implement `bytemuck::Pod` + `bytemuck::Zeroable`. Overflow returns `PodCollectionError`.
+
+New mdt providers:
+
+- `podCollectionTypesTable` — collection types reference table
+- `podCollectionDescription` — collection type semantics
+
+Updated documentation:
+
+- `pina_pod_primitives/readme.md` — added collection types section
+- `docs/src/core-concepts.md` — added Pod collection types section
+- `docs/src/crates-and-features.md` — added collection types and description
+- `readme.md` — added Pod collection types section
+- Updated `podTypesTable` and `podArithmeticDescription` providers to clarify integer-only scope
+
+### Refactoring
+
+#### Split `pina_pod_primitives/lib.rs` into multi-file module structure
+
+The monolithic `lib.rs` (2322 lines) was split into focused modules:
+
+- `pod_bool.rs` — PodBool type
+- `pod_numeric.rs` — PodU16..PodI128 via macros
+- `macros.rs` — define_pod_unsigned!/define_pod_signed! etc.
+- `error.rs` — PodCollectionError
+- `option.rs` — PodOption + kani proofs
+- `string.rs` — PodString + kani proofs
+- `vec.rs` — PodVec + kani proofs
+- `tests/` — unit tests per type
+
 ## 0.8.0 (2026-03-30)
 
 ### Breaking Changes
