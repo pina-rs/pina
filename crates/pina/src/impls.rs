@@ -3,6 +3,7 @@
 use core::mem::size_of;
 
 use pinocchio::ProgramResult;
+#[cfg(feature = "token")]
 use pinocchio::account::Ref as AccountRef;
 use pinocchio_system::instructions::Transfer;
 

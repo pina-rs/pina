@@ -43,6 +43,41 @@ for program in policy["trackedPrograms"]:
 PY
 )
 
+mapfile -t BUILD_GROUPS < <(
+	python3 - "$WORKSPACE_ROOT" "$POLICY_FILE" <<'PY'
+import json
+import sys
+import tomllib
+from pathlib import Path
+
+workspace_root = Path(sys.argv[1])
+policy_path = Path(sys.argv[2])
+
+with policy_path.open(encoding="utf-8") as handle:
+    policy = json.load(handle)
+
+groups: dict[str, list[str]] = {}
+
+for program in policy["trackedPrograms"]:
+    cargo_toml = workspace_root / "examples" / program / "Cargo.toml"
+    group_key = program
+
+    if cargo_toml.exists():
+        with cargo_toml.open("rb") as handle:
+            manifest = tomllib.load(handle)
+
+        pina_dependency = manifest.get("dependencies", {}).get("pina")
+        if isinstance(pina_dependency, dict):
+            features = sorted(pina_dependency.get("features", []))
+            group_key = ",".join(features)
+
+    groups.setdefault(group_key, []).append(program)
+
+for programs in groups.values():
+    print(" ".join(programs))
+PY
+)
+
 resolve_artifact_path() {
 	local program=$1
 	local candidates=(
@@ -70,44 +105,54 @@ else
 	rustup component add rust-src --toolchain "$BPF_TOOLCHAIN"
 fi
 
-for program in "${TRACKED_PROGRAMS[@]}"; do
-	rm -f "$OUTPUT_DIR/$program.json"
+for build_group in "${BUILD_GROUPS[@]}"; do
+	read -r -a group_programs <<<"$build_group"
+	build_args=()
 
-	echo "Building $program with cargo +$BPF_TOOLCHAIN build-bpf -p $program"
+	for program in "${group_programs[@]}"; do
+		rm -f "$OUTPUT_DIR/$program.json"
+		build_args+=(-p "$program")
+	done
+
+	echo "Building ${group_programs[*]} with cargo +$BPF_TOOLCHAIN build-bpf ${build_args[*]}"
 
 	set +e
 	(
 		cd "$WORKSPACE_ROOT"
-		cargo +"$BPF_TOOLCHAIN" build-bpf -p "$program"
+		cargo +"$BPF_TOOLCHAIN" build-bpf "${build_args[@]}"
 	)
 	build_status=$?
 	set -e
 
 	if [ "$build_status" -ne 0 ]; then
-		echo "warning: failed to build tracked program $program for static CU profiling" >&2
+		for program in "${group_programs[@]}"; do
+			echo "warning: failed to build tracked program $program for static CU profiling" >&2
+		done
 		continue
 	fi
 
-	artifact=$(resolve_artifact_path "$program") || {
-		echo "warning: failed to find built SBF artifact for $program under $WORKSPACE_ROOT/target" >&2
-		continue
-	}
+	for program in "${group_programs[@]}"; do
+		artifact=$(resolve_artifact_path "$program") || {
+			echo "warning: failed to find built SBF artifact for $program under $WORKSPACE_ROOT/target" >&2
+			continue
+		}
 
-	echo "Profiling $program from $artifact"
+		echo "Profiling $program from $artifact"
 
-	set +e
-	(
-		cd "$WORKSPACE_ROOT"
-		cargo run --quiet --locked -p pina_cli -- profile "$artifact" --json --output "$OUTPUT_DIR/$program.json"
-	)
-	profile_status=$?
-	set -e
+		set +e
+		(
+			cd "$WORKSPACE_ROOT"
+			cargo run --quiet --locked -p pina_cli -- profile "$artifact" --json --output "$OUTPUT_DIR/$program.json"
+		)
+		profile_status=$?
+		set -e
 
-	if [ "$profile_status" -ne 0 ]; then
-		echo "warning: failed to profile tracked program $program from $artifact" >&2
-		rm -f "$OUTPUT_DIR/$program.json"
-		continue
-	fi
+		if [ "$profile_status" -ne 0 ]; then
+			echo "warning: failed to profile tracked program $program from $artifact" >&2
+			rm -f "$OUTPUT_DIR/$program.json"
+			continue
+		fi
+	done
 done
 
 python3 - "$OUTPUT_DIR/manifest.json" "$POLICY_FILE" "$BPF_TOOLCHAIN" <<'PY'
