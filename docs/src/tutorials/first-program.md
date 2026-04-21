@@ -116,7 +116,7 @@ The `ProcessAccountInfos` trait defines the `process` method that contains your 
 
 ```rust
 impl<'a> ProcessAccountInfos<'a> for HelloAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let _ = HelloInstructionData::try_from_bytes(data)?;
 		self.user.assert_signer()?;
 		log!("Hello, Solana!");
@@ -145,7 +145,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: HelloInstruction = parse_instruction(program_id, &ID, data)?;
@@ -194,7 +194,7 @@ pub struct HelloAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for HelloAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let _ = HelloInstructionData::try_from_bytes(data)?;
 		self.user.assert_signer()?;
 		log!("Hello, Solana!");
@@ -213,7 +213,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: HelloInstruction = parse_instruction(program_id, &ID, data)?;

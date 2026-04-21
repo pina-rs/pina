@@ -572,11 +572,17 @@ pub trait LamportTransfer {
 /// # Examples
 ///
 /// ```ignore
-/// // Close the escrow account and return rent to the authority:
+/// // Zero the escrow state first when stale bytes would be dangerous,
+/// // then close it and return rent to the authority:
+/// escrow_account.as_account_mut::<EscrowState>(&program_id)?.zeroed();
 /// escrow_account.close_with_recipient(authority_account)?;
 /// ```
 pub trait CloseAccountWithRecipient {
 	/// Close the account and transfer all remaining lamports to the recipient.
+	///
+	/// This helper does not zero account data for you. Call `zeroed()` first
+	/// when the account's old bytes must not remain revivable within the same
+	/// transaction.
 	fn close_with_recipient(&mut self, recipient: &mut AccountView) -> ProgramResult;
 }
 
@@ -596,10 +602,8 @@ pub trait CloseAccountWithRecipient {
 /// // Typically derived via `#[derive(Accounts)]`:
 /// #[derive(Accounts)]
 /// pub struct InitEscrow<'a> {
-/// 	#[account(signer, writable)]
 /// 	pub authority: &'a AccountView,
-/// 	#[account(writable)]
-/// 	pub escrow: &'a AccountView,
+/// 	pub escrow: &'a mut AccountView,
 /// }
 ///
 /// // Then used in the entrypoint:

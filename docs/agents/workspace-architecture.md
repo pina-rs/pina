@@ -20,7 +20,7 @@ There are also multiple examples and security fixtures under `examples/` and `se
 nostd_entrypoint!(process_instruction);
 fn process_instruction(
 	program_id: &Address,
-	accounts: &[AccountView],
+	accounts: &mut [AccountView],
 	data: &[u8],
 ) -> ProgramResult {
 	let instruction: MyInstruction = parse_instruction(program_id, &ID, data)?;
@@ -44,7 +44,7 @@ Prefer chained validation on `AccountView` references:
 account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?
 ```
 
-These methods return `Result<&AccountView>` for chaining.
+These methods return the same reference type they receive, so mutable validation chains stay mutable.
 
 ### Pod types
 

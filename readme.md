@@ -168,11 +168,13 @@ That last count-parity check is important because it catches silent extraction r
 
 <!-- {=pinaFeatureFlags} -->
 
-| Feature  | Default | Description                                                |
-| -------- | ------- | ---------------------------------------------------------- |
-| `derive` | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.) |
-| `logs`   | Yes     | Enables on-chain logging via `solana-program-log`          |
-| `token`  | No      | Enables SPL token / token-2022 helpers and ATA utilities   |
+| Feature          | Default | Description                                                     |
+| ---------------- | ------- | --------------------------------------------------------------- |
+| `derive`         | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.)      |
+| `logs`           | Yes     | Enables on-chain logging via `solana-program-log`               |
+| `token`          | No      | Enables SPL token / token-2022 helpers and ATA utilities        |
+| `memo`           | No      | Enables memo program helpers via `pina::memo`                   |
+| `account-resize` | No      | Enables account realloc helpers that call Pinocchio resize APIs |
 
 <!-- {/pinaFeatureFlags} -->
 
@@ -219,7 +221,7 @@ pub struct Initialize {
 #[derive(Accounts)]
 pub struct InitializeAccounts<'a> {
 	pub payer: &'a AccountView,
-	pub state: &'a AccountView,
+	pub state: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 }
 
@@ -228,7 +230,7 @@ nostd_entrypoint!(process_instruction);
 
 fn process_instruction(
 	program_id: &Address,
-	accounts: &[AccountView],
+	accounts: &mut [AccountView],
 	data: &[u8],
 ) -> ProgramResult {
 	let instruction: MyInstruction = parse_instruction(program_id, &ID, data)?;
@@ -257,7 +259,7 @@ nostd_entrypoint!(process_instruction);
 
 fn process_instruction(
 	program_id: &Address,
-	accounts: &[AccountView],
+	accounts: &mut [AccountView],
 	data: &[u8],
 ) -> ProgramResult {
 	// Your instruction dispatch logic here
@@ -439,7 +441,7 @@ pub enum MyError {
 
 <br>
 
-Chain assertions on `AccountView` references. Each method returns `Result<&AccountView, ProgramError>` for fluent chaining:
+Chain assertions on `AccountView` references. Each method returns the same reference type it received, so shared borrows stay shared and mutable borrows stay mutable:
 
 ```rust
 // Validate an account is a signer, writable, and owned by our program.
@@ -478,7 +480,7 @@ Available assertions:
 
 <br>
 
-On deserialized account data, chain assertions using the `AccountValidation` trait:
+On deserialized account data, chain assertions using the `AccountValidation` trait. `as_account()` returns a guard-backed `Ref<T>` and `as_account_mut()` returns `RefMut<T>`:
 
 ```rust
 let state = account.as_account::<Config>(&program_id)?;
@@ -490,7 +492,7 @@ state.assert_msg(|s| s.bump == 255, "bump must be 255")?;
 
 <br>
 
-Automatically destructures a slice of `AccountView` into a named struct:
+Automatically destructures a mutable slice of `AccountView` into a named struct:
 
 ```rust
 use pina::*;
@@ -503,7 +505,7 @@ pub struct MyAccounts<'a> {
 }
 ```
 
-The derive generates `TryFromAccountInfos` and `TryFrom<&[AccountView]>` implementations. It validates that the exact number of accounts is provided.
+The derive generates `TryFromAccountInfos` and `TryFrom<&mut [AccountView]>` implementations. It validates that the exact number of accounts is provided, and it supports `&'a AccountView`, `&'a mut AccountView`, `&'a [AccountView]`, and `&'a mut [AccountView]` fields.
 
 Use the `#[pina(remaining)]` attribute on the last field to capture trailing accounts:
 

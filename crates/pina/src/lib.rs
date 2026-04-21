@@ -157,7 +157,7 @@ pub use crate::utils::*;
 /// ```ignore
 /// fn process_instruction(
 ///     program_id: &Address,
-///     accounts: &[AccountView],
+///     accounts: &mut [AccountView],
 ///     data: &[u8],
 /// ) -> ProgramResult
 /// ```

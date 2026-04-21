@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Breaking Changes
+
+- Upgrade the workspace to the Pinocchio 0.11 crate family (`pinocchio` 0.11, `pinocchio-system` 0.6, `pinocchio-token` 0.6, `pinocchio-token-2022` 0.3, `pinocchio-memo` 0.4, and `pinocchio-associated-token-account` 0.4).
+- Raise the workspace `rust-version` baseline to `1.89.0` to match upstream requirements.
+- Change the entrypoint and account parsing model from `&[AccountView]` to `&mut [AccountView]`.
+- Change `ProcessAccountInfos::process` to consume `self` instead of borrowing `&self`.
+- Change `AsAccount::as_account` / `as_account_mut` to return guard-backed `Ref<T>` / `RefMut<T>` values.
+- Extend `#[derive(Accounts)]` to support `&'a mut AccountView` and `&'a mut [AccountView]`, and use mutable fields to infer writable accounts in generated IDLs.
+- Split close and realloc behavior: `close_with_recipient()` no longer zeroes account data implicitly, and realloc helpers are gated behind the new `account-resize` feature.
+
+### Features
+
+- Add a standalone `memo` feature that re-exports `pinocchio_memo` as `pina::memo`.
+- Preserve `TokenAccount` compatibility aliases through `pina::token` and `pina::token_2022` wrapper modules.
+- Infer writable Codama/IDL accounts from mutable `#[derive(Accounts)]` fields in `pina_cli`.
+
+### Documentation
+
+- Refresh tutorials, READMEs, API docs, and security guidance for the mutable-account parsing model.
+- Document the explicit `zeroed()` then `close_with_recipient()` close flow.
+- Regenerate Codama IDLs and committed Rust/JS clients for the updated writable-account inference.
+
 ## 0.8.0 (2026-03-30)
 
 ### Breaking Changes

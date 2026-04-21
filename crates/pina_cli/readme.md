@@ -145,7 +145,8 @@ The extractor currently supports these dispatch shapes:
 Keep in mind:
 
 - Account metadata is only inferred for routed `Accounts::try_from(accounts)` arms.
-- Signer/writable/PDA/default-account inference still depends on direct `self.field.assert_*()` chains inside `impl ProcessAccountInfos`.
+- Signer/PDA/default-account inference still depends on direct `self.field.assert_*()` chains inside `impl ProcessAccountInfos`.
+- Writable inference comes from either direct `assert_writable()` chains or mutable `#[derive(Accounts)]` fields such as `&'a mut AccountView`.
 - If you hide routing or validation behind helper layers, instruction nodes may still exist, but account metadata becomes less complete.
 
 <!-- {/pinaIdlDispatchSupport} -->

@@ -55,12 +55,12 @@ pub struct InitializeInstruction {}
 #[derive(Accounts, Debug)]
 pub struct InitializeAccounts<'a> {
 	pub user: &'a AccountView,
-	pub my_account: &'a AccountView,
+	pub my_account: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 }
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let _ = InitializeInstruction::try_from_bytes(data)?;
 		self.user.assert_signer()?.assert_writable()?;
 		self.my_account.assert_empty()?.assert_writable()?;
@@ -74,7 +74,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 Key differences:
 
 - **No `#[program]` module.** Pina uses explicit discriminator enums and a manual `match` in the entrypoint.
-- **No `Context<T>`.** Each accounts struct receives `&[AccountView]` and the processor receives raw `data: &[u8]`.
+- **No `Context<T>`.** The entrypoint receives `&mut [AccountView]`, `#[derive(Accounts)]` maps that mutable slice into typed fields, and the processor receives raw `data: &[u8]`.
 - **Constraints are code, not attributes.** Validation happens inside `process` via chained assertions rather than `#[account(...)]` attribute directives.
 
 ## Account constraints to validation chains
@@ -94,7 +94,7 @@ Anchor expresses constraints as attributes on account fields. Pina uses explicit
 | `#[account(constraint = expr)]`   | Write the check directly in `process` and return an error              |
 | `Account<'info, T>` (type check)  | `account.assert_type::<T>(&owner)?`                                    |
 
-Pina's assertion methods return `Result<&AccountView>`, so they chain naturally:
+Pina's assertion methods return the same reference type they receive, so shared chains stay shared and mutable chains stay mutable:
 
 ```rust
 self.counter
@@ -463,7 +463,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: MyInstruction = parse_instruction(program_id, &ID, data)?;

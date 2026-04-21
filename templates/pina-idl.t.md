@@ -25,7 +25,7 @@ pub mod entrypoint {
 
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let ix: MyInstruction = parse_instruction(program_id, &ID, data)?;
@@ -66,7 +66,7 @@ match ix {
 
 ```rust
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = InitializeInstruction::try_from_bytes(data)?;
 		let seeds = my_seeds!(self.authority.address().as_ref(), args.bump);
 
@@ -146,7 +146,8 @@ The extractor currently supports these dispatch shapes:
 Keep in mind:
 
 - Account metadata is only inferred for routed `Accounts::try_from(accounts)` arms.
-- Signer/writable/PDA/default-account inference still depends on direct `self.field.assert_*()` chains inside `impl ProcessAccountInfos`.
+- Signer/PDA/default-account inference still depends on direct `self.field.assert_*()` chains inside `impl ProcessAccountInfos`.
+- Writable inference comes from either direct `assert_writable()` chains or mutable `#[derive(Accounts)]` fields such as `&'a mut AccountView`.
 - If you hide routing or validation behind helper layers, instruction nodes may still exist, but account metadata becomes less complete.
 
 <!-- {/pinaIdlDispatchSupport} -->

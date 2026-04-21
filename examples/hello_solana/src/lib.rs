@@ -76,8 +76,9 @@ pub struct HelloInstructionData {}
 /// The accounts required by the Hello instruction.
 ///
 /// `#[derive(Accounts)]` generates a `TryFromAccountInfos` implementation that
-/// destructures a `&[AccountView]` slice into named fields, returning
-/// `ProgramError::NotEnoughAccountKeys` if too few accounts are provided.
+/// destructures the mutable entrypoint `AccountView` slice into named fields,
+/// returning `ProgramError::NotEnoughAccountKeys` if too few accounts are
+/// provided.
 #[derive(Accounts, Debug)]
 pub struct HelloAccounts<'a> {
 	/// The user invoking the program. Must be a signer so we can trust the

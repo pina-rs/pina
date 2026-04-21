@@ -48,7 +48,7 @@ use crate::ProgramResult;
 /// ```ignore
 /// use pina::introspection::assert_no_cpi;
 ///
-/// fn process(accounts: &[AccountView], program_id: &Address) -> ProgramResult {
+/// fn process(accounts: &mut [AccountView], program_id: &Address) -> ProgramResult {
 ///     let instructions_account = &accounts[0];
 ///     // Ensure we are not being called via CPI
 ///     assert_no_cpi(instructions_account, program_id)?;
@@ -84,7 +84,7 @@ pub fn assert_no_cpi(instructions_account: &AccountView, program_id: &Address) -
 /// ```ignore
 /// use pina::introspection::get_instruction_count;
 ///
-/// fn process(accounts: &[AccountView]) -> ProgramResult {
+/// fn process(accounts: &mut [AccountView]) -> ProgramResult {
 ///     let instructions_account = &accounts[0];
 ///     let count = get_instruction_count(instructions_account)?;
 ///     // e.g. reject transactions with too many instructions
@@ -115,7 +115,7 @@ pub fn get_instruction_count(instructions_account: &AccountView) -> Result<u16, 
 /// ```ignore
 /// use pina::introspection::get_current_instruction_index;
 ///
-/// fn process(accounts: &[AccountView]) -> ProgramResult {
+/// fn process(accounts: &mut [AccountView]) -> ProgramResult {
 ///     let instructions_account = &accounts[0];
 ///     let index = get_current_instruction_index(instructions_account)?;
 ///     // e.g. ensure this is the first instruction in the transaction
@@ -157,7 +157,7 @@ pub fn get_current_instruction_index(
 /// use pina::introspection::has_instruction_before;
 ///
 /// fn process(
-///     accounts: &[AccountView],
+///     accounts: &mut [AccountView],
 ///     suspect_program: &Address,
 /// ) -> ProgramResult {
 ///     let instructions_account = &accounts[0];
@@ -212,7 +212,7 @@ pub fn has_instruction_before(
 /// use pina::introspection::has_instruction_after;
 ///
 /// fn process(
-///     accounts: &[AccountView],
+///     accounts: &mut [AccountView],
 ///     repay_program: &Address,
 /// ) -> ProgramResult {
 ///     let instructions_account = &accounts[0];

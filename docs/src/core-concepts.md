@@ -92,17 +92,17 @@ The discriminator strategy determines byte layout, parser guarantees, and cross-
 
 ## Account validation chains
 
-Validation methods on `AccountView` are composable:
+Validation methods on `AccountView` are composable and preserve the receiver type:
 
 ```rust
 account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?;
 ```
 
-This pattern improves readability while keeping checks explicit and audit-able.
+A chain that starts with `&AccountView` stays shared, while a chain that starts with `&mut AccountView` stays mutable. This keeps writability explicit without losing access to `as_account_mut()` later.
 
 ## Typed account conversions
 
-Traits in `crates/pina/src/impls.rs` provide typed conversion paths from raw `AccountView` values into strongly typed account states.
+Traits in `crates/pina/src/impls.rs` provide typed conversion paths from raw `AccountView` values into strongly typed account states. `as_account()` returns `Ref<T>` and `as_account_mut()` returns `RefMut<T>` borrow guards.
 
 ## Entrypoint model
 
