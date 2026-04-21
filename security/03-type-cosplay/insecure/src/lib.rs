@@ -51,7 +51,7 @@ pub struct AdminActionAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for AdminActionAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = AdminActionInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;

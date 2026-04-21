@@ -13,6 +13,7 @@
 ))]
 extern crate std;
 
+use pina::pinocchio::Resize;
 use pina::*;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
@@ -45,15 +46,15 @@ pub struct Realloc2Ix {
 #[derive(Accounts, Debug)]
 pub struct ReallocAccounts<'a> {
 	pub authority: &'a AccountView,
-	pub sample: &'a AccountView,
+	pub sample: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 }
 
 #[derive(Accounts, Debug)]
 pub struct Realloc2Accounts<'a> {
 	pub authority: &'a AccountView,
-	pub sample1: &'a AccountView,
-	pub sample2: &'a AccountView,
+	pub sample1: &'a mut AccountView,
+	pub sample2: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 }
 
@@ -78,7 +79,7 @@ fn validate_distinct_realloc_targets(account1: &Address, account2: &Address) -> 
 }
 
 impl<'a> ProcessAccountInfos<'a> for ReallocAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = ReallocIx::try_from_bytes(data)?;
 		let target_len = usize::from(u16::from(args.len));
 
@@ -93,7 +94,7 @@ impl<'a> ProcessAccountInfos<'a> for ReallocAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for Realloc2Accounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = Realloc2Ix::try_from_bytes(data)?;
 		let base_len = usize::from(u16::from(args.len));
 		let second_target_len = base_len
@@ -124,7 +125,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: ReallocInstruction = parse_instruction(program_id, &ID, data)?;

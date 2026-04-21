@@ -48,7 +48,7 @@ fn assert_external_program_id(external_program_id: &Address) -> ProgramResult {
 }
 
 impl<'a> ProcessAccountInfos<'a> for ValidateExternalProgramAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let _ = ValidateExternalProgramInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
@@ -71,7 +71,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: DeclareProgramInstruction = parse_instruction(program_id, &ID, data)?;

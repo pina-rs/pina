@@ -40,12 +40,12 @@ pub struct TransferInstruction {
 #[derive(Accounts, Debug)]
 pub struct TransferAccounts<'a> {
 	pub authority: &'a AccountView,
-	pub source: &'a AccountView,
-	pub dest: &'a AccountView,
+	pub source: &'a mut AccountView,
+	pub dest: &'a mut AccountView,
 }
 
 impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = TransferInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
@@ -57,11 +57,11 @@ impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
 		// operate on the same account.
 		let amount: u64 = args.amount.into();
 
-		let source = self.source.as_account_mut::<Balance>(&ID)?;
+		let mut source = self.source.as_account_mut::<Balance>(&ID)?;
 		let source_amount: u64 = source.amount.into();
 		source.amount = PodU64::from_primitive(source_amount.saturating_sub(amount));
 
-		let dest = self.dest.as_account_mut::<Balance>(&ID)?;
+		let mut dest = self.dest.as_account_mut::<Balance>(&ID)?;
 		let dest_amount: u64 = dest.amount.into();
 		dest.amount = PodU64::from_primitive(dest_amount.saturating_add(amount));
 

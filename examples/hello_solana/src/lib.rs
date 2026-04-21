@@ -99,7 +99,7 @@ pub struct HelloAccounts<'a> {
 /// 2. Assert the user account is a signer.
 /// 3. Log a greeting.
 impl<'a> ProcessAccountInfos<'a> for HelloAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		// Validate instruction data (checks the discriminator byte).
 		let _ = HelloInstructionData::try_from_bytes(data)?;
 
@@ -142,7 +142,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: HelloInstruction = parse_instruction(program_id, &ID, data)?;

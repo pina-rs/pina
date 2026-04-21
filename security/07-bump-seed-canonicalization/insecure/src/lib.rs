@@ -44,12 +44,12 @@ const SEED: &[u8] = b"data";
 #[derive(Accounts, Debug)]
 pub struct CreateAccounts<'a> {
 	pub authority: &'a AccountView,
-	pub data: &'a AccountView,
+	pub data: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 }
 
 impl<'a> ProcessAccountInfos<'a> for CreateAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = CreateInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
@@ -69,7 +69,7 @@ impl<'a> ProcessAccountInfos<'a> for CreateAccounts<'a> {
 		let seeds = &[SEED, self.authority.address().as_ref()];
 		create_program_account_with_bump::<Data>(self.data, self.authority, &ID, seeds, args.bump)?;
 
-		let data_account = self.data.as_account_mut::<Data>(&ID)?;
+		let mut data_account = self.data.as_account_mut::<Data>(&ID)?;
 		*data_account = Data::builder()
 			.authority(*self.authority.address())
 			.value(args.value)

@@ -36,7 +36,7 @@ fn test_accounts_derive_exact() {
 	let mut accounts = [UNINIT; 2];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
-	let accounts: &[AccountView] =
+	let accounts: &mut [AccountView] =
 		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
 
 	let test_accounts = TestAccounts::try_from_account_infos(accounts).unwrap();
@@ -53,7 +53,7 @@ fn test_accounts_derive_exact_not_enough() {
 	let mut accounts = [UNINIT; 1];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
-	let not_enough_accounts: &[AccountView] =
+	let not_enough_accounts: &mut [AccountView] =
 		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
 
 	let result = TestAccounts::try_from_account_infos(not_enough_accounts);
@@ -69,7 +69,7 @@ fn test_accounts_derive_exact_excess() {
 	let mut accounts = [UNINIT; 4];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
-	let too_many_accounts: &[AccountView] =
+	let too_many_accounts: &mut [AccountView] =
 		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
 
 	let result = TestAccounts::try_from_account_infos(too_many_accounts);
@@ -84,7 +84,7 @@ fn test_accounts_derive_remaining_excess() {
 	let mut accounts = [UNINIT; 20];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
-	let accounts: &[AccountView] =
+	let accounts: &mut [AccountView] =
 		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
 
 	let test_accounts = TestAccountsRemaining::try_from_account_infos(accounts).unwrap();
@@ -100,7 +100,7 @@ fn test_accounts_derive_remaining_exact() {
 	let mut accounts = [UNINIT; 1];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
-	let accounts: &[AccountView] =
+	let accounts: &mut [AccountView] =
 		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
 
 	let test_accounts = TestAccountsRemaining::try_from_account_infos(accounts).unwrap();

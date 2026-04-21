@@ -33,12 +33,12 @@ pub struct ClaimAndCloseInstruction {}
 #[derive(Accounts, Debug)]
 pub struct ClaimAndCloseAccounts<'a> {
 	pub authority: &'a AccountView,
-	pub reward: &'a AccountView,
-	pub recipient: &'a AccountView,
+	pub reward: &'a mut AccountView,
+	pub recipient: &'a mut AccountView,
 }
 
 impl<'a> ProcessAccountInfos<'a> for ClaimAndCloseAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let _ = ClaimAndCloseInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
@@ -47,13 +47,15 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAndCloseAccounts<'a> {
 			.assert_writable()?
 			.assert_type::<RewardState>(&ID)?;
 
-		let reward = self.reward.as_account::<RewardState>(&ID)?;
+		let reward_authority = {
+			let reward = self.reward.as_account::<RewardState>(&ID)?;
+			reward.authority
+		};
 
-		self.authority.assert_address(&reward.authority)?;
+		self.authority.assert_address(&reward_authority)?;
 
 		// SECURE: Zero the account data first, then close properly.
 		// zeroed() clears all bytes, preventing stale data reuse.
-		// close_with_recipient() transfers lamports, resizes to 0, and closes.
 		{
 			self.reward.as_account_mut::<RewardState>(&ID)?.zeroed();
 		}

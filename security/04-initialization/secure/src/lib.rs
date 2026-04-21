@@ -40,12 +40,12 @@ const SEED: &[u8] = b"config";
 #[derive(Accounts, Debug)]
 pub struct InitializeAccounts<'a> {
 	pub authority: &'a AccountView,
-	pub config: &'a AccountView,
+	pub config: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 }
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = InitializeInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
@@ -64,7 +64,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			args.bump,
 		)?;
 
-		let config = self.config.as_account_mut::<Config>(&ID)?;
+		let mut config = self.config.as_account_mut::<Config>(&ID)?;
 
 		*config = Config::builder()
 			.authority(*self.authority.address())

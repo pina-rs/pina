@@ -60,7 +60,7 @@ fn ensure_distinct(account1: &Address, account2: &Address) -> ProgramResult {
 }
 
 impl<'a> ProcessAccountInfos<'a> for DuplicateMutableAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let _ = FailsDuplicateMutableInstruction::try_from_bytes(data)?;
 
 		self.account1.assert_writable()?;
@@ -71,7 +71,7 @@ impl<'a> ProcessAccountInfos<'a> for DuplicateMutableAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for DuplicateReadonlyAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let _ = AllowsDuplicateReadonlyInstruction::try_from_bytes(data)?;
 		Ok(())
 	}
@@ -86,7 +86,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: DuplicateMutableInstruction = parse_instruction(program_id, &ID, data)?;

@@ -239,7 +239,7 @@ pub struct InitializeAccounts<'a> {{
 }}
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {{
-	fn process(&self, data: &[u8]) -> ProgramResult {{
+	fn process(self, data: &[u8]) -> ProgramResult {{
 		let _args = InitializeInstruction::try_from_bytes(data)?;
 		self.payer.assert_signer()?;
 		log!("Initialized {package_name}");
@@ -250,7 +250,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {{
 
 pub fn process_instruction(
 	program_id: &Address,
-	accounts: &[AccountView],
+	accounts: &mut [AccountView],
 	data: &[u8],
 ) -> ProgramResult {{
 	let instruction: {program_title}Instruction = parse_instruction(program_id, &ID, data)?;
@@ -275,7 +275,7 @@ nostd_entrypoint!(process_instruction);
 #[inline(always)]
 pub fn process_instruction(
 	program_id: &Address,
-	accounts: &[AccountView],
+	accounts: &mut [AccountView],
 	data: &[u8],
 ) -> ProgramResult {{
 	let instruction: {program_title}Instruction = parse_instruction(program_id, &ID, data)?;

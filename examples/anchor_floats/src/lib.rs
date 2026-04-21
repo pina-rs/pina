@@ -54,14 +54,14 @@ pub struct UpdateInstruction {
 
 #[derive(Accounts, Debug)]
 pub struct CreateAccounts<'a> {
-	pub account: &'a AccountView,
+	pub account: &'a mut AccountView,
 	pub authority: &'a AccountView,
 	pub system_program: &'a AccountView,
 }
 
 #[derive(Accounts, Debug)]
 pub struct UpdateAccounts<'a> {
-	pub account: &'a AccountView,
+	pub account: &'a mut AccountView,
 	pub authority: &'a AccountView,
 }
 
@@ -88,7 +88,7 @@ fn apply_update(
 }
 
 impl<'a> ProcessAccountInfos<'a> for CreateAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = CreateInstruction::try_from_bytes(data)?;
 		let data_f32 = f32::from_bits(u32::from(args.data_f32));
 		let data_f64 = f64::from_bits(u64::from(args.data_f64));
@@ -104,15 +104,15 @@ impl<'a> ProcessAccountInfos<'a> for CreateAccounts<'a> {
 			&ID,
 		)?;
 
-		let account = self.account.as_account_mut::<FloatDataAccount>(&ID)?;
-		apply_create(account, self.authority.address(), data_f32, data_f64);
+		let mut account = self.account.as_account_mut::<FloatDataAccount>(&ID)?;
+		apply_create(&mut account, self.authority.address(), data_f32, data_f64);
 
 		Ok(())
 	}
 }
 
 impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = UpdateInstruction::try_from_bytes(data)?;
 		let data_f32 = f32::from_bits(u32::from(args.data_f32));
 		let data_f64 = f64::from_bits(u64::from(args.data_f64));
@@ -122,8 +122,8 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 			.assert_writable()?
 			.assert_type::<FloatDataAccount>(&ID)?;
 
-		let account = self.account.as_account_mut::<FloatDataAccount>(&ID)?;
-		apply_update(account, self.authority.address(), data_f32, data_f64)
+		let mut account = self.account.as_account_mut::<FloatDataAccount>(&ID)?;
+		apply_update(&mut account, self.authority.address(), data_f32, data_f64)
 	}
 }
 
@@ -136,7 +136,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: FloatInstruction = parse_instruction(program_id, &ID, data)?;

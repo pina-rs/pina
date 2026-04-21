@@ -42,8 +42,8 @@ pub struct TransferInstruction {
 #[derive(Accounts, Debug)]
 pub struct TransferAccounts<'a> {
 	pub authority: &'a AccountView,
-	pub source: &'a AccountView,
-	pub dest: &'a AccountView,
+	pub source: &'a mut AccountView,
+	pub dest: &'a mut AccountView,
 }
 
 fn checked_transfer_balances(
@@ -63,7 +63,7 @@ fn checked_transfer_balances(
 }
 
 impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = TransferInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
@@ -77,10 +77,10 @@ impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
 
 		let amount: u64 = args.amount.into();
 
-		let source = self.source.as_account_mut::<Balance>(&ID)?;
+		let mut source = self.source.as_account_mut::<Balance>(&ID)?;
 		let source_amount: u64 = source.amount.into();
 
-		let dest = self.dest.as_account_mut::<Balance>(&ID)?;
+		let mut dest = self.dest.as_account_mut::<Balance>(&ID)?;
 		let dest_amount: u64 = dest.amount.into();
 
 		let (new_source, new_dest) = checked_transfer_balances(source_amount, dest_amount, amount)?;

@@ -110,7 +110,7 @@ pub struct CloseAccounts<'a> {
 // ---------------------------------------------------------------------------
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = InitializeInstr::try_from_bytes(data)?;
 
 		// Validate accounts.
@@ -142,7 +142,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = UpdateInstr::try_from_bytes(data)?;
 
 		// Validate accounts.
@@ -163,7 +163,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for CloseAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let _ = CloseInstr::try_from_bytes(data)?;
 
 		// Validate accounts.
@@ -191,7 +191,7 @@ impl<'a> ProcessAccountInfos<'a> for CloseAccounts<'a> {
 /// Top-level instruction dispatch.
 fn process_instruction(
 	program_id: &Address,
-	accounts: &[AccountView],
+	accounts: &mut [AccountView],
 	data: &[u8],
 ) -> ProgramResult {
 	let instruction: TestInstruction = parse_instruction(program_id, &TEST_PROGRAM_ID, data)?;
@@ -461,7 +461,7 @@ unsafe fn deserialize_test_input<const MAX_ACCOUNTS: usize>(
 ) {
 	let (program_id, count, ix_data) =
 		unsafe { entrypoint::deserialize::<MAX_ACCOUNTS>(input.as_mut_ptr(), accounts) };
-	let accounts: &[AccountView] =
+	let accounts: &mut [AccountView] =
 		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
 	(program_id, accounts, ix_data, count)
 }
