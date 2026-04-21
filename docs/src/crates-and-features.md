@@ -41,7 +41,7 @@ Feature flags:
 
 <!-- {/pinaFeatureFlags} -->
 
-See [ADR 0004](./adrs/0004-no-std-and-no-allocator-boundary.md) and [ADR 0005](./adrs/0005-token-feature-boundaries.md) for the architectural rationale behind these feature and runtime boundaries.
+See [ADR 0004](./adrs/0004-no-std-and-no-allocator-boundary.md) and [ADR 0005](./adrs/0005-token-feature-boundaries.md) for the architectural rationale behind these feature and runtime boundaries. For concrete token CPI patterns, see [Token CPI Recipes](./tutorials/token-cpi-recipes.md).
 
 ## `crates/pina_macros`
 

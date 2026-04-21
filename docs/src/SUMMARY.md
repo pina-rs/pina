@@ -16,6 +16,7 @@
 - [Examples](./examples.md)
 - [Tutorials]()
   - [Your First Program](./tutorials/first-program.md)
+  - [Token CPI Recipes](./tutorials/token-cpi-recipes.md)
   - [Token Escrow Tutorial](./tutorials/token-escrow.md)
   - [Migrating from Anchor](./tutorials/migrating-from-anchor.md)
 - [Anchor Test Porting](./anchor-test-porting.md)
