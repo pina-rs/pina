@@ -1,10 +1,12 @@
-# `crates/pina/src/loaders.rs` audit
+# Historical loader audit
 
 _Audit date: 2026-03-23_
 
+_Status note (2026-04-22): the high-severity escaped-borrow findings in this audit were resolved by the guard-backed loader redesign that landed with the Pinocchio 0.11 migration. The implementation now lives in `crates/pina/src/impls.rs` rather than `crates/pina/src/loaders.rs`. Keep this document as historical context for why the API moved to `Ref<T>` / `RefMut<T>`-backed loaders._
+
 ## Scope
 
-This audit covers only:
+This audit originally covered only:
 
 - `crates/pina/src/loaders.rs`
 
@@ -12,7 +14,7 @@ Line numbers below refer to the current working tree at the time of writing.
 
 ## Executive summary
 
-`crates/pina/src/loaders.rs` is mostly disciplined about validation, logging, and arithmetic checks. The main issue is **not** the presence of `unsafe` by itself. The real problem is that several loader APIs construct references from guard-backed account borrows and then return those references **after the temporary borrow guard has already been dropped**.
+At the time of the audit, `crates/pina/src/loaders.rs` was mostly disciplined about validation, logging, and arithmetic checks. The main issue was **not** the presence of `unsafe` by itself. The real problem was that several loader APIs constructed references from guard-backed account borrows and then returned those references **after the temporary borrow guard had already been dropped**.
 
 That pattern appears in:
 
@@ -30,12 +32,12 @@ The short-lived `unsafe { self.owner() }` reads in `assert_owner` and `assert_ow
 
 ## Findings
 
-| ID | Severity | Status | Summary                                                                                |
-| -- | -------- | ------ | -------------------------------------------------------------------------------------- |
-| F1 | High     | Open   | `as_account` / `as_account_mut` return references that outlive temporary borrow guards |
-| F2 | High     | Open   | Token loaders repeat the same escaped-borrow lifetime pattern                          |
-| F3 | Low      | Accept | `unsafe { self.owner() }` is acceptable here as a short-lived runtime read             |
-| F4 | Low      | Open   | Lamport mutation helpers rely on caller-enforced ownership preconditions               |
+| ID | Severity | Status    | Summary                                                                                         |
+| -- | -------- | --------- | ----------------------------------------------------------------------------------------------- |
+| F1 | High     | Resolved  | `as_account` / `as_account_mut` used to return references that outlived temporary borrow guards |
+| F2 | High     | Resolved  | Token loaders used to repeat the same escaped-borrow lifetime pattern                           |
+| F3 | Low      | Accept    | `unsafe { self.owner() }` was acceptable here as a short-lived runtime read                     |
+| F4 | Low      | Mitigated | Lamport mutation helpers still rely on caller-enforced ownership preconditions                  |
 
 ---
 

@@ -8,7 +8,7 @@ This document sketches a concrete path for reworking Pina's `#[derive(Accounts)]
 
 ## Why change the current model?
 
-Today `#[derive(Accounts)]` mainly expands to direct slice destructuring over `&[AccountView]`.
+Today `#[derive(Accounts)]` mainly expands to direct slice destructuring over `&mut [AccountView]`.
 
 That is simple and easy to audit, but it starts to strain when Pina needs richer account-loading behavior such as:
 
@@ -37,7 +37,7 @@ Any redesign must keep the following Pina invariants intact:
 
 A lightweight cursor owns:
 
-- the original `&'a [AccountView]`
+- the original `&'a mut [AccountView]`
 - the current index
 - duplicate-account bookkeeping state
 
@@ -57,7 +57,7 @@ Derive-generated code should stop directly destructuring account slices.
 Instead it should:
 
 1. parse structural account positions through the cursor
-2. produce a typed accounts struct of borrowed `&AccountView`
+2. produce a typed accounts struct of borrowed `&AccountView` / `&mut AccountView`
 3. leave semantic validation in user-authored `process(...)` methods
 
 This keeps Pina's existing style intact:

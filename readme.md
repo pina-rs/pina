@@ -180,6 +180,20 @@ That last count-parity check is important because it catches silent extraction r
 
 <!-- {/pinaFeatureFlags} -->
 
+## Feature selection tips
+
+<br>
+
+<!-- {=pinaFeatureSelectionTips} -->
+
+- `derive` is the normal choice for program crates; disable it only when you want the low-level runtime traits without the proc macros.
+- `logs` is useful during bring-up, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
+- `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
+- `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.
+- `account-resize` only unlocks realloc helpers such as `realloc_account()` and `realloc_account_zero()`. Close helpers still do not implicitly resize or zero account data.
+
+<!-- {/pinaFeatureSelectionTips} -->
+
 ## Documentation
 
 <br>
@@ -522,6 +536,20 @@ pub struct MyAccounts<'a> {
 }
 ```
 
+### Instruction authoring tips
+
+<br>
+
+<!-- {=pinaInstructionAuthoringTips} -->
+
+- Entry points should accept `&mut [AccountView]` and dispatch with `Accounts::try_from(accounts)?.process(data)`.
+- Use `&AccountView` for read-only accounts and `&mut AccountView` only when you need mutable loaders, direct lamport mutation, `close_*` helpers, or writable IDL inference.
+- Keep `assert_writable()` explicit even on `&mut AccountView`. Type-level mutability unlocks mutable APIs, but the runtime still decides whether the account is writable for the current instruction.
+- `as_account()` / `as_account_mut()` return `Ref<T>` / `RefMut<T>` borrow guards. Copy out the fields you need and `drop(...)` the guard before CPIs or later mutable borrows.
+- Keep validation chains direct inside `process(self, ...)` when possible. That makes audits easier and gives `pina idl` the clearest signal for signer, writable, PDA, and default-account inference.
+
+<!-- {/pinaInstructionAuthoringTips} -->
+
 ### Pod types
 
 <br>
@@ -642,6 +670,20 @@ destination.collect(1_000_000, source)?;
 // Close an account and return rent to recipient.
 account.close_with_recipient(recipient)?;
 ```
+
+#### Closing safety
+
+<br>
+
+<!-- {=pinaCloseAccountGuidance} -->
+
+Closing guidance under Pinocchio 0.11:
+
+- `close_with_recipient()` transfers lamports and closes the account handle, but it does not zero or resize account data for you.
+- When stale bytes must be invalidated, use `close_account_zeroed()` or manually call `zeroed()` before `close_with_recipient()`.
+- The `account-resize` feature only affects realloc helpers; it does not change close semantics.
+
+<!-- {/pinaCloseAccountGuidance} -->
 
 #### PDA seed combination
 
@@ -791,7 +833,7 @@ Pina provides strong built-in protections against common Solana vulnerabilities 
 - **Always call `assert_empty()`** before account initialization to prevent reinitialization attacks
 - **Always verify program accounts** with `assert_address()` / `assert_program()` before CPI invocations
 - **Use `assert_type::<T>()`** to prevent type cosplay — it checks discriminator, owner, and data size
-- **Use `close_with_recipient()` with `zeroed()`** to safely close accounts and prevent revival attacks
+- **Use `close_account_zeroed()` or `zeroed()` + `close_with_recipient()`** when stale account bytes must be invalidated before close
 - **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
 - **Namespace PDA seeds** with type-specific prefixes to prevent PDA sharing across account types
 
