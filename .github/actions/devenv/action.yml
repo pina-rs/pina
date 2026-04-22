@@ -7,7 +7,7 @@ inputs:
   cache-version:
     description: The version of the cache to use.
     required: false
-    default: "v1"
+    default: "v2"
   setup-retries:
     description: Number of retries for transient nix/devenv setup failures.
     required: false
@@ -19,13 +19,15 @@ runs:
     - name: cache rust dependencies
       uses: Swatinem/rust-cache@v2
       with:
-        prefix-key: "${{ inputs.cache-version }}"
+        # Include the devenv/toolchain wiring in the cache key so cached build
+        # scripts don't outlive the Nix environment that produced them.
+        prefix-key: "${{ inputs.cache-version }}-${{ hashFiles('devenv.nix', 'rust-toolchain.toml', '.github/actions/devenv/action.yml') }}"
 
     - name: cache cargo binaries
       uses: actions/cache@v4
       with:
         path: ./.bin
-        key: ${{ runner.os }}-cargo-bin-${{ inputs.cache-version }}-${{ env.RUSTUP_TOOLCHAIN }}-${{ hashFiles('rust-toolchain.toml', 'Cargo.toml') }}
+        key: ${{ runner.os }}-cargo-bin-${{ inputs.cache-version }}-${{ env.RUSTUP_TOOLCHAIN }}-${{ hashFiles('devenv.nix', 'rust-toolchain.toml', '.github/actions/devenv/action.yml', 'Cargo.toml') }}
         restore-keys: |
           ${{ runner.os }}-cargo-bin-${{ inputs.cache-version }}-
 

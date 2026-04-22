@@ -300,8 +300,19 @@ in
 
         mkdir -p "$CACHE_DIR"
 
+        if [ -x "$SBPF_BIN" ] && "$SBPF_BIN" --version >/dev/null 2>&1; then
+          export PATH="$CACHE_DIR/bin:$PATH"
+          echo "Using cached sbpf-linker binary at $SBPF_BIN"
+          exit 0
+        fi
+
+        if [ -e "$LLVM_CONFIG" ] && ! "$LLVM_CONFIG" --version >/dev/null 2>&1; then
+          echo "Cached LLVM install is invalid; rebuilding." >&2
+          rm -rf "$LLVM_BUILD" "$LLVM_INSTALL"
+        fi
+
         # Step 1: Build custom LLVM (BPF target only)
-        if [ ! -f "$LLVM_CONFIG" ]; then
+        if [ ! -x "$LLVM_CONFIG" ]; then
           if [ ! -d "$LLVM_SRC" ]; then
             echo "=== [1/3] Cloning Blueshift LLVM fork ==="
             git clone --depth 1 --branch upstream-gallery-21 \
@@ -370,7 +381,11 @@ in
           fi
         fi
 
+        SBPF_TARGET_DIR="$CACHE_DIR/sbpf-linker-target"
+        rm -rf "$SBPF_TARGET_DIR"
+
         LLVM_PREFIX="$LLVM_INSTALL" \
+          CARGO_TARGET_DIR="$SBPF_TARGET_DIR" \
           cargo install \
             --path "$SBPF_SRC" \
             --root "$CACHE_DIR" \
@@ -436,7 +451,7 @@ in
     "build:all" = {
       exec = ''
         set -euo pipefail
-        if [ -z "$CI" ]; then
+        if [ -z "''${CI:-}" ]; then
           echo "Building project locally"
           cargo build --all-features
         else
@@ -630,17 +645,25 @@ in
         # Run LiteSVM e2e tests with the generated TypeScript clients.
         # These verify that TS instruction builders with pina's discriminator
         # model produce transactions the on-chain programs accept.
-        pnpm --dir "$DEVENV_ROOT/codama/tests/litesvm" install --frozen-lockfile
-        SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
-          pnpm --dir "$DEVENV_ROOT/codama/tests/litesvm" test
+        litesvm_dir="$DEVENV_ROOT/codama/tests/litesvm"
+        pnpm --dir "$litesvm_dir" install --frozen-lockfile
+        (
+          cd "$litesvm_dir"
+          SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
+            node "$litesvm_dir/node_modules/vitest/vitest.mjs" run --pool threads
+        )
 
         # Run Quasar SVM tests alongside LiteSVM. These execute generated
         # instructions directly against the compiled program ELF in-process,
         # which is useful for fast instruction/account-cycle validation
         # without a validator.
-        pnpm --dir "$DEVENV_ROOT/codama/tests/quasar-svm" install --frozen-lockfile
-        SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
-          pnpm --dir "$DEVENV_ROOT/codama/tests/quasar-svm" test
+        quasar_svm_dir="$DEVENV_ROOT/codama/tests/quasar-svm"
+        pnpm --dir "$quasar_svm_dir" install --frozen-lockfile
+        (
+          cd "$quasar_svm_dir"
+          SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
+            node "$quasar_svm_dir/node_modules/vitest/vitest.mjs" run --pool threads
+        )
       '';
       description = "Build SBF binaries and run end-to-end program tests including mollusk-svm integration.";
       binary = "bash";
@@ -833,8 +856,12 @@ in
     "kani:proofs" = {
       exec = ''
         set -euo pipefail
+        # Kani injects `#![feature(register_tool)]`, which would otherwise trip
+        # the workspace-wide `unstable_features = "deny"` lint.
+        export RUSTFLAGS="''${RUSTFLAGS:+$RUSTFLAGS }-A unstable-features"
+
         # Run all Kani harnesses in pina_pod_primitives.
-        cargo kani --manifest-path "$DEVENV_ROOT/crates/pina_pod_primitives/Cargo.toml" --all-features --locked
+        cargo kani --manifest-path "$DEVENV_ROOT/crates/pina_pod_primitives/Cargo.toml" --all-features
       '';
       description = "Run Kani model-checking proofs for pina_pod_primitives.";
       binary = "bash";
@@ -906,9 +933,22 @@ in
           exit 1
         fi
 
-        cargo_dylint_bin="$(find "$bin_root" -path '*/cargo-dylint/*/bin/cargo-dylint' | sort | tail -n 1)"
-        if [ -z "$cargo_dylint_bin" ] || [ ! -x "$cargo_dylint_bin" ]; then
-          echo "Missing cargo-dylint in $bin_root. Run 'install:cargo:bin'." >&2
+        cargo_dylint_version="5.0.0"
+        cargo_dylint_root="$bin_root/manual/cargo-dylint/$cargo_dylint_version"
+        cargo_dylint_bin="$cargo_dylint_root/bin/cargo-dylint"
+
+        if [ ! -x "$cargo_dylint_bin" ]; then
+          mkdir -p "$cargo_dylint_root"
+          CARGO_TARGET_DIR="$DEVENV_ROOT/target/cargo-install/cargo-dylint" \
+            cargo install \
+              --locked \
+              --root "$cargo_dylint_root" \
+              cargo-dylint \
+              --version "$cargo_dylint_version"
+        fi
+
+        if [ ! -x "$cargo_dylint_bin" ]; then
+          echo "Unable to install cargo-dylint into $cargo_dylint_root." >&2
           exit 1
         fi
 
