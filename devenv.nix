@@ -118,7 +118,13 @@ in
         pass_filenames = false;
         name = "lint and test";
         description = "Run the local CI lint rules suite before push.";
-        entry = "${config.env.DEVENV_PROFILE}/bin/lint:all && ${config.env.DEVENV_PROFILE}/bin/test:all ${config.env.DEVENV_PROFILE}/bin/test:idl";
+        entry = ''
+          set -euo pipefail
+
+          ${config.env.DEVENV_PROFILE}/bin/lint:all
+          ${config.env.DEVENV_PROFILE}/bin/test:all
+          ${config.env.DEVENV_PROFILE}/bin/test:idl
+        '';
         stages = [ "pre-push" ];
       };
     };
@@ -154,7 +160,7 @@ in
   scripts = {
     "query-security-txt" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo bin query-security-txt $@
       '';
       description = "The `query-security-txt` executable";
@@ -162,7 +168,7 @@ in
     };
     "wait-for-them" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo bin wait-for-them $@
       '';
       description = "The `wait-for-them` executable";
@@ -193,7 +199,7 @@ in
     };
     "solana-verify" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo bin solana-verify $@
       '';
       description = "The `solana-verify` executable";
@@ -217,7 +223,7 @@ in
     };
     "pina" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo run -p pina_cli -- $@
       '';
       description = "Run the `pina` CLI from source.";
@@ -225,7 +231,7 @@ in
     };
     "codama:idl:all" = {
       exec = ''
-        set -e
+        set -euo pipefail
         "$DEVENV_ROOT/scripts/generate-codama-idls.sh"
         dprint fmt "codama/**"
       '';
@@ -234,7 +240,7 @@ in
     };
     "codama:clients:generate" = {
       exec = ''
-        set -e
+        set -euo pipefail
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
         pina codama generate \
           --examples-dir "$DEVENV_ROOT/examples" \
@@ -249,7 +255,7 @@ in
     };
     "codama:test" = {
       exec = ''
-        set -e
+        set -euo pipefail
         bash "$DEVENV_ROOT/codama/test.sh"
       '';
       description = "Run the full Codama integration pipeline.";
@@ -257,7 +263,7 @@ in
     };
     "generate:keypair" = {
       exec = ''
-        set -e
+        set -euo pipefail
         solana-keygen new -s -o $DEVENV_ROOT/$1.json --no-bip39-passphrase || true
       '';
       description = "Generate a local solana keypair. Must provide a name.";
@@ -265,7 +271,7 @@ in
     };
     "install:all" = {
       exec = ''
-        set -e
+        set -euo pipefail
         install:cargo:bin
       '';
       description = "Install all packages.";
@@ -274,41 +280,14 @@ in
     "install:cargo:bin" = {
       exec = ''
         set -euo pipefail
-
         cargo bin --install
-
-        ensure_local_cargo_bin() {
-          local crate="$1"
-          local version="$2"
-          local expected_glob="$3"
-          shift 3
-
-          if find "$DEVENV_ROOT/.bin" -path "$expected_glob" -print -quit | grep -q .; then
-            return 0
-          fi
-
-          local root="$DEVENV_ROOT/.bin/manual/$crate/$version"
-          rm -rf "$root"
-          mkdir -p "$root"
-
-          echo "Installing fallback tool $crate@$version into $root"
-          cargo install "$crate" --version "$version" --root "$root" --locked "$@"
-
-          if ! find "$DEVENV_ROOT/.bin" -path "$expected_glob" -print -quit | grep -q .; then
-            echo "Failed to install fallback tool $crate@$version" >&2
-            exit 1
-          fi
-        }
-
-        ensure_local_cargo_bin cargo-dylint 5.0.0 '*/cargo-dylint/*/bin/cargo-dylint'
-        ensure_local_cargo_bin dylint-link 5.0.0 '*/dylint-link/*/bin/dylint-link' --bin dylint-link
       '';
       description = "Install cargo binaries locally.";
       binary = "bash";
     };
     "install:sbpf-gallery" = {
       exec = ''
-        set -e
+        set -euo pipefail
 
         if [ -n "''${XDG_CACHE_HOME:-}" ]; then
           CACHE_BASE="$XDG_CACHE_HOME"
@@ -423,7 +402,7 @@ in
     };
     "clean:sbpf-gallery" = {
       exec = ''
-        set -e
+        set -euo pipefail
 
         if [ -n "''${XDG_CACHE_HOME:-}" ]; then
           CACHE_BASE="$XDG_CACHE_HOME"
@@ -454,7 +433,7 @@ in
     };
     "update:deps" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo update
         devenv update
       '';
@@ -463,7 +442,7 @@ in
     };
     "build:all" = {
       exec = ''
-        set -e
+        set -euo pipefail
         if [ -z "$CI" ]; then
           echo "Building project locally"
           cargo build --all-features
@@ -477,7 +456,7 @@ in
     };
     "build:default" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo build --locked
       '';
       description = "Build workspace crates with the default feature set.";
@@ -485,7 +464,7 @@ in
     };
     "build:pina:default" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo check -p pina --locked
       '';
       description = "Verify `pina` builds with the default feature set.";
@@ -493,7 +472,7 @@ in
     };
     "build:pina:no-default-only" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo check -p pina --no-default-features --locked
       '';
       description = "Verify `pina` builds with `--no-default-features`.";
@@ -501,7 +480,7 @@ in
     };
     "build:pina:token-only" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo check -p pina --no-default-features --features token --locked
       '';
       description = "Verify `pina` builds with only the `token` feature enabled.";
@@ -509,7 +488,7 @@ in
     };
     "build:pina:all-features" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo check -p pina --all-features --locked
       '';
       description = "Verify `pina` builds with all features enabled.";
@@ -517,7 +496,7 @@ in
     };
     "build:pina:no-default" = {
       exec = ''
-        set -e
+        set -euo pipefail
         build:pina:no-default-only
         cargo check -p pina --no-default-features --features derive --locked
         build:pina:token-only
@@ -528,7 +507,7 @@ in
     };
     "build:pina:feature-matrix" = {
       exec = ''
-        set -e
+        set -euo pipefail
         build:pina:default
         build:pina:no-default-only
         build:pina:token-only
@@ -539,7 +518,7 @@ in
     };
     "test:all" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo test --all-features --locked
       '';
       description = "Run all tests across the crates";
@@ -561,7 +540,7 @@ in
     };
     "test:pina:default" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo test -p pina --lib --locked
       '';
       description = "Run `pina` library tests with the default feature set.";
@@ -569,7 +548,7 @@ in
     };
     "test:pina:no-default" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo test -p pina --no-default-features --lib --locked
       '';
       description = "Run `pina` library tests with `--no-default-features`.";
@@ -577,7 +556,7 @@ in
     };
     "test:pina:token-only" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo test -p pina --no-default-features --features token --lib --locked
       '';
       description = "Run `pina` library tests with only the `token` feature enabled.";
@@ -585,7 +564,7 @@ in
     };
     "test:pina:all-features" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo test -p pina --all-features --lib --locked
       '';
       description = "Run `pina` library tests with all features enabled.";
@@ -593,7 +572,7 @@ in
     };
     "doc:pina:no-default" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo doc -p pina --no-default-features --no-deps --locked
       '';
       description = "Build `pina` docs without default features to catch hidden default-feature coupling.";
@@ -601,7 +580,7 @@ in
     };
     "test:pina:feature-matrix" = {
       exec = ''
-        set -e
+        set -euo pipefail
         test:pina:default
         test:pina:no-default
         doc:pina:no-default
@@ -613,7 +592,7 @@ in
     };
     "test:program-e2e" = {
       exec = ''
-        set -e
+        set -euo pipefail
 
         # Ensure sbpf-linker is built against the Blueshift LLVM upstream gallery.
         install:sbpf-gallery
@@ -675,7 +654,7 @@ in
     };
     "profile:cu:tracked" = {
       exec = ''
-        set -e
+        set -euo pipefail
         rm -rf "$DEVENV_ROOT/target/cu/current"
         "$DEVENV_ROOT/scripts/profile-tracked-examples.sh" \
           "$DEVENV_ROOT" \
@@ -725,7 +704,7 @@ in
     };
     "idl:generate" = {
       exec = ''
-        set -e
+        set -euo pipefail
         "$DEVENV_ROOT/scripts/generate-codama-idls.sh"
       '';
       description = "Generate Codama IDLs for all examples.";
@@ -733,7 +712,7 @@ in
     };
     "verify:idls" = {
       exec = ''
-        set -e
+        set -euo pipefail
         "$DEVENV_ROOT/scripts/verify-codama-idls.sh"
       '';
       description = "Verify Codama generation, fixture drift, validation, and deterministic output.";
@@ -741,7 +720,7 @@ in
     };
     "test:idl" = {
       exec = ''
-        set -e
+        set -euo pipefail
         verify:idls
       '';
       description = "Run full Codama integration and deterministic generation checks.";
@@ -749,7 +728,7 @@ in
     };
     "test:surfpool-idl" = {
       exec = ''
-        set -e
+        set -euo pipefail
         pnpm install --frozen-lockfile
         "$DEVENV_ROOT/scripts/test-surfpool-idl-smoke.sh"
       '';
@@ -758,7 +737,7 @@ in
     };
     "coverage:all" = {
       exec = ''
-        set -e
+        set -euo pipefail
         mkdir -p "$DEVENV_ROOT/target/coverage"
         rm -rf "$DEVENV_ROOT/target/llvm-cov-target"
         cargo llvm-cov \
@@ -774,7 +753,7 @@ in
     };
     "coverage:vm:experimental" = {
       exec = ''
-        set -e
+        set -euo pipefail
         if ! command -v mucho >/dev/null 2>&1; then
           echo "Skipping VM coverage: mucho is not installed."
           exit 0
@@ -783,7 +762,7 @@ in
         set +e
         mucho coverage
         status=$?
-        set -e
+        set -euo pipefail
 
         if [ "$status" -ne 0 ]; then
           echo "Experimental VM coverage failed with status $status (non-blocking)."
@@ -794,7 +773,7 @@ in
     };
     "mutants:all" = {
       exec = ''
-        set -e
+        set -euo pipefail
         mkdir -p "$DEVENV_ROOT/target/mutants"
         cargo mutants --all-features --locked --output "$DEVENV_ROOT/target/mutants"
       '';
@@ -869,7 +848,7 @@ in
     };
     "fix:all" = {
       exec = ''
-        set -e
+        set -euo pipefail
         fix:clippy
         fix:format
         codama:idl:all
@@ -880,7 +859,7 @@ in
     };
     "fix:format" = {
       exec = ''
-        set -e
+        set -euo pipefail
         dprint fmt --config "$DEVENV_ROOT/dprint.json"
         docs:sync
       '';
@@ -889,7 +868,7 @@ in
     };
     "fix:clippy" = {
       exec = ''
-        set -e
+        set -euo pipefail
         mapfile -t generated_client_manifests < <(find "$DEVENV_ROOT/codama/clients/rust" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
         exclude_args=()
         for manifest in "''${generated_client_manifests[@]}"; do
@@ -911,7 +890,7 @@ in
     };
     "security:dylint" = {
       exec = ''
-        set -e
+        set -euo pipefail
 
         cargo_dylint_bin="$(find "$DEVENV_ROOT/.bin" -path '*/cargo-dylint/*/bin/cargo-dylint' | sort | tail -n 1)"
 
@@ -944,14 +923,14 @@ in
         fi
 
         CARGO_INCREMENTAL=0 \
-          "$cargo_dylint_bin" dylint --all --no-deps "''${package_args[@]}" -- --all-features --all-targets --locked
+          cargo dylint --all --no-deps "''${package_args[@]}" -- --all-features --all-targets --locked
       '';
       description = "Run custom security dylint checks against the example and security program crates.";
       binary = "bash";
     };
     "security:deny" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo bin cargo-deny check --config "$DEVENV_ROOT/deny.toml" bans licenses sources
       '';
       description = "Run cargo-deny checks (bans, licenses, sources).";
@@ -959,7 +938,7 @@ in
     };
     "security:audit" = {
       exec = ''
-        set -e
+        set -euo pipefail
         cargo bin cargo-audit \
           --db "$DEVENV_ROOT/target/advisory-db-audit" \
           --url "https://github.com/RustSec/advisory-db.git" \
@@ -971,7 +950,7 @@ in
     };
     "verify:security" = {
       exec = ''
-        set -e
+        set -euo pipefail
         security:dylint
         security:deny
         security:audit
@@ -981,7 +960,7 @@ in
     };
     "lint:all" = {
       exec = ''
-        set -e
+        set -euo pipefail
         lint:clippy
         lint:format
         verify:docs
@@ -992,7 +971,7 @@ in
     };
     "docs:build" = {
       exec = ''
-        set -e
+        set -euo pipefail
         mdbook build "$DEVENV_ROOT/docs"
       '';
       description = "Build the mdBook documentation.";
@@ -1000,7 +979,7 @@ in
     };
     "docs:sync" = {
       exec = ''
-        set -e
+        set -euo pipefail
         mdt update --path "$DEVENV_ROOT"
       '';
       description = "Sync reusable documentation blocks with mdt.";
@@ -1008,7 +987,7 @@ in
     };
     "docs:check" = {
       exec = ''
-        set -e
+        set -euo pipefail
         mdt check --path "$DEVENV_ROOT"
       '';
       description = "Check reusable documentation blocks are synchronized.";
@@ -1016,7 +995,7 @@ in
     };
     "lint:format" = {
       exec = ''
-        set -e
+        set -euo pipefail
         dprint check
       '';
       description = "Check that all files are formatted.";
@@ -1024,7 +1003,7 @@ in
     };
     "verify:docs" = {
       exec = ''
-        set -e
+        set -euo pipefail
         docs:check
         [ -f "$DEVENV_ROOT/docs/book.toml" ]
         [ -f "$DEVENV_ROOT/docs/src/SUMMARY.md" ]
@@ -1036,7 +1015,7 @@ in
     };
     "docs:api" = {
       exec = ''
-        set -e
+        set -euo pipefail
 
         mapfile -t generated_client_manifests < <(find "$DEVENV_ROOT/codama/clients/rust" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
         exclude_args=()
@@ -1060,7 +1039,7 @@ in
     };
     "lint:clippy" = {
       exec = ''
-        set -e
+        set -euo pipefail
         mapfile -t generated_client_manifests < <(find "$DEVENV_ROOT/codama/clients/rust" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
         exclude_args=()
         for manifest in "''${generated_client_manifests[@]}"; do
@@ -1082,7 +1061,7 @@ in
     };
     "setup:vscode" = {
       exec = ''
-        set -e
+        set -euo pipefail
         rm -rf .vscode
         cp -r $DEVENV_ROOT/setup/editors/vscode .vscode
       '';
@@ -1091,7 +1070,7 @@ in
     };
     "setup:helix" = {
       exec = ''
-        set -e
+        set -euo pipefail
         rm -rf .helix
         cp -r $DEVENV_ROOT/setup/editors/helix .helix
       '';
