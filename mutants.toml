@@ -1,0 +1,44 @@
+# cargo-mutants configuration for the pina workspace.
+# See: https://mutants.rs/cfg.html
+
+# Target the core publishable crates — examples and generated clients are
+# excluded because they are integration-heavy and mutation testing there
+# yields diminishing returns.
+test_tool = "cargo"
+profile = "release"
+
+# Exclude paths that are integration tests, generated code, or example programs.
+exclude = [
+	"codama/**",
+	"examples/**",
+	"security/**",
+	"lints/**",
+	"**/tests/**",
+	"**/*_test.rs",
+	"**/*tests.rs",
+	"target/**",
+]
+
+# Only mutate the workspace crates we care about.
+packages = [
+	"pina",
+	"pina_cli",
+	"pina_codama_renderer",
+	"pina_macros",
+	"pina_pod_primitives",
+	"pina_profile",
+	"pina_sdk_ids",
+]
+
+# Features to activate during mutation testing.
+features = "all"
+locked = true
+
+# Cap individual mutant test runs so the nightly job does not hang.
+timeout = 120
+
+# Emit a JSON report for CI post-processing.
+output = "target/mutants"
+
+# Show caught / missed / timeout summary in console.
+colors = "auto"

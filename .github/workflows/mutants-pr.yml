@@ -1,0 +1,96 @@
+name: "mutants-pr"
+permissions:
+  contents: read
+
+# Run mutation testing on pull requests scoped to changed workspace crates.
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "crates/**"
+      - "mutants.toml"
+      - ".github/workflows/mutants-pr.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  detect-changed-crates:
+    timeout-minutes: 5
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    outputs:
+      matrix: ${{ steps.changed.outputs.matrix }}
+      any_changed: ${{ steps.changed.outputs.any_changed }}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: detect changed crates
+        id: changed
+        run: |
+          set -euo pipefail
+
+          base_ref="${GITHUB_BASE_REF:-main}"
+          git fetch origin "$base_ref" --depth=1 || true
+
+          changed_files=$(git diff --name-only "origin/${base_ref}...HEAD" || true)
+          if [ -z "$changed_files" ]; then
+            echo "any_changed=false" >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[]}' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Build a JSON matrix of changed workspace packages.
+          packages=()
+          for manifest in crates/*/Cargo.toml; do
+            dir=$(dirname "$manifest")
+            pkg=$(basename "$dir")
+            if echo "$changed_files" | grep -qE "^${dir}/"; then
+              packages+=("$pkg")
+            fi
+          done
+
+          if [ ${#packages[@]} -eq 0 ]; then
+            echo "any_changed=false" >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[]}' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "any_changed=true" >> "$GITHUB_OUTPUT"
+          # Build a simple JSON array of package names for a matrix job.
+          json=$(printf '%s\n' "${packages[@]}" | jq -R . | jq -s '{package: .}')
+          echo "matrix=$json" >> "$GITHUB_OUTPUT"
+
+  mutants:
+    needs: detect-changed-crates
+    if: needs.detect-changed-crates.outputs.any_changed == 'true'
+    timeout-minutes: 120
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect-changed-crates.outputs.matrix) }}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: run mutation tests for ${{ matrix.package }}
+        run: mutants:crate ${{ matrix.package }}
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: upload mutants report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutants-report-${{ matrix.package }}
+          path: target/mutants

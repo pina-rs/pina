@@ -1,0 +1,43 @@
+name: "kani"
+permissions:
+  contents: read
+
+# Run Kani model-checking proofs on PRs and main that touch Pod primitives or
+# any harness files.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "crates/pina_pod_primitives/**"
+      - "crates/pina/**"
+      - ".github/workflows/kani.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "crates/pina_pod_primitives/**"
+      - "crates/pina/**"
+      - ".github/workflows/kani.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  kani:
+    timeout-minutes: 30
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: run kani proofs
+        run: kani:proofs
+        shell: devenv shell -c -- bash -e {0}

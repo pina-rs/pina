@@ -633,6 +633,81 @@ in
       description = "Run experimental Solana VM coverage via mucho when available (non-blocking).";
       binary = "bash";
     };
+    "mutants:all" = {
+      exec = ''
+        set -e
+        mkdir -p "$DEVENV_ROOT/target/mutants"
+        cargo mutants --all-features --locked --output "$DEVENV_ROOT/target/mutants"
+      '';
+      description = "Run mutation testing across all core workspace crates (nightly).";
+      binary = "bash";
+    };
+    "mutants:diff" = {
+      exec = ''
+        set -euo pipefail
+
+        base_ref="''${1:-}"
+        if [ -z "$base_ref" ]; then
+          base_ref="''${CI_MERGE_REQUEST_DIFF_BASE_REF:-''${GITHUB_BASE_REF:-main}}"
+        fi
+        echo "Base ref: $base_ref"
+
+        # Determine changed files relative to the base ref.
+        changed_files=$(git diff --name-only "$base_ref"...HEAD || true)
+        if [ -z "$changed_files" ]; then
+          echo "No changed files detected; skipping mutation testing."
+          exit 0
+        fi
+
+        # Map changed files to workspace crates by checking crates/* directories.
+        changed_packages=()
+        for crate_dir in "$DEVENV_ROOT"/crates/*/; do
+          crate_name=$(basename "$crate_dir")
+          if echo "$changed_files" | grep -qE "^crates/$crate_name/"; then
+            changed_packages+=("$crate_name")
+          fi
+        done
+
+        if [ ''${#changed_packages[@]} -eq 0 ]; then
+          echo "No workspace packages changed; skipping mutation testing."
+          exit 0
+        fi
+
+        echo "Changed packages: ''${changed_packages[*]}"
+        mkdir -p "$DEVENV_ROOT/target/mutants"
+
+        pkg_args=()
+        for pkg in "''${changed_packages[@]}"; do
+          pkg_args+=("-p" "$pkg")
+        done
+
+        cargo mutants --all-features --locked --output "$DEVENV_ROOT/target/mutants" "''${pkg_args[@]}"
+      '';
+      description = "Run mutation testing only on crates changed relative to a base branch (PR).";
+      binary = "bash";
+    };
+    "mutants:crate" = {
+      exec = ''
+        set -euo pipefail
+        if [ $# -eq 0 ]; then
+          echo "Usage: mutants:crate <package-name>" >&2
+          exit 1
+        fi
+        mkdir -p "$DEVENV_ROOT/target/mutants"
+        cargo mutants --all-features --locked --output "$DEVENV_ROOT/target/mutants" -p "$1"
+      '';
+      description = "Run mutation testing on a single workspace crate.";
+      binary = "bash";
+    };
+    "kani:proofs" = {
+      exec = ''
+        set -euo pipefail
+        # Run all Kani harnesses in pina_pod_primitives.
+        cargo kani --manifest-path "$DEVENV_ROOT/crates/pina_pod_primitives/Cargo.toml" --all-features --locked
+      '';
+      description = "Run Kani model-checking proofs for pina_pod_primitives.";
+      binary = "bash";
+    };
     "fix:all" = {
       exec = ''
         set -e

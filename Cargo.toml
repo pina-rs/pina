@@ -143,6 +143,7 @@ cargo-nextest = { version = "0.9.129" }
 cargo-semver-checks = { version = "0.46.0" }
 cargo-workspaces = { version = "0.4.2" }
 dylint-link = { version = "5.0.0", bins = ["dylint-link"] }
+cargo-mutants = { version = "27.0.0", bins = ["cargo-mutants"] }
 kani-verifier = { version = "0.67.0", bins = ["kani", "cargo-kani"] }
 sbpf-linker = { version = "0.1.8", bins = ["sbpf-linker"] }
 solana-verify = { version = "0.4.11", bins = ["solana-verify"] }
