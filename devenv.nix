@@ -202,18 +202,17 @@ in
     "dylint-link" = {
       exec = ''
         set -euo pipefail
-
-        manual_root="$DEVENV_ROOT/.bin/manual/dylint-link/5.0.0"
-        dylint_link_bin="$manual_root/bin/dylint-link"
-
-        if [ ! -x "$dylint_link_bin" ]; then
-          mkdir -p "$manual_root"
-          cargo install dylint-link --version 5.0.0 --root "$manual_root" --locked --bin dylint-link
-        fi
-
-        "$dylint_link_bin" "$@"
+        cargo bin dylint-link $@
       '';
       description = "The `dylint-link` executable";
+      binary = "bash";
+    };
+    "kani" = {
+      exec = ''
+        set -euo pipefail
+        cargo bin kani $@
+      '';
+      description = "The `kani` executable";
       binary = "bash";
     };
     "pina" = {
