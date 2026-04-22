@@ -785,6 +785,26 @@ fn checked_close_balance(sender_balance: u64, recipient_balance: u64) -> Result<
 		.ok_or(ProgramError::ArithmeticOverflow)
 }
 
+#[track_caller]
+fn checked_close_recipient_balance(
+	account: &AccountView,
+	recipient: &AccountView,
+) -> Result<u64, ProgramError> {
+	account.assert_writable()?;
+	recipient.assert_writable()?;
+
+	if account.address() == recipient.address() {
+		log!("Could not close account: recipient must differ from account");
+		log_caller();
+		return Err(ProgramError::InvalidArgument);
+	}
+
+	checked_close_balance(account.lamports(), recipient.lamports()).inspect_err(|_| {
+		log!("Could not close account: lamport overflow");
+		log_caller();
+	})
+}
+
 impl LamportTransfer for AccountView {
 	/// Send the specified lamports to the `recipient` account.
 	/// The sender must be writable and owned by the executing program.
@@ -842,20 +862,21 @@ impl LamportTransfer for AccountView {
 impl CloseAccountWithRecipient for AccountView {
 	#[track_caller]
 	fn close_with_recipient(&mut self, recipient: &mut AccountView) -> ProgramResult {
-		self.assert_writable()?;
-		recipient.assert_writable()?;
+		let new_balance = checked_close_recipient_balance(self, recipient)?;
+		recipient.set_lamports(new_balance);
+		self.set_lamports(0);
+		self.close()
+	}
 
-		if self.address() == recipient.address() {
-			log!("Could not close account: recipient must differ from account");
-			log_caller();
-			return Err(ProgramError::InvalidArgument);
+	#[track_caller]
+	fn close_account_zeroed(&mut self, recipient: &mut AccountView) -> ProgramResult {
+		let new_balance = checked_close_recipient_balance(self, recipient)?;
+
+		{
+			let mut data = self.try_borrow_mut()?;
+			data.fill(0);
 		}
 
-		let new_balance = checked_close_balance(self.lamports(), recipient.lamports())
-			.inspect_err(|_| {
-				log!("Could not close account: lamport overflow");
-				log_caller();
-			})?;
 		recipient.set_lamports(new_balance);
 		self.set_lamports(0);
 		self.close()

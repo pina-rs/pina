@@ -26,7 +26,9 @@ use pinocchio_system::instructions::Assign;
 use pinocchio_system::instructions::CreateAccount;
 use pinocchio_system::instructions::Transfer;
 
+use crate::CloseAccountWithRecipient;
 use crate::HasDiscriminator;
+#[cfg(feature = "account-resize")]
 use crate::LamportTransfer;
 use crate::MAX_SEEDS;
 use crate::ProgramResult;
@@ -492,8 +494,38 @@ fn realloc_account_inner(
 /// ```
 #[inline(always)]
 pub fn close_account(account_info: &mut AccountView, recipient: &mut AccountView) -> ProgramResult {
-	account_info.send(account_info.lamports(), recipient)?;
-	account_info.close()
+	account_info.close_with_recipient(recipient)
+}
+
+/// Closes an account after zeroing its current data bytes in-place.
+///
+/// This helper clears the raw account data before transferring the remaining
+/// lamports and closing the account. It does not implicitly reallocate the
+/// account, even when the `account-resize` feature is enabled.
+///
+/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->/// All APIs in this section are designed for on-chain determinism.
+///
+/// They return `ProgramError` values for caller-side propagation with `?`.
+///
+/// No panics needed.<!-- {/pinaPublicResultContract} -->
+///
+/// # Errors
+///
+/// Returns errors from account borrowing, lamport transfer, or account close
+/// operations.
+///
+/// # Examples
+///
+/// ```ignore
+/// // Zero the raw account bytes, then close the account and return rent:
+/// close_account_zeroed(escrow_account, authority)?;
+/// ```
+#[inline(always)]
+pub fn close_account_zeroed(
+	account_info: &mut AccountView,
+	recipient: &mut AccountView,
+) -> ProgramResult {
+	account_info.close_account_zeroed(recipient)
 }
 
 /// Typed handle for passing validated accounts into CPI builders.

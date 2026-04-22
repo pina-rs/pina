@@ -590,6 +590,9 @@ pub trait LamportTransfer {
 /// // then close it and return rent to the authority:
 /// escrow_account.as_account_mut::<EscrowState>(&program_id)?.zeroed();
 /// escrow_account.close_with_recipient(authority_account)?;
+///
+/// // Or use the built-in helper to clear the raw account bytes first:
+/// escrow_account.close_account_zeroed(authority_account)?;
 /// ```
 pub trait CloseAccountWithRecipient {
 	/// Close the account and transfer all remaining lamports to the recipient.
@@ -598,6 +601,14 @@ pub trait CloseAccountWithRecipient {
 	/// when the account's old bytes must not remain revivable within the same
 	/// transaction.
 	fn close_with_recipient(&mut self, recipient: &mut AccountView) -> ProgramResult;
+
+	/// Zero the current account data bytes, then close the account and transfer
+	/// all remaining lamports to the recipient.
+	///
+	/// This helper clears the existing data region in-place before calling
+	/// [`Self::close_with_recipient`]. It does not implicitly reallocate the
+	/// account, even when the `account-resize` feature is enabled.
+	fn close_account_zeroed(&mut self, recipient: &mut AccountView) -> ProgramResult;
 }
 
 /// Destructures a slice of `AccountView` into a named accounts struct.

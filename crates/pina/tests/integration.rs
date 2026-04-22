@@ -1330,6 +1330,55 @@ fn close_account_with_recipient() {
 	);
 }
 
+#[test]
+fn close_account_zeroed_clears_source_bytes_before_close() {
+	let account_key: Address = address!("2Eg4H7V2Cd9uBSXreMKe1KjEo9e4NMpM4GZpsLtkj6pp");
+	let recipient_key: Address = address!("9Z6iYoJ1E9nQ7h6nC3ieUzYDRKsAqPPYUajF2iGaGLjm");
+	let state_data = build_test_state_bytes(9, 99);
+
+	let accounts = [
+		AccountBuilder::new()
+			.address(account_key)
+			.owner(TEST_PROGRAM_ID)
+			.lamports(600_000)
+			.data(&state_data)
+			.is_writable(true),
+		AccountBuilder::new()
+			.address(recipient_key)
+			.owner(system::ID)
+			.lamports(400_000)
+			.is_writable(true),
+	];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+	let (closed_accounts, recipient_accounts) = account_views.split_at_mut(1);
+	let closed_account = &mut closed_accounts[0];
+	let recipient = &mut recipient_accounts[0];
+	let source_len = closed_account.data_len();
+	let source_ptr = closed_account.data_ptr();
+
+	let result = closed_account.close_account_zeroed(recipient);
+	assert!(result.is_ok(), "close should succeed: {result:?}");
+
+	let source_bytes = unsafe {
+		// SAFETY: the serialized test input buffer remains allocated for the
+		// duration of this test, and the helper only zeroes the account bytes
+		// before closing the account metadata.
+		core::slice::from_raw_parts(source_ptr, source_len)
+	};
+
+	assert!(
+		source_bytes.iter().all(|byte| *byte == 0),
+		"source bytes should be zeroed before close"
+	);
+	assert_eq!(closed_account.lamports(), 0);
+	assert_eq!(closed_account.data_len(), 0);
+	assert_eq!(recipient.lamports(), 1_000_000);
+}
+
 // ---------------------------------------------------------------------------
 // Test: AccountView validation chain
 // ---------------------------------------------------------------------------
