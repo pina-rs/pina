@@ -149,7 +149,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "admin",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": true
 					},
 					{
@@ -206,7 +206,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "admin",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": true
 					},
 					{

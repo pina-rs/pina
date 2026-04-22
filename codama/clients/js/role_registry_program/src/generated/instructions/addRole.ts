@@ -24,12 +24,12 @@ import {
 	type InstructionWithAccounts,
 	type InstructionWithData,
 	type ReadonlyAccount,
-	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
 	type WritableAccount,
+	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
@@ -58,7 +58,7 @@ export type AddRoleInstruction<
 	& InstructionWithAccounts<
 		[
 			TAccountAdmin extends string ?
-					& ReadonlySignerAccount<TAccountAdmin>
+					& WritableSignerAccount<TAccountAdmin>
 					& AccountSignerMeta<TAccountAdmin>
 				: TAccountAdmin,
 			TAccountGrantee extends string ? ReadonlyAccount<TAccountGrantee>
@@ -163,7 +163,7 @@ export function getAddRoleInstruction<
 
 	// Original accounts.
 	const originalAccounts = {
-		admin: { value: input.admin ?? null, isWritable: false },
+		admin: { value: input.admin ?? null, isWritable: true },
 		grantee: { value: input.grantee ?? null, isWritable: false },
 		registryConfig: { value: input.registryConfig ?? null, isWritable: true },
 		roleEntry: { value: input.roleEntry ?? null, isWritable: true },

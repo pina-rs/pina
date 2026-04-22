@@ -22,12 +22,12 @@ import {
 	type InstructionWithAccounts,
 	type InstructionWithData,
 	type ReadonlyAccount,
-	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
 	type WritableAccount,
+	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
@@ -54,7 +54,7 @@ export type InitializeInstruction<
 	& InstructionWithAccounts<
 		[
 			TAccountAdmin extends string ?
-					& ReadonlySignerAccount<TAccountAdmin>
+					& WritableSignerAccount<TAccountAdmin>
 					& AccountSignerMeta<TAccountAdmin>
 				: TAccountAdmin,
 			TAccountRegistryConfig extends string
@@ -129,7 +129,7 @@ export function getInitializeInstruction<
 
 	// Original accounts.
 	const originalAccounts = {
-		admin: { value: input.admin ?? null, isWritable: false },
+		admin: { value: input.admin ?? null, isWritable: true },
 		registryConfig: { value: input.registryConfig ?? null, isWritable: true },
 		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
 	};

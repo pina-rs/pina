@@ -123,14 +123,14 @@ pub struct RotateAdminInstruction {}
 
 #[derive(Accounts, Debug)]
 pub struct InitializeAccounts<'a> {
-	pub admin: &'a AccountView,
+	pub admin: &'a mut AccountView,
 	pub registry_config: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 }
 
 #[derive(Accounts, Debug)]
 pub struct AddRoleAccounts<'a> {
-	pub admin: &'a AccountView,
+	pub admin: &'a mut AccountView,
 	pub grantee: &'a AccountView,
 	pub registry_config: &'a mut AccountView,
 	pub role_entry: &'a mut AccountView,
@@ -184,11 +184,11 @@ macro_rules! role_entry_seeds {
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = InitializeInstruction::try_from_bytes(data)?;
-		let registry_seeds = registry_config_seeds!(self.admin.address().as_ref());
-		let registry_seeds_with_bump =
-			registry_config_seeds!(self.admin.address().as_ref(), args.bump);
+		let admin_address = *self.admin.address();
+		let registry_seeds = registry_config_seeds!(admin_address.as_ref());
+		let registry_seeds_with_bump = registry_config_seeds!(admin_address.as_ref(), args.bump);
 
-		self.admin.assert_signer()?;
+		self.admin.assert_signer()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
 		self.registry_config
 			.assert_empty()?
@@ -205,7 +205,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 
 		let mut registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
 		*registry_config = RegistryConfig::builder()
-			.admin(*self.admin.address())
+			.admin(admin_address)
 			.role_count(PodU64::from_primitive(0))
 			.bump(args.bump)
 			.build();
@@ -222,7 +222,7 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 		let role_entry_seeds_with_bump =
 			role_entry_seeds!(registry_address.as_ref(), &args.role_id.0, args.bump);
 
-		self.admin.assert_signer()?;
+		self.admin.assert_signer()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
 		self.registry_config
 			.assert_not_empty()?

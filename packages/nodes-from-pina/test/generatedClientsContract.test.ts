@@ -232,7 +232,7 @@ describe("role registry JS client contracts", () => {
 		} as any);
 		expect(init.programAddress).toBe(ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS);
 		expectAccountsMatch(init.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: WRITABLE },
 			{ address: registryConfig, role: WRITABLE },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 		]);
@@ -250,7 +250,7 @@ describe("role registry JS client contracts", () => {
 			bump: 7,
 		} as any);
 		expectAccountsMatch(addRole.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: WRITABLE },
 			{ address: grantee, role: READONLY },
 			{ address: registryConfig, role: WRITABLE },
 			{ address: roleEntry, role: WRITABLE },
