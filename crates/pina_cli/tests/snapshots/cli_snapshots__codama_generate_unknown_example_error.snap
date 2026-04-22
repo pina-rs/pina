@@ -1,5 +1,6 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
+assertion_line: 151
 info:
   program: pina
   args:
@@ -23,4 +24,4 @@ exit_code: 1
 ----- stdout -----
 
 ----- stderr -----
-Error: Unknown example `does_not_exist`. Available examples: anchor_declare_id, anchor_declare_program, anchor_duplicate_mutable_accounts, anchor_errors, anchor_events, anchor_floats, anchor_realloc, anchor_system_accounts, anchor_sysvars, counter_program, escrow_program, hello_solana, pina_bpf, role_registry_program, staking_rewards_program, todo_program, transfer_sol, vesting_program
+[1m[31mError[39m[0m Unknown example `does_not_exist`. Available examples: anchor_declare_id, anchor_declare_program, anchor_duplicate_mutable_accounts, anchor_errors, anchor_events, anchor_floats, anchor_realloc, anchor_system_accounts, anchor_sysvars, counter_program, escrow_program, hello_solana, pina_bpf, role_registry_program, staking_rewards_program, todo_program, transfer_sol, vesting_program

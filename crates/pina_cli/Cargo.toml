@@ -26,6 +26,12 @@ serde_json = { workspace = true, default-features = true }
 syn = { workspace = true, default-features = true, features = ["full", "extra-traits", "visit"] }
 thiserror = { workspace = true, default-features = true }
 walkdir = { workspace = true, default-features = true }
+rayon = "1.10"
+indicatif = "0.17"
+owo-colors = "4.0"
+comfy-table = "7.1"
+miette = { version = "7.0", features = ["fancy"] }
+termimad = "0.25"
 
 [dev-dependencies]
 insta = { workspace = true, features = ["json"], default-features = true }

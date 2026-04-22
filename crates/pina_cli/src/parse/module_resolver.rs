@@ -6,6 +6,8 @@
 use std::path::Path;
 use std::path::PathBuf;
 
+use rayon::prelude::*;
+
 use crate::error::IdlError;
 
 /// A resolved source file with its parsed AST.
@@ -19,30 +21,53 @@ pub struct ResolvedFile {
 
 /// Resolve all source files in a crate starting from `lib.rs`.
 ///
-/// Parses `lib.rs`, then follows `mod` declarations to find and parse
-/// additional source files. Only inline modules (with a body) and file-based
-/// modules (without a body) are resolved. Conditional compilation attributes
-/// are ignored — all `mod` declarations are followed.
+/// First discovers all file paths by following `mod` declarations,
+/// then reads all files in parallel using rayon for I/O speedup,
+/// and finally parses each into a `syn::File`.
 pub fn resolve_crate(src_dir: &Path, lib_path: &Path) -> Result<Vec<ResolvedFile>, IdlError> {
+	let mut paths = Vec::new();
 	let source = std::fs::read_to_string(lib_path).map_err(|e| IdlError::io(lib_path, e))?;
 	let file = syn::parse_file(&source).map_err(|e| IdlError::parse(lib_path, &e))?;
+
+	paths.push(lib_path.to_path_buf());
+	discover_modules(src_dir, &file, &mut paths)?;
+
+	// Parallel file reading
+	let read_results: Vec<(PathBuf, String)> = paths
+		.iter()
+		.map(|p| p.clone())
+		.collect::<Vec<_>>()
+		.into_par_iter()
+		.filter_map(|p| {
+			if p == lib_path {
+				// Already read lib.rs
+				return None;
+			}
+			std::fs::read_to_string(&p).ok().map(|s| (p, s))
+		})
+		.collect();
 
 	let mut files = vec![ResolvedFile {
 		path: lib_path.to_path_buf(),
 		file: file.clone(),
 	}];
 
-	// Resolve child modules declared in lib.rs.
-	resolve_modules(src_dir, &file, &mut files)?;
+	for (path, source) in read_results {
+		let mod_file = syn::parse_file(&source).map_err(|e| IdlError::parse(&path, &e))?;
+		files.push(ResolvedFile {
+			path: path.clone(),
+			file: mod_file,
+		});
+	}
 
 	Ok(files)
 }
 
-/// Recursively resolve `mod` declarations in a parsed file.
-fn resolve_modules(
+/// Discover all `mod` declarations by recursively following them.
+fn discover_modules(
 	base_dir: &Path,
 	file: &syn::File,
-	files: &mut Vec<ResolvedFile>,
+	paths: &mut Vec<PathBuf>,
 ) -> Result<(), IdlError> {
 	for item in &file.items {
 		let syn::Item::Mod(item_mod) = item else {
@@ -65,32 +90,27 @@ fn resolve_modules(
 		let mod_path = candidates.iter().find(|p| p.is_file());
 
 		let Some(mod_path) = mod_path else {
-			// Module file not found — skip silently (could be a cfg-gated
-			// or external module).
 			continue;
 		};
+
+		if paths.contains(mod_path) {
+			continue;
+		}
+
+		paths.push(mod_path.clone());
 
 		let source = std::fs::read_to_string(mod_path).map_err(|e| IdlError::io(mod_path, e))?;
 		let mod_file = syn::parse_file(&source).map_err(|e| IdlError::parse(mod_path, &e))?;
 
-		files.push(ResolvedFile {
-			path: mod_path.clone(),
-			file: mod_file.clone(),
-		});
-
-		// Recurse into the resolved module's directory for nested modules.
 		let child_dir = if mod_path.file_name().is_some_and(|n| n == "mod.rs") {
 			mod_path.parent().unwrap_or(base_dir).to_path_buf()
 		} else {
-			// For foo.rs, child modules would be in foo/ directory.
 			base_dir.join(&mod_name)
 		};
 
-		if !child_dir.is_dir() {
-			continue;
+		if child_dir.is_dir() {
+			discover_modules(&child_dir, &mod_file, paths)?;
 		}
-
-		resolve_modules(&child_dir, &mod_file, files)?;
 	}
 
 	Ok(())

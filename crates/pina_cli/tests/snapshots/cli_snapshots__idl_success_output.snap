@@ -11,6 +11,17 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
+
+[1m[32m✨ Generation Complete[39m[0m ──
+┌──────────────┬───────┐
+│ Component    ┆ Count │
+╞══════════════╪═══════╡
+│ Instructions ┆ 1     │
+│ Accounts     ┆ 0     │
+│ PDAs         ┆ 0     │
+│ Errors       ┆ 0     │
+└──────────────┴───────┘
+
 {
   "kind": "rootNode",
   "standard": "codama",

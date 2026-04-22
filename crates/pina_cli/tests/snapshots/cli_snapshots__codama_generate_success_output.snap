@@ -1,5 +1,6 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
+assertion_line: 109
 info:
   program: pina
   args:
@@ -21,6 +22,6 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-Generated Codama IDLs and Rust/JS clients for 1 example(s): counter_program
+[32m✔[39m Generated Codama IDLs and Rust/JS clients for 1 example(s): counter_program
 
 ----- stderr -----
