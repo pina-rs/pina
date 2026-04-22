@@ -1,0 +1,63 @@
+name: "mutants-nightly"
+permissions:
+  contents: read
+  issues: write
+
+# Nightly mutation testing across all core workspace crates.
+on:
+  schedule:
+    # Run every day at 02:00 UTC.
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: mutants-nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  mutants:
+    timeout-minutes: 180
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: run mutation tests
+        run: mutants:all
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: upload mutants report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutants-report
+          path: target/mutants
+
+      - name: open issue on mutant escapes
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Extract the summary line from the mutants output if present.
+          summary="$(grep -m1 'mutants' target/mutants/outcomes.json 2>/dev/null || echo 'See uploaded artifact.')"
+          body="Nightly mutation testing failed — some mutants were not caught by the test suite.\n\n$summary\n\n[Artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+
+          # Only open a new issue if one is not already open.
+          existing=$(gh issue list --repo "${{ github.repository }}" \
+            --label "mutants" --state open --json number --jq '.[0].number')
+
+          if [ -z "$existing" ]; then
+            gh issue create --repo "${{ github.repository }}" \
+              --title "Nightly mutation testing failed" \
+              --body "$body" \
+              --label "mutants"
+          else
+            echo "Issue #$existing already open."
+          fi

@@ -2233,6 +2233,7 @@ dependencies = [
 name = "pina_sdk_ids"
 version = "0.8.0"
 dependencies = [
+ "proptest",
  "solana-address 2.6.0",
 ]
 

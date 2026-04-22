@@ -137,6 +137,22 @@ pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version
 prettyplease = { default-features = false, version = "^0.2" }
 tempfile = { default-features = false, version = "^3" }
 
+[workspace.metadata.bin]
+cargo-audit = { version = "0.22.1" }
+cargo-deny = { version = "0.19.0" }
+cargo-dylint = { version = "5.0.0" }
+cargo-insta = { version = "1.44.3" }
+cargo-llvm-cov = { version = "0.8.4" }
+cargo-nextest = { version = "0.9.129" }
+cargo-semver-checks = { version = "0.46.0" }
+cargo-workspaces = { version = "0.4.2" }
+dylint-link = { version = "5.0.0", bins = ["dylint-link"] }
+cargo-mutants = { version = "27.0.0", bins = ["cargo-mutants"] }
+kani-verifier = { version = "0.67.0", bins = ["kani", "cargo-kani"] }
+sbpf-linker = { version = "0.1.8", bins = ["sbpf-linker"] }
+solana-verify = { version = "0.4.11", bins = ["solana-verify"] }
+wait-for-them = { version = "0.5.1", bins = ["wait-for-them"] }
+
 [workspace.metadata.dylint]
 libraries = [
 	{ path = "lints/require_owner_before_token_cast" },
@@ -153,20 +169,6 @@ libraries = [
 	{ path = "lints/require_canonical_instruction_dispatch_for_idl" },
 	{ path = "lints/require_explicit_discriminators_and_seed_namespaces" },
 ]
-
-[workspace.metadata.bin]
-cargo-dylint = { version = "5.0.0" }
-cargo-audit = { version = "0.22.1" }
-cargo-deny = { version = "0.19.0" }
-cargo-insta = { version = "1.44.3" }
-cargo-llvm-cov = { version = "0.8.4" }
-cargo-nextest = { version = "0.9.129" }
-cargo-workspaces = { version = "0.4.2" }
-cargo-semver-checks = { version = "0.46.0" }
-dylint-link = { version = "5.0.0", bins = ["dylint-link"] }
-sbpf-linker = { version = "0.1.8", bins = ["sbpf-linker"] }
-solana-verify = { version = "0.4.11", bins = ["solana-verify"] }
-wait-for-them = { version = "0.5.1", bins = ["wait-for-them"] }
 
 [workspace.lints.rust]
 # Group lints
