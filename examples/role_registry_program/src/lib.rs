@@ -140,14 +140,14 @@ pub struct AddRoleAccounts<'a> {
 #[derive(Accounts, Debug)]
 pub struct UpdateRoleAccounts<'a> {
 	pub admin: &'a AccountView,
-	pub registry_config: &'a mut AccountView,
+	pub registry_config: &'a AccountView,
 	pub role_entry: &'a mut AccountView,
 }
 
 #[derive(Accounts, Debug)]
 pub struct DeactivateRoleAccounts<'a> {
 	pub admin: &'a AccountView,
-	pub registry_config: &'a mut AccountView,
+	pub registry_config: &'a AccountView,
 	pub role_entry: &'a mut AccountView,
 }
 
@@ -274,7 +274,6 @@ impl<'a> ProcessAccountInfos<'a> for UpdateRoleAccounts<'a> {
 		self.admin.assert_signer()?;
 		self.registry_config
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<RegistryConfig>(&ID)?;
 		self.role_entry
 			.assert_not_empty()?
@@ -308,7 +307,6 @@ impl<'a> ProcessAccountInfos<'a> for DeactivateRoleAccounts<'a> {
 		self.admin.assert_signer()?;
 		self.registry_config
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<RegistryConfig>(&ID)?;
 		self.role_entry
 			.assert_not_empty()?

@@ -83,7 +83,7 @@ fn role_registry_program_client_has_expected_contract_shape() {
 	);
 	assert_eq!(
 		update_ix.accounts[1],
-		AccountMeta::new(registry_config, false)
+		AccountMeta::new_readonly(registry_config, false)
 	);
 	assert_eq!(update_ix.accounts[2], AccountMeta::new(role_entry, false));
 	assert_eq!(update_ix.data, bytemuck::bytes_of(&update_payload).to_vec());
@@ -94,7 +94,7 @@ fn role_registry_program_client_has_expected_contract_shape() {
 	assert_eq!(deactivate_ix.accounts.len(), 3);
 	assert_eq!(
 		deactivate_ix.accounts[1],
-		AccountMeta::new(registry_config, false)
+		AccountMeta::new_readonly(registry_config, false)
 	);
 	assert_eq!(
 		deactivate_ix.data,

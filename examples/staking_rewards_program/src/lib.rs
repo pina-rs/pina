@@ -138,7 +138,7 @@ pub struct InitializePoolAccounts<'a> {
 #[derive(Accounts, Debug)]
 pub struct OpenPositionAccounts<'a> {
 	pub user: &'a AccountView,
-	pub pool_state: &'a mut AccountView,
+	pub pool_state: &'a AccountView,
 	pub position_state: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 }
@@ -169,7 +169,7 @@ pub struct WithdrawAccounts<'a> {
 pub struct ClaimAccounts<'a> {
 	pub user: &'a AccountView,
 	pub reward_mint: &'a AccountView,
-	pub pool_state: &'a mut AccountView,
+	pub pool_state: &'a AccountView,
 	pub position_state: &'a mut AccountView,
 	pub user_reward_ata: &'a AccountView,
 	pub token_program: &'a AccountView,
@@ -334,7 +334,6 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 		self.system_program.assert_address(&system::ID)?;
 		self.pool_state
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<PoolState>(&ID)?;
 		self.position_state
 			.assert_empty()?
@@ -531,7 +530,6 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.pool_state
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<PoolState>(&ID)?;
 		self.position_state
 			.assert_not_empty()?

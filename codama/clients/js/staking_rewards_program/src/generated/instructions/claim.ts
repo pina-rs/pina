@@ -52,7 +52,7 @@ export type ClaimInstruction<
 				: TAccountUser,
 			TAccountRewardMint extends string ? ReadonlyAccount<TAccountRewardMint>
 				: TAccountRewardMint,
-			TAccountPoolState extends string ? WritableAccount<TAccountPoolState>
+			TAccountPoolState extends string ? ReadonlyAccount<TAccountPoolState>
 				: TAccountPoolState,
 			TAccountPositionState extends string
 				? WritableAccount<TAccountPositionState>
@@ -127,7 +127,7 @@ export function getClaimInstruction<
 	const originalAccounts = {
 		user: { value: input.user ?? null, isWritable: false },
 		rewardMint: { value: input.rewardMint ?? null, isWritable: false },
-		poolState: { value: input.poolState ?? null, isWritable: true },
+		poolState: { value: input.poolState ?? null, isWritable: false },
 		positionState: { value: input.positionState ?? null, isWritable: true },
 		userRewardAta: { value: input.userRewardAta ?? null, isWritable: true },
 		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },

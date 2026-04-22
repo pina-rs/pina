@@ -22,6 +22,7 @@ import {
 	type Instruction,
 	type InstructionWithAccounts,
 	type InstructionWithData,
+	type ReadonlyAccount,
 	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
@@ -57,7 +58,7 @@ export type UpdateRoleInstruction<
 					& AccountSignerMeta<TAccountAdmin>
 				: TAccountAdmin,
 			TAccountRegistryConfig extends string
-				? WritableAccount<TAccountRegistryConfig>
+				? ReadonlyAccount<TAccountRegistryConfig>
 				: TAccountRegistryConfig,
 			TAccountRoleEntry extends string ? WritableAccount<TAccountRoleEntry>
 				: TAccountRoleEntry,
@@ -128,7 +129,7 @@ export function getUpdateRoleInstruction<
 	// Original accounts.
 	const originalAccounts = {
 		admin: { value: input.admin ?? null, isWritable: false },
-		registryConfig: { value: input.registryConfig ?? null, isWritable: true },
+		registryConfig: { value: input.registryConfig ?? null, isWritable: false },
 		roleEntry: { value: input.roleEntry ?? null, isWritable: true },
 	};
 	const accounts = originalAccounts as Record<

@@ -1273,10 +1273,10 @@ fn lamport_transfer_same_account_rejected() {
 	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
-	let account = &mut account_views[0];
-	let account_ptr: *mut AccountView = account;
+	let mut sender = account_views[0];
+	let mut recipient = account_views[0];
 
-	let result = unsafe { (&mut *account_ptr).send(500, &mut *account_ptr) };
+	let result = sender.send(500, &mut recipient);
 	assert!(result.is_err(), "should fail sending to self");
 	assert_eq!(
 		result.unwrap_err(),
@@ -1501,7 +1501,7 @@ fn as_account_keeps_borrow_guard_alive_until_drop() {
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
-	let mut account = account_views[0];
+	let account = account_views[0];
 	let mut shadow = account_views[0];
 	let state = account
 		.as_account::<TestState>(&TEST_PROGRAM_ID)
@@ -1581,7 +1581,7 @@ fn as_token_mint_keeps_borrow_guard_alive_until_drop() {
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
-	let mut account = account_views[0];
+	let account = account_views[0];
 	let mut shadow = account_views[0];
 	let mint = account
 		.as_token_mint()
@@ -1619,7 +1619,7 @@ fn as_token_account_keeps_borrow_guard_alive_until_drop() {
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
-	let mut account = account_views[0];
+	let account = account_views[0];
 	let mut shadow = account_views[0];
 	let token_account = account
 		.as_token_account()
@@ -1656,7 +1656,7 @@ fn as_token_2022_mint_keeps_borrow_guard_alive_until_drop() {
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
-	let mut account = account_views[0];
+	let account = account_views[0];
 	let mut shadow = account_views[0];
 	let mint = account
 		.as_token_2022_mint()
@@ -1694,7 +1694,7 @@ fn as_token_2022_account_keeps_borrow_guard_alive_until_drop() {
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
-	let mut account = account_views[0];
+	let account = account_views[0];
 	let mut shadow = account_views[0];
 	let token_account = account
 		.as_token_2022_account()
@@ -1733,7 +1733,7 @@ fn as_token_account_checked_with_owners_accepts_token_2022_owner() {
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
-	let mut account = account_views[0];
+	let account = account_views[0];
 	let mut shadow = account_views[0];
 	let token_account = account
 		.as_token_account_checked_with_owners(&[token::ID, token_2022::ID])
@@ -1771,7 +1771,7 @@ fn as_associated_token_account_checked_accepts_token_2022_owner() {
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
-	let mut account = account_views[0];
+	let account = account_views[0];
 	let mut shadow = account_views[0];
 	let token_account = account
 		.as_associated_token_account_checked(&wallet, &mint, &token_2022::ID)

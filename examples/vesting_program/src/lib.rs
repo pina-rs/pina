@@ -307,7 +307,9 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
-	fn process(self, _data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
+		let _ = CancelInstruction::try_from_bytes(data)?;
+
 		self.admin.assert_signer()?;
 		self.mint.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;

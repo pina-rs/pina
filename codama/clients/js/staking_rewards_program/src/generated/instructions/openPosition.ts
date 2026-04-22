@@ -57,7 +57,7 @@ export type OpenPositionInstruction<
 			TAccountUser extends string
 				? ReadonlySignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
 				: TAccountUser,
-			TAccountPoolState extends string ? WritableAccount<TAccountPoolState>
+			TAccountPoolState extends string ? ReadonlyAccount<TAccountPoolState>
 				: TAccountPoolState,
 			TAccountPositionState extends string
 				? WritableAccount<TAccountPositionState>
@@ -137,7 +137,7 @@ export function getOpenPositionInstruction<
 	// Original accounts.
 	const originalAccounts = {
 		user: { value: input.user ?? null, isWritable: false },
-		poolState: { value: input.poolState ?? null, isWritable: true },
+		poolState: { value: input.poolState ?? null, isWritable: false },
 		positionState: { value: input.positionState ?? null, isWritable: true },
 		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
 	};

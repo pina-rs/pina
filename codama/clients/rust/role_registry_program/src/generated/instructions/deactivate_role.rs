@@ -48,7 +48,7 @@ impl DeactivateRole {
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.admin, true,
 		));
-		accounts.push(solana_instruction::AccountMeta::new(
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.registry_config,
 			false,
 		));

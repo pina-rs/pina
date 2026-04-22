@@ -11,6 +11,7 @@ use pina::realloc_account;
 #[cfg(feature = "account-resize")]
 use pina::realloc_account_zero;
 use pinocchio::AccountView;
+#[cfg(feature = "account-resize")]
 use pinocchio::account::MAX_PERMITTED_DATA_INCREASE;
 use pinocchio::account::NOT_BORROWED;
 use pinocchio::account::RuntimeAccount;
@@ -91,17 +92,13 @@ fn max_permitted_data_increase_is_10_kib() {
 #[cfg(feature = "account-resize")]
 #[test]
 fn realloc_functions_are_exported() {
-	let _grow: fn(
-		&mut pinocchio::AccountView,
-		usize,
-		&mut pinocchio::AccountView,
-		&pinocchio::Address,
-	) -> pinocchio::ProgramResult = realloc_account;
+	let _grow: fn(&mut AccountView, usize, &mut AccountView, &Address) -> pinocchio::ProgramResult =
+		realloc_account;
 	let _grow_zero: fn(
-		&mut pinocchio::AccountView,
+		&mut AccountView,
 		usize,
-		&mut pinocchio::AccountView,
-		&pinocchio::Address,
+		&mut AccountView,
+		&Address,
 	) -> pinocchio::ProgramResult = realloc_account_zero;
 }
 

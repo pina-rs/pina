@@ -274,7 +274,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "poolState",
-						"isWritable": true,
+						"isWritable": false,
 						"isSigner": false
 					},
 					{
@@ -505,7 +505,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "poolState",
-						"isWritable": true,
+						"isWritable": false,
 						"isSigner": false
 					},
 					{

@@ -43,8 +43,13 @@ for program in policy["trackedPrograms"]:
 PY
 )
 
-mapfile -t BUILD_GROUPS < <(
-	python3 - "$WORKSPACE_ROOT" "$POLICY_FILE" <<'PY'
+BUILD_GROUPS_FILE=$(mktemp)
+cleanup_build_groups_file() {
+	rm -f "$BUILD_GROUPS_FILE"
+}
+trap cleanup_build_groups_file EXIT
+
+python3 - "$WORKSPACE_ROOT" "$POLICY_FILE" >"$BUILD_GROUPS_FILE" <<'PY'
 import json
 import sys
 import tomllib
@@ -76,7 +81,7 @@ for program in policy["trackedPrograms"]:
 for programs in groups.values():
     print(" ".join(programs))
 PY
-)
+mapfile -t BUILD_GROUPS <"$BUILD_GROUPS_FILE"
 
 resolve_artifact_path() {
 	local program=$1
