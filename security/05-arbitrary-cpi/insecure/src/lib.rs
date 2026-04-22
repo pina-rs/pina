@@ -34,7 +34,7 @@ pub struct PayAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for PayAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = PayInstructionData::try_from_bytes(data)?;
 
 		self.payer.assert_signer()?.assert_writable()?;

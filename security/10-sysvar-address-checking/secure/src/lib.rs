@@ -29,7 +29,7 @@ pub struct CheckRentAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for CheckRentAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let _ = CheckRentInstruction::try_from_bytes(data)?;
 
 		self.user.assert_signer()?;

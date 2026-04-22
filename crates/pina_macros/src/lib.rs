@@ -27,7 +27,8 @@ mod tests;
 
 /// Derives the `TryFromAccountInfos` trait for a named-field struct.
 ///
-/// Each field must be `&'a AccountView`. One field may be annotated with
+/// Fields may be `&'a AccountView`, `&'a mut AccountView`, `&'a [AccountView]`,
+/// or `&'a mut [AccountView]`. One field may be annotated with
 /// `#[pina(remaining)]` to capture all trailing accounts as a slice.
 #[proc_macro_derive(Accounts, attributes(pina))]
 pub fn accounts_derive(input: TokenStream) -> TokenStream {
@@ -106,7 +107,7 @@ fn accounts_derive_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenSt
 	quote! {
 		impl #impl_generics #crate_path::TryFromAccountInfos #ty_generics for #struct_name #ty_generics #where_clause {
 			fn try_from_account_infos(
-				accounts: & #lifetime [#crate_path::AccountView],
+				accounts: & #lifetime mut [#crate_path::AccountView],
 			) -> ::core::result::Result<Self, #crate_path::ProgramError> {
 				#too_many_accounts
 				#destructure_pattern else {
@@ -120,10 +121,10 @@ fn accounts_derive_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenSt
 			}
 		}
 
-		impl #impl_generics ::core::convert::TryFrom<& #lifetime [#crate_path::AccountView]> for #struct_name #ty_generics #where_clause {
+		impl #impl_generics ::core::convert::TryFrom<& #lifetime mut [#crate_path::AccountView]> for #struct_name #ty_generics #where_clause {
 			type Error = #crate_path::ProgramError;
 
-			fn try_from(accounts: & #lifetime [#crate_path::AccountView]) -> ::core::result::Result<Self, Self::Error> {
+			fn try_from(accounts: & #lifetime mut [#crate_path::AccountView]) -> ::core::result::Result<Self, Self::Error> {
 				<Self as #crate_path::TryFromAccountInfos>::try_from_account_infos(accounts)
 			}
 		}

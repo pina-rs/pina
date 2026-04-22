@@ -85,7 +85,7 @@ pub struct CloseInstr {}
 #[pina(crate = pina)]
 pub struct InitializeAccounts<'a> {
 	pub authority: &'a AccountView,
-	pub state_account: &'a AccountView,
+	pub state_account: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 }
 
@@ -94,15 +94,15 @@ pub struct InitializeAccounts<'a> {
 #[pina(crate = pina)]
 pub struct UpdateAccounts<'a> {
 	pub authority: &'a AccountView,
-	pub state_account: &'a AccountView,
+	pub state_account: &'a mut AccountView,
 }
 
 /// Accounts for Close.
 #[derive(Accounts, Debug)]
 #[pina(crate = pina)]
 pub struct CloseAccounts<'a> {
-	pub authority: &'a AccountView,
-	pub state_account: &'a AccountView,
+	pub authority: &'a mut AccountView,
+	pub state_account: &'a mut AccountView,
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ pub struct CloseAccounts<'a> {
 // ---------------------------------------------------------------------------
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = InitializeInstr::try_from_bytes(data)?;
 
 		// Validate accounts.
@@ -142,7 +142,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = UpdateInstr::try_from_bytes(data)?;
 
 		// Validate accounts.
@@ -163,7 +163,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for CloseAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let _ = CloseInstr::try_from_bytes(data)?;
 
 		// Validate accounts.
@@ -178,11 +178,12 @@ impl<'a> ProcessAccountInfos<'a> for CloseAccounts<'a> {
 			.state_account
 			.as_account_mut::<TestState>(&TEST_PROGRAM_ID)?;
 		state.zeroed();
+		drop(state);
 
 		// Transfer lamports back to authority (simulated via direct lamport
 		// manipulation).
-		self.state_account
-			.send(self.state_account.lamports(), self.authority)?;
+		let lamports = self.state_account.lamports();
+		self.state_account.send(lamports, self.authority)?;
 
 		Ok(())
 	}
@@ -191,7 +192,7 @@ impl<'a> ProcessAccountInfos<'a> for CloseAccounts<'a> {
 /// Top-level instruction dispatch.
 fn process_instruction(
 	program_id: &Address,
-	accounts: &[AccountView],
+	accounts: &mut [AccountView],
 	data: &[u8],
 ) -> ProgramResult {
 	let instruction: TestInstruction = parse_instruction(program_id, &TEST_PROGRAM_ID, data)?;
@@ -455,14 +456,14 @@ unsafe fn deserialize_test_input<const MAX_ACCOUNTS: usize>(
 	accounts: &mut [MaybeUninit<AccountView>; MAX_ACCOUNTS],
 ) -> (
 	&'static Address,
-	&'static [AccountView],
+	&'static mut [AccountView],
 	&'static [u8],
 	usize,
 ) {
 	let (program_id, count, ix_data) =
 		unsafe { entrypoint::deserialize::<MAX_ACCOUNTS>(input.as_mut_ptr(), accounts) };
-	let accounts: &[AccountView] =
-		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
+	let accounts: &mut [AccountView] =
+		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
 	(program_id, accounts, ix_data, count)
 }
 
@@ -1200,18 +1201,17 @@ fn lamport_transfer_send() {
 	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+	let (sender_accounts, recipient_accounts) = account_views.split_at_mut(1);
+	let sender = &mut sender_accounts[0];
+	let recipient = &mut recipient_accounts[0];
 
 	// Transfer 300_000 lamports from sender to recipient.
-	let result = account_views[0].send(300_000, &account_views[1]);
+	let result = sender.send(300_000, recipient);
 	assert!(result.is_ok(), "send should succeed: {result:?}");
 
+	assert_eq!(sender.lamports(), 700_000, "sender should have 700_000");
 	assert_eq!(
-		account_views[0].lamports(),
-		700_000,
-		"sender should have 700_000"
-	);
-	assert_eq!(
-		account_views[1].lamports(),
+		recipient.lamports(),
 		800_000,
 		"recipient should have 800_000"
 	);
@@ -1241,8 +1241,11 @@ fn lamport_transfer_insufficient_funds() {
 	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+	let (sender_accounts, recipient_accounts) = account_views.split_at_mut(1);
+	let sender = &mut sender_accounts[0];
+	let recipient = &mut recipient_accounts[0];
 
-	let result = account_views[0].send(101, &account_views[1]);
+	let result = sender.send(101, recipient);
 	assert!(result.is_err(), "should fail with insufficient funds");
 	assert_eq!(
 		result.unwrap_err(),
@@ -1251,8 +1254,8 @@ fn lamport_transfer_insufficient_funds() {
 	);
 
 	// Balances should be unchanged.
-	assert_eq!(account_views[0].lamports(), 100);
-	assert_eq!(account_views[1].lamports(), 0);
+	assert_eq!(sender.lamports(), 100);
+	assert_eq!(recipient.lamports(), 0);
 }
 
 /// Tests that sending to the same account fails with InvalidArgument.
@@ -1270,8 +1273,10 @@ fn lamport_transfer_same_account_rejected() {
 	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+	let mut sender = account_views[0];
+	let mut recipient = account_views[0];
 
-	let result = account_views[0].send(500, &account_views[0]);
+	let result = sender.send(500, &mut recipient);
 	assert!(result.is_err(), "should fail sending to self");
 	assert_eq!(
 		result.unwrap_err(),
@@ -1306,20 +1311,72 @@ fn close_account_with_recipient() {
 	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+	let (closed_accounts, recipient_accounts) = account_views.split_at_mut(1);
+	let closed_account = &mut closed_accounts[0];
+	let recipient = &mut recipient_accounts[0];
 
-	let result = account_views[0].close_with_recipient(&account_views[1]);
+	let result = closed_account.close_with_recipient(recipient);
 	assert!(result.is_ok(), "close should succeed: {result:?}");
 
 	assert_eq!(
-		account_views[0].lamports(),
+		closed_account.lamports(),
 		0,
 		"closed account should have 0 lamports"
 	);
 	assert_eq!(
-		account_views[1].lamports(),
+		recipient.lamports(),
 		1_500_000,
 		"recipient should have 1_500_000 lamports"
 	);
+}
+
+#[test]
+fn close_account_zeroed_clears_source_bytes_before_close() {
+	let account_key: Address = address!("2Eg4H7V2Cd9uBSXreMKe1KjEo9e4NMpM4GZpsLtkj6pp");
+	let recipient_key: Address = address!("9Z6iYoJ1E9nQ7h6nC3ieUzYDRKsAqPPYUajF2iGaGLjm");
+	let state_data = build_test_state_bytes(9, 99);
+
+	let accounts = [
+		AccountBuilder::new()
+			.address(account_key)
+			.owner(TEST_PROGRAM_ID)
+			.lamports(600_000)
+			.data(&state_data)
+			.is_writable(true),
+		AccountBuilder::new()
+			.address(recipient_key)
+			.owner(system::ID)
+			.lamports(400_000)
+			.is_writable(true),
+	];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+	let (closed_accounts, recipient_accounts) = account_views.split_at_mut(1);
+	let closed_account = &mut closed_accounts[0];
+	let recipient = &mut recipient_accounts[0];
+	let source_len = closed_account.data_len();
+	let source_ptr = closed_account.data_ptr();
+
+	let result = closed_account.close_account_zeroed(recipient);
+	assert!(result.is_ok(), "close should succeed: {result:?}");
+
+	let source_bytes = unsafe {
+		// SAFETY: the serialized test input buffer remains allocated for the
+		// duration of this test, and the helper only zeroes the account bytes
+		// before closing the account metadata.
+		core::slice::from_raw_parts(source_ptr, source_len)
+	};
+
+	assert!(
+		source_bytes.iter().all(|byte| *byte == 0),
+		"source bytes should be zeroed before close"
+	);
+	assert_eq!(closed_account.lamports(), 0);
+	assert_eq!(closed_account.data_len(), 0);
+	assert_eq!(recipient.lamports(), 1_000_000);
 }
 
 // ---------------------------------------------------------------------------
@@ -1493,19 +1550,21 @@ fn as_account_keeps_borrow_guard_alive_until_drop() {
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
-	let state = account_views[0]
+	let account = account_views[0];
+	let mut shadow = account_views[0];
+	let state = account
 		.as_account::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("read failed: {e:?}"));
 
 	assert_eq!(state.bump, 7);
 	assert!(matches!(
-		account_views[0].try_borrow_mut(),
+		shadow.try_borrow_mut(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 
 	drop(state);
 
-	let borrow = account_views[0]
+	let borrow = shadow
 		.try_borrow_mut()
 		.unwrap_or_else(|e| panic!("mutable borrow should succeed after drop: {e:?}"));
 	assert_eq!(borrow.len(), size_of::<TestState>());
@@ -1529,23 +1588,25 @@ fn as_account_mut_blocks_overlapping_borrows_until_drop() {
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
-	let mut state = account_views[0]
+	let mut account = account_views[0];
+	let mut shadow = account_views[0];
+	let mut state = account
 		.as_account_mut::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("write failed: {e:?}"));
 	state.value = PodU64::from_primitive(88);
 
 	assert!(matches!(
-		account_views[0].try_borrow(),
+		shadow.try_borrow(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 	assert!(matches!(
-		account_views[0].try_borrow_mut(),
+		shadow.try_borrow_mut(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 
 	drop(state);
 
-	let state = account_views[0]
+	let state = account
 		.as_account::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("read after drop failed: {e:?}"));
 	assert_eq!(u64::from(state.value), 88);
@@ -1569,20 +1630,22 @@ fn as_token_mint_keeps_borrow_guard_alive_until_drop() {
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
-	let mint = account_views[0]
+	let account = account_views[0];
+	let mut shadow = account_views[0];
+	let mint = account
 		.as_token_mint()
 		.unwrap_or_else(|e| panic!("mint load failed: {e:?}"));
 	assert_eq!(mint.decimals(), 6);
 	assert_eq!(mint.supply(), 1_000);
 
 	assert!(matches!(
-		account_views[0].try_borrow_mut(),
+		shadow.try_borrow_mut(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 
 	drop(mint);
 
-	assert!(account_views[0].try_borrow_mut().is_ok());
+	assert!(shadow.try_borrow_mut().is_ok());
 }
 
 #[cfg(feature = "token")]
@@ -1605,7 +1668,9 @@ fn as_token_account_keeps_borrow_guard_alive_until_drop() {
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
-	let token_account = account_views[0]
+	let account = account_views[0];
+	let mut shadow = account_views[0];
+	let token_account = account
 		.as_token_account()
 		.unwrap_or_else(|e| panic!("token account load failed: {e:?}"));
 	assert_eq!(token_account.amount(), 77);
@@ -1613,13 +1678,13 @@ fn as_token_account_keeps_borrow_guard_alive_until_drop() {
 	assert_eq!(token_account.owner(), &owner);
 
 	assert!(matches!(
-		account_views[0].try_borrow_mut(),
+		shadow.try_borrow_mut(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 
 	drop(token_account);
 
-	assert!(account_views[0].try_borrow_mut().is_ok());
+	assert!(shadow.try_borrow_mut().is_ok());
 }
 
 #[cfg(feature = "token")]
@@ -1640,20 +1705,22 @@ fn as_token_2022_mint_keeps_borrow_guard_alive_until_drop() {
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
-	let mint = account_views[0]
+	let account = account_views[0];
+	let mut shadow = account_views[0];
+	let mint = account
 		.as_token_2022_mint()
 		.unwrap_or_else(|e| panic!("token-2022 mint load failed: {e:?}"));
 	assert_eq!(mint.decimals(), 9);
 	assert_eq!(mint.supply(), 42);
 
 	assert!(matches!(
-		account_views[0].try_borrow_mut(),
+		shadow.try_borrow_mut(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 
 	drop(mint);
 
-	assert!(account_views[0].try_borrow_mut().is_ok());
+	assert!(shadow.try_borrow_mut().is_ok());
 }
 
 #[cfg(feature = "token")]
@@ -1676,7 +1743,9 @@ fn as_token_2022_account_keeps_borrow_guard_alive_until_drop() {
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
-	let token_account = account_views[0]
+	let account = account_views[0];
+	let mut shadow = account_views[0];
+	let token_account = account
 		.as_token_2022_account()
 		.unwrap_or_else(|e| panic!("token-2022 account load failed: {e:?}"));
 	assert_eq!(token_account.amount(), 123);
@@ -1684,13 +1753,13 @@ fn as_token_2022_account_keeps_borrow_guard_alive_until_drop() {
 	assert_eq!(token_account.owner(), &owner);
 
 	assert!(matches!(
-		account_views[0].try_borrow_mut(),
+		shadow.try_borrow_mut(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 
 	drop(token_account);
 
-	assert!(account_views[0].try_borrow_mut().is_ok());
+	assert!(shadow.try_borrow_mut().is_ok());
 }
 
 #[cfg(feature = "token")]
@@ -1713,19 +1782,21 @@ fn as_token_account_checked_with_owners_accepts_token_2022_owner() {
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
-	let token_account = account_views[0]
+	let account = account_views[0];
+	let mut shadow = account_views[0];
+	let token_account = account
 		.as_token_account_checked_with_owners(&[token::ID, token_2022::ID])
 		.unwrap_or_else(|e| panic!("multi-owner token account load failed: {e:?}"));
 	assert_eq!(token_account.amount(), 88);
 
 	assert!(matches!(
-		account_views[0].try_borrow_mut(),
+		shadow.try_borrow_mut(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 
 	drop(token_account);
 
-	assert!(account_views[0].try_borrow_mut().is_ok());
+	assert!(shadow.try_borrow_mut().is_ok());
 }
 
 #[cfg(feature = "token")]
@@ -1749,20 +1820,22 @@ fn as_associated_token_account_checked_accepts_token_2022_owner() {
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
-	let token_account = account_views[0]
+	let account = account_views[0];
+	let mut shadow = account_views[0];
+	let token_account = account
 		.as_associated_token_account_checked(&wallet, &mint, &token_2022::ID)
 		.unwrap_or_else(|e| panic!("associated token account load failed: {e:?}"));
 	assert_eq!(token_account.amount(), 99);
 	assert_eq!(token_account.owner(), &wallet);
 
 	assert!(matches!(
-		account_views[0].try_borrow_mut(),
+		shadow.try_borrow_mut(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 
 	drop(token_account);
 
-	assert!(account_views[0].try_borrow_mut().is_ok());
+	assert!(shadow.try_borrow_mut().is_ok());
 }
 
 // ---------------------------------------------------------------------------

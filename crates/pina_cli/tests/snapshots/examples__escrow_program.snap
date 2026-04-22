@@ -1,6 +1,5 @@
 ---
 source: crates/pina_cli/tests/examples.rs
-assertion_line: 49
 expression: idl
 ---
 {
@@ -256,7 +255,7 @@ expression: idl
           {
             "kind": "instructionAccountNode",
             "name": "maker",
-            "isWritable": false,
+            "isWritable": true,
             "isSigner": false
           },
           {

@@ -44,7 +44,7 @@ fn role_registry_program_client_has_expected_contract_shape() {
 	let init_ix = initialize.instruction(init_payload);
 	assert_eq!(init_ix.program_id, program_id);
 	assert_eq!(init_ix.accounts.len(), 3);
-	assert_eq!(init_ix.accounts[0], AccountMeta::new_readonly(admin, true),);
+	assert_eq!(init_ix.accounts[0], AccountMeta::new(admin, true),);
 	assert_eq!(
 		init_ix.accounts[1],
 		AccountMeta::new(registry_config, false)
@@ -60,7 +60,7 @@ fn role_registry_program_client_has_expected_contract_shape() {
 		AddRoleInstructionData::new(PodU64::from_primitive(11), PodU64::from_primitive(42), 3);
 	let add_ix = add_role.instruction(add_payload);
 	assert_eq!(add_ix.accounts.len(), 5);
-	assert_eq!(add_ix.accounts[0], AccountMeta::new_readonly(admin, true));
+	assert_eq!(add_ix.accounts[0], AccountMeta::new(admin, true));
 	assert_eq!(
 		add_ix.accounts[1],
 		AccountMeta::new_readonly(grantee, false)
@@ -83,7 +83,7 @@ fn role_registry_program_client_has_expected_contract_shape() {
 	);
 	assert_eq!(
 		update_ix.accounts[1],
-		AccountMeta::new(registry_config, false)
+		AccountMeta::new_readonly(registry_config, false)
 	);
 	assert_eq!(update_ix.accounts[2], AccountMeta::new(role_entry, false));
 	assert_eq!(update_ix.data, bytemuck::bytes_of(&update_payload).to_vec());
@@ -94,7 +94,7 @@ fn role_registry_program_client_has_expected_contract_shape() {
 	assert_eq!(deactivate_ix.accounts.len(), 3);
 	assert_eq!(
 		deactivate_ix.accounts[1],
-		AccountMeta::new(registry_config, false)
+		AccountMeta::new_readonly(registry_config, false)
 	);
 	assert_eq!(
 		deactivate_ix.data,

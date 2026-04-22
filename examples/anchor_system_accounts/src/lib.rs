@@ -32,7 +32,7 @@ pub struct InitializeAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let _ = InitializeInstruction::try_from_bytes(data)?;
 		self.authority.assert_signer()?;
 		self.wallet.assert_owner(&system::ID)?;
@@ -49,7 +49,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: SystemAccountsInstruction = parse_instruction(program_id, &ID, data)?;

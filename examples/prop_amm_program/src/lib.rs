@@ -83,19 +83,19 @@ pub struct RotateAuthorityInstruction {
 #[derive(Accounts, Debug)]
 pub struct InitializeAccounts<'a> {
 	pub payer: &'a AccountView,
-	pub oracle: &'a AccountView,
+	pub oracle: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 }
 
 #[derive(Accounts, Debug)]
 pub struct UpdateAccounts<'a> {
-	pub oracle: &'a AccountView,
+	pub oracle: &'a mut AccountView,
 	pub authority: &'a AccountView,
 }
 
 #[derive(Accounts, Debug)]
 pub struct RotateAuthorityAccounts<'a> {
-	pub oracle: &'a AccountView,
+	pub oracle: &'a mut AccountView,
 	pub authority: &'a AccountView,
 }
 
@@ -120,7 +120,7 @@ fn assert_oracle_authority(authority: &AccountView, expected: &Address) -> Progr
 }
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let _ = InitializeInstruction::try_from_bytes(data)?;
 
 		self.payer.assert_signer()?.assert_writable()?;
@@ -143,7 +143,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = UpdateInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
@@ -160,7 +160,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for RotateAuthorityAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = RotateAuthorityInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
@@ -189,7 +189,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: PropAmmInstruction = parse_instruction(program_id, &ID, data)?;

@@ -37,7 +37,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: VestingInstruction = parse_instruction(program_id, &ID, data)?;
@@ -106,7 +106,7 @@ pub struct InitializeAccounts<'a> {
 	pub admin: &'a AccountView,
 	pub beneficiary: &'a AccountView,
 	pub mint: &'a AccountView,
-	pub vesting_state: &'a AccountView,
+	pub vesting_state: &'a mut AccountView,
 	pub vault: &'a AccountView,
 	pub system_program: &'a AccountView,
 	pub token_program: &'a AccountView,
@@ -116,7 +116,7 @@ pub struct InitializeAccounts<'a> {
 pub struct ClaimAccounts<'a> {
 	pub beneficiary: &'a AccountView,
 	pub mint: &'a AccountView,
-	pub vesting_state: &'a AccountView,
+	pub vesting_state: &'a mut AccountView,
 	pub beneficiary_ata: &'a AccountView,
 	pub vault: &'a AccountView,
 	pub system_program: &'a AccountView,
@@ -127,7 +127,7 @@ pub struct ClaimAccounts<'a> {
 pub struct CancelAccounts<'a> {
 	pub admin: &'a AccountView,
 	pub mint: &'a AccountView,
-	pub vesting_state: &'a AccountView,
+	pub vesting_state: &'a mut AccountView,
 	pub vault: &'a AccountView,
 	pub token_program: &'a AccountView,
 }
@@ -154,7 +154,7 @@ fn validate_schedule(start_ts: u64, cliff_ts: u64, end_ts: u64) -> ProgramResult
 }
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = InitializeInstruction::try_from_bytes(data)?;
 		let start_ts = u64::from(args.start_ts);
 		let cliff_ts = u64::from(args.cliff_ts);
@@ -212,6 +212,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			.cancelled(PodBool::from_bool(false))
 			.bump(args.bump)
 			.build();
+		drop(vesting_state);
 
 		associated_token_account::instructions::Create {
 			account: self.vault,
@@ -228,7 +229,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = ClaimInstruction::try_from_bytes(data)?;
 		let amount: u64 = args.amount.into();
 
@@ -257,26 +258,30 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 				self.token_program.address(),
 			)?;
 
-		let vesting_state = self.vesting_state.as_account::<VestingState>(&ID)?;
-		self.beneficiary
-			.assert_address(&vesting_state.beneficiary)?;
-		self.mint.assert_address(&vesting_state.mint)?;
+		let (admin, beneficiary, mint, bump, cancelled, claimed_amount, total_amount) = {
+			let vesting_state = self.vesting_state.as_account::<VestingState>(&ID)?;
+			self.beneficiary
+				.assert_address(&vesting_state.beneficiary)?;
+			self.mint.assert_address(&vesting_state.mint)?;
+
+			(
+				vesting_state.admin,
+				vesting_state.beneficiary,
+				vesting_state.mint,
+				vesting_state.bump,
+				bool::from(vesting_state.cancelled),
+				u64::from(vesting_state.claimed_amount),
+				u64::from(vesting_state.total_amount),
+			)
+		};
 		self.vesting_state.assert_seeds_with_bump(
-			vesting_seeds!(
-				vesting_state.admin.as_ref(),
-				vesting_state.beneficiary.as_ref(),
-				vesting_state.mint.as_ref(),
-				vesting_state.bump
-			),
+			vesting_seeds!(admin.as_ref(), beneficiary.as_ref(), mint.as_ref(), bump),
 			&ID,
 		)?;
 
-		if bool::from(vesting_state.cancelled) {
+		if cancelled {
 			return Err(VestingError::AlreadyCancelled.into());
 		}
-
-		let claimed_amount = u64::from(vesting_state.claimed_amount);
-		let total_amount = u64::from(vesting_state.total_amount);
 		let next_claimed = claimed_amount
 			.checked_add(amount)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
@@ -302,7 +307,9 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
-	fn process(&self, _data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
+		let _ = CancelInstruction::try_from_bytes(data)?;
+
 		self.admin.assert_signer()?;
 		self.mint.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
@@ -320,22 +327,27 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 				self.token_program.address(),
 			)?;
 
-		let vesting_state = self.vesting_state.as_account::<VestingState>(&ID)?;
+		let (admin, beneficiary, mint, bump, cancelled) = {
+			let vesting_state = self.vesting_state.as_account::<VestingState>(&ID)?;
 
-		self.admin.assert_address(&vesting_state.admin)?;
-		self.mint.assert_address(&vesting_state.mint)?;
+			self.admin.assert_address(&vesting_state.admin)?;
+			self.mint.assert_address(&vesting_state.mint)?;
+
+			(
+				vesting_state.admin,
+				vesting_state.beneficiary,
+				vesting_state.mint,
+				vesting_state.bump,
+				bool::from(vesting_state.cancelled),
+			)
+		};
 
 		self.vesting_state.assert_seeds_with_bump(
-			vesting_seeds!(
-				vesting_state.admin.as_ref(),
-				vesting_state.beneficiary.as_ref(),
-				vesting_state.mint.as_ref(),
-				vesting_state.bump
-			),
+			vesting_seeds!(admin.as_ref(), beneficiary.as_ref(), mint.as_ref(), bump),
 			&ID,
 		)?;
 
-		if bool::from(vesting_state.cancelled) {
+		if cancelled {
 			return Err(VestingError::AlreadyCancelled.into());
 		}
 

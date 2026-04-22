@@ -149,7 +149,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "admin",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": true
 					},
 					{
@@ -206,7 +206,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "admin",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": true
 					},
 					{
@@ -299,7 +299,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "registryConfig",
-						"isWritable": true,
+						"isWritable": false,
 						"isSigner": false
 					},
 					{
@@ -352,7 +352,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "registryConfig",
-						"isWritable": true,
+						"isWritable": false,
 						"isSigner": false
 					},
 					{

@@ -45,9 +45,13 @@ Blank lines separate concepts and give the reader time to breathe.
 
 ```rust
 // Good: Logical grouping with breathing room
-fn process_instruction(accounts: &[AccountView], data: &[u8]) -> ProgramResult {
+fn process_instruction(
+	program_id: &Address,
+	accounts: &mut [AccountView],
+	data: &[u8],
+) -> ProgramResult {
 	// Group 1: Parse and validate instruction discriminator
-	let disc = parse_instruction(&ID, program_id, data)?;
+	let disc = parse_instruction(program_id, &ID, data)?;
 
 	// Group 2: Route to appropriate handler
 	match disc {

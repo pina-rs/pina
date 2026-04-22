@@ -16,7 +16,7 @@ N      | ...  | payload fields
 This contract is what enables:
 
 - deterministic `size_of::<T>()` checks,
-- guard-backed zero-copy validation with `as_account()` / `try_from_bytes()`,
+- zero-copy validation with `as_account()` / `try_from_bytes()`,
 - alignment-safe offsets for fixed-size Pod fields.
 
 ### Why this is safer than implicit external headers
@@ -92,17 +92,17 @@ The discriminator strategy determines byte layout, parser guarantees, and cross-
 
 ## Account validation chains
 
-Validation methods on `AccountView` are composable:
+Validation methods on `AccountView` are composable and preserve the receiver type:
 
 ```rust
 account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?;
 ```
 
-This pattern improves readability while keeping checks explicit and audit-able.
+A chain that starts with `&AccountView` stays shared, while a chain that starts with `&mut AccountView` stays mutable. This keeps writability explicit without losing access to `as_account_mut()` later.
 
 ## Typed account conversions
 
-Traits in `crates/pina/src/impls.rs` provide guard-backed typed conversion paths from raw `AccountView` values into strongly typed account states. `as_account()` and `as_account_mut()` keep the runtime borrow alive until the returned wrapper is dropped.
+Traits in `crates/pina/src/impls.rs` provide typed conversion paths from raw `AccountView` values into strongly typed account states. `as_account()` returns `Ref<T>` and `as_account_mut()` returns `RefMut<T>` borrow guards.
 
 ## Entrypoint model
 
@@ -142,28 +142,6 @@ This means you can write ergonomic code like:
 my_account.count += 1u64;
 let fee = balance.checked_mul(3u64).unwrap_or(PodU64::MAX);
 ```
-
-## Pod collection types
-
-<!-- {=podCollectionTypesTable} -->
-
-| Type                       | Purpose                | Layout                                    |
-| -------------------------- | ---------------------- | ----------------------------------------- |
-| `PodOption<T: Pod>`        | Fixed-size `Option<T>` | 1-byte discriminant + `T`                 |
-| `PodString<N, PFX=1>`      | Fixed-capacity string  | `PFX`-byte length prefix + `N` data bytes |
-| `PodVec<T: Pod, N, PFX=2>` | Fixed-capacity vec     | `PFX`-byte length prefix + `N` elements   |
-
-All collection types are `#[repr(C)]`, alignment-1, and implement `bytemuck::Pod` + `bytemuck::Zeroable`. Length prefixes (`PFX`) default to 1 byte for strings (max 255) and 2 bytes for vectors (max 65 535 elements).
-
-<!-- {/podCollectionTypesTable} -->
-
-<!-- {=podCollectionDescription} -->
-
-Collection types store data inline with a length prefix, enabling zero-copy access inside `#[repr(C)]` account structs. Overflow is detected at insertion time — `try_set` / `try_push` return `Err(PodCollectionError::Overflow)` when capacity is exceeded.
-
-`PodString` provides UTF-8 validation via `try_as_str()`, while `PodVec` offers slice-based access via `as_slice()` / `as_mut_slice()`. `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`.
-
-<!-- {/podCollectionDescription} -->
 
 ## Instruction introspection
 

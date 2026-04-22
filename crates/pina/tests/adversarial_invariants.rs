@@ -31,8 +31,8 @@ pub struct BalanceState {
 #[derive(Accounts, Debug)]
 #[pina(crate = pina)]
 struct DuplicateMutablePair<'a> {
-	pub source: &'a AccountView,
-	pub destination: &'a AccountView,
+	pub source: &'a mut AccountView,
+	pub destination: &'a mut AccountView,
 }
 
 #[derive(Accounts, Debug)]
@@ -40,7 +40,7 @@ struct DuplicateMutablePair<'a> {
 struct RemainingPassthrough<'a> {
 	pub first: &'a AccountView,
 	#[pina(remaining)]
-	pub rest: &'a [AccountView],
+	pub rest: &'a mut [AccountView],
 }
 
 struct AccountBuilder {
@@ -248,26 +248,36 @@ unsafe fn create_test_input(
 	input
 }
 
-unsafe fn deserialize_test_input<const MAX_ACCOUNTS: usize>(
-	input: &mut AlignedMemory,
-	accounts: &mut [MaybeUninit<AccountView>; MAX_ACCOUNTS],
-) -> (&'static [AccountView], &'static [u8]) {
+unsafe fn deserialize_test_input<'input, 'accounts, const MAX_ACCOUNTS: usize>(
+	input: &'input mut AlignedMemory,
+	accounts: &'accounts mut [MaybeUninit<AccountView>; MAX_ACCOUNTS],
+) -> (&'accounts mut [AccountView], &'input [u8]) {
 	let (_program_id, count, ix_data) =
 		unsafe { entrypoint::deserialize::<MAX_ACCOUNTS>(input.as_mut_ptr(), accounts) };
-	let accounts: &[AccountView] =
-		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
+	let accounts: &mut [AccountView] =
+		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
 
 	(accounts, ix_data)
+}
+
+fn initialized_account_views<'accounts, const MAX_ACCOUNTS: usize>(
+	accounts: &'accounts mut [MaybeUninit<AccountView>; MAX_ACCOUNTS],
+	count: usize,
+) -> &'accounts mut [AccountView] {
+	unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) }
 }
 
 macro_rules! load_accounts {
 	($unique_accounts:expr, $duplicate_count:expr, $max_accounts:expr) => {{
 		let mut input = unsafe { create_test_input($unique_accounts, $duplicate_count, &[]) };
 		let mut accounts = [UNINIT; $max_accounts];
-		let (account_views, _) =
-			unsafe { deserialize_test_input::<$max_accounts>(&mut input, &mut accounts) };
+		let count = {
+			let (account_views, _) =
+				unsafe { deserialize_test_input::<$max_accounts>(&mut input, &mut accounts) };
+			account_views.len()
+		};
 
-		(input, accounts, account_views)
+		(input, accounts, count)
 	}};
 }
 
@@ -337,11 +347,11 @@ fn duplicate_mutable_accounts_share_runtime_borrow_state() {
 		.data(&state_bytes)
 		.is_writable(true)];
 
-	let (_input, _accounts, account_views) = load_accounts!(&unique_accounts, 1, 4);
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 1, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
 	let pair = DuplicateMutablePair::try_from(account_views)
 		.unwrap_or_else(|error| panic!("failed to derive duplicate pair: {error:?}"));
 
-	assert_eq!(pair.source, pair.destination);
 	assert_eq!(pair.source.address(), pair.destination.address());
 	assert!(matches!(
 		assert_distinct_mutable_accounts(pair.source, pair.destination),
@@ -381,25 +391,30 @@ fn remaining_accounts_preserve_duplicate_order_and_aliasing() {
 			.is_writable(true),
 	];
 
-	let (_input, _accounts, account_views) = load_accounts!(&unique_accounts, 2, 6);
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 2, 6);
+	let account_views = initialized_account_views(&mut accounts, count);
 	let parsed = RemainingPassthrough::try_from(account_views)
 		.unwrap_or_else(|error| panic!("failed to derive remaining accounts: {error:?}"));
 
 	assert_eq!(parsed.first.address(), &first_key);
 	assert_eq!(parsed.rest.len(), 3);
 	assert_eq!(parsed.rest[0].address(), &duplicated_key);
-	assert_eq!(parsed.rest[1], parsed.rest[0]);
-	assert_eq!(parsed.rest[2], parsed.rest[0]);
+	assert_eq!(parsed.rest[1].address(), parsed.rest[0].address());
+	assert_eq!(parsed.rest[2].address(), parsed.rest[0].address());
 
-	let duplicated_borrow = parsed.rest[1]
+	let mut first = parsed.rest[0];
+	let mut duplicate = parsed.rest[1];
+	let mut third = parsed.rest[2];
+
+	let duplicated_borrow = duplicate
 		.try_borrow_mut()
 		.unwrap_or_else(|error| panic!("duplicate borrow should succeed once: {error:?}"));
 	assert!(matches!(
-		parsed.rest[0].try_borrow_mut(),
+		first.try_borrow_mut(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 	assert!(matches!(
-		parsed.rest[2].try_borrow_mut(),
+		third.try_borrow_mut(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 	drop(duplicated_borrow);
@@ -420,11 +435,13 @@ fn send_conserves_lamports_on_success() {
 			.is_writable(true),
 	];
 
-	let (_input, _accounts, account_views) = load_accounts!(&unique_accounts, 0, 4);
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
 	let total_before = account_views[0].lamports() + account_views[1].lamports();
 
-	account_views[0]
-		.send(125, &account_views[1])
+	let (sender, recipient) = account_views.split_at_mut(1);
+	sender[0]
+		.send(125, &mut recipient[0])
 		.unwrap_or_else(|error| panic!("send should succeed: {error:?}"));
 
 	let total_after = account_views[0].lamports() + account_views[1].lamports();
@@ -448,11 +465,13 @@ fn send_overflow_preserves_balances() {
 			.is_writable(true),
 	];
 
-	let (_input, _accounts, account_views) = load_accounts!(&unique_accounts, 0, 4);
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
 	let sender_before = account_views[0].lamports();
 	let recipient_before = account_views[1].lamports();
 
-	let result = account_views[0].send(1, &account_views[1]);
+	let (sender, recipient) = account_views.split_at_mut(1);
+	let result = sender[0].send(1, &mut recipient[0]);
 	assert_eq!(result, Err(ProgramError::ArithmeticOverflow));
 	assert_eq!(account_views[0].lamports(), sender_before);
 	assert_eq!(account_views[1].lamports(), recipient_before);
@@ -475,11 +494,13 @@ fn close_with_recipient_conserves_lamports_and_zeroes_source() {
 			.is_writable(true),
 	];
 
-	let (_input, _accounts, account_views) = load_accounts!(&unique_accounts, 0, 4);
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
 	let total_before = account_views[0].lamports() + account_views[1].lamports();
 
-	account_views[0]
-		.close_with_recipient(&account_views[1])
+	let (closing, recipient) = account_views.split_at_mut(1);
+	closing[0]
+		.close_with_recipient(&mut recipient[0])
 		.unwrap_or_else(|error| panic!("close should succeed: {error:?}"));
 
 	let total_after = account_views[0].lamports() + account_views[1].lamports();
@@ -507,12 +528,14 @@ fn close_with_recipient_overflow_preserves_balances_and_data() {
 			.is_writable(true),
 	];
 
-	let (_input, _accounts, account_views) = load_accounts!(&unique_accounts, 0, 4);
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
 	let source_before = account_views[0].lamports();
 	let recipient_before = account_views[1].lamports();
 	let data_len_before = account_views[0].data_len();
 
-	let result = account_views[0].close_with_recipient(&account_views[1]);
+	let (closing, recipient) = account_views.split_at_mut(1);
+	let result = closing[0].close_with_recipient(&mut recipient[0]);
 	assert_eq!(result, Err(ProgramError::ArithmeticOverflow));
 	assert_eq!(account_views[0].lamports(), source_before);
 	assert_eq!(account_views[1].lamports(), recipient_before);
@@ -529,7 +552,8 @@ fn assert_type_rejects_wrong_owner_before_trusting_bytes() {
 		.data(&build_balance_state_bytes(55))
 		.is_writable(true)];
 
-	let (_input, _accounts, account_views) = load_accounts!(&unique_accounts, 0, 4);
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
 	let result = account_views[0].assert_type::<BalanceState>(&TEST_PROGRAM_ID);
 	assert_eq!(result, Err(ProgramError::InvalidAccountOwner));
 }
@@ -545,7 +569,8 @@ fn assert_type_rejects_wrong_discriminator() {
 		.data(&wrong_bytes)
 		.is_writable(true)];
 
-	let (_input, _accounts, account_views) = load_accounts!(&unique_accounts, 0, 4);
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
 	let result = account_views[0].assert_type::<BalanceState>(&TEST_PROGRAM_ID);
 	assert_eq!(result, Err(ProgramError::InvalidAccountData));
 }
@@ -565,7 +590,8 @@ fn assert_program_rejects_wrong_identity_and_non_executable_targets() {
 			.executable(false),
 	];
 
-	let (_input, _accounts, account_views) = load_accounts!(&unique_accounts, 0, 4);
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
 
 	assert_eq!(
 		account_views[0].assert_program(&system::ID),
@@ -587,7 +613,8 @@ fn non_canonical_pda_requires_explicit_bump_verification() {
 		.lamports(1)
 		.is_writable(true)];
 
-	let (_input, _accounts, account_views) = load_accounts!(&unique_accounts, 0, 4);
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
 	let canonical_seeds: &[&[u8]] = &[b"noncanonical", &seed_bytes];
 	let bump_seed = [non_canonical_bump];
 	let seeds_with_bump: &[&[u8]] = &[b"noncanonical", &seed_bytes, &bump_seed];
@@ -624,7 +651,8 @@ fn token_checked_loader_rejects_wrong_owner() {
 		.data(&build_token_account_bytes(&mint, &owner, 55))
 		.is_writable(true)];
 
-	let (_input, _accounts, account_views) = load_accounts!(&unique_accounts, 0, 4);
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
 	let result = account_views[0].as_token_account_checked();
 	assert!(matches!(result, Err(ProgramError::InvalidAccountOwner)));
 }
@@ -642,7 +670,8 @@ fn associated_token_loader_rejects_wrong_ata_address() {
 		.data(&build_token_account_bytes(&mint, &wallet, 99))
 		.is_writable(true)];
 
-	let (_input, _accounts, account_views) = load_accounts!(&unique_accounts, 0, 4);
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
 	let result = account_views[0].as_associated_token_account_checked(&wallet, &mint, &token::ID);
 	assert!(matches!(result, Err(ProgramError::InvalidSeeds)));
 }

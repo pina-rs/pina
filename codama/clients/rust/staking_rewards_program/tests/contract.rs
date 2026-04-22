@@ -76,7 +76,10 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 	let open_ix = open_position.instruction(open_payload);
 	assert_eq!(open_ix.accounts.len(), 4);
 	assert_eq!(open_ix.accounts[0], AccountMeta::new_readonly(admin, true));
-	assert_eq!(open_ix.accounts[1], AccountMeta::new(pool_state, false));
+	assert_eq!(
+		open_ix.accounts[1],
+		AccountMeta::new_readonly(pool_state, false)
+	);
 	assert_eq!(open_ix.accounts[2], AccountMeta::new(position_state, false));
 	assert_eq!(open_ix.data, bytemuck::bytes_of(&open_payload).to_vec());
 
@@ -159,6 +162,10 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 	assert_eq!(
 		claim_ix.accounts[1],
 		AccountMeta::new_readonly(reward_mint, false)
+	);
+	assert_eq!(
+		claim_ix.accounts[2],
+		AccountMeta::new_readonly(pool_state, false)
 	);
 	assert_eq!(
 		claim_ix.accounts[4],

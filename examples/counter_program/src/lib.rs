@@ -152,7 +152,7 @@ pub struct InitializeAccounts<'a> {
 	/// the authority whose address seeds the PDA.
 	pub authority: &'a AccountView,
 	/// The counter PDA account (must be empty — not yet created).
-	pub counter: &'a AccountView,
+	pub counter: &'a mut AccountView,
 	/// The system program, required for `CreateAccount` CPI.
 	pub system_program: &'a AccountView,
 }
@@ -163,7 +163,7 @@ pub struct IncrementAccounts<'a> {
 	/// The counter's authority. Must sign to prove ownership.
 	pub authority: &'a AccountView,
 	/// The counter PDA account (must already exist and be writable).
-	pub counter: &'a AccountView,
+	pub counter: &'a mut AccountView,
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ pub struct IncrementAccounts<'a> {
 // ---------------------------------------------------------------------------
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		// Parse instruction and prepare PDA seeds
 		let args = InitializeInstruction::try_from_bytes(data)?;
 		let authority_key = self.authority.address();
@@ -209,7 +209,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		// Validate instruction discriminator
 		let _ = IncrementInstruction::try_from_bytes(data)?;
 
@@ -222,8 +222,11 @@ impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 			.assert_writable()?
 			.assert_type::<CounterState>(&ID)?;
 
-		let counter = self.counter.as_account::<CounterState>(&ID)?;
-		let seeds_with_bump = counter_seeds!(authority_key.as_ref(), counter.bump);
+		let bump = {
+			let counter = self.counter.as_account::<CounterState>(&ID)?;
+			counter.bump
+		};
+		let seeds_with_bump = counter_seeds!(authority_key.as_ref(), bump);
 		self.counter.assert_seeds_with_bump(seeds_with_bump, &ID)?;
 
 		// Mutate state
@@ -256,7 +259,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: CounterInstruction = parse_instruction(program_id, &ID, data)?;

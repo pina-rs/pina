@@ -3,13 +3,16 @@
 use pina::Address;
 use pina::CpiContext;
 use pina::CpiHandle;
-use pina::MAX_PERMITTED_DATA_INCREASE;
 use pina::ProgramError;
 use pina::ToCpiAccounts;
 use pina::combine_seeds_with_bump;
+#[cfg(feature = "account-resize")]
 use pina::realloc_account;
+#[cfg(feature = "account-resize")]
 use pina::realloc_account_zero;
 use pinocchio::AccountView;
+#[cfg(feature = "account-resize")]
+use pinocchio::account::MAX_PERMITTED_DATA_INCREASE;
 use pinocchio::account::NOT_BORROWED;
 use pinocchio::account::RuntimeAccount;
 use pinocchio::address::MAX_SEEDS;
@@ -26,7 +29,6 @@ fn combine_seeds_with_bump_basic() {
 	assert_eq!(&*result[0], b"escrow");
 	assert_eq!(&*result[1], &[1, 2, 3]);
 	assert_eq!(&*result[2], &[42]);
-	// Remaining slots should be empty.
 	for slot in &result[3..] {
 		assert!(slot.is_empty());
 	}
@@ -61,7 +63,6 @@ fn combine_seeds_with_bump_empty_seeds() {
 
 #[test]
 fn combine_seeds_with_bump_at_max_minus_one() {
-	// MAX_SEEDS - 1 seeds leaves room for exactly one bump slot.
 	let seeds: Vec<&[u8]> = (0..MAX_SEEDS - 1).map(|_| &[1u8][..]).collect();
 	let bump = [7u8; 1];
 
@@ -75,7 +76,6 @@ fn combine_seeds_with_bump_at_max_minus_one() {
 
 #[test]
 fn combine_seeds_with_bump_too_many_seeds_fails() {
-	// MAX_SEEDS seeds leaves no room for the bump — should return Err.
 	let seeds: Vec<&[u8]> = (0..MAX_SEEDS).map(|_| &[1u8][..]).collect();
 	let bump = [7u8; 1];
 
@@ -83,23 +83,23 @@ fn combine_seeds_with_bump_too_many_seeds_fails() {
 	assert!(result.is_err());
 }
 
+#[cfg(feature = "account-resize")]
 #[test]
 fn max_permitted_data_increase_is_10_kib() {
 	assert_eq!(MAX_PERMITTED_DATA_INCREASE, 10_240);
 }
 
-/// Verify that `realloc_account` and `realloc_account_zero` are exported and
-/// have the expected function signatures. This is a compilation-level check;
-/// the actual runtime behavior requires a Solana VM (e.g. mollusk-svm).
+#[cfg(feature = "account-resize")]
 #[test]
 fn realloc_functions_are_exported() {
-	// Confirm that both symbols resolve to function pointers with compatible
-	// signatures. We only inspect the type — calling them requires a live
-	// AccountView which cannot be safely constructed outside the runtime.
-	let _grow: fn(&AccountView, usize, &AccountView, &Address) -> pinocchio::ProgramResult =
+	let _grow: fn(&mut AccountView, usize, &mut AccountView, &Address) -> pinocchio::ProgramResult =
 		realloc_account;
-	let _grow_zero: fn(&AccountView, usize, &AccountView, &Address) -> pinocchio::ProgramResult =
-		realloc_account_zero;
+	let _grow_zero: fn(
+		&mut AccountView,
+		usize,
+		&mut AccountView,
+		&Address,
+	) -> pinocchio::ProgramResult = realloc_account_zero;
 }
 
 #[repr(C)]
@@ -116,7 +116,7 @@ impl<const N: usize> TestAccount<N> {
 				is_signer: u8::from(is_signer),
 				is_writable: u8::from(is_writable),
 				executable: 0,
-				resize_delta: 0,
+				padding: [0; 4],
 				address,
 				owner: Address::new_from_array([9u8; 32]),
 				lamports: 1,

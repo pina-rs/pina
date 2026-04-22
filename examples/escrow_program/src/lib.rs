@@ -35,7 +35,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: EscrowInstruction = parse_instruction(program_id, &ID, data)?;
@@ -98,7 +98,7 @@ pub struct MakeAccounts<'a> {
 	pub mint_a: &'a AccountView,
 	pub mint_b: &'a AccountView,
 	pub maker_ata_a: &'a AccountView,
-	pub escrow: &'a AccountView,
+	pub escrow: &'a mut AccountView,
 	pub vault: &'a AccountView,
 	pub system_program: &'a AccountView,
 	pub token_program: &'a AccountView,
@@ -127,12 +127,12 @@ macro_rules! seeds_escrow {
 }
 
 impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		// Parse instruction and prepare PDA seeds
 		let args = MakeInstruction::try_from_bytes(data)?;
-		let escrow_seeds = seeds_escrow!(self.maker.address().as_ref(), &args.seed.0);
-		let escrow_seeds_with_bump =
-			seeds_escrow!(self.maker.address().as_ref(), &args.seed.0, args.bump);
+		let maker_address = *self.maker.address();
+		let escrow_seeds = seeds_escrow!(maker_address.as_ref(), &args.seed.0);
+		let escrow_seeds_with_bump = seeds_escrow!(maker_address.as_ref(), &args.seed.0, args.bump);
 
 		// Validate accounts
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
@@ -178,6 +178,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			.seed(args.seed)
 			.bump(args.bump)
 			.build();
+		drop(escrow);
 
 		// Create the vault token account
 		associated_token_account::instructions::Create {
@@ -214,16 +215,16 @@ pub struct TakeAccounts<'a> {
 	pub mint_b: &'a AccountView,
 	pub taker_ata_a: &'a AccountView,
 	pub taker_ata_b: &'a AccountView,
-	pub maker: &'a AccountView,
+	pub maker: &'a mut AccountView,
 	pub maker_ata_b: &'a AccountView,
-	pub escrow: &'a AccountView,
+	pub escrow: &'a mut AccountView,
 	pub vault: &'a AccountView,
 	pub token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
 }
 
 impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		// Parse instruction data
 		let _ = TakeInstruction::try_from_bytes(data)?;
 
@@ -258,7 +259,6 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 
 		let (maker, mint_a, mint_b, amount_b, seed, bump) = {
 			let escrow = self.escrow.as_account::<EscrowState>(&ID)?;
-
 			(
 				escrow.maker,
 				escrow.mint_a,
@@ -317,7 +317,7 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			mint: self.mint_b,
 			to: self.maker_ata_b,
 			authority: self.taker,
-			amount: amount_b.into(),
+			amount: u64::from(amount_b),
 			decimals: self.mint_b.as_token_2022_mint()?.decimals(),
 			token_program: self.token_program.address(),
 		}

@@ -16,6 +16,7 @@ pub struct AccountsStruct {
 pub struct AccountsField {
 	pub name: String,
 	pub docs: Vec<String>,
+	pub is_mutable: bool,
 }
 
 /// Extract all `#[derive(Accounts)]` structs from a file.
@@ -70,15 +71,29 @@ fn extract_account_fields(fields: &syn::Fields) -> Vec<AccountsField> {
 	named
 		.named
 		.iter()
-		.map(|f| {
-			let name = f
+		.map(|field| {
+			let name = field
 				.ident
 				.as_ref()
 				.map_or_else(|| "unknown".to_owned(), ToString::to_string);
-			let docs = extract_docs(&f.attrs);
-			AccountsField { name, docs }
+			let docs = extract_docs(&field.attrs);
+			let is_mutable = type_is_mutable_account(&field.ty);
+
+			AccountsField {
+				name,
+				docs,
+				is_mutable,
+			}
 		})
 		.collect()
+}
+
+fn type_is_mutable_account(ty: &syn::Type) -> bool {
+	let syn::Type::Reference(reference) = ty else {
+		return false;
+	};
+
+	reference.mutability.is_some()
 }
 
 #[cfg(test)]
@@ -106,5 +121,27 @@ mod tests {
 		assert_eq!(structs[0].fields[0].name, "authority");
 		assert_eq!(structs[0].fields[1].name, "counter");
 		assert_eq!(structs[0].fields[2].name, "system_program");
+		assert!(structs[0].fields.iter().all(|field| !field.is_mutable));
+	}
+
+	#[test]
+	fn extracts_mutable_account_fields() {
+		let source = r#"
+			#[derive(Accounts, Debug)]
+			pub struct UpdateAccounts<'a> {
+				pub authority: &'a AccountView,
+				pub state: &'a mut AccountView,
+				#[pina(remaining)]
+				pub remaining: &'a mut [AccountView],
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let structs = extract_accounts_structs(&file);
+
+		assert_eq!(structs.len(), 1);
+		assert_eq!(structs[0].fields.len(), 3);
+		assert!(!structs[0].fields[0].is_mutable);
+		assert!(structs[0].fields[1].is_mutable);
+		assert!(structs[0].fields[2].is_mutable);
 	}
 }

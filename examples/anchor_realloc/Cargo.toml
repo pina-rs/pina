@@ -16,7 +16,7 @@ crate-type = ["cdylib", "lib"]
 bpf-entrypoint = []
 
 [dependencies]
-pina = { workspace = true, features = ["derive"] }
+pina = { workspace = true, features = ["account-resize", "derive"] }
 
 [lints]
 workspace = true

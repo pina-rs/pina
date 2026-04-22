@@ -40,11 +40,11 @@ pub struct WithdrawInstruction {
 #[derive(Accounts, Debug)]
 pub struct WithdrawAccounts<'a> {
 	pub authority: &'a AccountView,
-	pub vault: &'a AccountView,
+	pub vault: &'a mut AccountView,
 }
 
 impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = WithdrawInstruction::try_from_bytes(data)?;
 
 		// BUG: No `assert_signer()` check on authority!

@@ -42,7 +42,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		_accounts: &[AccountView],
+		_accounts: &mut [AccountView],
 		instruction_data: &[u8],
 	) -> ProgramResult {
 		let instruction: PinaBpfInstruction = parse_instruction(program_id, &ID, instruction_data)?;

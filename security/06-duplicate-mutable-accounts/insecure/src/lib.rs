@@ -40,12 +40,12 @@ pub struct TransferInstruction {
 #[derive(Accounts, Debug)]
 pub struct TransferAccounts<'a> {
 	pub authority: &'a AccountView,
-	pub source: &'a AccountView,
-	pub dest: &'a AccountView,
+	pub source: &'a mut AccountView,
+	pub dest: &'a mut AccountView,
 }
 
 impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = TransferInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;

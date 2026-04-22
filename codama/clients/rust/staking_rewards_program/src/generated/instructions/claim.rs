@@ -60,7 +60,10 @@ impl Claim {
 			self.reward_mint,
 			false,
 		));
-		accounts.push(solana_instruction::AccountMeta::new(self.pool_state, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.pool_state,
+			false,
+		));
 		accounts.push(solana_instruction::AccountMeta::new(
 			self.position_state,
 			false,

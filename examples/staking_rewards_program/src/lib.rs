@@ -35,7 +35,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: StakingInstruction = parse_instruction(program_id, &ID, data)?;
@@ -128,7 +128,7 @@ pub struct InitializePoolAccounts<'a> {
 	pub admin: &'a AccountView,
 	pub stake_mint: &'a AccountView,
 	pub reward_mint: &'a AccountView,
-	pub pool_state: &'a AccountView,
+	pub pool_state: &'a mut AccountView,
 	pub stake_vault: &'a AccountView,
 	pub reward_vault: &'a AccountView,
 	pub system_program: &'a AccountView,
@@ -139,7 +139,7 @@ pub struct InitializePoolAccounts<'a> {
 pub struct OpenPositionAccounts<'a> {
 	pub user: &'a AccountView,
 	pub pool_state: &'a AccountView,
-	pub position_state: &'a AccountView,
+	pub position_state: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 }
 
@@ -147,8 +147,8 @@ pub struct OpenPositionAccounts<'a> {
 pub struct DepositAccounts<'a> {
 	pub user: &'a AccountView,
 	pub stake_mint: &'a AccountView,
-	pub pool_state: &'a AccountView,
-	pub position_state: &'a AccountView,
+	pub pool_state: &'a mut AccountView,
+	pub position_state: &'a mut AccountView,
 	pub user_stake_ata: &'a AccountView,
 	pub token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
@@ -158,8 +158,8 @@ pub struct DepositAccounts<'a> {
 pub struct WithdrawAccounts<'a> {
 	pub user: &'a AccountView,
 	pub stake_mint: &'a AccountView,
-	pub pool_state: &'a AccountView,
-	pub position_state: &'a AccountView,
+	pub pool_state: &'a mut AccountView,
+	pub position_state: &'a mut AccountView,
 	pub user_stake_ata: &'a AccountView,
 	pub token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
@@ -170,7 +170,7 @@ pub struct ClaimAccounts<'a> {
 	pub user: &'a AccountView,
 	pub reward_mint: &'a AccountView,
 	pub pool_state: &'a AccountView,
-	pub position_state: &'a AccountView,
+	pub position_state: &'a mut AccountView,
 	pub user_reward_ata: &'a AccountView,
 	pub token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
@@ -229,7 +229,7 @@ fn assert_position_access(
 }
 
 impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		// Parse instruction and prepare PDA seeds
 		let args = InitializePoolInstruction::try_from_bytes(data)?;
 		let pool_seeds = pool_seeds!(
@@ -289,6 +289,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 			.paused(PodBool::from_bool(false))
 			.bump(args.bump)
 			.build();
+		drop(pool_state);
 
 		// Create stake vault
 		associated_token_account::instructions::Create {
@@ -317,15 +318,13 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		// Parse instruction and prepare PDA seeds
 		let args = OpenPositionInstruction::try_from_bytes(data)?;
-		let position_seeds = position_seeds!(
-			self.pool_state.address().as_ref(),
-			self.user.address().as_ref()
-		);
+		let pool_address = *self.pool_state.address();
+		let position_seeds = position_seeds!(pool_address.as_ref(), self.user.address().as_ref());
 		let position_seeds_with_bump = position_seeds!(
-			self.pool_state.address().as_ref(),
+			pool_address.as_ref(),
 			self.user.address().as_ref(),
 			args.bump
 		);
@@ -335,7 +334,6 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 		self.system_program.assert_address(&system::ID)?;
 		self.pool_state
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<PoolState>(&ID)?;
 		self.position_state
 			.assert_empty()?
@@ -373,7 +371,7 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		// Parse instruction data
 		let args = DepositInstruction::try_from_bytes(data)?;
 		let amount: u64 = args.amount.into();
@@ -400,35 +398,41 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 			)?;
 
 		// Validate pool and position state
-		let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
-		let position_state = self.position_state.as_account::<PositionState>(&ID)?;
+		let (staked_amount, reward_debt, total_staked) = {
+			let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
+			let position_state = self.position_state.as_account::<PositionState>(&ID)?;
 
-		if bool::from(pool_state.paused) {
-			return Err(StakingError::PoolPaused.into());
-		}
-		if amount == 0 {
-			return Err(StakingError::InvalidAmount.into());
-		}
-		assert_pool_stake_mint(&pool_state, self.stake_mint)?;
-		assert_position_access(self.pool_state, self.user, &position_state)?;
+			if bool::from(pool_state.paused) {
+				return Err(StakingError::PoolPaused.into());
+			}
+
+			if amount == 0 {
+				return Err(StakingError::InvalidAmount.into());
+			}
+
+			assert_pool_stake_mint(&pool_state, self.stake_mint)?;
+			assert_position_access(self.pool_state, self.user, &position_state)?;
+
+			(
+				u64::from(position_state.staked_amount),
+				u64::from(position_state.reward_debt),
+				u64::from(pool_state.total_staked),
+			)
+		};
 
 		// Calculate updated amounts
-		let staked_amount = u64::from(position_state.staked_amount);
 		let next_staked = staked_amount
 			.checked_add(amount)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
-		let total_staked = u64::from(pool_state.total_staked)
+		let total_staked = total_staked
 			.checked_add(amount)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
-
-		drop(position_state);
-		drop(pool_state);
 
 		// Update position state
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 		position_state.staked_amount = PodU64::from_primitive(next_staked);
 		position_state.reward_debt = PodU64::from_primitive(
-			u64::from(position_state.reward_debt)
+			reward_debt
 				.checked_add(amount)
 				.ok_or(ProgramError::ArithmeticOverflow)?,
 		);
@@ -453,7 +457,7 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		// Parse instruction data
 		let args = WithdrawInstruction::try_from_bytes(data)?;
 		let amount: u64 = args.amount.into();
@@ -480,25 +484,30 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 			)?;
 
 		// Validate pool and position state
-		let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
-		let position_state = self.position_state.as_account::<PositionState>(&ID)?;
+		let (staked_amount, total_staked) = {
+			let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
+			let position_state = self.position_state.as_account::<PositionState>(&ID)?;
 
-		if bool::from(pool_state.paused) {
-			return Err(StakingError::PoolPaused.into());
-		}
-		if amount == 0 {
-			return Err(StakingError::InvalidAmount.into());
-		}
-		assert_pool_stake_mint(&pool_state, self.stake_mint)?;
-		assert_position_access(self.pool_state, self.user, &position_state)?;
+			if bool::from(pool_state.paused) {
+				return Err(StakingError::PoolPaused.into());
+			}
 
-		let staked_amount = u64::from(position_state.staked_amount);
+			if amount == 0 {
+				return Err(StakingError::InvalidAmount.into());
+			}
+
+			assert_pool_stake_mint(&pool_state, self.stake_mint)?;
+			assert_position_access(self.pool_state, self.user, &position_state)?;
+
+			(
+				u64::from(position_state.staked_amount),
+				u64::from(pool_state.total_staked),
+			)
+		};
+
 		if amount > staked_amount {
 			return Err(StakingError::InsufficientBalance.into());
 		}
-
-		drop(position_state);
-		drop(pool_state);
 
 		// Update position state
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
@@ -506,15 +515,14 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 
 		// Update pool state
 		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
-		pool_state.total_staked =
-			PodU64::from_primitive(u64::from(pool_state.total_staked) - amount);
+		pool_state.total_staked = PodU64::from_primitive(total_staked - amount);
 
 		Ok(())
 	}
 }
 
 impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
-	fn process(&self, _data: &[u8]) -> ProgramResult {
+	fn process(self, _data: &[u8]) -> ProgramResult {
 		// Validate accounts
 		self.user.assert_signer()?;
 		self.reward_mint.assert_owners(&SPL_PROGRAM_IDS)?;
@@ -522,7 +530,6 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.pool_state
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<PoolState>(&ID)?;
 		self.position_state
 			.assert_not_empty()?
@@ -537,22 +544,27 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 			)?;
 
 		// Validate pool and position state
-		let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
-		let position_state = self.position_state.as_account::<PositionState>(&ID)?;
+		let (pending_rewards, reward_index) = {
+			let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
+			let position_state = self.position_state.as_account::<PositionState>(&ID)?;
 
-		if bool::from(pool_state.paused) {
-			return Err(StakingError::PoolPaused.into());
-		}
-		assert_pool_reward_mint(&pool_state, self.reward_mint)?;
-		assert_position_access(self.pool_state, self.user, &position_state)?;
+			if bool::from(pool_state.paused) {
+				return Err(StakingError::PoolPaused.into());
+			}
+
+			assert_pool_reward_mint(&pool_state, self.reward_mint)?;
+			assert_position_access(self.pool_state, self.user, &position_state)?;
+
+			(
+				u64::from(position_state.pending_rewards),
+				u64::from(pool_state.reward_index),
+			)
+		};
 
 		// Calculate and update pending rewards
-		let next_pending = u64::from(position_state.pending_rewards)
-			.checked_add(u64::from(pool_state.reward_index))
+		let next_pending = pending_rewards
+			.checked_add(reward_index)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
-
-		drop(position_state);
-		drop(pool_state);
 
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 		position_state.pending_rewards = PodU64::from_primitive(next_pending);

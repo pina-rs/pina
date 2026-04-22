@@ -29,7 +29,7 @@ cargo add pina_macros
 - `#[instruction]`: defines discriminator-first instruction data POD structs.
 - `#[event]`: defines discriminator-first event POD structs.
 - `#[error]`: maps custom enums to `ProgramError::Custom(code)`.
-- `#[derive(Accounts)]`: parses `&[AccountView]` into a named struct.
+- `#[derive(Accounts)]`: parses `&mut [AccountView]` into a named struct of shared and/or mutable account references.
 
 ## Common Usage
 
@@ -51,7 +51,7 @@ pub struct InitializeInstruction {
 #[derive(Accounts)]
 pub struct InitializeAccounts<'a> {
 	pub payer: &'a AccountView,
-	pub state: &'a AccountView,
+	pub state: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 }
 
@@ -94,6 +94,7 @@ pub enum ExampleError {
 <br>
 
 - Supports one lifetime parameter.
+- Supports `&'a AccountView`, `&'a mut AccountView`, `&'a [AccountView]`, and `&'a mut [AccountView]` fields.
 - Supports `#[pina(remaining)]` on a single trailing field to capture remaining accounts.
 - Supports `#[pina(crate = ::pina)]` on the struct to override the crate path.
 

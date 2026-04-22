@@ -113,9 +113,9 @@ pub struct DirectTransferInstruction {
 #[derive(Accounts, Debug)]
 pub struct CpiTransferAccounts<'a> {
 	/// The sender. Must be a signer and writable (lamports will be debited).
-	pub sender: &'a AccountView,
+	pub sender: &'a mut AccountView,
 	/// The recipient. Must be writable (lamports will be credited).
-	pub recipient: &'a AccountView,
+	pub recipient: &'a mut AccountView,
 	/// The system program.
 	pub system_program: &'a AccountView,
 }
@@ -127,9 +127,9 @@ pub struct CpiTransferAccounts<'a> {
 #[derive(Accounts, Debug)]
 pub struct DirectTransferAccounts<'a> {
 	/// The sender. Must be owned by this program, writable, and a signer.
-	pub sender: &'a AccountView,
+	pub sender: &'a mut AccountView,
 	/// The recipient. Must be writable.
-	pub recipient: &'a AccountView,
+	pub recipient: &'a mut AccountView,
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +137,7 @@ pub struct DirectTransferAccounts<'a> {
 // ---------------------------------------------------------------------------
 
 impl<'a> ProcessAccountInfos<'a> for CpiTransferAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = CpiTransferInstruction::try_from_bytes(data)?;
 		let amount: u64 = args.amount.into();
 
@@ -176,7 +176,7 @@ impl<'a> ProcessAccountInfos<'a> for CpiTransferAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for DirectTransferAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = DirectTransferInstruction::try_from_bytes(data)?;
 		let amount: u64 = args.amount.into();
 
@@ -225,7 +225,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: TransferInstruction = parse_instruction(program_id, &ID, data)?;

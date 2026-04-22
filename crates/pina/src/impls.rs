@@ -3,8 +3,8 @@
 use core::mem::size_of;
 
 use pinocchio::ProgramResult;
+#[cfg(feature = "token")]
 use pinocchio::account::Ref as AccountRef;
-use pinocchio::account::RefMut as AccountRefMut;
 use pinocchio_system::instructions::Transfer;
 
 use crate::AccountDeserialize;
@@ -19,362 +19,499 @@ use crate::AsTokenAccount;
 use crate::CloseAccountWithRecipient;
 use crate::HasDiscriminator;
 use crate::LamportTransfer;
-use crate::LoadedAccount;
-use crate::LoadedAccountMut;
 use crate::Pod;
 use crate::ProgramError;
+use crate::Ref;
+use crate::RefMut;
 use crate::log;
 use crate::log_caller;
 
 const SYSVAR_ID: Address = crate::address!("Sysvar1111111111111111111111111111111111111");
 
-impl AccountInfoValidation for AccountView {
-	#[track_caller]
-	fn assert_signer(&self) -> Result<&Self, ProgramError> {
-		if !self.is_signer() {
-			log!(
-				"address: {} is missing a required signature",
-				self.address().as_ref()
-			);
-			log_caller();
-
-			return Err(ProgramError::MissingRequiredSignature);
-		}
-
-		Ok(self)
-	}
-
-	#[track_caller]
-	fn assert_writable(&self) -> Result<&Self, ProgramError> {
-		if !self.is_writable() {
-			log!(
-				"address: {} has not been marked as writable",
-				self.address().as_ref()
-			);
-			log_caller();
-
-			return Err(ProgramError::InvalidAccountData);
-		}
-
-		Ok(self)
-	}
-
-	#[track_caller]
-	fn assert_executable(&self) -> Result<&Self, ProgramError> {
-		if !self.executable() {
-			log!("address: {} is not executable", self.address().as_ref());
-			log_caller();
-
-			return Err(ProgramError::InvalidAccountData);
-		}
-
-		Ok(self)
-	}
-
-	#[track_caller]
-	fn assert_data_len(&self, len: usize) -> Result<&Self, ProgramError> {
-		if self.data_len() != len {
-			log!(
-				"address: {} has an incorrect length",
-				self.address().as_ref()
-			);
-			log_caller();
-
-			return Err(ProgramError::InvalidAccountData);
-		}
-
-		Ok(self)
-	}
-
-	#[track_caller]
-	fn assert_empty(&self) -> Result<&Self, ProgramError> {
-		if !self.is_data_empty() {
-			log!("address: {} is not empty", self.address().as_ref());
-			log_caller();
-
-			return Err(ProgramError::AccountAlreadyInitialized);
-		}
-
-		Ok(self)
-	}
-
-	#[track_caller]
-	fn assert_not_empty(&self) -> Result<&Self, ProgramError> {
-		if self.is_data_empty() {
-			log!("address: {} is empty", self.address().as_ref());
-			log_caller();
-
-			return Err(ProgramError::UninitializedAccount);
-		}
-
-		Ok(self)
-	}
-
-	#[track_caller]
-	fn assert_program(&self, program_id: &Address) -> Result<&Self, ProgramError> {
-		self.assert_address(program_id)?.assert_executable()
-	}
-
-	fn assert_type<T: HasDiscriminator>(
-		&self,
-		program_id: &Address,
-	) -> Result<&Self, ProgramError> {
-		self.assert_owner(program_id)?;
-
-		let data = self.try_borrow()?;
-
-		if !T::matches_discriminator(&data) {
-			log!(
-				"address: {} has invalid discriminator",
-				self.address().as_ref()
-			);
-			log_caller();
-
-			return Err(ProgramError::InvalidAccountData);
-		}
-
-		if data.len() != size_of::<T>() {
-			log!(
-				"address: {} has invalid data length for the account type",
-				self.address().as_ref()
-			);
-			log_caller();
-
-			return Err(ProgramError::AccountDataTooSmall);
-		}
-
-		Ok(self)
-	}
-
-	#[track_caller]
-	fn assert_sysvar(&self, sysvar_id: &Address) -> Result<&Self, ProgramError> {
-		self.assert_owner(&SYSVAR_ID)?.assert_address(sysvar_id)
-	}
-
-	#[track_caller]
-	fn assert_owner(&self, owner: &Address) -> Result<&Self, ProgramError> {
-		// SAFETY: `owner()` is unsafe in pinocchio 0.10.x because it reads from
-		// raw account memory. The Solana runtime guarantees this memory is valid
-		// for the duration of the transaction.
-		let account_owner = unsafe { self.owner() };
-		if account_owner.ne(owner) {
-			log!(
-				"address: {} has invalid owner: {}, required: {}",
-				self.address().as_ref(),
-				account_owner.as_ref(),
-				owner.as_ref()
-			);
-			log_caller();
-
-			return Err(ProgramError::InvalidAccountOwner);
-		}
-
-		Ok(self)
-	}
-
-	#[track_caller]
-	fn assert_owners(&self, owners: &[Address]) -> Result<&Self, ProgramError> {
-		// SAFETY: see `assert_owner` above.
-		let account_owner = unsafe { self.owner() };
-
-		if owners.contains(account_owner) {
-			return Ok(self);
-		}
-
+#[track_caller]
+fn validate_signer(account: &AccountView) -> ProgramResult {
+	if !account.is_signer() {
 		log!(
-			"address: {} has invalid owner: {}",
-			self.address().as_ref(),
-			account_owner.as_ref(),
+			"address: {} is missing a required signature",
+			account.address().as_ref()
 		);
 		log_caller();
 
-		Err(ProgramError::InvalidAccountOwner)
+		return Err(ProgramError::MissingRequiredSignature);
 	}
 
-	#[track_caller]
-	fn assert_address(&self, addr: &Address) -> Result<&Self, ProgramError> {
-		if self.address() == addr {
-			return Ok(self);
-		}
-
-		log!(
-			"address: {} is invalid, expected: {}",
-			self.address().as_ref(),
-			addr.as_ref()
-		);
-		log_caller();
-
-		Err(ProgramError::InvalidAccountData)
-	}
-
-	#[track_caller]
-	fn assert_addresses(&self, addresses: &[Address]) -> Result<&Self, ProgramError> {
-		if addresses.contains(self.address()) {
-			return Ok(self);
-		}
-
-		log!("address: {} is invalid", self.address().as_ref());
-		log_caller();
-
-		Err(ProgramError::InvalidAccountData)
-	}
-
-	#[track_caller]
-	fn assert_seeds(&self, seeds: &[&[u8]], program_id: &Address) -> Result<&Self, ProgramError> {
-		let Some((pda, _bump)) = crate::try_find_program_address(seeds, program_id) else {
-			log!(
-				"could not find program address from seeds with program id: {}",
-				program_id.as_ref()
-			);
-			log_caller();
-
-			return Err(ProgramError::InvalidSeeds);
-		};
-
-		if self.address() == &pda {
-			return Ok(self);
-		}
-
-		log!(
-			"address: {} is invalid, expected pda: {}",
-			self.address().as_ref(),
-			pda.as_ref()
-		);
-		log_caller();
-
-		Err(ProgramError::InvalidSeeds)
-	}
-
-	#[track_caller]
-	fn assert_seeds_with_bump(
-		&self,
-		seeds: &[&[u8]],
-		program_id: &Address,
-	) -> Result<&Self, ProgramError> {
-		let pda = match crate::create_program_address(seeds, program_id) {
-			Ok(pda) => pda,
-			Err(_error) => {
-				log!(
-					"could not create pda for address: {}, with provided seeds and bump",
-					self.address().as_ref(),
-				);
-				log_caller();
-
-				return Err(ProgramError::InvalidSeeds);
-			}
-		};
-
-		if &pda != self.address() {
-			log!(
-				"address: {} is invalid, expected pda: {}",
-				self.address().as_ref(),
-				pda.as_ref()
-			);
-			log_caller();
-
-			return Err(ProgramError::InvalidSeeds);
-		}
-
-		Ok(self)
-	}
-
-	#[track_caller]
-	fn assert_canonical_bump(
-		&self,
-		seeds: &[&[u8]],
-		program_id: &Address,
-	) -> Result<u8, ProgramError> {
-		let Some((pda, bump)) = crate::try_find_program_address(seeds, program_id) else {
-			log!(
-				"could not find program address from seeds with program id: {}",
-				program_id.as_ref()
-			);
-			log_caller();
-			return Err(ProgramError::InvalidSeeds);
-		};
-
-		if pda.eq(self.address()) {
-			return Ok(bump);
-		}
-
-		log!(
-			"address: {} is invalid, expected pda: {}",
-			self.address().as_ref(),
-			pda.as_ref()
-		);
-		log_caller();
-
-		Err(ProgramError::InvalidSeeds)
-	}
-
-	#[cfg(feature = "token")]
-	#[track_caller]
-	fn assert_associated_token_address(
-		&self,
-		wallet: &Address,
-		mint: &Address,
-		token_program: &Address,
-	) -> Result<&Self, ProgramError> {
-		let Some((ata_address, _bump)) =
-			crate::try_get_associated_token_address(wallet, mint, token_program)
-		else {
-			log!(
-				"could not find associated token address for wallet: {}, mint: {}",
-				wallet.as_ref(),
-				mint.as_ref(),
-			);
-			log_caller();
-
-			return Err(ProgramError::InvalidSeeds);
-		};
-
-		if ata_address.eq(self.address()) {
-			return Ok(self);
-		}
-
-		log!(
-			"address: {} is invalid, expected associated token address: {}",
-			self.address().as_ref(),
-			ata_address.as_ref()
-		);
-		log_caller();
-
-		Err(ProgramError::InvalidSeeds)
-	}
+	Ok(())
 }
+
+#[track_caller]
+fn validate_writable(account: &AccountView) -> ProgramResult {
+	if !account.is_writable() {
+		log!(
+			"address: {} has not been marked as writable",
+			account.address().as_ref()
+		);
+		log_caller();
+
+		return Err(ProgramError::InvalidAccountData);
+	}
+
+	Ok(())
+}
+
+#[track_caller]
+fn validate_executable(account: &AccountView) -> ProgramResult {
+	if !account.executable() {
+		log!("address: {} is not executable", account.address().as_ref());
+		log_caller();
+
+		return Err(ProgramError::InvalidAccountData);
+	}
+
+	Ok(())
+}
+
+#[track_caller]
+fn validate_data_len(account: &AccountView, len: usize) -> ProgramResult {
+	if account.data_len() != len {
+		log!(
+			"address: {} has an incorrect length",
+			account.address().as_ref()
+		);
+		log_caller();
+
+		return Err(ProgramError::InvalidAccountData);
+	}
+
+	Ok(())
+}
+
+#[track_caller]
+fn validate_empty(account: &AccountView) -> ProgramResult {
+	if !account.is_data_empty() {
+		log!("address: {} is not empty", account.address().as_ref());
+		log_caller();
+
+		return Err(ProgramError::AccountAlreadyInitialized);
+	}
+
+	Ok(())
+}
+
+#[track_caller]
+fn validate_not_empty(account: &AccountView) -> ProgramResult {
+	if account.is_data_empty() {
+		log!("address: {} is empty", account.address().as_ref());
+		log_caller();
+
+		return Err(ProgramError::UninitializedAccount);
+	}
+
+	Ok(())
+}
+
+#[track_caller]
+fn validate_program(account: &AccountView, program_id: &Address) -> ProgramResult {
+	validate_address(account, program_id)?;
+	validate_executable(account)
+}
+
+#[track_caller]
+fn validate_type<T: HasDiscriminator>(
+	account: &AccountView,
+	program_id: &Address,
+) -> ProgramResult {
+	validate_owner(account, program_id)?;
+
+	let data = account.try_borrow()?;
+
+	if !T::matches_discriminator(&data) {
+		log!(
+			"address: {} has invalid discriminator",
+			account.address().as_ref()
+		);
+		log_caller();
+
+		return Err(ProgramError::InvalidAccountData);
+	}
+
+	if data.len() != size_of::<T>() {
+		log!(
+			"address: {} has invalid data length for the account type",
+			account.address().as_ref()
+		);
+		log_caller();
+
+		return Err(ProgramError::AccountDataTooSmall);
+	}
+
+	Ok(())
+}
+
+#[track_caller]
+fn validate_sysvar(account: &AccountView, sysvar_id: &Address) -> ProgramResult {
+	validate_owner(account, &SYSVAR_ID)?;
+	validate_address(account, sysvar_id)
+}
+
+#[track_caller]
+fn validate_owner(account: &AccountView, owner: &Address) -> ProgramResult {
+	let account_owner = account.owner();
+
+	if account_owner.ne(owner) {
+		log!(
+			"address: {} has invalid owner: {}, required: {}",
+			account.address().as_ref(),
+			account_owner.as_ref(),
+			owner.as_ref()
+		);
+		log_caller();
+
+		return Err(ProgramError::InvalidAccountOwner);
+	}
+
+	Ok(())
+}
+
+#[track_caller]
+fn validate_owners(account: &AccountView, owners: &[Address]) -> ProgramResult {
+	let account_owner = account.owner();
+
+	if owners.contains(account_owner) {
+		return Ok(());
+	}
+
+	log!(
+		"address: {} has invalid owner: {}",
+		account.address().as_ref(),
+		account_owner.as_ref(),
+	);
+	log_caller();
+
+	Err(ProgramError::InvalidAccountOwner)
+}
+
+#[track_caller]
+fn validate_address(account: &AccountView, addr: &Address) -> ProgramResult {
+	if account.address() == addr {
+		return Ok(());
+	}
+
+	log!(
+		"address: {} is invalid, expected: {}",
+		account.address().as_ref(),
+		addr.as_ref()
+	);
+	log_caller();
+
+	Err(ProgramError::InvalidAccountData)
+}
+
+#[track_caller]
+fn validate_addresses(account: &AccountView, addresses: &[Address]) -> ProgramResult {
+	if addresses.contains(account.address()) {
+		return Ok(());
+	}
+
+	log!("address: {} is invalid", account.address().as_ref());
+	log_caller();
+
+	Err(ProgramError::InvalidAccountData)
+}
+
+#[track_caller]
+fn validate_seeds(account: &AccountView, seeds: &[&[u8]], program_id: &Address) -> ProgramResult {
+	let Some((pda, _bump)) = crate::try_find_program_address(seeds, program_id) else {
+		log!(
+			"could not find program address from seeds with program id: {}",
+			program_id.as_ref()
+		);
+		log_caller();
+
+		return Err(ProgramError::InvalidSeeds);
+	};
+
+	if account.address() == &pda {
+		return Ok(());
+	}
+
+	log!(
+		"address: {} is invalid, expected pda: {}",
+		account.address().as_ref(),
+		pda.as_ref()
+	);
+	log_caller();
+
+	Err(ProgramError::InvalidSeeds)
+}
+
+#[track_caller]
+fn validate_seeds_with_bump(
+	account: &AccountView,
+	seeds: &[&[u8]],
+	program_id: &Address,
+) -> ProgramResult {
+	let pda = match crate::create_program_address(seeds, program_id) {
+		Ok(pda) => pda,
+		Err(_error) => {
+			log!(
+				"could not create pda for address: {}, with provided seeds and bump",
+				account.address().as_ref(),
+			);
+			log_caller();
+
+			return Err(ProgramError::InvalidSeeds);
+		}
+	};
+
+	if &pda != account.address() {
+		log!(
+			"address: {} is invalid, expected pda: {}",
+			account.address().as_ref(),
+			pda.as_ref()
+		);
+		log_caller();
+
+		return Err(ProgramError::InvalidSeeds);
+	}
+
+	Ok(())
+}
+
+#[track_caller]
+fn validate_canonical_bump(
+	account: &AccountView,
+	seeds: &[&[u8]],
+	program_id: &Address,
+) -> Result<u8, ProgramError> {
+	let Some((pda, bump)) = crate::try_find_program_address(seeds, program_id) else {
+		log!(
+			"could not find program address from seeds with program id: {}",
+			program_id.as_ref()
+		);
+		log_caller();
+
+		return Err(ProgramError::InvalidSeeds);
+	};
+
+	if pda.eq(account.address()) {
+		return Ok(bump);
+	}
+
+	log!(
+		"address: {} is invalid, expected pda: {}",
+		account.address().as_ref(),
+		pda.as_ref()
+	);
+	log_caller();
+
+	Err(ProgramError::InvalidSeeds)
+}
+
+#[cfg(feature = "token")]
+#[track_caller]
+fn validate_associated_token_address(
+	account: &AccountView,
+	wallet: &Address,
+	mint: &Address,
+	token_program: &Address,
+) -> ProgramResult {
+	let Some((ata_address, _bump)) =
+		crate::try_get_associated_token_address(wallet, mint, token_program)
+	else {
+		log!(
+			"could not find associated token address for wallet: {}, mint: {}",
+			wallet.as_ref(),
+			mint.as_ref(),
+		);
+		log_caller();
+
+		return Err(ProgramError::InvalidSeeds);
+	};
+
+	if ata_address.eq(account.address()) {
+		return Ok(());
+	}
+
+	log!(
+		"address: {} is invalid, expected associated token address: {}",
+		account.address().as_ref(),
+		ata_address.as_ref()
+	);
+	log_caller();
+
+	Err(ProgramError::InvalidSeeds)
+}
+
+macro_rules! impl_account_info_validation {
+	($type:ty) => {
+		impl<'a> AccountInfoValidation for $type {
+			#[track_caller]
+			fn assert_signer(self) -> Result<Self, ProgramError> {
+				validate_signer(self)?;
+
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_writable(self) -> Result<Self, ProgramError> {
+				validate_writable(self)?;
+
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_executable(self) -> Result<Self, ProgramError> {
+				validate_executable(self)?;
+
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_data_len(self, len: usize) -> Result<Self, ProgramError> {
+				validate_data_len(self, len)?;
+
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_empty(self) -> Result<Self, ProgramError> {
+				validate_empty(self)?;
+
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_not_empty(self) -> Result<Self, ProgramError> {
+				validate_not_empty(self)?;
+
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_type<T: HasDiscriminator>(
+				self,
+				program_id: &Address,
+			) -> Result<Self, ProgramError> {
+				validate_type::<T>(self, program_id)?;
+
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_program(self, program_id: &Address) -> Result<Self, ProgramError> {
+				validate_program(self, program_id)?;
+
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_sysvar(self, sysvar_id: &Address) -> Result<Self, ProgramError> {
+				validate_sysvar(self, sysvar_id)?;
+
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_address(self, address: &Address) -> Result<Self, ProgramError> {
+				validate_address(self, address)?;
+
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_addresses(self, addresses: &[Address]) -> Result<Self, ProgramError> {
+				validate_addresses(self, addresses)?;
+
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_owner(self, owner: &Address) -> Result<Self, ProgramError> {
+				validate_owner(self, owner)?;
+
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_owners(self, owners: &[Address]) -> Result<Self, ProgramError> {
+				validate_owners(self, owners)?;
+
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_seeds(
+				self,
+				seeds: &[&[u8]],
+				program_id: &Address,
+			) -> Result<Self, ProgramError> {
+				validate_seeds(self, seeds, program_id)?;
+
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_seeds_with_bump(
+				self,
+				seeds: &[&[u8]],
+				program_id: &Address,
+			) -> Result<Self, ProgramError> {
+				validate_seeds_with_bump(self, seeds, program_id)?;
+
+				Ok(self)
+			}
+
+			#[track_caller]
+			fn assert_canonical_bump(
+				self,
+				seeds: &[&[u8]],
+				program_id: &Address,
+			) -> Result<u8, ProgramError> {
+				validate_canonical_bump(self, seeds, program_id)
+			}
+
+			#[cfg(feature = "token")]
+			#[track_caller]
+			fn assert_associated_token_address(
+				self,
+				wallet: &Address,
+				mint: &Address,
+				token_program: &Address,
+			) -> Result<Self, ProgramError> {
+				validate_associated_token_address(self, wallet, mint, token_program)?;
+
+				Ok(self)
+			}
+		}
+	};
+}
+
+impl_account_info_validation!(&'a AccountView);
+impl_account_info_validation!(&'a mut AccountView);
 
 impl AsAccount for AccountView {
 	#[track_caller]
-	fn as_account<T>(&self, program_id: &Address) -> Result<LoadedAccount<'_, T>, ProgramError>
+	fn as_account<T>(&self, program_id: &Address) -> Result<Ref<'_, T>, ProgramError>
 	where
 		T: AccountDeserialize + HasDiscriminator + Pod,
 	{
 		self.assert_owner(program_id)?;
 		self.assert_data_len(size_of::<T>())?;
 
-		let bytes = self.try_borrow()?;
-		let account = AccountRef::try_map(bytes, |data| T::try_from_bytes(data))
-			.map_err(|(_, error)| error)?;
-
-		Ok(LoadedAccount::new(account))
+		Ref::try_map(self.try_borrow()?, |data| T::try_from_bytes(data))
+			.map_err(|(_guard, error)| error)
 	}
 
 	#[track_caller]
-	fn as_account_mut<T>(
-		&self,
-		program_id: &Address,
-	) -> Result<LoadedAccountMut<'_, T>, ProgramError>
+	fn as_account_mut<T>(&mut self, program_id: &Address) -> Result<RefMut<'_, T>, ProgramError>
 	where
 		T: AccountDeserialize + HasDiscriminator + Pod,
 	{
 		self.assert_owner(program_id)?;
 		self.assert_data_len(size_of::<T>())?;
 
-		let bytes = self.try_borrow_mut()?;
-		let account = AccountRefMut::try_map(bytes, |data| T::try_from_bytes_mut(data))
-			.map_err(|(_, error)| error)?;
-
-		Ok(LoadedAccountMut::new(account))
+		RefMut::try_map(self.try_borrow_mut()?, |data| T::try_from_bytes_mut(data))
+			.map_err(|(_guard, error)| error)
 	}
 }
 
@@ -470,7 +607,7 @@ fn load_token_state<'a, T: ?Sized>(
 	owners: &[Address],
 	minimum_len: usize,
 	from_bytes: unsafe fn(&[u8]) -> &T,
-) -> Result<LoadedAccount<'a, T>, ProgramError> {
+) -> Result<Ref<'a, T>, ProgramError> {
 	account.assert_owners(owners)?;
 
 	if account.data_len() < minimum_len {
@@ -486,26 +623,24 @@ fn load_token_state<'a, T: ?Sized>(
 	let bytes = account.try_borrow()?;
 	let state = AccountRef::map(bytes, |data| {
 		// SAFETY: the base layout length was validated above, the allowed owner
-		// set was validated above, and the returned `LoadedAccount` keeps the
+		// set was validated above, and the returned borrow guard keeps the
 		// underlying runtime borrow alive for the entire lifetime of the typed
 		// access.
 		unsafe { from_bytes(data) }
 	});
 
-	Ok(LoadedAccount::new(state))
+	Ok(state)
 }
 
 #[cfg(feature = "token")]
 impl AsTokenAccount for AccountView {
 	#[track_caller]
-	fn as_token_mint(&self) -> Result<LoadedAccount<'_, crate::token::state::Mint>, ProgramError> {
-		crate::token::state::Mint::from_account_view(self).map(LoadedAccount::new)
+	fn as_token_mint(&self) -> Result<Ref<'_, crate::token::state::Mint>, ProgramError> {
+		crate::token::state::Mint::from_account_view(self)
 	}
 
 	#[track_caller]
-	fn as_token_mint_checked(
-		&self,
-	) -> Result<LoadedAccount<'_, crate::token::state::Mint>, ProgramError> {
+	fn as_token_mint_checked(&self) -> Result<Ref<'_, crate::token::state::Mint>, ProgramError> {
 		self.as_token_mint_checked_with_owners(&[crate::token::ID])
 	}
 
@@ -513,7 +648,7 @@ impl AsTokenAccount for AccountView {
 	fn as_token_mint_checked_with_owners(
 		&self,
 		owners: &[Address],
-	) -> Result<LoadedAccount<'_, crate::token::state::Mint>, ProgramError> {
+	) -> Result<Ref<'_, crate::token::state::Mint>, ProgramError> {
 		load_token_state(
 			self,
 			owners,
@@ -523,16 +658,14 @@ impl AsTokenAccount for AccountView {
 	}
 
 	#[track_caller]
-	fn as_token_account(
-		&self,
-	) -> Result<LoadedAccount<'_, crate::token::state::TokenAccount>, ProgramError> {
-		crate::token::state::TokenAccount::from_account_view(self).map(LoadedAccount::new)
+	fn as_token_account(&self) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError> {
+		crate::token::state::TokenAccount::from_account_view(self)
 	}
 
 	#[track_caller]
 	fn as_token_account_checked(
 		&self,
-	) -> Result<LoadedAccount<'_, crate::token::state::TokenAccount>, ProgramError> {
+	) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError> {
 		self.as_token_account_checked_with_owners(&[crate::token::ID])
 	}
 
@@ -540,7 +673,7 @@ impl AsTokenAccount for AccountView {
 	fn as_token_account_checked_with_owners(
 		&self,
 		owners: &[Address],
-	) -> Result<LoadedAccount<'_, crate::token::state::TokenAccount>, ProgramError> {
+	) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError> {
 		load_token_state(
 			self,
 			owners,
@@ -550,16 +683,14 @@ impl AsTokenAccount for AccountView {
 	}
 
 	#[track_caller]
-	fn as_token_2022_mint(
-		&self,
-	) -> Result<LoadedAccount<'_, crate::token_2022::state::Mint>, ProgramError> {
-		crate::token_2022::state::Mint::from_account_view(self).map(LoadedAccount::new)
+	fn as_token_2022_mint(&self) -> Result<Ref<'_, crate::token_2022::state::Mint>, ProgramError> {
+		crate::token_2022::state::Mint::from_account_view(self)
 	}
 
 	#[track_caller]
 	fn as_token_2022_mint_checked(
 		&self,
-	) -> Result<LoadedAccount<'_, crate::token_2022::state::Mint>, ProgramError> {
+	) -> Result<Ref<'_, crate::token_2022::state::Mint>, ProgramError> {
 		self.as_token_2022_mint_checked_with_owners(&[crate::token_2022::ID])
 	}
 
@@ -567,7 +698,7 @@ impl AsTokenAccount for AccountView {
 	fn as_token_2022_mint_checked_with_owners(
 		&self,
 		owners: &[Address],
-	) -> Result<LoadedAccount<'_, crate::token_2022::state::Mint>, ProgramError> {
+	) -> Result<Ref<'_, crate::token_2022::state::Mint>, ProgramError> {
 		load_token_state(
 			self,
 			owners,
@@ -579,14 +710,14 @@ impl AsTokenAccount for AccountView {
 	#[track_caller]
 	fn as_token_2022_account(
 		&self,
-	) -> Result<LoadedAccount<'_, crate::token_2022::state::TokenAccount>, ProgramError> {
-		crate::token_2022::state::TokenAccount::from_account_view(self).map(LoadedAccount::new)
+	) -> Result<Ref<'_, crate::token_2022::state::TokenAccount>, ProgramError> {
+		crate::token_2022::state::TokenAccount::from_account_view(self)
 	}
 
 	#[track_caller]
 	fn as_token_2022_account_checked(
 		&self,
-	) -> Result<LoadedAccount<'_, crate::token_2022::state::TokenAccount>, ProgramError> {
+	) -> Result<Ref<'_, crate::token_2022::state::TokenAccount>, ProgramError> {
 		self.as_token_2022_account_checked_with_owners(&[crate::token_2022::ID])
 	}
 
@@ -594,7 +725,7 @@ impl AsTokenAccount for AccountView {
 	fn as_token_2022_account_checked_with_owners(
 		&self,
 		owners: &[Address],
-	) -> Result<LoadedAccount<'_, crate::token_2022::state::TokenAccount>, ProgramError> {
+	) -> Result<Ref<'_, crate::token_2022::state::TokenAccount>, ProgramError> {
 		load_token_state(
 			self,
 			owners,
@@ -609,7 +740,7 @@ impl AsTokenAccount for AccountView {
 		owner: &Address,
 		mint: &Address,
 		token_program: &Address,
-	) -> Result<LoadedAccount<'_, crate::token::state::TokenAccount>, ProgramError> {
+	) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError> {
 		let owners = [*token_program];
 		let account = self.assert_associated_token_address(owner, mint, token_program)?;
 
@@ -627,7 +758,7 @@ impl AsTokenAccount for AccountView {
 		owner: &Address,
 		mint: &Address,
 		token_program: &Address,
-	) -> Result<LoadedAccount<'_, crate::token::state::TokenAccount>, ProgramError> {
+	) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError> {
 		self.assert_owner(token_program)?;
 		self.as_associated_token_account(owner, mint, token_program)
 	}
@@ -654,12 +785,32 @@ fn checked_close_balance(sender_balance: u64, recipient_balance: u64) -> Result<
 		.ok_or(ProgramError::ArithmeticOverflow)
 }
 
-impl<'a> LamportTransfer<'a> for AccountView {
+#[track_caller]
+fn checked_close_recipient_balance(
+	account: &AccountView,
+	recipient: &AccountView,
+) -> Result<u64, ProgramError> {
+	account.assert_writable()?;
+	recipient.assert_writable()?;
+
+	if account.address() == recipient.address() {
+		log!("Could not close account: recipient must differ from account");
+		log_caller();
+		return Err(ProgramError::InvalidArgument);
+	}
+
+	checked_close_balance(account.lamports(), recipient.lamports()).inspect_err(|_| {
+		log!("Could not close account: lamport overflow");
+		log_caller();
+	})
+}
+
+impl LamportTransfer for AccountView {
 	/// Send the specified lamports to the `recipient` account.
 	/// The sender must be writable and owned by the executing program.
 	#[inline(always)]
 	#[track_caller]
-	fn send(&'a self, lamports: u64, recipient: &'a AccountView) -> ProgramResult {
+	fn send(&mut self, lamports: u64, recipient: &mut AccountView) -> ProgramResult {
 		self.assert_writable()?;
 		recipient.assert_writable()?;
 
@@ -678,9 +829,11 @@ impl<'a> LamportTransfer<'a> for AccountView {
 					ProgramError::InsufficientFunds => {
 						log!("Could not subtract lamports: insufficient funds");
 					}
+
 					ProgramError::ArithmeticOverflow => {
 						log!("Could not add lamports: arithmetic overflow");
 					}
+
 					_ => {}
 				}
 				log_caller();
@@ -696,7 +849,7 @@ impl<'a> LamportTransfer<'a> for AccountView {
 	/// The `from` account must be mutable and a signer for this to be
 	/// possible.
 	#[inline(always)]
-	fn collect(&'a self, lamports: u64, from: &'a AccountView) -> Result<(), ProgramError> {
+	fn collect(&self, lamports: u64, from: &AccountView) -> Result<(), ProgramError> {
 		Transfer {
 			from,
 			to: self,
@@ -706,26 +859,26 @@ impl<'a> LamportTransfer<'a> for AccountView {
 	}
 }
 
-impl<'a> CloseAccountWithRecipient<'a> for AccountView {
+impl CloseAccountWithRecipient for AccountView {
 	#[track_caller]
-	fn close_with_recipient(&'a self, recipient: &'a AccountView) -> ProgramResult {
-		self.assert_writable()?;
-		recipient.assert_writable()?;
-
-		if self.address() == recipient.address() {
-			log!("Could not close account: recipient must differ from account");
-			log_caller();
-			return Err(ProgramError::InvalidArgument);
-		}
-
-		let new_balance = checked_close_balance(self.lamports(), recipient.lamports())
-			.inspect_err(|_| {
-				log!("Could not close account: lamport overflow");
-				log_caller();
-			})?;
+	fn close_with_recipient(&mut self, recipient: &mut AccountView) -> ProgramResult {
+		let new_balance = checked_close_recipient_balance(self, recipient)?;
 		recipient.set_lamports(new_balance);
 		self.set_lamports(0);
-		self.resize(0)?;
+		self.close()
+	}
+
+	#[track_caller]
+	fn close_account_zeroed(&mut self, recipient: &mut AccountView) -> ProgramResult {
+		let new_balance = checked_close_recipient_balance(self, recipient)?;
+
+		{
+			let mut data = self.try_borrow_mut()?;
+			data.fill(0);
+		}
+
+		recipient.set_lamports(new_balance);
+		self.set_lamports(0);
 		self.close()
 	}
 }

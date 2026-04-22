@@ -38,11 +38,13 @@ cargo add pina --features token
 
 <!-- {=pinaFeatureFlags} -->
 
-| Feature  | Default | Description                                                |
-| -------- | ------- | ---------------------------------------------------------- |
-| `derive` | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.) |
-| `logs`   | Yes     | Enables on-chain logging via `solana-program-log`          |
-| `token`  | No      | Enables SPL token / token-2022 helpers and ATA utilities   |
+| Feature          | Default | Description                                                     |
+| ---------------- | ------- | --------------------------------------------------------------- |
+| `derive`         | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.)      |
+| `logs`           | Yes     | Enables on-chain logging via `solana-program-log`               |
+| `token`          | No      | Enables SPL token / token-2022 helpers and ATA utilities        |
+| `memo`           | No      | Enables memo program helpers via `pina::memo`                   |
+| `account-resize` | No      | Enables account realloc helpers that call Pinocchio resize APIs |
 
 <!-- {/pinaFeatureFlags} -->
 
@@ -69,7 +71,7 @@ nostd_entrypoint!(process_instruction);
 
 fn process_instruction(
 	program_id: &Address,
-	accounts: &[AccountView],
+	accounts: &mut [AccountView],
 	data: &[u8],
 ) -> ProgramResult {
 	let ix: Instruction = parse_instruction(program_id, &ID, data)?;

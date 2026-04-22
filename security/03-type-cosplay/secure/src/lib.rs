@@ -43,11 +43,11 @@ pub struct AdminActionInstruction {
 #[derive(Accounts, Debug)]
 pub struct AdminActionAccounts<'a> {
 	pub authority: &'a AccountView,
-	pub config: &'a AccountView,
+	pub config: &'a mut AccountView,
 }
 
 impl<'a> ProcessAccountInfos<'a> for AdminActionAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = AdminActionInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
@@ -57,9 +57,12 @@ impl<'a> ProcessAccountInfos<'a> for AdminActionAccounts<'a> {
 		// (1) doesn't match AdminConfig's discriminator (2).
 		self.config.assert_type::<AdminConfig>(&ID)?;
 
-		let config = self.config.as_account::<AdminConfig>(&ID)?;
+		let authority = {
+			let config = self.config.as_account::<AdminConfig>(&ID)?;
+			config.authority
+		};
 
-		self.authority.assert_address(&config.authority)?;
+		self.authority.assert_address(&authority)?;
 
 		let mut config_mut = self.config.as_account_mut::<AdminConfig>(&ID)?;
 		config_mut.fee = args.new_fee;

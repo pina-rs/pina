@@ -57,12 +57,12 @@ const SEED: &[u8] = b"state";
 #[derive(Accounts, Debug)]
 pub struct CreateConfigAccounts<'a> {
 	pub authority: &'a AccountView,
-	pub config: &'a AccountView,
+	pub config: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 }
 
 impl<'a> ProcessAccountInfos<'a> for CreateConfigAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = CreateConfigInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;

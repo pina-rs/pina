@@ -27,6 +27,21 @@ struct TestAccountsRemaining<'a> {
 	pub remaining: &'a [AccountView],
 }
 
+#[derive(Accounts, Debug)]
+#[pina(crate = pina)]
+struct TestAccountsMut<'a> {
+	pub one: &'a mut AccountView,
+	pub two: &'a mut AccountView,
+}
+
+#[derive(Accounts)]
+#[pina(crate = pina)]
+struct TestAccountsRemainingMut<'a> {
+	pub one: &'a mut AccountView,
+	#[pina(remaining)]
+	pub remaining: &'a mut [AccountView],
+}
+
 #[test]
 fn test_accounts_derive_exact() {
 	let ix_data = [3u8; 100];
@@ -36,12 +51,14 @@ fn test_accounts_derive_exact() {
 	let mut accounts = [UNINIT; 2];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
-	let accounts: &[AccountView] =
-		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
+	let accounts: &mut [AccountView] =
+		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
+	let one_ptr = core::ptr::addr_of!(accounts[0]);
+	let two_ptr = core::ptr::addr_of!(accounts[1]);
 
 	let test_accounts = TestAccounts::try_from_account_infos(accounts).unwrap();
-	assert_eq!(test_accounts.one, &accounts[0]);
-	assert_eq!(test_accounts.two, &accounts[1]);
+	assert_eq!(test_accounts.one as *const AccountView, one_ptr);
+	assert_eq!(test_accounts.two as *const AccountView, two_ptr);
 }
 
 #[test]
@@ -53,8 +70,8 @@ fn test_accounts_derive_exact_not_enough() {
 	let mut accounts = [UNINIT; 1];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
-	let not_enough_accounts: &[AccountView] =
-		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
+	let not_enough_accounts: &mut [AccountView] =
+		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
 
 	let result = TestAccounts::try_from_account_infos(not_enough_accounts);
 	assert!(matches!(result, Err(ProgramError::NotEnoughAccountKeys)));
@@ -69,8 +86,8 @@ fn test_accounts_derive_exact_excess() {
 	let mut accounts = [UNINIT; 4];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
-	let too_many_accounts: &[AccountView] =
-		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
+	let too_many_accounts: &mut [AccountView] =
+		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
 
 	let result = TestAccounts::try_from_account_infos(too_many_accounts);
 	assert!(result.is_err_and(|error| error.eq(&PinaProgramError::TooManyAccountKeys.into())));
@@ -84,11 +101,12 @@ fn test_accounts_derive_remaining_excess() {
 	let mut accounts = [UNINIT; 20];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
-	let accounts: &[AccountView] =
-		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
+	let accounts: &mut [AccountView] =
+		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
+	let one_ptr = core::ptr::addr_of!(accounts[0]);
 
 	let test_accounts = TestAccountsRemaining::try_from_account_infos(accounts).unwrap();
-	assert_eq!(test_accounts.one, &accounts[0]);
+	assert_eq!(test_accounts.one as *const AccountView, one_ptr);
 	assert_eq!(test_accounts.remaining.len(), 19);
 }
 
@@ -100,12 +118,46 @@ fn test_accounts_derive_remaining_exact() {
 	let mut accounts = [UNINIT; 1];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
-	let accounts: &[AccountView] =
-		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
+	let accounts: &mut [AccountView] =
+		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
+	let one_ptr = core::ptr::addr_of!(accounts[0]);
 
 	let test_accounts = TestAccountsRemaining::try_from_account_infos(accounts).unwrap();
-	assert_eq!(test_accounts.one, &accounts[0]);
+	assert_eq!(test_accounts.one as *const AccountView, one_ptr);
 	assert_eq!(test_accounts.remaining.len(), 0);
+}
+
+#[test]
+fn test_accounts_derive_exact_mutable() {
+	let ix_data = [3u8; 100];
+	let mut input = unsafe { create_input(2, &ix_data) };
+	let mut accounts = [UNINIT; 2];
+
+	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
+	let accounts: &mut [AccountView] =
+		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
+	let one_ptr = core::ptr::addr_of_mut!(accounts[0]);
+	let two_ptr = core::ptr::addr_of_mut!(accounts[1]);
+
+	let test_accounts = TestAccountsMut::try_from_account_infos(accounts).unwrap();
+	assert_eq!(test_accounts.one as *mut AccountView, one_ptr);
+	assert_eq!(test_accounts.two as *mut AccountView, two_ptr);
+}
+
+#[test]
+fn test_accounts_derive_remaining_mutable() {
+	let ix_data = [3u8; 100];
+	let mut input = unsafe { create_input(4, &ix_data) };
+	let mut accounts = [UNINIT; 4];
+
+	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
+	let accounts: &mut [AccountView] =
+		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
+	let one_ptr = core::ptr::addr_of_mut!(accounts[0]);
+
+	let test_accounts = TestAccountsRemainingMut::try_from_account_infos(accounts).unwrap();
+	assert_eq!(test_accounts.one as *mut AccountView, one_ptr);
+	assert_eq!(test_accounts.remaining.len(), 3);
 }
 
 /// The mock program ID used for testing.

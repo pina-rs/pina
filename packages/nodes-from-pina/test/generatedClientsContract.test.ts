@@ -232,7 +232,7 @@ describe("role registry JS client contracts", () => {
 		} as any);
 		expect(init.programAddress).toBe(ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS);
 		expectAccountsMatch(init.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: WRITABLE },
 			{ address: registryConfig, role: WRITABLE },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 		]);
@@ -250,7 +250,7 @@ describe("role registry JS client contracts", () => {
 			bump: 7,
 		} as any);
 		expectAccountsMatch(addRole.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: WRITABLE },
 			{ address: grantee, role: READONLY },
 			{ address: registryConfig, role: WRITABLE },
 			{ address: roleEntry, role: WRITABLE },
@@ -270,7 +270,7 @@ describe("role registry JS client contracts", () => {
 		} as any);
 		expectAccountsMatch(updateRole.accounts, [
 			{ address: admin, role: READONLY },
-			{ address: registryConfig, role: WRITABLE },
+			{ address: registryConfig, role: READONLY },
 			{ address: roleEntry, role: WRITABLE },
 		]);
 		expect(
@@ -287,7 +287,7 @@ describe("role registry JS client contracts", () => {
 		} as any);
 		expectAccountsMatch(deactivateRole.accounts, [
 			{ address: admin, role: READONLY },
-			{ address: registryConfig, role: WRITABLE },
+			{ address: registryConfig, role: READONLY },
 			{ address: roleEntry, role: WRITABLE },
 		]);
 		expect(
@@ -397,7 +397,7 @@ describe("staking rewards JS client contracts", () => {
 		} as any);
 		expectAccountsMatch(openPosition.accounts, [
 			{ address: admin, role: READONLY },
-			{ address: poolState, role: WRITABLE },
+			{ address: poolState, role: READONLY },
 			{ address: positionState, role: WRITABLE },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 		]);
@@ -462,7 +462,7 @@ describe("staking rewards JS client contracts", () => {
 		expectAccountsMatch(claim.accounts, [
 			{ address: admin, role: READONLY },
 			{ address: rewardMint, role: READONLY },
-			{ address: poolState, role: WRITABLE },
+			{ address: poolState, role: READONLY },
 			{ address: positionState, role: WRITABLE },
 			{ address: userRewardAta, role: WRITABLE },
 			{ address: tokenProgram, role: READONLY },

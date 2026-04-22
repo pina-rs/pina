@@ -33,7 +33,7 @@ pub struct DepositAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = DepositInstruction::try_from_bytes(data)?;
 
 		self.depositor.assert_signer()?;

@@ -69,18 +69,18 @@ macro_rules! todo_seeds {
 #[derive(Accounts, Debug)]
 pub struct InitializeAccounts<'a> {
 	pub owner: &'a AccountView,
-	pub todo: &'a AccountView,
+	pub todo: &'a mut AccountView,
 	pub system_program: &'a AccountView,
 }
 
 #[derive(Accounts, Debug)]
 pub struct UpdateAccounts<'a> {
 	pub owner: &'a AccountView,
-	pub todo: &'a AccountView,
+	pub todo: &'a mut AccountView,
 }
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		// Parse instruction and prepare PDA seeds
 		let args = InitializeInstruction::try_from_bytes(data)?;
 		let owner = self.owner.address();
@@ -114,7 +114,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		// Parse instruction data
 		let owner = self.owner.address();
 		let instruction = parse_instruction::<TodoInstruction>(&ID, &ID, data)?;
@@ -131,10 +131,13 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 			.assert_writable()?
 			.assert_type::<TodoState>(&ID)?;
 
-		let todo = self.todo.as_account::<TodoState>(&ID)?;
-		self.owner.assert_address(&todo.owner)?;
+		let bump = {
+			let todo = self.todo.as_account::<TodoState>(&ID)?;
+			self.owner.assert_address(&todo.owner)?;
+			todo.bump
+		};
 
-		let seeds_with_bump = todo_seeds!(owner.as_ref(), todo.bump);
+		let seeds_with_bump = todo_seeds!(owner.as_ref(), bump);
 		self.todo.assert_seeds_with_bump(seeds_with_bump, &ID)?;
 
 		// Execute instruction
@@ -173,7 +176,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: TodoInstruction = parse_instruction(program_id, &ID, data)?;

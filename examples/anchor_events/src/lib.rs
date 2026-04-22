@@ -108,7 +108,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		_accounts: &[AccountView],
+		_accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: EventsInstruction = parse_instruction(program_id, &ID, data)?;

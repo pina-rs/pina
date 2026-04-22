@@ -13,6 +13,7 @@ import {
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type ReadonlyAccount,
 	type ReadonlySignerAccount,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
@@ -46,7 +47,7 @@ export type DeactivateRoleInstruction<
 					& AccountSignerMeta<TAccountAdmin>
 				: TAccountAdmin,
 			TAccountRegistryConfig extends string
-				? WritableAccount<TAccountRegistryConfig>
+				? ReadonlyAccount<TAccountRegistryConfig>
 				: TAccountRegistryConfig,
 			TAccountRoleEntry extends string ? WritableAccount<TAccountRoleEntry>
 				: TAccountRoleEntry,
@@ -90,7 +91,7 @@ export function getDeactivateRoleInstruction<
 	// Original accounts.
 	const originalAccounts = {
 		admin: { value: input.admin ?? null, isWritable: false },
-		registryConfig: { value: input.registryConfig ?? null, isWritable: true },
+		registryConfig: { value: input.registryConfig ?? null, isWritable: false },
 		roleEntry: { value: input.roleEntry ?? null, isWritable: true },
 	};
 	const accounts = originalAccounts as Record<

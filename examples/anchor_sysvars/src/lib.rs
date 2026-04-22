@@ -37,7 +37,7 @@ pub struct SysvarsAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for SysvarsAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let _ = SysvarsCheckInstruction::try_from_bytes(data)?;
 
 		self.clock.assert_sysvar(&CLOCK_SYSVAR_ID)?;
@@ -57,7 +57,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: SysvarsInstruction = parse_instruction(program_id, &ID, data)?;

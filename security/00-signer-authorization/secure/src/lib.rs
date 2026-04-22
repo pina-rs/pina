@@ -36,7 +36,7 @@ pub struct WithdrawInstruction {
 #[derive(Accounts, Debug)]
 pub struct WithdrawAccounts<'a> {
 	pub authority: &'a AccountView,
-	pub vault: &'a AccountView,
+	pub vault: &'a mut AccountView,
 }
 
 fn checked_withdraw_balance(current: u64, amount: u64) -> Result<u64, ProgramError> {
@@ -46,7 +46,7 @@ fn checked_withdraw_balance(current: u64, amount: u64) -> Result<u64, ProgramErr
 }
 
 impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = WithdrawInstruction::try_from_bytes(data)?;
 
 		// SECURE: Verify the authority signed this transaction.
@@ -56,13 +56,16 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 			.assert_writable()?
 			.assert_type::<VaultState>(&ID)?;
 
-		let vault = self.vault.as_account::<VaultState>(&ID)?;
+		let current = {
+			let vault = self.vault.as_account::<VaultState>(&ID)?;
 
-		// Also verify the authority matches the vault's stored authority.
-		self.authority.assert_address(&vault.authority)?;
+			// Also verify the authority matches the vault's stored authority.
+			self.authority.assert_address(&vault.authority)?;
+
+			u64::from(vault.balance)
+		};
 
 		let mut vault = self.vault.as_account_mut::<VaultState>(&ID)?;
-		let current: u64 = vault.balance.into();
 		let amount: u64 = args.amount.into();
 
 		vault.balance = PodU64::from_primitive(checked_withdraw_balance(current, amount)?);

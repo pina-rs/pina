@@ -192,11 +192,11 @@ unsafe fn create_test_input(accounts: &[AccountBuilder], instruction_data: &[u8]
 unsafe fn deserialize_test_input<const MAX_ACCOUNTS: usize>(
 	input: &mut AlignedMemory,
 	accounts: &mut [MaybeUninit<AccountView>; MAX_ACCOUNTS],
-) -> (&'static [AccountView], &'static [u8]) {
+) -> (&'static mut [AccountView], &'static [u8]) {
 	let (_program_id, count, ix_data) =
 		unsafe { entrypoint::deserialize::<MAX_ACCOUNTS>(input.as_mut_ptr(), accounts) };
-	let accounts: &[AccountView] =
-		unsafe { core::slice::from_raw_parts(accounts.as_ptr().cast(), count) };
+	let accounts: &mut [AccountView] =
+		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
 	(accounts, ix_data)
 }
 
@@ -253,19 +253,21 @@ fn as_account_rejects_overlapping_mutable_borrows_under_miri() {
 	let mut accts = [UNINIT; 4];
 	let (account_views, _) = unsafe { deserialize_test_input::<4>(&mut input, &mut accts) };
 
-	let state = account_views[0]
+	let account = account_views[0];
+	let mut shadow = account_views[0];
+	let state = account
 		.as_account::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("typed load failed: {e:?}"));
 	assert_eq!(u64::from(state.value), 77);
 
 	assert!(matches!(
-		account_views[0].try_borrow_mut(),
+		shadow.try_borrow_mut(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 
 	drop(state);
 
-	assert!(account_views[0].try_borrow_mut().is_ok());
+	assert!(shadow.try_borrow_mut().is_ok());
 }
 
 #[test]
@@ -284,23 +286,25 @@ fn as_account_mut_rejects_shared_and_mutable_reborrows_under_miri() {
 	let mut accts = [UNINIT; 4];
 	let (account_views, _) = unsafe { deserialize_test_input::<4>(&mut input, &mut accts) };
 
-	let mut state = account_views[0]
+	let mut account = account_views[0];
+	let mut shadow = account_views[0];
+	let mut state = account
 		.as_account_mut::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("typed mutable load failed: {e:?}"));
 	state.value = PodU64::from_primitive(99);
 
 	assert!(matches!(
-		account_views[0].try_borrow(),
+		shadow.try_borrow(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 	assert!(matches!(
-		account_views[0].try_borrow_mut(),
+		shadow.try_borrow_mut(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 
 	drop(state);
 
-	let state = account_views[0]
+	let state = account
 		.as_account::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("typed reload failed: {e:?}"));
 	assert_eq!(u64::from(state.value), 99);
@@ -323,20 +327,22 @@ fn as_token_mint_rejects_overlapping_mutable_borrows_under_miri() {
 	let mut accts = [UNINIT; 4];
 	let (account_views, _) = unsafe { deserialize_test_input::<4>(&mut input, &mut accts) };
 
-	let mint = account_views[0]
+	let account = account_views[0];
+	let mut shadow = account_views[0];
+	let mint = account
 		.as_token_mint()
 		.unwrap_or_else(|e| panic!("mint load failed: {e:?}"));
 	assert_eq!(mint.decimals(), 6);
 	assert_eq!(mint.supply(), 1_000);
 
 	assert!(matches!(
-		account_views[0].try_borrow_mut(),
+		shadow.try_borrow_mut(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 
 	drop(mint);
 
-	assert!(account_views[0].try_borrow_mut().is_ok());
+	assert!(shadow.try_borrow_mut().is_ok());
 }
 
 #[cfg(feature = "token")]
@@ -358,7 +364,9 @@ fn as_token_account_checked_with_owners_supports_token_2022_under_miri() {
 	let mut accts = [UNINIT; 4];
 	let (account_views, _) = unsafe { deserialize_test_input::<4>(&mut input, &mut accts) };
 
-	let token_account = account_views[0]
+	let account = account_views[0];
+	let mut shadow = account_views[0];
+	let token_account = account
 		.as_token_account_checked_with_owners(&[token::ID, token_2022::ID])
 		.unwrap_or_else(|e| panic!("multi-owner token account load failed: {e:?}"));
 	assert_eq!(token_account.amount(), 55);
@@ -366,13 +374,13 @@ fn as_token_account_checked_with_owners_supports_token_2022_under_miri() {
 	assert_eq!(token_account.owner(), &owner);
 
 	assert!(matches!(
-		account_views[0].try_borrow_mut(),
+		shadow.try_borrow_mut(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 
 	drop(token_account);
 
-	assert!(account_views[0].try_borrow_mut().is_ok());
+	assert!(shadow.try_borrow_mut().is_ok());
 }
 
 #[cfg(feature = "token")]
@@ -395,18 +403,20 @@ fn as_associated_token_account_checked_supports_token_2022_under_miri() {
 	let mut accts = [UNINIT; 4];
 	let (account_views, _) = unsafe { deserialize_test_input::<4>(&mut input, &mut accts) };
 
-	let token_account = account_views[0]
+	let account = account_views[0];
+	let mut shadow = account_views[0];
+	let token_account = account
 		.as_associated_token_account_checked(&wallet, &mint, &token_2022::ID)
 		.unwrap_or_else(|e| panic!("associated token account load failed: {e:?}"));
 	assert_eq!(token_account.amount(), 88);
 	assert_eq!(token_account.owner(), &wallet);
 
 	assert!(matches!(
-		account_views[0].try_borrow_mut(),
+		shadow.try_borrow_mut(),
 		Err(ProgramError::AccountBorrowFailed)
 	));
 
 	drop(token_account);
 
-	assert!(account_views[0].try_borrow_mut().is_ok());
+	assert!(shadow.try_borrow_mut().is_ok());
 }

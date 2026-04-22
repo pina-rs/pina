@@ -38,12 +38,12 @@ pub struct ClaimAndCloseInstruction {}
 #[derive(Accounts, Debug)]
 pub struct ClaimAndCloseAccounts<'a> {
 	pub authority: &'a AccountView,
-	pub reward: &'a AccountView,
-	pub recipient: &'a AccountView,
+	pub reward: &'a mut AccountView,
+	pub recipient: &'a mut AccountView,
 }
 
 impl<'a> ProcessAccountInfos<'a> for ClaimAndCloseAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let _ = ClaimAndCloseInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;

@@ -39,7 +39,7 @@ pub struct TakeAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		let _ = TakeInstruction::try_from_bytes(data)?;
 
 		self.taker.assert_signer()?;

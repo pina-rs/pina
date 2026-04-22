@@ -31,15 +31,17 @@ Feature flags:
 
 <!-- {=pinaFeatureFlags} -->
 
-| Feature  | Default | Description                                                |
-| -------- | ------- | ---------------------------------------------------------- |
-| `derive` | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.) |
-| `logs`   | Yes     | Enables on-chain logging via `solana-program-log`          |
-| `token`  | No      | Enables SPL token / token-2022 helpers and ATA utilities   |
+| Feature          | Default | Description                                                     |
+| ---------------- | ------- | --------------------------------------------------------------- |
+| `derive`         | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.)      |
+| `logs`           | Yes     | Enables on-chain logging via `solana-program-log`               |
+| `token`          | No      | Enables SPL token / token-2022 helpers and ATA utilities        |
+| `memo`           | No      | Enables memo program helpers via `pina::memo`                   |
+| `account-resize` | No      | Enables account realloc helpers that call Pinocchio resize APIs |
 
 <!-- {/pinaFeatureFlags} -->
 
-See [ADR 0004](./adrs/0004-no-std-and-no-allocator-boundary.md) and [ADR 0005](./adrs/0005-token-feature-boundaries.md) for the architectural rationale behind these feature and runtime boundaries.
+See [ADR 0004](./adrs/0004-no-std-and-no-allocator-boundary.md) and [ADR 0005](./adrs/0005-token-feature-boundaries.md) for the architectural rationale behind these feature and runtime boundaries. For concrete token CPI patterns, see [Token CPI Recipes](./tutorials/token-cpi-recipes.md).
 
 ## `crates/pina_macros`
 

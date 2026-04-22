@@ -196,7 +196,7 @@ mod tests {
 			mod entrypoint {
 				pub fn process_instruction(
 					program_id: &Address,
-					accounts: &[AccountView],
+					accounts: &mut [AccountView],
 					data: &[u8],
 				) -> ProgramResult {
 					let instruction: CounterInstruction = parse_instruction(program_id, &ID, data)?;
@@ -232,7 +232,7 @@ mod tests {
 			mod entrypoint {
 				pub fn process_instruction(
 					program_id: &Address,
-					accounts: &[AccountView],
+					accounts: &mut [AccountView],
 					data: &[u8],
 				) -> ProgramResult {
 					let instruction: HelloInstruction = parse_instruction(program_id, &ID, data)?;
@@ -258,7 +258,7 @@ mod tests {
 			mod entrypoint {
 				pub fn process_instruction(
 					program_id: &Address,
-					accounts: &[AccountView],
+					accounts: &mut [AccountView],
 					data: &[u8],
 				) -> ProgramResult {
 					let instruction: TodoInstruction = parse_instruction(program_id, &ID, data)?;
@@ -293,7 +293,7 @@ mod tests {
 			mod entrypoint {
 				pub fn process_instruction(
 					program_id: &Address,
-					accounts: &[AccountView],
+					accounts: &mut [AccountView],
 					data: &[u8],
 				) -> ProgramResult {
 					let instruction: DuplicateMutableInstruction = parse_instruction(program_id, &ID, data)?;
@@ -326,7 +326,7 @@ mod tests {
 			mod entrypoint {
 				pub fn process_instruction(
 					program_id: &Address,
-					accounts: &[AccountView],
+					accounts: &mut [AccountView],
 					data: &[u8],
 				) -> ProgramResult {
 					let instruction: ExampleInstruction = parse_instruction(program_id, &ID, data)?;

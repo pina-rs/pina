@@ -28,11 +28,11 @@ An attacker can:
 
 <br>
 
-See [`secure/src/lib.rs`](secure/src/lib.rs). The program calls `zeroed()` on the account data to clear it, then calls `close_with_recipient()` which zeros lamports, resizes to 0, and closes the account.
+See [`secure/src/lib.rs`](secure/src/lib.rs). The program calls `zeroed()` on the account data to clear it, then calls `close_with_recipient()` to transfer the remaining lamports and close the account.
 
 ## Pina API Reference
 
 <br>
 
-- `CloseAccountWithRecipient::close_with_recipient()` — transfers lamports to recipient, resizes data to 0, and closes the account
+- `CloseAccountWithRecipient::close_with_recipient()` — transfers lamports to the recipient and closes the account
 - Account data `zeroed()` method — zeros all account data before closing to prevent stale data reuse

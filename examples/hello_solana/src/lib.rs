@@ -76,8 +76,9 @@ pub struct HelloInstructionData {}
 /// The accounts required by the Hello instruction.
 ///
 /// `#[derive(Accounts)]` generates a `TryFromAccountInfos` implementation that
-/// destructures a `&[AccountView]` slice into named fields, returning
-/// `ProgramError::NotEnoughAccountKeys` if too few accounts are provided.
+/// destructures the mutable entrypoint `AccountView` slice into named fields,
+/// returning `ProgramError::NotEnoughAccountKeys` if too few accounts are
+/// provided.
 #[derive(Accounts, Debug)]
 pub struct HelloAccounts<'a> {
 	/// The user invoking the program. Must be a signer so we can trust the
@@ -99,7 +100,7 @@ pub struct HelloAccounts<'a> {
 /// 2. Assert the user account is a signer.
 /// 3. Log a greeting.
 impl<'a> ProcessAccountInfos<'a> for HelloAccounts<'a> {
-	fn process(&self, data: &[u8]) -> ProgramResult {
+	fn process(self, data: &[u8]) -> ProgramResult {
 		// Validate instruction data (checks the discriminator byte).
 		let _ = HelloInstructionData::try_from_bytes(data)?;
 
@@ -142,7 +143,7 @@ pub mod entrypoint {
 	#[inline(always)]
 	pub fn process_instruction(
 		program_id: &Address,
-		accounts: &[AccountView],
+		accounts: &mut [AccountView],
 		data: &[u8],
 	) -> ProgramResult {
 		let instruction: HelloInstruction = parse_instruction(program_id, &ID, data)?;
