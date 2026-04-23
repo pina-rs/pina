@@ -82,7 +82,9 @@ impl Take {
 			self.taker_ata_b,
 			false,
 		));
-		accounts.push(solana_instruction::AccountMeta::new(self.maker, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.maker, false,
+		));
 		accounts.push(solana_instruction::AccountMeta::new(
 			self.maker_ata_b,
 			false,

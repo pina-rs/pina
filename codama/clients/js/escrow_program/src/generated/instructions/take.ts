@@ -63,7 +63,7 @@ export type TakeInstruction<
 				: TAccountTakerAtaA,
 			TAccountTakerAtaB extends string ? WritableAccount<TAccountTakerAtaB>
 				: TAccountTakerAtaB,
-			TAccountMaker extends string ? WritableAccount<TAccountMaker>
+			TAccountMaker extends string ? ReadonlyAccount<TAccountMaker>
 				: TAccountMaker,
 			TAccountMakerAtaB extends string ? WritableAccount<TAccountMakerAtaB>
 				: TAccountMakerAtaB,
@@ -160,7 +160,7 @@ export function getTakeInstruction<
 		mintB: { value: input.mintB ?? null, isWritable: false },
 		takerAtaA: { value: input.takerAtaA ?? null, isWritable: false },
 		takerAtaB: { value: input.takerAtaB ?? null, isWritable: true },
-		maker: { value: input.maker ?? null, isWritable: true },
+		maker: { value: input.maker ?? null, isWritable: false },
 		makerAtaB: { value: input.makerAtaB ?? null, isWritable: true },
 		escrow: { value: input.escrow ?? null, isWritable: true },
 		vault: { value: input.vault ?? null, isWritable: true },
