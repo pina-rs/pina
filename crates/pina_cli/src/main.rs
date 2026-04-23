@@ -1,16 +1,19 @@
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::Path;
+use std::path::PathBuf;
+
 use clap::Parser;
 use clap::Subcommand;
-use owo_colors::OwoColorize;
 use comfy_table::Table;
+use owo_colors::OwoColorize;
 
 #[derive(Parser, Debug)]
 #[command(
 	name = "pina",
 	version,
 	about = "CLI tool for Pina Solana programs",
-	after_help = "🤖 Agent Note: To understand the IDL extraction rules or architecture, run `pina docs <topic>`. Topics are derived from the project's MDT templates."
+	after_help = "🤖 Agent Note: To understand the IDL extraction rules or architecture, run \
+	              `pina docs <topic>`. Topics are derived from the project's MDT templates."
 )]
 struct Cli {
 	#[command(subcommand)]
@@ -136,12 +139,7 @@ fn main() {
 	}
 }
 
-fn run_idl(
-	path: &Path,
-	output: Option<&Path>,
-	name: Option<&str>,
-	pretty: bool,
-) {
+fn run_idl(path: &Path, output: Option<&Path>, name: Option<&str>, pretty: bool) {
 	let root = match pina_cli::generate_idl(path, name) {
 		Ok(r) => r,
 		Err(e) => {
@@ -154,7 +152,10 @@ fn run_idl(
 	let mut table = Table::new();
 	table.load_preset(comfy_table::presets::UTF8_FULL_CONDENSED);
 	table.set_header(vec!["Component", "Count"]);
-	table.add_row(vec!["Instructions", &root.program.instructions.len().to_string()]);
+	table.add_row(vec![
+		"Instructions",
+		&root.program.instructions.len().to_string(),
+	]);
 	table.add_row(vec!["Accounts", &root.program.accounts.len().to_string()]);
 	table.add_row(vec!["PDAs", &root.program.pdas.len().to_string()]);
 	table.add_row(vec!["Errors", &root.program.errors.len().to_string()]);
@@ -178,7 +179,12 @@ fn run_idl(
 
 	if let Some(output) = output {
 		if let Err(e) = fs::write(output, &json) {
-			eprintln!("{} Failed to write {}: {}", "Error".red().bold(), output.display(), e);
+			eprintln!(
+				"{} Failed to write {}: {}",
+				"Error".red().bold(),
+				output.display(),
+				e
+			);
 			std::process::exit(1);
 		}
 
@@ -193,14 +199,23 @@ fn run_docs(topic: &str) {
 	let template_path = template_dir.join(format!("{}.t.md", topic));
 
 	if !template_path.exists() {
-		eprintln!("{} Topic `{}` not found in templates directory.", "Error".red().bold(), topic);
+		eprintln!(
+			"{} Topic `{}` not found in templates directory.",
+			"Error".red().bold(),
+			topic
+		);
 		std::process::exit(1);
 	}
 
 	let content = match fs::read_to_string(&template_path) {
 		Ok(c) => c,
 		Err(e) => {
-			eprintln!("{} Failed to read template {}: {}", "Error".red().bold(), template_path.display(), e);
+			eprintln!(
+				"{} Failed to read template {}: {}",
+				"Error".red().bold(),
+				template_path.display(),
+				e
+			);
 			std::process::exit(1);
 		}
 	};
@@ -217,14 +232,22 @@ fn run_init(name: &str, path: Option<&Path>, force: bool) {
 		std::process::exit(1);
 	}
 
-	println!("{} Initialized new Pina project at {}", "✔".green(), project_path.display());
+	println!(
+		"{} Initialized new Pina project at {}",
+		"✔".green(),
+		project_path.display()
+	);
 	pina_cli::print_next_steps(&project_path, name);
 }
 
 fn run_profile(path: &Path, json: bool, output: Option<&Path>) {
 	if let Some(output_path) = output {
 		if output_path == path {
-			eprintln!("{} Refusing to overwrite input binary {}", "Error".red().bold(), path.display());
+			eprintln!(
+				"{} Refusing to overwrite input binary {}",
+				"Error".red().bold(),
+				path.display()
+			);
 			std::process::exit(1);
 		}
 	}
@@ -247,7 +270,12 @@ fn run_profile(path: &Path, json: bool, output: Option<&Path>) {
 		let mut file = match fs::File::create(output_path) {
 			Ok(f) => f,
 			Err(e) => {
-				eprintln!("{} Failed to create {}: {}", "Error".red().bold(), output_path.display(), e);
+				eprintln!(
+					"{} Failed to create {}: {}",
+					"Error".red().bold(),
+					output_path.display(),
+					e
+				);
 				std::process::exit(1);
 			}
 		};
