@@ -15,6 +15,7 @@ pub struct AccountStruct {
 }
 
 /// Extract all `#[account(...)]` structs from a file.
+#[must_use]
 pub fn extract_account_structs(file: &File) -> Vec<AccountStruct> {
 	let mut result = Vec::new();
 

@@ -34,6 +34,7 @@ pub struct AccountProperties {
 /// Analyse all `impl ProcessAccountInfos for X` blocks in a file and return a
 /// map from the struct name (without lifetime) to a map of field name ->
 /// properties.
+#[must_use]
 pub fn extract_validation_properties(
 	file: &syn::File,
 ) -> HashMap<String, HashMap<String, AccountProperties>> {

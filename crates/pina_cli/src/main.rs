@@ -160,7 +160,7 @@ fn run_idl(path: &Path, output: Option<&Path>, name: Option<&str>, pretty: bool)
 	table.add_row(vec!["PDAs", &root.program.pdas.len().to_string()]);
 	table.add_row(vec!["Errors", &root.program.errors.len().to_string()]);
 
-	println!("\n{} {}", "✨ Generation Complete".green().bold(), "──");
+	println!("\n{} ──", "✨ Generation Complete".green().bold());
 	println!("{table}");
 
 	let json = if pretty {
@@ -196,7 +196,7 @@ fn run_idl(path: &Path, output: Option<&Path>, name: Option<&str>, pretty: bool)
 
 fn run_docs(topic: &str) {
 	let template_dir = Path::new("templates");
-	let template_path = template_dir.join(format!("{}.t.md", topic));
+	let template_path = template_dir.join(format!("{topic}.t.md"));
 
 	if !template_path.exists() {
 		eprintln!(

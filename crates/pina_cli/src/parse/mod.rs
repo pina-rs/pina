@@ -262,6 +262,7 @@ fn extract_package_name(cargo_contents: &str) -> Option<String> {
 
 /// Build a lookup from discriminator enum name + variant name → (value,
 /// `repr_size`).
+#[must_use]
 pub fn build_discriminator_map(
 	disc_enums: &[discriminator::DiscriminatorEnum],
 ) -> HashMap<(String, String), DiscriminatorIr> {

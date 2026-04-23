@@ -34,9 +34,7 @@ pub fn resolve_crate(src_dir: &Path, lib_path: &Path) -> Result<Vec<ResolvedFile
 
 	// Parallel file reading
 	let read_results: Vec<(PathBuf, String)> = paths
-		.iter()
-		.map(|p| p.clone())
-		.collect::<Vec<_>>()
+		.clone()
 		.into_par_iter()
 		.filter_map(|p| {
 			if p == lib_path {

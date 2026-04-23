@@ -10,6 +10,7 @@ use crate::ir::PdaSeedIr;
 /// This is a best-effort heuristic: it finds byte-string constants that are
 /// likely used as PDA seeds and associates them with field names from
 /// `#[derive(Accounts)]` structs.
+#[must_use]
 pub fn extract_seed_constants(file: &File) -> Vec<SeedConstant> {
 	let mut result = Vec::new();
 
@@ -50,6 +51,7 @@ pub struct SeedConstant {
 ///    `seeds_`.
 /// 2. Parsing the first (non-bump) arm to identify constant refs and variable
 ///    captures.
+#[must_use]
 pub fn extract_pda_from_seed_macros(file: &File, seed_constants: &[SeedConstant]) -> Vec<PdaIr> {
 	let mut pdas = Vec::new();
 

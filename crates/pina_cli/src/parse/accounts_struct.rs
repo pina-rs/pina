@@ -19,6 +19,7 @@ pub struct AccountsField {
 }
 
 /// Extract all `#[derive(Accounts)]` structs from a file.
+#[must_use]
 pub fn extract_accounts_structs(file: &File) -> Vec<AccountsStruct> {
 	let mut result = Vec::new();
 

@@ -3,6 +3,7 @@ use syn::Attribute;
 /// Extract doc comments from a list of attributes.
 ///
 /// Returns each `/// comment` line as a trimmed string.
+#[must_use]
 pub fn extract_docs(attrs: &[Attribute]) -> Vec<String> {
 	attrs
 		.iter()

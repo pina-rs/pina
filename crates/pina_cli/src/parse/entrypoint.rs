@@ -25,6 +25,7 @@ pub struct DispatchEntry {
 ///     Enum::Variant => AccountsStruct::try_from(accounts)?.process(data),
 /// }
 /// ```
+#[must_use]
 pub fn extract_dispatch_map(file: &File) -> Vec<DispatchEntry> {
 	let mut entries = Vec::new();
 

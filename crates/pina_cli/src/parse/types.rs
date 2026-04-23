@@ -8,6 +8,7 @@ use codama_nodes::TypeNode;
 
 /// Map a Rust type name (as it appears in pina structs) to a Codama
 /// `TypeNode`.
+#[must_use]
 pub fn rust_type_to_codama(ty: &str) -> TypeNode {
 	match ty {
 		"u8" => NumberTypeNode::le(NumberFormat::U8).into(),
@@ -48,6 +49,7 @@ fn parse_byte_array(ty: &str) -> Option<usize> {
 
 /// Extract the simple type name from a `syn::Type`. Handles paths like
 /// `PodU64`, `Address`, `u8`, and arrays like `[u8; 32]`.
+#[must_use]
 pub fn type_to_string(ty: &syn::Type) -> String {
 	match ty {
 		syn::Type::Path(p) => {

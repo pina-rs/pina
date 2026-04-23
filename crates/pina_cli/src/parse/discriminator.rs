@@ -17,6 +17,7 @@ pub struct DiscriminatorVariant {
 }
 
 /// Extract all `#[discriminator]` enums from a file.
+#[must_use]
 pub fn extract_discriminator_enums(file: &File) -> Vec<DiscriminatorEnum> {
 	let mut result = Vec::new();
 

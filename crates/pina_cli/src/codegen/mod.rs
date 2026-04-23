@@ -37,6 +37,7 @@ use crate::ir::ProgramIr;
 use crate::parse::types::rust_type_to_codama;
 
 /// Convert a `ProgramIr` into a Codama `RootNode`.
+#[must_use]
 pub fn ir_to_root_node(ir: &ProgramIr) -> RootNode {
 	let mut program = ProgramNode::new(ir.name.as_str(), ir.public_key.as_str());
 

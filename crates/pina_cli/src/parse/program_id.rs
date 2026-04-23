@@ -2,6 +2,7 @@ use syn::File;
 use syn::Item;
 
 /// Extract the program ID from a `declare_id!("...")` macro invocation.
+#[must_use]
 pub fn extract_program_id(file: &File) -> Option<String> {
 	for item in &file.items {
 		if let Item::Macro(item_macro) = item {
