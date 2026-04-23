@@ -251,7 +251,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "maker",
-						"isWritable": true,
+						"isWritable": false,
 						"isSigner": false
 					},
 					{
