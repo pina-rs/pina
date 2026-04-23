@@ -19,8 +19,6 @@ clap = { workspace = true, default-features = true }
 codama-nodes = { workspace = true, default-features = true }
 comfy-table = "7.1"
 heck = { workspace = true, default-features = true }
-indicatif = "0.17"
-miette = { version = "7.0", features = ["fancy"] }
 owo-colors = "4.0"
 pina_codama_renderer = { workspace = true }
 pina_profile = { workspace = true }
