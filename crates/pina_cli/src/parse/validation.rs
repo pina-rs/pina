@@ -34,6 +34,7 @@ pub struct AccountProperties {
 /// Analyse all `impl ProcessAccountInfos for X` blocks in a file and return a
 /// map from the struct name (without lifetime) to a map of field name ->
 /// properties.
+#[must_use]
 pub fn extract_validation_properties(
 	file: &syn::File,
 ) -> HashMap<String, HashMap<String, AccountProperties>> {
@@ -295,7 +296,7 @@ mod tests {
 	fn extracts_signer_and_writable() {
 		let source = r#"
 			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
-				fn process(self, data: &[u8]) -> ProgramResult {
+				fn process(&self, data: &[u8]) -> ProgramResult {
 					self.authority.assert_signer()?;
 					self.counter.assert_writable()?;
 					Ok(())
@@ -315,7 +316,7 @@ mod tests {
 	fn extracts_chained_assertions() {
 		let source = r#"
 			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
-				fn process(self, data: &[u8]) -> ProgramResult {
+				fn process(&self, data: &[u8]) -> ProgramResult {
 					self.sender.assert_signer()?.assert_writable()?;
 					Ok(())
 				}
@@ -332,7 +333,7 @@ mod tests {
 	fn extracts_pda() {
 		let source = r#"
 			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
-				fn process(self, data: &[u8]) -> ProgramResult {
+				fn process(&self, data: &[u8]) -> ProgramResult {
 					self.counter
 						.assert_empty()?
 						.assert_writable()?
@@ -352,7 +353,7 @@ mod tests {
 	fn extracts_known_address() {
 		let source = r#"
 			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
-				fn process(self, data: &[u8]) -> ProgramResult {
+				fn process(&self, data: &[u8]) -> ProgramResult {
 					self.system_program.assert_address(&system::ID)?;
 					Ok(())
 				}

@@ -25,6 +25,7 @@ pub struct DispatchEntry {
 ///     Enum::Variant => AccountsStruct::try_from(accounts)?.process(data),
 /// }
 /// ```
+#[must_use]
 pub fn extract_dispatch_map(file: &File) -> Vec<DispatchEntry> {
 	let mut entries = Vec::new();
 
@@ -196,7 +197,7 @@ mod tests {
 			mod entrypoint {
 				pub fn process_instruction(
 					program_id: &Address,
-					accounts: &mut [AccountView],
+					accounts: &[AccountView],
 					data: &[u8],
 				) -> ProgramResult {
 					let instruction: CounterInstruction = parse_instruction(program_id, &ID, data)?;
@@ -232,7 +233,7 @@ mod tests {
 			mod entrypoint {
 				pub fn process_instruction(
 					program_id: &Address,
-					accounts: &mut [AccountView],
+					accounts: &[AccountView],
 					data: &[u8],
 				) -> ProgramResult {
 					let instruction: HelloInstruction = parse_instruction(program_id, &ID, data)?;
@@ -258,7 +259,7 @@ mod tests {
 			mod entrypoint {
 				pub fn process_instruction(
 					program_id: &Address,
-					accounts: &mut [AccountView],
+					accounts: &[AccountView],
 					data: &[u8],
 				) -> ProgramResult {
 					let instruction: TodoInstruction = parse_instruction(program_id, &ID, data)?;
@@ -293,7 +294,7 @@ mod tests {
 			mod entrypoint {
 				pub fn process_instruction(
 					program_id: &Address,
-					accounts: &mut [AccountView],
+					accounts: &[AccountView],
 					data: &[u8],
 				) -> ProgramResult {
 					let instruction: DuplicateMutableInstruction = parse_instruction(program_id, &ID, data)?;
@@ -326,7 +327,7 @@ mod tests {
 			mod entrypoint {
 				pub fn process_instruction(
 					program_id: &Address,
-					accounts: &mut [AccountView],
+					accounts: &[AccountView],
 					data: &[u8],
 				) -> ProgramResult {
 					let instruction: ExampleInstruction = parse_instruction(program_id, &ID, data)?;

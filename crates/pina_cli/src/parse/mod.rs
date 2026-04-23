@@ -262,6 +262,7 @@ fn extract_package_name(cargo_contents: &str) -> Option<String> {
 
 /// Build a lookup from discriminator enum name + variant name → (value,
 /// `repr_size`).
+#[must_use]
 pub fn build_discriminator_map(
 	disc_enums: &[discriminator::DiscriminatorEnum],
 ) -> HashMap<(String, String), DiscriminatorIr> {
@@ -384,7 +385,7 @@ fn build_instruction_accounts(
 
 			InstructionAccountIr {
 				name: field.name.clone(),
-				is_writable: field.is_mutable || props.is_writable,
+				is_writable: props.is_writable,
 				is_signer: props.is_signer,
 				is_optional: false,
 				default_value: props.default_value,
@@ -500,7 +501,7 @@ mod tests {
 			}
 
 			impl<'a> ProcessAccountInfos<'a> for DuplicateMutableAccounts<'a> {
-				fn process(self, _data: &[u8]) -> ProgramResult {
+				fn process(&self, _data: &[u8]) -> ProgramResult {
 					Ok(())
 				}
 			}
@@ -510,7 +511,7 @@ mod tests {
 
 				pub fn process_instruction(
 					program_id: &Address,
-					accounts: &mut [AccountView],
+					accounts: &[AccountView],
 					data: &[u8],
 				) -> ProgramResult {
 					let instruction: DuplicateMutableInstruction = parse_instruction(program_id, &ID, data)?;
@@ -536,60 +537,6 @@ mod tests {
 		assert_eq!(ir.instructions[0].accounts.len(), 2);
 		assert_eq!(ir.instructions[1].name, "allows_duplicate_mutable");
 		assert!(ir.instructions[1].accounts.is_empty());
-	}
-
-	#[test]
-	fn assemble_program_ir_marks_mutable_account_fields_writable() {
-		let source = r#"
-			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
-
-			#[discriminator]
-			pub enum MutableInstruction {
-				Initialize = 0,
-			}
-
-			#[instruction(discriminator = MutableInstruction, variant = Initialize)]
-			pub struct InitializeInstruction {}
-
-			#[derive(Accounts, Debug)]
-			pub struct InitializeAccounts<'a> {
-				pub authority: &'a AccountView,
-				pub state: &'a mut AccountView,
-			}
-
-			impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
-				fn process(self, data: &[u8]) -> ProgramResult {
-					let _ = InitializeInstruction::try_from_bytes(data)?;
-					self.authority.assert_signer()?;
-					Ok(())
-				}
-			}
-
-			pub mod entrypoint {
-				use super::*;
-
-				pub fn process_instruction(
-					program_id: &Address,
-					accounts: &mut [AccountView],
-					data: &[u8],
-				) -> ProgramResult {
-					let instruction: MutableInstruction = parse_instruction(program_id, &ID, data)?;
-
-					match instruction {
-						MutableInstruction::Initialize => {
-							InitializeAccounts::try_from(accounts)?.process(data)
-						}
-					}
-				}
-			}
-		"#;
-		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let ir = assemble_program_ir(&file, "mutable").unwrap_or_else(|e| panic!("assemble: {e}"));
-
-		assert_eq!(ir.instructions.len(), 1);
-		assert_eq!(ir.instructions[0].accounts.len(), 2);
-		assert!(!ir.instructions[0].accounts[0].is_writable);
-		assert!(ir.instructions[0].accounts[1].is_writable);
 	}
 
 	#[test]

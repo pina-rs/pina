@@ -5,6 +5,7 @@ use super::doc_comments::extract_docs;
 use crate::ir::ErrorIr;
 
 /// Extract all `#[error]` enums from a file.
+#[must_use]
 pub fn extract_error_enums(file: &File) -> Vec<ErrorIr> {
 	let mut result = Vec::new();
 

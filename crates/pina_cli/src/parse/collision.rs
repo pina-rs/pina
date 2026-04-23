@@ -37,6 +37,7 @@ pub struct DuplicateInputField {
 ///
 /// Returns a list of collision descriptions. An empty list means no
 /// collisions.
+#[must_use]
 pub fn find_discriminator_collisions(ir: &ProgramIr) -> Vec<DiscriminatorCollision> {
 	let mut collisions = Vec::new();
 
@@ -88,6 +89,7 @@ fn check_collisions_within<T>(
 /// An instruction's "input" consists of both its account names and its
 /// argument names. Having duplicates would cause ambiguity in client
 /// generation.
+#[must_use]
 pub fn find_duplicate_input_fields(ir: &ProgramIr) -> Vec<DuplicateInputField> {
 	let mut duplicates = Vec::new();
 
@@ -119,6 +121,7 @@ pub fn find_duplicate_input_fields(ir: &ProgramIr) -> Vec<DuplicateInputField> {
 }
 
 /// Format collision errors into human-readable messages.
+#[must_use]
 pub fn format_collision_errors(collisions: &[DiscriminatorCollision]) -> Vec<String> {
 	collisions
 		.iter()
@@ -138,6 +141,7 @@ pub fn format_collision_errors(collisions: &[DiscriminatorCollision]) -> Vec<Str
 }
 
 /// Format duplicate input field errors into human-readable messages.
+#[must_use]
 pub fn format_duplicate_field_errors(duplicates: &[DuplicateInputField]) -> Vec<String> {
 	duplicates
 		.iter()

@@ -16,6 +16,7 @@ pub struct InstructionStruct {
 }
 
 /// Extract all `#[instruction(...)]` structs from a file.
+#[must_use]
 pub fn extract_instruction_structs(file: &File) -> Vec<InstructionStruct> {
 	let mut result = Vec::new();
 
