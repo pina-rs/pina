@@ -15,14 +15,25 @@ in
     with pkgs;
     [
       binaryen
+      cargo-audit
       cargo-binstall
+      cargo-deny
+      cargo-insta
+      cargo-llvm-cov
+      cargo-mutants
+      cargo-nextest
       cargo-run-bin
       chromedriver
       cmake
       curl
       custom.agave
+      custom.cargo-dylint
+      custom.dylint-link
       custom.mdt
+      custom.sbpf-linker
+      custom.solana-verify
       custom.surfpool
+      custom.wait-for-them
       dprint
       gcc
       git
@@ -158,61 +169,6 @@ in
   dotenv.disableHint = true;
 
   scripts = {
-    "query-security-txt" = {
-      exec = ''
-        set -euo pipefail
-        cargo bin query-security-txt $@
-      '';
-      description = "The `query-security-txt` executable";
-      binary = "bash";
-    };
-    "wait-for-them" = {
-      exec = ''
-        set -euo pipefail
-        cargo bin wait-for-them $@
-      '';
-      description = "The `wait-for-them` executable";
-      binary = "bash";
-    };
-    "sbpf-linker" = {
-      exec = ''
-        set -euo pipefail
-
-        if [ -n "''${XDG_CACHE_HOME:-}" ]; then
-          CACHE_BASE="$XDG_CACHE_HOME"
-        elif [ -n "''${HOME:-}" ] && [ "$HOME" != "/" ]; then
-          CACHE_BASE="$HOME/.cache"
-        else
-          CACHE_BASE="$DEVENV_ROOT/.cache"
-        fi
-
-        gallery_sbpf_linker="$CACHE_BASE/sbpf-linker-upstream-gallery/bin/sbpf-linker"
-        if [ -x "$gallery_sbpf_linker" ]; then
-          "$gallery_sbpf_linker" "$@"
-          exit 0
-        fi
-
-        cargo bin sbpf-linker "$@"
-      '';
-      description = "The `sbpf-linker` executable";
-      binary = "bash";
-    };
-    "solana-verify" = {
-      exec = ''
-        set -euo pipefail
-        cargo bin solana-verify $@
-      '';
-      description = "The `solana-verify` executable";
-      binary = "bash";
-    };
-    "dylint-link" = {
-      exec = ''
-        set -euo pipefail
-        cargo bin dylint-link $@
-      '';
-      description = "The `dylint-link` executable";
-      binary = "bash";
-    };
     "kani" = {
       exec = ''
         set -euo pipefail
@@ -1057,24 +1013,6 @@ in
         done
       '';
       description = "Check that all rust lints are passing.";
-      binary = "bash";
-    };
-    "setup:vscode" = {
-      exec = ''
-        set -euo pipefail
-        rm -rf .vscode
-        cp -r $DEVENV_ROOT/setup/editors/vscode .vscode
-      '';
-      description = "Setup the environment for vscode.";
-      binary = "bash";
-    };
-    "setup:helix" = {
-      exec = ''
-        set -euo pipefail
-        rm -rf .helix
-        cp -r $DEVENV_ROOT/setup/editors/helix .helix
-      '';
-      description = "Setup for the helix editor.";
       binary = "bash";
     };
   };
