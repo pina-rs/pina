@@ -138,8 +138,10 @@ pina_profile = { default-features = false, path = "crates/pina_profile", version
 pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.8.0" }
 
 [workspace.metadata.bin]
+cargo-dylint = { version = "5.0.0" }
 cargo-semver-checks = { version = "0.46.0" }
 cargo-workspaces = { version = "0.4.2" }
+dylint-link = { version = "5.0.0", bins = ["dylint-link"] }
 kani-verifier = { version = "0.67.0", bins = ["kani", "cargo-kani"] }
 
 [workspace.metadata.dylint]

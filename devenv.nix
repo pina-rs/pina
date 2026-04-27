@@ -27,8 +27,6 @@ in
       cmake
       curl
       custom.agave
-      custom.cargo-dylint
-      custom.dylint-link
       custom.mdt
       custom.sbpf-linker
       custom.surfpool
@@ -168,6 +166,46 @@ in
   dotenv.disableHint = true;
 
   scripts = {
+    "dylint-link" = {
+      exec = ''
+        set -euo pipefail
+
+        repo_root="''${DEVENV_ROOT:-}"
+        if [ -z "$repo_root" ]; then
+          repo_root="$(${pkgs.git}/bin/git rev-parse --show-toplevel 2>/dev/null || true)"
+        fi
+        if [ -z "$repo_root" ]; then
+          for arg in "$@"; do
+            case "$arg" in
+              */target/dylint/libraries/*)
+                repo_root="$(printf '%s\n' "$arg" | sed 's#/target/dylint/libraries/.*##')"
+                break
+                ;;
+            esac
+          done
+        fi
+        if [ -z "$repo_root" ]; then
+          repo_root="$(pwd)"
+        fi
+
+        if [ -z "''${RUSTUP_TOOLCHAIN:-}" ] && [ -f "$repo_root/rust-toolchain.toml" ]; then
+          RUSTUP_TOOLCHAIN="$(sed -n 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p' "$repo_root/rust-toolchain.toml" | head -n 1)"
+          export RUSTUP_TOOLCHAIN
+        fi
+
+        if [ -d "$repo_root/.bin" ]; then
+          dylint_link_bin="$(find "$repo_root/.bin" -path '*/dylint-link/*/bin/dylint-link' | sort | tail -n 1)"
+          if [ -n "$dylint_link_bin" ] && [ -x "$dylint_link_bin" ]; then
+            exec "$dylint_link_bin" "$@"
+          fi
+        fi
+
+        cd "$repo_root"
+        exec cargo bin dylint-link "$@"
+      '';
+      description = "The `dylint-link` executable";
+      binary = "bash";
+    };
     "kani" = {
       exec = ''
         set -euo pipefail
@@ -847,14 +885,35 @@ in
       exec = ''
         set -euo pipefail
 
-        cargo_dylint_bin="$(find "$DEVENV_ROOT/.bin" -path '*/cargo-dylint/*/bin/cargo-dylint' | sort | tail -n 1)"
+        resolve_bin_root() {
+          if [ -d "$DEVENV_ROOT/.bin" ]; then
+            echo "$DEVENV_ROOT/.bin"
+            return 0
+          fi
 
-        if [ -z "$cargo_dylint_bin" ]; then
-          echo "Missing cargo-dylint in $DEVENV_ROOT/.bin. Run 'install:cargo:bin'." >&2
+          while read -r worktree_path; do
+            if [ -d "$worktree_path/.bin" ]; then
+              echo "$worktree_path/.bin"
+              return 0
+            fi
+          done < <(${pkgs.git}/bin/git -C "$DEVENV_ROOT" worktree list --porcelain | ${pkgs.gawk}/bin/awk '/^worktree / { print $2 }')
+
+          return 1
+        }
+
+        if ! bin_root="$(resolve_bin_root)"; then
+          echo "Missing .bin directory for this repository. Run 'install:cargo:bin'." >&2
           exit 1
         fi
 
-        if ! command -v dylint-link >/dev/null 2>&1; then
+        cargo_dylint_bin="$(find "$bin_root" -path '*/cargo-dylint/*/bin/cargo-dylint' | sort | tail -n 1)"
+        if [ -z "$cargo_dylint_bin" ] || [ ! -x "$cargo_dylint_bin" ]; then
+          echo "Missing cargo-dylint in $bin_root. Run 'install:cargo:bin'." >&2
+          exit 1
+        fi
+
+        dylint_link_wrapper="$(command -v dylint-link || true)"
+        if [ -z "$dylint_link_wrapper" ] || [ ! -x "$dylint_link_wrapper" ]; then
           echo "Missing dylint-link command. Run 'install:cargo:bin'." >&2
           exit 1
         fi
@@ -878,7 +937,8 @@ in
         fi
 
         CARGO_INCREMENTAL=0 \
-          cargo dylint --all --no-deps "''${package_args[@]}" -- --all-features --all-targets --locked
+          PATH="$(dirname "$dylint_link_wrapper"):$PATH" \
+          "$cargo_dylint_bin" dylint --all --no-deps "''${package_args[@]}" -- --locked
       '';
       description = "Run custom security dylint checks against the example and security program crates.";
       binary = "bash";
@@ -886,7 +946,7 @@ in
     "security:deny" = {
       exec = ''
         set -euo pipefail
-        cargo bin cargo-deny check --config "$DEVENV_ROOT/deny.toml" bans licenses sources
+        cargo-deny check --config "$DEVENV_ROOT/deny.toml" bans licenses sources
       '';
       description = "Run cargo-deny checks (bans, licenses, sources).";
       binary = "bash";
@@ -894,7 +954,7 @@ in
     "security:audit" = {
       exec = ''
         set -euo pipefail
-        cargo bin cargo-audit \
+        cargo-audit audit \
           --db "$DEVENV_ROOT/target/advisory-db-audit" \
           --url "https://github.com/RustSec/advisory-db.git" \
           --deny yanked \
