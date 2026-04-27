@@ -15,10 +15,6 @@ rustflags = [
 [alias]
 build-bpf = "build --release --target bpfel-unknown-none -p pina_bpf -F bpf-entrypoint -Z build-std=core,alloc"
 build-escrow-program = "build --release --target bpfel-unknown-none -p escrow_program -Z build-std -F bpf-entrypoint"
-dylint = ["bin", "cargo-dylint"]
-insta = ["bin", "cargo-insta"]
-llvm-cov = ["bin", "cargo-llvm-cov"]
-nextest = ["bin", "cargo-nextest"]
 semver-checks = ["bin", "cargo-semver-checks"]
 workspaces = ["bin", "cargo-workspaces"]
 kani = ["bin", "cargo-kani"]
