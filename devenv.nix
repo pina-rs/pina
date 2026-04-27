@@ -31,7 +31,6 @@ in
       custom.dylint-link
       custom.mdt
       custom.sbpf-linker
-      custom.solana-verify
       custom.surfpool
       custom.wait-for-them
       dprint
