@@ -17,13 +17,17 @@ path = "src/main.rs"
 [dependencies]
 clap = { workspace = true, default-features = true }
 codama-nodes = { workspace = true, default-features = true }
+comfy-table = "7.1"
 heck = { workspace = true, default-features = true }
+owo-colors = "4.0"
 pina_codama_renderer = { workspace = true }
 pina_profile = { workspace = true }
 proc-macro2 = { workspace = true, default-features = true }
+rayon = "1.10"
 serde = { workspace = true, features = ["derive"], default-features = true }
 serde_json = { workspace = true, default-features = true }
 syn = { workspace = true, default-features = true, features = ["full", "extra-traits", "visit"] }
+termimad = "0.25"
 thiserror = { workspace = true, default-features = true }
 walkdir = { workspace = true, default-features = true }
 
