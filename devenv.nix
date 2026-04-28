@@ -878,6 +878,12 @@ in
         # the workspace-wide `unstable_features = "deny"` lint.
         export RUSTFLAGS="''${RUSTFLAGS:+$RUSTFLAGS }-A unstable-features"
 
+        # Kani downloads Linux binaries that must resolve against the host
+        # runtime, not Nix's glibc/libm from the devenv shell.
+        unset LD_LIBRARY_PATH
+        unset NIX_LD_LIBRARY_PATH
+        unset LD_PRELOAD
+
         # Run all Kani harnesses in pina_pod_primitives.
         cargo kani --manifest-path "$DEVENV_ROOT/crates/pina_pod_primitives/Cargo.toml" --all-features
       '';
