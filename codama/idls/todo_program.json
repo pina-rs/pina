@@ -90,7 +90,24 @@
 						"kind": "instructionAccountNode",
 						"name": "todo",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "todo"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "owner",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "owner"
+									}
+								}
+							]
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -158,7 +175,24 @@
 						"kind": "instructionAccountNode",
 						"name": "todo",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "todo"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "owner",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "owner"
+									}
+								}
+							]
+						}
 					}
 				],
 				"arguments": [],
@@ -195,7 +229,24 @@
 						"kind": "instructionAccountNode",
 						"name": "todo",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "todo"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "owner",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "owner"
+									}
+								}
+							]
+						}
 					}
 				],
 				"arguments": [

@@ -36,10 +36,10 @@ import {
 	getCounterStateCodec,
 } from "../accounts";
 import {
-	getIncrementInstruction,
-	getInitializeInstruction,
-	type IncrementInput,
-	type InitializeInput,
+	getIncrementInstructionAsync,
+	getInitializeInstructionAsync,
+	type IncrementAsyncInput,
+	type InitializeAsyncInput,
 	type ParsedIncrementInstruction,
 	type ParsedInitializeInstruction,
 	parseIncrementInstruction,
@@ -144,11 +144,15 @@ export type CounterProgramPluginAccounts = {
 
 export type CounterProgramPluginInstructions = {
 	initialize: (
-		input: InitializeInput,
-	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
+		input: InitializeAsyncInput,
+	) =>
+		& ReturnType<typeof getInitializeInstructionAsync>
+		& SelfPlanAndSendFunctions;
 	increment: (
-		input: IncrementInput,
-	) => ReturnType<typeof getIncrementInstruction> & SelfPlanAndSendFunctions;
+		input: IncrementAsyncInput,
+	) =>
+		& ReturnType<typeof getIncrementInstructionAsync>
+		& SelfPlanAndSendFunctions;
 };
 
 export type CounterProgramPluginPdas = { counter: typeof findCounterPda };
@@ -170,10 +174,13 @@ export function counterProgramProgram() {
 					initialize: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstruction(input),
+							getInitializeInstructionAsync(input),
 						),
 					increment: (input) =>
-						addSelfPlanAndSendFunctions(client, getIncrementInstruction(input)),
+						addSelfPlanAndSendFunctions(
+							client,
+							getIncrementInstructionAsync(input),
+						),
 				},
 				pdas: { counter: findCounterPda },
 			},

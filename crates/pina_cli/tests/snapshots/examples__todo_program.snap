@@ -1,6 +1,5 @@
 ---
 source: crates/pina_cli/tests/examples.rs
-assertion_line: 55
 expression: idl
 ---
 {
@@ -95,7 +94,24 @@ expression: idl
             "kind": "instructionAccountNode",
             "name": "todo",
             "isWritable": true,
-            "isSigner": false
+            "isSigner": false,
+            "defaultValue": {
+              "kind": "pdaValueNode",
+              "pda": {
+                "kind": "pdaLinkNode",
+                "name": "todo"
+              },
+              "seeds": [
+                {
+                  "kind": "pdaSeedValueNode",
+                  "name": "owner",
+                  "value": {
+                    "kind": "accountValueNode",
+                    "name": "owner"
+                  }
+                }
+              ]
+            }
           },
           {
             "kind": "instructionAccountNode",
@@ -163,7 +179,24 @@ expression: idl
             "kind": "instructionAccountNode",
             "name": "todo",
             "isWritable": true,
-            "isSigner": false
+            "isSigner": false,
+            "defaultValue": {
+              "kind": "pdaValueNode",
+              "pda": {
+                "kind": "pdaLinkNode",
+                "name": "todo"
+              },
+              "seeds": [
+                {
+                  "kind": "pdaSeedValueNode",
+                  "name": "owner",
+                  "value": {
+                    "kind": "accountValueNode",
+                    "name": "owner"
+                  }
+                }
+              ]
+            }
           }
         ],
         "arguments": [],
@@ -200,7 +233,24 @@ expression: idl
             "kind": "instructionAccountNode",
             "name": "todo",
             "isWritable": true,
-            "isSigner": false
+            "isSigner": false,
+            "defaultValue": {
+              "kind": "pdaValueNode",
+              "pda": {
+                "kind": "pdaLinkNode",
+                "name": "todo"
+              },
+              "seeds": [
+                {
+                  "kind": "pdaSeedValueNode",
+                  "name": "owner",
+                  "value": {
+                    "kind": "accountValueNode",
+                    "name": "owner"
+                  }
+                }
+              ]
+            }
           }
         ],
         "arguments": [

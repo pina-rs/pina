@@ -36,10 +36,11 @@ fn role_registry_program_client_has_expected_contract_shape() {
 	let admin = Pubkey::new_unique();
 	let grantee = Pubkey::new_unique();
 	let new_admin = Pubkey::new_unique();
-	let registry_config = Pubkey::new_unique();
+	let registry_config =
+		Pubkey::find_program_address(&["registry".as_bytes(), admin.as_ref()], &program_id).0;
 	let role_entry = Pubkey::new_unique();
 
-	let initialize = Initialize::new(admin, registry_config);
+	let initialize = Initialize::new(admin);
 	let init_payload = InitializeInstructionData::new(7);
 	let init_ix = initialize.instruction(init_payload);
 	assert_eq!(init_ix.program_id, program_id);

@@ -35,8 +35,10 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { findTodoPda } from "../pdas";
 import { TODO_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const INITIALIZE_DISCRIMINATOR = 0;
@@ -103,6 +105,90 @@ export function getInitializeInstructionDataCodec(): FixedSizeCodec<
 		getInitializeInstructionDataEncoder(),
 		getInitializeInstructionDataDecoder(),
 	);
+}
+
+export type InitializeAsyncInput<
+	TAccountOwner extends string = string,
+	TAccountTodo extends string = string,
+	TAccountSystemProgram extends string = string,
+> = {
+	owner: TransactionSigner<TAccountOwner>;
+	todo?: Address<TAccountTodo>;
+	systemProgram?: Address<TAccountSystemProgram>;
+	bump: InitializeInstructionDataArgs["bump"];
+	digest: InitializeInstructionDataArgs["digest"];
+};
+
+export async function getInitializeInstructionAsync<
+	TAccountOwner extends string,
+	TAccountTodo extends string,
+	TAccountSystemProgram extends string,
+	TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: InitializeAsyncInput<
+		TAccountOwner,
+		TAccountTodo,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	InitializeInstruction<
+		TProgramAddress,
+		TAccountOwner,
+		TAccountTodo,
+		TAccountSystemProgram
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		owner: { value: input.owner ?? null, isWritable: false },
+		todo: { value: input.todo ?? null, isWritable: true },
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.todo.value) {
+		accounts.todo.value = await findTodoPda({
+			owner: getAddressFromResolvedInstructionAccount(
+				"owner",
+				accounts.owner.value,
+			),
+		});
+	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("owner", accounts.owner),
+			getAccountMeta("todo", accounts.todo),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getInitializeInstructionDataEncoder().encode(
+			args as InitializeInstructionDataArgs,
+		),
+		programAddress,
+	} as InitializeInstruction<
+		TProgramAddress,
+		TAccountOwner,
+		TAccountTodo,
+		TAccountSystemProgram
+	>);
 }
 
 export type InitializeInput<

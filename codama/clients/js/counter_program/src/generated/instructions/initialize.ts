@@ -31,8 +31,10 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { findCounterPda } from "../pdas";
 import { COUNTER_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const INITIALIZE_DISCRIMINATOR = 0;
@@ -90,6 +92,96 @@ export function getInitializeInstructionDataCodec(): FixedSizeCodec<
 		getInitializeInstructionDataEncoder(),
 		getInitializeInstructionDataDecoder(),
 	);
+}
+
+export type InitializeAsyncInput<
+	TAccountAuthority extends string = string,
+	TAccountCounter extends string = string,
+	TAccountSystemProgram extends string = string,
+> = {
+	/**
+	 * The wallet creating the counter. Pays for account creation and becomes
+	 * the authority whose address seeds the PDA.
+	 */
+	authority: TransactionSigner<TAccountAuthority>;
+	/** The counter PDA account (must be empty — not yet created). */
+	counter?: Address<TAccountCounter>;
+	/** The system program, required for `CreateAccount` CPI. */
+	systemProgram?: Address<TAccountSystemProgram>;
+	bump: InitializeInstructionDataArgs["bump"];
+};
+
+export async function getInitializeInstructionAsync<
+	TAccountAuthority extends string,
+	TAccountCounter extends string,
+	TAccountSystemProgram extends string,
+	TProgramAddress extends Address = typeof COUNTER_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: InitializeAsyncInput<
+		TAccountAuthority,
+		TAccountCounter,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	InitializeInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountCounter,
+		TAccountSystemProgram
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		COUNTER_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: false },
+		counter: { value: input.counter ?? null, isWritable: true },
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.counter.value) {
+		accounts.counter.value = await findCounterPda({
+			authority: getAddressFromResolvedInstructionAccount(
+				"authority",
+				accounts.authority.value,
+			),
+		});
+	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("counter", accounts.counter),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getInitializeInstructionDataEncoder().encode(
+			args as InitializeInstructionDataArgs,
+		),
+		programAddress,
+	} as InitializeInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountCounter,
+		TAccountSystemProgram
+	>);
 }
 
 export type InitializeInput<

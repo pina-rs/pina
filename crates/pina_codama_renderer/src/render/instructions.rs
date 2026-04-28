@@ -4,6 +4,11 @@ use codama_nodes::InstructionInputValueNode;
 use codama_nodes::InstructionNode;
 use codama_nodes::InstructionOptionalAccountStrategy;
 use codama_nodes::IsAccountSigner;
+use codama_nodes::PdaNode;
+use codama_nodes::PdaSeedNode;
+use codama_nodes::PdaSeedValueValueNode;
+use codama_nodes::PdaValue;
+use codama_nodes::PdaValueNode;
 use codama_nodes::ProgramNode;
 
 use super::discriminator::render_constant_discriminator;
@@ -11,6 +16,7 @@ use super::helpers::pascal;
 use super::helpers::program_id_const_name;
 use super::helpers::render_docs;
 use super::helpers::snake;
+use super::seeds::render_constant_seed_expression;
 use super::types::render_type_for_pod;
 use crate::error::RenderError;
 use crate::error::Result;
@@ -95,6 +101,7 @@ pub(crate) fn render_instruction_page(
 		let (field_type, base_type) = render_instruction_account_field_type(account);
 		let default_value = render_instruction_account_default_value(
 			account,
+			instruction,
 			&base_type,
 			primary_program_const,
 			program,
@@ -274,8 +281,165 @@ fn render_instruction_account_field_type(account: &InstructionAccountNode) -> (S
 	}
 }
 
+fn render_pda_default_value(
+	pda_value: &PdaValueNode,
+	instruction: &InstructionNode,
+	primary_program_const: &str,
+	program: &ProgramNode,
+	account: &InstructionAccountNode,
+) -> Result<String> {
+	let pda = match &pda_value.pda {
+		PdaValue::Linked(link) => {
+			program
+				.pdas
+				.iter()
+				.find(|pda| pda.name == link.name)
+				.ok_or_else(|| {
+					RenderError::UnsupportedValue {
+						context: format!(
+							"instruction `{}` account `{}` default PDA",
+							pascal(instruction.name.as_ref()),
+							snake(account.name.as_ref())
+						),
+						kind: pda_value.kind(),
+						reason: format!("linked PDA `{}` was not found", link.name.as_ref()),
+					}
+				})?
+		}
+		PdaValue::Nested(pda) => pda,
+	};
+
+	let seed_expressions = render_pda_default_seed_expressions(
+		pda,
+		pda_value,
+		instruction,
+		primary_program_const,
+		account,
+	)?;
+
+	Ok(format!(
+		"solana_pubkey::Pubkey::find_program_address(\n\t\t\t\t&[{}],\n\t\t\t\t&\
+		 crate::{primary_program_const},\n\t\t\t).0",
+		seed_expressions.join(", ")
+	))
+}
+
+fn render_pda_default_seed_expressions(
+	pda: &PdaNode,
+	pda_value: &PdaValueNode,
+	instruction: &InstructionNode,
+	primary_program_const: &str,
+	account: &InstructionAccountNode,
+) -> Result<Vec<String>> {
+	let mut seed_expressions = Vec::new();
+
+	for seed in &pda.seeds {
+		match seed {
+			PdaSeedNode::Constant(constant) => {
+				seed_expressions.push(render_constant_seed_expression(
+					&constant.r#type,
+					&constant.value,
+					&pda_default_context(instruction, account),
+					primary_program_const,
+				)?);
+			}
+			PdaSeedNode::Variable(variable) => {
+				let Some(value) = pda_value
+					.seeds
+					.iter()
+					.find(|value| value.name == variable.name)
+				else {
+					return Err(RenderError::UnsupportedValue {
+						context: pda_default_context(instruction, account),
+						kind: pda_value.kind(),
+						reason: format!("missing value for PDA seed `{}`", variable.name.as_ref()),
+					});
+				};
+
+				seed_expressions.push(render_pda_default_seed_value(
+					value,
+					instruction,
+					account,
+					&pda_default_context(instruction, account),
+				)?);
+			}
+		}
+	}
+
+	Ok(seed_expressions)
+}
+
+fn render_pda_default_seed_value(
+	value: &codama_nodes::PdaSeedValueNode,
+	instruction: &InstructionNode,
+	default_account: &InstructionAccountNode,
+	context: &str,
+) -> Result<String> {
+	match &value.value {
+		PdaSeedValueValueNode::Account(account) => {
+			let name = account.name.as_ref();
+			let referenced_account = instruction
+				.accounts
+				.iter()
+				.find(|instruction_account| instruction_account.name.as_ref() == name)
+				.ok_or_else(|| {
+					RenderError::UnsupportedValue {
+						context: context.to_string(),
+						kind: value.value.kind(),
+						reason: format!("account PDA seed `{name}` was not found"),
+					}
+				})?;
+
+			if referenced_account.name == default_account.name
+				|| referenced_account.is_optional
+				|| referenced_account.default_value.is_some()
+			{
+				return Err(RenderError::UnsupportedValue {
+					context: context.to_string(),
+					kind: value.value.kind(),
+					reason: format!(
+						"account PDA seed `{name}` is not an explicit builder parameter"
+					),
+				});
+			}
+
+			let seed_name = snake(name);
+			if matches!(referenced_account.is_signer, IsAccountSigner::Either) {
+				Ok(format!("{seed_name}.0.as_ref()"))
+			} else {
+				Ok(format!("{seed_name}.as_ref()"))
+			}
+		}
+		PdaSeedValueValueNode::Argument(_) => {
+			Err(RenderError::UnsupportedValue {
+				context: context.to_string(),
+				kind: value.value.kind(),
+				reason: "instruction argument PDA seed defaults are not supported by account \
+				         builders"
+					.to_string(),
+			})
+		}
+		other => {
+			Err(RenderError::UnsupportedValue {
+				context: context.to_string(),
+				kind: other.kind(),
+				reason: "only account and argument PDA seed values are supported".to_string(),
+			})
+		}
+	}
+}
+
+fn pda_default_context(instruction: &InstructionNode, account: &InstructionAccountNode) -> String {
+	format!(
+		"instruction `{}` account `{}` default PDA",
+		pascal(instruction.name.as_ref()),
+		snake(account.name.as_ref())
+	)
+}
+
 fn render_instruction_account_default_value(
 	account: &InstructionAccountNode,
+	instruction: &InstructionNode,
 	_base_type: &str,
 	primary_program_const: &str,
 	program: &ProgramNode,
@@ -300,6 +464,9 @@ fn render_instruction_account_default_value(
 				"crate::{}",
 				program_id_const_name(program_link.name.as_ref())
 			)
+		}
+		InstructionInputValueNode::Pda(pda) => {
+			render_pda_default_value(pda, instruction, primary_program_const, program, account)?
 		}
 		_ => {
 			return Err(RenderError::UnsupportedValue {
