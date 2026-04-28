@@ -28,11 +28,26 @@ An attacker can:
 
 <br>
 
-See [`secure/src/lib.rs`](secure/src/lib.rs). The program calls `zeroed()` on the account data to clear it, then calls `close_with_recipient()` to transfer the remaining lamports and close the account.
+See [`secure/src/lib.rs`](secure/src/lib.rs). The program invalidates the account bytes before closing so a revived account cannot reuse stale state in the same transaction.
+
+## Closing guidance
+
+<br>
+
+<!-- {=pinaCloseAccountGuidance} -->
+
+Closing guidance under Pinocchio 0.11:
+
+- `close_with_recipient()` transfers lamports and closes the account handle, but it does not zero or resize account data for you.
+- When stale bytes must be invalidated, use `close_account_zeroed()` or manually call `zeroed()` before `close_with_recipient()`.
+- The `account-resize` feature only affects realloc helpers; it does not change close semantics.
+
+<!-- {/pinaCloseAccountGuidance} -->
 
 ## Pina API Reference
 
 <br>
 
-- `CloseAccountWithRecipient::close_with_recipient()` — transfers lamports to the recipient and closes the account
-- Account data `zeroed()` method — zeros all account data before closing to prevent stale data reuse
+- `CloseAccountWithRecipient::close_with_recipient()` — close after you have already invalidated any sensitive or authority-bearing state
+- `CloseAccountWithRecipient::close_account_zeroed()` — zero the current raw account bytes, then close and return rent to the recipient
+- Account data `zeroed()` method — explicit typed/raw-state invalidation before `close_with_recipient()` when you need custom close sequencing

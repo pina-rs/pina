@@ -48,6 +48,20 @@ cargo add pina --features token
 
 <!-- {/pinaFeatureFlags} -->
 
+## Feature selection tips
+
+<br>
+
+<!-- {=pinaFeatureSelectionTips} -->
+
+- `derive` is the normal choice for program crates; disable it only when you want the low-level runtime traits without the proc macros.
+- `logs` is useful during **initial development and debugging**, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
+- `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
+- `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.
+- `account-resize` only unlocks realloc helpers such as `realloc_account()` and `realloc_account_zero()`. Close helpers still do not implicitly resize or zero account data.
+
+<!-- {/pinaFeatureSelectionTips} -->
+
 ## Minimal Program Skeleton
 
 <br>
@@ -84,6 +98,20 @@ fn process_instruction(
 	}
 }
 ```
+
+## Instruction authoring tips
+
+<br>
+
+<!-- {=pinaInstructionAuthoringTips} -->
+
+- Entry points should accept `&mut [AccountView]` and dispatch with `Accounts::try_from(accounts)?.process(data)`.
+- Use `&AccountView` for read-only accounts and `&mut AccountView` only when you need mutable loaders, direct lamport mutation, `close_*` helpers, or writable IDL inference.
+- Keep `assert_writable()` explicit even on `&mut AccountView`. Type-level mutability unlocks mutable APIs, but the runtime still decides whether the account is writable for the current instruction.
+- `as_account()` / `as_account_mut()` return `Ref<T>` / `RefMut<T>` borrow guards. Copy out the fields you need and `drop(...)` the guard before CPIs or later mutable borrows.
+- Keep validation chains direct inside `process(self, ...)` when possible. That makes audits easier and gives `pina idl` the clearest signal for signer, writable, PDA, and default-account inference.
+
+<!-- {/pinaInstructionAuthoringTips} -->
 
 ## Related Crates
 

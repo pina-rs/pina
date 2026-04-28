@@ -792,8 +792,8 @@ in
         set -euo pipefail
         mkdir -p "$DEVENV_ROOT/target/mutants"
         status=0
-        cargo mutants --all-features --output "$DEVENV_ROOT/target/mutants" || status=$?
-        if [ "$status" -eq 3 ]; then
+        cargo mutants --all-features --cargo-arg --locked --output "$DEVENV_ROOT/target/mutants" || status=$?
+        if [ "$status" -eq 2 ] || [ "$status" -eq 3 ]; then
           echo "cargo-mutants reported missed mutants; keeping CI non-blocking and uploading the report."
           exit 0
         fi
@@ -842,8 +842,8 @@ in
         done
 
         status=0
-        cargo mutants --all-features --output "$DEVENV_ROOT/target/mutants" "''${pkg_args[@]}" || status=$?
-        if [ "$status" -eq 3 ]; then
+        cargo mutants --all-features --cargo-arg --locked --output "$DEVENV_ROOT/target/mutants" "''${pkg_args[@]}" || status=$?
+        if [ "$status" -eq 2 ] || [ "$status" -eq 3 ]; then
           echo "cargo-mutants reported missed mutants; keeping CI non-blocking and uploading the report."
           exit 0
         fi
@@ -861,8 +861,8 @@ in
         fi
         mkdir -p "$DEVENV_ROOT/target/mutants"
         status=0
-        cargo mutants --all-features --output "$DEVENV_ROOT/target/mutants" -p "$1" || status=$?
-        if [ "$status" -eq 3 ]; then
+        cargo mutants --all-features --cargo-arg --locked --output "$DEVENV_ROOT/target/mutants" -p "$1" || status=$?
+        if [ "$status" -eq 2 ] || [ "$status" -eq 3 ]; then
           echo "cargo-mutants reported missed mutants; keeping CI non-blocking and uploading the report."
           exit 0
         fi
@@ -877,6 +877,12 @@ in
         # Kani injects `#![feature(register_tool)]`, which would otherwise trip
         # the workspace-wide `unstable_features = "deny"` lint.
         export RUSTFLAGS="''${RUSTFLAGS:+$RUSTFLAGS }-A unstable-features"
+
+        # Kani downloads Linux binaries that must resolve against the host
+        # runtime, not Nix's glibc/libm from the devenv shell.
+        unset LD_LIBRARY_PATH
+        unset NIX_LD_LIBRARY_PATH
+        unset LD_PRELOAD
 
         # Run all Kani harnesses in pina_pod_primitives.
         cargo kani --manifest-path "$DEVENV_ROOT/crates/pina_pod_primitives/Cargo.toml" --all-features

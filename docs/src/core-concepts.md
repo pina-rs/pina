@@ -104,6 +104,18 @@ A chain that starts with `&AccountView` stays shared, while a chain that starts 
 
 Traits in `crates/pina/src/impls.rs` provide typed conversion paths from raw `AccountView` values into strongly typed account states. `as_account()` returns `Ref<T>` and `as_account_mut()` returns `RefMut<T>` borrow guards.
 
+## Instruction authoring tips
+
+<!-- {=pinaInstructionAuthoringTips} -->
+
+- Entry points should accept `&mut [AccountView]` and dispatch with `Accounts::try_from(accounts)?.process(data)`.
+- Use `&AccountView` for read-only accounts and `&mut AccountView` only when you need mutable loaders, direct lamport mutation, `close_*` helpers, or writable IDL inference.
+- Keep `assert_writable()` explicit even on `&mut AccountView`. Type-level mutability unlocks mutable APIs, but the runtime still decides whether the account is writable for the current instruction.
+- `as_account()` / `as_account_mut()` return `Ref<T>` / `RefMut<T>` borrow guards. Copy out the fields you need and `drop(...)` the guard before CPIs or later mutable borrows.
+- Keep validation chains direct inside `process(self, ...)` when possible. That makes audits easier and gives `pina idl` the clearest signal for signer, writable, PDA, and default-account inference.
+
+<!-- {/pinaInstructionAuthoringTips} -->
+
 ## Entrypoint model
 
 `nostd_entrypoint!` wires BPF entrypoint plumbing while preserving `no_std` constraints for on-chain builds.

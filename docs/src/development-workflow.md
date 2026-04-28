@@ -24,6 +24,7 @@ test:idl
 ## Reusable documentation blocks
 
 - Template providers live in `templates/*.t.md`.
+- Prefer updating the shared provider block first when the same guidance appears in the README, crate readmes, and mdBook.
 - Run `docs:sync` after changing provider blocks to refresh all consumer blocks.
 - Run `docs:check` (or `verify:docs`) in CI to ensure docs stay synchronized.
 

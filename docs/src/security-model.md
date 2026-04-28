@@ -52,6 +52,18 @@ For instruction payloads:
 - Ensure all token account types used by helper traits implement `AccountValidation`.
 - Keep close/transfer helpers conservation-safe (no temporary double-crediting).
 
+## Closing accounts safely
+
+<!-- {=pinaCloseAccountGuidance} -->
+
+Closing guidance under Pinocchio 0.11:
+
+- `close_with_recipient()` transfers lamports and closes the account handle, but it does not zero or resize account data for you.
+- When stale bytes must be invalidated, use `close_account_zeroed()` or manually call `zeroed()` before `close_with_recipient()`.
+- The `account-resize` feature only affects realloc helpers; it does not change close semantics.
+
+<!-- {/pinaCloseAccountGuidance} -->
+
 ## Best practices
 
 <!-- {=pinaSecurityBestPractices} -->
@@ -61,7 +73,7 @@ For instruction payloads:
 - **Always call `assert_empty()`** before account initialization to prevent reinitialization attacks
 - **Always verify program accounts** with `assert_address()` / `assert_program()` before CPI invocations
 - **Use `assert_type::<T>()`** to prevent type cosplay — it checks discriminator, owner, and data size
-- **Use `close_with_recipient()` with `zeroed()`** to safely close accounts and prevent revival attacks
+- **Use `close_account_zeroed()` or `zeroed()` + `close_with_recipient()`** when stale account bytes must be invalidated before close
 - **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
 - **Namespace PDA seeds** with type-specific prefixes to prevent PDA sharing across account types
 
