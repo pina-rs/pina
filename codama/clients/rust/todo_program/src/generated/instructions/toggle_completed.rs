@@ -18,8 +18,15 @@ pub struct ToggleCompleted {
 }
 
 impl ToggleCompleted {
-	pub fn new(owner: solana_pubkey::Pubkey, todo: solana_pubkey::Pubkey) -> Self {
-		Self { owner, todo }
+	pub fn new(owner: solana_pubkey::Pubkey) -> Self {
+		Self {
+			owner,
+			todo: solana_pubkey::Pubkey::find_program_address(
+				&["todo".as_bytes(), owner.as_ref()],
+				&crate::TODO_PROGRAM_ID,
+			)
+			.0,
+		}
 	}
 
 	pub fn instruction(

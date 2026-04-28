@@ -22,8 +22,15 @@ pub struct Increment {
 }
 
 impl Increment {
-	pub fn new(authority: solana_pubkey::Pubkey, counter: solana_pubkey::Pubkey) -> Self {
-		Self { authority, counter }
+	pub fn new(authority: solana_pubkey::Pubkey) -> Self {
+		Self {
+			authority,
+			counter: solana_pubkey::Pubkey::find_program_address(
+				&["counter".as_bytes(), authority.as_ref()],
+				&crate::COUNTER_PROGRAM_ID,
+			)
+			.0,
+		}
 	}
 
 	pub fn instruction(&self, data: IncrementInstructionData) -> solana_instruction::Instruction {

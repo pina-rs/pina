@@ -36,18 +36,18 @@ import {
 	type TodoStateArgs,
 } from "../accounts";
 import {
-	getInitializeInstruction,
-	getToggleCompletedInstruction,
-	getUpdateDigestInstruction,
-	type InitializeInput,
+	getInitializeInstructionAsync,
+	getToggleCompletedInstructionAsync,
+	getUpdateDigestInstructionAsync,
+	type InitializeAsyncInput,
 	type ParsedInitializeInstruction,
 	type ParsedToggleCompletedInstruction,
 	type ParsedUpdateDigestInstruction,
 	parseInitializeInstruction,
 	parseToggleCompletedInstruction,
 	parseUpdateDigestInstruction,
-	type ToggleCompletedInput,
-	type UpdateDigestInput,
+	type ToggleCompletedAsyncInput,
+	type UpdateDigestAsyncInput,
 } from "../instructions";
 import { findTodoPda } from "../pdas";
 
@@ -161,16 +161,20 @@ export type TodoProgramPluginAccounts = {
 
 export type TodoProgramPluginInstructions = {
 	initialize: (
-		input: InitializeInput,
-	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
-	toggleCompleted: (
-		input: ToggleCompletedInput,
+		input: InitializeAsyncInput,
 	) =>
-		& ReturnType<typeof getToggleCompletedInstruction>
+		& ReturnType<typeof getInitializeInstructionAsync>
+		& SelfPlanAndSendFunctions;
+	toggleCompleted: (
+		input: ToggleCompletedAsyncInput,
+	) =>
+		& ReturnType<typeof getToggleCompletedInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	updateDigest: (
-		input: UpdateDigestInput,
-	) => ReturnType<typeof getUpdateDigestInstruction> & SelfPlanAndSendFunctions;
+		input: UpdateDigestAsyncInput,
+	) =>
+		& ReturnType<typeof getUpdateDigestInstructionAsync>
+		& SelfPlanAndSendFunctions;
 };
 
 export type TodoProgramPluginPdas = { todo: typeof findTodoPda };
@@ -192,17 +196,17 @@ export function todoProgramProgram() {
 					initialize: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstruction(input),
+							getInitializeInstructionAsync(input),
 						),
 					toggleCompleted: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getToggleCompletedInstruction(input),
+							getToggleCompletedInstructionAsync(input),
 						),
 					updateDigest: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getUpdateDigestInstruction(input),
+							getUpdateDigestInstructionAsync(input),
 						),
 				},
 				pdas: { todo: findTodoPda },

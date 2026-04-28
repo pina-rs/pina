@@ -21,8 +21,10 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { findTodoPda } from "../pdas";
 import { TODO_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const TOGGLE_COMPLETED_DISCRIMINATOR = 1;
@@ -49,6 +51,63 @@ export type ToggleCompletedInstruction<
 			...TRemainingAccounts,
 		]
 	>;
+
+export type ToggleCompletedAsyncInput<
+	TAccountOwner extends string = string,
+	TAccountTodo extends string = string,
+> = {
+	owner: TransactionSigner<TAccountOwner>;
+	todo?: Address<TAccountTodo>;
+};
+
+export async function getToggleCompletedInstructionAsync<
+	TAccountOwner extends string,
+	TAccountTodo extends string,
+	TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: ToggleCompletedAsyncInput<TAccountOwner, TAccountTodo>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	ToggleCompletedInstruction<TProgramAddress, TAccountOwner, TAccountTodo>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		owner: { value: input.owner ?? null, isWritable: false },
+		todo: { value: input.todo ?? null, isWritable: true },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Resolve default values.
+	if (!accounts.todo.value) {
+		accounts.todo.value = await findTodoPda({
+			owner: getAddressFromResolvedInstructionAccount(
+				"owner",
+				accounts.owner.value,
+			),
+		});
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze(
+		{
+			accounts: [
+				getAccountMeta("owner", accounts.owner),
+				getAccountMeta("todo", accounts.todo),
+			],
+			programAddress,
+		} as ToggleCompletedInstruction<
+			TProgramAddress,
+			TAccountOwner,
+			TAccountTodo
+		>,
+	);
+}
 
 export type ToggleCompletedInput<
 	TAccountOwner extends string = string,

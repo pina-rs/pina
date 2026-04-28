@@ -21,8 +21,10 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { findCounterPda } from "../pdas";
 import { COUNTER_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const INCREMENT_DISCRIMINATOR = 1;
@@ -49,6 +51,66 @@ export type IncrementInstruction<
 			...TRemainingAccounts,
 		]
 	>;
+
+export type IncrementAsyncInput<
+	TAccountAuthority extends string = string,
+	TAccountCounter extends string = string,
+> = {
+	/** The counter's authority. Must sign to prove ownership. */
+	authority: TransactionSigner<TAccountAuthority>;
+	/** The counter PDA account (must already exist and be writable). */
+	counter?: Address<TAccountCounter>;
+};
+
+export async function getIncrementInstructionAsync<
+	TAccountAuthority extends string,
+	TAccountCounter extends string,
+	TProgramAddress extends Address = typeof COUNTER_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: IncrementAsyncInput<TAccountAuthority, TAccountCounter>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	IncrementInstruction<TProgramAddress, TAccountAuthority, TAccountCounter>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		COUNTER_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: false },
+		counter: { value: input.counter ?? null, isWritable: true },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Resolve default values.
+	if (!accounts.counter.value) {
+		accounts.counter.value = await findCounterPda({
+			authority: getAddressFromResolvedInstructionAccount(
+				"authority",
+				accounts.authority.value,
+			),
+		});
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze(
+		{
+			accounts: [
+				getAccountMeta("authority", accounts.authority),
+				getAccountMeta("counter", accounts.counter),
+			],
+			programAddress,
+		} as IncrementInstruction<
+			TProgramAddress,
+			TAccountAuthority,
+			TAccountCounter
+		>,
+	);
+}
 
 export type IncrementInput<
 	TAccountAuthority extends string = string,

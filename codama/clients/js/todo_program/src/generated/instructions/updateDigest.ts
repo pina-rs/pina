@@ -33,8 +33,10 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { findTodoPda } from "../pdas";
 import { TODO_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const UPDATE_DIGEST_DISCRIMINATOR = 2;
@@ -87,6 +89,64 @@ export function getUpdateDigestInstructionDataCodec(): FixedSizeCodec<
 		getUpdateDigestInstructionDataEncoder(),
 		getUpdateDigestInstructionDataDecoder(),
 	);
+}
+
+export type UpdateDigestAsyncInput<
+	TAccountOwner extends string = string,
+	TAccountTodo extends string = string,
+> = {
+	owner: TransactionSigner<TAccountOwner>;
+	todo?: Address<TAccountTodo>;
+	digest: UpdateDigestInstructionDataArgs["digest"];
+};
+
+export async function getUpdateDigestInstructionAsync<
+	TAccountOwner extends string,
+	TAccountTodo extends string,
+	TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: UpdateDigestAsyncInput<TAccountOwner, TAccountTodo>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	UpdateDigestInstruction<TProgramAddress, TAccountOwner, TAccountTodo>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		owner: { value: input.owner ?? null, isWritable: false },
+		todo: { value: input.todo ?? null, isWritable: true },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.todo.value) {
+		accounts.todo.value = await findTodoPda({
+			owner: getAddressFromResolvedInstructionAccount(
+				"owner",
+				accounts.owner.value,
+			),
+		});
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("owner", accounts.owner),
+			getAccountMeta("todo", accounts.todo),
+		],
+		data: getUpdateDigestInstructionDataEncoder().encode(
+			args as UpdateDigestInstructionDataArgs,
+		),
+		programAddress,
+	} as UpdateDigestInstruction<TProgramAddress, TAccountOwner, TAccountTodo>);
 }
 
 export type UpdateDigestInput<

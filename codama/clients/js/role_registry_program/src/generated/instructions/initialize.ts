@@ -31,8 +31,10 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { findRegistryConfigPda } from "../pdas";
 import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const INITIALIZE_DISCRIMINATOR = 0;
@@ -91,6 +93,91 @@ export function getInitializeInstructionDataCodec(): FixedSizeCodec<
 		getInitializeInstructionDataEncoder(),
 		getInitializeInstructionDataDecoder(),
 	);
+}
+
+export type InitializeAsyncInput<
+	TAccountAdmin extends string = string,
+	TAccountRegistryConfig extends string = string,
+	TAccountSystemProgram extends string = string,
+> = {
+	admin: TransactionSigner<TAccountAdmin>;
+	registryConfig?: Address<TAccountRegistryConfig>;
+	systemProgram?: Address<TAccountSystemProgram>;
+	bump: InitializeInstructionDataArgs["bump"];
+};
+
+export async function getInitializeInstructionAsync<
+	TAccountAdmin extends string,
+	TAccountRegistryConfig extends string,
+	TAccountSystemProgram extends string,
+	TProgramAddress extends Address =
+		typeof ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: InitializeAsyncInput<
+		TAccountAdmin,
+		TAccountRegistryConfig,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	InitializeInstruction<
+		TProgramAddress,
+		TAccountAdmin,
+		TAccountRegistryConfig,
+		TAccountSystemProgram
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		admin: { value: input.admin ?? null, isWritable: true },
+		registryConfig: { value: input.registryConfig ?? null, isWritable: true },
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.registryConfig.value) {
+		accounts.registryConfig.value = await findRegistryConfigPda({
+			admin: getAddressFromResolvedInstructionAccount(
+				"admin",
+				accounts.admin.value,
+			),
+		});
+	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("admin", accounts.admin),
+			getAccountMeta("registryConfig", accounts.registryConfig),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getInitializeInstructionDataEncoder().encode(
+			args as InitializeInstructionDataArgs,
+		),
+		programAddress,
+	} as InitializeInstruction<
+		TProgramAddress,
+		TAccountAdmin,
+		TAccountRegistryConfig,
+		TAccountSystemProgram
+	>);
 }
 
 export type InitializeInput<
