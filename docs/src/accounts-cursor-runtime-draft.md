@@ -96,7 +96,7 @@ pub struct AccountsCursor<'a> {
 }
 
 pub trait ParseAccounts<'a>: Sized {
-	fn parse(cursor: &mut AccountsCursor<'a>) -> Result<Self, ProgramError>;
+	fn parse_accounts(cursor: &mut AccountsCursor<'a>) -> Result<Self, ProgramError>;
 }
 ```
 

@@ -70,15 +70,33 @@ fn accounts_derive_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenSt
 	let mut field_idents = Vec::new();
 	let mut parse_fields = Vec::new();
 	let mut remaining_field = None;
+	let field_count = fields.len();
+	let mut seen_remaining = false;
 
 	for field in fields.iter() {
+		if !field.remaining.is_present() {
+			continue;
+		}
+
+		if seen_remaining {
+			return syn::Error::new_spanned(
+				&field.ident,
+				"Only one field can be marked as `remaining`",
+			)
+			.to_compile_error();
+		}
+
+		seen_remaining = true;
+	}
+
+	for (index, field) in fields.iter().enumerate() {
 		let ident = field.ident.as_ref().unwrap();
 
 		if field.remaining.is_present() {
-			if remaining_field.is_some() {
+			if index + 1 != field_count {
 				return syn::Error::new_spanned(
 					&field.ident,
-					"Only one field can be marked as `remaining`",
+					"`#[pina(remaining)]` field must be the last field",
 				)
 				.to_compile_error();
 			}

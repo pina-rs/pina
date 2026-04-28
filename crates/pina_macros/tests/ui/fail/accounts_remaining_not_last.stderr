@@ -1,0 +1,5 @@
+error: `#[pina(remaining)]` field must be the last field
+ --> tests/ui/fail/accounts_remaining_not_last.rs:7:6
+  |
+7 |     pub rest: &'a [AccountView],
+  |         ^^^^
