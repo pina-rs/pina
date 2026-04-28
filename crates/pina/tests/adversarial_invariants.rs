@@ -28,6 +28,7 @@ pub struct BalanceState {
 	pub amount: PodU64,
 }
 
+#[allow(dead_code)]
 #[derive(Accounts, Debug)]
 #[pina(crate = pina)]
 struct DuplicateMutablePair<'a> {
@@ -281,17 +282,6 @@ macro_rules! load_accounts {
 	}};
 }
 
-fn assert_distinct_mutable_accounts(
-	left: &AccountView,
-	right: &AccountView,
-) -> Result<(), ProgramError> {
-	if left.address() == right.address() {
-		return Err(ProgramError::InvalidArgument);
-	}
-
-	Ok(())
-}
-
 fn find_non_canonical_pda_fixture() -> ([u8; 2], Address, u8, Address, u8) {
 	for counter in 0u16..=u16::MAX {
 		let seed_bytes = counter.to_le_bytes();
@@ -337,7 +327,7 @@ fn build_token_account_bytes(mint: &Address, owner: &Address, amount: u64) -> Ve
 }
 
 #[test]
-fn duplicate_mutable_accounts_share_runtime_borrow_state() {
+fn duplicate_mutable_accounts_are_rejected_by_cursor_runtime() {
 	let shared_key = fake_address(11);
 	let state_bytes = build_balance_state_bytes(7);
 	let unique_accounts = [AccountBuilder::new()
@@ -349,28 +339,13 @@ fn duplicate_mutable_accounts_share_runtime_borrow_state() {
 
 	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 1, 4);
 	let account_views = initialized_account_views(&mut accounts, count);
-	let pair = DuplicateMutablePair::try_from(account_views)
-		.unwrap_or_else(|error| panic!("failed to derive duplicate pair: {error:?}"));
+	let result = DuplicateMutablePair::try_from(account_views);
 
-	assert_eq!(pair.source.address(), pair.destination.address());
 	assert!(matches!(
-		assert_distinct_mutable_accounts(pair.source, pair.destination),
-		Err(ProgramError::InvalidArgument)
+		result,
+		Err(ProgramError::Custom(error))
+			if error == PinaProgramError::DuplicateMutableAccount as u32
 	));
-
-	let borrowed = pair
-		.source
-		.try_borrow_mut()
-		.unwrap_or_else(|error| panic!("expected first mutable borrow to succeed: {error:?}"));
-	assert!(matches!(
-		pair.destination.try_borrow_mut(),
-		Err(ProgramError::AccountBorrowFailed)
-	));
-	assert!(matches!(
-		pair.destination.try_borrow(),
-		Err(ProgramError::AccountBorrowFailed)
-	));
-	assert_eq!(borrowed.len(), size_of::<BalanceState>());
 }
 
 #[test]

@@ -34,6 +34,20 @@ struct TestAccountsMut<'a> {
 	pub two: &'a mut AccountView,
 }
 
+#[derive(Accounts, Debug)]
+#[pina(crate = pina)]
+struct NestedAccounts<'a> {
+	pub two: &'a AccountView,
+	pub three: &'a mut AccountView,
+}
+
+#[derive(Accounts, Debug)]
+#[pina(crate = pina)]
+struct ParentAccounts<'a> {
+	pub one: &'a AccountView,
+	pub nested: NestedAccounts<'a>,
+}
+
 #[derive(Accounts)]
 #[pina(crate = pina)]
 struct TestAccountsRemainingMut<'a> {
@@ -158,6 +172,25 @@ fn test_accounts_derive_remaining_mutable() {
 	let test_accounts = TestAccountsRemainingMut::try_from_account_infos(accounts).unwrap();
 	assert_eq!(test_accounts.one as *mut AccountView, one_ptr);
 	assert_eq!(test_accounts.remaining.len(), 3);
+}
+
+#[test]
+fn test_accounts_derive_nested_loader_order() {
+	let ix_data = [3u8; 100];
+	let mut input = unsafe { create_input(3, &ix_data) };
+	let mut accounts = [UNINIT; 3];
+
+	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
+	let accounts: &mut [AccountView] =
+		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
+	let one_ptr = core::ptr::addr_of!(accounts[0]);
+	let two_ptr = core::ptr::addr_of!(accounts[1]);
+	let three_ptr = core::ptr::addr_of_mut!(accounts[2]);
+
+	let test_accounts = ParentAccounts::try_from_account_infos(accounts).unwrap();
+	assert_eq!(test_accounts.one as *const AccountView, one_ptr);
+	assert_eq!(test_accounts.nested.two as *const AccountView, two_ptr);
+	assert_eq!(test_accounts.nested.three as *mut AccountView, three_ptr);
 }
 
 /// The mock program ID used for testing.

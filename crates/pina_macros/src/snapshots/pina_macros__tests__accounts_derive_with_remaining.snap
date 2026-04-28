@@ -1,22 +1,31 @@
 ---
 source: crates/pina_macros/src/tests.rs
+assertion_line: 433
 expression: output
 ---
-impl<'a> ::pina::TryFromAccountInfos<'a> for TransferAccounts<'a> {
-    fn try_from_account_infos(
-        accounts: &'a mut [::pina::AccountView],
+impl<'a> ::pina::ParseAccounts<'a> for TransferAccounts<'a> {
+    fn parse_accounts(
+        cursor: &mut ::pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, ::pina::ProgramError> {
-        let [authority, source, destination, extra @ ..] = accounts else {
-            return ::core::result::Result::Err(
-                ::pina::ProgramError::NotEnoughAccountKeys,
-            );
-        };
+        let authority = cursor.next()?;
+        let source = cursor.next()?;
+        let destination = cursor.next()?;
+        let extra = cursor.remaining_mut();
         Ok(Self {
             authority,
             source,
             destination,
             extra,
         })
+    }
+}
+impl<'a> ::pina::TryFromAccountInfos<'a> for TransferAccounts<'a> {
+    fn try_from_account_infos(
+        accounts: &'a mut [::pina::AccountView],
+    ) -> ::core::result::Result<Self, ::pina::ProgramError> {
+        let mut cursor = ::pina::AccountsCursor::new(accounts);
+        let parsed = <Self as ::pina::ParseAccounts>::parse_accounts(&mut cursor)?;
+        Ok(parsed)
     }
 }
 impl<'a> ::core::convert::TryFrom<&'a mut [::pina::AccountView]>

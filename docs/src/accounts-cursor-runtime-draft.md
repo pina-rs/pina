@@ -1,6 +1,6 @@
 # Accounts cursor runtime design draft
 
-- Status: Draft
+- Status: Implemented foundation
 - Related issue: [#143](https://github.com/pina-rs/pina/issues/143)
 - Related review: [Anchor `lang-v2` review](./anchor-next-review.md)
 
@@ -100,7 +100,9 @@ pub trait ParseAccounts<'a>: Sized {
 }
 ```
 
-Then `#[derive(Accounts)]` would generate `ParseAccounts` and keep `TryFromAccountInfos` as a compatibility layer that delegates to the cursor runtime.
+Then `#[derive(Accounts)]` generates `ParseAccounts` and keeps `TryFromAccountInfos` as a compatibility layer that delegates to the cursor runtime.
+
+Nested account groups use the same trait: a non-reference field in a derived accounts struct is parsed with `<FieldTy as ParseAccounts>::parse_accounts(cursor)`. That means parent and child loaders share one cursor, preserve left-to-right account order, and run one exactness check only at the outer `TryFromAccountInfos` boundary. Raw trailing accounts still use `#[pina(remaining)]`, which consumes the cursor tail and intentionally leaves those accounts for user code to inspect.
 
 That gives Pina an incremental migration path:
 

@@ -1,22 +1,21 @@
 ---
 source: crates/pina_macros/src/tests.rs
+assertion_line: 465
 expression: output
 ---
-impl<'a> ::pina::TryFromAccountInfos<'a> for EscrowAccounts<'a> {
-    fn try_from_account_infos(
-        accounts: &'a mut [::pina::AccountView],
+impl<'a> ::pina::ParseAccounts<'a> for EscrowAccounts<'a> {
+    fn parse_accounts(
+        cursor: &mut ::pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, ::pina::ProgramError> {
-        if accounts.len() > 9usize {
-            return ::core::result::Result::Err(
-                ::pina::PinaProgramError::TooManyAccountKeys.into(),
-            );
-        }
-        let [maker, escrow, mint_a, mint_b, maker_ata_a, vault, token_program,
-        associated_token_program, system_program] = accounts else {
-            return ::core::result::Result::Err(
-                ::pina::ProgramError::NotEnoughAccountKeys,
-            );
-        };
+        let maker = cursor.next()?;
+        let escrow = cursor.next()?;
+        let mint_a = cursor.next()?;
+        let mint_b = cursor.next()?;
+        let maker_ata_a = cursor.next()?;
+        let vault = cursor.next()?;
+        let token_program = cursor.next()?;
+        let associated_token_program = cursor.next()?;
+        let system_program = cursor.next()?;
         Ok(Self {
             maker,
             escrow,
@@ -28,6 +27,16 @@ impl<'a> ::pina::TryFromAccountInfos<'a> for EscrowAccounts<'a> {
             associated_token_program,
             system_program,
         })
+    }
+}
+impl<'a> ::pina::TryFromAccountInfos<'a> for EscrowAccounts<'a> {
+    fn try_from_account_infos(
+        accounts: &'a mut [::pina::AccountView],
+    ) -> ::core::result::Result<Self, ::pina::ProgramError> {
+        let mut cursor = ::pina::AccountsCursor::new(accounts);
+        let parsed = <Self as ::pina::ParseAccounts>::parse_accounts(&mut cursor)?;
+        cursor.finish_exact()?;
+        Ok(parsed)
     }
 }
 impl<'a> ::core::convert::TryFrom<&'a mut [::pina::AccountView]> for EscrowAccounts<'a> {
