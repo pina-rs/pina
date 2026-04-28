@@ -1,26 +1,30 @@
 ---
 source: crates/pina_macros/src/tests.rs
+assertion_line: 417
 expression: output
 ---
-impl<'a> ::pina::TryFromAccountInfos<'a> for InitAccounts<'a> {
-    fn try_from_account_infos(
-        accounts: &'a mut [::pina::AccountView],
+impl<'a> ::pina::ParseAccounts<'a> for InitAccounts<'a> {
+    fn parse_accounts(
+        cursor: &mut ::pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, ::pina::ProgramError> {
-        if accounts.len() > 3usize {
-            return ::core::result::Result::Err(
-                ::pina::PinaProgramError::TooManyAccountKeys.into(),
-            );
-        }
-        let [payer, config, system_program] = accounts else {
-            return ::core::result::Result::Err(
-                ::pina::ProgramError::NotEnoughAccountKeys,
-            );
-        };
+        let payer = cursor.next()?;
+        let config = cursor.next()?;
+        let system_program = cursor.next()?;
         Ok(Self {
             payer,
             config,
             system_program,
         })
+    }
+}
+impl<'a> ::pina::TryFromAccountInfos<'a> for InitAccounts<'a> {
+    fn try_from_account_infos(
+        accounts: &'a mut [::pina::AccountView],
+    ) -> ::core::result::Result<Self, ::pina::ProgramError> {
+        let mut cursor = ::pina::AccountsCursor::new(accounts);
+        let parsed = <Self as ::pina::ParseAccounts>::parse_accounts(&mut cursor)?;
+        cursor.finish_exact()?;
+        Ok(parsed)
     }
 }
 impl<'a> ::core::convert::TryFrom<&'a mut [::pina::AccountView]> for InitAccounts<'a> {

@@ -3,6 +3,7 @@ use pinocchio::ProgramResult;
 
 use crate::AccountView;
 use crate::Address;
+use crate::PinaProgramError;
 use crate::ProgramError;
 use crate::Ref;
 use crate::RefMut;
@@ -609,6 +610,96 @@ pub trait CloseAccountWithRecipient {
 	/// [`Self::close_with_recipient`]. It does not implicitly reallocate the
 	/// account, even when the `account-resize` feature is enabled.
 	fn close_account_zeroed(&mut self, recipient: &mut AccountView) -> ProgramResult;
+}
+
+/// Cursor for parsing instruction accounts exactly once.
+///
+/// `AccountsCursor` is the runtime layer used by `#[derive(Accounts)]`. It
+/// advances through the account slice from left to right, supports explicit
+/// trailing-account capture, and centralizes duplicate mutable account checks
+/// without heap allocation.
+pub struct AccountsCursor<'a> {
+	remaining: &'a mut [AccountView],
+}
+
+impl<'a> AccountsCursor<'a> {
+	/// Create a cursor over an instruction account slice.
+	pub fn new(accounts: &'a mut [AccountView]) -> Self {
+		Self {
+			remaining: accounts,
+		}
+	}
+
+	/// Return the next account without advancing the cursor.
+	pub fn peek(&self) -> Option<&AccountView> {
+		self.remaining.first()
+	}
+
+	/// Parse the next account as an immutable account field.
+	pub fn next(&mut self) -> Result<&'a AccountView, ProgramError> {
+		let accounts = core::mem::take(&mut self.remaining);
+		let (account, rest) = accounts
+			.split_first_mut()
+			.ok_or(ProgramError::NotEnoughAccountKeys)?;
+		self.remaining = rest;
+
+		Ok(account)
+	}
+
+	/// Parse the next account as a mutable account field.
+	pub fn next_mut(&mut self) -> Result<&'a mut AccountView, ProgramError> {
+		let accounts = core::mem::take(&mut self.remaining);
+		let (account, rest) = accounts
+			.split_first_mut()
+			.ok_or(ProgramError::NotEnoughAccountKeys)?;
+		self.remaining = rest;
+		self.track_mutable_account(account)?;
+
+		Ok(account)
+	}
+
+	/// Return the unparsed trailing accounts without advancing the cursor.
+	pub fn remaining(&self) -> &[AccountView] {
+		self.remaining
+	}
+
+	/// Consume and return the unparsed trailing accounts.
+	pub fn remaining_mut(&mut self) -> &'a mut [AccountView] {
+		core::mem::take(&mut self.remaining)
+	}
+
+	/// Require that no unparsed accounts remain.
+	pub fn finish_exact(&self) -> Result<(), ProgramError> {
+		if self.remaining.is_empty() {
+			return Ok(());
+		}
+
+		Err(PinaProgramError::TooManyAccountKeys.into())
+	}
+
+	fn track_mutable_account(&self, account: &AccountView) -> Result<(), ProgramError> {
+		if !account.is_writable() {
+			return Ok(());
+		}
+
+		let address = account.address();
+		let aliases_future_writable_account = self
+			.remaining
+			.iter()
+			.any(|remaining| remaining.is_writable() && remaining.address() == address);
+		if aliases_future_writable_account {
+			return Err(PinaProgramError::DuplicateMutableAccount.into());
+		}
+
+		Ok(())
+	}
+}
+
+/// Cursor-based parser for typed account structs.
+pub trait ParseAccounts<'a>: Sized {
+	/// Parse accounts from the cursor, preserving user-authored validation for
+	/// later instruction processing.
+	fn parse_accounts(cursor: &mut AccountsCursor<'a>) -> Result<Self, ProgramError>;
 }
 
 /// Destructures a slice of `AccountView` into a named accounts struct.

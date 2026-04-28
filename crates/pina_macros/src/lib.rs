@@ -16,6 +16,7 @@ use syn::Fields;
 use syn::ItemEnum;
 use syn::ItemStruct;
 use syn::Token;
+use syn::Type;
 use syn::punctuated::Punctuated;
 
 use crate::args::InstructionArgs;
@@ -67,15 +68,17 @@ fn accounts_derive_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenSt
 
 	// Process fields
 	let mut field_idents = Vec::new();
+	let mut parse_fields = Vec::new();
 	let mut remaining_field = None;
+	let field_count = fields.len();
+	let mut seen_remaining = false;
 
 	for field in fields.iter() {
 		if !field.remaining.is_present() {
-			field_idents.push(field.ident.as_ref().unwrap());
 			continue;
 		}
 
-		if remaining_field.is_some() {
+		if seen_remaining {
 			return syn::Error::new_spanned(
 				&field.ident,
 				"Only one field can be marked as `remaining`",
@@ -83,41 +86,69 @@ fn accounts_derive_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenSt
 			.to_compile_error();
 		}
 
-		remaining_field = field.ident.as_ref();
+		seen_remaining = true;
 	}
 
-	let number_of_fields = field_idents.len();
-	let too_many_accounts = remaining_field.is_none().then(|| {
-		quote! {
-			if accounts.len() > #number_of_fields {
-				return ::core::result::Result::Err(#crate_path::PinaProgramError::TooManyAccountKeys.into());
+	for (index, field) in fields.iter().enumerate() {
+		let ident = field.ident.as_ref().unwrap();
+
+		if field.remaining.is_present() {
+			if index + 1 != field_count {
+				return syn::Error::new_spanned(
+					&field.ident,
+					"`#[pina(remaining)]` field must be the last field",
+				)
+				.to_compile_error();
 			}
+
+			remaining_field = field.ident.as_ref();
+			continue;
+		}
+
+		field_idents.push(ident);
+		let parse_field = if is_mut_reference(&field.ty) {
+			quote! { let #ident = cursor.next_mut()?; }
+		} else if is_reference(&field.ty) {
+			quote! { let #ident = cursor.next()?; }
+		} else {
+			let ty = &field.ty;
+			quote! { let #ident = <#ty as #crate_path::ParseAccounts>::parse_accounts(cursor)?; }
+		};
+		parse_fields.push(parse_field);
+	}
+
+	let finish_exact = remaining_field.is_none().then(|| {
+		quote! {
+			cursor.finish_exact()?;
 		}
 	});
-	let destructure_pattern = if let Some(ref remaining_ident) = remaining_field {
-		quote! { let [#(#field_idents,)* #remaining_ident @ ..] = accounts }
-	} else {
-		quote! { let [#(#field_idents,)*] = accounts }
-	};
-
+	let remaining_binding = remaining_field.map(|f| quote! { let #f = cursor.remaining_mut(); });
 	let remaining_field_ident = remaining_field.map(|f| quote!(#f,));
-	let not_enough_accounts_error = quote! {
-		return ::core::result::Result::Err(#crate_path::ProgramError::NotEnoughAccountKeys);
-	};
+
 	quote! {
-		impl #impl_generics #crate_path::TryFromAccountInfos #ty_generics for #struct_name #ty_generics #where_clause {
-			fn try_from_account_infos(
-				accounts: & #lifetime mut [#crate_path::AccountView],
+		impl #impl_generics #crate_path::ParseAccounts #ty_generics for #struct_name #ty_generics #where_clause {
+			fn parse_accounts(
+				cursor: &mut #crate_path::AccountsCursor<#lifetime>,
 			) -> ::core::result::Result<Self, #crate_path::ProgramError> {
-				#too_many_accounts
-				#destructure_pattern else {
-					#not_enough_accounts_error
-				};
+				#(#parse_fields)*
+				#remaining_binding
 
 				Ok(Self {
 					#(#field_idents,)*
 					#remaining_field_ident
 				})
+			}
+		}
+
+		impl #impl_generics #crate_path::TryFromAccountInfos #ty_generics for #struct_name #ty_generics #where_clause {
+			fn try_from_account_infos(
+				accounts: & #lifetime mut [#crate_path::AccountView],
+			) -> ::core::result::Result<Self, #crate_path::ProgramError> {
+				let mut cursor = #crate_path::AccountsCursor::new(accounts);
+				let parsed = <Self as #crate_path::ParseAccounts>::parse_accounts(&mut cursor)?;
+				#finish_exact
+
+				Ok(parsed)
 			}
 		}
 
@@ -129,6 +160,14 @@ fn accounts_derive_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenSt
 			}
 		}
 	}
+}
+
+fn is_reference(ty: &Type) -> bool {
+	matches!(ty, Type::Reference(_))
+}
+
+fn is_mut_reference(ty: &Type) -> bool {
+	matches!(ty, Type::Reference(reference) if reference.mutability.is_some())
 }
 
 /// `#[error]` is a lightweight modification to the provided enum acting as

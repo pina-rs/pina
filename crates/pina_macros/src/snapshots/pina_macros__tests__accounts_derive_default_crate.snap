@@ -1,22 +1,25 @@
 ---
 source: crates/pina_macros/src/tests.rs
+assertion_line: 477
 expression: output
 ---
+impl<'a> ::pina::ParseAccounts<'a> for DefaultCrateAccounts<'a> {
+    fn parse_accounts(
+        cursor: &mut ::pina::AccountsCursor<'a>,
+    ) -> ::core::result::Result<Self, ::pina::ProgramError> {
+        let authority = cursor.next()?;
+        let data = cursor.next()?;
+        Ok(Self { authority, data })
+    }
+}
 impl<'a> ::pina::TryFromAccountInfos<'a> for DefaultCrateAccounts<'a> {
     fn try_from_account_infos(
         accounts: &'a mut [::pina::AccountView],
     ) -> ::core::result::Result<Self, ::pina::ProgramError> {
-        if accounts.len() > 2usize {
-            return ::core::result::Result::Err(
-                ::pina::PinaProgramError::TooManyAccountKeys.into(),
-            );
-        }
-        let [authority, data] = accounts else {
-            return ::core::result::Result::Err(
-                ::pina::ProgramError::NotEnoughAccountKeys,
-            );
-        };
-        Ok(Self { authority, data })
+        let mut cursor = ::pina::AccountsCursor::new(accounts);
+        let parsed = <Self as ::pina::ParseAccounts>::parse_accounts(&mut cursor)?;
+        cursor.finish_exact()?;
+        Ok(parsed)
     }
 }
 impl<'a> ::core::convert::TryFrom<&'a mut [::pina::AccountView]>

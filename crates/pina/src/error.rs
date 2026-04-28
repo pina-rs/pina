@@ -13,6 +13,8 @@
 #[non_exhaustive]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PinaProgramError {
+	/// Two mutable account fields point at the same runtime account.
+	DuplicateMutableAccount = 0xFFFF_FFF9,
 	/// Account or instruction data is shorter than the expected minimum.
 	DataTooShort = 0xFFFF_FFFA,
 	/// Account size does not match the expected type size.
