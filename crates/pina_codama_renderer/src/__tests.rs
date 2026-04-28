@@ -5,6 +5,7 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 use codama_nodes::AccountNode;
+use codama_nodes::AccountValueNode;
 use codama_nodes::BooleanTypeNode;
 use codama_nodes::ConstantDiscriminatorNode;
 use codama_nodes::ConstantPdaSeedNode;
@@ -14,6 +15,7 @@ use codama_nodes::DiscriminatorNode;
 use codama_nodes::Docs;
 use codama_nodes::Endian;
 use codama_nodes::InstructionAccountNode;
+use codama_nodes::InstructionInputValueNode;
 use codama_nodes::InstructionNode;
 use codama_nodes::InstructionOptionalAccountStrategy;
 use codama_nodes::IsAccountSigner;
@@ -23,7 +25,10 @@ use codama_nodes::NumberValueNode;
 use codama_nodes::PdaLinkNode;
 use codama_nodes::PdaNode;
 use codama_nodes::PdaSeedNode;
+use codama_nodes::PdaSeedValueNode;
+use codama_nodes::PdaValueNode;
 use codama_nodes::ProgramNode;
+use codama_nodes::PublicKeyTypeNode;
 use codama_nodes::RootNode;
 use codama_nodes::StringTypeNode;
 use codama_nodes::StringValueNode;
@@ -31,6 +36,7 @@ use codama_nodes::StructFieldTypeNode;
 use codama_nodes::StructTypeNode;
 use codama_nodes::TypeNode;
 use codama_nodes::U8;
+use codama_nodes::VariablePdaSeedNode;
 
 use super::render::seeds::render_variable_seed_parameter;
 use super::*;
@@ -153,6 +159,69 @@ fn renders_pda_helpers_for_linked_account() {
 	let content = read_generated_file(&crate_dir, "accounts/state.rs");
 
 	insta::assert_snapshot!("pda_helpers_for_linked_account", content);
+}
+
+#[test]
+fn renders_instruction_account_default_from_pda() {
+	let mut state = InstructionAccountNode::new("state", true, false);
+	state.default_value = Some(InstructionInputValueNode::Pda(PdaValueNode::new(
+		PdaLinkNode::new("statePda"),
+		vec![PdaSeedValueNode::new(
+			"authority",
+			AccountValueNode::new("authority"),
+		)],
+	)));
+
+	let program = ProgramNode {
+		name: "defaultProgram".into(),
+		public_key: "11111111111111111111111111111111".to_string(),
+		accounts: vec![],
+		instructions: vec![InstructionNode {
+			name: "initialize".into(),
+			docs: Docs::default(),
+			optional_account_strategy: InstructionOptionalAccountStrategy::ProgramId,
+			accounts: vec![InstructionAccountNode::new("authority", false, true), state],
+			arguments: vec![],
+			extra_arguments: vec![],
+			remaining_accounts: vec![],
+			byte_deltas: vec![],
+			discriminators: vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(NumberTypeNode::le(U8), NumberValueNode::new(7u8)),
+				0,
+			))],
+			status: None,
+			sub_instructions: vec![],
+		}],
+		defined_types: vec![],
+		pdas: vec![PdaNode::new(
+			"statePda",
+			vec![
+				PdaSeedNode::Constant(ConstantPdaSeedNode::new(
+					StringTypeNode::utf8(),
+					StringValueNode::new("state"),
+				)),
+				PdaSeedNode::Variable(VariablePdaSeedNode::new(
+					"authority",
+					PublicKeyTypeNode::new(),
+				)),
+			],
+		)],
+		errors: vec![],
+		version: String::new(),
+		origin: None,
+		docs: Docs::default(),
+	};
+	let output_dir = unique_temp_dir("pina-codama-render-pda-default");
+	let crate_dir = output_dir.join("default_program");
+	render_root_node(
+		&RootNode::new(program),
+		&crate_dir,
+		&RenderConfig::default(),
+	)
+	.unwrap_or_else(|e| panic!("render failed: {e}"));
+
+	let content = read_generated_file(&crate_dir, "instructions/initialize.rs");
+	insta::assert_snapshot!("instruction_account_default_from_pda", content);
 }
 
 #[test]

@@ -27,7 +27,24 @@ expression: idl
             "kind": "instructionAccountNode",
             "name": "counter",
             "isWritable": true,
-            "isSigner": false
+            "isSigner": false,
+            "defaultValue": {
+              "kind": "pdaValueNode",
+              "pda": {
+                "kind": "pdaLinkNode",
+                "name": "counter"
+              },
+              "seeds": [
+                {
+                  "kind": "pdaSeedValueNode",
+                  "name": "authority",
+                  "value": {
+                    "kind": "accountValueNode",
+                    "name": "authority"
+                  }
+                }
+              ]
+            }
           }
         ],
         "arguments": [

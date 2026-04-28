@@ -113,7 +113,24 @@ expression: idl
             "isSigner": false,
             "docs": [
               "The counter PDA account (must be empty — not yet created)."
-            ]
+            ],
+            "defaultValue": {
+              "kind": "pdaValueNode",
+              "pda": {
+                "kind": "pdaLinkNode",
+                "name": "counter"
+              },
+              "seeds": [
+                {
+                  "kind": "pdaSeedValueNode",
+                  "name": "authority",
+                  "value": {
+                    "kind": "accountValueNode",
+                    "name": "authority"
+                  }
+                }
+              ]
+            }
           },
           {
             "kind": "instructionAccountNode",
@@ -183,7 +200,24 @@ expression: idl
             "isSigner": false,
             "docs": [
               "The counter PDA account (must already exist and be writable)."
-            ]
+            ],
+            "defaultValue": {
+              "kind": "pdaValueNode",
+              "pda": {
+                "kind": "pdaLinkNode",
+                "name": "counter"
+              },
+              "seeds": [
+                {
+                  "kind": "pdaSeedValueNode",
+                  "name": "authority",
+                  "value": {
+                    "kind": "accountValueNode",
+                    "name": "authority"
+                  }
+                }
+              ]
+            }
           }
         ],
         "arguments": [],
