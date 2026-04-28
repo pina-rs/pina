@@ -792,8 +792,8 @@ in
         set -euo pipefail
         mkdir -p "$DEVENV_ROOT/target/mutants"
         status=0
-        cargo mutants --all-features --output "$DEVENV_ROOT/target/mutants" || status=$?
-        if [ "$status" -eq 3 ]; then
+        cargo mutants --all-features --cargo-arg --locked --output "$DEVENV_ROOT/target/mutants" || status=$?
+        if [ "$status" -eq 2 ] || [ "$status" -eq 3 ]; then
           echo "cargo-mutants reported missed mutants; keeping CI non-blocking and uploading the report."
           exit 0
         fi
@@ -842,8 +842,8 @@ in
         done
 
         status=0
-        cargo mutants --all-features --output "$DEVENV_ROOT/target/mutants" "''${pkg_args[@]}" || status=$?
-        if [ "$status" -eq 3 ]; then
+        cargo mutants --all-features --cargo-arg --locked --output "$DEVENV_ROOT/target/mutants" "''${pkg_args[@]}" || status=$?
+        if [ "$status" -eq 2 ] || [ "$status" -eq 3 ]; then
           echo "cargo-mutants reported missed mutants; keeping CI non-blocking and uploading the report."
           exit 0
         fi
@@ -861,8 +861,8 @@ in
         fi
         mkdir -p "$DEVENV_ROOT/target/mutants"
         status=0
-        cargo mutants --all-features --output "$DEVENV_ROOT/target/mutants" -p "$1" || status=$?
-        if [ "$status" -eq 3 ]; then
+        cargo mutants --all-features --cargo-arg --locked --output "$DEVENV_ROOT/target/mutants" -p "$1" || status=$?
+        if [ "$status" -eq 2 ] || [ "$status" -eq 3 ]; then
           echo "cargo-mutants reported missed mutants; keeping CI non-blocking and uploading the report."
           exit 0
         fi
