@@ -791,7 +791,7 @@ in
       exec = ''
         set -euo pipefail
         mkdir -p "$DEVENV_ROOT/target/mutants"
-        cargo mutants --all-features --locked --output "$DEVENV_ROOT/target/mutants"
+        cargo mutants --all-features --output "$DEVENV_ROOT/target/mutants"
       '';
       description = "Run mutation testing across all core workspace crates (nightly).";
       binary = "bash";
@@ -835,7 +835,7 @@ in
           pkg_args+=("-p" "$pkg")
         done
 
-        cargo mutants --all-features --locked --output "$DEVENV_ROOT/target/mutants" "''${pkg_args[@]}"
+        cargo mutants --all-features --output "$DEVENV_ROOT/target/mutants" "''${pkg_args[@]}"
       '';
       description = "Run mutation testing only on crates changed relative to a base branch (PR).";
       binary = "bash";
@@ -848,7 +848,7 @@ in
           exit 1
         fi
         mkdir -p "$DEVENV_ROOT/target/mutants"
-        cargo mutants --all-features --locked --output "$DEVENV_ROOT/target/mutants" -p "$1"
+        cargo mutants --all-features --output "$DEVENV_ROOT/target/mutants" -p "$1"
       '';
       description = "Run mutation testing on a single workspace crate.";
       binary = "bash";
