@@ -49,7 +49,7 @@ jobs:
           for manifest in crates/*/Cargo.toml; do
             dir=$(dirname "$manifest")
             pkg=$(basename "$dir")
-            if echo "$changed_files" | grep -qE "^${dir}/"; then
+            if echo "$changed_files" | grep -qE "^${dir}/(Cargo.toml|build.rs|src/|tests/|benches/|examples/)"; then
               packages+=("$pkg")
             fi
           done
