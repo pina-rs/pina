@@ -791,7 +791,13 @@ in
       exec = ''
         set -euo pipefail
         mkdir -p "$DEVENV_ROOT/target/mutants"
-        cargo mutants --all-features --output "$DEVENV_ROOT/target/mutants"
+        status=0
+        cargo mutants --all-features --output "$DEVENV_ROOT/target/mutants" || status=$?
+        if [ "$status" -eq 3 ]; then
+          echo "cargo-mutants reported missed mutants; keeping CI non-blocking and uploading the report."
+          exit 0
+        fi
+        exit "$status"
       '';
       description = "Run mutation testing across all core workspace crates (nightly).";
       binary = "bash";
@@ -835,7 +841,13 @@ in
           pkg_args+=("-p" "$pkg")
         done
 
-        cargo mutants --all-features --output "$DEVENV_ROOT/target/mutants" "''${pkg_args[@]}"
+        status=0
+        cargo mutants --all-features --output "$DEVENV_ROOT/target/mutants" "''${pkg_args[@]}" || status=$?
+        if [ "$status" -eq 3 ]; then
+          echo "cargo-mutants reported missed mutants; keeping CI non-blocking and uploading the report."
+          exit 0
+        fi
+        exit "$status"
       '';
       description = "Run mutation testing only on crates changed relative to a base branch (PR).";
       binary = "bash";
@@ -848,7 +860,13 @@ in
           exit 1
         fi
         mkdir -p "$DEVENV_ROOT/target/mutants"
-        cargo mutants --all-features --output "$DEVENV_ROOT/target/mutants" -p "$1"
+        status=0
+        cargo mutants --all-features --output "$DEVENV_ROOT/target/mutants" -p "$1" || status=$?
+        if [ "$status" -eq 3 ]; then
+          echo "cargo-mutants reported missed mutants; keeping CI non-blocking and uploading the report."
+          exit 0
+        fi
+        exit "$status"
       '';
       description = "Run mutation testing on a single workspace crate.";
       binary = "bash";
