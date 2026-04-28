@@ -403,7 +403,12 @@ fn render_pda_default_seed_value(
 				});
 			}
 
-			Ok(format!("{}.as_ref()", snake(name)))
+			let seed_name = snake(name);
+			if matches!(referenced_account.is_signer, IsAccountSigner::Either) {
+				Ok(format!("{seed_name}.0.as_ref()"))
+			} else {
+				Ok(format!("{seed_name}.as_ref()"))
+			}
 		}
 		PdaSeedValueValueNode::Argument(_) => {
 			Err(RenderError::UnsupportedValue {

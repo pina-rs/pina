@@ -172,6 +172,9 @@ fn renders_instruction_account_default_from_pda() {
 		)],
 	)));
 
+	let mut authority = InstructionAccountNode::new("authority", false, true);
+	authority.is_signer = IsAccountSigner::Either;
+
 	let program = ProgramNode {
 		name: "defaultProgram".into(),
 		public_key: "11111111111111111111111111111111".to_string(),
@@ -180,7 +183,7 @@ fn renders_instruction_account_default_from_pda() {
 			name: "initialize".into(),
 			docs: Docs::default(),
 			optional_account_strategy: InstructionOptionalAccountStrategy::ProgramId,
-			accounts: vec![InstructionAccountNode::new("authority", false, true), state],
+			accounts: vec![authority, state],
 			arguments: vec![],
 			extra_arguments: vec![],
 			remaining_accounts: vec![],

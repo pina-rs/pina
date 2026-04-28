@@ -157,7 +157,6 @@ fn build_pda_default_value(
 			if seed_account.name == account.name
 				|| seed_account.is_optional
 				|| seed_account.default_value.is_some()
-				|| seed_account.pda_name.is_some()
 			{
 				return None;
 			}
