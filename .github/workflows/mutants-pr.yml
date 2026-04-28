@@ -62,7 +62,7 @@ jobs:
 
           echo "any_changed=true" >> "$GITHUB_OUTPUT"
           # Build a simple JSON array of package names for a matrix job.
-          json=$(printf '%s\n' "${packages[@]}" | jq -R . | jq -s '{package: .}')
+          json=$(printf '%s\n' "${packages[@]}" | jq -R . | jq -cs '{package: .}')
           echo "matrix=$json" >> "$GITHUB_OUTPUT"
 
   mutants:
