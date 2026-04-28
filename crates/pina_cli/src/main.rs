@@ -248,8 +248,8 @@ const BUNDLED_DOC_TOPICS: &[&str] = &["pina-idl", "pina-overview"];
 
 fn bundled_docs(topic: &str) -> Option<&'static str> {
 	match topic {
-		"pina-idl" => Some(include_str!("../templates/pina-idl.t.md")),
-		"pina-overview" => Some(include_str!("../templates/pina-overview.t.md")),
+		"pina-idl" => Some(include_str!("../templates/pina-idl.md")),
+		"pina-overview" => Some(include_str!("../templates/pina-overview.md")),
 		_ => None,
 	}
 }
