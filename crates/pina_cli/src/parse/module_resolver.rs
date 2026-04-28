@@ -6,6 +6,8 @@
 use std::path::Path;
 use std::path::PathBuf;
 
+use rayon::prelude::*;
+
 use crate::error::IdlError;
 
 /// A resolved source file with its parsed AST.
@@ -17,83 +19,108 @@ pub struct ResolvedFile {
 	pub file: syn::File,
 }
 
+#[derive(Debug)]
+struct PendingModule {
+	path: PathBuf,
+	child_base_dir: PathBuf,
+}
+
 /// Resolve all source files in a crate starting from `lib.rs`.
 ///
-/// Parses `lib.rs`, then follows `mod` declarations to find and parse
-/// additional source files. Only inline modules (with a body) and file-based
-/// modules (without a body) are resolved. Conditional compilation attributes
-/// are ignored — all `mod` declarations are followed.
+/// Reads sibling modules for each discovery depth in parallel, then parses
+/// them deterministically to discover nested `mod` declarations. Each file is
+/// read once, and I/O or parse failures are surfaced as `IdlError`s.
 pub fn resolve_crate(src_dir: &Path, lib_path: &Path) -> Result<Vec<ResolvedFile>, IdlError> {
 	let source = std::fs::read_to_string(lib_path).map_err(|e| IdlError::io(lib_path, e))?;
 	let file = syn::parse_file(&source).map_err(|e| IdlError::parse(lib_path, &e))?;
 
+	let mut seen = vec![lib_path.to_path_buf()];
 	let mut files = vec![ResolvedFile {
 		path: lib_path.to_path_buf(),
-		file: file.clone(),
+		file,
 	}];
+	let mut pending = discover_module_paths(src_dir, &files[0].file, &mut seen);
 
-	// Resolve child modules declared in lib.rs.
-	resolve_modules(src_dir, &file, &mut files)?;
+	while !pending.is_empty() {
+		let read_modules: Vec<(PendingModule, String)> = pending
+			.into_par_iter()
+			.map(|module| {
+				let source = std::fs::read_to_string(&module.path)
+					.map_err(|e| IdlError::io(&module.path, e))?;
+				Ok((module, source))
+			})
+			.collect::<Result<_, IdlError>>()?;
+
+		let mut next_pending = Vec::new();
+
+		for (module, source) in read_modules {
+			let file = syn::parse_file(&source).map_err(|e| IdlError::parse(&module.path, &e))?;
+			next_pending.extend(discover_module_paths(
+				&module.child_base_dir,
+				&file,
+				&mut seen,
+			));
+			files.push(ResolvedFile {
+				path: module.path,
+				file,
+			});
+		}
+
+		pending = next_pending;
+	}
 
 	Ok(files)
 }
 
-/// Recursively resolve `mod` declarations in a parsed file.
-fn resolve_modules(
+/// Discover file-based `mod` declarations in a parsed file.
+fn discover_module_paths(
 	base_dir: &Path,
 	file: &syn::File,
-	files: &mut Vec<ResolvedFile>,
-) -> Result<(), IdlError> {
+	seen: &mut Vec<PathBuf>,
+) -> Vec<PendingModule> {
+	let mut modules = Vec::new();
+
 	for item in &file.items {
 		let syn::Item::Mod(item_mod) = item else {
 			continue;
 		};
 
-		// Skip inline modules (they're already in the parent file's AST).
+		// Inline modules are already in the parent file's AST.
 		if item_mod.content.is_some() {
 			continue;
 		}
 
 		let mod_name = item_mod.ident.to_string();
-
-		// Try mod_name.rs first, then mod_name/mod.rs.
 		let candidates = [
 			base_dir.join(format!("{mod_name}.rs")),
 			base_dir.join(&mod_name).join("mod.rs"),
 		];
 
-		let mod_path = candidates.iter().find(|p| p.is_file());
-
-		let Some(mod_path) = mod_path else {
-			// Module file not found — skip silently (could be a cfg-gated
-			// or external module).
+		let Some(mod_path) = candidates.iter().find(|p| p.is_file()) else {
+			// Missing module files are skipped to preserve support for cfg-gated or
+			// externally-provided modules.
 			continue;
 		};
 
-		let source = std::fs::read_to_string(mod_path).map_err(|e| IdlError::io(mod_path, e))?;
-		let mod_file = syn::parse_file(&source).map_err(|e| IdlError::parse(mod_path, &e))?;
-
-		files.push(ResolvedFile {
-			path: mod_path.clone(),
-			file: mod_file.clone(),
-		});
-
-		// Recurse into the resolved module's directory for nested modules.
-		let child_dir = if mod_path.file_name().is_some_and(|n| n == "mod.rs") {
-			mod_path.parent().unwrap_or(base_dir).to_path_buf()
-		} else {
-			// For foo.rs, child modules would be in foo/ directory.
-			base_dir.join(&mod_name)
-		};
-
-		if !child_dir.is_dir() {
+		if seen.contains(mod_path) {
 			continue;
 		}
 
-		resolve_modules(&child_dir, &mod_file, files)?;
+		seen.push(mod_path.clone());
+
+		let child_base_dir = if mod_path.file_name().is_some_and(|n| n == "mod.rs") {
+			mod_path.parent().unwrap_or(base_dir).to_path_buf()
+		} else {
+			base_dir.join(&mod_name)
+		};
+
+		modules.push(PendingModule {
+			path: mod_path.clone(),
+			child_base_dir,
+		});
 	}
 
-	Ok(())
+	modules
 }
 
 #[cfg(test)]
