@@ -78,10 +78,23 @@ cargo test -p pina_cli --locked --test codama_idls
 
 echo "Running Codama JS IDL validation..."
 pnpm --dir "$ROOT" run test:idls
-pnpm --dir "$ROOT" run test:nodes-from-pina
+
+NODES_FROM_PINA_DIR="$ROOT/packages/nodes-from-pina"
+
+echo "Type-checking nodes-from-pina..."
+(
+	cd "$NODES_FROM_PINA_DIR"
+	node "$NODES_FROM_PINA_DIR/node_modules/typescript/bin/tsc" --noEmit
+)
+
+echo "Running nodes-from-pina unit tests..."
+(
+	cd "$NODES_FROM_PINA_DIR"
+	node "$NODES_FROM_PINA_DIR/node_modules/vitest/vitest.mjs" run
+)
 
 echo "Type-checking generated JS clients..."
-pnpm --dir "$ROOT" run check:js
+node "$ROOT/node_modules/typescript/bin/tsc" --noEmit -p "$ROOT/codama/tsconfig.json"
 
 echo "Compile-checking generated Rust client crates..."
 CLIENT_MANIFESTS=()

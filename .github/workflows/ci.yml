@@ -146,10 +146,9 @@ jobs:
           path: |
             ${{ github.workspace }}/.cache/sbpf-linker-upstream-gallery/llvm-install
             ${{ github.workspace }}/.cache/sbpf-linker-upstream-gallery/bin
-            ${{ github.workspace }}/.cache/sbpf-linker-upstream-gallery/sbpf-linker
-          key: ${{ runner.os }}-sbpf-gallery-v1-${{ hashFiles('devenv.nix', 'rust-toolchain.toml') }}
+          key: ${{ runner.os }}-sbpf-gallery-v2-${{ hashFiles('devenv.nix', 'rust-toolchain.toml', '.github/workflows/ci.yml', '.github/workflows/compute-units.yml') }}
           restore-keys: |
-            ${{ runner.os }}-sbpf-gallery-v1-
+            ${{ runner.os }}-sbpf-gallery-v2-
 
       - name: run program e2e tests
         run: test:program-e2e
