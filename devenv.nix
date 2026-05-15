@@ -37,7 +37,7 @@ in
       gitleaks
       libiconv
       mdbook
-      custom.knope
+      custom.monochange
       custom.pnpm-standalone
       llvm.bintools
       llvm.clang

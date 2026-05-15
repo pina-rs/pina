@@ -2,6 +2,8 @@
 pina_cli: minor
 ---
 
+# Add UX improvements and parallel file I/O to the pina CLI
+
 Add UX improvements and parallel file I/O to the `pina` CLI.
 
 - **Parallel file reading**: `resolve_crate` reads sibling module files in parallel via `rayon` while preserving deterministic parsing and error reporting.

@@ -1,0 +1,81 @@
+name: "setup-mc"
+description: "Install and cache the monochange CLI (mc)"
+
+inputs:
+  github-token:
+    description: "GitHub token for downloading release assets"
+    required: true
+  version:
+    description: "monochange CLI version to install"
+    required: false
+    default: "latest"
+
+runs:
+  using: composite
+  steps:
+    - name: cache monochange binary
+      id: cache-mc
+      uses: actions/cache@v4
+      with:
+        path: /usr/local/bin/mc
+        key: monochange-${{ inputs.version }}-${{ runner.os }}-${{ runner.arch }}
+
+    - name: install monochange
+      if: steps.cache-mc.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        set -euo pipefail
+
+        os_name="${{ runner.os }}"
+        arch_name="$(uname -m)"
+
+        case "$os_name" in
+          Linux)  os_tag="unknown-linux-gnu" ;;
+          macOS)  os_tag="apple-darwin" ;;
+          Windows) os_tag="pc-windows-msvc" ;;
+          *) echo "::error::Unsupported OS: $os_name" >&2; exit 1 ;;
+        esac
+
+        case "$arch_name" in
+          x86_64|amd64) arch_tag="x86_64" ;;
+          aarch64|arm64) arch_tag="aarch64" ;;
+          *) echo "::error::Unsupported arch: $arch_name" >&2; exit 1 ;;
+        esac
+
+        target="${arch_tag}-${os_tag}"
+
+        if [ "${{ inputs.version }}" = "latest" ]; then
+          release_tag=$(gh release list --repo monochange/monochange --limit 1 --json tagName --jq '.[0].tagName')
+        else
+          release_tag="${{ inputs.version }}"
+        fi
+
+        echo "Installing monochange $release_tag for $target"
+
+        if [ "$os_name" = "Windows" ]; then
+          pattern="monochange-${target}-${release_tag}.zip"
+        else
+          pattern="monochange-${target}-${release_tag}.tar.gz"
+        fi
+
+        tmpdir="$(mktemp -d)"
+        gh release download "$release_tag" \
+          --repo monochange/monochange \
+          --pattern "$pattern" \
+          --dir "$tmpdir"
+
+        if [ "$os_name" = "Windows" ]; then
+          unzip -o "$tmpdir/$pattern" -d "$tmpdir/out"
+        else
+          tar xzf "$tmpdir/$pattern" -C "$tmpdir"
+        fi
+
+        mv "$tmpdir/mc" /usr/local/bin/mc
+        chmod +x /usr/local/bin/mc
+        rm -rf "$tmpdir"
+
+    - name: verify monochange installation
+      shell: bash
+      run: mc --version

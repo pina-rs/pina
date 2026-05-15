@@ -2,12 +2,12 @@
 
 ## Release workflow
 
-This repo uses the knope bot workflow.
+This repo uses the monochange release workflow.
 
 ```sh
-knope document-change
-knope release
-knope publish
+mc change
+mc release
+mc step:publish-packages
 ```
 
 ## Required changesets
@@ -24,15 +24,17 @@ must include at least one changeset file in `.changeset/`.
 Interactive:
 
 ```sh
-knope document-change
+mc change --package <package-id> --bump <bump> --reason <reason>
 ```
 
 Manual:
 
 ```md
 ---
-package_name: change_type
+package_name: minor
 ---
+
+# Short heading
 
 Detailed description of the change.
 ```

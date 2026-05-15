@@ -66,7 +66,7 @@ jobs:
           echo "  1. Add '!' to your PR title (e.g. 'feat!: my breaking change' or 'fix(pina)!: remove deprecated api')"
           echo ""
           echo "  2. Add a changeset file with a 'major' change type:"
-          echo "     Run 'knope document-change' or create a file in .changeset/ with:"
+          echo "     Run 'mc change' or create a file in .changeset/ with:"
           echo "     ---"
           echo "     package_name: major"
           echo "     ---"

@@ -1,0 +1,125 @@
+name: "publish"
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (for example `v0.8.0`)."
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.tag || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    environment: publisher
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    if: github.repository_owner == 'pina-rs'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: resolve release tag
+        id: release_tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG='${{ inputs.tag }}'
+
+          repo_url="https://github.com/${GITHUB_REPOSITORY}.git"
+
+          if ! git ls-remote --exit-code --tags "$repo_url" "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::Tag '$TAG' does not exist on the remote" >&2
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Resolved release tag: $TAG"
+
+      - name: checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.release_tag.outputs.tag }}
+          fetch-depth: 0
+
+      - name: verify tag checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_tag="${{ steps.release_tag.outputs.tag }}"
+          actual_commit=$(git rev-parse HEAD)
+          tag_commit=$(git rev-list -n1 "$expected_tag")
+          if [ "$actual_commit" != "$tag_commit" ]; then
+            echo "::error::Checked-out commit $actual_commit does not match tag $expected_tag ($tag_commit)" >&2
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor "$actual_commit" refs/remotes/origin/main 2>/dev/null; then
+            echo "::error::Tag $expected_tag ($actual_commit) is not on the main branch" >&2
+            exit 1
+          fi
+
+          echo "Verified: checked-out commit matches tag $expected_tag and is on main"
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: setup monochange
+        uses: ./.github/actions/setup-mc
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: build monochange cli
+        run: |
+          cargo build --release --package monochange --bin mc
+          mkdir -p "$RUNNER_TEMP/bin"
+          cp target/release/mc "$RUNNER_TEMP/bin/mc"
+        shell: devenv shell -- bash -e {0}
+
+      - name: get crates.io OIDC auth token
+        uses: rust-lang/crates-io-auth-action@bbd81622f20ce9e2dd9622e3218b975523e45bbe # v1.0.4
+        id: crates-oidc
+
+      - name: check publish readiness
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
+        run: |
+          "$RUNNER_TEMP/bin/mc" step:publish-readiness \
+            --from HEAD \
+            --output "$RUNNER_TEMP/publish-readiness.json" \
+            --format json
+        shell: devenv shell -- bash -e {0}
+
+      - name: setup cargo stable for publish
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: stable
+
+      - name: setup node for npm publish
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+
+      - name: install pnpm for publish
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - name: publish packages
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          "$RUNNER_TEMP/bin/mc" step:publish-packages \
+            --log-level info \
+            --all \
+            --output "$RUNNER_TEMP/publish-result.json" \
+            --format json
+        shell: bash
