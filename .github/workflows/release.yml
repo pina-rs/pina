@@ -36,11 +36,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: setup monochange
-        uses: ./.github/actions/setup-mc
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: prepare release
         run: |
           mc release --dry-run --format markdown

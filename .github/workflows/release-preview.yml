@@ -1,6 +1,7 @@
 name: "release-preview"
 permissions:
   contents: read
+
 on:
   pull_request:
     branches:
@@ -23,11 +24,6 @@ jobs:
 
       - name: setup
         uses: ./.github/actions/devenv
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: setup monochange
-        uses: ./.github/actions/setup-mc
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 

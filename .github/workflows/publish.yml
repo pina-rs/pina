@@ -70,18 +70,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: setup monochange
-        uses: ./.github/actions/setup-mc
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: build monochange cli
-        run: |
-          cargo build --release --package monochange --bin mc
-          mkdir -p "$RUNNER_TEMP/bin"
-          cp target/release/mc "$RUNNER_TEMP/bin/mc"
-        shell: devenv shell -- bash -e {0}
-
       - name: get crates.io OIDC auth token
         uses: rust-lang/crates-io-auth-action@bbd81622f20ce9e2dd9622e3218b975523e45bbe # v1.0.4
         id: crates-oidc
@@ -90,7 +78,7 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
         run: |
-          "$RUNNER_TEMP/bin/mc" step:publish-readiness \
+          mc step:publish-readiness \
             --from HEAD \
             --output "$RUNNER_TEMP/publish-readiness.json" \
             --format json
@@ -117,9 +105,9 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          "$RUNNER_TEMP/bin/mc" step:publish-packages \
+          mc step:publish-packages \
             --log-level info \
             --all \
             --output "$RUNNER_TEMP/publish-result.json" \
             --format json
-        shell: bash
+        shell: devenv shell -- bash -e {0}
