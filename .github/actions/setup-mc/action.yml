@@ -5,7 +5,7 @@ inputs:
   github-token:
     description: "GitHub token for downloading release assets"
     required: true
-  version:
+  mc-version:
     description: "monochange CLI version to install"
     required: false
     default: "latest"
@@ -18,7 +18,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: /usr/local/bin/mc
-        key: monochange-${{ inputs.version }}-${{ runner.os }}-${{ runner.arch }}
+        key: monochange-${{ inputs.mc-version }}-${{ runner.os }}-${{ runner.arch }}
 
     - name: install monochange
       if: steps.cache-mc.outputs.cache-hit != 'true'
@@ -32,8 +32,8 @@ runs:
         arch_name="$(uname -m)"
 
         case "$os_name" in
-          Linux)  os_tag="unknown-linux-gnu" ;;
-          macOS)  os_tag="apple-darwin" ;;
+          Linux)   os_tag="unknown-linux-gnu" ;;
+          macOS)   os_tag="apple-darwin" ;;
           Windows) os_tag="pc-windows-msvc" ;;
           *) echo "::error::Unsupported OS: $os_name" >&2; exit 1 ;;
         esac
@@ -46,10 +46,10 @@ runs:
 
         target="${arch_tag}-${os_tag}"
 
-        if [ "${{ inputs.version }}" = "latest" ]; then
+        if [ "${{ inputs.mc-version }}" = "latest" ]; then
           release_tag=$(gh release list --repo monochange/monochange --limit 1 --json tagName --jq '.[0].tagName')
         else
-          release_tag="${{ inputs.version }}"
+          release_tag="${{ inputs.mc-version }}"
         fi
 
         echo "Installing monochange $release_tag for $target"
@@ -68,11 +68,11 @@ runs:
 
         if [ "$os_name" = "Windows" ]; then
           unzip -o "$tmpdir/$pattern" -d "$tmpdir/out"
+          mv "$tmpdir/out/monochange.exe" /usr/local/bin/mc.exe
         else
           tar xzf "$tmpdir/$pattern" -C "$tmpdir"
+          mv "$tmpdir/monochange" /usr/local/bin/mc
         fi
-
-        mv "$tmpdir/mc" /usr/local/bin/mc
         chmod +x /usr/local/bin/mc
         rm -rf "$tmpdir"
 
