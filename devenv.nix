@@ -38,7 +38,7 @@ in
       gitleaks
       libiconv
       mdbook
-      monochangePkgs.monochange
+      (monochangePkgs.monochange)
       custom.pnpm-standalone
       llvm.bintools
       llvm.clang
