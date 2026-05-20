@@ -44,18 +44,26 @@ path = "packages/nodes-from-pina"
 type = "npm"
 
 [group.core]
-packages = ["pina", "pina_cli", "pina_macros", "pina_codama_renderer", "pina_pod_primitives", "pina_profile", "pina_sdk_ids"]
+packages = [
+	"pina",
+	"pina_cli",
+	"pina_macros",
+	"pina_codama_renderer",
+	"pina_pod_primitives",
+	"pina_profile",
+	"pina_sdk_ids",
+]
 release = true
 tag = true
 
 [ecosystems.cargo]
 enabled = true
 versioned_files = ["Cargo.toml"]
-lockfile_commands = ["cargo generate-lockfile"]
+lockfile_commands = [{ command = "cargo generate-lockfile" }]
 
 [ecosystems.npm]
 enabled = true
-lockfile_commands = ["pnpm install --lockfile-only"]
+lockfile_commands = [{ command = "pnpm install --lockfile-only" }]
 
 [ecosystems.cargo.publish]
 enabled = true
@@ -84,22 +92,22 @@ docs = { heading = "Documentation", priority = 40 }
 [cli.change]
 help_text = "Create a changeset"
 inputs = [
-  { name = "package", type = "string_list", required = true },
-  { name = "bump", type = "choice", choices = ["none", "patch", "minor", "major"], default = "patch" },
-  { name = "reason", type = "string", required = true },
-  { name = "type", type = "string" },
-  { name = "caused_by", type = "string_list" },
+	{ name = "package", type = "string_list", required = true },
+	{ name = "bump", type = "choice", choices = ["none", "patch", "minor", "major"], default = "patch" },
+	{ name = "reason", type = "string", required = true },
+	{ name = "type", type = "string" },
+	{ name = "caused_by", type = "string_list" },
 ]
 steps = [{ name = "create change file", type = "CreateChangeFile" }]
 
 [cli.release]
 help_text = "Prepare versioned package files"
 inputs = [
-  { name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "markdown" },
+	{ name = "format", type = "choice", choices = ["text", "markdown", "json"], default = "markdown" },
 ]
 steps = [
-  { name = "plan release", type = "PrepareRelease" },
-  { name = "format code", type = "Command", command = "dprint fmt" },
-  { name = "refresh lockfile", type = "Command", command = "cargo generate-lockfile" },
-  { name = "refresh pnpm lockfile", type = "Command", command = "pnpm install --lockfile-only" },
+	{ name = "plan release", type = "PrepareRelease" },
+	{ name = "format code", type = "Command", command = "dprint fmt" },
+	{ name = "refresh lockfile", type = "Command", command = "cargo generate-lockfile" },
+	{ name = "refresh pnpm lockfile", type = "Command", command = "pnpm install --lockfile-only" },
 ]

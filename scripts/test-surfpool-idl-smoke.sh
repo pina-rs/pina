@@ -47,7 +47,6 @@ find_sbf_sdk_template_dir() {
 }
 
 SURFPOOL_BIN="$(require_bin surfpool)"
-WAIT_FOR_THEM_BIN="$(require_bin wait-for-them)"
 SOLANA_BIN="$(require_bin solana)"
 SOLANA_KEYGEN_BIN="$(require_bin solana-keygen)"
 CARGO_BUILD_SBF_BIN="$(require_bin cargo-build-sbf)"
@@ -137,14 +136,25 @@ done
 		>"$SURFPOOL_LOG" 2>&1
 ) &
 SURFPOOL_PID=$!
-if ! "$WAIT_FOR_THEM_BIN" --silent --timeout 60000 "$RPC_HOST_PORT"; then
-	echo "surfpool RPC did not become ready in time" >&2
-	if [[ -f "$SURFPOOL_LOG" ]]; then
-		echo "--- surfpool.log ---" >&2
-		tail -n 200 "$SURFPOOL_LOG" >&2 || true
+deadline=$((SECONDS + 60))
+until python - "$RPC_HOST_PORT" <<'PY'; do
+import socket
+import sys
+
+host, port = sys.argv[1].split(":")
+with socket.create_connection((host, int(port)), timeout=1):
+    pass
+PY
+	if ((SECONDS >= deadline)); then
+		echo "surfpool RPC did not become ready in time" >&2
+		if [[ -f "$SURFPOOL_LOG" ]]; then
+			echo "--- surfpool.log ---" >&2
+			tail -n 200 "$SURFPOOL_LOG" >&2 || true
+		fi
+		exit 1
 	fi
-	exit 1
-fi
+	sleep 1
+done
 
 "$SOLANA_BIN" -u "$RPC_URL" airdrop 100 --keypair "$PAYER_KEYPAIR" >/dev/null
 "$SOLANA_BIN" -u "$RPC_URL" program deploy "$PROGRAM_SO" \
