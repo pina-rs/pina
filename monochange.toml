@@ -68,7 +68,6 @@ lockfile_commands = [{ command = "pnpm install --lockfile-only" }]
 [ecosystems.cargo.publish]
 enabled = true
 mode = "builtin"
-registry = "crates-io"
 trusted_publishing = true
 
 [ecosystems.npm.publish]
