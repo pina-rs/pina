@@ -2,7 +2,6 @@
   pkgs,
   lib,
   config,
-  inputs,
   ...
 }:
 let
@@ -37,7 +36,7 @@ in
       gitleaks
       libiconv
       mdbook
-      custom.monochange
+      monochange
       custom.pnpm-standalone
       llvm.bintools
       llvm.clang
