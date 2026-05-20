@@ -1,6 +1,6 @@
 ---
-pina: minor
-pina_codama_renderer: minor
+pina: feat
+pina_codama_renderer: feat
 ---
 
 # Resolve explicit PDA-derived account defaults in generated clients

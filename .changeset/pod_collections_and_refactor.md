@@ -1,5 +1,5 @@
 ---
-pina_pod_primitives: minor
+pina_pod_primitives: feat
 ---
 
 # Add PodOption, PodString, and PodVec fixed-capacity collection types

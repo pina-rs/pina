@@ -1,5 +1,5 @@
 ---
-core: patch
+core: fix
 ---
 
 # Improve Codama IDL extraction coverage

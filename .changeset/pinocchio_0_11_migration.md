@@ -1,5 +1,5 @@
 ---
-core: major
+core: feat
 ---
 
 # Upgrade workspace to Pinocchio 0.11
