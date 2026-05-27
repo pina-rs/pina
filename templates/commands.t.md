@@ -75,9 +75,9 @@ pnpm run test:quasar-svm
 <!-- {@releaseWorkflowCommands} -->
 
 ```bash
-knope document-change
-knope release
-knope publish
+mc change
+mc release
+mc step:publish-packages
 ```
 
 <!-- {/releaseWorkflowCommands} -->

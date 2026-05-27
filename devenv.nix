@@ -6,6 +6,7 @@
   ...
 }:
 let
+  monochangePkgs = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.system};
   llvm = pkgs.llvmPackages_21;
   custom = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.hostPlatform.system};
 in
@@ -37,7 +38,7 @@ in
       gitleaks
       libiconv
       mdbook
-      custom.knope
+      (monochangePkgs.monochange)
       custom.pnpm-standalone
       llvm.bintools
       llvm.clang

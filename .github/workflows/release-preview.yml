@@ -1,6 +1,7 @@
 name: "release-preview"
 permissions:
   contents: read
+
 on:
   pull_request:
     branches:
@@ -45,6 +46,6 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "### Dry-run output:" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          knope release --dry-run 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || true
+          mc release --dry-run --format markdown 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || true
           echo '```' >> "$GITHUB_STEP_SUMMARY"
         shell: devenv shell -- bash -e {0}

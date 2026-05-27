@@ -87,14 +87,14 @@ The `assets` workflow only publishes binaries for CLI tags:
 
 ## Release workflow
 
-Use `knope` for changelog/release management:
+Use `monochange` for changelog/release management:
 
 <!-- {=releaseWorkflowCommands} -->
 
 ```bash
-knope document-change
-knope release
-knope publish
+mc change
+mc release
+mc step:publish-packages
 ```
 
 <!-- {/releaseWorkflowCommands} -->
