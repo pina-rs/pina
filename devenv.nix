@@ -752,6 +752,10 @@ in
     "test:surfpool-idl" = {
       exec = ''
         set -euo pipefail
+        if [ -z "''${HOME:-}" ]; then
+          export HOME="$DEVENV_ROOT/.cache/home"
+        fi
+        mkdir -p "$HOME"
         pnpm install --frozen-lockfile
         "$DEVENV_ROOT/scripts/test-surfpool-idl-smoke.sh"
       '';
