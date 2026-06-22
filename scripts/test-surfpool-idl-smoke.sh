@@ -74,14 +74,14 @@ cargo run -p pina_cli --quiet -- idl --path "$EXAMPLE_DIR" --output "$IDL_PATH"
 "$CARGO_BUILD_SBF_BIN" \
 	--install-only \
 	--tools-version v1.53 \
-	--patch-binaries-for-nix true
+	--patch-binaries-for-nix false
 
 "$CARGO_BUILD_SBF_BIN" \
 	--manifest-path "$EXAMPLE_DIR/Cargo.toml" \
 	--features bpf-entrypoint \
 	--sbf-out-dir "$SURFPOOL_DIR" \
 	--arch v0 \
-	--patch-binaries-for-nix true
+	--patch-binaries-for-nix false
 
 PROGRAM_SO="$SURFPOOL_DIR/${EXAMPLE_NAME}.so"
 if [[ ! -f "$PROGRAM_SO" ]]; then
