@@ -55,6 +55,16 @@ trap '
 	fi
 ' EXIT
 
+if [[ -z "${HOME:-}" ]]; then
+	export HOME="$ROOT/.cache/home"
+fi
+mkdir -p "$HOME"
+if [[ "$(uname)" == "Linux" ]] && command -v gcc >/dev/null 2>&1; then
+	export CC="$(command -v gcc)"
+	export CXX="$(command -v g++)"
+	export ASM="$CC"
+fi
+
 echo "Installing pnpm workspace dependencies..."
 pnpm install --frozen-lockfile
 

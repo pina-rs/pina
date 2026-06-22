@@ -304,10 +304,12 @@ in
         LLVM_CONFIG="$LLVM_INSTALL/bin/llvm-config"
         SBPF_SRC="$CACHE_DIR/sbpf-linker"
         SBPF_BIN="$CACHE_DIR/bin/sbpf-linker"
+        SBPF_REV="4b6e888cd306b6f959d4acf7a6f0acea10c70a47"
+        SBPF_EXPECTED_VERSION="0.1.6"
 
         mkdir -p "$CACHE_DIR"
 
-        if [ -x "$SBPF_BIN" ] && "$SBPF_BIN" --version >/dev/null 2>&1; then
+        if [ -x "$SBPF_BIN" ] && "$SBPF_BIN" --version 2>/dev/null | grep -q "$SBPF_EXPECTED_VERSION"; then
           export PATH="$CACHE_DIR/bin:$PATH"
           echo "Using cached sbpf-linker binary at $SBPF_BIN"
           exit 0
@@ -353,14 +355,15 @@ in
           echo "LLVM already built at $LLVM_INSTALL ($("$LLVM_CONFIG" --version))"
         fi
 
-        # Step 2: Clone sbpf-linker
-        if [ ! -d "$SBPF_SRC" ]; then
+        # Step 2: Clone sbpf-linker at a revision that still exposes the
+        # upstream-gallery-21 feature expected by this workspace.
+        if [ ! -d "$SBPF_SRC/.git" ]; then
           echo "=== Cloning sbpf-linker ==="
-          git clone --depth 1 https://github.com/blueshift-gg/sbpf-linker.git "$SBPF_SRC"
-        else
-          echo "Updating sbpf-linker..."
-          git -C "$SBPF_SRC" pull --ff-only 2>/dev/null || true
+          rm -rf "$SBPF_SRC"
+          git clone --no-checkout https://github.com/blueshift-gg/sbpf-linker.git "$SBPF_SRC"
         fi
+        git -C "$SBPF_SRC" fetch --depth 1 origin "$SBPF_REV"
+        git -C "$SBPF_SRC" checkout --detach "$SBPF_REV"
 
         # Step 3: Build sbpf-linker with gallery features
         echo "=== Building sbpf-linker with upstream-gallery-21 ==="
@@ -756,6 +759,11 @@ in
           export HOME="$DEVENV_ROOT/.cache/home"
         fi
         mkdir -p "$HOME"
+        if [ "$(uname)" = "Linux" ] && command -v gcc >/dev/null 2>&1; then
+          export CC="$(command -v gcc)"
+          export CXX="$(command -v g++)"
+          export ASM="$CC"
+        fi
         pnpm install --frozen-lockfile
         "$DEVENV_ROOT/scripts/test-surfpool-idl-smoke.sh"
       '';
