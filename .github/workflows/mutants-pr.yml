@@ -25,7 +25,7 @@ jobs:
       any_changed: ${{ steps.changed.outputs.any_changed }}
     steps:
       - name: checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -75,7 +75,7 @@ jobs:
       matrix: ${{ fromJson(needs.detect-changed-crates.outputs.matrix) }}
     steps:
       - name: checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
