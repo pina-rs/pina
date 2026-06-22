@@ -40,7 +40,8 @@ in
       libiconv
       mdbook
       custom.knope
-      custom.pnpm-standalone
+      nodejs_22
+      pnpm
       llvm.bintools
       llvm.clang
       llvm.clang-tools
@@ -159,9 +160,6 @@ in
   enterShell = ''
     set -e
     export LDFLAGS="$NIX_LDFLAGS";
-    if command -v pnpm-activate-env >/dev/null 2>&1; then
-      eval "$(pnpm-activate-env)"
-    fi
   '';
 
   # disable dotenv since it breaks the variable interpolation supported by `direnv`
@@ -759,19 +757,7 @@ in
           export HOME="$DEVENV_ROOT/.cache/home"
         fi
         mkdir -p "$HOME"
-        if [ "$(uname)" = "Linux" ] && [ -x /usr/bin/gcc ] && [ -x /usr/bin/g++ ]; then
-          env \
-            -u NIX_LDFLAGS \
-            -u NIX_CFLAGS_COMPILE \
-            LDFLAGS= \
-            CC=/usr/bin/gcc \
-            CXX=/usr/bin/g++ \
-            AS=/usr/bin/as \
-            ASM=/usr/bin/gcc \
-            pnpm install --frozen-lockfile
-        else
-          pnpm install --frozen-lockfile
-        fi
+        pnpm install --frozen-lockfile
         "$DEVENV_ROOT/scripts/test-surfpool-idl-smoke.sh"
       '';
       description = "Deploy a generated program to Surfpool and invoke it using generated IDL metadata.";
