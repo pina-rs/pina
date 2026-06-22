@@ -43,7 +43,7 @@ format_codama_outputs() {
 			exit 1
 		fi
 
-		printf '%s\0' "${FORMAT_FILES[@]}" | xargs -0 -n 100 dprint fmt --config "$ROOT/dprint.json"
+		printf '%s\0' "${FORMAT_FILES[@]}" | xargs -0 -n 100 dprint fmt --allow-no-files --config "$ROOT/dprint.json"
 	)
 }
 
