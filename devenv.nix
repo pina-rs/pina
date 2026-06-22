@@ -28,12 +28,9 @@ in
       curl
       custom.agave
       custom.mdt
-      (custom.sbpf-linker.overrideAttrs (
-        _old:
-        lib.optionalAttrs stdenv.isDarwin {
-          doInstallCheck = false;
-        }
-      ))
+      (custom.sbpf-linker.overrideAttrs (_old: {
+        doInstallCheck = false;
+      }))
       custom.surfpool
       custom.wait-for-them
       dprint

@@ -2,4 +2,4 @@
 default: note
 ---
 
-Keep the prebuilt `custom.sbpf-linker` package available on Linux CI, where BPF and binary-size jobs rely on it being on `PATH`, while disabling its Nix `installCheckPhase` on Darwin. The Darwin package currently crashes during `sbpf-linker --help` because its Mach-O load commands reference `/opt/homebrew/opt/llvm/lib/libLLVM.dylib`; skipping that install check unblocks local `devenv shell` without removing the Linux linker used by CI.
+Keep the prebuilt `custom.sbpf-linker` package available in `devenv` so BPF and binary-size jobs can find `sbpf-linker` on `PATH`, while disabling the package's Nix `installCheckPhase`. The upstream binary now requires linker inputs and `--output`, so invoking it with no arguments during the install check fails on Linux; on Darwin the same check also exposed a stale Homebrew LLVM load path. Skipping the install check unblocks `devenv shell` without removing the linker used by CI.
