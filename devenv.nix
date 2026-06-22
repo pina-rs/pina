@@ -28,7 +28,6 @@ in
       curl
       custom.agave
       custom.mdt
-      custom.sbpf-linker
       custom.surfpool
       custom.wait-for-them
       dprint
