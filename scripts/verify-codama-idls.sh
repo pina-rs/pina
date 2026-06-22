@@ -59,14 +59,20 @@ if [[ -z "${HOME:-}" ]]; then
 	export HOME="$ROOT/.cache/home"
 fi
 mkdir -p "$HOME"
-if [[ "$(uname)" == "Linux" ]] && command -v gcc >/dev/null 2>&1; then
-	export CC="$(command -v gcc)"
-	export CXX="$(command -v g++)"
-	export ASM="$CC"
-fi
-
 echo "Installing pnpm workspace dependencies..."
-pnpm install --frozen-lockfile
+if [[ "$(uname)" == "Linux" ]] && [[ -x /usr/bin/gcc ]] && [[ -x /usr/bin/g++ ]]; then
+	env \
+		-u NIX_LDFLAGS \
+		-u NIX_CFLAGS_COMPILE \
+		LDFLAGS= \
+		CC=/usr/bin/gcc \
+		CXX=/usr/bin/g++ \
+		AS=/usr/bin/as \
+		ASM=/usr/bin/gcc \
+		pnpm install --frozen-lockfile
+else
+	pnpm install --frozen-lockfile
+fi
 
 echo "Generating Codama IDLs and clients for all examples..."
 cargo run -p pina_cli --quiet -- codama generate \
