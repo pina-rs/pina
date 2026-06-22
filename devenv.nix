@@ -663,6 +663,11 @@ in
         # Run LiteSVM e2e tests with the generated TypeScript clients.
         # These verify that TS instruction builders with pina's discriminator
         # model produce transactions the on-chain programs accept.
+        if [ -z "''${HOME:-}" ]; then
+          export HOME="$DEVENV_ROOT/.cache/home"
+        fi
+        mkdir -p "$HOME"
+
         litesvm_dir="$DEVENV_ROOT/codama/tests/litesvm"
         pnpm --dir "$litesvm_dir" install --frozen-lockfile
         (
