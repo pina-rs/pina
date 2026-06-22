@@ -26,8 +26,26 @@ require_bin() {
 	printf '%s\n' "$path"
 }
 
+wait_for_tcp() {
+	local host_port="$1"
+	local timeout_ms="$2"
+	local host="${host_port%:*}"
+	local port="${host_port##*:}"
+	local timeout_seconds=$(((timeout_ms + 999) / 1000))
+	local deadline=$((SECONDS + timeout_seconds))
+
+	while ((SECONDS < deadline)); do
+		if (exec 3<>"/dev/tcp/$host/$port") >/dev/null 2>&1; then
+			exec 3>&- 3<&-
+			return 0
+		fi
+		sleep 1
+	done
+
+	return 1
+}
+
 SURFPOOL_BIN="$(require_bin surfpool)"
-WAIT_FOR_THEM_BIN="$(require_bin wait-for-them)"
 SOLANA_BIN="$(require_bin solana)"
 SOLANA_KEYGEN_BIN="$(require_bin solana-keygen)"
 CARGO_BUILD_SBF_BIN="$(require_bin cargo-build-sbf)"
@@ -115,7 +133,7 @@ done
 		>"$SURFPOOL_LOG" 2>&1
 ) &
 SURFPOOL_PID=$!
-if ! "$WAIT_FOR_THEM_BIN" --silent --timeout 60000 "$RPC_HOST_PORT"; then
+if ! wait_for_tcp "$RPC_HOST_PORT" 60000; then
 	echo "surfpool RPC did not become ready in time" >&2
 	if [[ -f "$SURFPOOL_LOG" ]]; then
 		echo "--- surfpool.log ---" >&2
