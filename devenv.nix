@@ -28,6 +28,12 @@ in
       curl
       custom.agave
       custom.mdt
+      (custom.sbpf-linker.overrideAttrs (
+        _old:
+        lib.optionalAttrs stdenv.isDarwin {
+          doInstallCheck = false;
+        }
+      ))
       custom.surfpool
       custom.wait-for-them
       dprint
@@ -195,7 +201,12 @@ in
         if [ -d "$repo_root/.bin" ]; then
           dylint_link_bin="$(find "$repo_root/.bin" -path '*/dylint-link/*/bin/dylint-link' | sort | tail -n 1)"
           if [ -n "$dylint_link_bin" ] && [ -x "$dylint_link_bin" ]; then
-            exec "$dylint_link_bin" "$@"
+            if "$dylint_link_bin" --version >/dev/null 2>&1; then
+              exec "$dylint_link_bin" "$@"
+            fi
+
+            echo "Ignoring broken cached dylint-link at $dylint_link_bin" >&2
+            rm -f "$dylint_link_bin"
           fi
         fi
 
