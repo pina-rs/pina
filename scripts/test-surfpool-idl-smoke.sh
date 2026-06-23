@@ -26,33 +26,29 @@ require_bin() {
 	printf '%s\n' "$path"
 }
 
-find_sbf_sdk_template_dir() {
-	local cargo_build_sbf_bin="$1"
-	local cargo_bin_dir agave_root candidate
-	cargo_bin_dir="$(cd "$(dirname "$cargo_build_sbf_bin")" && pwd)"
-	agave_root="$(cd "$cargo_bin_dir/.." && pwd)"
+wait_for_tcp() {
+	local host_port="$1"
+	local timeout_ms="$2"
+	local host="${host_port%:*}"
+	local port="${host_port##*:}"
+	local timeout_seconds=$(((timeout_ms + 999) / 1000))
+	local deadline=$((SECONDS + timeout_seconds))
 
-	for candidate in \
-		"$cargo_bin_dir/platform-tools-sdk/sbf" \
-		"$agave_root/bin/platform-tools-sdk/sbf" \
-		"$agave_root/lib/platform-tools-sdk/sbf"; do
-		if [[ -d "$candidate" ]]; then
-			printf '%s\n' "$candidate"
+	while ((SECONDS < deadline)); do
+		if (exec 3<>"/dev/tcp/$host/$port") >/dev/null 2>&1; then
+			exec 3>&- 3<&-
 			return 0
 		fi
+		sleep 1
 	done
 
-	echo "missing agave SBF SDK next to cargo-build-sbf under $cargo_bin_dir or $agave_root" >&2
-	exit 1
+	return 1
 }
 
 SURFPOOL_BIN="$(require_bin surfpool)"
-WAIT_FOR_THEM_BIN="$(require_bin wait-for-them)"
 SOLANA_BIN="$(require_bin solana)"
 SOLANA_KEYGEN_BIN="$(require_bin solana-keygen)"
 CARGO_BUILD_SBF_BIN="$(require_bin cargo-build-sbf)"
-SBF_SDK_TEMPLATE_DIR="$(find_sbf_sdk_template_dir "$CARGO_BUILD_SBF_BIN")"
-SBF_SDK_DIR="$SURFPOOL_DIR/platform-tools-sdk/sbf"
 
 mkdir -p "$SURFPOOL_DIR"
 BACKUP_FILE="$(mktemp "$SURFPOOL_DIR/$EXAMPLE_NAME.lib.rs.XXXXXX")"
@@ -93,17 +89,17 @@ mkdir -p "$HOME"
 perl -0pi -e "s/declare_id!\(\"[^\"]+\"\);/declare_id!(\"$PROGRAM_ID\");/" "$EXAMPLE_SOURCE"
 cargo run -p pina_cli --quiet -- idl --path "$EXAMPLE_DIR" --output "$IDL_PATH"
 
-rm -rf "$SURFPOOL_DIR/platform-tools-sdk"
-mkdir -p "$SURFPOOL_DIR/platform-tools-sdk"
-cp -R "$SBF_SDK_TEMPLATE_DIR" "$SBF_SDK_DIR"
-chmod -R u+w "$SURFPOOL_DIR/platform-tools-sdk"
+"$CARGO_BUILD_SBF_BIN" \
+	--install-only \
+	--tools-version v1.53 \
+	--patch-binaries-for-nix false
 
 "$CARGO_BUILD_SBF_BIN" \
 	--manifest-path "$EXAMPLE_DIR/Cargo.toml" \
 	--features bpf-entrypoint \
 	--sbf-out-dir "$SURFPOOL_DIR" \
 	--arch v0 \
-	--sbf-sdk "$SBF_SDK_DIR"
+	--patch-binaries-for-nix false
 
 PROGRAM_SO="$SURFPOOL_DIR/${EXAMPLE_NAME}.so"
 if [[ ! -f "$PROGRAM_SO" ]]; then
@@ -137,7 +133,7 @@ done
 		>"$SURFPOOL_LOG" 2>&1
 ) &
 SURFPOOL_PID=$!
-if ! "$WAIT_FOR_THEM_BIN" --silent --timeout 60000 "$RPC_HOST_PORT"; then
+if ! wait_for_tcp "$RPC_HOST_PORT" 60000; then
 	echo "surfpool RPC did not become ready in time" >&2
 	if [[ -f "$SURFPOOL_LOG" ]]; then
 		echo "--- surfpool.log ---" >&2

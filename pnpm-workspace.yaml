@@ -5,7 +5,12 @@ packages:
   - codama/tests/litesvm
   - codama/tests/quasar-svm
 
+allowBuilds:
+  esbuild: true
+  koffi: true
+
 onlyBuiltDependencies:
   - esbuild
+  - koffi
 
 useNodeVersion: 24.13.0

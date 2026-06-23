@@ -43,7 +43,7 @@ format_codama_outputs() {
 			exit 1
 		fi
 
-		dprint fmt --config "$ROOT/dprint.json" "${FORMAT_FILES[@]}"
+		printf '%s\0' "${FORMAT_FILES[@]}" | xargs -0 -n 100 dprint fmt --allow-no-files --config "$ROOT/dprint.json"
 	)
 }
 
@@ -55,6 +55,10 @@ trap '
 	fi
 ' EXIT
 
+if [[ -z "${HOME:-}" ]]; then
+	export HOME="$ROOT/.cache/home"
+fi
+mkdir -p "$HOME"
 echo "Installing pnpm workspace dependencies..."
 pnpm install --frozen-lockfile
 
