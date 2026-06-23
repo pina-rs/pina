@@ -28,9 +28,7 @@ in
       curl
       custom.agave
       custom.mdt
-      (custom.sbpf-linker.overrideAttrs (_old: {
-        doInstallCheck = false;
-      }))
+      custom.sbpf-linker
       custom.surfpool
       custom.wait-for-them
       dprint
@@ -283,180 +281,6 @@ in
       description = "Install cargo binaries locally.";
       binary = "bash";
     };
-    "install:sbpf-gallery" = {
-      exec = ''
-                set -euo pipefail
-
-                if [ -n "''${XDG_CACHE_HOME:-}" ]; then
-                  CACHE_BASE="$XDG_CACHE_HOME"
-                elif [ -n "''${HOME:-}" ] && [ "$HOME" != "/" ]; then
-                  CACHE_BASE="$HOME/.cache"
-                else
-                  CACHE_BASE="$DEVENV_ROOT/.cache"
-                fi
-
-                CACHE_DIR="$CACHE_BASE/sbpf-linker-upstream-gallery"
-                LLVM_SRC="$CACHE_DIR/llvm-project"
-                LLVM_BUILD="$CACHE_DIR/llvm-build"
-                LLVM_INSTALL="$CACHE_DIR/llvm-install"
-                LLVM_CONFIG="$LLVM_INSTALL/bin/llvm-config"
-                SBPF_SRC="$CACHE_DIR/sbpf-linker"
-                SBPF_BIN="$CACHE_DIR/bin/sbpf-linker"
-                SBPF_REV="4b6e888cd306b6f959d4acf7a6f0acea10c70a47"
-                SBPF_EXPECTED_VERSION="0.1.6"
-
-                mkdir -p "$CACHE_DIR"
-
-                if [ -x "$SBPF_BIN" ] && "$SBPF_BIN" --version 2>/dev/null | grep -q "$SBPF_EXPECTED_VERSION"; then
-                  export PATH="$CACHE_DIR/bin:$PATH"
-                  echo "Using cached sbpf-linker binary at $SBPF_BIN"
-                  exit 0
-                fi
-
-                if [ -e "$LLVM_CONFIG" ] && ! "$LLVM_CONFIG" --version >/dev/null 2>&1; then
-                  echo "Cached LLVM install is invalid; rebuilding." >&2
-                  rm -rf "$LLVM_BUILD" "$LLVM_INSTALL"
-                fi
-
-                # Step 1: Build custom LLVM (BPF target only)
-                if [ ! -x "$LLVM_CONFIG" ]; then
-                  if [ ! -d "$LLVM_SRC" ]; then
-                    echo "=== [1/3] Cloning Blueshift LLVM fork ==="
-                    git clone --depth 1 --branch upstream-gallery-21 \
-                      https://github.com/blueshift-gg/llvm-project.git "$LLVM_SRC"
-                  fi
-
-                  mkdir -p "$LLVM_BUILD" "$LLVM_INSTALL"
-
-                  echo "=== [2/3] Building LLVM (BPF target only, this may take 30+ minutes) ==="
-                  cmake -S "$LLVM_SRC/llvm" -B "$LLVM_BUILD" \
-                    -G Ninja \
-                    -DCMAKE_BUILD_TYPE=Release \
-                    -DCMAKE_INSTALL_PREFIX="$LLVM_INSTALL" \
-                    -DLLVM_ENABLE_PROJECTS= \
-                    -DLLVM_ENABLE_RUNTIMES= \
-                    -DLLVM_TARGETS_TO_BUILD=BPF \
-                    -DLLVM_BUILD_LLVM_DYLIB=OFF \
-                    -DLLVM_LINK_LLVM_DYLIB=OFF \
-                    -DLLVM_BUILD_TESTS=OFF \
-                    -DLLVM_INCLUDE_TESTS=OFF \
-                    -DLLVM_ENABLE_ASSERTIONS=ON \
-                    -DLLVM_ENABLE_ZLIB=OFF \
-                    -DLLVM_ENABLE_ZSTD=OFF \
-                    -DLLVM_INSTALL_UTILS=ON
-
-                  NUM_CPUS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
-                  cmake --build "$LLVM_BUILD" --target install -- -j"$NUM_CPUS"
-
-                  echo "LLVM installed: $("$LLVM_CONFIG" --version)"
-                else
-                  echo "LLVM already built at $LLVM_INSTALL ($("$LLVM_CONFIG" --version))"
-                fi
-
-                # Step 2: Clone sbpf-linker at a revision that still exposes the
-                # upstream-gallery-21 feature expected by this workspace.
-                if [ ! -d "$SBPF_SRC/.git" ]; then
-                  echo "=== Cloning sbpf-linker ==="
-                  rm -rf "$SBPF_SRC"
-                  git clone --no-checkout https://github.com/blueshift-gg/sbpf-linker.git "$SBPF_SRC"
-                fi
-                git -C "$SBPF_SRC" fetch --depth 1 origin "$SBPF_REV"
-                git -C "$SBPF_SRC" checkout --detach "$SBPF_REV"
-                python3 - <<PY
-        from pathlib import Path
-
-        manifest = Path("$SBPF_SRC/Cargo.toml")
-        text = manifest.read_text()
-        text = text.replace('sbpf-assembler = "0.1.6"', 'sbpf-assembler = "=0.1.6"')
-        text = text.replace('sbpf-common = "0.1.6"', 'sbpf-common = "=0.1.6"')
-        text = text.replace('bpf-linker = { version = "0.10.1", default-features = false }', 'bpf-linker = { version = "=0.10.1", default-features = false }')
-        manifest.write_text(text)
-        PY
-
-                # Step 3: Build sbpf-linker with gallery features
-                echo "=== Building sbpf-linker with upstream-gallery-21 ==="
-                if [ "$(uname)" = "Darwin" ]; then
-                  # On macOS, point to Nix-provided static libs for the link step.
-                  # CXXSTDLIB_PATH: libc++ from the Nix LLVM toolchain
-                  # ZLIB_PATH / LIBZSTD_PATH: compression libs for the linker
-                  export CXXSTDLIB_PATH="${llvm.libcxx}/lib"
-                  export ZLIB_PATH="${pkgs.zlib}/lib"
-                  export LIBZSTD_PATH="${pkgs.zstd}/lib"
-                elif [ "$(uname)" = "Linux" ]; then
-                  # bpf-linker static linking expects libstdc++.a to be discoverable.
-                  # On Nix-based CI, that path may not be present in compiler
-                  # search dirs, so resolve it explicitly.
-                  CXXSTDLIB_ARCHIVE="$(gcc -print-file-name=libstdc++.a 2>/dev/null || true)"
-                  if [ -z "$CXXSTDLIB_ARCHIVE" ] || [ "$CXXSTDLIB_ARCHIVE" = "libstdc++.a" ] || [ ! -f "$CXXSTDLIB_ARCHIVE" ]; then
-                    CXXSTDLIB_ARCHIVE="$(g++ -print-file-name=libstdc++.a 2>/dev/null || true)"
-                  fi
-
-                  if [ -n "$CXXSTDLIB_ARCHIVE" ] && [ "$CXXSTDLIB_ARCHIVE" != "libstdc++.a" ] && [ -f "$CXXSTDLIB_ARCHIVE" ]; then
-                    export CXXSTDLIB_PATH="$(dirname "$CXXSTDLIB_ARCHIVE")"
-                  else
-                    echo "warning: failed to locate libstdc++.a via gcc/g++; falling back to Nix GCC lib path"
-                    export CXXSTDLIB_PATH="${pkgs.gcc.cc.lib}/lib"
-                  fi
-                fi
-
-                SBPF_TARGET_DIR="$CACHE_DIR/sbpf-linker-target"
-                rm -rf "$SBPF_TARGET_DIR"
-
-                LLVM_PREFIX="$LLVM_INSTALL" \
-                  CARGO_TARGET_DIR="$SBPF_TARGET_DIR" \
-                  cargo install \
-                    --path "$SBPF_SRC" \
-                    --root "$CACHE_DIR" \
-                    --no-default-features \
-                    --features "upstream-gallery-21,bpf-linker/llvm-link-static" \
-                    --force
-
-                # Symlink into the cache bin directory so it's discoverable on PATH.
-                mkdir -p "$CACHE_DIR/bin"
-                if [ "$SBPF_BIN" != "$CACHE_DIR/bin/sbpf-linker" ]; then
-                  ln -sf "$SBPF_BIN" "$CACHE_DIR/bin/sbpf-linker"
-                fi
-                export PATH="$CACHE_DIR/bin:$PATH"
-
-                echo ""
-                echo "Done! sbpf-linker (gallery) installed."
-                echo "Cache directory: $CACHE_DIR"
-                "$SBPF_BIN" --version 2>/dev/null || echo "(binary ready)"
-      '';
-      description = "Build sbpf-linker with custom Blueshift LLVM (upstream-gallery-21). First run builds LLVM from source (~30 min).";
-      binary = "bash";
-    };
-    "clean:sbpf-gallery" = {
-      exec = ''
-        set -euo pipefail
-
-        if [ -n "''${XDG_CACHE_HOME:-}" ]; then
-          CACHE_BASE="$XDG_CACHE_HOME"
-        elif [ -n "''${HOME:-}" ] && [ "$HOME" != "/" ]; then
-          CACHE_BASE="$HOME/.cache"
-        else
-          CACHE_BASE="$DEVENV_ROOT/.cache"
-        fi
-
-        CACHE_DIR="$CACHE_BASE/sbpf-linker-upstream-gallery"
-
-        if [ -d "$CACHE_DIR" ]; then
-          echo "Removing $CACHE_DIR ..."
-          rm -rf "$CACHE_DIR"
-          echo "Cleaned."
-        else
-          echo "Nothing to clean (no cache at $CACHE_DIR)."
-        fi
-
-        # Remove the symlink from cache bin if present
-        if [ -L "$CACHE_DIR/bin/sbpf-linker" ]; then
-          rm -f "$CACHE_DIR/bin/sbpf-linker"
-          echo "Removed cached sbpf-linker symlink."
-        fi
-      '';
-      description = "Remove the cached Blueshift LLVM build and gallery sbpf-linker binary.";
-      binary = "bash";
-    };
     "update:deps" = {
       exec = ''
         set -euo pipefail
@@ -620,9 +444,6 @@ in
       exec = ''
         set -euo pipefail
 
-        # Ensure sbpf-linker is built against the Blueshift LLVM upstream gallery.
-        install:sbpf-gallery
-
         # Run unit and parity tests for all example programs.
         cargo test --locked \
           -p anchor_declare_id \
@@ -647,7 +468,8 @@ in
           rustup component add rust-src --toolchain "$BPF_TOOLCHAIN"
         fi
 
-        cargo +"$BPF_TOOLCHAIN" build-bpf
+        PATH="${custom.sbpf-linker-21}/bin:$PATH" \
+          cargo +"$BPF_TOOLCHAIN" build-bpf
         cargo test --locked -p pina_bpf bpf_build_ -- --ignored
 
         # Run mollusk-svm e2e tests against the compiled SBF binaries.
@@ -773,7 +595,8 @@ in
         fi
         mkdir -p "$HOME"
         pnpm install --frozen-lockfile
-        "$DEVENV_ROOT/scripts/test-surfpool-idl-smoke.sh"
+        PATH="${custom.sbpf-linker-21}/bin:$PATH" \
+          "$DEVENV_ROOT/scripts/test-surfpool-idl-smoke.sh"
       '';
       description = "Deploy a generated program to Surfpool and invoke it using generated IDL metadata.";
       binary = "bash";

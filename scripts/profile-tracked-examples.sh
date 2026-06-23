@@ -17,8 +17,8 @@ if [ ! -f "$POLICY_FILE" ]; then
 	exit 1
 fi
 
-if ! command -v install:sbpf-gallery >/dev/null 2>&1; then
-	echo "install:sbpf-gallery must be available in PATH. Run this from devenv shell." >&2
+if ! command -v sbpf-linker >/dev/null 2>&1; then
+	echo "sbpf-linker must be available in PATH. Run this from the devenv shell." >&2
 	exit 1
 fi
 
@@ -101,8 +101,6 @@ resolve_artifact_path() {
 
 	return 1
 }
-
-install:sbpf-gallery
 
 if ! rustup toolchain list | grep -q "^$BPF_TOOLCHAIN"; then
 	rustup toolchain install "$BPF_TOOLCHAIN" --profile minimal --component rust-src

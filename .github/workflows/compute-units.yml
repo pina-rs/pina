@@ -28,16 +28,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: cache sbpf gallery toolchain
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ github.workspace }}/.cache/sbpf-linker-upstream-gallery/llvm-install
-            ${{ github.workspace }}/.cache/sbpf-linker-upstream-gallery/bin
-          key: ${{ runner.os }}-sbpf-gallery-v2-${{ hashFiles('devenv.nix', 'rust-toolchain.toml', '.github/workflows/ci.yml', '.github/workflows/compute-units.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-sbpf-gallery-v2-
-
       - name: create base worktree
         run: |
           git worktree add --detach ../pina-base ${{ github.event.pull_request.base.sha }}
