@@ -6,6 +6,7 @@ use args::EventArgs;
 use darling::FromDeriveInput;
 use darling::FromMeta;
 use darling::ast::NestedMeta;
+use darling::ast::Style;
 use heck::ToShoutySnakeCase;
 use proc_macro::TokenStream;
 use quote::format_ident;
@@ -52,7 +53,17 @@ fn accounts_derive_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenSt
 	let struct_name = &args.ident;
 	let (impl_generics, ty_generics, where_clause) = args.generics.split_for_impl();
 	let crate_path = &args.crate_path;
-	let fields = args.data.take_struct().unwrap();
+	let fields = match args.data.take_struct() {
+		Some(fields) if fields.style == Style::Struct => fields,
+		Some(_) => {
+			return syn::Error::new_spanned(&args.ident, "Accounts structs must have named fields")
+				.to_compile_error();
+		}
+		None => {
+			return syn::Error::new_spanned(&args.ident, "Accounts derive only supports structs")
+				.to_compile_error();
+		}
+	};
 
 	// Get lifetime parameter
 	let lifetime = match args.generics.lifetimes().next() {
@@ -90,7 +101,10 @@ fn accounts_derive_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenSt
 	}
 
 	for (index, field) in fields.iter().enumerate() {
-		let ident = field.ident.as_ref().unwrap();
+		let ident = field
+			.ident
+			.as_ref()
+			.unwrap_or_else(|| panic!("internal error: `Accounts` field without an ident"));
 
 		if field.remaining.is_present() {
 			if index + 1 != field_count {
@@ -903,7 +917,10 @@ fn account_impl(
 	// Generate assertions
 	let assertions = if let Fields::Named(named_fields) = &item_struct.fields {
 		let field_assertions = named_fields.named.iter().map(|field| {
-			let field_name = field.ident.as_ref().unwrap();
+			let field_name = field
+				.ident
+				.as_ref()
+				.unwrap_or_else(|| panic!("internal error: named field without an ident"));
 			let field_name_str = field_name.to_string();
 			let field_type = &field.ty;
 			quote! {
@@ -1300,7 +1317,10 @@ fn instruction_impl(
 	// Generate assertions
 	let assertions = if let Fields::Named(named_fields) = &item_struct.fields {
 		let field_assertions = named_fields.named.iter().map(|field| {
-			let field_name = field.ident.as_ref().unwrap();
+			let field_name = field
+				.ident
+				.as_ref()
+				.unwrap_or_else(|| panic!("internal error: named field without an ident"));
 			let field_name_str = field_name.to_string();
 			let field_type = &field.ty;
 			quote! {
@@ -1605,7 +1625,10 @@ fn event_impl(
 	// Generate assertions
 	let assertions = if let Fields::Named(named_fields) = &item_struct.fields {
 		let field_assertions = named_fields.named.iter().map(|field| {
-			let field_name = field.ident.as_ref().unwrap();
+			let field_name = field
+				.ident
+				.as_ref()
+				.unwrap_or_else(|| panic!("internal error: named field without an ident"));
 			let field_name_str = field_name.to_string();
 			let field_type = &field.ty;
 			quote! {

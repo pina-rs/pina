@@ -1,0 +1,7 @@
+error: Unsupported shape `enum`. Expected struct with named fields.
+ --> tests/ui/fail/accounts_enum.rs:3:10
+  |
+3 | #[derive(Accounts)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `Accounts` (in Nightly builds, run with -Z macro-backtrace for more info)
