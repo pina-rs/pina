@@ -1,19 +1,16 @@
 {
 	"kind": "rootNode",
 	"standard": "codama",
-	"version": "1.0.0",
+	"version": "1.8.0",
 	"program": {
 		"kind": "programNode",
 		"name": "anchorErrors",
 		"publicKey": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
-		"version": "",
-		"accounts": [],
+		"version": "0.0.0",
 		"instructions": [
 			{
 				"kind": "instructionNode",
 				"name": "hello",
-				"accounts": [],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -36,8 +33,6 @@
 			{
 				"kind": "instructionNode",
 				"name": "helloNoMsg",
-				"accounts": [],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -60,8 +55,6 @@
 			{
 				"kind": "instructionNode",
 				"name": "helloNext",
-				"accounts": [],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -84,8 +77,6 @@
 			{
 				"kind": "instructionNode",
 				"name": "requireEq",
-				"accounts": [],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -108,8 +99,6 @@
 			{
 				"kind": "instructionNode",
 				"name": "requireNeq",
-				"accounts": [],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -132,8 +121,6 @@
 			{
 				"kind": "instructionNode",
 				"name": "requireGt",
-				"accounts": [],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -156,8 +143,6 @@
 			{
 				"kind": "instructionNode",
 				"name": "requireGte",
-				"accounts": [],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -178,8 +163,6 @@
 				]
 			}
 		],
-		"definedTypes": [],
-		"pdas": [],
 		"errors": [
 			{
 				"kind": "errorNode",
@@ -230,6 +213,5 @@
 				"message": ""
 			}
 		]
-	},
-	"additionalPrograms": []
+	}
 }

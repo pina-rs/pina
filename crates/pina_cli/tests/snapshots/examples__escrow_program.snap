@@ -1,16 +1,17 @@
 ---
 source: crates/pina_cli/tests/examples.rs
+assertion_line: 49
 expression: idl
 ---
 {
   "kind": "rootNode",
   "standard": "codama",
-  "version": "1.0.0",
+  "version": "1.8.0",
   "program": {
     "kind": "programNode",
     "name": "escrowProgram",
     "publicKey": "4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT",
-    "version": "",
+    "version": "0.0.0",
     "accounts": [
       {
         "kind": "accountNode",
@@ -112,43 +113,50 @@ expression: idl
             "kind": "instructionAccountNode",
             "name": "maker",
             "isWritable": false,
-            "isSigner": true
+            "isSigner": true,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "mintA",
             "isWritable": false,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "mintB",
             "isWritable": false,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "makerAtaA",
             "isWritable": false,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "escrow",
             "isWritable": true,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "vault",
             "isWritable": true,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "systemProgram",
             "isWritable": false,
             "isSigner": false,
+            "isOptional": false,
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "11111111111111111111111111111111"
@@ -158,7 +166,8 @@ expression: idl
             "kind": "instructionAccountNode",
             "name": "tokenProgram",
             "isWritable": false,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           }
         ],
         "arguments": [
@@ -226,74 +235,84 @@ expression: idl
             "kind": "instructionAccountNode",
             "name": "taker",
             "isWritable": true,
-            "isSigner": true
+            "isSigner": true,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "mintA",
             "isWritable": false,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "mintB",
             "isWritable": false,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "takerAtaA",
             "isWritable": false,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "takerAtaB",
             "isWritable": true,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "maker",
             "isWritable": true,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "makerAtaB",
             "isWritable": true,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "escrow",
             "isWritable": true,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "vault",
             "isWritable": true,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "tokenProgram",
             "isWritable": false,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "systemProgram",
             "isWritable": false,
             "isSigner": false,
+            "isOptional": false,
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "11111111111111111111111111111111"
             }
           }
         ],
-        "arguments": [],
         "discriminators": [
           {
             "kind": "constantDiscriminatorNode",
@@ -314,7 +333,6 @@ expression: idl
         ]
       }
     ],
-    "definedTypes": [],
     "pdas": [
       {
         "kind": "pdaNode",
@@ -362,6 +380,5 @@ expression: idl
         "message": ""
       }
     ]
-  },
-  "additionalPrograms": []
+  }
 }

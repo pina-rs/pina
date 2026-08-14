@@ -29,11 +29,12 @@ import {
 	getU8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
 } from "@solana/kit";
 
 export const COUNTER_STATE_DISCRIMINATOR = 1;
 
-export function getCounterStateDiscriminatorBytes() {
+export function getCounterStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(COUNTER_STATE_DISCRIMINATOR);
 }
 

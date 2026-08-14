@@ -15,6 +15,7 @@ import {
 	type InstructionWithAccounts,
 	type ReadonlyAccount,
 	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
@@ -27,7 +28,7 @@ import { ANCHOR_SYSTEM_ACCOUNTS_PROGRAM_ADDRESS } from "../programs";
 
 export const INITIALIZE_DISCRIMINATOR = 0;
 
-export function getInitializeDiscriminatorBytes() {
+export function getInitializeDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR);
 }
 

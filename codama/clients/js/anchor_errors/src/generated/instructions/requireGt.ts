@@ -12,12 +12,13 @@ import {
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type ReadonlyUint8Array,
 } from "@solana/kit";
 import { ANCHOR_ERRORS_PROGRAM_ADDRESS } from "../programs";
 
 export const REQUIRE_GT_DISCRIMINATOR = 5;
 
-export function getRequireGtDiscriminatorBytes() {
+export function getRequireGtDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(REQUIRE_GT_DISCRIMINATOR);
 }
 

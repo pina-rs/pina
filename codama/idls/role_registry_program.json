@@ -1,12 +1,12 @@
 {
 	"kind": "rootNode",
 	"standard": "codama",
-	"version": "1.0.0",
+	"version": "1.8.0",
 	"program": {
 		"kind": "programNode",
 		"name": "roleRegistryProgram",
 		"publicKey": "3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX",
-		"version": "",
+		"version": "0.0.0",
 		"accounts": [
 			{
 				"kind": "accountNode",
@@ -150,13 +150,15 @@
 						"kind": "instructionAccountNode",
 						"name": "admin",
 						"isWritable": true,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "registryConfig",
 						"isWritable": true,
 						"isSigner": false,
+						"isOptional": false,
 						"defaultValue": {
 							"kind": "pdaValueNode",
 							"pda": {
@@ -180,6 +182,7 @@
 						"name": "systemProgram",
 						"isWritable": false,
 						"isSigner": false,
+						"isOptional": false,
 						"defaultValue": {
 							"kind": "publicKeyValueNode",
 							"publicKey": "11111111111111111111111111111111"
@@ -224,31 +227,36 @@
 						"kind": "instructionAccountNode",
 						"name": "admin",
 						"isWritable": true,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "grantee",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "registryConfig",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "roleEntry",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "systemProgram",
 						"isWritable": false,
 						"isSigner": false,
+						"isOptional": false,
 						"defaultValue": {
 							"kind": "publicKeyValueNode",
 							"publicKey": "11111111111111111111111111111111"
@@ -311,19 +319,22 @@
 						"kind": "instructionAccountNode",
 						"name": "admin",
 						"isWritable": false,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "registryConfig",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "roleEntry",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					}
 				],
 				"arguments": [
@@ -364,22 +375,24 @@
 						"kind": "instructionAccountNode",
 						"name": "admin",
 						"isWritable": false,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "registryConfig",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "roleEntry",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					}
 				],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -407,22 +420,24 @@
 						"kind": "instructionAccountNode",
 						"name": "admin",
 						"isWritable": false,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "newAdmin",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "registryConfig",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					}
 				],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -443,7 +458,6 @@
 				]
 			}
 		],
-		"definedTypes": [],
 		"pdas": [
 			{
 				"kind": "pdaNode",
@@ -521,6 +535,5 @@
 				"message": ""
 			}
 		]
-	},
-	"additionalPrograms": []
+	}
 }

@@ -1,12 +1,12 @@
 {
 	"kind": "rootNode",
 	"standard": "codama",
-	"version": "1.0.0",
+	"version": "1.8.0",
 	"program": {
 		"kind": "programNode",
 		"name": "stakingRewardsProgram",
 		"publicKey": "9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr",
-		"version": "",
+		"version": "0.0.0",
 		"accounts": [
 			{
 				"kind": "accountNode",
@@ -182,43 +182,50 @@
 						"kind": "instructionAccountNode",
 						"name": "admin",
 						"isWritable": false,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "stakeMint",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "rewardMint",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "poolState",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "stakeVault",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "rewardVault",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "systemProgram",
 						"isWritable": false,
 						"isSigner": false,
+						"isOptional": false,
 						"defaultValue": {
 							"kind": "publicKeyValueNode",
 							"publicKey": "11111111111111111111111111111111"
@@ -228,7 +235,8 @@
 						"kind": "instructionAccountNode",
 						"name": "tokenProgram",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					}
 				],
 				"arguments": [
@@ -269,25 +277,29 @@
 						"kind": "instructionAccountNode",
 						"name": "user",
 						"isWritable": false,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "poolState",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "positionState",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "systemProgram",
 						"isWritable": false,
 						"isSigner": false,
+						"isOptional": false,
 						"defaultValue": {
 							"kind": "publicKeyValueNode",
 							"publicKey": "11111111111111111111111111111111"
@@ -332,43 +344,50 @@
 						"kind": "instructionAccountNode",
 						"name": "user",
 						"isWritable": false,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "stakeMint",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "poolState",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "positionState",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "userStakeAta",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "tokenProgram",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "systemProgram",
 						"isWritable": false,
 						"isSigner": false,
+						"isOptional": false,
 						"defaultValue": {
 							"kind": "publicKeyValueNode",
 							"publicKey": "11111111111111111111111111111111"
@@ -413,43 +432,50 @@
 						"kind": "instructionAccountNode",
 						"name": "user",
 						"isWritable": false,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "stakeMint",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "poolState",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "positionState",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "userStakeAta",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "tokenProgram",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "systemProgram",
 						"isWritable": false,
 						"isSigner": false,
+						"isOptional": false,
 						"defaultValue": {
 							"kind": "publicKeyValueNode",
 							"publicKey": "11111111111111111111111111111111"
@@ -494,50 +520,56 @@
 						"kind": "instructionAccountNode",
 						"name": "user",
 						"isWritable": false,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "rewardMint",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "poolState",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "positionState",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "userRewardAta",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "tokenProgram",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "systemProgram",
 						"isWritable": false,
 						"isSigner": false,
+						"isOptional": false,
 						"defaultValue": {
 							"kind": "publicKeyValueNode",
 							"publicKey": "11111111111111111111111111111111"
 						}
 					}
 				],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -558,7 +590,6 @@
 				]
 			}
 		],
-		"definedTypes": [],
 		"pdas": [
 			{
 				"kind": "pdaNode",
@@ -655,6 +686,5 @@
 				"message": ""
 			}
 		]
-	},
-	"additionalPrograms": []
+	}
 }

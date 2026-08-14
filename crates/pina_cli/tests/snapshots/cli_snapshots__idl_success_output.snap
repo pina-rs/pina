@@ -25,19 +25,16 @@ exit_code: 0
 {
   "kind": "rootNode",
   "standard": "codama",
-  "version": "1.0.0",
+  "version": "1.8.0",
   "program": {
     "kind": "programNode",
     "name": "anchorDeclareId",
     "publicKey": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
-    "version": "",
-    "accounts": [],
+    "version": "0.0.0",
     "instructions": [
       {
         "kind": "instructionNode",
         "name": "initialize",
-        "accounts": [],
-        "arguments": [],
         "discriminators": [
           {
             "kind": "constantDiscriminatorNode",
@@ -57,12 +54,8 @@ exit_code: 0
           }
         ]
       }
-    ],
-    "definedTypes": [],
-    "pdas": [],
-    "errors": []
-  },
-  "additionalPrograms": []
+    ]
+  }
 }
 
 ----- stderr -----

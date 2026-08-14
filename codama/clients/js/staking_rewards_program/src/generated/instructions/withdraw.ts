@@ -38,7 +38,7 @@ import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const WITHDRAW_DISCRIMINATOR = 3;
 
-export function getWithdrawDiscriminatorBytes() {
+export function getWithdrawDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(WITHDRAW_DISCRIMINATOR);
 }
 

@@ -39,7 +39,7 @@ import { ESCROW_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const MAKE_DISCRIMINATOR = 1;
 
-export function getMakeDiscriminatorBytes() {
+export function getMakeDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(MAKE_DISCRIMINATOR);
 }
 

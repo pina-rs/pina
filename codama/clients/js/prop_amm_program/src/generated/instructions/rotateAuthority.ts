@@ -37,7 +37,7 @@ import { PROP_AMM_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const ROTATE_AUTHORITY_DISCRIMINATOR = 2;
 
-export function getRotateAuthorityDiscriminatorBytes() {
+export function getRotateAuthorityDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(ROTATE_AUTHORITY_DISCRIMINATOR);
 }
 

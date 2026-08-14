@@ -220,9 +220,9 @@ fn run_js_generation_with_npx(
 	command
 		.arg("-y")
 		.arg("-p")
-		.arg("codama@1.5.1")
+		.arg("codama@1.10.1")
 		.arg("-p")
-		.arg("@codama/renderers-js@2.0.2")
+		.arg("@codama/renderers-js@2.3.1")
 		.arg("node")
 		.arg("--input-type=module")
 		.arg("-e")
@@ -244,9 +244,9 @@ fn run_js_generation_with_pnpm(
 	command
 		.arg("dlx")
 		.arg("--package")
-		.arg("codama@1.5.1")
+		.arg("codama@1.10.1")
 		.arg("--package")
-		.arg("@codama/renderers-js@2.0.2")
+		.arg("@codama/renderers-js@2.3.1")
 		.arg("node")
 		.arg("--input-type=module")
 		.arg("-e")

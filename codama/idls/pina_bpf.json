@@ -1,19 +1,16 @@
 {
 	"kind": "rootNode",
 	"standard": "codama",
-	"version": "1.0.0",
+	"version": "1.8.0",
 	"program": {
 		"kind": "programNode",
 		"name": "pinaBpf",
 		"publicKey": "2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe",
-		"version": "",
-		"accounts": [],
+		"version": "0.0.0",
 		"instructions": [
 			{
 				"kind": "instructionNode",
 				"name": "hello",
-				"accounts": [],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -33,10 +30,6 @@
 					}
 				]
 			}
-		],
-		"definedTypes": [],
-		"pdas": [],
-		"errors": []
-	},
-	"additionalPrograms": []
+		]
+	}
 }

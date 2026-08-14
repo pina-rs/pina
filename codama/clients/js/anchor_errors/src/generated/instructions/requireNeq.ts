@@ -12,12 +12,13 @@ import {
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type ReadonlyUint8Array,
 } from "@solana/kit";
 import { ANCHOR_ERRORS_PROGRAM_ADDRESS } from "../programs";
 
 export const REQUIRE_NEQ_DISCRIMINATOR = 4;
 
-export function getRequireNeqDiscriminatorBytes() {
+export function getRequireNeqDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(REQUIRE_NEQ_DISCRIMINATOR);
 }
 

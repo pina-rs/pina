@@ -1,13 +1,12 @@
 {
 	"kind": "rootNode",
 	"standard": "codama",
-	"version": "1.0.0",
+	"version": "1.8.0",
 	"program": {
 		"kind": "programNode",
 		"name": "anchorDuplicateMutableAccounts",
 		"publicKey": "4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH",
-		"version": "",
-		"accounts": [],
+		"version": "0.0.0",
 		"instructions": [
 			{
 				"kind": "instructionNode",
@@ -17,16 +16,17 @@
 						"kind": "instructionAccountNode",
 						"name": "account1",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "account2",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					}
 				],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -49,8 +49,6 @@
 			{
 				"kind": "instructionNode",
 				"name": "allowsDuplicateMutable",
-				"accounts": [],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -78,16 +76,17 @@
 						"kind": "instructionAccountNode",
 						"name": "account1",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "account2",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					}
 				],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -108,8 +107,6 @@
 				]
 			}
 		],
-		"definedTypes": [],
-		"pdas": [],
 		"errors": [
 			{
 				"kind": "errorNode",
@@ -118,6 +115,5 @@
 				"message": ""
 			}
 		]
-	},
-	"additionalPrograms": []
+	}
 }

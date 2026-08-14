@@ -13,6 +13,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
@@ -134,6 +136,9 @@ export type EscrowProgramPlugin = {
 	accounts: EscrowProgramPluginAccounts;
 	instructions: EscrowProgramPluginInstructions;
 	pdas: EscrowProgramPluginPdas;
+	identifyAccount: typeof identifyEscrowProgramAccount;
+	identifyInstruction: typeof identifyEscrowProgramInstruction;
+	parseInstruction: typeof parseEscrowProgramInstruction;
 };
 
 export type EscrowProgramPluginAccounts = {
@@ -159,9 +164,10 @@ export type EscrowProgramPluginRequirements =
 	& ClientWithTransactionSending;
 
 export function escrowProgramProgram() {
-	return <T extends EscrowProgramPluginRequirements>(client: T) => {
-		return {
-			...client,
+	return <T extends EscrowProgramPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { escrowProgram: EscrowProgramPlugin }> => {
+		return extendClient(client, {
 			escrowProgram: <EscrowProgramPlugin> {
 				accounts: {
 					escrowState: addSelfFetchFunctions(client, getEscrowStateCodec()),
@@ -173,7 +179,10 @@ export function escrowProgramProgram() {
 						addSelfPlanAndSendFunctions(client, getTakeInstruction(input)),
 				},
 				pdas: { escrow: findEscrowPda },
+				identifyAccount: identifyEscrowProgramAccount,
+				identifyInstruction: identifyEscrowProgramInstruction,
+				parseInstruction: parseEscrowProgramInstruction,
 			},
-		};
+		});
 	};
 }

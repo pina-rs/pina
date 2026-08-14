@@ -26,7 +26,7 @@ export type RoleRegistryProgramError =
 let roleRegistryProgramErrorMessages:
 	| Record<RoleRegistryProgramError, string>
 	| undefined;
-if (process.env.NODE_ENV !== "production") {
+if (process.env["NODE_ENV"] !== "production") {
 	roleRegistryProgramErrorMessages = {
 		[ROLE_REGISTRY_PROGRAM_ERROR__INVALID_PERMISSIONS]: ``,
 		[ROLE_REGISTRY_PROGRAM_ERROR__ROLE_ALREADY_EXISTS]: ``,
@@ -37,7 +37,7 @@ if (process.env.NODE_ENV !== "production") {
 export function getRoleRegistryProgramErrorMessage(
 	code: RoleRegistryProgramError,
 ): string {
-	if (process.env.NODE_ENV !== "production") {
+	if (process.env["NODE_ENV"] !== "production") {
 		return (roleRegistryProgramErrorMessages as Record<
 			RoleRegistryProgramError,
 			string

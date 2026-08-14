@@ -1,19 +1,16 @@
 {
 	"kind": "rootNode",
 	"standard": "codama",
-	"version": "1.0.0",
+	"version": "1.8.0",
 	"program": {
 		"kind": "programNode",
 		"name": "anchorEvents",
 		"publicKey": "2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy",
-		"version": "",
-		"accounts": [],
+		"version": "0.0.0",
 		"instructions": [
 			{
 				"kind": "instructionNode",
 				"name": "initialize",
-				"accounts": [],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -36,8 +33,6 @@
 			{
 				"kind": "instructionNode",
 				"name": "testEvent",
-				"accounts": [],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -60,8 +55,6 @@
 			{
 				"kind": "instructionNode",
 				"name": "testEventCpi",
-				"accounts": [],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -81,10 +74,6 @@
 					}
 				]
 			}
-		],
-		"definedTypes": [],
-		"pdas": [],
-		"errors": []
-	},
-	"additionalPrograms": []
+		]
+	}
 }

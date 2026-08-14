@@ -13,6 +13,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
@@ -192,6 +194,9 @@ export type StakingRewardsProgramPlugin = {
 	accounts: StakingRewardsProgramPluginAccounts;
 	instructions: StakingRewardsProgramPluginInstructions;
 	pdas: StakingRewardsProgramPluginPdas;
+	identifyAccount: typeof identifyStakingRewardsProgramAccount;
+	identifyInstruction: typeof identifyStakingRewardsProgramInstruction;
+	parseInstruction: typeof parseStakingRewardsProgramInstruction;
 };
 
 export type StakingRewardsProgramPluginAccounts = {
@@ -234,9 +239,13 @@ export type StakingRewardsProgramPluginRequirements =
 	& ClientWithTransactionSending;
 
 export function stakingRewardsProgramProgram() {
-	return <T extends StakingRewardsProgramPluginRequirements>(client: T) => {
-		return {
-			...client,
+	return <T extends StakingRewardsProgramPluginRequirements>(
+		client: T,
+	): ExtendedClient<
+		T,
+		{ stakingRewardsProgram: StakingRewardsProgramPlugin }
+	> => {
+		return extendClient(client, {
 			stakingRewardsProgram: <StakingRewardsProgramPlugin> {
 				accounts: {
 					poolState: addSelfFetchFunctions(client, getPoolStateCodec()),
@@ -261,7 +270,10 @@ export function stakingRewardsProgramProgram() {
 						addSelfPlanAndSendFunctions(client, getClaimInstruction(input)),
 				},
 				pdas: { pool: findPoolPda, position: findPositionPda },
+				identifyAccount: identifyStakingRewardsProgramAccount,
+				identifyInstruction: identifyStakingRewardsProgramInstruction,
+				parseInstruction: parseStakingRewardsProgramInstruction,
 			},
-		};
+		});
 	};
 }

@@ -12,12 +12,13 @@ import {
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type ReadonlyUint8Array,
 } from "@solana/kit";
 import { ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ADDRESS } from "../programs";
 
 export const ALLOWS_DUPLICATE_MUTABLE_DISCRIMINATOR = 1;
 
-export function getAllowsDuplicateMutableDiscriminatorBytes() {
+export function getAllowsDuplicateMutableDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(ALLOWS_DUPLICATE_MUTABLE_DISCRIMINATOR);
 }
 

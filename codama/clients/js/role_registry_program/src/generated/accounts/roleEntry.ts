@@ -33,11 +33,12 @@ import {
 	getU8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
 } from "@solana/kit";
 
 export const ROLE_ENTRY_DISCRIMINATOR = 2;
 
-export function getRoleEntryDiscriminatorBytes() {
+export function getRoleEntryDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(ROLE_ENTRY_DISCRIMINATOR);
 }
 

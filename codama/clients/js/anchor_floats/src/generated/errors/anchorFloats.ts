@@ -19,12 +19,12 @@ export const ANCHOR_FLOATS_ERROR__AUTHORITY_MISMATCH = 0x0; // 0
 export type AnchorFloatsError = typeof ANCHOR_FLOATS_ERROR__AUTHORITY_MISMATCH;
 
 let anchorFloatsErrorMessages: Record<AnchorFloatsError, string> | undefined;
-if (process.env.NODE_ENV !== "production") {
+if (process.env["NODE_ENV"] !== "production") {
 	anchorFloatsErrorMessages = { [ANCHOR_FLOATS_ERROR__AUTHORITY_MISMATCH]: `` };
 }
 
 export function getAnchorFloatsErrorMessage(code: AnchorFloatsError): string {
-	if (process.env.NODE_ENV !== "production") {
+	if (process.env["NODE_ENV"] !== "production") {
 		return (anchorFloatsErrorMessages as Record<AnchorFloatsError, string>)[
 			code
 		];

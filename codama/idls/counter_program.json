@@ -1,12 +1,12 @@
 {
 	"kind": "rootNode",
 	"standard": "codama",
-	"version": "1.0.0",
+	"version": "1.8.0",
 	"program": {
 		"kind": "programNode",
 		"name": "counterProgram",
 		"publicKey": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
-		"version": "",
+		"version": "0.0.0",
 		"accounts": [
 			{
 				"kind": "accountNode",
@@ -97,6 +97,7 @@
 						"name": "authority",
 						"isWritable": false,
 						"isSigner": true,
+						"isOptional": false,
 						"docs": [
 							"The wallet creating the counter. Pays for account creation and becomes",
 							"the authority whose address seeds the PDA."
@@ -107,6 +108,7 @@
 						"name": "counter",
 						"isWritable": true,
 						"isSigner": false,
+						"isOptional": false,
 						"docs": [
 							"The counter PDA account (must be empty — not yet created)."
 						],
@@ -133,6 +135,7 @@
 						"name": "systemProgram",
 						"isWritable": false,
 						"isSigner": false,
+						"isOptional": false,
 						"docs": [
 							"The system program, required for `CreateAccount` CPI."
 						],
@@ -185,6 +188,7 @@
 						"name": "authority",
 						"isWritable": false,
 						"isSigner": true,
+						"isOptional": false,
 						"docs": [
 							"The counter's authority. Must sign to prove ownership."
 						]
@@ -194,6 +198,7 @@
 						"name": "counter",
 						"isWritable": true,
 						"isSigner": false,
+						"isOptional": false,
 						"docs": [
 							"The counter PDA account (must already exist and be writable)."
 						],
@@ -216,7 +221,6 @@
 						}
 					}
 				],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -237,7 +241,6 @@
 				]
 			}
 		],
-		"definedTypes": [],
 		"pdas": [
 			{
 				"kind": "pdaNode",
@@ -263,8 +266,6 @@
 					}
 				]
 			}
-		],
-		"errors": []
-	},
-	"additionalPrograms": []
+		]
+	}
 }

@@ -1,17 +1,17 @@
 ---
 source: crates/pina_cli/tests/examples.rs
+assertion_line: 61
 expression: idl
 ---
 {
   "kind": "rootNode",
   "standard": "codama",
-  "version": "1.0.0",
+  "version": "1.8.0",
   "program": {
     "kind": "programNode",
     "name": "transferSol",
     "publicKey": "BuXKn8EiVMKF8zYThuea3xhLq3jUHTTwDDLfCoehq7WG",
-    "version": "",
-    "accounts": [],
+    "version": "0.0.0",
     "instructions": [
       {
         "kind": "instructionNode",
@@ -33,6 +33,7 @@ expression: idl
             "name": "sender",
             "isWritable": true,
             "isSigner": true,
+            "isOptional": false,
             "docs": [
               "The sender. Must be a signer and writable (lamports will be debited)."
             ]
@@ -42,6 +43,7 @@ expression: idl
             "name": "recipient",
             "isWritable": true,
             "isSigner": false,
+            "isOptional": false,
             "docs": [
               "The recipient. Must be writable (lamports will be credited)."
             ]
@@ -51,6 +53,7 @@ expression: idl
             "name": "systemProgram",
             "isWritable": false,
             "isSigner": false,
+            "isOptional": false,
             "docs": [
               "The system program."
             ],
@@ -105,6 +108,7 @@ expression: idl
             "name": "sender",
             "isWritable": true,
             "isSigner": true,
+            "isOptional": false,
             "docs": [
               "The sender. Must be owned by this program, writable, and a signer."
             ]
@@ -114,6 +118,7 @@ expression: idl
             "name": "recipient",
             "isWritable": true,
             "isSigner": false,
+            "isOptional": false,
             "docs": [
               "The recipient. Must be writable."
             ]
@@ -150,8 +155,6 @@ expression: idl
         ]
       }
     ],
-    "definedTypes": [],
-    "pdas": [],
     "errors": [
       {
         "kind": "errorNode",
@@ -163,6 +166,5 @@ expression: idl
         ]
       }
     ]
-  },
-  "additionalPrograms": []
+  }
 }

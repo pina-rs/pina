@@ -31,11 +31,12 @@ import {
 	getU8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
 } from "@solana/kit";
 
 export const ESCROW_STATE_DISCRIMINATOR = 1;
 
-export function getEscrowStateDiscriminatorBytes() {
+export function getEscrowStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(ESCROW_STATE_DISCRIMINATOR);
 }
 

@@ -37,7 +37,7 @@ import { PROP_AMM_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const UPDATE_DISCRIMINATOR = 1;
 
-export function getUpdateDiscriminatorBytes() {
+export function getUpdateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(UPDATE_DISCRIMINATOR);
 }
 

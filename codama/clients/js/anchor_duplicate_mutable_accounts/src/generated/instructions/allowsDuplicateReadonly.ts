@@ -13,6 +13,7 @@ import {
 	type Instruction,
 	type InstructionWithAccounts,
 	type ReadonlyAccount,
+	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 } from "@solana/kit";
@@ -24,7 +25,7 @@ import { ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ADDRESS } from "../programs";
 
 export const ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR = 2;
 
-export function getAllowsDuplicateReadonlyDiscriminatorBytes() {
+export function getAllowsDuplicateReadonlyDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR);
 }
 

@@ -38,7 +38,7 @@ import { TRANSFER_SOL_PROGRAM_ADDRESS } from "../programs";
 
 export const CPI_TRANSFER_DISCRIMINATOR = 0;
 
-export function getCpiTransferDiscriminatorBytes() {
+export function getCpiTransferDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(CPI_TRANSFER_DISCRIMINATOR);
 }
 

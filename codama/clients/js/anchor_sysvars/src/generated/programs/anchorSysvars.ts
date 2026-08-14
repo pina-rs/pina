@@ -12,6 +12,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithData,
@@ -86,6 +88,8 @@ export function parseAnchorSysvarsInstruction<TProgram extends string>(
 
 export type AnchorSysvarsPlugin = {
 	instructions: AnchorSysvarsPluginInstructions;
+	identifyInstruction: typeof identifyAnchorSysvarsInstruction;
+	parseInstruction: typeof parseAnchorSysvarsInstruction;
 };
 
 export type AnchorSysvarsPluginInstructions = {
@@ -99,15 +103,18 @@ export type AnchorSysvarsPluginRequirements =
 	& ClientWithTransactionSending;
 
 export function anchorSysvarsProgram() {
-	return <T extends AnchorSysvarsPluginRequirements>(client: T) => {
-		return {
-			...client,
+	return <T extends AnchorSysvarsPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { anchorSysvars: AnchorSysvarsPlugin }> => {
+		return extendClient(client, {
 			anchorSysvars: <AnchorSysvarsPlugin> {
 				instructions: {
 					sysvars: (input) =>
 						addSelfPlanAndSendFunctions(client, getSysvarsInstruction(input)),
 				},
+				identifyInstruction: identifyAnchorSysvarsInstruction,
+				parseInstruction: parseAnchorSysvarsInstruction,
 			},
-		};
+		});
 	};
 }

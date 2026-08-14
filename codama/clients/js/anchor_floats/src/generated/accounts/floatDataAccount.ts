@@ -32,11 +32,12 @@ import {
 	getU8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
 } from "@solana/kit";
 
 export const FLOAT_DATA_ACCOUNT_DISCRIMINATOR = 1;
 
-export function getFloatDataAccountDiscriminatorBytes() {
+export function getFloatDataAccountDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(FLOAT_DATA_ACCOUNT_DISCRIMINATOR);
 }
 

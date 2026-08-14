@@ -39,7 +39,7 @@ import { ANCHOR_FLOATS_PROGRAM_ADDRESS } from "../programs";
 
 export const UPDATE_DISCRIMINATOR = 1;
 
-export function getUpdateDiscriminatorBytes() {
+export function getUpdateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(UPDATE_DISCRIMINATOR);
 }
 

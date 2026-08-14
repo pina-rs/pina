@@ -1,13 +1,12 @@
 {
 	"kind": "rootNode",
 	"standard": "codama",
-	"version": "1.0.0",
+	"version": "1.8.0",
 	"program": {
 		"kind": "programNode",
 		"name": "anchorRealloc",
 		"publicKey": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
-		"version": "",
-		"accounts": [],
+		"version": "0.0.0",
 		"instructions": [
 			{
 				"kind": "instructionNode",
@@ -17,19 +16,22 @@
 						"kind": "instructionAccountNode",
 						"name": "authority",
 						"isWritable": false,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "sample",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "systemProgram",
 						"isWritable": false,
 						"isSigner": false,
+						"isOptional": false,
 						"defaultValue": {
 							"kind": "publicKeyValueNode",
 							"publicKey": "11111111111111111111111111111111"
@@ -74,25 +76,29 @@
 						"kind": "instructionAccountNode",
 						"name": "authority",
 						"isWritable": false,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "sample1",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "sample2",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "systemProgram",
 						"isWritable": false,
 						"isSigner": false,
+						"isOptional": false,
 						"defaultValue": {
 							"kind": "publicKeyValueNode",
 							"publicKey": "11111111111111111111111111111111"
@@ -130,8 +136,6 @@
 				]
 			}
 		],
-		"definedTypes": [],
-		"pdas": [],
 		"errors": [
 			{
 				"kind": "errorNode",
@@ -146,6 +150,5 @@
 				"message": ""
 			}
 		]
-	},
-	"additionalPrograms": []
+	}
 }

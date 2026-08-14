@@ -22,7 +22,7 @@ export type AnchorReallocError =
 	| typeof ANCHOR_REALLOC_ERROR__ACCOUNT_REALLOC_EXCEEDS_LIMIT;
 
 let anchorReallocErrorMessages: Record<AnchorReallocError, string> | undefined;
-if (process.env.NODE_ENV !== "production") {
+if (process.env["NODE_ENV"] !== "production") {
 	anchorReallocErrorMessages = {
 		[ANCHOR_REALLOC_ERROR__ACCOUNT_DUPLICATE_REALLOCS]: ``,
 		[ANCHOR_REALLOC_ERROR__ACCOUNT_REALLOC_EXCEEDS_LIMIT]: ``,
@@ -30,7 +30,7 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export function getAnchorReallocErrorMessage(code: AnchorReallocError): string {
-	if (process.env.NODE_ENV !== "production") {
+	if (process.env["NODE_ENV"] !== "production") {
 		return (anchorReallocErrorMessages as Record<AnchorReallocError, string>)[
 			code
 		];

@@ -14,6 +14,7 @@ import {
 	type Instruction,
 	type InstructionWithAccounts,
 	type ReadonlyAccount,
+	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
@@ -28,7 +29,7 @@ import { ESCROW_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const TAKE_DISCRIMINATOR = 2;
 
-export function getTakeDiscriminatorBytes() {
+export function getTakeDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(TAKE_DISCRIMINATOR);
 }
 

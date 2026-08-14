@@ -1,13 +1,12 @@
 {
 	"kind": "rootNode",
 	"standard": "codama",
-	"version": "1.0.0",
+	"version": "1.8.0",
 	"program": {
 		"kind": "programNode",
 		"name": "helloSolana",
 		"publicKey": "DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A",
-		"version": "",
-		"accounts": [],
+		"version": "0.0.0",
 		"instructions": [
 			{
 				"kind": "instructionNode",
@@ -30,13 +29,13 @@
 						"name": "user",
 						"isWritable": false,
 						"isSigner": true,
+						"isOptional": false,
 						"docs": [
 							"The user invoking the program. Must be a signer so we can trust the",
 							"address is authentic."
 						]
 					}
 				],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -56,10 +55,6 @@
 					}
 				]
 			}
-		],
-		"definedTypes": [],
-		"pdas": [],
-		"errors": []
-	},
-	"additionalPrograms": []
+		]
+	}
 }

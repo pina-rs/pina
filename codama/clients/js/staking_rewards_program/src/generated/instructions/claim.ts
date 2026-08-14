@@ -15,6 +15,7 @@ import {
 	type InstructionWithAccounts,
 	type ReadonlyAccount,
 	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
@@ -28,7 +29,7 @@ import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const CLAIM_DISCRIMINATOR = 4;
 
-export function getClaimDiscriminatorBytes() {
+export function getClaimDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(CLAIM_DISCRIMINATOR);
 }
 

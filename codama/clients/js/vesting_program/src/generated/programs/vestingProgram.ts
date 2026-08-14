@@ -13,6 +13,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
@@ -151,6 +153,9 @@ export type VestingProgramPlugin = {
 	accounts: VestingProgramPluginAccounts;
 	instructions: VestingProgramPluginInstructions;
 	pdas: VestingProgramPluginPdas;
+	identifyAccount: typeof identifyVestingProgramAccount;
+	identifyInstruction: typeof identifyVestingProgramInstruction;
+	parseInstruction: typeof parseVestingProgramInstruction;
 };
 
 export type VestingProgramPluginAccounts = {
@@ -179,9 +184,10 @@ export type VestingProgramPluginRequirements =
 	& ClientWithTransactionSending;
 
 export function vestingProgramProgram() {
-	return <T extends VestingProgramPluginRequirements>(client: T) => {
-		return {
-			...client,
+	return <T extends VestingProgramPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { vestingProgram: VestingProgramPlugin }> => {
+		return extendClient(client, {
 			vestingProgram: <VestingProgramPlugin> {
 				accounts: {
 					vestingState: addSelfFetchFunctions(client, getVestingStateCodec()),
@@ -198,7 +204,10 @@ export function vestingProgramProgram() {
 						addSelfPlanAndSendFunctions(client, getCancelInstruction(input)),
 				},
 				pdas: { vesting: findVestingPda },
+				identifyAccount: identifyVestingProgramAccount,
+				identifyInstruction: identifyVestingProgramInstruction,
+				parseInstruction: parseVestingProgramInstruction,
 			},
-		};
+		});
 	};
 }

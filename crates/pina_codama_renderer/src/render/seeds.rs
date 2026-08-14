@@ -1,5 +1,6 @@
+use codama_nodes::ConstantPdaSeedValue;
 use codama_nodes::CountNode;
-use codama_nodes::Endian;
+use codama_nodes::Endianness;
 use codama_nodes::HasKind;
 use codama_nodes::NestedTypeNodeTrait;
 use codama_nodes::Number;
@@ -28,7 +29,7 @@ pub(crate) fn render_variable_seed_parameter(
 		TypeNode::Boolean(boolean_type) => {
 			let number_type = boolean_type.size.get_nested_type_node();
 			if !matches!(number_type.format, NumberFormat::U8)
-				|| !matches!(number_type.endian, Endian::Little)
+				|| !matches!(number_type.endian, Endianness::Le)
 			{
 				return Err(RenderError::UnsupportedType {
 					context: context.to_string(),
@@ -39,7 +40,7 @@ pub(crate) fn render_variable_seed_parameter(
 			Ok(("bool".to_string(), format!("&[u8::from({seed_name})]")))
 		}
 		TypeNode::Number(number_type) => {
-			if !matches!(number_type.endian, Endian::Little) {
+			if !matches!(number_type.endian, Endianness::Le) {
 				return Err(RenderError::UnsupportedType {
 					context: context.to_string(),
 					kind: "numberTypeNode",
@@ -83,7 +84,7 @@ pub(crate) fn render_variable_seed_parameter(
 			}
 		}
 		TypeNode::Array(array) => {
-			match &array.count {
+			match array.count.as_ref() {
 				CountNode::Fixed(count) => {
 					let inner = render_type_for_pod(&array.item, context)?;
 					Ok((
@@ -112,22 +113,24 @@ pub(crate) fn render_variable_seed_parameter(
 
 pub(crate) fn render_constant_seed_expression(
 	r#type: &TypeNode,
-	value: &ValueNode,
+	value: &ConstantPdaSeedValue,
 	context: &str,
 	primary_program_const: &str,
 ) -> Result<String> {
 	match value {
-		ValueNode::String(string_value) => Ok(format!("{:?}.as_bytes()", string_value.string)),
-		ValueNode::Number(number_value) => {
+		ConstantPdaSeedValue::String(string_value) => {
+			Ok(format!("{:?}.as_bytes()", string_value.string))
+		}
+		ConstantPdaSeedValue::Number(number_value) => {
 			render_number_seed_expression(r#type, &number_value.number, context)
 		}
-		ValueNode::PublicKey(public_key_value) => {
+		ConstantPdaSeedValue::PublicKey(public_key_value) => {
 			Ok(format!(
 				"solana_pubkey::pubkey!(\"{}\").as_ref()",
 				public_key_value.public_key
 			))
 		}
-		ValueNode::Constant(constant_value) => {
+		ConstantPdaSeedValue::Constant(constant_value) => {
 			match constant_value.value.as_ref() {
 				ValueNode::String(string_value) => {
 					Ok(format!("{:?}.as_bytes()", string_value.string))
@@ -148,7 +151,7 @@ pub(crate) fn render_constant_seed_expression(
 				}
 			}
 		}
-		ValueNode::Bytes(bytes_value) => {
+		ConstantPdaSeedValue::Bytes(bytes_value) => {
 			if matches!(bytes_value.encoding, codama_nodes::BytesEncoding::Utf8) {
 				Ok(format!("{:?}.as_bytes()", bytes_value.data))
 			} else {
@@ -184,7 +187,7 @@ pub(crate) fn render_number_seed_expression(
 			reason: "numeric seed value requires number type".to_string(),
 		});
 	};
-	if !matches!(number_type.endian, Endian::Little) {
+	if !matches!(number_type.endian, Endianness::Le) {
 		return Err(RenderError::UnsupportedType {
 			context: context.to_string(),
 			kind: "numberTypeNode",

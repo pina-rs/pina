@@ -38,7 +38,7 @@ import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const UPDATE_ROLE_DISCRIMINATOR = 2;
 
-export function getUpdateRoleDiscriminatorBytes() {
+export function getUpdateRoleDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(UPDATE_ROLE_DISCRIMINATOR);
 }
 

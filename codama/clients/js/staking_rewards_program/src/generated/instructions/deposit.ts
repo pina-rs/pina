@@ -38,7 +38,7 @@ import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const DEPOSIT_DISCRIMINATOR = 2;
 
-export function getDepositDiscriminatorBytes() {
+export function getDepositDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(DEPOSIT_DISCRIMINATOR);
 }
 

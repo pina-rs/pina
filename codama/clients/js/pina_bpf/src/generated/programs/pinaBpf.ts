@@ -11,6 +11,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithData,
@@ -79,7 +81,11 @@ export function parsePinaBpfInstruction<TProgram extends string>(
 	}
 }
 
-export type PinaBpfPlugin = { instructions: PinaBpfPluginInstructions };
+export type PinaBpfPlugin = {
+	instructions: PinaBpfPluginInstructions;
+	identifyInstruction: typeof identifyPinaBpfInstruction;
+	parseInstruction: typeof parsePinaBpfInstruction;
+};
 
 export type PinaBpfPluginInstructions = {
 	hello: (
@@ -92,15 +98,18 @@ export type PinaBpfPluginRequirements =
 	& ClientWithTransactionSending;
 
 export function pinaBpfProgram() {
-	return <T extends PinaBpfPluginRequirements>(client: T) => {
-		return {
-			...client,
+	return <T extends PinaBpfPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { pinaBpf: PinaBpfPlugin }> => {
+		return extendClient(client, {
 			pinaBpf: <PinaBpfPlugin> {
 				instructions: {
 					hello: (input) =>
 						addSelfPlanAndSendFunctions(client, getHelloInstruction(input)),
 				},
+				identifyInstruction: identifyPinaBpfInstruction,
+				parseInstruction: parsePinaBpfInstruction,
 			},
-		};
+		});
 	};
 }
