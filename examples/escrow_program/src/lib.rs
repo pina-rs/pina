@@ -193,15 +193,14 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 
 		// Transfer tokens to vault
 		let decimals = self.mint_a.as_token_mint()?.decimals();
-		token_2022::instructions::TransferChecked {
-			from: self.maker_ata_a,
-			to: self.vault,
-			authority: self.maker,
-			amount: args.amount_a.into(),
-			mint: self.mint_a,
+		token_2022::instructions::TransferChecked::new(
+			self.maker_ata_a,
+			self.mint_a,
+			self.vault,
+			self.maker,
+			args.amount_a.into(),
 			decimals,
-			token_program: self.token_program.address(),
-		}
+		)
 		.invoke()?;
 
 		Ok(())
@@ -312,15 +311,14 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		.invoke()?;
 
 		// Transfer token B from taker to maker
-		token_2022::instructions::TransferChecked {
-			from: self.taker_ata_b,
-			mint: self.mint_b,
-			to: self.maker_ata_b,
-			authority: self.taker,
-			amount: u64::from(amount_b),
-			decimals: self.mint_b.as_token_2022_mint()?.decimals(),
-			token_program: self.token_program.address(),
-		}
+		token_2022::instructions::TransferChecked::new(
+			self.taker_ata_b,
+			self.mint_b,
+			self.maker_ata_b,
+			self.taker,
+			u64::from(amount_b),
+			self.mint_b.as_token_2022_mint()?.decimals(),
+		)
 		.invoke()?;
 
 		// Prepare escrow signer for vault operations
@@ -331,25 +329,19 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		let signers = [escrow_signer];
 
 		// Transfer token A from vault to taker
-		token_2022::instructions::TransferChecked {
-			from: self.vault,
-			mint: self.mint_a,
-			to: self.taker_ata_a,
-			authority: self.escrow,
-			amount: self.vault.as_token_2022_account()?.amount(),
-			decimals: self.mint_a.as_token_2022_mint()?.decimals(),
-			token_program: self.token_program.address(),
-		}
+		token_2022::instructions::TransferChecked::new(
+			self.vault,
+			self.mint_a,
+			self.taker_ata_a,
+			self.escrow,
+			self.vault.as_token_2022_account()?.amount(),
+			self.mint_a.as_token_2022_mint()?.decimals(),
+		)
 		.invoke_signed(&signers)?;
 
 		// Close vault account
-		token_2022::instructions::CloseAccount {
-			account: self.vault,
-			destination: self.maker,
-			authority: self.escrow,
-			token_program: self.token_program.address(),
-		}
-		.invoke_signed(&signers)?;
+		token_2022::instructions::CloseAccount::new(self.vault, self.maker, self.escrow)
+			.invoke_signed(&signers)?;
 
 		// Zero out escrow state and close
 		self.escrow.as_account_mut::<EscrowState>(&ID)?.zeroed();
