@@ -17,8 +17,8 @@ pub enum WideDiscriminator {
 const _: () = {
     ::core::assert!(
         ::core::mem::size_of:: < u16 > () <= ::pina::MAX_DISCRIMINATOR_SPACE,
-        concat!("A discriminator with primitive `", stringify!(u16),
-        "` exceeds `MAX_DISCRIMINATOR_SPACE` and cannot be safely used for zero-copy layouts.")
+        concat!("A discriminator with primitive `", stringify!(u16), "` (", "2",
+        " bytes) exceeds `MAX_DISCRIMINATOR_SPACE` and cannot be safely used for zero-copy layouts. Supported primitives: `u8`, `u16`, `u32`, `u64`.")
     );
 };
 impl ::core::convert::From<WideDiscriminator> for u16 {

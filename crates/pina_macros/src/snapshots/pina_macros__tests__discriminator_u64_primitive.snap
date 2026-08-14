@@ -17,8 +17,8 @@ pub enum HugeDiscriminator {
 const _: () = {
     ::core::assert!(
         ::core::mem::size_of:: < u64 > () <= ::pina::MAX_DISCRIMINATOR_SPACE,
-        concat!("A discriminator with primitive `", stringify!(u64),
-        "` exceeds `MAX_DISCRIMINATOR_SPACE` and cannot be safely used for zero-copy layouts.")
+        concat!("A discriminator with primitive `", stringify!(u64), "` (", "8",
+        " bytes) exceeds `MAX_DISCRIMINATOR_SPACE` and cannot be safely used for zero-copy layouts. Supported primitives: `u8`, `u16`, `u32`, `u64`.")
     );
 };
 impl ::core::convert::From<HugeDiscriminator> for u64 {
