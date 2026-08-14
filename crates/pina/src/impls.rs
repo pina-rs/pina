@@ -600,17 +600,33 @@ impl_account_validation!(
 	"Token account data is invalid"
 );
 
+/// Length requirement for token account data.
+#[cfg(feature = "token")]
+#[derive(Clone, Copy)]
+enum LengthRequirement {
+	/// The account data must be exactly this length (SPL token).
+	Exact(usize),
+	/// The account data must be at least this length (token-2022, which
+	/// appends extension data after the base layout).
+	AtLeast(usize),
+}
+
 #[cfg(feature = "token")]
 #[track_caller]
 fn load_token_state<'a, T: ?Sized>(
 	account: &'a AccountView,
 	owners: &[Address],
-	minimum_len: usize,
+	length: LengthRequirement,
 	from_bytes: unsafe fn(&[u8]) -> &T,
 ) -> Result<Ref<'a, T>, ProgramError> {
 	account.assert_owners(owners)?;
 
-	if account.data_len() < minimum_len {
+	let data_len = account.data_len();
+	let valid_len = match length {
+		LengthRequirement::Exact(len) => data_len == len,
+		LengthRequirement::AtLeast(len) => data_len >= len,
+	};
+	if !valid_len {
 		log!(
 			"address: {} has an incorrect length",
 			account.address().as_ref()
@@ -622,10 +638,10 @@ fn load_token_state<'a, T: ?Sized>(
 
 	let bytes = account.try_borrow()?;
 	let state = AccountRef::map(bytes, |data| {
-		// SAFETY: the base layout length was validated above, the allowed owner
-		// set was validated above, and the returned borrow guard keeps the
-		// underlying runtime borrow alive for the entire lifetime of the typed
-		// access.
+		// SAFETY: the length requirement was validated above (exact for SPL
+		// token, minimum for token-2022), the allowed owner set was validated
+		// above, and the returned borrow guard keeps the underlying runtime
+		// borrow alive for the entire lifetime of the typed access.
 		unsafe { from_bytes(data) }
 	});
 
@@ -652,7 +668,7 @@ impl AsTokenAccount for AccountView {
 		load_token_state(
 			self,
 			owners,
-			crate::token::state::Mint::LEN,
+			LengthRequirement::Exact(crate::token::state::Mint::LEN),
 			crate::token::state::Mint::from_bytes_unchecked,
 		)
 	}
@@ -677,7 +693,7 @@ impl AsTokenAccount for AccountView {
 		load_token_state(
 			self,
 			owners,
-			crate::token::state::TokenAccount::LEN,
+			LengthRequirement::Exact(crate::token::state::TokenAccount::LEN),
 			crate::token::state::TokenAccount::from_bytes_unchecked,
 		)
 	}
@@ -702,7 +718,7 @@ impl AsTokenAccount for AccountView {
 		load_token_state(
 			self,
 			owners,
-			crate::token_2022::state::Mint::BASE_LEN,
+			LengthRequirement::AtLeast(crate::token_2022::state::Mint::BASE_LEN),
 			crate::token_2022::state::Mint::from_bytes_unchecked,
 		)
 	}
@@ -729,7 +745,7 @@ impl AsTokenAccount for AccountView {
 		load_token_state(
 			self,
 			owners,
-			crate::token_2022::state::TokenAccount::BASE_LEN,
+			LengthRequirement::AtLeast(crate::token_2022::state::TokenAccount::BASE_LEN),
 			crate::token_2022::state::TokenAccount::from_bytes_unchecked,
 		)
 	}
@@ -744,10 +760,13 @@ impl AsTokenAccount for AccountView {
 		let owners = [*token_program];
 		let account = self.assert_associated_token_address(owner, mint, token_program)?;
 
+		// The associated token account may be owned by either the SPL token
+		// program or token-2022; token-2022 accounts can carry extension data
+		// after the base layout, so only a minimum length is enforced.
 		load_token_state(
 			account,
 			&owners,
-			crate::token::state::TokenAccount::LEN,
+			LengthRequirement::AtLeast(crate::token::state::TokenAccount::LEN),
 			crate::token::state::TokenAccount::from_bytes_unchecked,
 		)
 	}
