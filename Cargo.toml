@@ -101,8 +101,8 @@ pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }
 pinocchio-memo = { default-features = false, version = "^0.4" }
 pinocchio-system = { default-features = false, version = "^0.6" }
-pinocchio-token = { default-features = false, version = "^0.6" }
-pinocchio-token-2022 = { default-features = false, version = "^0.3" }
+pinocchio-token = { default-features = false, version = "^0.7" }
+pinocchio-token-2022 = { default-features = false, version = "^0.4" }
 prettyplease = { default-features = false, version = "^0.2" }
 proc-macro2 = { default-features = false, version = "^1" }
 proptest = { default-features = false, version = "^1", features = ["std"] }
