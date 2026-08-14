@@ -85,6 +85,10 @@ in
     CXX = "${llvm.clang}/bin/clang++";
     PROTOC = "${pkgs.protobuf}/bin/protoc";
     LD_LIBRARY_PATH = "${config.env.DEVENV_PROFILE}/lib";
+    # Single source of truth for the BPF/SBF Rust toolchain pin. The
+    # compute-units workflow and the profile script read this instead of
+    # hardcoding the version themselves.
+    PINA_BPF_TOOLCHAIN = "nightly-2025-11-20";
   };
 
   # Rely on the global sdk for now as the nix apple sdk is not working for me.
@@ -461,7 +465,8 @@ in
         # Blueshift's upstream-gallery-21 linker is LLVM 21-based.
         # Build the BPF artifact with a Rust toolchain that also uses LLVM 21
         # to avoid producer/reader attribute mismatches at link time.
-        BPF_TOOLCHAIN="nightly-2025-11-20"
+        # The toolchain version is pinned once in the env section above.
+        BPF_TOOLCHAIN="$PINA_BPF_TOOLCHAIN"
         if ! rustup toolchain list | grep -q "^$BPF_TOOLCHAIN"; then
           rustup toolchain install "$BPF_TOOLCHAIN" --profile minimal --component rust-src
         else
