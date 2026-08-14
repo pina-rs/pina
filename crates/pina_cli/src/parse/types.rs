@@ -1,3 +1,4 @@
+use codama_nodes::ArrayTypeNode;
 use codama_nodes::BooleanTypeNode;
 use codama_nodes::BytesTypeNode;
 use codama_nodes::FixedSizeTypeNode;
@@ -5,6 +6,7 @@ use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
 use codama_nodes::PublicKeyTypeNode;
 use codama_nodes::TypeNode;
+use quote::ToTokens;
 
 /// Map a Rust type name (as it appears in pina structs) to a Codama
 /// `TypeNode`.
@@ -26,12 +28,88 @@ pub fn rust_type_to_codama(ty: &str) -> TypeNode {
 			// Handle fixed-size byte arrays like [u8; 32]
 			if let Some(size) = parse_byte_array(ty) {
 				FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), size).into()
+			} else if let Some(node) = parse_pod_collection(ty) {
+				node
 			} else {
 				// Fallback: treat unknown types as public keys (common for
 				// address-like types)
 				PublicKeyTypeNode::new().into()
 			}
 		}
+	}
+}
+
+/// Parse a `PodString<N, PFX>` or `PodVec<T, N, PFX>` type into a fixed-size
+/// Codama node.
+///
+/// - `PodString<N, PFX = 1>` maps to `FixedSizeTypeNode(BytesTypeNode, N + PFX)`:
+///   the length prefix plus the UTF-8 payload, laid out inline.
+/// - `PodVec<T, N, PFX = 2>` maps to `ArrayTypeNode(T, N)`: a fixed-size
+///   array of `N` elements (the length prefix is implicit in the fixed
+///   capacity).
+///
+/// Returns `None` for non-collection types or unparseable arguments.
+fn parse_pod_collection(ty: &str) -> Option<TypeNode> {
+	let (name, args) = parse_generic_args(ty)?;
+	match name.as_str() {
+		"PodString" => {
+			let n: usize = args.first()?.parse().ok()?;
+			let pfx: usize = match args.get(1) {
+				Some(s) => s.parse().ok()?,
+				None => 1,
+			};
+			Some(FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), n + pfx).into())
+		}
+		"PodVec" => {
+			let item = rust_type_to_codama(args.first()?);
+			let n: usize = args.get(1)?.parse().ok()?;
+			// A bare fixed-size array: the renderer emits `[T; N]` directly.
+			Some(ArrayTypeNode::fixed(item, n).into())
+		}
+		_ => None,
+	}
+}
+
+/// Split a generic type string like `PodVec<PodU64, 8, 2>` into its base name
+/// and top-level arguments.
+fn parse_generic_args(ty: &str) -> Option<(String, Vec<String>)> {
+	let open = ty.find('<')?;
+	let close = ty.rfind('>')?;
+	if close < open {
+		return None;
+	}
+	let name = ty[..open].trim().to_owned();
+	let inner = &ty[open + 1..close];
+
+	let mut args = Vec::new();
+	let mut depth = 0usize;
+	let mut start = 0usize;
+	for (i, c) in inner.char_indices() {
+		match c {
+			'<' | '(' | '[' => depth += 1,
+			'>' | ')' | ']' => depth = depth.saturating_sub(1),
+			',' if depth == 0 => {
+				args.push(inner[start..i].trim().to_owned());
+				start = i + 1;
+			}
+			_ => {}
+		}
+	}
+	args.push(inner[start..].trim().to_owned());
+
+	if args.iter().any(String::is_empty) {
+		return None;
+	}
+	Some((name, args))
+}
+
+/// Render a single generic argument (type, const, or lifetime) as a string.
+fn generic_arg_to_string(arg: &syn::GenericArgument) -> String {
+	match arg {
+		syn::GenericArgument::Type(t) => type_to_string(t),
+		syn::GenericArgument::Const(e) => e.to_token_stream().to_string(),
+		syn::GenericArgument::Lifetime(lt) => lt.ident.to_string(),
+		_ => "unknown".to_owned(),
 	}
 }
 
@@ -51,9 +129,22 @@ fn parse_byte_array(ty: &str) -> Option<usize> {
 pub fn type_to_string(ty: &syn::Type) -> String {
 	match ty {
 		syn::Type::Path(p) => {
-			// Use the last segment (e.g. `PodU64` from `pina::PodU64`)
+			// Use the last segment (e.g. `PodU64` from `pina::PodU64`),
+			// preserving generic arguments (e.g. `PodString<32>`, `PodVec<
+			// PodU64, 8>`) so collection types keep their capacity parameters
+			// for IDL extraction.
 			if let Some(seg) = p.path.segments.last() {
-				seg.ident.to_string()
+				let mut s = seg.ident.to_string();
+				if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
+					let inner = args
+						.args
+						.iter()
+						.map(generic_arg_to_string)
+						.collect::<Vec<_>>()
+						.join(", ");
+					s = format!("{s}<{inner}>");
+				}
+				s
 			} else {
 				"unknown".to_owned()
 			}
@@ -116,5 +207,54 @@ mod tests {
 		let expected: TypeNode =
 			FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 32).into();
 		assert_eq!(ty, expected);
+	}
+
+	#[test]
+	fn maps_pod_string() {
+		// PodString<32> = 1 length byte + 32 payload bytes.
+		let ty = rust_type_to_codama("PodString<32>");
+		let expected: TypeNode =
+			FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 33).into();
+		assert_eq!(ty, expected);
+	}
+
+	#[test]
+	fn maps_pod_string_with_explicit_prefix() {
+		// PodString<64, 2> = 2 length bytes + 64 payload bytes.
+		let ty = rust_type_to_codama("PodString<64, 2>");
+		let expected: TypeNode =
+			FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 66).into();
+		assert_eq!(ty, expected);
+	}
+
+	#[test]
+	fn maps_pod_vec() {
+		// PodVec<PodU64, 8> = 8 × 8-byte elements.
+		let ty = rust_type_to_codama("PodVec<PodU64, 8>");
+		let expected: TypeNode =
+			ArrayTypeNode::fixed(NumberTypeNode::le(NumberFormat::U64), 8).into();
+		assert_eq!(ty, expected);
+	}
+
+	#[test]
+	fn maps_pod_vec_with_explicit_prefix() {
+		// PodVec<PodU16, 4, 1> = 4 × 2-byte elements.
+		let ty = rust_type_to_codama("PodVec<PodU16, 4, 1>");
+		let expected: TypeNode =
+			ArrayTypeNode::fixed(NumberTypeNode::le(NumberFormat::U16), 4).into();
+		assert_eq!(ty, expected);
+	}
+
+	#[test]
+	fn type_to_string_preserves_generics() {
+		let ty: syn::Type = syn::parse_str("PodString<32>").unwrap_or_else(|e| panic!("{e}"));
+		assert_eq!(type_to_string(&ty), "PodString<32>");
+
+		let ty: syn::Type =
+			syn::parse_str("pina::PodVec<PodU64, 8>").unwrap_or_else(|e| panic!("{e}"));
+		assert_eq!(type_to_string(&ty), "PodVec<PodU64, 8>");
+
+		let ty: syn::Type = syn::parse_str("PodU64").unwrap_or_else(|e| panic!("{e}"));
+		assert_eq!(type_to_string(&ty), "PodU64");
 	}
 }
