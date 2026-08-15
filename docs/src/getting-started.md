@@ -17,6 +17,14 @@ install:all
 
 <!-- {/devEnvironmentSetupCommands} -->
 
+You can also scaffold a new project directly with the CLI:
+
+```bash
+pina init my_program
+```
+
+See `pina init --help` for options like `--path` and `--force`.
+
 If `pnpm-workspace.yaml` sets `useNodeVersion`, `devenv shell` activates the matching pnpm-managed `node`/`npm`/`npx`/`corepack` toolchain automatically.
 
 ## Build and test
