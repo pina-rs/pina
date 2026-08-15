@@ -150,51 +150,83 @@ pub trait AccountValidation {
 /// let vault = &accounts[1];
 /// vault.assert_seeds(&[b"vault", authority.address().as_ref()], &program_id)?;
 /// ```
-pub trait AccountInfoValidation: Sized {
+pub trait AccountInfoValidation {
 	/// Assert that the account is a signer.
-	fn assert_signer(self) -> Result<Self, ProgramError>;
+	fn assert_signer(self) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is writable.
-	fn assert_writable(self) -> Result<Self, ProgramError>;
+	fn assert_writable(self) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is executable.
-	fn assert_executable(self) -> Result<Self, ProgramError>;
+	fn assert_executable(self) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the data held by the account is of the specified length.
-	fn assert_data_len(self, len: usize) -> Result<Self, ProgramError>;
+	fn assert_data_len(self, len: usize) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is empty.
-	fn assert_empty(self) -> Result<Self, ProgramError>;
+	fn assert_empty(self) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is not empty.
-	fn assert_not_empty(self) -> Result<Self, ProgramError>;
+	fn assert_not_empty(self) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is of the type provided.
-	fn assert_type<T: HasDiscriminator>(self, program_id: &Address) -> Result<Self, ProgramError>;
+	fn assert_type<T: HasDiscriminator>(self, program_id: &Address) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is a program.
-	fn assert_program(self, program_id: &Address) -> Result<Self, ProgramError>;
+	fn assert_program(self, program_id: &Address) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is a system variable.
-	fn assert_sysvar(self, sysvar_id: &Address) -> Result<Self, ProgramError>;
+	fn assert_sysvar(self, sysvar_id: &Address) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account has the address provided.
-	fn assert_address(self, address: &Address) -> Result<Self, ProgramError>;
+	fn assert_address(self, address: &Address) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account has any of the address provided.
-	fn assert_addresses(self, addresses: &[Address]) -> Result<Self, ProgramError>;
+	fn assert_addresses(self, addresses: &[Address]) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is owned by the address provided.
-	fn assert_owner(self, owner: &Address) -> Result<Self, ProgramError>;
+	fn assert_owner(self, owner: &Address) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is owned by one of the owner (program) ids
 	/// provided.
-	fn assert_owners(self, owners: &[Address]) -> Result<Self, ProgramError>;
+	fn assert_owners(self, owners: &[Address]) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account has the seeds provided and uses the canonical
 	/// bump.
-	fn assert_seeds(self, seeds: &[&[u8]], program_id: &Address) -> Result<Self, ProgramError>;
+	fn assert_seeds(self, seeds: &[&[u8]], program_id: &Address) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account matches a PDA derived from the provided seed
 	/// array, where the bump byte is already included in `seeds`.
 	fn assert_seeds_with_bump(
 		self,
 		seeds: &[&[u8]],
 		program_id: &Address,
-	) -> Result<Self, ProgramError>;
+	) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account uses the canonical bump for the seeds provided.
 	/// Returns the bump.
 	fn assert_canonical_bump(
 		self,
 		seeds: &[&[u8]],
 		program_id: &Address,
-	) -> Result<u8, ProgramError>;
+	) -> Result<u8, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account address matches the associated token address
 	/// derived from `wallet`, `mint`, and `token_program`.
 	#[cfg(feature = "token")]
@@ -203,7 +235,9 @@ pub trait AccountInfoValidation: Sized {
 		wallet: &Address,
 		mint: &Address,
 		token_program: &Address,
-	) -> Result<Self, ProgramError>;
+	) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 }
 
 macro_rules! primitive_into_discriminator {
@@ -610,7 +644,13 @@ pub trait CloseAccountWithRecipient {
 	/// This helper clears the existing data region in-place before calling
 	/// [`Self::close_with_recipient`]. It does not implicitly reallocate the
 	/// account, even when the `account-resize` feature is enabled.
-	fn close_account_zeroed(&mut self, recipient: &mut AccountView) -> ProgramResult;
+	///
+	/// The default implementation delegates to [`Self::close_with_recipient`]
+	/// without clearing the data region. Implementors that need stale bytes
+	/// cleared before close should override this method.
+	fn close_account_zeroed(&mut self, recipient: &mut AccountView) -> ProgramResult {
+		self.close_with_recipient(recipient)
+	}
 }
 
 /// Cursor for parsing instruction accounts exactly once.
