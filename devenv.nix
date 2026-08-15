@@ -860,7 +860,9 @@ in
     "security:deny" = {
       exec = ''
         set -euo pipefail
-        cargo-deny check --config "$DEVENV_ROOT/deny.toml" bans licenses sources
+        # cargo-deny 0.20+ auto-discovers deny.toml from the working directory;
+        # the --config flag was removed from the CLI.
+        cargo-deny check bans licenses sources
       '';
       description = "Run cargo-deny checks (bans, licenses, sources).";
       binary = "bash";
