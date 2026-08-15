@@ -1,5 +1,5 @@
 ---
-type: note
+pina: feat
 ---
 
 Add fuzz harness infrastructure for pina-rs targeting `AccountDeserialize::try_from_bytes` and `parse_instruction`.

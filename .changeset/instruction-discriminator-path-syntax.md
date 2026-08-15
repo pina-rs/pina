@@ -1,6 +1,6 @@
 ---
-pina_macros: minor
-pina_cli: patch
+pina_macros: feat
+pina_cli: fix
 ---
 
 Support `discriminator = Enum::Variant` in the `#[instruction]`, `#[account]`, and `#[event]` attribute macros, replacing the separate `variant = Variant` argument.
