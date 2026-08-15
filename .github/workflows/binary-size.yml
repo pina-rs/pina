@@ -27,7 +27,6 @@ jobs:
 
       - name: build SBF programs
         run: |
-          rm -rf .bin/rust-nightly/sbpf-linker
           cargo bin --install
           cargo build-bpf
         shell: devenv shell -- bash -e {0}
