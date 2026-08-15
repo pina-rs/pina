@@ -11,6 +11,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithData,
@@ -116,6 +118,8 @@ export function parseAnchorEventsInstruction<TProgram extends string>(
 
 export type AnchorEventsPlugin = {
 	instructions: AnchorEventsPluginInstructions;
+	identifyInstruction: typeof identifyAnchorEventsInstruction;
+	parseInstruction: typeof parseAnchorEventsInstruction;
 };
 
 export type AnchorEventsPluginInstructions = {
@@ -135,9 +139,10 @@ export type AnchorEventsPluginRequirements =
 	& ClientWithTransactionSending;
 
 export function anchorEventsProgram() {
-	return <T extends AnchorEventsPluginRequirements>(client: T) => {
-		return {
-			...client,
+	return <T extends AnchorEventsPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { anchorEvents: AnchorEventsPlugin }> => {
+		return extendClient(client, {
 			anchorEvents: <AnchorEventsPlugin> {
 				instructions: {
 					initialize: (input) =>
@@ -153,7 +158,9 @@ export function anchorEventsProgram() {
 							getTestEventCpiInstruction(input),
 						),
 				},
+				identifyInstruction: identifyAnchorEventsInstruction,
+				parseInstruction: parseAnchorEventsInstruction,
 			},
-		};
+		});
 	};
 }

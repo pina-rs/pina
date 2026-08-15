@@ -12,12 +12,13 @@ import {
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type ReadonlyUint8Array,
 } from "@solana/kit";
 import { ANCHOR_EVENTS_PROGRAM_ADDRESS } from "../programs";
 
 export const TEST_EVENT_CPI_DISCRIMINATOR = 2;
 
-export function getTestEventCpiDiscriminatorBytes() {
+export function getTestEventCpiDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(TEST_EVENT_CPI_DISCRIMINATOR);
 }
 

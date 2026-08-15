@@ -10,7 +10,7 @@ use codama_nodes::InstructionAccountNode;
 use codama_nodes::InstructionArgumentNode;
 use codama_nodes::InstructionInputValueNode;
 use codama_nodes::InstructionNode;
-use codama_nodes::IsAccountSigner;
+use codama_nodes::IsSigner;
 use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
 use codama_nodes::NumberValueNode;
@@ -113,23 +113,23 @@ fn build_instruction_account_node(
 	pdas: &[PdaIr],
 ) -> InstructionAccountNode {
 	let is_signer = if account.is_signer {
-		IsAccountSigner::True
+		IsSigner::True
 	} else {
-		IsAccountSigner::False
+		IsSigner::False
 	};
 
 	let mut node =
 		InstructionAccountNode::new(account.name.as_str(), account.is_writable, is_signer);
-	node.is_optional = account.is_optional;
+	node.is_optional = Some(account.is_optional);
 
 	if !account.docs.is_empty() {
 		node.docs = account.docs.clone().into();
 	}
 
 	if let Some(default_value) = &account.default_value {
-		node.default_value = Some(build_default_value(default_value));
+		node.default_value = Box::new(Some(build_default_value(default_value)));
 	} else if let Some(default_value) = build_pda_default_value(account, instruction, pdas) {
-		node.default_value = Some(default_value);
+		node.default_value = Box::new(Some(default_value));
 	}
 
 	node
@@ -161,7 +161,10 @@ fn build_pda_default_value(
 				return None;
 			}
 
-			PdaSeedValueNode::new(name.as_str(), AccountValueNode::new(name.as_str()))
+			PdaSeedValueNode {
+				name: name.as_str().into(),
+				value: Box::new(AccountValueNode::new(name.as_str()).into()),
+			}
 		} else {
 			return None;
 		};
@@ -169,7 +172,7 @@ fn build_pda_default_value(
 		seed_values.push(value);
 	}
 
-	Some(InstructionInputValueNode::Pda(PdaValueNode::new(
+	Some(InstructionInputValueNode::PdaValue(PdaValueNode::new(
 		PdaLinkNode::new(pda_name.as_str()),
 		seed_values,
 	)))
@@ -178,7 +181,7 @@ fn build_pda_default_value(
 fn build_default_value(default_value: &DefaultValueIr) -> InstructionInputValueNode {
 	match default_value {
 		DefaultValueIr::ProgramId(addr) | DefaultValueIr::PublicKey(addr) => {
-			InstructionInputValueNode::PublicKey(PublicKeyValueNode::new(addr.as_str()))
+			InstructionInputValueNode::PublicKeyValue(PublicKeyValueNode::new(addr.as_str()))
 		}
 	}
 }
@@ -250,7 +253,7 @@ fn build_pda_node(pda: &PdaIr) -> PdaNode {
 fn build_error_node(error: &ErrorIr) -> ErrorNode {
 	let message = error.docs.first().cloned().unwrap_or_default();
 
-	let mut node = ErrorNode::new(error.name.as_str(), error.code as usize, message);
+	let mut node = ErrorNode::new(error.name.as_str(), error.code, message);
 
 	if !error.docs.is_empty() {
 		node.docs = error.docs.clone().into();
@@ -262,8 +265,8 @@ fn build_error_node(error: &ErrorIr) -> ErrorNode {
 #[cfg(test)]
 mod tests {
 	use codama_nodes::InstructionInputValueNode;
-	use codama_nodes::PdaSeedValueValueNode;
-	use codama_nodes::PdaValue;
+	use codama_nodes::PdaSeedValueValue;
+	use codama_nodes::PdaValuePda;
 
 	use super::*;
 
@@ -321,17 +324,19 @@ mod tests {
 
 		let root = ir_to_root_node(&ir);
 		let account = &root.program.instructions[0].accounts[1];
-		let Some(InstructionInputValueNode::Pda(default_value)) = &account.default_value else {
+		let Some(InstructionInputValueNode::PdaValue(default_value)) =
+			account.default_value.as_ref()
+		else {
 			panic!("expected PDA account default");
 		};
 
 		assert!(
-			matches!(&default_value.pda, PdaValue::Linked(link) if link.name.as_ref() == "state")
+			matches!(default_value.pda.as_ref(), PdaValuePda::PdaLink(link) if link.name.as_ref() == "state")
 		);
 		assert_eq!(default_value.seeds.len(), 1);
 		assert!(matches!(
-			&default_value.seeds[0].value,
-			PdaSeedValueValueNode::Account(account) if account.name.as_ref() == "authority"
+			default_value.seeds[0].value.as_ref(),
+			PdaSeedValueValue::Account(account) if account.name.as_ref() == "authority"
 		));
 	}
 }

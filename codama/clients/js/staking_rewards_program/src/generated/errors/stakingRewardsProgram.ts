@@ -30,7 +30,7 @@ export type StakingRewardsProgramError =
 let stakingRewardsProgramErrorMessages:
 	| Record<StakingRewardsProgramError, string>
 	| undefined;
-if (process.env.NODE_ENV !== "production") {
+if (process.env["NODE_ENV"] !== "production") {
 	stakingRewardsProgramErrorMessages = {
 		[STAKING_REWARDS_PROGRAM_ERROR__INSUFFICIENT_BALANCE]: ``,
 		[STAKING_REWARDS_PROGRAM_ERROR__INVALID_AMOUNT]: ``,
@@ -43,7 +43,7 @@ if (process.env.NODE_ENV !== "production") {
 export function getStakingRewardsProgramErrorMessage(
 	code: StakingRewardsProgramError,
 ): string {
-	if (process.env.NODE_ENV !== "production") {
+	if (process.env["NODE_ENV"] !== "production") {
 		return (stakingRewardsProgramErrorMessages as Record<
 			StakingRewardsProgramError,
 			string

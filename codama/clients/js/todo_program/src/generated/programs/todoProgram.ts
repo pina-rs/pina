@@ -13,6 +13,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
@@ -151,6 +153,9 @@ export type TodoProgramPlugin = {
 	accounts: TodoProgramPluginAccounts;
 	instructions: TodoProgramPluginInstructions;
 	pdas: TodoProgramPluginPdas;
+	identifyAccount: typeof identifyTodoProgramAccount;
+	identifyInstruction: typeof identifyTodoProgramInstruction;
+	parseInstruction: typeof parseTodoProgramInstruction;
 };
 
 export type TodoProgramPluginAccounts = {
@@ -185,9 +190,10 @@ export type TodoProgramPluginRequirements =
 	& ClientWithTransactionSending;
 
 export function todoProgramProgram() {
-	return <T extends TodoProgramPluginRequirements>(client: T) => {
-		return {
-			...client,
+	return <T extends TodoProgramPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { todoProgram: TodoProgramPlugin }> => {
+		return extendClient(client, {
 			todoProgram: <TodoProgramPlugin> {
 				accounts: {
 					todoState: addSelfFetchFunctions(client, getTodoStateCodec()),
@@ -210,7 +216,10 @@ export function todoProgramProgram() {
 						),
 				},
 				pdas: { todo: findTodoPda },
+				identifyAccount: identifyTodoProgramAccount,
+				identifyInstruction: identifyTodoProgramInstruction,
+				parseInstruction: parseTodoProgramInstruction,
 			},
-		};
+		});
 	};
 }

@@ -9,9 +9,9 @@
 	"keywords": [],
 	"author": "",
 	"peerDependencies": {
-		"@solana/kit": "^6.1.0"
+		"@solana/kit": "^6.10.0"
 	},
 	"dependencies": {
-		"@solana/program-client-core": "^6.1.0"
+		"@solana/program-client-core": "^6.10.0"
 	}
 }

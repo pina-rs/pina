@@ -25,7 +25,7 @@ test("it creates root nodes from a Pina IDL JSON string", () => {
 	expect(root.program.publicKey).toBe(
 		"Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd",
 	);
-	expect(root.program.accounts[0]?.size).toBeDefined();
+	expect(root.program.accounts?.[0]?.size).toBeDefined();
 });
 
 test("it creates root nodes from parsed Pina IDL objects", () => {
@@ -36,7 +36,7 @@ test("it creates root nodes from parsed Pina IDL objects", () => {
 
 	expect(root.kind).toBe("rootNode");
 	expect(root.program.name).toBe("todoProgram");
-	expect(root.program.accounts[0]?.size).toBeDefined();
+	expect(root.program.accounts?.[0]?.size).toBeDefined();
 });
 
 test("it can skip the default visitor", () => {
@@ -47,7 +47,7 @@ test("it can skip the default visitor", () => {
 	);
 
 	expect(root.kind).toBe("rootNode");
-	expect(root.program.accounts[0]?.size).toBeUndefined();
+	expect(root.program.accounts?.[0]?.size).toBeUndefined();
 });
 
 test("it throws on invalid input", () => {

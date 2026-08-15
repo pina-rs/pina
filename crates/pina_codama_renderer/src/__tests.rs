@@ -13,15 +13,15 @@ use codama_nodes::ConstantValueNode;
 use codama_nodes::DefinedTypeNode;
 use codama_nodes::DiscriminatorNode;
 use codama_nodes::Docs;
-use codama_nodes::Endian;
+use codama_nodes::Endianness;
 use codama_nodes::InstructionAccountNode;
 use codama_nodes::InstructionInputValueNode;
 use codama_nodes::InstructionNode;
-use codama_nodes::InstructionOptionalAccountStrategy;
-use codama_nodes::IsAccountSigner;
+use codama_nodes::IsSigner;
 use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
 use codama_nodes::NumberValueNode;
+use codama_nodes::OptionalAccountStrategy;
 use codama_nodes::PdaLinkNode;
 use codama_nodes::PdaNode;
 use codama_nodes::PdaSeedNode;
@@ -145,6 +145,8 @@ fn renders_pda_helpers_for_linked_account() {
 			))],
 		)],
 		errors: vec![],
+		events: vec![],
+		constants: vec![],
 		version: String::new(),
 		origin: None,
 		docs: Docs::default(),
@@ -164,16 +166,18 @@ fn renders_pda_helpers_for_linked_account() {
 #[test]
 fn renders_instruction_account_default_from_pda() {
 	let mut state = InstructionAccountNode::new("state", true, false);
-	state.default_value = Some(InstructionInputValueNode::Pda(PdaValueNode::new(
-		PdaLinkNode::new("statePda"),
-		vec![PdaSeedValueNode::new(
-			"authority",
-			AccountValueNode::new("authority"),
-		)],
+	state.default_value = Box::new(Some(InstructionInputValueNode::PdaValue(
+		PdaValueNode::new(
+			PdaLinkNode::new("statePda"),
+			vec![PdaSeedValueNode {
+				name: "authority".into(),
+				value: Box::new(AccountValueNode::new("authority").into()),
+			}],
+		),
 	)));
 
 	let mut authority = InstructionAccountNode::new("authority", false, true);
-	authority.is_signer = IsAccountSigner::Either;
+	authority.is_signer = IsSigner::Either;
 
 	let program = ProgramNode {
 		name: "defaultProgram".into(),
@@ -182,7 +186,7 @@ fn renders_instruction_account_default_from_pda() {
 		instructions: vec![InstructionNode {
 			name: "initialize".into(),
 			docs: Docs::default(),
-			optional_account_strategy: InstructionOptionalAccountStrategy::ProgramId,
+			optional_account_strategy: Some(OptionalAccountStrategy::ProgramId),
 			accounts: vec![authority, state],
 			arguments: vec![],
 			extra_arguments: vec![],
@@ -194,6 +198,9 @@ fn renders_instruction_account_default_from_pda() {
 			))],
 			status: None,
 			sub_instructions: vec![],
+			provides: vec![],
+			display: None,
+			plugins: vec![],
 		}],
 		defined_types: vec![],
 		pdas: vec![PdaNode::new(
@@ -210,6 +217,8 @@ fn renders_instruction_account_default_from_pda() {
 			],
 		)],
 		errors: vec![],
+		events: vec![],
+		constants: vec![],
 		version: String::new(),
 		origin: None,
 		docs: Docs::default(),
@@ -230,8 +239,8 @@ fn renders_instruction_account_default_from_pda() {
 #[test]
 fn renders_optional_accounts_with_program_fallback_strategy() {
 	let mut optional_signer = InstructionAccountNode::new("optionalSigner", false, false);
-	optional_signer.is_optional = true;
-	optional_signer.is_signer = IsAccountSigner::Either;
+	optional_signer.is_optional = Some(true);
+	optional_signer.is_signer = IsSigner::Either;
 
 	let program = ProgramNode {
 		name: "optionalProgram".into(),
@@ -240,7 +249,7 @@ fn renders_optional_accounts_with_program_fallback_strategy() {
 		instructions: vec![InstructionNode {
 			name: "maybe".into(),
 			docs: Docs::default(),
-			optional_account_strategy: InstructionOptionalAccountStrategy::ProgramId,
+			optional_account_strategy: Some(OptionalAccountStrategy::ProgramId),
 			accounts: vec![optional_signer],
 			arguments: vec![],
 			extra_arguments: vec![],
@@ -252,10 +261,15 @@ fn renders_optional_accounts_with_program_fallback_strategy() {
 			))],
 			status: None,
 			sub_instructions: vec![],
+			provides: vec![],
+			display: None,
+			plugins: vec![],
 		}],
 		defined_types: vec![],
 		pdas: vec![],
 		errors: vec![],
+		events: vec![],
+		constants: vec![],
 		version: String::new(),
 		origin: None,
 		docs: Docs::default(),
@@ -297,6 +311,8 @@ fn rejects_variable_size_strings() {
 		defined_types: vec![],
 		pdas: vec![],
 		errors: vec![],
+		events: vec![],
+		constants: vec![],
 		version: String::new(),
 		origin: None,
 		docs: Docs::default(),
@@ -329,7 +345,8 @@ fn rejects_big_endian_numbers() {
 				"count",
 				NumberTypeNode {
 					format: NumberFormat::U16,
-					endian: Endian::Big,
+					endian: Endianness::Be,
+					display: Box::new(None),
 				},
 			)])
 			.into(),
@@ -343,6 +360,8 @@ fn rejects_big_endian_numbers() {
 		defined_types: vec![],
 		pdas: vec![],
 		errors: vec![],
+		events: vec![],
+		constants: vec![],
 		version: String::new(),
 		origin: None,
 		docs: Docs::default(),
@@ -369,13 +388,16 @@ fn renders_defined_type_aliases_with_pod_wrappers() {
 		defined_types: vec![DefinedTypeNode {
 			name: "counter".into(),
 			docs: Docs::default(),
-			r#type: TypeNode::Number(NumberTypeNode {
+			r#type: Box::new(TypeNode::Number(NumberTypeNode {
 				format: NumberFormat::U64,
-				endian: Endian::Little,
-			}),
+				endian: Endianness::Le,
+				display: Box::new(None),
+			})),
 		}],
 		pdas: vec![],
 		errors: vec![],
+		events: vec![],
+		constants: vec![],
 		version: String::new(),
 		origin: None,
 		docs: Docs::default(),
@@ -400,7 +422,7 @@ fn rejects_missing_instruction_discriminators() {
 		instructions: vec![InstructionNode {
 			name: "doThing".into(),
 			docs: Docs::default(),
-			optional_account_strategy: InstructionOptionalAccountStrategy::ProgramId,
+			optional_account_strategy: Some(OptionalAccountStrategy::ProgramId),
 			accounts: vec![InstructionAccountNode::new("payer", true, true)],
 			arguments: vec![],
 			extra_arguments: vec![],
@@ -409,10 +431,15 @@ fn rejects_missing_instruction_discriminators() {
 			discriminators: vec![],
 			status: None,
 			sub_instructions: vec![],
+			provides: vec![],
+			display: None,
+			plugins: vec![],
 		}],
 		defined_types: vec![],
 		pdas: vec![],
 		errors: vec![],
+		events: vec![],
+		constants: vec![],
 		version: String::new(),
 		origin: None,
 		docs: Docs::default(),
@@ -458,7 +485,8 @@ fn validates_boolean_encoding_for_pda_variable_seed() {
 	let boolean_type = BooleanTypeNode {
 		size: NumberTypeNode {
 			format: NumberFormat::U16,
-			endian: Endian::Little,
+			endian: Endianness::Le,
+			display: Box::new(None),
 		}
 		.into(),
 	};

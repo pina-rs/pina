@@ -31,11 +31,12 @@ import {
 	getU8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
 } from "@solana/kit";
 
 export const REGISTRY_CONFIG_DISCRIMINATOR = 1;
 
-export function getRegistryConfigDiscriminatorBytes() {
+export function getRegistryConfigDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(REGISTRY_CONFIG_DISCRIMINATOR);
 }
 

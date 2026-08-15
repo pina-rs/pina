@@ -30,11 +30,12 @@ import {
 	getU8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
 } from "@solana/kit";
 
 export const ORACLE_STATE_DISCRIMINATOR = 1;
 
-export function getOracleStateDiscriminatorBytes() {
+export function getOracleStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(ORACLE_STATE_DISCRIMINATOR);
 }
 

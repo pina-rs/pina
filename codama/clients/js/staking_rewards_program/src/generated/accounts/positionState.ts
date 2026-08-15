@@ -31,11 +31,12 @@ import {
 	getU8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
 } from "@solana/kit";
 
 export const POSITION_STATE_DISCRIMINATOR = 2;
 
-export function getPositionStateDiscriminatorBytes() {
+export function getPositionStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(POSITION_STATE_DISCRIMINATOR);
 }
 

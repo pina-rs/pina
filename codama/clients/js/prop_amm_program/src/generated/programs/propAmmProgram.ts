@@ -13,6 +13,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
@@ -149,6 +151,9 @@ export function parsePropAmmProgramInstruction<TProgram extends string>(
 export type PropAmmProgramPlugin = {
 	accounts: PropAmmProgramPluginAccounts;
 	instructions: PropAmmProgramPluginInstructions;
+	identifyAccount: typeof identifyPropAmmProgramAccount;
+	identifyInstruction: typeof identifyPropAmmProgramInstruction;
+	parseInstruction: typeof parsePropAmmProgramInstruction;
 };
 
 export type PropAmmProgramPluginAccounts = {
@@ -177,9 +182,10 @@ export type PropAmmProgramPluginRequirements =
 	& ClientWithTransactionSending;
 
 export function propAmmProgramProgram() {
-	return <T extends PropAmmProgramPluginRequirements>(client: T) => {
-		return {
-			...client,
+	return <T extends PropAmmProgramPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { propAmmProgram: PropAmmProgramPlugin }> => {
+		return extendClient(client, {
 			propAmmProgram: <PropAmmProgramPlugin> {
 				accounts: {
 					oracleState: addSelfFetchFunctions(client, getOracleStateCodec()),
@@ -198,7 +204,10 @@ export function propAmmProgramProgram() {
 							getRotateAuthorityInstruction(input),
 						),
 				},
+				identifyAccount: identifyPropAmmProgramAccount,
+				identifyInstruction: identifyPropAmmProgramInstruction,
+				parseInstruction: parsePropAmmProgramInstruction,
 			},
-		};
+		});
 	};
 }

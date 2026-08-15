@@ -22,7 +22,7 @@ export type EscrowProgramError =
 	| typeof ESCROW_PROGRAM_ERROR__TOKEN_ACCOUNT_MISMATCH;
 
 let escrowProgramErrorMessages: Record<EscrowProgramError, string> | undefined;
-if (process.env.NODE_ENV !== "production") {
+if (process.env["NODE_ENV"] !== "production") {
 	escrowProgramErrorMessages = {
 		[ESCROW_PROGRAM_ERROR__OFFER_KEY_MISMATCH]: ``,
 		[ESCROW_PROGRAM_ERROR__TOKEN_ACCOUNT_MISMATCH]: ``,
@@ -30,7 +30,7 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export function getEscrowProgramErrorMessage(code: EscrowProgramError): string {
-	if (process.env.NODE_ENV !== "production") {
+	if (process.env["NODE_ENV"] !== "production") {
 		return (escrowProgramErrorMessages as Record<EscrowProgramError, string>)[
 			code
 		];

@@ -12,6 +12,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithData,
@@ -132,6 +134,8 @@ export function parseAnchorDuplicateMutableAccountsInstruction<
 
 export type AnchorDuplicateMutableAccountsPlugin = {
 	instructions: AnchorDuplicateMutableAccountsPluginInstructions;
+	identifyInstruction: typeof identifyAnchorDuplicateMutableAccountsInstruction;
+	parseInstruction: typeof parseAnchorDuplicateMutableAccountsInstruction;
 };
 
 export type AnchorDuplicateMutableAccountsPluginInstructions = {
@@ -159,9 +163,11 @@ export type AnchorDuplicateMutableAccountsPluginRequirements =
 export function anchorDuplicateMutableAccountsProgram() {
 	return <T extends AnchorDuplicateMutableAccountsPluginRequirements>(
 		client: T,
-	) => {
-		return {
-			...client,
+	): ExtendedClient<
+		T,
+		{ anchorDuplicateMutableAccounts: AnchorDuplicateMutableAccountsPlugin }
+	> => {
+		return extendClient(client, {
 			anchorDuplicateMutableAccounts: <AnchorDuplicateMutableAccountsPlugin> {
 				instructions: {
 					failsDuplicateMutable: (input) =>
@@ -180,7 +186,9 @@ export function anchorDuplicateMutableAccountsProgram() {
 							getAllowsDuplicateReadonlyInstruction(input),
 						),
 				},
+				identifyInstruction: identifyAnchorDuplicateMutableAccountsInstruction,
+				parseInstruction: parseAnchorDuplicateMutableAccountsInstruction,
 			},
-		};
+		});
 	};
 }

@@ -12,12 +12,13 @@ import {
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type ReadonlyUint8Array,
 } from "@solana/kit";
 import { ANCHOR_ERRORS_PROGRAM_ADDRESS } from "../programs";
 
 export const HELLO_NO_MSG_DISCRIMINATOR = 1;
 
-export function getHelloNoMsgDiscriminatorBytes() {
+export function getHelloNoMsgDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(HELLO_NO_MSG_DISCRIMINATOR);
 }
 

@@ -24,7 +24,7 @@ export type PropAmmProgramError =
 let propAmmProgramErrorMessages:
 	| Record<PropAmmProgramError, string>
 	| undefined;
-if (process.env.NODE_ENV !== "production") {
+if (process.env["NODE_ENV"] !== "production") {
 	propAmmProgramErrorMessages = {
 		[PROP_AMM_PROGRAM_ERROR__UNAUTHORIZED_ORACLE_AUTHORITY]: ``,
 		[PROP_AMM_PROGRAM_ERROR__UNAUTHORIZED_UPDATE_AUTHORITY]: ``,
@@ -34,7 +34,7 @@ if (process.env.NODE_ENV !== "production") {
 export function getPropAmmProgramErrorMessage(
 	code: PropAmmProgramError,
 ): string {
-	if (process.env.NODE_ENV !== "production") {
+	if (process.env["NODE_ENV"] !== "production") {
 		return (propAmmProgramErrorMessages as Record<PropAmmProgramError, string>)[
 			code
 		];

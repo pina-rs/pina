@@ -37,7 +37,7 @@ import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const OPEN_POSITION_DISCRIMINATOR = 1;
 
-export function getOpenPositionDiscriminatorBytes() {
+export function getOpenPositionDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(OPEN_POSITION_DISCRIMINATOR);
 }
 

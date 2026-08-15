@@ -38,7 +38,7 @@ import { ANCHOR_REALLOC_PROGRAM_ADDRESS } from "../programs";
 
 export const REALLOC2_DISCRIMINATOR = 1;
 
-export function getRealloc2DiscriminatorBytes() {
+export function getRealloc2DiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(REALLOC2_DISCRIMINATOR);
 }
 

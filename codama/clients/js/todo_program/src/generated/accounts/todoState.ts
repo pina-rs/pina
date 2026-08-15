@@ -40,7 +40,7 @@ import {
 
 export const TODO_STATE_DISCRIMINATOR = 1;
 
-export function getTodoStateDiscriminatorBytes() {
+export function getTodoStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(TODO_STATE_DISCRIMINATOR);
 }
 

@@ -12,6 +12,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithData,
@@ -87,6 +89,8 @@ export function parseAnchorDeclareProgramInstruction<TProgram extends string>(
 
 export type AnchorDeclareProgramPlugin = {
 	instructions: AnchorDeclareProgramPluginInstructions;
+	identifyInstruction: typeof identifyAnchorDeclareProgramInstruction;
+	parseInstruction: typeof parseAnchorDeclareProgramInstruction;
 };
 
 export type AnchorDeclareProgramPluginInstructions = {
@@ -102,9 +106,13 @@ export type AnchorDeclareProgramPluginRequirements =
 	& ClientWithTransactionSending;
 
 export function anchorDeclareProgramProgram() {
-	return <T extends AnchorDeclareProgramPluginRequirements>(client: T) => {
-		return {
-			...client,
+	return <T extends AnchorDeclareProgramPluginRequirements>(
+		client: T,
+	): ExtendedClient<
+		T,
+		{ anchorDeclareProgram: AnchorDeclareProgramPlugin }
+	> => {
+		return extendClient(client, {
 			anchorDeclareProgram: <AnchorDeclareProgramPlugin> {
 				instructions: {
 					validateExternalProgram: (input) =>
@@ -113,7 +121,9 @@ export function anchorDeclareProgramProgram() {
 							getValidateExternalProgramInstruction(input),
 						),
 				},
+				identifyInstruction: identifyAnchorDeclareProgramInstruction,
+				parseInstruction: parseAnchorDeclareProgramInstruction,
 			},
-		};
+		});
 	};
 }

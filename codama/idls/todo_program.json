@@ -1,12 +1,12 @@
 {
 	"kind": "rootNode",
 	"standard": "codama",
-	"version": "1.0.0",
+	"version": "1.8.0",
 	"program": {
 		"kind": "programNode",
 		"name": "todoProgram",
 		"publicKey": "Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd",
-		"version": "",
+		"version": "0.0.0",
 		"accounts": [
 			{
 				"kind": "accountNode",
@@ -84,13 +84,15 @@
 						"kind": "instructionAccountNode",
 						"name": "owner",
 						"isWritable": false,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "todo",
 						"isWritable": true,
 						"isSigner": false,
+						"isOptional": false,
 						"defaultValue": {
 							"kind": "pdaValueNode",
 							"pda": {
@@ -114,6 +116,7 @@
 						"name": "systemProgram",
 						"isWritable": false,
 						"isSigner": false,
+						"isOptional": false,
 						"defaultValue": {
 							"kind": "publicKeyValueNode",
 							"publicKey": "11111111111111111111111111111111"
@@ -169,13 +172,15 @@
 						"kind": "instructionAccountNode",
 						"name": "owner",
 						"isWritable": false,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "todo",
 						"isWritable": true,
 						"isSigner": false,
+						"isOptional": false,
 						"defaultValue": {
 							"kind": "pdaValueNode",
 							"pda": {
@@ -195,7 +200,6 @@
 						}
 					}
 				],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -223,13 +227,15 @@
 						"kind": "instructionAccountNode",
 						"name": "owner",
 						"isWritable": false,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "todo",
 						"isWritable": true,
 						"isSigner": false,
+						"isOptional": false,
 						"defaultValue": {
 							"kind": "pdaValueNode",
 							"pda": {
@@ -282,7 +288,6 @@
 				]
 			}
 		],
-		"definedTypes": [],
 		"pdas": [
 			{
 				"kind": "pdaNode",
@@ -308,8 +313,6 @@
 					}
 				]
 			}
-		],
-		"errors": []
-	},
-	"additionalPrograms": []
+		]
+	}
 }

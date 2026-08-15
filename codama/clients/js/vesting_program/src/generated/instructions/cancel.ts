@@ -15,6 +15,7 @@ import {
 	type InstructionWithAccounts,
 	type ReadonlyAccount,
 	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
@@ -28,7 +29,7 @@ import { VESTING_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const CANCEL_DISCRIMINATOR = 2;
 
-export function getCancelDiscriminatorBytes() {
+export function getCancelDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(CANCEL_DISCRIMINATOR);
 }
 

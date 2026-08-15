@@ -12,6 +12,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithData,
@@ -84,7 +86,11 @@ export function parseHelloSolanaInstruction<TProgram extends string>(
 	}
 }
 
-export type HelloSolanaPlugin = { instructions: HelloSolanaPluginInstructions };
+export type HelloSolanaPlugin = {
+	instructions: HelloSolanaPluginInstructions;
+	identifyInstruction: typeof identifyHelloSolanaInstruction;
+	parseInstruction: typeof parseHelloSolanaInstruction;
+};
 
 export type HelloSolanaPluginInstructions = {
 	hello: (
@@ -97,15 +103,18 @@ export type HelloSolanaPluginRequirements =
 	& ClientWithTransactionSending;
 
 export function helloSolanaProgram() {
-	return <T extends HelloSolanaPluginRequirements>(client: T) => {
-		return {
-			...client,
+	return <T extends HelloSolanaPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { helloSolana: HelloSolanaPlugin }> => {
+		return extendClient(client, {
 			helloSolana: <HelloSolanaPlugin> {
 				instructions: {
 					hello: (input) =>
 						addSelfPlanAndSendFunctions(client, getHelloInstruction(input)),
 				},
+				identifyInstruction: identifyHelloSolanaInstruction,
+				parseInstruction: parseHelloSolanaInstruction,
 			},
-		};
+		});
 	};
 }

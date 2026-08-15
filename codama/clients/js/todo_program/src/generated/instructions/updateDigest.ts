@@ -41,7 +41,7 @@ import { TODO_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const UPDATE_DIGEST_DISCRIMINATOR = 2;
 
-export function getUpdateDigestDiscriminatorBytes() {
+export function getUpdateDigestDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(UPDATE_DIGEST_DISCRIMINATOR);
 }
 

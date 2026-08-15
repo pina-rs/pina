@@ -12,6 +12,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithData,
@@ -86,6 +88,8 @@ export function parseAnchorSystemAccountsInstruction<TProgram extends string>(
 
 export type AnchorSystemAccountsPlugin = {
 	instructions: AnchorSystemAccountsPluginInstructions;
+	identifyInstruction: typeof identifyAnchorSystemAccountsInstruction;
+	parseInstruction: typeof parseAnchorSystemAccountsInstruction;
 };
 
 export type AnchorSystemAccountsPluginInstructions = {
@@ -99,9 +103,13 @@ export type AnchorSystemAccountsPluginRequirements =
 	& ClientWithTransactionSending;
 
 export function anchorSystemAccountsProgram() {
-	return <T extends AnchorSystemAccountsPluginRequirements>(client: T) => {
-		return {
-			...client,
+	return <T extends AnchorSystemAccountsPluginRequirements>(
+		client: T,
+	): ExtendedClient<
+		T,
+		{ anchorSystemAccounts: AnchorSystemAccountsPlugin }
+	> => {
+		return extendClient(client, {
 			anchorSystemAccounts: <AnchorSystemAccountsPlugin> {
 				instructions: {
 					initialize: (input) =>
@@ -110,7 +118,9 @@ export function anchorSystemAccountsProgram() {
 							getInitializeInstruction(input),
 						),
 				},
+				identifyInstruction: identifyAnchorSystemAccountsInstruction,
+				parseInstruction: parseAnchorSystemAccountsInstruction,
 			},
-		};
+		});
 	};
 }

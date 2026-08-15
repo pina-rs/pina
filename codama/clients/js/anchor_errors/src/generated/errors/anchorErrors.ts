@@ -34,7 +34,7 @@ export type AnchorErrorsError =
 	| typeof ANCHOR_ERRORS_ERROR__VALUE_MISMATCH;
 
 let anchorErrorsErrorMessages: Record<AnchorErrorsError, string> | undefined;
-if (process.env.NODE_ENV !== "production") {
+if (process.env["NODE_ENV"] !== "production") {
 	anchorErrorsErrorMessages = {
 		[ANCHOR_ERRORS_ERROR__HELLO]: ``,
 		[ANCHOR_ERRORS_ERROR__HELLO_CUSTOM]: ``,
@@ -48,7 +48,7 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export function getAnchorErrorsErrorMessage(code: AnchorErrorsError): string {
-	if (process.env.NODE_ENV !== "production") {
+	if (process.env["NODE_ENV"] !== "production") {
 		return (anchorErrorsErrorMessages as Record<AnchorErrorsError, string>)[
 			code
 		];

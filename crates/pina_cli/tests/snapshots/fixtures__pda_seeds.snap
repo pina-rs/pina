@@ -1,17 +1,17 @@
 ---
 source: crates/pina_cli/tests/fixtures.rs
+assertion_line: 38
 expression: idl
 ---
 {
   "kind": "rootNode",
   "standard": "codama",
-  "version": "1.0.0",
+  "version": "1.8.0",
   "program": {
     "kind": "programNode",
     "name": "pdaSeeds",
     "publicKey": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
-    "version": "",
-    "accounts": [],
+    "version": "0.0.0",
     "instructions": [
       {
         "kind": "instructionNode",
@@ -21,13 +21,15 @@ expression: idl
             "kind": "instructionAccountNode",
             "name": "authority",
             "isWritable": false,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "counter",
             "isWritable": true,
             "isSigner": false,
+            "isOptional": false,
             "defaultValue": {
               "kind": "pdaValueNode",
               "pda": {
@@ -78,7 +80,6 @@ expression: idl
         ]
       }
     ],
-    "definedTypes": [],
     "pdas": [
       {
         "kind": "pdaNode",
@@ -104,8 +105,6 @@ expression: idl
           }
         ]
       }
-    ],
-    "errors": []
-  },
-  "additionalPrograms": []
+    ]
+  }
 }

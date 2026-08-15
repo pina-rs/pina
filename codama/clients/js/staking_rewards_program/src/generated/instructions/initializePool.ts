@@ -37,7 +37,7 @@ import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const INITIALIZE_POOL_DISCRIMINATOR = 0;
 
-export function getInitializePoolDiscriminatorBytes() {
+export function getInitializePoolDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(INITIALIZE_POOL_DISCRIMINATOR);
 }
 

@@ -1,6 +1,6 @@
 use codama_nodes::ConstantDiscriminatorNode;
 use codama_nodes::DiscriminatorNode;
-use codama_nodes::Endian;
+use codama_nodes::Endianness;
 use codama_nodes::HasKind;
 use codama_nodes::Number;
 use codama_nodes::NumberFormat;
@@ -74,7 +74,7 @@ fn render_constant_discriminator_value(
 }
 
 fn render_discriminator_type(number_type: &NumberTypeNode, context: &str) -> Result<String> {
-	if !matches!(number_type.endian, Endian::Little) {
+	if !matches!(number_type.endian, Endianness::Le) {
 		return Err(RenderError::UnsupportedDiscriminator {
 			context: context.to_string(),
 			reason: "only little-endian discriminators are supported".to_string(),

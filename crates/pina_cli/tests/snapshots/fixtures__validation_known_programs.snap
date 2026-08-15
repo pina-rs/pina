@@ -1,17 +1,17 @@
 ---
 source: crates/pina_cli/tests/fixtures.rs
+assertion_line: 38
 expression: idl
 ---
 {
   "kind": "rootNode",
   "standard": "codama",
-  "version": "1.0.0",
+  "version": "1.8.0",
   "program": {
     "kind": "programNode",
     "name": "validationKnownPrograms",
     "publicKey": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
-    "version": "",
-    "accounts": [],
+    "version": "0.0.0",
     "instructions": [
       {
         "kind": "instructionNode",
@@ -22,6 +22,7 @@ expression: idl
             "name": "systemProgram",
             "isWritable": false,
             "isSigner": false,
+            "isOptional": false,
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "11111111111111111111111111111111"
@@ -32,6 +33,7 @@ expression: idl
             "name": "tokenProgram",
             "isWritable": false,
             "isSigner": false,
+            "isOptional": false,
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
@@ -42,6 +44,7 @@ expression: idl
             "name": "token2022Program",
             "isWritable": false,
             "isSigner": false,
+            "isOptional": false,
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
@@ -52,13 +55,13 @@ expression: idl
             "name": "associatedTokenProgram",
             "isWritable": false,
             "isSigner": false,
+            "isOptional": false,
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
             }
           }
         ],
-        "arguments": [],
         "discriminators": [
           {
             "kind": "constantDiscriminatorNode",
@@ -78,10 +81,6 @@ expression: idl
           }
         ]
       }
-    ],
-    "definedTypes": [],
-    "pdas": [],
-    "errors": []
-  },
-  "additionalPrograms": []
+    ]
+  }
 }

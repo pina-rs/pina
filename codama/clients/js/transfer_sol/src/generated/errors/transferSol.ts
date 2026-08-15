@@ -20,7 +20,7 @@ export const TRANSFER_SOL_ERROR__INSUFFICIENT_FUNDS = 0x0; // 0
 export type TransferSolError = typeof TRANSFER_SOL_ERROR__INSUFFICIENT_FUNDS;
 
 let transferSolErrorMessages: Record<TransferSolError, string> | undefined;
-if (process.env.NODE_ENV !== "production") {
+if (process.env["NODE_ENV"] !== "production") {
 	transferSolErrorMessages = {
 		[TRANSFER_SOL_ERROR__INSUFFICIENT_FUNDS]:
 			`The sender does not have enough lamports for the transfer.`,
@@ -28,7 +28,7 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export function getTransferSolErrorMessage(code: TransferSolError): string {
-	if (process.env.NODE_ENV !== "production") {
+	if (process.env["NODE_ENV"] !== "production") {
 		return (transferSolErrorMessages as Record<TransferSolError, string>)[code];
 	}
 

@@ -12,6 +12,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithData,
@@ -103,6 +105,8 @@ export function parseAnchorReallocInstruction<TProgram extends string>(
 
 export type AnchorReallocPlugin = {
 	instructions: AnchorReallocPluginInstructions;
+	identifyInstruction: typeof identifyAnchorReallocInstruction;
+	parseInstruction: typeof parseAnchorReallocInstruction;
 };
 
 export type AnchorReallocPluginInstructions = {
@@ -119,9 +123,10 @@ export type AnchorReallocPluginRequirements =
 	& ClientWithTransactionSending;
 
 export function anchorReallocProgram() {
-	return <T extends AnchorReallocPluginRequirements>(client: T) => {
-		return {
-			...client,
+	return <T extends AnchorReallocPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { anchorRealloc: AnchorReallocPlugin }> => {
+		return extendClient(client, {
 			anchorRealloc: <AnchorReallocPlugin> {
 				instructions: {
 					realloc: (input) =>
@@ -129,7 +134,9 @@ export function anchorReallocProgram() {
 					realloc2: (input) =>
 						addSelfPlanAndSendFunctions(client, getRealloc2Instruction(input)),
 				},
+				identifyInstruction: identifyAnchorReallocInstruction,
+				parseInstruction: parseAnchorReallocInstruction,
 			},
-		};
+		});
 	};
 }

@@ -1,12 +1,12 @@
 {
 	"kind": "rootNode",
 	"standard": "codama",
-	"version": "1.0.0",
+	"version": "1.8.0",
 	"program": {
 		"kind": "programNode",
 		"name": "vestingProgram",
 		"publicKey": "FEa5fqN6NACrhWUZSBdGKybJKNxkdw8cdLvRvTARsFHh",
-		"version": "",
+		"version": "0.0.0",
 		"accounts": [
 			{
 				"kind": "accountNode",
@@ -132,37 +132,43 @@
 						"kind": "instructionAccountNode",
 						"name": "admin",
 						"isWritable": false,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "beneficiary",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "mint",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "vestingState",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "vault",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "systemProgram",
 						"isWritable": false,
 						"isSigner": false,
+						"isOptional": false,
 						"defaultValue": {
 							"kind": "publicKeyValueNode",
 							"publicKey": "11111111111111111111111111111111"
@@ -172,7 +178,8 @@
 						"kind": "instructionAccountNode",
 						"name": "tokenProgram",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					}
 				],
 				"arguments": [
@@ -249,37 +256,43 @@
 						"kind": "instructionAccountNode",
 						"name": "beneficiary",
 						"isWritable": false,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "mint",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "vestingState",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "beneficiaryAta",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "vault",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "systemProgram",
 						"isWritable": false,
 						"isSigner": false,
+						"isOptional": false,
 						"defaultValue": {
 							"kind": "publicKeyValueNode",
 							"publicKey": "11111111111111111111111111111111"
@@ -289,7 +302,8 @@
 						"kind": "instructionAccountNode",
 						"name": "tokenProgram",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					}
 				],
 				"arguments": [
@@ -330,34 +344,38 @@
 						"kind": "instructionAccountNode",
 						"name": "admin",
 						"isWritable": false,
-						"isSigner": true
+						"isSigner": true,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "mint",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "vestingState",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "vault",
 						"isWritable": true,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "tokenProgram",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					}
 				],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -378,7 +396,6 @@
 				]
 			}
 		],
-		"definedTypes": [],
 		"pdas": [
 			{
 				"kind": "pdaNode",
@@ -439,6 +456,5 @@
 				"message": ""
 			}
 		]
-	},
-	"additionalPrograms": []
+	}
 }

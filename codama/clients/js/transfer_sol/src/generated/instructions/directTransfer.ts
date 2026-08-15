@@ -37,7 +37,7 @@ import { TRANSFER_SOL_PROGRAM_ADDRESS } from "../programs";
 
 export const DIRECT_TRANSFER_DISCRIMINATOR = 1;
 
-export function getDirectTransferDiscriminatorBytes() {
+export function getDirectTransferDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(DIRECT_TRANSFER_DISCRIMINATOR);
 }
 

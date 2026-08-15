@@ -2,13 +2,13 @@ use codama_nodes::HasKind;
 use codama_nodes::InstructionAccountNode;
 use codama_nodes::InstructionInputValueNode;
 use codama_nodes::InstructionNode;
-use codama_nodes::InstructionOptionalAccountStrategy;
-use codama_nodes::IsAccountSigner;
+use codama_nodes::IsSigner;
+use codama_nodes::OptionalAccountStrategy;
 use codama_nodes::PdaNode;
 use codama_nodes::PdaSeedNode;
-use codama_nodes::PdaSeedValueValueNode;
-use codama_nodes::PdaValue;
+use codama_nodes::PdaSeedValueValue;
 use codama_nodes::PdaValueNode;
+use codama_nodes::PdaValuePda;
 use codama_nodes::ProgramNode;
 
 use super::discriminator::render_constant_discriminator;
@@ -217,17 +217,17 @@ fn render_instruction_account_metas(
 		};
 
 		let signer_expr = match account.is_signer {
-			IsAccountSigner::False => "false".to_string(),
-			IsAccountSigner::True => "true".to_string(),
-			IsAccountSigner::Either => format!("self.{field_name}.1"),
+			IsSigner::False => "false".to_string(),
+			IsSigner::True => "true".to_string(),
+			IsSigner::Either => format!("self.{field_name}.1"),
 		};
 		let key_expr = match account.is_signer {
-			IsAccountSigner::Either => format!("self.{field_name}.0"),
+			IsSigner::Either => format!("self.{field_name}.0"),
 			_ => format!("self.{field_name}"),
 		};
 
-		if account.is_optional {
-			if account.is_signer == IsAccountSigner::Either {
+		if account.is_optional == Some(true) {
+			if account.is_signer == IsSigner::Either {
 				lines.push(format!(
 					"\t\tif let Some(({field_name}, signer)) = self.{field_name} {{"
 				));
@@ -247,7 +247,7 @@ fn render_instruction_account_metas(
 
 			if matches!(
 				instruction.optional_account_strategy,
-				InstructionOptionalAccountStrategy::ProgramId
+				Some(OptionalAccountStrategy::ProgramId)
 			) {
 				lines.push("\t\telse {".to_string());
 				lines.push(format!(
@@ -271,10 +271,10 @@ fn render_instruction_account_metas(
 
 fn render_instruction_account_field_type(account: &InstructionAccountNode) -> (String, String) {
 	let base_type = match account.is_signer {
-		IsAccountSigner::Either => "(solana_pubkey::Pubkey, bool)".to_string(),
-		IsAccountSigner::False | IsAccountSigner::True => "solana_pubkey::Pubkey".to_string(),
+		IsSigner::Either => "(solana_pubkey::Pubkey, bool)".to_string(),
+		IsSigner::False | IsSigner::True => "solana_pubkey::Pubkey".to_string(),
 	};
-	if account.is_optional {
+	if account.is_optional == Some(true) {
 		(format!("Option<{base_type}>"), base_type)
 	} else {
 		(base_type.clone(), base_type)
@@ -288,8 +288,8 @@ fn render_pda_default_value(
 	program: &ProgramNode,
 	account: &InstructionAccountNode,
 ) -> Result<String> {
-	let pda = match &pda_value.pda {
-		PdaValue::Linked(link) => {
+	let pda = match pda_value.pda.as_ref() {
+		PdaValuePda::PdaLink(link) => {
 			program
 				.pdas
 				.iter()
@@ -306,7 +306,7 @@ fn render_pda_default_value(
 					}
 				})?
 		}
-		PdaValue::Nested(pda) => pda,
+		PdaValuePda::Pda(pda) => pda,
 	};
 
 	let seed_expressions = render_pda_default_seed_expressions(
@@ -375,8 +375,8 @@ fn render_pda_default_seed_value(
 	default_account: &InstructionAccountNode,
 	context: &str,
 ) -> Result<String> {
-	match &value.value {
-		PdaSeedValueValueNode::Account(account) => {
+	match value.value.as_ref() {
+		PdaSeedValueValue::Account(account) => {
 			let name = account.name.as_ref();
 			let referenced_account = instruction
 				.accounts
@@ -391,7 +391,7 @@ fn render_pda_default_seed_value(
 				})?;
 
 			if referenced_account.name == default_account.name
-				|| referenced_account.is_optional
+				|| referenced_account.is_optional == Some(true)
 				|| referenced_account.default_value.is_some()
 			{
 				return Err(RenderError::UnsupportedValue {
@@ -404,13 +404,13 @@ fn render_pda_default_seed_value(
 			}
 
 			let seed_name = snake(name);
-			if matches!(referenced_account.is_signer, IsAccountSigner::Either) {
+			if matches!(referenced_account.is_signer, IsSigner::Either) {
 				Ok(format!("{seed_name}.0.as_ref()"))
 			} else {
 				Ok(format!("{seed_name}.as_ref()"))
 			}
 		}
-		PdaSeedValueValueNode::Argument(_) => {
+		PdaSeedValueValue::Argument(_) => {
 			Err(RenderError::UnsupportedValue {
 				context: context.to_string(),
 				kind: value.value.kind(),
@@ -444,19 +444,19 @@ fn render_instruction_account_default_value(
 	primary_program_const: &str,
 	program: &ProgramNode,
 ) -> Result<Option<String>> {
-	if account.is_optional {
+	if account.is_optional == Some(true) {
 		return Ok(Some("None".to_string()));
 	}
 
-	let Some(default_value) = &account.default_value else {
+	let Some(default_value) = account.default_value.as_ref() else {
 		return Ok(None);
 	};
 
 	let value = match default_value {
-		InstructionInputValueNode::PublicKey(public_key) => {
+		InstructionInputValueNode::PublicKeyValue(public_key) => {
 			format!("solana_pubkey::pubkey!(\"{}\")", public_key.public_key)
 		}
-		InstructionInputValueNode::ProgramId(_) => {
+		InstructionInputValueNode::ProgramIdValue(_) => {
 			format!("crate::{primary_program_const}")
 		}
 		InstructionInputValueNode::ProgramLink(program_link) => {
@@ -465,7 +465,7 @@ fn render_instruction_account_default_value(
 				program_id_const_name(program_link.name.as_ref())
 			)
 		}
-		InstructionInputValueNode::Pda(pda) => {
+		InstructionInputValueNode::PdaValue(pda) => {
 			render_pda_default_value(pda, instruction, primary_program_const, program, account)?
 		}
 		_ => {
@@ -481,7 +481,7 @@ fn render_instruction_account_default_value(
 		}
 	};
 
-	if matches!(account.is_signer, IsAccountSigner::Either) {
+	if matches!(account.is_signer, IsSigner::Either) {
 		return Ok(Some(format!("({value}, false)")));
 	}
 

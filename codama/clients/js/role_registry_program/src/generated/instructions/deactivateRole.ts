@@ -15,6 +15,7 @@ import {
 	type InstructionWithAccounts,
 	type ReadonlyAccount,
 	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
@@ -28,7 +29,7 @@ import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const DEACTIVATE_ROLE_DISCRIMINATOR = 3;
 
-export function getDeactivateRoleDiscriminatorBytes() {
+export function getDeactivateRoleDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(DEACTIVATE_ROLE_DISCRIMINATOR);
 }
 

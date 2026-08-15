@@ -13,6 +13,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
@@ -132,6 +134,9 @@ export function parseAnchorFloatsInstruction<TProgram extends string>(
 export type AnchorFloatsPlugin = {
 	accounts: AnchorFloatsPluginAccounts;
 	instructions: AnchorFloatsPluginInstructions;
+	identifyAccount: typeof identifyAnchorFloatsAccount;
+	identifyInstruction: typeof identifyAnchorFloatsInstruction;
+	parseInstruction: typeof parseAnchorFloatsInstruction;
 };
 
 export type AnchorFloatsPluginAccounts = {
@@ -155,9 +160,10 @@ export type AnchorFloatsPluginRequirements =
 	& ClientWithTransactionSending;
 
 export function anchorFloatsProgram() {
-	return <T extends AnchorFloatsPluginRequirements>(client: T) => {
-		return {
-			...client,
+	return <T extends AnchorFloatsPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { anchorFloats: AnchorFloatsPlugin }> => {
+		return extendClient(client, {
 			anchorFloats: <AnchorFloatsPlugin> {
 				accounts: {
 					floatDataAccount: addSelfFetchFunctions(
@@ -171,7 +177,10 @@ export function anchorFloatsProgram() {
 					update: (input) =>
 						addSelfPlanAndSendFunctions(client, getUpdateInstruction(input)),
 				},
+				identifyAccount: identifyAnchorFloatsAccount,
+				identifyInstruction: identifyAnchorFloatsInstruction,
+				parseInstruction: parseAnchorFloatsInstruction,
 			},
-		};
+		});
 	};
 }

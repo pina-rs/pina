@@ -1,16 +1,17 @@
 ---
 source: crates/pina_cli/tests/examples.rs
+assertion_line: 43
 expression: idl
 ---
 {
   "kind": "rootNode",
   "standard": "codama",
-  "version": "1.0.0",
+  "version": "1.8.0",
   "program": {
     "kind": "programNode",
     "name": "counterProgram",
     "publicKey": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
-    "version": "",
+    "version": "0.0.0",
     "accounts": [
       {
         "kind": "accountNode",
@@ -101,6 +102,7 @@ expression: idl
             "name": "authority",
             "isWritable": false,
             "isSigner": true,
+            "isOptional": false,
             "docs": [
               "The wallet creating the counter. Pays for account creation and becomes",
               "the authority whose address seeds the PDA."
@@ -111,6 +113,7 @@ expression: idl
             "name": "counter",
             "isWritable": true,
             "isSigner": false,
+            "isOptional": false,
             "docs": [
               "The counter PDA account (must be empty — not yet created)."
             ],
@@ -137,6 +140,7 @@ expression: idl
             "name": "systemProgram",
             "isWritable": false,
             "isSigner": false,
+            "isOptional": false,
             "docs": [
               "The system program, required for `CreateAccount` CPI."
             ],
@@ -189,6 +193,7 @@ expression: idl
             "name": "authority",
             "isWritable": false,
             "isSigner": true,
+            "isOptional": false,
             "docs": [
               "The counter's authority. Must sign to prove ownership."
             ]
@@ -198,6 +203,7 @@ expression: idl
             "name": "counter",
             "isWritable": true,
             "isSigner": false,
+            "isOptional": false,
             "docs": [
               "The counter PDA account (must already exist and be writable)."
             ],
@@ -220,7 +226,6 @@ expression: idl
             }
           }
         ],
-        "arguments": [],
         "discriminators": [
           {
             "kind": "constantDiscriminatorNode",
@@ -241,7 +246,6 @@ expression: idl
         ]
       }
     ],
-    "definedTypes": [],
     "pdas": [
       {
         "kind": "pdaNode",
@@ -267,8 +271,6 @@ expression: idl
           }
         ]
       }
-    ],
-    "errors": []
-  },
-  "additionalPrograms": []
+    ]
+  }
 }

@@ -26,7 +26,7 @@ export type VestingProgramError =
 let vestingProgramErrorMessages:
 	| Record<VestingProgramError, string>
 	| undefined;
-if (process.env.NODE_ENV !== "production") {
+if (process.env["NODE_ENV"] !== "production") {
 	vestingProgramErrorMessages = {
 		[VESTING_PROGRAM_ERROR__ALREADY_CANCELLED]: ``,
 		[VESTING_PROGRAM_ERROR__CLAIM_TOO_LARGE]: ``,
@@ -37,7 +37,7 @@ if (process.env.NODE_ENV !== "production") {
 export function getVestingProgramErrorMessage(
 	code: VestingProgramError,
 ): string {
-	if (process.env.NODE_ENV !== "production") {
+	if (process.env["NODE_ENV"] !== "production") {
 		return (vestingProgramErrorMessages as Record<VestingProgramError, string>)[
 			code
 		];

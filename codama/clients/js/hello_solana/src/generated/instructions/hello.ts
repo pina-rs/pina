@@ -14,6 +14,7 @@ import {
 	type Instruction,
 	type InstructionWithAccounts,
 	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
@@ -26,7 +27,7 @@ import { HELLO_SOLANA_PROGRAM_ADDRESS } from "../programs";
 
 export const HELLO_DISCRIMINATOR = 0;
 
-export function getHelloDiscriminatorBytes() {
+export function getHelloDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(HELLO_DISCRIMINATOR);
 }
 

@@ -12,6 +12,7 @@ import {
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type WritableAccount,
@@ -24,7 +25,7 @@ import { ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ADDRESS } from "../programs";
 
 export const FAILS_DUPLICATE_MUTABLE_DISCRIMINATOR = 0;
 
-export function getFailsDuplicateMutableDiscriminatorBytes() {
+export function getFailsDuplicateMutableDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(FAILS_DUPLICATE_MUTABLE_DISCRIMINATOR);
 }
 

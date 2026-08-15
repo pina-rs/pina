@@ -13,6 +13,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
@@ -192,6 +194,9 @@ export type RoleRegistryProgramPlugin = {
 	accounts: RoleRegistryProgramPluginAccounts;
 	instructions: RoleRegistryProgramPluginInstructions;
 	pdas: RoleRegistryProgramPluginPdas;
+	identifyAccount: typeof identifyRoleRegistryProgramAccount;
+	identifyInstruction: typeof identifyRoleRegistryProgramInstruction;
+	parseInstruction: typeof parseRoleRegistryProgramInstruction;
 };
 
 export type RoleRegistryProgramPluginAccounts = {
@@ -236,9 +241,10 @@ export type RoleRegistryProgramPluginRequirements =
 	& ClientWithTransactionSending;
 
 export function roleRegistryProgramProgram() {
-	return <T extends RoleRegistryProgramPluginRequirements>(client: T) => {
-		return {
-			...client,
+	return <T extends RoleRegistryProgramPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { roleRegistryProgram: RoleRegistryProgramPlugin }> => {
+		return extendClient(client, {
 			roleRegistryProgram: <RoleRegistryProgramPlugin> {
 				accounts: {
 					registryConfig: addSelfFetchFunctions(
@@ -275,7 +281,10 @@ export function roleRegistryProgramProgram() {
 					registryConfig: findRegistryConfigPda,
 					roleEntry: findRoleEntryPda,
 				},
+				identifyAccount: identifyRoleRegistryProgramAccount,
+				identifyInstruction: identifyRoleRegistryProgramInstruction,
+				parseInstruction: parseRoleRegistryProgramInstruction,
 			},
-		};
+		});
 	};
 }

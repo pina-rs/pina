@@ -2,7 +2,7 @@ use codama_nodes::BooleanTypeNode;
 use codama_nodes::CountNode;
 use codama_nodes::DefinedTypeNode;
 use codama_nodes::Docs;
-use codama_nodes::Endian;
+use codama_nodes::Endianness;
 use codama_nodes::HasKind;
 use codama_nodes::NestedTypeNodeTrait;
 use codama_nodes::NumberFormat;
@@ -45,7 +45,7 @@ pub(crate) fn render_type_for_pod(r#type: &TypeNode, context: &str) -> Result<St
 		}
 		TypeNode::Array(array_type) => {
 			let item_type = render_type_for_pod(&array_type.item, context)?;
-			match &array_type.count {
+			match array_type.count.as_ref() {
 				CountNode::Fixed(count) => Ok(format!("[{item_type}; {}]", count.value)),
 				CountNode::Prefixed(_) | CountNode::Remainder(_) => {
 					Err(RenderError::UnsupportedType {
@@ -73,7 +73,7 @@ pub(crate) fn render_type_for_pod(r#type: &TypeNode, context: &str) -> Result<St
 }
 
 fn render_number_type_for_pod(number_type: &NumberTypeNode, context: &str) -> Result<String> {
-	if !matches!(number_type.endian, Endian::Little) {
+	if !matches!(number_type.endian, Endianness::Le) {
 		return Err(RenderError::UnsupportedType {
 			context: context.to_string(),
 			kind: "numberTypeNode",
@@ -105,7 +105,7 @@ fn render_number_type_for_pod(number_type: &NumberTypeNode, context: &str) -> Re
 fn render_boolean_type(boolean_type: &BooleanTypeNode, context: &str) -> Result<String> {
 	let number_type = boolean_type.size.get_nested_type_node();
 	if !matches!(number_type.format, NumberFormat::U8)
-		|| !matches!(number_type.endian, Endian::Little)
+		|| !matches!(number_type.endian, Endianness::Le)
 	{
 		return Err(RenderError::UnsupportedType {
 			context: context.to_string(),
@@ -119,7 +119,7 @@ fn render_boolean_type(boolean_type: &BooleanTypeNode, context: &str) -> Result<
 pub(crate) fn render_defined_type_page(defined_type: &DefinedTypeNode) -> Result<String> {
 	let name = pascal(defined_type.name.as_ref());
 	let context = format!("defined type `{name}`");
-	match &defined_type.r#type {
+	match defined_type.r#type.as_ref() {
 		TypeNode::Struct(struct_type) => {
 			render_defined_struct(name.as_str(), struct_type, &defined_type.docs)
 		}

@@ -38,7 +38,7 @@ import { VESTING_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const CLAIM_DISCRIMINATOR = 1;
 
-export function getClaimDiscriminatorBytes() {
+export function getClaimDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(CLAIM_DISCRIMINATOR);
 }
 

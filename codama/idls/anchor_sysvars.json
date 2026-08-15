@@ -1,13 +1,12 @@
 {
 	"kind": "rootNode",
 	"standard": "codama",
-	"version": "1.0.0",
+	"version": "1.8.0",
 	"program": {
 		"kind": "programNode",
 		"name": "anchorSysvars",
 		"publicKey": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
-		"version": "",
-		"accounts": [],
+		"version": "0.0.0",
 		"instructions": [
 			{
 				"kind": "instructionNode",
@@ -17,22 +16,24 @@
 						"kind": "instructionAccountNode",
 						"name": "clock",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "rent",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "stakeHistory",
 						"isWritable": false,
-						"isSigner": false
+						"isSigner": false,
+						"isOptional": false
 					}
 				],
-				"arguments": [],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -52,10 +53,6 @@
 					}
 				]
 			}
-		],
-		"definedTypes": [],
-		"pdas": [],
-		"errors": []
-	},
-	"additionalPrograms": []
+		]
+	}
 }

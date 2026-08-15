@@ -13,6 +13,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
@@ -134,6 +136,9 @@ export type CounterProgramPlugin = {
 	accounts: CounterProgramPluginAccounts;
 	instructions: CounterProgramPluginInstructions;
 	pdas: CounterProgramPluginPdas;
+	identifyAccount: typeof identifyCounterProgramAccount;
+	identifyInstruction: typeof identifyCounterProgramInstruction;
+	parseInstruction: typeof parseCounterProgramInstruction;
 };
 
 export type CounterProgramPluginAccounts = {
@@ -163,9 +168,10 @@ export type CounterProgramPluginRequirements =
 	& ClientWithTransactionSending;
 
 export function counterProgramProgram() {
-	return <T extends CounterProgramPluginRequirements>(client: T) => {
-		return {
-			...client,
+	return <T extends CounterProgramPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { counterProgram: CounterProgramPlugin }> => {
+		return extendClient(client, {
 			counterProgram: <CounterProgramPlugin> {
 				accounts: {
 					counterState: addSelfFetchFunctions(client, getCounterStateCodec()),
@@ -183,7 +189,10 @@ export function counterProgramProgram() {
 						),
 				},
 				pdas: { counter: findCounterPda },
+				identifyAccount: identifyCounterProgramAccount,
+				identifyInstruction: identifyCounterProgramInstruction,
+				parseInstruction: parseCounterProgramInstruction,
 			},
-		};
+		});
 	};
 }

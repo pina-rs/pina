@@ -23,7 +23,7 @@ export type AnchorDuplicateMutableAccountsError =
 let anchorDuplicateMutableAccountsErrorMessages:
 	| Record<AnchorDuplicateMutableAccountsError, string>
 	| undefined;
-if (process.env.NODE_ENV !== "production") {
+if (process.env["NODE_ENV"] !== "production") {
 	anchorDuplicateMutableAccountsErrorMessages = {
 		[ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_ERROR__CONSTRAINT_DUPLICATE_MUTABLE_ACCOUNT]:
 			``,
@@ -33,7 +33,7 @@ if (process.env.NODE_ENV !== "production") {
 export function getAnchorDuplicateMutableAccountsErrorMessage(
 	code: AnchorDuplicateMutableAccountsError,
 ): string {
-	if (process.env.NODE_ENV !== "production") {
+	if (process.env["NODE_ENV"] !== "production") {
 		return (anchorDuplicateMutableAccountsErrorMessages as Record<
 			AnchorDuplicateMutableAccountsError,
 			string

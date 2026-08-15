@@ -13,6 +13,7 @@ import {
 	type Instruction,
 	type InstructionWithAccounts,
 	type ReadonlyAccount,
+	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 } from "@solana/kit";
@@ -24,7 +25,7 @@ import { ANCHOR_SYSVARS_PROGRAM_ADDRESS } from "../programs";
 
 export const SYSVARS_DISCRIMINATOR = 0;
 
-export function getSysvarsDiscriminatorBytes() {
+export function getSysvarsDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(SYSVARS_DISCRIMINATOR);
 }
 

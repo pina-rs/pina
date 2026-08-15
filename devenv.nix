@@ -868,6 +868,10 @@ in
     "security:audit" = {
       exec = ''
         set -euo pipefail
+        # The advisory DB lives inside the cached target dir; a stale or
+        # partial clone from a cache restore makes cargo-audit refuse to
+        # (re)initialize it. Remove it so the clone always starts fresh.
+        rm -rf "$DEVENV_ROOT/target/advisory-db-audit"
         cargo-audit audit \
           --db "$DEVENV_ROOT/target/advisory-db-audit" \
           --url "https://github.com/RustSec/advisory-db.git" \

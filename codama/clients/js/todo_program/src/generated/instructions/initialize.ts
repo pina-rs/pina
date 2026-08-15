@@ -43,7 +43,7 @@ import { TODO_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const INITIALIZE_DISCRIMINATOR = 0;
 
-export function getInitializeDiscriminatorBytes() {
+export function getInitializeDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR);
 }
 

@@ -1,16 +1,17 @@
 ---
 source: crates/pina_cli/tests/fixtures.rs
+assertion_line: 38
 expression: idl
 ---
 {
   "kind": "rootNode",
   "standard": "codama",
-  "version": "1.0.0",
+  "version": "1.8.0",
   "program": {
     "kind": "programNode",
     "name": "singleAccount",
     "publicKey": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
-    "version": "",
+    "version": "0.0.0",
     "accounts": [
       {
         "kind": "accountNode",
@@ -55,11 +56,6 @@ expression: idl
           }
         ]
       }
-    ],
-    "instructions": [],
-    "definedTypes": [],
-    "pdas": [],
-    "errors": []
-  },
-  "additionalPrograms": []
+    ]
+  }
 }

@@ -14,6 +14,7 @@ import {
 	type Instruction,
 	type InstructionWithAccounts,
 	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
@@ -29,7 +30,7 @@ import { COUNTER_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const INCREMENT_DISCRIMINATOR = 1;
 
-export function getIncrementDiscriminatorBytes() {
+export function getIncrementDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(INCREMENT_DISCRIMINATOR);
 }
 

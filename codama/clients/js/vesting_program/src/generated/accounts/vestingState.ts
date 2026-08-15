@@ -33,11 +33,12 @@ import {
 	getU8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
 } from "@solana/kit";
 
 export const VESTING_STATE_DISCRIMINATOR = 1;
 
-export function getVestingStateDiscriminatorBytes() {
+export function getVestingStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(VESTING_STATE_DISCRIMINATOR);
 }
 

@@ -12,6 +12,8 @@ import {
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
+	extendClient,
+	type ExtendedClient,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithData,
@@ -101,7 +103,11 @@ export function parseTransferSolInstruction<TProgram extends string>(
 	}
 }
 
-export type TransferSolPlugin = { instructions: TransferSolPluginInstructions };
+export type TransferSolPlugin = {
+	instructions: TransferSolPluginInstructions;
+	identifyInstruction: typeof identifyTransferSolInstruction;
+	parseInstruction: typeof parseTransferSolInstruction;
+};
 
 export type TransferSolPluginInstructions = {
 	cpiTransfer: (
@@ -119,9 +125,10 @@ export type TransferSolPluginRequirements =
 	& ClientWithTransactionSending;
 
 export function transferSolProgram() {
-	return <T extends TransferSolPluginRequirements>(client: T) => {
-		return {
-			...client,
+	return <T extends TransferSolPluginRequirements>(
+		client: T,
+	): ExtendedClient<T, { transferSol: TransferSolPlugin }> => {
+		return extendClient(client, {
 			transferSol: <TransferSolPlugin> {
 				instructions: {
 					cpiTransfer: (input) =>
@@ -135,7 +142,9 @@ export function transferSolProgram() {
 							getDirectTransferInstruction(input),
 						),
 				},
+				identifyInstruction: identifyTransferSolInstruction,
+				parseInstruction: parseTransferSolInstruction,
 			},
-		};
+		});
 	};
 }

@@ -1,16 +1,17 @@
 ---
 source: crates/pina_cli/tests/examples.rs
+assertion_line: 55
 expression: idl
 ---
 {
   "kind": "rootNode",
   "standard": "codama",
-  "version": "1.0.0",
+  "version": "1.8.0",
   "program": {
     "kind": "programNode",
     "name": "todoProgram",
     "publicKey": "Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd",
-    "version": "",
+    "version": "0.0.0",
     "accounts": [
       {
         "kind": "accountNode",
@@ -88,13 +89,15 @@ expression: idl
             "kind": "instructionAccountNode",
             "name": "owner",
             "isWritable": false,
-            "isSigner": true
+            "isSigner": true,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "todo",
             "isWritable": true,
             "isSigner": false,
+            "isOptional": false,
             "defaultValue": {
               "kind": "pdaValueNode",
               "pda": {
@@ -118,6 +121,7 @@ expression: idl
             "name": "systemProgram",
             "isWritable": false,
             "isSigner": false,
+            "isOptional": false,
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "11111111111111111111111111111111"
@@ -173,13 +177,15 @@ expression: idl
             "kind": "instructionAccountNode",
             "name": "owner",
             "isWritable": false,
-            "isSigner": true
+            "isSigner": true,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "todo",
             "isWritable": true,
             "isSigner": false,
+            "isOptional": false,
             "defaultValue": {
               "kind": "pdaValueNode",
               "pda": {
@@ -199,7 +205,6 @@ expression: idl
             }
           }
         ],
-        "arguments": [],
         "discriminators": [
           {
             "kind": "constantDiscriminatorNode",
@@ -227,13 +232,15 @@ expression: idl
             "kind": "instructionAccountNode",
             "name": "owner",
             "isWritable": false,
-            "isSigner": true
+            "isSigner": true,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "todo",
             "isWritable": true,
             "isSigner": false,
+            "isOptional": false,
             "defaultValue": {
               "kind": "pdaValueNode",
               "pda": {
@@ -286,7 +293,6 @@ expression: idl
         ]
       }
     ],
-    "definedTypes": [],
     "pdas": [
       {
         "kind": "pdaNode",
@@ -312,8 +318,6 @@ expression: idl
           }
         ]
       }
-    ],
-    "errors": []
-  },
-  "additionalPrograms": []
+    ]
+  }
 }
