@@ -4,7 +4,11 @@ all-features = true
 [advisories]
 db-path = "target/advisory-db"
 db-urls = ["https://github.com/RustSec/advisory-db.git"]
-ignore = []
+ignore = [
+	# RUSTSEC-2026-0204: bincode is unmaintained. Transitive dev-dependency
+	# (mollusk-svm, solana-account) — not shipped in any on-chain program.
+	"RUSTSEC-2026-0204",
+]
 
 [licenses]
 allow = [
