@@ -89,12 +89,12 @@ rust-version = "1.89.0"
 bytemuck = { default-features = false, version = "^1" }
 clap = { default-features = false, version = "^4", features = ["derive", "std"] }
 codama-nodes = { default-features = false, version = "0.11.0" }
-darling = { default-features = false, version = "0.23.0" }
+darling = { default-features = false, version = "0.24.0" }
 heck = { default-features = false, version = "^0.5" }
 insta = { default-features = false, version = "^1" }
 insta-cmd = { default-features = false, version = "^0.7.0" }
 mollusk-svm = { default-features = false, version = "0.15.0" }
-num-derive = { version = "^0.4", default-features = false }
+num-derive = { version = "^0.5", default-features = false }
 num-traits = { version = "^0.2", default-features = false }
 pastey = { default-features = false, version = "^0.2" }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
@@ -103,7 +103,7 @@ pinocchio-memo = { default-features = false, version = "^0.4" }
 pinocchio-system = { default-features = false, version = "^0.6" }
 pinocchio-token = { default-features = false, version = "^0.7" }
 pinocchio-token-2022 = { default-features = false, version = "^0.4" }
-prettyplease = { default-features = false, version = "^0.2" }
+prettyplease = { default-features = false, version = "^0.3" }
 proc-macro2 = { default-features = false, version = "^1" }
 proptest = { default-features = false, version = "^1", features = ["std"] }
 quote = { default-features = false, version = "^1" }
@@ -119,7 +119,7 @@ solana-program-log = { default-features = false, version = "^1.1" }
 solana-pubkey = { version = "^4", features = ["bytemuck"], default-features = false }
 solana-sdk-ids = { version = "^3", default-features = false }
 solana-system-interface = { version = "^3", default-features = false }
-syn = { default-features = false, version = "^2", features = ["full"] }
+syn = { default-features = false, version = "^3", features = ["full"] }
 tempfile = { default-features = false, version = "^3" }
 thiserror = { default-features = false, version = "^2" }
 tokio = { default-features = false, version = "^1" }

@@ -45,7 +45,7 @@ pub fn extract_validation_properties(
 		};
 
 		// Must be `impl ProcessAccountInfos for X`.
-		let Some(trait_path) = item_impl.trait_.as_ref().map(|(_, path, _)| path) else {
+		let Some(trait_path) = item_impl.trait_.as_ref().map(|(path, _)| path) else {
 			continue;
 		};
 
