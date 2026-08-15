@@ -1,3 +1,4 @@
+crates/**/target
 /target
 /docs/book
 /programs/target
