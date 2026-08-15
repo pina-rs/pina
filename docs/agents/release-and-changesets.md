@@ -2,12 +2,12 @@
 
 ## Release workflow
 
-This repo uses the knope bot workflow.
+This repo uses the monochange release workflow.
 
 ```sh
-knope document-change
-knope release
-knope publish
+monochange run change
+monochange run release
+monochange step publish-packages
 ```
 
 ## Required changesets
@@ -24,7 +24,7 @@ must include at least one changeset file in `.changeset/`.
 Interactive:
 
 ```sh
-knope document-change
+monochange run change --package <package-id> --bump <bump> --reason <reason>
 ```
 
 Manual:
@@ -33,6 +33,8 @@ Manual:
 ---
 package_name: change_type
 ---
+
+# Short heading
 
 Detailed description of the change.
 ```
@@ -46,18 +48,23 @@ dprint fmt .changeset/* --allow-no-files
 ## Change types
 
 - `major` — breaking changes
-- `minor` — new backwards-compatible features
-- `patch` — bug fixes
+- `feat` — new backwards-compatible features
+- `fix` — bug fixes
 - `docs` — documentation-only changes
-- `note` — general notes
+- `none` — general notes
 
 ## Package names
 
 - `pina`
 - `pina_macros`
 - `pina_sdk_ids`
+- `pina_cli`
+- `pina_codama_renderer`
+- `pina_pod_primitives`
+- `pina_profile`
+- `codama-nodes-from-pina`
 
-A single changeset file may reference multiple packages.
+A single changeset file may reference multiple packages. All publishable packages share one release identity via the `core` group, so any changeset bumps the whole group to the same version.
 
 ## Commit scope convention
 

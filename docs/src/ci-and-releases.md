@@ -79,22 +79,22 @@ The `docs-pages` workflow publishes the mdBook to GitHub Pages:
 
 ## CLI asset releases
 
-The `assets` workflow only publishes binaries for CLI tags:
+The `publish` workflow builds and uploads the `pina` CLI binary for all supported platforms on release tag pushes (`v*`):
 
-- Required tag format: `pina_cli/v<version>`
-- Tag/version check: release tag must match `crates/pina_cli/Cargo.toml`
-- Build scope: `crates/pina_cli` only (`package = "pina_cli"`)
+- Trigger: tag push `v*` (created by the `release-pr` workflow after a release PR merges)
+- Build scope: `crates/pina_cli` only (`bin = "pina"`)
+- Artifacts: `pina-<target>-<tag>` archives with `sha256`/`sha512` checksums, attested with build provenance
 
 ## Release workflow
 
-Use `knope` for changelog/release management:
+Use `monochange` for changelog/release management:
 
 <!-- {=releaseWorkflowCommands} -->
 
 ```bash
-knope document-change
-knope release
-knope publish
+monochange run change
+monochange run release
+monochange step publish-packages
 ```
 
 <!-- {/releaseWorkflowCommands} -->

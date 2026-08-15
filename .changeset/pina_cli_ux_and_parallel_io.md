@@ -1,6 +1,8 @@
 ---
-pina_cli: minor
+pina_cli: feat
 ---
+
+# Add UX improvements and parallel file I/O to the pina CLI
 
 Add UX improvements and parallel file I/O to the `pina` CLI.
 

@@ -1,0 +1,170 @@
+# :schema https://monochange.github.io/monochange/schemas/monochange.schema.json
+
+[defaults]
+parent_bump = "patch"
+include_private = false
+warn_on_group_mismatch = true
+package_type = "cargo"
+changelog = false
+
+[changelog.sections]
+breaking = { heading = "Breaking Changes", priority = 10 }
+feat = { heading = "Features", priority = 20 }
+fix = { heading = "Fixes", priority = 30 }
+docs = { heading = "Documentation", priority = 40 }
+other = { heading = "Notes", priority = 50 }
+
+[changelog.types]
+major = { bump = "major", section = "breaking" }
+breaking = { bump = "major", section = "breaking" }
+feat = { bump = "minor", section = "feat" }
+fix = { bump = "patch", section = "fix" }
+docs = { bump = "none", section = "docs" }
+none = { bump = "none", section = "other" }
+
+[source]
+provider = "github"
+owner = "pina-rs"
+repo = "pina"
+
+[source.releases]
+enabled = true
+source = "monochange"
+branches = ["main"]
+enforce_for_tags = true
+enforce_for_publish = true
+enforce_for_commit = false
+changeset_context_timeout_seconds = 120
+
+[source.pull_requests]
+enabled = true
+branch_prefix = "monochange/release"
+base = "main"
+title = "chore(release): prepare release"
+labels = ["release", "automated"]
+auto_merge = false
+
+[cli.change]
+help_text = "Create a changeset"
+inputs = [
+	{ name = "interactive", type = "boolean" },
+	{ name = "package", type = "string_list", required = true },
+	{ name = "bump", type = "choice", choices = ["none", "patch", "minor", "major"], default = "patch" },
+	{ name = "version", type = "string" },
+	{ name = "reason", type = "string", required = true },
+	{ name = "type", type = "string" },
+	{ name = "details", type = "string" },
+	{ name = "caused_by", type = "string_list" },
+	{ name = "output", type = "string" },
+]
+steps = [
+	{ name = "create change file", type = "CreateChangeFile", inputs = ["interactive", "package", "bump", "version", "type", "caused_by", "reason", "details", "output"] },
+]
+
+[cli.release]
+help_text = "Prepare, format, commit, and open the release pull request."
+steps = [
+	{ name = "prepare release", type = "PrepareRelease", allow_empty_changesets = true, inputs = { format = "json" } },
+	{ name = "format release commit", type = "Command", shell = "bash", command = "fix:format", when = "{{ number_of_changesets > 0 }}" },
+	{ name = "commit release", type = "CommitRelease", inputs = { stage_all = true, no_verify = true }, when = "{{ number_of_changesets > 0 }}" },
+	{ name = "open release request", type = "OpenReleaseRequest", inputs = { stage_all = true, no_verify = true }, when = "{{ number_of_changesets > 0 }}" },
+]
+
+[package.pina]
+path = "crates/pina"
+type = "cargo"
+
+[package.pina_cli]
+path = "crates/pina_cli"
+type = "cargo"
+
+[package.pina_macros]
+path = "crates/pina_macros"
+type = "cargo"
+
+[package.pina_codama_renderer]
+path = "crates/pina_codama_renderer"
+type = "cargo"
+
+[package.pina_pod_primitives]
+path = "crates/pina_pod_primitives"
+type = "cargo"
+
+[package.pina_profile]
+path = "crates/pina_profile"
+type = "cargo"
+
+[package.pina_sdk_ids]
+path = "crates/pina_sdk_ids"
+type = "cargo"
+
+[package."codama-nodes-from-pina"]
+path = "packages/nodes-from-pina"
+type = "npm"
+
+[group.core]
+packages = [
+	"pina",
+	"pina_cli",
+	"pina_macros",
+	"pina_codama_renderer",
+	"pina_pod_primitives",
+	"pina_profile",
+	"pina_sdk_ids",
+	"codama-nodes-from-pina",
+]
+release = true
+tag = true
+version_format = "primary"
+changelog = { path = "changelog.md", format = "keep_a_changelog", include = "all" }
+versioned_files = [
+	{ path = "Cargo.toml", type = "cargo", fields = ["workspace.package.version"] },
+]
+
+[ecosystems.cargo]
+enabled = true
+versioned_files = ["Cargo.toml"]
+# Refresh Cargo.lock after a release bumps the workspace version. All pina
+# crates inherit `version = { workspace = true }`, so `cargo update --workspace`
+# syncs exactly those lockfile entries without touching dependencies.
+lockfile_commands = [
+	{ command = "cargo update --workspace", cwd = ".", shell = "bash" },
+]
+
+[ecosystems.cargo.publish]
+enabled = true
+mode = "builtin"
+trusted_publishing = true
+
+[ecosystems.npm]
+enabled = true
+lockfile_commands = [{ command = "pnpm install --lockfile-only" }]
+
+[ecosystems.npm.publish]
+enabled = true
+mode = "builtin"
+registry = "npm"
+trusted_publishing = true
+
+[changesets.affected]
+enabled = true
+required = true
+skip_labels = ["release"]
+comment_on_failure = true
+changed_paths = ["codecov.yml"]
+ignored_paths = [
+	"**/tests/**",
+	"**/snapshots/**",
+	"changelog.md",
+	"docs/**",
+	"templates/**",
+]
+
+[lints]
+use = ["cargo/baseline", "npm/baseline"]
+exclude = ["codama/**"]
+
+[lints.rules]
+# Crates inherit `repository` from `[workspace.package]`; the per-crate
+# subdirectory URL is a nice-to-have, not a correctness requirement.
+"cargo/manifest-repository" = "off"
