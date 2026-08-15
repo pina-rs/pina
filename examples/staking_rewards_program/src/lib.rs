@@ -100,27 +100,27 @@ pub struct PositionState {
 	pub bump: u8,
 }
 
-#[instruction(discriminator = StakingInstruction, variant = InitializePool)]
+#[instruction(discriminator = StakingInstruction::InitializePool)]
 pub struct InitializePoolInstruction {
 	pub bump: u8,
 }
 
-#[instruction(discriminator = StakingInstruction, variant = OpenPosition)]
+#[instruction(discriminator = StakingInstruction::OpenPosition)]
 pub struct OpenPositionInstruction {
 	pub bump: u8,
 }
 
-#[instruction(discriminator = StakingInstruction, variant = Deposit)]
+#[instruction(discriminator = StakingInstruction::Deposit)]
 pub struct DepositInstruction {
 	pub amount: PodU64,
 }
 
-#[instruction(discriminator = StakingInstruction, variant = Withdraw)]
+#[instruction(discriminator = StakingInstruction::Withdraw)]
 pub struct WithdrawInstruction {
 	pub amount: PodU64,
 }
 
-#[instruction(discriminator = StakingInstruction, variant = Claim)]
+#[instruction(discriminator = StakingInstruction::Claim)]
 pub struct ClaimInstruction {}
 
 #[derive(Accounts, Debug)]
@@ -250,7 +250,6 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.pool_state
 			.assert_empty()?
-			.assert_writable()?
 			.assert_seeds_with_bump(pool_seeds_with_bump, &ID)?;
 		self.stake_vault
 			.assert_empty()?
@@ -337,7 +336,6 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 			.assert_type::<PoolState>(&ID)?;
 		self.position_state
 			.assert_empty()?
-			.assert_writable()?
 			.assert_seeds_with_bump(position_seeds_with_bump, &ID)?;
 
 		// Check pool is not paused
@@ -383,11 +381,9 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.pool_state
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<PoolState>(&ID)?;
 		self.position_state
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<PositionState>(&ID)?;
 		self.user_stake_ata
 			.assert_writable()?
@@ -469,11 +465,9 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.pool_state
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<PoolState>(&ID)?;
 		self.position_state
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<PositionState>(&ID)?;
 		self.user_stake_ata
 			.assert_writable()?
@@ -533,7 +527,6 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 			.assert_type::<PoolState>(&ID)?;
 		self.position_state
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<PositionState>(&ID)?;
 		self.user_reward_ata
 			.assert_writable()?

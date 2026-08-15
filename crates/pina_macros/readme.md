@@ -43,7 +43,7 @@ pub enum Instruction {
 	Initialize = 0,
 }
 
-#[instruction(discriminator = Instruction, variant = Initialize)]
+#[instruction(discriminator = Instruction::Initialize)]
 pub struct InitializeInstruction {
 	pub bump: u8,
 }
@@ -79,7 +79,7 @@ pub enum ExampleError {
 <br>
 
 - `discriminator = PathToEnum`
-- `variant = EnumVariant` (optional; defaults to inferred struct name)
+- `variant = EnumVariant` (optional; defaults to inferred struct name; cannot be combined with a `discriminator` path that includes a variant)
 - `crate = ::pina` (optional)
 
 ### `#[error(...)]`

@@ -25,13 +25,13 @@ pub enum EventsInstruction {
 	TestEventCpi = 2,
 }
 
-#[instruction(discriminator = EventsInstruction, variant = Initialize)]
+#[instruction(discriminator = EventsInstruction::Initialize)]
 pub struct InitializeInstruction {}
 
-#[instruction(discriminator = EventsInstruction, variant = TestEvent)]
+#[instruction(discriminator = EventsInstruction::TestEvent)]
 pub struct TestEventInstruction {}
 
-#[instruction(discriminator = EventsInstruction, variant = TestEventCpi)]
+#[instruction(discriminator = EventsInstruction::TestEventCpi)]
 pub struct TestEventCpiInstruction {}
 
 #[discriminator]

@@ -33,12 +33,12 @@ pub enum ReallocInstruction {
 	Realloc2 = 1,
 }
 
-#[instruction(discriminator = ReallocInstruction, variant = Realloc)]
+#[instruction(discriminator = ReallocInstruction::Realloc)]
 pub struct ReallocIx {
 	pub len: PodU16,
 }
 
-#[instruction(discriminator = ReallocInstruction, variant = Realloc2)]
+#[instruction(discriminator = ReallocInstruction::Realloc2)]
 pub struct Realloc2Ix {
 	pub len: PodU16,
 }
@@ -84,7 +84,6 @@ impl<'a> ProcessAccountInfos<'a> for ReallocAccounts<'a> {
 		let target_len = usize::from(u16::from(args.len));
 
 		self.authority.assert_signer()?;
-		self.sample.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
 
 		validate_realloc_delta(self.sample.data_len(), target_len)?;
@@ -102,8 +101,6 @@ impl<'a> ProcessAccountInfos<'a> for Realloc2Accounts<'a> {
 			.ok_or(ProgramError::ArithmeticOverflow)?;
 
 		self.authority.assert_signer()?;
-		self.sample1.assert_writable()?;
-		self.sample2.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
 
 		validate_distinct_realloc_targets(self.sample1.address(), self.sample2.address())?;

@@ -1,3 +1,4 @@
+crates/**/target
 /target
 /docs/book
 /programs/target
@@ -74,6 +75,11 @@ devenv.local.nix
 .pre-commit-config.yaml
 
 
+
+# Fuzz artifacts
+crates/pina_fuzz/fuzz/corpus/
+crates/pina_fuzz/fuzz/artifacts/
+crates/pina_fuzz/target/
 
 # Claude Code worktrees
 .claude/worktrees/

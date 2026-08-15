@@ -87,7 +87,7 @@ The numeric value (`0`) becomes the first byte of the serialized instruction dat
 The `#[instruction]` macro creates a `Pod`/`Zeroable` struct whose first field is an auto-injected discriminator byte. It also generates a `TypedBuilder` for ergonomic construction in tests:
 
 ```rust
-#[instruction(discriminator = HelloInstruction, variant = Hello)]
+#[instruction(discriminator = HelloInstruction::Hello)]
 pub struct HelloInstructionData {}
 ```
 
@@ -185,7 +185,7 @@ pub enum HelloInstruction {
 	Hello = 0,
 }
 
-#[instruction(discriminator = HelloInstruction, variant = Hello)]
+#[instruction(discriminator = HelloInstruction::Hello)]
 pub struct HelloInstructionData {}
 
 #[derive(Accounts, Debug)]

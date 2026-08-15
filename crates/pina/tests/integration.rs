@@ -1892,7 +1892,9 @@ fn try_from_account_infos_rejects_too_many() {
 		AccountBuilder::new()
 			.address(address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY"))
 			.is_signer(true),
-		AccountBuilder::new().address(address!("3Jiy8N6ZGv3ueH9k3svLRaHscmQbE6v7W9FHJaGH2mki")),
+		AccountBuilder::new()
+			.address(address!("3Jiy8N6ZGv3ueH9k3svLRaHscmQbE6v7W9FHJaGH2mki"))
+			.is_writable(true),
 		AccountBuilder::new().address(address!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")),
 	];
 

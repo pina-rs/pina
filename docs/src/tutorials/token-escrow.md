@@ -97,7 +97,7 @@ The `seed` and `bump` fields are stored so that PDA derivation can be verified o
 <br>
 
 ```rust
-#[instruction(discriminator = EscrowInstruction, variant = Make)]
+#[instruction(discriminator = EscrowInstruction::Make)]
 pub struct MakeInstruction {
 	pub seed: PodU64,
 	pub amount_a: PodU64,
@@ -105,7 +105,7 @@ pub struct MakeInstruction {
 	pub bump: u8,
 }
 
-#[instruction(discriminator = EscrowInstruction, variant = Take)]
+#[instruction(discriminator = EscrowInstruction::Take)]
 pub struct TakeInstruction {}
 ```
 

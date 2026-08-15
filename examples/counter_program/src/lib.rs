@@ -105,7 +105,7 @@ pub struct CounterState {
 ///
 /// Contains the PDA bump seed so the client can pass a pre-computed bump
 /// (avoids the cost of `find_program_address` on-chain).
-#[instruction(discriminator = CounterInstruction, variant = Initialize)]
+#[instruction(discriminator = CounterInstruction::Initialize)]
 pub struct InitializeInstruction {
 	/// The PDA bump seed, computed off-chain.
 	pub bump: u8,
@@ -113,7 +113,7 @@ pub struct InitializeInstruction {
 
 /// Instruction data for `Increment`. No extra payload beyond the
 /// discriminator byte.
-#[instruction(discriminator = CounterInstruction, variant = Increment)]
+#[instruction(discriminator = CounterInstruction::Increment)]
 pub struct IncrementInstruction {}
 
 // ---------------------------------------------------------------------------
@@ -182,7 +182,6 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.authority.assert_signer()?;
 		self.counter
 			.assert_empty()?
-			.assert_writable()?
 			.assert_seeds_with_bump(seeds_with_bump, &ID)?;
 		self.system_program.assert_address(&system::ID)?;
 
@@ -219,7 +218,6 @@ impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 		let authority_key = self.authority.address();
 		self.counter
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<CounterState>(&ID)?;
 
 		let bump = {

@@ -40,16 +40,16 @@ pub struct TodoState {
 	pub digest: [u8; 32],
 }
 
-#[instruction(discriminator = TodoInstruction, variant = Initialize)]
+#[instruction(discriminator = TodoInstruction::Initialize)]
 pub struct InitializeInstruction {
 	pub bump: u8,
 	pub digest: [u8; 32],
 }
 
-#[instruction(discriminator = TodoInstruction, variant = ToggleCompleted)]
+#[instruction(discriminator = TodoInstruction::ToggleCompleted)]
 pub struct ToggleCompletedInstruction {}
 
-#[instruction(discriminator = TodoInstruction, variant = UpdateDigest)]
+#[instruction(discriminator = TodoInstruction::UpdateDigest)]
 pub struct UpdateDigestInstruction {
 	pub digest: [u8; 32],
 }
@@ -91,7 +91,6 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.owner.assert_signer()?;
 		self.todo
 			.assert_empty()?
-			.assert_writable()?
 			.assert_seeds_with_bump(seeds_with_bump, &ID)?;
 		self.system_program.assert_address(&system::ID)?;
 
@@ -128,7 +127,6 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 		self.owner.assert_signer()?;
 		self.todo
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<TodoState>(&ID)?;
 
 		let bump = {

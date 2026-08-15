@@ -29,7 +29,7 @@ pub enum DeclareProgramInstruction {
 	ValidateExternalProgram = 0,
 }
 
-#[instruction(discriminator = DeclareProgramInstruction, variant = ValidateExternalProgram)]
+#[instruction(discriminator = DeclareProgramInstruction::ValidateExternalProgram)]
 pub struct ValidateExternalProgramInstruction {}
 
 #[derive(Accounts, Debug)]

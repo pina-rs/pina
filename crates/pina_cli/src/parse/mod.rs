@@ -249,12 +249,10 @@ fn extract_package_name(cargo_contents: &str) -> Option<String> {
 			in_package = false;
 			continue;
 		}
-		if in_package {
-			if let Some(rest) = trimmed.strip_prefix("name") {
-				let rest = rest.trim().strip_prefix('=')?;
-				let rest = rest.trim().trim_matches('"');
-				return Some(rest.to_owned());
-			}
+		if in_package && let Some(rest) = trimmed.strip_prefix("name") {
+			let rest = rest.trim().strip_prefix('=')?;
+			let rest = rest.trim().trim_matches('"');
+			return Some(rest.to_owned());
 		}
 	}
 	None

@@ -14,13 +14,13 @@ pub fn extract_seed_constants(file: &File) -> Vec<SeedConstant> {
 	let mut result = Vec::new();
 
 	for item in &file.items {
-		if let Item::Const(c) = item {
-			if let Some(value) = extract_byte_string_value(&c.expr) {
-				result.push(SeedConstant {
-					name: c.ident.to_string(),
-					value,
-				});
-			}
+		if let Item::Const(c) = item
+			&& let Some(value) = extract_byte_string_value(&c.expr)
+		{
+			result.push(SeedConstant {
+				name: c.ident.to_string(),
+				value,
+			});
 		}
 	}
 

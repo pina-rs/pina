@@ -22,7 +22,7 @@ pub enum SystemAccountsInstruction {
 	Initialize = 0,
 }
 
-#[instruction(discriminator = SystemAccountsInstruction, variant = Initialize)]
+#[instruction(discriminator = SystemAccountsInstruction::Initialize)]
 pub struct InitializeInstruction {}
 
 #[derive(Accounts, Debug)]

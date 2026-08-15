@@ -40,13 +40,13 @@ pub struct FloatDataAccount {
 	pub authority: Address,
 }
 
-#[instruction(discriminator = FloatInstruction, variant = Create)]
+#[instruction(discriminator = FloatInstruction::Create)]
 pub struct CreateInstruction {
 	pub data_f32: PodU32,
 	pub data_f64: PodU64,
 }
 
-#[instruction(discriminator = FloatInstruction, variant = Update)]
+#[instruction(discriminator = FloatInstruction::Update)]
 pub struct UpdateInstruction {
 	pub data_f32: PodU32,
 	pub data_f64: PodU64,
@@ -94,7 +94,7 @@ impl<'a> ProcessAccountInfos<'a> for CreateAccounts<'a> {
 		let data_f64 = f64::from_bits(u64::from(args.data_f64));
 
 		self.authority.assert_signer()?;
-		self.account.assert_empty()?.assert_writable()?;
+		self.account.assert_empty()?;
 		self.system_program.assert_address(&system::ID)?;
 
 		create_account(
@@ -118,9 +118,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 		let data_f64 = f64::from_bits(u64::from(args.data_f64));
 
 		self.authority.assert_signer()?;
-		self.account
-			.assert_writable()?
-			.assert_type::<FloatDataAccount>(&ID)?;
+		self.account.assert_type::<FloatDataAccount>(&ID)?;
 
 		let mut account = self.account.as_account_mut::<FloatDataAccount>(&ID)?;
 		apply_update(&mut account, self.authority.address(), data_f32, data_f64)

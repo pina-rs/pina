@@ -257,6 +257,23 @@ fn account_with_custom_variant() {
 }
 
 #[test]
+fn account_with_path_variant() {
+	let args = quote! { crate = ::pina, discriminator = AcctDisc::Custom };
+	let input = quote! {
+		pub struct MyStruct {
+			pub value: u8,
+		}
+	};
+	let tokens = account_impl(args, input);
+	if let Err(e) = syn::parse2::<syn::File>(tokens.clone()) {
+		eprintln!("PARSE ERROR: {e}");
+		eprintln!("TOKENS: {tokens}");
+	}
+	let output = pretty(tokens);
+	insta::assert_snapshot!("account_with_path_variant", output);
+}
+
+#[test]
 fn account_many_fields() {
 	let args = quote! { crate = ::pina, discriminator = MyAccount };
 	let input = quote! {
@@ -331,6 +348,19 @@ fn instruction_with_custom_variant() {
 }
 
 #[test]
+fn instruction_with_path_variant() {
+	let args = quote! { crate = ::pina, discriminator = OpCode::DoTransfer };
+	let input = quote! {
+		pub struct TransferData {
+			pub amount: PodU64,
+			pub destination: [u8; 32],
+		}
+	};
+	let output = pretty(instruction_impl(args, input));
+	insta::assert_snapshot!("instruction_with_path_variant", output);
+}
+
+#[test]
 fn instruction_with_array_and_pod() {
 	let args = quote! { crate = ::pina, discriminator = MyInstruction };
 	let input = quote! {
@@ -373,6 +403,18 @@ fn event_with_variant() {
 	};
 	let output = pretty(event_impl(args, input));
 	insta::assert_snapshot!("event_with_variant", output);
+}
+
+#[test]
+fn event_with_path_variant() {
+	let args = quote! { crate = ::pina, discriminator = EventKind::Init };
+	let input = quote! {
+		pub struct InitializeEvent {
+			pub choice: u8,
+		}
+	};
+	let output = pretty(event_impl(args, input));
+	insta::assert_snapshot!("event_with_path_variant", output);
 }
 
 #[test]

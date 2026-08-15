@@ -122,7 +122,7 @@ fn accounts_derive_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenSt
 			cursor.finish_exact()?;
 		}
 	});
-	let remaining_binding = remaining_field.map(|f| quote! { let #f = cursor.remaining_mut(); });
+	let remaining_binding = remaining_field.map(|f| quote! { let #f = cursor.remaining_mut()?; });
 	let remaining_field_ident = remaining_field.map(|f| quote!(#f,));
 
 	quote! {
@@ -168,6 +168,59 @@ fn is_reference(ty: &Type) -> bool {
 
 fn is_mut_reference(ty: &Type) -> bool {
 	matches!(ty, Type::Reference(reference) if reference.mutability.is_some())
+}
+
+/// Split a `discriminator` path into the enum path and an optional variant.
+///
+/// Accepts both `Enum` (the variant defaults to the struct name) and
+/// `Enum::Variant` forms.
+fn split_discriminator_path(
+	path: &syn::Path,
+) -> Result<(syn::Path, Option<syn::Ident>), syn::Error> {
+	match path.segments.len() {
+		1 => Ok((path.clone(), None)),
+		2 => {
+			let variant = path.segments.last().unwrap().ident.clone();
+			let mut enum_segments = Punctuated::new();
+			enum_segments.push(path.segments.first().unwrap().clone());
+			let enum_path = syn::Path {
+				leading_colon: path.leading_colon,
+				segments: enum_segments,
+			};
+			Ok((enum_path, Some(variant)))
+		}
+		_ => {
+			Err(syn::Error::new_spanned(
+				path,
+				"`discriminator` must be a path of the form `Enum` or `Enum::Variant`",
+			))
+		}
+	}
+}
+
+/// Resolve the discriminator variant from a `discriminator` path and an
+/// explicit `variant` argument.
+///
+/// - `discriminator = Enum::Variant` → `Variant`
+/// - `discriminator = Enum, variant = Variant` → `Variant`
+/// - `discriminator = Enum` → the struct name (shorthand)
+fn resolve_discriminator_variant(
+	discriminator: &syn::Path,
+	explicit_variant: Option<syn::Ident>,
+	struct_name: &syn::Ident,
+) -> Result<(syn::Path, syn::Ident), syn::Error> {
+	let (enum_path, path_variant) = split_discriminator_path(discriminator)?;
+	if path_variant.is_some() && explicit_variant.is_some() {
+		return Err(syn::Error::new_spanned(
+			discriminator,
+			"`variant` cannot be combined with a `discriminator` path that already includes a \
+			 variant",
+		));
+	}
+	let variant = explicit_variant
+		.or(path_variant)
+		.unwrap_or_else(|| struct_name.clone());
+	Ok((enum_path, variant))
 }
 
 /// `#[error]` is a lightweight modification to the provided enum acting as
@@ -531,8 +584,12 @@ fn discriminator_impl(
 ///   access to the `pina` crate in the dependencies. This is optional and
 ///   defaults to `::pina` assuming that `pina` is installed in the consuming
 ///   crate.
-/// - `discriminator` - the discriminator enum to use for this account. The
-///   variant should match the name of the account struct.
+/// - `discriminator` - the discriminator enum to use for this account. May be
+///   written as `Enum` (the variant defaults to the account struct name) or
+///   `Enum::Variant`.
+/// - `variant` - (optional) the variant of the discriminator enum to use for
+///   this account. Cannot be combined with a `discriminator` path that already
+///   includes a variant.
 ///
 /// #### Codegen
 ///
@@ -759,7 +816,11 @@ fn account_impl(
 		discriminator,
 		variant,
 	} = args;
-	let variant = variant.unwrap_or(struct_name.clone());
+	let (discriminator, variant) =
+		match resolve_discriminator_variant(&discriminator, variant, struct_name) {
+			Ok(v) => v,
+			Err(e) => return e.to_compile_error(),
+		};
 
 	// Add #[repr(C)]
 	let repr_attr: Attribute = syn::parse_quote!(#[repr(C)]);
@@ -1009,8 +1070,12 @@ fn account_impl(
 ///
 /// #### Attributes
 ///
-/// - `discriminator` - the discriminator enum to use for this instruction. The
-///   variant should match the name of the instruction struct.
+/// - `discriminator` - the discriminator enum to use for this instruction. May
+///   be written as `Enum` (the variant defaults to the instruction struct
+///   name) or `Enum::Variant`.
+/// - `variant` - (optional) the variant of the discriminator enum to use for
+///   this instruction. Cannot be combined with a `discriminator` path that
+///   already includes a variant.
 ///
 /// #### Codegen
 ///
@@ -1147,7 +1212,11 @@ fn instruction_impl(
 		discriminator,
 		variant,
 	} = args;
-	let variant = variant.unwrap_or(struct_name.clone());
+	let (discriminator, variant) =
+		match resolve_discriminator_variant(&discriminator, variant, struct_name) {
+			Ok(v) => v,
+			Err(e) => return e.to_compile_error(),
+		};
 
 	// Add #[repr(C)]
 	let repr_attr: Attribute = syn::parse_quote!(#[repr(C)]);
@@ -1334,8 +1403,12 @@ fn instruction_impl(
 ///
 /// - `crate` - this defaults to `::pina` as the developer is expected to have
 ///   access to the `pina` crate in the dependencies.
-/// - `discriminator` - the discriminator enum to use for this event.
-/// - `variant` - the variant of the discriminator enum to use for this event.
+/// - `discriminator` - the discriminator enum to use for this event. May be
+///   written as `Enum` (the variant defaults to the event struct name) or
+///   `Enum::Variant`.
+/// - `variant` - (optional) the variant of the discriminator enum to use for
+///   this event. Cannot be combined with a `discriminator` path that already
+///   includes a variant.
 ///
 /// #### Codegen
 ///
@@ -1444,7 +1517,11 @@ fn event_impl(
 		discriminator,
 		variant,
 	} = args;
-	let variant = variant.unwrap_or(struct_name.clone());
+	let (discriminator, variant) =
+		match resolve_discriminator_variant(&discriminator, variant, struct_name) {
+			Ok(v) => v,
+			Err(e) => return e.to_compile_error(),
+		};
 
 	// Add #[repr(C)]
 	let repr_attr: Attribute = syn::parse_quote!(#[repr(C)]);

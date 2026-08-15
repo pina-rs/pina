@@ -41,25 +41,25 @@ pub enum ErrorsInstruction {
 	RequireGte = 6,
 }
 
-#[instruction(discriminator = ErrorsInstruction, variant = Hello)]
+#[instruction(discriminator = ErrorsInstruction::Hello)]
 pub struct HelloInstruction {}
 
-#[instruction(discriminator = ErrorsInstruction, variant = HelloNoMsg)]
+#[instruction(discriminator = ErrorsInstruction::HelloNoMsg)]
 pub struct HelloNoMsgInstruction {}
 
-#[instruction(discriminator = ErrorsInstruction, variant = HelloNext)]
+#[instruction(discriminator = ErrorsInstruction::HelloNext)]
 pub struct HelloNextInstruction {}
 
-#[instruction(discriminator = ErrorsInstruction, variant = RequireEq)]
+#[instruction(discriminator = ErrorsInstruction::RequireEq)]
 pub struct RequireEqInstruction {}
 
-#[instruction(discriminator = ErrorsInstruction, variant = RequireNeq)]
+#[instruction(discriminator = ErrorsInstruction::RequireNeq)]
 pub struct RequireNeqInstruction {}
 
-#[instruction(discriminator = ErrorsInstruction, variant = RequireGt)]
+#[instruction(discriminator = ErrorsInstruction::RequireGt)]
 pub struct RequireGtInstruction {}
 
-#[instruction(discriminator = ErrorsInstruction, variant = RequireGte)]
+#[instruction(discriminator = ErrorsInstruction::RequireGte)]
 pub struct RequireGteInstruction {}
 
 #[allow(dead_code)]

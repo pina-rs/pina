@@ -25,7 +25,7 @@ pub fn extract_instruction_structs(file: &File) -> Vec<InstructionStruct> {
 		};
 
 		let Some((disc_enum, variant)) =
-			get_instruction_discriminator_and_variant(&item_struct.attrs)
+			get_instruction_discriminator_and_variant(&item_struct.attrs, &item_struct.ident)
 		else {
 			continue;
 		};
@@ -45,9 +45,13 @@ pub fn extract_instruction_structs(file: &File) -> Vec<InstructionStruct> {
 	result
 }
 
-/// Parse `discriminator = EnumType, variant = Variant` from
-/// `#[instruction(...)]`.
-fn get_instruction_discriminator_and_variant(attrs: &[syn::Attribute]) -> Option<(String, String)> {
+/// Parse `discriminator = EnumType` (with the variant defaulting to the
+/// struct name), `discriminator = EnumType::Variant`, or
+/// `discriminator = EnumType, variant = Variant` from `#[instruction(...)]`.
+fn get_instruction_discriminator_and_variant(
+	attrs: &[syn::Attribute],
+	struct_name: &syn::Ident,
+) -> Option<(String, String)> {
 	for attr in attrs {
 		if !attr.path().is_ident("instruction") {
 			continue;
@@ -68,9 +72,23 @@ fn get_instruction_discriminator_and_variant(attrs: &[syn::Attribute]) -> Option
 				}
 			}
 		}
-		if let (Some(d), Some(v)) = (disc, variant) {
-			return Some((d, v));
-		}
+		let disc = disc?;
+		// `discriminator = Enum::Variant` carries the variant in the path.
+		let (disc_enum, path_variant) = match disc.split_once("::") {
+			Some((enum_name, variant_name)) => {
+				(enum_name.to_owned(), Some(variant_name.to_owned()))
+			}
+			None => (disc, None),
+		};
+		let variant = match (path_variant, variant) {
+			(Some(_), Some(_)) => return None,
+			(path_variant, variant) => {
+				variant
+					.or(path_variant)
+					.unwrap_or_else(|| struct_name.to_string())
+			}
+		};
+		return Some((disc_enum, variant));
 	}
 	None
 }
@@ -133,6 +151,37 @@ mod tests {
 		assert_eq!(instructions[0].variant, "Initialize");
 		assert_eq!(instructions[0].fields.len(), 1);
 		assert_eq!(instructions[0].fields[0].name, "bump");
+	}
+
+	#[test]
+	fn extracts_instruction_struct_with_path_variant() {
+		let source = r#"
+			#[instruction(discriminator = CounterInstruction::Initialize)]
+			pub struct InitializeInstruction {
+				pub bump: u8,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let instructions = extract_instruction_structs(&file);
+		assert_eq!(instructions.len(), 1);
+		assert_eq!(instructions[0].name, "InitializeInstruction");
+		assert_eq!(instructions[0].discriminator_enum, "CounterInstruction");
+		assert_eq!(instructions[0].variant, "Initialize");
+	}
+
+	#[test]
+	fn extracts_instruction_struct_with_shorthand_variant() {
+		let source = r#"
+			#[instruction(discriminator = CounterInstruction)]
+			pub struct Initialize {
+				pub bump: u8,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let instructions = extract_instruction_structs(&file);
+		assert_eq!(instructions.len(), 1);
+		assert_eq!(instructions[0].discriminator_enum, "CounterInstruction");
+		assert_eq!(instructions[0].variant, "Initialize");
 	}
 
 	#[test]

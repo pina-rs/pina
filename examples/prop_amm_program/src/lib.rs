@@ -67,15 +67,15 @@ pub struct OracleState {
 	pub price: PodU64,
 }
 
-#[instruction(discriminator = PropAmmInstruction, variant = Initialize)]
+#[instruction(discriminator = PropAmmInstruction::Initialize)]
 pub struct InitializeInstruction {}
 
-#[instruction(discriminator = PropAmmInstruction, variant = Update)]
+#[instruction(discriminator = PropAmmInstruction::Update)]
 pub struct UpdateInstruction {
 	pub new_price: PodU64,
 }
 
-#[instruction(discriminator = PropAmmInstruction, variant = RotateAuthority)]
+#[instruction(discriminator = PropAmmInstruction::RotateAuthority)]
 pub struct RotateAuthorityInstruction {
 	pub new_authority: Address,
 }
@@ -124,10 +124,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		let _ = InitializeInstruction::try_from_bytes(data)?;
 
 		self.payer.assert_signer()?.assert_writable()?;
-		self.oracle
-			.assert_signer()?
-			.assert_writable()?
-			.assert_empty()?;
+		self.oracle.assert_signer()?.assert_empty()?;
 		self.system_program.assert_address(&system::ID)?;
 
 		create_account(self.payer, self.oracle, oracle_size(), &ID)?;
@@ -148,9 +145,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 
 		self.authority.assert_signer()?;
 		assert_update_authority(self.authority)?;
-		self.oracle
-			.assert_writable()?
-			.assert_type::<OracleState>(&ID)?;
+		self.oracle.assert_type::<OracleState>(&ID)?;
 
 		let mut oracle = self.oracle.as_account_mut::<OracleState>(&ID)?;
 		oracle.price = args.new_price;
@@ -164,9 +159,7 @@ impl<'a> ProcessAccountInfos<'a> for RotateAuthorityAccounts<'a> {
 		let args = RotateAuthorityInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
-		self.oracle
-			.assert_writable()?
-			.assert_type::<OracleState>(&ID)?;
+		self.oracle.assert_type::<OracleState>(&ID)?;
 
 		{
 			let oracle = self.oracle.as_account::<OracleState>(&ID)?;

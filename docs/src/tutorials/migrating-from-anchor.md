@@ -49,7 +49,7 @@ pub enum MyInstruction {
 	Initialize = 0,
 }
 
-#[instruction(discriminator = MyInstruction, variant = Initialize)]
+#[instruction(discriminator = MyInstruction::Initialize)]
 pub struct InitializeInstruction {}
 
 #[derive(Accounts, Debug)]
@@ -189,7 +189,7 @@ pub enum MyAccountType {
 Each `#[instruction]` or `#[account]` macro references its discriminator enum and variant:
 
 ```rust
-#[instruction(discriminator = MyInstruction, variant = Initialize)]
+#[instruction(discriminator = MyInstruction::Initialize)]
 pub struct InitializeInstruction {
 	// ...
 }

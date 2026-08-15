@@ -262,10 +262,10 @@ fn expr_to_path_string(expr: &Expr) -> Option<String> {
 
 fn find_process_method(items: &[ImplItem]) -> Option<&syn::ImplItemFn> {
 	for item in items {
-		if let ImplItem::Fn(f) = item {
-			if f.sig.ident == "process" {
-				return Some(f);
-			}
+		if let ImplItem::Fn(f) = item
+			&& f.sig.ident == "process"
+		{
+			return Some(f);
 		}
 	}
 	None

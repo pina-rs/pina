@@ -7,6 +7,7 @@ use crate::PinaProgramError;
 use crate::ProgramError;
 use crate::Ref;
 use crate::RefMut;
+use crate::impls::validate_writable;
 
 /// Zero-copy deserialization for on-chain account data.
 ///
@@ -85,8 +86,10 @@ where
 /// `Ok(&Self)` when the condition holds and `Err(InvalidAccountData)`
 /// otherwise.
 ///
-/// <!-- {=pinaValidationChainSnippet|trim|linePrefix:"/// ":true} -->/// Validation methods are intentionally chainable: `account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?`.<!-- {/pinaValidationChainSnippet} -->
-/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->/// All APIs in this section are designed for on-chain determinism.
+/// <!-- {=pinaValidationChainSnippet|trim|linePrefix:"/// ":true} -->
+/// Validation methods are intentionally chainable: `account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?`.<!-- {/pinaValidationChainSnippet} -->
+/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
+/// All APIs in this section are designed for on-chain determinism.
 ///
 /// They return `ProgramError` values for caller-side propagation with `?`.
 ///
@@ -132,9 +135,10 @@ pub trait AccountValidation {
 /// account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?;
 /// ```
 ///
-/// <!-- {=pinaValidationChainSnippet|trim|linePrefix:"/// ":true} -->/// Validation methods are intentionally chainable: `account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?`.<!-- {/pinaValidationChainSnippet} -->
-/// <!-- {=pinaMdtManagedDocNote|trim|linePrefix:"/// ":true} -->/// This section is synchronized by `mdt` from `api-docs.t.md`.<!-- {/pinaMdtManagedDocNote} -->
-///
+/// <!-- {=pinaValidationChainSnippet|trim|linePrefix:"/// ":true} -->
+/// Validation methods are intentionally chainable: `account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?`.<!-- {/pinaValidationChainSnippet} -->
+/// <!-- {=pinaMdtManagedDocNote|trim|linePrefix:"/// ":true} -->
+/// This section is synchronized by `mdt` from `api-docs.t.md`.<!-- {/pinaMdtManagedDocNote} -->
 /// # Examples
 ///
 /// ```ignore
@@ -149,51 +153,83 @@ pub trait AccountValidation {
 /// let vault = &accounts[1];
 /// vault.assert_seeds(&[b"vault", authority.address().as_ref()], &program_id)?;
 /// ```
-pub trait AccountInfoValidation: Sized {
+pub trait AccountInfoValidation {
 	/// Assert that the account is a signer.
-	fn assert_signer(self) -> Result<Self, ProgramError>;
+	fn assert_signer(self) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is writable.
-	fn assert_writable(self) -> Result<Self, ProgramError>;
+	fn assert_writable(self) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is executable.
-	fn assert_executable(self) -> Result<Self, ProgramError>;
+	fn assert_executable(self) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the data held by the account is of the specified length.
-	fn assert_data_len(self, len: usize) -> Result<Self, ProgramError>;
+	fn assert_data_len(self, len: usize) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is empty.
-	fn assert_empty(self) -> Result<Self, ProgramError>;
+	fn assert_empty(self) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is not empty.
-	fn assert_not_empty(self) -> Result<Self, ProgramError>;
+	fn assert_not_empty(self) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is of the type provided.
-	fn assert_type<T: HasDiscriminator>(self, program_id: &Address) -> Result<Self, ProgramError>;
+	fn assert_type<T: HasDiscriminator>(self, program_id: &Address) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is a program.
-	fn assert_program(self, program_id: &Address) -> Result<Self, ProgramError>;
+	fn assert_program(self, program_id: &Address) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is a system variable.
-	fn assert_sysvar(self, sysvar_id: &Address) -> Result<Self, ProgramError>;
+	fn assert_sysvar(self, sysvar_id: &Address) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account has the address provided.
-	fn assert_address(self, address: &Address) -> Result<Self, ProgramError>;
+	fn assert_address(self, address: &Address) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account has any of the address provided.
-	fn assert_addresses(self, addresses: &[Address]) -> Result<Self, ProgramError>;
+	fn assert_addresses(self, addresses: &[Address]) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is owned by the address provided.
-	fn assert_owner(self, owner: &Address) -> Result<Self, ProgramError>;
+	fn assert_owner(self, owner: &Address) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account is owned by one of the owner (program) ids
 	/// provided.
-	fn assert_owners(self, owners: &[Address]) -> Result<Self, ProgramError>;
+	fn assert_owners(self, owners: &[Address]) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account has the seeds provided and uses the canonical
 	/// bump.
-	fn assert_seeds(self, seeds: &[&[u8]], program_id: &Address) -> Result<Self, ProgramError>;
+	fn assert_seeds(self, seeds: &[&[u8]], program_id: &Address) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account matches a PDA derived from the provided seed
 	/// array, where the bump byte is already included in `seeds`.
 	fn assert_seeds_with_bump(
 		self,
 		seeds: &[&[u8]],
 		program_id: &Address,
-	) -> Result<Self, ProgramError>;
+	) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account uses the canonical bump for the seeds provided.
 	/// Returns the bump.
 	fn assert_canonical_bump(
 		self,
 		seeds: &[&[u8]],
 		program_id: &Address,
-	) -> Result<u8, ProgramError>;
+	) -> Result<u8, ProgramError>
+	where
+		Self: Sized;
 	/// Assert that the account address matches the associated token address
 	/// derived from `wallet`, `mint`, and `token_program`.
 	#[cfg(feature = "token")]
@@ -202,7 +238,9 @@ pub trait AccountInfoValidation: Sized {
 		wallet: &Address,
 		mint: &Address,
 		token_program: &Address,
-	) -> Result<Self, ProgramError>;
+	) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
 }
 
 macro_rules! primitive_into_discriminator {
@@ -431,7 +469,8 @@ pub type LoadedAccountMut<'a, T> = RefMut<'a, T>;
 /// 3. Checked borrow-guard conversion of account data to [`Ref<T>`] or
 ///    [`RefMut<T>`].
 ///
-/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->/// All APIs in this section are designed for on-chain determinism.
+/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
+/// All APIs in this section are designed for on-chain determinism.
 ///
 /// They return `ProgramError` values for caller-side propagation with `?`.
 ///
@@ -474,7 +513,8 @@ pub trait AsAccount {
 /// The `*_checked_with_owners` variants accept a custom owner allowlist before
 /// reinterpreting the shared token base layout.
 ///
-/// <!-- {=pinaTokenFeatureGateContract|trim|linePrefix:"/// ":true} -->/// This API is gated behind the `token` feature. Keep token-specific code behind `#[cfg(feature = "token")]` so on-chain programs that do not use SPL token interfaces can avoid extra dependencies.<!-- {/pinaTokenFeatureGateContract} -->
+/// <!-- {=pinaTokenFeatureGateContract|trim|linePrefix:"/// ":true} -->
+/// This API is gated behind the `token` feature. Keep token-specific code behind `#[cfg(feature = "token")]` so on-chain programs that do not use SPL token interfaces can avoid extra dependencies.<!-- {/pinaTokenFeatureGateContract} -->
 #[cfg(feature = "token")]
 pub trait AsTokenAccount {
 	/// Interpret the account data as an SPL Token mint.
@@ -551,7 +591,8 @@ pub trait AsTokenAccount {
 /// when the sender is owned by the executing program. `collect` uses a system
 /// program CPI transfer and works with any signer account.
 ///
-/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->/// All APIs in this section are designed for on-chain determinism.
+/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
+/// All APIs in this section are designed for on-chain determinism.
 ///
 /// They return `ProgramError` values for caller-side propagation with `?`.
 ///
@@ -578,7 +619,8 @@ pub trait LamportTransfer {
 
 /// Close an account and reclaim its rent lamports.
 ///
-/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->/// All APIs in this section are designed for on-chain determinism.
+/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
+/// All APIs in this section are designed for on-chain determinism.
 ///
 /// They return `ProgramError` values for caller-side propagation with `?`.
 ///
@@ -609,7 +651,13 @@ pub trait CloseAccountWithRecipient {
 	/// This helper clears the existing data region in-place before calling
 	/// [`Self::close_with_recipient`]. It does not implicitly reallocate the
 	/// account, even when the `account-resize` feature is enabled.
-	fn close_account_zeroed(&mut self, recipient: &mut AccountView) -> ProgramResult;
+	///
+	/// The default implementation delegates to [`Self::close_with_recipient`]
+	/// without clearing the data region. Implementors that need stale bytes
+	/// cleared before close should override this method.
+	fn close_account_zeroed(&mut self, recipient: &mut AccountView) -> ProgramResult {
+		self.close_with_recipient(recipient)
+	}
 }
 
 /// Cursor for parsing instruction accounts exactly once.
@@ -647,12 +695,18 @@ impl<'a> AccountsCursor<'a> {
 	}
 
 	/// Parse the next account as a mutable account field.
+	///
+	/// The account must be marked writable in the instruction; otherwise a
+	/// `ProgramError::InvalidAccountData` error is returned. This makes the
+	/// `&mut AccountView` field type the single source of truth for writable
+	/// accounts — no separate `assert_writable()` call is required.
 	pub fn next_mut(&mut self) -> Result<&'a mut AccountView, ProgramError> {
 		let accounts = core::mem::take(&mut self.remaining);
 		let (account, rest) = accounts
 			.split_first_mut()
 			.ok_or(ProgramError::NotEnoughAccountKeys)?;
 		self.remaining = rest;
+		validate_writable(account)?;
 		self.track_mutable_account(account)?;
 
 		Ok(account)
@@ -664,8 +718,19 @@ impl<'a> AccountsCursor<'a> {
 	}
 
 	/// Consume and return the unparsed trailing accounts.
-	pub fn remaining_mut(&mut self) -> &'a mut [AccountView] {
-		core::mem::take(&mut self.remaining)
+	///
+	/// Every remaining account must be marked writable in the instruction;
+	/// otherwise a `ProgramError::InvalidAccountData` error is returned. This
+	/// makes the `&mut [AccountView]` field type the single source of truth
+	/// for writable account slices — no separate `assert_writable()` call is
+	/// required.
+	pub fn remaining_mut(&mut self) -> Result<&'a mut [AccountView], ProgramError> {
+		let remaining = core::mem::take(&mut self.remaining);
+		for account in &*remaining {
+			validate_writable(account)?;
+		}
+
+		Ok(remaining)
 	}
 
 	/// Require that no unparsed accounts remain.
@@ -706,7 +771,8 @@ pub trait ParseAccounts<'a>: Sized {
 ///
 /// Automatically derived by `#[derive(Accounts)]`.
 ///
-/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->/// All APIs in this section are designed for on-chain determinism.
+/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
+/// All APIs in this section are designed for on-chain determinism.
 ///
 /// They return `ProgramError` values for caller-side propagation with `?`.
 ///
@@ -737,7 +803,8 @@ pub trait TryFromAccountInfos<'a>: Sized {
 ///
 /// Implementors validate accounts and execute the instruction logic.
 ///
-/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->/// All APIs in this section are designed for on-chain determinism.
+/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
+/// All APIs in this section are designed for on-chain determinism.
 ///
 /// They return `ProgramError` values for caller-side propagation with `?`.
 ///

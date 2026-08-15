@@ -51,9 +51,16 @@ impl<'tcx> LateLintPass<'tcx> for RequireWritableBeforeAccountResize {
 			return;
 		}
 
-		let facts = shared::collect_function_facts(body);
+		let facts = shared::collect_function_facts_typed(cx, body);
 		for (index, call) in facts.calls.iter().enumerate() {
 			if !TARGET_METHODS.contains(&call.method.as_str()) {
+				continue;
+			}
+
+			// A `&mut AccountView` receiver is validated writable at account
+			// parse time by `#[derive(Accounts)]`, so no explicit
+			// `assert_writable()` guard is required before resizing.
+			if call.receiver_is_mut_ref {
 				continue;
 			}
 

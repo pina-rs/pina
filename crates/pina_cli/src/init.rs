@@ -226,7 +226,7 @@ pub enum {program_title}Instruction {{
 	Initialize = 0,
 }}
 
-#[instruction(discriminator = {program_title}Instruction, variant = Initialize)]
+#[instruction(discriminator = {program_title}Instruction::Initialize)]
 pub struct InitializeInstruction {{
 	pub value: u8,
 }}

@@ -26,7 +26,7 @@ pub enum SysvarsInstruction {
 	Sysvars = 0,
 }
 
-#[instruction(discriminator = SysvarsInstruction, variant = Sysvars)]
+#[instruction(discriminator = SysvarsInstruction::Sysvars)]
 pub struct SysvarsCheckInstruction {}
 
 #[derive(Accounts, Debug)]

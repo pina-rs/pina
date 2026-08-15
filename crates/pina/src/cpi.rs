@@ -75,7 +75,8 @@ pub fn create_account<'a>(
 /// This helper derives the canonical PDA for `seeds` + `owner`, allocates
 /// account storage for `T`, and assigns account ownership to `owner`.
 ///
-/// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->/// Seed-based APIs require deterministic seed ordering.
+/// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->
+/// Seed-based APIs require deterministic seed ordering.
 ///
 /// Program IDs must stay consistent across derivation and verification.
 ///
@@ -117,7 +118,8 @@ pub fn create_program_account<'a, T: HasDiscriminator + Pod>(
 /// Prefer [`create_program_account`] when you want canonical bump derivation.
 /// Use this function when the bump is instruction data and must be validated.
 ///
-/// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->/// Seed-based APIs require deterministic seed ordering.
+/// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->
+/// Seed-based APIs require deterministic seed ordering.
 ///
 /// Program IDs must stay consistent across derivation and verification.
 ///
@@ -159,7 +161,8 @@ pub fn create_program_account_with_bump<'a, T: HasDiscriminator + Pod>(
 /// This is the lower-level allocator used by [`create_program_account`] for
 /// cases where caller code wants manual discriminator/data initialization.
 ///
-/// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->/// Seed-based APIs require deterministic seed ordering.
+/// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->
+/// Seed-based APIs require deterministic seed ordering.
 ///
 /// Program IDs must stay consistent across derivation and verification.
 ///
@@ -204,7 +207,8 @@ pub fn allocate_account<'a>(
 ///
 /// Returns `ProgramError::InvalidSeeds` if `seeds.len() >= MAX_SEEDS`.
 ///
-/// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->/// Seed-based APIs require deterministic seed ordering.
+/// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->
+/// Seed-based APIs require deterministic seed ordering.
 ///
 /// Program IDs must stay consistent across derivation and verification.
 ///
@@ -253,7 +257,8 @@ pub fn combine_seeds_with_bump<'a>(
 ///   `Assign` are issued separately. This covers the case where the account was
 ///   pre-funded (e.g. by a previous failed transaction).
 ///
-/// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->/// Seed-based APIs require deterministic seed ordering.
+/// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->
+/// Seed-based APIs require deterministic seed ordering.
 ///
 /// Program IDs must stay consistent across derivation and verification.
 ///
@@ -476,7 +481,8 @@ fn realloc_account_inner(
 /// Callers should clear any program-owned account state before closing when
 /// stale data reuse matters for their threat model.
 ///
-/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->/// All APIs in this section are designed for on-chain determinism.
+/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
+/// All APIs in this section are designed for on-chain determinism.
 ///
 /// They return `ProgramError` values for caller-side propagation with `?`.
 ///
@@ -503,7 +509,8 @@ pub fn close_account(account_info: &mut AccountView, recipient: &mut AccountView
 /// lamports and closing the account. It does not implicitly reallocate the
 /// account, even when the `account-resize` feature is enabled.
 ///
-/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->/// All APIs in this section are designed for on-chain determinism.
+/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
+/// All APIs in this section are designed for on-chain determinism.
 ///
 /// They return `ProgramError` values for caller-side propagation with `?`.
 ///

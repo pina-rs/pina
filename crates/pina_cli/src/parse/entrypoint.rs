@@ -37,10 +37,10 @@ pub fn extract_dispatch_map(file: &File) -> Vec<DispatchEntry> {
 			Item::Mod(m) => {
 				if let Some((_, items)) = &m.content {
 					for inner in items {
-						if let Item::Fn(f) = inner {
-							if f.sig.ident == "process_instruction" {
-								extract_from_fn_body(&f.block.stmts, &mut entries);
-							}
+						if let Item::Fn(f) = inner
+							&& f.sig.ident == "process_instruction"
+						{
+							extract_from_fn_body(&f.block.stmts, &mut entries);
 						}
 					}
 				}
