@@ -1,0 +1,14 @@
+[package]
+name = "pina_fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[workspace]
+
+[dependencies]
+counter_program = { path = "../../examples/counter_program" }
+libfuzzer-sys = "0.4"
+pina = { path = "../../crates/pina", features = ["logs", "derive"] }
+role_registry_program = { path = "../../examples/role_registry_program" }

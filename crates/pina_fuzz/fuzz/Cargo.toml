@@ -1,0 +1,19 @@
+[package]
+name = "pina_fuzz_targets"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+pina_fuzz = { path = ".." }
+
+[[bin]]
+name = "account_deserialize"
+path = "fuzz_targets/account_deserialize.rs"
+
+[[bin]]
+name = "parse_instruction"
+path = "fuzz_targets/parse_instruction.rs"

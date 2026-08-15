@@ -75,6 +75,11 @@ devenv.local.nix
 
 
 
+# Fuzz artifacts
+crates/pina_fuzz/fuzz/corpus/
+crates/pina_fuzz/fuzz/artifacts/
+crates/pina_fuzz/target/
+
 # Claude Code worktrees
 .claude/worktrees/
 .ant-colony/
