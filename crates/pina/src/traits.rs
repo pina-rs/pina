@@ -87,12 +87,12 @@ where
 /// otherwise.
 ///
 /// <!-- {=pinaValidationChainSnippet|trim|linePrefix:"/// ":true} -->
-//// Validation methods are intentionally chainable: `account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?`.<!-- {/pinaValidationChainSnippet} -->
+/// Validation methods are intentionally chainable: `account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?`.<!-- {/pinaValidationChainSnippet} -->
 /// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
-//// All APIs in this section are designed for on-chain determinism.
-
+/// All APIs in this section are designed for on-chain determinism.
+///
 /// They return `ProgramError` values for caller-side propagation with `?`.
-
+///
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
 ///
 /// # Examples
@@ -136,9 +136,9 @@ pub trait AccountValidation {
 /// ```
 ///
 /// <!-- {=pinaValidationChainSnippet|trim|linePrefix:"/// ":true} -->
-//// Validation methods are intentionally chainable: `account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?`.<!-- {/pinaValidationChainSnippet} -->
+/// Validation methods are intentionally chainable: `account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?`.<!-- {/pinaValidationChainSnippet} -->
 /// <!-- {=pinaMdtManagedDocNote|trim|linePrefix:"/// ":true} -->
-//// This section is synchronized by `mdt` from `api-docs.t.md`.<!-- {/pinaMdtManagedDocNote} -->
+/// This section is synchronized by `mdt` from `api-docs.t.md`.<!-- {/pinaMdtManagedDocNote} -->
 /// # Examples
 ///
 /// ```ignore
@@ -470,10 +470,10 @@ pub type LoadedAccountMut<'a, T> = RefMut<'a, T>;
 ///    [`RefMut<T>`].
 ///
 /// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
-//// All APIs in this section are designed for on-chain determinism.
-
+/// All APIs in this section are designed for on-chain determinism.
+///
 /// They return `ProgramError` values for caller-side propagation with `?`.
-
+///
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
 ///
 /// # Examples
@@ -514,7 +514,7 @@ pub trait AsAccount {
 /// reinterpreting the shared token base layout.
 ///
 /// <!-- {=pinaTokenFeatureGateContract|trim|linePrefix:"/// ":true} -->
-//// This API is gated behind the `token` feature. Keep token-specific code behind `#[cfg(feature = "token")]` so on-chain programs that do not use SPL token interfaces can avoid extra dependencies.<!-- {/pinaTokenFeatureGateContract} -->
+/// This API is gated behind the `token` feature. Keep token-specific code behind `#[cfg(feature = "token")]` so on-chain programs that do not use SPL token interfaces can avoid extra dependencies.<!-- {/pinaTokenFeatureGateContract} -->
 #[cfg(feature = "token")]
 pub trait AsTokenAccount {
 	/// Interpret the account data as an SPL Token mint.
@@ -592,10 +592,10 @@ pub trait AsTokenAccount {
 /// program CPI transfer and works with any signer account.
 ///
 /// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
-//// All APIs in this section are designed for on-chain determinism.
-
+/// All APIs in this section are designed for on-chain determinism.
+///
 /// They return `ProgramError` values for caller-side propagation with `?`.
-
+///
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
 ///
 /// # Examples
@@ -620,10 +620,10 @@ pub trait LamportTransfer {
 /// Close an account and reclaim its rent lamports.
 ///
 /// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
-//// All APIs in this section are designed for on-chain determinism.
-
+/// All APIs in this section are designed for on-chain determinism.
+///
 /// They return `ProgramError` values for caller-side propagation with `?`.
-
+///
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
 ///
 /// # Examples
@@ -772,10 +772,10 @@ pub trait ParseAccounts<'a>: Sized {
 /// Automatically derived by `#[derive(Accounts)]`.
 ///
 /// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
-//// All APIs in this section are designed for on-chain determinism.
-
+/// All APIs in this section are designed for on-chain determinism.
+///
 /// They return `ProgramError` values for caller-side propagation with `?`.
-
+///
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
 ///
 /// # Examples
@@ -804,10 +804,10 @@ pub trait TryFromAccountInfos<'a>: Sized {
 /// Implementors validate accounts and execute the instruction logic.
 ///
 /// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
-//// All APIs in this section are designed for on-chain determinism.
-
+/// All APIs in this section are designed for on-chain determinism.
+///
 /// They return `ProgramError` values for caller-side propagation with `?`.
-
+///
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
 ///
 /// # Examples
