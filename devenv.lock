@@ -79,7 +79,7 @@
       },
       "locked": {
         "lastModified": 1786778510,
-        "narHash": "sha256-84ObWnCQhkUcoRixgk5C4KdYz1ZD7vy4nKH0jpXR1fg=",
+        "narHash": "sha256-OJ7qolMFZNRldJeOdmIBcE34dTgz5tT2tu+Bfler0Yw=",
         "owner": "ifiokjr",
         "repo": "nixpkgs",
         "rev": "b2f829de07e2b6922898d746c226be62cccf9bd2",
