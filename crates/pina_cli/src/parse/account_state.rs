@@ -57,14 +57,14 @@ fn get_account_discriminator_enum(attrs: &[syn::Attribute]) -> Option<String> {
 		};
 
 		for meta in &meta_list {
-			if let syn::Meta::NameValue(nv) = meta {
-				if nv.path.is_ident("discriminator") {
-					let disc = expr_to_ident_string(&nv.value);
-					return Some(
-						disc.split_once("::")
-							.map_or(disc.clone(), |(enum_name, _)| enum_name.to_owned()),
-					);
-				}
+			if let syn::Meta::NameValue(nv) = meta
+				&& nv.path.is_ident("discriminator")
+			{
+				let disc = expr_to_ident_string(&nv.value);
+				return Some(
+					disc.split_once("::")
+						.map_or(disc.clone(), |(enum_name, _)| enum_name.to_owned()),
+				);
 			}
 		}
 	}

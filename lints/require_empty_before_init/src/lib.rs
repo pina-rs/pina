@@ -85,15 +85,15 @@ fn visit_expr(expr: &Expr<'_>, calls: &mut Vec<CallInfo>) {
 			for arg in *args {
 				visit_expr(arg, calls);
 			}
-			if let ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) = &callee.kind {
-				if let Some(seg) = path.segments.last() {
-					let target = args.first().and_then(receiver_name);
-					calls.push(CallInfo {
-						span: expr.span,
-						name: seg.ident.name.as_str().to_string(),
-						target,
-					});
-				}
+			if let ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) = &callee.kind
+				&& let Some(seg) = path.segments.last()
+			{
+				let target = args.first().and_then(receiver_name);
+				calls.push(CallInfo {
+					span: expr.span,
+					name: seg.ident.name.as_str().to_string(),
+					target,
+				});
 			}
 		}
 		ExprKind::Block(block, _) => {

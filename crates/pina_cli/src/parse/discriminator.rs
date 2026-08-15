@@ -31,13 +31,13 @@ pub fn extract_discriminator_enums(file: &File) -> Vec<DiscriminatorEnum> {
 		let repr_size = detect_repr_size(&item_enum.attrs);
 		let mut variants = Vec::new();
 		for variant in &item_enum.variants {
-			if let Some((_, expr)) = &variant.discriminant {
-				if let Some(val) = expr_to_u64(expr) {
-					variants.push(DiscriminatorVariant {
-						name: variant.ident.to_string(),
-						value: val,
-					});
-				}
+			if let Some((_, expr)) = &variant.discriminant
+				&& let Some(val) = expr_to_u64(expr)
+			{
+				variants.push(DiscriminatorVariant {
+					name: variant.ident.to_string(),
+					value: val,
+				});
 			}
 		}
 

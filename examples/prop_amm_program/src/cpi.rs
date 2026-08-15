@@ -151,23 +151,21 @@ pub fn rotate_authority<'a>(
 }
 
 #[inline(always)]
-pub fn initialize_context<'a>(
-	accounts: accounts::Initialize<'a>,
-) -> CpiContext<'a, accounts::Initialize<'a>, 3> {
+pub fn initialize_context(
+	accounts: accounts::Initialize<'_>,
+) -> CpiContext<'_, accounts::Initialize<'_>, 3> {
 	CpiContext::new(&ID, accounts)
 }
 
 #[inline(always)]
-pub fn update_context<'a>(
-	accounts: accounts::Update<'a>,
-) -> CpiContext<'a, accounts::Update<'a>, 2> {
+pub fn update_context(accounts: accounts::Update<'_>) -> CpiContext<'_, accounts::Update<'_>, 2> {
 	CpiContext::new(&ID, accounts)
 }
 
 #[inline(always)]
-pub fn rotate_authority_context<'a>(
-	accounts: accounts::RotateAuthority<'a>,
-) -> CpiContext<'a, accounts::RotateAuthority<'a>, 2> {
+pub fn rotate_authority_context(
+	accounts: accounts::RotateAuthority<'_>,
+) -> CpiContext<'_, accounts::RotateAuthority<'_>, 2> {
 	CpiContext::new(&ID, accounts)
 }
 
