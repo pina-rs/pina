@@ -1,12 +1,14 @@
 ---
-pina: patch
-pina_cli: patch
-pina_codama_renderer: patch
-pina_macros: patch
-pina_pod_primitives: patch
-pina_profile: patch
-pina_sdk_ids: patch
+pina: fix
+pina_cli: fix
+pina_codama_renderer: fix
+pina_macros: fix
+pina_pod_primitives: fix
+pina_profile: fix
+pina_sdk_ids: fix
 ---
+
+# Refresh workspace dependencies
 
 Refresh workspace dependencies to their latest compatible versions.
 
