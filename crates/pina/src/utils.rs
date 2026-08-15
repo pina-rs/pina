@@ -20,10 +20,11 @@ use crate::log;
 /// When the `logs` feature is enabled, the original custom error code is
 /// emitted before remapping so diagnostic detail is still available during
 /// development.
-/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->/// All APIs in this section are designed for on-chain determinism.
-///
+/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
+//// All APIs in this section are designed for on-chain determinism.
+
 /// They return `ProgramError` values for caller-side propagation with `?`.
-///
+
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
 ///
 /// # Examples
@@ -85,10 +86,11 @@ pub fn parse_instruction<'a, T: IntoDiscriminator>(
 ///
 /// Intended for compact guard checks inside instruction handlers.
 ///
-/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->/// All APIs in this section are designed for on-chain determinism.
-///
+/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
+//// All APIs in this section are designed for on-chain determinism.
+
 /// They return `ProgramError` values for caller-side propagation with `?`.
-///
+
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
 ///
 /// # Examples
@@ -143,8 +145,8 @@ pub fn log_caller() {}
 /// Derives the associated token account address for the given wallet, mint,
 /// and token program. Returns `None` if no valid PDA exists.
 ///
-/// <!-- {=pinaTokenFeatureGateContract|trim|linePrefix:"/// ":true} -->/// This API is gated behind the `token` feature. Keep token-specific code behind `#[cfg(feature = "token")]` so on-chain programs that do not use SPL token interfaces can avoid extra dependencies.<!-- {/pinaTokenFeatureGateContract} -->
-///
+/// <!-- {=pinaTokenFeatureGateContract|trim|linePrefix:"/// ":true} -->
+//// This API is gated behind the `token` feature. Keep token-specific code behind `#[cfg(feature = "token")]` so on-chain programs that do not use SPL token interfaces can avoid extra dependencies.<!-- {/pinaTokenFeatureGateContract} -->
 /// # Examples
 ///
 /// ```ignore

@@ -4,10 +4,11 @@
 /// to avoid collisions with user-defined program errors. User `#[error]` enums
 /// should use discriminant values below `0xFFFF_0000` to prevent overlap.
 ///
-/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->/// All APIs in this section are designed for on-chain determinism.
-///
+/// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
+//// All APIs in this section are designed for on-chain determinism.
+
 /// They return `ProgramError` values for caller-side propagation with `?`.
-///
+
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
 #[repr(u32)]
 #[non_exhaustive]
