@@ -44,7 +44,7 @@ fn validate_signer(account: &AccountView) -> ProgramResult {
 }
 
 #[track_caller]
-fn validate_writable(account: &AccountView) -> ProgramResult {
+pub(crate) fn validate_writable(account: &AccountView) -> ProgramResult {
 	if !account.is_writable() {
 		log!(
 			"address: {} has not been marked as writable",

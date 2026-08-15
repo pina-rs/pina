@@ -7,6 +7,7 @@ use crate::PinaProgramError;
 use crate::ProgramError;
 use crate::Ref;
 use crate::RefMut;
+use crate::impls::validate_writable;
 
 /// Zero-copy deserialization for on-chain account data.
 ///
@@ -647,12 +648,18 @@ impl<'a> AccountsCursor<'a> {
 	}
 
 	/// Parse the next account as a mutable account field.
+	///
+	/// The account must be marked writable in the instruction; otherwise a
+	/// `ProgramError::InvalidAccountData` error is returned. This makes the
+	/// `&mut AccountView` field type the single source of truth for writable
+	/// accounts — no separate `assert_writable()` call is required.
 	pub fn next_mut(&mut self) -> Result<&'a mut AccountView, ProgramError> {
 		let accounts = core::mem::take(&mut self.remaining);
 		let (account, rest) = accounts
 			.split_first_mut()
 			.ok_or(ProgramError::NotEnoughAccountKeys)?;
 		self.remaining = rest;
+		validate_writable(account)?;
 		self.track_mutable_account(account)?;
 
 		Ok(account)
@@ -664,8 +671,19 @@ impl<'a> AccountsCursor<'a> {
 	}
 
 	/// Consume and return the unparsed trailing accounts.
-	pub fn remaining_mut(&mut self) -> &'a mut [AccountView] {
-		core::mem::take(&mut self.remaining)
+	///
+	/// Every remaining account must be marked writable in the instruction;
+	/// otherwise a `ProgramError::InvalidAccountData` error is returned. This
+	/// makes the `&mut [AccountView]` field type the single source of truth
+	/// for writable account slices — no separate `assert_writable()` call is
+	/// required.
+	pub fn remaining_mut(&mut self) -> Result<&'a mut [AccountView], ProgramError> {
+		let remaining = core::mem::take(&mut self.remaining);
+		for account in &*remaining {
+			validate_writable(account)?;
+		}
+
+		Ok(remaining)
 	}
 
 	/// Require that no unparsed accounts remain.

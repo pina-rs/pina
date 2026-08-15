@@ -273,6 +273,11 @@ unsafe fn create_input(accounts: usize, instruction_data: &[u8]) -> AlignedMemor
 		// Account data.
 		let mut account = [0u8; STATIC_ACCOUNT_DATA + size_of::<u64>()];
 		account[0] = NON_DUP_MARKER;
+		// Mark the account as writable so mutable account fields parse.
+		account[2] = 1;
+		// Give each account a unique address so the duplicate-mutable
+		// account check does not treat them as aliases.
+		account[8] = (i + 1) as u8;
 		// Set the accounts data length. The actual account data is zeroed.
 		account[80..88].copy_from_slice(&i.to_le_bytes());
 		unsafe {

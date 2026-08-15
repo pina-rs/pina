@@ -2,12 +2,16 @@
 
 extern crate rustc_ast;
 extern crate rustc_hir;
+extern crate rustc_middle;
 extern crate rustc_span;
 
 use rustc_ast::LitKind;
 use rustc_hir::Body;
 use rustc_hir::Expr;
 use rustc_hir::ExprKind;
+use rustc_lint::LateContext;
+use rustc_middle::ty::Mutability;
+use rustc_middle::ty::TyKind;
 use rustc_span::Span;
 
 #[derive(Debug, Clone)]
@@ -17,6 +21,9 @@ pub struct CallInfo {
 	pub receiver: Option<String>,
 	pub path: Option<String>,
 	pub args: Vec<Option<String>>,
+	/// Whether the receiver is a mutable reference binding (e.g. a
+	/// `&mut AccountView` field parsed by `#[derive(Accounts)]`).
+	pub receiver_is_mut_ref: bool,
 }
 
 #[derive(Debug, Default)]
@@ -27,8 +34,24 @@ pub struct FunctionFacts {
 }
 
 pub fn collect_function_facts(body: &Body<'_>) -> FunctionFacts {
+	collect_function_facts_impl(None, body)
+}
+
+/// Like [`collect_function_facts`], but also records whether each call's
+/// receiver is a mutable reference binding.
+pub fn collect_function_facts_typed<'tcx>(
+	cx: &LateContext<'tcx>,
+	body: &Body<'tcx>,
+) -> FunctionFacts {
+	collect_function_facts_impl(Some(cx), body)
+}
+
+fn collect_function_facts_impl<'tcx>(
+	cx: Option<&LateContext<'tcx>>,
+	body: &Body<'tcx>,
+) -> FunctionFacts {
 	let mut facts = FunctionFacts::default();
-	collect_from_expr(body.value, &mut facts);
+	collect_from_expr(cx, body.value, &mut facts);
 	facts
 }
 
@@ -95,12 +118,16 @@ pub fn def_path_matches(def_path: &str, needles: &[&str]) -> bool {
 	needles.iter().any(|needle| def_path.contains(needle))
 }
 
-fn collect_from_expr(expr: &Expr<'_>, facts: &mut FunctionFacts) {
+fn collect_from_expr<'tcx>(
+	cx: Option<&LateContext<'tcx>>,
+	expr: &Expr<'tcx>,
+	facts: &mut FunctionFacts,
+) {
 	match &expr.kind {
 		ExprKind::MethodCall(path_segment, receiver, args, _) => {
-			collect_from_expr(receiver, facts);
+			collect_from_expr(cx, receiver, facts);
 			for arg in *args {
-				collect_from_expr(arg, facts);
+				collect_from_expr(cx, arg, facts);
 			}
 			facts.calls.push(CallInfo {
 				span: expr.span,
@@ -108,12 +135,18 @@ fn collect_from_expr(expr: &Expr<'_>, facts: &mut FunctionFacts) {
 				receiver: expression_identity(receiver),
 				path: None,
 				args: args.iter().map(expression_identity).collect(),
+				receiver_is_mut_ref: cx.is_some_and(|cx| {
+					matches!(
+						cx.typeck_results().expr_ty(receiver).kind(),
+						TyKind::Ref(_, _, Mutability::Mut)
+					)
+				}),
 			});
 		}
 		ExprKind::Call(callee, args) => {
-			collect_from_expr(callee, facts);
+			collect_from_expr(cx, callee, facts);
 			for arg in *args {
-				collect_from_expr(arg, facts);
+				collect_from_expr(cx, arg, facts);
 			}
 			if let rustc_hir::ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) = &callee.kind {
 				let path_name = path
@@ -133,6 +166,7 @@ fn collect_from_expr(expr: &Expr<'_>, facts: &mut FunctionFacts) {
 					receiver: None,
 					path: Some(path_name),
 					args: args.iter().map(expression_identity).collect(),
+					receiver_is_mut_ref: false,
 				});
 			}
 		}
@@ -141,31 +175,31 @@ fn collect_from_expr(expr: &Expr<'_>, facts: &mut FunctionFacts) {
 				match &stmt.kind {
 					rustc_hir::StmtKind::Let(local) => {
 						if let Some(init) = local.init {
-							collect_from_expr(init, facts);
+							collect_from_expr(cx, init, facts);
 						}
 					}
 					rustc_hir::StmtKind::Expr(e) | rustc_hir::StmtKind::Semi(e) => {
-						collect_from_expr(e, facts);
+						collect_from_expr(cx, e, facts);
 					}
 					_ => {}
 				}
 			}
 			if let Some(expr) = block.expr {
-				collect_from_expr(expr, facts);
+				collect_from_expr(cx, expr, facts);
 			}
 		}
 		ExprKind::Match(scrutinee, arms, _) => {
 			facts.has_match = true;
-			collect_from_expr(scrutinee, facts);
+			collect_from_expr(cx, scrutinee, facts);
 			for arm in *arms {
-				collect_from_expr(arm.body, facts);
+				collect_from_expr(cx, arm.body, facts);
 			}
 		}
 		ExprKind::If(cond, then, else_opt) => {
-			collect_from_expr(cond, facts);
-			collect_from_expr(then, facts);
+			collect_from_expr(cx, cond, facts);
+			collect_from_expr(cx, then, facts);
 			if let Some(el) = else_opt {
-				collect_from_expr(el, facts);
+				collect_from_expr(cx, el, facts);
 			}
 		}
 		ExprKind::Unary(_, expr)
@@ -173,15 +207,15 @@ fn collect_from_expr(expr: &Expr<'_>, facts: &mut FunctionFacts) {
 		| ExprKind::DropTemps(expr)
 		| ExprKind::AddrOf(_, _, expr)
 		| ExprKind::Field(expr, _) => {
-			collect_from_expr(expr, facts);
+			collect_from_expr(cx, expr, facts);
 		}
 		ExprKind::Binary(_, lhs, rhs) | ExprKind::Assign(lhs, rhs, _) => {
-			collect_from_expr(lhs, facts);
-			collect_from_expr(rhs, facts);
+			collect_from_expr(cx, lhs, facts);
+			collect_from_expr(cx, rhs, facts);
 		}
 		ExprKind::Tup(exprs) | ExprKind::Array(exprs) => {
 			for e in *exprs {
-				collect_from_expr(e, facts);
+				collect_from_expr(cx, e, facts);
 			}
 		}
 		ExprKind::Lit(lit) => {
