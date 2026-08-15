@@ -16,7 +16,7 @@ concurrency:
 jobs:
   lint:
     timeout-minutes: 60
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -32,7 +32,7 @@ jobs:
 
   security:
     timeout-minutes: 60
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -48,7 +48,7 @@ jobs:
 
   test:
     timeout-minutes: 60
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -66,7 +66,7 @@ jobs:
 
   miri:
     timeout-minutes: 90
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -82,7 +82,7 @@ jobs:
 
   feature-matrix:
     timeout-minutes: 60
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -128,7 +128,7 @@ jobs:
 
   program-e2e:
     timeout-minutes: 120
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     env:
       XDG_CACHE_HOME: ${{ github.workspace }}/.cache
     steps:
@@ -146,7 +146,7 @@ jobs:
 
   idl:
     timeout-minutes: 60
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -172,7 +172,7 @@ jobs:
 
   build:
     timeout-minutes: 60
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
