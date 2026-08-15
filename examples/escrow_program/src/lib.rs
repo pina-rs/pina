@@ -329,12 +329,14 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		let signers = [escrow_signer];
 
 		// Transfer token A from vault to taker
+		self.vault.assert_owners(&SPL_PROGRAM_IDS)?;
+		let vault_amount = self.vault.as_token_2022_account()?.amount();
 		token_2022::instructions::TransferChecked::new(
 			self.vault,
 			self.mint_a,
 			self.taker_ata_a,
 			self.escrow,
-			self.vault.as_token_2022_account()?.amount(),
+			vault_amount,
 			self.mint_a.as_token_2022_mint()?.decimals(),
 		)
 		.invoke_signed(&signers)?;

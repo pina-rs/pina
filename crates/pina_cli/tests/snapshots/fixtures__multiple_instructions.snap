@@ -1,17 +1,17 @@
 ---
 source: crates/pina_cli/tests/fixtures.rs
+assertion_line: 38
 expression: idl
 ---
 {
   "kind": "rootNode",
   "standard": "codama",
-  "version": "1.0.0",
+  "version": "1.8.0",
   "program": {
     "kind": "programNode",
     "name": "multipleInstructions",
     "publicKey": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
-    "version": "",
-    "accounts": [],
+    "version": "0.0.0",
     "instructions": [
       {
         "kind": "instructionNode",
@@ -21,13 +21,15 @@ expression: idl
             "kind": "instructionAccountNode",
             "name": "authority",
             "isWritable": false,
-            "isSigner": true
+            "isSigner": true,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "state",
             "isWritable": true,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           }
         ],
         "arguments": [
@@ -68,13 +70,15 @@ expression: idl
             "kind": "instructionAccountNode",
             "name": "authority",
             "isWritable": false,
-            "isSigner": true
+            "isSigner": true,
+            "isOptional": false
           },
           {
             "kind": "instructionAccountNode",
             "name": "state",
             "isWritable": true,
-            "isSigner": false
+            "isSigner": false,
+            "isOptional": false
           }
         ],
         "arguments": [
@@ -107,10 +111,6 @@ expression: idl
           }
         ]
       }
-    ],
-    "definedTypes": [],
-    "pdas": [],
-    "errors": []
-  },
-  "additionalPrograms": []
+    ]
+  }
 }

@@ -33,7 +33,7 @@
 		"test:unit": "vitest run"
 	},
 	"dependencies": {
-		"codama": "^1.5.1"
+		"codama": "^1.10.0"
 	},
 	"devDependencies": {
 		"@types/node": "^25.5.0",

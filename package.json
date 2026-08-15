@@ -15,8 +15,8 @@
 		"codama": "^1.10.0"
 	},
 	"devDependencies": {
-		"@solana/kit": "^6.5.0",
-		"@solana/program-client-core": "^6.5.0",
+		"@solana/kit": "^6.10.0",
+		"@solana/program-client-core": "^6.10.0",
 		"@types/node": "^25.5.0",
 		"typescript": "^5.9.3"
 	}
