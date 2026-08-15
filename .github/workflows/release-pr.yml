@@ -81,6 +81,8 @@ jobs:
 
       - name: refresh release pull request
         if: steps.release_record.outputs.is_release_commit != 'true' && steps.pending_changesets.outputs.has_changesets == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           # A changeset that only bumps `docs`/`none` produces no releaseable
@@ -138,6 +140,8 @@ jobs:
 
       - name: detect release commit and create tags
         id: tag_release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: devenv shell -- bash -e {0}
         run: |
           set -euo pipefail
@@ -159,6 +163,8 @@ jobs:
 
       - name: create draft releases
         if: steps.tag_release.outputs.is_release_commit == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           monochange --log-level=debug step publish-release --from-ref="HEAD" --draft --format json | tee /tmp/publish-release.json
@@ -166,6 +172,8 @@ jobs:
 
       - name: comment on released issues
         if: steps.tag_release.outputs.is_release_commit == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           monochange --log-level=debug step comment-released-issues --from-ref="HEAD" --auto-close-issues
