@@ -30,6 +30,8 @@
 //!   safe account resize support.
 
 #![no_std]
+// CU optimization for on-chain programs; inline_always ensures discriminator
+// reads compile to a single load instruction in BPF bytecode.
 #![allow(clippy::inline_always)]
 
 mod cpi;
@@ -186,8 +188,15 @@ macro_rules! nostd_entrypoint {
 ///
 /// Supports two forms:
 /// - `log!("simple string literal")` — works in all crates
-/// - `log!("format: {}", value)` — works in pina and crates that depend on
-///   `solana-program-log` directly (the proc macro generates absolute paths)
+/// - `log!("format: {}", value)` — format-arg form
+///
+/// # Limitations
+///
+/// The format-arg form (`log!("format: {}", value)`) only works inside pina
+/// and crates that depend on `solana-program-log` directly, because the
+/// proc macro generates absolute paths to `solana_program_log::log!`.
+/// Crates that only re-export pina without their own `solana-program-log`
+/// dependency will fail to resolve the macro path for the format arm.
 ///
 /// When the `logs` feature is disabled this is a no-op that compiles to
 /// nothing.
