@@ -23,7 +23,7 @@ pub enum DeclareIdInstruction {
 	Initialize = 0,
 }
 
-#[instruction(discriminator = DeclareIdInstruction, variant = Initialize)]
+#[instruction(discriminator = DeclareIdInstruction::Initialize)]
 pub struct InitializeInstruction {}
 
 #[cfg(feature = "bpf-entrypoint")]

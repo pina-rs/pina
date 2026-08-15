@@ -87,7 +87,7 @@ pub enum TransferInstruction {
 /// | 0      | 1    | discriminator |
 /// | 1      | 8    | amount (u64)  |
 /// ```
-#[instruction(discriminator = TransferInstruction, variant = CpiTransfer)]
+#[instruction(discriminator = TransferInstruction::CpiTransfer)]
 pub struct CpiTransferInstruction {
 	/// Amount of lamports to transfer.
 	pub amount: PodU64,
@@ -97,7 +97,7 @@ pub struct CpiTransferInstruction {
 ///
 /// Same layout as `CpiTransferInstruction` but with a different discriminator
 /// byte.
-#[instruction(discriminator = TransferInstruction, variant = DirectTransfer)]
+#[instruction(discriminator = TransferInstruction::DirectTransfer)]
 pub struct DirectTransferInstruction {
 	/// Amount of lamports to transfer.
 	pub amount: PodU64,
@@ -144,10 +144,9 @@ impl<'a> ProcessAccountInfos<'a> for CpiTransferAccounts<'a> {
 		// --- Validate accounts ---
 
 		// Sender must sign and be writable.
-		self.sender.assert_signer()?.assert_writable()?;
+		self.sender.assert_signer()?;
 
 		// Recipient must be writable to receive lamports.
-		self.recipient.assert_writable()?;
 
 		// Verify the system program address.
 		self.system_program.assert_address(&system::ID)?;
@@ -184,13 +183,9 @@ impl<'a> ProcessAccountInfos<'a> for DirectTransferAccounts<'a> {
 
 		// Sender must sign, be writable, and be owned by this program.
 		// Only the owning program can debit an account's lamports.
-		self.sender
-			.assert_signer()?
-			.assert_writable()?
-			.assert_owner(&ID)?;
+		self.sender.assert_signer()?.assert_owner(&ID)?;
 
 		// Recipient must be writable.
-		self.recipient.assert_writable()?;
 
 		// Check the sender has enough lamports.
 		if self.sender.lamports() < amount {

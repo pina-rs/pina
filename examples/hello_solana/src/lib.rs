@@ -66,7 +66,7 @@ pub enum HelloInstruction {
 ///
 /// `HelloInstructionData` has no payload fields — only the discriminator byte
 /// is needed to identify the instruction.
-#[instruction(discriminator = HelloInstruction, variant = Hello)]
+#[instruction(discriminator = HelloInstruction::Hello)]
 pub struct HelloInstructionData {}
 
 // ---------------------------------------------------------------------------

@@ -84,7 +84,7 @@ pub struct VestingState {
 	pub bump: u8,
 }
 
-#[instruction(discriminator = VestingInstruction, variant = Initialize)]
+#[instruction(discriminator = VestingInstruction::Initialize)]
 pub struct InitializeInstruction {
 	pub total_amount: PodU64,
 	pub start_ts: PodU64,
@@ -93,12 +93,12 @@ pub struct InitializeInstruction {
 	pub bump: u8,
 }
 
-#[instruction(discriminator = VestingInstruction, variant = Claim)]
+#[instruction(discriminator = VestingInstruction::Claim)]
 pub struct ClaimInstruction {
 	pub amount: PodU64,
 }
 
-#[instruction(discriminator = VestingInstruction, variant = Cancel)]
+#[instruction(discriminator = VestingInstruction::Cancel)]
 pub struct CancelInstruction {}
 
 #[derive(Accounts, Debug)]
@@ -180,7 +180,6 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.vesting_state
 			.assert_empty()?
-			.assert_writable()?
 			.assert_seeds_with_bump(vesting_seeds_with_bump, &ID)?;
 		self.vault
 			.assert_empty()?
@@ -239,7 +238,6 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.vesting_state
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<VestingState>(&ID)?;
 		self.vault
 			.assert_not_empty()?
@@ -315,7 +313,6 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.vesting_state
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<VestingState>(&ID)?;
 		self.vault
 			.assert_not_empty()?

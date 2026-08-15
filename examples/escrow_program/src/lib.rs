@@ -78,7 +78,7 @@ pub struct EscrowState {
 	pub bump: u8,
 }
 
-#[instruction(discriminator = EscrowInstruction, variant = Make)]
+#[instruction(discriminator = EscrowInstruction::Make)]
 pub struct MakeInstruction {
 	/// An ID of the transaction.
 	pub seed: PodU64,
@@ -89,7 +89,7 @@ pub struct MakeInstruction {
 	pub bump: u8,
 }
 
-#[instruction(discriminator = EscrowInstruction, variant = Take)]
+#[instruction(discriminator = EscrowInstruction::Take)]
 pub struct TakeInstruction {}
 
 #[derive(Accounts, Debug)]
@@ -147,7 +147,6 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		)?;
 		self.escrow
 			.assert_empty()?
-			.assert_writable()?
 			.assert_seeds_with_bump(escrow_seeds_with_bump, &ID)?;
 		self.vault
 			.assert_empty()?
@@ -253,7 +252,6 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		// Validate escrow state
 		self.escrow
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<EscrowState>(&ID)?;
 
 		let (maker, mint_a, mint_b, amount_b, seed, bump) = {

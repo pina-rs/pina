@@ -98,27 +98,27 @@ pub struct RoleEntry {
 	pub bump: u8,
 }
 
-#[instruction(discriminator = RegistryInstruction, variant = Initialize)]
+#[instruction(discriminator = RegistryInstruction::Initialize)]
 pub struct InitializeInstruction {
 	pub bump: u8,
 }
 
-#[instruction(discriminator = RegistryInstruction, variant = AddRole)]
+#[instruction(discriminator = RegistryInstruction::AddRole)]
 pub struct AddRoleInstruction {
 	pub role_id: PodU64,
 	pub permissions: PodU64,
 	pub bump: u8,
 }
 
-#[instruction(discriminator = RegistryInstruction, variant = UpdateRole)]
+#[instruction(discriminator = RegistryInstruction::UpdateRole)]
 pub struct UpdateRoleInstruction {
 	pub permissions: PodU64,
 }
 
-#[instruction(discriminator = RegistryInstruction, variant = DeactivateRole)]
+#[instruction(discriminator = RegistryInstruction::DeactivateRole)]
 pub struct DeactivateRoleInstruction {}
 
-#[instruction(discriminator = RegistryInstruction, variant = RotateAdmin)]
+#[instruction(discriminator = RegistryInstruction::RotateAdmin)]
 pub struct RotateAdminInstruction {}
 
 #[derive(Accounts, Debug)]
@@ -188,11 +188,10 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		let registry_seeds = registry_config_seeds!(admin_address.as_ref());
 		let registry_seeds_with_bump = registry_config_seeds!(admin_address.as_ref(), args.bump);
 
-		self.admin.assert_signer()?.assert_writable()?;
+		self.admin.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
 		self.registry_config
 			.assert_empty()?
-			.assert_writable()?
 			.assert_seeds_with_bump(registry_seeds_with_bump, &ID)?;
 
 		create_program_account_with_bump::<RegistryConfig>(
@@ -222,15 +221,13 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 		let role_entry_seeds_with_bump =
 			role_entry_seeds!(registry_address.as_ref(), &args.role_id.0, args.bump);
 
-		self.admin.assert_signer()?.assert_writable()?;
+		self.admin.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
 		self.registry_config
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<RegistryConfig>(&ID)?;
 		self.role_entry
 			.assert_empty()?
-			.assert_writable()?
 			.assert_seeds_with_bump(role_entry_seeds_with_bump, &ID)?;
 
 		let role_count = {
@@ -277,7 +274,6 @@ impl<'a> ProcessAccountInfos<'a> for UpdateRoleAccounts<'a> {
 			.assert_type::<RegistryConfig>(&ID)?;
 		self.role_entry
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<RoleEntry>(&ID)?;
 
 		{
@@ -310,7 +306,6 @@ impl<'a> ProcessAccountInfos<'a> for DeactivateRoleAccounts<'a> {
 			.assert_type::<RegistryConfig>(&ID)?;
 		self.role_entry
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<RoleEntry>(&ID)?;
 
 		{
@@ -340,7 +335,6 @@ impl<'a> ProcessAccountInfos<'a> for RotateAdminAccounts<'a> {
 		self.admin.assert_signer()?;
 		self.registry_config
 			.assert_not_empty()?
-			.assert_writable()?
 			.assert_type::<RegistryConfig>(&ID)?;
 
 		{

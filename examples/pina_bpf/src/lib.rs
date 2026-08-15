@@ -20,7 +20,7 @@ pub enum PinaBpfInstruction {
 	Hello = 0,
 }
 
-#[instruction(discriminator = PinaBpfInstruction, variant = Hello)]
+#[instruction(discriminator = PinaBpfInstruction::Hello)]
 pub struct HelloInstruction {}
 
 #[cfg_attr(not(any(test, feature = "bpf-entrypoint")), allow(dead_code))]

@@ -30,13 +30,13 @@ pub enum DuplicateMutableInstruction {
 	AllowsDuplicateReadonly = 2,
 }
 
-#[instruction(discriminator = DuplicateMutableInstruction, variant = FailsDuplicateMutable)]
+#[instruction(discriminator = DuplicateMutableInstruction::FailsDuplicateMutable)]
 pub struct FailsDuplicateMutableInstruction {}
 
-#[instruction(discriminator = DuplicateMutableInstruction, variant = AllowsDuplicateMutable)]
+#[instruction(discriminator = DuplicateMutableInstruction::AllowsDuplicateMutable)]
 pub struct AllowsDuplicateMutableInstruction {}
 
-#[instruction(discriminator = DuplicateMutableInstruction, variant = AllowsDuplicateReadonly)]
+#[instruction(discriminator = DuplicateMutableInstruction::AllowsDuplicateReadonly)]
 pub struct AllowsDuplicateReadonlyInstruction {}
 
 #[derive(Accounts, Debug)]
