@@ -222,12 +222,12 @@ pub enum MyAccountType {
 	MyState = 1,
 }
 
-#[instruction(discriminator = MyInstruction, variant = Initialize)]
+#[instruction(discriminator = MyInstruction::Initialize)]
 pub struct InitializeInstruction {
 	pub bump: u8,
 }
 
-#[instruction(discriminator = MyInstruction, variant = Update)]
+#[instruction(discriminator = MyInstruction::Update)]
 pub struct UpdateInstruction {
 	pub value: PodU64,
 }

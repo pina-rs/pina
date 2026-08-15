@@ -15,7 +15,7 @@ These rules describe the source shapes Pina's IDL extractor recognizes most reli
 - Use `#[discriminator]` on enums that define instruction or account tags.
 - Give every variant an explicit integer value.
 - Keep the variant names stable.
-- Use `#[instruction(discriminator = ..., variant = ...)]` on each instruction payload struct.
+- Use `#[instruction(discriminator = Enum::Variant)]` on each instruction payload struct.
 - Use `#[account(discriminator = ...)]` on account structs.
 
 This keeps the on-chain layout predictable and gives the extractor a clear path from source to IDL.
@@ -298,12 +298,12 @@ pub enum MyAccountType {
 	MyState = 1,
 }
 
-#[instruction(discriminator = MyInstruction, variant = Initialize)]
+#[instruction(discriminator = MyInstruction::Initialize)]
 pub struct InitializeInstruction {
 	pub bump: u8,
 }
 
-#[instruction(discriminator = MyInstruction, variant = Update)]
+#[instruction(discriminator = MyInstruction::Update)]
 pub struct UpdateInstruction {
 	pub value: PodU64,
 }

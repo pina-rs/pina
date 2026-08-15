@@ -1,6 +1,5 @@
 ---
 source: crates/pina_macros/src/tests.rs
-assertion_line: 433
 expression: output
 ---
 impl<'a> ::pina::ParseAccounts<'a> for TransferAccounts<'a> {
@@ -10,7 +9,7 @@ impl<'a> ::pina::ParseAccounts<'a> for TransferAccounts<'a> {
         let authority = cursor.next()?;
         let source = cursor.next()?;
         let destination = cursor.next()?;
-        let extra = cursor.remaining_mut();
+        let extra = cursor.remaining_mut()?;
         Ok(Self {
             authority,
             source,

@@ -5,7 +5,7 @@ pub enum ValidationInstruction {
 	Validate = 1,
 }
 
-#[instruction(discriminator = ValidationInstruction, variant = Validate)]
+#[instruction(discriminator = ValidationInstruction::Validate)]
 pub struct ValidateInstruction {}
 
 #[derive(Accounts, Debug)]
