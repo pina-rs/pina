@@ -3,6 +3,7 @@
 	"version": "0.8.0",
 	"description": "Helpers for converting Pina IDLs into Codama RootNodes",
 	"license": "MIT",
+	"repository": "https://github.com/pina-rs/pina/tree/main/packages/nodes-from-pina",
 	"type": "commonjs",
 	"sideEffects": false,
 	"main": "./dist/index.node.cjs",

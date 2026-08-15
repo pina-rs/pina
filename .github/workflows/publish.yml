@@ -1,0 +1,250 @@
+name: publish
+
+# Single workflow that builds release artifacts, publishes packages, and
+# publishes the GitHub release. Triggered by a tag push (v*) so that crates.io
+# and npm trusted publishing (OIDC) accept the run. workflow_dispatch is
+# retained for manual retries where every package version already exists on its
+# registry (monochange skips them, so no OIDC/OTP path is hit).
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (for example v0.8.0). Only used for manual retries; the tag-push event is the primary trigger."
+        required: true
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.tag || github.ref_name }}
+  # Never cancel a publish mid-flight: a partial registry publish is worse than
+  # a queued run waiting its turn.
+  cancel-in-progress: false
+
+# On a tag push github.ref_name is the tag (e.g. v0.9.0); on a manual
+# workflow_dispatch retry inputs.tag is the tag.
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+  RELEASE_ASSET_TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  upload_assets:
+    if: >-
+      github.repository_owner == 'pina-rs' &&
+      startsWith(inputs.tag || github.ref_name, 'v')
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - target: x86_64-unknown-freebsd
+            os: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      # The release-pr tag job pushes the tag (firing this workflow) and then
+      # creates the draft release. Wait for that draft release to exist before
+      # uploading assets into it.
+      - name: wait for draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Waiting for the draft release $RELEASE_TAG to be created by the release-pr tag job..."
+          for attempt in $(seq 1 30); do
+            if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "Draft release $RELEASE_TAG exists after $attempt attempt(s)."
+              exit 0
+            fi
+            echo "  attempt $attempt/30: release not found yet; sleeping 10s"
+            sleep 10
+          done
+          echo "::error::Release $RELEASE_TAG was not created within the wait window. Check the release-pr tag job." >&2
+          exit 1
+      - name: checkout release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - name: install rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: setup cross toolchain
+        if: startsWith(matrix.os, 'ubuntu') && !contains(matrix.target, '-musl')
+        uses: taiki-e/setup-cross-toolchain-action@v1
+        with:
+          target: ${{ matrix.target }}
+      - name: install cross
+        if: contains(matrix.target, '-musl')
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+      - name: set static crt linkage
+        if: endsWith(matrix.target, 'windows-msvc')
+        shell: bash
+        run: echo "RUSTFLAGS=${RUSTFLAGS:-} -C target-feature=+crt-static" >> "$GITHUB_ENV"
+      - name: upload binaries
+        uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: pina
+          manifest-path: crates/pina_cli/Cargo.toml
+          profile: release
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          archive: pina-$target-${{ env.RELEASE_ASSET_TAG }}
+          target: ${{ matrix.target }}
+          tar: all
+          zip: windows
+          token: ${{ secrets.GITHUB_TOKEN }}
+          checksum: sha256,sha512
+
+  attest_assets:
+    if: >-
+      github.repository_owner == 'pina-rs' &&
+      startsWith(inputs.tag || github.ref_name, 'v')
+    needs: upload_assets
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: checkout release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          persist-credentials: false
+      - name: download all release archives for attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset_dir="$RUNNER_TEMP/release-asset-attestations"
+          mkdir -p "$asset_dir"
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern 'pina-*' \
+            --dir "$asset_dir"
+          shopt -s nullglob
+          archives=("$asset_dir"/*)
+          if [ ${#archives[@]} -eq 0 ]; then
+            echo "::error::No release archives downloaded for $RELEASE_TAG" >&2
+            exit 1
+          fi
+          sha256sum "$asset_dir"/*
+      - name: attest all release archives
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: ${{ runner.temp }}/release-asset-attestations/*
+      - name: verify all release archive attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for archive in "$RUNNER_TEMP/release-asset-attestations"/*; do
+            verified=false
+            for attempt in 1 2 3 4 5; do
+              if gh attestation verify "$archive" --repo "$GITHUB_REPOSITORY"; then
+                verified=true
+                break
+              fi
+              echo "Attestation for $archive is not available yet (attempt $attempt/5)."
+              sleep 10
+            done
+            if [ "$verified" != true ]; then
+              echo "::error::Failed to verify attestation for $archive" >&2
+              exit 1
+            fi
+          done
+
+  publish:
+    needs: attest_assets
+    environment: publisher
+    permissions:
+      contents: write
+      id-token: write
+    if: >-
+      github.repository_owner == 'pina-rs' &&
+      startsWith(inputs.tag || github.ref_name, 'v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: validate release tag input
+        run: |
+          set -euo pipefail
+          if [[ "$RELEASE_TAG" != v* ]]; then
+            echo "::error::Tag '$RELEASE_TAG' must be a release tag like v0.9.0" >&2
+            exit 1
+          fi
+        shell: bash
+      - name: checkout release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: get crates oidc auth token
+        uses: rust-lang/crates-io-auth-action@v1
+        id: crates-oidc
+      - name: setup cargo stable for publish
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: setup node for publish
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: check publish readiness
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
+          NPM_CONFIG_PROVENANCE: "true"
+        run: monochange step publish-readiness --from HEAD --output "$RUNNER_TEMP/publish-readiness.json" --format json
+        shell: devenv shell -- bash -e {0}
+      - name: publish packages with monochange
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
+          NPM_CONFIG_PROVENANCE: "true"
+          # Stream child publish output so any auth prompt or hang is visible in
+          # the job log instead of being buffered until process exit.
+          PUBLISH_STREAM_OUTPUT: "true"
+        run: |
+          monochange step publish-packages \
+            --log-level info \
+            --all \
+            --output "$RUNNER_TEMP/publish-result.json" \
+            --format json
+        shell: devenv shell -- bash -e {0}
+      - name: publish draft release
+        run: gh release edit "$RELEASE_TAG" --draft=false --latest --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ github.token }}

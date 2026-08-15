@@ -1,6 +1,8 @@
 ---
-default: major
+core: major
 ---
+
+# Upgrade workspace to Pinocchio 0.11
 
 Upgrade the workspace to Pinocchio 0.11 and migrate Pina's core account APIs to the new mutable `AccountView` model.
 

@@ -37,7 +37,7 @@ in
       gitleaks
       libiconv
       mdbook
-      custom.knope
+      custom.monochange
       nodejs_22
       pnpm
       llvm.bintools
@@ -898,8 +898,17 @@ in
         lint:format
         verify:docs
         security:dylint
+        lint:monochange
       '';
       description = "Run all checks, including all custom dylint rules.";
+      binary = "bash";
+    };
+    "lint:monochange" = {
+      exec = ''
+        set -euo pipefail
+        monochange check
+      '';
+      description = "Validate monochange release metadata.";
       binary = "bash";
     };
     "docs:build" = {

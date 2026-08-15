@@ -75,9 +75,9 @@ pnpm run test:quasar-svm
 <!-- {@releaseWorkflowCommands} -->
 
 ```bash
-knope document-change
-knope release
-knope publish
+monochange run change
+monochange run release
+monochange step publish-packages
 ```
 
 <!-- {/releaseWorkflowCommands} -->
