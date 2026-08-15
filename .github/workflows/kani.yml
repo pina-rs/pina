@@ -28,7 +28,7 @@ concurrency:
 jobs:
   kani:
     timeout-minutes: 30
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
