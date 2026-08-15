@@ -426,8 +426,14 @@ mod tests {
 			],
 		);
 		let result = analyze_functions(&elf);
-		let func_a = result.iter().find(|f| f.name == "func_a").unwrap();
-		let func_b = result.iter().find(|f| f.name == "func_b").unwrap();
+		let func_a = result
+			.iter()
+			.find(|f| f.name == "func_a")
+			.unwrap_or_else(|| panic!("test data should contain 'func_a'"));
+		let func_b = result
+			.iter()
+			.find(|f| f.name == "func_b")
+			.unwrap_or_else(|| panic!("test data should contain 'func_b'"));
 
 		assert_eq!(func_a.syscall_count, 0);
 		assert_eq!(func_a.estimated_cu, 5);
