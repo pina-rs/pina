@@ -487,6 +487,31 @@ pub type LoadedAccountMut<'a, T> = RefMut<'a, T>;
 /// let mut escrow = accounts[0].as_account_mut::<EscrowState>(&program_id)?;
 /// escrow.amount = PodU64::from(100u64);
 /// ```
+///
+/// # Guard lifetime
+///
+/// `as_account` returns a [`Ref<'_, T>`] that borrows the underlying
+/// `AccountView` data. The guard must remain alive for the entire scope where
+/// the typed data is read. Dropping the guard early and then accessing the
+/// data through a different path can cause a runtime panic (double borrow).
+///
+/// When branching over an account, bind the guard in a single let-binding
+/// rather than creating and dropping it across match arms:
+///
+/// ```ignore
+/// // ✅ Correct — guard held across the full use site
+/// let state = account.as_account::<EscrowState>(&program_id)?;
+/// match state.field {
+///     Status::Open => { /* ... */ }
+///     Status::Closed => { /* ... */ }
+/// }
+///
+/// // ❌ Wrong — guard dropped at end of each arm, reborrow fails
+/// match account.as_account::<EscrowState>(&program_id)?.field {
+///     // The temporary `Ref` is dropped after `.field` is read;
+///     // subsequent mutable access to the same account will panic.
+/// }
+/// ```
 pub trait AsAccount {
 	/// Validate ownership and deserialize the account data into an immutable
 	/// borrow guard of type `T`. Returns `InvalidAccountData` if the
@@ -679,6 +704,12 @@ impl<'a> AccountsCursor<'a> {
 	}
 
 	/// Return the next account without advancing the cursor.
+	///
+	/// **Note:** `peek` does not invoke `track_mutable_account`.
+	/// Prefer [`next_mut`](Self::next_mut) for mutable access — it is the only path
+	/// that checks for duplicate mutable accounts. Using `peek` + manual indexing
+	/// bypasses that safety check and can accept duplicate writable accounts that
+	/// `next_mut` would reject.
 	pub fn peek(&self) -> Option<&AccountView> {
 		self.remaining.first()
 	}
@@ -742,6 +773,12 @@ impl<'a> AccountsCursor<'a> {
 		Err(PinaProgramError::TooManyAccountKeys.into())
 	}
 
+	/// Check whether the given account is a mutable duplicate of any account
+	/// still in the cursor's remaining slice.
+	///
+	/// This is called automatically by [`next_mut`](Self::next_mut). Calling it
+	/// directly is only necessary when implementing a custom cursor that replaces
+	/// `next_mut`.
 	fn track_mutable_account(&self, account: &AccountView) -> Result<(), ProgramError> {
 		if !account.is_writable() {
 			return Ok(());
