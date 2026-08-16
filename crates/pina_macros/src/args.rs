@@ -55,7 +55,8 @@ pub(crate) struct ErrorArgs {
 }
 
 fn default_crate_path() -> syn::Path {
-	syn::parse_str("::pina").unwrap()
+	syn::parse_str("::pina")
+		.unwrap_or_else(|e| panic!("internal error: failed to parse default crate path: {e}"))
 }
 
 /// Arguments for the `#[discriminator(...)]` attribute macro.
