@@ -1838,6 +1838,180 @@ fn as_associated_token_account_checked_accepts_token_2022_owner() {
 	assert!(shadow.try_borrow_mut().is_ok());
 }
 
+#[cfg(feature = "token")]
+#[test]
+fn as_token_account_checked_rejects_overlong_account() {
+	let token_account_key: Address = address!("6QWeT6FpJrm8AF1btu6WH2k2Xhq6t5vbheKVfQavmeoZ");
+	let mint: Address = address!("4hT5gDpr9HMmXzttW2Kz7LxyzKDn5XxhxL7sRKqGZo4x");
+	let owner: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let mut token_account_data = build_token_account_bytes(&mint, &owner, 88);
+	// SPL token accounts are fixed-size; extra bytes are rejected.
+	token_account_data.push(0);
+
+	let accounts = [AccountBuilder::new()
+		.address(token_account_key)
+		.owner(token::ID)
+		.lamports(1_000_000)
+		.data(&token_account_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let account = account_views[0];
+	assert!(matches!(
+		account.as_token_account_checked(),
+		Err(ProgramError::InvalidAccountData)
+	));
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_token_account_checked_rejects_short_account() {
+	let token_account_key: Address = address!("6QWeT6FpJrm8AF1btu6WH2k2Xhq6t5vbheKVfQavmeoZ");
+	let mint: Address = address!("4hT5gDpr9HMmXzttW2Kz7LxyzKDn5XxhxL7sRKqGZo4x");
+	let owner: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let mut token_account_data = build_token_account_bytes(&mint, &owner, 88);
+	token_account_data.pop();
+
+	let accounts = [AccountBuilder::new()
+		.address(token_account_key)
+		.owner(token::ID)
+		.lamports(1_000_000)
+		.data(&token_account_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let account = account_views[0];
+	assert!(matches!(
+		account.as_token_account_checked(),
+		Err(ProgramError::InvalidAccountData)
+	));
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_token_mint_checked_rejects_overlong_mint() {
+	let mint_key: Address = address!("8qbHbw2BbbTHBW1sK7d7Yx4Z4DccnE9vrFica8FWHQrP");
+	let mut mint_data = build_token_mint_bytes(9, 42);
+	// SPL token mints are fixed-size; extra bytes are rejected.
+	mint_data.push(0);
+
+	let accounts = [AccountBuilder::new()
+		.address(mint_key)
+		.owner(token::ID)
+		.lamports(1_000_000)
+		.data(&mint_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let account = account_views[0];
+	assert!(matches!(
+		account.as_token_mint_checked(),
+		Err(ProgramError::InvalidAccountData)
+	));
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_token_2022_account_checked_accepts_extension_data() {
+	let token_account_key: Address = address!("4vJ9JU1bJJE96FWSJKv9J5xBqHkM7SspGq2pZ7uS5k4x");
+	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
+	let owner: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
+	let mut token_account_data = build_token_account_bytes(&mint, &owner, 123);
+	// token-2022 accounts may carry extension data after the base layout.
+	token_account_data.extend_from_slice(&[0u8; 8]);
+
+	let accounts = [AccountBuilder::new()
+		.address(token_account_key)
+		.owner(token_2022::ID)
+		.lamports(1_000_000)
+		.data(&token_account_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let account = account_views[0];
+	let token_account = account
+		.as_token_2022_account_checked()
+		.unwrap_or_else(|e| panic!("token-2022 account load failed: {e:?}"));
+	assert_eq!(token_account.amount(), 123);
+	assert_eq!(token_account.mint(), &mint);
+	assert_eq!(token_account.owner(), &owner);
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_token_2022_account_checked_rejects_short_account() {
+	let token_account_key: Address = address!("4vJ9JU1bJJE96FWSJKv9J5xBqHkM7SspGq2pZ7uS5k4x");
+	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
+	let owner: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
+	let mut token_account_data = build_token_account_bytes(&mint, &owner, 123);
+	token_account_data.pop();
+
+	let accounts = [AccountBuilder::new()
+		.address(token_account_key)
+		.owner(token_2022::ID)
+		.lamports(1_000_000)
+		.data(&token_account_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let account = account_views[0];
+	assert!(matches!(
+		account.as_token_2022_account_checked(),
+		Err(ProgramError::InvalidAccountData)
+	));
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_associated_token_account_accepts_overlong_data() {
+	let wallet: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
+	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
+	let (ata_address, _bump) = try_get_associated_token_address(&wallet, &mint, &token_2022::ID)
+		.unwrap_or_else(|| panic!("failed to derive ata"));
+	let mut token_account_data = build_token_account_bytes(&mint, &wallet, 99);
+	// token-2022 ATAs may carry extension data after the base layout.
+	token_account_data.extend_from_slice(&[0u8; 8]);
+
+	let accounts = [AccountBuilder::new()
+		.address(ata_address)
+		.owner(token_2022::ID)
+		.lamports(1_000_000)
+		.data(&token_account_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let account = account_views[0];
+	let token_account = account
+		.as_associated_token_account_checked(&wallet, &mint, &token_2022::ID)
+		.unwrap_or_else(|e| panic!("associated token account load failed: {e:?}"));
+	assert_eq!(token_account.amount(), 99);
+	assert_eq!(token_account.owner(), &wallet);
+}
+
 // ---------------------------------------------------------------------------
 // Test: TryFromAccountInfos derive
 // ---------------------------------------------------------------------------
