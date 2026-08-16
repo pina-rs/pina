@@ -103,11 +103,16 @@ impl<const N: usize, const PFX: usize> PodString<N, PFX> {
 		N
 	}
 
-	/// Returns the string as a `&str`.
+	/// Returns the string as a `&str` without validating UTF-8.
+	///
+	/// This is the only way to obtain a `&str` view without validation —
+	/// `PodString` deliberately does not implement `Deref<Target = str>` or
+	/// `AsRef<str>`, because the stored bytes may be arbitrary when the value
+	/// is loaded from untrusted account data via `Pod`.
 	///
 	/// # Safety
-	/// This assumes the stored bytes are valid UTF-8. For untrusted account
-	/// data, use `try_as_str()` instead.
+	/// The stored bytes must be valid UTF-8. For untrusted account data, use
+	/// `try_as_str()` instead.
 	#[inline]
 	pub unsafe fn as_str_unchecked(&self) -> &str {
 		unsafe {
@@ -194,20 +199,6 @@ impl<const N: usize, const PFX: usize> Default for PodString<N, PFX> {
 			len: [0u8; PFX],
 			data: [MaybeUninit::uninit(); N],
 		}
-	}
-}
-
-impl<const N: usize, const PFX: usize> core::ops::Deref for PodString<N, PFX> {
-	type Target = str;
-
-	fn deref(&self) -> &str {
-		unsafe { self.as_str_unchecked() }
-	}
-}
-
-impl<const N: usize, const PFX: usize> AsRef<str> for PodString<N, PFX> {
-	fn as_ref(&self) -> &str {
-		unsafe { self.as_str_unchecked() }
 	}
 }
 
