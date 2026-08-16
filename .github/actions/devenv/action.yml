@@ -17,14 +17,14 @@ runs:
   using: composite
   steps:
     - name: cache rust dependencies
-      uses: Swatinem/rust-cache@v2
+      uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       with:
         # Include the devenv/toolchain wiring in the cache key so cached build
         # scripts don't outlive the Nix environment that produced them.
         prefix-key: "${{ inputs.cache-version }}-${{ hashFiles('devenv.nix', 'rust-toolchain.toml', '.github/actions/devenv/action.yml') }}"
 
     - name: cache cargo binaries
-      uses: actions/cache@v4
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ./.bin
         key: ${{ runner.os }}-cargo-bin-${{ inputs.cache-version }}-${{ env.RUSTUP_TOOLCHAIN }}-${{ hashFiles('devenv.nix', 'rust-toolchain.toml', '.github/actions/devenv/action.yml', 'Cargo.toml') }}
@@ -32,7 +32,7 @@ runs:
           ${{ runner.os }}-cargo-bin-${{ inputs.cache-version }}-
 
     - name: install nix
-      uses: cachix/install-nix-action@v31
+      uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
       with:
         github_access_token: ${{ inputs.github-token }}
 

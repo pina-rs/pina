@@ -86,22 +86,22 @@ jobs:
           echo "::error::Release $RELEASE_TAG was not created within the wait window. Check the release-pr tag job." >&2
           exit 1
       - name: checkout release tag
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
       - name: install rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
         with:
           toolchain: stable
       - name: setup cross toolchain
         if: startsWith(matrix.os, 'ubuntu') && !contains(matrix.target, '-musl')
-        uses: taiki-e/setup-cross-toolchain-action@v1
+        uses: taiki-e/setup-cross-toolchain-action@12b7ad4acfa95a1476779d6c06699b96ec1691f8 # v1.42.0
         with:
           target: ${{ matrix.target }}
       - name: install cross
         if: contains(matrix.target, '-musl')
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@288e746965032cfcc232e09af2daf5f23c14d780 # v2.86.1
         with:
           tool: cross
       - name: set static crt linkage
@@ -109,7 +109,7 @@ jobs:
         shell: bash
         run: echo "RUSTFLAGS=${RUSTFLAGS:-} -C target-feature=+crt-static" >> "$GITHUB_ENV"
       - name: upload binaries
-        uses: taiki-e/upload-rust-binary-action@v1
+        uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1.30.2
         with:
           bin: pina
           manifest-path: crates/pina_cli/Cargo.toml
@@ -135,7 +135,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: checkout release tag
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.RELEASE_TAG }}
           persist-credentials: false
@@ -159,7 +159,7 @@ jobs:
           fi
           sha256sum "$asset_dir"/*
       - name: attest all release archives
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: ${{ runner.temp }}/release-asset-attestations/*
       - name: verify all release archive attestations
@@ -205,7 +205,7 @@ jobs:
           fi
         shell: bash
       - name: checkout release tag
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
@@ -214,14 +214,14 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: get crates oidc auth token
-        uses: rust-lang/crates-io-auth-action@v1
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
         id: crates-oidc
       - name: setup cargo stable for publish
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
         with:
           toolchain: stable
       - name: setup node for publish
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
       - name: check publish readiness
