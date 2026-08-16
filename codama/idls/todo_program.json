@@ -1,318 +1,318 @@
 {
-  "kind": "rootNode",
-  "standard": "codama",
-  "version": "1.8.0",
-  "program": {
-    "kind": "programNode",
-    "name": "todoProgram",
-    "publicKey": "Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd",
-    "version": "0.0.0",
-    "accounts": [
-      {
-        "kind": "accountNode",
-        "name": "todoState",
-        "data": {
-          "kind": "structTypeNode",
-          "fields": [
-            {
-              "kind": "structFieldTypeNode",
-              "name": "owner",
-              "type": {
-                "kind": "publicKeyTypeNode"
-              }
-            },
-            {
-              "kind": "structFieldTypeNode",
-              "name": "bump",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              }
-            },
-            {
-              "kind": "structFieldTypeNode",
-              "name": "completed",
-              "type": {
-                "kind": "booleanTypeNode",
-                "size": {
-                  "kind": "numberTypeNode",
-                  "format": "u8",
-                  "endian": "le"
-                }
-              }
-            },
-            {
-              "kind": "structFieldTypeNode",
-              "name": "digest",
-              "type": {
-                "kind": "fixedSizeTypeNode",
-                "size": 32,
-                "type": {
-                  "kind": "bytesTypeNode"
-                }
-              }
-            }
-          ]
-        },
-        "discriminators": [
-          {
-            "kind": "constantDiscriminatorNode",
-            "offset": 0,
-            "constant": {
-              "kind": "constantValueNode",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              },
-              "value": {
-                "kind": "numberValueNode",
-                "number": 1
-              }
-            }
-          }
-        ]
-      }
-    ],
-    "instructions": [
-      {
-        "kind": "instructionNode",
-        "name": "initialize",
-        "accounts": [
-          {
-            "kind": "instructionAccountNode",
-            "name": "owner",
-            "isWritable": false,
-            "isSigner": true,
-            "isOptional": false
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "todo",
-            "isWritable": true,
-            "isSigner": false,
-            "isOptional": false,
-            "defaultValue": {
-              "kind": "pdaValueNode",
-              "pda": {
-                "kind": "pdaLinkNode",
-                "name": "todo"
-              },
-              "seeds": [
-                {
-                  "kind": "pdaSeedValueNode",
-                  "name": "owner",
-                  "value": {
-                    "kind": "accountValueNode",
-                    "name": "owner"
-                  }
-                }
-              ]
-            }
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "systemProgram",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "11111111111111111111111111111111"
-            }
-          }
-        ],
-        "arguments": [
-          {
-            "kind": "instructionArgumentNode",
-            "name": "bump",
-            "type": {
-              "kind": "numberTypeNode",
-              "format": "u8",
-              "endian": "le"
-            }
-          },
-          {
-            "kind": "instructionArgumentNode",
-            "name": "digest",
-            "type": {
-              "kind": "fixedSizeTypeNode",
-              "size": 32,
-              "type": {
-                "kind": "bytesTypeNode"
-              }
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "constantDiscriminatorNode",
-            "offset": 0,
-            "constant": {
-              "kind": "constantValueNode",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              },
-              "value": {
-                "kind": "numberValueNode",
-                "number": 0
-              }
-            }
-          }
-        ]
-      },
-      {
-        "kind": "instructionNode",
-        "name": "toggleCompleted",
-        "accounts": [
-          {
-            "kind": "instructionAccountNode",
-            "name": "owner",
-            "isWritable": false,
-            "isSigner": true,
-            "isOptional": false
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "todo",
-            "isWritable": true,
-            "isSigner": false,
-            "isOptional": false,
-            "defaultValue": {
-              "kind": "pdaValueNode",
-              "pda": {
-                "kind": "pdaLinkNode",
-                "name": "todo"
-              },
-              "seeds": [
-                {
-                  "kind": "pdaSeedValueNode",
-                  "name": "owner",
-                  "value": {
-                    "kind": "accountValueNode",
-                    "name": "owner"
-                  }
-                }
-              ]
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "constantDiscriminatorNode",
-            "offset": 0,
-            "constant": {
-              "kind": "constantValueNode",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              },
-              "value": {
-                "kind": "numberValueNode",
-                "number": 1
-              }
-            }
-          }
-        ]
-      },
-      {
-        "kind": "instructionNode",
-        "name": "updateDigest",
-        "accounts": [
-          {
-            "kind": "instructionAccountNode",
-            "name": "owner",
-            "isWritable": false,
-            "isSigner": true,
-            "isOptional": false
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "todo",
-            "isWritable": true,
-            "isSigner": false,
-            "isOptional": false,
-            "defaultValue": {
-              "kind": "pdaValueNode",
-              "pda": {
-                "kind": "pdaLinkNode",
-                "name": "todo"
-              },
-              "seeds": [
-                {
-                  "kind": "pdaSeedValueNode",
-                  "name": "owner",
-                  "value": {
-                    "kind": "accountValueNode",
-                    "name": "owner"
-                  }
-                }
-              ]
-            }
-          }
-        ],
-        "arguments": [
-          {
-            "kind": "instructionArgumentNode",
-            "name": "digest",
-            "type": {
-              "kind": "fixedSizeTypeNode",
-              "size": 32,
-              "type": {
-                "kind": "bytesTypeNode"
-              }
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "constantDiscriminatorNode",
-            "offset": 0,
-            "constant": {
-              "kind": "constantValueNode",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              },
-              "value": {
-                "kind": "numberValueNode",
-                "number": 2
-              }
-            }
-          }
-        ]
-      }
-    ],
-    "pdas": [
-      {
-        "kind": "pdaNode",
-        "name": "todo",
-        "seeds": [
-          {
-            "kind": "constantPdaSeedNode",
-            "type": {
-              "kind": "stringTypeNode",
-              "encoding": "utf8"
-            },
-            "value": {
-              "kind": "stringValueNode",
-              "string": "todo"
-            }
-          },
-          {
-            "kind": "variablePdaSeedNode",
-            "name": "owner",
-            "type": {
-              "kind": "publicKeyTypeNode"
-            }
-          }
-        ]
-      }
-    ]
-  }
+	"kind": "rootNode",
+	"standard": "codama",
+	"version": "1.8.0",
+	"program": {
+		"kind": "programNode",
+		"name": "todoProgram",
+		"publicKey": "Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd",
+		"version": "0.0.0",
+		"accounts": [
+			{
+				"kind": "accountNode",
+				"name": "todoState",
+				"data": {
+					"kind": "structTypeNode",
+					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "owner",
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "bump",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "completed",
+							"type": {
+								"kind": "booleanTypeNode",
+								"size": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "digest",
+							"type": {
+								"kind": "fixedSizeTypeNode",
+								"size": 32,
+								"type": {
+									"kind": "bytesTypeNode"
+								}
+							}
+						}
+					]
+				},
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			}
+		],
+		"instructions": [
+			{
+				"kind": "instructionNode",
+				"name": "initialize",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "owner",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "todo",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "todo"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "owner",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "owner"
+									}
+								}
+							]
+						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "bump",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "digest",
+						"type": {
+							"kind": "fixedSizeTypeNode",
+							"size": 32,
+							"type": {
+								"kind": "bytesTypeNode"
+							}
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "toggleCompleted",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "owner",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "todo",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "todo"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "owner",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "owner"
+									}
+								}
+							]
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "updateDigest",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "owner",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "todo",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "todo"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "owner",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "owner"
+									}
+								}
+							]
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "digest",
+						"type": {
+							"kind": "fixedSizeTypeNode",
+							"size": 32,
+							"type": {
+								"kind": "bytesTypeNode"
+							}
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 2
+							}
+						}
+					}
+				]
+			}
+		],
+		"pdas": [
+			{
+				"kind": "pdaNode",
+				"name": "todo",
+				"seeds": [
+					{
+						"kind": "constantPdaSeedNode",
+						"type": {
+							"kind": "stringTypeNode",
+							"encoding": "utf8"
+						},
+						"value": {
+							"kind": "stringValueNode",
+							"string": "todo"
+						}
+					},
+					{
+						"kind": "variablePdaSeedNode",
+						"name": "owner",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					}
+				]
+			}
+		]
+	}
 }

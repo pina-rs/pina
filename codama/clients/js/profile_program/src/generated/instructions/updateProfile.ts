@@ -6,111 +6,265 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { combineCodec, fixDecoderSize, fixEncoderSize, getBytesDecoder, getBytesEncoder, getStructDecoder, getStructEncoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlySignerAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount } from '@solana/kit';
-import { getAccountMetaFactory, getAddressFromResolvedInstructionAccount, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { findProfilePda } from '../pdas';
-import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	fixDecoderSize,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	fixEncoderSize,
+	getBytesDecoder,
+	getBytesEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	type TransactionSigner,
+	type WritableAccount,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
+import { findProfilePda } from "../pdas";
+import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const UPDATE_PROFILE_DISCRIMINATOR = 1;
 
-export function getUpdateProfileDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(UPDATE_PROFILE_DISCRIMINATOR); }
+export function getUpdateProfileDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(UPDATE_PROFILE_DISCRIMINATOR);
+}
 
-export type UpdateProfileInstruction<TProgram extends string = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS, TAccountAuthority extends string | AccountMeta<string> = string, TAccountProfile extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAuthority extends string ? ReadonlySignerAccount<TAccountAuthority> & AccountSignerMeta<TAccountAuthority> : TAccountAuthority, TAccountProfile extends string ? WritableAccount<TAccountProfile> : TAccountProfile, ...TRemainingAccounts]>;
+export type UpdateProfileInstruction<
+	TProgram extends string = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
+	TAccountAuthority extends string | AccountMeta<string> = string,
+	TAccountProfile extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountAuthority extends string ?
+					& ReadonlySignerAccount<TAccountAuthority>
+					& AccountSignerMeta<TAccountAuthority>
+				: TAccountAuthority,
+			TAccountProfile extends string ? WritableAccount<TAccountProfile>
+				: TAccountProfile,
+			...TRemainingAccounts,
+		]
+	>;
 
-export type UpdateProfileInstructionData = { name: ReadonlyUint8Array; bio: ReadonlyUint8Array;  };
+export type UpdateProfileInstructionData = {
+	name: ReadonlyUint8Array;
+	bio: ReadonlyUint8Array;
+};
 
 export type UpdateProfileInstructionDataArgs = UpdateProfileInstructionData;
 
-export function getUpdateProfileInstructionDataEncoder(): FixedSizeEncoder<UpdateProfileInstructionDataArgs> {
-    return getStructEncoder([['name', fixEncoderSize(getBytesEncoder(), 33)], ['bio', fixEncoderSize(getBytesEncoder(), 129)]]);
+export function getUpdateProfileInstructionDataEncoder(): FixedSizeEncoder<
+	UpdateProfileInstructionDataArgs
+> {
+	return getStructEncoder([["name", fixEncoderSize(getBytesEncoder(), 33)], [
+		"bio",
+		fixEncoderSize(getBytesEncoder(), 129),
+	]]);
 }
 
-export function getUpdateProfileInstructionDataDecoder(): FixedSizeDecoder<UpdateProfileInstructionData> {
-    return getStructDecoder([['name', fixDecoderSize(getBytesDecoder(), 33)], ['bio', fixDecoderSize(getBytesDecoder(), 129)]]);
+export function getUpdateProfileInstructionDataDecoder(): FixedSizeDecoder<
+	UpdateProfileInstructionData
+> {
+	return getStructDecoder([["name", fixDecoderSize(getBytesDecoder(), 33)], [
+		"bio",
+		fixDecoderSize(getBytesDecoder(), 129),
+	]]);
 }
 
-export function getUpdateProfileInstructionDataCodec(): FixedSizeCodec<UpdateProfileInstructionDataArgs, UpdateProfileInstructionData> {
-    return combineCodec(getUpdateProfileInstructionDataEncoder(), getUpdateProfileInstructionDataDecoder());
+export function getUpdateProfileInstructionDataCodec(): FixedSizeCodec<
+	UpdateProfileInstructionDataArgs,
+	UpdateProfileInstructionData
+> {
+	return combineCodec(
+		getUpdateProfileInstructionDataEncoder(),
+		getUpdateProfileInstructionDataDecoder(),
+	);
 }
 
-export type UpdateProfileAsyncInput<TAccountAuthority extends string = string, TAccountProfile extends string = string> =  {
-  /** The profile's authority. Must sign to prove ownership. */
-authority: TransactionSigner<TAccountAuthority>;
-/** The profile PDA account (must already exist and be writable). */
-profile?: Address<TAccountProfile>;
-name: UpdateProfileInstructionDataArgs["name"];
-bio: UpdateProfileInstructionDataArgs["bio"];
-}
-
-export async function getUpdateProfileInstructionAsync<TAccountAuthority extends string, TAccountProfile extends string, TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS>(input: UpdateProfileAsyncInput<TAccountAuthority, TAccountProfile>, config?: { programAddress?: TProgramAddress } ): Promise<UpdateProfileInstruction<TProgramAddress, TAccountAuthority, TAccountProfile>> {
-  // Program address.
-const programAddress = config?.programAddress ?? PROFILE_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isWritable: false }, profile: { value: input.profile ?? null, isWritable: true } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-// Resolve default values.
-if (!accounts.profile.value) {
-accounts.profile.value = await findProfilePda({ authority: getAddressFromResolvedInstructionAccount("authority", accounts.authority.value) });
-}
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("profile", accounts.profile)], data: getUpdateProfileInstructionDataEncoder().encode(args as UpdateProfileInstructionDataArgs), programAddress } as UpdateProfileInstruction<TProgramAddress, TAccountAuthority, TAccountProfile>);
-}
-
-export type UpdateProfileInput<TAccountAuthority extends string = string, TAccountProfile extends string = string> =  {
-  /** The profile's authority. Must sign to prove ownership. */
-authority: TransactionSigner<TAccountAuthority>;
-/** The profile PDA account (must already exist and be writable). */
-profile: Address<TAccountProfile>;
-name: UpdateProfileInstructionDataArgs["name"];
-bio: UpdateProfileInstructionDataArgs["bio"];
-}
-
-export function getUpdateProfileInstruction<TAccountAuthority extends string, TAccountProfile extends string, TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS>(input: UpdateProfileInput<TAccountAuthority, TAccountProfile>, config?: { programAddress?: TProgramAddress } ): UpdateProfileInstruction<TProgramAddress, TAccountAuthority, TAccountProfile> {
-  // Program address.
-const programAddress = config?.programAddress ?? PROFILE_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isWritable: false }, profile: { value: input.profile ?? null, isWritable: true } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("profile", accounts.profile)], data: getUpdateProfileInstructionDataEncoder().encode(args as UpdateProfileInstructionDataArgs), programAddress } as UpdateProfileInstruction<TProgramAddress, TAccountAuthority, TAccountProfile>);
-}
-
-export type ParsedUpdateProfileInstruction<TProgram extends string = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-/** The profile's authority. Must sign to prove ownership. */
-authority: TAccountMetas[0];
-/** The profile PDA account (must already exist and be writable). */
-profile: TAccountMetas[1];
+export type UpdateProfileAsyncInput<
+	TAccountAuthority extends string = string,
+	TAccountProfile extends string = string,
+> = {
+	/** The profile's authority. Must sign to prove ownership. */
+	authority: TransactionSigner<TAccountAuthority>;
+	/** The profile PDA account (must already exist and be writable). */
+	profile?: Address<TAccountProfile>;
+	name: UpdateProfileInstructionDataArgs["name"];
+	bio: UpdateProfileInstructionDataArgs["bio"];
 };
-data: UpdateProfileInstructionData; };
 
-export function parseUpdateProfileInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedUpdateProfileInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 2) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 2 });
+export async function getUpdateProfileInstructionAsync<
+	TAccountAuthority extends string,
+	TAccountProfile extends string,
+	TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: UpdateProfileAsyncInput<TAccountAuthority, TAccountProfile>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	UpdateProfileInstruction<TProgramAddress, TAccountAuthority, TAccountProfile>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		PROFILE_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: false },
+		profile: { value: input.profile ?? null, isWritable: true },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.profile.value) {
+		accounts.profile.value = await findProfilePda({
+			authority: getAddressFromResolvedInstructionAccount(
+				"authority",
+				accounts.authority.value,
+			),
+		});
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("profile", accounts.profile),
+		],
+		data: getUpdateProfileInstructionDataEncoder().encode(
+			args as UpdateProfileInstructionDataArgs,
+		),
+		programAddress,
+	} as UpdateProfileInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountProfile
+	>);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
+
+export type UpdateProfileInput<
+	TAccountAuthority extends string = string,
+	TAccountProfile extends string = string,
+> = {
+	/** The profile's authority. Must sign to prove ownership. */
+	authority: TransactionSigner<TAccountAuthority>;
+	/** The profile PDA account (must already exist and be writable). */
+	profile: Address<TAccountProfile>;
+	name: UpdateProfileInstructionDataArgs["name"];
+	bio: UpdateProfileInstructionDataArgs["bio"];
+};
+
+export function getUpdateProfileInstruction<
+	TAccountAuthority extends string,
+	TAccountProfile extends string,
+	TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: UpdateProfileInput<TAccountAuthority, TAccountProfile>,
+	config?: { programAddress?: TProgramAddress },
+): UpdateProfileInstruction<
+	TProgramAddress,
+	TAccountAuthority,
+	TAccountProfile
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		PROFILE_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: false },
+		profile: { value: input.profile ?? null, isWritable: true },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("profile", accounts.profile),
+		],
+		data: getUpdateProfileInstructionDataEncoder().encode(
+			args as UpdateProfileInstructionDataArgs,
+		),
+		programAddress,
+	} as UpdateProfileInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountProfile
+	>);
 }
-  return { programAddress: instruction.programAddress, accounts: { authority: getNextAccount(), profile: getNextAccount() }, data: getUpdateProfileInstructionDataDecoder().decode(instruction.data) };
+
+export type ParsedUpdateProfileInstruction<
+	TProgram extends string = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		/** The profile's authority. Must sign to prove ownership. */
+		authority: TAccountMetas[0];
+		/** The profile PDA account (must already exist and be writable). */
+		profile: TAccountMetas[1];
+	};
+	data: UpdateProfileInstructionData;
+};
+
+export function parseUpdateProfileInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedUpdateProfileInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 2) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 2,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: { authority: getNextAccount(), profile: getNextAccount() },
+		data: getUpdateProfileInstructionDataDecoder().decode(instruction.data),
+	};
 }

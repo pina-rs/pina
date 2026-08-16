@@ -6,134 +6,332 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { combineCodec, fixDecoderSize, fixEncoderSize, getBytesDecoder, getBytesEncoder, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlyUint8Array, type TransactionSigner, type WritableAccount, type WritableSignerAccount } from '@solana/kit';
-import { getAccountMetaFactory, getAddressFromResolvedInstructionAccount, type ResolvedInstructionAccount } from '@solana/program-client-core';
-import { findProfilePda } from '../pdas';
-import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	fixDecoderSize,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	fixEncoderSize,
+	getBytesDecoder,
+	getBytesEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	type TransactionSigner,
+	type WritableAccount,
+	type WritableSignerAccount,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
+import { findProfilePda } from "../pdas";
+import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const INITIALIZE_DISCRIMINATOR = 0;
 
-export function getInitializeDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR); }
+export function getInitializeDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR);
+}
 
-export type InitializeInstruction<TProgram extends string = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS, TAccountAuthority extends string | AccountMeta<string> = string, TAccountProfile extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = "11111111111111111111111111111111", TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAuthority extends string ? WritableSignerAccount<TAccountAuthority> & AccountSignerMeta<TAccountAuthority> : TAccountAuthority, TAccountProfile extends string ? WritableAccount<TAccountProfile> : TAccountProfile, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, ...TRemainingAccounts]>;
+export type InitializeInstruction<
+	TProgram extends string = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
+	TAccountAuthority extends string | AccountMeta<string> = string,
+	TAccountProfile extends string | AccountMeta<string> = string,
+	TAccountSystemProgram extends string | AccountMeta<string> =
+		"11111111111111111111111111111111",
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountAuthority extends string ?
+					& WritableSignerAccount<TAccountAuthority>
+					& AccountSignerMeta<TAccountAuthority>
+				: TAccountAuthority,
+			TAccountProfile extends string ? WritableAccount<TAccountProfile>
+				: TAccountProfile,
+			TAccountSystemProgram extends string
+				? ReadonlyAccount<TAccountSystemProgram>
+				: TAccountSystemProgram,
+			...TRemainingAccounts,
+		]
+	>;
 
-export type InitializeInstructionData = { bump: number; name: ReadonlyUint8Array; bio: ReadonlyUint8Array;  };
+export type InitializeInstructionData = {
+	bump: number;
+	name: ReadonlyUint8Array;
+	bio: ReadonlyUint8Array;
+};
 
 export type InitializeInstructionDataArgs = InitializeInstructionData;
 
-export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<InitializeInstructionDataArgs> {
-    return getStructEncoder([['bump', getU8Encoder()], ['name', fixEncoderSize(getBytesEncoder(), 33)], ['bio', fixEncoderSize(getBytesEncoder(), 129)]]);
+export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
+	InitializeInstructionDataArgs
+> {
+	return getStructEncoder([["bump", getU8Encoder()], [
+		"name",
+		fixEncoderSize(getBytesEncoder(), 33),
+	], ["bio", fixEncoderSize(getBytesEncoder(), 129)]]);
 }
 
-export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<InitializeInstructionData> {
-    return getStructDecoder([['bump', getU8Decoder()], ['name', fixDecoderSize(getBytesDecoder(), 33)], ['bio', fixDecoderSize(getBytesDecoder(), 129)]]);
+export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
+	InitializeInstructionData
+> {
+	return getStructDecoder([["bump", getU8Decoder()], [
+		"name",
+		fixDecoderSize(getBytesDecoder(), 33),
+	], ["bio", fixDecoderSize(getBytesDecoder(), 129)]]);
 }
 
-export function getInitializeInstructionDataCodec(): FixedSizeCodec<InitializeInstructionDataArgs, InitializeInstructionData> {
-    return combineCodec(getInitializeInstructionDataEncoder(), getInitializeInstructionDataDecoder());
+export function getInitializeInstructionDataCodec(): FixedSizeCodec<
+	InitializeInstructionDataArgs,
+	InitializeInstructionData
+> {
+	return combineCodec(
+		getInitializeInstructionDataEncoder(),
+		getInitializeInstructionDataDecoder(),
+	);
 }
 
-export type InitializeAsyncInput<TAccountAuthority extends string = string, TAccountProfile extends string = string, TAccountSystemProgram extends string = string> =  {
-  /**
- * The wallet creating the profile. Pays for account creation and becomes
- * the authority whose address seeds the PDA.
- */
-authority: TransactionSigner<TAccountAuthority>;
-/** The profile PDA account (must be empty — not yet created). */
-profile?: Address<TAccountProfile>;
-/** The system program, required for `CreateAccount` CPI. */
-systemProgram?: Address<TAccountSystemProgram>;
-bump: InitializeInstructionDataArgs["bump"];
-name: InitializeInstructionDataArgs["name"];
-bio: InitializeInstructionDataArgs["bio"];
-}
-
-export async function getInitializeInstructionAsync<TAccountAuthority extends string, TAccountProfile extends string, TAccountSystemProgram extends string, TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS>(input: InitializeAsyncInput<TAccountAuthority, TAccountProfile, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): Promise<InitializeInstruction<TProgramAddress, TAccountAuthority, TAccountProfile, TAccountSystemProgram>> {
-  // Program address.
-const programAddress = config?.programAddress ?? PROFILE_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isWritable: true }, profile: { value: input.profile ?? null, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-// Resolve default values.
-if (!accounts.profile.value) {
-accounts.profile.value = await findProfilePda({ authority: getAddressFromResolvedInstructionAccount("authority", accounts.authority.value) });
-}
-if (!accounts.systemProgram.value) {
-accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
-}
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("profile", accounts.profile), getAccountMeta("systemProgram", accounts.systemProgram)], data: getInitializeInstructionDataEncoder().encode(args as InitializeInstructionDataArgs), programAddress } as InitializeInstruction<TProgramAddress, TAccountAuthority, TAccountProfile, TAccountSystemProgram>);
-}
-
-export type InitializeInput<TAccountAuthority extends string = string, TAccountProfile extends string = string, TAccountSystemProgram extends string = string> =  {
-  /**
- * The wallet creating the profile. Pays for account creation and becomes
- * the authority whose address seeds the PDA.
- */
-authority: TransactionSigner<TAccountAuthority>;
-/** The profile PDA account (must be empty — not yet created). */
-profile: Address<TAccountProfile>;
-/** The system program, required for `CreateAccount` CPI. */
-systemProgram?: Address<TAccountSystemProgram>;
-bump: InitializeInstructionDataArgs["bump"];
-name: InitializeInstructionDataArgs["name"];
-bio: InitializeInstructionDataArgs["bio"];
-}
-
-export function getInitializeInstruction<TAccountAuthority extends string, TAccountProfile extends string, TAccountSystemProgram extends string, TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS>(input: InitializeInput<TAccountAuthority, TAccountProfile, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress } ): InitializeInstruction<TProgramAddress, TAccountAuthority, TAccountProfile, TAccountSystemProgram> {
-  // Program address.
-const programAddress = config?.programAddress ?? PROFILE_PROGRAM_PROGRAM_ADDRESS;
-
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isWritable: true }, profile: { value: input.profile ?? null, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-// Resolve default values.
-if (!accounts.systemProgram.value) {
-accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
-}
-
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("profile", accounts.profile), getAccountMeta("systemProgram", accounts.systemProgram)], data: getInitializeInstructionDataEncoder().encode(args as InitializeInstructionDataArgs), programAddress } as InitializeInstruction<TProgramAddress, TAccountAuthority, TAccountProfile, TAccountSystemProgram>);
-}
-
-export type ParsedInitializeInstruction<TProgram extends string = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-/**
- * The wallet creating the profile. Pays for account creation and becomes
- * the authority whose address seeds the PDA.
- */
-authority: TAccountMetas[0];
-/** The profile PDA account (must be empty — not yet created). */
-profile: TAccountMetas[1];
-/** The system program, required for `CreateAccount` CPI. */
-systemProgram: TAccountMetas[2];
+export type InitializeAsyncInput<
+	TAccountAuthority extends string = string,
+	TAccountProfile extends string = string,
+	TAccountSystemProgram extends string = string,
+> = {
+	/**
+	 * The wallet creating the profile. Pays for account creation and becomes
+	 * the authority whose address seeds the PDA.
+	 */
+	authority: TransactionSigner<TAccountAuthority>;
+	/** The profile PDA account (must be empty — not yet created). */
+	profile?: Address<TAccountProfile>;
+	/** The system program, required for `CreateAccount` CPI. */
+	systemProgram?: Address<TAccountSystemProgram>;
+	bump: InitializeInstructionDataArgs["bump"];
+	name: InitializeInstructionDataArgs["name"];
+	bio: InitializeInstructionDataArgs["bio"];
 };
-data: InitializeInstructionData; };
 
-export function parseInitializeInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedInitializeInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 3) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 3 });
+export async function getInitializeInstructionAsync<
+	TAccountAuthority extends string,
+	TAccountProfile extends string,
+	TAccountSystemProgram extends string,
+	TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: InitializeAsyncInput<
+		TAccountAuthority,
+		TAccountProfile,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	InitializeInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountProfile,
+		TAccountSystemProgram
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		PROFILE_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: true },
+		profile: { value: input.profile ?? null, isWritable: true },
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.profile.value) {
+		accounts.profile.value = await findProfilePda({
+			authority: getAddressFromResolvedInstructionAccount(
+				"authority",
+				accounts.authority.value,
+			),
+		});
+	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("profile", accounts.profile),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getInitializeInstructionDataEncoder().encode(
+			args as InitializeInstructionDataArgs,
+		),
+		programAddress,
+	} as InitializeInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountProfile,
+		TAccountSystemProgram
+	>);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
+
+export type InitializeInput<
+	TAccountAuthority extends string = string,
+	TAccountProfile extends string = string,
+	TAccountSystemProgram extends string = string,
+> = {
+	/**
+	 * The wallet creating the profile. Pays for account creation and becomes
+	 * the authority whose address seeds the PDA.
+	 */
+	authority: TransactionSigner<TAccountAuthority>;
+	/** The profile PDA account (must be empty — not yet created). */
+	profile: Address<TAccountProfile>;
+	/** The system program, required for `CreateAccount` CPI. */
+	systemProgram?: Address<TAccountSystemProgram>;
+	bump: InitializeInstructionDataArgs["bump"];
+	name: InitializeInstructionDataArgs["name"];
+	bio: InitializeInstructionDataArgs["bio"];
+};
+
+export function getInitializeInstruction<
+	TAccountAuthority extends string,
+	TAccountProfile extends string,
+	TAccountSystemProgram extends string,
+	TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: InitializeInput<
+		TAccountAuthority,
+		TAccountProfile,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): InitializeInstruction<
+	TProgramAddress,
+	TAccountAuthority,
+	TAccountProfile,
+	TAccountSystemProgram
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		PROFILE_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: true },
+		profile: { value: input.profile ?? null, isWritable: true },
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("profile", accounts.profile),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getInitializeInstructionDataEncoder().encode(
+			args as InitializeInstructionDataArgs,
+		),
+		programAddress,
+	} as InitializeInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountProfile,
+		TAccountSystemProgram
+	>);
 }
-  return { programAddress: instruction.programAddress, accounts: { authority: getNextAccount(), profile: getNextAccount(), systemProgram: getNextAccount() }, data: getInitializeInstructionDataDecoder().decode(instruction.data) };
+
+export type ParsedInitializeInstruction<
+	TProgram extends string = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		/**
+		 * The wallet creating the profile. Pays for account creation and becomes
+		 * the authority whose address seeds the PDA.
+		 */
+		authority: TAccountMetas[0];
+		/** The profile PDA account (must be empty — not yet created). */
+		profile: TAccountMetas[1];
+		/** The system program, required for `CreateAccount` CPI. */
+		systemProgram: TAccountMetas[2];
+	};
+	data: InitializeInstructionData;
+};
+
+export function parseInitializeInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedInitializeInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 3) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 3,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: {
+			authority: getNextAccount(),
+			profile: getNextAccount(),
+			systemProgram: getNextAccount(),
+		},
+		data: getInitializeInstructionDataDecoder().decode(instruction.data),
+	};
 }

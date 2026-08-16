@@ -27,7 +27,8 @@ impl AddTag {
 			profile: solana_pubkey::Pubkey::find_program_address(
 				&["profile".as_bytes(), authority.as_ref()],
 				&crate::PROFILE_PROGRAM_ID,
-			).0,
+			)
+			.0,
 		}
 	}
 
@@ -42,7 +43,10 @@ impl AddTag {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.authority, true));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.authority,
+			true,
+		));
 		accounts.push(solana_instruction::AccountMeta::new(self.profile, false));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();

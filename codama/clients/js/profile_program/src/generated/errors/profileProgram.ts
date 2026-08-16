@@ -6,8 +6,13 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { isProgramError, type Address, type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM, type SolanaError } from '@solana/kit';
-import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import {
+	type Address,
+	isProgramError,
+	type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
+	type SolanaError,
+} from "@solana/kit";
+import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 /** A `PodString` field contained invalid UTF-8. */
 export const PROFILE_PROGRAM_ERROR__INVALID_UTF8 = 0x0; // 0
@@ -16,25 +21,50 @@ export const PROFILE_PROGRAM_ERROR__TAG_OVERFLOW = 0x1; // 1
 /** The tag index is out of range. */
 export const PROFILE_PROGRAM_ERROR__TAG_NOT_FOUND = 0x2; // 2
 
-export type ProfileProgramError = typeof PROFILE_PROGRAM_ERROR__INVALID_UTF8 | typeof PROFILE_PROGRAM_ERROR__TAG_NOT_FOUND | typeof PROFILE_PROGRAM_ERROR__TAG_OVERFLOW;
+export type ProfileProgramError =
+	| typeof PROFILE_PROGRAM_ERROR__INVALID_UTF8
+	| typeof PROFILE_PROGRAM_ERROR__TAG_NOT_FOUND
+	| typeof PROFILE_PROGRAM_ERROR__TAG_OVERFLOW;
 
-let profileProgramErrorMessages: Record<ProfileProgramError, string> | undefined;
-if (process.env['NODE_ENV'] !== 'production') {
-  profileProgramErrorMessages = { [PROFILE_PROGRAM_ERROR__INVALID_UTF8]: `A \`PodString\` field contained invalid UTF-8.`, [PROFILE_PROGRAM_ERROR__TAG_NOT_FOUND]: `The tag index is out of range.`, [PROFILE_PROGRAM_ERROR__TAG_OVERFLOW]: `The tag list is full (capacity 8).` };
+let profileProgramErrorMessages:
+	| Record<ProfileProgramError, string>
+	| undefined;
+if (process.env["NODE_ENV"] !== "production") {
+	profileProgramErrorMessages = {
+		[PROFILE_PROGRAM_ERROR__INVALID_UTF8]:
+			`A \`PodString\` field contained invalid UTF-8.`,
+		[PROFILE_PROGRAM_ERROR__TAG_NOT_FOUND]: `The tag index is out of range.`,
+		[PROFILE_PROGRAM_ERROR__TAG_OVERFLOW]: `The tag list is full (capacity 8).`,
+	};
 }
 
-export function getProfileProgramErrorMessage(code: ProfileProgramError): string {
-  if (process.env['NODE_ENV'] !== 'production') {
-    return (profileProgramErrorMessages as Record<ProfileProgramError, string>)[code];
-  }
+export function getProfileProgramErrorMessage(
+	code: ProfileProgramError,
+): string {
+	if (process.env["NODE_ENV"] !== "production") {
+		return (profileProgramErrorMessages as Record<ProfileProgramError, string>)[
+			code
+		];
+	}
 
-  return 'Error message not available in production bundles.';
+	return "Error message not available in production bundles.";
 }
 
-export function isProfileProgramError<TProgramErrorCode extends ProfileProgramError>(
-    error: unknown,
-    transactionMessage: { instructions: Record<number, { programAddress: Address }> },
-    code?: TProgramErrorCode,
-): error is SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM> & Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
-  return isProgramError<TProgramErrorCode>(error, transactionMessage, PROFILE_PROGRAM_PROGRAM_ADDRESS, code);
+export function isProfileProgramError<
+	TProgramErrorCode extends ProfileProgramError,
+>(
+	error: unknown,
+	transactionMessage: {
+		instructions: Record<number, { programAddress: Address }>;
+	},
+	code?: TProgramErrorCode,
+): error is
+	& SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM>
+	& Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
+	return isProgramError<TProgramErrorCode>(
+		error,
+		transactionMessage,
+		PROFILE_PROGRAM_PROGRAM_ADDRESS,
+		code,
+	);
 }

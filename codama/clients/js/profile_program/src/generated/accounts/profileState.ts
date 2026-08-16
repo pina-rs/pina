@@ -6,11 +6,45 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, fixDecoderSize, fixEncoderSize, getArrayDecoder, getArrayEncoder, getBooleanDecoder, getBooleanEncoder, getBytesDecoder, getBytesEncoder, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, type Account, type Address, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
+import {
+	type Account,
+	type Address,
+	assertAccountExists,
+	assertAccountsExist,
+	combineCodec,
+	decodeAccount,
+	type EncodedAccount,
+	type FetchAccountConfig,
+	type FetchAccountsConfig,
+	fetchEncodedAccount,
+	fetchEncodedAccounts,
+	fixDecoderSize,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	fixEncoderSize,
+	getArrayDecoder,
+	getArrayEncoder,
+	getBooleanDecoder,
+	getBooleanEncoder,
+	getBytesDecoder,
+	getBytesEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU64Decoder,
+	getU64Encoder,
+	getU8Decoder,
+	getU8Encoder,
+	type MaybeAccount,
+	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
+} from "@solana/kit";
 
 export const PROFILE_STATE_DISCRIMINATOR = 1;
 
-export function getProfileStateDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(PROFILE_STATE_DISCRIMINATOR); }
+export function getProfileStateDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(PROFILE_STATE_DISCRIMINATOR);
+}
 
 /**
  * On-chain profile state.
@@ -35,103 +69,129 @@ export function getProfileStateDiscriminatorBytes(): ReadonlyUint8Array { return
  * | 230    | 1    | active (PodBool) |
  * ```
  */
-export type ProfileState = { 
-/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
-bump: number; 
-/**
- * The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8
- * bytes.
- */
-name: ReadonlyUint8Array; 
-/**
- * A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8
- * bytes.
- */
-bio: ReadonlyUint8Array; 
-/**
- * Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
- * elements.
- */
-tags: Array<bigint>; 
-/** Whether the profile is active. */
-active: boolean;  };
+export type ProfileState = {
+	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
+	bump: number;
+	/**
+	 * The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8
+	 * bytes.
+	 */
+	name: ReadonlyUint8Array;
+	/**
+	 * A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8
+	 * bytes.
+	 */
+	bio: ReadonlyUint8Array;
+	/**
+	 * Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
+	 * elements.
+	 */
+	tags: Array<bigint>;
+	/** Whether the profile is active. */
+	active: boolean;
+};
 
-export type ProfileStateArgs = { 
-/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
-bump: number; 
-/**
- * The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8
- * bytes.
- */
-name: ReadonlyUint8Array; 
-/**
- * A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8
- * bytes.
- */
-bio: ReadonlyUint8Array; 
-/**
- * Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
- * elements.
- */
-tags: Array<number | bigint>; 
-/** Whether the profile is active. */
-active: boolean;  };
+export type ProfileStateArgs = {
+	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
+	bump: number;
+	/**
+	 * The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8
+	 * bytes.
+	 */
+	name: ReadonlyUint8Array;
+	/**
+	 * A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8
+	 * bytes.
+	 */
+	bio: ReadonlyUint8Array;
+	/**
+	 * Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
+	 * elements.
+	 */
+	tags: Array<number | bigint>;
+	/** Whether the profile is active. */
+	active: boolean;
+};
 
 /** Gets the encoder for {@link ProfileStateArgs} account data. */
 export function getProfileStateEncoder(): FixedSizeEncoder<ProfileStateArgs> {
-    return getStructEncoder([['bump', getU8Encoder()], ['name', fixEncoderSize(getBytesEncoder(), 33)], ['bio', fixEncoderSize(getBytesEncoder(), 129)], ['tags', getArrayEncoder(getU64Encoder(), { size: 8 })], ['active', getBooleanEncoder()]]);
+	return getStructEncoder([
+		["bump", getU8Encoder()],
+		["name", fixEncoderSize(getBytesEncoder(), 33)],
+		["bio", fixEncoderSize(getBytesEncoder(), 129)],
+		["tags", getArrayEncoder(getU64Encoder(), { size: 8 })],
+		["active", getBooleanEncoder()],
+	]);
 }
 
 /** Gets the decoder for {@link ProfileState} account data. */
 export function getProfileStateDecoder(): FixedSizeDecoder<ProfileState> {
-    return getStructDecoder([['bump', getU8Decoder()], ['name', fixDecoderSize(getBytesDecoder(), 33)], ['bio', fixDecoderSize(getBytesDecoder(), 129)], ['tags', getArrayDecoder(getU64Decoder(), { size: 8 })], ['active', getBooleanDecoder()]]);
+	return getStructDecoder([
+		["bump", getU8Decoder()],
+		["name", fixDecoderSize(getBytesDecoder(), 33)],
+		["bio", fixDecoderSize(getBytesDecoder(), 129)],
+		["tags", getArrayDecoder(getU64Decoder(), { size: 8 })],
+		["active", getBooleanDecoder()],
+	]);
 }
 
 /** Gets the codec for {@link ProfileState} account data. */
-export function getProfileStateCodec(): FixedSizeCodec<ProfileStateArgs, ProfileState> {
-    return combineCodec(getProfileStateEncoder(), getProfileStateDecoder());
+export function getProfileStateCodec(): FixedSizeCodec<
+	ProfileStateArgs,
+	ProfileState
+> {
+	return combineCodec(getProfileStateEncoder(), getProfileStateDecoder());
 }
 
-export function decodeProfileState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<ProfileState, TAddress>;
-export function decodeProfileState<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<ProfileState, TAddress>;
-export function decodeProfileState<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<ProfileState, TAddress> | MaybeAccount<ProfileState, TAddress> {
-  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getProfileStateDecoder());
+export function decodeProfileState<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress>,
+): Account<ProfileState, TAddress>;
+export function decodeProfileState<TAddress extends string = string>(
+	encodedAccount: MaybeEncodedAccount<TAddress>,
+): MaybeAccount<ProfileState, TAddress>;
+export function decodeProfileState<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
+): Account<ProfileState, TAddress> | MaybeAccount<ProfileState, TAddress> {
+	return decodeAccount(
+		encodedAccount as MaybeEncodedAccount<TAddress>,
+		getProfileStateDecoder(),
+	);
 }
 
 export async function fetchProfileState<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  address: Address<TAddress>,
-  config?: FetchAccountConfig,
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	address: Address<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<Account<ProfileState, TAddress>> {
-  const maybeAccount = await fetchMaybeProfileState(rpc, address, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybeProfileState(rpc, address, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybeProfileState<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0],
-  address: Address<TAddress>,
-  config?: FetchAccountConfig,
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	address: Address<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<ProfileState, TAddress>> {
-  const maybeAccount = await fetchEncodedAccount(rpc, address, config);
-  return decodeProfileState(maybeAccount);
+	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	return decodeProfileState(maybeAccount);
 }
 
 export async function fetchAllProfileState(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0],
-  addresses: Array<Address>,
-  config?: FetchAccountsConfig,
+	rpc: Parameters<typeof fetchEncodedAccounts>[0],
+	addresses: Array<Address>,
+	config?: FetchAccountsConfig,
 ): Promise<Account<ProfileState>[]> {
-  const maybeAccounts = await fetchAllMaybeProfileState(rpc, addresses, config);
-  assertAccountsExist(maybeAccounts);
-  return maybeAccounts;
+	const maybeAccounts = await fetchAllMaybeProfileState(rpc, addresses, config);
+	assertAccountsExist(maybeAccounts);
+	return maybeAccounts;
 }
 
 export async function fetchAllMaybeProfileState(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0],
-  addresses: Array<Address>,
-  config?: FetchAccountsConfig,
+	rpc: Parameters<typeof fetchEncodedAccounts>[0],
+	addresses: Array<Address>,
+	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<ProfileState>[]> {
-  const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
-  return maybeAccounts.map((maybeAccount) => decodeProfileState(maybeAccount));
+	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	return maybeAccounts.map((maybeAccount) => decodeProfileState(maybeAccount));
 }

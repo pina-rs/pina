@@ -1,202 +1,202 @@
 {
-  "kind": "rootNode",
-  "standard": "codama",
-  "version": "1.8.0",
-  "program": {
-    "kind": "programNode",
-    "name": "anchorFloats",
-    "publicKey": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
-    "version": "0.0.0",
-    "accounts": [
-      {
-        "kind": "accountNode",
-        "name": "floatDataAccount",
-        "data": {
-          "kind": "structTypeNode",
-          "fields": [
-            {
-              "kind": "structFieldTypeNode",
-              "name": "dataF64",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u64",
-                "endian": "le"
-              }
-            },
-            {
-              "kind": "structFieldTypeNode",
-              "name": "dataF32",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u32",
-                "endian": "le"
-              }
-            },
-            {
-              "kind": "structFieldTypeNode",
-              "name": "authority",
-              "type": {
-                "kind": "publicKeyTypeNode"
-              }
-            }
-          ]
-        },
-        "discriminators": [
-          {
-            "kind": "constantDiscriminatorNode",
-            "offset": 0,
-            "constant": {
-              "kind": "constantValueNode",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              },
-              "value": {
-                "kind": "numberValueNode",
-                "number": 1
-              }
-            }
-          }
-        ]
-      }
-    ],
-    "instructions": [
-      {
-        "kind": "instructionNode",
-        "name": "create",
-        "accounts": [
-          {
-            "kind": "instructionAccountNode",
-            "name": "account",
-            "isWritable": true,
-            "isSigner": false,
-            "isOptional": false
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "authority",
-            "isWritable": false,
-            "isSigner": true,
-            "isOptional": false
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "systemProgram",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "11111111111111111111111111111111"
-            }
-          }
-        ],
-        "arguments": [
-          {
-            "kind": "instructionArgumentNode",
-            "name": "dataF32",
-            "type": {
-              "kind": "numberTypeNode",
-              "format": "u32",
-              "endian": "le"
-            }
-          },
-          {
-            "kind": "instructionArgumentNode",
-            "name": "dataF64",
-            "type": {
-              "kind": "numberTypeNode",
-              "format": "u64",
-              "endian": "le"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "constantDiscriminatorNode",
-            "offset": 0,
-            "constant": {
-              "kind": "constantValueNode",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              },
-              "value": {
-                "kind": "numberValueNode",
-                "number": 0
-              }
-            }
-          }
-        ]
-      },
-      {
-        "kind": "instructionNode",
-        "name": "update",
-        "accounts": [
-          {
-            "kind": "instructionAccountNode",
-            "name": "account",
-            "isWritable": true,
-            "isSigner": false,
-            "isOptional": false
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "authority",
-            "isWritable": false,
-            "isSigner": true,
-            "isOptional": false
-          }
-        ],
-        "arguments": [
-          {
-            "kind": "instructionArgumentNode",
-            "name": "dataF32",
-            "type": {
-              "kind": "numberTypeNode",
-              "format": "u32",
-              "endian": "le"
-            }
-          },
-          {
-            "kind": "instructionArgumentNode",
-            "name": "dataF64",
-            "type": {
-              "kind": "numberTypeNode",
-              "format": "u64",
-              "endian": "le"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "constantDiscriminatorNode",
-            "offset": 0,
-            "constant": {
-              "kind": "constantValueNode",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              },
-              "value": {
-                "kind": "numberValueNode",
-                "number": 1
-              }
-            }
-          }
-        ]
-      }
-    ],
-    "errors": [
-      {
-        "kind": "errorNode",
-        "name": "authorityMismatch",
-        "code": 0,
-        "message": ""
-      }
-    ]
-  }
+	"kind": "rootNode",
+	"standard": "codama",
+	"version": "1.8.0",
+	"program": {
+		"kind": "programNode",
+		"name": "anchorFloats",
+		"publicKey": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
+		"version": "0.0.0",
+		"accounts": [
+			{
+				"kind": "accountNode",
+				"name": "floatDataAccount",
+				"data": {
+					"kind": "structTypeNode",
+					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "dataF64",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u64",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "dataF32",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u32",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "authority",
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						}
+					]
+				},
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			}
+		],
+		"instructions": [
+			{
+				"kind": "instructionNode",
+				"name": "create",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "account",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "dataF32",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u32",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "dataF64",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u64",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "update",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "account",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "dataF32",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u32",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "dataF64",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u64",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			}
+		],
+		"errors": [
+			{
+				"kind": "errorNode",
+				"name": "authorityMismatch",
+				"code": 0,
+				"message": ""
+			}
+		]
+	}
 }

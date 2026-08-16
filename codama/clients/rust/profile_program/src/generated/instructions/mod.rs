@@ -8,12 +8,12 @@
 	clippy::too_many_arguments
 )]
 
-pub(crate) mod r#initialize;
-pub(crate) mod r#update_profile;
 pub(crate) mod r#add_tag;
+pub(crate) mod r#initialize;
 pub(crate) mod r#remove_tag;
+pub(crate) mod r#update_profile;
 
-pub use self::r#initialize::*;
-pub use self::r#update_profile::*;
 pub use self::r#add_tag::*;
+pub use self::r#initialize::*;
 pub use self::r#remove_tag::*;
+pub use self::r#update_profile::*;

@@ -1,551 +1,551 @@
 {
-  "kind": "rootNode",
-  "standard": "codama",
-  "version": "1.8.0",
-  "program": {
-    "kind": "programNode",
-    "name": "profileProgram",
-    "publicKey": "6oW4PDgWpZGWqAEZNvqnAtQi8GotATsxxjCLYQpZJhHL",
-    "version": "0.0.0",
-    "accounts": [
-      {
-        "kind": "accountNode",
-        "name": "profileState",
-        "docs": [
-          "On-chain profile state.",
-          "",
-          "The `#[account]` macro generates:",
-          "- A discriminator field (`ProfileAccountType::ProfileState`) as the first",
-          "byte.",
-          "- `Pod` + `Zeroable` derives for zero-copy (de)serialization.",
-          "- `HasDiscriminator` linking this struct to",
-          "`ProfileAccountType::ProfileState`.",
-          "- `TypedBuilder` for ergonomic construction.",
-          "",
-          "Layout (231 bytes total):",
-          "```text",
-          "| offset | size | field          |",
-          "|--------|------|----------------|",
-          "| 0      | 1    | discriminator  |",
-          "| 1      | 1    | bump           |",
-          "| 2      | 33   | name (PodString<32>)  |",
-          "| 35     | 129  | bio (PodString<128>)  |",
-          "| 164    | 66   | tags (PodVec<PodU64, 8>) |",
-          "| 230    | 1    | active (PodBool) |",
-          "```"
-        ],
-        "data": {
-          "kind": "structTypeNode",
-          "fields": [
-            {
-              "kind": "structFieldTypeNode",
-              "name": "bump",
-              "docs": [
-                "The PDA bump seed, stored on-chain so we don't need to re-derive it."
-              ],
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              }
-            },
-            {
-              "kind": "structFieldTypeNode",
-              "name": "name",
-              "docs": [
-                "The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8",
-                "bytes."
-              ],
-              "type": {
-                "kind": "fixedSizeTypeNode",
-                "size": 33,
-                "type": {
-                  "kind": "bytesTypeNode"
-                }
-              }
-            },
-            {
-              "kind": "structFieldTypeNode",
-              "name": "bio",
-              "docs": [
-                "A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8",
-                "bytes."
-              ],
-              "type": {
-                "kind": "fixedSizeTypeNode",
-                "size": 129,
-                "type": {
-                  "kind": "bytesTypeNode"
-                }
-              }
-            },
-            {
-              "kind": "structFieldTypeNode",
-              "name": "tags",
-              "docs": [
-                "Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte",
-                "elements."
-              ],
-              "type": {
-                "kind": "arrayTypeNode",
-                "item": {
-                  "kind": "numberTypeNode",
-                  "format": "u64",
-                  "endian": "le"
-                },
-                "count": {
-                  "kind": "fixedCountNode",
-                  "value": 8
-                }
-              }
-            },
-            {
-              "kind": "structFieldTypeNode",
-              "name": "active",
-              "docs": [
-                "Whether the profile is active."
-              ],
-              "type": {
-                "kind": "booleanTypeNode",
-                "size": {
-                  "kind": "numberTypeNode",
-                  "format": "u8",
-                  "endian": "le"
-                }
-              }
-            }
-          ]
-        },
-        "discriminators": [
-          {
-            "kind": "constantDiscriminatorNode",
-            "offset": 0,
-            "constant": {
-              "kind": "constantValueNode",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              },
-              "value": {
-                "kind": "numberValueNode",
-                "number": 1
-              }
-            }
-          }
-        ]
-      }
-    ],
-    "instructions": [
-      {
-        "kind": "instructionNode",
-        "name": "initialize",
-        "docs": [
-          "Instruction data for `Initialize`.",
-          "",
-          "Contains the PDA bump seed and the initial name/bio. The `PodString`",
-          "fields carry their own length prefix, so the client writes",
-          "`discriminator + bump + len(name) + name + len(bio) + bio`."
-        ],
-        "accounts": [
-          {
-            "kind": "instructionAccountNode",
-            "name": "authority",
-            "isWritable": true,
-            "isSigner": true,
-            "isOptional": false,
-            "docs": [
-              "The wallet creating the profile. Pays for account creation and becomes",
-              "the authority whose address seeds the PDA."
-            ]
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "profile",
-            "isWritable": true,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "The profile PDA account (must be empty — not yet created)."
-            ],
-            "defaultValue": {
-              "kind": "pdaValueNode",
-              "pda": {
-                "kind": "pdaLinkNode",
-                "name": "profile"
-              },
-              "seeds": [
-                {
-                  "kind": "pdaSeedValueNode",
-                  "name": "authority",
-                  "value": {
-                    "kind": "accountValueNode",
-                    "name": "authority"
-                  }
-                }
-              ]
-            }
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "systemProgram",
-            "isWritable": false,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "The system program, required for `CreateAccount` CPI."
-            ],
-            "defaultValue": {
-              "kind": "publicKeyValueNode",
-              "publicKey": "11111111111111111111111111111111"
-            }
-          }
-        ],
-        "arguments": [
-          {
-            "kind": "instructionArgumentNode",
-            "name": "bump",
-            "type": {
-              "kind": "numberTypeNode",
-              "format": "u8",
-              "endian": "le"
-            }
-          },
-          {
-            "kind": "instructionArgumentNode",
-            "name": "name",
-            "type": {
-              "kind": "fixedSizeTypeNode",
-              "size": 33,
-              "type": {
-                "kind": "bytesTypeNode"
-              }
-            }
-          },
-          {
-            "kind": "instructionArgumentNode",
-            "name": "bio",
-            "type": {
-              "kind": "fixedSizeTypeNode",
-              "size": 129,
-              "type": {
-                "kind": "bytesTypeNode"
-              }
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "constantDiscriminatorNode",
-            "offset": 0,
-            "constant": {
-              "kind": "constantValueNode",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              },
-              "value": {
-                "kind": "numberValueNode",
-                "number": 0
-              }
-            }
-          }
-        ]
-      },
-      {
-        "kind": "instructionNode",
-        "name": "updateProfile",
-        "docs": [
-          "Instruction data for `UpdateProfile`. Replaces both name and bio."
-        ],
-        "accounts": [
-          {
-            "kind": "instructionAccountNode",
-            "name": "authority",
-            "isWritable": false,
-            "isSigner": true,
-            "isOptional": false,
-            "docs": [
-              "The profile's authority. Must sign to prove ownership."
-            ]
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "profile",
-            "isWritable": true,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "The profile PDA account (must already exist and be writable)."
-            ],
-            "defaultValue": {
-              "kind": "pdaValueNode",
-              "pda": {
-                "kind": "pdaLinkNode",
-                "name": "profile"
-              },
-              "seeds": [
-                {
-                  "kind": "pdaSeedValueNode",
-                  "name": "authority",
-                  "value": {
-                    "kind": "accountValueNode",
-                    "name": "authority"
-                  }
-                }
-              ]
-            }
-          }
-        ],
-        "arguments": [
-          {
-            "kind": "instructionArgumentNode",
-            "name": "name",
-            "type": {
-              "kind": "fixedSizeTypeNode",
-              "size": 33,
-              "type": {
-                "kind": "bytesTypeNode"
-              }
-            }
-          },
-          {
-            "kind": "instructionArgumentNode",
-            "name": "bio",
-            "type": {
-              "kind": "fixedSizeTypeNode",
-              "size": 129,
-              "type": {
-                "kind": "bytesTypeNode"
-              }
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "constantDiscriminatorNode",
-            "offset": 0,
-            "constant": {
-              "kind": "constantValueNode",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              },
-              "value": {
-                "kind": "numberValueNode",
-                "number": 1
-              }
-            }
-          }
-        ]
-      },
-      {
-        "kind": "instructionNode",
-        "name": "addTag",
-        "docs": [
-          "Instruction data for `AddTag`. Appends a tag to the profile."
-        ],
-        "accounts": [
-          {
-            "kind": "instructionAccountNode",
-            "name": "authority",
-            "isWritable": false,
-            "isSigner": true,
-            "isOptional": false,
-            "docs": [
-              "The profile's authority. Must sign to prove ownership."
-            ]
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "profile",
-            "isWritable": true,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "The profile PDA account (must already exist and be writable)."
-            ],
-            "defaultValue": {
-              "kind": "pdaValueNode",
-              "pda": {
-                "kind": "pdaLinkNode",
-                "name": "profile"
-              },
-              "seeds": [
-                {
-                  "kind": "pdaSeedValueNode",
-                  "name": "authority",
-                  "value": {
-                    "kind": "accountValueNode",
-                    "name": "authority"
-                  }
-                }
-              ]
-            }
-          }
-        ],
-        "arguments": [
-          {
-            "kind": "instructionArgumentNode",
-            "name": "tag",
-            "type": {
-              "kind": "numberTypeNode",
-              "format": "u64",
-              "endian": "le"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "constantDiscriminatorNode",
-            "offset": 0,
-            "constant": {
-              "kind": "constantValueNode",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              },
-              "value": {
-                "kind": "numberValueNode",
-                "number": 2
-              }
-            }
-          }
-        ]
-      },
-      {
-        "kind": "instructionNode",
-        "name": "removeTag",
-        "docs": [
-          "Instruction data for `RemoveTag`. Removes the tag at `index`."
-        ],
-        "accounts": [
-          {
-            "kind": "instructionAccountNode",
-            "name": "authority",
-            "isWritable": false,
-            "isSigner": true,
-            "isOptional": false,
-            "docs": [
-              "The profile's authority. Must sign to prove ownership."
-            ]
-          },
-          {
-            "kind": "instructionAccountNode",
-            "name": "profile",
-            "isWritable": true,
-            "isSigner": false,
-            "isOptional": false,
-            "docs": [
-              "The profile PDA account (must already exist and be writable)."
-            ],
-            "defaultValue": {
-              "kind": "pdaValueNode",
-              "pda": {
-                "kind": "pdaLinkNode",
-                "name": "profile"
-              },
-              "seeds": [
-                {
-                  "kind": "pdaSeedValueNode",
-                  "name": "authority",
-                  "value": {
-                    "kind": "accountValueNode",
-                    "name": "authority"
-                  }
-                }
-              ]
-            }
-          }
-        ],
-        "arguments": [
-          {
-            "kind": "instructionArgumentNode",
-            "name": "index",
-            "type": {
-              "kind": "numberTypeNode",
-              "format": "u64",
-              "endian": "le"
-            }
-          }
-        ],
-        "discriminators": [
-          {
-            "kind": "constantDiscriminatorNode",
-            "offset": 0,
-            "constant": {
-              "kind": "constantValueNode",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              },
-              "value": {
-                "kind": "numberValueNode",
-                "number": 3
-              }
-            }
-          }
-        ]
-      }
-    ],
-    "pdas": [
-      {
-        "kind": "pdaNode",
-        "name": "profile",
-        "seeds": [
-          {
-            "kind": "constantPdaSeedNode",
-            "type": {
-              "kind": "stringTypeNode",
-              "encoding": "utf8"
-            },
-            "value": {
-              "kind": "stringValueNode",
-              "string": "profile"
-            }
-          },
-          {
-            "kind": "variablePdaSeedNode",
-            "name": "authority",
-            "type": {
-              "kind": "publicKeyTypeNode"
-            }
-          }
-        ]
-      }
-    ],
-    "errors": [
-      {
-        "kind": "errorNode",
-        "name": "invalidUtf8",
-        "code": 0,
-        "message": "A `PodString` field contained invalid UTF-8.",
-        "docs": [
-          "A `PodString` field contained invalid UTF-8."
-        ]
-      },
-      {
-        "kind": "errorNode",
-        "name": "tagOverflow",
-        "code": 1,
-        "message": "The tag list is full (capacity 8).",
-        "docs": [
-          "The tag list is full (capacity 8)."
-        ]
-      },
-      {
-        "kind": "errorNode",
-        "name": "tagNotFound",
-        "code": 2,
-        "message": "The tag index is out of range.",
-        "docs": [
-          "The tag index is out of range."
-        ]
-      }
-    ]
-  }
+	"kind": "rootNode",
+	"standard": "codama",
+	"version": "1.8.0",
+	"program": {
+		"kind": "programNode",
+		"name": "profileProgram",
+		"publicKey": "6oW4PDgWpZGWqAEZNvqnAtQi8GotATsxxjCLYQpZJhHL",
+		"version": "0.0.0",
+		"accounts": [
+			{
+				"kind": "accountNode",
+				"name": "profileState",
+				"docs": [
+					"On-chain profile state.",
+					"",
+					"The `#[account]` macro generates:",
+					"- A discriminator field (`ProfileAccountType::ProfileState`) as the first",
+					"byte.",
+					"- `Pod` + `Zeroable` derives for zero-copy (de)serialization.",
+					"- `HasDiscriminator` linking this struct to",
+					"`ProfileAccountType::ProfileState`.",
+					"- `TypedBuilder` for ergonomic construction.",
+					"",
+					"Layout (231 bytes total):",
+					"```text",
+					"| offset | size | field          |",
+					"|--------|------|----------------|",
+					"| 0      | 1    | discriminator  |",
+					"| 1      | 1    | bump           |",
+					"| 2      | 33   | name (PodString<32>)  |",
+					"| 35     | 129  | bio (PodString<128>)  |",
+					"| 164    | 66   | tags (PodVec<PodU64, 8>) |",
+					"| 230    | 1    | active (PodBool) |",
+					"```"
+				],
+				"data": {
+					"kind": "structTypeNode",
+					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "bump",
+							"docs": [
+								"The PDA bump seed, stored on-chain so we don't need to re-derive it."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "name",
+							"docs": [
+								"The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8",
+								"bytes."
+							],
+							"type": {
+								"kind": "fixedSizeTypeNode",
+								"size": 33,
+								"type": {
+									"kind": "bytesTypeNode"
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "bio",
+							"docs": [
+								"A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8",
+								"bytes."
+							],
+							"type": {
+								"kind": "fixedSizeTypeNode",
+								"size": 129,
+								"type": {
+									"kind": "bytesTypeNode"
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "tags",
+							"docs": [
+								"Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte",
+								"elements."
+							],
+							"type": {
+								"kind": "arrayTypeNode",
+								"item": {
+									"kind": "numberTypeNode",
+									"format": "u64",
+									"endian": "le"
+								},
+								"count": {
+									"kind": "fixedCountNode",
+									"value": 8
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "active",
+							"docs": [
+								"Whether the profile is active."
+							],
+							"type": {
+								"kind": "booleanTypeNode",
+								"size": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								}
+							}
+						}
+					]
+				},
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			}
+		],
+		"instructions": [
+			{
+				"kind": "instructionNode",
+				"name": "initialize",
+				"docs": [
+					"Instruction data for `Initialize`.",
+					"",
+					"Contains the PDA bump seed and the initial name/bio. The `PodString`",
+					"fields carry their own length prefix, so the client writes",
+					"`discriminator + bump + len(name) + name + len(bio) + bio`."
+				],
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": true,
+						"isSigner": true,
+						"isOptional": false,
+						"docs": [
+							"The wallet creating the profile. Pays for account creation and becomes",
+							"the authority whose address seeds the PDA."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "profile",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"The profile PDA account (must be empty — not yet created)."
+						],
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "profile"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"The system program, required for `CreateAccount` CPI."
+						],
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "bump",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "name",
+						"type": {
+							"kind": "fixedSizeTypeNode",
+							"size": 33,
+							"type": {
+								"kind": "bytesTypeNode"
+							}
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "bio",
+						"type": {
+							"kind": "fixedSizeTypeNode",
+							"size": 129,
+							"type": {
+								"kind": "bytesTypeNode"
+							}
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "updateProfile",
+				"docs": [
+					"Instruction data for `UpdateProfile`. Replaces both name and bio."
+				],
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false,
+						"docs": [
+							"The profile's authority. Must sign to prove ownership."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "profile",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"The profile PDA account (must already exist and be writable)."
+						],
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "profile"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "name",
+						"type": {
+							"kind": "fixedSizeTypeNode",
+							"size": 33,
+							"type": {
+								"kind": "bytesTypeNode"
+							}
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "bio",
+						"type": {
+							"kind": "fixedSizeTypeNode",
+							"size": 129,
+							"type": {
+								"kind": "bytesTypeNode"
+							}
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "addTag",
+				"docs": [
+					"Instruction data for `AddTag`. Appends a tag to the profile."
+				],
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false,
+						"docs": [
+							"The profile's authority. Must sign to prove ownership."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "profile",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"The profile PDA account (must already exist and be writable)."
+						],
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "profile"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "tag",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u64",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 2
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "removeTag",
+				"docs": [
+					"Instruction data for `RemoveTag`. Removes the tag at `index`."
+				],
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false,
+						"docs": [
+							"The profile's authority. Must sign to prove ownership."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "profile",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"The profile PDA account (must already exist and be writable)."
+						],
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "profile"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "index",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u64",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 3
+							}
+						}
+					}
+				]
+			}
+		],
+		"pdas": [
+			{
+				"kind": "pdaNode",
+				"name": "profile",
+				"seeds": [
+					{
+						"kind": "constantPdaSeedNode",
+						"type": {
+							"kind": "stringTypeNode",
+							"encoding": "utf8"
+						},
+						"value": {
+							"kind": "stringValueNode",
+							"string": "profile"
+						}
+					},
+					{
+						"kind": "variablePdaSeedNode",
+						"name": "authority",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					}
+				]
+			}
+		],
+		"errors": [
+			{
+				"kind": "errorNode",
+				"name": "invalidUtf8",
+				"code": 0,
+				"message": "A `PodString` field contained invalid UTF-8.",
+				"docs": [
+					"A `PodString` field contained invalid UTF-8."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "tagOverflow",
+				"code": 1,
+				"message": "The tag list is full (capacity 8).",
+				"docs": [
+					"The tag list is full (capacity 8)."
+				]
+			},
+			{
+				"kind": "errorNode",
+				"name": "tagNotFound",
+				"code": 2,
+				"message": "The tag index is out of range.",
+				"docs": [
+					"The tag index is out of range."
+				]
+			}
+		]
+	}
 }

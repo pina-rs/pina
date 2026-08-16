@@ -6,7 +6,7 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from './addTag';
-export * from './initialize';
-export * from './removeTag';
-export * from './updateProfile';
+export * from "./addTag";
+export * from "./initialize";
+export * from "./removeTag";
+export * from "./updateProfile";
