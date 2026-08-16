@@ -25,7 +25,7 @@ jobs:
       any_changed: ${{ steps.changed.outputs.any_changed }}
     steps:
       - name: checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -75,7 +75,7 @@ jobs:
       matrix: ${{ fromJson(needs.detect-changed-crates.outputs.matrix) }}
     steps:
       - name: checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -90,7 +90,7 @@ jobs:
 
       - name: upload mutants report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mutants-report-${{ matrix.package }}
           path: target/mutants
