@@ -100,6 +100,19 @@ impl ToTokens for Primitive {
 	}
 }
 
+impl Primitive {
+	/// The byte width of the primitive, used to produce a concrete error
+	/// message if it ever exceeds `MAX_DISCRIMINATOR_SPACE`.
+	pub(crate) fn byte_size(&self) -> usize {
+		match self {
+			Primitive::U8 => 1,
+			Primitive::U16 => 2,
+			Primitive::U32 => 4,
+			Primitive::U64 => 8,
+		}
+	}
+}
+
 impl FromMeta for Primitive {
 	fn from_expr(expr: &Expr) -> darling::Result<Self> {
 		let error = darling::Error::unsupported_format(

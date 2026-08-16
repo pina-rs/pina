@@ -16,8 +16,8 @@ pub enum SingleVariant {
 const _: () = {
     ::core::assert!(
         ::core::mem::size_of:: < u8 > () <= ::pina::MAX_DISCRIMINATOR_SPACE,
-        concat!("A discriminator with primitive `", stringify!(u8),
-        "` exceeds `MAX_DISCRIMINATOR_SPACE` and cannot be safely used for zero-copy layouts.")
+        concat!("A discriminator with primitive `", stringify!(u8), "` (", "1",
+        " bytes) exceeds `MAX_DISCRIMINATOR_SPACE` and cannot be safely used for zero-copy layouts. Supported primitives: `u8`, `u16`, `u32`, `u64`.")
     );
 };
 impl ::core::convert::From<SingleVariant> for u8 {

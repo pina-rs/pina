@@ -18,8 +18,8 @@ pub enum U32Discriminator {
 const _: () = {
     ::core::assert!(
         ::core::mem::size_of:: < u32 > () <= ::pina::MAX_DISCRIMINATOR_SPACE,
-        concat!("A discriminator with primitive `", stringify!(u32),
-        "` exceeds `MAX_DISCRIMINATOR_SPACE` and cannot be safely used for zero-copy layouts.")
+        concat!("A discriminator with primitive `", stringify!(u32), "` (", "4",
+        " bytes) exceeds `MAX_DISCRIMINATOR_SPACE` and cannot be safely used for zero-copy layouts. Supported primitives: `u8`, `u16`, `u32`, `u64`.")
     );
 };
 impl ::core::convert::From<U32Discriminator> for u32 {

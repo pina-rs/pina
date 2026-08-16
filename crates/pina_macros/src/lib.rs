@@ -500,6 +500,7 @@ fn discriminator_impl(
 		item_enum.attrs.push(new_derive_attr);
 	}
 
+	let primitive_size = primitive.byte_size().to_string();
 	let primitive_width_assertion = quote! {
 		const _: () = {
 			::core::assert!(
@@ -508,7 +509,9 @@ fn discriminator_impl(
 				concat!(
 					"A discriminator with primitive `",
 					stringify!(#primitive),
-					"` exceeds `MAX_DISCRIMINATOR_SPACE` and cannot be safely used for zero-copy layouts."
+					"` (",
+					#primitive_size,
+					" bytes) exceeds `MAX_DISCRIMINATOR_SPACE` and cannot be safely used for zero-copy layouts. Supported primitives: `u8`, `u16`, `u32`, `u64`."
 				)
 			);
 		};
