@@ -1,119 +1,119 @@
 {
-	"kind": "rootNode",
-	"standard": "codama",
-	"version": "1.8.0",
-	"program": {
-		"kind": "programNode",
-		"name": "anchorDuplicateMutableAccounts",
-		"publicKey": "4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH",
-		"version": "0.0.0",
-		"instructions": [
-			{
-				"kind": "instructionNode",
-				"name": "failsDuplicateMutable",
-				"accounts": [
-					{
-						"kind": "instructionAccountNode",
-						"name": "account1",
-						"isWritable": true,
-						"isSigner": false,
-						"isOptional": false
-					},
-					{
-						"kind": "instructionAccountNode",
-						"name": "account2",
-						"isWritable": true,
-						"isSigner": false,
-						"isOptional": false
-					}
-				],
-				"discriminators": [
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 0,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
-							}
-						}
-					}
-				]
-			},
-			{
-				"kind": "instructionNode",
-				"name": "allowsDuplicateMutable",
-				"discriminators": [
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 0,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 1
-							}
-						}
-					}
-				]
-			},
-			{
-				"kind": "instructionNode",
-				"name": "allowsDuplicateReadonly",
-				"accounts": [
-					{
-						"kind": "instructionAccountNode",
-						"name": "account1",
-						"isWritable": false,
-						"isSigner": false,
-						"isOptional": false
-					},
-					{
-						"kind": "instructionAccountNode",
-						"name": "account2",
-						"isWritable": false,
-						"isSigner": false,
-						"isOptional": false
-					}
-				],
-				"discriminators": [
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 0,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 2
-							}
-						}
-					}
-				]
-			}
-		],
-		"errors": [
-			{
-				"kind": "errorNode",
-				"name": "constraintDuplicateMutableAccount",
-				"code": 2040,
-				"message": ""
-			}
-		]
-	}
+  "kind": "rootNode",
+  "standard": "codama",
+  "version": "1.8.0",
+  "program": {
+    "kind": "programNode",
+    "name": "anchorDuplicateMutableAccounts",
+    "publicKey": "4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH",
+    "version": "0.0.0",
+    "instructions": [
+      {
+        "kind": "instructionNode",
+        "name": "failsDuplicateMutable",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "account1",
+            "isWritable": true,
+            "isSigner": false,
+            "isOptional": false
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "account2",
+            "isWritable": true,
+            "isSigner": false,
+            "isOptional": false
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "kind": "instructionNode",
+        "name": "allowsDuplicateMutable",
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 1
+              }
+            }
+          }
+        ]
+      },
+      {
+        "kind": "instructionNode",
+        "name": "allowsDuplicateReadonly",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "account1",
+            "isWritable": false,
+            "isSigner": false,
+            "isOptional": false
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "account2",
+            "isWritable": false,
+            "isSigner": false,
+            "isOptional": false
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 2
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "errors": [
+      {
+        "kind": "errorNode",
+        "name": "constraintDuplicateMutableAccount",
+        "code": 2040,
+        "message": ""
+      }
+    ]
+  }
 }

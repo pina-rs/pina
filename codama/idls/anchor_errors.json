@@ -1,217 +1,217 @@
 {
-	"kind": "rootNode",
-	"standard": "codama",
-	"version": "1.8.0",
-	"program": {
-		"kind": "programNode",
-		"name": "anchorErrors",
-		"publicKey": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
-		"version": "0.0.0",
-		"instructions": [
-			{
-				"kind": "instructionNode",
-				"name": "hello",
-				"discriminators": [
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 0,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
-							}
-						}
-					}
-				]
-			},
-			{
-				"kind": "instructionNode",
-				"name": "helloNoMsg",
-				"discriminators": [
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 0,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 1
-							}
-						}
-					}
-				]
-			},
-			{
-				"kind": "instructionNode",
-				"name": "helloNext",
-				"discriminators": [
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 0,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 2
-							}
-						}
-					}
-				]
-			},
-			{
-				"kind": "instructionNode",
-				"name": "requireEq",
-				"discriminators": [
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 0,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 3
-							}
-						}
-					}
-				]
-			},
-			{
-				"kind": "instructionNode",
-				"name": "requireNeq",
-				"discriminators": [
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 0,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 4
-							}
-						}
-					}
-				]
-			},
-			{
-				"kind": "instructionNode",
-				"name": "requireGt",
-				"discriminators": [
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 0,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 5
-							}
-						}
-					}
-				]
-			},
-			{
-				"kind": "instructionNode",
-				"name": "requireGte",
-				"discriminators": [
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 0,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 6
-							}
-						}
-					}
-				]
-			}
-		],
-		"errors": [
-			{
-				"kind": "errorNode",
-				"name": "hello",
-				"code": 6000,
-				"message": ""
-			},
-			{
-				"kind": "errorNode",
-				"name": "helloNoMsg",
-				"code": 6123,
-				"message": ""
-			},
-			{
-				"kind": "errorNode",
-				"name": "helloNext",
-				"code": 6124,
-				"message": ""
-			},
-			{
-				"kind": "errorNode",
-				"name": "helloCustom",
-				"code": 6125,
-				"message": ""
-			},
-			{
-				"kind": "errorNode",
-				"name": "valueMismatch",
-				"code": 6126,
-				"message": ""
-			},
-			{
-				"kind": "errorNode",
-				"name": "valueMatch",
-				"code": 6127,
-				"message": ""
-			},
-			{
-				"kind": "errorNode",
-				"name": "valueLess",
-				"code": 6128,
-				"message": ""
-			},
-			{
-				"kind": "errorNode",
-				"name": "valueLessOrEqual",
-				"code": 6129,
-				"message": ""
-			}
-		]
-	}
+  "kind": "rootNode",
+  "standard": "codama",
+  "version": "1.8.0",
+  "program": {
+    "kind": "programNode",
+    "name": "anchorErrors",
+    "publicKey": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
+    "version": "0.0.0",
+    "instructions": [
+      {
+        "kind": "instructionNode",
+        "name": "hello",
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "kind": "instructionNode",
+        "name": "helloNoMsg",
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 1
+              }
+            }
+          }
+        ]
+      },
+      {
+        "kind": "instructionNode",
+        "name": "helloNext",
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 2
+              }
+            }
+          }
+        ]
+      },
+      {
+        "kind": "instructionNode",
+        "name": "requireEq",
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 3
+              }
+            }
+          }
+        ]
+      },
+      {
+        "kind": "instructionNode",
+        "name": "requireNeq",
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 4
+              }
+            }
+          }
+        ]
+      },
+      {
+        "kind": "instructionNode",
+        "name": "requireGt",
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 5
+              }
+            }
+          }
+        ]
+      },
+      {
+        "kind": "instructionNode",
+        "name": "requireGte",
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 6
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "errors": [
+      {
+        "kind": "errorNode",
+        "name": "hello",
+        "code": 6000,
+        "message": ""
+      },
+      {
+        "kind": "errorNode",
+        "name": "helloNoMsg",
+        "code": 6123,
+        "message": ""
+      },
+      {
+        "kind": "errorNode",
+        "name": "helloNext",
+        "code": 6124,
+        "message": ""
+      },
+      {
+        "kind": "errorNode",
+        "name": "helloCustom",
+        "code": 6125,
+        "message": ""
+      },
+      {
+        "kind": "errorNode",
+        "name": "valueMismatch",
+        "code": 6126,
+        "message": ""
+      },
+      {
+        "kind": "errorNode",
+        "name": "valueMatch",
+        "code": 6127,
+        "message": ""
+      },
+      {
+        "kind": "errorNode",
+        "name": "valueLess",
+        "code": 6128,
+        "message": ""
+      },
+      {
+        "kind": "errorNode",
+        "name": "valueLessOrEqual",
+        "code": 6129,
+        "message": ""
+      }
+    ]
+  }
 }

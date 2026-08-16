@@ -9,7 +9,7 @@
 )]
 
 /// Instruction data for `Initialize`.
-///
+/// 
 /// Contains the PDA bump seed and the initial name/bio. The `PodString`
 /// fields carry their own length prefix, so the client writes
 /// `discriminator + bump + len(name) + name + len(bio) + bio`.
@@ -34,8 +34,7 @@ impl Initialize {
 			profile: solana_pubkey::Pubkey::find_program_address(
 				&["profile".as_bytes(), authority.as_ref()],
 				&crate::PROFILE_PROGRAM_ID,
-			)
-			.0,
+			).0,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}
@@ -53,10 +52,7 @@ impl Initialize {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.authority, true));
 		accounts.push(solana_instruction::AccountMeta::new(self.profile, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.system_program,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
 		accounts.extend_from_slice(remaining_accounts);
 		let data = bytemuck::bytes_of(&data).to_vec();
 
