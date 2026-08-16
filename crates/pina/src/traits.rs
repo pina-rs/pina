@@ -705,7 +705,7 @@ impl<'a> AccountsCursor<'a> {
 
 	/// Return the next account without advancing the cursor.
 	///
-	/// **Note:** `peek` does not invoke [`track_mutable_account`](Self::track_mutable_account).
+	/// **Note:** `peek` does not invoke `track_mutable_account`.
 	/// Prefer [`next_mut`](Self::next_mut) for mutable access — it is the only path
 	/// that checks for duplicate mutable accounts. Using `peek` + manual indexing
 	/// bypasses that safety check and can accept duplicate writable accounts that
