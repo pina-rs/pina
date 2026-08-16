@@ -16,7 +16,6 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       XDG_CACHE_HOME: ${{ github.workspace }}/.cache
-      PINA_BPF_TOOLCHAIN: nightly-2025-11-20
     steps:
       - name: checkout repository
         uses: actions/checkout@v6

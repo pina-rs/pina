@@ -10,7 +10,7 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 WORKSPACE_ROOT=$(cd "$1" && pwd)
 OUTPUT_DIR=$2
 POLICY_FILE=${3:-"$SCRIPT_DIR/compute-unit-policy.json"}
-BPF_TOOLCHAIN=${PINA_BPF_TOOLCHAIN:-nightly-2025-11-20}
+BPF_TOOLCHAIN=${PINA_BPF_TOOLCHAIN:?PINA_BPF_TOOLCHAIN must be set (devenv sets it)}
 
 if [ ! -f "$POLICY_FILE" ]; then
 	echo "Missing compute-unit policy file: $POLICY_FILE" >&2
