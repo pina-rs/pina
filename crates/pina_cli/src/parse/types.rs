@@ -64,7 +64,7 @@ fn parse_pod_collection(ty: &str) -> Option<TypeNode> {
 			let item = rust_type_to_codama(args.first()?);
 			let n: usize = args.get(1)?.parse().ok()?;
 			// A bare fixed-size array: the renderer emits `[T; N]` directly.
-			Some(ArrayTypeNode::fixed(item, n).into())
+			Some(ArrayTypeNode::fixed(item, n as u64).into())
 		}
 		_ => None,
 	}
