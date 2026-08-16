@@ -788,6 +788,28 @@ in
         export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
         export PATH="${pkgs.pkg-config}/bin:$PATH"
 
+        # The dylint library links pass -nodefaultlibs, so -lz/-lc++/-liconv
+        # must resolve through the nix cc/ld wrappers with explicit -L paths.
+        # Reconstruct that environment so the check works outside the devenv
+        # shell too.
+        case "$(uname -s)" in
+          Darwin)
+            host_triple="$(uname -m | tr -d '\n')_apple_darwin"
+            ;;
+          Linux)
+            host_triple="$(uname -m | tr -d '\n')_unknown_linux_gnu"
+            ;;
+          *)
+            host_triple=""
+            ;;
+        esac
+        if [ -n "$host_triple" ]; then
+          export "NIX_CC_WRAPPER_TARGET_HOST_''${host_triple}=1"
+          export "NIX_BINTOOLS_WRAPPER_TARGET_HOST_''${host_triple}=1"
+          export NIX_LDFLAGS="-L${pkgs.zlib}/lib -L${pkgs.libcxx}/lib -L${pkgs.libiconv}/lib''${NIX_LDFLAGS:+ $NIX_LDFLAGS}"
+          export PATH="${pkgs.gcc}/bin:${pkgs.stdenv.cc.bintools}/bin:$PATH"
+        fi
+
         resolve_bin_root() {
           if [ -d "${currentDir}/.bin" ]; then
             echo "${currentDir}/.bin"
