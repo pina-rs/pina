@@ -170,6 +170,7 @@ in
         if [ -z "$repo_root" ]; then
           for arg in "$@"; do
             case "$arg" in
+              -*) ;;
               */target/dylint/libraries/*)
                 repo_root="$(printf '%s\n' "$arg" | sed 's#/target/dylint/libraries/.*##')"
                 break
@@ -781,6 +782,12 @@ in
       exec = ''
         set -euo pipefail
 
+        # cargo-dylint and its dependencies need openssl at build time; expose
+        # the nix openssl through pkg-config so installs work outside the
+        # devenv shell too.
+        export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+        export PATH="${pkgs.pkg-config}/bin:$PATH"
+
         resolve_bin_root() {
           if [ -d "${currentDir}/.bin" ]; then
             echo "${currentDir}/.bin"
@@ -821,8 +828,8 @@ in
           exit 1
         fi
 
-        dylint_link_wrapper="$(command -v dylint-link || true)"
-        if [ -z "$dylint_link_wrapper" ] || [ ! -x "$dylint_link_wrapper" ]; then
+        dylint_link_wrapper="${currentDir}/.devenv/profile/bin/dylint-link"
+        if [ ! -x "$dylint_link_wrapper" ]; then
           echo "Missing dylint-link command. Run 'install:cargo:bin'." >&2
           exit 1
         fi
@@ -1002,6 +1009,13 @@ in
     "lint:clippy" = {
       exec = ''
         set -euo pipefail
+
+        # The dylint lint crates pull in openssl-sys (via dylint_linting); expose
+        # the nix openssl through pkg-config so the build works outside the
+        # devenv shell too.
+        export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+        export PATH="${pkgs.pkg-config}/bin:$PATH"
+
         mapfile -t generated_client_manifests < <(find "${currentDir}/codama/clients/rust" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
         exclude_args=()
         for manifest in "''${generated_client_manifests[@]}"; do
