@@ -23,16 +23,12 @@ import {
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
 	fixEncoderSize,
-	getArrayDecoder,
-	getArrayEncoder,
 	getBooleanDecoder,
 	getBooleanEncoder,
 	getBytesDecoder,
 	getBytesEncoder,
 	getStructDecoder,
 	getStructEncoder,
-	getU64Decoder,
-	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
 	type MaybeAccount,
@@ -86,32 +82,12 @@ export type ProfileState = {
 	 * Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
 	 * elements.
 	 */
-	tags: Array<bigint>;
+	tags: ReadonlyUint8Array;
 	/** Whether the profile is active. */
 	active: boolean;
 };
 
-export type ProfileStateArgs = {
-	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
-	bump: number;
-	/**
-	 * The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8
-	 * bytes.
-	 */
-	name: ReadonlyUint8Array;
-	/**
-	 * A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8
-	 * bytes.
-	 */
-	bio: ReadonlyUint8Array;
-	/**
-	 * Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
-	 * elements.
-	 */
-	tags: Array<number | bigint>;
-	/** Whether the profile is active. */
-	active: boolean;
-};
+export type ProfileStateArgs = ProfileState;
 
 /** Gets the encoder for {@link ProfileStateArgs} account data. */
 export function getProfileStateEncoder(): FixedSizeEncoder<ProfileStateArgs> {
@@ -119,7 +95,7 @@ export function getProfileStateEncoder(): FixedSizeEncoder<ProfileStateArgs> {
 		["bump", getU8Encoder()],
 		["name", fixEncoderSize(getBytesEncoder(), 33)],
 		["bio", fixEncoderSize(getBytesEncoder(), 129)],
-		["tags", getArrayEncoder(getU64Encoder(), { size: 8 })],
+		["tags", fixEncoderSize(getBytesEncoder(), 66)],
 		["active", getBooleanEncoder()],
 	]);
 }
@@ -130,7 +106,7 @@ export function getProfileStateDecoder(): FixedSizeDecoder<ProfileState> {
 		["bump", getU8Decoder()],
 		["name", fixDecoderSize(getBytesDecoder(), 33)],
 		["bio", fixDecoderSize(getBytesDecoder(), 129)],
-		["tags", getArrayDecoder(getU64Decoder(), { size: 8 })],
+		["tags", fixDecoderSize(getBytesDecoder(), 66)],
 		["active", getBooleanDecoder()],
 	]);
 }

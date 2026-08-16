@@ -100,6 +100,8 @@ const SKIP_MSG: &str = "[SKIP] profile_program SBF binary not found. Build it fi
 
 /// Build `Initialize` instruction data: discriminator + bump + name + bio.
 fn initialize_ix_data(bump: u8, name: &str, bio: &str) -> Vec<u8> {
+	assert!(name.len() <= 32, "name exceeds PodString<32> capacity");
+	assert!(bio.len() <= 128, "bio exceeds PodString<128> capacity");
 	let mut data = vec![ProfileInstruction::Initialize as u8, bump];
 	data.extend_from_slice(&[name.len() as u8]);
 	data.extend_from_slice(name.as_bytes());
@@ -112,6 +114,8 @@ fn initialize_ix_data(bump: u8, name: &str, bio: &str) -> Vec<u8> {
 
 /// Build `UpdateProfile` instruction data: discriminator + name + bio.
 fn update_profile_ix_data(name: &str, bio: &str) -> Vec<u8> {
+	assert!(name.len() <= 32, "name exceeds PodString<32> capacity");
+	assert!(bio.len() <= 128, "bio exceeds PodString<128> capacity");
 	let mut data = vec![ProfileInstruction::UpdateProfile as u8];
 	data.extend_from_slice(&[name.len() as u8]);
 	data.extend_from_slice(name.as_bytes());
@@ -154,16 +158,7 @@ fn initialize_accounts(authority: &Pubkey, profile: &Pubkey) -> Vec<(Pubkey, Acc
 	]
 }
 
-/// The account set for the `UpdateProfile`/`AddTag`/`RemoveTag` instructions.
-fn profile_accounts(authority: &Pubkey, profile: &Pubkey) -> Vec<(Pubkey, Account)> {
-	vec![
-		(
-			*authority,
-			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
-		),
-		(*profile, Account::default()),
-	]
-}
+/// The account set for the `Initialize` instruction.
 
 /// Assert that a profile's name/bio/tags match expectations.
 fn assert_profile(
@@ -202,6 +197,10 @@ fn assert_profile(
 
 /// Run the full lifecycle: Initialize → UpdateProfile → AddTag ×3 →
 /// RemoveTag, verifying the stored `PodString`/`PodVec` state at each step.
+///
+/// Mollusk does not persist account state between
+/// `process_and_validate_instruction` calls, so each instruction is fed the
+/// previous result's accounts.
 #[test]
 fn full_lifecycle() {
 	let Some(mollusk) = try_create_mollusk() else {
@@ -222,9 +221,10 @@ fn full_lifecycle() {
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 		],
 	);
+	let mut accounts = initialize_accounts(&authority, &profile);
 	let result = mollusk.process_and_validate_instruction(
 		&instruction,
-		&initialize_accounts(&authority, &profile),
+		&accounts,
 		&[Check::success()],
 	);
 	assert!(
@@ -243,9 +243,10 @@ fn full_lifecycle() {
 			AccountMeta::new(profile, false),
 		],
 	);
+	accounts = result.resulting_accounts;
 	let result = mollusk.process_and_validate_instruction(
 		&instruction,
-		&profile_accounts(&authority, &profile),
+		&accounts,
 		&[Check::success()],
 	);
 	assert!(
@@ -256,6 +257,7 @@ fn full_lifecycle() {
 	assert_profile(&result, &profile, "alice2", "updated bio", &[], true);
 
 	// AddTag ×3
+	let mut result = result;
 	for tag in [10u64, 20, 30] {
 		let instruction = Instruction::new_with_bytes(
 			program_id(),
@@ -265,9 +267,10 @@ fn full_lifecycle() {
 				AccountMeta::new(profile, false),
 			],
 		);
-		let result = mollusk.process_and_validate_instruction(
+		accounts = result.resulting_accounts;
+		result = mollusk.process_and_validate_instruction(
 			&instruction,
-			&profile_accounts(&authority, &profile),
+			&accounts,
 			&[Check::success()],
 		);
 		assert!(
@@ -294,9 +297,10 @@ fn full_lifecycle() {
 			AccountMeta::new(profile, false),
 		],
 	);
+	accounts = result.resulting_accounts;
 	let result = mollusk.process_and_validate_instruction(
 		&instruction,
-		&profile_accounts(&authority, &profile),
+		&accounts,
 		&[Check::success()],
 	);
 	assert!(
@@ -364,9 +368,10 @@ fn add_tag_rejects_overflow() {
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 		],
 	);
-	let result = mollusk.process_and_validate_instruction(
+	let mut accounts = initialize_accounts(&authority, &profile);
+	let mut result = mollusk.process_and_validate_instruction(
 		&instruction,
-		&initialize_accounts(&authority, &profile),
+		&accounts,
 		&[Check::success()],
 	);
 	assert!(
@@ -385,9 +390,10 @@ fn add_tag_rejects_overflow() {
 				AccountMeta::new(profile, false),
 			],
 		);
-		let result = mollusk.process_and_validate_instruction(
+		accounts = result.resulting_accounts;
+		result = mollusk.process_and_validate_instruction(
 			&instruction,
-			&profile_accounts(&authority, &profile),
+			&accounts,
 			&[Check::success()],
 		);
 		assert!(
@@ -406,9 +412,10 @@ fn add_tag_rejects_overflow() {
 			AccountMeta::new(profile, false),
 		],
 	);
+	accounts = result.resulting_accounts;
 	let _result = mollusk.process_and_validate_instruction(
 		&instruction,
-		&profile_accounts(&authority, &profile),
+		&accounts,
 		&[Check::err(ProfileError::TagOverflow.into())],
 	);
 }
@@ -434,9 +441,10 @@ fn remove_tag_rejects_out_of_range() {
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 		],
 	);
+	let mut accounts = initialize_accounts(&authority, &profile);
 	let result = mollusk.process_and_validate_instruction(
 		&instruction,
-		&initialize_accounts(&authority, &profile),
+		&accounts,
 		&[Check::success()],
 	);
 	assert!(
@@ -454,9 +462,10 @@ fn remove_tag_rejects_out_of_range() {
 			AccountMeta::new(profile, false),
 		],
 	);
+	accounts = result.resulting_accounts;
 	let _result = mollusk.process_and_validate_instruction(
 		&instruction,
-		&profile_accounts(&authority, &profile),
+		&accounts,
 		&[Check::err(ProfileError::TagNotFound.into())],
 	);
 }

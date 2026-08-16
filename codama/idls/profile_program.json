@@ -87,15 +87,10 @@
 								"elements."
 							],
 							"type": {
-								"kind": "arrayTypeNode",
-								"item": {
-									"kind": "numberTypeNode",
-									"format": "u64",
-									"endian": "le"
-								},
-								"count": {
-									"kind": "fixedCountNode",
-									"value": 8
+								"kind": "fixedSizeTypeNode",
+								"size": 66,
+								"type": {
+									"kind": "bytesTypeNode"
 								}
 							}
 						},

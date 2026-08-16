@@ -446,8 +446,6 @@ mod tests {
 		let mut name = PodString::<32>::default();
 		// 0xff is not valid UTF-8
 		assert!(name.try_set("\u{FFFD}").is_ok()); // replacement char is valid
-		let bytes = name.as_bytes();
-		let _ = bytes;
 		// Direct byte-level corruption: set the length to 1 and write 0xff
 		let mut raw = [0u8; 33];
 		raw[0] = 1;

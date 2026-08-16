@@ -46,7 +46,7 @@ pub struct ProfileState {
 	pub bio: [u8; 129],
 	/// Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
 	/// elements.
-	pub tags: [pina_pod_primitives::PodU64; 8],
+	pub tags: [u8; 66],
 	/// Whether the profile is active.
 	pub active: pina_pod_primitives::PodBool,
 }
@@ -60,7 +60,7 @@ impl ProfileState {
 		bump: u8,
 		name: [u8; 33],
 		bio: [u8; 129],
-		tags: [pina_pod_primitives::PodU64; 8],
+		tags: [u8; 66],
 		active: pina_pod_primitives::PodBool,
 	) -> Self {
 		Self {

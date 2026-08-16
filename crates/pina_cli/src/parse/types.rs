@@ -1,6 +1,6 @@
-use codama_nodes::ArrayTypeNode;
 use codama_nodes::BooleanTypeNode;
 use codama_nodes::BytesTypeNode;
+use codama_nodes::CountNode;
 use codama_nodes::FixedSizeTypeNode;
 use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
@@ -44,9 +44,9 @@ pub fn rust_type_to_codama(ty: &str) -> TypeNode {
 ///
 /// - `PodString<N, PFX = 1>` maps to `FixedSizeTypeNode(BytesTypeNode, N + PFX)`:
 ///   the length prefix plus the UTF-8 payload, laid out inline.
-/// - `PodVec<T, N, PFX = 2>` maps to `ArrayTypeNode(T, N)`: a fixed-size
-///   array of `N` elements (the length prefix is implicit in the fixed
-///   capacity).
+/// - `PodVec<T, N, PFX = 2>` maps to
+///   `FixedSizeTypeNode(BytesTypeNode, N × size_of::<T>() + PFX)`: the length
+///   prefix plus the fixed element array, laid out inline.
 ///
 /// Returns `None` for non-collection types or unparseable arguments.
 fn parse_pod_collection(ty: &str) -> Option<TypeNode> {
@@ -63,9 +63,45 @@ fn parse_pod_collection(ty: &str) -> Option<TypeNode> {
 		"PodVec" => {
 			let item = rust_type_to_codama(args.first()?);
 			let n: usize = args.get(1)?.parse().ok()?;
-			// A bare fixed-size array: the renderer emits `[T; N]` directly.
-			Some(ArrayTypeNode::fixed(item, n as u64).into())
+			let pfx: usize = match args.get(2) {
+				Some(s) => s.parse().ok()?,
+				None => 2,
+			};
+			// Wire layout: [count: PFX bytes][items: N × T]. Emit the full
+			// fixed size (prefix + elements) so generated clients decode the
+			// correct account size and field offsets.
+			let item_size = type_node_size(&item)?;
+			Some(
+				FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), n * item_size + pfx)
+					.into(),
+			)
 		}
+		_ => None,
+	}
+}
+
+/// Compute the on-chain byte size of a fixed-size Codama type node.
+///
+/// Returns `None` for variable-size or unsupported nodes.
+fn type_node_size(node: &TypeNode) -> Option<usize> {
+	match node {
+		TypeNode::Number(number) => match number.format {
+			NumberFormat::U8 | NumberFormat::I8 => Some(1),
+			NumberFormat::U16 | NumberFormat::I16 => Some(2),
+			NumberFormat::U32 | NumberFormat::I32 => Some(4),
+			NumberFormat::U64 | NumberFormat::I64 => Some(8),
+			NumberFormat::U128 | NumberFormat::I128 => Some(16),
+			NumberFormat::F32 | NumberFormat::F64 | NumberFormat::ShortU16 => None,
+		},
+		TypeNode::Boolean(_) => Some(1),
+		TypeNode::PublicKey(_) => Some(32),
+		TypeNode::FixedSize(fixed) => Some(fixed.size),
+		TypeNode::Array(array) => match array.count.as_ref() {
+			CountNode::Fixed(count) => {
+				type_node_size(&array.item).map(|size| size * count.value as usize)
+			}
+			_ => None,
+		},
 		_ => None,
 	}
 }
@@ -229,19 +265,19 @@ mod tests {
 
 	#[test]
 	fn maps_pod_vec() {
-		// PodVec<PodU64, 8> = 8 × 8-byte elements.
+		// PodVec<PodU64, 8> = 2 count bytes + 8 × 8-byte elements.
 		let ty = rust_type_to_codama("PodVec<PodU64, 8>");
 		let expected: TypeNode =
-			ArrayTypeNode::fixed(NumberTypeNode::le(NumberFormat::U64), 8).into();
+			FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 66).into();
 		assert_eq!(ty, expected);
 	}
 
 	#[test]
 	fn maps_pod_vec_with_explicit_prefix() {
-		// PodVec<PodU16, 4, 1> = 4 × 2-byte elements.
+		// PodVec<PodU16, 4, 1> = 1 count byte + 4 × 2-byte elements.
 		let ty = rust_type_to_codama("PodVec<PodU16, 4, 1>");
 		let expected: TypeNode =
-			ArrayTypeNode::fixed(NumberTypeNode::le(NumberFormat::U16), 4).into();
+			FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 9).into();
 		assert_eq!(ty, expected);
 	}
 
