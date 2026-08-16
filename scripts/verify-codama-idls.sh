@@ -60,7 +60,7 @@ if [[ -z "${HOME:-}" ]]; then
 fi
 mkdir -p "$HOME"
 echo "Installing pnpm workspace dependencies..."
-pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile --config.confirm-modules-purge=false
 
 echo "Generating Codama IDLs and clients for all examples..."
 cargo run -p pina_cli --quiet -- codama generate \
