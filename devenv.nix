@@ -6,6 +6,7 @@
   ...
 }:
 let
+  currentDir = builtins.dirOf __curPos.file;
   llvm = pkgs.llvmPackages_21;
   custom = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.hostPlatform.system};
 in
@@ -125,15 +126,9 @@ in
         enable = true;
         verbose = true;
         pass_filenames = false;
-        name = "lint and test";
-        description = "Run the local CI lint rules suite before push.";
-        entry = ''
-          set -euo pipefail
-
-          ${config.env.DEVENV_PROFILE}/bin/lint:all
-          ${config.env.DEVENV_PROFILE}/bin/test:all
-          ${config.env.DEVENV_PROFILE}/bin/test:idl
-        '';
+        name = "lint:push";
+        description = "Run the local CI lint rules and test suite before push.";
+        entry = "${config.env.DEVENV_PROFILE}/bin/lint:push";
         stages = [ "pre-push" ];
       };
     };
@@ -574,7 +569,7 @@ in
     "verify:idls" = {
       exec = ''
         set -euo pipefail
-        "$DEVENV_ROOT/scripts/verify-codama-idls.sh"
+        "${currentDir}/scripts/verify-codama-idls.sh"
       '';
       description = "Verify Codama generation, fixture drift, validation, and deterministic output.";
       binary = "bash";
@@ -582,7 +577,7 @@ in
     "test:idl" = {
       exec = ''
         set -euo pipefail
-        verify:idls
+        ${currentDir}/.devenv/profile/bin/verify:idls
       '';
       description = "Run full Codama integration and deterministic generation checks.";
       binary = "bash";
@@ -787,8 +782,8 @@ in
         set -euo pipefail
 
         resolve_bin_root() {
-          if [ -d "$DEVENV_ROOT/.bin" ]; then
-            echo "$DEVENV_ROOT/.bin"
+          if [ -d "${currentDir}/.bin" ]; then
+            echo "${currentDir}/.bin"
             return 0
           fi
 
@@ -797,7 +792,7 @@ in
               echo "$worktree_path/.bin"
               return 0
             fi
-          done < <(${pkgs.git}/bin/git -C "$DEVENV_ROOT" worktree list --porcelain | ${pkgs.gawk}/bin/awk '/^worktree / { print $2 }')
+          done < <(${pkgs.git}/bin/git -C "${currentDir}" worktree list --porcelain | ${pkgs.gawk}/bin/awk '/^worktree / { print $2 }')
 
           return 1
         }
@@ -813,7 +808,7 @@ in
 
         if [ ! -x "$cargo_dylint_bin" ]; then
           mkdir -p "$cargo_dylint_root"
-          CARGO_TARGET_DIR="$DEVENV_ROOT/target/cargo-install/cargo-dylint" \
+          CARGO_TARGET_DIR="${currentDir}/target/cargo-install/cargo-dylint" \
             cargo install \
               --locked \
               --root "$cargo_dylint_root" \
@@ -833,8 +828,8 @@ in
         fi
 
         mapfile -t target_manifests < <(
-          find "$DEVENV_ROOT/examples" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort
-          find "$DEVENV_ROOT/security" -mindepth 3 -maxdepth 3 -path '*/secure/Cargo.toml' | sort
+          find "${currentDir}/examples" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort
+          find "${currentDir}/security" -mindepth 3 -maxdepth 3 -path '*/secure/Cargo.toml' | sort
         )
 
         package_args=()
@@ -893,6 +888,29 @@ in
       description = "Run all custom and dependency security checks.";
       binary = "bash";
     };
+    "lint:push" = {
+      exec = ''
+        set -euo pipefail
+
+        run_step() {
+          local name="$1"
+          shift
+          echo "Currently running: $name"
+          "$@"
+        }
+
+        run_step "gitleaks detect" ${pkgs.gitleaks}/bin/gitleaks detect --verbose --redact
+        run_step "lint:clippy" ${currentDir}/.devenv/profile/bin/lint:clippy
+        run_step "lint:format" ${currentDir}/.devenv/profile/bin/lint:format
+        run_step "verify:docs" ${currentDir}/.devenv/profile/bin/verify:docs
+        run_step "security:dylint" ${currentDir}/.devenv/profile/bin/security:dylint
+        run_step "lint:monochange" ${currentDir}/.devenv/profile/bin/lint:monochange
+        run_step "test:all" ${currentDir}/.devenv/profile/bin/test:all
+        run_step "test:idl" ${currentDir}/.devenv/profile/bin/test:idl
+      '';
+      description = "Run the full local CI suite before push, independent of the active shell environment.";
+      binary = "bash";
+    };
     "lint:all" = {
       exec = ''
         set -euo pipefail
@@ -908,7 +926,7 @@ in
     "lint:monochange" = {
       exec = ''
         set -euo pipefail
-        monochange check
+        ${custom.monochange}/bin/monochange check
       '';
       description = "Validate monochange release metadata.";
       binary = "bash";
@@ -932,7 +950,7 @@ in
     "docs:check" = {
       exec = ''
         set -euo pipefail
-        mdt check --path "$DEVENV_ROOT"
+        ${custom.mdt}/bin/mdt check --path ${currentDir}
       '';
       description = "Check reusable documentation blocks are synchronized.";
       binary = "bash";
@@ -940,7 +958,7 @@ in
     "lint:format" = {
       exec = ''
         set -euo pipefail
-        dprint check
+        ${pkgs.dprint}/bin/dprint check
       '';
       description = "Check that all files are formatted.";
       binary = "bash";
@@ -948,11 +966,11 @@ in
     "verify:docs" = {
       exec = ''
         set -euo pipefail
-        docs:check
-        [ -f "$DEVENV_ROOT/docs/book.toml" ]
-        [ -f "$DEVENV_ROOT/docs/src/SUMMARY.md" ]
-        mdbook build "$DEVENV_ROOT/docs" -d "$DEVENV_ROOT/target/mdbook"
-        docs:api
+        ${currentDir}/.devenv/profile/bin/docs:check
+        [ -f "${currentDir}/docs/book.toml" ]
+        [ -f "${currentDir}/docs/src/SUMMARY.md" ]
+        ${pkgs.mdbook}/bin/mdbook build "${currentDir}/docs" -d "${currentDir}/target/mdbook"
+        ${currentDir}/.devenv/profile/bin/docs:api
       '';
       description = "Verify docs folder structure, build mdBook, and check API docs.";
       binary = "bash";
@@ -961,7 +979,7 @@ in
       exec = ''
         set -euo pipefail
 
-        mapfile -t generated_client_manifests < <(find "$DEVENV_ROOT/codama/clients/rust" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
+        mapfile -t generated_client_manifests < <(find "${currentDir}/codama/clients/rust" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
         exclude_args=()
         for manifest in "''${generated_client_manifests[@]}"; do
           package_name="$(sed -n 's/^name = "\(.*\)"$/\1/p' "$manifest" | head -n 1)"
@@ -984,7 +1002,7 @@ in
     "lint:clippy" = {
       exec = ''
         set -euo pipefail
-        mapfile -t generated_client_manifests < <(find "$DEVENV_ROOT/codama/clients/rust" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
+        mapfile -t generated_client_manifests < <(find "${currentDir}/codama/clients/rust" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
         exclude_args=()
         for manifest in "''${generated_client_manifests[@]}"; do
           package_name="$(sed -n 's/^name = "\(.*\)"$/\1/p' "$manifest" | head -n 1)"
@@ -995,7 +1013,7 @@ in
 
         cargo clippy --workspace --all-features --locked ''${exclude_args[@]}
 
-        mapfile -t lint_manifests < <(find "$DEVENV_ROOT/lints" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
+        mapfile -t lint_manifests < <(find "${currentDir}/lints" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
         for manifest in "''${lint_manifests[@]}"; do
           cargo clippy --manifest-path "$manifest" --all-features --all-targets --locked
         done
