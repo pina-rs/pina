@@ -79,6 +79,11 @@ jobs:
           echo "has_changesets=${has_changesets}" >> "$GITHUB_OUTPUT"
         shell: bash
 
+      - name: configure git authentication
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh auth setup-git
+
       - name: refresh release pull request
         if: steps.release_record.outputs.is_release_commit != 'true' && steps.pending_changesets.outputs.has_changesets == 'true'
         env:
@@ -137,6 +142,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
         shell: bash
+
+      - name: configure git authentication
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh auth setup-git
 
       - name: detect release commit and create tags
         id: tag_release
