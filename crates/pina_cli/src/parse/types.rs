@@ -85,23 +85,27 @@ fn parse_pod_collection(ty: &str) -> Option<TypeNode> {
 /// Returns `None` for variable-size or unsupported nodes.
 fn type_node_size(node: &TypeNode) -> Option<usize> {
 	match node {
-		TypeNode::Number(number) => match number.format {
-			NumberFormat::U8 | NumberFormat::I8 => Some(1),
-			NumberFormat::U16 | NumberFormat::I16 => Some(2),
-			NumberFormat::U32 | NumberFormat::I32 => Some(4),
-			NumberFormat::U64 | NumberFormat::I64 => Some(8),
-			NumberFormat::U128 | NumberFormat::I128 => Some(16),
-			NumberFormat::F32 | NumberFormat::F64 | NumberFormat::ShortU16 => None,
-		},
+		TypeNode::Number(number) => {
+			match number.format {
+				NumberFormat::U8 | NumberFormat::I8 => Some(1),
+				NumberFormat::U16 | NumberFormat::I16 => Some(2),
+				NumberFormat::U32 | NumberFormat::I32 => Some(4),
+				NumberFormat::U64 | NumberFormat::I64 => Some(8),
+				NumberFormat::U128 | NumberFormat::I128 => Some(16),
+				NumberFormat::F32 | NumberFormat::F64 | NumberFormat::ShortU16 => None,
+			}
+		}
 		TypeNode::Boolean(_) => Some(1),
 		TypeNode::PublicKey(_) => Some(32),
 		TypeNode::FixedSize(fixed) => Some(fixed.size),
-		TypeNode::Array(array) => match array.count.as_ref() {
-			CountNode::Fixed(count) => {
-				type_node_size(&array.item).map(|size| size * count.value as usize)
+		TypeNode::Array(array) => {
+			match array.count.as_ref() {
+				CountNode::Fixed(count) => {
+					type_node_size(&array.item).map(|size| size * count.value as usize)
+				}
+				_ => None,
 			}
-			_ => None,
-		},
+		}
 		_ => None,
 	}
 }
@@ -276,8 +280,7 @@ mod tests {
 	fn maps_pod_vec_with_explicit_prefix() {
 		// PodVec<PodU16, 4, 1> = 1 count byte + 4 × 2-byte elements.
 		let ty = rust_type_to_codama("PodVec<PodU16, 4, 1>");
-		let expected: TypeNode =
-			FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 9).into();
+		let expected: TypeNode = FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 9).into();
 		assert_eq!(ty, expected);
 	}
 

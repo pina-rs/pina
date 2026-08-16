@@ -222,11 +222,8 @@ fn full_lifecycle() {
 		],
 	);
 	let mut accounts = initialize_accounts(&authority, &profile);
-	let result = mollusk.process_and_validate_instruction(
-		&instruction,
-		&accounts,
-		&[Check::success()],
-	);
+	let result =
+		mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
 	assert!(
 		result.program_result.is_ok(),
 		"initialize failed: {:?}",
@@ -244,11 +241,8 @@ fn full_lifecycle() {
 		],
 	);
 	accounts = result.resulting_accounts;
-	let result = mollusk.process_and_validate_instruction(
-		&instruction,
-		&accounts,
-		&[Check::success()],
-	);
+	let result =
+		mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
 	assert!(
 		result.program_result.is_ok(),
 		"update failed: {:?}",
@@ -268,11 +262,8 @@ fn full_lifecycle() {
 			],
 		);
 		accounts = result.resulting_accounts;
-		result = mollusk.process_and_validate_instruction(
-			&instruction,
-			&accounts,
-			&[Check::success()],
-		);
+		result =
+			mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
 		assert!(
 			result.program_result.is_ok(),
 			"add tag {tag} failed: {:?}",
@@ -298,11 +289,8 @@ fn full_lifecycle() {
 		],
 	);
 	accounts = result.resulting_accounts;
-	let result = mollusk.process_and_validate_instruction(
-		&instruction,
-		&accounts,
-		&[Check::success()],
-	);
+	let result =
+		mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
 	assert!(
 		result.program_result.is_ok(),
 		"remove tag failed: {:?}",
@@ -369,11 +357,8 @@ fn add_tag_rejects_overflow() {
 		],
 	);
 	let mut accounts = initialize_accounts(&authority, &profile);
-	let mut result = mollusk.process_and_validate_instruction(
-		&instruction,
-		&accounts,
-		&[Check::success()],
-	);
+	let mut result =
+		mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
 	assert!(
 		result.program_result.is_ok(),
 		"initialize failed: {:?}",
@@ -391,11 +376,8 @@ fn add_tag_rejects_overflow() {
 			],
 		);
 		accounts = result.resulting_accounts;
-		result = mollusk.process_and_validate_instruction(
-			&instruction,
-			&accounts,
-			&[Check::success()],
-		);
+		result =
+			mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
 		assert!(
 			result.program_result.is_ok(),
 			"add tag {tag} failed: {:?}",
@@ -442,11 +424,8 @@ fn remove_tag_rejects_out_of_range() {
 		],
 	);
 	let mut accounts = initialize_accounts(&authority, &profile);
-	let result = mollusk.process_and_validate_instruction(
-		&instruction,
-		&accounts,
-		&[Check::success()],
-	);
+	let result =
+		mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
 	assert!(
 		result.program_result.is_ok(),
 		"initialize failed: {:?}",
