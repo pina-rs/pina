@@ -216,6 +216,14 @@ Use `verify:docs` to validate documentation structure and build output in CI. Us
 
 <br>
 
+You can scaffold a new project with the CLI:
+
+```sh
+pina init my_program
+```
+
+Or add Pina to an existing crate:
+
 ```rust
 use pina::*;
 
@@ -498,7 +506,7 @@ Available assertions:
 
 <br>
 
-On deserialized account data, chain assertions using the `AccountValidation` trait. `as_account()` returns a guard-backed `Ref<T>` and `as_account_mut()` returns `RefMut<T>`:
+On deserialized account data, chain assertions using the `AccountValidation` trait. `as_account()` returns a guard-backed `Ref<T>` (also available as the `LoadedAccount<T>` alias) and `as_account_mut()` returns `RefMut<T>` (also available as the `LoadedAccountMut<T>` alias):
 
 ```rust
 let state = account.as_account::<Config>(&program_id)?;
@@ -523,7 +531,7 @@ pub struct MyAccounts<'a> {
 }
 ```
 
-The derive generates `TryFromAccountInfos` and `TryFrom<&mut [AccountView]>` implementations. It validates that the exact number of accounts is provided, and it supports `&'a AccountView`, `&'a mut AccountView`, `&'a [AccountView]`, and `&'a mut [AccountView]` fields.
+The derive generates `TryFromAccountInfos` and `TryFrom<&mut [AccountView]>` implementations. Internally it uses `AccountsCursor` to walk the account slice left-to-right, which centralises duplicate-mutable-account checks without heap allocation. It validates that the exact number of accounts is provided, and it supports `&'a AccountView`, `&'a mut AccountView`, `&'a [AccountView]`, and `&'a mut [AccountView]` fields.
 
 Use the `#[pina(remaining)]` attribute on the last field to capture trailing accounts:
 
@@ -769,6 +777,10 @@ pina profile target/deploy/my_program.so -o r.json # write to file
 The profiler decodes each SBF instruction opcode and assigns costs: regular instructions cost 1 CU, syscalls cost 100 CU.
 
 <!-- {/pinaProfileDescription} -->
+
+### CLI configuration
+
+The `pina docs` subcommand renders built-in reference topics. Set the `PINA_TEMPLATES_DIR` environment variable to a directory containing `<topic>.t.md` template files to override or extend the default topics with your own content.
 
 ## Crates
 

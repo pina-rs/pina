@@ -102,7 +102,11 @@ A chain that starts with `&AccountView` stays shared, while a chain that starts 
 
 ## Typed account conversions
 
-Traits in `crates/pina/src/impls.rs` provide typed conversion paths from raw `AccountView` values into strongly typed account states. `as_account()` returns `Ref<T>` and `as_account_mut()` returns `RefMut<T>` borrow guards.
+Traits in `crates/pina/src/impls.rs` provide typed conversion paths from raw `AccountView` values into strongly typed account states. `as_account()` returns `Ref<T>` and `as_account_mut()` returns `RefMut<T>` borrow guards. The type aliases `LoadedAccount<'a, T>` and `LoadedAccountMut<'a, T>` are provided for `Ref<'a, T>` and `RefMut<'a, T>` respectively, offering a more descriptive name for guard-backed typed account access.
+
+## Account cursors
+
+`AccountsCursor` is the runtime layer used by `#[derive(Accounts)]`. It advances through the account slice from left to right, supports explicit trailing-account capture via `#[pina(remaining)]`, and centralises duplicate mutable-account checks without heap allocation.
 
 ## Instruction authoring tips
 
