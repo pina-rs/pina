@@ -134,8 +134,10 @@ mod tests {
 	fn text_output_contains_program_name() {
 		let profile = sample_profile();
 		let mut buf = Vec::new();
-		write_profile(&profile, OutputFormat::Text, &mut buf).unwrap();
-		let output = String::from_utf8(buf).unwrap();
+		write_profile(&profile, OutputFormat::Text, &mut buf)
+			.unwrap_or_else(|e| panic!("write_profile Text failed: {e}"));
+		let output =
+			String::from_utf8(buf).unwrap_or_else(|e| panic!("output is not valid UTF-8: {e}"));
 		assert!(output.contains("my_program"));
 		assert!(output.contains("1024"));
 		assert!(output.contains("process_instruction"));
@@ -146,8 +148,10 @@ mod tests {
 	fn text_output_shows_totals() {
 		let profile = sample_profile();
 		let mut buf = Vec::new();
-		write_profile(&profile, OutputFormat::Text, &mut buf).unwrap();
-		let output = String::from_utf8(buf).unwrap();
+		write_profile(&profile, OutputFormat::Text, &mut buf)
+			.unwrap_or_else(|e| panic!("write_profile Text failed: {e}"));
+		let output =
+			String::from_utf8(buf).unwrap_or_else(|e| panic!("output is not valid UTF-8: {e}"));
 		assert!(output.contains("Total instructions: 100"));
 		assert!(output.contains("Total syscalls: 2"));
 		assert!(output.contains("Total estimated CU: 298"));
@@ -157,8 +161,10 @@ mod tests {
 	fn json_output_is_valid() {
 		let profile = sample_profile();
 		let mut buf = Vec::new();
-		write_profile(&profile, OutputFormat::Json, &mut buf).unwrap();
-		let output = String::from_utf8(buf).unwrap();
+		write_profile(&profile, OutputFormat::Json, &mut buf)
+			.unwrap_or_else(|e| panic!("write_profile Json failed: {e}"));
+		let output =
+			String::from_utf8(buf).unwrap_or_else(|e| panic!("output is not valid UTF-8: {e}"));
 		let parsed: serde_json::Value =
 			serde_json::from_str(&output).unwrap_or_else(|e| panic!("Invalid JSON: {e}"));
 		assert_eq!(parsed["program_name"], "my_program");
@@ -178,8 +184,10 @@ mod tests {
 			functions: vec![],
 		};
 		let mut buf = Vec::new();
-		write_profile(&profile, OutputFormat::Text, &mut buf).unwrap();
-		let output = String::from_utf8(buf).unwrap();
+		write_profile(&profile, OutputFormat::Text, &mut buf)
+			.unwrap_or_else(|e| panic!("write_profile Text failed: {e}"));
+		let output =
+			String::from_utf8(buf).unwrap_or_else(|e| panic!("output is not valid UTF-8: {e}"));
 		assert!(output.contains("No functions found."));
 	}
 
@@ -206,9 +214,12 @@ mod tests {
 	fn json_contains_all_fields() {
 		let profile = sample_profile();
 		let mut buf = Vec::new();
-		write_profile(&profile, OutputFormat::Json, &mut buf).unwrap();
-		let output = String::from_utf8(buf).unwrap();
-		let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+		write_profile(&profile, OutputFormat::Json, &mut buf)
+			.unwrap_or_else(|e| panic!("write_profile Json failed: {e}"));
+		let output =
+			String::from_utf8(buf).unwrap_or_else(|e| panic!("output is not valid UTF-8: {e}"));
+		let parsed: serde_json::Value =
+			serde_json::from_str(&output).unwrap_or_else(|e| panic!("JSON parsing failed: {e}"));
 		assert!(parsed["binary_size"].is_number());
 		assert!(parsed["text_size"].is_number());
 		assert!(parsed["total_instructions"].is_number());
