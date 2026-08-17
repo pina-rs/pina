@@ -1,6 +1,6 @@
 # Port to zeropod — Implementation Tracking
 
-_Issue: pina-rs/pina#193_ _Branch: `explore/zeropod-alignment`_
+_Issue: pina-rs/pina#193_ _Branch: `explore/zeropod-alignment` (PR: pina-rs/pina#195)_
 
 ## Design decisions (locked)
 
@@ -61,7 +61,7 @@ _Issue: pina-rs/pina#193_ _Branch: `explore/zeropod-alignment`_
 - [ ] `lint:all`
 - [ ] `build:pina:no-default`
 - [ ] Miri
-- [x] Create PR
+- [x] Create PR: https://github.com/pina-rs/pina/pull/195
 
 ## Notes
 
