@@ -33,6 +33,7 @@ pub enum TodoAccount {
 }
 
 #[account(discriminator = TodoAccount)]
+#[pda(seeds = [TODO_SEED, owner: Address], bump = bump)]
 pub struct TodoState {
 	pub owner: Address,
 	pub bump: u8,
@@ -54,17 +55,8 @@ pub struct UpdateDigestInstruction {
 	pub digest: [u8; 32],
 }
 
+/// Seed prefix for todo PDAs.
 const TODO_SEED: &[u8] = b"todo";
-
-#[macro_export]
-macro_rules! todo_seeds {
-	($owner:expr) => {
-		&[TODO_SEED, $owner]
-	};
-	($owner:expr, $bump:expr) => {
-		&[TODO_SEED, $owner, &[$bump]]
-	};
-}
 
 #[derive(Accounts, Debug)]
 pub struct InitializeAccounts<'a> {
@@ -84,19 +76,23 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		// Parse instruction and prepare PDA seeds
 		let args = InitializeInstruction::try_from_bytes(data)?;
 		let owner = self.owner.address();
-		let seeds = todo_seeds!(owner.as_ref());
-		let seeds_with_bump = todo_seeds!(owner.as_ref(), args.bump);
+		let seeds = TodoState::seeds(owner);
+		let seeds_with_bump = seeds.with_bump(args.bump);
 
 		// Validate accounts
 		self.owner.assert_signer()?;
 		self.todo
 			.assert_empty()?
-			.assert_seeds_with_bump(seeds_with_bump, &ID)?;
+			.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
 		self.system_program.assert_address(&system::ID)?;
 
 		// Create the PDA account
 		create_program_account_with_bump::<TodoState>(
-			self.todo, self.owner, &ID, seeds, args.bump,
+			self.todo,
+			self.owner,
+			&ID,
+			&seeds.as_slices(),
+			args.bump,
 		)?;
 
 		// Initialize account data
@@ -129,14 +125,15 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 			.assert_not_empty()?
 			.assert_type::<TodoState>(&ID)?;
 
-		let bump = {
+		let stored_owner = {
 			let todo = self.todo.as_account::<TodoState>(&ID)?;
-			self.owner.assert_address(&todo.owner)?;
-			todo.bump
+			todo.owner
 		};
+		self.owner.assert_address(&stored_owner)?;
 
-		let seeds_with_bump = todo_seeds!(owner.as_ref(), bump);
-		self.todo.assert_seeds_with_bump(seeds_with_bump, &ID)?;
+		// Verify the todo is the PDA for the owner, using the stored bump
+		// field (avoids re-deriving the canonical bump on-chain).
+		TodoState::assert_seeds(self.todo, owner, &ID)?;
 
 		// Execute instruction
 		match instruction {

@@ -71,6 +71,7 @@ pub enum VestingAccountType {
 }
 
 #[account(discriminator = VestingAccountType)]
+#[pda(seeds = [VESTING_SEED_PREFIX, admin: Address, beneficiary: Address, mint: Address], bump = bump)]
 pub struct VestingState {
 	pub admin: Address,
 	pub beneficiary: Address,
@@ -132,18 +133,10 @@ pub struct CancelAccounts<'a> {
 	pub token_program: &'a AccountView,
 }
 
+/// Seed prefix for vesting PDAs.
 const VESTING_SEED_PREFIX: &[u8] = b"vesting";
-const SPL_PROGRAM_IDS: [Address; 2] = [token::ID, token_2022::ID];
 
-#[macro_export]
-macro_rules! vesting_seeds {
-	($admin:expr, $beneficiary:expr, $mint:expr) => {
-		&[VESTING_SEED_PREFIX, $admin, $beneficiary, $mint]
-	};
-	($admin:expr, $beneficiary:expr, $mint:expr, $bump:expr) => {
-		&[VESTING_SEED_PREFIX, $admin, $beneficiary, $mint, &[$bump]]
-	};
-}
+const SPL_PROGRAM_IDS: [Address; 2] = [token::ID, token_2022::ID];
 
 fn validate_schedule(start_ts: u64, cliff_ts: u64, end_ts: u64) -> ProgramResult {
 	if start_ts > cliff_ts || cliff_ts > end_ts {
@@ -162,17 +155,12 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 
 		validate_schedule(start_ts, cliff_ts, end_ts)?;
 
-		let vesting_seeds = vesting_seeds!(
-			self.admin.address().as_ref(),
-			self.beneficiary.address().as_ref(),
-			self.mint.address().as_ref()
+		let vesting_seeds = VestingState::seeds(
+			self.admin.address(),
+			self.beneficiary.address(),
+			self.mint.address(),
 		);
-		let vesting_seeds_with_bump = vesting_seeds!(
-			self.admin.address().as_ref(),
-			self.beneficiary.address().as_ref(),
-			self.mint.address().as_ref(),
-			args.bump
-		);
+		let vesting_seeds_with_bump = vesting_seeds.with_bump(args.bump);
 
 		self.admin.assert_signer()?;
 		self.mint.assert_owners(&SPL_PROGRAM_IDS)?;
@@ -180,7 +168,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.vesting_state
 			.assert_empty()?
-			.assert_seeds_with_bump(vesting_seeds_with_bump, &ID)?;
+			.assert_seeds_with_bump(&vesting_seeds_with_bump.as_slices(), &ID)?;
 		self.vault
 			.assert_empty()?
 			.assert_writable()?
@@ -194,7 +182,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			self.vesting_state,
 			self.admin,
 			&ID,
-			vesting_seeds,
+			&vesting_seeds.as_slices(),
 			args.bump,
 		)?;
 
@@ -256,7 +244,7 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 				self.token_program.address(),
 			)?;
 
-		let (admin, beneficiary, mint, bump, cancelled, claimed_amount, total_amount) = {
+		let (admin, beneficiary, mint, cancelled, claimed_amount, total_amount) = {
 			let vesting_state = self.vesting_state.as_account::<VestingState>(&ID)?;
 			self.beneficiary
 				.assert_address(&vesting_state.beneficiary)?;
@@ -266,16 +254,15 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 				vesting_state.admin,
 				vesting_state.beneficiary,
 				vesting_state.mint,
-				vesting_state.bump,
 				bool::from(vesting_state.cancelled),
 				u64::from(vesting_state.claimed_amount),
 				u64::from(vesting_state.total_amount),
 			)
 		};
-		self.vesting_state.assert_seeds_with_bump(
-			vesting_seeds!(admin.as_ref(), beneficiary.as_ref(), mint.as_ref(), bump),
-			&ID,
-		)?;
+		// Verify the vesting state is the PDA for the admin, beneficiary, and
+		// mint, using the stored bump field (avoids re-deriving the canonical
+		// bump on-chain).
+		VestingState::assert_seeds(self.vesting_state, &admin, &beneficiary, &mint, &ID)?;
 
 		if cancelled {
 			return Err(VestingError::AlreadyCancelled.into());
@@ -324,7 +311,7 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 				self.token_program.address(),
 			)?;
 
-		let (admin, beneficiary, mint, bump, cancelled) = {
+		let (admin, beneficiary, mint, cancelled) = {
 			let vesting_state = self.vesting_state.as_account::<VestingState>(&ID)?;
 
 			self.admin.assert_address(&vesting_state.admin)?;
@@ -334,15 +321,14 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 				vesting_state.admin,
 				vesting_state.beneficiary,
 				vesting_state.mint,
-				vesting_state.bump,
 				bool::from(vesting_state.cancelled),
 			)
 		};
 
-		self.vesting_state.assert_seeds_with_bump(
-			vesting_seeds!(admin.as_ref(), beneficiary.as_ref(), mint.as_ref(), bump),
-			&ID,
-		)?;
+		// Verify the vesting state is the PDA for the admin, beneficiary, and
+		// mint, using the stored bump field (avoids re-deriving the canonical
+		// bump on-chain).
+		VestingState::assert_seeds(self.vesting_state, &admin, &beneficiary, &mint, &ID)?;
 
 		if cancelled {
 			return Err(VestingError::AlreadyCancelled.into());

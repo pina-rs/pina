@@ -37,6 +37,7 @@ import {
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
 } from "@solana/kit";
+import { findTodoPda, TodoSeeds } from "../pdas";
 
 export const TODO_STATE_DISCRIMINATOR = 1;
 
@@ -129,4 +130,24 @@ export async function fetchAllMaybeTodoState(
 ): Promise<MaybeAccount<TodoState>[]> {
 	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
 	return maybeAccounts.map((maybeAccount) => decodeTodoState(maybeAccount));
+}
+
+export async function fetchTodoStateFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: TodoSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<Account<TodoState>> {
+	const maybeAccount = await fetchMaybeTodoStateFromSeeds(rpc, seeds, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
+}
+
+export async function fetchMaybeTodoStateFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: TodoSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<MaybeAccount<TodoState>> {
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findTodoPda(seeds, { programAddress });
+	return await fetchMaybeTodoState(rpc, address, fetchConfig);
 }

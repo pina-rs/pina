@@ -67,3 +67,22 @@ impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for RegistryConfig {
 		Ok(*account)
 	}
 }
+
+impl RegistryConfig {
+	pub fn find_pda(admin: &solana_pubkey::Pubkey) -> (solana_pubkey::Pubkey, u8) {
+		solana_pubkey::Pubkey::find_program_address(
+			&["registry".as_bytes(), admin.as_ref()],
+			&crate::ROLE_REGISTRY_PROGRAM_ID,
+		)
+	}
+
+	pub fn create_pda(
+		admin: &solana_pubkey::Pubkey,
+		bump: u8,
+	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+		solana_pubkey::Pubkey::create_program_address(
+			&["registry".as_bytes(), admin.as_ref(), &[bump]],
+			&crate::ROLE_REGISTRY_PROGRAM_ID,
+		)
+	}
+}

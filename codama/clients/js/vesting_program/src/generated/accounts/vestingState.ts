@@ -35,6 +35,7 @@ import {
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
 } from "@solana/kit";
+import { findVestingPda, VestingSeeds } from "../pdas";
 
 export const VESTING_STATE_DISCRIMINATOR = 1;
 
@@ -159,4 +160,28 @@ export async function fetchAllMaybeVestingState(
 ): Promise<MaybeAccount<VestingState>[]> {
 	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
 	return maybeAccounts.map((maybeAccount) => decodeVestingState(maybeAccount));
+}
+
+export async function fetchVestingStateFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: VestingSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<Account<VestingState>> {
+	const maybeAccount = await fetchMaybeVestingStateFromSeeds(
+		rpc,
+		seeds,
+		config,
+	);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
+}
+
+export async function fetchMaybeVestingStateFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: VestingSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<MaybeAccount<VestingState>> {
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findVestingPda(seeds, { programAddress });
+	return await fetchMaybeVestingState(rpc, address, fetchConfig);
 }

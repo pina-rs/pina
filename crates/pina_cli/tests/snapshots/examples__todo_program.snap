@@ -1,6 +1,5 @@
 ---
 source: crates/pina_cli/tests/examples.rs
-assertion_line: 55
 expression: idl
 ---
 {
@@ -59,6 +58,10 @@ expression: idl
               }
             }
           ]
+        },
+        "pda": {
+          "kind": "pdaLinkNode",
+          "name": "todo"
         },
         "discriminators": [
           {

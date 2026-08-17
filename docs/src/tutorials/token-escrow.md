@@ -115,22 +115,29 @@ pub struct TakeInstruction {}
 
 <br>
 
-The escrow PDA is derived from a prefix, the maker's address, and a user-chosen seed:
+The escrow PDA is derived from a prefix, the maker's address, and a user-chosen seed. Pina's `#[pda]` attribute declares the typed seeds once on the account struct:
 
 ```rust
-const SEED_PREFIX: &[u8] = b"escrow";
-
-macro_rules! seeds_escrow {
-	($maker:expr, $seed:expr) => {
-		&[SEED_PREFIX, $maker, $seed]
-	};
-	($maker:expr, $seed:expr, $bump:expr) => {
-		&[SEED_PREFIX, $maker, $seed, &[$bump]]
-	};
+#[account(discriminator = EscrowAccount)]
+#[pda(seeds = [SEED_PREFIX, maker: Address, seed: u64], bump = bump)]
+pub struct EscrowState {
+	pub maker: Address,
+	// ...
+	pub seed: PodU64,
+	pub bump: u8,
 }
+
+/// Seed prefix for escrow PDAs.
+const SEED_PREFIX: &[u8] = b"escrow";
 ```
 
-The seed macro generates the PDA seeds array in both forms: without bump (for `create_program_account_with_bump`) and with bump (for `assert_seeds_with_bump`).
+The attribute generates:
+
+- `EscrowState::seeds(maker, seed)` -- a typed seeds struct with `as_slices()` (without bump) and `with_bump(bump)` (with bump).
+- `EscrowState::try_find_pda(...)` / `find_pda(...)` -- canonical PDA derivation.
+- `EscrowState::assert_seeds(account, ...)` -- verifies an existing account against the stored `bump` field, avoiding a canonical bump search on-chain.
+
+Supported seed types are `Address`, `u8`, `u16`, `u32`, `u64`, `[u8; N]`, and `const &[u8]` references.
 
 ## Make: accounts and validation
 
@@ -161,8 +168,8 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = MakeInstruction::try_from_bytes(data)?;
 		let maker_address = *self.maker.address();
-		let escrow_seeds = seeds_escrow!(maker_address.as_ref(), &args.seed.0);
-		let escrow_seeds_with_bump = seeds_escrow!(maker_address.as_ref(), &args.seed.0, args.bump);
+		let escrow_seeds = EscrowState::seeds(&maker_address, u64::from(args.seed));
+		let escrow_seeds_with_bump = escrow_seeds.with_bump(args.bump);
 
 		// Validate all accounts before mutating anything.
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
@@ -177,7 +184,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		self.escrow
 			.assert_empty()?
 			.assert_writable()?
-			.assert_seeds_with_bump(escrow_seeds_with_bump, &ID)?;
+			.assert_seeds_with_bump(&escrow_seeds_with_bump.as_slices(), &ID)?;
 		self.vault
 			.assert_empty()?
 			.assert_writable()?
@@ -214,7 +221,7 @@ create_program_account_with_bump::<EscrowState>(
 	self.escrow,
 	self.maker,
 	&ID,
-	escrow_seeds,
+	&escrow_seeds.as_slices(),
 	args.bump,
 )?;
 
@@ -292,6 +299,10 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			(escrow.maker, escrow.seed, escrow.bump, escrow.amount_b)
 		};
 
+		// Verify the escrow is the PDA for the maker and seed, using the
+		// stored bump field (avoids re-deriving the canonical bump on-chain).
+		EscrowState::assert_seeds(self.escrow, &maker, u64::from(seed), &ID)?;
+
 		// Transfer token B: taker -> maker
 		token_2022::instructions::TransferChecked {
 			from: self.taker_ata_b,
@@ -305,10 +316,10 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		.invoke()?;
 
 		// Transfer token A: vault -> taker (PDA-signed)
-		let bump_as_seeds = [bump];
-		let escrow_seeds =
-			seeds_escrow!(true, self.maker.address().as_ref(), &seed.0, &bump_as_seeds);
-		let escrow_signer = Signer::from(&escrow_seeds);
+		let escrow_seeds = EscrowState::seeds(&maker, u64::from(seed));
+		let escrow_seeds_with_bump = escrow_seeds.with_bump(bump);
+		let seed_values = escrow_seeds_with_bump.as_slices().map(Seed::from);
+		let escrow_signer = Signer::from(&seed_values);
 		let signers = [escrow_signer];
 
 		token_2022::instructions::TransferChecked {
@@ -390,16 +401,16 @@ mod tests {
 	}
 
 	#[test]
-	fn seeds_macro_builds_expected_seed_arrays() {
-		let maker = [3u8; 32];
+	fn seeds_build_expected_seed_arrays() {
+		let maker = Address::new_from_array([3u8; 32]);
 		let seed = PodU64::from_primitive(42);
 		let bump = 7u8;
 
-		let seeds = seeds_escrow!(&maker, &seed.0);
-		assert_eq!(seeds.len(), 3);
+		let seeds = EscrowState::seeds(&maker, u64::from(seed));
+		assert_eq!(seeds.as_slices().len(), 3);
 
-		let seeds_with_bump = seeds_escrow!(&maker, &seed.0, bump);
-		assert_eq!(seeds_with_bump.len(), 4);
+		let seeds_with_bump = seeds.with_bump(bump);
+		assert_eq!(seeds_with_bump.as_slices().len(), 4);
 	}
 
 	#[test]

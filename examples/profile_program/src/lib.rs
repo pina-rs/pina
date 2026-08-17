@@ -109,6 +109,7 @@ pub enum ProfileError {
 /// | 230    | 1    | active (PodBool) |
 /// ```
 #[account(discriminator = ProfileAccountType)]
+#[pda(seeds = [PROFILE_SEED, authority: Address], bump = bump)]
 pub struct ProfileState {
 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
 	pub bump: u8,
@@ -174,21 +175,6 @@ pub struct RemoveTagInstruction {
 /// Seed prefix for profile PDAs.
 const PROFILE_SEED: &[u8] = b"profile";
 
-/// Build the PDA seeds for a profile account.
-///
-/// Seeds: `["profile", <authority_address>]`
-///
-/// With bump: `["profile", <authority_address>, &[bump]]`
-#[macro_export]
-macro_rules! profile_seeds {
-	($authority:expr) => {
-		&[PROFILE_SEED, $authority]
-	};
-	($authority:expr, $bump:expr) => {
-		&[PROFILE_SEED, $authority, &[$bump]]
-	};
-}
-
 // ---------------------------------------------------------------------------
 // Accounts structs
 // ---------------------------------------------------------------------------
@@ -222,16 +208,16 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		// Parse instruction and prepare PDA seeds
 		let args = InitializeInstruction::try_from_bytes(data)?;
+		let authority_key = *self.authority.address();
+		let seeds = ProfileState::seeds(&authority_key);
+		let seeds_with_bump = seeds.with_bump(args.bump);
 
 		// Validate accounts
 		self.authority.assert_signer()?;
 		self.profile
 			.assert_empty()?
 			.assert_writable()?
-			.assert_seeds_with_bump(
-				profile_seeds!(self.authority.address().as_ref(), args.bump),
-				&ID,
-			)?;
+			.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
 		self.system_program.assert_address(&system::ID)?;
 
 		// Validate UTF-8 before storing anything on-chain (boundary validation
@@ -244,7 +230,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			self.profile,
 			self.authority,
 			&ID,
-			profile_seeds!(self.authority.address().as_ref()),
+			&seeds.as_slices(),
 			args.bump,
 		)?;
 
@@ -275,12 +261,9 @@ impl<'a> ProcessAccountInfos<'a> for ProfileAccounts<'a> {
 			.assert_writable()?
 			.assert_type::<ProfileState>(&ID)?;
 
-		let bump = {
-			let profile = self.profile.as_account::<ProfileState>(&ID)?;
-			profile.bump
-		};
-		let seeds_with_bump = profile_seeds!(authority_key.as_ref(), bump);
-		self.profile.assert_seeds_with_bump(seeds_with_bump, &ID)?;
+		// Verify the profile is the PDA for the authority, using the stored
+		// bump field (avoids re-deriving the canonical bump on-chain).
+		ProfileState::assert_seeds(self.profile, authority_key, &ID)?;
 
 		// Dispatch on the instruction discriminator
 		let instruction = ProfileInstruction::try_from(
@@ -518,22 +501,25 @@ mod tests {
 	}
 
 	#[test]
-	fn profile_seeds_macro() {
-		let authority = [1u8; 32];
-		let seeds = profile_seeds!(&authority);
-		assert_eq!(seeds.len(), 2);
-		assert_eq!(seeds[0], b"profile");
-		assert_eq!(seeds[1], &authority);
+	fn profile_seeds() {
+		let authority = Address::new_from_array([1u8; 32]);
+		let seeds = ProfileState::seeds(&authority);
+		let slices = seeds.as_slices();
+		assert_eq!(slices.len(), 2);
+		assert_eq!(slices[0], b"profile");
+		assert_eq!(slices[1], authority.as_ref());
 	}
 
 	#[test]
-	fn profile_seeds_with_bump_macro() {
-		let authority = [1u8; 32];
-		let seeds = profile_seeds!(&authority, 42);
-		assert_eq!(seeds.len(), 3);
-		assert_eq!(seeds[0], b"profile");
-		assert_eq!(seeds[1], &authority);
-		assert_eq!(seeds[2], &[42u8]);
+	fn profile_seeds_with_bump() {
+		let authority = Address::new_from_array([1u8; 32]);
+		let seeds = ProfileState::seeds(&authority);
+		let with_bump = seeds.with_bump(42);
+		let slices = with_bump.as_slices();
+		assert_eq!(slices.len(), 3);
+		assert_eq!(slices[0], b"profile");
+		assert_eq!(slices[1], authority.as_ref());
+		assert_eq!(slices[2], &[42u8]);
 	}
 
 	#[test]

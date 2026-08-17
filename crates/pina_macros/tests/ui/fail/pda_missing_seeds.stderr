@@ -1,0 +1,7 @@
+error: `seeds` is required (e.g. `seeds = [b"counter", authority: Address]`)
+ --> tests/ui/fail/pda_missing_seeds.rs:4:1
+  |
+4 | #[pda(bump = bump)]
+  | ^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `pda` (in Nightly builds, run with -Z macro-backtrace for more info)

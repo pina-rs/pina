@@ -103,6 +103,10 @@
 						}
 					]
 				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "vesting"
+				},
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",

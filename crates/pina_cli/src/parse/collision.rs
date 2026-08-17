@@ -174,6 +174,7 @@ mod tests {
 				repr_size,
 			},
 			docs: vec![],
+			pda_name: None,
 		}
 	}
 

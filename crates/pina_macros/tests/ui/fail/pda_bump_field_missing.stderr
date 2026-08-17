@@ -1,0 +1,5 @@
+error: `bump` field `missing` was not found on `TestAccount`
+ --> tests/ui/fail/pda_bump_field_missing.rs:4:53
+  |
+4 | #[pda(seeds = [b"test", authority: Address], bump = missing)]
+  |                                                     ^^^^^^^

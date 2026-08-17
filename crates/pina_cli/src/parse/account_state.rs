@@ -1,3 +1,4 @@
+use heck::ToSnakeCase;
 use syn::File;
 use syn::Item;
 
@@ -12,6 +13,8 @@ pub struct AccountStruct {
 	pub discriminator_enum: String,
 	pub fields: Vec<FieldIr>,
 	pub docs: Vec<String>,
+	/// The name of the PDA declared for this account via `#[pda(...)]`.
+	pub pda_name: Option<String>,
 }
 
 /// Extract all `#[account(...)]` structs from a file.
@@ -29,16 +32,36 @@ pub fn extract_account_structs(file: &File) -> Vec<AccountStruct> {
 
 		let fields = extract_named_fields(&item_struct.fields);
 		let docs = extract_docs(&item_struct.attrs);
+		let pda_name = extract_pda_name(&item_struct.attrs, &item_struct.ident.to_string());
 
 		result.push(AccountStruct {
 			name: item_struct.ident.to_string(),
 			discriminator_enum: disc_enum,
 			fields,
 			docs,
+			pda_name,
 		});
 	}
 
 	result
+}
+
+/// Derive the IDL PDA name for a struct with a `#[pda(...)]` attribute.
+///
+/// The `State` suffix is stripped so `CounterState` produces the `counter`
+/// PDA, matching the naming convention used by the example programs.
+fn extract_pda_name(attrs: &[syn::Attribute], struct_name: &str) -> Option<String> {
+	let has_pda_attr = attrs.iter().any(|attr| attr.path().is_ident("pda"));
+	if !has_pda_attr {
+		return None;
+	}
+
+	Some(
+		struct_name
+			.strip_suffix("State")
+			.unwrap_or(struct_name)
+			.to_snake_case(),
+	)
 }
 
 /// Parse the `discriminator = EnumType` from `#[account(discriminator =

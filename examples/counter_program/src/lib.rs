@@ -89,6 +89,7 @@ pub enum CounterAccountType {
 /// | 2      | 8    | count (PodU64)|
 /// ```
 #[account(discriminator = CounterAccountType)]
+#[pda(seeds = [COUNTER_SEED, authority: Address], bump = bump)]
 pub struct CounterState {
 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
 	pub bump: u8,
@@ -122,21 +123,6 @@ pub struct IncrementInstruction {}
 
 /// Seed prefix for counter PDAs.
 const COUNTER_SEED: &[u8] = b"counter";
-
-/// Build the PDA seeds for a counter account.
-///
-/// Seeds: `["counter", <authority_address>]`
-///
-/// With bump: `["counter", <authority_address>, &[bump]]`
-#[macro_export]
-macro_rules! counter_seeds {
-	($authority:expr) => {
-		&[COUNTER_SEED, $authority]
-	};
-	($authority:expr, $bump:expr) => {
-		&[COUNTER_SEED, $authority, &[$bump]]
-	};
-}
 
 // ---------------------------------------------------------------------------
 // Accounts structs
@@ -175,14 +161,14 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		// Parse instruction and prepare PDA seeds
 		let args = InitializeInstruction::try_from_bytes(data)?;
 		let authority_key = self.authority.address();
-		let seeds = counter_seeds!(authority_key.as_ref());
-		let seeds_with_bump = counter_seeds!(authority_key.as_ref(), args.bump);
+		let seeds = CounterState::seeds(authority_key);
+		let seeds_with_bump = seeds.with_bump(args.bump);
 
 		// Validate accounts
 		self.authority.assert_signer()?;
 		self.counter
 			.assert_empty()?
-			.assert_seeds_with_bump(seeds_with_bump, &ID)?;
+			.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
 		self.system_program.assert_address(&system::ID)?;
 
 		// Create the PDA account
@@ -190,7 +176,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			self.counter,
 			self.authority,
 			&ID,
-			seeds,
+			&seeds.as_slices(),
 			args.bump,
 		)?;
 
@@ -220,12 +206,9 @@ impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 			.assert_not_empty()?
 			.assert_type::<CounterState>(&ID)?;
 
-		let bump = {
-			let counter = self.counter.as_account::<CounterState>(&ID)?;
-			counter.bump
-		};
-		let seeds_with_bump = counter_seeds!(authority_key.as_ref(), bump);
-		self.counter.assert_seeds_with_bump(seeds_with_bump, &ID)?;
+		// Verify the account is the PDA for the authority, using the stored
+		// bump field (avoids re-deriving the canonical bump on-chain).
+		CounterState::assert_seeds(self.counter, authority_key, &ID)?;
 
 		// Mutate state
 		let mut counter = self.counter.as_account_mut::<CounterState>(&ID)?;
@@ -366,22 +349,25 @@ mod tests {
 	}
 
 	#[test]
-	fn counter_seeds_macro() {
-		let authority = [1u8; 32];
-		let seeds = counter_seeds!(&authority);
-		assert_eq!(seeds.len(), 2);
-		assert_eq!(seeds[0], b"counter");
-		assert_eq!(seeds[1], &authority);
+	fn counter_seeds() {
+		let authority = Address::new_from_array([1u8; 32]);
+		let seeds = CounterState::seeds(&authority);
+		let slices = seeds.as_slices();
+		assert_eq!(slices.len(), 2);
+		assert_eq!(slices[0], b"counter");
+		assert_eq!(slices[1], authority.as_ref());
 	}
 
 	#[test]
-	fn counter_seeds_with_bump_macro() {
-		let authority = [1u8; 32];
-		let seeds = counter_seeds!(&authority, 42);
-		assert_eq!(seeds.len(), 3);
-		assert_eq!(seeds[0], b"counter");
-		assert_eq!(seeds[1], &authority);
-		assert_eq!(seeds[2], &[42u8]);
+	fn counter_seeds_with_bump() {
+		let authority = Address::new_from_array([1u8; 32]);
+		let seeds = CounterState::seeds(&authority);
+		let with_bump = seeds.with_bump(42);
+		let slices = with_bump.as_slices();
+		assert_eq!(slices.len(), 3);
+		assert_eq!(slices[0], b"counter");
+		assert_eq!(slices[1], authority.as_ref());
+		assert_eq!(slices[2], &[42u8]);
 	}
 
 	#[test]

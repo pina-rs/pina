@@ -6,6 +6,7 @@ use crate::discriminator_impl;
 use crate::error_impl;
 use crate::event_impl;
 use crate::instruction_impl;
+use crate::pda_impl;
 
 /// Format a `proc_macro2::TokenStream` into a readable Rust string using
 /// `prettyplease`.
@@ -517,4 +518,89 @@ fn accounts_derive_default_crate() {
 	};
 	let output = pretty(accounts_derive_impl(input));
 	insta::assert_snapshot!("accounts_derive_default_crate", output);
+}
+
+// ---------------------------------------------------------------------------
+// #[pda] snapshots
+// ---------------------------------------------------------------------------
+
+#[test]
+fn pda_basic_address_seed_with_bump() {
+	let args = quote! { crate = ::pina, seeds = [b"counter", authority: Address], bump = bump };
+	let input = quote! {
+		pub struct CounterState {
+			pub authority: Address,
+			pub bump: u8,
+		}
+	};
+	let output = pretty(pda_impl(args, input));
+	insta::assert_snapshot!("pda_basic_address_seed_with_bump", output);
+}
+
+#[test]
+fn pda_all_seed_types() {
+	let args = quote! {
+		crate = ::pina,
+		seeds = [
+			b"test",
+			authority: Address,
+			amount: u64,
+			side: u8,
+			tag: [u8; 8],
+			width: u16,
+			height: u32,
+		],
+		bump = bump,
+	};
+	let input = quote! {
+		pub struct TestState {
+			pub authority: Address,
+			pub amount: PodU64,
+			pub side: u8,
+			pub tag: [u8; 8],
+			pub width: PodU16,
+			pub height: PodU32,
+			pub bump: u8,
+		}
+	};
+	let output = pretty(pda_impl(args, input));
+	insta::assert_snapshot!("pda_all_seed_types", output);
+}
+
+#[test]
+fn pda_without_bump_field() {
+	let args = quote! { crate = ::pina, seeds = [b"vault", user: Address] };
+	let input = quote! {
+		pub struct VaultState {
+			pub user: Address,
+		}
+	};
+	let output = pretty(pda_impl(args, input));
+	insta::assert_snapshot!("pda_without_bump_field", output);
+}
+
+#[test]
+fn pda_default_crate_path() {
+	let args = quote! { seeds = [b"todo", owner: Address], bump = bump };
+	let input = quote! {
+		pub struct TodoState {
+			pub owner: Address,
+			pub bump: u8,
+		}
+	};
+	let output = pretty(pda_impl(args, input));
+	insta::assert_snapshot!("pda_default_crate_path", output);
+}
+
+#[test]
+fn pda_constant_ref_seed() {
+	let args = quote! { crate = ::pina, seeds = [COUNTER_SEED, authority: Address], bump = bump };
+	let input = quote! {
+		pub struct CounterState {
+			pub authority: Address,
+			pub bump: u8,
+		}
+	};
+	let output = pretty(pda_impl(args, input));
+	insta::assert_snapshot!("pda_constant_ref_seed", output);
 }

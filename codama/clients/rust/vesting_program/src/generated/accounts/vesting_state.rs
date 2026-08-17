@@ -92,3 +92,39 @@ impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for VestingState {
 		Ok(*account)
 	}
 }
+
+impl VestingState {
+	pub fn find_pda(
+		admin: &solana_pubkey::Pubkey,
+		beneficiary: &solana_pubkey::Pubkey,
+		mint: &solana_pubkey::Pubkey,
+	) -> (solana_pubkey::Pubkey, u8) {
+		solana_pubkey::Pubkey::find_program_address(
+			&[
+				"vesting".as_bytes(),
+				admin.as_ref(),
+				beneficiary.as_ref(),
+				mint.as_ref(),
+			],
+			&crate::VESTING_PROGRAM_ID,
+		)
+	}
+
+	pub fn create_pda(
+		admin: &solana_pubkey::Pubkey,
+		beneficiary: &solana_pubkey::Pubkey,
+		mint: &solana_pubkey::Pubkey,
+		bump: u8,
+	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+		solana_pubkey::Pubkey::create_program_address(
+			&[
+				"vesting".as_bytes(),
+				admin.as_ref(),
+				beneficiary.as_ref(),
+				mint.as_ref(),
+				&[bump],
+			],
+			&crate::VESTING_PROGRAM_ID,
+		)
+	}
+}

@@ -85,3 +85,28 @@ impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for EscrowState {
 		Ok(*account)
 	}
 }
+
+impl EscrowState {
+	pub fn find_pda(maker: &solana_pubkey::Pubkey, seed: u64) -> (solana_pubkey::Pubkey, u8) {
+		solana_pubkey::Pubkey::find_program_address(
+			&["escrow".as_bytes(), maker.as_ref(), &seed.to_le_bytes()],
+			&crate::ESCROW_PROGRAM_ID,
+		)
+	}
+
+	pub fn create_pda(
+		maker: &solana_pubkey::Pubkey,
+		seed: u64,
+		bump: u8,
+	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+		solana_pubkey::Pubkey::create_program_address(
+			&[
+				"escrow".as_bytes(),
+				maker.as_ref(),
+				&seed.to_le_bytes(),
+				&[bump],
+			],
+			&crate::ESCROW_PROGRAM_ID,
+		)
+	}
+}
