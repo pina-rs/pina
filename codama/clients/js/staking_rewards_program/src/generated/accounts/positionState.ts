@@ -33,6 +33,7 @@ import {
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
 } from "@solana/kit";
+import { findPositionPda, PositionSeeds } from "../pdas";
 
 export const POSITION_STATE_DISCRIMINATOR = 2;
 
@@ -145,4 +146,28 @@ export async function fetchAllMaybePositionState(
 ): Promise<MaybeAccount<PositionState>[]> {
 	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
 	return maybeAccounts.map((maybeAccount) => decodePositionState(maybeAccount));
+}
+
+export async function fetchPositionStateFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: PositionSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<Account<PositionState>> {
+	const maybeAccount = await fetchMaybePositionStateFromSeeds(
+		rpc,
+		seeds,
+		config,
+	);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
+}
+
+export async function fetchMaybePositionStateFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: PositionSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<MaybeAccount<PositionState>> {
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findPositionPda(seeds, { programAddress });
+	return await fetchMaybePositionState(rpc, address, fetchConfig);
 }

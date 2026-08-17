@@ -55,6 +55,10 @@
 						}
 					]
 				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "todo"
+				},
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",

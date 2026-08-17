@@ -35,6 +35,7 @@ import {
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
 } from "@solana/kit";
+import { findPoolPda, PoolSeeds } from "../pdas";
 
 export const POOL_STATE_DISCRIMINATOR = 1;
 
@@ -144,4 +145,24 @@ export async function fetchAllMaybePoolState(
 ): Promise<MaybeAccount<PoolState>[]> {
 	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
 	return maybeAccounts.map((maybeAccount) => decodePoolState(maybeAccount));
+}
+
+export async function fetchPoolStateFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: PoolSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<Account<PoolState>> {
+	const maybeAccount = await fetchMaybePoolStateFromSeeds(rpc, seeds, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
+}
+
+export async function fetchMaybePoolStateFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: PoolSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<MaybeAccount<PoolState>> {
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findPoolPda(seeds, { programAddress });
+	return await fetchMaybePoolState(rpc, address, fetchConfig);
 }

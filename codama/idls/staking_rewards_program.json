@@ -76,6 +76,10 @@
 						}
 					]
 				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "pool"
+				},
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -152,6 +156,10 @@
 							}
 						}
 					]
+				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "position"
 				},
 				"discriminators": [
 					{

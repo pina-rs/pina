@@ -10,13 +10,14 @@ import {
 	type Address,
 	getAddressEncoder,
 	getProgramDerivedAddress,
+	getU64Encoder,
 	getUtf8Encoder,
 	type ProgramDerivedAddress,
 } from "@solana/kit";
 
 export type RoleEntrySeeds = {
 	registry: Address;
-	roleId: Address;
+	roleId: number | bigint;
 };
 
 export async function findRoleEntryPda(
@@ -33,7 +34,7 @@ export async function findRoleEntryPda(
 		seeds: [
 			getUtf8Encoder().encode("role-entry"),
 			getAddressEncoder().encode(seeds.registry),
-			getAddressEncoder().encode(seeds.roleId),
+			getU64Encoder().encode(seeds.roleId),
 		],
 	});
 }

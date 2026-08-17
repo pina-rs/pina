@@ -1,0 +1,5 @@
+error: unsupported seed type; expected `Address`, `u8`, `u16`, `u32`, `u64`, or `[u8; N]`
+ --> tests/ui/fail/pda_unsupported_seed_type.rs:4:36
+  |
+4 | #[pda(seeds = [b"test", authority: String], bump = bump)]
+  |                                    ^^^^^^

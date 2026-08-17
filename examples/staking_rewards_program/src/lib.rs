@@ -80,6 +80,7 @@ pub enum StakingAccountType {
 }
 
 #[account(discriminator = StakingAccountType)]
+#[pda(seeds = [POOL_SEED_PREFIX, stake_mint: Address, reward_mint: Address], bump = bump)]
 pub struct PoolState {
 	pub admin: Address,
 	pub stake_mint: Address,
@@ -91,6 +92,7 @@ pub struct PoolState {
 }
 
 #[account(discriminator = StakingAccountType)]
+#[pda(seeds = [POSITION_SEED_PREFIX, pool: Address, owner: Address], bump = bump)]
 pub struct PositionState {
 	pub pool: Address,
 	pub owner: Address,
@@ -176,29 +178,13 @@ pub struct ClaimAccounts<'a> {
 	pub system_program: &'a AccountView,
 }
 
+/// Seed prefix for pool PDAs.
 const POOL_SEED_PREFIX: &[u8] = b"pool";
+
+/// Seed prefix for position PDAs.
 const POSITION_SEED_PREFIX: &[u8] = b"position";
+
 const SPL_PROGRAM_IDS: [Address; 2] = [token::ID, token_2022::ID];
-
-#[macro_export]
-macro_rules! pool_seeds {
-	($stake_mint:expr, $reward_mint:expr) => {
-		&[POOL_SEED_PREFIX, $stake_mint, $reward_mint]
-	};
-	($stake_mint:expr, $reward_mint:expr, $bump:expr) => {
-		&[POOL_SEED_PREFIX, $stake_mint, $reward_mint, &[$bump]]
-	};
-}
-
-#[macro_export]
-macro_rules! position_seeds {
-	($pool:expr, $owner:expr) => {
-		&[POSITION_SEED_PREFIX, $pool, $owner]
-	};
-	($pool:expr, $owner:expr, $bump:expr) => {
-		&[POSITION_SEED_PREFIX, $pool, $owner, &[$bump]]
-	};
-}
 
 fn assert_pool_stake_mint(pool_state: &PoolState, stake_mint: &AccountView) -> ProgramResult {
 	stake_mint
@@ -232,15 +218,8 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		// Parse instruction and prepare PDA seeds
 		let args = InitializePoolInstruction::try_from_bytes(data)?;
-		let pool_seeds = pool_seeds!(
-			self.stake_mint.address().as_ref(),
-			self.reward_mint.address().as_ref()
-		);
-		let pool_seeds_with_bump = pool_seeds!(
-			self.stake_mint.address().as_ref(),
-			self.reward_mint.address().as_ref(),
-			args.bump
-		);
+		let pool_seeds = PoolState::seeds(self.stake_mint.address(), self.reward_mint.address());
+		let pool_seeds_with_bump = pool_seeds.with_bump(args.bump);
 
 		// Validate accounts
 		self.admin.assert_signer()?;
@@ -250,7 +229,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.pool_state
 			.assert_empty()?
-			.assert_seeds_with_bump(pool_seeds_with_bump, &ID)?;
+			.assert_seeds_with_bump(&pool_seeds_with_bump.as_slices(), &ID)?;
 		self.stake_vault
 			.assert_empty()?
 			.assert_writable()?
@@ -273,7 +252,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 			self.pool_state,
 			self.admin,
 			&ID,
-			pool_seeds,
+			&pool_seeds.as_slices(),
 			args.bump,
 		)?;
 
@@ -321,12 +300,8 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 		// Parse instruction and prepare PDA seeds
 		let args = OpenPositionInstruction::try_from_bytes(data)?;
 		let pool_address = *self.pool_state.address();
-		let position_seeds = position_seeds!(pool_address.as_ref(), self.user.address().as_ref());
-		let position_seeds_with_bump = position_seeds!(
-			pool_address.as_ref(),
-			self.user.address().as_ref(),
-			args.bump
-		);
+		let position_seeds = PositionState::seeds(&pool_address, self.user.address());
+		let position_seeds_with_bump = position_seeds.with_bump(args.bump);
 
 		// Validate accounts
 		self.user.assert_signer()?;
@@ -336,7 +311,7 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 			.assert_type::<PoolState>(&ID)?;
 		self.position_state
 			.assert_empty()?
-			.assert_seeds_with_bump(position_seeds_with_bump, &ID)?;
+			.assert_seeds_with_bump(&position_seeds_with_bump.as_slices(), &ID)?;
 
 		// Check pool is not paused
 		let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
@@ -349,7 +324,7 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 			self.position_state,
 			self.user,
 			&ID,
-			position_seeds,
+			&position_seeds.as_slices(),
 			args.bump,
 		)?;
 

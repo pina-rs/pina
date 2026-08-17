@@ -33,6 +33,7 @@ import {
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
 } from "@solana/kit";
+import { findRegistryConfigPda, RegistryConfigSeeds } from "../pdas";
 
 export const REGISTRY_CONFIG_DISCRIMINATOR = 1;
 
@@ -137,4 +138,28 @@ export async function fetchAllMaybeRegistryConfig(
 	return maybeAccounts.map((maybeAccount) =>
 		decodeRegistryConfig(maybeAccount)
 	);
+}
+
+export async function fetchRegistryConfigFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: RegistryConfigSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<Account<RegistryConfig>> {
+	const maybeAccount = await fetchMaybeRegistryConfigFromSeeds(
+		rpc,
+		seeds,
+		config,
+	);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
+}
+
+export async function fetchMaybeRegistryConfigFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: RegistryConfigSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<MaybeAccount<RegistryConfig>> {
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findRegistryConfigPda(seeds, { programAddress });
+	return await fetchMaybeRegistryConfig(rpc, address, fetchConfig);
 }

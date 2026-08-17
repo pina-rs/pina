@@ -1,0 +1,5 @@
+error: unknown `#[pda]` argument `unknown`; expected `seeds`, `bump`, or `crate`
+ --> tests/ui/fail/pda_unknown_argument.rs:4:26
+  |
+4 | #[pda(seeds = [b"test"], unknown = true)]
+  |                          ^^^^^^^

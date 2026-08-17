@@ -71,3 +71,22 @@ impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for TodoState {
 		Ok(*account)
 	}
 }
+
+impl TodoState {
+	pub fn find_pda(owner: &solana_pubkey::Pubkey) -> (solana_pubkey::Pubkey, u8) {
+		solana_pubkey::Pubkey::find_program_address(
+			&["todo".as_bytes(), owner.as_ref()],
+			&crate::TODO_PROGRAM_ID,
+		)
+	}
+
+	pub fn create_pda(
+		owner: &solana_pubkey::Pubkey,
+		bump: u8,
+	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+		solana_pubkey::Pubkey::create_program_address(
+			&["todo".as_bytes(), owner.as_ref(), &[bump]],
+			&crate::TODO_PROGRAM_ID,
+		)
+	}
+}

@@ -31,6 +31,7 @@ import {
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
 } from "@solana/kit";
+import { CounterSeeds, findCounterPda } from "../pdas";
 
 export const COUNTER_STATE_DISCRIMINATOR = 1;
 
@@ -153,4 +154,28 @@ export async function fetchAllMaybeCounterState(
 ): Promise<MaybeAccount<CounterState>[]> {
 	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
 	return maybeAccounts.map((maybeAccount) => decodeCounterState(maybeAccount));
+}
+
+export async function fetchCounterStateFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: CounterSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<Account<CounterState>> {
+	const maybeAccount = await fetchMaybeCounterStateFromSeeds(
+		rpc,
+		seeds,
+		config,
+	);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
+}
+
+export async function fetchMaybeCounterStateFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: CounterSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<MaybeAccount<CounterState>> {
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findCounterPda(seeds, { programAddress });
+	return await fetchMaybeCounterState(rpc, address, fetchConfig);
 }

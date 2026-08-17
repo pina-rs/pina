@@ -3,6 +3,8 @@ use args::AccountsInput;
 use args::DiscriminatorArgs;
 use args::ErrorArgs;
 use args::EventArgs;
+use args::PdaArgs;
+use args::PdaSeedArg;
 use darling::FromDeriveInput;
 use darling::FromMeta;
 use darling::ast::NestedMeta;
@@ -612,7 +614,7 @@ fn discriminator_impl(
 ///
 /// It will transform the following:
 ///
-/// ```rust
+/// ```ignore
 /// use pina::*;
 ///
 /// #[discriminator(crate = ::pina, primitive = u8, final)]
@@ -1085,6 +1087,333 @@ fn account_impl(
 	}
 }
 
+/// The `#[pda(...)]` attribute macro declares the typed PDA seeds for an
+/// `#[account]` struct and generates derivation, verification, and CPI
+/// signing helpers.
+///
+/// #### Attributes
+///
+/// - `seeds` - (required) the typed PDA seed list. Each element is either a
+///   byte-string literal (`b"counter"`) or a typed dynamic seed
+///   (`authority: Address`). Supported types: `Address`, `u8`, `u16`, `u32`,
+///   `u64`, and `[u8; N]` (with `N <= 32`). At most 16 seeds are allowed
+///   before the bump seed.
+/// - `bump` - (optional) the name of the field that stores the PDA bump
+///   seed. When present, the generated `assert_seeds` method verifies the
+///   account against the stored bump instead of searching for the canonical
+///   one.
+/// - `crate` - (optional) the path to the `pina` crate. Defaults to `::pina`.
+///
+/// #### Codegen
+///
+/// It will transform the following:
+///
+/// ```ignore
+/// use pina::*;
+///
+/// #[account(discriminator = CounterAccount)]
+/// #[pda(seeds = [b"counter", authority: Address], bump = bump)]
+/// pub struct CounterState {
+/// 	/// The authority whose address seeds the PDA.
+/// 	pub authority: Address,
+/// 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
+/// 	pub bump: u8,
+/// }
+/// ```
+///
+/// Is transformed to:
+///
+/// ```ignore
+/// #[account(discriminator = CounterAccount)]
+/// pub struct CounterState {
+/// 	/// The authority whose address seeds the PDA.
+/// 	pub authority: Address,
+/// 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
+/// 	pub bump: u8,
+/// }
+///
+/// /// The PDA seeds for `CounterState`.
+/// pub struct CounterSeeds<'a> {
+/// 	/// The `authority` seed.
+/// 	pub authority: &'a Address,
+/// }
+///
+/// /// The PDA seeds for `CounterState`, including the bump seed.
+/// pub struct CounterSeedsWithBump<'a> {
+/// 	inner: CounterSeeds<'a>,
+/// 	_bump: [u8; 1],
+/// }
+///
+/// impl CounterState {
+/// 	/// Build the PDA seeds for this account.
+/// 	pub fn seeds(authority: &Address) -> CounterSeeds<'_> {
+/// 		CounterSeeds { authority }
+/// 	}
+///
+/// 	/// Find the canonical PDA for this account and its bump seed.
+/// 	pub fn try_find_pda(authority: &Address, program_id: &Address) -> Option<(Address, u8)> {
+/// 		let seeds = Self::seeds(authority);
+/// 		::pina::try_find_program_address(&seeds.as_slices(), program_id)
+/// 	}
+///
+/// 	/// Find the canonical PDA for this account and its bump seed.
+/// 	///
+/// 	/// # Panics
+/// 	///
+/// 	/// Panics if no valid PDA exists for the given seeds.
+/// 	pub fn find_pda(authority: &Address, program_id: &Address) -> (Address, u8) {
+/// 		Self::try_find_pda(authority, program_id)
+/// 			.unwrap_or_else(|| panic!("could not find program address from seeds"))
+/// 	}
+///
+/// 	/// Assert that `account` is the PDA for the given seeds, using the
+/// 	/// stored `bump` field.
+/// 	pub fn assert_seeds(
+/// 		account: &AccountView,
+/// 		authority: &Address,
+/// 		program_id: &Address,
+/// 	) -> Result<(), ProgramError> {
+/// 		let bump = ::pina::AsAccount::as_account::<Self>(account, program_id)?.bump;
+/// 		let seeds = Self::seeds(authority).with_bump(bump);
+/// 		::pina::AccountValidation::assert_seeds_with_bump(account, &seeds.as_slices(), program_id)
+/// 	}
+/// }
+///
+/// impl<'a> CounterSeeds<'a> {
+/// 	/// The seeds as byte slices, without the bump seed.
+/// 	pub fn as_slices(&self) -> [&[u8]; 2] {
+/// 		[b"counter", self.authority.as_ref()]
+/// 	}
+///
+/// 	/// Append the bump seed to the seeds.
+/// 	pub fn with_bump(self, bump: u8) -> CounterSeedsWithBump<'a> {
+/// 		CounterSeedsWithBump { inner: self, _bump: [bump] }
+/// 	}
+/// }
+///
+/// impl<'a> CounterSeedsWithBump<'a> {
+/// 	/// The seeds as byte slices, including the bump seed.
+/// 	pub fn as_slices(&self) -> [&[u8]; 3] {
+/// 		[b"counter", self.inner.authority.as_ref(), &self._bump]
+/// 	}
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn pda(args: TokenStream, input: TokenStream) -> TokenStream {
+	pda_impl(args.into(), input.into()).into()
+}
+
+fn pda_impl(
+	args: proc_macro2::TokenStream,
+	input: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+	// Parse macro arguments
+	let args = match syn::parse2::<PdaArgs>(args) {
+		Ok(v) => v,
+		Err(e) => return e.to_compile_error(),
+	};
+
+	// Parse input struct
+	let item_struct: ItemStruct = match syn::parse2(input) {
+		Ok(v) => v,
+		Err(e) => return e.to_compile_error(),
+	};
+
+	// Extract configuration
+	let struct_name = &item_struct.ident;
+	let crate_path = &args.crate_path;
+	let seeds_name = format_ident!("{}Seeds", struct_name);
+	let seeds_with_bump_name = format_ident!("{}SeedsWithBump", struct_name);
+
+	// Validate the struct has named fields
+	let named_fields = match &item_struct.fields {
+		Fields::Named(named) => &named.named,
+		_ => {
+			return syn::Error::new_spanned(
+				item_struct,
+				"`#[pda]` can only be applied to structs with named fields",
+			)
+			.to_compile_error();
+		}
+	};
+
+	// Validate the bump field exists and is a `u8`
+	if let Some(bump_field) = &args.bump {
+		let field = named_fields
+			.iter()
+			.find(|f| f.ident.as_ref() == Some(bump_field));
+		let Some(field) = field else {
+			return syn::Error::new_spanned(
+				bump_field,
+				format!("`bump` field `{bump_field}` was not found on `{struct_name}`"),
+			)
+			.to_compile_error();
+		};
+
+		let is_u8 = matches!(
+			&field.ty,
+			Type::Path(type_path) if type_path.path.is_ident("u8")
+		);
+		if !is_u8 {
+			return syn::Error::new_spanned(
+				&field.ty,
+				format!("`bump` field `{bump_field}` must have type `u8`"),
+			)
+			.to_compile_error();
+		}
+	}
+
+	// Build the seed struct fields, constructor params, and slice expressions
+	let mut seed_fields = Vec::new();
+	let mut seed_field_docs = Vec::new();
+	let mut seed_params = Vec::new();
+	let mut seeds_params_lt = Vec::new();
+	let mut seed_param_names = Vec::new();
+	let mut seed_stored_exprs = Vec::new();
+	let mut seed_slice_exprs = Vec::new();
+	let mut seed_slice_exprs_with_bump = Vec::new();
+	let mut seed_constants = Vec::new();
+
+	for seed in &args.seeds {
+		match seed {
+			PdaSeedArg::Constant(value) => {
+				let lit = syn::LitByteStr::new(value, proc_macro2::Span::call_site());
+				seed_constants.push(quote!(#lit));
+			}
+			PdaSeedArg::ConstantRef(path) => {
+				seed_constants.push(quote!(#path));
+			}
+			PdaSeedArg::Variable { name, ty } => {
+				let field_type = ty.field_type();
+				let param_type = ty.param_type();
+				let param_type_lt = ty.param_type_lt();
+				let stored_expr = ty.to_stored_expr(name);
+				let slice_expr = ty.slice_expr(name);
+				let slice_expr_with_bump = ty.slice_expr_inner(name);
+				let doc = format!("The `{name}` seed.");
+
+				seed_fields.push(quote!(pub #name: #field_type));
+				seed_field_docs.push(quote!(#[doc = #doc]));
+				seed_params.push(quote!(#name: #param_type));
+				seeds_params_lt.push(quote!(#name: #param_type_lt));
+				seed_param_names.push(name.clone());
+				seed_stored_exprs.push(stored_expr);
+				seed_slice_exprs.push(slice_expr);
+				seed_slice_exprs_with_bump.push(slice_expr_with_bump);
+			}
+		}
+	}
+
+	let seed_count = args.seeds.len();
+	let seed_count_with_bump = seed_count + 1;
+	let seeds_doc = format!("The PDA seeds for `{struct_name}`.");
+	let seeds_with_bump_doc =
+		format!("The PDA seeds for `{struct_name}`, including the bump seed.");
+
+	// The `seeds()` constructor params (with a shared lifetime) and the
+	// `try_find_pda`/`find_pda`/`assert_seeds` params
+	let seeds_params = seeds_params_lt;
+	let find_params = {
+		let mut params = seed_params.clone();
+		params.push(quote!(program_id: &Address));
+		params
+	};
+
+	// The `assert_seeds` method (only when a bump field is declared)
+	let assert_seeds = args.bump.as_ref().map(|bump_field| {
+		let doc = format!(
+			"Assert that `account` is the PDA for the given seeds, using the stored \
+			 `{bump_field}` field."
+		);
+		quote! {
+			#[doc = #doc]
+			pub fn assert_seeds(
+				account: &#crate_path::AccountView,
+				#(#seed_params,)*
+				program_id: &#crate_path::Address,
+			) -> ::core::result::Result<(), #crate_path::ProgramError> {
+				let bump = #crate_path::AsAccount::as_account::<Self>(account, program_id)?.bump;
+				let seeds = Self::seeds(#(#seed_param_names,)*).with_bump(bump);
+				<&#crate_path::AccountView as #crate_path::AccountInfoValidation>::assert_seeds_with_bump(
+					account,
+					&seeds.as_slices(),
+					program_id,
+				)
+				.map(|_| ())
+			}
+		}
+	});
+
+	let generated = quote! {
+		#[doc = #seeds_doc]
+		#[derive(Clone, Copy)]
+		pub struct #seeds_name<'a> {
+			#(#seed_field_docs)*
+			#(#seed_fields,)*
+		}
+
+		#[doc = #seeds_with_bump_doc]
+		pub struct #seeds_with_bump_name<'a> {
+			inner: #seeds_name<'a>,
+			_bump: [u8; 1],
+		}
+
+		impl #struct_name {
+			/// Build the PDA seeds for this account.
+			pub fn seeds<'a>(#(#seeds_params,)*) -> #seeds_name<'a> {
+				#seeds_name {
+					#(#seed_param_names: #seed_stored_exprs,)*
+				}
+			}
+
+			/// Find the canonical PDA for this account and its bump seed.
+			pub fn try_find_pda(#(#find_params,)*) -> ::core::option::Option<(#crate_path::Address, u8)> {
+				let seeds = Self::seeds(#(#seed_param_names,)*);
+				#crate_path::try_find_program_address(&seeds.as_slices(), program_id)
+			}
+
+			/// Find the canonical PDA for this account and its bump seed.
+			///
+			/// # Panics
+			///
+			/// Panics if no valid PDA exists for the given seeds.
+			pub fn find_pda(#(#find_params,)*) -> (#crate_path::Address, u8) {
+				Self::try_find_pda(#(#seed_param_names,)* program_id)
+					.unwrap_or_else(|| panic!("could not find program address from seeds"))
+			}
+
+			#assert_seeds
+		}
+
+		impl<'a> #seeds_name<'a> {
+			/// The seeds as byte slices, without the bump seed.
+			pub fn as_slices(&self) -> [&[u8]; #seed_count] {
+				[#(#seed_constants,)* #(#seed_slice_exprs,)*]
+			}
+
+			/// Append the bump seed to the seeds.
+			pub fn with_bump(&self, bump: u8) -> #seeds_with_bump_name<'a> {
+				#seeds_with_bump_name {
+					inner: *self,
+					_bump: [bump],
+				}
+			}
+		}
+
+		impl<'a> #seeds_with_bump_name<'a> {
+			/// The seeds as byte slices, including the bump seed.
+			pub fn as_slices(&self) -> [&[u8]; #seed_count_with_bump] {
+				[#(#seed_constants,)* #(#seed_slice_exprs_with_bump,)* &self._bump]
+			}
+		}
+	};
+
+	quote! {
+		#item_struct
+		#generated
+	}
+}
+
 /// The instruction macro is used to annotate instruction data that will exist
 /// within a solana instruction.
 ///
@@ -1101,7 +1430,7 @@ fn account_impl(
 ///
 /// It will transform the following:
 ///
-/// ```rust
+/// ```ignore
 /// use pina::*;
 ///
 /// #[discriminator(crate = ::pina, primitive = u8, final)]
@@ -1437,7 +1766,7 @@ fn instruction_impl(
 ///
 /// It will transform the following:
 ///
-/// ```rust
+/// ```ignore
 /// use pina::*;
 ///
 /// #[discriminator(primitive = u8)]

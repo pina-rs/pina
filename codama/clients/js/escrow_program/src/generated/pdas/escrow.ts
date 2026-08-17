@@ -10,13 +10,14 @@ import {
 	type Address,
 	getAddressEncoder,
 	getProgramDerivedAddress,
+	getU64Encoder,
 	getUtf8Encoder,
 	type ProgramDerivedAddress,
 } from "@solana/kit";
 
 export type EscrowSeeds = {
 	maker: Address;
-	seed: Address;
+	seed: number | bigint;
 };
 
 export async function findEscrowPda(
@@ -33,7 +34,7 @@ export async function findEscrowPda(
 		seeds: [
 			getUtf8Encoder().encode("escrow"),
 			getAddressEncoder().encode(seeds.maker),
-			getAddressEncoder().encode(seeds.seed),
+			getU64Encoder().encode(seeds.seed),
 		],
 	});
 }

@@ -1,0 +1,5 @@
+error: seed literal is 52 bytes, exceeds the maximum of 32
+ --> tests/ui/fail/pda_seed_too_long.rs:4:16
+  |
+4 | #[pda(seeds = [b"this seed literal is way too long to be a valid seed"], bump = bump)]
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

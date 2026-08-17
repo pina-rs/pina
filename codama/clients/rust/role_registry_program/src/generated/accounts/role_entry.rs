@@ -77,3 +77,32 @@ impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for RoleEntry {
 		Ok(*account)
 	}
 }
+
+impl RoleEntry {
+	pub fn find_pda(registry: &solana_pubkey::Pubkey, role_id: u64) -> (solana_pubkey::Pubkey, u8) {
+		solana_pubkey::Pubkey::find_program_address(
+			&[
+				"role-entry".as_bytes(),
+				registry.as_ref(),
+				&role_id.to_le_bytes(),
+			],
+			&crate::ROLE_REGISTRY_PROGRAM_ID,
+		)
+	}
+
+	pub fn create_pda(
+		registry: &solana_pubkey::Pubkey,
+		role_id: u64,
+		bump: u8,
+	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+		solana_pubkey::Pubkey::create_program_address(
+			&[
+				"role-entry".as_bytes(),
+				registry.as_ref(),
+				&role_id.to_le_bytes(),
+				&[bump],
+			],
+			&crate::ROLE_REGISTRY_PROGRAM_ID,
+		)
+	}
+}

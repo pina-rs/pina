@@ -61,6 +61,10 @@
 						}
 					]
 				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "counter"
+				},
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",

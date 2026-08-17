@@ -77,3 +77,31 @@ impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for PositionState {
 		Ok(*account)
 	}
 }
+
+impl PositionState {
+	pub fn find_pda(
+		pool: &solana_pubkey::Pubkey,
+		owner: &solana_pubkey::Pubkey,
+	) -> (solana_pubkey::Pubkey, u8) {
+		solana_pubkey::Pubkey::find_program_address(
+			&["position".as_bytes(), pool.as_ref(), owner.as_ref()],
+			&crate::STAKING_REWARDS_PROGRAM_ID,
+		)
+	}
+
+	pub fn create_pda(
+		pool: &solana_pubkey::Pubkey,
+		owner: &solana_pubkey::Pubkey,
+		bump: u8,
+	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+		solana_pubkey::Pubkey::create_program_address(
+			&[
+				"position".as_bytes(),
+				pool.as_ref(),
+				owner.as_ref(),
+				&[bump],
+			],
+			&crate::STAKING_REWARDS_PROGRAM_ID,
+		)
+	}
+}

@@ -111,6 +111,10 @@
 						}
 					]
 				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "profile"
+				},
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
