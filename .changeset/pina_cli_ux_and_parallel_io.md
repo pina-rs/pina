@@ -10,4 +10,4 @@ Add UX improvements and parallel file I/O to the `pina` CLI.
 - **Colored output**: Error messages and success indicators now use `owo-colors` for semantic terminal styling.
 - **Summary table**: `pina idl` prints a `comfy-table` summary showing instruction, account, PDA, and error counts after generation.
 - **`docs` subcommand**: `pina docs <topic>` renders bundled `.t.md` documentation in-terminal using `termimad`, with `PINA_TEMPLATES_DIR` support for custom topics.
-- **New dependencies**: `rayon`, `owo-colors`, `comfy-table`, and `termimad` (kept on the maintained `0.34.1` release).
+- **New dependencies**: `rayon`, `owo-colors`, `comfy-table` (8.0), and `termimad` (0.35.1).

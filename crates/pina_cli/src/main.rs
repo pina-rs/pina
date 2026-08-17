@@ -150,7 +150,7 @@ fn run_idl(path: &Path, output: Option<&Path>, name: Option<&str>, pretty: bool)
 
 	// Print Summary Table
 	let mut table = Table::new();
-	table.load_preset(comfy_table::presets::UTF8_FULL_CONDENSED);
+	table.load_style(comfy_table::presets::UTF8_FULL_CONDENSED);
 	table.set_header(vec!["Component", "Count"]);
 	table.add_row(vec![
 		"Instructions",
