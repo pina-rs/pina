@@ -249,7 +249,7 @@ fn parse_seed_list(input: syn::parse::ParseStream) -> syn::Result<Vec<PdaSeedArg
 				));
 			}
 			seeds.push(PdaSeedArg::Constant(value));
-		} else if content.peek2(syn::Token![:]) {
+		} else if content.peek2(syn::Token![:]) && !content.peek3(syn::Token![:]) {
 			let name: syn::Ident = content.parse()?;
 			content.parse::<syn::Token![:]>()?;
 			let ty: syn::Type = content.parse()?;

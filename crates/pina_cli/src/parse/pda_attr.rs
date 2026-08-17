@@ -161,7 +161,7 @@ fn parse_seed_list(input: syn::parse::ParseStream) -> syn::Result<Vec<PdaAttrSee
 		if content.peek(syn::LitByteStr) {
 			let lit: syn::LitByteStr = content.parse()?;
 			seeds.push(PdaAttrSeed::Constant(lit.value()));
-		} else if content.peek2(syn::Token![:]) {
+		} else if content.peek2(syn::Token![:]) && !content.peek3(syn::Token![:]) {
 			let name: syn::Ident = content.parse()?;
 			content.parse::<syn::Token![:]>()?;
 			let ty: syn::Type = content.parse()?;
@@ -367,6 +367,148 @@ mod tests {
 			&pdas[0].seeds[1],
 			PdaSeedIr::Variable { name, rust_type }
 				if name == "authority" && rust_type == "NotAType"
+		));
+	}
+
+	#[test]
+	fn skips_malformed_pda_attributes() {
+		let source = r#"
+			#[account(discriminator = BrokenAccount)]
+			#[pda(seeds)]
+			pub struct BrokenState {
+				pub bump: u8,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let pdas = extract_pda_from_attributes(&file, &[]);
+
+		assert!(pdas.is_empty(), "malformed attributes must skip the PDA");
+	}
+
+	#[test]
+	fn skips_pda_with_multi_segment_constant_path() {
+		let source = r#"
+			#[account(discriminator = BrokenAccount)]
+			#[pda(seeds = [crate::SEED, authority: Address], bump = bump)]
+			pub struct BrokenState {
+				pub authority: Address,
+				pub bump: u8,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let pdas = extract_pda_from_attributes(&file, &[]);
+
+		assert!(
+			pdas.is_empty(),
+			"multi-segment constant paths must skip the PDA"
+		);
+	}
+
+	#[test]
+	fn parses_bump_and_crate_arguments() {
+		let source = r#"
+			#[account(discriminator = CounterAccount)]
+			#[pda(seeds = [b"counter", authority: Address], bump = bump, crate = ::pina)]
+			pub struct CounterState {
+				pub authority: Address,
+				pub bump: u8,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let pdas = extract_pda_from_attributes(&file, &[]);
+
+		assert_eq!(pdas.len(), 1);
+		assert_eq!(pdas[0].name, "counter");
+	}
+
+	#[test]
+	fn skips_pda_with_duplicate_seeds_argument() {
+		let source = r#"
+			#[account(discriminator = BrokenAccount)]
+			#[pda(seeds = [b"broken"], seeds = [b"again"])]
+			pub struct BrokenState {}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let pdas = extract_pda_from_attributes(&file, &[]);
+
+		assert!(
+			pdas.is_empty(),
+			"duplicate `seeds` arguments must skip the PDA"
+		);
+	}
+
+	#[test]
+	fn skips_pda_with_unknown_argument() {
+		let source = r#"
+			#[account(discriminator = BrokenAccount)]
+			#[pda(seeds = [b"broken"], unknown = 5)]
+			pub struct BrokenState {}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let pdas = extract_pda_from_attributes(&file, &[]);
+
+		assert!(pdas.is_empty(), "unknown arguments must skip the PDA");
+	}
+
+	#[test]
+	fn extracts_pda_with_const_length_byte_array_seed() {
+		let source = r#"
+			#[account(discriminator = PositionAccount)]
+			#[pda(seeds = [b"position", owner: Address, tag: [u8; SIZE]], bump = bump)]
+			pub struct PositionState {
+				pub owner: Address,
+				pub tag: [u8; 8],
+				pub bump: u8,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let pdas = extract_pda_from_attributes(&file, &[]);
+
+		assert!(matches!(
+			&pdas[0].seeds[2],
+			PdaSeedIr::Variable { name, rust_type }
+				if name == "tag" && rust_type == "[u8; 0]"
+		));
+	}
+
+	#[test]
+	fn extracts_pda_with_char_literal_array_length() {
+		let source = r#"
+			#[account(discriminator = PositionAccount)]
+			#[pda(seeds = [b"position", owner: Address, tag: [u8; 'a']], bump = bump)]
+			pub struct PositionState {
+				pub owner: Address,
+				pub tag: [u8; 8],
+				pub bump: u8,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let pdas = extract_pda_from_attributes(&file, &[]);
+
+		assert!(matches!(
+			&pdas[0].seeds[2],
+			PdaSeedIr::Variable { name, rust_type }
+				if name == "tag" && rust_type == "[u8; 0]"
+		));
+	}
+
+	#[test]
+	fn extracts_pda_with_reference_seed_type() {
+		let source = r#"
+			#[account(discriminator = PositionAccount)]
+			#[pda(seeds = [b"position", owner: &[u8]], bump = bump)]
+			pub struct PositionState {
+				pub owner: Address,
+				pub bump: u8,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let pdas = extract_pda_from_attributes(&file, &[]);
+
+		assert!(matches!(
+			&pdas[0].seeds[1],
+			PdaSeedIr::Variable { name, rust_type }
+				if name == "owner" && rust_type == "Address"
 		));
 	}
 
