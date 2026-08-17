@@ -1,15 +1,15 @@
 name: Feature request
 description: Propose a new feature or workflow improvement for Pina.
-title: "Sentence case summary of the feature"
+title: "Title case summary of the feature"
 labels:
   - enhancement
 body:
   - type: markdown
     attributes:
       value: |
-        Please write the issue title in **sentence case**.
+        Please write the issue title in **title case**.
 
-        Good: `Add Miri coverage for account loader aliasing rules`
+        Good: `Add Miri Coverage for Account Loader Aliasing Rules`
         Avoid: `feat: add miri coverage for account loader aliasing rules`
   - type: textarea
     id: problem

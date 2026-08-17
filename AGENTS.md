@@ -10,6 +10,11 @@ Pina is a Rust workspace for building performant, `no_std` Solana programs on to
 - Workspace code must preserve `no_std` compatibility where applicable.
 - `unsafe_code` and `unstable_features` are denied workspace-wide.
 
+## Contribution conventions
+
+- GitHub issue titles must be written in title case (e.g. `Add Miri Coverage for Account Loader Aliasing Rules`). Do not use commit-style prefixes like `fix:` / `feat:` / `docs:` in issue titles.
+- Pull request titles must follow Conventional Commits (e.g. `feat(loaders): preserve borrow guard lifetime`).
+
 ## Common commands
 
 - `devenv shell` — enter the dev environment
