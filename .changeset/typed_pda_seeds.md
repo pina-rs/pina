@@ -1,8 +1,8 @@
 ---
-"pina": minor
-"pina_macros": minor
-"pina_cli": minor
-"pina_codama_renderer": minor
+pina: feat
+pina_macros: feat
+pina_cli: feat
+pina_codama_renderer: feat
 ---
 
 feat: add typed `#[pda]` attribute for PDA seed declarations
