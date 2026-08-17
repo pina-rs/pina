@@ -85,6 +85,10 @@ Pina's zero-copy account model is built on [zeropod](https://crates.io/crates/ze
 
 The `#[account]` macro generates the zeropod trait impls directly on the account struct (the "direct pattern": `ZeroPodFixed` with `type Zc = Self`), keeping the discriminator as the first field. `PinaAccount::validate` checks the discriminator and content; `try_from_bytes` additionally enforces exact size.
 
+### Unit enums (`#[derive(PodEnum)]`)
+
+Unit enums with explicit discriminants can be stored in accounts via `#[derive(PodEnum)]`, which generates an `EnumZc` zero-copy companion (`#[repr(transparent)]` over `[u8; N]`, alignment 1). The companion validates the discriminant at the deserialization boundary. Because the enum's validity is bit-pattern-restricted at the Rust type level, account structs store the `EnumZc` companion as the field type (never the bare enum) — invalid discriminants are rejected before any reference to the enum is formed.
+
 ## Testing strategy
 
 - Unit tests for negative validation cases.
