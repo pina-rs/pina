@@ -62,6 +62,8 @@ _Issue: pina-rs/pina#193_ _Branch: `explore/zeropod-alignment` (PR: pina-rs/pina
 - [ ] `build:pina:no-default`
 - [ ] Miri
 - [x] Create PR: https://github.com/pina-rs/pina/pull/195
+- [x] **All 24 CI checks pass** (lint, test, miri, idl, changeset-policy, semver, coverage, binary-size, feature-matrix, mutants, program-e2e, compute-units, surfpool)
+- [x] PR is MERGEABLE (mergeStateStatus: CLEAN)
 
 ## Notes
 
