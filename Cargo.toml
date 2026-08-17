@@ -14,6 +14,7 @@ members = [
 	"codama/clients/rust/escrow_program",
 	"codama/clients/rust/hello_solana",
 	"codama/clients/rust/pina_bpf",
+	"codama/clients/rust/profile_program",
 	"codama/clients/rust/prop_amm_program",
 	"codama/clients/rust/role_registry_program",
 	"codama/clients/rust/staking_rewards_program",
@@ -40,6 +41,7 @@ members = [
 	"examples/escrow_program",
 	"examples/hello_solana",
 	"examples/pina_bpf",
+	"examples/profile_program",
 	"examples/prop_amm_program",
 	"examples/role_registry_program",
 	"examples/staking_rewards_program",
@@ -86,7 +88,7 @@ repository = "https://github.com/pina-rs/pina"
 rust-version = "1.89.0"
 
 [workspace.dependencies]
-bytemuck = { default-features = false, version = "^1" }
+bytemuck = { default-features = false, version = "^1", features = ["min_const_generics"] }
 clap = { default-features = false, version = "^4", features = ["derive", "std"] }
 codama-nodes = { default-features = false, version = "0.11.0" }
 darling = { default-features = false, version = "0.24.0" }
