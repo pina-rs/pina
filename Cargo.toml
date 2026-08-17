@@ -96,6 +96,7 @@ insta-cmd = { default-features = false, version = "^0.7.0" }
 mollusk-svm = { default-features = false, version = "0.15.0" }
 num-derive = { version = "^0.5", default-features = false }
 num-traits = { version = "^0.2", default-features = false }
+object = { default-features = false, version = "^0.40.0" }
 pastey = { default-features = false, version = "^0.2" }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }
@@ -128,7 +129,6 @@ typed-builder = { default-features = false, version = "^0.23" }
 walkdir = { default-features = false, version = "^2" }
 
 # publishable crates
-object = { default-features = false, version = "^0.40.0" }
 pina = { default-features = false, path = "crates/pina", version = "0.8.0" }
 pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.8.0" }
 pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.8.0" }
@@ -138,9 +138,9 @@ pina_profile = { default-features = false, path = "crates/pina_profile", version
 pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.8.0" }
 
 [workspace.metadata.bin]
-cargo-semver-checks = { version = "0.46.0" }
+cargo-semver-checks = { version = "0.50.0" }
 cargo-workspaces = { version = "0.4.2" }
-dylint-link = { version = "5.0.0", bins = ["dylint-link"] }
+dylint-link = { version = "6.0.4", bins = ["dylint-link"] }
 kani-verifier = { version = "0.67.0", bins = ["kani", "cargo-kani"] }
 
 [workspace.metadata.dylint]
