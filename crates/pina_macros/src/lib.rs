@@ -2238,3 +2238,327 @@ fn event_impl(
 		#implementations
 	}
 }
+
+/// Derives zeropod trait impls for a unit enum, generating a zero-copy
+/// `EnumZc` companion for use as a field in `#[account]` structs and other pod
+/// types.
+///
+/// Requires `#[repr(u8)]`, `#[repr(u16)]`, `#[repr(u32)]`, or `#[repr(u64)]`
+/// with all variants being unit variants that carry explicit discriminants
+/// (e.g. `Red = 0`).
+///
+/// The generated `EnumZc` type wraps the raw discriminant bytes (alignment 1,
+/// always valid as a reference) and validates the discriminant at the
+/// deserialization boundary. The enum itself is the *schema* type:
+/// `ZeroPodFixed` with `type Zc = EnumZc`, and `ZcField` maps the enum to its
+/// zero-copy companion.
+///
+/// # Examples
+///
+/// ```ignore
+/// use pina::PodEnum;
+/// use pina::PodU64;
+///
+/// #[derive(PodEnum)]
+/// #[repr(u8)]
+/// enum Color {
+///     Red = 0,
+///     Green = 1,
+///     Blue = 2,
+/// }
+///
+/// #[account(...)]
+/// struct Palette {
+///     color: ColorZc,   // use the zero-copy companion as the field type
+///     brightness: PodU64,
+/// }
+///
+/// // Read / compare / convert:
+/// let c: ColorZc = Color::Red.into();
+/// assert!(c.is(Color::Red));
+/// assert_eq!(c, Color::Red);
+/// let color: Color = c.try_to_enum().unwrap();
+/// ```
+#[proc_macro_derive(PodEnum, attributes(pina))]
+pub fn pod_enum_derive(input: TokenStream) -> TokenStream {
+	pod_enum_impl(input.into()).into()
+}
+
+fn default_crate_path() -> syn::Path {
+	syn::parse_quote!(::pina)
+}
+
+fn pod_enum_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+	let input: DeriveInput = match syn::parse2(input) {
+		Ok(v) => v,
+		Err(e) => return e.to_compile_error(),
+	};
+
+	let enum_name = &input.ident;
+	let zc_name = format_ident!("{}Zc", enum_name);
+
+	// Crate path: support #[pina(crate = ::pina)] for renamed dependencies.
+	let crate_path: syn::Path =
+		match <PodEnumArgs as darling::FromDeriveInput>::from_derive_input(&input) {
+			Ok(args) => args.crate_path,
+			Err(e) => return e.write_errors(),
+		};
+
+	// 1. Parse #[repr(uN)].
+	let repr = match parse_enum_repr(&input.attrs) {
+		Some(r) => r,
+		None => {
+			return quote! {
+				compile_error!("PodEnum enums require #[repr(u8)], #[repr(u16)], #[repr(u32)], or #[repr(u64)]");
+			}
+			.into();
+		}
+	};
+
+	// 2. Extract variants — all must be unit variants with explicit discriminants.
+	let variants = match &input.data {
+		syn::Data::Enum(data) => &data.variants,
+		_ => {
+			return quote! {
+				compile_error!("PodEnum can only be derived for enums");
+			}
+			.into();
+		}
+	};
+
+	let mut variant_names: Vec<&syn::Ident> = Vec::new();
+	let mut discriminant_values: Vec<proc_macro2::TokenStream> = Vec::new();
+
+	for v in variants {
+		if !v.fields.is_empty() {
+			let msg = format!(
+				"PodEnum enum variant `{}` must be a unit variant (no data fields)",
+				v.ident
+			);
+			return quote! { compile_error!(#msg); }.into();
+		}
+		let disc = match &v.discriminant {
+			Some((_, expr)) => expr.clone(),
+			None => {
+				let msg = format!(
+					"PodEnum enum variant `{}` must have an explicit discriminant (e.g. `= 0`)",
+					v.ident
+				);
+				return quote! { compile_error!(#msg); }.into();
+			}
+		};
+		variant_names.push(&v.ident);
+		discriminant_values.push(quote! { #disc });
+	}
+
+	// 3. Map repr to native type and size.
+	let (native_ty, repr_size): (proc_macro2::TokenStream, usize) = match repr.as_str() {
+		"u8" => (quote! { u8 }, 1),
+		"u16" => (quote! { u16 }, 2),
+		"u32" => (quote! { u32 }, 4),
+		"u64" => (quote! { u64 }, 8),
+		_ => unreachable!(),
+	};
+
+	// 4. Build the valid discriminant set for validation.
+	let valid_arms: Vec<proc_macro2::TokenStream> =
+		discriminant_values.iter().map(|d| quote! { #d }).collect();
+
+	// 5. Build the From<Enum> -> raw match arms.
+	let from_arms: Vec<proc_macro2::TokenStream> = variant_names
+		.iter()
+		.zip(discriminant_values.iter())
+		.map(|(name, disc)| {
+			quote! { #enum_name::#name => #disc as #native_ty }
+		})
+		.collect();
+
+	let read_value = match repr_size {
+		1 => quote! { self.0[0] as #native_ty },
+		_ => quote! { <#native_ty>::from_le_bytes(self.0) },
+	};
+
+	quote! {
+		#[repr(transparent)]
+		#[derive(Clone, Copy)]
+		pub struct #zc_name([u8; #repr_size]);
+
+		impl #zc_name {
+			/// Returns the raw discriminant value.
+			#[inline(always)]
+			pub fn get(&self) -> #native_ty {
+				#read_value
+			}
+
+			/// Try to convert the raw value back to the enum.
+			#[allow(clippy::manual_range_patterns)]
+			pub fn try_to_enum(&self) -> Result<#enum_name, #crate_path::ZeroPodError> {
+				let val = self.get();
+				match val {
+					#(#valid_arms => Ok(#enum_name::#variant_names),)*
+					_ => Err(#crate_path::ZeroPodError::InvalidDiscriminant),
+				}
+			}
+
+			/// Returns `true` if the stored value matches the given variant.
+			pub fn is(&self, variant: #enum_name) -> bool {
+				let raw: #native_ty = variant.into();
+				self.get() == raw
+			}
+		}
+
+		impl #crate_path::ZcValidate for #zc_name {
+			#[allow(clippy::manual_range_patterns)]
+			fn validate_ref(value: &Self) -> Result<(), #crate_path::ZeroPodError> {
+				let v = value.get();
+				match v {
+					#(#valid_arms)|* => Ok(()),
+					_ => Err(#crate_path::ZeroPodError::InvalidDiscriminant),
+				}
+			}
+		}
+
+		impl #crate_path::ZeroPodSchema for #enum_name {
+			const LAYOUT: #crate_path::LayoutKind = #crate_path::LayoutKind::Fixed;
+		}
+
+		impl #crate_path::ZeroPodFixed for #enum_name {
+			type Zc = #zc_name;
+			const SIZE: usize = #repr_size;
+
+			fn from_bytes(data: &[u8]) -> Result<&Self::Zc, #crate_path::ZeroPodError> {
+				Self::validate(data)?;
+				Ok(unsafe { &*(data.as_ptr() as *const #zc_name) })
+			}
+
+			fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, #crate_path::ZeroPodError> {
+				Self::validate(data)?;
+				Ok(unsafe { &mut *(data.as_mut_ptr() as *mut #zc_name) })
+			}
+
+			fn validate(data: &[u8]) -> Result<(), #crate_path::ZeroPodError> {
+				if data.len() < #repr_size {
+					return Err(#crate_path::ZeroPodError::BufferTooSmall);
+				}
+				let __zc = unsafe { &*(data.as_ptr() as *const #zc_name) };
+				<#zc_name as #crate_path::ZcValidate>::validate_ref(__zc)?;
+				Ok(())
+			}
+
+			unsafe fn from_bytes_unchecked(data: &[u8]) -> &Self::Zc {
+				&*(data.as_ptr() as *const #zc_name)
+			}
+
+			unsafe fn from_bytes_mut_unchecked(data: &mut [u8]) -> &mut Self::Zc {
+				&mut *(data.as_mut_ptr() as *mut #zc_name)
+			}
+		}
+
+		impl #crate_path::ZcField for #enum_name {
+			type Pod = #zc_name;
+			const POD_SIZE: usize = #repr_size;
+		}
+
+		// --- Enum ergonomics ---
+
+		impl From<#enum_name> for #zc_name {
+			fn from(v: #enum_name) -> Self {
+				let raw: #native_ty = match v {
+					#(#from_arms),*
+				};
+				Self(raw.to_le_bytes())
+			}
+		}
+
+		impl From<#enum_name> for #native_ty {
+			fn from(v: #enum_name) -> Self {
+				match v {
+					#(#from_arms),*
+				}
+			}
+		}
+
+		impl PartialEq<#enum_name> for #zc_name {
+			fn eq(&self, other: &#enum_name) -> bool {
+				let other_raw: #native_ty = match other {
+					#(#enum_name::#variant_names => #discriminant_values as #native_ty),*
+				};
+				self.get() == other_raw
+			}
+		}
+
+		impl PartialEq<#native_ty> for #zc_name {
+			fn eq(&self, other: &#native_ty) -> bool {
+				self.get() == *other
+			}
+		}
+
+		impl core::fmt::Display for #zc_name {
+			fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+				match self.get() {
+					#(#discriminant_values => write!(f, stringify!(#variant_names)),)*
+					other => write!(f, "{}(invalid: {})", stringify!(#enum_name), other),
+				}
+			}
+		}
+
+		impl core::fmt::Debug for #zc_name {
+			fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+				match self.get() {
+					#(#discriminant_values => write!(f, "{}Zc({})", stringify!(#enum_name), stringify!(#variant_names)),)*
+					other => write!(f, "{}Zc(invalid: {})", stringify!(#enum_name), other),
+				}
+			}
+		}
+
+		impl PartialEq for #zc_name {
+			fn eq(&self, other: &Self) -> bool {
+				self.0 == other.0
+			}
+		}
+
+		impl Eq for #zc_name {}
+
+		// SAFETY: #zc_name is #[repr(transparent)] over [u8; #repr_size],
+		// alignment 1, every bit pattern is a valid reference, and
+		// ZcValidate::validate_ref is load-bearing (rejects invalid
+		// discriminants).
+		#[allow(unsafe_code)]
+		unsafe impl #crate_path::ZcElem for #zc_name {}
+	}
+	.into()
+}
+
+/// Parses the `#[repr(uN)]` attribute, returning the integer name (`u8`, `u16`,
+/// `u32`, or `u64`) if present.
+fn parse_enum_repr(attrs: &[syn::Attribute]) -> Option<String> {
+	for attr in attrs {
+		if !attr.path().is_ident("repr") {
+			continue;
+		}
+		let mut result = None;
+		let _ = attr.parse_nested_meta(|meta| {
+			if meta.path.is_ident("u8") {
+				result = Some("u8".to_string());
+			} else if meta.path.is_ident("u16") {
+				result = Some("u16".to_string());
+			} else if meta.path.is_ident("u32") {
+				result = Some("u32".to_string());
+			} else if meta.path.is_ident("u64") {
+				result = Some("u64".to_string());
+			}
+			Ok(())
+		});
+		if result.is_some() {
+			return result;
+		}
+	}
+	None
+}
+
+#[derive(Debug, darling::FromDeriveInput)]
+#[darling(attributes(pina))]
+struct PodEnumArgs {
+	#[darling(default = "default_crate_path", rename = "crate")]
+	crate_path: syn::Path,
+}
