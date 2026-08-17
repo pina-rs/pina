@@ -232,7 +232,7 @@ macro_rules! log {
 /// modules that want validation traits without long import lists.
 ///
 /// <!-- {=pinaMdtManagedDocNote|trim|linePrefix:"/// ":true} -->
-//// This section is synchronized by `mdt` from `api-docs.t.md`.<!-- {/pinaMdtManagedDocNote} -->
+/// This section is synchronized by `mdt` from `api-docs.t.md`.<!-- {/pinaMdtManagedDocNote} -->
 pub mod prelude {
 	#[cfg(feature = "logs")]
 	pub use solana_program_log::Logger;
