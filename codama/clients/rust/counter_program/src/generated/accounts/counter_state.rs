@@ -16,7 +16,7 @@ pub struct CounterState {
 	/// The `#[account]` macro generates:
 	/// - A discriminator field (`CounterAccountType::CounterState`) as the first
 	/// byte.
-	/// - `Pod` + `Zeroable` derives for zero-copy (de)serialization.
+	/// - Zeropod trait impls (`ZcValidate`, `ZcElem`, `ZeroPodFixed`) for validated zero-copy (de)serialization.
 	/// - `HasDiscriminator` linking this struct to
 	/// `CounterAccountType::CounterState`.
 	/// - `TypedBuilder` for ergonomic construction.

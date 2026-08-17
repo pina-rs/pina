@@ -4,7 +4,7 @@
 //! and mutate it across transactions. It covers:
 //!
 //! - **Account structs** with `#[account]` — zero-copy state with automatic
-//!   discriminator fields, `Pod`/`Zeroable` derives, and `TypedBuilder`.
+//!   discriminator fields, zeropod trait impls, and `TypedBuilder`.
 //! - **PDA-based accounts** — the counter is stored at a Program Derived
 //!   Address seeded by the authority's public key, so each user gets their own
 //!   counter.
@@ -75,7 +75,7 @@ pub enum CounterAccountType {
 /// The `#[account]` macro generates:
 /// - A discriminator field (`CounterAccountType::CounterState`) as the first
 ///   byte.
-/// - `Pod` + `Zeroable` derives for zero-copy (de)serialization.
+/// - Zeropod trait impls (`ZcValidate`, `ZcElem`, `ZeroPodFixed`) for validated zero-copy (de)serialization.
 /// - `HasDiscriminator` linking this struct to
 ///   `CounterAccountType::CounterState`.
 /// - `TypedBuilder` for ergonomic construction.
