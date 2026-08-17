@@ -3,3 +3,20 @@ error: unsupported seed type; expected `Address`, `u8`, `u16`, `u32`, `u64`, or 
   |
 4 | #[pda(seeds = [b"test", authority: String], bump = bump)]
   |                                    ^^^^^^
+
+error[E0277]: the trait bound `String: ZcValidate` is not satisfied
+ --> tests/ui/fail/pda_unsupported_seed_type.rs:6:17
+  |
+6 |     pub authority: String,
+  |                    ^^^^^^ the trait `ZcValidate` is not implemented for `String`
+  |
+  = help: the following other types implement trait `ZcValidate`:
+            Address
+            PodBool
+            PodI128
+            PodI16
+            PodI32
+            PodI64
+            PodOption<T, PFX>
+            PodString<N, PFX>
+          and $N others
