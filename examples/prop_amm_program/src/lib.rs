@@ -208,7 +208,7 @@ mod tests {
 			.build();
 		let bytes = instruction.to_bytes();
 		let decoded =
-			UpdateInstruction::try_from_bytes(bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
+			UpdateInstruction::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
 
 		assert_eq!(u64::from(decoded.new_price), 1_234);
 	}
@@ -219,7 +219,7 @@ mod tests {
 			.new_authority([9u8; ADDRESS_BYTES].into())
 			.build();
 		let bytes = instruction.to_bytes();
-		let decoded = RotateAuthorityInstruction::try_from_bytes(bytes)
+		let decoded = RotateAuthorityInstruction::try_from_bytes(&bytes)
 			.unwrap_or_else(|e| panic!("decode: {e:?}"));
 
 		assert_eq!(decoded.new_authority, Address::from([9u8; ADDRESS_BYTES]));

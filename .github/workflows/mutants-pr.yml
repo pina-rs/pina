@@ -44,15 +44,22 @@ jobs:
             exit 0
           fi
 
-          # Build a JSON matrix of changed workspace packages.
+          # Build a JSON matrix of changed packages that belong to the root
+          # workspace. Standalone workspaces such as pina_fuzz must not be sent
+          # to `cargo mutants -p` from the repository root.
           packages=()
-          for manifest in crates/*/Cargo.toml; do
-            dir=$(dirname "$manifest")
-            pkg=$(basename "$dir")
+          workspace_root=$(pwd)
+          while IFS=$'\t' read -r pkg manifest; do
+            dir=${manifest#"$workspace_root/"}
+            dir=$(dirname "$dir")
             if echo "$changed_files" | grep -qE "^${dir}/(Cargo.toml|build.rs|src/|tests/|benches/|examples/)"; then
               packages+=("$pkg")
             fi
-          done
+          done < <(
+            cargo metadata --no-deps --format-version 1 |
+              jq -r --arg root "$workspace_root/crates/" \
+                '.packages[] | select(.manifest_path | startswith($root)) | [.name, .manifest_path] | @tsv'
+          )
 
           if [ ${#packages[@]} -eq 0 ]; then
             echo "any_changed=false" >> "$GITHUB_OUTPUT"

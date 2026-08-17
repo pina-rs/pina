@@ -8,6 +8,8 @@
 //! `#[repr(C)]` account layout.
 
 mod primitives;
+mod serialize;
 
 pub use primitives::*;
+pub use serialize::*;
 pub use zeropod::pod::*;

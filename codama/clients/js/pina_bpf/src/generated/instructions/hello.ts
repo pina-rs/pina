@@ -9,10 +9,19 @@
 import {
 	type AccountMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { PINA_BPF_PROGRAM_ADDRESS } from "../programs";
 
@@ -25,7 +34,39 @@ export function getHelloDiscriminatorBytes(): ReadonlyUint8Array {
 export type HelloInstruction<
 	TProgram extends string = typeof PINA_BPF_PROGRAM_ADDRESS,
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> = Instruction<TProgram> & InstructionWithAccounts<TRemainingAccounts>;
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<TRemainingAccounts>;
+
+export type HelloInstructionData = { discriminator: number };
+
+export type HelloInstructionDataArgs = {};
+
+export function getHelloInstructionDataEncoder(): FixedSizeEncoder<
+	HelloInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 0 }),
+	);
+}
+
+export function getHelloInstructionDataDecoder(): FixedSizeDecoder<
+	HelloInstructionData
+> {
+	return getStructDecoder([["discriminator", getU8Decoder()]]);
+}
+
+export function getHelloInstructionDataCodec(): FixedSizeCodec<
+	HelloInstructionDataArgs,
+	HelloInstructionData
+> {
+	return combineCodec(
+		getHelloInstructionDataEncoder(),
+		getHelloInstructionDataDecoder(),
+	);
+}
 
 export type HelloInput = {};
 
@@ -37,15 +78,23 @@ export function getHelloInstruction<
 	// Program address.
 	const programAddress = config?.programAddress ?? PINA_BPF_PROGRAM_ADDRESS;
 
-	return Object.freeze({ programAddress } as HelloInstruction<TProgramAddress>);
+	return Object.freeze(
+		{
+			data: getHelloInstructionDataEncoder().encode({}),
+			programAddress,
+		} as HelloInstruction<TProgramAddress>,
+	);
 }
 
 export type ParsedHelloInstruction<
 	TProgram extends string = typeof PINA_BPF_PROGRAM_ADDRESS,
-> = { programAddress: Address<TProgram> };
+> = { programAddress: Address<TProgram>; data: HelloInstructionData };
 
 export function parseHelloInstruction<TProgram extends string>(
-	instruction: Instruction<TProgram>,
+	instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
 ): ParsedHelloInstruction<TProgram> {
-	return { programAddress: instruction.programAddress };
+	return {
+		programAddress: instruction.programAddress,
+		data: getHelloInstructionDataDecoder().decode(instruction.data),
+	};
 }

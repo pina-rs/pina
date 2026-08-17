@@ -9,13 +9,22 @@
 import {
 	type AccountMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
+	transformEncoder,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
@@ -37,6 +46,7 @@ export type AllowsDuplicateReadonlyInstruction<
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<
 		[
 			TAccountAccount1 extends string ? ReadonlyAccount<TAccountAccount1>
@@ -46,6 +56,35 @@ export type AllowsDuplicateReadonlyInstruction<
 			...TRemainingAccounts,
 		]
 	>;
+
+export type AllowsDuplicateReadonlyInstructionData = { discriminator: number };
+
+export type AllowsDuplicateReadonlyInstructionDataArgs = {};
+
+export function getAllowsDuplicateReadonlyInstructionDataEncoder(): FixedSizeEncoder<
+	AllowsDuplicateReadonlyInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 2 }),
+	);
+}
+
+export function getAllowsDuplicateReadonlyInstructionDataDecoder(): FixedSizeDecoder<
+	AllowsDuplicateReadonlyInstructionData
+> {
+	return getStructDecoder([["discriminator", getU8Decoder()]]);
+}
+
+export function getAllowsDuplicateReadonlyInstructionDataCodec(): FixedSizeCodec<
+	AllowsDuplicateReadonlyInstructionDataArgs,
+	AllowsDuplicateReadonlyInstructionData
+> {
+	return combineCodec(
+		getAllowsDuplicateReadonlyInstructionDataEncoder(),
+		getAllowsDuplicateReadonlyInstructionDataDecoder(),
+	);
+}
 
 export type AllowsDuplicateReadonlyInput<
 	TAccountAccount1 extends string = string,
@@ -83,19 +122,18 @@ export function getAllowsDuplicateReadonlyInstruction<
 	>;
 
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze(
-		{
-			accounts: [
-				getAccountMeta("account1", accounts.account1),
-				getAccountMeta("account2", accounts.account2),
-			],
-			programAddress,
-		} as AllowsDuplicateReadonlyInstruction<
-			TProgramAddress,
-			TAccountAccount1,
-			TAccountAccount2
-		>,
-	);
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("account1", accounts.account1),
+			getAccountMeta("account2", accounts.account2),
+		],
+		data: getAllowsDuplicateReadonlyInstructionDataEncoder().encode({}),
+		programAddress,
+	} as AllowsDuplicateReadonlyInstruction<
+		TProgramAddress,
+		TAccountAccount1,
+		TAccountAccount2
+	>);
 }
 
 export type ParsedAllowsDuplicateReadonlyInstruction<
@@ -108,13 +146,17 @@ export type ParsedAllowsDuplicateReadonlyInstruction<
 		account1: TAccountMetas[0];
 		account2: TAccountMetas[1];
 	};
+	data: AllowsDuplicateReadonlyInstructionData;
 };
 
 export function parseAllowsDuplicateReadonlyInstruction<
 	TProgram extends string,
 	TAccountMetas extends readonly AccountMeta[],
 >(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedAllowsDuplicateReadonlyInstruction<TProgram, TAccountMetas> {
 	if (instruction.accounts.length < 2) {
 		throw new SolanaError(
@@ -134,5 +176,8 @@ export function parseAllowsDuplicateReadonlyInstruction<
 	return {
 		programAddress: instruction.programAddress,
 		accounts: { account1: getNextAccount(), account2: getNextAccount() },
+		data: getAllowsDuplicateReadonlyInstructionDataDecoder().decode(
+			instruction.data,
+		),
 	};
 }

@@ -52,14 +52,14 @@ const __BALANCEACCOUNT_ALIGNMENT_ASSERTIONS__: () = {
     ::core::assert!(
         ::core::mem::align_of:: < BalanceAccount > () == 1,
         concat!("The alignment of struct `", stringify!(BalanceAccount),
-        "` should be one so it can be used for zero-copy Pod casts.")
+        "` should be one so it can be used for zero-copy casts.")
     );
     ::core::assert!(
         ::core::mem::size_of:: < BalanceAccount > () == (0usize + ::core::mem::size_of::
         < [u8; MyDiscriminator::BYTES] > () + ::core::mem::size_of:: < [u8; 32] > () +
         ::core::mem::size_of:: < PodU64 > () + ::core::mem::size_of:: < u8 > () +
         ::core::mem::size_of:: < PodBool > ()), concat!("`", stringify!(BalanceAccount),
-        "` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed.")
+        "` layout is padded. `#[pina]` discriminator-first zero-copy layouts must be tightly packed.")
     );
 };
 impl BalanceAccount {
@@ -68,15 +68,9 @@ impl BalanceAccount {
     pub fn zeroed(&mut self) {
         unsafe { ::core::ptr::write_bytes(self as *mut Self, 0, 1) }
     }
-    /// Returns the raw byte representation of the struct.
-    #[allow(unsafe_code)]
-    pub fn to_bytes(&self) -> &[u8] {
-        unsafe {
-            ::core::slice::from_raw_parts(
-                self as *const Self as *const u8,
-                ::core::mem::size_of::<Self>(),
-            )
-        }
+    /// Returns a deterministic, fully initialized byte representation.
+    pub fn to_bytes(&self) -> <Self as ::pina::PinaToBytes>::Bytes {
+        <Self as ::pina::PinaToBytes>::to_bytes(self)
     }
     pub fn builder() -> BalanceAccountBuilderType {
         let mut bytes = [0u8; MyDiscriminator::BYTES];
@@ -148,6 +142,58 @@ impl ::pina::AccountValidation for BalanceAccount {
             Err(err) => Err(err),
             Ok(()) => Ok(self),
         }
+    }
+}
+const _: fn() = || {
+    fn assert_zc_elem<T: ::pina::ZcElem>() {}
+    assert_zc_elem::<[u8; MyDiscriminator::BYTES]>();
+    assert_zc_elem::<[u8; 32]>();
+    assert_zc_elem::<PodU64>();
+    assert_zc_elem::<u8>();
+    assert_zc_elem::<PodBool>();
+};
+impl ::pina::PinaSerialize for BalanceAccount {
+    fn write_bytes(&self, output: &mut [u8]) {
+        ::core::assert!(output.len() == ::core::mem::size_of:: < Self > ());
+        output.fill(0);
+        let mut offset = 0usize;
+        let field_size = ::core::mem::size_of::<[u8; MyDiscriminator::BYTES]>();
+        <[u8; MyDiscriminator::BYTES] as ::pina::PinaSerialize>::write_bytes(
+            &self.discriminator,
+            &mut output[offset..offset + field_size],
+        );
+        offset += field_size;
+        let field_size = ::core::mem::size_of::<[u8; 32]>();
+        <[u8; 32] as ::pina::PinaSerialize>::write_bytes(
+            &self.owner,
+            &mut output[offset..offset + field_size],
+        );
+        offset += field_size;
+        let field_size = ::core::mem::size_of::<PodU64>();
+        <PodU64 as ::pina::PinaSerialize>::write_bytes(
+            &self.amount,
+            &mut output[offset..offset + field_size],
+        );
+        offset += field_size;
+        let field_size = ::core::mem::size_of::<u8>();
+        <u8 as ::pina::PinaSerialize>::write_bytes(
+            &self.decimals,
+            &mut output[offset..offset + field_size],
+        );
+        offset += field_size;
+        let field_size = ::core::mem::size_of::<PodBool>();
+        <PodBool as ::pina::PinaSerialize>::write_bytes(
+            &self.is_frozen,
+            &mut output[offset..offset + field_size],
+        );
+        offset += field_size;
+        ::core::debug_assert!(offset == output.len());
+    }
+}
+impl ::pina::PinaToBytes for BalanceAccount {
+    type Bytes = [u8; ::core::mem::size_of::<BalanceAccount>()];
+    fn zeroed_bytes() -> Self::Bytes {
+        [0u8; ::core::mem::size_of::<BalanceAccount>()]
     }
 }
 impl ::pina::ZcValidate for BalanceAccount {

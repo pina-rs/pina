@@ -11,6 +11,22 @@
 			{
 				"kind": "instructionNode",
 				"name": "hello",
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					}
+				],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -33,6 +49,22 @@
 			{
 				"kind": "instructionNode",
 				"name": "helloNoMsg",
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 1
+						}
+					}
+				],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -55,6 +87,22 @@
 			{
 				"kind": "instructionNode",
 				"name": "helloNext",
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 2
+						}
+					}
+				],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -77,6 +125,22 @@
 			{
 				"kind": "instructionNode",
 				"name": "requireEq",
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 3
+						}
+					}
+				],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -99,6 +163,22 @@
 			{
 				"kind": "instructionNode",
 				"name": "requireNeq",
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 4
+						}
+					}
+				],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -121,6 +201,22 @@
 			{
 				"kind": "instructionNode",
 				"name": "requireGt",
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 5
+						}
+					}
+				],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -143,6 +239,22 @@
 			{
 				"kind": "instructionNode",
 				"name": "requireGte",
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 6
+						}
+					}
+				],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",

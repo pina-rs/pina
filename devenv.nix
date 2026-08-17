@@ -117,15 +117,6 @@ in
         entry = "${pkgs.dprint}/bin/dprint fmt --allow-no-files";
         stages = [ "pre-commit" ];
       };
-      "secrets:push" = {
-        enable = true;
-        verbose = true;
-        pass_filenames = false;
-        name = "secrets";
-        description = "Scan repository history for leaked secrets with gitleaks before push.";
-        entry = "${pkgs.gitleaks}/bin/gitleaks detect --verbose --redact";
-        stages = [ "pre-push" ];
-      };
       "lint:test" = {
         enable = true;
         verbose = true;
@@ -207,14 +198,6 @@ in
         exec cargo bin dylint-link "$@"
       '';
       description = "The `dylint-link` executable";
-      binary = "bash";
-    };
-    "kani" = {
-      exec = ''
-        set -euo pipefail
-        cargo bin kani $@
-      '';
-      description = "The `kani` executable";
       binary = "bash";
     };
     "pina" = {
@@ -370,8 +353,12 @@ in
       exec = ''
         set -euo pipefail
         cargo test --all-features --locked
+        cargo check \
+          --manifest-path ${lib.escapeShellArg "${currentDir}/crates/pina_fuzz/fuzz/Cargo.toml"} \
+          --all-targets \
+          --locked
       '';
-      description = "Run all tests across the crates";
+      description = "Run workspace tests and compile the standalone fuzz targets.";
       binary = "bash";
     };
     "test:miri" = {
@@ -456,7 +443,8 @@ in
           -p anchor_system_accounts \
           -p anchor_sysvars \
           -p escrow_program \
-          -p pina_bpf
+          -p pina_bpf \
+          -p profile_program
 
         # Blueshift's upstream-gallery-21 linker is LLVM 21-based.
         # Build the BPF artifact with a Rust toolchain that also uses LLVM 21
@@ -471,6 +459,65 @@ in
 
         PATH="${custom.sbpf-linker-21}/bin:$PATH" \
           cargo +"$BPF_TOOLCHAIN" build-bpf
+
+        if [ -z "''${HOME:-}" ]; then
+          export HOME="$DEVENV_ROOT/.cache/home"
+        fi
+        mkdir -p "$HOME"
+
+        if [ "$(uname -s)" = "Linux" ]; then
+          # The Nix wrapper seeds cargo-build-sbf's cache with its bundled
+          # sysroot before forwarding arguments. Bypass that wrapper so
+          # --force-tools-install can fetch the complete pinned toolchain,
+          # including liballoc. cargo-build-sbf detects NixOS itself; forcing
+          # its Nix patcher on Ubuntu can fail before the program build starts.
+          cargo_build_sbf="$(command -v cargo-build-sbf)"
+          cargo_build_sbf_resolved="$(${pkgs.coreutils}/bin/readlink -f "$cargo_build_sbf")"
+          cargo_build_sbf_real="$(dirname "$cargo_build_sbf_resolved")/.cargo-build-sbf-wrapped"
+          if [ ! -x "$cargo_build_sbf_real" ]; then
+            cargo_build_sbf_real="$cargo_build_sbf"
+          fi
+
+          # A previous wrapper invocation may already have installed its
+          # read-only Nix-store bundle as cargo-build-sbf's cache symlink.
+          # Remove only that exact derived symlink so the forced download can
+          # replace it; refuse to touch any user-managed target.
+          platform_tools_links=(
+            "''${HOME:?}/.cache/solana/v1.54/platform-tools"
+            "''${XDG_CACHE_HOME:-$HOME/.cache}/solana/v1.54/platform-tools"
+          )
+          for platform_tools_link in "''${platform_tools_links[@]}"; do
+            [ -L "$platform_tools_link" ] || continue
+            platform_tools_target="$(readlink "$platform_tools_link")"
+            case "$platform_tools_target" in
+              /nix/store/*/lib/platform-tools) unlink "$platform_tools_link" ;;
+              *)
+                echo "refusing to replace unexpected platform-tools link: $platform_tools_target" >&2
+                exit 1
+                ;;
+            esac
+          done
+
+          "$cargo_build_sbf_real" \
+            --force-tools-install \
+            --install-only \
+            --tools-version v1.54
+          "$cargo_build_sbf_real" \
+            --skip-tools-install \
+            --tools-version v1.54 \
+            --manifest-path examples/escrow_program/Cargo.toml \
+            --sbf-out-dir target/deploy \
+            --features bpf-entrypoint
+          "$cargo_build_sbf_real" \
+            --skip-tools-install \
+            --tools-version v1.54 \
+            --manifest-path examples/profile_program/Cargo.toml \
+            --sbf-out-dir target/deploy \
+            --features bpf-entrypoint
+        else
+          cargo build-escrow-program
+          cargo build-profile-program
+        fi
         cargo test --locked -p pina_bpf bpf_build_ -- --ignored
 
         # Run mollusk-svm e2e tests against the compiled SBF binaries.
@@ -478,19 +525,15 @@ in
         # that the on-chain programs accept and process correctly.
         SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
           cargo test --locked \
+            -p profile_program --test e2e \
             -p role_registry_program --test e2e \
             -p staking_rewards_program --test e2e \
             -p vesting_program --test e2e \
-            -- --nocapture
+            -- --include-ignored --nocapture
 
         # Run LiteSVM e2e tests with the generated TypeScript clients.
         # These verify that TS instruction builders with pina's discriminator
         # model produce transactions the on-chain programs accept.
-        if [ -z "''${HOME:-}" ]; then
-          export HOME="$DEVENV_ROOT/.cache/home"
-        fi
-        mkdir -p "$HOME"
-
         litesvm_dir="$DEVENV_ROOT/codama/tests/litesvm"
         pnpm --dir "$litesvm_dir" install --frozen-lockfile
         (
@@ -575,7 +618,7 @@ in
     "verify:idls" = {
       exec = ''
         set -euo pipefail
-        "${currentDir}/scripts/verify-codama-idls.sh"
+        ${lib.escapeShellArg "${currentDir}/scripts/verify-codama-idls.sh"}
       '';
       description = "Verify Codama generation, fixture drift, validation, and deterministic output.";
       binary = "bash";
@@ -583,7 +626,7 @@ in
     "test:idl" = {
       exec = ''
         set -euo pipefail
-        ${currentDir}/.devenv/profile/bin/verify:idls
+        ${lib.escapeShellArg "${currentDir}/.devenv/profile/bin/verify:idls"}
       '';
       description = "Run full Codama integration and deterministic generation checks.";
       binary = "bash";
@@ -644,10 +687,6 @@ in
         mkdir -p "$DEVENV_ROOT/target/mutants"
         status=0
         cargo mutants --all-features --cargo-arg --locked --output "$DEVENV_ROOT/target/mutants" || status=$?
-        if [ "$status" -eq 2 ] || [ "$status" -eq 3 ]; then
-          echo "cargo-mutants reported missed mutants; keeping CI non-blocking and uploading the report."
-          exit 0
-        fi
         exit "$status"
       '';
       description = "Run mutation testing across all core workspace crates (nightly).";
@@ -768,6 +807,8 @@ in
       exec = ''
         set -euo pipefail
 
+        repo_root=${lib.escapeShellArg currentDir}
+
         # cargo-dylint and its dependencies need openssl at build time; expose
         # the nix openssl through pkg-config so installs work outside the
         # devenv shell too.
@@ -797,17 +838,23 @@ in
         fi
 
         resolve_bin_root() {
-          if [ -d "${currentDir}/.bin" ]; then
-            echo "${currentDir}/.bin"
+          if [ -d "$repo_root/.bin" ]; then
+            echo "$repo_root/.bin"
             return 0
           fi
 
-          while read -r worktree_path; do
-            if [ -d "$worktree_path/.bin" ]; then
-              echo "$worktree_path/.bin"
-              return 0
-            fi
-          done < <(${pkgs.git}/bin/git -C "${currentDir}" worktree list --porcelain | ${pkgs.gawk}/bin/awk '/^worktree / { print $2 }')
+          while IFS= read -r -d "" worktree_field; do
+            case "$worktree_field" in
+              "worktree "*)
+                worktree_path="''${worktree_field#worktree }"
+
+                if [ -d "$worktree_path/.bin" ]; then
+                  echo "$worktree_path/.bin"
+                  return 0
+                fi
+                ;;
+            esac
+          done < <(${pkgs.git}/bin/git -C "$repo_root" worktree list --porcelain -z)
 
           return 1
         }
@@ -823,7 +870,7 @@ in
 
         if [ ! -x "$cargo_dylint_bin" ]; then
           mkdir -p "$cargo_dylint_root"
-          CARGO_TARGET_DIR="${currentDir}/target/cargo-install/cargo-dylint" \
+          CARGO_TARGET_DIR="$repo_root/target/cargo-install/cargo-dylint" \
             cargo install \
               --locked \
               --root "$cargo_dylint_root" \
@@ -836,15 +883,15 @@ in
           exit 1
         fi
 
-        dylint_link_wrapper="${currentDir}/.devenv/profile/bin/dylint-link"
+        dylint_link_wrapper="$repo_root/.devenv/profile/bin/dylint-link"
         if [ ! -x "$dylint_link_wrapper" ]; then
           echo "Missing dylint-link command. Run 'install:cargo:bin'." >&2
           exit 1
         fi
 
         mapfile -t target_manifests < <(
-          find "${currentDir}/examples" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort
-          find "${currentDir}/security" -mindepth 3 -maxdepth 3 -path '*/secure/Cargo.toml' | sort
+          find "$repo_root/examples" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort
+          find "$repo_root/security" -mindepth 3 -maxdepth 3 -path '*/secure/Cargo.toml' | sort
         )
 
         package_args=()
@@ -907,6 +954,9 @@ in
       exec = ''
         set -euo pipefail
 
+        profile_bin=${lib.escapeShellArg "${currentDir}/.devenv/profile/bin"}
+        export PATH="$profile_bin''${PATH:+:$PATH}"
+
         run_step() {
           local name="$1"
           shift
@@ -915,13 +965,13 @@ in
         }
 
         run_step "gitleaks detect" ${pkgs.gitleaks}/bin/gitleaks detect --verbose --redact
-        run_step "lint:clippy" ${currentDir}/.devenv/profile/bin/lint:clippy
-        run_step "lint:format" ${currentDir}/.devenv/profile/bin/lint:format
-        run_step "verify:docs" ${currentDir}/.devenv/profile/bin/verify:docs
-        run_step "security:dylint" ${currentDir}/.devenv/profile/bin/security:dylint
-        run_step "lint:monochange" ${currentDir}/.devenv/profile/bin/lint:monochange
-        run_step "test:all" ${currentDir}/.devenv/profile/bin/test:all
-        run_step "test:idl" ${currentDir}/.devenv/profile/bin/test:idl
+        run_step "lint:clippy" "$profile_bin/lint:clippy"
+        run_step "lint:format" "$profile_bin/lint:format"
+        run_step "verify:docs" "$profile_bin/verify:docs"
+        run_step "security:dylint" "$profile_bin/security:dylint"
+        run_step "lint:monochange" "$profile_bin/lint:monochange"
+        run_step "test:all" "$profile_bin/test:all"
+        run_step "test:idl" "$profile_bin/test:idl"
       '';
       description = "Run the full local CI suite before push, independent of the active shell environment.";
       binary = "bash";
@@ -965,7 +1015,7 @@ in
     "docs:check" = {
       exec = ''
         set -euo pipefail
-        ${custom.mdt}/bin/mdt check --path ${currentDir}
+        ${custom.mdt}/bin/mdt check --path ${lib.escapeShellArg currentDir}
       '';
       description = "Check reusable documentation blocks are synchronized.";
       binary = "bash";
@@ -981,11 +1031,11 @@ in
     "verify:docs" = {
       exec = ''
         set -euo pipefail
-        ${currentDir}/.devenv/profile/bin/docs:check
-        [ -f "${currentDir}/docs/book.toml" ]
-        [ -f "${currentDir}/docs/src/SUMMARY.md" ]
-        ${pkgs.mdbook}/bin/mdbook build "${currentDir}/docs" -d "${currentDir}/target/mdbook"
-        ${currentDir}/.devenv/profile/bin/docs:api
+        ${lib.escapeShellArg "${currentDir}/.devenv/profile/bin/docs:check"}
+        [ -f ${lib.escapeShellArg "${currentDir}/docs/book.toml"} ]
+        [ -f ${lib.escapeShellArg "${currentDir}/docs/src/SUMMARY.md"} ]
+        ${pkgs.mdbook}/bin/mdbook build ${lib.escapeShellArg "${currentDir}/docs"} -d ${lib.escapeShellArg "${currentDir}/target/mdbook"}
+        ${lib.escapeShellArg "${currentDir}/.devenv/profile/bin/docs:api"}
       '';
       description = "Verify docs folder structure, build mdBook, and check API docs.";
       binary = "bash";
@@ -994,7 +1044,7 @@ in
       exec = ''
         set -euo pipefail
 
-        mapfile -t generated_client_manifests < <(find "${currentDir}/codama/clients/rust" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
+        mapfile -t generated_client_manifests < <(find ${lib.escapeShellArg "${currentDir}/codama/clients/rust"} -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
         exclude_args=()
         for manifest in "''${generated_client_manifests[@]}"; do
           package_name="$(sed -n 's/^name = "\(.*\)"$/\1/p' "$manifest" | head -n 1)"
@@ -1024,7 +1074,7 @@ in
         export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
         export PATH="${pkgs.pkg-config}/bin:$PATH"
 
-        mapfile -t generated_client_manifests < <(find "${currentDir}/codama/clients/rust" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
+        mapfile -t generated_client_manifests < <(find ${lib.escapeShellArg "${currentDir}/codama/clients/rust"} -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
         exclude_args=()
         for manifest in "''${generated_client_manifests[@]}"; do
           package_name="$(sed -n 's/^name = "\(.*\)"$/\1/p' "$manifest" | head -n 1)"
@@ -1035,7 +1085,7 @@ in
 
         cargo clippy --workspace --all-features --locked ''${exclude_args[@]}
 
-        mapfile -t lint_manifests < <(find "${currentDir}/lints" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
+        mapfile -t lint_manifests < <(find ${lib.escapeShellArg "${currentDir}/lints"} -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
         for manifest in "''${lint_manifests[@]}"; do
           cargo clippy --manifest-path "$manifest" --all-features --all-targets --locked
         done

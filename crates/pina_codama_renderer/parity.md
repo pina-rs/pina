@@ -2,7 +2,7 @@
 
 <br>
 
-This document tracks which Codama IDL node types the `pina_codama_renderer` supports. The renderer produces fixed-size `#[repr(C)]` structs with `bytemuck::Pod` and `bytemuck::Zeroable` derives, so only node types that map to a known, constant-size layout are supported.
+This document tracks which Codama IDL node types the `pina_codama_renderer` supports. The renderer produces fixed-size `#[repr(C)]` structs that implement zeropod validation and layout traits, so only node types that map to a known, constant-size layout are supported.
 
 ## Supported Type Nodes
 
@@ -96,8 +96,8 @@ This document tracks which Codama IDL node types the `pina_codama_renderer` supp
 | --------------------------------- | ---------------------------------------------------------------------------------- |
 | `StringTypeNode`                  | Variable-length; POD layout requires fixed size                                    |
 | `BytesTypeNode` (unwrapped)       | Must be wrapped in `FixedSizeTypeNode` to have a known size                        |
-| `NumberTypeNode` (f32)            | Floating-point types are not POD-compatible with bytemuck                          |
-| `NumberTypeNode` (f64)            | Floating-point types are not POD-compatible with bytemuck                          |
+| `NumberTypeNode` (f32)            | Floating-point types are not supported by Pina's fixed-layout model                |
+| `NumberTypeNode` (f64)            | Floating-point types are not supported by Pina's fixed-layout model                |
 | `NumberTypeNode` (ShortU16)       | Solana compact-u16 encoding is variable-length                                     |
 | `NumberTypeNode` (big-endian)     | Only little-endian number types are supported                                      |
 | `BooleanTypeNode` (non-u8 size)   | Booleans must be encoded as little-endian u8                                       |
@@ -169,7 +169,7 @@ This document tracks which Codama IDL node types the `pina_codama_renderer` supp
 
 <br>
 
-- **Fixed-size only:** The renderer exclusively produces `#[repr(C)]` structs compatible with `bytemuck::Pod`. Any Codama type that implies a variable-length layout will be rejected with an error.
+- **Fixed-size only:** The renderer exclusively produces validated zeropod-compatible `#[repr(C)]` structs. Any Codama type that implies a variable-length layout will be rejected with an error.
 - **Little-endian only:** All numeric types and boolean sizes must use little-endian byte order, which is the native Solana byte order.
 - **Discriminator required for instructions:** Every `InstructionNode` must have a `ConstantDiscriminatorNode` at offset 0. Account discriminators are optional (omitted if absent).
 - **No enum rendering:** `EnumTypeNode` is not yet supported. Programs with enum-typed fields will fail to render.

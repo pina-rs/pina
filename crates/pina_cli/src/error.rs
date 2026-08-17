@@ -32,6 +32,13 @@ pub enum IdlError {
 
 	#[error("{0}")]
 	Other(String),
+
+	#[error("Unsupported IDL type `{ty}` in {context}: {reason}")]
+	UnsupportedType {
+		ty: String,
+		context: String,
+		reason: String,
+	},
 }
 
 impl IdlError {

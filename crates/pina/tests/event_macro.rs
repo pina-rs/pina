@@ -26,7 +26,7 @@ fn test_event_compiles() {
 fn test_event_bytes() {
 	let event = Initialize::builder().choice(10).build();
 	let bytes = event.to_bytes();
-	let from_bytes = Initialize::try_from_bytes(bytes).unwrap();
+	let from_bytes = Initialize::try_from_bytes(&bytes).unwrap();
 	assert_eq!(event.discriminator, from_bytes.discriminator);
 	assert_eq!(event.choice, from_bytes.choice);
 }

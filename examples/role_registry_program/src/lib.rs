@@ -354,7 +354,7 @@ mod tests {
 			.bump(2)
 			.build();
 		let bytes = ix.to_bytes();
-		let parsed = AddRoleInstruction::try_from_bytes(bytes)
+		let parsed = AddRoleInstruction::try_from_bytes(&bytes)
 			.unwrap_or_else(|e| panic!("decode failed: {e:?}"));
 		assert_eq!(u64::from(parsed.role_id), 7);
 		assert_eq!(u64::from(parsed.permissions), 3);

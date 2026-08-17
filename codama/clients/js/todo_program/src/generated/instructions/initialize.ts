@@ -31,6 +31,7 @@ import {
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
@@ -73,28 +74,35 @@ export type InitializeInstruction<
 	>;
 
 export type InitializeInstructionData = {
+	discriminator: number;
 	bump: number;
 	digest: ReadonlyUint8Array;
 };
 
-export type InitializeInstructionDataArgs = InitializeInstructionData;
+export type InitializeInstructionDataArgs = {
+	bump: number;
+	digest: ReadonlyUint8Array;
+};
 
 export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
 	InitializeInstructionDataArgs
 > {
-	return getStructEncoder([["bump", getU8Encoder()], [
-		"digest",
-		fixEncoderSize(getBytesEncoder(), 32),
-	]]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"bump",
+			getU8Encoder(),
+		], ["digest", fixEncoderSize(getBytesEncoder(), 32)]]),
+		(value) => ({ ...value, discriminator: 0 }),
+	);
 }
 
 export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
 	InitializeInstructionData
 > {
-	return getStructDecoder([["bump", getU8Decoder()], [
-		"digest",
-		fixDecoderSize(getBytesDecoder(), 32),
-	]]);
+	return getStructDecoder([["discriminator", getU8Decoder()], [
+		"bump",
+		getU8Decoder(),
+	], ["digest", fixDecoderSize(getBytesDecoder(), 32)]]);
 }
 
 export function getInitializeInstructionDataCodec(): FixedSizeCodec<

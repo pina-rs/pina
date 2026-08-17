@@ -27,23 +27,17 @@ const __INITIALIZE_ALIGNMENT_ASSERTIONS__: () = {
     ::core::assert!(
         ::core::mem::align_of:: < Initialize > () == 1,
         concat!("The alignment of struct `", stringify!(Initialize),
-        "` should be one so it can be used for zero-copy Pod casts.")
+        "` should be one so it can be used for zero-copy casts.")
     );
     ::core::assert!(
         ::core::mem::size_of:: < Initialize > () == (0usize + ::core::mem::size_of:: <
         [u8; MyInstruction::BYTES] > ()), concat!("`", stringify!(Initialize),
-        "` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed.")
+        "` layout is padded. `#[pina]` discriminator-first zero-copy layouts must be tightly packed.")
     );
 };
 impl Initialize {
-    #[allow(unsafe_code)]
-    pub fn to_bytes(&self) -> &[u8] {
-        unsafe {
-            ::core::slice::from_raw_parts(
-                self as *const Self as *const u8,
-                ::core::mem::size_of::<Self>(),
-            )
-        }
+    pub fn to_bytes(&self) -> <Self as ::pina::PinaToBytes>::Bytes {
+        <Self as ::pina::PinaToBytes>::to_bytes(self)
     }
     pub fn try_from_bytes(data: &[u8]) -> Result<&Self, ::pina::ProgramError> {
         if data.len() != ::core::mem::size_of::<Self>() {
@@ -61,6 +55,30 @@ impl Initialize {
 impl ::pina::HasDiscriminator for Initialize {
     type Type = MyInstruction;
     const VALUE: Self::Type = MyInstruction::Initialize;
+}
+const _: fn() = || {
+    fn assert_zc_elem<T: ::pina::ZcElem>() {}
+    assert_zc_elem::<[u8; MyInstruction::BYTES]>();
+};
+impl ::pina::PinaSerialize for Initialize {
+    fn write_bytes(&self, output: &mut [u8]) {
+        ::core::assert!(output.len() == ::core::mem::size_of:: < Self > ());
+        output.fill(0);
+        let mut offset = 0usize;
+        let field_size = ::core::mem::size_of::<[u8; MyInstruction::BYTES]>();
+        <[u8; MyInstruction::BYTES] as ::pina::PinaSerialize>::write_bytes(
+            &self.discriminator,
+            &mut output[offset..offset + field_size],
+        );
+        offset += field_size;
+        ::core::debug_assert!(offset == output.len());
+    }
+}
+impl ::pina::PinaToBytes for Initialize {
+    type Bytes = [u8; ::core::mem::size_of::<Initialize>()];
+    fn zeroed_bytes() -> Self::Bytes {
+        [0u8; ::core::mem::size_of::<Initialize>()]
+    }
 }
 impl ::pina::ZcValidate for Initialize {
     fn validate_ref(value: &Self) -> Result<(), ::pina::ZeroPodError> {

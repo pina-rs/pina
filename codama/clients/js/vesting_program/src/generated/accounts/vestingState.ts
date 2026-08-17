@@ -34,6 +34,7 @@ import {
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { findVestingPda, VestingSeeds } from "../pdas";
 
@@ -44,6 +45,7 @@ export function getVestingStateDiscriminatorBytes(): ReadonlyUint8Array {
 }
 
 export type VestingState = {
+	discriminator: number;
 	admin: Address;
 	beneficiary: Address;
 	mint: Address;
@@ -71,23 +73,28 @@ export type VestingStateArgs = {
 
 /** Gets the encoder for {@link VestingStateArgs} account data. */
 export function getVestingStateEncoder(): FixedSizeEncoder<VestingStateArgs> {
-	return getStructEncoder([
-		["admin", getAddressEncoder()],
-		["beneficiary", getAddressEncoder()],
-		["mint", getAddressEncoder()],
-		["totalAmount", getU64Encoder()],
-		["claimedAmount", getU64Encoder()],
-		["startTs", getU64Encoder()],
-		["cliffTs", getU64Encoder()],
-		["endTs", getU64Encoder()],
-		["cancelled", getBooleanEncoder()],
-		["bump", getU8Encoder()],
-	]);
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["admin", getAddressEncoder()],
+			["beneficiary", getAddressEncoder()],
+			["mint", getAddressEncoder()],
+			["totalAmount", getU64Encoder()],
+			["claimedAmount", getU64Encoder()],
+			["startTs", getU64Encoder()],
+			["cliffTs", getU64Encoder()],
+			["endTs", getU64Encoder()],
+			["cancelled", getBooleanEncoder()],
+			["bump", getU8Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link VestingState} account data. */
 export function getVestingStateDecoder(): FixedSizeDecoder<VestingState> {
 	return getStructDecoder([
+		["discriminator", getU8Decoder()],
 		["admin", getAddressDecoder()],
 		["beneficiary", getAddressDecoder()],
 		["mint", getAddressDecoder()],

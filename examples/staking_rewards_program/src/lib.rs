@@ -571,7 +571,7 @@ mod tests {
 			.amount(PodU64::from(50))
 			.build();
 		let bytes = ix.to_bytes();
-		let parsed = DepositInstruction::try_from_bytes(bytes)
+		let parsed = DepositInstruction::try_from_bytes(&bytes)
 			.unwrap_or_else(|e| panic!("decode failed: {e:?}"));
 		assert_eq!(u64::from(parsed.amount), 50);
 	}

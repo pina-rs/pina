@@ -9,7 +9,7 @@ impl<'a> ::pina::ParseAccounts<'a> for TransferAccounts<'a> {
         let authority = cursor.next()?;
         let source = cursor.next()?;
         let destination = cursor.next()?;
-        let extra = cursor.remaining_mut()?;
+        let extra = cursor.take_remaining();
         Ok(Self {
             authority,
             source,

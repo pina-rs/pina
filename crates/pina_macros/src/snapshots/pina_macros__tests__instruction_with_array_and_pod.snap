@@ -53,7 +53,7 @@ const __COMPLEXINSTRUCTION_ALIGNMENT_ASSERTIONS__: () = {
     ::core::assert!(
         ::core::mem::align_of:: < ComplexInstruction > () == 1,
         concat!("The alignment of struct `", stringify!(ComplexInstruction),
-        "` should be one so it can be used for zero-copy Pod casts.")
+        "` should be one so it can be used for zero-copy casts.")
     );
     ::core::assert!(
         ::core::mem::size_of:: < ComplexInstruction > () == (0usize +
@@ -61,18 +61,12 @@ const __COMPLEXINSTRUCTION_ALIGNMENT_ASSERTIONS__: () = {
         < [u8; 32] > () + ::core::mem::size_of:: < PodU64 > () + ::core::mem::size_of:: <
         u8 > () + ::core::mem::size_of:: < [u8; 4] > ()), concat!("`",
         stringify!(ComplexInstruction),
-        "` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed.")
+        "` layout is padded. `#[pina]` discriminator-first zero-copy layouts must be tightly packed.")
     );
 };
 impl ComplexInstruction {
-    #[allow(unsafe_code)]
-    pub fn to_bytes(&self) -> &[u8] {
-        unsafe {
-            ::core::slice::from_raw_parts(
-                self as *const Self as *const u8,
-                ::core::mem::size_of::<Self>(),
-            )
-        }
+    pub fn to_bytes(&self) -> <Self as ::pina::PinaToBytes>::Bytes {
+        <Self as ::pina::PinaToBytes>::to_bytes(self)
     }
     pub fn try_from_bytes(data: &[u8]) -> Result<&Self, ::pina::ProgramError> {
         if data.len() != ::core::mem::size_of::<Self>() {
@@ -90,6 +84,58 @@ impl ComplexInstruction {
 impl ::pina::HasDiscriminator for ComplexInstruction {
     type Type = MyInstruction;
     const VALUE: Self::Type = MyInstruction::ComplexInstruction;
+}
+const _: fn() = || {
+    fn assert_zc_elem<T: ::pina::ZcElem>() {}
+    assert_zc_elem::<[u8; MyInstruction::BYTES]>();
+    assert_zc_elem::<[u8; 32]>();
+    assert_zc_elem::<PodU64>();
+    assert_zc_elem::<u8>();
+    assert_zc_elem::<[u8; 4]>();
+};
+impl ::pina::PinaSerialize for ComplexInstruction {
+    fn write_bytes(&self, output: &mut [u8]) {
+        ::core::assert!(output.len() == ::core::mem::size_of:: < Self > ());
+        output.fill(0);
+        let mut offset = 0usize;
+        let field_size = ::core::mem::size_of::<[u8; MyInstruction::BYTES]>();
+        <[u8; MyInstruction::BYTES] as ::pina::PinaSerialize>::write_bytes(
+            &self.discriminator,
+            &mut output[offset..offset + field_size],
+        );
+        offset += field_size;
+        let field_size = ::core::mem::size_of::<[u8; 32]>();
+        <[u8; 32] as ::pina::PinaSerialize>::write_bytes(
+            &self.seed,
+            &mut output[offset..offset + field_size],
+        );
+        offset += field_size;
+        let field_size = ::core::mem::size_of::<PodU64>();
+        <PodU64 as ::pina::PinaSerialize>::write_bytes(
+            &self.amount,
+            &mut output[offset..offset + field_size],
+        );
+        offset += field_size;
+        let field_size = ::core::mem::size_of::<u8>();
+        <u8 as ::pina::PinaSerialize>::write_bytes(
+            &self.bump,
+            &mut output[offset..offset + field_size],
+        );
+        offset += field_size;
+        let field_size = ::core::mem::size_of::<[u8; 4]>();
+        <[u8; 4] as ::pina::PinaSerialize>::write_bytes(
+            &self.flags,
+            &mut output[offset..offset + field_size],
+        );
+        offset += field_size;
+        ::core::debug_assert!(offset == output.len());
+    }
+}
+impl ::pina::PinaToBytes for ComplexInstruction {
+    type Bytes = [u8; ::core::mem::size_of::<ComplexInstruction>()];
+    fn zeroed_bytes() -> Self::Bytes {
+        [0u8; ::core::mem::size_of::<ComplexInstruction>()]
+    }
 }
 impl ::pina::ZcValidate for ComplexInstruction {
     fn validate_ref(value: &Self) -> Result<(), ::pina::ZeroPodError> {

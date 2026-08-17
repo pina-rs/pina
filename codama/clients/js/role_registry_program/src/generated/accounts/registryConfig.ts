@@ -32,6 +32,7 @@ import {
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { findRegistryConfigPda, RegistryConfigSeeds } from "../pdas";
 
@@ -42,6 +43,7 @@ export function getRegistryConfigDiscriminatorBytes(): ReadonlyUint8Array {
 }
 
 export type RegistryConfig = {
+	discriminator: number;
 	admin: Address;
 	roleCount: bigint;
 	bump: number;
@@ -57,18 +59,25 @@ export type RegistryConfigArgs = {
 export function getRegistryConfigEncoder(): FixedSizeEncoder<
 	RegistryConfigArgs
 > {
-	return getStructEncoder([["admin", getAddressEncoder()], [
-		"roleCount",
-		getU64Encoder(),
-	], ["bump", getU8Encoder()]]);
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["admin", getAddressEncoder()],
+			["roleCount", getU64Encoder()],
+			["bump", getU8Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link RegistryConfig} account data. */
 export function getRegistryConfigDecoder(): FixedSizeDecoder<RegistryConfig> {
-	return getStructDecoder([["admin", getAddressDecoder()], [
-		"roleCount",
-		getU64Decoder(),
-	], ["bump", getU8Decoder()]]);
+	return getStructDecoder([
+		["discriminator", getU8Decoder()],
+		["admin", getAddressDecoder()],
+		["roleCount", getU64Decoder()],
+		["bump", getU8Decoder()],
+	]);
 }
 
 /** Gets the codec for {@link RegistryConfig} account data. */

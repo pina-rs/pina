@@ -5,52 +5,29 @@
 //! for real instruction enums from the workspace example programs.
 
 #![allow(clippy::all)]
+#![no_main]
 
 use counter_program::CounterInstruction;
 use libfuzzer_sys::fuzz_target;
 use pina::Address;
+use pina::ProgramError;
 use pina::parse_instruction;
 use role_registry_program::RegistryInstruction;
 
-/// Fuzz `parse_instruction::<CounterInstruction>` — a `u8` discriminator
-/// enum with variants `Initialize = 0` and `Increment = 1`.
-///
-/// `parse_instruction` first checks that `program_id == api_id`, then
-/// decodes the discriminator from the data slice. We supply matching
-/// IDs so the discriminator path is reached, and also exercise the
-/// mismatch case by flipping a byte in the program ID.
+// Use fixed, distinct IDs so every input exercises both the discriminator and
+// incorrect-program-ID paths, including empty input and a leading 0xff byte.
 fuzz_target!(|data: &[u8]| {
 	let program_id = Address::default();
-	let api_id = Address::default();
+	let other_id = Address::new_from_array([1u8; 32]);
 
-	// Matching IDs — discriminator decode branch
-	let _ = parse_instruction::<CounterInstruction>(&program_id, &api_id, data);
-
-	// Mismatching IDs — should always return IncorrectProgramId
-	let other_id = {
-		let mut bytes = [0u8; 32];
-		if !data.is_empty() {
-			bytes[0] = data[0].wrapping_add(1);
-		}
-		Address::new_from_array(bytes)
-	};
-	let _ = parse_instruction::<CounterInstruction>(&program_id, &other_id, data);
-});
-
-/// Fuzz `parse_instruction::<RegistryInstruction>` — a `u8` discriminator
-/// enum with 5 variants (`Initialize = 0` through `RotateAdmin = 4`).
-fuzz_target!(|data: &[u8]| {
-	let program_id = Address::default();
-	let api_id = Address::default();
-
-	let _ = parse_instruction::<RegistryInstruction>(&program_id, &api_id, data);
-
-	let other_id = {
-		let mut bytes = [0u8; 32];
-		if !data.is_empty() {
-			bytes[0] = data[0].wrapping_add(1);
-		}
-		Address::new_from_array(bytes)
-	};
-	let _ = parse_instruction::<RegistryInstruction>(&program_id, &other_id, data);
+	let _ = parse_instruction::<CounterInstruction>(&program_id, &program_id, data);
+	let _ = parse_instruction::<RegistryInstruction>(&program_id, &program_id, data);
+	assert!(matches!(
+		parse_instruction::<CounterInstruction>(&program_id, &other_id, data),
+		Err(ProgramError::IncorrectProgramId)
+	));
+	assert!(matches!(
+		parse_instruction::<RegistryInstruction>(&program_id, &other_id, data),
+		Err(ProgramError::IncorrectProgramId)
+	));
 });

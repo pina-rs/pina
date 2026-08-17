@@ -17,6 +17,48 @@ pub struct RegistryConfig {
 	pub bump: u8,
 }
 
+impl pina::PinaSerialize for RegistryConfig {
+	fn write_bytes(&self, output: &mut [u8]) {
+		assert_eq!(output.len(), core::mem::size_of::<Self>());
+		output.fill(0);
+		let mut offset = 0usize;
+		let field_size = core::mem::size_of::<u8>();
+		pina::PinaSerialize::write_bytes(
+			&self.discriminator,
+			&mut output[offset..offset + field_size],
+		);
+		offset += field_size;
+		let field_size = core::mem::size_of::<solana_pubkey::Pubkey>();
+		pina::PinaSerialize::write_bytes(&self.admin, &mut output[offset..offset + field_size]);
+		offset += field_size;
+		let field_size = core::mem::size_of::<pina::PodU64>();
+		pina::PinaSerialize::write_bytes(
+			&self.role_count,
+			&mut output[offset..offset + field_size],
+		);
+		offset += field_size;
+		let field_size = core::mem::size_of::<u8>();
+		pina::PinaSerialize::write_bytes(&self.bump, &mut output[offset..offset + field_size]);
+		offset += field_size;
+		debug_assert_eq!(offset, output.len());
+	}
+}
+
+impl pina::ZcValidate for RegistryConfig {
+	fn validate_ref(value: &Self) -> Result<(), pina::ZeroPodError> {
+		<u8 as pina::ZcValidate>::validate_ref(&value.discriminator)?;
+		<solana_pubkey::Pubkey as pina::ZcValidate>::validate_ref(&value.admin)?;
+		<pina::PodU64 as pina::ZcValidate>::validate_ref(&value.role_count)?;
+		<u8 as pina::ZcValidate>::validate_ref(&value.bump)?;
+		Ok(())
+	}
+}
+
+// SAFETY: all rendered fields are align-1, padding-free ZcElem values;
+// validate_ref recursively validates every field before safe access.
+#[allow(unsafe_code)]
+unsafe impl pina::ZcElem for RegistryConfig {}
+
 pub const REGISTRY_CONFIG_DISCRIMINATOR: u8 = 1u8;
 
 impl RegistryConfig {
@@ -32,11 +74,8 @@ impl RegistryConfig {
 	}
 
 	pub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {
-		if data.len() != core::mem::size_of::<Self>() {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let account = unsafe { &*(data.as_ptr() as *const Self) };
+		let account = pina::pod_from_bytes::<Self>(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != REGISTRY_CONFIG_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
@@ -46,11 +85,8 @@ impl RegistryConfig {
 	pub fn from_bytes_mut(
 		data: &mut [u8],
 	) -> Result<&mut Self, solana_program_error::ProgramError> {
-		if data.len() != core::mem::size_of::<Self>() {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let account = unsafe { &mut *(data.as_mut_ptr() as *mut Self) };
+		let account = pina::pod_from_bytes_mut::<Self>(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != REGISTRY_CONFIG_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
@@ -62,7 +98,10 @@ impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for RegistryConfig {
 	type Error = solana_program_error::ProgramError;
 
 	fn try_from(account_info: &solana_account_info::AccountInfo<'a>) -> Result<Self, Self::Error> {
-		let data_ref = (*account_info.data).borrow();
+		if account_info.owner != &crate::ROLE_REGISTRY_PROGRAM_ID {
+			return Err(solana_program_error::ProgramError::IncorrectProgramId);
+		}
+		let data_ref = account_info.try_borrow_data()?;
 		let account = Self::from_bytes(&data_ref)?;
 		Ok(*account)
 	}

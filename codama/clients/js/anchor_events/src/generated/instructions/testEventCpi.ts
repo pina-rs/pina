@@ -9,10 +9,19 @@
 import {
 	type AccountMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { ANCHOR_EVENTS_PROGRAM_ADDRESS } from "../programs";
 
@@ -25,7 +34,39 @@ export function getTestEventCpiDiscriminatorBytes(): ReadonlyUint8Array {
 export type TestEventCpiInstruction<
 	TProgram extends string = typeof ANCHOR_EVENTS_PROGRAM_ADDRESS,
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> = Instruction<TProgram> & InstructionWithAccounts<TRemainingAccounts>;
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<TRemainingAccounts>;
+
+export type TestEventCpiInstructionData = { discriminator: number };
+
+export type TestEventCpiInstructionDataArgs = {};
+
+export function getTestEventCpiInstructionDataEncoder(): FixedSizeEncoder<
+	TestEventCpiInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 2 }),
+	);
+}
+
+export function getTestEventCpiInstructionDataDecoder(): FixedSizeDecoder<
+	TestEventCpiInstructionData
+> {
+	return getStructDecoder([["discriminator", getU8Decoder()]]);
+}
+
+export function getTestEventCpiInstructionDataCodec(): FixedSizeCodec<
+	TestEventCpiInstructionDataArgs,
+	TestEventCpiInstructionData
+> {
+	return combineCodec(
+		getTestEventCpiInstructionDataEncoder(),
+		getTestEventCpiInstructionDataDecoder(),
+	);
+}
 
 export type TestEventCpiInput = {};
 
@@ -39,16 +80,22 @@ export function getTestEventCpiInstruction<
 		ANCHOR_EVENTS_PROGRAM_ADDRESS;
 
 	return Object.freeze(
-		{ programAddress } as TestEventCpiInstruction<TProgramAddress>,
+		{
+			data: getTestEventCpiInstructionDataEncoder().encode({}),
+			programAddress,
+		} as TestEventCpiInstruction<TProgramAddress>,
 	);
 }
 
 export type ParsedTestEventCpiInstruction<
 	TProgram extends string = typeof ANCHOR_EVENTS_PROGRAM_ADDRESS,
-> = { programAddress: Address<TProgram> };
+> = { programAddress: Address<TProgram>; data: TestEventCpiInstructionData };
 
 export function parseTestEventCpiInstruction<TProgram extends string>(
-	instruction: Instruction<TProgram>,
+	instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
 ): ParsedTestEventCpiInstruction<TProgram> {
-	return { programAddress: instruction.programAddress };
+	return {
+		programAddress: instruction.programAddress,
+		data: getTestEventCpiInstructionDataDecoder().decode(instruction.data),
+	};
 }

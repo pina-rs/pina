@@ -266,10 +266,10 @@ fn benchmark_account_try_from_bytes() {
 		.count(PodU64::from(999))
 		.authority([7u8; 32].into())
 		.build();
-	let bytes: &[u8] = state.to_bytes();
+	let bytes = state.to_bytes();
 
 	bench("PinaAccount try_from_bytes (TestState)", || {
-		let _ = black_box(TestState::try_from_bytes(black_box(bytes)));
+		let _ = black_box(TestState::try_from_bytes(black_box(&bytes)));
 	});
 }
 

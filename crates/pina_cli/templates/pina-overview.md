@@ -56,13 +56,13 @@ All types are `#[repr(transparent)]` over byte arrays (or `u8` for `PodBool`) an
 | `PodString<N, PFX=1>`      | Fixed-capacity string  | `PFX`-byte length prefix + `N` data bytes |
 | `PodVec<T: Pod, N, PFX=2>` | Fixed-capacity vec     | `PFX`-byte length prefix + `N` elements   |
 
-All collection types are `#[repr(C)]`, alignment-1, and implement `bytemuck::Pod` + `bytemuck::Zeroable`. Length prefixes (`PFX`) default to 1 byte for strings (max 255) and 2 bytes for vectors (max 65 535 elements).
+All collection types are `#[repr(C)]`, use fully initialized backing storage, and implement `bytemuck::Zeroable`. `PodString` is alignment-1 and padding-free, so it also implements `bytemuck::Pod`. `PodVec<T, N, PFX>` implements `Pod` when `T: PodVecElement`; Pina's primitive wrappers implement that alignment-1 marker. Other generic `PodOption` and `PodVec` layouts may contain padding when `T` has alignment greater than 1, so they deliberately do not implement `Pod`. Length prefixes (`PFX`) default to 1 byte for strings (max 255) and 2 bytes for vectors (max 65 535 elements).
 
 <!-- {/podCollectionTypesTable} -->
 
 <!-- {@podCollectionDescription} -->
 
-Collection types store data inline with a length prefix, enabling zero-copy access inside `#[repr(C)]` account structs. Overflow is detected at insertion time — `try_set` / `try_push` return `Err(PodCollectionError::Overflow)` when capacity is exceeded.
+Collection types store data inline without allocation. `PodString` and `PodVec<T, N, PFX>` where `T: PodVecElement` support whole-value bytemuck casts and embedding in account structs that derive `Pod`; use the allocation-free APIs on other `PodOption` and `PodVec` layouts instead. Overflow is detected at insertion time — `try_set` / `try_push` return `Err(PodCollectionError::Overflow)` when capacity is exceeded.
 
 `PodString` provides UTF-8 validation via `try_as_str()`, while `PodVec` offers slice-based access via `as_slice()` / `as_mut_slice()`. `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`.
 

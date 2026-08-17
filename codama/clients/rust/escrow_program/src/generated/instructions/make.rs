@@ -19,6 +19,7 @@ pub struct Make {
 	pub maker_ata_a: solana_pubkey::Pubkey,
 	pub escrow: solana_pubkey::Pubkey,
 	pub vault: solana_pubkey::Pubkey,
+	pub associated_token_program: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
 	pub token_program: solana_pubkey::Pubkey,
 }
@@ -40,6 +41,9 @@ impl Make {
 			maker_ata_a,
 			escrow,
 			vault,
+			associated_token_program: solana_pubkey::pubkey!(
+				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+			),
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 			token_program,
 		}
@@ -55,10 +59,8 @@ impl Make {
 		data: MakeInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.maker, true,
-		));
+		let mut accounts = Vec::with_capacity(9 + remaining_accounts.len());
+		accounts.push(solana_instruction::AccountMeta::new(self.maker, true));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.mint_a,
 			false,
@@ -67,12 +69,16 @@ impl Make {
 			self.mint_b,
 			false,
 		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
+		accounts.push(solana_instruction::AccountMeta::new(
 			self.maker_ata_a,
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.escrow, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.vault, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.associated_token_program,
+			false,
+		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.system_program,
 			false,
@@ -82,19 +88,13 @@ impl Make {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
+		let mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];
+		pina::PinaSerialize::write_bytes(&data, &mut instruction_data);
 
 		solana_instruction::Instruction {
 			program_id: crate::ESCROW_PROGRAM_ID,
 			accounts,
-			data,
+			data: instruction_data,
 		}
 	}
 }
@@ -123,5 +123,32 @@ impl MakeInstructionData {
 			amount_b,
 			bump,
 		}
+	}
+}
+
+impl pina::PinaSerialize for MakeInstructionData {
+	fn write_bytes(&self, output: &mut [u8]) {
+		assert_eq!(output.len(), core::mem::size_of::<Self>());
+		output.fill(0);
+		let mut offset = 0usize;
+		let field_size = core::mem::size_of::<u8>();
+		pina::PinaSerialize::write_bytes(
+			&self.discriminator,
+			&mut output[offset..offset + field_size],
+		);
+		offset += field_size;
+		let field_size = core::mem::size_of::<pina::PodU64>();
+		pina::PinaSerialize::write_bytes(&self.seed, &mut output[offset..offset + field_size]);
+		offset += field_size;
+		let field_size = core::mem::size_of::<pina::PodU64>();
+		pina::PinaSerialize::write_bytes(&self.amount_a, &mut output[offset..offset + field_size]);
+		offset += field_size;
+		let field_size = core::mem::size_of::<pina::PodU64>();
+		pina::PinaSerialize::write_bytes(&self.amount_b, &mut output[offset..offset + field_size]);
+		offset += field_size;
+		let field_size = core::mem::size_of::<u8>();
+		pina::PinaSerialize::write_bytes(&self.bump, &mut output[offset..offset + field_size]);
+		offset += field_size;
+		debug_assert_eq!(offset, output.len());
 	}
 }

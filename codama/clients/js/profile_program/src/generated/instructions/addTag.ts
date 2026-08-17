@@ -18,6 +18,7 @@ import {
 	getStructEncoder,
 	getU64Decoder,
 	getU64Encoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
@@ -27,6 +28,7 @@ import {
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
@@ -63,20 +65,29 @@ export type AddTagInstruction<
 		]
 	>;
 
-export type AddTagInstructionData = { tag: bigint };
+export type AddTagInstructionData = { discriminator: number; tag: bigint };
 
 export type AddTagInstructionDataArgs = { tag: number | bigint };
 
 export function getAddTagInstructionDataEncoder(): FixedSizeEncoder<
 	AddTagInstructionDataArgs
 > {
-	return getStructEncoder([["tag", getU64Encoder()]]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"tag",
+			getU64Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 2 }),
+	);
 }
 
 export function getAddTagInstructionDataDecoder(): FixedSizeDecoder<
 	AddTagInstructionData
 > {
-	return getStructDecoder([["tag", getU64Decoder()]]);
+	return getStructDecoder([["discriminator", getU8Decoder()], [
+		"tag",
+		getU64Decoder(),
+	]]);
 }
 
 export function getAddTagInstructionDataCodec(): FixedSizeCodec<

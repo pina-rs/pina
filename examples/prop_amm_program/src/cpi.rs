@@ -121,7 +121,7 @@ pub fn initialize<'a>(ctx: &CpiContext<'a, accounts::Initialize<'a>, 3>) -> Prog
 	program_account.assert_address(&ID)?;
 
 	let data = InitializeInstruction::builder().build();
-	ctx.invoke(data.to_bytes(), &[])
+	ctx.invoke(&data.to_bytes(), &[])
 }
 
 #[inline(always)]
@@ -133,7 +133,7 @@ pub fn update<'a>(
 	program_account.assert_address(&ID)?;
 
 	let data = UpdateInstruction::builder().new_price(new_price).build();
-	ctx.invoke(data.to_bytes(), &[])
+	ctx.invoke(&data.to_bytes(), &[])
 }
 
 #[inline(always)]
@@ -147,7 +147,7 @@ pub fn rotate_authority<'a>(
 	let data = RotateAuthorityInstruction::builder()
 		.new_authority(new_authority)
 		.build();
-	ctx.invoke(data.to_bytes(), &[])
+	ctx.invoke(&data.to_bytes(), &[])
 }
 
 #[inline(always)]
@@ -178,7 +178,8 @@ mod tests {
 		let data = UpdateInstruction::builder()
 			.new_price(PodU64::from(99))
 			.build();
-		let decoded = UpdateInstruction::try_from_bytes(data.to_bytes())
+		let bytes = data.to_bytes();
+		let decoded = UpdateInstruction::try_from_bytes(&bytes)
 			.unwrap_or_else(|e| panic!("decode update cpi bytes: {e:?}"));
 
 		assert_eq!(u64::from(decoded.new_price), 99);
@@ -190,7 +191,8 @@ mod tests {
 		let data = RotateAuthorityInstruction::builder()
 			.new_authority(next_authority)
 			.build();
-		let decoded = RotateAuthorityInstruction::try_from_bytes(data.to_bytes())
+		let bytes = data.to_bytes();
+		let decoded = RotateAuthorityInstruction::try_from_bytes(&bytes)
 			.unwrap_or_else(|e| panic!("decode rotate cpi bytes: {e:?}"));
 
 		assert_eq!(decoded.new_authority, next_authority);

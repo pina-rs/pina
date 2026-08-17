@@ -119,7 +119,7 @@ await codama.accept(renderJsVisitor("./clients/js/my_program"));
 
 <br>
 
-This repository includes `crates/pina_codama_renderer`, which renders discriminator-first/bytemuck Rust client models from Codama JSON.
+This repository includes `crates/pina_codama_renderer`, which renders discriminator-first, zeropod-validated Rust client models from Codama JSON.
 
 ```bash
 cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \

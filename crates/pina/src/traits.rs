@@ -444,25 +444,25 @@ pub type LoadedAccountMut<'a, T> = RefMut<'a, T>;
 /// # Guard lifetime
 ///
 /// `as_account` returns a [`Ref<'_, T>`] that borrows the underlying
-/// `AccountView` data. The guard must remain alive for the entire scope where
-/// the typed data is read. Dropping the guard early and then accessing the
-/// data through a different path can cause a runtime panic (double borrow).
+/// `AccountView` data. Keep the guard alive while reading the typed data.
+/// While it is alive, an incompatible mutable borrow through another view of
+/// the same account returns `ProgramError::AccountBorrowFailed`.
 ///
-/// When branching over an account, bind the guard in a single let-binding
-/// rather than creating and dropping it across match arms:
+/// Drop the guard before requesting mutable access to the same account or
+/// making a CPI that may access it. If only a copied field is needed, a short
+/// scope makes the release point explicit:
 ///
 /// ```ignore
-/// // ✅ Correct — guard held across the full use site
-/// let state = account.as_account::<EscrowState>(&program_id)?;
-/// match state.field {
+/// let status = {
+///     let state = account.as_account::<EscrowState>(&program_id)?;
+///     state.status
+/// };
+///
+/// // The immutable guard has been released, so mutable access can succeed.
+/// let mut state = account.as_account_mut::<EscrowState>(&program_id)?;
+/// match status {
 ///     Status::Open => { /* ... */ }
 ///     Status::Closed => { /* ... */ }
-/// }
-///
-/// // ❌ Wrong — guard dropped at end of each arm, reborrow fails
-/// match account.as_account::<EscrowState>(&program_id)?.field {
-///     // The temporary `Ref` is dropped after `.field` is read;
-///     // subsequent mutable access to the same account will panic.
 /// }
 /// ```
 pub trait AsAccount {
@@ -629,21 +629,16 @@ pub trait CloseAccountWithRecipient {
 	/// This helper clears the existing data region in-place before calling
 	/// [`Self::close_with_recipient`]. It does not implicitly reallocate the
 	/// account, even when the `account-resize` feature is enabled.
-	///
-	/// The default implementation delegates to [`Self::close_with_recipient`]
-	/// without clearing the data region. Implementors that need stale bytes
-	/// cleared before close should override this method.
-	fn close_account_zeroed(&mut self, recipient: &mut AccountView) -> ProgramResult {
-		self.close_with_recipient(recipient)
-	}
+	fn close_account_zeroed(&mut self, recipient: &mut AccountView) -> ProgramResult;
 }
 
 /// Cursor for parsing instruction accounts exactly once.
 ///
 /// `AccountsCursor` is the runtime layer used by `#[derive(Accounts)]`. It
 /// advances through the account slice from left to right, supports explicit
-/// trailing-account capture, and centralizes duplicate mutable account checks
-/// without heap allocation.
+/// trailing-account capture, and rejects writable aliases for mutable accounts
+/// parsed individually through [`Self::next_mut`]. Trailing accounts returned
+/// by [`Self::remaining_mut`] preserve their original order and aliasing.
 pub struct AccountsCursor<'a> {
 	remaining: &'a mut [AccountView],
 }
@@ -658,11 +653,9 @@ impl<'a> AccountsCursor<'a> {
 
 	/// Return the next account without advancing the cursor.
 	///
-	/// **Note:** `peek` does not invoke `track_mutable_account`.
-	/// Prefer [`next_mut`](Self::next_mut) for mutable access — it is the only path
-	/// that checks for duplicate mutable accounts. Using `peek` + manual indexing
-	/// bypasses that safety check and can accept duplicate writable accounts that
-	/// `next_mut` would reject.
+	/// `peek` only provides shared access and does not validate writability or
+	/// duplicate addresses. Use [`Self::next_mut`] to parse an individual mutable
+	/// account with those checks.
 	pub fn peek(&self) -> Option<&AccountView> {
 		self.remaining.first()
 	}
@@ -701,6 +694,16 @@ impl<'a> AccountsCursor<'a> {
 		self.remaining
 	}
 
+	/// Consume and return the unparsed trailing accounts without requiring them
+	/// to be writable.
+	///
+	/// This is the trailing-account counterpart to [`Self::next`] and is used by
+	/// immutable `#[pina(remaining)]` fields.
+	pub fn take_remaining(&mut self) -> &'a [AccountView] {
+		let remaining = core::mem::take(&mut self.remaining);
+		remaining
+	}
+
 	/// Consume and return the unparsed trailing accounts.
 	///
 	/// Every remaining account must be marked writable in the instruction;
@@ -708,6 +711,9 @@ impl<'a> AccountsCursor<'a> {
 	/// makes the `&mut [AccountView]` field type the single source of truth
 	/// for writable account slices — no separate `assert_writable()` call is
 	/// required.
+	///
+	/// Duplicate addresses are preserved in this pass-through slice. Callers that
+	/// require logically distinct trailing accounts must validate their addresses.
 	pub fn remaining_mut(&mut self) -> Result<&'a mut [AccountView], ProgramError> {
 		let remaining = core::mem::take(&mut self.remaining);
 		for account in &*remaining {
@@ -726,12 +732,11 @@ impl<'a> AccountsCursor<'a> {
 		Err(PinaProgramError::TooManyAccountKeys.into())
 	}
 
-	/// Check whether the given account is a mutable duplicate of any account
-	/// still in the cursor's remaining slice.
+	/// Reject a mutable account that aliases a writable account still in the
+	/// cursor's remaining slice.
 	///
-	/// This is called automatically by [`next_mut`](Self::next_mut). Calling it
-	/// directly is only necessary when implementing a custom cursor that replaces
-	/// `next_mut`.
+	/// This check protects fields parsed individually through [`Self::next_mut`].
+	/// It does not inspect pairs contained entirely within [`Self::remaining_mut`].
 	fn track_mutable_account(&self, account: &AccountView) -> Result<(), ProgramError> {
 		if !account.is_writable() {
 			return Ok(());

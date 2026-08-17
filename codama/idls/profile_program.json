@@ -39,6 +39,20 @@
 					"fields": [
 						{
 							"kind": "structFieldTypeNode",
+							"name": "discriminator",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
 							"name": "bump",
 							"docs": [
 								"The PDA bump seed, stored on-chain so we don't need to re-derive it."
@@ -203,6 +217,20 @@
 				"arguments": [
 					{
 						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
 						"name": "bump",
 						"type": {
 							"kind": "numberTypeNode",
@@ -300,6 +328,20 @@
 				"arguments": [
 					{
 						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 1
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
 						"name": "name",
 						"type": {
 							"kind": "fixedSizeTypeNode",
@@ -388,6 +430,20 @@
 				"arguments": [
 					{
 						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 2
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
 						"name": "tag",
 						"type": {
 							"kind": "numberTypeNode",
@@ -461,6 +517,20 @@
 					}
 				],
 				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 3
+						}
+					},
 					{
 						"kind": "instructionArgumentNode",
 						"name": "index",

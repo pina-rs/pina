@@ -58,4 +58,4 @@ Common alignment-safe wrapper types include:
 - `PodI16`
 - `PodI64`
 
-Use them in `#[repr(C)]` account structs with bytemuck-compatible layouts.
+Use them in `#[repr(C)]` account structs whose fields satisfy zeropod's `ZcElem` and `ZcValidate` contracts.

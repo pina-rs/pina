@@ -9,10 +9,19 @@
 import {
 	type AccountMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ADDRESS } from "../programs";
 
@@ -26,7 +35,39 @@ export type AllowsDuplicateMutableInstruction<
 	TProgram extends string =
 		typeof ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ADDRESS,
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> = Instruction<TProgram> & InstructionWithAccounts<TRemainingAccounts>;
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<TRemainingAccounts>;
+
+export type AllowsDuplicateMutableInstructionData = { discriminator: number };
+
+export type AllowsDuplicateMutableInstructionDataArgs = {};
+
+export function getAllowsDuplicateMutableInstructionDataEncoder(): FixedSizeEncoder<
+	AllowsDuplicateMutableInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
+}
+
+export function getAllowsDuplicateMutableInstructionDataDecoder(): FixedSizeDecoder<
+	AllowsDuplicateMutableInstructionData
+> {
+	return getStructDecoder([["discriminator", getU8Decoder()]]);
+}
+
+export function getAllowsDuplicateMutableInstructionDataCodec(): FixedSizeCodec<
+	AllowsDuplicateMutableInstructionDataArgs,
+	AllowsDuplicateMutableInstructionData
+> {
+	return combineCodec(
+		getAllowsDuplicateMutableInstructionDataEncoder(),
+		getAllowsDuplicateMutableInstructionDataDecoder(),
+	);
+}
 
 export type AllowsDuplicateMutableInput = {};
 
@@ -41,17 +82,28 @@ export function getAllowsDuplicateMutableInstruction<
 		ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ADDRESS;
 
 	return Object.freeze(
-		{ programAddress } as AllowsDuplicateMutableInstruction<TProgramAddress>,
+		{
+			data: getAllowsDuplicateMutableInstructionDataEncoder().encode({}),
+			programAddress,
+		} as AllowsDuplicateMutableInstruction<TProgramAddress>,
 	);
 }
 
 export type ParsedAllowsDuplicateMutableInstruction<
 	TProgram extends string =
 		typeof ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ADDRESS,
-> = { programAddress: Address<TProgram> };
+> = {
+	programAddress: Address<TProgram>;
+	data: AllowsDuplicateMutableInstructionData;
+};
 
 export function parseAllowsDuplicateMutableInstruction<TProgram extends string>(
-	instruction: Instruction<TProgram>,
+	instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
 ): ParsedAllowsDuplicateMutableInstruction<TProgram> {
-	return { programAddress: instruction.programAddress };
+	return {
+		programAddress: instruction.programAddress,
+		data: getAllowsDuplicateMutableInstructionDataDecoder().decode(
+			instruction.data,
+		),
+	};
 }

@@ -1,3 +1,5 @@
+use core::mem::size_of;
+
 use pinocchio::error::ProgramError;
 
 use crate::ZcElem;
@@ -21,12 +23,25 @@ use crate::ZcValidate;
 /// ```
 #[allow(unsafe_code)]
 pub fn pod_from_bytes<T: ZcElem>(bytes: &[u8]) -> Result<&T, ProgramError> {
-	if bytes.len() != core::mem::size_of::<T>() {
+	if bytes.len() != size_of::<T>() {
 		return Err(ProgramError::InvalidArgument);
 	}
 	// SAFETY: `T: ZcElem` guarantees alignment 1, no padding, and that every
 	// bit pattern is a valid reference. The length is checked above.
 	let value = unsafe { &*(bytes.as_ptr() as *const T) };
+	<T as ZcValidate>::validate_ref(value).map_err(|_| ProgramError::InvalidArgument)?;
+	Ok(value)
+}
+
+/// Mutably reinterprets a byte slice as `T`, validating content first.
+#[allow(unsafe_code)]
+pub fn pod_from_bytes_mut<T: ZcElem>(bytes: &mut [u8]) -> Result<&mut T, ProgramError> {
+	if bytes.len() != size_of::<T>() {
+		return Err(ProgramError::InvalidArgument);
+	}
+	// SAFETY: `T: ZcElem` guarantees alignment 1, no padding, and that every
+	// bit pattern is a valid reference. The length is checked above.
+	let value = unsafe { &mut *(bytes.as_mut_ptr() as *mut T) };
 	<T as ZcValidate>::validate_ref(value).map_err(|_| ProgramError::InvalidArgument)?;
 	Ok(value)
 }

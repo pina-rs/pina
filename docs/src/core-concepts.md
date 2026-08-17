@@ -106,7 +106,7 @@ Traits in `crates/pina/src/impls.rs` provide typed conversion paths from raw `Ac
 
 ## Account cursors
 
-`AccountsCursor` is the runtime layer used by `#[derive(Accounts)]`. It advances through the account slice from left to right, supports explicit trailing-account capture via `#[pina(remaining)]`, and centralises duplicate mutable-account checks without heap allocation.
+`AccountsCursor` is the runtime layer used by `#[derive(Accounts)]`. It advances through the account slice from left to right and rejects writable aliases for mutable accounts parsed individually through `next_mut()`, without heap allocation. Explicit trailing-account capture via `#[pina(remaining)]` is pass-through: it preserves account order and aliases, so handlers that require distinct trailing accounts must validate their addresses.
 
 ## Instruction authoring tips
 
@@ -140,7 +140,7 @@ Traits in `crates/pina/src/impls.rs` provide typed conversion paths from raw `Ac
 | `PodU128` | `u128` | 16 bytes |
 | `PodI128` | `i128` | 16 bytes |
 
-All types are `#[repr(transparent)]` over byte arrays (or `u8` for `PodBool`) and implement `bytemuck::Pod` + `bytemuck::Zeroable`.
+All types are alignment-1 byte-backed values that implement zeropod's `ZcElem` and `ZcValidate` contracts.
 
 <!-- {/podTypesTable} -->
 

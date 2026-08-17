@@ -20,6 +20,20 @@ expression: idl
           "fields": [
             {
               "kind": "structFieldTypeNode",
+              "name": "discriminator",
+              "defaultValueStrategy": "omitted",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "defaultValue": {
+                "kind": "numberValueNode",
+                "number": 1
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
               "name": "maker",
               "type": {
                 "kind": "publicKeyTypeNode"
@@ -115,7 +129,7 @@ expression: idl
           {
             "kind": "instructionAccountNode",
             "name": "maker",
-            "isWritable": false,
+            "isWritable": true,
             "isSigner": true,
             "isOptional": false
           },
@@ -136,7 +150,7 @@ expression: idl
           {
             "kind": "instructionAccountNode",
             "name": "makerAtaA",
-            "isWritable": false,
+            "isWritable": true,
             "isSigner": false,
             "isOptional": false
           },
@@ -153,6 +167,17 @@ expression: idl
             "isWritable": true,
             "isSigner": false,
             "isOptional": false
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "associatedTokenProgram",
+            "isWritable": false,
+            "isSigner": false,
+            "isOptional": false,
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+            }
           },
           {
             "kind": "instructionAccountNode",
@@ -174,6 +199,20 @@ expression: idl
           }
         ],
         "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 1
+            }
+          },
           {
             "kind": "instructionArgumentNode",
             "name": "seed",
@@ -258,7 +297,7 @@ expression: idl
           {
             "kind": "instructionAccountNode",
             "name": "takerAtaA",
-            "isWritable": false,
+            "isWritable": true,
             "isSigner": false,
             "isOptional": false
           },
@@ -306,6 +345,17 @@ expression: idl
           },
           {
             "kind": "instructionAccountNode",
+            "name": "associatedTokenProgram",
+            "isWritable": false,
+            "isSigner": false,
+            "isOptional": false,
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
             "name": "systemProgram",
             "isWritable": false,
             "isSigner": false,
@@ -313,6 +363,22 @@ expression: idl
             "defaultValue": {
               "kind": "publicKeyValueNode",
               "publicKey": "11111111111111111111111111111111"
+            }
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 2
             }
           }
         ],

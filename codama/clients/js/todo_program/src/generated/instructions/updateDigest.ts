@@ -20,6 +20,7 @@ import {
 	getBytesEncoder,
 	getStructDecoder,
 	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
@@ -29,6 +30,7 @@ import {
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
@@ -65,20 +67,32 @@ export type UpdateDigestInstruction<
 		]
 	>;
 
-export type UpdateDigestInstructionData = { digest: ReadonlyUint8Array };
+export type UpdateDigestInstructionData = {
+	discriminator: number;
+	digest: ReadonlyUint8Array;
+};
 
-export type UpdateDigestInstructionDataArgs = UpdateDigestInstructionData;
+export type UpdateDigestInstructionDataArgs = { digest: ReadonlyUint8Array };
 
 export function getUpdateDigestInstructionDataEncoder(): FixedSizeEncoder<
 	UpdateDigestInstructionDataArgs
 > {
-	return getStructEncoder([["digest", fixEncoderSize(getBytesEncoder(), 32)]]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"digest",
+			fixEncoderSize(getBytesEncoder(), 32),
+		]]),
+		(value) => ({ ...value, discriminator: 2 }),
+	);
 }
 
 export function getUpdateDigestInstructionDataDecoder(): FixedSizeDecoder<
 	UpdateDigestInstructionData
 > {
-	return getStructDecoder([["digest", fixDecoderSize(getBytesDecoder(), 32)]]);
+	return getStructDecoder([["discriminator", getU8Decoder()], [
+		"digest",
+		fixDecoderSize(getBytesDecoder(), 32),
+	]]);
 }
 
 export function getUpdateDigestInstructionDataCodec(): FixedSizeCodec<

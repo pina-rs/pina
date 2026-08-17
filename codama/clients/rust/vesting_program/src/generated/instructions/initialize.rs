@@ -77,19 +77,13 @@ impl Initialize {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
+		let mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];
+		pina::PinaSerialize::write_bytes(&data, &mut instruction_data);
 
 		solana_instruction::Instruction {
 			program_id: crate::VESTING_PROGRAM_ID,
 			accounts,
-			data,
+			data: instruction_data,
 		}
 	}
 }
@@ -121,5 +115,38 @@ impl InitializeInstructionData {
 			end_ts,
 			bump,
 		}
+	}
+}
+
+impl pina::PinaSerialize for InitializeInstructionData {
+	fn write_bytes(&self, output: &mut [u8]) {
+		assert_eq!(output.len(), core::mem::size_of::<Self>());
+		output.fill(0);
+		let mut offset = 0usize;
+		let field_size = core::mem::size_of::<u8>();
+		pina::PinaSerialize::write_bytes(
+			&self.discriminator,
+			&mut output[offset..offset + field_size],
+		);
+		offset += field_size;
+		let field_size = core::mem::size_of::<pina::PodU64>();
+		pina::PinaSerialize::write_bytes(
+			&self.total_amount,
+			&mut output[offset..offset + field_size],
+		);
+		offset += field_size;
+		let field_size = core::mem::size_of::<pina::PodU64>();
+		pina::PinaSerialize::write_bytes(&self.start_ts, &mut output[offset..offset + field_size]);
+		offset += field_size;
+		let field_size = core::mem::size_of::<pina::PodU64>();
+		pina::PinaSerialize::write_bytes(&self.cliff_ts, &mut output[offset..offset + field_size]);
+		offset += field_size;
+		let field_size = core::mem::size_of::<pina::PodU64>();
+		pina::PinaSerialize::write_bytes(&self.end_ts, &mut output[offset..offset + field_size]);
+		offset += field_size;
+		let field_size = core::mem::size_of::<u8>();
+		pina::PinaSerialize::write_bytes(&self.bump, &mut output[offset..offset + field_size]);
+		offset += field_size;
+		debug_assert_eq!(offset, output.len());
 	}
 }

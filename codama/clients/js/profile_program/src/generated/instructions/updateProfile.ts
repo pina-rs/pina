@@ -20,6 +20,7 @@ import {
 	getBytesEncoder,
 	getStructDecoder,
 	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
@@ -29,6 +30,7 @@ import {
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
@@ -66,28 +68,35 @@ export type UpdateProfileInstruction<
 	>;
 
 export type UpdateProfileInstructionData = {
+	discriminator: number;
 	name: ReadonlyUint8Array;
 	bio: ReadonlyUint8Array;
 };
 
-export type UpdateProfileInstructionDataArgs = UpdateProfileInstructionData;
+export type UpdateProfileInstructionDataArgs = {
+	name: ReadonlyUint8Array;
+	bio: ReadonlyUint8Array;
+};
 
 export function getUpdateProfileInstructionDataEncoder(): FixedSizeEncoder<
 	UpdateProfileInstructionDataArgs
 > {
-	return getStructEncoder([["name", fixEncoderSize(getBytesEncoder(), 33)], [
-		"bio",
-		fixEncoderSize(getBytesEncoder(), 129),
-	]]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"name",
+			fixEncoderSize(getBytesEncoder(), 33),
+		], ["bio", fixEncoderSize(getBytesEncoder(), 129)]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 export function getUpdateProfileInstructionDataDecoder(): FixedSizeDecoder<
 	UpdateProfileInstructionData
 > {
-	return getStructDecoder([["name", fixDecoderSize(getBytesDecoder(), 33)], [
-		"bio",
-		fixDecoderSize(getBytesDecoder(), 129),
-	]]);
+	return getStructDecoder([["discriminator", getU8Decoder()], [
+		"name",
+		fixDecoderSize(getBytesDecoder(), 33),
+	], ["bio", fixDecoderSize(getBytesDecoder(), 129)]]);
 }
 
 export function getUpdateProfileInstructionDataCodec(): FixedSizeCodec<

@@ -4,6 +4,7 @@ use codama_nodes::Base16;
 use codama_nodes::ConstantDiscriminatorNode;
 use codama_nodes::ConstantPdaSeedNode;
 use codama_nodes::ConstantValueNode;
+use codama_nodes::DefaultValueStrategy;
 use codama_nodes::DiscriminatorNode;
 use codama_nodes::ErrorNode;
 use codama_nodes::InstructionAccountNode;
@@ -28,6 +29,7 @@ use codama_nodes::StructFieldTypeNode;
 use codama_nodes::StructTypeNode;
 use codama_nodes::VariablePdaSeedNode;
 
+use crate::error::IdlError;
 use crate::ir::AccountIr;
 use crate::ir::DefaultValueIr;
 use crate::ir::DiscriminatorIr;
@@ -39,6 +41,49 @@ use crate::ir::PdaIr;
 use crate::ir::PdaSeedIr;
 use crate::ir::ProgramIr;
 use crate::parse::types::rust_type_to_codama;
+use crate::parse::types::try_rust_type_to_codama;
+
+/// Validate every IR type mapping and convert a `ProgramIr` into a Codama
+/// `RootNode`.
+pub fn try_ir_to_root_node(ir: &ProgramIr) -> Result<RootNode, IdlError> {
+	for account in &ir.accounts {
+		for field in &account.fields {
+			validate_type_mapping(
+				&field.rust_type,
+				format!("account `{}.{}`", account.name, field.name),
+			)?;
+		}
+	}
+
+	for instruction in &ir.instructions {
+		for argument in &instruction.arguments {
+			validate_type_mapping(
+				&argument.rust_type,
+				format!("instruction `{}.{}`", instruction.name, argument.name),
+			)?;
+		}
+	}
+
+	for pda in &ir.pdas {
+		for seed in &pda.seeds {
+			if let PdaSeedIr::Variable { name, rust_type } = seed {
+				validate_type_mapping(rust_type, format!("PDA `{}.{name}`", pda.name))?;
+			}
+		}
+	}
+
+	Ok(ir_to_root_node(ir))
+}
+
+fn validate_type_mapping(ty: &str, context: String) -> Result<(), IdlError> {
+	try_rust_type_to_codama(ty).map(|_| ()).map_err(|reason| {
+		IdlError::UnsupportedType {
+			ty: ty.to_owned(),
+			context,
+			reason,
+		}
+	})
+}
 
 /// Convert a `ProgramIr` into a Codama `RootNode`.
 pub fn ir_to_root_node(ir: &ProgramIr) -> RootNode {
@@ -64,7 +109,8 @@ pub fn ir_to_root_node(ir: &ProgramIr) -> RootNode {
 }
 
 fn build_account_node(account: &AccountIr) -> AccountNode {
-	let fields: Vec<StructFieldTypeNode> = account.fields.iter().map(build_struct_field).collect();
+	let mut fields = vec![build_account_discriminator_field(&account.discriminator)];
+	fields.extend(account.fields.iter().map(build_struct_field));
 
 	let data = StructTypeNode::new(fields);
 	let mut node = AccountNode::new(account.name.as_str(), data);
@@ -88,11 +134,14 @@ fn build_instruction_node(instruction: &InstructionIr, pdas: &[PdaIr]) -> Instru
 		.map(|account| build_instruction_account_node(account, instruction, pdas))
 		.collect();
 
-	let arguments: Vec<InstructionArgumentNode> = instruction
-		.arguments
-		.iter()
-		.map(|f| InstructionArgumentNode::new(f.name.as_str(), rust_type_to_codama(&f.rust_type)))
-		.collect();
+	let mut arguments = vec![build_instruction_discriminator_argument(
+		&instruction.discriminator,
+	)];
+	arguments.extend(
+		instruction.arguments.iter().map(|f| {
+			InstructionArgumentNode::new(f.name.as_str(), rust_type_to_codama(&f.rust_type))
+		}),
+	);
 
 	let discriminators = vec![build_discriminator_node(&instruction.discriminator)];
 
@@ -201,7 +250,32 @@ fn build_struct_field(field: &FieldIr) -> StructFieldTypeNode {
 	node
 }
 
+fn build_account_discriminator_field(disc: &DiscriminatorIr) -> StructFieldTypeNode {
+	let (r#type, value) = build_discriminator_type_and_value(disc);
+	let mut field = StructFieldTypeNode::new("discriminator", r#type);
+	field.default_value = Box::new(Some(value.into()));
+	field.default_value_strategy = Some(DefaultValueStrategy::Omitted);
+	field
+}
+
+fn build_instruction_discriminator_argument(disc: &DiscriminatorIr) -> InstructionArgumentNode {
+	let (r#type, value) = build_discriminator_type_and_value(disc);
+	let mut argument = InstructionArgumentNode::new("discriminator", r#type);
+	argument.default_value = Box::new(Some(InstructionInputValueNode::NumberValue(value)));
+	argument.default_value_strategy = Some(DefaultValueStrategy::Omitted);
+	argument
+}
+
 fn build_discriminator_node(disc: &DiscriminatorIr) -> DiscriminatorNode {
+	let (r#type, value) = build_discriminator_type_and_value(disc);
+
+	DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+		ConstantValueNode::new(r#type, value),
+		0,
+	))
+}
+
+fn build_discriminator_type_and_value(disc: &DiscriminatorIr) -> (NumberTypeNode, NumberValueNode) {
 	let format = match disc.repr_size {
 		2 => NumberFormat::U16,
 		4 => NumberFormat::U32,
@@ -209,10 +283,7 @@ fn build_discriminator_node(disc: &DiscriminatorIr) -> DiscriminatorNode {
 		_ => NumberFormat::U8,
 	};
 
-	DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
-		ConstantValueNode::new(NumberTypeNode::le(format), NumberValueNode::new(disc.value)),
-		0,
-	))
+	(NumberTypeNode::le(format), NumberValueNode::new(disc.value))
 }
 
 fn build_pda_node(pda: &PdaIr) -> PdaNode {
@@ -268,11 +339,97 @@ fn build_error_node(error: &ErrorIr) -> ErrorNode {
 
 #[cfg(test)]
 mod tests {
+	use codama_nodes::DefaultValueStrategy;
 	use codama_nodes::InstructionInputValueNode;
+	use codama_nodes::NestedTypeNodeTrait;
 	use codama_nodes::PdaSeedValueValue;
 	use codama_nodes::PdaValuePda;
+	use codama_nodes::ValueNode;
 
 	use super::*;
+
+	#[test]
+	fn lowers_discriminators_into_encoded_data() {
+		let discriminator = DiscriminatorIr {
+			value: 7,
+			repr_size: 1,
+		};
+		let ir = ProgramIr {
+			name: "discriminator_program".to_string(),
+			public_key: "11111111111111111111111111111111".to_string(),
+			accounts: vec![AccountIr {
+				name: "State".to_string(),
+				pda_name: None,
+				fields: vec![],
+				discriminator: discriminator.clone(),
+				docs: vec![],
+			}],
+			instructions: vec![InstructionIr {
+				name: "update".to_string(),
+				accounts: vec![],
+				arguments: vec![],
+				discriminator,
+				docs: vec![],
+			}],
+			errors: vec![],
+			pdas: vec![],
+		};
+
+		let root = ir_to_root_node(&ir);
+		let account_data = root.program.accounts[0].data.get_nested_type_node();
+		let field = &account_data.fields[0];
+		assert_eq!(field.name.as_ref(), "discriminator");
+		assert_eq!(
+			field.default_value_strategy,
+			Some(DefaultValueStrategy::Omitted)
+		);
+		assert!(matches!(
+			field.default_value.as_ref(),
+			Some(ValueNode::Number(_))
+		));
+
+		let argument = &root.program.instructions[0].arguments[0];
+		assert_eq!(argument.name.as_ref(), "discriminator");
+		assert_eq!(
+			argument.default_value_strategy,
+			Some(DefaultValueStrategy::Omitted)
+		);
+		assert!(matches!(
+			argument.default_value.as_ref(),
+			Some(InstructionInputValueNode::NumberValue(_))
+		));
+	}
+
+	#[test]
+	fn rejects_unresolved_pod_collection_layouts() {
+		let ir = ProgramIr {
+			name: "unsupported_collection_program".to_string(),
+			public_key: "11111111111111111111111111111111".to_string(),
+			accounts: vec![AccountIr {
+				name: "State".to_string(),
+				pda_name: None,
+				fields: vec![FieldIr {
+					name: "values".to_string(),
+					rust_type: "PodVec<MyPod, 8>".to_string(),
+					docs: vec![],
+				}],
+				discriminator: DiscriminatorIr {
+					value: 1,
+					repr_size: 1,
+				},
+				docs: vec![],
+			}],
+			instructions: vec![],
+			errors: vec![],
+			pdas: vec![],
+		};
+
+		let error = try_ir_to_root_node(&ir)
+			.expect_err("unresolved Pod collection layouts must fail generation");
+		let message = error.to_string();
+		assert!(message.contains("PodVec<MyPod, 8>"));
+		assert!(message.contains("State.values"));
+	}
 
 	#[test]
 	fn lowers_pda_instruction_account_default_from_account_seed() {

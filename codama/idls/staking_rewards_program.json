@@ -16,6 +16,20 @@
 					"fields": [
 						{
 							"kind": "structFieldTypeNode",
+							"name": "discriminator",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
 							"name": "admin",
 							"type": {
 								"kind": "publicKeyTypeNode"
@@ -105,6 +119,20 @@
 				"data": {
 					"kind": "structTypeNode",
 					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "discriminator",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 2
+							}
+						},
 						{
 							"kind": "structFieldTypeNode",
 							"name": "pool",
@@ -250,6 +278,20 @@
 				"arguments": [
 					{
 						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
 						"name": "bump",
 						"type": {
 							"kind": "numberTypeNode",
@@ -315,6 +357,20 @@
 					}
 				],
 				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 1
+						}
+					},
 					{
 						"kind": "instructionArgumentNode",
 						"name": "bump",
@@ -405,6 +461,20 @@
 				"arguments": [
 					{
 						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 2
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
 						"name": "amount",
 						"type": {
 							"kind": "numberTypeNode",
@@ -493,6 +563,20 @@
 				"arguments": [
 					{
 						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 3
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
 						"name": "amount",
 						"type": {
 							"kind": "numberTypeNode",
@@ -575,6 +659,22 @@
 						"defaultValue": {
 							"kind": "publicKeyValueNode",
 							"publicKey": "11111111111111111111111111111111"
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 4
 						}
 					}
 				],

@@ -6,7 +6,7 @@
 //!
 //! - **`PodString<N, PFX>`** — a fixed-capacity UTF-8 string with a length
 //!   prefix. Used here for the profile `name` (32 bytes) and `bio` (128
-//!   bytes). The program validates UTF-8 with `try_as_str()` before storing.
+//!   bytes). Zeropod validates UTF-8 at the instruction boundary before storage.
 //! - **`PodVec<T, N, PFX>`** — a fixed-capacity vector with a length prefix.
 //!   Used here for a list of up to 8 `PodU64` tags.
 //! - **`PodBool`** — a single-byte boolean for the `active` flag.
@@ -236,13 +236,14 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 
 		// Initialize account data
 		let mut profile = self.profile.as_account_mut::<ProfileState>(&ID)?;
-		*profile = ProfileState::builder()
-			.bump(args.bump)
-			.name(args.name)
-			.bio(args.bio)
-			.tags(PodVec::default())
-			.active(PodBool::from(true))
-			.build();
+		// The newly allocated account buffer is already zero-initialized. Assign
+		// fields in place so the inactive capacity of zeropod collections stays
+		// initialized instead of being replaced by `PodVec::default()` storage.
+		profile.bump = args.bump;
+		profile.name = args.name;
+		profile.bio = args.bio;
+		profile.tags.clear();
+		profile.active = PodBool::from(true);
 
 		log!("Profile initialized");
 
@@ -308,7 +309,7 @@ impl<'a> ProcessAccountInfos<'a> for ProfileAccounts<'a> {
 				// Shift remaining tags left, then pop the (now duplicated)
 				// last slot to decrement the length prefix.
 				profile.tags.as_slice_mut().copy_within(index + 1.., index);
-				profile.tags.pop();
+				let _ = profile.tags.pop();
 
 				log!("Tag removed");
 			}
@@ -424,7 +425,7 @@ mod tests {
 		let mut raw = [0u8; 33];
 		raw[0] = 1;
 		raw[1] = 0xff;
-		assert!(pina::pod_from_bytes::<PodString<32>>(&raw).is_err());
+		assert!(pod_from_bytes::<PodString<32>>(&raw).is_err());
 	}
 
 	#[test]

@@ -254,7 +254,7 @@ fn assert_seeds_accepts_correct_account() {
 		._padding(0)
 		.build();
 
-	let test_account = build_account_view(pda, state.to_bytes());
+	let test_account = build_account_view(pda, &state.to_bytes());
 	let account = test_account.view;
 	let result = TestState::assert_seeds(
 		&account,
@@ -292,7 +292,7 @@ fn assert_seeds_rejects_wrong_address() {
 
 	// Same data, but at a different address.
 	let wrong_address = unique_address(12);
-	let test_account = build_account_view(wrong_address, state.to_bytes());
+	let test_account = build_account_view(wrong_address, &state.to_bytes());
 	let account = test_account.view;
 	let result = TestState::assert_seeds(
 		&account,
@@ -328,7 +328,7 @@ fn assert_seeds_rejects_wrong_stored_bump() {
 		._padding(0)
 		.build();
 
-	let test_account = build_account_view(pda, state.to_bytes());
+	let test_account = build_account_view(pda, &state.to_bytes());
 	let account = test_account.view;
 	let result = TestState::assert_seeds(
 		&account,
@@ -365,7 +365,7 @@ fn assert_seeds_rejects_wrong_owner() {
 		.build();
 
 	// Correct address and data, but owned by a different program.
-	let test_account = build_account_view_with_owner(pda, state.to_bytes(), unique_address(15));
+	let test_account = build_account_view_with_owner(pda, &state.to_bytes(), unique_address(15));
 	let account = test_account.view;
 	let result = TestState::assert_seeds(
 		&account,
@@ -404,7 +404,7 @@ fn assert_seeds_rejects_wrong_seed_value() {
 	// The account is the PDA for `amount = 42`, so asserting with a
 	// different seed value must fail even though the address matches the
 	// stored bump.
-	let test_account = build_account_view(pda, state.to_bytes());
+	let test_account = build_account_view(pda, &state.to_bytes());
 	let account = test_account.view;
 	let result = TestState::assert_seeds(
 		&account,

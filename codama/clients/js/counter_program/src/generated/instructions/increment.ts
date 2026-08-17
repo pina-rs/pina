@@ -10,14 +10,23 @@ import {
 	type AccountMeta,
 	type AccountSignerMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
@@ -41,6 +50,7 @@ export type IncrementInstruction<
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<
 		[
 			TAccountAuthority extends string ?
@@ -52,6 +62,35 @@ export type IncrementInstruction<
 			...TRemainingAccounts,
 		]
 	>;
+
+export type IncrementInstructionData = { discriminator: number };
+
+export type IncrementInstructionDataArgs = {};
+
+export function getIncrementInstructionDataEncoder(): FixedSizeEncoder<
+	IncrementInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
+}
+
+export function getIncrementInstructionDataDecoder(): FixedSizeDecoder<
+	IncrementInstructionData
+> {
+	return getStructDecoder([["discriminator", getU8Decoder()]]);
+}
+
+export function getIncrementInstructionDataCodec(): FixedSizeCodec<
+	IncrementInstructionDataArgs,
+	IncrementInstructionData
+> {
+	return combineCodec(
+		getIncrementInstructionDataEncoder(),
+		getIncrementInstructionDataDecoder(),
+	);
+}
 
 export type IncrementAsyncInput<
 	TAccountAuthority extends string = string,
@@ -98,19 +137,18 @@ export async function getIncrementInstructionAsync<
 	}
 
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze(
-		{
-			accounts: [
-				getAccountMeta("authority", accounts.authority),
-				getAccountMeta("counter", accounts.counter),
-			],
-			programAddress,
-		} as IncrementInstruction<
-			TProgramAddress,
-			TAccountAuthority,
-			TAccountCounter
-		>,
-	);
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("counter", accounts.counter),
+		],
+		data: getIncrementInstructionDataEncoder().encode({}),
+		programAddress,
+	} as IncrementInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountCounter
+	>);
 }
 
 export type IncrementInput<
@@ -146,19 +184,18 @@ export function getIncrementInstruction<
 	>;
 
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze(
-		{
-			accounts: [
-				getAccountMeta("authority", accounts.authority),
-				getAccountMeta("counter", accounts.counter),
-			],
-			programAddress,
-		} as IncrementInstruction<
-			TProgramAddress,
-			TAccountAuthority,
-			TAccountCounter
-		>,
-	);
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("counter", accounts.counter),
+		],
+		data: getIncrementInstructionDataEncoder().encode({}),
+		programAddress,
+	} as IncrementInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountCounter
+	>);
 }
 
 export type ParsedIncrementInstruction<
@@ -172,13 +209,17 @@ export type ParsedIncrementInstruction<
 		/** The counter PDA account (must already exist and be writable). */
 		counter: TAccountMetas[1];
 	};
+	data: IncrementInstructionData;
 };
 
 export function parseIncrementInstruction<
 	TProgram extends string,
 	TAccountMetas extends readonly AccountMeta[],
 >(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedIncrementInstruction<TProgram, TAccountMetas> {
 	if (instruction.accounts.length < 2) {
 		throw new SolanaError(
@@ -198,5 +239,6 @@ export function parseIncrementInstruction<
 	return {
 		programAddress: instruction.programAddress,
 		accounts: { authority: getNextAccount(), counter: getNextAccount() },
+		data: getIncrementInstructionDataDecoder().decode(instruction.data),
 	};
 }

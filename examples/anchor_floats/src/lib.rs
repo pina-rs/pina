@@ -158,7 +158,7 @@ mod tests {
 			.build();
 		let bytes = instruction.to_bytes();
 		let decoded =
-			CreateInstruction::try_from_bytes(bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
+			CreateInstruction::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
 
 		assert_eq!(f32::from_bits(u32::from(decoded.data_f32)), 1.0);
 		assert_eq!(f64::from_bits(u64::from(decoded.data_f64)), 2.0);
@@ -172,7 +172,7 @@ mod tests {
 			.build();
 		let bytes = instruction.to_bytes();
 		let decoded =
-			UpdateInstruction::try_from_bytes(bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
+			UpdateInstruction::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
 
 		assert_eq!(f32::from_bits(u32::from(decoded.data_f32)), 3.0);
 		assert_eq!(f64::from_bits(u64::from(decoded.data_f64)), 4.0);

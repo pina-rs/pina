@@ -102,7 +102,7 @@ pub enum ExampleError {
 
 <br>
 
-- Generated account/instruction/event structs are intended for fixed-size, bytemuck-safe layouts.
+- Generated account/instruction/event structs require fixed-size, alignment-1 `ZcElem` layouts with load-bearing `ZcValidate` implementations.
 - The macros are designed for `no_std` Solana program crates.
 - If you use `pina`, these macros are available directly without importing `pina_macros`.
 

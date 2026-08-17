@@ -135,7 +135,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		if account_data.len() < state_bytes.len() {
 			return Err(ProgramError::AccountDataTooSmall);
 		}
-		account_data[..state_bytes.len()].copy_from_slice(state_bytes);
+		account_data[..state_bytes.len()].copy_from_slice(&state_bytes);
 
 		Ok(())
 	}
@@ -506,6 +506,13 @@ fn build_token_account_bytes(mint: &Address, owner: &Address, amount: u64) -> Ve
 	data
 }
 
+#[cfg(feature = "token")]
+fn add_token_2022_account_type(data: &mut Vec<u8>, account_type: token_2022::state::AccountType) {
+	const ACCOUNT_TYPE_INDEX: usize = token::state::TokenAccount::LEN;
+	data.resize(ACCOUNT_TYPE_INDEX + 1, 0);
+	data[ACCOUNT_TYPE_INDEX] = account_type as u8;
+}
+
 // ---------------------------------------------------------------------------
 // Test: Full account lifecycle
 // ---------------------------------------------------------------------------
@@ -545,7 +552,7 @@ fn full_account_lifecycle() {
 		AccountBuilder::new().address(system::ID).executable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, init_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &init_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -581,7 +588,7 @@ fn full_account_lifecycle() {
 			.is_writable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, update_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &update_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -616,7 +623,7 @@ fn full_account_lifecycle() {
 			.is_writable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, close_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &close_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -675,7 +682,7 @@ fn multi_instruction_flow_initialize_then_update() {
 		AccountBuilder::new().address(system::ID).executable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, init_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &init_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -710,7 +717,7 @@ fn multi_instruction_flow_initialize_then_update() {
 			.is_writable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, update_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &update_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -755,7 +762,7 @@ fn multi_update_flow() {
 				.is_writable(true),
 		];
 
-		let mut input = unsafe { create_test_input(&accounts, update_bytes) };
+		let mut input = unsafe { create_test_input(&accounts, &update_bytes) };
 		let mut accts = [UNINIT; 10];
 		let (program_id, account_views, ix_data, _) =
 			unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -810,7 +817,7 @@ fn error_missing_signer_rejected() {
 		AccountBuilder::new().address(system::ID).executable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, init_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &init_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -852,7 +859,7 @@ fn error_wrong_program_owner_rejected() {
 			.is_writable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, update_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &update_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -895,7 +902,7 @@ fn error_discriminator_mismatch_rejected() {
 			.is_writable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, update_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &update_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -937,7 +944,7 @@ fn error_data_length_mismatch_rejected() {
 			.is_writable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, update_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &update_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -1037,7 +1044,7 @@ fn error_wrong_program_id() {
 
 	// Process with wrong program ID.
 	let result =
-		parse_instruction::<TestInstruction>(&wrong_program_id, &TEST_PROGRAM_ID, init_bytes);
+		parse_instruction::<TestInstruction>(&wrong_program_id, &TEST_PROGRAM_ID, &init_bytes);
 	assert!(result.is_err(), "should fail with wrong program ID");
 	assert_eq!(
 		result.unwrap_err(),
@@ -1066,7 +1073,7 @@ fn error_not_enough_accounts() {
 		.is_signer(true)
 		.is_writable(true)];
 
-	let mut input = unsafe { create_test_input(&accounts, init_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &init_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -1106,7 +1113,7 @@ fn error_non_writable_rejected() {
 			.is_writable(false), // <-- not writable
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, update_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &update_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -1145,7 +1152,7 @@ fn error_empty_account_rejected_for_update() {
 			.is_writable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, update_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &update_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -1473,7 +1480,7 @@ fn account_data_roundtrip_through_account_view() {
 		let mut account_data = account_views[0]
 			.try_borrow_mut()
 			.unwrap_or_else(|e| panic!("borrow failed: {e:?}"));
-		account_data[..state_bytes.len()].copy_from_slice(state_bytes);
+		account_data[..state_bytes.len()].copy_from_slice(&state_bytes);
 	}
 
 	// Read state back via as_account (discriminator is now valid).
@@ -1754,7 +1761,11 @@ fn as_token_account_checked_with_owners_accepts_token_2022_owner() {
 	let token_account_key: Address = address!("6QWeT6FpJrm8AF1btu6WH2k2Xhq6t5vbheKVfQavmeoZ");
 	let mint: Address = address!("4hT5gDpr9HMmXzttW2Kz7LxyzKDn5XxhxL7sRKqGZo4x");
 	let owner: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
-	let token_account_data = build_token_account_bytes(&mint, &owner, 88);
+	let mut token_account_data = build_token_account_bytes(&mint, &owner, 88);
+	add_token_2022_account_type(
+		&mut token_account_data,
+		token_2022::state::AccountType::Account,
+	);
 
 	let accounts = [AccountBuilder::new()
 		.address(token_account_key)
@@ -1783,6 +1794,31 @@ fn as_token_account_checked_with_owners_accepts_token_2022_owner() {
 	drop(token_account);
 
 	assert!(shadow.try_borrow_mut().is_ok());
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_token_mint_checked_with_owners_accepts_token_2022_extensions() {
+	let mint_key: Address = address!("8qbHbw2BbbTHBW1sK7d7Yx4Z4DccnE9vrFica8FWHQrP");
+	let mut mint_data = build_token_mint_bytes(9, 42);
+	add_token_2022_account_type(&mut mint_data, token_2022::state::AccountType::Mint);
+
+	let accounts = [AccountBuilder::new()
+		.address(mint_key)
+		.owner(token_2022::ID)
+		.lamports(1_000_000)
+		.data(&mint_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let mint = account_views[0]
+		.as_token_mint_checked_with_owners(&[token::ID, token_2022::ID])
+		.unwrap_or_else(|error| panic!("multi-owner token mint load failed: {error:?}"));
+	assert_eq!(mint.decimals(), 9);
 }
 
 #[cfg(feature = "token")]
@@ -1915,8 +1951,10 @@ fn as_token_2022_account_checked_accepts_extension_data() {
 	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
 	let owner: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
 	let mut token_account_data = build_token_account_bytes(&mint, &owner, 123);
-	// token-2022 accounts may carry extension data after the base layout.
-	token_account_data.extend_from_slice(&[0u8; 8]);
+	add_token_2022_account_type(
+		&mut token_account_data,
+		token_2022::state::AccountType::Account,
+	);
 
 	let accounts = [AccountBuilder::new()
 		.address(token_account_key)
@@ -1937,6 +1975,36 @@ fn as_token_2022_account_checked_accepts_extension_data() {
 	assert_eq!(token_account.amount(), 123);
 	assert_eq!(token_account.mint(), &mint);
 	assert_eq!(token_account.owner(), &owner);
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_token_2022_account_checked_rejects_wrong_account_type() {
+	let token_account_key: Address = address!("4vJ9JU1bJJE96FWSJKv9J5xBqHkM7SspGq2pZ7uS5k4x");
+	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
+	let owner: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
+	let mut token_account_data = build_token_account_bytes(&mint, &owner, 123);
+	add_token_2022_account_type(
+		&mut token_account_data,
+		token_2022::state::AccountType::Mint,
+	);
+
+	let accounts = [AccountBuilder::new()
+		.address(token_account_key)
+		.owner(token_2022::ID)
+		.lamports(1_000_000)
+		.data(&token_account_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	assert!(matches!(
+		account_views[0].as_token_2022_account_checked(),
+		Err(ProgramError::InvalidAccountData)
+	));
 }
 
 #[cfg(feature = "token")]
@@ -1975,8 +2043,10 @@ fn as_associated_token_account_accepts_overlong_data() {
 	let (ata_address, _bump) = try_get_associated_token_address(&wallet, &mint, &token_2022::ID)
 		.unwrap_or_else(|| panic!("failed to derive ata"));
 	let mut token_account_data = build_token_account_bytes(&mint, &wallet, 99);
-	// token-2022 ATAs may carry extension data after the base layout.
-	token_account_data.extend_from_slice(&[0u8; 8]);
+	add_token_2022_account_type(
+		&mut token_account_data,
+		token_2022::state::AccountType::Account,
+	);
 
 	let accounts = [AccountBuilder::new()
 		.address(ata_address)
@@ -1996,6 +2066,34 @@ fn as_associated_token_account_accepts_overlong_data() {
 		.unwrap_or_else(|e| panic!("associated token account load failed: {e:?}"));
 	assert_eq!(token_account.amount(), 99);
 	assert_eq!(token_account.owner(), &wallet);
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_associated_token_account_rejects_overlong_legacy_data() {
+	let wallet: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
+	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
+	let (ata_address, _bump) = try_get_associated_token_address(&wallet, &mint, &token::ID)
+		.unwrap_or_else(|| panic!("failed to derive ata"));
+	let mut token_account_data = build_token_account_bytes(&mint, &wallet, 99);
+	token_account_data.push(0);
+
+	let accounts = [AccountBuilder::new()
+		.address(ata_address)
+		.owner(token::ID)
+		.lamports(1_000_000)
+		.data(&token_account_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	assert!(matches!(
+		account_views[0].as_associated_token_account_checked(&wallet, &mint, &token::ID),
+		Err(ProgramError::InvalidAccountData)
+	));
 }
 
 // ---------------------------------------------------------------------------

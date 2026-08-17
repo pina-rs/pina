@@ -95,12 +95,13 @@ pub struct TakeInstruction {}
 
 #[derive(Accounts, Debug)]
 pub struct MakeAccounts<'a> {
-	pub maker: &'a AccountView,
+	pub maker: &'a mut AccountView,
 	pub mint_a: &'a AccountView,
 	pub mint_b: &'a AccountView,
-	pub maker_ata_a: &'a AccountView,
+	pub maker_ata_a: &'a mut AccountView,
 	pub escrow: &'a mut AccountView,
 	pub vault: &'a AccountView,
+	pub associated_token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
 	pub token_program: &'a AccountView,
 }
@@ -120,15 +121,25 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 
 		// Validate accounts
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
+		let token_program = *self.token_program.address();
+		let token_owners = [token_program];
+		self.associated_token_program
+			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.maker.assert_signer()?;
-		self.mint_a.assert_owners(&SPL_PROGRAM_IDS)?;
-		self.mint_b.assert_owners(&SPL_PROGRAM_IDS)?;
-		self.maker_ata_a.assert_associated_token_address(
+		let decimals = self
+			.mint_a
+			.as_token_mint_checked_with_owners(&token_owners)?
+			.decimals();
+		drop(
+			self.mint_b
+				.as_token_mint_checked_with_owners(&token_owners)?,
+		);
+		drop(self.maker_ata_a.as_associated_token_account_checked(
 			self.maker.address(),
 			self.mint_a.address(),
-			self.token_program.address(),
-		)?;
+			&token_program,
+		)?);
 		self.escrow
 			.assert_empty()?
 			.assert_seeds_with_bump(&escrow_seeds_with_bump.as_slices(), &ID)?;
@@ -175,8 +186,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		.invoke()?;
 
 		// Transfer tokens to vault
-		let decimals = self.mint_a.as_token_mint()?.decimals();
-		token_2022::instructions::TransferChecked::new(
+		token::instructions::TransferChecked::new(
 			self.maker_ata_a,
 			self.mint_a,
 			self.vault,
@@ -184,7 +194,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			args.amount_a.into(),
 			decimals,
 		)
-		.invoke()?;
+		.invoke_with_program(&token_program)?;
 
 		Ok(())
 	}
@@ -202,6 +212,7 @@ pub struct TakeAccounts<'a> {
 	pub escrow: &'a mut AccountView,
 	pub vault: &'a AccountView,
 	pub token_program: &'a AccountView,
+	pub associated_token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
 }
 
@@ -212,26 +223,26 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 
 		// Validate program accounts
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
+		let token_program = *self.token_program.address();
+		let token_owners = [token_program];
+		self.associated_token_program
+			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 
 		// Validate taker accounts
 		self.taker.assert_signer()?.assert_writable()?;
-		self.taker_ata_a
-			.assert_owners(&SPL_PROGRAM_IDS)?
-			.assert_data_len(token::state::TokenAccount::LEN)?
-			.assert_associated_token_address(
-				self.taker.address(),
-				self.mint_a.address(),
-				self.token_program.address(),
-			)?;
-		self.taker_ata_b
-			.assert_writable()?
-			.assert_owners(&SPL_PROGRAM_IDS)?
-			.assert_associated_token_address(
-				self.taker.address(),
-				self.mint_b.address(),
-				self.token_program.address(),
-			)?;
+		self.taker_ata_a.assert_writable()?;
+		drop(self.taker_ata_a.as_associated_token_account_checked(
+			self.taker.address(),
+			self.mint_a.address(),
+			&token_program,
+		)?);
+		self.taker_ata_b.assert_writable()?;
+		drop(self.taker_ata_b.as_associated_token_account_checked(
+			self.taker.address(),
+			self.mint_b.address(),
+			&token_program,
+		)?);
 
 		// Validate escrow state
 		self.escrow
@@ -256,23 +267,27 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 
 		// Validate maker and mint accounts
 		self.maker.assert_address(&maker)?;
-		self.mint_a
-			.assert_owners(&SPL_PROGRAM_IDS)?
-			.assert_address(&mint_a)?;
-		self.mint_b
-			.assert_owners(&SPL_PROGRAM_IDS)?
-			.assert_address(&mint_b)?;
+		self.mint_a.assert_address(&mint_a)?;
+		let decimals_a = self
+			.mint_a
+			.as_token_mint_checked_with_owners(&token_owners)?
+			.decimals();
+		self.mint_b.assert_address(&mint_b)?;
+		let decimals_b = self
+			.mint_b
+			.as_token_mint_checked_with_owners(&token_owners)?
+			.decimals();
 
 		// Validate vault and maker ATA
-		self.vault
-			.assert_not_empty()?
-			.assert_writable()?
-			.assert_owners(&SPL_PROGRAM_IDS)?
-			.assert_associated_token_address(
+		self.vault.assert_not_empty()?.assert_writable()?;
+		let vault_amount = self
+			.vault
+			.as_associated_token_account_checked(
 				self.escrow.address(),
 				self.mint_a.address(),
-				self.token_program.address(),
-			)?;
+				&token_program,
+			)?
+			.amount();
 		self.maker_ata_b
 			.assert_writable()?
 			.assert_associated_token_address(
@@ -293,15 +308,15 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		.invoke()?;
 
 		// Transfer token B from taker to maker
-		token_2022::instructions::TransferChecked::new(
+		token::instructions::TransferChecked::new(
 			self.taker_ata_b,
 			self.mint_b,
 			self.maker_ata_b,
 			self.taker,
 			u64::from(amount_b),
-			self.mint_b.as_token_2022_mint()?.decimals(),
+			decimals_b,
 		)
-		.invoke()?;
+		.invoke_with_program(&token_program)?;
 
 		// Prepare escrow signer for vault operations
 		let escrow_seeds = EscrowState::seeds(&maker, u64::from(seed));
@@ -311,21 +326,19 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		let signers = [escrow_signer];
 
 		// Transfer token A from vault to taker
-		self.vault.assert_owners(&SPL_PROGRAM_IDS)?;
-		let vault_amount = self.vault.as_token_2022_account()?.amount();
-		token_2022::instructions::TransferChecked::new(
+		token::instructions::TransferChecked::new(
 			self.vault,
 			self.mint_a,
 			self.taker_ata_a,
 			self.escrow,
 			vault_amount,
-			self.mint_a.as_token_2022_mint()?.decimals(),
+			decimals_a,
 		)
-		.invoke_signed(&signers)?;
+		.invoke_signed_with_program(&signers, &token_program)?;
 
 		// Close vault account
-		token_2022::instructions::CloseAccount::new(self.vault, self.maker, self.escrow)
-			.invoke_signed(&signers)?;
+		token::instructions::CloseAccount::new(self.vault, self.maker, self.escrow)
+			.invoke_signed_with_program(&signers, &token_program)?;
 
 		// Zero out escrow state and close
 		self.escrow.as_account_mut::<EscrowState>(&ID)?.zeroed();

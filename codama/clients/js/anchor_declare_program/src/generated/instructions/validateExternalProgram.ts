@@ -10,15 +10,24 @@ import {
 	type AccountMeta,
 	type AccountSignerMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyAccount,
 	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
@@ -39,6 +48,7 @@ export type ValidateExternalProgramInstruction<
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<
 		[
 			TAccountAuthority extends string ?
@@ -51,6 +61,35 @@ export type ValidateExternalProgramInstruction<
 			...TRemainingAccounts,
 		]
 	>;
+
+export type ValidateExternalProgramInstructionData = { discriminator: number };
+
+export type ValidateExternalProgramInstructionDataArgs = {};
+
+export function getValidateExternalProgramInstructionDataEncoder(): FixedSizeEncoder<
+	ValidateExternalProgramInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 0 }),
+	);
+}
+
+export function getValidateExternalProgramInstructionDataDecoder(): FixedSizeDecoder<
+	ValidateExternalProgramInstructionData
+> {
+	return getStructDecoder([["discriminator", getU8Decoder()]]);
+}
+
+export function getValidateExternalProgramInstructionDataCodec(): FixedSizeCodec<
+	ValidateExternalProgramInstructionDataArgs,
+	ValidateExternalProgramInstructionData
+> {
+	return combineCodec(
+		getValidateExternalProgramInstructionDataEncoder(),
+		getValidateExternalProgramInstructionDataDecoder(),
+	);
+}
 
 export type ValidateExternalProgramInput<
 	TAccountAuthority extends string = string,
@@ -94,19 +133,18 @@ export function getValidateExternalProgramInstruction<
 	>;
 
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze(
-		{
-			accounts: [
-				getAccountMeta("authority", accounts.authority),
-				getAccountMeta("externalProgram", accounts.externalProgram),
-			],
-			programAddress,
-		} as ValidateExternalProgramInstruction<
-			TProgramAddress,
-			TAccountAuthority,
-			TAccountExternalProgram
-		>,
-	);
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("externalProgram", accounts.externalProgram),
+		],
+		data: getValidateExternalProgramInstructionDataEncoder().encode({}),
+		programAddress,
+	} as ValidateExternalProgramInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountExternalProgram
+	>);
 }
 
 export type ParsedValidateExternalProgramInstruction<
@@ -118,13 +156,17 @@ export type ParsedValidateExternalProgramInstruction<
 		authority: TAccountMetas[0];
 		externalProgram: TAccountMetas[1];
 	};
+	data: ValidateExternalProgramInstructionData;
 };
 
 export function parseValidateExternalProgramInstruction<
 	TProgram extends string,
 	TAccountMetas extends readonly AccountMeta[],
 >(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedValidateExternalProgramInstruction<TProgram, TAccountMetas> {
 	if (instruction.accounts.length < 2) {
 		throw new SolanaError(
@@ -147,5 +189,8 @@ export function parseValidateExternalProgramInstruction<
 			authority: getNextAccount(),
 			externalProgram: getNextAccount(),
 		},
+		data: getValidateExternalProgramInstructionDataDecoder().decode(
+			instruction.data,
+		),
 	};
 }

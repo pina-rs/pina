@@ -10,15 +10,24 @@ import {
 	type AccountMeta,
 	type AccountSignerMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyAccount,
 	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
@@ -46,6 +55,7 @@ export type ClaimInstruction<
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<
 		[
 			TAccountUser extends string
@@ -70,6 +80,35 @@ export type ClaimInstruction<
 			...TRemainingAccounts,
 		]
 	>;
+
+export type ClaimInstructionData = { discriminator: number };
+
+export type ClaimInstructionDataArgs = {};
+
+export function getClaimInstructionDataEncoder(): FixedSizeEncoder<
+	ClaimInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 4 }),
+	);
+}
+
+export function getClaimInstructionDataDecoder(): FixedSizeDecoder<
+	ClaimInstructionData
+> {
+	return getStructDecoder([["discriminator", getU8Decoder()]]);
+}
+
+export function getClaimInstructionDataCodec(): FixedSizeCodec<
+	ClaimInstructionDataArgs,
+	ClaimInstructionData
+> {
+	return combineCodec(
+		getClaimInstructionDataEncoder(),
+		getClaimInstructionDataDecoder(),
+	);
+}
 
 export type ClaimInput<
 	TAccountUser extends string = string,
@@ -158,6 +197,7 @@ export function getClaimInstruction<
 			getAccountMeta("tokenProgram", accounts.tokenProgram),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 		],
+		data: getClaimInstructionDataEncoder().encode({}),
 		programAddress,
 	} as ClaimInstruction<
 		TProgramAddress,
@@ -185,13 +225,17 @@ export type ParsedClaimInstruction<
 		tokenProgram: TAccountMetas[5];
 		systemProgram: TAccountMetas[6];
 	};
+	data: ClaimInstructionData;
 };
 
 export function parseClaimInstruction<
 	TProgram extends string,
 	TAccountMetas extends readonly AccountMeta[],
 >(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedClaimInstruction<TProgram, TAccountMetas> {
 	if (instruction.accounts.length < 7) {
 		throw new SolanaError(
@@ -219,5 +263,6 @@ export function parseClaimInstruction<
 			tokenProgram: getNextAccount(),
 			systemProgram: getNextAccount(),
 		},
+		data: getClaimInstructionDataDecoder().decode(instruction.data),
 	};
 }

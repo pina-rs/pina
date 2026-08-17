@@ -27,6 +27,7 @@ import {
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
@@ -69,20 +70,32 @@ export type OpenPositionInstruction<
 		]
 	>;
 
-export type OpenPositionInstructionData = { bump: number };
+export type OpenPositionInstructionData = {
+	discriminator: number;
+	bump: number;
+};
 
-export type OpenPositionInstructionDataArgs = OpenPositionInstructionData;
+export type OpenPositionInstructionDataArgs = { bump: number };
 
 export function getOpenPositionInstructionDataEncoder(): FixedSizeEncoder<
 	OpenPositionInstructionDataArgs
 > {
-	return getStructEncoder([["bump", getU8Encoder()]]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"bump",
+			getU8Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 export function getOpenPositionInstructionDataDecoder(): FixedSizeDecoder<
 	OpenPositionInstructionData
 > {
-	return getStructDecoder([["bump", getU8Decoder()]]);
+	return getStructDecoder([["discriminator", getU8Decoder()], [
+		"bump",
+		getU8Decoder(),
+	]]);
 }
 
 export function getOpenPositionInstructionDataCodec(): FixedSizeCodec<

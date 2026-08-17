@@ -74,6 +74,36 @@ fn generate_zeropod_impls(
 	};
 
 	quote! {
+		const _: fn() = || {
+			fn assert_zc_elem<T: #crate_path::ZcElem>() {}
+			#(assert_zc_elem::<#field_types>();)*
+		};
+
+		impl #crate_path::PinaSerialize for #struct_name {
+			fn write_bytes(&self, output: &mut [u8]) {
+				::core::assert!(output.len() == ::core::mem::size_of::<Self>());
+				output.fill(0);
+				let mut offset = 0usize;
+				#(
+					let field_size = ::core::mem::size_of::<#field_types>();
+					<#field_types as #crate_path::PinaSerialize>::write_bytes(
+						&self.#field_names,
+						&mut output[offset..offset + field_size],
+					);
+					offset += field_size;
+				)*
+				::core::debug_assert!(offset == output.len());
+			}
+		}
+
+		impl #crate_path::PinaToBytes for #struct_name {
+			type Bytes = [u8; ::core::mem::size_of::<#struct_name>()];
+
+			fn zeroed_bytes() -> Self::Bytes {
+				[0u8; ::core::mem::size_of::<#struct_name>()]
+			}
+		}
+
 		impl #crate_path::ZcValidate for #struct_name {
 			fn validate_ref(value: &Self) -> Result<(), #crate_path::ZeroPodError> {
 				#(<#field_types as #crate_path::ZcValidate>::validate_ref(&value.#field_names)?;)*
@@ -83,7 +113,7 @@ fn generate_zeropod_impls(
 
 		// SAFETY:
 		// 1. Alignment == 1 (const-asserted above).
-		// 2. No padding (all fields are align-1 pod types; size is the sum of fields).
+		// 2. No padding (all fields are align-1 fixed-layout types; size is the sum of fields).
 		// 3. Every bit pattern is a valid reference (no bare bool/char/NonZero).
 		// 4. ZcValidate::validate_ref is load-bearing (rejects invalid content).
 		#[allow(unsafe_code)]
@@ -136,27 +166,19 @@ fn generate_zeropod_impls(
 
 /// Generates the `zeroed()` and `to_bytes()` inherent methods for a
 /// fixed-layout struct, replacing the removed bytemuck helpers.
-fn generate_bytes_helpers() -> proc_macro2::TokenStream {
+fn generate_bytes_helpers(crate_path: &syn::Path) -> proc_macro2::TokenStream {
 	quote! {
 		/// Zero out all bytes in the struct including padding bytes. This can be useful when closing an account.
 		#[allow(unsafe_code)]
 		pub fn zeroed(&mut self) {
-			// SAFETY: all fields are align-1 pod types (compile-time asserted),
+			// SAFETY: all fields are align-1 fixed-layout types (compile-time asserted),
 			// so the all-zero bit pattern is valid for every field.
 			unsafe { ::core::ptr::write_bytes(self as *mut Self, 0, 1) }
 		}
 
-		/// Returns the raw byte representation of the struct.
-		#[allow(unsafe_code)]
-		pub fn to_bytes(&self) -> &[u8] {
-			// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields
-			// (compile-time asserted), so its bytes are a valid representation.
-			unsafe {
-				::core::slice::from_raw_parts(
-					self as *const Self as *const u8,
-					::core::mem::size_of::<Self>(),
-				)
-			}
+		/// Returns a deterministic, fully initialized byte representation.
+		pub fn to_bytes(&self) -> <Self as #crate_path::PinaToBytes>::Bytes {
+			<Self as #crate_path::PinaToBytes>::to_bytes(self)
 		}
 	}
 }
@@ -252,7 +274,10 @@ fn accounts_derive_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenSt
 				.to_compile_error();
 			}
 
-			remaining_field = field.ident.as_ref();
+			remaining_field = field
+				.ident
+				.as_ref()
+				.map(|ident| (ident, is_mut_reference(&field.ty)));
 			continue;
 		}
 
@@ -273,8 +298,14 @@ fn accounts_derive_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenSt
 			cursor.finish_exact()?;
 		}
 	});
-	let remaining_binding = remaining_field.map(|f| quote! { let #f = cursor.remaining_mut()?; });
-	let remaining_field_ident = remaining_field.map(|f| quote!(#f,));
+	let remaining_binding = remaining_field.map(|(field, is_mut)| {
+		if is_mut {
+			quote! { let #field = cursor.remaining_mut()?; }
+		} else {
+			quote! { let #field = cursor.take_remaining(); }
+		}
+	});
+	let remaining_field_ident = remaining_field.map(|(field, _)| quote!(#field,));
 
 	quote! {
 		impl #impl_generics #crate_path::ParseAccounts #ty_generics for #struct_name #ty_generics #where_clause {
@@ -321,32 +352,34 @@ fn is_mut_reference(ty: &Type) -> bool {
 	matches!(ty, Type::Reference(reference) if reference.mutability.is_some())
 }
 
-/// Split a `discriminator` path into the enum path and an optional variant.
-///
-/// Accepts both `Enum` (the variant defaults to the struct name) and
-/// `Enum::Variant` forms.
-fn split_discriminator_path(
-	path: &syn::Path,
-) -> Result<(syn::Path, Option<syn::Ident>), syn::Error> {
-	match path.segments.len() {
-		1 => Ok((path.clone(), None)),
-		2 => {
-			let variant = path.segments.last().unwrap().ident.clone();
-			let mut enum_segments = Punctuated::new();
-			enum_segments.push(path.segments.first().unwrap().clone());
-			let enum_path = syn::Path {
-				leading_colon: path.leading_colon,
-				segments: enum_segments,
-			};
-			Ok((enum_path, Some(variant)))
-		}
-		_ => {
-			Err(syn::Error::new_spanned(
-				path,
-				"`discriminator` must be a path of the form `Enum` or `Enum::Variant`",
-			))
-		}
+/// Split the final segment from a qualified `Enum::Variant` path.
+fn split_discriminator_path(path: &syn::Path) -> Result<(syn::Path, syn::Ident), syn::Error> {
+	let Some(variant) = path.segments.last() else {
+		return Err(syn::Error::new_spanned(
+			path,
+			"`discriminator` path cannot be empty",
+		));
+	};
+	let mut enum_segments = Punctuated::new();
+
+	for segment in path.segments.iter().take(path.segments.len() - 1) {
+		enum_segments.push(segment.clone());
 	}
+
+	if enum_segments.is_empty() {
+		return Err(syn::Error::new_spanned(
+			path,
+			"`discriminator` must include an enum before its variant",
+		));
+	}
+
+	Ok((
+		syn::Path {
+			leading_colon: path.leading_colon,
+			segments: enum_segments,
+		},
+		variant.ident.clone(),
+	))
 }
 
 /// Resolve the discriminator variant from a `discriminator` path and an
@@ -360,18 +393,15 @@ fn resolve_discriminator_variant(
 	explicit_variant: Option<syn::Ident>,
 	struct_name: &syn::Ident,
 ) -> Result<(syn::Path, syn::Ident), syn::Error> {
-	let (enum_path, path_variant) = split_discriminator_path(discriminator)?;
-	if path_variant.is_some() && explicit_variant.is_some() {
-		return Err(syn::Error::new_spanned(
-			discriminator,
-			"`variant` cannot be combined with a `discriminator` path that already includes a \
-			 variant",
-		));
+	if let Some(variant) = explicit_variant {
+		return Ok((discriminator.clone(), variant));
 	}
-	let variant = explicit_variant
-		.or(path_variant)
-		.unwrap_or_else(|| struct_name.clone());
-	Ok((enum_path, variant))
+
+	if discriminator.segments.len() == 1 {
+		return Ok((discriminator.clone(), struct_name.clone()));
+	}
+
+	split_discriminator_path(discriminator)
 }
 
 /// `#[error]` is a lightweight modification to the provided enum acting as
@@ -1092,7 +1122,7 @@ fn account_impl(
 					concat!(
 						"The alignment of struct `",
 						stringify!(#struct_name),
-						"` should be one so it can be used for zero-copy Pod casts."
+						"` should be one so it can be used for zero-copy casts."
 					)
 				);
 				::core::assert!(
@@ -1100,7 +1130,7 @@ fn account_impl(
 					concat!(
 						"`",
 						stringify!(#struct_name),
-						"` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed."
+						"` layout is padded. `#[pina]` discriminator-first zero-copy layouts must be tightly packed."
 					)
 				);
 			};
@@ -1122,7 +1152,7 @@ fn account_impl(
 		&crate_path,
 		true,
 	);
-	let bytes_helpers = generate_bytes_helpers();
+	let bytes_helpers = generate_bytes_helpers(&crate_path);
 
 	let implementations = quote! {
 		#[allow(dead_code)]
@@ -1825,7 +1855,7 @@ fn instruction_impl(
 					concat!(
 						"The alignment of struct `",
 						stringify!(#struct_name),
-						"` should be one so it can be used for zero-copy Pod casts."
+						"` should be one so it can be used for zero-copy casts."
 					)
 				);
 				::core::assert!(
@@ -1833,7 +1863,7 @@ fn instruction_impl(
 					concat!(
 						"`",
 						stringify!(#struct_name),
-						"` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed."
+						"` layout is padded. `#[pina]` discriminator-first zero-copy layouts must be tightly packed."
 					)
 				);
 			};
@@ -1866,16 +1896,8 @@ fn instruction_impl(
 		#assertions
 
 		impl #struct_name {
-			#[allow(unsafe_code)]
-			pub fn to_bytes(&self) -> &[u8] {
-				// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields
-				// (compile-time asserted), so its bytes are a valid representation.
-				unsafe {
-					::core::slice::from_raw_parts(
-						self as *const Self as *const u8,
-						::core::mem::size_of::<Self>(),
-					)
-				}
+			pub fn to_bytes(&self) -> <Self as #crate_path::PinaToBytes>::Bytes {
+				<Self as #crate_path::PinaToBytes>::to_bytes(self)
 			}
 
 			pub fn try_from_bytes(data: &[u8]) -> Result<&Self, #crate_path::ProgramError> {
@@ -2155,7 +2177,7 @@ fn event_impl(
 					concat!(
 						"The alignment of struct `",
 						stringify!(#struct_name),
-						"` should be one so it can be used for zero-copy Pod casts."
+						"` should be one so it can be used for zero-copy casts."
 					)
 				);
 				::core::assert!(
@@ -2163,7 +2185,7 @@ fn event_impl(
 					concat!(
 						"`",
 						stringify!(#struct_name),
-						"` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed."
+						"` layout is padded. `#[pina]` discriminator-first zero-copy layouts must be tightly packed."
 					)
 				);
 			};
@@ -2196,16 +2218,8 @@ fn event_impl(
 		#assertions
 
 		impl #struct_name {
-			#[allow(unsafe_code)]
-			pub fn to_bytes(&self) -> &[u8] {
-				// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields
-				// (compile-time asserted), so its bytes are a valid representation.
-				unsafe {
-					::core::slice::from_raw_parts(
-						self as *const Self as *const u8,
-						::core::mem::size_of::<Self>(),
-					)
-				}
+			pub fn to_bytes(&self) -> <Self as #crate_path::PinaToBytes>::Bytes {
+				<Self as #crate_path::PinaToBytes>::to_bytes(self)
 			}
 
 			pub fn try_from_bytes(data: &[u8]) -> Result<&Self, #crate_path::ProgramError> {
@@ -2404,6 +2418,13 @@ fn pod_enum_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
 			pub fn is(&self, variant: #enum_name) -> bool {
 				let raw: #native_ty = variant.into();
 				self.get() == raw
+			}
+		}
+
+		impl #crate_path::PinaSerialize for #zc_name {
+			fn write_bytes(&self, output: &mut [u8]) {
+				::core::assert!(output.len() == #repr_size);
+				output.copy_from_slice(&self.0);
 			}
 		}
 

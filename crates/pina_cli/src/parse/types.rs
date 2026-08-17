@@ -11,36 +11,45 @@ use quote::ToTokens;
 /// Map a Rust type name (as it appears in pina structs) to a Codama
 /// `TypeNode`.
 pub fn rust_type_to_codama(ty: &str) -> TypeNode {
+	try_rust_type_to_codama(ty).unwrap_or_else(|_| PublicKeyTypeNode::new().into())
+}
+
+/// Fallible type mapping used by IDL generation.
+///
+/// Unsupported Pod collection layouts are rejected rather than silently
+/// emitted as public keys with an incorrect wire size.
+pub fn try_rust_type_to_codama(ty: &str) -> Result<TypeNode, String> {
 	match ty {
-		"u8" => NumberTypeNode::le(NumberFormat::U8).into(),
-		"u16" | "PodU16" => NumberTypeNode::le(NumberFormat::U16).into(),
-		"u32" | "PodU32" => NumberTypeNode::le(NumberFormat::U32).into(),
-		"u64" | "PodU64" => NumberTypeNode::le(NumberFormat::U64).into(),
-		"u128" | "PodU128" => NumberTypeNode::le(NumberFormat::U128).into(),
-		"i8" => NumberTypeNode::le(NumberFormat::I8).into(),
-		"i16" | "PodI16" => NumberTypeNode::le(NumberFormat::I16).into(),
-		"i32" => NumberTypeNode::le(NumberFormat::I32).into(),
-		"i64" | "PodI64" => NumberTypeNode::le(NumberFormat::I64).into(),
-		"i128" => NumberTypeNode::le(NumberFormat::I128).into(),
-		"PodBool" | "bool" => BooleanTypeNode::default().into(),
-		"Address" | "Pubkey" => PublicKeyTypeNode::new().into(),
+		"u8" => Ok(NumberTypeNode::le(NumberFormat::U8).into()),
+		"u16" | "PodU16" => Ok(NumberTypeNode::le(NumberFormat::U16).into()),
+		"u32" | "PodU32" => Ok(NumberTypeNode::le(NumberFormat::U32).into()),
+		"u64" | "PodU64" => Ok(NumberTypeNode::le(NumberFormat::U64).into()),
+		"u128" | "PodU128" => Ok(NumberTypeNode::le(NumberFormat::U128).into()),
+		"i8" => Ok(NumberTypeNode::le(NumberFormat::I8).into()),
+		"i16" | "PodI16" => Ok(NumberTypeNode::le(NumberFormat::I16).into()),
+		"i32" | "PodI32" => Ok(NumberTypeNode::le(NumberFormat::I32).into()),
+		"i64" | "PodI64" => Ok(NumberTypeNode::le(NumberFormat::I64).into()),
+		"i128" | "PodI128" => Ok(NumberTypeNode::le(NumberFormat::I128).into()),
+		"PodBool" | "bool" => Ok(BooleanTypeNode::default().into()),
+		"Address" | "Pubkey" => Ok(PublicKeyTypeNode::new().into()),
 		_ => {
 			// Handle fixed-size byte arrays like [u8; 32]
 			if let Some(size) = parse_byte_array(ty) {
-				FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), size).into()
-			} else if let Some(node) = parse_pod_collection(ty) {
-				node
+				Ok(FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), size).into())
+			} else if let Some(node) = parse_pod_collection(ty)? {
+				Ok(node)
 			} else {
-				// Fallback: treat unknown types as public keys (common for
-				// address-like types)
-				PublicKeyTypeNode::new().into()
+				Err(format!(
+					"unknown fixed-layout type `{ty}`; only Address and Pubkey map to public keys"
+				))
 			}
 		}
 	}
 }
 
 /// Parse a `PodString<N, PFX>` or `PodVec<T, N, PFX>` type into a fixed-size
-/// Codama node.
+/// Codama node. `PodOption<T>` remains unsupported until its semantic mapping
+/// is represented in the generated client schema.
 ///
 /// - `PodString<N, PFX = 1>` maps to `FixedSizeTypeNode(BytesTypeNode, N + PFX)`:
 ///   the length prefix plus the UTF-8 payload, laid out inline.
@@ -48,36 +57,114 @@ pub fn rust_type_to_codama(ty: &str) -> TypeNode {
 ///   `FixedSizeTypeNode(BytesTypeNode, N × size_of::<T>() + PFX)`: the length
 ///   prefix plus the fixed element array, laid out inline.
 ///
-/// Returns `None` for non-collection types or unparseable arguments.
-fn parse_pod_collection(ty: &str) -> Option<TypeNode> {
-	let (name, args) = parse_generic_args(ty)?;
+/// Returns `Ok(None)` for non-collection types and an error for collection
+/// layouts whose byte size cannot be resolved statically.
+fn parse_pod_collection(ty: &str) -> Result<Option<TypeNode>, String> {
+	let Some((name, args)) = parse_generic_args(ty) else {
+		if ty == "PodString"
+			|| ty.starts_with("PodString<")
+			|| ty == "PodVec"
+			|| ty.starts_with("PodVec<")
+			|| ty == "PodOption"
+			|| ty.starts_with("PodOption<")
+		{
+			return Err(format!("unable to parse Pod collection type `{ty}`"));
+		}
+
+		return Ok(None);
+	};
+
 	match name.as_str() {
 		"PodString" => {
-			let n: usize = args.first()?.parse().ok()?;
+			if !(1..=2).contains(&args.len()) {
+				return Err(format!("`{ty}` expects one or two generic arguments"));
+			}
+
+			let n = parse_collection_size(args.first(), ty, "capacity")?;
 			let pfx: usize = match args.get(1) {
-				Some(s) => s.parse().ok()?,
+				Some(s) => parse_collection_size(Some(s), ty, "prefix size")?,
 				None => 1,
 			};
-			Some(FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), n + pfx).into())
+			validate_prefix_size(pfx, ty)?;
+			let size = n
+				.checked_add(pfx)
+				.ok_or_else(|| format!("`{ty}` byte size overflows usize"))?;
+			Ok(Some(
+				FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), size).into(),
+			))
 		}
 		"PodVec" => {
-			let item = rust_type_to_codama(args.first()?);
-			let n: usize = args.get(1)?.parse().ok()?;
+			if !(2..=3).contains(&args.len()) {
+				return Err(format!("`{ty}` expects two or three generic arguments"));
+			}
+
+			let item_ty = args
+				.first()
+				.ok_or_else(|| format!("`{ty}` is missing its element type"))?;
+			if !is_known_fixed_size_type(item_ty) {
+				return Err(format!(
+					"cannot determine the byte size of PodVec element `{item_ty}` in `{ty}`"
+				));
+			}
+			let item = try_rust_type_to_codama(item_ty)?;
+			let n = parse_collection_size(args.get(1), ty, "capacity")?;
 			let pfx: usize = match args.get(2) {
-				Some(s) => s.parse().ok()?,
+				Some(s) => parse_collection_size(Some(s), ty, "prefix size")?,
 				None => 2,
 			};
+			validate_prefix_size(pfx, ty)?;
 			// Wire layout: [count: PFX bytes][items: N × T]. Emit the full
 			// fixed size (prefix + elements) so generated clients decode the
 			// correct account size and field offsets.
-			let item_size = type_node_size(&item)?;
-			Some(
-				FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), n * item_size + pfx)
-					.into(),
-			)
+			let item_size = type_node_size(&item)
+				.ok_or_else(|| format!("cannot determine the byte size of `{item_ty}`"))?;
+			let size = n
+				.checked_mul(item_size)
+				.and_then(|size| size.checked_add(pfx))
+				.ok_or_else(|| format!("`{ty}` byte size overflows usize"))?;
+			Ok(Some(
+				FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), size).into(),
+			))
 		}
-		_ => None,
+		"PodOption" => Err(format!("`{ty}` is not yet supported by IDL generation")),
+		_ => Ok(None),
 	}
+}
+
+fn parse_collection_size(value: Option<&String>, ty: &str, name: &str) -> Result<usize, String> {
+	value
+		.ok_or_else(|| format!("`{ty}` is missing its {name}"))?
+		.parse()
+		.map_err(|_| format!("`{ty}` requires a literal usize {name}"))
+}
+
+fn validate_prefix_size(pfx: usize, ty: &str) -> Result<(), String> {
+	if matches!(pfx, 1 | 2 | 4 | 8) {
+		Ok(())
+	} else {
+		Err(format!("`{ty}` has unsupported prefix size {pfx}"))
+	}
+}
+
+fn is_known_fixed_size_type(ty: &str) -> bool {
+	matches!(
+		ty,
+		"u8" | "u16"
+			| "PodU16"
+			| "u32" | "PodU32"
+			| "u64" | "PodU64"
+			| "u128" | "PodU128"
+			| "i8" | "i16"
+			| "PodI16"
+			| "i32" | "PodI32"
+			| "i64" | "PodI64"
+			| "i128" | "PodI128"
+			| "PodBool"
+			| "bool" | "Address"
+			| "Pubkey"
+	) || parse_byte_array(ty).is_some()
+		|| ty.starts_with("PodString<")
+		|| ty.starts_with("PodVec<")
 }
 
 /// Compute the on-chain byte size of a fixed-size Codama type node.
@@ -282,6 +369,36 @@ mod tests {
 		let ty = rust_type_to_codama("PodVec<PodU16, 4, 1>");
 		let expected: TypeNode = FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 9).into();
 		assert_eq!(ty, expected);
+	}
+
+	#[test]
+	fn maps_pod_vec_with_signed_pod_elements() {
+		let ty = rust_type_to_codama("PodVec<PodI32, 8>");
+		let expected: TypeNode =
+			FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 34).into();
+		assert_eq!(ty, expected);
+
+		let ty = rust_type_to_codama("PodVec<PodI128, 8>");
+		let expected: TypeNode =
+			FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 130).into();
+		assert_eq!(ty, expected);
+	}
+
+	#[test]
+	fn rejects_pod_collections_with_unresolved_sizes() {
+		for ty in [
+			"PodString<NAME_LEN>",
+			"PodVec<PodU64, { 4 + 4 }>",
+			"PodVec<MyPod, 8>",
+			"PodOption",
+			"PodOption<>",
+			"PodOption<PodU64>",
+			"PodOption<PodU64, PodU64>",
+		] {
+			let error = try_rust_type_to_codama(ty)
+				.expect_err("unresolved Pod collection sizes must be rejected");
+			assert!(error.contains(ty), "unexpected error for {ty}: {error}");
+		}
 	}
 
 	#[test]

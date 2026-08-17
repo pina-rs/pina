@@ -31,5 +31,5 @@ pub struct Initialize {
 ## Migration guide
 
 - Replace `#[instruction(discriminator = Enum, variant = Variant)]` with `#[instruction(discriminator = Enum::Variant)]`. The same applies to `#[account(...)]` and `#[event(...)]`.
-- The old `variant = Variant` argument remains supported for backwards compatibility, but cannot be combined with a `discriminator` path that already includes a variant (compile error).
+- The old `variant = Variant` argument remains supported for backwards compatibility. When it is present, the complete `discriminator` value is treated as the enum path, which preserves qualified forms such as `crate::types::Enum, variant = Variant`.
 - `pina_cli` IDL extraction understands all three forms: `Enum::Variant`, `Enum` + `variant = Variant`, and bare `Enum` (variant defaults to the struct name). The `pina init` template now emits the new syntax.

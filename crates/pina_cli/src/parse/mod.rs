@@ -77,8 +77,8 @@ pub fn assemble_program_ir_multi(
 		}
 
 		all_disc_enums.extend(discriminator::extract_discriminator_enums(file));
-		all_account_structs.extend(account_state::extract_account_structs(file));
-		all_instruction_structs.extend(instruction_data::extract_instruction_structs(file));
+		all_account_structs.extend(account_state::extract_account_structs(file)?);
+		all_instruction_structs.extend(instruction_data::extract_instruction_structs(file)?);
 		all_ix_accounts_structs.extend(accounts_struct::extract_accounts_structs(file));
 		all_errors.extend(error_enum::extract_error_enums(file));
 
@@ -143,7 +143,7 @@ fn assemble_from_extracted(
 			resolve_discriminator_value(
 				&discriminator_map,
 				&acct.discriminator_enum,
-				&acct.name,
+				&acct.variant,
 				"account",
 			)
 			.map(|disc_value| {

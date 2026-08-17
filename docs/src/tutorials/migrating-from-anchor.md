@@ -133,7 +133,7 @@ pub struct MyAccount {
 }
 ```
 
-Pina uses zero-copy (`bytemuck::Pod`) layouts. Every field must be a fixed-size, `Copy` type. This means:
+Pina uses zeropod-validated zero-copy layouts. Every field must be a fixed-size, alignment-1 `ZcElem` type. This means:
 
 | Anchor type | Pina type       | Notes                                    |
 | ----------- | --------------- | ---------------------------------------- |
@@ -147,11 +147,11 @@ Pina uses zero-copy (`bytemuck::Pod`) layouts. Every field must be a fixed-size,
 | `Vec<T>`    | Not supported   | Use fixed-size arrays                    |
 | `Option<T>` | Manual encoding | Use a sentinel value or a `PodBool` flag |
 
-Pod wrappers are needed because `#[repr(C)]` structs require all fields to have alignment 1 for bytemuck compatibility. Converting to and from native types:
+Pod wrappers keep every field alignment 1 and provide zeropod validation. Convert to and from native types with `From`:
 
 ```rust
 // Creating Pod values
-let value = PodU64::from_primitive(42);
+let value = PodU64::from(42);
 let active = PodBool::from(true);
 
 // Reading Pod values
@@ -393,19 +393,18 @@ token::transfer(cpi_ctx, amount)?;
 ### Pina
 
 ```rust
-token_2022::instructions::TransferChecked {
-	from: self.from,
-	to: self.to,
-	authority: self.authority,
+token::instructions::TransferChecked::new(
+	self.from,
+	self.mint,
+	self.to,
+	self.authority,
 	amount,
-	mint: self.mint,
 	decimals,
-	token_program: self.token_program.address(),
-}
-.invoke()?;
+)
+.invoke_with_program(self.token_program.address())?;
 ```
 
-Pina's CPI helpers (enabled with `features = ["token"]`) are typed instruction builders. Fill in the struct and call `.invoke()` or `.invoke_signed(&signers)` for PDA-authorized calls. No `CpiContext` wrapper is needed.
+Pina's CPI helpers (enabled with `features = ["token"]`) are typed instruction builders. Construct one with `new()` and call `.invoke_with_program()` or `.invoke_signed_with_program()` for PDA-authorized calls. No `CpiContext` wrapper is needed.
 
 See `examples/escrow_program` for CPI usage with both token transfers and ATA creation.
 

@@ -9,10 +9,19 @@
 import {
 	type AccountMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { ANCHOR_ERRORS_PROGRAM_ADDRESS } from "../programs";
 
@@ -25,7 +34,39 @@ export function getHelloNoMsgDiscriminatorBytes(): ReadonlyUint8Array {
 export type HelloNoMsgInstruction<
 	TProgram extends string = typeof ANCHOR_ERRORS_PROGRAM_ADDRESS,
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> = Instruction<TProgram> & InstructionWithAccounts<TRemainingAccounts>;
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<TRemainingAccounts>;
+
+export type HelloNoMsgInstructionData = { discriminator: number };
+
+export type HelloNoMsgInstructionDataArgs = {};
+
+export function getHelloNoMsgInstructionDataEncoder(): FixedSizeEncoder<
+	HelloNoMsgInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
+}
+
+export function getHelloNoMsgInstructionDataDecoder(): FixedSizeDecoder<
+	HelloNoMsgInstructionData
+> {
+	return getStructDecoder([["discriminator", getU8Decoder()]]);
+}
+
+export function getHelloNoMsgInstructionDataCodec(): FixedSizeCodec<
+	HelloNoMsgInstructionDataArgs,
+	HelloNoMsgInstructionData
+> {
+	return combineCodec(
+		getHelloNoMsgInstructionDataEncoder(),
+		getHelloNoMsgInstructionDataDecoder(),
+	);
+}
 
 export type HelloNoMsgInput = {};
 
@@ -39,16 +80,22 @@ export function getHelloNoMsgInstruction<
 		ANCHOR_ERRORS_PROGRAM_ADDRESS;
 
 	return Object.freeze(
-		{ programAddress } as HelloNoMsgInstruction<TProgramAddress>,
+		{
+			data: getHelloNoMsgInstructionDataEncoder().encode({}),
+			programAddress,
+		} as HelloNoMsgInstruction<TProgramAddress>,
 	);
 }
 
 export type ParsedHelloNoMsgInstruction<
 	TProgram extends string = typeof ANCHOR_ERRORS_PROGRAM_ADDRESS,
-> = { programAddress: Address<TProgram> };
+> = { programAddress: Address<TProgram>; data: HelloNoMsgInstructionData };
 
 export function parseHelloNoMsgInstruction<TProgram extends string>(
-	instruction: Instruction<TProgram>,
+	instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
 ): ParsedHelloNoMsgInstruction<TProgram> {
-	return { programAddress: instruction.programAddress };
+	return {
+		programAddress: instruction.programAddress,
+		data: getHelloNoMsgInstructionDataDecoder().decode(instruction.data),
+	};
 }

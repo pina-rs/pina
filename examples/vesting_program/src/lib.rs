@@ -356,7 +356,7 @@ mod tests {
 	fn instruction_roundtrip() {
 		let ix = ClaimInstruction::builder().amount(PodU64::from(10)).build();
 		let bytes = ix.to_bytes();
-		let parsed = ClaimInstruction::try_from_bytes(bytes)
+		let parsed = ClaimInstruction::try_from_bytes(&bytes)
 			.unwrap_or_else(|e| panic!("decode failed: {e:?}"));
 		assert_eq!(u64::from(parsed.amount), 10);
 	}

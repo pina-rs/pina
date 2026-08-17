@@ -29,10 +29,12 @@ import {
 	getU32Encoder,
 	getU64Decoder,
 	getU64Encoder,
+	getU8Decoder,
 	getU8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 
 export const FLOAT_DATA_ACCOUNT_DISCRIMINATOR = 1;
@@ -42,6 +44,7 @@ export function getFloatDataAccountDiscriminatorBytes(): ReadonlyUint8Array {
 }
 
 export type FloatDataAccount = {
+	discriminator: number;
 	dataF64: bigint;
 	dataF32: number;
 	authority: Address;
@@ -57,20 +60,27 @@ export type FloatDataAccountArgs = {
 export function getFloatDataAccountEncoder(): FixedSizeEncoder<
 	FloatDataAccountArgs
 > {
-	return getStructEncoder([["dataF64", getU64Encoder()], [
-		"dataF32",
-		getU32Encoder(),
-	], ["authority", getAddressEncoder()]]);
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["dataF64", getU64Encoder()],
+			["dataF32", getU32Encoder()],
+			["authority", getAddressEncoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link FloatDataAccount} account data. */
 export function getFloatDataAccountDecoder(): FixedSizeDecoder<
 	FloatDataAccount
 > {
-	return getStructDecoder([["dataF64", getU64Decoder()], [
-		"dataF32",
-		getU32Decoder(),
-	], ["authority", getAddressDecoder()]]);
+	return getStructDecoder([
+		["discriminator", getU8Decoder()],
+		["dataF64", getU64Decoder()],
+		["dataF32", getU32Decoder()],
+		["authority", getAddressDecoder()],
+	]);
 }
 
 /** Gets the codec for {@link FloatDataAccount} account data. */

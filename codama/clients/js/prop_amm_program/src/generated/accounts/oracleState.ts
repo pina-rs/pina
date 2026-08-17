@@ -27,10 +27,12 @@ import {
 	getStructEncoder,
 	getU64Decoder,
 	getU64Encoder,
+	getU8Decoder,
 	getU8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 
 export const ORACLE_STATE_DISCRIMINATOR = 1;
@@ -39,24 +41,31 @@ export function getOracleStateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(ORACLE_STATE_DISCRIMINATOR);
 }
 
-export type OracleState = { authority: Address; price: bigint };
+export type OracleState = {
+	discriminator: number;
+	authority: Address;
+	price: bigint;
+};
 
 export type OracleStateArgs = { authority: Address; price: number | bigint };
 
 /** Gets the encoder for {@link OracleStateArgs} account data. */
 export function getOracleStateEncoder(): FixedSizeEncoder<OracleStateArgs> {
-	return getStructEncoder([["authority", getAddressEncoder()], [
-		"price",
-		getU64Encoder(),
-	]]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"authority",
+			getAddressEncoder(),
+		], ["price", getU64Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link OracleState} account data. */
 export function getOracleStateDecoder(): FixedSizeDecoder<OracleState> {
-	return getStructDecoder([["authority", getAddressDecoder()], [
-		"price",
-		getU64Decoder(),
-	]]);
+	return getStructDecoder([["discriminator", getU8Decoder()], [
+		"authority",
+		getAddressDecoder(),
+	], ["price", getU64Decoder()]]);
 }
 
 /** Gets the codec for {@link OracleState} account data. */

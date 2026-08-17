@@ -1,6 +1,5 @@
 ---
 source: crates/pina_cli/tests/fixtures.rs
-assertion_line: 38
 expression: idl
 ---
 {
@@ -37,6 +36,22 @@ expression: idl
             "isWritable": true,
             "isSigner": false,
             "isOptional": false
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 1
+            }
           }
         ],
         "discriminators": [

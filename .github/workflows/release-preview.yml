@@ -28,6 +28,7 @@ jobs:
 
       - name: preview release
         run: |
+          set -euo pipefail
           echo "## Release Preview" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           if ls .changeset/*.md 1>/dev/null 2>&1; then
@@ -45,6 +46,8 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "### Dry-run output:" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          monochange preview --format markdown 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || true
+          preview_status=0
+          monochange preview --format md 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || preview_status=$?
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit "$preview_status"
         shell: devenv shell -- bash -e {0}

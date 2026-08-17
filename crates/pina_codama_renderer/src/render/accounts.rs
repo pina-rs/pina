@@ -48,6 +48,7 @@ pub(crate) fn render_account_page(
 	let mut field_lines = Vec::new();
 	let mut ctor_args = Vec::new();
 	let mut ctor_inits = Vec::new();
+	let mut pod_fields = Vec::new();
 
 	for doc_line in render_docs(&account.docs, 0) {
 		field_lines.push(doc_line);
@@ -55,9 +56,14 @@ pub(crate) fn render_account_page(
 
 	if let Some(discriminator) = &discriminator {
 		field_lines.push(format!("\tpub discriminator: {},", discriminator.ty));
+		pod_fields.push(("discriminator".to_string(), discriminator.ty.clone()));
 	}
 
 	for field in &data_type.fields {
+		if discriminator.is_some() && field.name.as_ref() == "discriminator" {
+			continue;
+		}
+
 		let field_name = snake(field.name.as_ref());
 		let field_context = format!("{account_name}.{field_name}");
 		let field_type = render_type_for_pod(&field.r#type, &field_context)?;
@@ -65,6 +71,7 @@ pub(crate) fn render_account_page(
 			field_lines.push(doc_line);
 		}
 		field_lines.push(format!("\tpub {field_name}: {field_type},"));
+		pod_fields.push((field_name.clone(), field_type.clone()));
 		ctor_args.push(format!("{field_name}: {field_type}"));
 		ctor_inits.push(format!("\t\t\t{field_name},"));
 	}
@@ -76,6 +83,45 @@ pub(crate) fn render_account_page(
 	lines.push(format!("pub struct {account_name} {{"));
 	lines.extend(field_lines);
 	lines.push("}".to_string());
+	lines.push(String::new());
+
+	lines.push(format!("impl pina::PinaSerialize for {account_name} {{"));
+	lines.push("\tfn write_bytes(&self, output: &mut [u8]) {".to_string());
+	lines.push("\t\tassert_eq!(output.len(), core::mem::size_of::<Self>());".to_string());
+	lines.push("\t\toutput.fill(0);".to_string());
+	lines.push("\t\tlet mut offset = 0usize;".to_string());
+	for (field_name, field_type) in &pod_fields {
+		lines.push(format!(
+			"\t\tlet field_size = core::mem::size_of::<{field_type}>();"
+		));
+		lines.push(format!(
+			"\t\tpina::PinaSerialize::write_bytes(&self.{field_name}, &mut output[offset..offset \
+			 + field_size]);"
+		));
+		lines.push("\t\toffset += field_size;".to_string());
+	}
+	lines.push("\t\tdebug_assert_eq!(offset, output.len());".to_string());
+	lines.push("\t}".to_string());
+	lines.push("}".to_string());
+	lines.push(String::new());
+
+	lines.push(format!("impl pina::ZcValidate for {account_name} {{"));
+	lines.push("\tfn validate_ref(value: &Self) -> Result<(), pina::ZeroPodError> {".to_string());
+	for (field_name, field_type) in &pod_fields {
+		lines.push(format!(
+			"\t\t<{field_type} as pina::ZcValidate>::validate_ref(&value.{field_name})?;"
+		));
+	}
+	lines.push("\t\tOk(())".to_string());
+	lines.push("\t}".to_string());
+	lines.push("}".to_string());
+	lines.push(String::new());
+	lines.push(
+		"// SAFETY: all rendered fields are align-1, padding-free ZcElem values;".to_string(),
+	);
+	lines.push("// validate_ref recursively validates every field before safe access.".to_string());
+	lines.push("#[allow(unsafe_code)]".to_string());
+	lines.push(format!("unsafe impl pina::ZcElem for {account_name} {{}}"));
 	lines.push(String::new());
 
 	if let Some(discriminator) = &discriminator {
@@ -121,13 +167,10 @@ pub(crate) fn render_account_page(
 		"\tpub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {"
 			.to_string(),
 	);
-	lines.push("\t\tif data.len() != core::mem::size_of::<Self>() {".to_string());
+	lines.push("\t\tlet account = pina::pod_from_bytes::<Self>(data)".to_string());
 	lines.push(
-		"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
 	);
-	lines.push("\t\t}".to_string());
-	lines.push("\t\t// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.".to_string());
-	lines.push("\t\tlet account = unsafe { &*(data.as_ptr() as *const Self) };".to_string());
 	if let Some(discriminator) = &discriminator {
 		lines.push(format!(
 			"\t\tif account.discriminator != {} {{",
@@ -146,13 +189,10 @@ pub(crate) fn render_account_page(
 		 solana_program_error::ProgramError> {"
 			.to_string(),
 	);
-	lines.push("\t\tif data.len() != core::mem::size_of::<Self>() {".to_string());
+	lines.push("\t\tlet account = pina::pod_from_bytes_mut::<Self>(data)".to_string());
 	lines.push(
-		"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
 	);
-	lines.push("\t\t}".to_string());
-	lines.push("\t\t// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.".to_string());
-	lines.push("\t\tlet account = unsafe { &mut *(data.as_mut_ptr() as *mut Self) };".to_string());
 	if let Some(discriminator) = &discriminator {
 		lines.push(format!(
 			"\t\tif account.discriminator != {} {{",
@@ -177,7 +217,14 @@ pub(crate) fn render_account_page(
 		 Self::Error> {"
 			.to_string(),
 	);
-	lines.push("\t\tlet data_ref = (*account_info.data).borrow();".to_string());
+	lines.push(format!(
+		"\t\tif account_info.owner != &crate::{primary_program_const} {{"
+	));
+	lines.push(
+		"\t\t\treturn Err(solana_program_error::ProgramError::IncorrectProgramId);".to_string(),
+	);
+	lines.push("\t\t}".to_string());
+	lines.push("\t\tlet data_ref = account_info.try_borrow_data()?;".to_string());
 	lines.push("\t\tlet account = Self::from_bytes(&data_ref)?;".to_string());
 	lines.push("\t\tOk(*account)".to_string());
 	lines.push("\t}".to_string());

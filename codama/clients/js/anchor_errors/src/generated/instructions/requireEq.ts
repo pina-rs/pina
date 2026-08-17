@@ -9,10 +9,19 @@
 import {
 	type AccountMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { ANCHOR_ERRORS_PROGRAM_ADDRESS } from "../programs";
 
@@ -25,7 +34,39 @@ export function getRequireEqDiscriminatorBytes(): ReadonlyUint8Array {
 export type RequireEqInstruction<
 	TProgram extends string = typeof ANCHOR_ERRORS_PROGRAM_ADDRESS,
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> = Instruction<TProgram> & InstructionWithAccounts<TRemainingAccounts>;
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<TRemainingAccounts>;
+
+export type RequireEqInstructionData = { discriminator: number };
+
+export type RequireEqInstructionDataArgs = {};
+
+export function getRequireEqInstructionDataEncoder(): FixedSizeEncoder<
+	RequireEqInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 3 }),
+	);
+}
+
+export function getRequireEqInstructionDataDecoder(): FixedSizeDecoder<
+	RequireEqInstructionData
+> {
+	return getStructDecoder([["discriminator", getU8Decoder()]]);
+}
+
+export function getRequireEqInstructionDataCodec(): FixedSizeCodec<
+	RequireEqInstructionDataArgs,
+	RequireEqInstructionData
+> {
+	return combineCodec(
+		getRequireEqInstructionDataEncoder(),
+		getRequireEqInstructionDataDecoder(),
+	);
+}
 
 export type RequireEqInput = {};
 
@@ -39,16 +80,22 @@ export function getRequireEqInstruction<
 		ANCHOR_ERRORS_PROGRAM_ADDRESS;
 
 	return Object.freeze(
-		{ programAddress } as RequireEqInstruction<TProgramAddress>,
+		{
+			data: getRequireEqInstructionDataEncoder().encode({}),
+			programAddress,
+		} as RequireEqInstruction<TProgramAddress>,
 	);
 }
 
 export type ParsedRequireEqInstruction<
 	TProgram extends string = typeof ANCHOR_ERRORS_PROGRAM_ADDRESS,
-> = { programAddress: Address<TProgram> };
+> = { programAddress: Address<TProgram>; data: RequireEqInstructionData };
 
 export function parseRequireEqInstruction<TProgram extends string>(
-	instruction: Instruction<TProgram>,
+	instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
 ): ParsedRequireEqInstruction<TProgram> {
-	return { programAddress: instruction.programAddress };
+	return {
+		programAddress: instruction.programAddress,
+		data: getRequireEqInstructionDataDecoder().decode(instruction.data),
+	};
 }

@@ -30,6 +30,7 @@ import {
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { CounterSeeds, findCounterPda } from "../pdas";
 
@@ -60,6 +61,7 @@ export function getCounterStateDiscriminatorBytes(): ReadonlyUint8Array {
  * ```
  */
 export type CounterState = {
+	discriminator: number;
 	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
 	bump: number;
 	/**
@@ -81,18 +83,21 @@ export type CounterStateArgs = {
 
 /** Gets the encoder for {@link CounterStateArgs} account data. */
 export function getCounterStateEncoder(): FixedSizeEncoder<CounterStateArgs> {
-	return getStructEncoder([["bump", getU8Encoder()], [
-		"count",
-		getU64Encoder(),
-	]]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"bump",
+			getU8Encoder(),
+		], ["count", getU64Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link CounterState} account data. */
 export function getCounterStateDecoder(): FixedSizeDecoder<CounterState> {
-	return getStructDecoder([["bump", getU8Decoder()], [
-		"count",
-		getU64Decoder(),
-	]]);
+	return getStructDecoder([["discriminator", getU8Decoder()], [
+		"bump",
+		getU8Decoder(),
+	], ["count", getU64Decoder()]]);
 }
 
 /** Gets the codec for {@link CounterState} account data. */

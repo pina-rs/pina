@@ -72,7 +72,8 @@ pub fn create_account<'a>(
 /// Creates a new PDA-backed program account and returns `(address, bump)`.
 ///
 /// This helper derives the canonical PDA for `seeds` + `owner`, allocates
-/// account storage for `T`, and assigns account ownership to `owner`.
+/// account storage for `T`, initializes its discriminator, and assigns account
+/// ownership to `owner`.
 ///
 /// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->
 /// Seed-based APIs require deterministic seed ordering.
@@ -98,7 +99,7 @@ pub fn create_account<'a>(
 /// ```
 #[inline(always)]
 pub fn create_program_account<'a, T: PinaAccount>(
-	target_account: &'a AccountView,
+	target_account: &'a mut AccountView,
 	payer: &'a AccountView,
 	owner: &Address,
 	seeds: &[&[u8]],
@@ -112,7 +113,8 @@ pub fn create_program_account<'a, T: PinaAccount>(
 	Ok((address, bump))
 }
 
-/// Creates a new PDA-backed program account using a caller-provided `bump`.
+/// Creates a new PDA-backed program account using a caller-provided `bump` and
+/// initializes `T`'s discriminator.
 ///
 /// Prefer [`create_program_account`] when you want canonical bump derivation.
 /// Use this function when the bump is instruction data and must be validated.
@@ -142,14 +144,19 @@ pub fn create_program_account<'a, T: PinaAccount>(
 /// ```
 #[inline(always)]
 pub fn create_program_account_with_bump<'a, T: PinaAccount>(
-	target_account: &'a AccountView,
+	target_account: &'a mut AccountView,
 	payer: &'a AccountView,
 	owner: &Address,
 	seeds: &[&[u8]],
 	bump: u8,
 ) -> ProgramResult {
-	// Allocate space.
+	// Allocate space, then initialize the discriminator so callers can safely
+	// obtain a typed account view immediately after this helper returns.
 	allocate_account_with_bump(target_account, payer, size_of::<T>(), owner, seeds, bump)?;
+	{
+		let mut data = target_account.try_borrow_mut()?;
+		T::write_discriminator(&mut data);
+	}
 
 	Ok(())
 }

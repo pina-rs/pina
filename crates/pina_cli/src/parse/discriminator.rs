@@ -1,6 +1,8 @@
 use syn::File;
 use syn::Item;
 
+use crate::error::IdlError;
+
 /// A parsed `#[discriminator]` enum.
 #[derive(Debug, Clone)]
 pub struct DiscriminatorEnum {
@@ -14,6 +16,132 @@ pub struct DiscriminatorEnum {
 pub struct DiscriminatorVariant {
 	pub name: String,
 	pub value: u64,
+}
+
+/// Parse the discriminator enum and variant used by an attribute macro.
+pub(super) fn extract_discriminator_and_variant(
+	attrs: &[syn::Attribute],
+	attribute_name: &str,
+	struct_name: &syn::Ident,
+) -> Result<Option<(String, String)>, IdlError> {
+	for attr in attrs {
+		if !attr.path().is_ident(attribute_name) {
+			continue;
+		}
+
+		let meta_list = attr
+			.parse_args_with(
+				syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
+			)
+			.map_err(|error| {
+				invalid_discriminator(attribute_name, struct_name, error.to_string())
+			})?;
+		let mut discriminator = None;
+		let mut explicit_variant = None;
+
+		for meta in &meta_list {
+			let syn::Meta::NameValue(name_value) = meta else {
+				continue;
+			};
+
+			if name_value.path.is_ident("discriminator") {
+				discriminator = Some(path_segments(
+					&name_value.value,
+					"discriminator",
+					attribute_name,
+					struct_name,
+				)?);
+			} else if name_value.path.is_ident("variant") {
+				explicit_variant = Some(path_segments(
+					&name_value.value,
+					"variant",
+					attribute_name,
+					struct_name,
+				)?);
+			}
+		}
+
+		let discriminator = discriminator.ok_or_else(|| {
+			invalid_discriminator(
+				attribute_name,
+				struct_name,
+				"missing `discriminator` argument",
+			)
+		})?;
+		let explicit_variant = match explicit_variant.as_deref() {
+			None => None,
+			Some([variant]) => Some(variant.clone()),
+			Some(_) => {
+				return Err(invalid_discriminator(
+					attribute_name,
+					struct_name,
+					"`variant` must be a single identifier",
+				));
+			}
+		};
+		let (enum_segments, variant) = match explicit_variant {
+			Some(variant) => (discriminator.as_slice(), variant),
+			None => {
+				match discriminator.as_slice() {
+					[enum_name] => (core::slice::from_ref(enum_name), struct_name.to_string()),
+					[.., variant] => {
+						let enum_segments = &discriminator[..discriminator.len() - 1];
+						(enum_segments, variant.clone())
+					}
+					[] => {
+						return Err(invalid_discriminator(
+							attribute_name,
+							struct_name,
+							"`discriminator` path cannot be empty",
+						));
+					}
+				}
+			}
+		};
+		let discriminator_enum = enum_segments.last().cloned().ok_or_else(|| {
+			invalid_discriminator(
+				attribute_name,
+				struct_name,
+				"`discriminator` path cannot be empty",
+			)
+		})?;
+
+		return Ok(Some((discriminator_enum, variant)));
+	}
+
+	Ok(None)
+}
+
+fn path_segments(
+	expr: &syn::Expr,
+	argument_name: &str,
+	attribute_name: &str,
+	struct_name: &syn::Ident,
+) -> Result<Vec<String>, IdlError> {
+	let syn::Expr::Path(path) = expr else {
+		return Err(invalid_discriminator(
+			attribute_name,
+			struct_name,
+			format!("`{argument_name}` must be a path"),
+		));
+	};
+
+	Ok(path
+		.path
+		.segments
+		.iter()
+		.map(|segment| segment.ident.to_string())
+		.collect())
+}
+
+fn invalid_discriminator(
+	attribute_name: &str,
+	struct_name: &syn::Ident,
+	message: impl core::fmt::Display,
+) -> IdlError {
+	IdlError::Other(format!(
+		"Invalid `#[{attribute_name}]` discriminator on `{struct_name}`: {message}"
+	))
 }
 
 /// Extract all `#[discriminator]` enums from a file.

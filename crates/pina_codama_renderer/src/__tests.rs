@@ -236,11 +236,14 @@ fn renders_instruction_account_default_from_pda() {
 	insta::assert_snapshot!("instruction_account_default_from_pda", content);
 }
 
-#[test]
-fn renders_optional_accounts_with_program_fallback_strategy() {
+fn render_optional_accounts(
+	optional_account_strategy: Option<OptionalAccountStrategy>,
+	prefix: &str,
+) -> String {
 	let mut optional_signer = InstructionAccountNode::new("optionalSigner", false, false);
 	optional_signer.is_optional = Some(true);
 	optional_signer.is_signer = IsSigner::Either;
+	let required_account = InstructionAccountNode::new("requiredAccount", false, false);
 
 	let program = ProgramNode {
 		name: "optionalProgram".into(),
@@ -249,8 +252,8 @@ fn renders_optional_accounts_with_program_fallback_strategy() {
 		instructions: vec![InstructionNode {
 			name: "maybe".into(),
 			docs: Docs::default(),
-			optional_account_strategy: Some(OptionalAccountStrategy::ProgramId),
-			accounts: vec![optional_signer],
+			optional_account_strategy,
+			accounts: vec![optional_signer, required_account],
 			arguments: vec![],
 			extra_arguments: vec![],
 			remaining_accounts: vec![],
@@ -274,7 +277,7 @@ fn renders_optional_accounts_with_program_fallback_strategy() {
 		origin: None,
 		docs: Docs::default(),
 	};
-	let output_dir = unique_temp_dir("pina-codama-render-optional-fallback");
+	let output_dir = unique_temp_dir(prefix);
 	let crate_dir = output_dir.join("optional_program");
 	render_root_node(
 		&RootNode::new(program),
@@ -283,8 +286,73 @@ fn renders_optional_accounts_with_program_fallback_strategy() {
 	)
 	.unwrap_or_else(|e| panic!("render failed: {e}"));
 
-	let content = read_generated_file(&crate_dir, "instructions/maybe.rs");
+	read_generated_file(&crate_dir, "instructions/maybe.rs")
+}
+
+fn assert_optional_account_meta_order(content: &str, expects_program_fallback: bool) {
+	let optional_meta = "new_readonly(optional_signer, signer)";
+	let fallback_meta = "new_readonly(crate::OPTIONAL_PROGRAM_ID, false)";
+	let required_meta = "new_readonly(self.required_account, false)";
+	let optional_index = content
+		.find(optional_meta)
+		.unwrap_or_else(|| panic!("missing optional account meta:\n{content}"));
+	let required_index = content
+		.find(required_meta)
+		.unwrap_or_else(|| panic!("missing required account meta:\n{content}"));
+
+	assert!(
+		optional_index < required_index,
+		"optional account meta must precede the required account meta"
+	);
+
+	if expects_program_fallback {
+		let fallback_index = content
+			.find(fallback_meta)
+			.unwrap_or_else(|| panic!("missing program fallback meta:\n{content}"));
+
+		assert!(
+			optional_index < fallback_index && fallback_index < required_index,
+			"program fallback meta must preserve the optional account position"
+		);
+	} else {
+		assert!(
+			!content.contains(fallback_meta),
+			"omitted strategy must not render a program fallback meta"
+		);
+	}
+}
+
+#[test]
+fn renders_optional_accounts_with_program_fallback_strategy() {
+	let content = render_optional_accounts(
+		Some(OptionalAccountStrategy::ProgramId),
+		"pina-codama-render-optional-fallback",
+	);
+	assert_optional_account_meta_order(&content, true);
+
 	insta::assert_snapshot!("optional_accounts_with_program_fallback_strategy", content);
+}
+
+#[test]
+fn defaults_optional_accounts_to_program_fallback_strategy() {
+	let default_content = render_optional_accounts(None, "pina-codama-render-optional-default");
+	let explicit_content = render_optional_accounts(
+		Some(OptionalAccountStrategy::ProgramId),
+		"pina-codama-render-optional-explicit",
+	);
+
+	assert_eq!(default_content, explicit_content);
+	assert_optional_account_meta_order(&default_content, true);
+}
+
+#[test]
+fn renders_optional_accounts_with_omitted_strategy() {
+	let content = render_optional_accounts(
+		Some(OptionalAccountStrategy::Omitted),
+		"pina-codama-render-optional-omitted",
+	);
+
+	assert_optional_account_meta_order(&content, false);
 }
 
 #[test]

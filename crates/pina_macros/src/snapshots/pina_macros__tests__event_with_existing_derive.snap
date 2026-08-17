@@ -39,24 +39,18 @@ const __AUDITEVENT_ALIGNMENT_ASSERTIONS__: () = {
     ::core::assert!(
         ::core::mem::align_of:: < AuditEvent > () == 1,
         concat!("The alignment of struct `", stringify!(AuditEvent),
-        "` should be one so it can be used for zero-copy Pod casts.")
+        "` should be one so it can be used for zero-copy casts.")
     );
     ::core::assert!(
         ::core::mem::size_of:: < AuditEvent > () == (0usize + ::core::mem::size_of:: <
         [u8; EvtDisc::BYTES] > () + ::core::mem::size_of:: < u8 > () +
         ::core::mem::size_of:: < PodU64 > ()), concat!("`", stringify!(AuditEvent),
-        "` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed.")
+        "` layout is padded. `#[pina]` discriminator-first zero-copy layouts must be tightly packed.")
     );
 };
 impl AuditEvent {
-    #[allow(unsafe_code)]
-    pub fn to_bytes(&self) -> &[u8] {
-        unsafe {
-            ::core::slice::from_raw_parts(
-                self as *const Self as *const u8,
-                ::core::mem::size_of::<Self>(),
-            )
-        }
+    pub fn to_bytes(&self) -> <Self as ::pina::PinaToBytes>::Bytes {
+        <Self as ::pina::PinaToBytes>::to_bytes(self)
     }
     pub fn try_from_bytes(data: &[u8]) -> Result<&Self, ::pina::ProgramError> {
         if data.len() != ::core::mem::size_of::<Self>() {
@@ -74,6 +68,44 @@ impl AuditEvent {
 impl ::pina::HasDiscriminator for AuditEvent {
     type Type = EvtDisc;
     const VALUE: Self::Type = EvtDisc::AuditEvent;
+}
+const _: fn() = || {
+    fn assert_zc_elem<T: ::pina::ZcElem>() {}
+    assert_zc_elem::<[u8; EvtDisc::BYTES]>();
+    assert_zc_elem::<u8>();
+    assert_zc_elem::<PodU64>();
+};
+impl ::pina::PinaSerialize for AuditEvent {
+    fn write_bytes(&self, output: &mut [u8]) {
+        ::core::assert!(output.len() == ::core::mem::size_of:: < Self > ());
+        output.fill(0);
+        let mut offset = 0usize;
+        let field_size = ::core::mem::size_of::<[u8; EvtDisc::BYTES]>();
+        <[u8; EvtDisc::BYTES] as ::pina::PinaSerialize>::write_bytes(
+            &self.discriminator,
+            &mut output[offset..offset + field_size],
+        );
+        offset += field_size;
+        let field_size = ::core::mem::size_of::<u8>();
+        <u8 as ::pina::PinaSerialize>::write_bytes(
+            &self.action,
+            &mut output[offset..offset + field_size],
+        );
+        offset += field_size;
+        let field_size = ::core::mem::size_of::<PodU64>();
+        <PodU64 as ::pina::PinaSerialize>::write_bytes(
+            &self.timestamp,
+            &mut output[offset..offset + field_size],
+        );
+        offset += field_size;
+        ::core::debug_assert!(offset == output.len());
+    }
+}
+impl ::pina::PinaToBytes for AuditEvent {
+    type Bytes = [u8; ::core::mem::size_of::<AuditEvent>()];
+    fn zeroed_bytes() -> Self::Bytes {
+        [0u8; ::core::mem::size_of::<AuditEvent>()]
+    }
 }
 impl ::pina::ZcValidate for AuditEvent {
     fn validate_ref(value: &Self) -> Result<(), ::pina::ZeroPodError> {

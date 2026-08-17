@@ -10,14 +10,23 @@ import {
 	type AccountMeta,
 	type AccountSignerMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableSignerAccount,
 } from "@solana/kit";
 import {
@@ -41,6 +50,7 @@ export type InitializeInstruction<
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<
 		[
 			TAccountPayer extends string ?
@@ -57,6 +67,35 @@ export type InitializeInstruction<
 			...TRemainingAccounts,
 		]
 	>;
+
+export type InitializeInstructionData = { discriminator: number };
+
+export type InitializeInstructionDataArgs = {};
+
+export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
+	InitializeInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 0 }),
+	);
+}
+
+export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
+	InitializeInstructionData
+> {
+	return getStructDecoder([["discriminator", getU8Decoder()]]);
+}
+
+export function getInitializeInstructionDataCodec(): FixedSizeCodec<
+	InitializeInstructionDataArgs,
+	InitializeInstructionData
+> {
+	return combineCodec(
+		getInitializeInstructionDataEncoder(),
+		getInitializeInstructionDataDecoder(),
+	);
+}
 
 export type InitializeInput<
 	TAccountPayer extends string = string,
@@ -112,6 +151,7 @@ export function getInitializeInstruction<
 			getAccountMeta("oracle", accounts.oracle),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 		],
+		data: getInitializeInstructionDataEncoder().encode({}),
 		programAddress,
 	} as InitializeInstruction<
 		TProgramAddress,
@@ -131,13 +171,17 @@ export type ParsedInitializeInstruction<
 		oracle: TAccountMetas[1];
 		systemProgram: TAccountMetas[2];
 	};
+	data: InitializeInstructionData;
 };
 
 export function parseInitializeInstruction<
 	TProgram extends string,
 	TAccountMetas extends readonly AccountMeta[],
 >(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedInitializeInstruction<TProgram, TAccountMetas> {
 	if (instruction.accounts.length < 3) {
 		throw new SolanaError(
@@ -161,5 +205,6 @@ export function parseInitializeInstruction<
 			oracle: getNextAccount(),
 			systemProgram: getNextAccount(),
 		},
+		data: getInitializeInstructionDataDecoder().decode(instruction.data),
 	};
 }

@@ -23,6 +23,7 @@ pub struct Take {
 	pub escrow: solana_pubkey::Pubkey,
 	pub vault: solana_pubkey::Pubkey,
 	pub token_program: solana_pubkey::Pubkey,
+	pub associated_token_program: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
 }
 
@@ -50,6 +51,9 @@ impl Take {
 			escrow,
 			vault,
 			token_program,
+			associated_token_program: solana_pubkey::pubkey!(
+				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+			),
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}
@@ -64,7 +68,7 @@ impl Take {
 		data: TakeInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(11 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(12 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.taker, true));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.mint_a,
@@ -74,7 +78,7 @@ impl Take {
 			self.mint_b,
 			false,
 		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
+		accounts.push(solana_instruction::AccountMeta::new(
 			self.taker_ata_a,
 			false,
 		));
@@ -94,23 +98,21 @@ impl Take {
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.associated_token_program,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.system_program,
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
+		let mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];
+		pina::PinaSerialize::write_bytes(&data, &mut instruction_data);
 
 		solana_instruction::Instruction {
 			program_id: crate::ESCROW_PROGRAM_ID,
 			accounts,
-			data,
+			data: instruction_data,
 		}
 	}
 }
@@ -126,5 +128,20 @@ impl TakeInstructionData {
 		Self {
 			discriminator: TAKE_DISCRIMINATOR,
 		}
+	}
+}
+
+impl pina::PinaSerialize for TakeInstructionData {
+	fn write_bytes(&self, output: &mut [u8]) {
+		assert_eq!(output.len(), core::mem::size_of::<Self>());
+		output.fill(0);
+		let mut offset = 0usize;
+		let field_size = core::mem::size_of::<u8>();
+		pina::PinaSerialize::write_bytes(
+			&self.discriminator,
+			&mut output[offset..offset + field_size],
+		);
+		offset += field_size;
+		debug_assert_eq!(offset, output.len());
 	}
 }

@@ -147,19 +147,15 @@ pub(crate) fn render_instruction_page(
 		primary_program_const,
 	));
 	lines.push("\t\taccounts.extend_from_slice(remaining_accounts);".to_string());
-	lines.push("\t\t// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.".to_string());
-	lines.push("\t\tlet data = unsafe {".to_string());
-	lines.push("\t\t\tcore::slice::from_raw_parts(".to_string());
-	lines.push("\t\t\t\t&data as *const _ as *const u8,".to_string());
-	lines.push("\t\t\t\tcore::mem::size_of_val(&data),".to_string());
-	lines.push("\t\t\t)".to_string());
-	lines.push("\t\t\t.to_vec()".to_string());
-	lines.push("\t\t};".to_string());
+	lines.push(
+		"\t\tlet mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];".to_string(),
+	);
+	lines.push("\t\tpina::PinaSerialize::write_bytes(&data, &mut instruction_data);".to_string());
 	lines.push(String::new());
 	lines.push("\t\tsolana_instruction::Instruction {".to_string());
 	lines.push(format!("\t\t\tprogram_id: crate::{primary_program_const},"));
 	lines.push("\t\t\taccounts,".to_string());
-	lines.push("\t\t\tdata,".to_string());
+	lines.push("\t\t\tdata: instruction_data,".to_string());
 	lines.push("\t\t}".to_string());
 	lines.push("\t}".to_string());
 	lines.push("}".to_string());
@@ -167,12 +163,17 @@ pub(crate) fn render_instruction_page(
 
 	let mut data_fields = Vec::new();
 	data_fields.push(format!("\tpub discriminator: {},", discriminator.ty));
+	let mut data_pod_fields = vec![("discriminator".to_string(), discriminator.ty.clone())];
 
 	let mut data_new_args = Vec::new();
 	let mut data_inits = Vec::new();
 	data_inits.push(format!("\t\t\tdiscriminator: {},", discriminator.name));
 
 	for argument in &instruction.arguments {
+		if argument.name.as_ref() == "discriminator" {
+			continue;
+		}
+
 		let argument_name = snake(argument.name.as_ref());
 		let field_context = format!("{instruction_name}.{argument_name}");
 		let argument_type = render_type_for_pod(&argument.r#type, &field_context)?;
@@ -182,6 +183,7 @@ pub(crate) fn render_instruction_page(
 		}
 
 		data_fields.push(format!("\tpub {argument_name}: {argument_type},"));
+		data_pod_fields.push((argument_name.clone(), argument_type.clone()));
 		data_new_args.push(format!("{argument_name}: {argument_type}"));
 		data_inits.push(format!("\t\t\t{argument_name},"));
 	}
@@ -200,6 +202,27 @@ pub(crate) fn render_instruction_page(
 	lines.push("\t\tSelf {".to_string());
 	lines.extend(data_inits);
 	lines.push("\t\t}".to_string());
+	lines.push("\t}".to_string());
+	lines.push("}".to_string());
+	lines.push(String::new());
+	lines.push(format!(
+		"impl pina::PinaSerialize for {instruction_name}InstructionData {{"
+	));
+	lines.push("\tfn write_bytes(&self, output: &mut [u8]) {".to_string());
+	lines.push("\t\tassert_eq!(output.len(), core::mem::size_of::<Self>());".to_string());
+	lines.push("\t\toutput.fill(0);".to_string());
+	lines.push("\t\tlet mut offset = 0usize;".to_string());
+	for (field_name, field_type) in &data_pod_fields {
+		lines.push(format!(
+			"\t\tlet field_size = core::mem::size_of::<{field_type}>();"
+		));
+		lines.push(format!(
+			"\t\tpina::PinaSerialize::write_bytes(&self.{field_name}, &mut output[offset..offset \
+			 + field_size]);"
+		));
+		lines.push("\t\toffset += field_size;".to_string());
+	}
+	lines.push("\t\tdebug_assert_eq!(offset, output.len());".to_string());
 	lines.push("\t}".to_string());
 	lines.push("}".to_string());
 
@@ -249,10 +272,9 @@ fn render_instruction_account_metas(
 				lines.push("\t\t}".to_string());
 			}
 
-			if matches!(
-				instruction.optional_account_strategy,
-				Some(OptionalAccountStrategy::ProgramId)
-			) {
+			if instruction.optional_account_strategy.unwrap_or_default()
+				== OptionalAccountStrategy::ProgramId
+			{
 				lines.push("\t\telse {".to_string());
 				lines.push(format!(
 					"\t\t\taccounts.\

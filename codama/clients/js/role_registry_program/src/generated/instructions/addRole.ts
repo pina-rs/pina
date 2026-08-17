@@ -28,6 +28,7 @@ import {
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
@@ -76,6 +77,7 @@ export type AddRoleInstruction<
 	>;
 
 export type AddRoleInstructionData = {
+	discriminator: number;
 	roleId: bigint;
 	permissions: bigint;
 	bump: number;
@@ -90,19 +92,26 @@ export type AddRoleInstructionDataArgs = {
 export function getAddRoleInstructionDataEncoder(): FixedSizeEncoder<
 	AddRoleInstructionDataArgs
 > {
-	return getStructEncoder([["roleId", getU64Encoder()], [
-		"permissions",
-		getU64Encoder(),
-	], ["bump", getU8Encoder()]]);
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["roleId", getU64Encoder()],
+			["permissions", getU64Encoder()],
+			["bump", getU8Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 export function getAddRoleInstructionDataDecoder(): FixedSizeDecoder<
 	AddRoleInstructionData
 > {
-	return getStructDecoder([["roleId", getU64Decoder()], [
-		"permissions",
-		getU64Decoder(),
-	], ["bump", getU8Decoder()]]);
+	return getStructDecoder([
+		["discriminator", getU8Decoder()],
+		["roleId", getU64Decoder()],
+		["permissions", getU64Decoder()],
+		["bump", getU8Decoder()],
+	]);
 }
 
 export function getAddRoleInstructionDataCodec(): FixedSizeCodec<

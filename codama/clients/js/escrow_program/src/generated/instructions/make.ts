@@ -24,12 +24,13 @@ import {
 	type InstructionWithAccounts,
 	type InstructionWithData,
 	type ReadonlyAccount,
-	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
+	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
@@ -51,6 +52,8 @@ export type MakeInstruction<
 	TAccountMakerAtaA extends string | AccountMeta<string> = string,
 	TAccountEscrow extends string | AccountMeta<string> = string,
 	TAccountVault extends string | AccountMeta<string> = string,
+	TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+		"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 	TAccountSystemProgram extends string | AccountMeta<string> =
 		"11111111111111111111111111111111",
 	TAccountTokenProgram extends string | AccountMeta<string> = string,
@@ -61,19 +64,22 @@ export type MakeInstruction<
 	& InstructionWithAccounts<
 		[
 			TAccountMaker extends string ?
-					& ReadonlySignerAccount<TAccountMaker>
+					& WritableSignerAccount<TAccountMaker>
 					& AccountSignerMeta<TAccountMaker>
 				: TAccountMaker,
 			TAccountMintA extends string ? ReadonlyAccount<TAccountMintA>
 				: TAccountMintA,
 			TAccountMintB extends string ? ReadonlyAccount<TAccountMintB>
 				: TAccountMintB,
-			TAccountMakerAtaA extends string ? ReadonlyAccount<TAccountMakerAtaA>
+			TAccountMakerAtaA extends string ? WritableAccount<TAccountMakerAtaA>
 				: TAccountMakerAtaA,
 			TAccountEscrow extends string ? WritableAccount<TAccountEscrow>
 				: TAccountEscrow,
 			TAccountVault extends string ? WritableAccount<TAccountVault>
 				: TAccountVault,
+			TAccountAssociatedTokenProgram extends string
+				? ReadonlyAccount<TAccountAssociatedTokenProgram>
+				: TAccountAssociatedTokenProgram,
 			TAccountSystemProgram extends string
 				? ReadonlyAccount<TAccountSystemProgram>
 				: TAccountSystemProgram,
@@ -85,6 +91,7 @@ export type MakeInstruction<
 	>;
 
 export type MakeInstructionData = {
+	discriminator: number;
 	seed: bigint;
 	amountA: bigint;
 	amountB: bigint;
@@ -101,18 +108,23 @@ export type MakeInstructionDataArgs = {
 export function getMakeInstructionDataEncoder(): FixedSizeEncoder<
 	MakeInstructionDataArgs
 > {
-	return getStructEncoder([
-		["seed", getU64Encoder()],
-		["amountA", getU64Encoder()],
-		["amountB", getU64Encoder()],
-		["bump", getU8Encoder()],
-	]);
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["seed", getU64Encoder()],
+			["amountA", getU64Encoder()],
+			["amountB", getU64Encoder()],
+			["bump", getU8Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 export function getMakeInstructionDataDecoder(): FixedSizeDecoder<
 	MakeInstructionData
 > {
 	return getStructDecoder([
+		["discriminator", getU8Decoder()],
 		["seed", getU64Decoder()],
 		["amountA", getU64Decoder()],
 		["amountB", getU64Decoder()],
@@ -137,6 +149,7 @@ export type MakeInput<
 	TAccountMakerAtaA extends string = string,
 	TAccountEscrow extends string = string,
 	TAccountVault extends string = string,
+	TAccountAssociatedTokenProgram extends string = string,
 	TAccountSystemProgram extends string = string,
 	TAccountTokenProgram extends string = string,
 > = {
@@ -146,6 +159,7 @@ export type MakeInput<
 	makerAtaA: Address<TAccountMakerAtaA>;
 	escrow: Address<TAccountEscrow>;
 	vault: Address<TAccountVault>;
+	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
 	systemProgram?: Address<TAccountSystemProgram>;
 	tokenProgram: Address<TAccountTokenProgram>;
 	seed: MakeInstructionDataArgs["seed"];
@@ -161,6 +175,7 @@ export function getMakeInstruction<
 	TAccountMakerAtaA extends string,
 	TAccountEscrow extends string,
 	TAccountVault extends string,
+	TAccountAssociatedTokenProgram extends string,
 	TAccountSystemProgram extends string,
 	TAccountTokenProgram extends string,
 	TProgramAddress extends Address = typeof ESCROW_PROGRAM_PROGRAM_ADDRESS,
@@ -172,6 +187,7 @@ export function getMakeInstruction<
 		TAccountMakerAtaA,
 		TAccountEscrow,
 		TAccountVault,
+		TAccountAssociatedTokenProgram,
 		TAccountSystemProgram,
 		TAccountTokenProgram
 	>,
@@ -184,6 +200,7 @@ export function getMakeInstruction<
 	TAccountMakerAtaA,
 	TAccountEscrow,
 	TAccountVault,
+	TAccountAssociatedTokenProgram,
 	TAccountSystemProgram,
 	TAccountTokenProgram
 > {
@@ -193,12 +210,16 @@ export function getMakeInstruction<
 
 	// Original accounts.
 	const originalAccounts = {
-		maker: { value: input.maker ?? null, isWritable: false },
+		maker: { value: input.maker ?? null, isWritable: true },
 		mintA: { value: input.mintA ?? null, isWritable: false },
 		mintB: { value: input.mintB ?? null, isWritable: false },
-		makerAtaA: { value: input.makerAtaA ?? null, isWritable: false },
+		makerAtaA: { value: input.makerAtaA ?? null, isWritable: true },
 		escrow: { value: input.escrow ?? null, isWritable: true },
 		vault: { value: input.vault ?? null, isWritable: true },
+		associatedTokenProgram: {
+			value: input.associatedTokenProgram ?? null,
+			isWritable: false,
+		},
 		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
 		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
 	};
@@ -211,6 +232,12 @@ export function getMakeInstruction<
 	const args = { ...input };
 
 	// Resolve default values.
+	if (!accounts.associatedTokenProgram.value) {
+		accounts.associatedTokenProgram.value =
+			"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<
+				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+			>;
+	}
 	if (!accounts.systemProgram.value) {
 		accounts.systemProgram.value =
 			"11111111111111111111111111111111" as Address<
@@ -227,6 +254,7 @@ export function getMakeInstruction<
 			getAccountMeta("makerAtaA", accounts.makerAtaA),
 			getAccountMeta("escrow", accounts.escrow),
 			getAccountMeta("vault", accounts.vault),
+			getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 			getAccountMeta("tokenProgram", accounts.tokenProgram),
 		],
@@ -242,6 +270,7 @@ export function getMakeInstruction<
 		TAccountMakerAtaA,
 		TAccountEscrow,
 		TAccountVault,
+		TAccountAssociatedTokenProgram,
 		TAccountSystemProgram,
 		TAccountTokenProgram
 	>);
@@ -259,8 +288,9 @@ export type ParsedMakeInstruction<
 		makerAtaA: TAccountMetas[3];
 		escrow: TAccountMetas[4];
 		vault: TAccountMetas[5];
-		systemProgram: TAccountMetas[6];
-		tokenProgram: TAccountMetas[7];
+		associatedTokenProgram: TAccountMetas[6];
+		systemProgram: TAccountMetas[7];
+		tokenProgram: TAccountMetas[8];
 	};
 	data: MakeInstructionData;
 };
@@ -274,12 +304,12 @@ export function parseMakeInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedMakeInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 8) {
+	if (instruction.accounts.length < 9) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 8,
+				expectedAccountMetas: 9,
 			},
 		);
 	}
@@ -298,6 +328,7 @@ export function parseMakeInstruction<
 			makerAtaA: getNextAccount(),
 			escrow: getNextAccount(),
 			vault: getNextAccount(),
+			associatedTokenProgram: getNextAccount(),
 			systemProgram: getNextAccount(),
 			tokenProgram: getNextAccount(),
 		},

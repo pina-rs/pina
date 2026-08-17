@@ -53,19 +53,13 @@ impl Sysvars {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
+		let mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];
+		pina::PinaSerialize::write_bytes(&data, &mut instruction_data);
 
 		solana_instruction::Instruction {
 			program_id: crate::ANCHOR_SYSVARS_ID,
 			accounts,
-			data,
+			data: instruction_data,
 		}
 	}
 }
@@ -81,5 +75,20 @@ impl SysvarsInstructionData {
 		Self {
 			discriminator: SYSVARS_DISCRIMINATOR,
 		}
+	}
+}
+
+impl pina::PinaSerialize for SysvarsInstructionData {
+	fn write_bytes(&self, output: &mut [u8]) {
+		assert_eq!(output.len(), core::mem::size_of::<Self>());
+		output.fill(0);
+		let mut offset = 0usize;
+		let field_size = core::mem::size_of::<u8>();
+		pina::PinaSerialize::write_bytes(
+			&self.discriminator,
+			&mut output[offset..offset + field_size],
+		);
+		offset += field_size;
+		debug_assert_eq!(offset, output.len());
 	}
 }

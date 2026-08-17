@@ -61,7 +61,7 @@ fn test_accounts_derive_exact() {
 	let ix_data = [3u8; 100];
 
 	// Input with 2 accounts.
-	let mut input = unsafe { create_input(2, &ix_data) };
+	let mut input = create_input(2, &ix_data);
 	let mut accounts = [UNINIT; 2];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
@@ -80,7 +80,7 @@ fn test_accounts_derive_exact_not_enough() {
 	let ix_data = [3u8; 100];
 
 	// Input with 1 account
-	let mut input = unsafe { create_input(1, &ix_data) };
+	let mut input = create_input(1, &ix_data);
 	let mut accounts = [UNINIT; 1];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
@@ -96,7 +96,7 @@ fn test_accounts_derive_exact_excess() {
 	let ix_data = [3u8; 100];
 
 	// Input with 4 accounts
-	let mut input = unsafe { create_input(4, &ix_data) };
+	let mut input = create_input(4, &ix_data);
 	let mut accounts = [UNINIT; 4];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
@@ -111,7 +111,7 @@ fn test_accounts_derive_exact_excess() {
 fn test_accounts_derive_remaining_excess() {
 	// Input with 20 accounts.
 	let ix_data = [3u8; 100];
-	let mut input = unsafe { create_input(20, &ix_data) };
+	let mut input = create_input(20, &ix_data);
 	let mut accounts = [UNINIT; 20];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
@@ -125,10 +125,30 @@ fn test_accounts_derive_remaining_excess() {
 }
 
 #[test]
+fn test_accounts_derive_immutable_remaining_accepts_readonly_accounts() {
+	let ix_data = [3u8; 100];
+	let mut input = create_input_with_writability(3, &ix_data, |index| index == 0);
+	let mut accounts = [UNINIT; 3];
+
+	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
+	let accounts: &mut [AccountView] =
+		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
+
+	let test_accounts = TestAccountsRemaining::try_from_account_infos(accounts).unwrap();
+	assert_eq!(test_accounts.remaining.len(), 2);
+	assert!(
+		test_accounts
+			.remaining
+			.iter()
+			.all(|account| !account.is_writable())
+	);
+}
+
+#[test]
 fn test_accounts_derive_remaining_exact() {
 	// Input with 1 accounts.
 	let ix_data = [3u8; 100];
-	let mut input = unsafe { create_input(1, &ix_data) };
+	let mut input = create_input(1, &ix_data);
 	let mut accounts = [UNINIT; 1];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
@@ -144,7 +164,7 @@ fn test_accounts_derive_remaining_exact() {
 #[test]
 fn test_accounts_derive_exact_mutable() {
 	let ix_data = [3u8; 100];
-	let mut input = unsafe { create_input(2, &ix_data) };
+	let mut input = create_input(2, &ix_data);
 	let mut accounts = [UNINIT; 2];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
@@ -161,7 +181,7 @@ fn test_accounts_derive_exact_mutable() {
 #[test]
 fn test_accounts_derive_remaining_mutable() {
 	let ix_data = [3u8; 100];
-	let mut input = unsafe { create_input(4, &ix_data) };
+	let mut input = create_input(4, &ix_data);
 	let mut accounts = [UNINIT; 4];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
@@ -175,9 +195,23 @@ fn test_accounts_derive_remaining_mutable() {
 }
 
 #[test]
+fn test_accounts_derive_mutable_remaining_rejects_readonly_accounts() {
+	let ix_data = [3u8; 100];
+	let mut input = create_input_with_writability(3, &ix_data, |index| index != 2);
+	let mut accounts = [UNINIT; 3];
+
+	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
+	let accounts: &mut [AccountView] =
+		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
+
+	let result = TestAccountsRemainingMut::try_from_account_infos(accounts);
+	assert!(matches!(result, Err(ProgramError::InvalidAccountData)));
+}
+
+#[test]
 fn test_accounts_derive_nested_loader_order() {
 	let ix_data = [3u8; 100];
-	let mut input = unsafe { create_input(3, &ix_data) };
+	let mut input = create_input(3, &ix_data);
 	let mut accounts = [UNINIT; 3];
 
 	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
@@ -226,12 +260,14 @@ impl AlignedMemory {
 	}
 
 	/// Write data to the memory region at the specified offset.
-	///
-	/// # Safety
-	///
-	/// The caller must ensure that the `data` length does not exceed the
-	/// remaining space in the memory region starting from the `offset`.
-	pub unsafe fn write(&mut self, data: &[u8], offset: usize) {
+	pub fn write(&mut self, data: &[u8], offset: usize) {
+		let end = offset
+			.checked_add(data.len())
+			.expect("input offset overflow");
+		assert!(end <= self.layout.size(), "write exceeds input allocation");
+
+		// SAFETY: the bounds check above keeps the write within the allocation,
+		// and source and destination cannot overlap.
 		unsafe {
 			copy_nonoverlapping(data.as_ptr(), self.ptr.add(offset), data.len());
 		}
@@ -257,55 +293,47 @@ impl Drop for AlignedMemory {
 /// This function mimics the input buffer created by the SVM loader.  Each
 /// account created has zeroed data, apart from the `data_len` field, which is
 /// set to the index of the account.
-///
-/// # Safety
-///
-/// The returned `AlignedMemory` should only be used within the test context.
-unsafe fn create_input(accounts: usize, instruction_data: &[u8]) -> AlignedMemory {
+fn create_input(accounts: usize, instruction_data: &[u8]) -> AlignedMemory {
+	create_input_with_writability(accounts, instruction_data, |_| true)
+}
+
+/// Creates an input buffer with per-account writable flags.
+fn create_input_with_writability(
+	accounts: usize,
+	instruction_data: &[u8],
+	is_writable: impl Fn(usize) -> bool,
+) -> AlignedMemory {
 	let mut input = AlignedMemory::new(1_000_000_000);
 	// Number of accounts.
-	unsafe {
-		input.write(&(accounts as u64).to_le_bytes(), 0);
-	}
+	input.write(&(accounts as u64).to_le_bytes(), 0);
 	let mut offset = size_of::<u64>();
 
 	for i in 0..accounts {
 		// Account data.
 		let mut account = [0u8; STATIC_ACCOUNT_DATA + size_of::<u64>()];
 		account[0] = NON_DUP_MARKER;
-		// Mark the account as writable so mutable account fields parse.
-		account[2] = 1;
+		account[2] = u8::from(is_writable(i));
 		// Give each account a unique address so the duplicate-mutable
 		// account check does not treat them as aliases.
 		account[8] = (i + 1) as u8;
 		// Set the accounts data length. The actual account data is zeroed.
 		account[80..88].copy_from_slice(&i.to_le_bytes());
-		unsafe {
-			input.write(&account, offset);
-		}
+		input.write(&account, offset);
 		offset += account.len();
 		// Padding for the account data to align to `BPF_ALIGN_OF_U128`.
 		let padding_for_data = (i + (BPF_ALIGN_OF_U128 - 1)) & !(BPF_ALIGN_OF_U128 - 1);
-		unsafe {
-			input.write(&vec![0u8; padding_for_data], offset);
-		}
+		input.write(&vec![0u8; padding_for_data], offset);
 		offset += padding_for_data;
 	}
 
 	// Instruction data length.
-	unsafe {
-		input.write(&instruction_data.len().to_le_bytes(), offset);
-	}
+	input.write(&instruction_data.len().to_le_bytes(), offset);
 	offset += size_of::<u64>();
 	// Instruction data.
-	unsafe {
-		input.write(instruction_data, offset);
-	}
+	input.write(instruction_data, offset);
 	offset += instruction_data.len();
 	// Program ID (mock).
-	unsafe {
-		input.write(MOCK_PROGRAM_ID.as_ref(), offset);
-	}
+	input.write(MOCK_PROGRAM_ID.as_ref(), offset);
 
 	input
 }

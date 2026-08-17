@@ -10,15 +10,24 @@ import {
 	type AccountMeta,
 	type AccountSignerMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyAccount,
 	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
@@ -41,6 +50,7 @@ export type DeactivateRoleInstruction<
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<
 		[
 			TAccountAdmin extends string ?
@@ -55,6 +65,35 @@ export type DeactivateRoleInstruction<
 			...TRemainingAccounts,
 		]
 	>;
+
+export type DeactivateRoleInstructionData = { discriminator: number };
+
+export type DeactivateRoleInstructionDataArgs = {};
+
+export function getDeactivateRoleInstructionDataEncoder(): FixedSizeEncoder<
+	DeactivateRoleInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 3 }),
+	);
+}
+
+export function getDeactivateRoleInstructionDataDecoder(): FixedSizeDecoder<
+	DeactivateRoleInstructionData
+> {
+	return getStructDecoder([["discriminator", getU8Decoder()]]);
+}
+
+export function getDeactivateRoleInstructionDataCodec(): FixedSizeCodec<
+	DeactivateRoleInstructionDataArgs,
+	DeactivateRoleInstructionData
+> {
+	return combineCodec(
+		getDeactivateRoleInstructionDataEncoder(),
+		getDeactivateRoleInstructionDataDecoder(),
+	);
+}
 
 export type DeactivateRoleInput<
 	TAccountAdmin extends string = string,
@@ -107,6 +146,7 @@ export function getDeactivateRoleInstruction<
 			getAccountMeta("registryConfig", accounts.registryConfig),
 			getAccountMeta("roleEntry", accounts.roleEntry),
 		],
+		data: getDeactivateRoleInstructionDataEncoder().encode({}),
 		programAddress,
 	} as DeactivateRoleInstruction<
 		TProgramAddress,
@@ -126,13 +166,17 @@ export type ParsedDeactivateRoleInstruction<
 		registryConfig: TAccountMetas[1];
 		roleEntry: TAccountMetas[2];
 	};
+	data: DeactivateRoleInstructionData;
 };
 
 export function parseDeactivateRoleInstruction<
 	TProgram extends string,
 	TAccountMetas extends readonly AccountMeta[],
 >(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedDeactivateRoleInstruction<TProgram, TAccountMetas> {
 	if (instruction.accounts.length < 3) {
 		throw new SolanaError(
@@ -156,5 +200,6 @@ export function parseDeactivateRoleInstruction<
 			registryConfig: getNextAccount(),
 			roleEntry: getNextAccount(),
 		},
+		data: getDeactivateRoleInstructionDataDecoder().decode(instruction.data),
 	};
 }

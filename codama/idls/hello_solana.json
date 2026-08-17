@@ -36,6 +36,22 @@
 						]
 					}
 				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					}
+				],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",

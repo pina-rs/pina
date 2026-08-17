@@ -161,7 +161,7 @@ mod tests {
 			.label(LABEL_HELLO)
 			.build();
 		let bytes = event.to_bytes();
-		let decoded = MyEvent::try_from_bytes(bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
+		let decoded = MyEvent::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
 
 		assert_eq!(decoded.label, LABEL_HELLO);
 		assert_eq!(u64::from(decoded.data), 5);

@@ -305,11 +305,11 @@ mod tests {
 			.build();
 
 		// Serialize to bytes via to_bytes().
-		let bytes: &[u8] = state.to_bytes();
+		let bytes = state.to_bytes();
 		assert_eq!(bytes.len(), 10);
 
 		// Deserialize back.
-		let deserialized = CounterState::try_from_bytes(bytes)
+		let deserialized = CounterState::try_from_bytes(&bytes)
 			.unwrap_or_else(|e| panic!("deserialization failed: {e:?}"));
 		assert_eq!(deserialized.bump, 7);
 		assert_eq!(u64::from(deserialized.count), 999);

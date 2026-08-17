@@ -29,6 +29,7 @@ import {
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
@@ -83,6 +84,7 @@ export type InitializeInstruction<
 	>;
 
 export type InitializeInstructionData = {
+	discriminator: number;
 	totalAmount: bigint;
 	startTs: bigint;
 	cliffTs: bigint;
@@ -101,19 +103,24 @@ export type InitializeInstructionDataArgs = {
 export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
 	InitializeInstructionDataArgs
 > {
-	return getStructEncoder([
-		["totalAmount", getU64Encoder()],
-		["startTs", getU64Encoder()],
-		["cliffTs", getU64Encoder()],
-		["endTs", getU64Encoder()],
-		["bump", getU8Encoder()],
-	]);
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["totalAmount", getU64Encoder()],
+			["startTs", getU64Encoder()],
+			["cliffTs", getU64Encoder()],
+			["endTs", getU64Encoder()],
+			["bump", getU8Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 0 }),
+	);
 }
 
 export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
 	InitializeInstructionData
 > {
 	return getStructDecoder([
+		["discriminator", getU8Decoder()],
 		["totalAmount", getU64Decoder()],
 		["startTs", getU64Decoder()],
 		["cliffTs", getU64Decoder()],

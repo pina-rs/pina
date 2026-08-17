@@ -10,15 +10,24 @@ import {
 	type AccountMeta,
 	type AccountSignerMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyAccount,
 	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
@@ -43,6 +52,7 @@ export type CancelInstruction<
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<
 		[
 			TAccountAdmin extends string ?
@@ -62,6 +72,35 @@ export type CancelInstruction<
 			...TRemainingAccounts,
 		]
 	>;
+
+export type CancelInstructionData = { discriminator: number };
+
+export type CancelInstructionDataArgs = {};
+
+export function getCancelInstructionDataEncoder(): FixedSizeEncoder<
+	CancelInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 2 }),
+	);
+}
+
+export function getCancelInstructionDataDecoder(): FixedSizeDecoder<
+	CancelInstructionData
+> {
+	return getStructDecoder([["discriminator", getU8Decoder()]]);
+}
+
+export function getCancelInstructionDataCodec(): FixedSizeCodec<
+	CancelInstructionDataArgs,
+	CancelInstructionData
+> {
+	return combineCodec(
+		getCancelInstructionDataEncoder(),
+		getCancelInstructionDataDecoder(),
+	);
+}
 
 export type CancelInput<
 	TAccountAdmin extends string = string,
@@ -127,6 +166,7 @@ export function getCancelInstruction<
 			getAccountMeta("vault", accounts.vault),
 			getAccountMeta("tokenProgram", accounts.tokenProgram),
 		],
+		data: getCancelInstructionDataEncoder().encode({}),
 		programAddress,
 	} as CancelInstruction<
 		TProgramAddress,
@@ -150,13 +190,17 @@ export type ParsedCancelInstruction<
 		vault: TAccountMetas[3];
 		tokenProgram: TAccountMetas[4];
 	};
+	data: CancelInstructionData;
 };
 
 export function parseCancelInstruction<
 	TProgram extends string,
 	TAccountMetas extends readonly AccountMeta[],
 >(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCancelInstruction<TProgram, TAccountMetas> {
 	if (instruction.accounts.length < 5) {
 		throw new SolanaError(
@@ -182,5 +226,6 @@ export function parseCancelInstruction<
 			vault: getNextAccount(),
 			tokenProgram: getNextAccount(),
 		},
+		data: getCancelInstructionDataDecoder().decode(instruction.data),
 	};
 }

@@ -6,6 +6,7 @@ use pina::*;
 pub enum MyInstruction {
 	FlipBit = 0,
 	Another = 1,
+	Collections = 2,
 }
 
 #[instruction(crate = ::pina, discriminator = MyInstruction)]
@@ -19,6 +20,12 @@ pub struct FlipBit {
 	pub offset: u8,
 	/// The value to set the bit to: `0` or `1`.
 	pub value: u8,
+}
+
+#[instruction(crate = ::pina, discriminator = MyInstruction)]
+pub struct Collections {
+	pub name: PodString<4>,
+	pub values: PodVec<PodU16, 2>,
 }
 
 #[test]
@@ -41,7 +48,22 @@ fn test_instruction_macro() {
 	assert_eq!(flip_bit.discriminator, expected_discriminator);
 
 	let bytes = flip_bit.to_bytes();
-	let flip_bit_from_bytes = FlipBit::try_from_bytes(bytes).unwrap();
+	let flip_bit_from_bytes = FlipBit::try_from_bytes(&bytes).unwrap();
 
 	assert_eq!(flip_bit, *flip_bit_from_bytes);
+}
+
+#[test]
+fn partial_collections_serialize_without_reading_inactive_capacity() {
+	let mut name = PodString::<4>::default();
+	assert!(name.set("hi"));
+
+	let mut values = PodVec::<PodU16, 2>::default();
+	assert!(values.push(PodU16::from(0x1234)));
+
+	let data = Collections::builder().name(name).values(values).build();
+	let bytes = data.to_bytes();
+
+	assert_eq!(bytes, [2, 2, b'h', b'i', 0, 0, 1, 0, 0x34, 0x12, 0, 0]);
+	assert!(Collections::try_from_bytes(&bytes).is_ok());
 }

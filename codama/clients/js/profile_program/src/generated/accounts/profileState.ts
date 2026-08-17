@@ -34,6 +34,7 @@ import {
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { findProfilePda, ProfileSeeds } from "../pdas";
 
@@ -67,6 +68,7 @@ export function getProfileStateDiscriminatorBytes(): ReadonlyUint8Array {
  * ```
  */
 export type ProfileState = {
+	discriminator: number;
 	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
 	bump: number;
 	/**
@@ -88,22 +90,47 @@ export type ProfileState = {
 	active: boolean;
 };
 
-export type ProfileStateArgs = ProfileState;
+export type ProfileStateArgs = {
+	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
+	bump: number;
+	/**
+	 * The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8
+	 * bytes.
+	 */
+	name: ReadonlyUint8Array;
+	/**
+	 * A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8
+	 * bytes.
+	 */
+	bio: ReadonlyUint8Array;
+	/**
+	 * Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
+	 * elements.
+	 */
+	tags: ReadonlyUint8Array;
+	/** Whether the profile is active. */
+	active: boolean;
+};
 
 /** Gets the encoder for {@link ProfileStateArgs} account data. */
 export function getProfileStateEncoder(): FixedSizeEncoder<ProfileStateArgs> {
-	return getStructEncoder([
-		["bump", getU8Encoder()],
-		["name", fixEncoderSize(getBytesEncoder(), 33)],
-		["bio", fixEncoderSize(getBytesEncoder(), 129)],
-		["tags", fixEncoderSize(getBytesEncoder(), 66)],
-		["active", getBooleanEncoder()],
-	]);
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["bump", getU8Encoder()],
+			["name", fixEncoderSize(getBytesEncoder(), 33)],
+			["bio", fixEncoderSize(getBytesEncoder(), 129)],
+			["tags", fixEncoderSize(getBytesEncoder(), 66)],
+			["active", getBooleanEncoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link ProfileState} account data. */
 export function getProfileStateDecoder(): FixedSizeDecoder<ProfileState> {
 	return getStructDecoder([
+		["discriminator", getU8Decoder()],
 		["bump", getU8Decoder()],
 		["name", fixDecoderSize(getBytesDecoder(), 33)],
 		["bio", fixDecoderSize(getBytesDecoder(), 129)],

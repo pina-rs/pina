@@ -184,8 +184,14 @@ describe("vesting JS client contracts", () => {
 			{ address: vault, role: WRITABLE },
 			{ address: tokenProgram, role: READONLY },
 		]);
-		expect(cancel).not.toHaveProperty("data");
-		expect(parseCancelInstruction(cancel).accounts.admin.address).toBe(admin);
+		expect(Array.from(cancel.data)).toEqual([
+			VESTING_CANCEL_DISCRIMINATOR,
+		]);
+		const parsedCancel = parseCancelInstruction(cancel);
+		expect(parsedCancel.accounts.admin.address).toBe(admin);
+		expect(parsedCancel.data.discriminator).toBe(
+			VESTING_CANCEL_DISCRIMINATOR,
+		);
 	});
 
 	test("vesting discriminators are identified by instruction helpers", () => {
@@ -293,7 +299,9 @@ describe("role registry JS client contracts", () => {
 		expect(
 			parseDeactivateRoleInstruction(deactivateRole).accounts.roleEntry.address,
 		).toBe(roleEntry);
-		expect(deactivateRole).not.toHaveProperty("data");
+		expect(Array.from(deactivateRole.data)).toEqual([
+			ROLE_DEACTIVATE_ROLE_DISCRIMINATOR,
+		]);
 
 		const rotateAdmin = getRotateAdminInstruction({
 			admin,
@@ -305,9 +313,14 @@ describe("role registry JS client contracts", () => {
 			{ address: newAdmin, role: READONLY },
 			{ address: registryConfig, role: WRITABLE },
 		]);
-		expect(parseRotateAdminInstruction(rotateAdmin).accounts.newAdmin.address)
-			.toBe(newAdmin);
-		expect(rotateAdmin).not.toHaveProperty("data");
+		const parsedRotateAdmin = parseRotateAdminInstruction(rotateAdmin);
+		expect(parsedRotateAdmin.accounts.newAdmin.address).toBe(newAdmin);
+		expect(Array.from(rotateAdmin.data)).toEqual([
+			ROLE_ROTATE_ADMIN_DISCRIMINATOR,
+		]);
+		expect(parsedRotateAdmin.data.discriminator).toBe(
+			ROLE_ROTATE_ADMIN_DISCRIMINATOR,
+		);
 	});
 
 	test("role discriminators are identified by instruction helpers", () => {
@@ -471,7 +484,10 @@ describe("staking rewards JS client contracts", () => {
 		expect(parseStakingClaimInstruction(claim).accounts.user.address).toBe(
 			admin,
 		);
-		expect(claim).not.toHaveProperty("data");
+		expect(Array.from(claim.data)).toEqual([STAKING_CLAIM_DISCRIMINATOR]);
+		expect(parseStakingClaimInstruction(claim).data.discriminator).toBe(
+			STAKING_CLAIM_DISCRIMINATOR,
+		);
 	});
 
 	test("staking discriminators are identified by instruction helpers", () => {

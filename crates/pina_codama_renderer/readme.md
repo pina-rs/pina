@@ -2,7 +2,7 @@
 
 <br>
 
-Repository-local Codama Rust renderer that generates Pina-style bytemuck models and discriminator-first layouts from Codama JSON IDLs.
+Repository-local Codama Rust renderer that generates Pina-style validated zeropod models and discriminator-first layouts from Codama JSON IDLs.
 
 [![CI][ci-status-image]][ci-status-link] [![License][unlicense-image]][unlicense-link]
 
@@ -23,7 +23,7 @@ cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
 <br>
 
 - Discriminator-first `#[repr(C)]` account/instruction/event structs
-- `bytemuck::Pod` + `bytemuck::Zeroable` derives (no `borsh` serialization)
+- zeropod `ZcElem`/`ZcValidate` models and initialized field-wise serialization (no `borsh`)
 - `pina` types for alignment-safe integer fields
 - Type-safe instruction builders
 

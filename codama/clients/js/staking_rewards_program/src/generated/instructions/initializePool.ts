@@ -27,6 +27,7 @@ import {
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
@@ -82,20 +83,32 @@ export type InitializePoolInstruction<
 		]
 	>;
 
-export type InitializePoolInstructionData = { bump: number };
+export type InitializePoolInstructionData = {
+	discriminator: number;
+	bump: number;
+};
 
-export type InitializePoolInstructionDataArgs = InitializePoolInstructionData;
+export type InitializePoolInstructionDataArgs = { bump: number };
 
 export function getInitializePoolInstructionDataEncoder(): FixedSizeEncoder<
 	InitializePoolInstructionDataArgs
 > {
-	return getStructEncoder([["bump", getU8Encoder()]]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"bump",
+			getU8Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 0 }),
+	);
 }
 
 export function getInitializePoolInstructionDataDecoder(): FixedSizeDecoder<
 	InitializePoolInstructionData
 > {
-	return getStructDecoder([["bump", getU8Decoder()]]);
+	return getStructDecoder([["discriminator", getU8Decoder()], [
+		"bump",
+		getU8Decoder(),
+	]]);
 }
 
 export function getInitializePoolInstructionDataCodec(): FixedSizeCodec<

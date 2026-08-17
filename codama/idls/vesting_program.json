@@ -16,6 +16,20 @@
 					"fields": [
 						{
 							"kind": "structFieldTypeNode",
+							"name": "discriminator",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
 							"name": "admin",
 							"type": {
 								"kind": "publicKeyTypeNode"
@@ -189,6 +203,20 @@
 				"arguments": [
 					{
 						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
 						"name": "totalAmount",
 						"type": {
 							"kind": "numberTypeNode",
@@ -313,6 +341,20 @@
 				"arguments": [
 					{
 						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 1
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
 						"name": "amount",
 						"type": {
 							"kind": "numberTypeNode",
@@ -378,6 +420,22 @@
 						"isWritable": false,
 						"isSigner": false,
 						"isOptional": false
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 2
+						}
 					}
 				],
 				"discriminators": [
