@@ -51,7 +51,14 @@ impl UpdateRole {
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.role_entry, false));
 		accounts.extend_from_slice(remaining_accounts);
-		let data = bytemuck::bytes_of(&data).to_vec();
+		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
+		let data = unsafe {
+			core::slice::from_raw_parts(
+				&data as *const _ as *const u8,
+				core::mem::size_of_val(&data),
+			)
+			.to_vec()
+		};
 
 		solana_instruction::Instruction {
 			program_id: crate::ROLE_REGISTRY_PROGRAM_ID,
@@ -62,14 +69,14 @@ impl UpdateRole {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct UpdateRoleInstructionData {
 	pub discriminator: u8,
-	pub permissions: pina_pod_primitives::PodU64,
+	pub permissions: pina::PodU64,
 }
 
 impl UpdateRoleInstructionData {
-	pub const fn new(permissions: pina_pod_primitives::PodU64) -> Self {
+	pub const fn new(permissions: pina::PodU64) -> Self {
 		Self {
 			discriminator: UPDATE_ROLE_DISCRIMINATOR,
 			permissions,

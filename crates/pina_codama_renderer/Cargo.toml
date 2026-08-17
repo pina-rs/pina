@@ -7,7 +7,7 @@ keywords.workspace = true
 license.workspace = true
 publish = true
 repository.workspace = true
-description = "Codama Rust renderer that generates Pina-style bytemuck models and discriminator-first layouts"
+description = "Codama Rust renderer that generates Pina-style zeropod models and discriminator-first layouts"
 
 [dependencies]
 clap = { workspace = true, features = ["derive", "std"], default-features = true }

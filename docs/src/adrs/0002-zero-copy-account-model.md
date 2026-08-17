@@ -17,8 +17,8 @@ Pina keeps zero-copy account and instruction handling as a core design choice, b
 
 In practice that means:
 
-- zero-copy types must be fixed-size and Pod-compatible
-- typed loads must validate discriminator, size, and relevant account identity constraints before use
+- zero-copy types must be fixed-size and zeropod-compatible (`ZcElem` + `ZcValidate`)
+- typed loads must validate discriminator, size, content (`ZcValidate`), and relevant account identity constraints before use
 - dynamic, variable-length, or schema-driven reinterpretation is out of scope for the core loader model
 - performance-motivated `unsafe` is only acceptable when the soundness boundary is narrow and documented
 

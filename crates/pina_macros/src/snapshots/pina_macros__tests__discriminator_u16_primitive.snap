@@ -47,6 +47,4 @@ impl ::core::convert::TryFrom<u16> for WideDiscriminator {
         }
     }
 }
-unsafe impl ::pina::Zeroable for WideDiscriminator {}
-unsafe impl ::pina::Pod for WideDiscriminator {}
 ::pina::into_discriminator!(WideDiscriminator, u16);

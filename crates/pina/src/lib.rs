@@ -6,7 +6,7 @@
 //!
 //! ## Features
 //!
-//! - **Zero-copy account deserialization** via `bytemuck` — no heap allocation.
+//! - **Zero-copy account deserialization** via `zeropod` — no heap allocation.
 //! - **`no_std` compatible** — designed for on-chain deployment to the SBF
 //!   target.
 //! - **Discriminator system** — every account, instruction, and event type
@@ -48,19 +48,10 @@ mod traits;
 pub mod transaction;
 mod utils;
 
-/// Re-export of the [`bytemuck`] crate for zero-copy serialization.
-pub use bytemuck;
-/// Marker trait for types that can be safely cast from any byte pattern.
-pub use bytemuck::Pod;
-/// Marker trait for types that can be safely zeroed.
-pub use bytemuck::Zeroable;
 /// Re-export all proc macros from `pina_macros` when the `derive` feature is
 /// enabled.
 #[cfg(feature = "derive")]
 pub use pina_macros::*;
-/// Macro for implementing bidirectional conversion between Pod wrappers and
-/// standard integers.
-pub use pina_pod_primitives::impl_int_conversion;
 /// Re-export of the [`pinocchio`] crate for low-level Solana program
 /// primitives.
 pub use pinocchio;
@@ -135,6 +126,24 @@ pub use typed_builder;
 /// **Not part of the stable public API.** See [`typed_builder`] for details.
 #[doc(hidden)]
 pub use typed_builder::TypedBuilder;
+/// Re-export of the [`zeropod`] crate for zero-copy serialization.
+pub use zeropod;
+/// Declares whether a type uses a fixed or compact zero-copy layout.
+pub use zeropod::LayoutKind;
+/// Marker trait for types that can be safely cast from any byte pattern.
+pub use zeropod::ZcElem;
+/// Maps a native Rust type to its pod (zero-copy) companion and byte size.
+pub use zeropod::ZcField;
+/// Validation trait for stored (pod) types.
+pub use zeropod::ZcValidate;
+/// Zero-copy access for compact (variable-length) types.
+pub use zeropod::ZeroPodCompact;
+/// Error type for zeropod validation failures.
+pub use zeropod::ZeroPodError;
+/// Zero-copy access for fixed-size types.
+pub use zeropod::ZeroPodFixed;
+/// Schema trait for zero-copy types.
+pub use zeropod::ZeroPodSchema;
 
 /// CPI helpers for account creation, PDA allocation, and account closure.
 pub use crate::cpi::*;
@@ -223,7 +232,7 @@ macro_rules! log {
 /// modules that want validation traits without long import lists.
 ///
 /// <!-- {=pinaMdtManagedDocNote|trim|linePrefix:"/// ":true} -->
-/// This section is synchronized by `mdt` from `api-docs.t.md`.<!-- {/pinaMdtManagedDocNote} -->
+//// This section is synchronized by `mdt` from `api-docs.t.md`.<!-- {/pinaMdtManagedDocNote} -->
 pub mod prelude {
 	#[cfg(feature = "logs")]
 	pub use solana_program_log::Logger;

@@ -77,7 +77,14 @@ impl Initialize {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		let data = bytemuck::bytes_of(&data).to_vec();
+		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
+		let data = unsafe {
+			core::slice::from_raw_parts(
+				&data as *const _ as *const u8,
+				core::mem::size_of_val(&data),
+			)
+			.to_vec()
+		};
 
 		solana_instruction::Instruction {
 			program_id: crate::VESTING_PROGRAM_ID,
@@ -88,22 +95,22 @@ impl Initialize {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct InitializeInstructionData {
 	pub discriminator: u8,
-	pub total_amount: pina_pod_primitives::PodU64,
-	pub start_ts: pina_pod_primitives::PodU64,
-	pub cliff_ts: pina_pod_primitives::PodU64,
-	pub end_ts: pina_pod_primitives::PodU64,
+	pub total_amount: pina::PodU64,
+	pub start_ts: pina::PodU64,
+	pub cliff_ts: pina::PodU64,
+	pub end_ts: pina::PodU64,
 	pub bump: u8,
 }
 
 impl InitializeInstructionData {
 	pub const fn new(
-		total_amount: pina_pod_primitives::PodU64,
-		start_ts: pina_pod_primitives::PodU64,
-		cliff_ts: pina_pod_primitives::PodU64,
-		end_ts: pina_pod_primitives::PodU64,
+		total_amount: pina::PodU64,
+		start_ts: pina::PodU64,
+		cliff_ts: pina::PodU64,
+		end_ts: pina::PodU64,
 		bump: u8,
 	) -> Self {
 		Self {

@@ -73,7 +73,7 @@ fn build_event(instruction: EventsInstruction) -> EmittedEvent {
 		EventsInstruction::Initialize => {
 			EmittedEvent::MyEvent(
 				MyEvent::builder()
-					.data(PodU64::from_primitive(5))
+					.data(PodU64::from(5))
 					.label(LABEL_HELLO)
 					.build(),
 			)
@@ -82,7 +82,7 @@ fn build_event(instruction: EventsInstruction) -> EmittedEvent {
 		EventsInstruction::TestEvent => {
 			EmittedEvent::MyOtherEvent(
 				MyOtherEvent::builder()
-					.data(PodU64::from_primitive(6))
+					.data(PodU64::from(6))
 					.label(LABEL_BYE)
 					.build(),
 			)
@@ -91,7 +91,7 @@ fn build_event(instruction: EventsInstruction) -> EmittedEvent {
 		EventsInstruction::TestEventCpi => {
 			EmittedEvent::MyOtherEvent(
 				MyOtherEvent::builder()
-					.data(PodU64::from_primitive(7))
+					.data(PodU64::from(7))
 					.label(LABEL_CPI)
 					.build(),
 			)
@@ -157,7 +157,7 @@ mod tests {
 	#[test]
 	fn my_event_roundtrip_serialization() {
 		let event = MyEvent::builder()
-			.data(PodU64::from_primitive(5))
+			.data(PodU64::from(5))
 			.label(LABEL_HELLO)
 			.build();
 		let bytes = event.to_bytes();

@@ -25,7 +25,6 @@ members = [
 	"crates/pina_cli",
 	"crates/pina_codama_renderer",
 	"crates/pina_macros",
-	"crates/pina_pod_primitives",
 	"crates/pina_profile",
 	"crates/pina_sdk_ids",
 	"examples/anchor_declare_id",
@@ -129,13 +128,13 @@ tokio = { default-features = false, version = "^1" }
 trybuild = { default-features = false, version = "^1" }
 typed-builder = { default-features = false, version = "^0.23" }
 walkdir = { default-features = false, version = "^2" }
+zeropod = { default-features = false, version = "0.3.5", features = ["solana-address", "solana-program-error"] }
 
 # publishable crates
 pina = { default-features = false, path = "crates/pina", version = "0.8.0" }
 pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.8.0" }
 pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.8.0" }
 pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.8.0" }
-pina_pod_primitives = { default-features = false, path = "crates/pina_pod_primitives", version = "0.8.0" }
 pina_profile = { default-features = false, path = "crates/pina_profile", version = "0.8.0" }
 pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.8.0" }
 

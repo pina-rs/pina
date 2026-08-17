@@ -205,7 +205,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		let mut registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
 		*registry_config = RegistryConfig::builder()
 			.admin(admin_address)
-			.role_count(PodU64::from_primitive(0))
+			.role_count(PodU64::from(0))
 			.bump(args.bump)
 			.build();
 
@@ -217,9 +217,9 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = AddRoleInstruction::try_from_bytes(data)?;
 		let registry_address = *self.registry_config.address();
-		let role_entry_seeds = role_entry_seeds!(registry_address.as_ref(), &args.role_id.0);
+		let role_entry_seeds = role_entry_seeds!(registry_address.as_ref(), args.role_id.as_ref());
 		let role_entry_seeds_with_bump =
-			role_entry_seeds!(registry_address.as_ref(), &args.role_id.0, args.bump);
+			role_entry_seeds!(registry_address.as_ref(), args.role_id.as_ref(), args.bump);
 
 		self.admin.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
@@ -253,12 +253,12 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 			.role_id(args.role_id)
 			.grantee(*self.grantee.address())
 			.permissions(args.permissions)
-			.active(PodBool::from_bool(true))
+			.active(PodBool::from(true))
 			.bump(args.bump)
 			.build();
 
 		let mut registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
-		registry_config.role_count = PodU64::from_primitive(role_count);
+		registry_config.role_count = PodU64::from(role_count);
 
 		Ok(())
 	}
@@ -324,7 +324,7 @@ impl<'a> ProcessAccountInfos<'a> for DeactivateRoleAccounts<'a> {
 		}
 
 		let mut role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
-		role_entry.active = PodBool::from_bool(false);
+		role_entry.active = PodBool::from(false);
 
 		Ok(())
 	}
@@ -365,8 +365,8 @@ mod tests {
 	#[test]
 	fn instruction_roundtrip() {
 		let ix = AddRoleInstruction::builder()
-			.role_id(PodU64::from_primitive(7))
-			.permissions(PodU64::from_primitive(3))
+			.role_id(PodU64::from(7))
+			.permissions(PodU64::from(3))
 			.bump(2)
 			.build();
 		let bytes = ix.to_bytes();

@@ -60,7 +60,7 @@ dprint fmt .changeset/* --allow-no-files
 - `pina_sdk_ids`
 - `pina_cli`
 - `pina_codama_renderer`
-- `pina_pod_primitives`
+- `pina`
 - `pina_profile`
 - `codama-nodes-from-pina`
 

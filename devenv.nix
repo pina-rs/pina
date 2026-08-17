@@ -735,10 +735,10 @@ in
         unset NIX_LD_LIBRARY_PATH
         unset LD_PRELOAD
 
-        # Run all Kani harnesses in pina_pod_primitives.
-        cargo kani --manifest-path "$DEVENV_ROOT/crates/pina_pod_primitives/Cargo.toml" --all-features
+        # Run all Kani harnesses in pina.
+        cargo kani --manifest-path "$DEVENV_ROOT/crates/pina/Cargo.toml" --all-features
       '';
-      description = "Run Kani model-checking proofs for pina_pod_primitives.";
+      description = "Run Kani model-checking proofs for pina.";
       binary = "bash";
     };
     "fix:all" = {

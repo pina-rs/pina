@@ -8,18 +8,15 @@
 	clippy::too_many_arguments
 )]
 
-use bytemuck::Pod;
-use bytemuck::Zeroable;
-
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Pod, Zeroable)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PositionState {
 	pub discriminator: u8,
 	pub pool: solana_pubkey::Pubkey,
 	pub owner: solana_pubkey::Pubkey,
-	pub staked_amount: pina_pod_primitives::PodU64,
-	pub reward_debt: pina_pod_primitives::PodU64,
-	pub pending_rewards: pina_pod_primitives::PodU64,
+	pub staked_amount: pina::PodU64,
+	pub reward_debt: pina::PodU64,
+	pub pending_rewards: pina::PodU64,
 	pub bump: u8,
 }
 
@@ -31,9 +28,9 @@ impl PositionState {
 	pub const fn new(
 		pool: solana_pubkey::Pubkey,
 		owner: solana_pubkey::Pubkey,
-		staked_amount: pina_pod_primitives::PodU64,
-		reward_debt: pina_pod_primitives::PodU64,
-		pending_rewards: pina_pod_primitives::PodU64,
+		staked_amount: pina::PodU64,
+		reward_debt: pina::PodU64,
+		pending_rewards: pina::PodU64,
 		bump: u8,
 	) -> Self {
 		Self {
@@ -48,8 +45,11 @@ impl PositionState {
 	}
 
 	pub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {
-		let account = bytemuck::try_from_bytes::<Self>(data)
-			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
+		if data.len() != core::mem::size_of::<Self>() {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
+		let account = unsafe { &*(data.as_ptr() as *const Self) };
 		if account.discriminator != POSITION_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
@@ -59,8 +59,11 @@ impl PositionState {
 	pub fn from_bytes_mut(
 		data: &mut [u8],
 	) -> Result<&mut Self, solana_program_error::ProgramError> {
-		let account = bytemuck::try_from_bytes_mut::<Self>(data)
-			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
+		if data.len() != core::mem::size_of::<Self>() {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
+		let account = unsafe { &mut *(data.as_mut_ptr() as *mut Self) };
 		if account.discriminator != POSITION_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}

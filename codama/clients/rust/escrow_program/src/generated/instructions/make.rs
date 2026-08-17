@@ -82,7 +82,14 @@ impl Make {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		let data = bytemuck::bytes_of(&data).to_vec();
+		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
+		let data = unsafe {
+			core::slice::from_raw_parts(
+				&data as *const _ as *const u8,
+				core::mem::size_of_val(&data),
+			)
+			.to_vec()
+		};
 
 		solana_instruction::Instruction {
 			program_id: crate::ESCROW_PROGRAM_ID,
@@ -93,20 +100,20 @@ impl Make {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MakeInstructionData {
 	pub discriminator: u8,
-	pub seed: pina_pod_primitives::PodU64,
-	pub amount_a: pina_pod_primitives::PodU64,
-	pub amount_b: pina_pod_primitives::PodU64,
+	pub seed: pina::PodU64,
+	pub amount_a: pina::PodU64,
+	pub amount_b: pina::PodU64,
 	pub bump: u8,
 }
 
 impl MakeInstructionData {
 	pub const fn new(
-		seed: pina_pod_primitives::PodU64,
-		amount_a: pina_pod_primitives::PodU64,
-		amount_b: pina_pod_primitives::PodU64,
+		seed: pina::PodU64,
+		amount_a: pina::PodU64,
+		amount_b: pina::PodU64,
 		bump: u8,
 	) -> Self {
 		Self {

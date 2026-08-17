@@ -48,7 +48,14 @@ impl Create {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		let data = bytemuck::bytes_of(&data).to_vec();
+		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
+		let data = unsafe {
+			core::slice::from_raw_parts(
+				&data as *const _ as *const u8,
+				core::mem::size_of_val(&data),
+			)
+			.to_vec()
+		};
 
 		solana_instruction::Instruction {
 			program_id: crate::ANCHOR_FLOATS_ID,
@@ -59,18 +66,15 @@ impl Create {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CreateInstructionData {
 	pub discriminator: u8,
-	pub data_f32: pina_pod_primitives::PodU32,
-	pub data_f64: pina_pod_primitives::PodU64,
+	pub data_f32: pina::PodU32,
+	pub data_f64: pina::PodU64,
 }
 
 impl CreateInstructionData {
-	pub const fn new(
-		data_f32: pina_pod_primitives::PodU32,
-		data_f64: pina_pod_primitives::PodU64,
-	) -> Self {
+	pub const fn new(data_f32: pina::PodU32, data_f64: pina::PodU64) -> Self {
 		Self {
 			discriminator: CREATE_DISCRIMINATOR,
 			data_f32,

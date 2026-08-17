@@ -9,14 +9,12 @@ on:
     branches:
       - main
     paths:
-      - "crates/pina_pod_primitives/**"
       - "crates/pina/**"
       - ".github/workflows/kani.yml"
   pull_request:
     branches:
       - main
     paths:
-      - "crates/pina_pod_primitives/**"
       - "crates/pina/**"
       - ".github/workflows/kani.yml"
   workflow_dispatch:

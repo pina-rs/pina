@@ -9,7 +9,6 @@
 //! Seed-based helpers require deterministic seed ordering and consistent
 //! program IDs across derivation and verification.
 
-use bytemuck::Pod;
 use pinocchio::AccountView;
 use pinocchio::Address;
 #[cfg(feature = "account-resize")]
@@ -27,10 +26,10 @@ use pinocchio_system::instructions::CreateAccount;
 use pinocchio_system::instructions::Transfer;
 
 use crate::CloseAccountWithRecipient;
-use crate::HasDiscriminator;
 #[cfg(feature = "account-resize")]
 use crate::LamportTransfer;
 use crate::MAX_SEEDS;
+use crate::PinaAccount;
 use crate::ProgramResult;
 
 /// Creates a new system account owned by `owner`.
@@ -76,12 +75,12 @@ pub fn create_account<'a>(
 /// account storage for `T`, and assigns account ownership to `owner`.
 ///
 /// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->
-/// Seed-based APIs require deterministic seed ordering.
-///
+//// Seed-based APIs require deterministic seed ordering.
+
 /// Program IDs must stay consistent across derivation and verification.
-///
+
 /// When a bump is required, prefer canonical bump derivation.
-///
+
 /// Use explicit bumps when needed.<!-- {/pinaPdaSeedContract} -->
 ///
 /// # Errors
@@ -98,7 +97,7 @@ pub fn create_account<'a>(
 /// 	create_program_account::<EscrowState>(escrow_account, payer, &program_id, seeds)?;
 /// ```
 #[inline(always)]
-pub fn create_program_account<'a, T: HasDiscriminator + Pod>(
+pub fn create_program_account<'a, T: PinaAccount>(
 	target_account: &'a AccountView,
 	payer: &'a AccountView,
 	owner: &Address,
@@ -119,12 +118,12 @@ pub fn create_program_account<'a, T: HasDiscriminator + Pod>(
 /// Use this function when the bump is instruction data and must be validated.
 ///
 /// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->
-/// Seed-based APIs require deterministic seed ordering.
-///
+//// Seed-based APIs require deterministic seed ordering.
+
 /// Program IDs must stay consistent across derivation and verification.
-///
+
 /// When a bump is required, prefer canonical bump derivation.
-///
+
 /// Use explicit bumps when needed.<!-- {/pinaPdaSeedContract} -->
 ///
 /// # Errors
@@ -142,7 +141,7 @@ pub fn create_program_account<'a, T: HasDiscriminator + Pod>(
 /// )?;
 /// ```
 #[inline(always)]
-pub fn create_program_account_with_bump<'a, T: HasDiscriminator + Pod>(
+pub fn create_program_account_with_bump<'a, T: PinaAccount>(
 	target_account: &'a AccountView,
 	payer: &'a AccountView,
 	owner: &Address,
@@ -162,12 +161,12 @@ pub fn create_program_account_with_bump<'a, T: HasDiscriminator + Pod>(
 /// cases where caller code wants manual discriminator/data initialization.
 ///
 /// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->
-/// Seed-based APIs require deterministic seed ordering.
-///
+//// Seed-based APIs require deterministic seed ordering.
+
 /// Program IDs must stay consistent across derivation and verification.
-///
+
 /// When a bump is required, prefer canonical bump derivation.
-///
+
 /// Use explicit bumps when needed.<!-- {/pinaPdaSeedContract} -->
 ///
 /// # Errors
@@ -208,12 +207,12 @@ pub fn allocate_account<'a>(
 /// Returns `ProgramError::InvalidSeeds` if `seeds.len() >= MAX_SEEDS`.
 ///
 /// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->
-/// Seed-based APIs require deterministic seed ordering.
-///
+//// Seed-based APIs require deterministic seed ordering.
+
 /// Program IDs must stay consistent across derivation and verification.
-///
+
 /// When a bump is required, prefer canonical bump derivation.
-///
+
 /// Use explicit bumps when needed.<!-- {/pinaPdaSeedContract} -->
 ///
 /// # Examples
@@ -258,12 +257,12 @@ pub fn combine_seeds_with_bump<'a>(
 ///   pre-funded (e.g. by a previous failed transaction).
 ///
 /// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->
-/// Seed-based APIs require deterministic seed ordering.
-///
+//// Seed-based APIs require deterministic seed ordering.
+
 /// Program IDs must stay consistent across derivation and verification.
-///
+
 /// When a bump is required, prefer canonical bump derivation.
-///
+
 /// Use explicit bumps when needed.<!-- {/pinaPdaSeedContract} -->
 ///
 /// # Errors
@@ -482,10 +481,10 @@ fn realloc_account_inner(
 /// stale data reuse matters for their threat model.
 ///
 /// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
-/// All APIs in this section are designed for on-chain determinism.
-///
+//// All APIs in this section are designed for on-chain determinism.
+
 /// They return `ProgramError` values for caller-side propagation with `?`.
-///
+
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
 ///
 /// # Errors
@@ -510,10 +509,10 @@ pub fn close_account(account_info: &mut AccountView, recipient: &mut AccountView
 /// account, even when the `account-resize` feature is enabled.
 ///
 /// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
-/// All APIs in this section are designed for on-chain determinism.
-///
+//// All APIs in this section are designed for on-chain determinism.
+
 /// They return `ProgramError` values for caller-side propagation with `?`.
-///
+
 /// No panics needed.<!-- {/pinaPublicResultContract} -->
 ///
 /// # Errors

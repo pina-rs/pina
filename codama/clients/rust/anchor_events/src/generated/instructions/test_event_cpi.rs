@@ -34,7 +34,14 @@ impl TestEventCpi {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(0 + remaining_accounts.len());
 		accounts.extend_from_slice(remaining_accounts);
-		let data = bytemuck::bytes_of(&data).to_vec();
+		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
+		let data = unsafe {
+			core::slice::from_raw_parts(
+				&data as *const _ as *const u8,
+				core::mem::size_of_val(&data),
+			)
+			.to_vec()
+		};
 
 		solana_instruction::Instruction {
 			program_id: crate::ANCHOR_EVENTS_ID,
@@ -45,7 +52,7 @@ impl TestEventCpi {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TestEventCpiInstructionData {
 	pub discriminator: u8,
 }

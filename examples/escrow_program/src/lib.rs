@@ -131,8 +131,9 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		// Parse instruction and prepare PDA seeds
 		let args = MakeInstruction::try_from_bytes(data)?;
 		let maker_address = *self.maker.address();
-		let escrow_seeds = seeds_escrow!(maker_address.as_ref(), &args.seed.0);
-		let escrow_seeds_with_bump = seeds_escrow!(maker_address.as_ref(), &args.seed.0, args.bump);
+		let escrow_seeds = seeds_escrow!(maker_address.as_ref(), args.seed.as_ref());
+		let escrow_seeds_with_bump =
+			seeds_escrow!(maker_address.as_ref(), args.seed.as_ref(), args.bump);
 
 		// Validate accounts
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
@@ -266,7 +267,8 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			)
 		};
 
-		let escrow_seeds_with_bump = seeds_escrow!(self.maker.address().as_ref(), &seed.0, bump);
+		let escrow_seeds_with_bump =
+			seeds_escrow!(self.maker.address().as_ref(), seed.as_ref(), bump);
 		self.escrow
 			.assert_seeds_with_bump(escrow_seeds_with_bump, &ID)?;
 
@@ -321,8 +323,12 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 
 		// Prepare escrow signer for vault operations
 		let bump_as_seeds = [bump];
-		let escrow_seeds =
-			seeds_escrow!(true, self.maker.address().as_ref(), &seed.0, &bump_as_seeds);
+		let escrow_seeds = seeds_escrow!(
+			true,
+			self.maker.address().as_ref(),
+			seed.as_ref(),
+			&bump_as_seeds
+		);
 		let escrow_signer = Signer::from(&escrow_seeds);
 		let signers = [escrow_signer];
 
@@ -368,20 +374,20 @@ mod tests {
 	#[test]
 	fn seeds_macro_builds_expected_seed_arrays() {
 		let maker = [3u8; 32];
-		let seed = PodU64::from_primitive(42);
+		let seed = PodU64::from(42);
 		let bump = 7u8;
 
-		let seeds = seeds_escrow!(&maker, &seed.0);
+		let seeds = seeds_escrow!(&maker, seed.as_ref());
 		assert_eq!(seeds.len(), 3);
 		assert_eq!(seeds[0], SEED_PREFIX);
 		assert_eq!(seeds[1], &maker);
-		assert_eq!(seeds[2], &seed.0);
+		assert_eq!(seeds[2], seed.as_ref());
 
-		let seeds_with_bump = seeds_escrow!(&maker, &seed.0, bump);
+		let seeds_with_bump = seeds_escrow!(&maker, seed.as_ref(), bump);
 		assert_eq!(seeds_with_bump.len(), 4);
 		assert_eq!(seeds_with_bump[0], SEED_PREFIX);
 		assert_eq!(seeds_with_bump[1], &maker);
-		assert_eq!(seeds_with_bump[2], &seed.0);
+		assert_eq!(seeds_with_bump[2], seed.as_ref());
 		assert_eq!(seeds_with_bump[3], &[bump]);
 	}
 

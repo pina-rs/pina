@@ -39,7 +39,14 @@ impl Update {
 			true,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		let data = bytemuck::bytes_of(&data).to_vec();
+		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
+		let data = unsafe {
+			core::slice::from_raw_parts(
+				&data as *const _ as *const u8,
+				core::mem::size_of_val(&data),
+			)
+			.to_vec()
+		};
 
 		solana_instruction::Instruction {
 			program_id: crate::PROP_AMM_PROGRAM_ID,
@@ -50,14 +57,14 @@ impl Update {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct UpdateInstructionData {
 	pub discriminator: u8,
-	pub new_price: pina_pod_primitives::PodU64,
+	pub new_price: pina::PodU64,
 }
 
 impl UpdateInstructionData {
-	pub const fn new(new_price: pina_pod_primitives::PodU64) -> Self {
+	pub const fn new(new_price: pina::PodU64) -> Self {
 		Self {
 			discriminator: UPDATE_DISCRIMINATOR,
 			new_price,
