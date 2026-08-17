@@ -86,10 +86,6 @@ type = "cargo"
 path = "crates/pina_codama_renderer"
 type = "cargo"
 
-[package.pina_pod_primitives]
-path = "crates/pina_pod_primitives"
-type = "cargo"
-
 [package.pina_profile]
 path = "crates/pina_profile"
 type = "cargo"
@@ -108,7 +104,6 @@ packages = [
 	"pina_cli",
 	"pina_macros",
 	"pina_codama_renderer",
-	"pina_pod_primitives",
 	"pina_profile",
 	"pina_sdk_ids",
 	"codama-nodes-from-pina",

@@ -39,10 +39,9 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 name = "anchor-declare-id-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -55,10 +54,9 @@ dependencies = [
 name = "anchor-declare-program-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -71,10 +69,9 @@ dependencies = [
 name = "anchor-duplicate-mutable-accounts-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -87,10 +84,9 @@ dependencies = [
 name = "anchor-errors-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -103,10 +99,9 @@ dependencies = [
 name = "anchor-events-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -119,10 +114,9 @@ dependencies = [
 name = "anchor-floats-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -135,10 +129,9 @@ dependencies = [
 name = "anchor-realloc-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -151,10 +144,9 @@ dependencies = [
 name = "anchor-system-accounts-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -167,10 +159,9 @@ dependencies = [
 name = "anchor-sysvars-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -964,10 +955,9 @@ dependencies = [
 name = "counter-program-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -1520,10 +1510,9 @@ dependencies = [
 name = "escrow-program-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -1738,10 +1727,9 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 name = "hello-solana-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -2352,10 +2340,8 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 name = "pina"
 version = "0.8.0"
 dependencies = [
- "bytemuck",
  "pastey",
  "pina_macros",
- "pina_pod_primitives",
  "pinocchio",
  "pinocchio-associated-token-account",
  "pinocchio-memo",
@@ -2366,16 +2352,16 @@ dependencies = [
  "solana-address",
  "solana-program-log",
  "typed-builder",
+ "zeropod",
 ]
 
 [[package]]
 name = "pina-bpf-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -2442,14 +2428,6 @@ dependencies = [
  "quote",
  "syn 3.0.3",
  "trybuild",
-]
-
-[[package]]
-name = "pina_pod_primitives"
-version = "0.8.0"
-dependencies = [
- "bytemuck",
- "proptest",
 ]
 
 [[package]]
@@ -2611,10 +2589,9 @@ dependencies = [
 name = "profile-program-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -2639,10 +2616,9 @@ dependencies = [
 name = "prop-amm-program-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -2875,10 +2851,9 @@ dependencies = [
 name = "role-registry-program-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -4301,10 +4276,9 @@ dependencies = [
 name = "staking-rewards-program-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -4494,10 +4468,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 name = "todo-program-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -4637,10 +4610,9 @@ checksum = "7d56353a2a665ad0f41a421187180aab746c8c325620617ad883a99a1cbe66d2"
 name = "transfer-sol-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -4758,10 +4730,9 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 name = "vesting-program-client"
 version = "0.0.0"
 dependencies = [
- "bytemuck",
  "num-derive",
  "num-traits",
- "pina_pod_primitives",
+ "pina",
  "solana-account-info",
  "solana-cpi",
  "solana-instruction",
@@ -4961,6 +4932,28 @@ name = "zeroize_derive"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c50655cbb0fe3fc43170059e702f1ce5e19b84cec58dc87b037a09935c2f328"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "zeropod"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af6c4fe8dc57179de72db5185c9c618a3350a9122a76ec3e13ccd493bca38931"
+dependencies = [
+ "solana-address",
+ "solana-program-error",
+ "zeropod-derive",
+]
+
+[[package]]
+name = "zeropod-derive"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "babb94e405e4914176ad9fd74e34c640ea0fcd314bfcb2bb6690a5300e724257"
 dependencies = [
  "proc-macro2",
  "quote",

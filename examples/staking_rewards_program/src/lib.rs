@@ -262,9 +262,9 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 			.admin(*self.admin.address())
 			.stake_mint(*self.stake_mint.address())
 			.reward_mint(*self.reward_mint.address())
-			.total_staked(PodU64::from_primitive(0))
-			.reward_index(PodU64::from_primitive(0))
-			.paused(PodBool::from_bool(false))
+			.total_staked(PodU64::from(0))
+			.reward_index(PodU64::from(0))
+			.paused(PodBool::from(false))
 			.bump(args.bump)
 			.build();
 		drop(pool_state);
@@ -333,9 +333,9 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 		*position_state = PositionState::builder()
 			.pool(*self.pool_state.address())
 			.owner(*self.user.address())
-			.staked_amount(PodU64::from_primitive(0))
-			.reward_debt(PodU64::from_primitive(0))
-			.pending_rewards(PodU64::from_primitive(0))
+			.staked_amount(PodU64::from(0))
+			.reward_debt(PodU64::from(0))
+			.pending_rewards(PodU64::from(0))
 			.bump(args.bump)
 			.build();
 
@@ -401,8 +401,8 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 
 		// Update position state
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
-		position_state.staked_amount = PodU64::from_primitive(next_staked);
-		position_state.reward_debt = PodU64::from_primitive(
+		position_state.staked_amount = PodU64::from(next_staked);
+		position_state.reward_debt = PodU64::from(
 			reward_debt
 				.checked_add(amount)
 				.ok_or(ProgramError::ArithmeticOverflow)?,
@@ -410,7 +410,7 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 
 		// Update pool state
 		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
-		pool_state.total_staked = PodU64::from_primitive(total_staked);
+		pool_state.total_staked = PodU64::from(total_staked);
 
 		// Ensure user's stake ATA exists
 		associated_token_account::instructions::CreateIdempotent {
@@ -480,11 +480,11 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 
 		// Update position state
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
-		position_state.staked_amount = PodU64::from_primitive(staked_amount - amount);
+		position_state.staked_amount = PodU64::from(staked_amount - amount);
 
 		// Update pool state
 		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
-		pool_state.total_staked = PodU64::from_primitive(total_staked - amount);
+		pool_state.total_staked = PodU64::from(total_staked - amount);
 
 		Ok(())
 	}
@@ -535,7 +535,7 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 			.ok_or(ProgramError::ArithmeticOverflow)?;
 
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
-		position_state.pending_rewards = PodU64::from_primitive(next_pending);
+		position_state.pending_rewards = PodU64::from(next_pending);
 
 		// Ensure user's reward ATA exists
 		associated_token_account::instructions::CreateIdempotent {
@@ -568,7 +568,7 @@ mod tests {
 	#[test]
 	fn instruction_roundtrip() {
 		let ix = DepositInstruction::builder()
-			.amount(PodU64::from_primitive(50))
+			.amount(PodU64::from(50))
 			.build();
 		let bytes = ix.to_bytes();
 		let parsed = DepositInstruction::try_from_bytes(bytes)

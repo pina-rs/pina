@@ -33,7 +33,6 @@ use mollusk_svm::result::Check;
 use mollusk_svm::result::InstructionResult;
 use pina::PodU64;
 use pina::ProgramError;
-use pina::bytemuck;
 use profile_program::AddTagInstruction;
 use profile_program::ID;
 use profile_program::InitializeInstruction;
@@ -128,16 +127,14 @@ fn update_profile_ix_data(name: &str, bio: &str) -> Vec<u8> {
 
 /// Build `AddTag` instruction data: discriminator + tag.
 fn add_tag_ix_data(tag: u64) -> Vec<u8> {
-	let ix = AddTagInstruction::builder()
-		.tag(PodU64::from_primitive(tag))
-		.build();
+	let ix = AddTagInstruction::builder().tag(PodU64::from(tag)).build();
 	ix.to_bytes().to_vec()
 }
 
 /// Build `RemoveTag` instruction data: discriminator + index.
 fn remove_tag_ix_data(index: u64) -> Vec<u8> {
 	let ix = RemoveTagInstruction::builder()
-		.index(PodU64::from_primitive(index))
+		.index(PodU64::from(index))
 		.build();
 	ix.to_bytes().to_vec()
 }
@@ -172,15 +169,10 @@ fn assert_profile(
 	let account = result
 		.get_account(profile)
 		.unwrap_or_else(|| panic!("profile account {profile} not found"));
-	let state: &ProfileState = bytemuck::from_bytes::<ProfileState>(&account.data);
-	assert_eq!(
-		state.name.try_as_str().unwrap_or_else(|e| panic!("{e:?}")),
-		expected_name
-	);
-	assert_eq!(
-		state.bio.try_as_str().unwrap_or_else(|e| panic!("{e:?}")),
-		expected_bio
-	);
+	let state: &ProfileState =
+		<ProfileState as pina::ZeroPodFixed>::from_bytes(&account.data).unwrap();
+	assert_eq!(state.name.as_str(), expected_name);
+	assert_eq!(state.bio.as_str(), expected_bio);
 	let tags: Vec<u64> = state
 		.tags
 		.as_slice()

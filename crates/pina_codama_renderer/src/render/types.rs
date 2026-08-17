@@ -84,14 +84,14 @@ fn render_number_type_for_pod(number_type: &NumberTypeNode, context: &str) -> Re
 	match number_type.format {
 		NumberFormat::U8 => Ok("u8".to_string()),
 		NumberFormat::I8 => Ok("i8".to_string()),
-		NumberFormat::U16 => Ok("pina_pod_primitives::PodU16".to_string()),
-		NumberFormat::I16 => Ok("pina_pod_primitives::PodI16".to_string()),
-		NumberFormat::U32 => Ok("pina_pod_primitives::PodU32".to_string()),
-		NumberFormat::I32 => Ok("pina_pod_primitives::PodI32".to_string()),
-		NumberFormat::U64 => Ok("pina_pod_primitives::PodU64".to_string()),
-		NumberFormat::I64 => Ok("pina_pod_primitives::PodI64".to_string()),
-		NumberFormat::U128 => Ok("pina_pod_primitives::PodU128".to_string()),
-		NumberFormat::I128 => Ok("pina_pod_primitives::PodI128".to_string()),
+		NumberFormat::U16 => Ok("pina::PodU16".to_string()),
+		NumberFormat::I16 => Ok("pina::PodI16".to_string()),
+		NumberFormat::U32 => Ok("pina::PodU32".to_string()),
+		NumberFormat::I32 => Ok("pina::PodI32".to_string()),
+		NumberFormat::U64 => Ok("pina::PodU64".to_string()),
+		NumberFormat::I64 => Ok("pina::PodI64".to_string()),
+		NumberFormat::U128 => Ok("pina::PodU128".to_string()),
+		NumberFormat::I128 => Ok("pina::PodI128".to_string()),
 		NumberFormat::F32 | NumberFormat::F64 | NumberFormat::ShortU16 => {
 			Err(RenderError::UnsupportedType {
 				context: context.to_string(),
@@ -113,7 +113,7 @@ fn render_boolean_type(boolean_type: &BooleanTypeNode, context: &str) -> Result<
 			reason: "booleans must be encoded as little-endian u8".to_string(),
 		});
 	}
-	Ok("pina_pod_primitives::PodBool".to_string())
+	Ok("pina::PodBool".to_string())
 }
 
 pub(crate) fn render_defined_type_page(defined_type: &DefinedTypeNode) -> Result<String> {
@@ -142,10 +142,7 @@ fn render_defined_struct(name: &str, struct_type: &StructTypeNode, docs: &Docs) 
 		lines.push(doc_line);
 	}
 	lines.push("#[repr(C)]".to_string());
-	lines.push(
-		"#[derive(Clone, Copy, Debug, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]"
-			.to_string(),
-	);
+	lines.push("#[derive(Clone, Copy, Debug, PartialEq, Eq)]".to_string());
 	lines.push(format!("pub struct {name} {{"));
 	let mut ctor_args = Vec::new();
 	let mut ctor_inits = Vec::new();

@@ -1,5 +1,5 @@
 ---
-pina_pod_primitives: feat
+pina: feat
 ---
 
 # Add fixed-capacity Pod collection types

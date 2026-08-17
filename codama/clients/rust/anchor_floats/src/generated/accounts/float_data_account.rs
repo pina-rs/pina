@@ -8,15 +8,12 @@
 	clippy::too_many_arguments
 )]
 
-use bytemuck::Pod;
-use bytemuck::Zeroable;
-
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Pod, Zeroable)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FloatDataAccount {
 	pub discriminator: u8,
-	pub data_f64: pina_pod_primitives::PodU64,
-	pub data_f32: pina_pod_primitives::PodU32,
+	pub data_f64: pina::PodU64,
+	pub data_f32: pina::PodU32,
 	pub authority: solana_pubkey::Pubkey,
 }
 
@@ -26,8 +23,8 @@ impl FloatDataAccount {
 	pub const LEN: usize = core::mem::size_of::<Self>();
 
 	pub const fn new(
-		data_f64: pina_pod_primitives::PodU64,
-		data_f32: pina_pod_primitives::PodU32,
+		data_f64: pina::PodU64,
+		data_f32: pina::PodU32,
 		authority: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
@@ -39,8 +36,11 @@ impl FloatDataAccount {
 	}
 
 	pub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {
-		let account = bytemuck::try_from_bytes::<Self>(data)
-			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
+		if data.len() != core::mem::size_of::<Self>() {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
+		let account = unsafe { &*(data.as_ptr() as *const Self) };
 		if account.discriminator != FLOAT_DATA_ACCOUNT_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
@@ -50,8 +50,11 @@ impl FloatDataAccount {
 	pub fn from_bytes_mut(
 		data: &mut [u8],
 	) -> Result<&mut Self, solana_program_error::ProgramError> {
-		let account = bytemuck::try_from_bytes_mut::<Self>(data)
-			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
+		if data.len() != core::mem::size_of::<Self>() {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
+		let account = unsafe { &mut *(data.as_mut_ptr() as *mut Self) };
 		if account.discriminator != FLOAT_DATA_ACCOUNT_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}

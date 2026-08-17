@@ -11,7 +11,7 @@ use client::generated::instructions::RotateAdminInstructionData;
 use client::generated::instructions::UpdateRole;
 use client::generated::instructions::UpdateRoleInstructionData;
 use client::generated::instructions::{self};
-use pina_pod_primitives::PodU64;
+use pina::PodU64;
 use role_registry_program_client as client;
 use solana_instruction::AccountMeta;
 use solana_pubkey::Pubkey;
@@ -54,11 +54,19 @@ fn role_registry_program_client_has_expected_contract_shape() {
 		init_ix.accounts[2],
 		AccountMeta::new_readonly(pubkey!("11111111111111111111111111111111"), false,),
 	);
-	assert_eq!(init_ix.data, bytemuck::bytes_of(&init_payload).to_vec());
+	assert_eq!(
+		init_ix.data,
+		unsafe {
+			core::slice::from_raw_parts(
+				&init_payload as *const _ as *const u8,
+				core::mem::size_of_val(&init_payload),
+			)
+		}
+		.to_vec()
+	);
 
 	let add_role = AddRole::new(admin, grantee, registry_config, role_entry);
-	let add_payload =
-		AddRoleInstructionData::new(PodU64::from_primitive(11), PodU64::from_primitive(42), 3);
+	let add_payload = AddRoleInstructionData::new(PodU64::from(11), PodU64::from(42), 3);
 	let add_ix = add_role.instruction(add_payload);
 	assert_eq!(add_ix.accounts.len(), 5);
 	assert_eq!(add_ix.accounts[0], AccountMeta::new(admin, true));
@@ -72,10 +80,19 @@ fn role_registry_program_client_has_expected_contract_shape() {
 		add_ix.accounts[4],
 		AccountMeta::new_readonly(pubkey!("11111111111111111111111111111111"), false,)
 	);
-	assert_eq!(add_ix.data, bytemuck::bytes_of(&add_payload).to_vec());
+	assert_eq!(
+		add_ix.data,
+		unsafe {
+			core::slice::from_raw_parts(
+				&add_payload as *const _ as *const u8,
+				core::mem::size_of_val(&add_payload),
+			)
+		}
+		.to_vec()
+	);
 
 	let update = UpdateRole::new(admin, registry_config, role_entry);
-	let update_payload = UpdateRoleInstructionData::new(PodU64::from_primitive(99));
+	let update_payload = UpdateRoleInstructionData::new(PodU64::from(99));
 	let update_ix = update.instruction(update_payload);
 	assert_eq!(update_ix.accounts.len(), 3);
 	assert_eq!(
@@ -87,7 +104,16 @@ fn role_registry_program_client_has_expected_contract_shape() {
 		AccountMeta::new_readonly(registry_config, false)
 	);
 	assert_eq!(update_ix.accounts[2], AccountMeta::new(role_entry, false));
-	assert_eq!(update_ix.data, bytemuck::bytes_of(&update_payload).to_vec());
+	assert_eq!(
+		update_ix.data,
+		unsafe {
+			core::slice::from_raw_parts(
+				&update_payload as *const _ as *const u8,
+				core::mem::size_of_val(&update_payload),
+			)
+		}
+		.to_vec()
+	);
 
 	let deactivate = DeactivateRole::new(admin, registry_config, role_entry);
 	let deactivate_payload = DeactivateRoleInstructionData::new();
@@ -99,7 +125,13 @@ fn role_registry_program_client_has_expected_contract_shape() {
 	);
 	assert_eq!(
 		deactivate_ix.data,
-		bytemuck::bytes_of(&deactivate_payload).to_vec()
+		unsafe {
+			core::slice::from_raw_parts(
+				&deactivate_payload as *const _ as *const u8,
+				core::mem::size_of_val(&deactivate_payload),
+			)
+		}
+		.to_vec()
 	);
 
 	let rotate = RotateAdmin::new(admin, new_admin, registry_config);
@@ -118,5 +150,14 @@ fn role_registry_program_client_has_expected_contract_shape() {
 		rotate_ix.accounts[2],
 		AccountMeta::new(registry_config, false)
 	);
-	assert_eq!(rotate_ix.data, bytemuck::bytes_of(&rotate_payload).to_vec());
+	assert_eq!(
+		rotate_ix.data,
+		unsafe {
+			core::slice::from_raw_parts(
+				&rotate_payload as *const _ as *const u8,
+				core::mem::size_of_val(&rotate_payload),
+			)
+		}
+		.to_vec()
+	);
 }

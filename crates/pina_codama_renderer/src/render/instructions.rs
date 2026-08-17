@@ -147,7 +147,14 @@ pub(crate) fn render_instruction_page(
 		primary_program_const,
 	));
 	lines.push("\t\taccounts.extend_from_slice(remaining_accounts);".to_string());
-	lines.push("\t\tlet data = bytemuck::bytes_of(&data).to_vec();".to_string());
+	lines.push("\t\t// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.".to_string());
+	lines.push("\t\tlet data = unsafe {".to_string());
+	lines.push("\t\t\tcore::slice::from_raw_parts(".to_string());
+	lines.push("\t\t\t\t&data as *const _ as *const u8,".to_string());
+	lines.push("\t\t\t\tcore::mem::size_of_val(&data),".to_string());
+	lines.push("\t\t\t)".to_string());
+	lines.push("\t\t\t.to_vec()".to_string());
+	lines.push("\t\t};".to_string());
 	lines.push(String::new());
 	lines.push("\t\tsolana_instruction::Instruction {".to_string());
 	lines.push(format!("\t\t\tprogram_id: crate::{primary_program_const},"));
@@ -180,10 +187,7 @@ pub(crate) fn render_instruction_page(
 	}
 
 	lines.push("#[repr(C)]".to_string());
-	lines.push(
-		"#[derive(Clone, Copy, Debug, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]"
-			.to_string(),
-	);
+	lines.push("#[derive(Clone, Copy, Debug, PartialEq, Eq)]".to_string());
 	lines.push(format!("pub struct {instruction_name}InstructionData {{"));
 	lines.extend(data_fields);
 	lines.push("}".to_string());

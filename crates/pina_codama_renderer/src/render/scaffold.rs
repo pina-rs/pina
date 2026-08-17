@@ -37,10 +37,9 @@ edition = "2021"
 publish = false
 
 [dependencies]
-bytemuck = {{ workspace = true, default-features = true }}
+pina = {{ workspace = true }}
 num-derive = {{ workspace = true, default-features = true }}
 num-traits = {{ workspace = true, default-features = true }}
-pina_pod_primitives = {{ workspace = true }}
 solana-account-info = {{ workspace = true, default-features = true }}
 solana-cpi = {{ workspace = true, default-features = true }}
 solana-instruction = {{ workspace = true, default-features = true }}
@@ -101,11 +100,7 @@ mod tests {
 		let cargo_toml = fs::read_to_string(crate_dir.join("Cargo.toml"))
 			.unwrap_or_else(|err| panic!("failed to read generated Cargo.toml: {err}"));
 
-		assert!(
-			cargo_toml.contains(
-				"[dependencies]\nbytemuck = { workspace = true, default-features = true }"
-			)
-		);
+		assert!(cargo_toml.contains("[dependencies]\npina = { workspace = true }"));
 		assert!(!cargo_toml.contains("workspace = true ,"));
 		assert!(!cargo_toml.contains("\n\t[dependencies]"));
 

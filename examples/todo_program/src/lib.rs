@@ -100,7 +100,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		*todo = TodoState::builder()
 			.owner(*owner)
 			.bump(args.bump)
-			.completed(PodBool::from_bool(false))
+			.completed(PodBool::from(false))
 			.digest(args.digest)
 			.build();
 
@@ -142,7 +142,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 				let mut todo = self.todo.as_account_mut::<TodoState>(&ID)?;
 				let completed = bool::from(todo.completed);
 
-				todo.completed = PodBool::from_bool(!completed);
+				todo.completed = PodBool::from(!completed);
 			}
 			TodoInstruction::UpdateDigest => {
 				let args = UpdateDigestInstruction::try_from_bytes(data)?;
@@ -229,7 +229,7 @@ mod tests {
 
 	#[test]
 	fn pod_bool_conversion() {
-		let value = PodBool::from_bool(true);
+		let value = PodBool::from(true);
 		assert!(bool::from(value));
 	}
 

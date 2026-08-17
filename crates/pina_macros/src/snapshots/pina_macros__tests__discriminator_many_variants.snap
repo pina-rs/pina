@@ -66,6 +66,4 @@ impl ::core::convert::TryFrom<u16> for ManyVariants {
         }
     }
 }
-unsafe impl ::pina::Zeroable for ManyVariants {}
-unsafe impl ::pina::Pod for ManyVariants {}
 ::pina::into_discriminator!(ManyVariants, u16);

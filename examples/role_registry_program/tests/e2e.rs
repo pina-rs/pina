@@ -33,7 +33,6 @@ use mollusk_svm::result::Check;
 use pina::PodBool;
 use pina::PodU64;
 use pina::ProgramError;
-use pina::bytemuck;
 use role_registry_program::AddRoleInstruction;
 use role_registry_program::DeactivateRoleInstruction;
 use role_registry_program::ID;
@@ -93,7 +92,7 @@ fn derive_registry_pda(admin: &Pubkey) -> (Pubkey, u8) {
 
 /// Derive the role entry PDA for a given registry address and role_id.
 ///
-/// The seed uses the LE bytes of `role_id`, matching `&args.role_id.0` in the
+/// The seed uses the LE bytes of `role_id`, matching `args.role_id.as_ref()` in the
 /// program (which stores `PodU64` in little-endian order).
 fn derive_role_entry_pda(registry: &Pubkey, role_id: u64) -> (Pubkey, u8) {
 	let role_id_bytes = role_id.to_le_bytes();
@@ -119,8 +118,8 @@ fn initialize_ix_data(bump: u8) -> Vec<u8> {
 
 fn add_role_ix_data(role_id: u64, permissions: u64, bump: u8) -> Vec<u8> {
 	let ix = AddRoleInstruction::builder()
-		.role_id(PodU64::from_primitive(role_id))
-		.permissions(PodU64::from_primitive(permissions))
+		.role_id(PodU64::from(role_id))
+		.permissions(PodU64::from(permissions))
 		.bump(bump)
 		.build();
 	ix.to_bytes().to_vec()
@@ -128,7 +127,7 @@ fn add_role_ix_data(role_id: u64, permissions: u64, bump: u8) -> Vec<u8> {
 
 fn update_role_ix_data(permissions: u64) -> Vec<u8> {
 	let ix = UpdateRoleInstruction::builder()
-		.permissions(PodU64::from_primitive(permissions))
+		.permissions(PodU64::from(permissions))
 		.build();
 	ix.to_bytes().to_vec()
 }
@@ -152,10 +151,10 @@ fn rotate_admin_ix_data() -> Vec<u8> {
 fn registry_config_account(admin: &Pubkey, role_count: u64, bump: u8, lamports: u64) -> Account {
 	let state = RegistryConfig::builder()
 		.admin(pubkey_to_address(admin))
-		.role_count(PodU64::from_primitive(role_count))
+		.role_count(PodU64::from(role_count))
 		.bump(bump)
 		.build();
-	let data = bytemuck::bytes_of(&state).to_vec();
+	let data = state.to_bytes().to_vec();
 	Account {
 		lamports,
 		data,
@@ -178,13 +177,13 @@ fn role_entry_account(
 ) -> Account {
 	let state = RoleEntry::builder()
 		.registry(pubkey_to_address(registry))
-		.role_id(PodU64::from_primitive(role_id))
+		.role_id(PodU64::from(role_id))
 		.grantee(pubkey_to_address(grantee))
-		.permissions(PodU64::from_primitive(permissions))
-		.active(PodBool::from_bool(active))
+		.permissions(PodU64::from(permissions))
+		.active(PodBool::from(active))
 		.bump(bump)
 		.build();
-	let data = bytemuck::bytes_of(&state).to_vec();
+	let data = state.to_bytes().to_vec();
 	Account {
 		lamports,
 		data,
@@ -240,7 +239,8 @@ fn initialize_creates_registry_config() {
 		.get_account(&registry_pda)
 		.expect("registry_config PDA should exist after Initialize");
 
-	let registry_config: &RegistryConfig = bytemuck::from_bytes(&registry_account.data);
+	let registry_config: &RegistryConfig =
+		<RegistryConfig as pina::ZeroPodFixed>::from_bytes(&registry_account.data).unwrap();
 	assert_eq!(
 		registry_config.admin,
 		pubkey_to_address(&admin),
@@ -318,7 +318,8 @@ fn full_flow_initialize_add_update_deactivate() {
 		.unwrap_or_else(|| panic!("registry_pda not found after Initialize"));
 
 	// Verify role_count == 0 after Initialize.
-	let registry_config: &RegistryConfig = bytemuck::from_bytes(&registry_after_init.data);
+	let registry_config: &RegistryConfig =
+		<RegistryConfig as pina::ZeroPodFixed>::from_bytes(&registry_after_init.data).unwrap();
 	assert_eq!(u64::from(registry_config.role_count), 0);
 
 	// ----- Step 2: AddRole -----
@@ -368,14 +369,16 @@ fn full_flow_initialize_add_update_deactivate() {
 		.unwrap_or_else(|| panic!("admin not found after AddRole"));
 
 	// Verify role_count incremented to 1 and role entry is active.
-	let registry_config: &RegistryConfig = bytemuck::from_bytes(&registry_after_add.data);
+	let registry_config: &RegistryConfig =
+		<RegistryConfig as pina::ZeroPodFixed>::from_bytes(&registry_after_add.data).unwrap();
 	assert_eq!(
 		u64::from(registry_config.role_count),
 		1,
 		"role_count should be 1 after AddRole"
 	);
 
-	let role_entry: &RoleEntry = bytemuck::from_bytes(&role_entry_after_add.data);
+	let role_entry: &RoleEntry =
+		<RoleEntry as pina::ZeroPodFixed>::from_bytes(&role_entry_after_add.data).unwrap();
 	assert!(
 		bool::from(role_entry.active),
 		"role should be active after AddRole"
@@ -424,7 +427,8 @@ fn full_flow_initialize_add_update_deactivate() {
 		.unwrap_or_else(|| panic!("admin not found after UpdateRole"));
 
 	// Verify permissions were updated.
-	let role_entry: &RoleEntry = bytemuck::from_bytes(&role_entry_after_update.data);
+	let role_entry: &RoleEntry =
+		<RoleEntry as pina::ZeroPodFixed>::from_bytes(&role_entry_after_update.data).unwrap();
 	assert_eq!(
 		u64::from(role_entry.permissions),
 		0b1111_1111,
@@ -466,7 +470,8 @@ fn full_flow_initialize_add_update_deactivate() {
 		.get_account(&role_entry_pda)
 		.expect("role_entry_pda should exist after DeactivateRole");
 
-	let role_entry: &RoleEntry = bytemuck::from_bytes(&role_entry_after_deactivate.data);
+	let role_entry: &RoleEntry =
+		<RoleEntry as pina::ZeroPodFixed>::from_bytes(&role_entry_after_deactivate.data).unwrap();
 	assert!(
 		!bool::from(role_entry.active),
 		"role should be inactive after DeactivateRole"
@@ -564,7 +569,8 @@ fn rotate_admin_changes_admin() {
 		.get_account(&registry_pda)
 		.expect("registry_pda should exist after RotateAdmin");
 
-	let registry_config: &RegistryConfig = bytemuck::from_bytes(&registry_account.data);
+	let registry_config: &RegistryConfig =
+		<RegistryConfig as pina::ZeroPodFixed>::from_bytes(&registry_account.data).unwrap();
 	assert_eq!(
 		registry_config.admin,
 		pubkey_to_address(&new_admin),

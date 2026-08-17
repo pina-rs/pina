@@ -12,4 +12,4 @@ expression: content
 	clippy::too_many_arguments
 )]
 
-pub type Counter = pina_pod_primitives::PodU64;
+pub type Counter = pina::PodU64;

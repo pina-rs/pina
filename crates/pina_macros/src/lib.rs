@@ -26,6 +26,141 @@ use crate::args::InstructionArgs;
 
 mod args;
 
+/// Generates the zeropod trait impls for a fixed-layout struct.
+///
+/// This is the "direct pattern": `ZeroPodFixed` with `type Zc = Self`, so the
+/// struct itself is the zero-copy representation (no companion struct). The
+/// discriminator is the first field and is validated separately by
+/// `PinaAccount::validate` (via `HasDiscriminator::matches_discriminator`).
+fn generate_zeropod_impls(
+	struct_name: &syn::Ident,
+	field_names: &[syn::Ident],
+	field_types: &[syn::Type],
+	crate_path: &syn::Path,
+	include_pina_account: bool,
+) -> proc_macro2::TokenStream {
+	let pina_account_impls = if include_pina_account {
+		quote! {
+			impl #crate_path::PinaAccount for #struct_name {
+				fn validate(data: &[u8]) -> Result<(), #crate_path::ProgramError> {
+					if !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data) {
+						return Err(#crate_path::ProgramError::InvalidAccountData);
+					}
+					<Self as #crate_path::ZeroPodFixed>::validate(data)
+						.map_err(|_| #crate_path::ProgramError::InvalidAccountData)
+				}
+
+				fn try_from_bytes(data: &[u8]) -> Result<&Self, #crate_path::ProgramError> {
+					<Self as #crate_path::PinaAccount>::validate(data)?;
+					if data.len() != ::core::mem::size_of::<Self>() {
+						return Err(#crate_path::ProgramError::InvalidAccountData);
+					}
+					<Self as #crate_path::ZeroPodFixed>::from_bytes(data)
+						.map_err(|_| #crate_path::ProgramError::InvalidAccountData)
+				}
+
+				fn try_from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, #crate_path::ProgramError> {
+					<Self as #crate_path::PinaAccount>::validate(data)?;
+					if data.len() != ::core::mem::size_of::<Self>() {
+						return Err(#crate_path::ProgramError::InvalidAccountData);
+					}
+					<Self as #crate_path::ZeroPodFixed>::from_bytes_mut(data)
+						.map_err(|_| #crate_path::ProgramError::InvalidAccountData)
+				}
+			}
+		}
+	} else {
+		quote! {}
+	};
+
+	quote! {
+		impl #crate_path::ZcValidate for #struct_name {
+			fn validate_ref(value: &Self) -> Result<(), #crate_path::ZeroPodError> {
+				#(<#field_types as #crate_path::ZcValidate>::validate_ref(&value.#field_names)?;)*
+				Ok(())
+			}
+		}
+
+		// SAFETY:
+		// 1. Alignment == 1 (const-asserted above).
+		// 2. No padding (all fields are align-1 pod types; size is the sum of fields).
+		// 3. Every bit pattern is a valid reference (no bare bool/char/NonZero).
+		// 4. ZcValidate::validate_ref is load-bearing (rejects invalid content).
+		#[allow(unsafe_code)]
+		unsafe impl #crate_path::ZcElem for #struct_name {}
+
+		impl #crate_path::ZeroPodSchema for #struct_name {
+			const LAYOUT: #crate_path::LayoutKind = #crate_path::LayoutKind::Fixed;
+		}
+
+		impl #crate_path::ZeroPodFixed for #struct_name {
+			type Zc = #struct_name;
+			const SIZE: usize = ::core::mem::size_of::<#struct_name>();
+
+			fn from_bytes(data: &[u8]) -> Result<&Self::Zc, #crate_path::ZeroPodError> {
+				<Self as #crate_path::ZeroPodFixed>::validate(data)?;
+				Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
+			}
+
+			fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, #crate_path::ZeroPodError> {
+				<Self as #crate_path::ZeroPodFixed>::validate(data)?;
+				Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
+			}
+
+			fn validate(data: &[u8]) -> Result<(), #crate_path::ZeroPodError> {
+				if data.len() < Self::SIZE {
+					return Err(#crate_path::ZeroPodError::BufferTooSmall);
+				}
+				let zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
+				<Self::Zc as #crate_path::ZcValidate>::validate_ref(zc)?;
+				Ok(())
+			}
+
+			unsafe fn from_bytes_unchecked(data: &[u8]) -> &Self::Zc {
+				&*(data.as_ptr() as *const Self::Zc)
+			}
+
+			unsafe fn from_bytes_mut_unchecked(data: &mut [u8]) -> &mut Self::Zc {
+				&mut *(data.as_mut_ptr() as *mut Self::Zc)
+			}
+		}
+
+		impl #crate_path::ZcField for #struct_name {
+			type Pod = #struct_name;
+			const POD_SIZE: usize = ::core::mem::size_of::<#struct_name>();
+		}
+
+		#pina_account_impls
+	}
+}
+
+/// Generates the `zeroed()` and `to_bytes()` inherent methods for a
+/// fixed-layout struct, replacing the removed bytemuck helpers.
+fn generate_bytes_helpers() -> proc_macro2::TokenStream {
+	quote! {
+		/// Zero out all bytes in the struct including padding bytes. This can be useful when closing an account.
+		#[allow(unsafe_code)]
+		pub fn zeroed(&mut self) {
+			// SAFETY: all fields are align-1 pod types (compile-time asserted),
+			// so the all-zero bit pattern is valid for every field.
+			unsafe { ::core::ptr::write_bytes(self as *mut Self, 0, 1) }
+		}
+
+		/// Returns the raw byte representation of the struct.
+		#[allow(unsafe_code)]
+		pub fn to_bytes(&self) -> &[u8] {
+			// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields
+			// (compile-time asserted), so its bytes are a valid representation.
+			unsafe {
+				::core::slice::from_raw_parts(
+					self as *const Self as *const u8,
+					::core::mem::size_of::<Self>(),
+				)
+			}
+		}
+	}
+}
+
 #[cfg(test)]
 mod tests;
 
@@ -381,7 +516,7 @@ fn error_impl(
 ///
 /// Is transformed to:
 ///
-/// ```rust
+/// ```ignore
 /// use pina::*;
 ///
 /// #[repr(u8)]
@@ -583,8 +718,6 @@ fn discriminator_impl(
 			}
 		}
 
-		unsafe impl #crate_path::Zeroable for #enum_name {}
-		unsafe impl #crate_path::Pod for #enum_name {}
 		#crate_path::into_discriminator!(#enum_name, #primitive);
 	};
 
@@ -668,11 +801,8 @@ fn discriminator_impl(
 /// 	::core::marker::Copy,
 /// 	::core::cmp::PartialEq,
 /// 	::core::cmp::Eq,
-/// 	::pina::Pod,
-/// 	::pina::Zeroable,
 /// 	::pina::TypedBuilder,
 /// )]
-/// #[bytemuck(crate = "::pina::bytemuck")]
 /// #[builder(builder_method(vis = "", name = __builder))]
 /// pub struct ConfigState {
 /// 	// This discriminator is automatically injected as the first field in the struct. It must be
@@ -717,7 +847,12 @@ fn discriminator_impl(
 ///
 /// impl ConfigState {
 /// 	pub fn to_bytes(&self) -> &[u8] {
-/// 		::pina::bytemuck::bytes_of(self)
+/// 		unsafe {
+/// 			::core::slice::from_raw_parts(
+/// 				self as *const Self as *const u8,
+/// 				::core::mem::size_of::<Self>(),
+/// 			)
+/// 		}
 /// 	}
 ///
 /// 	pub fn builder() -> ConfigStateBuilderType {
@@ -846,10 +981,8 @@ fn account_impl(
 	item_struct.attrs.push(repr_attr);
 
 	// Add derive macros
-	let derives_to_add: [syn::Path; 7] = [
+	let derives_to_add: [syn::Path; 5] = [
 		syn::parse_quote!(#crate_path::TypedBuilder),
-		syn::parse_quote!(#crate_path::Pod),
-		syn::parse_quote!(#crate_path::Zeroable),
 		syn::parse_quote!(::core::clone::Clone),
 		syn::parse_quote!(::core::marker::Copy),
 		syn::parse_quote!(::core::cmp::PartialEq),
@@ -898,13 +1031,6 @@ fn account_impl(
 		syn::parse_quote!(#[builder(builder_method(vis = "", name = __builder))]);
 	item_struct.attrs.push(builder_attr);
 
-	let bytemuck_crate_str = format!(
-		"{}::bytemuck",
-		quote!(#crate_path).to_string().replace(' ', "")
-	);
-	let bytemuck_attr: Attribute = syn::parse_quote!(#[bytemuck(crate = #bytemuck_crate_str)]);
-	item_struct.attrs.push(bytemuck_attr);
-
 	// Add discriminator field
 	let Fields::Named(named_fields) = &mut item_struct.fields else {
 		return syn::Error::new_spanned(item_struct, "Account structs must have named fields")
@@ -915,6 +1041,14 @@ fn account_impl(
 		discriminator: [u8; #discriminator::BYTES]
 	};
 	named_fields.named.insert(0, discriminator_field);
+
+	let zeropod_field_names: Vec<syn::Ident> = named_fields
+		.named
+		.iter()
+		.map(|f| f.ident.clone().expect("named field must have ident"))
+		.collect();
+	let zeropod_field_types: Vec<syn::Type> =
+		named_fields.named.iter().map(|f| f.ty.clone()).collect();
 
 	// Generate assertions
 	let assertions = if let Fields::Named(named_fields) = &item_struct.fields {
@@ -981,6 +1115,15 @@ fn account_impl(
 
 	let builder_type_alias = format_ident!("{}BuilderType", struct_name);
 
+	let zeropod_impls = generate_zeropod_impls(
+		struct_name,
+		&zeropod_field_names,
+		&zeropod_field_types,
+		&crate_path,
+		true,
+	);
+	let bytes_helpers = generate_bytes_helpers();
+
 	let implementations = quote! {
 		#[allow(dead_code)]
 		type #builder_type_alias = #builder_name<(
@@ -991,14 +1134,7 @@ fn account_impl(
 		#assertions
 
 		impl #struct_name {
-			/// Zero out all bytes in the struct including padding bytes. This can be useful when closing an account.
-			pub fn zeroed(&mut self) {
-				#crate_path::bytemuck::write_zeroes(self);
-			}
-
-			pub fn to_bytes(&self) -> &[u8] {
-				#crate_path::bytemuck::bytes_of(self)
-			}
+			#bytes_helpers
 
 			pub fn builder() -> #builder_type_alias {
 				let mut bytes = [0u8; #discriminator::BYTES];
@@ -1079,6 +1215,8 @@ fn account_impl(
 				}
 			}
 		}
+		#zeropod_impls
+
 	};
 
 	quote! {
@@ -1455,7 +1593,7 @@ fn pda_impl(
 ///
 /// Is transformed to:
 ///
-/// ```rust
+/// ```ignore
 /// use pina::*;
 ///
 /// #[discriminator(crate = ::pina, primitive = u8, final)]
@@ -1471,12 +1609,9 @@ fn pda_impl(
 /// 	::core::marker::Copy,
 /// 	::core::cmp::PartialEq,
 /// 	::core::cmp::Eq,
-/// 	::pina::Pod,
-/// 	::pina::Zeroable,
 /// 	::pina::TypedBuilder,
 /// )]
 /// #[builder(builder_method(vis = "", name = __builder))]
-/// #[bytemuck(crate = "::pina::bytemuck")]
 /// pub struct FlipBit {
 /// 	// This discriminator is automatically injected as the first field in the struct. It must be
 /// 	// present.
@@ -1504,11 +1639,17 @@ fn pda_impl(
 ///
 /// impl FlipBit {
 /// 	pub fn to_bytes(&self) -> &[u8] {
-/// 		::pina::bytemuck::bytes_of(self)
+/// 		unsafe {
+/// 			::core::slice::from_raw_parts(
+/// 				self as *const Self as *const u8,
+/// 				::core::mem::size_of::<Self>(),
+/// 			)
+/// 		}
 /// 	}
 ///
 /// 	pub fn try_from_bytes(data: &[u8]) -> Result<&Self, ::pina::ProgramError> {
-/// 		::pina::bytemuck::try_from_bytes::<Self>(data)
+/// 		<Self as ::pina::ZeroPodFixed>::from_bytes(data)
+/// 			.map_err(|_| ::pina::ProgramError::InvalidInstructionData)
 /// 			.or(Err(::pina::ProgramError::InvalidInstructionData))
 /// 	}
 ///
@@ -1572,10 +1713,8 @@ fn instruction_impl(
 	item_struct.attrs.push(repr_attr);
 
 	// Add derive macros
-	let derives_to_add: [syn::Path; 8] = [
+	let derives_to_add: [syn::Path; 6] = [
 		syn::parse_quote!(#crate_path::TypedBuilder),
-		syn::parse_quote!(#crate_path::Pod),
-		syn::parse_quote!(#crate_path::Zeroable),
 		syn::parse_quote!(::core::clone::Clone),
 		syn::parse_quote!(::core::marker::Copy),
 		syn::parse_quote!(::core::cmp::PartialEq),
@@ -1625,13 +1764,6 @@ fn instruction_impl(
 		syn::parse_quote!(#[builder(builder_method(vis = "", name = __builder))]);
 	item_struct.attrs.push(builder_attr);
 
-	let bytemuck_crate_str = format!(
-		"{}::bytemuck",
-		quote!(#crate_path).to_string().replace(' ', "")
-	);
-	let bytemuck_attr: Attribute = syn::parse_quote!(#[bytemuck(crate = #bytemuck_crate_str)]);
-	item_struct.attrs.push(bytemuck_attr);
-
 	// Add discriminator field
 	let Fields::Named(named_fields) = &mut item_struct.fields else {
 		return syn::Error::new_spanned(item_struct, "Instruction structs must have named fields")
@@ -1642,6 +1774,14 @@ fn instruction_impl(
 		discriminator: [u8; #discriminator::BYTES]
 	};
 	named_fields.named.insert(0, discriminator_field);
+
+	let zeropod_field_names: Vec<syn::Ident> = named_fields
+		.named
+		.iter()
+		.map(|f| f.ident.clone().expect("named field must have ident"))
+		.collect();
+	let zeropod_field_types: Vec<syn::Type> =
+		named_fields.named.iter().map(|f| f.ty.clone()).collect();
 
 	// Generate assertions
 	let assertions = if let Fields::Named(named_fields) = &item_struct.fields {
@@ -1708,6 +1848,14 @@ fn instruction_impl(
 
 	let builder_type_alias = format_ident!("{}BuilderType", struct_name);
 
+	let zeropod_impls = generate_zeropod_impls(
+		struct_name,
+		&zeropod_field_names,
+		&zeropod_field_types,
+		&crate_path,
+		false,
+	);
+
 	let implementations = quote! {
 		#[allow(dead_code)]
 		type #builder_type_alias = #builder_name<(
@@ -1718,13 +1866,24 @@ fn instruction_impl(
 		#assertions
 
 		impl #struct_name {
+			#[allow(unsafe_code)]
 			pub fn to_bytes(&self) -> &[u8] {
-				#crate_path::bytemuck::bytes_of(self)
+				// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields
+				// (compile-time asserted), so its bytes are a valid representation.
+				unsafe {
+					::core::slice::from_raw_parts(
+						self as *const Self as *const u8,
+						::core::mem::size_of::<Self>(),
+					)
+				}
 			}
 
 			pub fn try_from_bytes(data: &[u8]) -> Result<&Self, #crate_path::ProgramError> {
-				#crate_path::bytemuck::try_from_bytes::<Self>(data)
-					.or(Err(#crate_path::ProgramError::InvalidInstructionData))
+				if data.len() != ::core::mem::size_of::<Self>() {
+					return Err(#crate_path::ProgramError::InvalidInstructionData);
+				}
+				<Self as #crate_path::ZeroPodFixed>::from_bytes(data)
+					.map_err(|_| #crate_path::ProgramError::InvalidInstructionData)
 			}
 
 			pub fn builder() -> #builder_type_alias {
@@ -1740,6 +1899,8 @@ fn instruction_impl(
 
 			const VALUE: Self::Type = #discriminator::#variant;
 		}
+		#zeropod_impls
+
 	};
 
 	quote! {
@@ -1784,7 +1945,7 @@ fn instruction_impl(
 ///
 /// Is transformed to:
 ///
-/// ```rust
+/// ```ignore
 /// # use pina::*;
 /// # #[discriminator(primitive = u8)]
 /// # pub enum Event {
@@ -1798,12 +1959,9 @@ fn instruction_impl(
 /// 	::core::marker::Copy,
 /// 	::core::cmp::PartialEq,
 /// 	::core::cmp::Eq,
-/// 	::pina::Pod,
-/// 	::pina::Zeroable,
 /// 	::pina::TypedBuilder,
 /// )]
 /// #[builder(builder_method(vis = "", name = __builder))]
-/// #[bytemuck(crate = "::pina::bytemuck")]
 /// pub struct InitializeEvent {
 /// 	discriminator: [u8; Event::BYTES],
 /// 	pub choice: u8,
@@ -1812,11 +1970,17 @@ fn instruction_impl(
 /// type InitializeEventBuilderType = InitializeEventBuilder<(([u8; 1],), ())>;
 /// impl InitializeEvent {
 /// 	pub fn to_bytes(&self) -> &[u8] {
-/// 		::pina::bytemuck::bytes_of(self)
+/// 		unsafe {
+/// 			::core::slice::from_raw_parts(
+/// 				self as *const Self as *const u8,
+/// 				::core::mem::size_of::<Self>(),
+/// 			)
+/// 		}
 /// 	}
 ///
 /// 	pub fn try_from_bytes(data: &[u8]) -> Result<&Self, ::pina::ProgramError> {
-/// 		::pina::bytemuck::try_from_bytes::<Self>(data)
+/// 		<Self as ::pina::ZeroPodFixed>::from_bytes(data)
+/// 			.map_err(|_| ::pina::ProgramError::InvalidInstructionData)
 /// 			.or(Err(::pina::ProgramError::InvalidInstructionData))
 /// 	}
 ///
@@ -1885,10 +2049,8 @@ fn event_impl(
 	item_struct.attrs.push(builder_attr);
 
 	// Add derive macros
-	let derives_to_add: [syn::Path; 8] = [
+	let derives_to_add: [syn::Path; 6] = [
 		syn::parse_quote!(#crate_path::TypedBuilder),
-		syn::parse_quote!(#crate_path::Pod),
-		syn::parse_quote!(#crate_path::Zeroable),
 		syn::parse_quote!(::core::clone::Clone),
 		syn::parse_quote!(::core::marker::Copy),
 		syn::parse_quote!(::core::cmp::PartialEq),
@@ -1933,13 +2095,6 @@ fn event_impl(
 		item_struct.attrs.push(new_derive_attr);
 	}
 
-	let bytemuck_crate_str = format!(
-		"{}::bytemuck",
-		quote!(#crate_path).to_string().replace(' ', "")
-	);
-	let bytemuck_attr: Attribute = syn::parse_quote!(#[bytemuck(crate = #bytemuck_crate_str)]);
-	item_struct.attrs.push(bytemuck_attr);
-
 	// Add discriminator field
 	let Fields::Named(named_fields) = &mut item_struct.fields else {
 		return syn::Error::new_spanned(item_struct, "Event structs must have named fields")
@@ -1950,6 +2105,14 @@ fn event_impl(
 		discriminator: [u8; #discriminator::BYTES]
 	};
 	named_fields.named.insert(0, discriminator_field);
+
+	let zeropod_field_names: Vec<syn::Ident> = named_fields
+		.named
+		.iter()
+		.map(|f| f.ident.clone().expect("named field must have ident"))
+		.collect();
+	let zeropod_field_types: Vec<syn::Type> =
+		named_fields.named.iter().map(|f| f.ty.clone()).collect();
 
 	// Generate assertions
 	let assertions = if let Fields::Named(named_fields) = &item_struct.fields {
@@ -2015,6 +2178,14 @@ fn event_impl(
 
 	let builder_type_alias = format_ident!("{}BuilderType", struct_name);
 
+	let zeropod_impls = generate_zeropod_impls(
+		struct_name,
+		&zeropod_field_names,
+		&zeropod_field_types,
+		&crate_path,
+		false,
+	);
+
 	let implementations = quote! {
 		#[allow(dead_code)]
 		type #builder_type_alias = #builder_name<(
@@ -2025,13 +2196,24 @@ fn event_impl(
 		#assertions
 
 		impl #struct_name {
+			#[allow(unsafe_code)]
 			pub fn to_bytes(&self) -> &[u8] {
-				#crate_path::bytemuck::bytes_of(self)
+				// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields
+				// (compile-time asserted), so its bytes are a valid representation.
+				unsafe {
+					::core::slice::from_raw_parts(
+						self as *const Self as *const u8,
+						::core::mem::size_of::<Self>(),
+					)
+				}
 			}
 
 			pub fn try_from_bytes(data: &[u8]) -> Result<&Self, #crate_path::ProgramError> {
-				#crate_path::bytemuck::try_from_bytes::<Self>(data)
-					.or(Err(#crate_path::ProgramError::InvalidInstructionData))
+				if data.len() != ::core::mem::size_of::<Self>() {
+					return Err(#crate_path::ProgramError::InvalidInstructionData);
+				}
+				<Self as #crate_path::ZeroPodFixed>::from_bytes(data)
+					.map_err(|_| #crate_path::ProgramError::InvalidInstructionData)
 			}
 
 			pub fn builder() -> #builder_type_alias {
@@ -2047,10 +2229,336 @@ fn event_impl(
 
 			const VALUE: Self::Type = #discriminator::#variant;
 		}
+		#zeropod_impls
+
 	};
 
 	quote! {
 		#item_struct
 		#implementations
 	}
+}
+
+/// Derives zeropod trait impls for a unit enum, generating a zero-copy
+/// `EnumZc` companion for use as a field in `#[account]` structs and other pod
+/// types.
+///
+/// Requires `#[repr(u8)]`, `#[repr(u16)]`, `#[repr(u32)]`, or `#[repr(u64)]`
+/// with all variants being unit variants that carry explicit discriminants
+/// (e.g. `Red = 0`).
+///
+/// The generated `EnumZc` type wraps the raw discriminant bytes (alignment 1,
+/// always valid as a reference) and validates the discriminant at the
+/// deserialization boundary. The enum itself is the *schema* type:
+/// `ZeroPodFixed` with `type Zc = EnumZc`, and `ZcField` maps the enum to its
+/// zero-copy companion.
+///
+/// # Examples
+///
+/// ```ignore
+/// use pina::PodEnum;
+/// use pina::PodU64;
+///
+/// #[derive(PodEnum)]
+/// #[repr(u8)]
+/// enum Color {
+///     Red = 0,
+///     Green = 1,
+///     Blue = 2,
+/// }
+///
+/// #[account(...)]
+/// struct Palette {
+///     color: ColorZc,   // use the zero-copy companion as the field type
+///     brightness: PodU64,
+/// }
+///
+/// // Read / compare / convert:
+/// let c: ColorZc = Color::Red.into();
+/// assert!(c.is(Color::Red));
+/// assert_eq!(c, Color::Red);
+/// let color: Color = c.try_to_enum().unwrap();
+/// ```
+#[proc_macro_derive(PodEnum, attributes(pina))]
+pub fn pod_enum_derive(input: TokenStream) -> TokenStream {
+	pod_enum_impl(input.into()).into()
+}
+
+fn default_crate_path() -> syn::Path {
+	syn::parse_quote!(::pina)
+}
+
+fn pod_enum_impl(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+	let input: DeriveInput = match syn::parse2(input) {
+		Ok(v) => v,
+		Err(e) => return e.to_compile_error(),
+	};
+
+	let enum_name = &input.ident;
+	let zc_name = format_ident!("{}Zc", enum_name);
+
+	// Crate path: support #[pina(crate = ::pina)] for renamed dependencies.
+	let crate_path: syn::Path =
+		match <PodEnumArgs as darling::FromDeriveInput>::from_derive_input(&input) {
+			Ok(args) => args.crate_path,
+			Err(e) => return e.write_errors(),
+		};
+
+	// 1. Parse #[repr(uN)].
+	let repr = match parse_enum_repr(&input.attrs) {
+		Some(r) => r,
+		None => {
+			return quote! {
+				compile_error!("PodEnum enums require #[repr(u8)], #[repr(u16)], #[repr(u32)], or #[repr(u64)]");
+			}
+			.into();
+		}
+	};
+
+	// 2. Extract variants — all must be unit variants with explicit discriminants.
+	let variants = match &input.data {
+		syn::Data::Enum(data) => &data.variants,
+		_ => {
+			return quote! {
+				compile_error!("PodEnum can only be derived for enums");
+			}
+			.into();
+		}
+	};
+
+	let mut variant_names: Vec<&syn::Ident> = Vec::new();
+	let mut discriminant_values: Vec<proc_macro2::TokenStream> = Vec::new();
+
+	for v in variants {
+		if !v.fields.is_empty() {
+			let msg = format!(
+				"PodEnum enum variant `{}` must be a unit variant (no data fields)",
+				v.ident
+			);
+			return quote! { compile_error!(#msg); }.into();
+		}
+		let disc = match &v.discriminant {
+			Some((_, expr)) => expr.clone(),
+			None => {
+				let msg = format!(
+					"PodEnum enum variant `{}` must have an explicit discriminant (e.g. `= 0`)",
+					v.ident
+				);
+				return quote! { compile_error!(#msg); }.into();
+			}
+		};
+		variant_names.push(&v.ident);
+		discriminant_values.push(quote! { #disc });
+	}
+
+	// 3. Map repr to native type and size.
+	let (native_ty, repr_size): (proc_macro2::TokenStream, usize) = match repr.as_str() {
+		"u8" => (quote! { u8 }, 1),
+		"u16" => (quote! { u16 }, 2),
+		"u32" => (quote! { u32 }, 4),
+		"u64" => (quote! { u64 }, 8),
+		_ => unreachable!(),
+	};
+
+	// 4. Build the valid discriminant set for validation.
+	let valid_arms: Vec<proc_macro2::TokenStream> =
+		discriminant_values.iter().map(|d| quote! { #d }).collect();
+
+	// 5. Build the From<Enum> -> raw match arms.
+	let from_arms: Vec<proc_macro2::TokenStream> = variant_names
+		.iter()
+		.zip(discriminant_values.iter())
+		.map(|(name, disc)| {
+			quote! { #enum_name::#name => #disc as #native_ty }
+		})
+		.collect();
+
+	let read_value = match repr_size {
+		1 => quote! { self.0[0] as #native_ty },
+		_ => quote! { <#native_ty>::from_le_bytes(self.0) },
+	};
+
+	quote! {
+		#[repr(transparent)]
+		#[derive(Clone, Copy)]
+		pub struct #zc_name([u8; #repr_size]);
+
+		impl #zc_name {
+			/// Returns the raw discriminant value.
+			#[inline(always)]
+			pub fn get(&self) -> #native_ty {
+				#read_value
+			}
+
+			/// Try to convert the raw value back to the enum.
+			#[allow(clippy::manual_range_patterns)]
+			pub fn try_to_enum(&self) -> Result<#enum_name, #crate_path::ZeroPodError> {
+				let val = self.get();
+				match val {
+					#(#valid_arms => Ok(#enum_name::#variant_names),)*
+					_ => Err(#crate_path::ZeroPodError::InvalidDiscriminant),
+				}
+			}
+
+			/// Returns `true` if the stored value matches the given variant.
+			pub fn is(&self, variant: #enum_name) -> bool {
+				let raw: #native_ty = variant.into();
+				self.get() == raw
+			}
+		}
+
+		impl #crate_path::ZcValidate for #zc_name {
+			#[allow(clippy::manual_range_patterns)]
+			fn validate_ref(value: &Self) -> Result<(), #crate_path::ZeroPodError> {
+				let v = value.get();
+				match v {
+					#(#valid_arms)|* => Ok(()),
+					_ => Err(#crate_path::ZeroPodError::InvalidDiscriminant),
+				}
+			}
+		}
+
+		impl #crate_path::ZeroPodSchema for #enum_name {
+			const LAYOUT: #crate_path::LayoutKind = #crate_path::LayoutKind::Fixed;
+		}
+
+		impl #crate_path::ZeroPodFixed for #enum_name {
+			type Zc = #zc_name;
+			const SIZE: usize = #repr_size;
+
+			fn from_bytes(data: &[u8]) -> Result<&Self::Zc, #crate_path::ZeroPodError> {
+				Self::validate(data)?;
+				Ok(unsafe { &*(data.as_ptr() as *const #zc_name) })
+			}
+
+			fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, #crate_path::ZeroPodError> {
+				Self::validate(data)?;
+				Ok(unsafe { &mut *(data.as_mut_ptr() as *mut #zc_name) })
+			}
+
+			fn validate(data: &[u8]) -> Result<(), #crate_path::ZeroPodError> {
+				if data.len() < #repr_size {
+					return Err(#crate_path::ZeroPodError::BufferTooSmall);
+				}
+				let __zc = unsafe { &*(data.as_ptr() as *const #zc_name) };
+				<#zc_name as #crate_path::ZcValidate>::validate_ref(__zc)?;
+				Ok(())
+			}
+
+			unsafe fn from_bytes_unchecked(data: &[u8]) -> &Self::Zc {
+				&*(data.as_ptr() as *const #zc_name)
+			}
+
+			unsafe fn from_bytes_mut_unchecked(data: &mut [u8]) -> &mut Self::Zc {
+				&mut *(data.as_mut_ptr() as *mut #zc_name)
+			}
+		}
+
+		impl #crate_path::ZcField for #enum_name {
+			type Pod = #zc_name;
+			const POD_SIZE: usize = #repr_size;
+		}
+
+		// --- Enum ergonomics ---
+
+		impl From<#enum_name> for #zc_name {
+			fn from(v: #enum_name) -> Self {
+				let raw: #native_ty = match v {
+					#(#from_arms),*
+				};
+				Self(raw.to_le_bytes())
+			}
+		}
+
+		impl From<#enum_name> for #native_ty {
+			fn from(v: #enum_name) -> Self {
+				match v {
+					#(#from_arms),*
+				}
+			}
+		}
+
+		impl PartialEq<#enum_name> for #zc_name {
+			fn eq(&self, other: &#enum_name) -> bool {
+				let other_raw: #native_ty = match other {
+					#(#enum_name::#variant_names => #discriminant_values as #native_ty),*
+				};
+				self.get() == other_raw
+			}
+		}
+
+		impl PartialEq<#native_ty> for #zc_name {
+			fn eq(&self, other: &#native_ty) -> bool {
+				self.get() == *other
+			}
+		}
+
+		impl core::fmt::Display for #zc_name {
+			fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+				match self.get() {
+					#(#discriminant_values => write!(f, stringify!(#variant_names)),)*
+					other => write!(f, "{}(invalid: {})", stringify!(#enum_name), other),
+				}
+			}
+		}
+
+		impl core::fmt::Debug for #zc_name {
+			fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+				match self.get() {
+					#(#discriminant_values => write!(f, "{}Zc({})", stringify!(#enum_name), stringify!(#variant_names)),)*
+					other => write!(f, "{}Zc(invalid: {})", stringify!(#enum_name), other),
+				}
+			}
+		}
+
+		impl PartialEq for #zc_name {
+			fn eq(&self, other: &Self) -> bool {
+				self.0 == other.0
+			}
+		}
+
+		impl Eq for #zc_name {}
+
+		// SAFETY: #zc_name is #[repr(transparent)] over [u8; #repr_size],
+		// alignment 1, every bit pattern is a valid reference, and
+		// ZcValidate::validate_ref is load-bearing (rejects invalid
+		// discriminants).
+		#[allow(unsafe_code)]
+		unsafe impl #crate_path::ZcElem for #zc_name {}
+	}
+	.into()
+}
+
+/// Parses the `#[repr(uN)]` attribute, returning the integer name (`u8`, `u16`,
+/// `u32`, or `u64`) if present.
+fn parse_enum_repr(attrs: &[syn::Attribute]) -> Option<String> {
+	for attr in attrs {
+		if !attr.path().is_ident("repr") {
+			continue;
+		}
+		let mut result = None;
+		let _ = attr.parse_nested_meta(|meta| {
+			if meta.path.is_ident("u8") {
+				result = Some("u8".to_string());
+			} else if meta.path.is_ident("u16") {
+				result = Some("u16".to_string());
+			} else if meta.path.is_ident("u32") {
+				result = Some("u32".to_string());
+			} else if meta.path.is_ident("u64") {
+				result = Some("u64".to_string());
+			}
+			Ok(())
+		});
+		if result.is_some() {
+			return result;
+		}
+	}
+	None
+}
+
+#[derive(Debug, darling::FromDeriveInput)]
+#[darling(attributes(pina))]
+struct PodEnumArgs {
+	#[darling(default = "default_crate_path", rename = "crate")]
+	crate_path: syn::Path,
 }

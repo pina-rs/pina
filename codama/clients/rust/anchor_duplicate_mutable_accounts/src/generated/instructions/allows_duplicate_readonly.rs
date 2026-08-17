@@ -45,7 +45,14 @@ impl AllowsDuplicateReadonly {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		let data = bytemuck::bytes_of(&data).to_vec();
+		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
+		let data = unsafe {
+			core::slice::from_raw_parts(
+				&data as *const _ as *const u8,
+				core::mem::size_of_val(&data),
+			)
+			.to_vec()
+		};
 
 		solana_instruction::Instruction {
 			program_id: crate::ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_ID,
@@ -56,7 +63,7 @@ impl AllowsDuplicateReadonly {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AllowsDuplicateReadonlyInstructionData {
 	pub discriminator: u8,
 }

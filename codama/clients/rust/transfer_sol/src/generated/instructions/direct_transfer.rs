@@ -45,7 +45,14 @@ impl DirectTransfer {
 		accounts.push(solana_instruction::AccountMeta::new(self.sender, true));
 		accounts.push(solana_instruction::AccountMeta::new(self.recipient, false));
 		accounts.extend_from_slice(remaining_accounts);
-		let data = bytemuck::bytes_of(&data).to_vec();
+		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
+		let data = unsafe {
+			core::slice::from_raw_parts(
+				&data as *const _ as *const u8,
+				core::mem::size_of_val(&data),
+			)
+			.to_vec()
+		};
 
 		solana_instruction::Instruction {
 			program_id: crate::TRANSFER_SOL_ID,
@@ -56,14 +63,14 @@ impl DirectTransfer {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DirectTransferInstructionData {
 	pub discriminator: u8,
-	pub amount: pina_pod_primitives::PodU64,
+	pub amount: pina::PodU64,
 }
 
 impl DirectTransferInstructionData {
-	pub const fn new(amount: pina_pod_primitives::PodU64) -> Self {
+	pub const fn new(amount: pina::PodU64) -> Self {
 		Self {
 			discriminator: DIRECT_TRANSFER_DISCRIMINATOR,
 			amount,

@@ -461,7 +461,7 @@ fn rejects_missing_instruction_discriminators() {
 }
 
 #[test]
-fn writes_scaffold_with_bytemuck_dependency() {
+fn writes_scaffold_with_zeropod_dependency() {
 	let root = load_fixture_root("hello_solana");
 	let output_dir = unique_temp_dir("pina-codama-render-scaffold");
 	let crate_dir = output_dir.join("hello_solana");
@@ -477,7 +477,7 @@ fn writes_scaffold_with_bytemuck_dependency() {
 		)
 	});
 
-	insta::assert_snapshot!("writes_scaffold_with_bytemuck_dependency", cargo_toml);
+	insta::assert_snapshot!("writes_scaffold_with_zeropod_dependency", cargo_toml);
 }
 
 #[test]

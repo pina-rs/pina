@@ -30,7 +30,6 @@ use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
 use pina::PodU64;
-use pina::bytemuck;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
@@ -92,9 +91,9 @@ fn increment_ix_data() -> Vec<u8> {
 fn counter_account(bump: u8, count: u64, lamports: u64) -> Account {
 	let state = CounterState::builder()
 		.bump(bump)
-		.count(PodU64::from_primitive(count))
+		.count(PodU64::from(count))
 		.build();
-	let data = bytemuck::bytes_of(&state).to_vec();
+	let data = state.to_bytes().to_vec();
 	Account {
 		lamports,
 		data,

@@ -127,7 +127,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			._padding2(0)
 			.value(args.initial_value)
 			.build();
-		let state_bytes = bytemuck::bytes_of(&new_state);
+		let state_bytes = new_state.to_bytes();
 
 		// Write directly to the account's raw data, bypassing discriminator
 		// validation (which would fail on zeroed/uninitialized data).
@@ -473,9 +473,9 @@ fn build_test_state_bytes(bump: u8, value: u64) -> Vec<u8> {
 		.bump(bump)
 		._padding(0)
 		._padding2(0)
-		.value(PodU64::from_primitive(value))
+		.value(PodU64::from(value))
 		.build();
-	bytemuck::bytes_of(&state).to_vec()
+	state.to_bytes().to_vec()
 }
 
 #[cfg(feature = "token")]
@@ -525,9 +525,9 @@ fn full_account_lifecycle() {
 
 	let init_data = InitializeInstr::builder()
 		.bump(42)
-		.initial_value(PodU64::from_primitive(100))
+		.initial_value(PodU64::from(100))
 		.build();
-	let init_bytes = bytemuck::bytes_of(&init_data);
+	let init_bytes = init_data.to_bytes();
 
 	let accounts = [
 		AccountBuilder::new()
@@ -562,10 +562,8 @@ fn full_account_lifecycle() {
 
 	// --- Step 2: Update ---
 	// Reuse the same memory (state account now has initialized data).
-	let update_data = UpdateInstr::builder()
-		.new_value(PodU64::from_primitive(999))
-		.build();
-	let update_bytes = bytemuck::bytes_of(&update_data);
+	let update_data = UpdateInstr::builder().new_value(PodU64::from(999)).build();
+	let update_bytes = update_data.to_bytes();
 
 	let state_bytes = build_test_state_bytes(42, 100);
 	let accounts = [
@@ -601,7 +599,7 @@ fn full_account_lifecycle() {
 	// --- Step 3: Close ---
 	let state_bytes = build_test_state_bytes(42, 999);
 	let close_data = CloseInstr::builder().build();
-	let close_bytes = bytemuck::bytes_of(&close_data);
+	let close_bytes = close_data.to_bytes();
 
 	let accounts = [
 		AccountBuilder::new()
@@ -657,9 +655,9 @@ fn multi_instruction_flow_initialize_then_update() {
 	let state_data = vec![0u8; size_of::<TestState>()];
 	let init_data = InitializeInstr::builder()
 		.bump(7)
-		.initial_value(PodU64::from_primitive(50))
+		.initial_value(PodU64::from(50))
 		.build();
-	let init_bytes = bytemuck::bytes_of(&init_data);
+	let init_bytes = init_data.to_bytes();
 
 	let accounts = [
 		AccountBuilder::new()
@@ -694,10 +692,8 @@ fn multi_instruction_flow_initialize_then_update() {
 
 	// --- Update to value=200 ---
 	let state_bytes = build_test_state_bytes(7, 50);
-	let update_data = UpdateInstr::builder()
-		.new_value(PodU64::from_primitive(200))
-		.build();
-	let update_bytes = bytemuck::bytes_of(&update_data);
+	let update_data = UpdateInstr::builder().new_value(PodU64::from(200)).build();
+	let update_bytes = update_data.to_bytes();
 
 	let accounts = [
 		AccountBuilder::new()
@@ -740,9 +736,9 @@ fn multi_update_flow() {
 	for new_value in [20u64, 30, 40, 50, u64::MAX] {
 		let state_bytes = build_test_state_bytes(1, current_value);
 		let update_data = UpdateInstr::builder()
-			.new_value(PodU64::from_primitive(new_value))
+			.new_value(PodU64::from(new_value))
 			.build();
-		let update_bytes = bytemuck::bytes_of(&update_data);
+		let update_bytes = update_data.to_bytes();
 
 		let accounts = [
 			AccountBuilder::new()
@@ -793,9 +789,9 @@ fn error_missing_signer_rejected() {
 	let state_data = vec![0u8; size_of::<TestState>()];
 	let init_data = InitializeInstr::builder()
 		.bump(1)
-		.initial_value(PodU64::from_primitive(0))
+		.initial_value(PodU64::from(0))
 		.build();
-	let init_bytes = bytemuck::bytes_of(&init_data);
+	let init_bytes = init_data.to_bytes();
 
 	// Authority is NOT a signer.
 	let accounts = [
@@ -835,10 +831,8 @@ fn error_wrong_program_owner_rejected() {
 	let state_key: Address = address!("3Jiy8N6ZGv3ueH9k3svLRaHscmQbE6v7W9FHJaGH2mki");
 
 	let state_bytes = build_test_state_bytes(1, 100);
-	let update_data = UpdateInstr::builder()
-		.new_value(PodU64::from_primitive(200))
-		.build();
-	let update_bytes = bytemuck::bytes_of(&update_data);
+	let update_data = UpdateInstr::builder().new_value(PodU64::from(200)).build();
+	let update_bytes = update_data.to_bytes();
 
 	// Wrong owner — system::ID instead of TEST_PROGRAM_ID.
 	let wrong_owner = system::ID;
@@ -883,10 +877,8 @@ fn error_discriminator_mismatch_rejected() {
 	let mut bad_data = vec![0u8; size_of::<TestState>()];
 	bad_data[0] = 99; // Wrong discriminator.
 
-	let update_data = UpdateInstr::builder()
-		.new_value(PodU64::from_primitive(200))
-		.build();
-	let update_bytes = bytemuck::bytes_of(&update_data);
+	let update_data = UpdateInstr::builder().new_value(PodU64::from(200)).build();
+	let update_bytes = update_data.to_bytes();
 
 	let accounts = [
 		AccountBuilder::new()
@@ -927,10 +919,8 @@ fn error_data_length_mismatch_rejected() {
 	// size_of::<TestState>().
 	let short_data = vec![TestAccountType::TestState as u8, 0, 0, 0, 0];
 
-	let update_data = UpdateInstr::builder()
-		.new_value(PodU64::from_primitive(200))
-		.build();
-	let update_bytes = bytemuck::bytes_of(&update_data);
+	let update_data = UpdateInstr::builder().new_value(PodU64::from(200)).build();
+	let update_bytes = update_data.to_bytes();
 
 	let accounts = [
 		AccountBuilder::new()
@@ -1034,9 +1024,9 @@ fn error_wrong_program_id() {
 
 	let init_data = InitializeInstr::builder()
 		.bump(1)
-		.initial_value(PodU64::from_primitive(0))
+		.initial_value(PodU64::from(0))
 		.build();
-	let init_bytes = bytemuck::bytes_of(&init_data);
+	let init_bytes = init_data.to_bytes();
 
 	let accounts = [AccountBuilder::new()
 		.address(authority_key)
@@ -1064,9 +1054,9 @@ fn error_not_enough_accounts() {
 
 	let init_data = InitializeInstr::builder()
 		.bump(1)
-		.initial_value(PodU64::from_primitive(0))
+		.initial_value(PodU64::from(0))
 		.build();
-	let init_bytes = bytemuck::bytes_of(&init_data);
+	let init_bytes = init_data.to_bytes();
 
 	// Only 1 account, but Initialize needs 3.
 	let accounts = [AccountBuilder::new()
@@ -1097,10 +1087,8 @@ fn error_non_writable_rejected() {
 	let state_key: Address = address!("3Jiy8N6ZGv3ueH9k3svLRaHscmQbE6v7W9FHJaGH2mki");
 
 	let state_bytes = build_test_state_bytes(1, 100);
-	let update_data = UpdateInstr::builder()
-		.new_value(PodU64::from_primitive(200))
-		.build();
-	let update_bytes = bytemuck::bytes_of(&update_data);
+	let update_data = UpdateInstr::builder().new_value(PodU64::from(200)).build();
+	let update_bytes = update_data.to_bytes();
 
 	// State account is NOT writable.
 	let accounts = [
@@ -1139,10 +1127,8 @@ fn error_empty_account_rejected_for_update() {
 	let authority_key: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 	let state_key: Address = address!("3Jiy8N6ZGv3ueH9k3svLRaHscmQbE6v7W9FHJaGH2mki");
 
-	let update_data = UpdateInstr::builder()
-		.new_value(PodU64::from_primitive(200))
-		.build();
-	let update_bytes = bytemuck::bytes_of(&update_data);
+	let update_data = UpdateInstr::builder().new_value(PodU64::from(200)).build();
+	let update_bytes = update_data.to_bytes();
 
 	// Account has no data — it's empty.
 	let accounts = [
@@ -1481,9 +1467,9 @@ fn account_data_roundtrip_through_account_view() {
 			.bump(123)
 			._padding(0)
 			._padding2(0)
-			.value(PodU64::from_primitive(u64::MAX))
+			.value(PodU64::from(u64::MAX))
 			.build();
-		let state_bytes = bytemuck::bytes_of(&new_state);
+		let state_bytes = new_state.to_bytes();
 		let mut account_data = account_views[0]
 			.try_borrow_mut()
 			.unwrap_or_else(|e| panic!("borrow failed: {e:?}"));
@@ -1521,7 +1507,7 @@ fn account_data_mutation_persists() {
 		let mut state = account_views[0]
 			.as_account_mut::<TestState>(&TEST_PROGRAM_ID)
 			.unwrap_or_else(|e| panic!("write failed: {e:?}"));
-		state.value = PodU64::from_primitive(12345);
+		state.value = PodU64::from(12345);
 	}
 
 	// Verify persistence.
@@ -1593,7 +1579,7 @@ fn as_account_mut_blocks_overlapping_borrows_until_drop() {
 	let mut state = account
 		.as_account_mut::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("write failed: {e:?}"));
-	state.value = PodU64::from_primitive(88);
+	state.value = PodU64::from(88);
 
 	assert!(matches!(
 		shadow.try_borrow(),

@@ -68,7 +68,7 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 		let mut vault = self.vault.as_account_mut::<VaultState>(&ID)?;
 		let amount: u64 = args.amount.into();
 
-		vault.balance = PodU64::from_primitive(checked_withdraw_balance(current, amount)?);
+		vault.balance = PodU64::from(checked_withdraw_balance(current, amount)?);
 
 		Ok(())
 	}

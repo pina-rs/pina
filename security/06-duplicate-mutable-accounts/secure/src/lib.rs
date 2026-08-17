@@ -84,8 +84,8 @@ impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
 		let dest_amount: u64 = dest.amount.into();
 
 		let (new_source, new_dest) = checked_transfer_balances(source_amount, dest_amount, amount)?;
-		source.amount = PodU64::from_primitive(new_source);
-		dest.amount = PodU64::from_primitive(new_dest);
+		source.amount = PodU64::from(new_source);
+		dest.amount = PodU64::from(new_dest);
 
 		Ok(())
 	}

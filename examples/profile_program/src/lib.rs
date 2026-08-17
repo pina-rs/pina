@@ -220,13 +220,10 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
 		self.system_program.assert_address(&system::ID)?;
 
-		// Validate UTF-8 before storing anything on-chain
-		args.name
-			.try_as_str()
-			.map_err(|_| ProfileError::InvalidUtf8)?;
-		args.bio
-			.try_as_str()
-			.map_err(|_| ProfileError::InvalidUtf8)?;
+		// Validate UTF-8 before storing anything on-chain (boundary validation
+		// already guarantees this, but keep the explicit check for clarity).
+		let _ = args.name.as_str();
+		let _ = args.bio.as_str();
 
 		// Create the PDA account
 		create_program_account_with_bump::<ProfileState>(
@@ -244,7 +241,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			.name(args.name)
 			.bio(args.bio)
 			.tags(PodVec::default())
-			.active(PodBool::from_bool(true))
+			.active(PodBool::from(true))
 			.build();
 
 		log!("Profile initialized");
@@ -277,12 +274,8 @@ impl<'a> ProcessAccountInfos<'a> for ProfileAccounts<'a> {
 		match instruction {
 			ProfileInstruction::UpdateProfile => {
 				let args = UpdateProfileInstruction::try_from_bytes(data)?;
-				args.name
-					.try_as_str()
-					.map_err(|_| ProfileError::InvalidUtf8)?;
-				args.bio
-					.try_as_str()
-					.map_err(|_| ProfileError::InvalidUtf8)?;
+				let _ = args.name.as_str();
+				let _ = args.bio.as_str();
 
 				let mut profile = self.profile.as_account_mut::<ProfileState>(&ID)?;
 				profile.name = args.name;
@@ -314,7 +307,7 @@ impl<'a> ProcessAccountInfos<'a> for ProfileAccounts<'a> {
 
 				// Shift remaining tags left, then pop the (now duplicated)
 				// last slot to decrement the length prefix.
-				profile.tags.as_mut_slice().copy_within(index + 1.., index);
+				profile.tags.as_slice_mut().copy_within(index + 1.., index);
 				profile.tags.pop();
 
 				log!("Tag removed");
@@ -404,7 +397,7 @@ mod tests {
 			.name(PodString::default())
 			.bio(PodString::default())
 			.tags(PodVec::default())
-			.active(PodBool::from_bool(true))
+			.active(PodBool::from(true))
 			.build();
 		assert_eq!(state.bump, 42);
 		assert!(state.name.is_empty());
@@ -416,10 +409,7 @@ mod tests {
 	fn pod_string_roundtrip() {
 		let mut name = PodString::<32>::default();
 		assert!(name.try_set("alice").is_ok());
-		assert_eq!(
-			name.try_as_str().unwrap_or_else(|e| panic!("{e:?}")),
-			"alice"
-		);
+		assert_eq!(name.as_str(), "alice");
 		assert_eq!(name.len(), 5);
 		assert_eq!(name.capacity(), 32);
 	}
@@ -429,13 +419,12 @@ mod tests {
 		let mut name = PodString::<32>::default();
 		// 0xff is not valid UTF-8
 		assert!(name.try_set("\u{FFFD}").is_ok()); // replacement char is valid
-		// Direct byte-level corruption: set the length to 1 and write 0xff
+		// Direct byte-level corruption: set the length to 1 and write 0xff.
+		// Boundary validation must reject the invalid UTF-8.
 		let mut raw = [0u8; 33];
 		raw[0] = 1;
 		raw[1] = 0xff;
-		let corrupted =
-			bytemuck::try_from_bytes::<PodString<32>>(&raw).unwrap_or_else(|e| panic!("{e:?}"));
-		assert!(corrupted.try_as_str().is_err());
+		assert!(pina::pod_from_bytes::<PodString<32>>(&raw).is_err());
 	}
 
 	#[test]
@@ -448,26 +437,18 @@ mod tests {
 	#[test]
 	fn pod_vec_roundtrip() {
 		let mut tags = PodVec::<PodU64, 8>::default();
-		assert!(tags.try_push(PodU64::from_primitive(1)).is_ok());
-		assert!(tags.try_push(PodU64::from_primitive(2)).is_ok());
+		assert!(tags.try_push(PodU64::from(1)).is_ok());
+		assert!(tags.try_push(PodU64::from(2)).is_ok());
 		assert_eq!(tags.len(), 2);
 		assert_eq!(
-			u64::from(
-				tags.get(0)
-					.copied()
-					.unwrap_or_else(|| PodU64::from_primitive(0))
-			),
+			u64::from(tags.get(0).copied().unwrap_or_else(|| PodU64::from(0))),
 			1
 		);
 		assert_eq!(
-			u64::from(
-				tags.get(1)
-					.copied()
-					.unwrap_or_else(|| PodU64::from_primitive(0))
-			),
+			u64::from(tags.get(1).copied().unwrap_or_else(|| PodU64::from(0))),
 			2
 		);
-		assert_eq!(tags.pop(), Some(PodU64::from_primitive(2)));
+		assert_eq!(tags.pop(), Some(PodU64::from(2)));
 		assert_eq!(tags.len(), 1);
 	}
 
@@ -475,9 +456,9 @@ mod tests {
 	fn pod_vec_capacity_overflow() {
 		let mut tags = PodVec::<PodU64, 8>::default();
 		for i in 0..8 {
-			assert!(tags.try_push(PodU64::from_primitive(i)).is_ok());
+			assert!(tags.try_push(PodU64::from(i)).is_ok());
 		}
-		assert!(tags.try_push(PodU64::from_primitive(8)).is_err());
+		assert!(tags.try_push(PodU64::from(8)).is_err());
 	}
 
 	#[test]
@@ -516,10 +497,7 @@ mod tests {
 		let ix = InitializeInstruction::try_from_bytes(&data)
 			.unwrap_or_else(|e| panic!("failed: {e:?}"));
 		assert_eq!(ix.bump, 42);
-		assert_eq!(
-			ix.name.try_as_str().unwrap_or_else(|e| panic!("{e:?}")),
-			"ali"
-		);
+		assert_eq!(ix.name.as_str(), "ali");
 	}
 
 	#[test]

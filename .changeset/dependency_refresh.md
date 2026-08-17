@@ -3,7 +3,6 @@ pina: fix
 pina_cli: fix
 pina_codama_renderer: fix
 pina_macros: fix
-pina_pod_primitives: fix
 pina_profile: fix
 pina_sdk_ids: fix
 ---
