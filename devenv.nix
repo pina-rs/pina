@@ -722,25 +722,6 @@ in
       description = "Run mutation testing on a single workspace crate.";
       binary = "bash";
     };
-    "kani:proofs" = {
-      exec = ''
-        set -euo pipefail
-        # Kani injects `#![feature(register_tool)]`, which would otherwise trip
-        # the workspace-wide `unstable_features = "deny"` lint.
-        export RUSTFLAGS="''${RUSTFLAGS:+$RUSTFLAGS }-A unstable-features"
-
-        # Kani downloads Linux binaries that must resolve against the host
-        # runtime, not Nix's glibc/libm from the devenv shell.
-        unset LD_LIBRARY_PATH
-        unset NIX_LD_LIBRARY_PATH
-        unset LD_PRELOAD
-
-        # Run all Kani harnesses in pina.
-        cargo kani --manifest-path "$DEVENV_ROOT/crates/pina/Cargo.toml" --all-features
-      '';
-      description = "Run Kani model-checking proofs for pina.";
-      binary = "bash";
-    };
     "fix:all" = {
       exec = ''
         set -euo pipefail
