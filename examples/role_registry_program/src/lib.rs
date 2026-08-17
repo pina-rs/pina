@@ -82,6 +82,7 @@ pub enum RegistryAccountType {
 }
 
 #[account(discriminator = RegistryAccountType)]
+#[pda(seeds = [REGISTRY_SEED_PREFIX, admin: Address], bump = bump)]
 pub struct RegistryConfig {
 	pub admin: Address,
 	pub role_count: PodU64,
@@ -89,6 +90,7 @@ pub struct RegistryConfig {
 }
 
 #[account(discriminator = RegistryAccountType)]
+#[pda(seeds = [ROLE_ENTRY_SEED_PREFIX, registry: Address, role_id: u64], bump = bump)]
 pub struct RoleEntry {
 	pub registry: Address,
 	pub role_id: PodU64,
@@ -158,47 +160,30 @@ pub struct RotateAdminAccounts<'a> {
 	pub registry_config: &'a mut AccountView,
 }
 
+/// Seed prefix for registry config PDAs.
 const REGISTRY_SEED_PREFIX: &[u8] = b"registry";
+
+/// Seed prefix for role entry PDAs.
 const ROLE_ENTRY_SEED_PREFIX: &[u8] = b"role-entry";
-
-#[macro_export]
-macro_rules! registry_config_seeds {
-	($admin:expr) => {
-		&[REGISTRY_SEED_PREFIX, $admin]
-	};
-	($admin:expr, $bump:expr) => {
-		&[REGISTRY_SEED_PREFIX, $admin, &[$bump]]
-	};
-}
-
-#[macro_export]
-macro_rules! role_entry_seeds {
-	($registry:expr, $role_id:expr) => {
-		&[ROLE_ENTRY_SEED_PREFIX, $registry, $role_id]
-	};
-	($registry:expr, $role_id:expr, $bump:expr) => {
-		&[ROLE_ENTRY_SEED_PREFIX, $registry, $role_id, &[$bump]]
-	};
-}
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = InitializeInstruction::try_from_bytes(data)?;
 		let admin_address = *self.admin.address();
-		let registry_seeds = registry_config_seeds!(admin_address.as_ref());
-		let registry_seeds_with_bump = registry_config_seeds!(admin_address.as_ref(), args.bump);
+		let registry_seeds = RegistryConfig::seeds(&admin_address);
+		let registry_seeds_with_bump = registry_seeds.with_bump(args.bump);
 
 		self.admin.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
 		self.registry_config
 			.assert_empty()?
-			.assert_seeds_with_bump(registry_seeds_with_bump, &ID)?;
+			.assert_seeds_with_bump(&registry_seeds_with_bump.as_slices(), &ID)?;
 
 		create_program_account_with_bump::<RegistryConfig>(
 			self.registry_config,
 			self.admin,
 			&ID,
-			registry_seeds,
+			&registry_seeds.as_slices(),
 			args.bump,
 		)?;
 
@@ -217,9 +202,8 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = AddRoleInstruction::try_from_bytes(data)?;
 		let registry_address = *self.registry_config.address();
-		let role_entry_seeds = role_entry_seeds!(registry_address.as_ref(), &args.role_id.0);
-		let role_entry_seeds_with_bump =
-			role_entry_seeds!(registry_address.as_ref(), &args.role_id.0, args.bump);
+		let role_entry_seeds = RoleEntry::seeds(&registry_address, u64::from(args.role_id));
+		let role_entry_seeds_with_bump = role_entry_seeds.with_bump(args.bump);
 
 		self.admin.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
@@ -228,7 +212,7 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 			.assert_type::<RegistryConfig>(&ID)?;
 		self.role_entry
 			.assert_empty()?
-			.assert_seeds_with_bump(role_entry_seeds_with_bump, &ID)?;
+			.assert_seeds_with_bump(&role_entry_seeds_with_bump.as_slices(), &ID)?;
 
 		let role_count = {
 			let registry_config = self.registry_config.as_account::<RegistryConfig>(&ID)?;
@@ -243,7 +227,7 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 			self.role_entry,
 			self.admin,
 			&ID,
-			role_entry_seeds,
+			&role_entry_seeds.as_slices(),
 			args.bump,
 		)?;
 

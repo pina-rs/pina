@@ -1,6 +1,5 @@
 ---
 source: crates/pina_cli/tests/examples.rs
-assertion_line: 49
 expression: idl
 ---
 {
@@ -83,6 +82,10 @@ expression: idl
               }
             }
           ]
+        },
+        "pda": {
+          "kind": "pdaLinkNode",
+          "name": "escrow"
         },
         "discriminators": [
           {
@@ -360,7 +363,9 @@ expression: idl
             "kind": "variablePdaSeedNode",
             "name": "seed",
             "type": {
-              "kind": "publicKeyTypeNode"
+              "kind": "numberTypeNode",
+              "format": "u64",
+              "endian": "le"
             }
           }
         ]

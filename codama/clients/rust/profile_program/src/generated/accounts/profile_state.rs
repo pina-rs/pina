@@ -103,3 +103,22 @@ impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for ProfileState {
 		Ok(*account)
 	}
 }
+
+impl ProfileState {
+	pub fn find_pda(authority: &solana_pubkey::Pubkey) -> (solana_pubkey::Pubkey, u8) {
+		solana_pubkey::Pubkey::find_program_address(
+			&["profile".as_bytes(), authority.as_ref()],
+			&crate::PROFILE_PROGRAM_ID,
+		)
+	}
+
+	pub fn create_pda(
+		authority: &solana_pubkey::Pubkey,
+		bump: u8,
+	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+		solana_pubkey::Pubkey::create_program_address(
+			&["profile".as_bytes(), authority.as_ref(), &[bump]],
+			&crate::PROFILE_PROGRAM_ID,
+		)
+	}
+}

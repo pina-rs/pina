@@ -33,6 +33,7 @@ import {
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
 } from "@solana/kit";
+import { EscrowSeeds, findEscrowPda } from "../pdas";
 
 export const ESCROW_STATE_DISCRIMINATOR = 1;
 
@@ -149,4 +150,24 @@ export async function fetchAllMaybeEscrowState(
 ): Promise<MaybeAccount<EscrowState>[]> {
 	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
 	return maybeAccounts.map((maybeAccount) => decodeEscrowState(maybeAccount));
+}
+
+export async function fetchEscrowStateFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: EscrowSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<Account<EscrowState>> {
+	const maybeAccount = await fetchMaybeEscrowStateFromSeeds(rpc, seeds, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
+}
+
+export async function fetchMaybeEscrowStateFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: EscrowSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<MaybeAccount<EscrowState>> {
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findEscrowPda(seeds, { programAddress });
+	return await fetchMaybeEscrowState(rpc, address, fetchConfig);
 }

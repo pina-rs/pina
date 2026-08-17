@@ -35,6 +35,7 @@ import {
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
 } from "@solana/kit";
+import { findProfilePda, ProfileSeeds } from "../pdas";
 
 export const PROFILE_STATE_DISCRIMINATOR = 1;
 
@@ -170,4 +171,28 @@ export async function fetchAllMaybeProfileState(
 ): Promise<MaybeAccount<ProfileState>[]> {
 	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
 	return maybeAccounts.map((maybeAccount) => decodeProfileState(maybeAccount));
+}
+
+export async function fetchProfileStateFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: ProfileSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<Account<ProfileState>> {
+	const maybeAccount = await fetchMaybeProfileStateFromSeeds(
+		rpc,
+		seeds,
+		config,
+	);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
+}
+
+export async function fetchMaybeProfileStateFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	seeds: ProfileSeeds,
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<MaybeAccount<ProfileState>> {
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findProfilePda(seeds, { programAddress });
+	return await fetchMaybeProfileState(rpc, address, fetchConfig);
 }

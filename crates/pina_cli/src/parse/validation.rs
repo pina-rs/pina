@@ -158,6 +158,25 @@ fn collect_assertions_from_expr(expr: &Expr, props: &mut HashMap<String, Account
 		}
 
 		Expr::Call(call) => {
+			// Recognize generated `Type::assert_seeds(self.<field>, ...)`
+			// static calls from the `#[pda]` attribute macro.
+			if let Expr::Path(path) = &*call.func {
+				if let Some(method) = path.path.segments.last() {
+					let method = method.ident.to_string();
+					if matches!(
+						method.as_str(),
+						"assert_seeds" | "assert_seeds_with_bump" | "assert_canonical_bump"
+					) {
+						if let Some(first_arg) = call.args.first() {
+							if let Some(field_name) = resolve_self_field(first_arg) {
+								let entry = props.entry(field_name).or_default();
+								apply_assertion(&method, &call.args, entry);
+							}
+						}
+					}
+				}
+			}
+
 			collect_assertions_from_expr(&call.func, props);
 
 			for arg in &call.args {
@@ -191,6 +210,7 @@ fn resolve_self_field(expr: &Expr) -> Option<String> {
 		Expr::Try(t) => resolve_self_field(&t.expr),
 		Expr::MethodCall(mc) => resolve_self_field(&mc.receiver),
 		Expr::Paren(p) => resolve_self_field(&p.expr),
+		Expr::Reference(r) => resolve_self_field(&r.expr),
 		_ => None,
 	}
 }
@@ -346,6 +366,38 @@ mod tests {
 		let props = &all["MyAccounts"];
 		assert!(props["counter"].is_pda);
 		assert!(props["counter"].is_writable);
+	}
+
+	#[test]
+	fn extracts_pda_from_generated_static_assert() {
+		let source = r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					CounterState::assert_seeds(self.counter, authority_key, &ID)?;
+					Ok(())
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let all = extract_validation_properties(&file);
+		let props = &all["MyAccounts"];
+		assert!(props["counter"].is_pda);
+	}
+
+	#[test]
+	fn extracts_pda_from_generated_static_assert_with_reference() {
+		let source = r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					VestingState::assert_seeds(&self.vesting_state, &admin, &beneficiary, &mint, &ID)?;
+					Ok(())
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let all = extract_validation_properties(&file);
+		let props = &all["MyAccounts"];
+		assert!(props["vesting_state"].is_pda);
 	}
 
 	#[test]

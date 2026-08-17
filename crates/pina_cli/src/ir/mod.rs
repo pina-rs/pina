@@ -21,6 +21,8 @@ pub struct AccountIr {
 	pub fields: Vec<FieldIr>,
 	pub discriminator: DiscriminatorIr,
 	pub docs: Vec<String>,
+	/// The name of the PDA declared for this account via `#[pda(...)]`.
+	pub pda_name: Option<String>,
 }
 
 /// An instruction assembled from `#[instruction]`, `#[derive(Accounts)]`, the

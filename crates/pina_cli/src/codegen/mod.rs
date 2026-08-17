@@ -69,6 +69,10 @@ fn build_account_node(account: &AccountIr) -> AccountNode {
 	let data = StructTypeNode::new(fields);
 	let mut node = AccountNode::new(account.name.as_str(), data);
 	node.discriminators = vec![build_discriminator_node(&account.discriminator)];
+	node.pda = account
+		.pda_name
+		.as_ref()
+		.map(|name| PdaLinkNode::new(name.as_str()));
 
 	if !account.docs.is_empty() {
 		node.docs = account.docs.clone().into();

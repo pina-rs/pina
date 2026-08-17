@@ -1,0 +1,5 @@
+error: `bump` field `bump` must have type `u8`
+ --> tests/ui/fail/pda_bump_field_wrong_type.rs:7:12
+  |
+7 |     pub bump: PodU64,
+  |               ^^^^^^

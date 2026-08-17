@@ -79,6 +79,10 @@
 						}
 					]
 				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "escrow"
+				},
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -355,7 +359,9 @@
 						"kind": "variablePdaSeedNode",
 						"name": "seed",
 						"type": {
-							"kind": "publicKeyTypeNode"
+							"kind": "numberTypeNode",
+							"format": "u64",
+							"endian": "le"
 						}
 					}
 				]

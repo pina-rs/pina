@@ -1,0 +1,141 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+pub struct TestState {
+    pub authority: Address,
+    pub amount: PodU64,
+    pub side: u8,
+    pub tag: [u8; 8],
+    pub width: PodU16,
+    pub height: PodU32,
+    pub bump: u8,
+}
+///The PDA seeds for `TestState`.
+#[derive(Clone, Copy)]
+pub struct TestStateSeeds<'a> {
+    ///The `authority` seed.
+    ///The `amount` seed.
+    ///The `side` seed.
+    ///The `tag` seed.
+    ///The `width` seed.
+    ///The `height` seed.
+    pub authority: &'a Address,
+    pub amount: [u8; 8],
+    pub side: [u8; 1],
+    pub tag: [u8; 8usize],
+    pub width: [u8; 2],
+    pub height: [u8; 4],
+}
+///The PDA seeds for `TestState`, including the bump seed.
+pub struct TestStateSeedsWithBump<'a> {
+    inner: TestStateSeeds<'a>,
+    _bump: [u8; 1],
+}
+impl TestState {
+    /// Build the PDA seeds for this account.
+    pub fn seeds<'a>(
+        authority: &'a Address,
+        amount: u64,
+        side: u8,
+        tag: [u8; 8usize],
+        width: u16,
+        height: u32,
+    ) -> TestStateSeeds<'a> {
+        TestStateSeeds {
+            authority: authority,
+            amount: amount.to_le_bytes(),
+            side: [side],
+            tag: tag,
+            width: width.to_le_bytes(),
+            height: height.to_le_bytes(),
+        }
+    }
+    /// Find the canonical PDA for this account and its bump seed.
+    pub fn try_find_pda(
+        authority: &Address,
+        amount: u64,
+        side: u8,
+        tag: [u8; 8usize],
+        width: u16,
+        height: u32,
+        program_id: &Address,
+    ) -> ::core::option::Option<(::pina::Address, u8)> {
+        let seeds = Self::seeds(authority, amount, side, tag, width, height);
+        ::pina::try_find_program_address(&seeds.as_slices(), program_id)
+    }
+    /// Find the canonical PDA for this account and its bump seed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no valid PDA exists for the given seeds.
+    pub fn find_pda(
+        authority: &Address,
+        amount: u64,
+        side: u8,
+        tag: [u8; 8usize],
+        width: u16,
+        height: u32,
+        program_id: &Address,
+    ) -> (::pina::Address, u8) {
+        Self::try_find_pda(authority, amount, side, tag, width, height, program_id)
+            .unwrap_or_else(|| panic!("could not find program address from seeds"))
+    }
+    ///Assert that `account` is the PDA for the given seeds, using the stored `bump` field.
+    pub fn assert_seeds(
+        account: &::pina::AccountView,
+        authority: &Address,
+        amount: u64,
+        side: u8,
+        tag: [u8; 8usize],
+        width: u16,
+        height: u32,
+        program_id: &::pina::Address,
+    ) -> ::core::result::Result<(), ::pina::ProgramError> {
+        let bump = ::pina::AsAccount::as_account::<Self>(account, program_id)?.bump;
+        let seeds = Self::seeds(authority, amount, side, tag, width, height)
+            .with_bump(bump);
+        <&::pina::AccountView as ::pina::AccountInfoValidation>::assert_seeds_with_bump(
+                account,
+                &seeds.as_slices(),
+                program_id,
+            )
+            .map(|_| ())
+    }
+}
+impl<'a> TestStateSeeds<'a> {
+    /// The seeds as byte slices, without the bump seed.
+    pub fn as_slices(&self) -> [&[u8]; 7usize] {
+        [
+            b"test",
+            self.authority.as_ref(),
+            &self.amount,
+            &self.side,
+            &self.tag,
+            &self.width,
+            &self.height,
+        ]
+    }
+    /// Append the bump seed to the seeds.
+    pub fn with_bump(&self, bump: u8) -> TestStateSeedsWithBump<'a> {
+        TestStateSeedsWithBump {
+            inner: *self,
+            _bump: [bump],
+        }
+    }
+}
+impl<'a> TestStateSeedsWithBump<'a> {
+    /// The seeds as byte slices, including the bump seed.
+    pub fn as_slices(&self) -> [&[u8]; 8usize] {
+        [
+            b"test",
+            self.inner.authority.as_ref(),
+            &self.inner.amount,
+            &self.inner.side,
+            &self.inner.tag,
+            &self.inner.width,
+            &self.inner.height,
+            &self._bump,
+        ]
+    }
+}

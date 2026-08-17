@@ -7,6 +7,7 @@ pub mod entrypoint;
 pub mod error_enum;
 pub mod instruction_data;
 pub mod module_resolver;
+pub mod pda_attr;
 pub mod program_id;
 pub mod seeds;
 pub mod types;
@@ -91,9 +92,11 @@ pub fn assemble_program_ir_multi(
 
 		let file_seed_constants = seeds::extract_seed_constants(file);
 		let file_pdas = seeds::extract_pda_from_seed_macros(file, &file_seed_constants);
+		let file_attr_pdas = pda_attr::extract_pda_from_attributes(file, &file_seed_constants);
 
 		all_seed_constants.extend(file_seed_constants);
 		pdas_ir.extend(file_pdas);
+		pdas_ir.extend(file_attr_pdas);
 	}
 
 	let public_key = public_key.ok_or(IdlError::NoProgramId)?;
@@ -149,6 +152,7 @@ fn assemble_from_extracted(
 					fields: acct.fields.clone(),
 					discriminator: disc_value,
 					docs: acct.docs.clone(),
+					pda_name: acct.pda_name.clone(),
 				}
 			})
 		})

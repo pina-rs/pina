@@ -41,6 +41,10 @@
 						}
 					]
 				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "registryConfig"
+				},
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -120,6 +124,10 @@
 							}
 						}
 					]
+				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "roleEntry"
 				},
 				"discriminators": [
 					{
@@ -509,7 +517,9 @@
 						"kind": "variablePdaSeedNode",
 						"name": "roleId",
 						"type": {
-							"kind": "publicKeyTypeNode"
+							"kind": "numberTypeNode",
+							"format": "u64",
+							"endian": "le"
 						}
 					}
 				]
