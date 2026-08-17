@@ -1,7 +1,7 @@
 ---
 pina: major
-pina_cli: minor
-pina_codama_renderer: minor
+pina_cli: major
+pina_codama_renderer: major
 pina_macros: major
 ---
 

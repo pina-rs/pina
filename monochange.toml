@@ -86,8 +86,6 @@ type = "cargo"
 path = "crates/pina_codama_renderer"
 type = "cargo"
 
-type = "cargo"
-
 [package.pina_profile]
 path = "crates/pina_profile"
 type = "cargo"
