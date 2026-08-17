@@ -1,15 +1,15 @@
 name: Bug report
 description: Report a defect or regression in Pina.
-title: "Sentence case summary of the bug"
+title: "Title case summary of the bug"
 labels:
   - bug
 body:
   - type: markdown
     attributes:
       value: |
-        Please write the issue title in **sentence case**.
+        Please write the issue title in **title case**.
 
-        Good: `Account loaders should preserve the borrow guard lifetime`
+        Good: `Account Loaders Should Preserve the Borrow Guard Lifetime`
         Avoid: `fix: account loaders preserve borrow guard lifetime`
   - type: textarea
     id: summary
