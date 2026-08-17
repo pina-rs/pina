@@ -10,6 +10,7 @@ The `examples/` workspace members demonstrate practical usage patterns:
 - `vesting_program`: token vesting / lockup scaffold with vault ATA setup and claim/cancel state.
 - `role_registry_program`: role-based configuration and registry PDAs with admin rotation.
 - `staking_rewards_program`: staking pool and user-position accounting scaffold with reward bookkeeping.
+- `profile_program`: user profile registry with `PodString`/`PodVec`/`PodBool` collections stored inline in zero-copy account state.
 - `pina_bpf`: minimal pina-native BPF hello world with nightly `build-std=core,alloc`.
 - `prop_amm_program`: Pina-native semantic port of Anchor `anchor-next` benchmark `prop-amm`, focused on authority-controlled oracle updates without the upstream asm fast path.
 - `anchor_declare_id`: first Anchor test parity port, focused on program-id mismatch checks.
