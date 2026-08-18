@@ -64,6 +64,32 @@ jobs:
           test:all
         shell: devenv shell -- bash -e {0}
 
+  fuzz:
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: replay corpus and fuzz for a bounded duration
+        run: test:fuzz:smoke
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: upload fuzz artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-artifacts-${{ github.sha }}
+          path: crates/pina_fuzz/fuzz/artifacts
+          if-no-files-found: ignore
+
   miri:
     timeout-minutes: 90
     runs-on: ubuntu-24.04

@@ -9,8 +9,17 @@ allowBuilds:
   esbuild: true
   koffi: true
 
+audit:
+  level: moderate
+
 onlyBuiltDependencies:
   - esbuild
   - koffi
+
+overrides:
+  "brace-expansion@>=4.0.0 <5.0.9": 5.0.9
+  "picomatch@>=4.0.0 <4.0.4": 4.0.4
+  "vite@>=7.0.0 <=7.3.4": 7.3.5
+  "ws@>=8.0.0 <8.21.0": 8.21.0
 
 useNodeVersion: 24.13.0
