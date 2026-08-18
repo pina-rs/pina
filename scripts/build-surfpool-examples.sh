@@ -22,8 +22,15 @@ mkdir -p "$OUT_DIR"
 while IFS= read -r manifest; do
 	example_dir="$(dirname "$manifest")"
 	example_name="$(basename "$example_dir")"
+	direct_artifact="$OUT_DIR/${example_name}.so"
+	library_artifact="$OUT_DIR/lib${example_name}.so"
+	if [[ -z "$example_name" || "$direct_artifact" != "$OUT_DIR/"*.so || "$library_artifact" != "$OUT_DIR/"*.so ]]; then
+		echo "refusing unsafe artifact paths for ${example_name}" >&2
+		exit 1
+	fi
 
 	echo "Building ${example_name} for Surfpool"
+	rm -f -- "$direct_artifact" "$library_artifact"
 	cargo-build-sbf \
 		--skip-tools-install \
 		--tools-version "$TOOLS_VERSION" \
@@ -31,7 +38,7 @@ while IFS= read -r manifest; do
 		--features bpf-entrypoint \
 		--sbf-out-dir "$OUT_DIR"
 
-	if [[ ! -f "$OUT_DIR/${example_name}.so" && ! -f "$OUT_DIR/lib${example_name}.so" ]]; then
+	if [[ ! -f "$direct_artifact" && ! -f "$library_artifact" ]]; then
 		echo "cargo-build-sbf did not produce an artifact for ${example_name}" >&2
 		exit 1
 	fi

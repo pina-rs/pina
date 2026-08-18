@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"test": "node --experimental-strip-types src/allExamples.test.ts",
+		"test": "node src/allExamples.test.ts",
 		"test:types": "tsc --noEmit -p tsconfig.json"
 	},
 	"devDependencies": {

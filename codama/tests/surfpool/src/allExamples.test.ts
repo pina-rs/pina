@@ -10,6 +10,7 @@ import {
 	createSolanaRpc,
 	createTransactionMessage,
 	getBase64EncodedWireTransaction,
+	getSignatureFromTransaction,
 	type Instruction,
 	sendTransactionWithoutConfirmingFactory,
 	setTransactionMessageFeePayerSigner,
@@ -103,17 +104,21 @@ type ExampleDescriptor = {
 	idl: ProgramIdl;
 };
 
+function stringifyValue(value: unknown): string {
+	return JSON.stringify(
+		value,
+		(_key, nested: unknown) =>
+			typeof nested === "bigint" ? nested.toString() : nested,
+	);
+}
+
 class ProgramInvocationError extends Error {
 	public readonly errorText: string;
 	public readonly programError: unknown;
 	public readonly logs: readonly string[];
 
 	public constructor(programError: unknown, logs: readonly string[]) {
-		const errorText = JSON.stringify(
-			programError,
-			(_key, value: unknown) =>
-				typeof value === "bigint" ? value.toString() : value,
-		);
+		const errorText = stringifyValue(programError);
 		super(`program execution failed: ${errorText}\n${logs.join("\n")}`);
 		this.errorText = errorText;
 		this.programError = programError;
@@ -327,15 +332,43 @@ async function createSubmitter(surfnet: Surfnet): Promise<{
 			// Simulating first gives negative tests stable program logs. Submit the
 			// successful transaction as well so each positive case reaches Surfpool's
 			// deployed SBF runtime rather than being a simulation-only smoke test.
-			await sendTransaction(signed, { commitment: "confirmed" });
+			const signature = getSignatureFromTransaction(signed);
+			await sendTransaction(signed, {
+				commitment: "confirmed",
+			});
+			const statuses = await rpc.getSignatureStatuses([signature], {
+				searchTransactionHistory: true,
+			}).send();
+			const status = statuses.value[0];
+			assert.ok(status, `submitted transaction ${signature} has no status`);
+			assert.equal(
+				status.err,
+				null,
+				`submitted transaction ${signature} failed: ${
+					JSON.stringify(status.err)
+				}`,
+			);
 		},
 	};
+}
+
+type ExpectedProgramError = string | { Custom: bigint };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null;
+}
+
+function instructionError(value: unknown): unknown {
+	if (!isRecord(value)) return undefined;
+	const error = value.InstructionError;
+	if (!Array.isArray(error) || error.length !== 2) return undefined;
+	return error[1];
 }
 
 async function assertRejected(
 	operation: () => Promise<void>,
 	message: string,
-	expectedProgramError: string,
+	expectedProgramError: ExpectedProgramError,
 ): Promise<void> {
 	let error: unknown;
 	try {
@@ -351,17 +384,19 @@ async function assertRejected(
 		error.logs.length > 0,
 		`${message}: runtime returned no program logs`,
 	);
-	assert.match(
-		error.errorText,
-		new RegExp(expectedProgramError),
-		`${message}: expected ${expectedProgramError}, got ${error.errorText}`,
+	assert.deepEqual(
+		instructionError(error.programError),
+		expectedProgramError,
+		`${message}: expected ${
+			stringifyValue(expectedProgramError)
+		}, got ${error.errorText}`,
 	);
 }
 
 type ExpectedEntrypointCase = {
 	instruction: string;
 	accounts: "none" | "payerSigner";
-	programError?: string;
+	programError?: ExpectedProgramError;
 };
 
 // This is the second half of the inventory check: every program must either
@@ -386,7 +421,7 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 	anchor_errors: {
 		instruction: "hello",
 		accounts: "none",
-		programError: "Custom",
+		programError: { Custom: 6000n },
 	},
 	anchor_events: { instruction: "initialize", accounts: "none" },
 	anchor_floats: {
@@ -458,7 +493,9 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 	},
 };
 
-const ACCESS_GUARD_PROGRAMS: Partial<Record<ExampleProgram, string>> = {
+const ACCESS_GUARD_PROGRAMS: Partial<
+	Record<ExampleProgram, ExpectedProgramError>
+> = {
 	anchor_declare_program: "MissingRequiredSignature",
 	anchor_floats: "InvalidAccountData",
 	anchor_realloc: "InvalidAccountData",
@@ -510,7 +547,10 @@ async function runAccessGuardCase(
 	const expectedProgramError = ACCESS_GUARD_PROGRAMS[descriptor.name];
 	if (!expectedProgramError) return;
 
-	const instruction = descriptor.idl.program.instructions[0]!;
+	const instruction = instructionByName(
+		descriptor,
+		EXPECTED_ENTRYPOINT_CASES[descriptor.name].instruction,
+	);
 	const accountCount = instruction.accounts?.length ?? 0;
 	assert.ok(accountCount > 0, `${descriptor.name} access case has no accounts`);
 	const attackerAccounts = Array.from({ length: accountCount }, () => ({
@@ -559,7 +599,6 @@ async function runSpecificGuards(
 				"hello_solana accepted an unsigned user account",
 				"MissingRequiredSignature",
 			);
-			await submit(rawInstruction(descriptor.programId, data, [payerSigner]));
 			return;
 		}
 		case "anchor_duplicate_mutable_accounts": {
@@ -573,7 +612,7 @@ async function runSpecificGuards(
 						payerWritableSigner,
 					])),
 				"duplicate mutable accounts were accepted",
-				"Custom",
+				{ Custom: 2040n },
 			);
 			await assertRejected(
 				() => {
@@ -653,7 +692,10 @@ async function runExample(descriptor: ExampleDescriptor): Promise<void> {
 		});
 
 		const { payer, submit } = await createSubmitter(surfnet);
-		const firstInstruction = descriptor.idl.program.instructions[0]!;
+		const firstInstruction = instructionByName(
+			descriptor,
+			EXPECTED_ENTRYPOINT_CASES[descriptor.name].instruction,
+		);
 		const canonicalData = encodeInstruction(firstInstruction);
 		const invalidData = canonicalData.slice();
 		invalidData.fill(0xff, 0, Math.min(1, invalidData.length));

@@ -90,6 +90,9 @@ in
     # compute-units workflow and the profile script read this instead of
     # hardcoding the version themselves.
     PINA_BPF_TOOLCHAIN = "nightly-2025-11-20";
+    # Shared by the program-e2e and Surfpool builders so every SBF artifact is
+    # produced with the same pinned platform tools.
+    SBF_TOOLS_VERSION = "v1.54";
   };
 
   # Rely on the global sdk for now as the nix apple sdk is not working for me.
@@ -473,7 +476,6 @@ in
           export HOME="$DEVENV_ROOT/.cache/home"
         fi
         mkdir -p "$HOME"
-
         if [ "$(uname -s)" = "Linux" ]; then
           # The Nix wrapper seeds cargo-build-sbf's cache with its bundled
           # sysroot before forwarding arguments. Bypass that wrapper so
@@ -674,11 +676,10 @@ in
         # hard failure in both local runs and CI.
         cargo-build-sbf \
           --install-only \
-          --tools-version v1.54 \
+          --tools-version "$SBF_TOOLS_VERSION" \
           --patch-binaries-for-nix false
         pnpm install --frozen-lockfile
-        SBF_TOOLS_VERSION=v1.54 \
-          "$DEVENV_ROOT/scripts/build-surfpool-examples.sh"
+        "$DEVENV_ROOT/scripts/build-surfpool-examples.sh"
         pnpm --dir "$DEVENV_ROOT/codama/tests/surfpool" run test:types
         pnpm --dir "$DEVENV_ROOT/codama/tests/surfpool" run test
       '';
