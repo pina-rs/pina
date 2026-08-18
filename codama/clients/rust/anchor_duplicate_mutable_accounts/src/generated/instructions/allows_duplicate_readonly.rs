@@ -72,8 +72,8 @@ impl AllowsDuplicateReadonlyInstructionData {
 					&mut bytes,
 				)
 				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR;
 		}
 		<AllowsDuplicateReadonlyInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

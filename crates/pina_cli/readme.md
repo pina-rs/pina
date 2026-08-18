@@ -77,6 +77,8 @@ pina codama generate
 pina codama generate --example counter_program --example todo_program
 ```
 
+The combined command keeps Codama's ergonomic JavaScript string and array types, then adds Pina-specific runtime validation at the generated client's wire boundary. Over-capacity values fail instead of being truncated; discriminators, booleans, and UTF-8 are checked during decoding.
+
 ## Library API
 
 <br>
@@ -114,6 +116,8 @@ import { createFromFile } from "codama";
 const codama = await createFromFile("./idls/my_program.json");
 await codama.accept(renderJsVisitor("./clients/js/my_program"));
 ```
+
+The stock visitor emits the correct fixed-size wire layout, but its generic codecs are intentionally permissive. Use `pina codama generate` when you want the generated JavaScript client to enforce the same canonical zeropod values as the on-chain program.
 
 ### Pina-style Rust clients
 

@@ -35,6 +35,7 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { EscrowSeeds, findEscrowPda } from "../pdas";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const ESCROW_STATE_DISCRIMINATOR = 1;
 
@@ -87,7 +88,13 @@ export function getEscrowStateEncoder(): FixedSizeEncoder<EscrowStateArgs> {
 /** Gets the decoder for {@link EscrowState} account data. */
 export function getEscrowStateDecoder(): FixedSizeDecoder<EscrowState> {
 	return getStructDecoder([
-		["discriminator", getU8Decoder()],
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(
+				ESCROW_STATE_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
 		["maker", getAddressDecoder()],
 		["mintA", getAddressDecoder()],
 		["mintB", getAddressDecoder()],

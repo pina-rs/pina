@@ -39,6 +39,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { ANCHOR_FLOATS_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const CREATE_DISCRIMINATOR = 0;
 
@@ -97,10 +98,14 @@ export function getCreateInstructionDataEncoder(): FixedSizeEncoder<
 export function getCreateInstructionDataDecoder(): FixedSizeDecoder<
 	CreateInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()], [
-		"dataF32",
-		getU32Decoder(),
-	], ["dataF64", getU64Decoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(CREATE_DISCRIMINATOR, getU8Decoder()),
+		],
+		["dataF32", getU32Decoder()],
+		["dataF64", getU64Decoder()],
+	]);
 }
 
 export function getCreateInstructionDataCodec(): FixedSizeCodec<

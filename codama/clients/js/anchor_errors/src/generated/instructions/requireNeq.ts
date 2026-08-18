@@ -24,6 +24,7 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { ANCHOR_ERRORS_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const REQUIRE_NEQ_DISCRIMINATOR = 4;
 
@@ -55,7 +56,10 @@ export function getRequireNeqInstructionDataEncoder(): FixedSizeEncoder<
 export function getRequireNeqInstructionDataDecoder(): FixedSizeDecoder<
 	RequireNeqInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(REQUIRE_NEQ_DISCRIMINATOR, getU8Decoder()),
+	]]);
 }
 
 export function getRequireNeqInstructionDataCodec(): FixedSizeCodec<

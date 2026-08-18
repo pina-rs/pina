@@ -54,8 +54,8 @@ impl HelloInstructionData {
 		{
 			let data = <HelloInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = HELLO_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = HELLO_DISCRIMINATOR;
 		}
 		<HelloInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

@@ -69,8 +69,8 @@ impl DirectTransferInstructionData {
 			let data =
 				<DirectTransferInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = DIRECT_TRANSFER_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = DIRECT_TRANSFER_DISCRIMINATOR;
 		}
 		<DirectTransferInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

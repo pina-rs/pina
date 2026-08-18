@@ -84,7 +84,6 @@ fn idl_success_output_snapshot() {
 #[test]
 fn codama_generate_success_output_snapshot() {
 	let temp_dir = reset_snapshot_dir("codama_generate_success");
-	let fake_npx = create_fake_npx(&temp_dir);
 	let idls_dir = temp_dir.join("idls");
 	let rust_out = temp_dir.join("rust");
 	let js_out = temp_dir.join("js");
@@ -105,7 +104,7 @@ fn codama_generate_success_output_snapshot() {
 		.arg("--example")
 		.arg("counter_program")
 		.arg("--npx")
-		.arg(fake_npx);
+		.arg("node");
 	assert_cmd_snapshot!("codama_generate_success_output", command);
 
 	assert!(
@@ -122,6 +121,17 @@ fn codama_generate_success_output_snapshot() {
 		rust_out
 			.join("counter_program")
 			.join("src/generated/mod.rs")
+			.display()
+	);
+	assert!(
+		js_out
+			.join("counter_program")
+			.join("src/generated/zeropodCodecs.ts")
+			.is_file(),
+		"expected generated JavaScript validation helpers at {}",
+		js_out
+			.join("counter_program")
+			.join("src/generated/zeropodCodecs.ts")
 			.display()
 	);
 }

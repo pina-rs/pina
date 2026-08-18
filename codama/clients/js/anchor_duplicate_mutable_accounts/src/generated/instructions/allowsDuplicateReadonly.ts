@@ -31,6 +31,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR = 2;
 
@@ -73,7 +74,13 @@ export function getAllowsDuplicateReadonlyInstructionDataEncoder(): FixedSizeEnc
 export function getAllowsDuplicateReadonlyInstructionDataDecoder(): FixedSizeDecoder<
 	AllowsDuplicateReadonlyInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(
+			ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	]]);
 }
 
 export function getAllowsDuplicateReadonlyInstructionDataCodec(): FixedSizeCodec<

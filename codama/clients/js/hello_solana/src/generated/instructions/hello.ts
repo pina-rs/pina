@@ -33,6 +33,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { HELLO_SOLANA_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const HELLO_DISCRIMINATOR = 0;
 
@@ -72,7 +73,10 @@ export function getHelloInstructionDataEncoder(): FixedSizeEncoder<
 export function getHelloInstructionDataDecoder(): FixedSizeDecoder<
 	HelloInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(HELLO_DISCRIMINATOR, getU8Decoder()),
+	]]);
 }
 
 export function getHelloInstructionDataCodec(): FixedSizeCodec<

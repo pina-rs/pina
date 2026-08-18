@@ -35,6 +35,7 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { findRegistryConfigPda, RegistryConfigSeeds } from "../pdas";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const REGISTRY_CONFIG_DISCRIMINATOR = 1;
 
@@ -73,7 +74,13 @@ export function getRegistryConfigEncoder(): FixedSizeEncoder<
 /** Gets the decoder for {@link RegistryConfig} account data. */
 export function getRegistryConfigDecoder(): FixedSizeDecoder<RegistryConfig> {
 	return getStructDecoder([
-		["discriminator", getU8Decoder()],
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(
+				REGISTRY_CONFIG_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
 		["admin", getAddressDecoder()],
 		["roleCount", getU64Decoder()],
 		["bump", getU8Decoder()],

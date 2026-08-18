@@ -118,8 +118,8 @@ impl InitializePoolInstructionData {
 			let data =
 				<InitializePoolInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = INITIALIZE_POOL_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = INITIALIZE_POOL_DISCRIMINATOR;
 		}
 		<InitializePoolInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

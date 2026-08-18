@@ -5,6 +5,8 @@ pub mod init;
 pub mod ir;
 pub mod parse;
 
+mod js_client;
+
 use std::path::Path;
 
 use codama_nodes::RootNode;

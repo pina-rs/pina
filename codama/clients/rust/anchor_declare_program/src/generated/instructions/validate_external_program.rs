@@ -75,8 +75,8 @@ impl ValidateExternalProgramInstructionData {
 					&mut bytes,
 				)
 				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = VALIDATE_EXTERNAL_PROGRAM_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = VALIDATE_EXTERNAL_PROGRAM_DISCRIMINATOR;
 		}
 		<ValidateExternalProgramInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

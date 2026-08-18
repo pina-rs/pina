@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Replace Pina's local bytemuck primitive layer with zeropod's `ZcElem`, `ZcValidate`, `ZeroPodFixed`, and fixed-capacity collection model.
 - Separate native zeropod schemas from their generated zero-copy storage views. Account loaders now return `TypeZc`, and storage fields use zeropod's accessor methods.
 - Remove Pina's whole-object `to_bytes()`, `PinaSerialize`, generic `InstructionBuilder`, custom `PodEnum`, and generic pointer-cast helpers. Inactive string and vector capacity is no longer observable through Pina.
+- Token loaders no longer project Token-2022 bytes into legacy SPL Token state. Multi-program callers receive a guard-backed enum that preserves the concrete upstream type and extension layout.
 
 ### Features
 
@@ -33,6 +34,8 @@ New mdt providers:
 - `podCollectionDescription` — collection type semantics
 
 Account, instruction, and event schemas derive `zeropod::ZeroPod`. Their `initialize` helpers zero caller-owned storage, write the discriminator, and return the validated generated view. Generated client instruction builders own their fully initialized buffers and do not expose schema object representations.
+
+Generated JavaScript codecs reject over-capacity values rather than truncating them and validate discriminators, booleans, and UTF-8 using the same canonical rules as the on-chain zeropod views.
 
 ### Documentation
 

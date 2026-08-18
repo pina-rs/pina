@@ -122,19 +122,15 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		// Validate accounts
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		let token_program = *self.token_program.address();
-		let token_owners = [token_program];
 		self.associated_token_program
 			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.maker.assert_signer()?;
 		let decimals = self
 			.mint_a
-			.as_token_mint_checked_with_owners(&token_owners)?
+			.as_token_mint_for_program(&token_program)?
 			.decimals();
-		drop(
-			self.mint_b
-				.as_token_mint_checked_with_owners(&token_owners)?,
-		);
+		drop(self.mint_b.as_token_mint_for_program(&token_program)?);
 		drop(self.maker_ata_a.as_associated_token_account_checked(
 			self.maker.address(),
 			self.mint_a.address(),
@@ -222,7 +218,6 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		// Validate program accounts
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		let token_program = *self.token_program.address();
-		let token_owners = [token_program];
 		self.associated_token_program
 			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
@@ -268,12 +263,12 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		self.mint_a.assert_address(&mint_a)?;
 		let decimals_a = self
 			.mint_a
-			.as_token_mint_checked_with_owners(&token_owners)?
+			.as_token_mint_for_program(&token_program)?
 			.decimals();
 		self.mint_b.assert_address(&mint_b)?;
 		let decimals_b = self
 			.mint_b
-			.as_token_mint_checked_with_owners(&token_owners)?
+			.as_token_mint_for_program(&token_program)?
 			.decimals();
 
 		// Validate vault and maker ATA

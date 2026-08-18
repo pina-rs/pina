@@ -69,8 +69,8 @@ impl MaybeInstructionData {
 		{
 			let data = <MaybeInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = MAYBE_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = MAYBE_DISCRIMINATOR;
 		}
 		<MaybeInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

@@ -35,6 +35,7 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { findPositionPda, PositionSeeds } from "../pdas";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const POSITION_STATE_DISCRIMINATOR = 2;
 
@@ -80,7 +81,13 @@ export function getPositionStateEncoder(): FixedSizeEncoder<PositionStateArgs> {
 /** Gets the decoder for {@link PositionState} account data. */
 export function getPositionStateDecoder(): FixedSizeDecoder<PositionState> {
 	return getStructDecoder([
-		["discriminator", getU8Decoder()],
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(
+				POSITION_STATE_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
 		["pool", getAddressDecoder()],
 		["owner", getAddressDecoder()],
 		["stakedAmount", getU64Decoder()],

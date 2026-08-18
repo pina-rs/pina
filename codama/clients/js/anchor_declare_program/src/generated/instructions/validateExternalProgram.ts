@@ -34,6 +34,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { ANCHOR_DECLARE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const VALIDATE_EXTERNAL_PROGRAM_DISCRIMINATOR = 0;
 
@@ -78,7 +79,13 @@ export function getValidateExternalProgramInstructionDataEncoder(): FixedSizeEnc
 export function getValidateExternalProgramInstructionDataDecoder(): FixedSizeDecoder<
 	ValidateExternalProgramInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(
+			VALIDATE_EXTERNAL_PROGRAM_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	]]);
 }
 
 export function getValidateExternalProgramInstructionDataCodec(): FixedSizeCodec<

@@ -24,6 +24,7 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { ANCHOR_EVENTS_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const TEST_EVENT_CPI_DISCRIMINATOR = 2;
 
@@ -55,7 +56,13 @@ export function getTestEventCpiInstructionDataEncoder(): FixedSizeEncoder<
 export function getTestEventCpiInstructionDataDecoder(): FixedSizeDecoder<
 	TestEventCpiInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(
+			TEST_EVENT_CPI_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	]]);
 }
 
 export function getTestEventCpiInstructionDataCodec(): FixedSizeCodec<

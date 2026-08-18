@@ -36,6 +36,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { PROP_AMM_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const UPDATE_DISCRIMINATOR = 1;
 
@@ -82,10 +83,10 @@ export function getUpdateInstructionDataEncoder(): FixedSizeEncoder<
 export function getUpdateInstructionDataDecoder(): FixedSizeDecoder<
 	UpdateInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()], [
-		"newPrice",
-		getU64Decoder(),
-	]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(UPDATE_DISCRIMINATOR, getU8Decoder()),
+	], ["newPrice", getU64Decoder()]]);
 }
 
 export function getUpdateInstructionDataCodec(): FixedSizeCodec<

@@ -23,6 +23,10 @@ pub const FLOAT_DATA_ACCOUNT_DISCRIMINATOR: u8 = 1u8;
 impl FloatDataAccount {
 	pub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;
 
+	/// Initialize zero-valid account storage.
+	///
+	/// Every non-discriminator field must accept an all-zero
+	/// representation. Otherwise this method returns `InvalidAccountData`.
 	pub fn initialize(
 		data: &mut [u8],
 	) -> Result<&mut FloatDataAccountZc, solana_program_error::ProgramError> {

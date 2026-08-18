@@ -43,6 +43,11 @@ import {
 } from "@solana/program-client-core";
 import { findProfilePda } from "../pdas";
 import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import {
+	fixZeroPodEncoderSize,
+	getZeroPodDiscriminatorDecoder,
+	getZeroPodStringDecoder,
+} from "../zeropodCodecs";
 
 export const INITIALIZE_DISCRIMINATOR = 0;
 
@@ -97,13 +102,13 @@ export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
 			getU8Encoder(),
 		], [
 			"name",
-			fixEncoderSize(
+			fixZeroPodEncoderSize(
 				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
 				33,
 			),
 		], [
 			"bio",
-			fixEncoderSize(
+			fixZeroPodEncoderSize(
 				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
 				129,
 			),
@@ -115,16 +120,15 @@ export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
 export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
 	InitializeInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()], [
-		"bump",
-		getU8Decoder(),
-	], [
-		"name",
-		fixDecoderSize(addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()), 33),
-	], [
-		"bio",
-		fixDecoderSize(addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()), 129),
-	]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder()),
+		],
+		["bump", getU8Decoder()],
+		["name", getZeroPodStringDecoder(getU8Decoder(), 33)],
+		["bio", getZeroPodStringDecoder(getU8Decoder(), 129)],
+	]);
 }
 
 export function getInitializeInstructionDataCodec(): FixedSizeCodec<

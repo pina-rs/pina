@@ -45,6 +45,12 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { findProfilePda, ProfileSeeds } from "../pdas";
+import {
+	fixZeroPodEncoderSize,
+	getZeroPodBooleanDecoder,
+	getZeroPodDiscriminatorDecoder,
+	getZeroPodStringDecoder,
+} from "../zeropodCodecs";
 
 export const PROFILE_STATE_DISCRIMINATOR = 1;
 
@@ -128,19 +134,19 @@ export function getProfileStateEncoder(): FixedSizeEncoder<ProfileStateArgs> {
 			getU8Encoder(),
 		], [
 			"name",
-			fixEncoderSize(
+			fixZeroPodEncoderSize(
 				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
 				33,
 			),
 		], [
 			"bio",
-			fixEncoderSize(
+			fixZeroPodEncoderSize(
 				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
 				129,
 			),
 		], [
 			"tags",
-			fixEncoderSize(
+			fixZeroPodEncoderSize(
 				getArrayEncoder(getU64Encoder(), { size: getU16Encoder() }),
 				66,
 			),
@@ -151,22 +157,26 @@ export function getProfileStateEncoder(): FixedSizeEncoder<ProfileStateArgs> {
 
 /** Gets the decoder for {@link ProfileState} account data. */
 export function getProfileStateDecoder(): FixedSizeDecoder<ProfileState> {
-	return getStructDecoder([["discriminator", getU8Decoder()], [
-		"bump",
-		getU8Decoder(),
-	], [
-		"name",
-		fixDecoderSize(addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()), 33),
-	], [
-		"bio",
-		fixDecoderSize(addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()), 129),
-	], [
-		"tags",
-		fixDecoderSize(
-			getArrayDecoder(getU64Decoder(), { size: getU16Decoder() }),
-			66,
-		),
-	], ["active", getBooleanDecoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(
+				PROFILE_STATE_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["bump", getU8Decoder()],
+		["name", getZeroPodStringDecoder(getU8Decoder(), 33)],
+		["bio", getZeroPodStringDecoder(getU8Decoder(), 129)],
+		[
+			"tags",
+			fixDecoderSize(
+				getArrayDecoder(getU64Decoder(), { size: getU16Decoder() }),
+				66,
+			),
+		],
+		["active", getZeroPodBooleanDecoder()],
+	]);
 }
 
 /** Gets the codec for {@link ProfileState} account data. */

@@ -31,6 +31,8 @@ The contiguous-enum restriction is deliberate: the stock JavaScript renderer doe
 
 Constant numeric discriminators at offset zero are required for account and instruction nodes. They are emitted both as metadata/constants and as actual schema fields so every generated client includes the discriminator byte in the wire format.
 
+Generated Rust instruction builders write the framework discriminator after the caller's configuration closure, so callers cannot accidentally or deliberately emit a different instruction variant. JavaScript clients produced by `pina codama generate` validate the discriminator during decoding and add strict zeropod collection/value checks around the stock Codama codecs.
+
 ## PDA seeds and account defaults
 
 The renderer supports fixed string/byte, little-endian number, boolean, and public-key PDA seeds. Instruction accounts support public-key, program-ID, and linked-program defaults. Optional accounts preserve Codama's explicit omitted or program-ID placeholder strategy.

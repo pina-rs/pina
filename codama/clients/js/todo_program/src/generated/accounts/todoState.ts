@@ -39,6 +39,11 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { findTodoPda, TodoSeeds } from "../pdas";
+import {
+	fixZeroPodEncoderSize,
+	getZeroPodBooleanDecoder,
+	getZeroPodDiscriminatorDecoder,
+} from "../zeropodCodecs";
 
 export const TODO_STATE_DISCRIMINATOR = 1;
 
@@ -69,7 +74,7 @@ export function getTodoStateEncoder(): FixedSizeEncoder<TodoStateArgs> {
 			["owner", getAddressEncoder()],
 			["bump", getU8Encoder()],
 			["completed", getBooleanEncoder()],
-			["digest", fixEncoderSize(getBytesEncoder(), 32)],
+			["digest", fixZeroPodEncoderSize(getBytesEncoder(), 32)],
 		]),
 		(value) => ({ ...value, discriminator: 1 }),
 	);
@@ -78,10 +83,13 @@ export function getTodoStateEncoder(): FixedSizeEncoder<TodoStateArgs> {
 /** Gets the decoder for {@link TodoState} account data. */
 export function getTodoStateDecoder(): FixedSizeDecoder<TodoState> {
 	return getStructDecoder([
-		["discriminator", getU8Decoder()],
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(TODO_STATE_DISCRIMINATOR, getU8Decoder()),
+		],
 		["owner", getAddressDecoder()],
 		["bump", getU8Decoder()],
-		["completed", getBooleanDecoder()],
+		["completed", getZeroPodBooleanDecoder()],
 		["digest", fixDecoderSize(getBytesDecoder(), 32)],
 	]);
 }

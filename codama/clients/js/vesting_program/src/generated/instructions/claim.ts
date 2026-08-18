@@ -37,6 +37,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { VESTING_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const CLAIM_DISCRIMINATOR = 1;
 
@@ -108,10 +109,10 @@ export function getClaimInstructionDataEncoder(): FixedSizeEncoder<
 export function getClaimInstructionDataDecoder(): FixedSizeDecoder<
 	ClaimInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()], [
-		"amount",
-		getU64Decoder(),
-	]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(CLAIM_DISCRIMINATOR, getU8Decoder()),
+	], ["amount", getU64Decoder()]]);
 }
 
 export function getClaimInstructionDataCodec(): FixedSizeCodec<

@@ -24,6 +24,7 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { ANCHOR_ERRORS_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const HELLO_NEXT_DISCRIMINATOR = 2;
 
@@ -55,7 +56,10 @@ export function getHelloNextInstructionDataEncoder(): FixedSizeEncoder<
 export function getHelloNextInstructionDataDecoder(): FixedSizeDecoder<
 	HelloNextInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(HELLO_NEXT_DISCRIMINATOR, getU8Decoder()),
+	]]);
 }
 
 export function getHelloNextInstructionDataCodec(): FixedSizeCodec<

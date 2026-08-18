@@ -75,8 +75,8 @@ impl UpdateRoleInstructionData {
 			let data =
 				<UpdateRoleInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = UPDATE_ROLE_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = UPDATE_ROLE_DISCRIMINATOR;
 		}
 		<UpdateRoleInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

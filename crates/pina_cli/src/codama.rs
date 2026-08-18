@@ -8,6 +8,7 @@ use pina_codama_renderer::render_idl_file;
 
 use crate::error::CodamaError;
 use crate::generate_idl;
+use crate::js_client::harden_generated_clients;
 
 const JS_RENDER_SCRIPT: &str = r#"
 import { renderVisitor as renderJsVisitor } from "@codama/renderers-js";
@@ -109,6 +110,7 @@ pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, C
 
 	// Generate JavaScript clients.
 	run_js_generation(options, &idl_paths)?;
+	harden_generated_clients(&options.js_out, &examples)?;
 
 	Ok(examples)
 }

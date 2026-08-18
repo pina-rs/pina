@@ -1670,8 +1670,8 @@ fn as_token_2022_mint_keeps_borrow_guard_alive_until_drop() {
 	let mint = account
 		.as_token_2022_mint()
 		.unwrap_or_else(|e| panic!("token-2022 mint load failed: {e:?}"));
-	assert_eq!(mint.decimals(), 9);
-	assert_eq!(mint.supply(), 42);
+	assert_eq!(mint.base.decimals(), 9);
+	assert_eq!(mint.base.supply(), 42);
 
 	assert!(matches!(
 		shadow.try_borrow_mut(),
@@ -1708,9 +1708,9 @@ fn as_token_2022_account_keeps_borrow_guard_alive_until_drop() {
 	let token_account = account
 		.as_token_2022_account()
 		.unwrap_or_else(|e| panic!("token-2022 account load failed: {e:?}"));
-	assert_eq!(token_account.amount(), 123);
-	assert_eq!(token_account.mint(), &mint);
-	assert_eq!(token_account.owner(), &owner);
+	assert_eq!(token_account.base.amount(), 123);
+	assert_eq!(token_account.base.mint(), &mint);
+	assert_eq!(token_account.base.owner(), &owner);
 
 	assert!(matches!(
 		shadow.try_borrow_mut(),
@@ -1724,7 +1724,7 @@ fn as_token_2022_account_keeps_borrow_guard_alive_until_drop() {
 
 #[cfg(feature = "token")]
 #[test]
-fn as_token_account_checked_with_owners_accepts_token_2022_owner() {
+fn as_token_account_for_program_preserves_token_2022_state() {
 	let token_account_key: Address = address!("6QWeT6FpJrm8AF1btu6WH2k2Xhq6t5vbheKVfQavmeoZ");
 	let mint: Address = address!("4hT5gDpr9HMmXzttW2Kz7LxyzKDn5XxhxL7sRKqGZo4x");
 	let owner: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
@@ -1749,9 +1749,12 @@ fn as_token_account_checked_with_owners_accepts_token_2022_owner() {
 	let account = account_views[0];
 	let mut shadow = account_views[0];
 	let token_account = account
-		.as_token_account_checked_with_owners(&[token::ID, token_2022::ID])
-		.unwrap_or_else(|e| panic!("multi-owner token account load failed: {e:?}"));
+		.as_token_account_for_program(&token_2022::ID)
+		.unwrap_or_else(|e| panic!("token-program account load failed: {e:?}"));
 	assert_eq!(token_account.amount(), 88);
+	assert_eq!(token_account.program_id(), &token_2022::ID);
+	assert!(token_account.legacy().is_none());
+	assert!(token_account.token_2022().is_some());
 
 	assert!(matches!(
 		shadow.try_borrow_mut(),
@@ -1765,7 +1768,7 @@ fn as_token_account_checked_with_owners_accepts_token_2022_owner() {
 
 #[cfg(feature = "token")]
 #[test]
-fn as_token_mint_checked_with_owners_accepts_token_2022_extensions() {
+fn as_token_mint_for_program_preserves_token_2022_extensions() {
 	let mint_key: Address = address!("8qbHbw2BbbTHBW1sK7d7Yx4Z4DccnE9vrFica8FWHQrP");
 	let mut mint_data = build_token_mint_bytes(9, 42);
 	add_token_2022_account_type(&mut mint_data, token_2022::state::AccountType::Mint);
@@ -1783,9 +1786,12 @@ fn as_token_mint_checked_with_owners_accepts_token_2022_extensions() {
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
 	let mint = account_views[0]
-		.as_token_mint_checked_with_owners(&[token::ID, token_2022::ID])
-		.unwrap_or_else(|error| panic!("multi-owner token mint load failed: {error:?}"));
+		.as_token_mint_for_program(&token_2022::ID)
+		.unwrap_or_else(|error| panic!("token-program mint load failed: {error:?}"));
 	assert_eq!(mint.decimals(), 9);
+	assert_eq!(mint.program_id(), &token_2022::ID);
+	assert!(mint.legacy().is_none());
+	assert!(mint.token_2022().is_some());
 }
 
 #[cfg(feature = "token")]
@@ -1939,9 +1945,9 @@ fn as_token_2022_account_checked_accepts_extension_data() {
 	let token_account = account
 		.as_token_2022_account_checked()
 		.unwrap_or_else(|e| panic!("token-2022 account load failed: {e:?}"));
-	assert_eq!(token_account.amount(), 123);
-	assert_eq!(token_account.mint(), &mint);
-	assert_eq!(token_account.owner(), &owner);
+	assert_eq!(token_account.base.amount(), 123);
+	assert_eq!(token_account.base.mint(), &mint);
+	assert_eq!(token_account.base.owner(), &owner);
 }
 
 #[cfg(feature = "token")]

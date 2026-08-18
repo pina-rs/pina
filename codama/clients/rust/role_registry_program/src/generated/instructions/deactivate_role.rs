@@ -78,8 +78,8 @@ impl DeactivateRoleInstructionData {
 			let data =
 				<DeactivateRoleInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = DEACTIVATE_ROLE_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = DEACTIVATE_ROLE_DISCRIMINATOR;
 		}
 		<DeactivateRoleInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

@@ -1,4 +1,6 @@
 use profile_program_client::generated::accounts::ProfileState;
+use profile_program_client::generated::instructions::Initialize;
+use profile_program_client::generated::instructions::InitializeInstructionData;
 
 const PROFILE_LEN: usize = 231;
 
@@ -50,4 +52,18 @@ fn profile_state_ignores_inactive_collection_capacity() {
 	data[166..230].fill(0xff);
 
 	assert!(ProfileState::from_bytes(&data).is_ok());
+}
+
+#[test]
+fn instruction_builder_owns_the_discriminator() {
+	let data = InitializeInstructionData::new(|data| {
+		data.discriminator = u8::MAX;
+		data.bump = 42;
+	})
+	.unwrap_or_else(|error| panic!("instruction data failed: {error}"));
+	let instruction =
+		Initialize::new(solana_pubkey::Pubkey::new_from_array([7; 32])).instruction(data);
+
+	assert_eq!(instruction.data[0], 0);
+	assert_eq!(instruction.data[1], 42);
 }

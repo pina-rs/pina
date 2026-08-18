@@ -34,6 +34,7 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const ORACLE_STATE_DISCRIMINATOR = 1;
 
@@ -62,10 +63,17 @@ export function getOracleStateEncoder(): FixedSizeEncoder<OracleStateArgs> {
 
 /** Gets the decoder for {@link OracleState} account data. */
 export function getOracleStateDecoder(): FixedSizeDecoder<OracleState> {
-	return getStructDecoder([["discriminator", getU8Decoder()], [
-		"authority",
-		getAddressDecoder(),
-	], ["price", getU64Decoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(
+				ORACLE_STATE_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["authority", getAddressDecoder()],
+		["price", getU64Decoder()],
+	]);
 }
 
 /** Gets the codec for {@link OracleState} account data. */

@@ -87,8 +87,8 @@ impl CancelInstructionData {
 		{
 			let data = <CancelInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = CANCEL_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = CANCEL_DISCRIMINATOR;
 		}
 		<CancelInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

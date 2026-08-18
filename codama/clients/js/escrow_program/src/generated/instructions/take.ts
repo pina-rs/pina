@@ -35,6 +35,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { ESCROW_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const TAKE_DISCRIMINATOR = 2;
 
@@ -113,7 +114,10 @@ export function getTakeInstructionDataEncoder(): FixedSizeEncoder<
 export function getTakeInstructionDataDecoder(): FixedSizeDecoder<
 	TakeInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(TAKE_DISCRIMINATOR, getU8Decoder()),
+	]]);
 }
 
 export function getTakeInstructionDataCodec(): FixedSizeCodec<

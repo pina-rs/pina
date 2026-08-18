@@ -346,7 +346,7 @@ fn as_token_mint_rejects_overlapping_mutable_borrows_under_miri() {
 
 #[cfg(feature = "token")]
 #[test]
-fn as_token_account_checked_with_owners_supports_token_2022_under_miri() {
+fn as_token_account_for_program_supports_token_2022_under_miri() {
 	let account_key: Address = address!("4vJ9JU1bJJE96FWSJKv9J5xBqHkM7SspGq2pZ7uS5k4x");
 	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
 	let owner: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
@@ -366,8 +366,8 @@ fn as_token_account_checked_with_owners_supports_token_2022_under_miri() {
 	let account = account_views[0];
 	let mut shadow = account_views[0];
 	let token_account = account
-		.as_token_account_checked_with_owners(&[token::ID, token_2022::ID])
-		.unwrap_or_else(|e| panic!("multi-owner token account load failed: {e:?}"));
+		.as_token_account_for_program(&token_2022::ID)
+		.unwrap_or_else(|e| panic!("token-program account load failed: {e:?}"));
 	assert_eq!(token_account.amount(), 55);
 	assert_eq!(token_account.mint(), &mint);
 	assert_eq!(token_account.owner(), &owner);

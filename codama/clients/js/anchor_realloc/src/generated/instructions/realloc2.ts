@@ -37,6 +37,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { ANCHOR_REALLOC_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const REALLOC2_DISCRIMINATOR = 1;
 
@@ -91,10 +92,10 @@ export function getRealloc2InstructionDataEncoder(): FixedSizeEncoder<
 export function getRealloc2InstructionDataDecoder(): FixedSizeDecoder<
 	Realloc2InstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()], [
-		"len",
-		getU16Decoder(),
-	]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(REALLOC2_DISCRIMINATOR, getU8Decoder()),
+	], ["len", getU16Decoder()]]);
 }
 
 export function getRealloc2InstructionDataCodec(): FixedSizeCodec<

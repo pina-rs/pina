@@ -35,6 +35,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const OPEN_POSITION_DISCRIMINATOR = 1;
 
@@ -92,10 +93,10 @@ export function getOpenPositionInstructionDataEncoder(): FixedSizeEncoder<
 export function getOpenPositionInstructionDataDecoder(): FixedSizeDecoder<
 	OpenPositionInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()], [
-		"bump",
-		getU8Decoder(),
-	]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(OPEN_POSITION_DISCRIMINATOR, getU8Decoder()),
+	], ["bump", getU8Decoder()]]);
 }
 
 export function getOpenPositionInstructionDataCodec(): FixedSizeCodec<

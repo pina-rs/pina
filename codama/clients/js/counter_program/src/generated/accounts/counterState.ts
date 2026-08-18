@@ -33,6 +33,7 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { CounterSeeds, findCounterPda } from "../pdas";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const COUNTER_STATE_DISCRIMINATOR = 1;
 
@@ -94,10 +95,17 @@ export function getCounterStateEncoder(): FixedSizeEncoder<CounterStateArgs> {
 
 /** Gets the decoder for {@link CounterState} account data. */
 export function getCounterStateDecoder(): FixedSizeDecoder<CounterState> {
-	return getStructDecoder([["discriminator", getU8Decoder()], [
-		"bump",
-		getU8Decoder(),
-	], ["count", getU64Decoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(
+				COUNTER_STATE_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["bump", getU8Decoder()],
+		["count", getU64Decoder()],
+	]);
 }
 
 /** Gets the codec for {@link CounterState} account data. */

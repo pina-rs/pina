@@ -14,12 +14,6 @@ use quote::ToTokens;
 
 use crate::ir::ZeroPodEnumIr;
 
-/// Map a Rust type name (as it appears in pina structs) to a Codama
-/// `TypeNode`.
-pub fn rust_type_to_codama(ty: &str) -> TypeNode {
-	try_rust_type_to_codama(ty).unwrap_or_else(|_| PublicKeyTypeNode::new().into())
-}
-
 /// Fallible type mapping used by IDL generation.
 ///
 /// Unsupported Pod collection layouts are rejected rather than silently
@@ -366,37 +360,32 @@ mod tests {
 
 	use super::*;
 
+	fn mapped(ty: &str) -> TypeNode {
+		try_rust_type_to_codama(ty).unwrap_or_else(|error| panic!("failed to map `{ty}`: {error}"))
+	}
+
 	#[test]
 	fn maps_pod_types() {
 		assert_eq!(
-			rust_type_to_codama("PodU64"),
+			mapped("PodU64"),
 			NumberTypeNode::le(NumberFormat::U64).into()
 		);
-		assert_eq!(
-			rust_type_to_codama("PodBool"),
-			BooleanTypeNode::default().into()
-		);
+		assert_eq!(mapped("PodBool"), BooleanTypeNode::default().into());
 	}
 
 	#[test]
 	fn maps_primitives() {
-		assert_eq!(
-			rust_type_to_codama("u8"),
-			NumberTypeNode::le(NumberFormat::U8).into()
-		);
+		assert_eq!(mapped("u8"), NumberTypeNode::le(NumberFormat::U8).into());
 	}
 
 	#[test]
 	fn maps_address() {
-		assert_eq!(
-			rust_type_to_codama("Address"),
-			PublicKeyTypeNode::new().into()
-		);
+		assert_eq!(mapped("Address"), PublicKeyTypeNode::new().into());
 	}
 
 	#[test]
 	fn maps_byte_array() {
-		let ty = rust_type_to_codama("[u8; 32]");
+		let ty = mapped("[u8; 32]");
 		let expected: TypeNode =
 			FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 32).into();
 		assert_eq!(ty, expected);
@@ -405,7 +394,7 @@ mod tests {
 	#[test]
 	fn maps_pod_string() {
 		// PodString<32> = 1 length byte + 32 payload bytes.
-		let ty = rust_type_to_codama("PodString<32>");
+		let ty = mapped("PodString<32>");
 		let string = SizePrefixTypeNode::<TypeNode>::new(
 			StringTypeNode::utf8(),
 			NumberTypeNode::le(NumberFormat::U8),
@@ -417,7 +406,7 @@ mod tests {
 	#[test]
 	fn maps_pod_string_with_explicit_prefix() {
 		// PodString<64, 2> = 2 length bytes + 64 payload bytes.
-		let ty = rust_type_to_codama("PodString<64, 2>");
+		let ty = mapped("PodString<64, 2>");
 		let string = SizePrefixTypeNode::<TypeNode>::new(
 			StringTypeNode::utf8(),
 			NumberTypeNode::le(NumberFormat::U16),
@@ -429,13 +418,13 @@ mod tests {
 	#[test]
 	fn maps_wide_collection_prefixes_and_nested_elements() {
 		for (ty, size) in [("PodString<64, 4>", 68), ("PodString<64, 8>", 72)] {
-			let TypeNode::FixedSize(node) = rust_type_to_codama(ty) else {
+			let TypeNode::FixedSize(node) = mapped(ty) else {
 				panic!("{ty} did not lower to a fixed-size node");
 			};
 			assert_eq!(node.size, size);
 		}
 
-		let TypeNode::FixedSize(node) = rust_type_to_codama("PodVec<PodString<8, 1>, 4, 2>") else {
+		let TypeNode::FixedSize(node) = mapped("PodVec<PodString<8, 1>, 4, 2>") else {
 			panic!("nested PodVec did not lower to a fixed-size node");
 		};
 		assert_eq!(node.size, 38);
@@ -444,7 +433,7 @@ mod tests {
 	#[test]
 	fn maps_pod_vec() {
 		// PodVec<PodU64, 8> = 2 count bytes + 8 × 8-byte elements.
-		let ty = rust_type_to_codama("PodVec<PodU64, 8>");
+		let ty = mapped("PodVec<PodU64, 8>");
 		let array = ArrayTypeNode::prefixed(
 			NumberTypeNode::le(NumberFormat::U64),
 			NumberTypeNode::le(NumberFormat::U16),
@@ -456,7 +445,7 @@ mod tests {
 	#[test]
 	fn maps_pod_vec_with_explicit_prefix() {
 		// PodVec<PodU16, 4, 1> = 1 count byte + 4 × 2-byte elements.
-		let ty = rust_type_to_codama("PodVec<PodU16, 4, 1>");
+		let ty = mapped("PodVec<PodU16, 4, 1>");
 		let array = ArrayTypeNode::prefixed(
 			NumberTypeNode::le(NumberFormat::U16),
 			NumberTypeNode::le(NumberFormat::U8),
@@ -467,7 +456,7 @@ mod tests {
 
 	#[test]
 	fn maps_pod_vec_with_signed_pod_elements() {
-		let ty = rust_type_to_codama("PodVec<PodI32, 8>");
+		let ty = mapped("PodVec<PodI32, 8>");
 		let array = ArrayTypeNode::prefixed(
 			NumberTypeNode::le(NumberFormat::I32),
 			NumberTypeNode::le(NumberFormat::U16),
@@ -475,7 +464,7 @@ mod tests {
 		let expected: TypeNode = FixedSizeTypeNode::<TypeNode>::new(array, 34).into();
 		assert_eq!(ty, expected);
 
-		let ty = rust_type_to_codama("PodVec<PodI128, 8>");
+		let ty = mapped("PodVec<PodI128, 8>");
 		let array = ArrayTypeNode::prefixed(
 			NumberTypeNode::le(NumberFormat::I128),
 			NumberTypeNode::le(NumberFormat::U16),

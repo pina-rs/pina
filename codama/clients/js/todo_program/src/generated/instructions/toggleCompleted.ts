@@ -36,6 +36,7 @@ import {
 } from "@solana/program-client-core";
 import { findTodoPda } from "../pdas";
 import { TODO_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const TOGGLE_COMPLETED_DISCRIMINATOR = 1;
 
@@ -79,7 +80,13 @@ export function getToggleCompletedInstructionDataEncoder(): FixedSizeEncoder<
 export function getToggleCompletedInstructionDataDecoder(): FixedSizeDecoder<
 	ToggleCompletedInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(
+			TOGGLE_COMPLETED_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	]]);
 }
 
 export function getToggleCompletedInstructionDataCodec(): FixedSizeCodec<

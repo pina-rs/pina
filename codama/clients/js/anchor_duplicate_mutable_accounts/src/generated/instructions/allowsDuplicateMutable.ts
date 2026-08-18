@@ -24,6 +24,7 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const ALLOWS_DUPLICATE_MUTABLE_DISCRIMINATOR = 1;
 
@@ -56,7 +57,13 @@ export function getAllowsDuplicateMutableInstructionDataEncoder(): FixedSizeEnco
 export function getAllowsDuplicateMutableInstructionDataDecoder(): FixedSizeDecoder<
 	AllowsDuplicateMutableInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(
+			ALLOWS_DUPLICATE_MUTABLE_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	]]);
 }
 
 export function getAllowsDuplicateMutableInstructionDataCodec(): FixedSizeCodec<

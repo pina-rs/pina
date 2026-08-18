@@ -173,11 +173,14 @@ pub(crate) fn render_instruction_page(
 		"\t\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;"
 			.to_string(),
 	);
+	lines.push("\t\t\tconfigure(data);".to_string());
+	// Security: The discriminator is framework-owned metadata. Writing it after
+	// the callback prevents otherwise valid user configuration from changing
+	// which on-chain instruction will receive the payload.
 	lines.push(format!(
 		"\t\t\tdata.discriminator = {};",
 		discriminator.name
 	));
-	lines.push("\t\t\tconfigure(data);".to_string());
 	lines.push("\t\t}".to_string());
 	lines.push(format!(
 		"\t\t<{wire_name} as pina::ZeroPodFixed>::validate(&bytes)"

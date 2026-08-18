@@ -71,8 +71,8 @@ impl CreateInstructionData {
 		{
 			let data = <CreateInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = CREATE_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = CREATE_DISCRIMINATOR;
 		}
 		<CreateInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

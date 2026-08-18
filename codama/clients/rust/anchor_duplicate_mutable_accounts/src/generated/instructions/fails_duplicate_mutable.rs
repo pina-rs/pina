@@ -66,8 +66,8 @@ impl FailsDuplicateMutableInstructionData {
 					&mut bytes,
 				)
 				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = FAILS_DUPLICATE_MUTABLE_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = FAILS_DUPLICATE_MUTABLE_DISCRIMINATOR;
 		}
 		<FailsDuplicateMutableInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

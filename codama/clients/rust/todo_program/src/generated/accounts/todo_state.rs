@@ -24,6 +24,10 @@ pub const TODO_STATE_DISCRIMINATOR: u8 = 1u8;
 impl TodoState {
 	pub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;
 
+	/// Initialize zero-valid account storage.
+	///
+	/// Every non-discriminator field must accept an all-zero
+	/// representation. Otherwise this method returns `InvalidAccountData`.
 	pub fn initialize(
 		data: &mut [u8],
 	) -> Result<&mut TodoStateZc, solana_program_error::ProgramError> {

@@ -37,6 +37,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const UPDATE_ROLE_DISCRIMINATOR = 2;
 
@@ -90,10 +91,10 @@ export function getUpdateRoleInstructionDataEncoder(): FixedSizeEncoder<
 export function getUpdateRoleInstructionDataDecoder(): FixedSizeDecoder<
 	UpdateRoleInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()], [
-		"permissions",
-		getU64Decoder(),
-	]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(UPDATE_ROLE_DISCRIMINATOR, getU8Decoder()),
+	], ["permissions", getU64Decoder()]]);
 }
 
 export function getUpdateRoleInstructionDataCodec(): FixedSizeCodec<

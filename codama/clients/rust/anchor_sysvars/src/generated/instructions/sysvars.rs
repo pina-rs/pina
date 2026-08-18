@@ -76,8 +76,8 @@ impl SysvarsInstructionData {
 		{
 			let data = <SysvarsInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = SYSVARS_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = SYSVARS_DISCRIMINATOR;
 		}
 		<SysvarsInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

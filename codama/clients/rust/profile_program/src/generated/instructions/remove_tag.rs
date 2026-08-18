@@ -72,8 +72,8 @@ impl RemoveTagInstructionData {
 		{
 			let data = <RemoveTagInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = REMOVE_TAG_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = REMOVE_TAG_DISCRIMINATOR;
 		}
 		<RemoveTagInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

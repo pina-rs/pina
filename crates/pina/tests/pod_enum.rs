@@ -15,6 +15,13 @@ pub enum Color {
 	Blue = 2,
 }
 
+#[derive(ZeroPod, Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum NonZeroColor {
+	Red = 1,
+	Blue = 7,
+}
+
 #[discriminator(crate = ::pina, primitive = u8, final)]
 pub enum MyAccount {
 	Palette = 7,
@@ -24,6 +31,11 @@ pub enum MyAccount {
 pub struct Palette {
 	pub color: Color,
 	pub brightness: u64,
+}
+
+#[account(crate = ::pina, discriminator = MyAccount, variant = Palette)]
+pub struct NonZeroPalette {
+	pub color: NonZeroColor,
 }
 
 #[derive(ZeroPod)]
@@ -98,6 +110,13 @@ fn zeropod_enum_in_account_rejects_invalid_discriminant() {
 
 	assert!(Palette::try_from_bytes(&data).is_err());
 	assert!(<Palette as PinaAccount>::validate_account_data(&data).is_err());
+}
+
+#[test]
+fn account_initialize_rejects_schemas_without_a_zero_state() {
+	let mut data = [0u8; NonZeroPalette::SIZE];
+
+	assert!(NonZeroPalette::initialize(&mut data).is_err());
 }
 
 #[test]

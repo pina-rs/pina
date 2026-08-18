@@ -37,6 +37,10 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { findPoolPda, PoolSeeds } from "../pdas";
+import {
+	getZeroPodBooleanDecoder,
+	getZeroPodDiscriminatorDecoder,
+} from "../zeropodCodecs";
 
 export const POOL_STATE_DISCRIMINATOR = 1;
 
@@ -85,13 +89,16 @@ export function getPoolStateEncoder(): FixedSizeEncoder<PoolStateArgs> {
 /** Gets the decoder for {@link PoolState} account data. */
 export function getPoolStateDecoder(): FixedSizeDecoder<PoolState> {
 	return getStructDecoder([
-		["discriminator", getU8Decoder()],
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(POOL_STATE_DISCRIMINATOR, getU8Decoder()),
+		],
 		["admin", getAddressDecoder()],
 		["stakeMint", getAddressDecoder()],
 		["rewardMint", getAddressDecoder()],
 		["totalStaked", getU64Decoder()],
 		["rewardIndex", getU64Decoder()],
-		["paused", getBooleanDecoder()],
+		["paused", getZeroPodBooleanDecoder()],
 		["bump", getU8Decoder()],
 	]);
 }

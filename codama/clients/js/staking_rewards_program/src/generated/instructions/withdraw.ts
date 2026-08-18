@@ -37,6 +37,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const WITHDRAW_DISCRIMINATOR = 3;
 
@@ -102,10 +103,10 @@ export function getWithdrawInstructionDataEncoder(): FixedSizeEncoder<
 export function getWithdrawInstructionDataDecoder(): FixedSizeDecoder<
 	WithdrawInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()], [
-		"amount",
-		getU64Decoder(),
-	]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(WITHDRAW_DISCRIMINATOR, getU8Decoder()),
+	], ["amount", getU64Decoder()]]);
 }
 
 export function getWithdrawInstructionDataCodec(): FixedSizeCodec<

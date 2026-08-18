@@ -75,8 +75,8 @@ impl InitializeInstructionData {
 			let data =
 				<InitializeInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = INITIALIZE_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = INITIALIZE_DISCRIMINATOR;
 		}
 		<InitializeInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

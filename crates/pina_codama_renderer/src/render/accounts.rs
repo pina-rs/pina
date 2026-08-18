@@ -86,6 +86,12 @@ pub(crate) fn render_account_page(
 	lines.push(format!("impl {account_name} {{"));
 	lines.push("\tpub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;".to_string());
 	lines.push(String::new());
+	lines.push("\t/// Initialize zero-valid account storage.".to_string());
+	lines.push("\t///".to_string());
+	lines.push("\t/// Every non-discriminator field must accept an all-zero".to_string());
+	lines.push(
+		"\t/// representation. Otherwise this method returns `InvalidAccountData`.".to_string(),
+	);
 	lines.push(format!(
 		"\tpub fn initialize(data: &mut [u8]) -> Result<&mut {zc_name}, \
 		 solana_program_error::ProgramError> {{"

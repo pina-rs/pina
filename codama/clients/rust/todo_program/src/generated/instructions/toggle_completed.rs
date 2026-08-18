@@ -72,8 +72,8 @@ impl ToggleCompletedInstructionData {
 			let data =
 				<ToggleCompletedInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = TOGGLE_COMPLETED_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = TOGGLE_COMPLETED_DISCRIMINATOR;
 		}
 		<ToggleCompletedInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

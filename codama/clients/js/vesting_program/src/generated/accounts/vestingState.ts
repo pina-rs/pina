@@ -37,6 +37,10 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { findVestingPda, VestingSeeds } from "../pdas";
+import {
+	getZeroPodBooleanDecoder,
+	getZeroPodDiscriminatorDecoder,
+} from "../zeropodCodecs";
 
 export const VESTING_STATE_DISCRIMINATOR = 1;
 
@@ -94,7 +98,13 @@ export function getVestingStateEncoder(): FixedSizeEncoder<VestingStateArgs> {
 /** Gets the decoder for {@link VestingState} account data. */
 export function getVestingStateDecoder(): FixedSizeDecoder<VestingState> {
 	return getStructDecoder([
-		["discriminator", getU8Decoder()],
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(
+				VESTING_STATE_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
 		["admin", getAddressDecoder()],
 		["beneficiary", getAddressDecoder()],
 		["mint", getAddressDecoder()],
@@ -103,7 +113,7 @@ export function getVestingStateDecoder(): FixedSizeDecoder<VestingState> {
 		["startTs", getU64Decoder()],
 		["cliffTs", getU64Decoder()],
 		["endTs", getU64Decoder()],
-		["cancelled", getBooleanDecoder()],
+		["cancelled", getZeroPodBooleanDecoder()],
 		["bump", getU8Decoder()],
 	]);
 }

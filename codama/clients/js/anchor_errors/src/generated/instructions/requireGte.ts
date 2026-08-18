@@ -24,6 +24,7 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { ANCHOR_ERRORS_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const REQUIRE_GTE_DISCRIMINATOR = 6;
 
@@ -55,7 +56,10 @@ export function getRequireGteInstructionDataEncoder(): FixedSizeEncoder<
 export function getRequireGteInstructionDataDecoder(): FixedSizeDecoder<
 	RequireGteInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(REQUIRE_GTE_DISCRIMINATOR, getU8Decoder()),
+	]]);
 }
 
 export function getRequireGteInstructionDataCodec(): FixedSizeCodec<

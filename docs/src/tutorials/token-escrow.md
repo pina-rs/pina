@@ -260,14 +260,13 @@ associated_token_account::instructions::Create {
 .invoke()?;
 
 let token_program = *self.token_program.address();
-let token_owners = [token_program];
 let decimals = self
 	.mint_a
-	.as_token_mint_checked_with_owners(&token_owners)?
+	.as_token_mint_for_program(&token_program)?
 	.decimals();
 drop(
 	self.mint_b
-		.as_token_mint_checked_with_owners(&token_owners)?,
+		.as_token_mint_for_program(&token_program)?,
 );
 drop(self.maker_ata_a.as_associated_token_account_checked(
 	self.maker.address(),
@@ -312,14 +311,13 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			(escrow.maker, escrow.seed, escrow.bump, escrow.amount_b)
 		};
 		let token_program = *self.token_program.address();
-		let token_owners = [token_program];
 		let decimals_a = self
 			.mint_a
-			.as_token_mint_checked_with_owners(&token_owners)?
+			.as_token_mint_for_program(&token_program)?
 			.decimals();
 		let decimals_b = self
 			.mint_b
-			.as_token_mint_checked_with_owners(&token_owners)?
+			.as_token_mint_for_program(&token_program)?
 			.decimals();
 
 		// Verify the escrow is the PDA for the maker and seed, using the

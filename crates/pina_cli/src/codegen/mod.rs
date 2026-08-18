@@ -45,61 +45,11 @@ use crate::ir::PdaIr;
 use crate::ir::PdaSeedIr;
 use crate::ir::ProgramIr;
 use crate::ir::ZeroPodEnumIr;
-use crate::parse::types::rust_type_to_codama;
 use crate::parse::types::try_rust_type_to_codama_with_zeropod_enums;
 
 /// Validate every IR type mapping and convert a `ProgramIr` into a Codama
 /// `RootNode`.
 pub fn try_ir_to_root_node(ir: &ProgramIr) -> Result<RootNode, IdlError> {
-	for account in &ir.accounts {
-		for field in &account.fields {
-			validate_type_mapping(
-				&field.rust_type,
-				format!("account `{}.{}`", account.name, field.name),
-				&ir.zeropod_enums,
-			)?;
-		}
-	}
-
-	for instruction in &ir.instructions {
-		for argument in &instruction.arguments {
-			validate_type_mapping(
-				&argument.rust_type,
-				format!("instruction `{}.{}`", instruction.name, argument.name),
-				&ir.zeropod_enums,
-			)?;
-		}
-	}
-
-	for pda in &ir.pdas {
-		for seed in &pda.seeds {
-			if let PdaSeedIr::Variable { name, rust_type } = seed {
-				validate_type_mapping(rust_type, format!("PDA `{}.{name}`", pda.name), &[])?;
-			}
-		}
-	}
-
-	Ok(ir_to_root_node(ir))
-}
-
-fn validate_type_mapping(
-	ty: &str,
-	context: String,
-	zeropod_enums: &[ZeroPodEnumIr],
-) -> Result<(), IdlError> {
-	try_rust_type_to_codama_with_zeropod_enums(ty, zeropod_enums)
-		.map(|_| ())
-		.map_err(|reason| {
-			IdlError::UnsupportedType {
-				ty: ty.to_owned(),
-				context,
-				reason,
-			}
-		})
-}
-
-/// Convert a `ProgramIr` into a Codama `RootNode`.
-pub fn ir_to_root_node(ir: &ProgramIr) -> RootNode {
 	let mut program = ProgramNode::new(ir.name.as_str(), ir.public_key.as_str());
 
 	for zeropod_enum in &ir.zeropod_enums {
@@ -107,7 +57,7 @@ pub fn ir_to_root_node(ir: &ProgramIr) -> RootNode {
 	}
 
 	for account in &ir.accounts {
-		program = program.add_account(build_account_node(account, &ir.zeropod_enums));
+		program = program.add_account(build_account_node(account, &ir.zeropod_enums)?);
 	}
 
 	for instruction in &ir.instructions {
@@ -115,18 +65,24 @@ pub fn ir_to_root_node(ir: &ProgramIr) -> RootNode {
 			instruction,
 			&ir.pdas,
 			&ir.zeropod_enums,
-		));
+		)?);
 	}
 
 	for pda in &ir.pdas {
-		program = program.add_pda(build_pda_node(pda));
+		program = program.add_pda(build_pda_node(pda)?);
 	}
 
 	for error in &ir.errors {
 		program = program.add_error(build_error_node(error));
 	}
 
-	RootNode::new(program)
+	Ok(RootNode::new(program))
+}
+
+/// Convert a `ProgramIr` into a Codama `RootNode` without silent type
+/// substitutions.
+pub fn ir_to_root_node(ir: &ProgramIr) -> Result<RootNode, IdlError> {
+	try_ir_to_root_node(ir)
 }
 
 fn build_zeropod_enum_node(zeropod_enum: &ZeroPodEnumIr) -> DefinedTypeNode {
@@ -162,14 +118,18 @@ fn build_zeropod_enum_node(zeropod_enum: &ZeroPodEnumIr) -> DefinedTypeNode {
 	node
 }
 
-fn build_account_node(account: &AccountIr, zeropod_enums: &[ZeroPodEnumIr]) -> AccountNode {
+fn build_account_node(
+	account: &AccountIr,
+	zeropod_enums: &[ZeroPodEnumIr],
+) -> Result<AccountNode, IdlError> {
 	let mut fields = vec![build_account_discriminator_field(&account.discriminator)];
-	fields.extend(
-		account
-			.fields
-			.iter()
-			.map(|field| build_struct_field(field, zeropod_enums)),
-	);
+	for field in &account.fields {
+		fields.push(build_struct_field(
+			field,
+			format!("account `{}.{}`", account.name, field.name),
+			zeropod_enums,
+		)?);
+	}
 
 	let data = StructTypeNode::new(fields);
 	let mut node = AccountNode::new(account.name.as_str(), data);
@@ -183,14 +143,14 @@ fn build_account_node(account: &AccountIr, zeropod_enums: &[ZeroPodEnumIr]) -> A
 		node.docs = account.docs.clone().into();
 	}
 
-	node
+	Ok(node)
 }
 
 fn build_instruction_node(
 	instruction: &InstructionIr,
 	pdas: &[PdaIr],
 	zeropod_enums: &[ZeroPodEnumIr],
-) -> InstructionNode {
+) -> Result<InstructionNode, IdlError> {
 	let accounts: Vec<InstructionAccountNode> = instruction
 		.accounts
 		.iter()
@@ -200,13 +160,14 @@ fn build_instruction_node(
 	let mut arguments = vec![build_instruction_discriminator_argument(
 		&instruction.discriminator,
 	)];
-	arguments.extend(instruction.arguments.iter().map(|f| {
-		InstructionArgumentNode::new(
-			f.name.as_str(),
-			try_rust_type_to_codama_with_zeropod_enums(&f.rust_type, zeropod_enums)
-				.unwrap_or_else(|_| rust_type_to_codama(&f.rust_type)),
-		)
-	}));
+	for argument in &instruction.arguments {
+		let r#type = map_type(
+			&argument.rust_type,
+			format!("instruction `{}.{}`", instruction.name, argument.name),
+			zeropod_enums,
+		)?;
+		arguments.push(InstructionArgumentNode::new(argument.name.as_str(), r#type));
+	}
 
 	let discriminators = vec![build_discriminator_node(&instruction.discriminator)];
 
@@ -222,7 +183,7 @@ fn build_instruction_node(
 		node.docs = instruction.docs.clone().into();
 	}
 
-	node
+	Ok(node)
 }
 
 fn build_instruction_account_node(
@@ -304,16 +265,33 @@ fn build_default_value(default_value: &DefaultValueIr) -> InstructionInputValueN
 	}
 }
 
-fn build_struct_field(field: &FieldIr, zeropod_enums: &[ZeroPodEnumIr]) -> StructFieldTypeNode {
-	let type_node = try_rust_type_to_codama_with_zeropod_enums(&field.rust_type, zeropod_enums)
-		.unwrap_or_else(|_| rust_type_to_codama(&field.rust_type));
+fn build_struct_field(
+	field: &FieldIr,
+	context: String,
+	zeropod_enums: &[ZeroPodEnumIr],
+) -> Result<StructFieldTypeNode, IdlError> {
+	let type_node = map_type(&field.rust_type, context, zeropod_enums)?;
 	let mut node = StructFieldTypeNode::new(field.name.as_str(), type_node);
 
 	if !field.docs.is_empty() {
 		node.docs = field.docs.clone().into();
 	}
 
-	node
+	Ok(node)
+}
+
+fn map_type(
+	ty: &str,
+	context: String,
+	zeropod_enums: &[ZeroPodEnumIr],
+) -> Result<codama_nodes::TypeNode, IdlError> {
+	try_rust_type_to_codama_with_zeropod_enums(ty, zeropod_enums).map_err(|reason| {
+		IdlError::UnsupportedType {
+			ty: ty.to_owned(),
+			context,
+			reason,
+		}
+	})
 }
 
 fn build_account_discriminator_field(disc: &DiscriminatorIr) -> StructFieldTypeNode {
@@ -352,12 +330,12 @@ fn build_discriminator_type_and_value(disc: &DiscriminatorIr) -> (NumberTypeNode
 	(NumberTypeNode::le(format), NumberValueNode::new(disc.value))
 }
 
-fn build_pda_node(pda: &PdaIr) -> PdaNode {
+fn build_pda_node(pda: &PdaIr) -> Result<PdaNode, IdlError> {
 	let seeds: Vec<PdaSeedNode> = pda
 		.seeds
 		.iter()
 		.map(|seed| {
-			match seed {
+			Ok(match seed {
 				PdaSeedIr::Constant { value } => {
 					// Try to interpret as UTF-8 string first.
 					if let Ok(s) = std::str::from_utf8(value) {
@@ -381,14 +359,14 @@ fn build_pda_node(pda: &PdaIr) -> PdaNode {
 				PdaSeedIr::Variable { name, rust_type } => {
 					PdaSeedNode::Variable(VariablePdaSeedNode::new(
 						name.as_str(),
-						rust_type_to_codama(rust_type),
+						map_type(rust_type, format!("PDA `{}.{name}`", pda.name), &[])?,
 					))
 				}
-			}
+			})
 		})
-		.collect();
+		.collect::<Result<_, IdlError>>()?;
 
-	PdaNode::new(pda.name.as_str(), seeds)
+	Ok(PdaNode::new(pda.name.as_str(), seeds))
 }
 
 fn build_error_node(error: &ErrorIr) -> ErrorNode {
@@ -443,7 +421,7 @@ mod tests {
 			pdas: vec![],
 		};
 
-		let root = ir_to_root_node(&ir);
+		let root = ir_to_root_node(&ir).unwrap_or_else(|error| panic!("{error}"));
 		let account_data = root.program.accounts[0].data.get_nested_type_node();
 		let field = &account_data.fields[0];
 		assert_eq!(field.name.as_ref(), "discriminator");
@@ -612,7 +590,7 @@ mod tests {
 			}],
 		};
 
-		let root = ir_to_root_node(&ir);
+		let root = ir_to_root_node(&ir).unwrap_or_else(|error| panic!("{error}"));
 		let account = &root.program.instructions[0].accounts[1];
 		let Some(InstructionInputValueNode::PdaValue(default_value)) =
 			account.default_value.as_ref()

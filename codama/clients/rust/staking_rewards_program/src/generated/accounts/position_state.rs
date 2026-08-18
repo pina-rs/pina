@@ -26,6 +26,10 @@ pub const POSITION_STATE_DISCRIMINATOR: u8 = 2u8;
 impl PositionState {
 	pub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;
 
+	/// Initialize zero-valid account storage.
+	///
+	/// Every non-discriminator field must accept an all-zero
+	/// representation. Otherwise this method returns `InvalidAccountData`.
 	pub fn initialize(
 		data: &mut [u8],
 	) -> Result<&mut PositionStateZc, solana_program_error::ProgramError> {

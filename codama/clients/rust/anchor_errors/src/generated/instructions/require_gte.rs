@@ -55,8 +55,8 @@ impl RequireGteInstructionData {
 			let data =
 				<RequireGteInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = REQUIRE_GTE_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = REQUIRE_GTE_DISCRIMINATOR;
 		}
 		<RequireGteInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

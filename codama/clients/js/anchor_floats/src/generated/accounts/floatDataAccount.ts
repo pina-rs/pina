@@ -36,6 +36,7 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const FLOAT_DATA_ACCOUNT_DISCRIMINATOR = 1;
 
@@ -76,7 +77,13 @@ export function getFloatDataAccountDecoder(): FixedSizeDecoder<
 	FloatDataAccount
 > {
 	return getStructDecoder([
-		["discriminator", getU8Decoder()],
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(
+				FLOAT_DATA_ACCOUNT_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
 		["dataF64", getU64Decoder()],
 		["dataF32", getU32Decoder()],
 		["authority", getAddressDecoder()],

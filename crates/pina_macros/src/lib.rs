@@ -83,12 +83,22 @@ fn generate_view_helpers(
 			<Self as #crate_path::ZeroPodFixed>::from_bytes(data).map_err(|_| #error)
 		}
 
-		/// Initialize caller-owned storage and return its mutable zero-copy view.
-		///
-		/// The complete slice is initialized before zeropod validates it. The
-		/// returned borrow prevents the caller from observing or changing the raw
-		/// bytes while the typed view is live.
-		pub fn initialize(
+			/// Initialize caller-owned storage and return its mutable zero-copy view.
+			///
+			/// The complete slice is initialized before zeropod validates it. The
+			/// returned borrow prevents the caller from observing or changing the raw
+			/// bytes while the typed view is live.
+			///
+			/// Every non-discriminator field must accept an all-zero representation.
+			/// In particular, an enum stored directly in this schema needs a variant
+			/// with discriminant zero. Schemas without a valid zero state return the
+			/// generated invalid-data error instead of exposing an unvalidated view.
+			///
+			/// # Errors
+			///
+			/// Returns the generated invalid-data error when `data` has the wrong
+			/// length or zeroed storage is not a valid zeropod representation.
+			pub fn initialize(
 			data: &mut [u8],
 		) -> Result<&mut <Self as #crate_path::ZeroPodFixed>::Zc, #crate_path::ProgramError> {
 			if data.len() != Self::SIZE {

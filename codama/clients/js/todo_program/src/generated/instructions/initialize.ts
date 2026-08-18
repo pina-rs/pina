@@ -41,6 +41,10 @@ import {
 } from "@solana/program-client-core";
 import { findTodoPda } from "../pdas";
 import { TODO_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import {
+	fixZeroPodEncoderSize,
+	getZeroPodDiscriminatorDecoder,
+} from "../zeropodCodecs";
 
 export const INITIALIZE_DISCRIMINATOR = 0;
 
@@ -91,7 +95,7 @@ export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
 		getStructEncoder([["discriminator", getU8Encoder()], [
 			"bump",
 			getU8Encoder(),
-		], ["digest", fixEncoderSize(getBytesEncoder(), 32)]]),
+		], ["digest", fixZeroPodEncoderSize(getBytesEncoder(), 32)]]),
 		(value) => ({ ...value, discriminator: 0 }),
 	);
 }
@@ -99,10 +103,14 @@ export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
 export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
 	InitializeInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()], [
-		"bump",
-		getU8Decoder(),
-	], ["digest", fixDecoderSize(getBytesDecoder(), 32)]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder()),
+		],
+		["bump", getU8Decoder()],
+		["digest", fixDecoderSize(getBytesDecoder(), 32)],
+	]);
 }
 
 export function getInitializeInstructionDataCodec(): FixedSizeCodec<

@@ -35,6 +35,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const ROTATE_ADMIN_DISCRIMINATOR = 4;
 
@@ -82,7 +83,10 @@ export function getRotateAdminInstructionDataEncoder(): FixedSizeEncoder<
 export function getRotateAdminInstructionDataDecoder(): FixedSizeDecoder<
 	RotateAdminInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(ROTATE_ADMIN_DISCRIMINATOR, getU8Decoder()),
+	]]);
 }
 
 export function getRotateAdminInstructionDataCodec(): FixedSizeCodec<

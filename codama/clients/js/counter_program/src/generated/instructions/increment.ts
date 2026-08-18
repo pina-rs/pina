@@ -36,6 +36,7 @@ import {
 } from "@solana/program-client-core";
 import { findCounterPda } from "../pdas";
 import { COUNTER_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const INCREMENT_DISCRIMINATOR = 1;
 
@@ -79,7 +80,10 @@ export function getIncrementInstructionDataEncoder(): FixedSizeEncoder<
 export function getIncrementInstructionDataDecoder(): FixedSizeDecoder<
 	IncrementInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(INCREMENT_DISCRIMINATOR, getU8Decoder()),
+	]]);
 }
 
 export function getIncrementInstructionDataCodec(): FixedSizeCodec<

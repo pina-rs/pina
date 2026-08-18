@@ -103,6 +103,12 @@ pub enum CodamaError {
 		source: pina_codama_renderer::RenderError,
 	},
 
+	#[error("Failed to harden generated JavaScript client at {path}: {source}")]
+	HardenJavaScript {
+		path: PathBuf,
+		source: std::io::Error,
+	},
+
 	#[error("Failed to run `{cmd}`: {source}")]
 	RunCommand { cmd: String, source: std::io::Error },
 

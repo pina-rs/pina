@@ -58,8 +58,8 @@ impl TestEventCpiInstructionData {
 			let data =
 				<TestEventCpiInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = TEST_EVENT_CPI_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = TEST_EVENT_CPI_DISCRIMINATOR;
 		}
 		<TestEventCpiInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

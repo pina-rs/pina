@@ -71,8 +71,8 @@ impl ReallocInstructionData {
 		{
 			let data = <ReallocInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = REALLOC_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = REALLOC_DISCRIMINATOR;
 		}
 		<ReallocInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

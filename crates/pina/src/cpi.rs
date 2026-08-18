@@ -150,8 +150,9 @@ pub fn create_program_account_with_bump<'a, T: PinaAccount>(
 	seeds: &[&[u8]],
 	bump: u8,
 ) -> ProgramResult {
-	// Allocate space, then initialize the discriminator so callers can safely
-	// obtain a typed account view immediately after this helper returns.
+	// Allocate space, then initialize the discriminator. Callers can obtain a
+	// typed view immediately when the schema's remaining zeroed fields form a
+	// valid zeropod representation.
 	allocate_account_with_bump(target_account, payer, T::SIZE, owner, seeds, bump)?;
 	{
 		let mut data = target_account.try_borrow_mut()?;

@@ -38,6 +38,7 @@ import {
 } from "@solana/program-client-core";
 import { findProfilePda } from "../pdas";
 import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const REMOVE_TAG_DISCRIMINATOR = 3;
 
@@ -84,10 +85,10 @@ export function getRemoveTagInstructionDataEncoder(): FixedSizeEncoder<
 export function getRemoveTagInstructionDataDecoder(): FixedSizeDecoder<
 	RemoveTagInstructionData
 > {
-	return getStructDecoder([["discriminator", getU8Decoder()], [
-		"index",
-		getU64Decoder(),
-	]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(REMOVE_TAG_DISCRIMINATOR, getU8Decoder()),
+	], ["index", getU64Decoder()]]);
 }
 
 export function getRemoveTagInstructionDataCodec(): FixedSizeCodec<

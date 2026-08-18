@@ -37,6 +37,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { VESTING_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const INITIALIZE_DISCRIMINATOR = 0;
 
@@ -125,7 +126,10 @@ export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
 	InitializeInstructionData
 > {
 	return getStructDecoder([
-		["discriminator", getU8Decoder()],
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder()),
+		],
 		["totalAmount", getU64Decoder()],
 		["startTs", getU64Decoder()],
 		["cliffTs", getU64Decoder()],

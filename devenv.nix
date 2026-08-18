@@ -730,14 +730,20 @@ in
           exit 0
         fi
 
-        # Map changed files to workspace crates by checking crates/* directories.
+        # Resolve package names from the root workspace so standalone nested
+        # workspaces cannot produce a misleading zero-mutant run.
         changed_packages=()
-        for crate_dir in "$DEVENV_ROOT"/crates/*/; do
-          crate_name=$(basename "$crate_dir")
-          if echo "$changed_files" | grep -qE "^crates/$crate_name/"; then
-            changed_packages+=("$crate_name")
+        while IFS=$'\t' read -r package manifest; do
+          relative_manifest="''${manifest#"$DEVENV_ROOT"/}"
+          package_dir=$(dirname "$relative_manifest")
+          if echo "$changed_files" | grep -qE "^''${package_dir}/(Cargo.toml|build.rs|src/|tests/|benches/|examples/)"; then
+            changed_packages+=("$package")
           fi
-        done
+        done < <(
+          cargo metadata --no-deps --format-version 1 |
+            jq -r --arg root "$DEVENV_ROOT/crates/" \
+              '.packages[] | select(.manifest_path | startswith($root)) | [.name, .manifest_path] | @tsv'
+        )
 
         if [ ''${#changed_packages[@]} -eq 0 ]; then
           echo "No workspace packages changed; skipping mutation testing."
@@ -754,10 +760,6 @@ in
 
         status=0
         cargo mutants --all-features --cargo-arg --locked --output "$DEVENV_ROOT/target/mutants" "''${pkg_args[@]}" || status=$?
-        if [ "$status" -eq 2 ] || [ "$status" -eq 3 ]; then
-          echo "cargo-mutants reported missed mutants; keeping CI non-blocking and uploading the report."
-          exit 0
-        fi
         exit "$status"
       '';
       description = "Run mutation testing only on crates changed relative to a base branch (PR).";
@@ -770,13 +772,15 @@ in
           echo "Usage: mutants:crate <package-name>" >&2
           exit 1
         fi
+        if ! cargo metadata --no-deps --format-version 1 |
+          jq -e --arg package "$1" '.packages[] | select(.name == $package)' >/dev/null
+        then
+          echo "Package '$1' does not belong to the root workspace." >&2
+          exit 1
+        fi
         mkdir -p "$DEVENV_ROOT/target/mutants"
         status=0
         cargo mutants --all-features --cargo-arg --locked --output "$DEVENV_ROOT/target/mutants" -p "$1" || status=$?
-        if [ "$status" -eq 2 ] || [ "$status" -eq 3 ]; then
-          echo "cargo-mutants reported missed mutants; keeping CI non-blocking and uploading the report."
-          exit 0
-        fi
         exit "$status"
       '';
       description = "Run mutation testing on a single workspace crate.";

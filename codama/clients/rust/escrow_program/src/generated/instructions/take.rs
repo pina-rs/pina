@@ -129,8 +129,8 @@ impl TakeInstructionData {
 		{
 			let data = <TakeInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = TAKE_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = TAKE_DISCRIMINATOR;
 		}
 		<TakeInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;

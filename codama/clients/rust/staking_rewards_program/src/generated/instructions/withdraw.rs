@@ -101,8 +101,8 @@ impl WithdrawInstructionData {
 		{
 			let data = <WithdrawInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
 				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			data.discriminator = WITHDRAW_DISCRIMINATOR;
 			configure(data);
+			data.discriminator = WITHDRAW_DISCRIMINATOR;
 		}
 		<WithdrawInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
