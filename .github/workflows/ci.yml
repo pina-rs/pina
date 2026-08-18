@@ -102,7 +102,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: run miri loader regressions
+      - name: run miri zero-copy regressions
         run: test:miri
         shell: devenv shell -c -- bash -e {0}
 

@@ -15,30 +15,38 @@ fn valid_profile_bytes() -> [u8; PROFILE_LEN] {
 }
 
 #[test]
-fn profile_state_validates_semantic_pod_collections() {
+fn profile_state_exposes_fully_initialized_bounded_fields() {
 	let data = valid_profile_bytes();
 	let profile =
 		ProfileState::from_bytes(&data).unwrap_or_else(|error| panic!("parse failed: {error}"));
 
-	assert_eq!(profile.name.as_str(), "A");
-	assert_eq!(profile.bio.as_str(), "");
-	assert!(profile.tags.is_empty());
+	assert_eq!(profile.name[0], 1);
+	assert_eq!(profile.name[1], b'A');
+	assert_eq!(profile.bio, [0u8; 129]);
+	assert_eq!(profile.tags, [0u8; 66]);
 	assert!(profile.favorite_tag.is_none());
 }
 
 #[test]
-fn profile_state_rejects_invalid_collection_data() {
+fn bounded_fields_remain_bytes_until_the_program_applies_semantics() {
 	let mut invalid_name_length = valid_profile_bytes();
 	invalid_name_length[2] = 33;
-	assert!(ProfileState::from_bytes(&invalid_name_length).is_err());
+	let profile = ProfileState::from_bytes(&invalid_name_length)
+		.unwrap_or_else(|error| panic!("byte-array parse failed: {error}"));
+	assert_eq!(profile.name[0], 33);
 
 	let mut invalid_name_utf8 = valid_profile_bytes();
 	invalid_name_utf8[3] = 0xff;
-	assert!(ProfileState::from_bytes(&invalid_name_utf8).is_err());
+	let profile = ProfileState::from_bytes(&invalid_name_utf8)
+		.unwrap_or_else(|error| panic!("byte-array parse failed: {error}"));
+	assert_eq!(profile.name[1], 0xff);
 
 	let mut invalid_tags_length = valid_profile_bytes();
 	invalid_tags_length[164] = 9;
-	assert!(ProfileState::from_bytes(&invalid_tags_length).is_err());
+	let profile = ProfileState::from_bytes(&invalid_tags_length)
+		.unwrap_or_else(|error| panic!("byte-array parse failed: {error}"));
+	assert_eq!(profile.tags[0], 9);
+	assert_eq!(profile.tags[1], 0);
 
 	let mut invalid_option_tag = valid_profile_bytes();
 	invalid_option_tag[230] = 2;
@@ -46,7 +54,7 @@ fn profile_state_rejects_invalid_collection_data() {
 }
 
 #[test]
-fn profile_state_ignores_inactive_collection_capacity() {
+fn profile_state_preserves_every_fixed_capacity_byte() {
 	let mut data = valid_profile_bytes();
 	data[2] = 0;
 	data[3..35].fill(0xff);
@@ -57,7 +65,11 @@ fn profile_state_ignores_inactive_collection_capacity() {
 	data[166..230].fill(0xff);
 	data[231..239].fill(0xff);
 
-	assert!(ProfileState::from_bytes(&data).is_ok());
+	let profile =
+		ProfileState::from_bytes(&data).unwrap_or_else(|error| panic!("parse failed: {error}"));
+	assert!(profile.name[1..].iter().all(|byte| *byte == 0xff));
+	assert!(profile.bio[1..].iter().all(|byte| *byte == 0xff));
+	assert!(profile.tags[2..].iter().all(|byte| *byte == 0xff));
 }
 
 #[test]
@@ -76,6 +88,8 @@ fn instruction_builder_owns_the_discriminator() {
 	let data = InitializeInstructionData::new(|data| {
 		data.discriminator = u8::MAX;
 		data.bump = 42;
+		data.name[0] = 1;
+		data.name[1] = b'A';
 	})
 	.unwrap_or_else(|error| panic!("instruction data failed: {error}"));
 	let instruction =
@@ -83,4 +97,5 @@ fn instruction_builder_owns_the_discriminator() {
 
 	assert_eq!(instruction.data[0], 0);
 	assert_eq!(instruction.data[1], 42);
+	assert_eq!(&instruction.data[2..4], &[1, b'A']);
 }

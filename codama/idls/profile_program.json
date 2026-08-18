@@ -28,9 +28,9 @@
 					"|--------|------|----------------|",
 					"| 0      | 1    | discriminator  |",
 					"| 1      | 1    | bump           |",
-					"| 2      | 33   | name (PodString<32>)  |",
-					"| 35     | 129  | bio (PodString<128>)  |",
-					"| 164    | 66   | tags (PodVec<PodU64, 8>) |",
+					"| 2      | 33   | bounded name bytes   |",
+					"| 35     | 129  | bounded bio bytes    |",
+					"| 164    | 66   | bounded tag bytes    |",
 					"| 230    | 9    | favorite_tag (PodOption<PodU64>) |",
 					"| 239    | 1    | active (PodBool) |",
 					"```"
@@ -68,23 +68,13 @@
 							"kind": "structFieldTypeNode",
 							"name": "name",
 							"docs": [
-								"The profile display name. The generated view uses one length byte plus",
-								"32 bytes of UTF-8 capacity."
+								"One length byte followed by 32 fully initialized UTF-8 bytes."
 							],
 							"type": {
 								"kind": "fixedSizeTypeNode",
 								"size": 33,
 								"type": {
-									"kind": "sizePrefixTypeNode",
-									"type": {
-										"kind": "stringTypeNode",
-										"encoding": "utf8"
-									},
-									"prefix": {
-										"kind": "numberTypeNode",
-										"format": "u8",
-										"endian": "le"
-									}
+									"kind": "bytesTypeNode"
 								}
 							}
 						},
@@ -92,23 +82,13 @@
 							"kind": "structFieldTypeNode",
 							"name": "bio",
 							"docs": [
-								"A longer free-form bio. The generated view uses one length byte plus",
-								"128 bytes of UTF-8 capacity."
+								"One length byte followed by 128 fully initialized UTF-8 bytes."
 							],
 							"type": {
 								"kind": "fixedSizeTypeNode",
 								"size": 129,
 								"type": {
-									"kind": "sizePrefixTypeNode",
-									"type": {
-										"kind": "stringTypeNode",
-										"encoding": "utf8"
-									},
-									"prefix": {
-										"kind": "numberTypeNode",
-										"format": "u8",
-										"endian": "le"
-									}
+									"kind": "bytesTypeNode"
 								}
 							}
 						},
@@ -116,27 +96,13 @@
 							"kind": "structFieldTypeNode",
 							"name": "tags",
 							"docs": [
-								"Up to 8 tags. The generated view uses a two-byte count followed by",
-								"eight little-endian `u64` slots."
+								"A two-byte count followed by eight little-endian `u64` slots."
 							],
 							"type": {
 								"kind": "fixedSizeTypeNode",
 								"size": 66,
 								"type": {
-									"kind": "arrayTypeNode",
-									"item": {
-										"kind": "numberTypeNode",
-										"format": "u64",
-										"endian": "le"
-									},
-									"count": {
-										"kind": "prefixedCountNode",
-										"prefix": {
-											"kind": "numberTypeNode",
-											"format": "u16",
-											"endian": "le"
-										}
-									}
+									"kind": "bytesTypeNode"
 								}
 							}
 						},
@@ -210,8 +176,8 @@
 				"docs": [
 					"Instruction data for `Initialize`.",
 					"",
-					"Contains the PDA bump seed and the initial name/bio. The generated string",
-					"views carry their own length prefix, so the client writes",
+					"Contains the PDA bump seed and the initial name/bio. The fixed arrays",
+					"carry their own length prefix, so the client writes",
 					"`discriminator + bump + len(name) + name + len(bio) + bio`."
 				],
 				"accounts": [
@@ -299,16 +265,7 @@
 							"kind": "fixedSizeTypeNode",
 							"size": 33,
 							"type": {
-								"kind": "sizePrefixTypeNode",
-								"type": {
-									"kind": "stringTypeNode",
-									"encoding": "utf8"
-								},
-								"prefix": {
-									"kind": "numberTypeNode",
-									"format": "u8",
-									"endian": "le"
-								}
+								"kind": "bytesTypeNode"
 							}
 						}
 					},
@@ -319,16 +276,7 @@
 							"kind": "fixedSizeTypeNode",
 							"size": 129,
 							"type": {
-								"kind": "sizePrefixTypeNode",
-								"type": {
-									"kind": "stringTypeNode",
-									"encoding": "utf8"
-								},
-								"prefix": {
-									"kind": "numberTypeNode",
-									"format": "u8",
-									"endian": "le"
-								}
+								"kind": "bytesTypeNode"
 							}
 						}
 					}
@@ -419,16 +367,7 @@
 							"kind": "fixedSizeTypeNode",
 							"size": 33,
 							"type": {
-								"kind": "sizePrefixTypeNode",
-								"type": {
-									"kind": "stringTypeNode",
-									"encoding": "utf8"
-								},
-								"prefix": {
-									"kind": "numberTypeNode",
-									"format": "u8",
-									"endian": "le"
-								}
+								"kind": "bytesTypeNode"
 							}
 						}
 					},
@@ -439,16 +378,7 @@
 							"kind": "fixedSizeTypeNode",
 							"size": 129,
 							"type": {
-								"kind": "sizePrefixTypeNode",
-								"type": {
-									"kind": "stringTypeNode",
-									"encoding": "utf8"
-								},
-								"prefix": {
-									"kind": "numberTypeNode",
-									"format": "u8",
-									"endian": "le"
-								}
+								"kind": "bytesTypeNode"
 							}
 						}
 					}
@@ -682,9 +612,9 @@
 				"kind": "errorNode",
 				"name": "invalidUtf8",
 				"code": 0,
-				"message": "A `PodString` field contained invalid UTF-8.",
+				"message": "A bounded string field contained invalid UTF-8.",
 				"docs": [
-					"A `PodString` field contained invalid UTF-8."
+					"A bounded string field contained invalid UTF-8."
 				]
 			},
 			{

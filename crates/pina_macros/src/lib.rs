@@ -25,6 +25,7 @@ use syn::punctuated::Punctuated;
 use crate::args::InstructionArgs;
 
 mod args;
+mod schema;
 
 fn add_derive(item: &mut ItemStruct, derive: syn::Path) -> syn::Result<()> {
 	if let Some(attribute) = item
@@ -89,10 +90,9 @@ fn generate_view_helpers(
 			/// returned borrow prevents the caller from observing or changing the raw
 			/// bytes while the typed view is live.
 			///
-			/// Every non-discriminator field must accept an all-zero representation.
-			/// In particular, an enum stored directly in this schema needs a variant
-			/// with discriminant zero. Schemas without a valid zero state return the
-			/// generated invalid-data error instead of exposing an unvalidated view.
+			/// Every accepted field has an audited all-zero representation. The macro
+			/// rejects custom types and other layouts whose zero state cannot be
+			/// established by Pina's closed schema grammar.
 			///
 			/// # Errors
 			///
@@ -700,6 +700,14 @@ fn discriminator_impl(
 ///   this account. Cannot be combined with a `discriminator` path that already
 ///   includes a variant.
 ///
+/// #### Supported fields
+///
+/// Account schemas use a closed, audited grammar: native integer scalars,
+/// `bool`, Pina's `Pod*` integer/boolean wrappers, Pina's exact `Address` type,
+/// `[u8; N]` with a literal length, and `Option<T>` where `T` is a native
+/// integer or `bool`. Generics, custom/nested mappings, enums, `NonZero*`,
+/// `char`, collection fields, raw `PodOption`, and nested options are rejected.
+///
 /// #### Codegen
 ///
 /// It will transform the following:
@@ -903,6 +911,11 @@ fn account_impl(
 			Ok(v) => v,
 			Err(e) => return e.to_compile_error(),
 		};
+	let schema_proofs =
+		match schema::validate_fixed_schema(&item_struct, &crate_path, &discriminator, &zc_name) {
+			Ok(proofs) => proofs,
+			Err(error) => return error.to_compile_error(),
+		};
 
 	// Add derive macros
 	let derives_to_add: [syn::Path; 1] = [syn::parse_quote!(#crate_path::zeropod::ZeroPod)];
@@ -1042,6 +1055,7 @@ fn account_impl(
 
 	quote! {
 		#item_struct
+		#schema_proofs
 		#implementations
 	}
 }
@@ -1385,6 +1399,14 @@ fn pda_impl(
 ///   this instruction. Cannot be combined with a `discriminator` path that
 ///   already includes a variant.
 ///
+/// #### Supported fields
+///
+/// Instruction schemas use a closed, audited grammar: native integer scalars,
+/// `bool`, Pina's `Pod*` integer/boolean wrappers, Pina's exact `Address` type,
+/// `[u8; N]` with a literal length, and `Option<T>` where `T` is a native
+/// integer or `bool`. Generics, custom/nested mappings, enums, `NonZero*`,
+/// `char`, collection fields, raw `PodOption`, and nested options are rejected.
+///
 /// #### Codegen
 ///
 /// It will transform the following:
@@ -1485,6 +1507,7 @@ fn instruction_impl(
 
 	// Extract configuration
 	let struct_name = &item_struct.ident;
+	let zc_name = format_ident!("{}Zc", struct_name);
 
 	let InstructionArgs {
 		crate_path,
@@ -1495,6 +1518,11 @@ fn instruction_impl(
 		match resolve_discriminator_variant(&discriminator, variant, struct_name) {
 			Ok(v) => v,
 			Err(e) => return e.to_compile_error(),
+		};
+	let schema_proofs =
+		match schema::validate_fixed_schema(&item_struct, &crate_path, &discriminator, &zc_name) {
+			Ok(proofs) => proofs,
+			Err(error) => return error.to_compile_error(),
 		};
 
 	// Add derive macros
@@ -1567,6 +1595,7 @@ fn instruction_impl(
 
 	quote! {
 		#item_struct
+		#schema_proofs
 		#implementations
 	}
 }
@@ -1584,6 +1613,14 @@ fn instruction_impl(
 /// - `variant` - (optional) the variant of the discriminator enum to use for
 ///   this event. Cannot be combined with a `discriminator` path that already
 ///   includes a variant.
+///
+/// #### Supported fields
+///
+/// Event schemas use a closed, audited grammar: native integer scalars,
+/// `bool`, Pina's `Pod*` integer/boolean wrappers, Pina's exact `Address` type,
+/// `[u8; N]` with a literal length, and `Option<T>` where `T` is a native
+/// integer or `bool`. Generics, custom/nested mappings, enums, `NonZero*`,
+/// `char`, collection fields, raw `PodOption`, and nested options are rejected.
 ///
 /// #### Codegen
 ///
@@ -1662,6 +1699,7 @@ fn event_impl(
 	};
 
 	let struct_name = item_struct.ident.clone();
+	let zc_name = format_ident!("{}Zc", struct_name);
 	let EventArgs {
 		crate_path,
 		discriminator,
@@ -1670,6 +1708,11 @@ fn event_impl(
 	let (discriminator, variant) =
 		match resolve_discriminator_variant(&discriminator, variant, &struct_name) {
 			Ok(value) => value,
+			Err(error) => return error.to_compile_error(),
+		};
+	let schema_proofs =
+		match schema::validate_fixed_schema(&item_struct, &crate_path, &discriminator, &zc_name) {
+			Ok(proofs) => proofs,
 			Err(error) => return error.to_compile_error(),
 		};
 
@@ -1707,6 +1750,7 @@ fn event_impl(
 
 	quote! {
 		#item_struct
+		#schema_proofs
 		#implementations
 	}
 }

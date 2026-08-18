@@ -89,6 +89,6 @@ impl UpdateProfileInstructionData {
 #[derive(pina::ZeroPod)]
 pub struct UpdateProfileInstructionWire {
 	pub discriminator: u8,
-	pub name: pina::String<32>,
-	pub bio: pina::String<128>,
+	pub name: [u8; 33],
+	pub bio: [u8; 129],
 }

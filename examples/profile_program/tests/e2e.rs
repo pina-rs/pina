@@ -1,13 +1,13 @@
-//! End-to-end tests for the profile_program.
+//! End-to-end tests for the `profile_program`.
 //!
 //! These tests exercise the full instruction flow through `mollusk-svm`:
-//! Initialize, UpdateProfile, AddTag, and RemoveTag. Because the program only
+//! `Initialize`, `UpdateProfile`, `AddTag`, and `RemoveTag`. Because the program only
 //! CPIs to the system program (no token CPIs), the entire lifecycle —
 //! including account creation — can be tested end-to-end.
 //!
 //! ## Prerequisites
 //!
-//! The profile_program must be compiled to an SBF binary before running these
+//! The `profile_program` must be compiled to an SBF binary before running these
 //! tests:
 //!
 //! ```sh
@@ -39,6 +39,7 @@ use profile_program::ProfileState;
 use profile_program::ProfileStateZc;
 use profile_program::RemoveTagInstruction;
 use profile_program::UpdateProfileInstruction;
+use profile_program::encode_bounded_text;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
@@ -89,29 +90,25 @@ fn derive_profile_pda(authority: &Pubkey) -> (Pubkey, u8) {
 
 /// Build `Initialize` instruction data: discriminator + bump + name + bio.
 fn initialize_ix_data(bump: u8, name: &str, bio: &str) -> Vec<u8> {
-	assert!(name.len() <= 32, "name exceeds PodString<32> capacity");
-	assert!(bio.len() <= 128, "bio exceeds PodString<128> capacity");
+	let name = encode_bounded_text::<33>(name)
+		.unwrap_or_else(|error| panic!("invalid profile name: {error:?}"));
+	let bio = encode_bounded_text::<129>(bio)
+		.unwrap_or_else(|error| panic!("invalid profile bio: {error:?}"));
 	let mut data = vec![ProfileInstruction::Initialize as u8, bump];
-	data.extend_from_slice(&[name.len() as u8]);
-	data.extend_from_slice(name.as_bytes());
-	data.extend_from_slice(&vec![0u8; 32 - name.len()]);
-	data.extend_from_slice(&[bio.len() as u8]);
-	data.extend_from_slice(bio.as_bytes());
-	data.extend_from_slice(&vec![0u8; 128 - bio.len()]);
+	data.extend_from_slice(&name);
+	data.extend_from_slice(&bio);
 	data
 }
 
 /// Build `UpdateProfile` instruction data: discriminator + name + bio.
 fn update_profile_ix_data(name: &str, bio: &str) -> Vec<u8> {
-	assert!(name.len() <= 32, "name exceeds PodString<32> capacity");
-	assert!(bio.len() <= 128, "bio exceeds PodString<128> capacity");
+	let name = encode_bounded_text::<33>(name)
+		.unwrap_or_else(|error| panic!("invalid profile name: {error:?}"));
+	let bio = encode_bounded_text::<129>(bio)
+		.unwrap_or_else(|error| panic!("invalid profile bio: {error:?}"));
 	let mut data = vec![ProfileInstruction::UpdateProfile as u8];
-	data.extend_from_slice(&[name.len() as u8]);
-	data.extend_from_slice(name.as_bytes());
-	data.extend_from_slice(&vec![0u8; 32 - name.len()]);
-	data.extend_from_slice(&[bio.len() as u8]);
-	data.extend_from_slice(bio.as_bytes());
-	data.extend_from_slice(&vec![0u8; 128 - bio.len()]);
+	data.extend_from_slice(&name);
+	data.extend_from_slice(&bio);
 	data
 }
 
@@ -151,8 +148,6 @@ fn initialize_accounts(authority: &Pubkey, profile: &Pubkey) -> Vec<(Pubkey, Acc
 	]
 }
 
-/// The account set for the `Initialize` instruction.
-
 /// Assert that a profile's name/bio/tags match expectations.
 fn assert_profile(
 	result: &InstructionResult,
@@ -165,15 +160,11 @@ fn assert_profile(
 	let account = result
 		.get_account(profile)
 		.unwrap_or_else(|| panic!("profile account {profile} not found"));
-	let state: &ProfileStateZc =
-		<ProfileState as pina::ZeroPodFixed>::from_bytes(&account.data).unwrap();
-	assert_eq!(state.name.as_str(), expected_name);
-	assert_eq!(state.bio.as_str(), expected_bio);
-	let tags: Vec<u64> = state
-		.tags
-		.as_slice()
-		.iter()
-		.map(|t| u64::from(*t))
+	let state: &ProfileStateZc = ProfileState::try_from_bytes(&account.data).unwrap();
+	assert_eq!(state.name_text().unwrap(), expected_name);
+	assert_eq!(state.bio_text().unwrap(), expected_bio);
+	let tags: Vec<u64> = (0..state.tag_count().unwrap())
+		.map(|index| state.tag(index).unwrap().unwrap())
 		.collect();
 	assert_eq!(tags, expected_tags);
 	assert!(state.favorite_tag.is_none());
@@ -184,8 +175,8 @@ fn assert_profile(
 // Tests
 // ---------------------------------------------------------------------------
 
-/// Run the full lifecycle: Initialize → UpdateProfile → AddTag ×3 →
-/// RemoveTag, verifying the stored `PodString`/`PodVec` state at each step.
+/// Run the full lifecycle: `Initialize` → `UpdateProfile` → `AddTag` ×3 →
+/// `RemoveTag`, verifying the bounded text and tag state at each step.
 ///
 /// Mollusk does not persist account state between
 /// `process_and_validate_instruction` calls, so each instruction is fed the
@@ -299,8 +290,8 @@ fn initialize_rejects_invalid_utf8() {
 	// Name with an invalid UTF-8 byte (0xff)
 	let mut data = vec![ProfileInstruction::Initialize as u8, bump];
 	data.extend_from_slice(&[1u8, 0xff]);
-	data.extend_from_slice(&vec![0u8; 31]);
-	data.extend_from_slice(&vec![0u8; 129]);
+	data.extend_from_slice(&[0u8; 31]);
+	data.extend_from_slice(&[0u8; 129]);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -325,7 +316,7 @@ fn initialize_rejects_invalid_utf8() {
 	assert_eq!(account.owner, solana_sdk_ids::system_program::id());
 }
 
-/// `AddTag` must reject a 9th tag once the `PodVec` capacity (8) is reached.
+/// `AddTag` must reject a 9th tag once the bounded capacity (8) is reached.
 #[test]
 #[ignore = "requires the profile_program SBF binary"]
 fn add_tag_rejects_overflow() {

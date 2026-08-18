@@ -14,7 +14,7 @@ import {
 } from "@solana/kit";
 import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
-/** A `PodString` field contained invalid UTF-8. */
+/** A bounded string field contained invalid UTF-8. */
 export const PROFILE_PROGRAM_ERROR__INVALID_UTF8 = 0x0; // 0
 /** The tag list is full (capacity 8). */
 export const PROFILE_PROGRAM_ERROR__TAG_OVERFLOW = 0x1; // 1
@@ -32,7 +32,7 @@ let profileProgramErrorMessages:
 if (process.env["NODE_ENV"] !== "production") {
 	profileProgramErrorMessages = {
 		[PROFILE_PROGRAM_ERROR__INVALID_UTF8]:
-			`A \`PodString\` field contained invalid UTF-8.`,
+			`A bounded string field contained invalid UTF-8.`,
 		[PROFILE_PROGRAM_ERROR__TAG_NOT_FOUND]: `The tag index is out of range.`,
 		[PROFILE_PROGRAM_ERROR__TAG_OVERFLOW]: `The tag list is full (capacity 8).`,
 	};

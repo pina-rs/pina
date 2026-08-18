@@ -1,0 +1,13 @@
+error: `NonZero*` types are not zero-copy fields because an all-zero bit pattern is invalid
+  --> tests/ui/fail/account_nonzero_field.rs:12:13
+   |
+12 |     pub value: NonZeroU64,
+   |                ^^^^^^^^^^
+
+warning: unused import: `core::num::NonZeroU64`
+ --> tests/ui/fail/account_nonzero_field.rs:1:5
+  |
+1 | use core::num::NonZeroU64;
+  |     ^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default

@@ -1,9 +1,9 @@
 //! Zeropod's zero-copy storage types.
 //!
-//! Application schemas should use native Rust field types and derive
-//! [`zeropod::ZeroPod`]. The derive generates a separate zero-copy view whose
-//! fields use these storage types. Byte slices are converted to validated views
-//! through [`zeropod::ZeroPodFixed`], so Pina does not expose an independent
-//! raw-casting API.
+//! Pina's `#[account]`, `#[instruction]`, and `#[event]` macros accept only
+//! their documented closed field grammar. Some storage types re-exported here
+//! are useful for direct zeropod integrations but are deliberately rejected by
+//! those macros. Direct derives and manual `ZeroPodFixed` implementations are
+//! advanced APIs outside Pina's audited macro-generated contract.
 
 pub use zeropod::pod::*;

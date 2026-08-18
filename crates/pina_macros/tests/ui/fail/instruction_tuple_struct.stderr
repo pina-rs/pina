@@ -1,7 +1,5 @@
-error: Instruction structs must have named fields
- --> tests/ui/fail/instruction_tuple_struct.rs:8:1
+error: Pina zero-copy schemas must have named fields
+ --> tests/ui/fail/instruction_tuple_struct.rs:9:1
   |
-8 | #[instruction(discriminator = InstructionKind, variant = TupleInstruction)]
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
-  = note: this error originates in the attribute macro `instruction` (in Nightly builds, run with -Z macro-backtrace for more info)
+9 | pub struct TupleInstruction(u8);
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

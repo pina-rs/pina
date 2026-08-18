@@ -10,6 +10,76 @@ pub struct ComplexInstruction {
     pub bump: u8,
     pub flags: [u8; 4],
 }
+const _: fn([u8; 32]) -> [::core::primitive::u8; 32] = |value| value;
+const _: fn() = || {
+    fn assert_mapping<T: ::pina::ZcField<Pod = [::core::primitive::u8; 32]>>() {}
+    fn assert_storage<T: ::pina::ZcElem>() {}
+    assert_mapping::<[u8; 32]>();
+    assert_storage::<[::core::primitive::u8; 32]>();
+};
+const _: () = {
+    ::core::assert!(::core::mem::align_of:: < [::core::primitive::u8; 32] > () == 1);
+    ::core::assert!(
+        ::core::mem::size_of:: < [::core::primitive::u8; 32] > () == < [u8; 32] as
+        ::pina::ZcField > ::POD_SIZE,
+    );
+};
+const _: fn(PodU64) -> ::pina::PodU64 = |value| value;
+const _: fn() = || {
+    fn assert_mapping<T: ::pina::ZcField<Pod = ::pina::PodU64>>() {}
+    fn assert_storage<T: ::pina::ZcElem>() {}
+    assert_mapping::<PodU64>();
+    assert_storage::<::pina::PodU64>();
+};
+const _: () = {
+    ::core::assert!(::core::mem::align_of:: < ::pina::PodU64 > () == 1);
+    ::core::assert!(
+        ::core::mem::size_of:: < ::pina::PodU64 > () == < PodU64 as ::pina::ZcField >
+        ::POD_SIZE,
+    );
+};
+const _: fn(u8) -> ::core::primitive::u8 = |value| value;
+const _: fn() = || {
+    fn assert_mapping<T: ::pina::ZcField<Pod = ::core::primitive::u8>>() {}
+    fn assert_storage<T: ::pina::ZcElem>() {}
+    assert_mapping::<u8>();
+    assert_storage::<::core::primitive::u8>();
+};
+const _: () = {
+    ::core::assert!(::core::mem::align_of:: < ::core::primitive::u8 > () == 1);
+    ::core::assert!(
+        ::core::mem::size_of:: < ::core::primitive::u8 > () == < u8 as ::pina::ZcField >
+        ::POD_SIZE,
+    );
+};
+const _: fn([u8; 4]) -> [::core::primitive::u8; 4] = |value| value;
+const _: fn() = || {
+    fn assert_mapping<T: ::pina::ZcField<Pod = [::core::primitive::u8; 4]>>() {}
+    fn assert_storage<T: ::pina::ZcElem>() {}
+    assert_mapping::<[u8; 4]>();
+    assert_storage::<[::core::primitive::u8; 4]>();
+};
+const _: () = {
+    ::core::assert!(::core::mem::align_of:: < [::core::primitive::u8; 4] > () == 1);
+    ::core::assert!(
+        ::core::mem::size_of:: < [::core::primitive::u8; 4] > () == < [u8; 4] as
+        ::pina::ZcField > ::POD_SIZE,
+    );
+};
+const _: fn() = || {
+    fn assert_storage<T: ::pina::ZcElem>() {}
+    assert_storage::<ComplexInstructionZc>();
+};
+const _: () = {
+    ::core::assert!(::core::mem::align_of:: < ComplexInstructionZc > () == 1);
+    ::core::assert!(
+        ::core::mem::size_of:: < ComplexInstructionZc > () == MyInstruction::BYTES +
+        ::core::mem::size_of:: < [::core::primitive::u8; 32] > () +
+        ::core::mem::size_of:: < ::pina::PodU64 > () + ::core::mem::size_of:: <
+        ::core::primitive::u8 > () + ::core::mem::size_of:: < [::core::primitive::u8; 4]
+        > ()
+    );
+};
 impl ComplexInstruction {
     /// The exact number of bytes required by the zeropod representation.
     pub const SIZE: usize = <Self as ::pina::ZeroPodFixed>::SIZE;
@@ -31,10 +101,9 @@ impl ComplexInstruction {
     /// returned borrow prevents the caller from observing or changing the raw
     /// bytes while the typed view is live.
     ///
-    /// Every non-discriminator field must accept an all-zero representation.
-    /// In particular, an enum stored directly in this schema needs a variant
-    /// with discriminant zero. Schemas without a valid zero state return the
-    /// generated invalid-data error instead of exposing an unvalidated view.
+    /// Every accepted field has an audited all-zero representation. The macro
+    /// rejects custom types and other layouts whose zero state cannot be
+    /// established by Pina's closed schema grammar.
     ///
     /// # Errors
     ///

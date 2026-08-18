@@ -1,0 +1,5 @@
+error: fixed-capacity `String` and `Vec` fields are temporarily unsupported because upstream collection defaults can contain uninitialized inactive capacity; use fully initialized fixed fields such as `[u8; N]`
+  --> tests/ui/fail/instruction_vec_field.rs:10:14
+   |
+10 |     pub values: Vec<u64, 8>,
+   |                 ^^^^^^^^^^^

@@ -1,6 +1,8 @@
-//! Verifies that Pina account schemas compose with zeropod's native enum
-//! support. Pina does not implement a second enum representation: the
-//! `ZeroPod` derive owns the `Color` to `ColorZc` mapping and validation.
+//! Verifies standalone zeropod enum support.
+//!
+//! Pina's macro-generated account, instruction, and event schemas reject
+//! custom field mappings, including these enums. Direct zeropod users may
+//! still compose audited standalone schemas outside that closed boundary.
 
 use core::mem::align_of;
 use core::mem::size_of;
@@ -20,22 +22,6 @@ pub enum Color {
 pub enum NonZeroColor {
 	Red = 1,
 	Blue = 7,
-}
-
-#[discriminator(crate = ::pina, primitive = u8, final)]
-pub enum MyAccount {
-	Palette = 7,
-}
-
-#[account(crate = ::pina, discriminator = MyAccount)]
-pub struct Palette {
-	pub color: Color,
-	pub brightness: u64,
-}
-
-#[account(crate = ::pina, discriminator = MyAccount, variant = Palette)]
-pub struct NonZeroPalette {
-	pub color: NonZeroColor,
 }
 
 #[derive(ZeroPod)]
@@ -69,54 +55,10 @@ fn zeropod_enum_conversion_and_validation() {
 }
 
 #[test]
-fn zeropod_enum_in_account_roundtrip() {
-	let mut data = [0u8; Palette::SIZE];
-	{
-		let palette = Palette::initialize(&mut data).unwrap();
-		palette.color = Color::Green.into();
-		palette.brightness.set(42);
-	}
+fn nonzero_enum_rejects_zeroed_storage() {
+	let mut data = [0u8; NonZeroColor::SIZE];
 
-	let palette = Palette::try_from_bytes(&data).unwrap();
-	assert!(palette.color.is(Color::Green));
-	assert_eq!(palette.color.get(), 1);
-	assert_eq!(palette.brightness.get(), 42);
-}
-
-#[test]
-fn zeropod_enum_in_account_mutation() {
-	let mut data = [0u8; Palette::SIZE];
-	{
-		let palette = Palette::initialize(&mut data).unwrap();
-		palette.color = Color::Red.into();
-		palette.brightness.set(10);
-	}
-	{
-		let palette = Palette::try_from_bytes_mut(&mut data).unwrap();
-		palette.color = Color::Blue.into();
-		palette.brightness.set(999);
-	}
-
-	let palette = Palette::try_from_bytes(&data).unwrap();
-	assert!(palette.color.is(Color::Blue));
-	assert_eq!(palette.brightness.get(), 999);
-}
-
-#[test]
-fn zeropod_enum_in_account_rejects_invalid_discriminant() {
-	let mut data = [0u8; Palette::SIZE];
-	Palette::initialize(&mut data).unwrap();
-	data[1] = 99;
-
-	assert!(Palette::try_from_bytes(&data).is_err());
-	assert!(<Palette as PinaAccount>::validate_account_data(&data).is_err());
-}
-
-#[test]
-fn account_initialize_rejects_schemas_without_a_zero_state() {
-	let mut data = [0u8; NonZeroPalette::SIZE];
-
-	assert!(NonZeroPalette::initialize(&mut data).is_err());
+	assert!(NonZeroColor::from_bytes_mut(&mut data).is_err());
 }
 
 #[test]

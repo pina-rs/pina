@@ -17,8 +17,8 @@ describe("profile generated codecs", () => {
 	test("instruction encoders prepend their discriminator", () => {
 		const initialize = getInitializeInstructionDataEncoder().encode({
 			bump: 42,
-			name: "A",
-			bio: "hello",
+			name: boundedText("A", 32),
+			bio: boundedText("hello", 128),
 		});
 		const addTag = getAddTagInstructionDataEncoder().encode({ tag: 10 });
 
@@ -40,14 +40,14 @@ describe("profile generated codecs", () => {
 
 		expect(state.discriminator).toBe(1);
 		expect(state.bump).toBe(42);
-		expect(state.name).toBe("A");
-		expect(state.bio).toBe("");
-		expect(state.tags).toEqual([]);
+		expect(readBoundedText(state.name)).toBe("A");
+		expect(readBoundedText(state.bio)).toBe("");
+		expect(readBoundedTags(state.tags)).toEqual([]);
 		expect(isNone(state.favoriteTag)).toBe(true);
 		expect(state.active).toBe(true);
 	});
 
-	test("account decoder rejects collection lengths beyond capacity", () => {
+	test("semantic helpers reject bounded lengths beyond capacity", () => {
 		const invalidName = new Uint8Array(240);
 		invalidName[0] = 1;
 		invalidName[2] = 33;
@@ -56,29 +56,20 @@ describe("profile generated codecs", () => {
 		invalidTags[0] = 1;
 		invalidTags[164] = 9;
 
-		expect(() => getProfileStateDecoder().decode(invalidName)).toThrow();
-		expect(() => getProfileStateDecoder().decode(invalidTags)).toThrow();
+		expect(() =>
+			readBoundedText(getProfileStateDecoder().decode(invalidName).name)
+		).toThrow(/capacity/);
+		expect(() =>
+			readBoundedTags(getProfileStateDecoder().decode(invalidTags).tags)
+		).toThrow(/capacity/);
 	});
 
-	test("encoders reject collections that exceed their capacity", () => {
+	test("bounded construction helpers reject values beyond capacity", () => {
+		expect(() => boundedText("x".repeat(33), 32)).toThrow(/capacity/);
 		expect(() =>
-			getInitializeInstructionDataEncoder().encode({
-				bump: 7,
-				name: "x".repeat(33),
-				bio: "",
-			})
-		).toThrow(/capacity/);
-
-		expect(() =>
-			getProfileStateEncoder().encode({
-				bump: 7,
-				name: "",
-				bio: "",
-				tags: Array.from({ length: 9 }, (_, index) => BigInt(index)),
-				favoriteTag: null,
-				active: true,
-			})
-		).toThrow(/capacity/);
+			boundedTags(Array.from({ length: 9 }, (_, index) => BigInt(index)))
+		)
+			.toThrow(/capacity/);
 	});
 
 	test("decoders reject the wrong discriminator and non-canonical booleans", () => {
@@ -97,9 +88,9 @@ describe("profile generated codecs", () => {
 	test("option codecs preserve values and reject non-canonical tags", () => {
 		const encoded = getProfileStateEncoder().encode({
 			bump: 7,
-			name: "",
-			bio: "",
-			tags: [],
+			name: boundedText("", 32),
+			bio: boundedText("", 128),
+			tags: boundedTags([]),
 			favoriteTag: 42n,
 			active: true,
 		});
@@ -145,13 +136,15 @@ describe("profile generated codecs", () => {
 		);
 	});
 
-	test("string decoding is strict UTF-8 and preserves embedded NULs", () => {
+	test("bounded text validation is strict UTF-8 and preserves embedded NULs", () => {
 		const account = emptyProfileAccount();
 		account.set([3, 65, 0, 66], 2);
-		expect(getProfileStateDecoder().decode(account).name).toBe("A\0B");
+		expect(readBoundedText(getProfileStateDecoder().decode(account).name))
+			.toBe("A\0B");
 
 		account.set([1, 0xff, 0, 0], 2);
-		expect(() => getProfileStateDecoder().decode(account)).toThrow();
+		expect(() => readBoundedText(getProfileStateDecoder().decode(account).name))
+			.toThrow();
 	});
 
 	test("enum validation rejects undeclared numeric variants", () => {
@@ -167,4 +160,54 @@ function emptyProfileAccount(): Uint8Array {
 	const account = new Uint8Array(240);
 	account[0] = 1;
 	return account;
+}
+
+function boundedText(value: string, capacity: number): Uint8Array {
+	const valueBytes = new TextEncoder().encode(value);
+	if (valueBytes.length > capacity) {
+		throw new RangeError("bounded text exceeds capacity");
+	}
+
+	const bytes = new Uint8Array(capacity + 1);
+	bytes[0] = valueBytes.length;
+	bytes.set(valueBytes, 1);
+	return bytes;
+}
+
+function readBoundedText(bytes: Uint8Array): string {
+	const length = bytes[0] ?? 0;
+	if (length > bytes.length - 1) {
+		throw new RangeError("bounded text length exceeds capacity");
+	}
+
+	return new TextDecoder("utf-8", { fatal: true }).decode(
+		bytes.subarray(1, length + 1),
+	);
+}
+
+function boundedTags(values: readonly bigint[]): Uint8Array {
+	const capacity = 8;
+	if (values.length > capacity) {
+		throw new RangeError("bounded tags exceed capacity");
+	}
+
+	const bytes = new Uint8Array(2 + capacity * 8);
+	new DataView(bytes.buffer).setUint16(0, values.length, true);
+	for (const [index, value] of values.entries()) {
+		new DataView(bytes.buffer).setBigUint64(2 + index * 8, value, true);
+	}
+	return bytes;
+}
+
+function readBoundedTags(bytes: Uint8Array): bigint[] {
+	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+	const length = view.getUint16(0, true);
+	if (length > 8) {
+		throw new RangeError("bounded tag length exceeds capacity");
+	}
+
+	return Array.from(
+		{ length },
+		(_, index) => view.getBigUint64(2 + index * 8, true),
+	);
 }

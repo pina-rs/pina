@@ -1,0 +1,5 @@
+error: raw `PodOption` fields are unsupported; use semantic `Option<scalar>` so Pina can prove the exact storage mapping
+  --> tests/ui/fail/account_raw_pod_option.rs:10:13
+   |
+10 |     pub value: PodOption<PodU64>,
+   |                ^^^^^^^^^^^^^^^^^

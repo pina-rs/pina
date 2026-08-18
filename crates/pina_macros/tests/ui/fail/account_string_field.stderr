@@ -1,0 +1,5 @@
+error: fixed-capacity `String` and `Vec` fields are temporarily unsupported because upstream collection defaults can contain uninitialized inactive capacity; use fully initialized fixed fields such as `[u8; N]`
+  --> tests/ui/fail/account_string_field.rs:10:12
+   |
+10 |     pub name: String<32>,
+   |               ^^^^^^^^^^

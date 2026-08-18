@@ -2,15 +2,15 @@
 
 <br>
 
-User profile registry built with Pina, demonstrating **Pod collections** — fixed-capacity `PodString` and `PodVec` fields stored inline in zero-copy account state.
+User profile registry built with Pina, demonstrating fully initialized bounded text and list fields stored inline in zero-copy account state.
 
 ## What it covers
 
 <br>
 
-- `PodString<N, PFX>` — fixed-capacity UTF-8 strings validated at the instruction/account boundary and accessed with `as_str()`.
-- `PodVec<T, N, PFX>` — fixed-capacity element lists with a length prefix; push, pop, and in-place removal via `copy_within`.
-- `PodBool` — single-byte boolean flags.
+- `[u8; 33]` / `[u8; 129]` — length-prefixed UTF-8 with initialized capacity and checked `name_text()` / `bio_text()` accessors.
+- `[u8; 66]` — an initialized count plus eight little-endian `u64` slots, with checked append, lookup, and removal helpers.
+- `bool` / `Option<u64>` — semantic source fields mapped to audited `PodBool` / `PodOption<PodU64>` storage by Pina.
 - Full lifecycle: initialize → update → add/remove tags, with custom `#[error]` codes for UTF-8, capacity, and index failures.
 
 ## Run

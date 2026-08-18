@@ -28,24 +28,21 @@ pub struct ProfileState {
 	/// |--------|------|----------------|
 	/// | 0      | 1    | discriminator  |
 	/// | 1      | 1    | bump           |
-	/// | 2      | 33   | name (PodString<32>)  |
-	/// | 35     | 129  | bio (PodString<128>)  |
-	/// | 164    | 66   | tags (PodVec<PodU64, 8>) |
+	/// | 2      | 33   | bounded name bytes   |
+	/// | 35     | 129  | bounded bio bytes    |
+	/// | 164    | 66   | bounded tag bytes    |
 	/// | 230    | 9    | favorite_tag (PodOption<PodU64>) |
 	/// | 239    | 1    | active (PodBool) |
 	/// ```
 	pub discriminator: u8,
 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
 	pub bump: u8,
-	/// The profile display name. The generated view uses one length byte plus
-	/// 32 bytes of UTF-8 capacity.
-	pub name: pina::String<32>,
-	/// A longer free-form bio. The generated view uses one length byte plus
-	/// 128 bytes of UTF-8 capacity.
-	pub bio: pina::String<128>,
-	/// Up to 8 tags. The generated view uses a two-byte count followed by
-	/// eight little-endian `u64` slots.
-	pub tags: pina::Vec<u64, 8>,
+	/// One length byte followed by 32 fully initialized UTF-8 bytes.
+	pub name: [u8; 33],
+	/// One length byte followed by 128 fully initialized UTF-8 bytes.
+	pub bio: [u8; 129],
+	/// A two-byte count followed by eight little-endian `u64` slots.
+	pub tags: [u8; 66],
 	/// An optional favourite tag. The generated view uses a one-byte tag and
 	/// an eight-byte value slot, even when the option is `None`.
 	pub favorite_tag: Option<u64>,

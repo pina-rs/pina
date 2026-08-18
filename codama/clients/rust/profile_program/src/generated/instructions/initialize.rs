@@ -12,8 +12,8 @@ use pina::zeropod;
 
 /// Instruction data for `Initialize`.
 ///
-/// Contains the PDA bump seed and the initial name/bio. The generated string
-/// views carry their own length prefix, so the client writes
+/// Contains the PDA bump seed and the initial name/bio. The fixed arrays
+/// carry their own length prefix, so the client writes
 /// `discriminator + bump + len(name) + name + len(bio) + bio`.
 pub const INITIALIZE_DISCRIMINATOR: u8 = 0u8;
 
@@ -96,6 +96,6 @@ impl InitializeInstructionData {
 pub struct InitializeInstructionWire {
 	pub discriminator: u8,
 	pub bump: u8,
-	pub name: pina::String<32>,
-	pub bio: pina::String<128>,
+	pub name: [u8; 33],
+	pub bio: [u8; 129],
 }

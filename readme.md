@@ -639,9 +639,9 @@ The full generic forms are `PodOption<T: ZcElem>`, `PodString<N, PFX = 1>`, and 
 
 <!-- {=podCollectionDescription} -->
 
-Collection types store data inline without allocation and can be embedded in Pina's zeropod account, instruction, and event schemas. Overflow is detected at insertion time — `try_set` / `try_push` return `Err(ZeroPodError::Overflow)` when capacity is exceeded. Inactive capacity is not part of the semantic value and Pina never exposes it through a whole-object byte view.
+Collection types store data inline without allocation for advanced direct zeropod use. Pina's `#[account]`, `#[instruction]`, and `#[event]` macros reject `PodString`/`String` and `PodVec`/`Vec` fields because their inactive capacity is not guaranteed to be initialized after every upstream construction path. Use fully initialized fixed byte arrays plus checked semantic helpers in macro-generated schemas. Semantic `Option<scalar>` remains supported because Pina proves its exact `PodOption` mapping and scalar storage contract.
 
-After boundary validation, `PodString::as_str()` is safe. `PodVec` offers slice-based access via `as_slice()` / `as_slice_mut()`, and `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`.
+For direct zeropod integrations, zeropod boundary validation must establish the active `PodString` bytes are valid UTF-8 before callers use `as_str()`. `PodVec` offers slice-based access via `as_slice()` / `as_slice_mut()`, and `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`. Those direct integrations are outside Pina's audited macro-generated contract and must uphold zeropod's complete safety invariants.
 
 <!-- {/podCollectionDescription} -->
 

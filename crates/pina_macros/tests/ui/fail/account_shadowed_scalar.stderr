@@ -1,0 +1,14 @@
+error[E0308]: mismatched types
+  --> tests/ui/fail/account_shadowed_scalar.rs:23:1
+   |
+23 | #[account(discriminator = Kind)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `u8`, found `shadow::u8`
+   |
+   = note: `u8` and `shadow::u8` have similar names, but are actually distinct types
+   = note: one `u8` is a primitive defined by the language
+note: the other `shadow::u8` is defined in the current crate
+  --> tests/ui/fail/account_shadowed_scalar.rs:9:2
+   |
+ 9 |     pub struct u8(pub ::core::primitive::u8);
+   |     ^^^^^^^^^^^^^
+   = note: this error originates in the attribute macro `account` (in Nightly builds, run with -Z macro-backtrace for more info)
