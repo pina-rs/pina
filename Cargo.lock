@@ -2411,6 +2411,8 @@ dependencies = [
  "heck",
  "insta",
  "serde_json",
+ "solana-pubkey",
+ "syn 3.0.3",
  "thiserror 2.0.20",
 ]
 

@@ -99,5 +99,27 @@ fn file_stem(path: &Path) -> Result<String, RenderError> {
 			reason: "expected a UTF-8 file stem".to_string(),
 		});
 	};
+	if stem.is_empty() || matches!(stem, "." | "..") {
+		return Err(RenderError::UnsupportedValue {
+			context: format!("path `{}`", path.display()),
+			kind: "path",
+			reason: "file stem must name a child output directory".to_string(),
+		});
+	}
 	Ok(stem.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+	use std::path::Path;
+
+	use super::file_stem;
+
+	#[test]
+	fn rejects_parent_directory_file_stem() {
+		let error = file_stem(Path::new("...json"))
+			.err()
+			.unwrap_or_else(|| panic!("expected parent-directory stem to be rejected"));
+		assert!(error.to_string().contains("child output directory"));
+	}
 }

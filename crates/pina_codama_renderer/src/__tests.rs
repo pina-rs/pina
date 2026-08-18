@@ -804,3 +804,176 @@ fn snapshots_escrow_take_instruction() {
 	let content = read_generated_file(&crate_dir, "instructions/take.rs");
 	insta::assert_snapshot!("escrow_take_instruction_rs", content);
 }
+
+#[test]
+fn renders_untrusted_multiline_text_as_valid_rust() {
+	let mut account_root = load_fixture_root("counter_program");
+	account_root.program.accounts[0]
+		.docs
+		.push("Account documentation.\npub const INJECTED: bool = true;");
+	let account_files = render_program_to_files(&account_root)
+		.unwrap_or_else(|error| panic!("render failed: {error}"));
+	let account_source = account_files
+		.get(Path::new("accounts/counter_state.rs"))
+		.unwrap_or_else(|| panic!("missing account source"));
+	assert!(account_source.contains("/// pub const INJECTED: bool = true;"));
+	assert!(!account_source.contains("\npub const INJECTED: bool = true;"));
+	syn::parse_file(account_source)
+		.unwrap_or_else(|error| panic!("generated account source is invalid: {error}"));
+
+	let mut error_root = load_fixture_root("anchor_errors");
+	error_root.program.errors[0].message =
+		"bad message\n)]\npub const INJECTED: bool = true;".to_string();
+	let error_files = render_program_to_files(&error_root)
+		.unwrap_or_else(|error| panic!("render failed: {error}"));
+	let error_path = format!("errors/{}.rs", snake(error_root.program.name.as_ref()));
+	let error_source = error_files
+		.get(Path::new(&error_path))
+		.unwrap_or_else(|| panic!("missing error source"));
+	assert!(error_source.contains("/// pub const INJECTED: bool = true;"));
+	assert!(!error_source.contains("\npub const INJECTED: bool = true;"));
+	syn::parse_file(error_source)
+		.unwrap_or_else(|error| panic!("generated error source is invalid: {error}"));
+}
+
+#[test]
+fn rejects_output_path_escape_without_mutating_files() {
+	let root = load_fixture_root("counter_program");
+	let output_dir = unique_temp_dir("pina-codama-render-path-escape");
+	let crate_dir = output_dir.join("client");
+	let escaped_dir = output_dir.join("escaped");
+	fs::create_dir_all(&escaped_dir)
+		.unwrap_or_else(|error| panic!("failed to create escaped directory: {error}"));
+	let sentinel_path = escaped_dir.join("sentinel.txt");
+	fs::write(&sentinel_path, "keep")
+		.unwrap_or_else(|error| panic!("failed to write sentinel: {error}"));
+
+	let error = render_root_node(
+		&root,
+		&crate_dir,
+		&RenderConfig {
+			delete_folder_before_rendering: true,
+			generated_folder: PathBuf::from("../escaped"),
+		},
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected unsafe output path to be rejected"));
+	assert!(matches!(error, RenderError::UnsafeOutputPath { .. }));
+	assert_eq!(
+		fs::read_to_string(&sentinel_path)
+			.unwrap_or_else(|error| panic!("failed to read sentinel: {error}")),
+		"keep"
+	);
+	assert!(!crate_dir.exists());
+
+	let absolute_error = render_root_node(
+		&root,
+		&crate_dir,
+		&RenderConfig {
+			delete_folder_before_rendering: true,
+			generated_folder: escaped_dir.clone(),
+		},
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected absolute output path to be rejected"));
+	assert!(matches!(
+		absolute_error,
+		RenderError::UnsafeOutputPath { .. }
+	));
+	assert_eq!(
+		fs::read_to_string(&sentinel_path)
+			.unwrap_or_else(|error| panic!("failed to reread sentinel: {error}")),
+		"keep"
+	);
+}
+
+#[test]
+fn refuses_to_delete_an_unmanaged_directory() {
+	let root = load_fixture_root("counter_program");
+	let crate_dir = unique_temp_dir("pina-codama-render-unmanaged");
+	let source_dir = crate_dir.join("src");
+	fs::create_dir_all(&source_dir)
+		.unwrap_or_else(|error| panic!("failed to create source directory: {error}"));
+	let sentinel_path = source_dir.join("lib.rs");
+	fs::write(&sentinel_path, "pub const KEEP: bool = true;")
+		.unwrap_or_else(|error| panic!("failed to write source sentinel: {error}"));
+
+	let error = render_root_node(
+		&root,
+		&crate_dir,
+		&RenderConfig {
+			delete_folder_before_rendering: true,
+			generated_folder: PathBuf::from("src"),
+		},
+	)
+	.err()
+	.unwrap_or_else(|| panic!("expected unmanaged source directory to be rejected"));
+	assert!(matches!(error, RenderError::UnsafeOutputPath { .. }));
+	assert_eq!(
+		fs::read_to_string(&sentinel_path)
+			.unwrap_or_else(|error| panic!("failed to read source sentinel: {error}")),
+		"pub const KEEP: bool = true;"
+	);
+}
+
+#[test]
+fn render_failure_preserves_last_known_good_output() {
+	let root = load_fixture_root("counter_program");
+	let crate_dir = unique_temp_dir("pina-codama-render-preserve");
+	render_root_node(&root, &crate_dir, &RenderConfig::default())
+		.unwrap_or_else(|error| panic!("initial render failed: {error}"));
+	let generated_path = crate_dir.join("src/generated/programs.rs");
+	let previous_source = fs::read_to_string(&generated_path)
+		.unwrap_or_else(|error| panic!("failed to read generated source: {error}"));
+	let cargo_path = crate_dir.join("Cargo.toml");
+	fs::write(&cargo_path, "last-known-good")
+		.unwrap_or_else(|error| panic!("failed to write Cargo sentinel: {error}"));
+
+	let mut invalid_root = root;
+	invalid_root.program.public_key =
+		"11111111111111111111111111111111\"); pub const INJECTED: bool = true; //".to_string();
+	let error = render_root_node(&invalid_root, &crate_dir, &RenderConfig::default())
+		.err()
+		.unwrap_or_else(|| panic!("expected invalid public key to fail"));
+	assert!(matches!(error, RenderError::UnsupportedValue { .. }));
+	assert_eq!(
+		fs::read_to_string(&generated_path)
+			.unwrap_or_else(|error| panic!("failed to reread generated source: {error}")),
+		previous_source
+	);
+	assert_eq!(
+		fs::read_to_string(&cargo_path)
+			.unwrap_or_else(|error| panic!("failed to reread Cargo sentinel: {error}")),
+		"last-known-good"
+	);
+}
+
+#[cfg(unix)]
+#[test]
+fn rejects_symlinked_generated_directory() {
+	use std::os::unix::fs::symlink;
+
+	let root = load_fixture_root("counter_program");
+	let output_dir = unique_temp_dir("pina-codama-render-symlink");
+	let crate_dir = output_dir.join("client");
+	let external_dir = output_dir.join("external");
+	fs::create_dir_all(crate_dir.join("src"))
+		.unwrap_or_else(|error| panic!("failed to create crate directory: {error}"));
+	fs::create_dir_all(&external_dir)
+		.unwrap_or_else(|error| panic!("failed to create external directory: {error}"));
+	let sentinel_path = external_dir.join("sentinel.txt");
+	fs::write(&sentinel_path, "keep")
+		.unwrap_or_else(|error| panic!("failed to write sentinel: {error}"));
+	symlink(&external_dir, crate_dir.join("src/generated"))
+		.unwrap_or_else(|error| panic!("failed to create symlink: {error}"));
+
+	let error = render_root_node(&root, &crate_dir, &RenderConfig::default())
+		.err()
+		.unwrap_or_else(|| panic!("expected symlinked output path to fail"));
+	assert!(matches!(error, RenderError::UnsafeOutputPath { .. }));
+	assert_eq!(
+		fs::read_to_string(&sentinel_path)
+			.unwrap_or_else(|error| panic!("failed to read sentinel: {error}")),
+		"keep"
+	);
+}

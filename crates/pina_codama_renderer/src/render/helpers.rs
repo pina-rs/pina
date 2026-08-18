@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use codama_nodes::Docs;
 use codama_nodes::Number;
 use heck::ToShoutySnakeCase;
@@ -38,15 +40,36 @@ pub(crate) fn program_id_const_name(program_name: &str) -> String {
 	shouty(program_name) + "_ID"
 }
 
-pub(crate) fn escape_rust_str(value: &str) -> String {
-	value.replace('\\', "\\\\").replace('"', "\\\"")
+pub(crate) fn rust_string_literal(value: &str) -> String {
+	format!("{value:?}")
 }
 
 pub(crate) fn render_docs(docs: &Docs, indent_level: usize) -> Vec<String> {
-	let indent = "\t".repeat(indent_level);
 	docs.iter()
-		.map(|line| format!("{indent}/// {line}"))
+		.flat_map(|doc| render_doc(doc, indent_level))
 		.collect()
+}
+
+pub(crate) fn render_doc(doc: &str, indent_level: usize) -> Vec<String> {
+	let indent = "\t".repeat(indent_level);
+	doc.split('\n')
+		.map(|line| {
+			let line = line.strip_suffix('\r').unwrap_or(line);
+			format!("{indent}/// {line}")
+		})
+		.collect()
+}
+
+pub(crate) fn canonical_pubkey(value: &str, context: &str) -> Result<String> {
+	solana_pubkey::Pubkey::from_str(value)
+		.map(|public_key| public_key.to_string())
+		.map_err(|error| {
+			RenderError::UnsupportedValue {
+				context: context.to_string(),
+				kind: "publicKeyValueNode",
+				reason: format!("invalid public key: {error}"),
+			}
+		})
 }
 
 pub(crate) fn cast_unsigned(value: &Number, max: u128, context: &str) -> Result<u128> {

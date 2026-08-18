@@ -14,6 +14,8 @@ clap = { workspace = true, features = ["derive", "std"], default-features = true
 codama-nodes = { workspace = true, default-features = true }
 heck = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
+solana-pubkey = { workspace = true, default-features = true }
+syn = { workspace = true, default-features = true }
 thiserror = { workspace = true, default-features = true }
 
 [dev-dependencies]

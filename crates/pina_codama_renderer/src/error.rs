@@ -21,6 +21,10 @@ pub enum RenderError {
 		path: PathBuf,
 		source: serde_json::Error,
 	},
+	#[error("unsafe generated output path `{path}`: {reason}")]
+	UnsafeOutputPath { path: PathBuf, reason: String },
+	#[error("generated Rust source `{path}` is invalid: {reason}")]
+	InvalidGeneratedSource { path: PathBuf, reason: String },
 	#[error("unsupported type `{kind}` at `{context}`: {reason}")]
 	UnsupportedType {
 		context: String,

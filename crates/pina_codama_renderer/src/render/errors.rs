@@ -1,8 +1,9 @@
 use codama_nodes::ProgramNode;
 
-use super::helpers::escape_rust_str;
 use super::helpers::pascal;
+use super::helpers::render_doc;
 use super::helpers::render_docs;
+use super::helpers::rust_string_literal;
 use super::helpers::snake;
 
 pub(crate) fn render_errors_mod(program: &ProgramNode) -> String {
@@ -30,10 +31,12 @@ pub(crate) fn render_errors_page(program: &ProgramNode) -> String {
 		for doc_line in render_docs(&error.docs, 1) {
 			lines.push(doc_line);
 		}
-		lines.push(format!("\t/// {} - {}", error.code, error.message));
+		for doc_line in render_doc(&format!("{} - {}", error.code, error.message), 1) {
+			lines.push(doc_line);
+		}
 		lines.push(format!(
-			"\t#[error(\"{}\")]",
-			escape_rust_str(&error.message)
+			"\t#[error({})]",
+			rust_string_literal(&error.message)
 		));
 		lines.push(format!(
 			"\t{} = 0x{:X},",
