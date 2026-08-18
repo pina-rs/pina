@@ -16,8 +16,8 @@ pub struct ProfileState {
 	/// The `#[account]` macro generates:
 	/// - A discriminator field (`ProfileAccountType::ProfileState`) as the first
 	/// byte.
-	/// - `Pod` + `Zeroable` derives for zero-copy (de)serialization.
-	/// - `HasDiscriminator` linking this struct to
+	/// - `PinaAccount` and zeropod validation for checked zero-copy access.
+	/// - `HasDiscriminator` linking this account to
 	/// `ProfileAccountType::ProfileState`.
 	/// - `TypedBuilder` for ergonomic construction.
 	///
@@ -37,13 +37,13 @@ pub struct ProfileState {
 	pub bump: u8,
 	/// The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8
 	/// bytes.
-	pub name: [u8; 33],
+	pub name: pina::PodString<32, 1>,
 	/// A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8
 	/// bytes.
-	pub bio: [u8; 129],
+	pub bio: pina::PodString<128, 1>,
 	/// Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
 	/// elements.
-	pub tags: [u8; 66],
+	pub tags: pina::PodVec<pina::PodU64, 8, 2>,
 	/// Whether the profile is active.
 	pub active: pina::PodBool,
 }
@@ -62,13 +62,13 @@ impl pina::PinaSerialize for ProfileState {
 		let field_size = core::mem::size_of::<u8>();
 		pina::PinaSerialize::write_bytes(&self.bump, &mut output[offset..offset + field_size]);
 		offset += field_size;
-		let field_size = core::mem::size_of::<[u8; 33]>();
+		let field_size = core::mem::size_of::<pina::PodString<32, 1>>();
 		pina::PinaSerialize::write_bytes(&self.name, &mut output[offset..offset + field_size]);
 		offset += field_size;
-		let field_size = core::mem::size_of::<[u8; 129]>();
+		let field_size = core::mem::size_of::<pina::PodString<128, 1>>();
 		pina::PinaSerialize::write_bytes(&self.bio, &mut output[offset..offset + field_size]);
 		offset += field_size;
-		let field_size = core::mem::size_of::<[u8; 66]>();
+		let field_size = core::mem::size_of::<pina::PodVec<pina::PodU64, 8, 2>>();
 		pina::PinaSerialize::write_bytes(&self.tags, &mut output[offset..offset + field_size]);
 		offset += field_size;
 		let field_size = core::mem::size_of::<pina::PodBool>();
@@ -82,9 +82,9 @@ impl pina::ZcValidate for ProfileState {
 	fn validate_ref(value: &Self) -> Result<(), pina::ZeroPodError> {
 		<u8 as pina::ZcValidate>::validate_ref(&value.discriminator)?;
 		<u8 as pina::ZcValidate>::validate_ref(&value.bump)?;
-		<[u8; 33] as pina::ZcValidate>::validate_ref(&value.name)?;
-		<[u8; 129] as pina::ZcValidate>::validate_ref(&value.bio)?;
-		<[u8; 66] as pina::ZcValidate>::validate_ref(&value.tags)?;
+		<pina::PodString<32, 1> as pina::ZcValidate>::validate_ref(&value.name)?;
+		<pina::PodString<128, 1> as pina::ZcValidate>::validate_ref(&value.bio)?;
+		<pina::PodVec<pina::PodU64, 8, 2> as pina::ZcValidate>::validate_ref(&value.tags)?;
 		<pina::PodBool as pina::ZcValidate>::validate_ref(&value.active)?;
 		Ok(())
 	}
@@ -102,9 +102,9 @@ impl ProfileState {
 
 	pub const fn new(
 		bump: u8,
-		name: [u8; 33],
-		bio: [u8; 129],
-		tags: [u8; 66],
+		name: pina::PodString<32, 1>,
+		bio: pina::PodString<128, 1>,
+		tags: pina::PodVec<pina::PodU64, 8, 2>,
 		active: pina::PodBool,
 	) -> Self {
 		Self {

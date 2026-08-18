@@ -9,6 +9,8 @@
 import {
 	type AccountMeta,
 	type AccountSignerMeta,
+	addDecoderSizePrefix,
+	addEncoderSizePrefix,
 	type Address,
 	combineCodec,
 	fixDecoderSize,
@@ -16,12 +18,12 @@ import {
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
 	fixEncoderSize,
-	getBytesDecoder,
-	getBytesEncoder,
 	getStructDecoder,
 	getStructEncoder,
 	getU8Decoder,
 	getU8Encoder,
+	getUtf8Decoder,
+	getUtf8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
 	type InstructionWithData,
@@ -69,14 +71,11 @@ export type UpdateProfileInstruction<
 
 export type UpdateProfileInstructionData = {
 	discriminator: number;
-	name: ReadonlyUint8Array;
-	bio: ReadonlyUint8Array;
+	name: string;
+	bio: string;
 };
 
-export type UpdateProfileInstructionDataArgs = {
-	name: ReadonlyUint8Array;
-	bio: ReadonlyUint8Array;
-};
+export type UpdateProfileInstructionDataArgs = { name: string; bio: string };
 
 export function getUpdateProfileInstructionDataEncoder(): FixedSizeEncoder<
 	UpdateProfileInstructionDataArgs
@@ -84,8 +83,17 @@ export function getUpdateProfileInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
 			"name",
-			fixEncoderSize(getBytesEncoder(), 33),
-		], ["bio", fixEncoderSize(getBytesEncoder(), 129)]]),
+			fixEncoderSize(
+				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+				33,
+			),
+		], [
+			"bio",
+			fixEncoderSize(
+				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+				129,
+			),
+		]]),
 		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
@@ -95,8 +103,11 @@ export function getUpdateProfileInstructionDataDecoder(): FixedSizeDecoder<
 > {
 	return getStructDecoder([["discriminator", getU8Decoder()], [
 		"name",
-		fixDecoderSize(getBytesDecoder(), 33),
-	], ["bio", fixDecoderSize(getBytesDecoder(), 129)]]);
+		fixDecoderSize(addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()), 33),
+	], [
+		"bio",
+		fixDecoderSize(addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()), 129),
+	]]);
 }
 
 export function getUpdateProfileInstructionDataCodec(): FixedSizeCodec<

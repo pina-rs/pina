@@ -6,14 +6,20 @@ use std::time::UNIX_EPOCH;
 
 use codama_nodes::AccountNode;
 use codama_nodes::AccountValueNode;
+use codama_nodes::ArrayTypeNode;
 use codama_nodes::BooleanTypeNode;
 use codama_nodes::ConstantDiscriminatorNode;
 use codama_nodes::ConstantPdaSeedNode;
 use codama_nodes::ConstantValueNode;
+use codama_nodes::DefinedTypeLinkNode;
 use codama_nodes::DefinedTypeNode;
 use codama_nodes::DiscriminatorNode;
 use codama_nodes::Docs;
 use codama_nodes::Endianness;
+use codama_nodes::EnumEmptyVariantTypeNode;
+use codama_nodes::EnumTypeNode;
+use codama_nodes::EnumVariantTypeNode;
+use codama_nodes::FixedSizeTypeNode;
 use codama_nodes::InstructionAccountNode;
 use codama_nodes::InstructionInputValueNode;
 use codama_nodes::InstructionNode;
@@ -30,6 +36,7 @@ use codama_nodes::PdaValueNode;
 use codama_nodes::ProgramNode;
 use codama_nodes::PublicKeyTypeNode;
 use codama_nodes::RootNode;
+use codama_nodes::SizePrefixTypeNode;
 use codama_nodes::StringTypeNode;
 use codama_nodes::StringValueNode;
 use codama_nodes::StructFieldTypeNode;
@@ -39,6 +46,7 @@ use codama_nodes::U8;
 use codama_nodes::VariablePdaSeedNode;
 
 use super::render::seeds::render_variable_seed_parameter;
+use super::render::types::render_type_for_pod;
 use super::*;
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {
@@ -88,6 +96,38 @@ fn renders_counter_account_with_pod_types() {
 	let content = read_generated_file(&crate_dir, "accounts/counter_state.rs");
 
 	insta::assert_snapshot!("counter_state_account_rs", content);
+}
+
+#[test]
+fn renders_semantic_pod_collection_types() {
+	let string =
+		SizePrefixTypeNode::<TypeNode>::new(StringTypeNode::utf8(), NumberTypeNode::le(U8));
+	let string = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(string, 33));
+	assert_eq!(
+		render_type_for_pod(&string, "ProfileState.name")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::PodString<32, 1>"
+	);
+
+	let values = ArrayTypeNode::prefixed(
+		NumberTypeNode::le(NumberFormat::U64),
+		NumberTypeNode::le(NumberFormat::U16),
+	);
+	let values = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(values, 66));
+	assert_eq!(
+		render_type_for_pod(&values, "ProfileState.tags")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::PodVec<pina::PodU64, 8, 2>"
+	);
+
+	let color = FixedSizeTypeNode::<TypeNode>::new(DefinedTypeLinkNode::new("colorZc"), 1);
+	let colors = ArrayTypeNode::prefixed(color, NumberTypeNode::le(NumberFormat::U16));
+	let colors = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(colors, 10));
+	assert_eq!(
+		render_type_for_pod(&colors, "Palette.colors")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::PodVec<crate::generated::types::ColorZc, 8, 2>"
+	);
 }
 
 #[test]
@@ -479,6 +519,74 @@ fn renders_defined_type_aliases_with_pod_wrappers() {
 
 	let content = read_generated_file(&crate_dir, "types/counter.rs");
 	insta::assert_snapshot!("defined_type_alias_counter_rs", content);
+}
+
+#[test]
+fn renders_pod_enum_companion_defined_type() {
+	let mut red = EnumEmptyVariantTypeNode::new("red");
+	red.discriminator = Some(0);
+	let mut blue = EnumEmptyVariantTypeNode::new("blue");
+	blue.discriminator = Some(1);
+	let color = TypeNode::Link(DefinedTypeLinkNode::new("colorZc"));
+	let color_item = FixedSizeTypeNode::<TypeNode>::new(color.clone(), 1);
+	let colors = ArrayTypeNode::prefixed(color_item, NumberTypeNode::le(NumberFormat::U16));
+	let colors = FixedSizeTypeNode::<TypeNode>::new(colors, 10);
+	let program = ProgramNode {
+		name: "podEnumProgram".into(),
+		public_key: "11111111111111111111111111111111".to_string(),
+		accounts: vec![AccountNode {
+			name: "palette".into(),
+			size: None,
+			docs: Docs::default(),
+			data: StructTypeNode::new(vec![
+				StructFieldTypeNode::new("discriminator", NumberTypeNode::le(U8)),
+				StructFieldTypeNode::new("color", color),
+				StructFieldTypeNode::new("colors", colors),
+			])
+			.into(),
+			pda: None,
+			discriminators: vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(NumberTypeNode::le(U8), NumberValueNode::new(1u8)),
+				0,
+			))],
+		}],
+		instructions: vec![],
+		defined_types: vec![DefinedTypeNode {
+			name: "colorZc".into(),
+			docs: vec!["A color stored on chain.".to_string()].into(),
+			r#type: Box::new(
+				EnumTypeNode {
+					variants: vec![
+						EnumVariantTypeNode::Empty(red),
+						EnumVariantTypeNode::Empty(blue),
+					],
+					size: NumberTypeNode::le(U8).into(),
+				}
+				.into(),
+			),
+		}],
+		pdas: vec![],
+		errors: vec![],
+		events: vec![],
+		constants: vec![],
+		version: String::new(),
+		origin: None,
+		docs: Docs::default(),
+	};
+	let root = RootNode::new(program);
+	let output_dir = unique_temp_dir("pina-codama-render-pod-enum");
+	let crate_dir = output_dir.join("pod_enum_program");
+	render_root_node(&root, &crate_dir, &RenderConfig::default())
+		.unwrap_or_else(|error| panic!("render failed: {error}"));
+
+	let content = read_generated_file(&crate_dir, "types/color_zc.rs");
+	assert!(content.contains("#[derive(Clone, Copy, Debug, PartialEq, Eq, pina::PodEnum)]"));
+	assert!(content.contains("pub enum Color"));
+	assert!(content.contains("Red = 0"));
+	assert!(content.contains("Blue = 1"));
+	let account = read_generated_file(&crate_dir, "accounts/palette.rs");
+	assert!(account.contains("pub color: crate::generated::types::ColorZc"));
+	assert!(account.contains("pub colors: pina::PodVec<crate::generated::types::ColorZc, 8, 2>"));
 }
 
 #[test]

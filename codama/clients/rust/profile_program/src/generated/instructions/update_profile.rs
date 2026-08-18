@@ -67,12 +67,12 @@ impl UpdateProfile {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct UpdateProfileInstructionData {
 	pub discriminator: u8,
-	pub name: [u8; 33],
-	pub bio: [u8; 129],
+	pub name: pina::PodString<32, 1>,
+	pub bio: pina::PodString<128, 1>,
 }
 
 impl UpdateProfileInstructionData {
-	pub const fn new(name: [u8; 33], bio: [u8; 129]) -> Self {
+	pub const fn new(name: pina::PodString<32, 1>, bio: pina::PodString<128, 1>) -> Self {
 		Self {
 			discriminator: UPDATE_PROFILE_DISCRIMINATOR,
 			name,
@@ -92,10 +92,10 @@ impl pina::PinaSerialize for UpdateProfileInstructionData {
 			&mut output[offset..offset + field_size],
 		);
 		offset += field_size;
-		let field_size = core::mem::size_of::<[u8; 33]>();
+		let field_size = core::mem::size_of::<pina::PodString<32, 1>>();
 		pina::PinaSerialize::write_bytes(&self.name, &mut output[offset..offset + field_size]);
 		offset += field_size;
-		let field_size = core::mem::size_of::<[u8; 129]>();
+		let field_size = core::mem::size_of::<pina::PodString<128, 1>>();
 		pina::PinaSerialize::write_bytes(&self.bio, &mut output[offset..offset + field_size]);
 		offset += field_size;
 		debug_assert_eq!(offset, output.len());

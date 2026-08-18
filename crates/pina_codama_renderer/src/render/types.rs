@@ -1,8 +1,11 @@
 use codama_nodes::BooleanTypeNode;
+use codama_nodes::BytesEncoding;
 use codama_nodes::CountNode;
 use codama_nodes::DefinedTypeNode;
 use codama_nodes::Docs;
 use codama_nodes::Endianness;
+use codama_nodes::EnumTypeNode;
+use codama_nodes::EnumVariantTypeNode;
 use codama_nodes::HasKind;
 use codama_nodes::NestedTypeNodeTrait;
 use codama_nodes::NumberFormat;
@@ -38,9 +41,20 @@ pub(crate) fn render_type_for_pod(r#type: &TypeNode, context: &str) -> Result<St
 		TypeNode::FixedSize(fixed_size) => {
 			if matches!(fixed_size.r#type.as_ref(), TypeNode::Bytes(_)) {
 				Ok(format!("[u8; {}]", fixed_size.size))
+			} else if matches!(fixed_size.r#type.as_ref(), TypeNode::Link(_)) {
+				render_type_for_pod(&fixed_size.r#type, context)
+			} else if let Some(collection) =
+				render_pod_collection_type(fixed_size.size, &fixed_size.r#type, context)?
+			{
+				Ok(collection)
 			} else {
-				let inner = render_type_for_pod(&fixed_size.r#type, context)?;
-				Ok(format!("[{inner}; {}]", fixed_size.size))
+				Err(RenderError::UnsupportedType {
+					context: context.to_string(),
+					kind: r#type.kind(),
+					reason: "unsupported fixed-size wrapper; its size is a total byte size, not \
+					         an element count"
+						.to_string(),
+				})
 			}
 		}
 		TypeNode::Array(array_type) => {
@@ -69,6 +83,118 @@ pub(crate) fn render_type_for_pod(r#type: &TypeNode, context: &str) -> Result<St
 				reason: "node kind is not supported by pina_codama_renderer yet".to_string(),
 			})
 		}
+	}
+}
+
+fn render_pod_collection_type(
+	fixed_size: usize,
+	inner: &TypeNode,
+	context: &str,
+) -> Result<Option<String>> {
+	if let TypeNode::SizePrefix(size_prefix) = inner
+		&& let TypeNode::String(string) = size_prefix.r#type.as_ref()
+		&& matches!(string.encoding, BytesEncoding::Utf8)
+	{
+		let prefix_size = render_prefix_size(size_prefix.prefix.get_nested_type_node(), context)?;
+		let capacity = fixed_size.checked_sub(prefix_size).ok_or_else(|| {
+			RenderError::UnsupportedType {
+				context: context.to_string(),
+				kind: inner.kind(),
+				reason: "PodString fixed size is smaller than its length prefix".to_string(),
+			}
+		})?;
+
+		return Ok(Some(format!("pina::PodString<{capacity}, {prefix_size}>")));
+	}
+
+	let TypeNode::Array(array) = inner else {
+		return Ok(None);
+	};
+	let CountNode::Prefixed(count) = array.count.as_ref() else {
+		return Ok(None);
+	};
+
+	let prefix_size = render_prefix_size(count.prefix.get_nested_type_node(), context)?;
+	let payload_size = fixed_size.checked_sub(prefix_size).ok_or_else(|| {
+		RenderError::UnsupportedType {
+			context: context.to_string(),
+			kind: inner.kind(),
+			reason: "PodVec fixed size is smaller than its length prefix".to_string(),
+		}
+	})?;
+	let item_size = fixed_type_node_size(&array.item).ok_or_else(|| {
+		RenderError::UnsupportedType {
+			context: context.to_string(),
+			kind: array.item.kind(),
+			reason: "cannot determine the fixed byte size of the PodVec element".to_string(),
+		}
+	})?;
+
+	if item_size == 0 || payload_size % item_size != 0 {
+		return Err(RenderError::UnsupportedType {
+			context: context.to_string(),
+			kind: inner.kind(),
+			reason: "PodVec fixed size is not an exact number of elements".to_string(),
+		});
+	}
+
+	let capacity = payload_size / item_size;
+	let item_type = render_type_for_pod(&array.item, context)?;
+
+	Ok(Some(format!(
+		"pina::PodVec<{item_type}, {capacity}, {prefix_size}>"
+	)))
+}
+
+fn render_prefix_size(number_type: &NumberTypeNode, context: &str) -> Result<usize> {
+	if !matches!(number_type.endian, Endianness::Le) {
+		return Err(RenderError::UnsupportedType {
+			context: context.to_string(),
+			kind: "numberTypeNode",
+			reason: "collection length prefixes must be little-endian".to_string(),
+		});
+	}
+
+	match number_type.format {
+		NumberFormat::U8 => Ok(1),
+		NumberFormat::U16 => Ok(2),
+		NumberFormat::U32 => Ok(4),
+		NumberFormat::U64 => Ok(8),
+		_ => {
+			Err(RenderError::UnsupportedType {
+				context: context.to_string(),
+				kind: "numberTypeNode",
+				reason: "collection length prefixes must be u8, u16, u32, or u64".to_string(),
+			})
+		}
+	}
+}
+
+fn fixed_type_node_size(node: &TypeNode) -> Option<usize> {
+	match node {
+		TypeNode::Number(number) => {
+			match number.format {
+				NumberFormat::U8 | NumberFormat::I8 => Some(1),
+				NumberFormat::U16 | NumberFormat::I16 => Some(2),
+				NumberFormat::U32 | NumberFormat::I32 => Some(4),
+				NumberFormat::U64 | NumberFormat::I64 => Some(8),
+				NumberFormat::U128 | NumberFormat::I128 => Some(16),
+				NumberFormat::F32 | NumberFormat::F64 | NumberFormat::ShortU16 => None,
+			}
+		}
+		TypeNode::Boolean(_) => Some(1),
+		TypeNode::PublicKey(_) => Some(32),
+		TypeNode::FixedSize(fixed) => Some(fixed.size),
+		TypeNode::Array(array) => {
+			match array.count.as_ref() {
+				CountNode::Fixed(count) => {
+					fixed_type_node_size(&array.item)
+						.and_then(|size| size.checked_mul(count.value as usize))
+				}
+				CountNode::Prefixed(_) | CountNode::Remainder(_) => None,
+			}
+		}
+		_ => None,
 	}
 }
 
@@ -123,6 +249,9 @@ pub(crate) fn render_defined_type_page(defined_type: &DefinedTypeNode) -> Result
 		TypeNode::Struct(struct_type) => {
 			render_defined_struct(name.as_str(), struct_type, &defined_type.docs)
 		}
+		TypeNode::Enum(enum_type) => {
+			render_defined_pod_enum(name.as_str(), enum_type, &defined_type.docs)
+		}
 		TypeNode::Link(link) => {
 			Ok(format!(
 				"pub type {name} = crate::generated::types::{};",
@@ -134,6 +263,56 @@ pub(crate) fn render_defined_type_page(defined_type: &DefinedTypeNode) -> Result
 			Ok(format!("pub type {name} = {ty};"))
 		}
 	}
+}
+
+fn render_defined_pod_enum(name: &str, enum_type: &EnumTypeNode, docs: &Docs) -> Result<String> {
+	let enum_name = name.strip_suffix("Zc").ok_or_else(|| {
+		RenderError::UnsupportedType {
+			context: format!("defined type `{name}`"),
+			kind: "enumTypeNode",
+			reason: "Pina POD enum defined types must use the `EnumZc` companion name".to_string(),
+		}
+	})?;
+	let number = enum_type.size.get_nested_type_node();
+	if !matches!(number.endian, Endianness::Le) {
+		return Err(RenderError::UnsupportedType {
+			context: format!("defined type `{name}`"),
+			kind: "enumTypeNode",
+			reason: "Pina POD enums must use little-endian unsigned discriminants".to_string(),
+		});
+	}
+	let repr = match number.format {
+		NumberFormat::U8 => "u8",
+		NumberFormat::U16 => "u16",
+		NumberFormat::U32 => "u32",
+		NumberFormat::U64 => "u64",
+		_ => {
+			return Err(RenderError::UnsupportedType {
+				context: format!("defined type `{name}`"),
+				kind: "enumTypeNode",
+				reason: "Pina POD enums require u8, u16, u32, or u64 discriminants".to_string(),
+			});
+		}
+	};
+
+	let mut lines = render_docs(docs, 0);
+	lines.push("#[derive(Clone, Copy, Debug, PartialEq, Eq, pina::PodEnum)]".to_string());
+	lines.push(format!("#[repr({repr})]"));
+	lines.push(format!("pub enum {enum_name} {{"));
+	for (index, variant) in enum_type.variants.iter().enumerate() {
+		let EnumVariantTypeNode::Empty(variant) = variant else {
+			return Err(RenderError::UnsupportedType {
+				context: format!("defined type `{name}`"),
+				kind: "enumTypeNode",
+				reason: "Pina POD enums support unit variants only".to_string(),
+			});
+		};
+		let variant_name = pascal(variant.name.as_ref());
+		let value = variant.discriminator.unwrap_or(index as u32);
+		lines.push(format!("\t{variant_name} = {value},"));
+	}
+	lines.push("}".to_string());
+	Ok(lines.join("\n"))
 }
 
 fn render_defined_struct(name: &str, struct_type: &StructTypeNode, docs: &Docs) -> Result<String> {

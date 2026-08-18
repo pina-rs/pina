@@ -11,9 +11,9 @@
 //!   Used here for a list of up to 8 `PodU64` tags.
 //! - **`PodBool`** — a single-byte boolean for the `active` flag.
 //!
-//! Because every field is `Pod` with alignment 1, the whole account is
-//! zero-copy: `as_account::<ProfileState>()` casts the raw account bytes
-//! directly, with no (de)serialization.
+//! Because every field has an alignment-one zeropod representation, the whole
+//! account is validated and accessed in place by
+//! `as_account::<ProfileState>()`, without allocating or copying its data.
 //!
 //! ## Instructions
 //!
@@ -92,8 +92,8 @@ pub enum ProfileError {
 /// The `#[account]` macro generates:
 /// - A discriminator field (`ProfileAccountType::ProfileState`) as the first
 ///   byte.
-/// - `Pod` + `Zeroable` derives for zero-copy (de)serialization.
-/// - `HasDiscriminator` linking this struct to
+/// - `PinaAccount` and zeropod validation for checked zero-copy access.
+/// - `HasDiscriminator` linking this account to
 ///   `ProfileAccountType::ProfileState`.
 /// - `TypedBuilder` for ergonomic construction.
 ///

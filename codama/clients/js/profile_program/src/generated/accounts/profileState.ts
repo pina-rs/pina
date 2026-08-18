@@ -8,6 +8,8 @@
 
 import {
 	type Account,
+	addDecoderSizePrefix,
+	addEncoderSizePrefix,
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
@@ -23,14 +25,20 @@ import {
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
 	fixEncoderSize,
+	getArrayDecoder,
+	getArrayEncoder,
 	getBooleanDecoder,
 	getBooleanEncoder,
-	getBytesDecoder,
-	getBytesEncoder,
 	getStructDecoder,
 	getStructEncoder,
+	getU16Decoder,
+	getU16Encoder,
+	getU64Decoder,
+	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	getUtf8Decoder,
+	getUtf8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -50,8 +58,8 @@ export function getProfileStateDiscriminatorBytes(): ReadonlyUint8Array {
  * The `#[account]` macro generates:
  * - A discriminator field (`ProfileAccountType::ProfileState`) as the first
  * byte.
- * - `Pod` + `Zeroable` derives for zero-copy (de)serialization.
- * - `HasDiscriminator` linking this struct to
+ * - `PinaAccount` and zeropod validation for checked zero-copy access.
+ * - `HasDiscriminator` linking this account to
  * `ProfileAccountType::ProfileState`.
  * - `TypedBuilder` for ergonomic construction.
  *
@@ -75,17 +83,17 @@ export type ProfileState = {
 	 * The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8
 	 * bytes.
 	 */
-	name: ReadonlyUint8Array;
+	name: string;
 	/**
 	 * A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8
 	 * bytes.
 	 */
-	bio: ReadonlyUint8Array;
+	bio: string;
 	/**
 	 * Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
 	 * elements.
 	 */
-	tags: ReadonlyUint8Array;
+	tags: Array<bigint>;
 	/** Whether the profile is active. */
 	active: boolean;
 };
@@ -97,17 +105,17 @@ export type ProfileStateArgs = {
 	 * The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8
 	 * bytes.
 	 */
-	name: ReadonlyUint8Array;
+	name: string;
 	/**
 	 * A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8
 	 * bytes.
 	 */
-	bio: ReadonlyUint8Array;
+	bio: string;
 	/**
 	 * Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
 	 * elements.
 	 */
-	tags: ReadonlyUint8Array;
+	tags: Array<number | bigint>;
 	/** Whether the profile is active. */
 	active: boolean;
 };
@@ -115,28 +123,50 @@ export type ProfileStateArgs = {
 /** Gets the encoder for {@link ProfileStateArgs} account data. */
 export function getProfileStateEncoder(): FixedSizeEncoder<ProfileStateArgs> {
 	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["bump", getU8Encoder()],
-			["name", fixEncoderSize(getBytesEncoder(), 33)],
-			["bio", fixEncoderSize(getBytesEncoder(), 129)],
-			["tags", fixEncoderSize(getBytesEncoder(), 66)],
-			["active", getBooleanEncoder()],
-		]),
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"bump",
+			getU8Encoder(),
+		], [
+			"name",
+			fixEncoderSize(
+				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+				33,
+			),
+		], [
+			"bio",
+			fixEncoderSize(
+				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+				129,
+			),
+		], [
+			"tags",
+			fixEncoderSize(
+				getArrayEncoder(getU64Encoder(), { size: getU16Encoder() }),
+				66,
+			),
+		], ["active", getBooleanEncoder()]]),
 		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
 
 /** Gets the decoder for {@link ProfileState} account data. */
 export function getProfileStateDecoder(): FixedSizeDecoder<ProfileState> {
-	return getStructDecoder([
-		["discriminator", getU8Decoder()],
-		["bump", getU8Decoder()],
-		["name", fixDecoderSize(getBytesDecoder(), 33)],
-		["bio", fixDecoderSize(getBytesDecoder(), 129)],
-		["tags", fixDecoderSize(getBytesDecoder(), 66)],
-		["active", getBooleanDecoder()],
-	]);
+	return getStructDecoder([["discriminator", getU8Decoder()], [
+		"bump",
+		getU8Decoder(),
+	], [
+		"name",
+		fixDecoderSize(addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()), 33),
+	], [
+		"bio",
+		fixDecoderSize(addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()), 129),
+	], [
+		"tags",
+		fixDecoderSize(
+			getArrayDecoder(getU64Decoder(), { size: getU16Decoder() }),
+			66,
+		),
+	], ["active", getBooleanDecoder()]]);
 }
 
 /** Gets the codec for {@link ProfileState} account data. */

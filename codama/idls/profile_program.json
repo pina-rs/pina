@@ -17,8 +17,8 @@
 					"The `#[account]` macro generates:",
 					"- A discriminator field (`ProfileAccountType::ProfileState`) as the first",
 					"byte.",
-					"- `Pod` + `Zeroable` derives for zero-copy (de)serialization.",
-					"- `HasDiscriminator` linking this struct to",
+					"- `PinaAccount` and zeropod validation for checked zero-copy access.",
+					"- `HasDiscriminator` linking this account to",
 					"`ProfileAccountType::ProfileState`.",
 					"- `TypedBuilder` for ergonomic construction.",
 					"",
@@ -74,7 +74,16 @@
 								"kind": "fixedSizeTypeNode",
 								"size": 33,
 								"type": {
-									"kind": "bytesTypeNode"
+									"kind": "sizePrefixTypeNode",
+									"type": {
+										"kind": "stringTypeNode",
+										"encoding": "utf8"
+									},
+									"prefix": {
+										"kind": "numberTypeNode",
+										"format": "u8",
+										"endian": "le"
+									}
 								}
 							}
 						},
@@ -89,7 +98,16 @@
 								"kind": "fixedSizeTypeNode",
 								"size": 129,
 								"type": {
-									"kind": "bytesTypeNode"
+									"kind": "sizePrefixTypeNode",
+									"type": {
+										"kind": "stringTypeNode",
+										"encoding": "utf8"
+									},
+									"prefix": {
+										"kind": "numberTypeNode",
+										"format": "u8",
+										"endian": "le"
+									}
 								}
 							}
 						},
@@ -104,7 +122,20 @@
 								"kind": "fixedSizeTypeNode",
 								"size": 66,
 								"type": {
-									"kind": "bytesTypeNode"
+									"kind": "arrayTypeNode",
+									"item": {
+										"kind": "numberTypeNode",
+										"format": "u64",
+										"endian": "le"
+									},
+									"count": {
+										"kind": "prefixedCountNode",
+										"prefix": {
+											"kind": "numberTypeNode",
+											"format": "u16",
+											"endian": "le"
+										}
+									}
 								}
 							}
 						},
@@ -245,7 +276,16 @@
 							"kind": "fixedSizeTypeNode",
 							"size": 33,
 							"type": {
-								"kind": "bytesTypeNode"
+								"kind": "sizePrefixTypeNode",
+								"type": {
+									"kind": "stringTypeNode",
+									"encoding": "utf8"
+								},
+								"prefix": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								}
 							}
 						}
 					},
@@ -256,7 +296,16 @@
 							"kind": "fixedSizeTypeNode",
 							"size": 129,
 							"type": {
-								"kind": "bytesTypeNode"
+								"kind": "sizePrefixTypeNode",
+								"type": {
+									"kind": "stringTypeNode",
+									"encoding": "utf8"
+								},
+								"prefix": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								}
 							}
 						}
 					}
@@ -347,7 +396,16 @@
 							"kind": "fixedSizeTypeNode",
 							"size": 33,
 							"type": {
-								"kind": "bytesTypeNode"
+								"kind": "sizePrefixTypeNode",
+								"type": {
+									"kind": "stringTypeNode",
+									"encoding": "utf8"
+								},
+								"prefix": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								}
 							}
 						}
 					},
@@ -358,7 +416,16 @@
 							"kind": "fixedSizeTypeNode",
 							"size": 129,
 							"type": {
-								"kind": "bytesTypeNode"
+								"kind": "sizePrefixTypeNode",
+								"type": {
+									"kind": "stringTypeNode",
+									"encoding": "utf8"
+								},
+								"prefix": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								}
 							}
 						}
 					}

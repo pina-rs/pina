@@ -1,12 +1,18 @@
+use codama_nodes::ArrayTypeNode;
 use codama_nodes::BooleanTypeNode;
 use codama_nodes::BytesTypeNode;
 use codama_nodes::CountNode;
+use codama_nodes::DefinedTypeLinkNode;
 use codama_nodes::FixedSizeTypeNode;
 use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
 use codama_nodes::PublicKeyTypeNode;
+use codama_nodes::SizePrefixTypeNode;
+use codama_nodes::StringTypeNode;
 use codama_nodes::TypeNode;
 use quote::ToTokens;
+
+use crate::ir::PodEnumIr;
 
 /// Map a Rust type name (as it appears in pina structs) to a Codama
 /// `TypeNode`.
@@ -19,6 +25,14 @@ pub fn rust_type_to_codama(ty: &str) -> TypeNode {
 /// Unsupported Pod collection layouts are rejected rather than silently
 /// emitted as public keys with an incorrect wire size.
 pub fn try_rust_type_to_codama(ty: &str) -> Result<TypeNode, String> {
+	try_rust_type_to_codama_with_pod_enums(ty, &[])
+}
+
+/// Fallible type mapping with the local `PodEnum` companion registry.
+pub fn try_rust_type_to_codama_with_pod_enums(
+	ty: &str,
+	pod_enums: &[PodEnumIr],
+) -> Result<TypeNode, String> {
 	match ty {
 		"u8" => Ok(NumberTypeNode::le(NumberFormat::U8).into()),
 		"u16" | "PodU16" => Ok(NumberTypeNode::le(NumberFormat::U16).into()),
@@ -33,10 +47,13 @@ pub fn try_rust_type_to_codama(ty: &str) -> Result<TypeNode, String> {
 		"PodBool" | "bool" => Ok(BooleanTypeNode::default().into()),
 		"Address" | "Pubkey" => Ok(PublicKeyTypeNode::new().into()),
 		_ => {
+			if pod_enums.iter().any(|pod_enum| pod_enum.zc_name == ty) {
+				return Ok(DefinedTypeLinkNode::new(ty).into());
+			}
 			// Handle fixed-size byte arrays like [u8; 32]
 			if let Some(size) = parse_byte_array(ty) {
 				Ok(FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), size).into())
-			} else if let Some(node) = parse_pod_collection(ty)? {
+			} else if let Some(node) = parse_pod_collection(ty, pod_enums)? {
 				Ok(node)
 			} else {
 				Err(format!(
@@ -47,19 +64,16 @@ pub fn try_rust_type_to_codama(ty: &str) -> Result<TypeNode, String> {
 	}
 }
 
-/// Parse a `PodString<N, PFX>` or `PodVec<T, N, PFX>` type into a fixed-size
-/// Codama node. `PodOption<T>` remains unsupported until its semantic mapping
-/// is represented in the generated client schema.
+/// Parse a `PodString<N, PFX>` or `PodVec<T, N, PFX>` type into a semantic,
+/// fixed-size Codama node. `PodOption<T>` remains unsupported until its
+/// semantic mapping is represented in the generated client schema.
 ///
-/// - `PodString<N, PFX = 1>` maps to `FixedSizeTypeNode(BytesTypeNode, N + PFX)`:
-///   the length prefix plus the UTF-8 payload, laid out inline.
-/// - `PodVec<T, N, PFX = 2>` maps to
-///   `FixedSizeTypeNode(BytesTypeNode, N × size_of::<T>() + PFX)`: the length
-///   prefix plus the fixed element array, laid out inline.
+/// - `PodString<N, PFX = 1>` maps to a fixed-size, size-prefixed UTF-8 string.
+/// - `PodVec<T, N, PFX = 2>` maps to a fixed-size, prefix-counted array.
 ///
 /// Returns `Ok(None)` for non-collection types and an error for collection
 /// layouts whose byte size cannot be resolved statically.
-fn parse_pod_collection(ty: &str) -> Result<Option<TypeNode>, String> {
+fn parse_pod_collection(ty: &str, pod_enums: &[PodEnumIr]) -> Result<Option<TypeNode>, String> {
 	let Some((name, args)) = parse_generic_args(ty) else {
 		if ty == "PodString"
 			|| ty.starts_with("PodString<")
@@ -86,11 +100,14 @@ fn parse_pod_collection(ty: &str) -> Result<Option<TypeNode>, String> {
 				None => 1,
 			};
 			validate_prefix_size(pfx, ty)?;
+			validate_collection_capacity(n, pfx, ty)?;
 			let size = n
 				.checked_add(pfx)
 				.ok_or_else(|| format!("`{ty}` byte size overflows usize"))?;
+			let prefix = prefix_number_type(pfx, ty)?;
+			let string = SizePrefixTypeNode::<TypeNode>::new(StringTypeNode::utf8(), prefix);
 			Ok(Some(
-				FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), size).into(),
+				FixedSizeTypeNode::<TypeNode>::new(string, size).into(),
 			))
 		}
 		"PodVec" => {
@@ -101,30 +118,38 @@ fn parse_pod_collection(ty: &str) -> Result<Option<TypeNode>, String> {
 			let item_ty = args
 				.first()
 				.ok_or_else(|| format!("`{ty}` is missing its element type"))?;
-			if !is_known_fixed_size_type(item_ty) {
+			if !is_known_fixed_size_type(item_ty, pod_enums) {
 				return Err(format!(
 					"cannot determine the byte size of PodVec element `{item_ty}` in `{ty}`"
 				));
 			}
-			let item = try_rust_type_to_codama(item_ty)?;
+			let mut item = try_rust_type_to_codama_with_pod_enums(item_ty, pod_enums)?;
 			let n = parse_collection_size(args.get(1), ty, "capacity")?;
 			let pfx: usize = match args.get(2) {
 				Some(s) => parse_collection_size(Some(s), ty, "prefix size")?,
 				None => 2,
 			};
 			validate_prefix_size(pfx, ty)?;
+			validate_collection_capacity(n, pfx, ty)?;
 			// Wire layout: [count: PFX bytes][items: N × T]. Emit the full
 			// fixed size (prefix + elements) so generated clients decode the
 			// correct account size and field offsets.
-			let item_size = type_node_size(&item)
+			let item_size = pod_enums
+				.iter()
+				.find(|pod_enum| pod_enum.zc_name == *item_ty)
+				.map(|pod_enum| pod_enum.repr_size)
+				.or_else(|| type_node_size(&item))
 				.ok_or_else(|| format!("cannot determine the byte size of `{item_ty}`"))?;
+			if matches!(item, TypeNode::Link(_)) {
+				item = FixedSizeTypeNode::<TypeNode>::new(item, item_size).into();
+			}
 			let size = n
 				.checked_mul(item_size)
 				.and_then(|size| size.checked_add(pfx))
 				.ok_or_else(|| format!("`{ty}` byte size overflows usize"))?;
-			Ok(Some(
-				FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), size).into(),
-			))
+			let prefix = prefix_number_type(pfx, ty)?;
+			let array = ArrayTypeNode::prefixed(item, prefix);
+			Ok(Some(FixedSizeTypeNode::<TypeNode>::new(array, size).into()))
 		}
 		"PodOption" => Err(format!("`{ty}` is not yet supported by IDL generation")),
 		_ => Ok(None),
@@ -146,7 +171,37 @@ fn validate_prefix_size(pfx: usize, ty: &str) -> Result<(), String> {
 	}
 }
 
-fn is_known_fixed_size_type(ty: &str) -> bool {
+fn validate_collection_capacity(capacity: usize, pfx: usize, ty: &str) -> Result<(), String> {
+	let fits_prefix = match pfx {
+		1 => u8::try_from(capacity).is_ok(),
+		2 => u16::try_from(capacity).is_ok(),
+		4 => u32::try_from(capacity).is_ok(),
+		8 => true,
+		_ => false,
+	};
+
+	if fits_prefix {
+		Ok(())
+	} else {
+		Err(format!(
+			"`{ty}` capacity {capacity} cannot be represented by its {pfx}-byte prefix"
+		))
+	}
+}
+
+fn prefix_number_type(pfx: usize, ty: &str) -> Result<NumberTypeNode, String> {
+	let format = match pfx {
+		1 => NumberFormat::U8,
+		2 => NumberFormat::U16,
+		4 => NumberFormat::U32,
+		8 => NumberFormat::U64,
+		_ => return Err(format!("`{ty}` has unsupported prefix size {pfx}")),
+	};
+
+	Ok(NumberTypeNode::le(format))
+}
+
+fn is_known_fixed_size_type(ty: &str, pod_enums: &[PodEnumIr]) -> bool {
 	matches!(
 		ty,
 		"u8" | "u16"
@@ -162,7 +217,8 @@ fn is_known_fixed_size_type(ty: &str) -> bool {
 			| "PodBool"
 			| "bool" | "Address"
 			| "Pubkey"
-	) || parse_byte_array(ty).is_some()
+	) || pod_enums.iter().any(|pod_enum| pod_enum.zc_name == ty)
+		|| parse_byte_array(ty).is_some()
 		|| ty.starts_with("PodString<")
 		|| ty.starts_with("PodVec<")
 }
@@ -340,8 +396,11 @@ mod tests {
 	fn maps_pod_string() {
 		// PodString<32> = 1 length byte + 32 payload bytes.
 		let ty = rust_type_to_codama("PodString<32>");
-		let expected: TypeNode =
-			FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 33).into();
+		let string = SizePrefixTypeNode::<TypeNode>::new(
+			StringTypeNode::utf8(),
+			NumberTypeNode::le(NumberFormat::U8),
+		);
+		let expected: TypeNode = FixedSizeTypeNode::<TypeNode>::new(string, 33).into();
 		assert_eq!(ty, expected);
 	}
 
@@ -349,17 +408,38 @@ mod tests {
 	fn maps_pod_string_with_explicit_prefix() {
 		// PodString<64, 2> = 2 length bytes + 64 payload bytes.
 		let ty = rust_type_to_codama("PodString<64, 2>");
-		let expected: TypeNode =
-			FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 66).into();
+		let string = SizePrefixTypeNode::<TypeNode>::new(
+			StringTypeNode::utf8(),
+			NumberTypeNode::le(NumberFormat::U16),
+		);
+		let expected: TypeNode = FixedSizeTypeNode::<TypeNode>::new(string, 66).into();
 		assert_eq!(ty, expected);
+	}
+
+	#[test]
+	fn maps_wide_collection_prefixes_and_nested_elements() {
+		for (ty, size) in [("PodString<64, 4>", 68), ("PodString<64, 8>", 72)] {
+			let TypeNode::FixedSize(node) = rust_type_to_codama(ty) else {
+				panic!("{ty} did not lower to a fixed-size node");
+			};
+			assert_eq!(node.size, size);
+		}
+
+		let TypeNode::FixedSize(node) = rust_type_to_codama("PodVec<PodString<8, 1>, 4, 2>") else {
+			panic!("nested PodVec did not lower to a fixed-size node");
+		};
+		assert_eq!(node.size, 38);
 	}
 
 	#[test]
 	fn maps_pod_vec() {
 		// PodVec<PodU64, 8> = 2 count bytes + 8 × 8-byte elements.
 		let ty = rust_type_to_codama("PodVec<PodU64, 8>");
-		let expected: TypeNode =
-			FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 66).into();
+		let array = ArrayTypeNode::prefixed(
+			NumberTypeNode::le(NumberFormat::U64),
+			NumberTypeNode::le(NumberFormat::U16),
+		);
+		let expected: TypeNode = FixedSizeTypeNode::<TypeNode>::new(array, 66).into();
 		assert_eq!(ty, expected);
 	}
 
@@ -367,20 +447,30 @@ mod tests {
 	fn maps_pod_vec_with_explicit_prefix() {
 		// PodVec<PodU16, 4, 1> = 1 count byte + 4 × 2-byte elements.
 		let ty = rust_type_to_codama("PodVec<PodU16, 4, 1>");
-		let expected: TypeNode = FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 9).into();
+		let array = ArrayTypeNode::prefixed(
+			NumberTypeNode::le(NumberFormat::U16),
+			NumberTypeNode::le(NumberFormat::U8),
+		);
+		let expected: TypeNode = FixedSizeTypeNode::<TypeNode>::new(array, 9).into();
 		assert_eq!(ty, expected);
 	}
 
 	#[test]
 	fn maps_pod_vec_with_signed_pod_elements() {
 		let ty = rust_type_to_codama("PodVec<PodI32, 8>");
-		let expected: TypeNode =
-			FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 34).into();
+		let array = ArrayTypeNode::prefixed(
+			NumberTypeNode::le(NumberFormat::I32),
+			NumberTypeNode::le(NumberFormat::U16),
+		);
+		let expected: TypeNode = FixedSizeTypeNode::<TypeNode>::new(array, 34).into();
 		assert_eq!(ty, expected);
 
 		let ty = rust_type_to_codama("PodVec<PodI128, 8>");
-		let expected: TypeNode =
-			FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 130).into();
+		let array = ArrayTypeNode::prefixed(
+			NumberTypeNode::le(NumberFormat::I128),
+			NumberTypeNode::le(NumberFormat::U16),
+		);
+		let expected: TypeNode = FixedSizeTypeNode::<TypeNode>::new(array, 130).into();
 		assert_eq!(ty, expected);
 	}
 
@@ -398,6 +488,15 @@ mod tests {
 			let error = try_rust_type_to_codama(ty)
 				.expect_err("unresolved Pod collection sizes must be rejected");
 			assert!(error.contains(ty), "unexpected error for {ty}: {error}");
+		}
+	}
+
+	#[test]
+	fn rejects_collection_capacities_that_do_not_fit_the_prefix() {
+		for ty in ["PodString<256, 1>", "PodVec<u8, 256, 1>"] {
+			let error = try_rust_type_to_codama(ty)
+				.expect_err("collection capacity must fit its length prefix");
+			assert!(error.contains("cannot be represented"), "{error}");
 		}
 	}
 
