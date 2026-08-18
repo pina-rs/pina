@@ -4,6 +4,7 @@ packages:
   - codama/tests/js
   - codama/tests/litesvm
   - codama/tests/quasar-svm
+  - codama/tests/surfpool
 
 allowBuilds:
   esbuild: true

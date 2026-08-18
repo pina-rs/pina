@@ -661,18 +661,28 @@ in
       description = "Run full Codama integration and deterministic generation checks.";
       binary = "bash";
     };
-    "test:surfpool-idl" = {
+    "test:surfpool" = {
       exec = ''
         set -euo pipefail
         if [ -z "''${HOME:-}" ]; then
           export HOME="$DEVENV_ROOT/.cache/home"
         fi
         mkdir -p "$HOME"
+
+        # Install the pinned SDK once, then let the test script build every
+        # example with --skip-tools-install. A missing program artifact is a
+        # hard failure in both local runs and CI.
+        cargo-build-sbf \
+          --install-only \
+          --tools-version v1.54 \
+          --patch-binaries-for-nix false
         pnpm install --frozen-lockfile
-        PATH="${custom.sbpf-linker-21}/bin:$PATH" \
-          "$DEVENV_ROOT/scripts/test-surfpool-idl-smoke.sh"
+        SBF_TOOLS_VERSION=v1.54 \
+          "$DEVENV_ROOT/scripts/build-surfpool-examples.sh"
+        pnpm --dir "$DEVENV_ROOT/codama/tests/surfpool" run test:types
+        pnpm --dir "$DEVENV_ROOT/codama/tests/surfpool" run test
       '';
-      description = "Deploy a generated program to Surfpool and invoke it using generated IDL metadata.";
+      description = "Build, deploy, and adversarially exercise every SBF example through the Surfpool SDK.";
       binary = "bash";
     };
     "coverage:all" = {
