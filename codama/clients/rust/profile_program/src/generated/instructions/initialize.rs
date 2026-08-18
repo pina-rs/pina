@@ -12,9 +12,10 @@ use pina::zeropod;
 
 /// Instruction data for `Initialize`.
 ///
-/// Contains the PDA bump seed and the initial name/bio. The fixed arrays
-/// carry their own length prefix, so the client writes
-/// `discriminator + bump + len(name) + name + len(bio) + bio`.
+/// Contains the PDA bump seed and fixed-width encodings of the initial name and
+/// bio. The name occupies 33 bytes and the bio occupies 129 bytes. Each field
+/// starts with a one-byte payload length, followed by its UTF-8 payload and
+/// zero padding through the end of the field.
 pub const INITIALIZE_DISCRIMINATOR: u8 = 0u8;
 
 /// Accounts.

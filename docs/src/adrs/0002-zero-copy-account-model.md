@@ -20,7 +20,7 @@ In practice that means:
 - macro-generated application schemas accept only audited scalar, address, byte-array, and scalar-option fields; loaders return the generated `TypeZc` storage view
 - typed loads must validate discriminator, size, content (`ZcValidate`), and relevant account identity constraints before use
 - dynamic, variable-length, or schema-driven reinterpretation is out of scope for the core loader model
-- custom/nested `ZcField` mappings, enums, generic schemas, and fixed-capacity collection fields are outside the macro-generated contract
+- custom/nested `ZcField` mappings, enum-typed payload fields, generic schemas, and `PodString`/`PodVec` or `String`/`Vec` fields are outside the macro-generated contract
 - Pina does not manually implement zeropod's unsafe traits, duplicate its pointer casts, or expose a schema/storage-view object representation as bytes
 - bounded text and lists use fully initialized fixed byte arrays with checked semantic helpers
 - manual `PinaAccount` / `ZeroPodFixed` implementations are advanced escape hatches whose authors own all zeropod safety invariants

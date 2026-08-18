@@ -192,9 +192,10 @@ function boundedTags(values: readonly bigint[]): Uint8Array {
 	}
 
 	const bytes = new Uint8Array(2 + capacity * 8);
-	new DataView(bytes.buffer).setUint16(0, values.length, true);
+	const view = new DataView(bytes.buffer);
+	view.setUint16(0, values.length, true);
 	for (const [index, value] of values.entries()) {
-		new DataView(bytes.buffer).setBigUint64(2 + index * 8, value, true);
+		view.setBigUint64(2 + index * 8, value, true);
 	}
 	return bytes;
 }

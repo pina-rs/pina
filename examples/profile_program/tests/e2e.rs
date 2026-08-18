@@ -305,7 +305,7 @@ fn initialize_rejects_invalid_utf8() {
 	let result = mollusk.process_and_validate_instruction(
 		&instruction,
 		&initialize_accounts(&authority, &profile),
-		&[Check::err(ProgramError::InvalidInstructionData)],
+		&[Check::err(ProfileError::InvalidUtf8.into())],
 	);
 	// Mollusk retains the input placeholder account after a failed instruction.
 	let account = result

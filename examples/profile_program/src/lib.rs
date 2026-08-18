@@ -136,9 +136,10 @@ pub struct ProfileState {
 
 /// Instruction data for `Initialize`.
 ///
-/// Contains the PDA bump seed and the initial name/bio. The fixed arrays
-/// carry their own length prefix, so the client writes
-/// `discriminator + bump + len(name) + name + len(bio) + bio`.
+/// Contains the PDA bump seed and fixed-width encodings of the initial name and
+/// bio. The name occupies 33 bytes and the bio occupies 129 bytes. Each field
+/// starts with a one-byte payload length, followed by its UTF-8 payload and
+/// zero padding through the end of the field.
 #[instruction(discriminator = ProfileInstruction, variant = Initialize)]
 pub struct InitializeInstruction {
 	/// The PDA bump seed, computed off-chain.
@@ -161,6 +162,7 @@ pub struct UpdateProfileInstruction {
 const TAG_CAPACITY: usize = 8;
 const TAG_PREFIX_BYTES: usize = 2;
 const TAG_BYTES: usize = size_of::<u64>();
+const TAG_FIELD_BYTES: usize = TAG_PREFIX_BYTES + TAG_CAPACITY * TAG_BYTES;
 
 /// Encode UTF-8 into a fully initialized, one-byte-length-prefixed field.
 ///
@@ -202,7 +204,7 @@ fn bounded_text(bytes: &[u8]) -> Result<&str, ProgramError> {
 	core::str::from_utf8(&capacity[..length]).map_err(|_| ProfileError::InvalidUtf8.into())
 }
 
-fn tag_count(bytes: &[u8; 66]) -> Result<usize, ProgramError> {
+fn tag_count(bytes: &[u8; TAG_FIELD_BYTES]) -> Result<usize, ProgramError> {
 	let count = usize::from(u16::from_le_bytes([bytes[0], bytes[1]]));
 
 	if count > TAG_CAPACITY {
@@ -344,8 +346,9 @@ impl InitializeInstructionZc {
 	///
 	/// # Errors
 	///
-	/// Returns [`ProgramError::InvalidInstructionData`] when the encoded length or
-	/// UTF-8 payload is invalid.
+	/// Returns [`ProgramError::InvalidInstructionData`] when the encoded length
+	/// exceeds the fixed capacity, or [`ProfileError::InvalidUtf8`] when the
+	/// active payload is not valid UTF-8.
 	pub fn name_text(&self) -> Result<&str, ProgramError> {
 		bounded_text(&self.name)
 	}
@@ -354,8 +357,9 @@ impl InitializeInstructionZc {
 	///
 	/// # Errors
 	///
-	/// Returns [`ProgramError::InvalidInstructionData`] when the encoded length or
-	/// UTF-8 payload is invalid.
+	/// Returns [`ProgramError::InvalidInstructionData`] when the encoded length
+	/// exceeds the fixed capacity, or [`ProfileError::InvalidUtf8`] when the
+	/// active payload is not valid UTF-8.
 	pub fn bio_text(&self) -> Result<&str, ProgramError> {
 		bounded_text(&self.bio)
 	}
@@ -388,8 +392,9 @@ impl UpdateProfileInstructionZc {
 	///
 	/// # Errors
 	///
-	/// Returns [`ProgramError::InvalidInstructionData`] when the encoded length or
-	/// UTF-8 payload is invalid.
+	/// Returns [`ProgramError::InvalidInstructionData`] when the encoded length
+	/// exceeds the fixed capacity, or [`ProfileError::InvalidUtf8`] when the
+	/// active payload is not valid UTF-8.
 	pub fn name_text(&self) -> Result<&str, ProgramError> {
 		bounded_text(&self.name)
 	}
@@ -398,8 +403,9 @@ impl UpdateProfileInstructionZc {
 	///
 	/// # Errors
 	///
-	/// Returns [`ProgramError::InvalidInstructionData`] when the encoded length or
-	/// UTF-8 payload is invalid.
+	/// Returns [`ProgramError::InvalidInstructionData`] when the encoded length
+	/// exceeds the fixed capacity, or [`ProfileError::InvalidUtf8`] when the
+	/// active payload is not valid UTF-8.
 	pub fn bio_text(&self) -> Result<&str, ProgramError> {
 		bounded_text(&self.bio)
 	}
@@ -783,7 +789,7 @@ mod tests {
 	}
 
 	#[test]
-	fn every_semantic_mutation_leaves_full_account_storage_initialized() {
+	fn semantic_mutations_preserve_valid_profile_storage() {
 		let mut bytes = [0u8; ProfileState::SIZE];
 
 		{
@@ -796,7 +802,12 @@ mod tests {
 				.write_bio_text("hello")
 				.unwrap_or_else(|error| panic!("bio write failed: {error:?}"));
 		}
-		assert_ne!(bytes.iter().copied().fold(0u8, u8::wrapping_add), 0);
+		{
+			let state = ProfileState::try_from_bytes(&bytes)
+				.unwrap_or_else(|error| panic!("validation failed: {error:?}"));
+			assert_eq!(state.name_text(), Ok("alice"));
+			assert_eq!(state.bio_text(), Ok("hello"));
+		}
 
 		{
 			let state = ProfileState::try_from_bytes_mut(&mut bytes)
@@ -807,7 +818,14 @@ mod tests {
 			state.favorite_tag.set(Some(PodU64::from(7)));
 			state.active.set(true);
 		}
-		assert_ne!(bytes.iter().copied().fold(0u8, u8::wrapping_add), 0);
+		{
+			let state = ProfileState::try_from_bytes(&bytes)
+				.unwrap_or_else(|error| panic!("validation failed: {error:?}"));
+			assert_eq!(state.tag_count(), Ok(1));
+			assert_eq!(state.tag(0), Ok(Some(7)));
+			assert_eq!(state.favorite_tag.get(), Some(PodU64::from(7)));
+			assert!(state.active.get());
+		}
 
 		{
 			let state = ProfileState::try_from_bytes_mut(&mut bytes)
@@ -819,7 +837,13 @@ mod tests {
 			state.favorite_tag.clear();
 			state.active.set(false);
 		}
-		assert_ne!(bytes.iter().copied().fold(0u8, u8::wrapping_add), 0);
+		{
+			let state = ProfileState::try_from_bytes(&bytes)
+				.unwrap_or_else(|error| panic!("validation failed: {error:?}"));
+			assert_eq!(state.tag_count(), Ok(0));
+			assert_eq!(state.favorite_tag.get(), None);
+			assert!(!state.active.get());
+		}
 	}
 
 	#[test]
