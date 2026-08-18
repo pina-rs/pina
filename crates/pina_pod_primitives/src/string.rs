@@ -1,7 +1,6 @@
 //! Fixed-capacity string with length prefix.
 
 use core::fmt;
-use core::mem::MaybeUninit;
 use core::mem::align_of;
 use core::mem::size_of;
 
@@ -18,12 +17,12 @@ use crate::error::max_n_for_pfx;
 ///
 /// # Layout
 /// - Bytes 0..PFX: length prefix (little-endian)
-/// - Bytes PFX..PFX+N: UTF-8 data (may be partially uninitialized)
+/// - Bytes PFX..PFX+N: UTF-8 data (bytes beyond the length may be stale)
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct PodString<const N: usize, const PFX: usize = 1> {
 	len: [u8; PFX],
-	data: [MaybeUninit<u8>; N],
+	data: [u8; N],
 }
 
 // Compile-time validation of PFX
@@ -117,7 +116,7 @@ impl<const N: usize, const PFX: usize> PodString<N, PFX> {
 	pub unsafe fn as_str_unchecked(&self) -> &str {
 		unsafe {
 			let len = self.len();
-			let bytes = core::slice::from_raw_parts(self.data.as_ptr().cast::<u8>(), len);
+			let bytes = core::slice::from_raw_parts(self.data.as_ptr(), len);
 			core::str::from_utf8_unchecked(bytes)
 		}
 	}
@@ -125,14 +124,14 @@ impl<const N: usize, const PFX: usize> PodString<N, PFX> {
 	/// Returns the string as a `&str`, validating UTF-8.
 	pub fn try_as_str(&self) -> Result<&str, PodCollectionError> {
 		let len = self.len();
-		let bytes = unsafe { core::slice::from_raw_parts(self.data.as_ptr().cast::<u8>(), len) };
+		let bytes = unsafe { core::slice::from_raw_parts(self.data.as_ptr(), len) };
 		core::str::from_utf8(bytes).map_err(|_| PodCollectionError::InvalidUtf8)
 	}
 
 	/// Returns the raw bytes (may include trailing garbage — use `len()` for valid slice).
 	pub fn as_bytes(&self) -> &[u8] {
 		let len = self.len();
-		unsafe { core::slice::from_raw_parts(self.data.as_ptr().cast::<u8>(), len) }
+		unsafe { core::slice::from_raw_parts(self.data.as_ptr(), len) }
 	}
 
 	/// Sets the string to a new value, returning error if too long.
@@ -142,11 +141,7 @@ impl<const N: usize, const PFX: usize> PodString<N, PFX> {
 			return Err(PodCollectionError::Overflow);
 		}
 		unsafe {
-			core::ptr::copy_nonoverlapping(
-				value.as_ptr(),
-				self.data.as_mut_ptr().cast::<u8>(),
-				vlen,
-			);
+			core::ptr::copy_nonoverlapping(value.as_ptr(), self.data.as_mut_ptr(), vlen);
 		}
 		self.encode_len(vlen);
 		Ok(())
@@ -169,11 +164,7 @@ impl<const N: usize, const PFX: usize> PodString<N, PFX> {
 			return Err(PodCollectionError::Overflow);
 		}
 		unsafe {
-			core::ptr::copy_nonoverlapping(
-				value.as_ptr(),
-				self.data.as_mut_ptr().cast::<u8>().add(cur),
-				vlen,
-			);
+			core::ptr::copy_nonoverlapping(value.as_ptr(), self.data.as_mut_ptr().add(cur), vlen);
 		}
 		self.encode_len(new_len);
 		Ok(())
@@ -193,11 +184,26 @@ impl<const N: usize, const PFX: usize> PodString<N, PFX> {
 	}
 }
 
+impl<const N: usize, const PFX: usize> From<&str> for PodString<N, PFX> {
+	/// Constructs a `PodString` from a string slice.
+	///
+	/// # Panics
+	///
+	/// Panics if `value` exceeds the capacity `N`. Use [`try_set`](Self::try_set)
+	/// for fallible construction from untrusted input.
+	fn from(value: &str) -> Self {
+		let mut out = Self::default();
+		out.try_set(value)
+			.expect("PodString capacity exceeded in From<&str>");
+		out
+	}
+}
+
 impl<const N: usize, const PFX: usize> Default for PodString<N, PFX> {
 	fn default() -> Self {
 		Self {
 			len: [0u8; PFX],
-			data: [MaybeUninit::uninit(); N],
+			data: [0u8; N],
 		}
 	}
 }
@@ -244,8 +250,8 @@ impl<const N: usize, const PFX: usize> fmt::Display for PodString<N, PFX> {
 	}
 }
 
-// SAFETY: PodString is #[repr(C)] with len: [u8; PFX] + data: [MaybeUninit<u8>; N].
-// Both have align 1 and any bit pattern is valid.
+// SAFETY: PodString is #[repr(C)] with len: [u8; PFX] + data: [u8; N].
+// Both have align 1, no padding, and every bit pattern is a valid value.
 unsafe impl<const N: usize, const PFX: usize> Zeroable for PodString<N, PFX> {}
 unsafe impl<const N: usize, const PFX: usize> Pod for PodString<N, PFX> {}
 
@@ -288,7 +294,7 @@ mod kani_proofs {
 		let raw: [u8; 1] = kani::any();
 		let s = PodString::<8, 1> {
 			len: raw,
-			data: [MaybeUninit::uninit(); 8],
+			data: [0u8; 8],
 		};
 		assert!(s.len() <= 8);
 	}
@@ -298,7 +304,7 @@ mod kani_proofs {
 		let raw: [u8; 2] = kani::any();
 		let s = PodString::<8, 2> {
 			len: raw,
-			data: [MaybeUninit::uninit(); 8],
+			data: [0u8; 8],
 		};
 		assert!(s.len() <= 8);
 	}

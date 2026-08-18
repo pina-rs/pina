@@ -28,11 +28,12 @@
 //! insertion time via `try_set` / `try_push`, which return
 //! `Err(PodCollectionError::Overflow)` when capacity is exceeded.
 
-// Allow unsafe code for the collection types that need MaybeUninit.
+// Allow unsafe code for the collection types that perform zero-copy casts.
 // Safety is guaranteed by:
 // - All types are #[repr(C)] with alignment 1
-// - MaybeUninit allows any bit pattern (satisfying Pod requirements)
-// - Length prefixes prevent reading uninitialized data as initialized
+// - All fields are plain pod types (no MaybeUninit): every bit pattern is a
+//   valid value and there is no uninitialized memory
+// - Length prefixes prevent interpreting stale capacity bytes as data
 #![allow(unsafe_code)]
 
 mod error;

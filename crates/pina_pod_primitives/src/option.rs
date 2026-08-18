@@ -1,7 +1,6 @@
 //! Fixed-size optional value with 1-byte discriminant.
 
 use core::fmt;
-use core::mem::MaybeUninit;
 use core::mem::align_of;
 use core::mem::size_of;
 
@@ -12,12 +11,12 @@ use bytemuck::Zeroable;
 ///
 /// # Layout
 /// - Byte 0: discriminant (`0` or `1`)
-/// - Bytes `1..1+size_of::<T>()`: value (uninitialized if `None`)
+/// - Bytes `1..1+size_of::<T>()`: value (zeroed if `None`)
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct PodOption<T: Pod> {
 	tag: u8,
-	value: MaybeUninit<T>,
+	value: T,
 }
 
 impl<T: Pod> PodOption<T> {
@@ -25,16 +24,15 @@ impl<T: Pod> PodOption<T> {
 	pub const fn none() -> Self {
 		Self {
 			tag: 0,
-			value: MaybeUninit::uninit(),
+			// SAFETY: `T: Pod` implies `T: Zeroable`, so the all-zero bit
+			// pattern is a valid value of `T`.
+			value: unsafe { core::mem::zeroed() },
 		}
 	}
 
 	/// Creates a `Some` value.
 	pub const fn some(value: T) -> Self {
-		Self {
-			tag: 1,
-			value: MaybeUninit::new(value),
-		}
+		Self { tag: 1, value }
 	}
 
 	/// Returns `true` if the option is `None`.
@@ -50,8 +48,7 @@ impl<T: Pod> PodOption<T> {
 	/// Returns the value if `Some`, otherwise `None`.
 	pub fn get(&self) -> Option<T> {
 		if self.tag == 1 {
-			// SAFETY: tag == 1 means value was initialized
-			Some(unsafe { self.value.assume_init() })
+			Some(self.value)
 		} else {
 			None
 		}
@@ -60,8 +57,7 @@ impl<T: Pod> PodOption<T> {
 	/// Returns a reference to the value if `Some`.
 	pub fn as_ref(&self) -> Option<&T> {
 		if self.tag == 1 {
-			// SAFETY: tag == 1 means value was initialized
-			Some(unsafe { &*self.value.as_ptr() })
+			Some(&self.value)
 		} else {
 			None
 		}
@@ -70,8 +66,7 @@ impl<T: Pod> PodOption<T> {
 	/// Returns a mutable reference to the value if `Some`.
 	pub fn as_mut(&mut self) -> Option<&mut T> {
 		if self.tag == 1 {
-			// SAFETY: tag == 1 means value was initialized
-			Some(unsafe { &mut *self.value.as_mut_ptr() })
+			Some(&mut self.value)
 		} else {
 			None
 		}
@@ -79,7 +74,7 @@ impl<T: Pod> PodOption<T> {
 
 	/// Sets the value to `Some`.
 	pub fn set(&mut self, value: T) {
-		self.value = MaybeUninit::new(value);
+		self.value = value;
 		self.tag = 1;
 	}
 
@@ -94,9 +89,9 @@ impl<T: Pod> PodOption<T> {
 	}
 
 	/// # Safety
-	/// Caller must ensure this is `Some`, otherwise returns uninitialized data.
+	/// Caller must ensure this is `Some`, otherwise returns the zeroed value.
 	pub unsafe fn assume_init(&self) -> &T {
-		unsafe { &*self.value.as_ptr() }
+		&self.value
 	}
 }
 
@@ -110,7 +105,7 @@ impl<T: Pod + PartialEq> PartialEq for PodOption<T> {
 	fn eq(&self, other: &Self) -> bool {
 		match (self.tag, other.tag) {
 			(0, 0) => true,
-			(1, 1) => unsafe { self.value.assume_init() == other.value.assume_init() },
+			(1, 1) => self.value == other.value,
 			_ => false,
 		}
 	}
@@ -130,9 +125,9 @@ where
 	}
 }
 
-// SAFETY: PodOption is #[repr(C)] with tag: u8 + MaybeUninit<T> where T: Pod.
-// T: Pod guarantees T is align-1 and valid for any bit pattern, so the
-// MaybeUninit doesn't violate Pod requirements.
+// SAFETY: PodOption is #[repr(C)] with tag: u8 + value: T where T: Pod.
+// T: Pod guarantees T is align-1, has no padding, and every bit pattern is a
+// valid value, so the struct satisfies the Pod requirements.
 unsafe impl<T: Pod> Zeroable for PodOption<T> {}
 unsafe impl<T: Pod> Pod for PodOption<T> {}
 

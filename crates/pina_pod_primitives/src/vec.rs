@@ -1,7 +1,6 @@
 //! Fixed-capacity vector with length prefix.
 
 use core::fmt;
-use core::mem::MaybeUninit;
 use core::mem::align_of;
 use core::mem::size_of;
 
@@ -19,12 +18,12 @@ use crate::error::max_n_for_pfx;
 ///
 /// # Layout
 /// - Bytes 0..PFX: element count prefix (little-endian)
-/// - Bytes `PFX..PFX+(N*size_of::<T>())`: element data (may be partially uninitialized)
+/// - Bytes `PFX..PFX+(N*size_of::<T>())`: element data (elements beyond the length may be stale)
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct PodVec<T: Pod, const N: usize, const PFX: usize = 2> {
 	len: [u8; PFX],
-	data: [MaybeUninit<T>; N],
+	data: [T; N],
 }
 
 // Compile-time validation of PFX
@@ -107,13 +106,13 @@ impl<T: Pod, const N: usize, const PFX: usize> PodVec<T, N, PFX> {
 	/// Returns a slice of the initialized elements.
 	pub fn as_slice(&self) -> &[T] {
 		let len = self.len();
-		unsafe { core::slice::from_raw_parts(self.data.as_ptr().cast::<T>(), len) }
+		unsafe { core::slice::from_raw_parts(self.data.as_ptr(), len) }
 	}
 
 	/// Returns a mutable slice of the initialized elements.
 	pub fn as_mut_slice(&mut self) -> &mut [T] {
 		let len = self.len();
-		unsafe { core::slice::from_raw_parts_mut(self.data.as_mut_ptr().cast::<T>(), len) }
+		unsafe { core::slice::from_raw_parts_mut(self.data.as_mut_ptr(), len) }
 	}
 
 	/// Returns the element at the given index.
@@ -140,9 +139,7 @@ impl<T: Pod, const N: usize, const PFX: usize> PodVec<T, N, PFX> {
 		if len >= N {
 			return Err(PodCollectionError::Overflow);
 		}
-		unsafe {
-			self.data.as_mut_ptr().add(len).cast::<T>().write(value);
-		}
+		self.data[len] = value;
 		self.encode_len(len + 1);
 		Ok(())
 	}
@@ -161,7 +158,7 @@ impl<T: Pod, const N: usize, const PFX: usize> PodVec<T, N, PFX> {
 		if len == 0 {
 			return None;
 		}
-		let value = unsafe { self.data.as_ptr().add(len - 1).cast::<T>().read() };
+		let value = self.data[len - 1];
 		self.encode_len(len - 1);
 		Some(value)
 	}
@@ -172,11 +169,28 @@ impl<T: Pod, const N: usize, const PFX: usize> PodVec<T, N, PFX> {
 	}
 }
 
+impl<T: Pod, const N: usize, const PFX: usize> From<&[T]> for PodVec<T, N, PFX> {
+	/// Constructs a `PodVec` from a slice.
+	///
+	/// # Panics
+	///
+	/// Panics if `value` exceeds the capacity `N`. Use [`try_push`](Self::try_push)
+	/// for fallible construction from untrusted input.
+	fn from(value: &[T]) -> Self {
+		let mut out = Self::default();
+		for &item in value {
+			out.try_push(item)
+				.expect("PodVec capacity exceeded in From<&[T]>");
+		}
+		out
+	}
+}
+
 impl<T: Pod, const N: usize, const PFX: usize> Default for PodVec<T, N, PFX> {
 	fn default() -> Self {
 		Self {
 			len: [0u8; PFX],
-			data: [MaybeUninit::uninit(); N],
+			data: [T::zeroed(); N],
 		}
 	}
 }
@@ -215,8 +229,8 @@ impl<T: Pod + fmt::Debug, const N: usize, const PFX: usize> fmt::Debug for PodVe
 	}
 }
 
-// SAFETY: PodVec is #[repr(C)] with len: [u8; PFX] + data: [MaybeUninit<T>; N] where T: Pod.
-// Both have align 1 and any bit pattern is valid.
+// SAFETY: PodVec is #[repr(C)] with len: [u8; PFX] + data: [T; N] where T: Pod.
+// Both have align 1, no padding, and every bit pattern is a valid value.
 unsafe impl<T: Pod, const N: usize, const PFX: usize> Zeroable for PodVec<T, N, PFX> {}
 unsafe impl<T: Pod, const N: usize, const PFX: usize> Pod for PodVec<T, N, PFX> {}
 
