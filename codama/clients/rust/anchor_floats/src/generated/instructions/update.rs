@@ -39,14 +39,7 @@ impl Update {
 			true,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
+		let data = bytemuck::bytes_of(&data).to_vec();
 
 		solana_instruction::Instruction {
 			program_id: crate::ANCHOR_FLOATS_ID,
@@ -57,15 +50,18 @@ impl Update {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct UpdateInstructionData {
 	pub discriminator: u8,
-	pub data_f32: pina::PodU32,
-	pub data_f64: pina::PodU64,
+	pub data_f32: pina_pod_primitives::PodU32,
+	pub data_f64: pina_pod_primitives::PodU64,
 }
 
 impl UpdateInstructionData {
-	pub const fn new(data_f32: pina::PodU32, data_f64: pina::PodU64) -> Self {
+	pub const fn new(
+		data_f32: pina_pod_primitives::PodU32,
+		data_f64: pina_pod_primitives::PodU64,
+	) -> Self {
 		Self {
 			discriminator: UPDATE_DISCRIMINATOR,
 			data_f32,

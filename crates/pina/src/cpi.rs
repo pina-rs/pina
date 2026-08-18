@@ -9,6 +9,7 @@
 //! Seed-based helpers require deterministic seed ordering and consistent
 //! program IDs across derivation and verification.
 
+use bytemuck::Pod;
 use pinocchio::AccountView;
 use pinocchio::Address;
 #[cfg(feature = "account-resize")]
@@ -26,10 +27,10 @@ use pinocchio_system::instructions::CreateAccount;
 use pinocchio_system::instructions::Transfer;
 
 use crate::CloseAccountWithRecipient;
+use crate::HasDiscriminator;
 #[cfg(feature = "account-resize")]
 use crate::LamportTransfer;
 use crate::MAX_SEEDS;
-use crate::PinaAccount;
 use crate::ProgramResult;
 
 /// Creates a new system account owned by `owner`.
@@ -97,7 +98,7 @@ pub fn create_account<'a>(
 /// 	create_program_account::<EscrowState>(escrow_account, payer, &program_id, seeds)?;
 /// ```
 #[inline(always)]
-pub fn create_program_account<'a, T: PinaAccount>(
+pub fn create_program_account<'a, T: HasDiscriminator + Pod>(
 	target_account: &'a AccountView,
 	payer: &'a AccountView,
 	owner: &Address,
@@ -141,7 +142,7 @@ pub fn create_program_account<'a, T: PinaAccount>(
 /// )?;
 /// ```
 #[inline(always)]
-pub fn create_program_account_with_bump<'a, T: PinaAccount>(
+pub fn create_program_account_with_bump<'a, T: HasDiscriminator + Pod>(
 	target_account: &'a AccountView,
 	payer: &'a AccountView,
 	owner: &Address,

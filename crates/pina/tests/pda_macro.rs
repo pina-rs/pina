@@ -245,16 +245,16 @@ fn assert_seeds_accepts_correct_account() {
 
 	let state = TestState::builder()
 		.authority(authority)
-		.amount(PodU64::from(42))
+		.amount(PodU64::from_primitive(42))
 		.side(1)
 		.tag([0xAB; 8])
-		.width(PodU16::from(7))
-		.height(PodU32::from(99))
+		.width(PodU16::from_primitive(7))
+		.height(PodU32::from_primitive(99))
 		.bump(bump)
 		._padding(0)
 		.build();
 
-	let test_account = build_account_view(pda, state.to_bytes());
+	let test_account = build_account_view(pda, bytemuck::bytes_of(&state));
 	let account = test_account.view;
 	let result = TestState::assert_seeds(
 		&account,
@@ -281,18 +281,18 @@ fn assert_seeds_rejects_wrong_address() {
 
 	let state = TestState::builder()
 		.authority(authority)
-		.amount(PodU64::from(42))
+		.amount(PodU64::from_primitive(42))
 		.side(1)
 		.tag([0xAB; 8])
-		.width(PodU16::from(7))
-		.height(PodU32::from(99))
+		.width(PodU16::from_primitive(7))
+		.height(PodU32::from_primitive(99))
 		.bump(bump)
 		._padding(0)
 		.build();
 
 	// Same data, but at a different address.
 	let wrong_address = unique_address(12);
-	let test_account = build_account_view(wrong_address, state.to_bytes());
+	let test_account = build_account_view(wrong_address, bytemuck::bytes_of(&state));
 	let account = test_account.view;
 	let result = TestState::assert_seeds(
 		&account,
@@ -319,16 +319,16 @@ fn assert_seeds_rejects_wrong_stored_bump() {
 	// Correct address, but the stored bump does not match the derived one.
 	let state = TestState::builder()
 		.authority(authority)
-		.amount(PodU64::from(42))
+		.amount(PodU64::from_primitive(42))
 		.side(1)
 		.tag([0xAB; 8])
-		.width(PodU16::from(7))
-		.height(PodU32::from(99))
+		.width(PodU16::from_primitive(7))
+		.height(PodU32::from_primitive(99))
 		.bump(bump.wrapping_add(1))
 		._padding(0)
 		.build();
 
-	let test_account = build_account_view(pda, state.to_bytes());
+	let test_account = build_account_view(pda, bytemuck::bytes_of(&state));
 	let account = test_account.view;
 	let result = TestState::assert_seeds(
 		&account,
@@ -355,17 +355,18 @@ fn assert_seeds_rejects_wrong_owner() {
 
 	let state = TestState::builder()
 		.authority(authority)
-		.amount(PodU64::from(42))
+		.amount(PodU64::from_primitive(42))
 		.side(1)
 		.tag([0xAB; 8])
-		.width(PodU16::from(7))
-		.height(PodU32::from(99))
+		.width(PodU16::from_primitive(7))
+		.height(PodU32::from_primitive(99))
 		.bump(bump)
 		._padding(0)
 		.build();
 
 	// Correct address and data, but owned by a different program.
-	let test_account = build_account_view_with_owner(pda, state.to_bytes(), unique_address(15));
+	let test_account =
+		build_account_view_with_owner(pda, bytemuck::bytes_of(&state), unique_address(15));
 	let account = test_account.view;
 	let result = TestState::assert_seeds(
 		&account,
@@ -392,11 +393,11 @@ fn assert_seeds_rejects_wrong_seed_value() {
 
 	let state = TestState::builder()
 		.authority(authority)
-		.amount(PodU64::from(42))
+		.amount(PodU64::from_primitive(42))
 		.side(1)
 		.tag([0xAB; 8])
-		.width(PodU16::from(7))
-		.height(PodU32::from(99))
+		.width(PodU16::from_primitive(7))
+		.height(PodU32::from_primitive(99))
 		.bump(bump)
 		._padding(0)
 		.build();
@@ -404,7 +405,7 @@ fn assert_seeds_rejects_wrong_seed_value() {
 	// The account is the PDA for `amount = 42`, so asserting with a
 	// different seed value must fail even though the address matches the
 	// stored bump.
-	let test_account = build_account_view(pda, state.to_bytes());
+	let test_account = build_account_view(pda, bytemuck::bytes_of(&state));
 	let account = test_account.view;
 	let result = TestState::assert_seeds(
 		&account,

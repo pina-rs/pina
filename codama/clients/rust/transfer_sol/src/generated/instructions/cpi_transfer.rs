@@ -57,14 +57,7 @@ impl CpiTransfer {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
+		let data = bytemuck::bytes_of(&data).to_vec();
 
 		solana_instruction::Instruction {
 			program_id: crate::TRANSFER_SOL_ID,
@@ -75,14 +68,14 @@ impl CpiTransfer {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CpiTransferInstructionData {
 	pub discriminator: u8,
-	pub amount: pina::PodU64,
+	pub amount: pina_pod_primitives::PodU64,
 }
 
 impl CpiTransferInstructionData {
-	pub const fn new(amount: pina::PodU64) -> Self {
+	pub const fn new(amount: pina_pod_primitives::PodU64) -> Self {
 		Self {
 			discriminator: CPI_TRANSFER_DISCRIMINATOR,
 			amount,

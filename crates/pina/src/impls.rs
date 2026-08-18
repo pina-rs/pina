@@ -7,6 +7,7 @@ use pinocchio::ProgramResult;
 use pinocchio::account::Ref as AccountRef;
 use pinocchio_system::instructions::Transfer;
 
+use crate::AccountDeserialize;
 use crate::AccountInfoValidation;
 #[cfg(feature = "token")]
 use crate::AccountValidation;
@@ -18,7 +19,7 @@ use crate::AsTokenAccount;
 use crate::CloseAccountWithRecipient;
 use crate::HasDiscriminator;
 use crate::LamportTransfer;
-use crate::PinaAccount;
+use crate::Pod;
 use crate::ProgramError;
 use crate::Ref;
 use crate::RefMut;
@@ -492,7 +493,7 @@ impl AsAccount for AccountView {
 	#[track_caller]
 	fn as_account<T>(&self, program_id: &Address) -> Result<Ref<'_, T>, ProgramError>
 	where
-		T: PinaAccount,
+		T: AccountDeserialize + HasDiscriminator + Pod,
 	{
 		self.assert_owner(program_id)?;
 		self.assert_data_len(size_of::<T>())?;
@@ -504,7 +505,7 @@ impl AsAccount for AccountView {
 	#[track_caller]
 	fn as_account_mut<T>(&mut self, program_id: &Address) -> Result<RefMut<'_, T>, ProgramError>
 	where
-		T: PinaAccount,
+		T: AccountDeserialize + HasDiscriminator + Pod,
 	{
 		self.assert_owner(program_id)?;
 		self.assert_data_len(size_of::<T>())?;

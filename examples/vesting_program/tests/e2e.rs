@@ -28,6 +28,7 @@ use mollusk_svm::Mollusk;
 use mollusk_svm::result::Check;
 use pina::PodBool;
 use pina::PodU64;
+use pina::bytemuck;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
@@ -138,15 +139,15 @@ fn vesting_state_account(
 		.admin(pubkey_to_address(admin))
 		.beneficiary(pubkey_to_address(beneficiary))
 		.mint(pubkey_to_address(mint))
-		.total_amount(PodU64::from(total_amount))
-		.claimed_amount(PodU64::from(claimed_amount))
-		.start_ts(PodU64::from(start_ts))
-		.cliff_ts(PodU64::from(cliff_ts))
-		.end_ts(PodU64::from(end_ts))
-		.cancelled(PodBool::from(cancelled))
+		.total_amount(PodU64::from_primitive(total_amount))
+		.claimed_amount(PodU64::from_primitive(claimed_amount))
+		.start_ts(PodU64::from_primitive(start_ts))
+		.cliff_ts(PodU64::from_primitive(cliff_ts))
+		.end_ts(PodU64::from_primitive(end_ts))
+		.cancelled(PodBool::from_bool(cancelled))
 		.bump(bump)
 		.build();
-	let data = state.to_bytes().to_vec();
+	let data = bytemuck::bytes_of(&state).to_vec();
 	Account {
 		lamports,
 		data,
@@ -195,7 +196,7 @@ fn cancel_ix_data() -> Vec<u8> {
 /// Build instruction data for Claim (discriminator byte 1 + amount).
 fn claim_ix_data(amount: u64) -> Vec<u8> {
 	let ix = ClaimInstruction::builder()
-		.amount(PodU64::from(amount))
+		.amount(PodU64::from_primitive(amount))
 		.build();
 	ix.to_bytes().to_vec()
 }
@@ -209,10 +210,10 @@ fn initialize_ix_data(
 	bump: u8,
 ) -> Vec<u8> {
 	let ix = InitializeInstruction::builder()
-		.total_amount(PodU64::from(total_amount))
-		.start_ts(PodU64::from(start_ts))
-		.cliff_ts(PodU64::from(cliff_ts))
-		.end_ts(PodU64::from(end_ts))
+		.total_amount(PodU64::from_primitive(total_amount))
+		.start_ts(PodU64::from_primitive(start_ts))
+		.cliff_ts(PodU64::from_primitive(cliff_ts))
+		.end_ts(PodU64::from_primitive(end_ts))
 		.bump(bump)
 		.build();
 	ix.to_bytes().to_vec()
@@ -304,8 +305,7 @@ fn cancel_sets_cancelled_flag() {
 	let vesting_account = result
 		.get_account(&vesting_pda)
 		.expect("vesting_state account should exist after cancel");
-	let vesting_state: &VestingState =
-		<VestingState as pina::ZeroPodFixed>::from_bytes(&vesting_account.data).unwrap();
+	let vesting_state: &VestingState = bytemuck::from_bytes(&vesting_account.data);
 	assert!(
 		bool::from(vesting_state.cancelled),
 		"cancelled flag should be true after Cancel"

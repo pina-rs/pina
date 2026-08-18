@@ -49,14 +49,7 @@ impl RemoveTag {
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.profile, false));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
+		let data = bytemuck::bytes_of(&data).to_vec();
 
 		solana_instruction::Instruction {
 			program_id: crate::PROFILE_PROGRAM_ID,
@@ -67,14 +60,14 @@ impl RemoveTag {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct RemoveTagInstructionData {
 	pub discriminator: u8,
-	pub index: pina::PodU64,
+	pub index: pina_pod_primitives::PodU64,
 }
 
 impl RemoveTagInstructionData {
-	pub const fn new(index: pina::PodU64) -> Self {
+	pub const fn new(index: pina_pod_primitives::PodU64) -> Self {
 		Self {
 			discriminator: REMOVE_TAG_DISCRIMINATOR,
 			index,

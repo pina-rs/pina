@@ -66,8 +66,8 @@ pub struct UpdateAccounts<'a> {
 }
 
 fn apply_create(account: &mut FloatDataAccount, authority: &Address, data_f32: f32, data_f64: f64) {
-	account.data_f32 = PodU32::from(data_f32.to_bits());
-	account.data_f64 = PodU64::from(data_f64.to_bits());
+	account.data_f32 = PodU32::from_primitive(data_f32.to_bits());
+	account.data_f64 = PodU64::from_primitive(data_f64.to_bits());
 	account.authority = *authority;
 }
 
@@ -81,8 +81,8 @@ fn apply_update(
 		return Err(FloatError::AuthorityMismatch.into());
 	}
 
-	account.data_f32 = PodU32::from(data_f32.to_bits());
-	account.data_f64 = PodU64::from(data_f64.to_bits());
+	account.data_f32 = PodU32::from_primitive(data_f32.to_bits());
+	account.data_f64 = PodU64::from_primitive(data_f64.to_bits());
 
 	Ok(())
 }
@@ -153,8 +153,8 @@ mod tests {
 	#[test]
 	fn create_instruction_roundtrip() {
 		let instruction = CreateInstruction::builder()
-			.data_f32(PodU32::from(1.0f32.to_bits()))
-			.data_f64(PodU64::from(2.0f64.to_bits()))
+			.data_f32(PodU32::from_primitive(1.0f32.to_bits()))
+			.data_f64(PodU64::from_primitive(2.0f64.to_bits()))
 			.build();
 		let bytes = instruction.to_bytes();
 		let decoded =
@@ -167,8 +167,8 @@ mod tests {
 	#[test]
 	fn update_instruction_roundtrip() {
 		let instruction = UpdateInstruction::builder()
-			.data_f32(PodU32::from(3.0f32.to_bits()))
-			.data_f64(PodU64::from(4.0f64.to_bits()))
+			.data_f32(PodU32::from_primitive(3.0f32.to_bits()))
+			.data_f64(PodU64::from_primitive(4.0f64.to_bits()))
 			.build();
 		let bytes = instruction.to_bytes();
 		let decoded =
@@ -183,8 +183,8 @@ mod tests {
 		let authority: Address = [1u8; 32].into();
 		let wrong_authority: Address = [2u8; 32].into();
 		let mut account = FloatDataAccount::builder()
-			.data_f32(PodU32::from(1.0f32.to_bits()))
-			.data_f64(PodU64::from(2.0f64.to_bits()))
+			.data_f32(PodU32::from_primitive(1.0f32.to_bits()))
+			.data_f64(PodU64::from_primitive(2.0f64.to_bits()))
 			.authority(authority)
 			.build();
 
@@ -199,8 +199,8 @@ mod tests {
 	fn apply_update_updates_values() {
 		let authority: Address = [1u8; 32].into();
 		let mut account = FloatDataAccount::builder()
-			.data_f32(PodU32::from(1.0f32.to_bits()))
-			.data_f64(PodU64::from(2.0f64.to_bits()))
+			.data_f32(PodU32::from_primitive(1.0f32.to_bits()))
+			.data_f64(PodU64::from_primitive(2.0f64.to_bits()))
 			.authority(authority)
 			.build();
 

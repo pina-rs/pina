@@ -8,15 +8,18 @@
 	clippy::too_many_arguments
 )]
 
+use bytemuck::Pod;
+use bytemuck::Zeroable;
+
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Pod, Zeroable)]
 pub struct CounterState {
 	/// On-chain counter state.
 	///
 	/// The `#[account]` macro generates:
 	/// - A discriminator field (`CounterAccountType::CounterState`) as the first
 	/// byte.
-	/// - Zeropod trait impls (`ZcValidate`, `ZcElem`, `ZeroPodFixed`) for validated zero-copy (de)serialization.
+	/// - `Pod` + `Zeroable` derives for zero-copy (de)serialization.
 	/// - `HasDiscriminator` linking this struct to
 	/// `CounterAccountType::CounterState`.
 	/// - `TypedBuilder` for ergonomic construction.
@@ -34,7 +37,7 @@ pub struct CounterState {
 	pub bump: u8,
 	/// The current counter value. Uses `PodU64` (a little-endian `u64`
 	/// wrapper) for safe alignment in `#[repr(C)]` structs.
-	pub count: pina::PodU64,
+	pub count: pina_pod_primitives::PodU64,
 }
 
 pub const COUNTER_STATE_DISCRIMINATOR: u8 = 1u8;
@@ -42,7 +45,7 @@ pub const COUNTER_STATE_DISCRIMINATOR: u8 = 1u8;
 impl CounterState {
 	pub const LEN: usize = core::mem::size_of::<Self>();
 
-	pub const fn new(bump: u8, count: pina::PodU64) -> Self {
+	pub const fn new(bump: u8, count: pina_pod_primitives::PodU64) -> Self {
 		Self {
 			discriminator: COUNTER_STATE_DISCRIMINATOR,
 			bump,
@@ -51,11 +54,8 @@ impl CounterState {
 	}
 
 	pub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {
-		if data.len() != core::mem::size_of::<Self>() {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let account = unsafe { &*(data.as_ptr() as *const Self) };
+		let account = bytemuck::try_from_bytes::<Self>(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != COUNTER_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
@@ -65,11 +65,8 @@ impl CounterState {
 	pub fn from_bytes_mut(
 		data: &mut [u8],
 	) -> Result<&mut Self, solana_program_error::ProgramError> {
-		if data.len() != core::mem::size_of::<Self>() {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let account = unsafe { &mut *(data.as_mut_ptr() as *mut Self) };
+		let account = bytemuck::try_from_bytes_mut::<Self>(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != COUNTER_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}

@@ -44,4 +44,6 @@ impl ::core::convert::TryFrom<u8> for SingleVariant {
         }
     }
 }
+unsafe impl ::pina::Zeroable for SingleVariant {}
+unsafe impl ::pina::Pod for SingleVariant {}
 ::pina::into_discriminator!(SingleVariant, u8);

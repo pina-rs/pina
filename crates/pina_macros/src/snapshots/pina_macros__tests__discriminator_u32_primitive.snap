@@ -50,4 +50,6 @@ impl ::core::convert::TryFrom<u32> for U32Discriminator {
         }
     }
 }
+unsafe impl ::pina::Zeroable for U32Discriminator {}
+unsafe impl ::pina::Pod for U32Discriminator {}
 ::pina::into_discriminator!(U32Discriminator, u32);

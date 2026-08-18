@@ -1,4 +1,4 @@
-//! Fuzz harnesses for pina — targeting `PinaAccount::try_from_bytes`
+//! Fuzz harnesses for pina — targeting `AccountDeserialize::try_from_bytes`
 //! and `parse_instruction`.
 //!
 //! This crate is **not** a workspace member. It is built separately with

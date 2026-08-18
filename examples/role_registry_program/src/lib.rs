@@ -190,7 +190,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		let mut registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
 		*registry_config = RegistryConfig::builder()
 			.admin(admin_address)
-			.role_count(PodU64::from(0))
+			.role_count(PodU64::from_primitive(0))
 			.bump(args.bump)
 			.build();
 
@@ -237,12 +237,12 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 			.role_id(args.role_id)
 			.grantee(*self.grantee.address())
 			.permissions(args.permissions)
-			.active(PodBool::from(true))
+			.active(PodBool::from_bool(true))
 			.bump(args.bump)
 			.build();
 
 		let mut registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
-		registry_config.role_count = PodU64::from(role_count);
+		registry_config.role_count = PodU64::from_primitive(role_count);
 
 		Ok(())
 	}
@@ -308,7 +308,7 @@ impl<'a> ProcessAccountInfos<'a> for DeactivateRoleAccounts<'a> {
 		}
 
 		let mut role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
-		role_entry.active = PodBool::from(false);
+		role_entry.active = PodBool::from_bool(false);
 
 		Ok(())
 	}
@@ -349,8 +349,8 @@ mod tests {
 	#[test]
 	fn instruction_roundtrip() {
 		let ix = AddRoleInstruction::builder()
-			.role_id(PodU64::from(7))
-			.permissions(PodU64::from(3))
+			.role_id(PodU64::from_primitive(7))
+			.permissions(PodU64::from_primitive(3))
 			.bump(2)
 			.build();
 		let bytes = ix.to_bytes();

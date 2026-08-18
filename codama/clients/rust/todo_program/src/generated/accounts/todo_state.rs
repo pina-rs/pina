@@ -8,13 +8,16 @@
 	clippy::too_many_arguments
 )]
 
+use bytemuck::Pod;
+use bytemuck::Zeroable;
+
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Pod, Zeroable)]
 pub struct TodoState {
 	pub discriminator: u8,
 	pub owner: solana_pubkey::Pubkey,
 	pub bump: u8,
-	pub completed: pina::PodBool,
+	pub completed: pina_pod_primitives::PodBool,
 	pub digest: [u8; 32],
 }
 
@@ -26,7 +29,7 @@ impl TodoState {
 	pub const fn new(
 		owner: solana_pubkey::Pubkey,
 		bump: u8,
-		completed: pina::PodBool,
+		completed: pina_pod_primitives::PodBool,
 		digest: [u8; 32],
 	) -> Self {
 		Self {
@@ -39,11 +42,8 @@ impl TodoState {
 	}
 
 	pub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {
-		if data.len() != core::mem::size_of::<Self>() {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let account = unsafe { &*(data.as_ptr() as *const Self) };
+		let account = bytemuck::try_from_bytes::<Self>(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != TODO_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
@@ -53,11 +53,8 @@ impl TodoState {
 	pub fn from_bytes_mut(
 		data: &mut [u8],
 	) -> Result<&mut Self, solana_program_error::ProgramError> {
-		if data.len() != core::mem::size_of::<Self>() {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let account = unsafe { &mut *(data.as_mut_ptr() as *mut Self) };
+		let account = bytemuck::try_from_bytes_mut::<Self>(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != TODO_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}

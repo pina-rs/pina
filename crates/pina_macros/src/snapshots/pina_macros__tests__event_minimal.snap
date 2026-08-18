@@ -6,12 +6,15 @@ expression: output
 #[builder(builder_method(vis = "", name = __builder))]
 #[derive(
     ::pina::TypedBuilder,
+    ::pina::Pod,
+    ::pina::Zeroable,
     ::core::clone::Clone,
     ::core::marker::Copy,
     ::core::cmp::PartialEq,
     ::core::cmp::Eq,
     ::core::fmt::Debug
 )]
+#[bytemuck(crate = "::pina::bytemuck")]
 pub struct EmptyEvent {
     discriminator: [u8; EventDisc::BYTES],
 }
@@ -36,21 +39,12 @@ const __EMPTYEVENT_ALIGNMENT_ASSERTIONS__: () = {
     );
 };
 impl EmptyEvent {
-    #[allow(unsafe_code)]
     pub fn to_bytes(&self) -> &[u8] {
-        unsafe {
-            ::core::slice::from_raw_parts(
-                self as *const Self as *const u8,
-                ::core::mem::size_of::<Self>(),
-            )
-        }
+        ::pina::bytemuck::bytes_of(self)
     }
     pub fn try_from_bytes(data: &[u8]) -> Result<&Self, ::pina::ProgramError> {
-        if data.len() != ::core::mem::size_of::<Self>() {
-            return Err(::pina::ProgramError::InvalidInstructionData);
-        }
-        <Self as ::pina::ZeroPodFixed>::from_bytes(data)
-            .map_err(|_| ::pina::ProgramError::InvalidInstructionData)
+        ::pina::bytemuck::try_from_bytes::<Self>(data)
+            .or(Err(::pina::ProgramError::InvalidInstructionData))
     }
     pub fn builder() -> EmptyEventBuilderType {
         let mut bytes = [0u8; EventDisc::BYTES];
@@ -61,47 +55,4 @@ impl EmptyEvent {
 impl ::pina::HasDiscriminator for EmptyEvent {
     type Type = EventDisc;
     const VALUE: Self::Type = EventDisc::EmptyEvent;
-}
-impl ::pina::ZcValidate for EmptyEvent {
-    fn validate_ref(value: &Self) -> Result<(), ::pina::ZeroPodError> {
-        <[u8; EventDisc::BYTES] as ::pina::ZcValidate>::validate_ref(
-            &value.discriminator,
-        )?;
-        Ok(())
-    }
-}
-#[allow(unsafe_code)]
-unsafe impl ::pina::ZcElem for EmptyEvent {}
-impl ::pina::ZeroPodSchema for EmptyEvent {
-    const LAYOUT: ::pina::LayoutKind = ::pina::LayoutKind::Fixed;
-}
-impl ::pina::ZeroPodFixed for EmptyEvent {
-    type Zc = EmptyEvent;
-    const SIZE: usize = ::core::mem::size_of::<EmptyEvent>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, ::pina::ZeroPodError> {
-        <Self as ::pina::ZeroPodFixed>::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, ::pina::ZeroPodError> {
-        <Self as ::pina::ZeroPodFixed>::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), ::pina::ZeroPodError> {
-        if data.len() < Self::SIZE {
-            return Err(::pina::ZeroPodError::BufferTooSmall);
-        }
-        let zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as ::pina::ZcValidate>::validate_ref(zc)?;
-        Ok(())
-    }
-    unsafe fn from_bytes_unchecked(data: &[u8]) -> &Self::Zc {
-        &*(data.as_ptr() as *const Self::Zc)
-    }
-    unsafe fn from_bytes_mut_unchecked(data: &mut [u8]) -> &mut Self::Zc {
-        &mut *(data.as_mut_ptr() as *mut Self::Zc)
-    }
-}
-impl ::pina::ZcField for EmptyEvent {
-    type Pod = EmptyEvent;
-    const POD_SIZE: usize = ::core::mem::size_of::<EmptyEvent>();
 }

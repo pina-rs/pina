@@ -24,7 +24,7 @@ cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
 
 - Discriminator-first `#[repr(C)]` account/instruction/event structs
 - `bytemuck::Pod` + `bytemuck::Zeroable` derives (no `borsh` serialization)
-- `pina` types for alignment-safe integer fields
+- `pina_pod_primitives` types for alignment-safe integer fields
 - Type-safe instruction builders
 
 ## Constraints

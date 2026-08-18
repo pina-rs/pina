@@ -32,6 +32,7 @@ use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
 use pina::PodBool;
 use pina::PodU64;
+use pina::bytemuck;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
@@ -145,12 +146,12 @@ fn pool_state_account(
 		.admin(pubkey_to_address(admin))
 		.stake_mint(pubkey_to_address(stake_mint))
 		.reward_mint(pubkey_to_address(reward_mint))
-		.total_staked(PodU64::from(total_staked))
-		.reward_index(PodU64::from(0))
-		.paused(PodBool::from(paused))
+		.total_staked(PodU64::from_primitive(total_staked))
+		.reward_index(PodU64::from_primitive(0))
+		.paused(PodBool::from_bool(paused))
 		.bump(bump)
 		.build();
-	let data = state.to_bytes().to_vec();
+	let data = bytemuck::bytes_of(&state).to_vec();
 	Account {
 		lamports,
 		data,
@@ -173,12 +174,12 @@ fn position_state_account(
 	let state = PositionState::builder()
 		.pool(pubkey_to_address(pool))
 		.owner(pubkey_to_address(owner))
-		.staked_amount(PodU64::from(staked_amount))
-		.reward_debt(PodU64::from(reward_debt))
-		.pending_rewards(PodU64::from(pending_rewards))
+		.staked_amount(PodU64::from_primitive(staked_amount))
+		.reward_debt(PodU64::from_primitive(reward_debt))
+		.pending_rewards(PodU64::from_primitive(pending_rewards))
 		.bump(bump)
 		.build();
-	let data = state.to_bytes().to_vec();
+	let data = bytemuck::bytes_of(&state).to_vec();
 	Account {
 		lamports,
 		data,
@@ -226,7 +227,7 @@ fn open_position_ix_data(bump: u8) -> Vec<u8> {
 /// Instruction bytes for `Deposit`.
 fn deposit_ix_data(amount: u64) -> Vec<u8> {
 	let ix = DepositInstruction::builder()
-		.amount(PodU64::from(amount))
+		.amount(PodU64::from_primitive(amount))
 		.build();
 	ix.to_bytes().to_vec()
 }
@@ -234,7 +235,7 @@ fn deposit_ix_data(amount: u64) -> Vec<u8> {
 /// Instruction bytes for `Withdraw`.
 fn withdraw_ix_data(amount: u64) -> Vec<u8> {
 	let ix = WithdrawInstruction::builder()
-		.amount(PodU64::from(amount))
+		.amount(PodU64::from_primitive(amount))
 		.build();
 	ix.to_bytes().to_vec()
 }
@@ -321,8 +322,7 @@ fn open_position_creates_position_state() {
 		"position_state data should be exactly size_of::<PositionState>() bytes"
 	);
 
-	let pos_state: &PositionState =
-		<PositionState as pina::ZeroPodFixed>::from_bytes(&pos_account.data).unwrap();
+	let pos_state: &PositionState = bytemuck::from_bytes(&pos_account.data);
 	assert_eq!(
 		pos_state.pool.as_ref(),
 		pool_state_key.as_ref(),
@@ -442,8 +442,7 @@ fn withdraw_updates_balances() {
 	let pos_account = result
 		.get_account(&position_state_key)
 		.expect("position_state should exist after Withdraw");
-	let pos_state: &PositionState =
-		<PositionState as pina::ZeroPodFixed>::from_bytes(&pos_account.data).unwrap();
+	let pos_state: &PositionState = bytemuck::from_bytes(&pos_account.data);
 	assert_eq!(
 		u64::from(pos_state.staked_amount),
 		100,
@@ -454,8 +453,7 @@ fn withdraw_updates_balances() {
 	let pool_account = result
 		.get_account(&pool_state_key)
 		.expect("pool_state should exist after Withdraw");
-	let pool_st: &PoolState =
-		<PoolState as pina::ZeroPodFixed>::from_bytes(&pool_account.data).unwrap();
+	let pool_st: &PoolState = bytemuck::from_bytes(&pool_account.data);
 	assert_eq!(
 		u64::from(pool_st.total_staked),
 		400,

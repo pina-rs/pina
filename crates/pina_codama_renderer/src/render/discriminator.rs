@@ -84,14 +84,14 @@ fn render_discriminator_type(number_type: &NumberTypeNode, context: &str) -> Res
 	match number_type.format {
 		NumberFormat::U8 => Ok("u8".to_string()),
 		NumberFormat::I8 => Ok("i8".to_string()),
-		NumberFormat::U16 => Ok("pina::PodU16".to_string()),
-		NumberFormat::I16 => Ok("pina::PodI16".to_string()),
-		NumberFormat::U32 => Ok("pina::PodU32".to_string()),
-		NumberFormat::I32 => Ok("pina::PodI32".to_string()),
-		NumberFormat::U64 => Ok("pina::PodU64".to_string()),
-		NumberFormat::I64 => Ok("pina::PodI64".to_string()),
-		NumberFormat::U128 => Ok("pina::PodU128".to_string()),
-		NumberFormat::I128 => Ok("pina::PodI128".to_string()),
+		NumberFormat::U16 => Ok("pina_pod_primitives::PodU16".to_string()),
+		NumberFormat::I16 => Ok("pina_pod_primitives::PodI16".to_string()),
+		NumberFormat::U32 => Ok("pina_pod_primitives::PodU32".to_string()),
+		NumberFormat::I32 => Ok("pina_pod_primitives::PodI32".to_string()),
+		NumberFormat::U64 => Ok("pina_pod_primitives::PodU64".to_string()),
+		NumberFormat::I64 => Ok("pina_pod_primitives::PodI64".to_string()),
+		NumberFormat::U128 => Ok("pina_pod_primitives::PodU128".to_string()),
+		NumberFormat::I128 => Ok("pina_pod_primitives::PodI128".to_string()),
 		NumberFormat::F32 | NumberFormat::F64 | NumberFormat::ShortU16 => {
 			Err(RenderError::UnsupportedDiscriminator {
 				context: context.to_string(),
@@ -167,14 +167,14 @@ fn render_discriminator_literal(
 
 	Ok(match number_type.format {
 		NumberFormat::U8 | NumberFormat::I8 => literal,
-		NumberFormat::U16 => format!("pina::PodU16::from({literal})"),
-		NumberFormat::I16 => format!("pina::PodI16::from({literal})"),
-		NumberFormat::U32 => format!("pina::PodU32::from({literal})"),
-		NumberFormat::I32 => format!("pina::PodI32::from({literal})"),
-		NumberFormat::U64 => format!("pina::PodU64::from({literal})"),
-		NumberFormat::I64 => format!("pina::PodI64::from({literal})"),
-		NumberFormat::U128 => format!("pina::PodU128::from({literal})"),
-		NumberFormat::I128 => format!("pina::PodI128::from({literal})"),
+		NumberFormat::U16 => format!("pina_pod_primitives::PodU16::from({literal})"),
+		NumberFormat::I16 => format!("pina_pod_primitives::PodI16::from({literal})"),
+		NumberFormat::U32 => format!("pina_pod_primitives::PodU32::from({literal})"),
+		NumberFormat::I32 => format!("pina_pod_primitives::PodI32::from({literal})"),
+		NumberFormat::U64 => format!("pina_pod_primitives::PodU64::from({literal})"),
+		NumberFormat::I64 => format!("pina_pod_primitives::PodI64::from({literal})"),
+		NumberFormat::U128 => format!("pina_pod_primitives::PodU128::from({literal})"),
+		NumberFormat::I128 => format!("pina_pod_primitives::PodI128::from({literal})"),
 		NumberFormat::F32 | NumberFormat::F64 | NumberFormat::ShortU16 => unreachable!(),
 	})
 }

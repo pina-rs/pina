@@ -79,16 +79,6 @@ Closing guidance under Pinocchio 0.11:
 
 <!-- {/pinaSecurityBestPractices} -->
 
-## Content validation (zeropod)
-
-Pina's zero-copy account model is built on [zeropod](https://crates.io/crates/zeropod): `bytemuck::Pod` guaranteed memory safety but not semantic validity. Zeropod's `ZcValidate` / `ZcElem` model makes **validation load-bearing**: every pod type validates itself, and `PinaAccount::try_from_bytes` / `as_account` reject non-canonical `PodBool` bytes, invalid UTF-8 in `PodString`, and overlength `PodVec` prefixes at the deserialization boundary.
-
-The `#[account]` macro generates the zeropod trait impls directly on the account struct (the "direct pattern": `ZeroPodFixed` with `type Zc = Self`), keeping the discriminator as the first field. `PinaAccount::validate` checks the discriminator and content; `try_from_bytes` additionally enforces exact size.
-
-### Unit enums (`#[derive(PodEnum)]`)
-
-Unit enums with explicit discriminants can be stored in accounts via `#[derive(PodEnum)]`, which generates an `EnumZc` zero-copy companion (`#[repr(transparent)]` over `[u8; N]`, alignment 1). The companion validates the discriminant at the deserialization boundary. Because the enum's validity is bit-pattern-restricted at the Rust type level, account structs store the `EnumZc` companion as the field type (never the bare enum) — invalid discriminants are rejected before any reference to the enum is formed.
-
 ## Testing strategy
 
 - Unit tests for negative validation cases.

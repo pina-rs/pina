@@ -14,10 +14,10 @@
 use std::hint::black_box;
 use std::time::Instant;
 
+use pina::AccountDeserialize;
 use pina::Address;
 use pina::HasDiscriminator;
 use pina::IntoDiscriminator;
-use pina::PinaAccount;
 use pina::PodU64;
 use pina::create_program_address;
 use pina::try_find_program_address;
@@ -263,12 +263,12 @@ fn benchmark_parse_instruction_wrong_program_id() {
 fn benchmark_account_try_from_bytes() {
 	let state = TestState::builder()
 		.bump(42)
-		.count(PodU64::from(999))
+		.count(PodU64::from_primitive(999))
 		.authority([7u8; 32].into())
 		.build();
-	let bytes: &[u8] = state.to_bytes();
+	let bytes: &[u8] = bytemuck::bytes_of(&state);
 
-	bench("PinaAccount try_from_bytes (TestState)", || {
+	bench("AccountDeserialize try_from_bytes (TestState)", || {
 		let _ = black_box(TestState::try_from_bytes(black_box(bytes)));
 	});
 }
@@ -277,9 +277,12 @@ fn benchmark_account_try_from_bytes() {
 fn benchmark_account_try_from_bytes_wrong_discriminator() {
 	let mut data = [0u8; size_of::<TestState>()];
 	data[0] = 99; // wrong discriminator
-	bench("PinaAccount try_from_bytes (wrong discriminator)", || {
-		let _ = black_box(TestState::try_from_bytes(black_box(&data)));
-	});
+	bench(
+		"AccountDeserialize try_from_bytes (wrong discriminator)",
+		|| {
+			let _ = black_box(TestState::try_from_bytes(black_box(&data)));
+		},
+	);
 }
 
 // ---------------------------------------------------------------------------
@@ -289,13 +292,13 @@ fn benchmark_account_try_from_bytes_wrong_discriminator() {
 #[test]
 fn benchmark_pod_u64_from_primitive() {
 	bench("PodU64::from_primitive", || {
-		let _ = black_box(PodU64::from(black_box(42u64)));
+		let _ = black_box(PodU64::from_primitive(black_box(42u64)));
 	});
 }
 
 #[test]
 fn benchmark_pod_u64_into_u64() {
-	let pod = PodU64::from(42);
+	let pod = PodU64::from_primitive(42);
 	bench("PodU64 -> u64 conversion", || {
 		let _: u64 = black_box(black_box(pod).into());
 	});

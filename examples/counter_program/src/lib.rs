@@ -4,7 +4,7 @@
 //! and mutate it across transactions. It covers:
 //!
 //! - **Account structs** with `#[account]` — zero-copy state with automatic
-//!   discriminator fields, zeropod trait impls, and `TypedBuilder`.
+//!   discriminator fields, `Pod`/`Zeroable` derives, and `TypedBuilder`.
 //! - **PDA-based accounts** — the counter is stored at a Program Derived
 //!   Address seeded by the authority's public key, so each user gets their own
 //!   counter.
@@ -75,7 +75,7 @@ pub enum CounterAccountType {
 /// The `#[account]` macro generates:
 /// - A discriminator field (`CounterAccountType::CounterState`) as the first
 ///   byte.
-/// - Zeropod trait impls (`ZcValidate`, `ZcElem`, `ZeroPodFixed`) for validated zero-copy (de)serialization.
+/// - `Pod` + `Zeroable` derives for zero-copy (de)serialization.
 /// - `HasDiscriminator` linking this struct to
 ///   `CounterAccountType::CounterState`.
 /// - `TypedBuilder` for ergonomic construction.
@@ -184,7 +184,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		let mut counter = self.counter.as_account_mut::<CounterState>(&ID)?;
 		*counter = CounterState::builder()
 			.bump(args.bump)
-			.count(PodU64::from(0))
+			.count(PodU64::from_primitive(0))
 			.build();
 
 		log!("Counter initialized");
@@ -217,7 +217,7 @@ impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 			.checked_add(1)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
 
-		counter.count = PodU64::from(next);
+		counter.count = PodU64::from_primitive(next);
 
 		log!("Counter incremented");
 
@@ -291,7 +291,7 @@ mod tests {
 	fn counter_state_builder() {
 		let state = CounterState::builder()
 			.bump(42)
-			.count(PodU64::from(100))
+			.count(PodU64::from_primitive(100))
 			.build();
 		assert_eq!(state.bump, 42);
 		assert_eq!(u64::from(state.count), 100);
@@ -301,11 +301,11 @@ mod tests {
 	fn counter_state_deserialize_roundtrip() {
 		let state = CounterState::builder()
 			.bump(7)
-			.count(PodU64::from(999))
+			.count(PodU64::from_primitive(999))
 			.build();
 
-		// Serialize to bytes via to_bytes().
-		let bytes: &[u8] = state.to_bytes();
+		// Serialize to bytes via bytemuck.
+		let bytes: &[u8] = bytemuck::bytes_of(&state);
 		assert_eq!(bytes.len(), 10);
 
 		// Deserialize back.

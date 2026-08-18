@@ -25,6 +25,7 @@ use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
 use pina::PodU64;
 use pina::ProgramError;
+use pina::bytemuck;
 use prop_amm_program::ID;
 use prop_amm_program::InitializeInstruction;
 use prop_amm_program::OracleState;
@@ -83,7 +84,7 @@ fn system_account(lamports: u64) -> Account {
 }
 
 fn read_oracle(account: &Account) -> &OracleState {
-	<OracleState as pina::ZeroPodFixed>::from_bytes(&account.data).unwrap()
+	bytemuck::from_bytes::<OracleState>(&account.data)
 }
 
 fn initialize_ix_data() -> Vec<u8> {
@@ -92,7 +93,7 @@ fn initialize_ix_data() -> Vec<u8> {
 
 fn update_ix_data(new_price: u64) -> Vec<u8> {
 	UpdateInstruction::builder()
-		.new_price(PodU64::from(new_price))
+		.new_price(PodU64::from_primitive(new_price))
 		.build()
 		.to_bytes()
 		.to_vec()

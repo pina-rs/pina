@@ -49,14 +49,7 @@ impl AddTag {
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.profile, false));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
+		let data = bytemuck::bytes_of(&data).to_vec();
 
 		solana_instruction::Instruction {
 			program_id: crate::PROFILE_PROGRAM_ID,
@@ -67,14 +60,14 @@ impl AddTag {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct AddTagInstructionData {
 	pub discriminator: u8,
-	pub tag: pina::PodU64,
+	pub tag: pina_pod_primitives::PodU64,
 }
 
 impl AddTagInstructionData {
-	pub const fn new(tag: pina::PodU64) -> Self {
+	pub const fn new(tag: pina_pod_primitives::PodU64) -> Self {
 		Self {
 			discriminator: ADD_TAG_DISCRIMINATOR,
 			tag,

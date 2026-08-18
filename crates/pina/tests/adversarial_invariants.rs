@@ -137,9 +137,11 @@ impl Drop for AlignedMemory {
 }
 
 fn build_balance_state_bytes(amount: u64) -> Vec<u8> {
-	let state = BalanceState::builder().amount(PodU64::from(amount)).build();
+	let state = BalanceState::builder()
+		.amount(PodU64::from_primitive(amount))
+		.build();
 
-	state.to_bytes().to_vec()
+	bytemuck::bytes_of(&state).to_vec()
 }
 
 fn fake_address(byte: u8) -> Address {

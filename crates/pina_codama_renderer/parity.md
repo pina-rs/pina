@@ -12,15 +12,15 @@ This document tracks which Codama IDL node types the `pina_codama_renderer` supp
 | ---------------------------------- | ------------------------------- | ---------------------------------- |
 | `NumberTypeNode` (u8)              | `u8`                            | Little-endian only                 |
 | `NumberTypeNode` (i8)              | `i8`                            | Little-endian only                 |
-| `NumberTypeNode` (u16)             | `pina::PodU16`                  | Little-endian only                 |
-| `NumberTypeNode` (i16)             | `pina::PodI16`                  | Little-endian only                 |
-| `NumberTypeNode` (u32)             | `pina::PodU32`                  | Little-endian only                 |
-| `NumberTypeNode` (i32)             | `pina::PodI32`                  | Little-endian only                 |
-| `NumberTypeNode` (u64)             | `pina::PodU64`                  | Little-endian only                 |
-| `NumberTypeNode` (i64)             | `pina::PodI64`                  | Little-endian only                 |
-| `NumberTypeNode` (u128)            | `pina::PodU128`                 | Little-endian only                 |
-| `NumberTypeNode` (i128)            | `pina::PodI128`                 | Little-endian only                 |
-| `BooleanTypeNode`                  | `pina::PodBool`                 | Must be little-endian u8-sized     |
+| `NumberTypeNode` (u16)             | `pina_pod_primitives::PodU16`   | Little-endian only                 |
+| `NumberTypeNode` (i16)             | `pina_pod_primitives::PodI16`   | Little-endian only                 |
+| `NumberTypeNode` (u32)             | `pina_pod_primitives::PodU32`   | Little-endian only                 |
+| `NumberTypeNode` (i32)             | `pina_pod_primitives::PodI32`   | Little-endian only                 |
+| `NumberTypeNode` (u64)             | `pina_pod_primitives::PodU64`   | Little-endian only                 |
+| `NumberTypeNode` (i64)             | `pina_pod_primitives::PodI64`   | Little-endian only                 |
+| `NumberTypeNode` (u128)            | `pina_pod_primitives::PodU128`  | Little-endian only                 |
+| `NumberTypeNode` (i128)            | `pina_pod_primitives::PodI128`  | Little-endian only                 |
+| `BooleanTypeNode`                  | `pina_pod_primitives::PodBool`  | Must be little-endian u8-sized     |
 | `PublicKeyTypeNode`                | `solana_pubkey::Pubkey`         | 32-byte fixed size                 |
 | `FixedSizeTypeNode<BytesTypeNode>` | `[u8; N]`                       | Fixed-size byte arrays only        |
 | `FixedSizeTypeNode<T>`             | `[T; N]`                        | Wraps any supported inner type     |

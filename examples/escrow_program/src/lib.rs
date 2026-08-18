@@ -352,7 +352,7 @@ mod tests {
 	#[test]
 	fn seeds_build_expected_seed_arrays() {
 		let maker = Address::new_from_array([3u8; 32]);
-		let seed = PodU64::from(42);
+		let seed = PodU64::from_primitive(42);
 		let bump = 7u8;
 
 		let seeds = EscrowState::seeds(&maker, u64::from(seed));
@@ -360,14 +360,14 @@ mod tests {
 		assert_eq!(slices.len(), 3);
 		assert_eq!(slices[0], b"escrow");
 		assert_eq!(slices[1], maker.as_ref());
-		assert_eq!(slices[2], seed.as_ref());
+		assert_eq!(slices[2], &seed.0);
 
 		let with_bump = seeds.with_bump(bump);
 		let slices_with_bump = with_bump.as_slices();
 		assert_eq!(slices_with_bump.len(), 4);
 		assert_eq!(slices_with_bump[0], b"escrow");
 		assert_eq!(slices_with_bump[1], maker.as_ref());
-		assert_eq!(slices_with_bump[2], seed.as_ref());
+		assert_eq!(slices_with_bump[2], &seed.0);
 		assert_eq!(slices_with_bump[3], &[bump]);
 	}
 

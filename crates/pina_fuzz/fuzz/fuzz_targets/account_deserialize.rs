@@ -1,4 +1,4 @@
-//! Fuzz harness for `PinaAccount::try_from_bytes`.
+//! Fuzz harness for `AccountDeserialize::try_from_bytes`.
 //!
 //! Feeds arbitrary byte slices to the account deserialization path for
 //! real account types from the counter_program and role_registry_program
@@ -9,7 +9,7 @@
 
 use counter_program::CounterState;
 use libfuzzer_sys::fuzz_target;
-use pina::PinaAccount;
+use pina::AccountDeserialize;
 use role_registry_program::RegistryConfig;
 use role_registry_program::RoleEntry;
 

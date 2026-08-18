@@ -2,14 +2,15 @@
 
 <!-- {=pinaWorkspacePackages} -->
 
-| Crate                  | Path                          | Description                                                       |
-| ---------------------- | ----------------------------- | ----------------------------------------------------------------- |
-| `pina`                 | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types. |
-| `pina_macros`          | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.    |
-| `pina_cli`             | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding.  |
-| `pina_codama_renderer` | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.     |
-| `pina_profile`         | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                     |
-| `pina_sdk_ids`         | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.         |
+| Crate                  | Path                          | Description                                                                  |
+| ---------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
+| `pina`                 | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types.            |
+| `pina_macros`          | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.               |
+| `pina_cli`             | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding.             |
+| `pina_codama_renderer` | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.                |
+| `pina_pod_primitives`  | `crates/pina_pod_primitives`  | `no_std` POD primitives — integer/bool wrappers, fixed-capacity collections. |
+| `pina_profile`         | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                                |
+| `pina_sdk_ids`         | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.                    |
 
 <!-- {/pinaWorkspacePackages} -->
 
@@ -91,7 +92,7 @@ Library surface:
 - `pina_cli::generate_idl(program_path, name_override)`
 - `pina_cli::init_project(path, package_name, force)`
 
-## `crates/pina`
+## `crates/pina_pod_primitives`
 
 `no_std` crate containing alignment-safe POD primitive wrappers (`PodBool`, `PodU*`, `PodI*`) and fixed-capacity collection types (`PodOption`, `PodString`, `PodVec`) shared by `pina` and generated clients.
 

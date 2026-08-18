@@ -8,16 +8,19 @@
 	clippy::too_many_arguments
 )]
 
+use bytemuck::Pod;
+use bytemuck::Zeroable;
+
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Pod, Zeroable)]
 pub struct PoolState {
 	pub discriminator: u8,
 	pub admin: solana_pubkey::Pubkey,
 	pub stake_mint: solana_pubkey::Pubkey,
 	pub reward_mint: solana_pubkey::Pubkey,
-	pub total_staked: pina::PodU64,
-	pub reward_index: pina::PodU64,
-	pub paused: pina::PodBool,
+	pub total_staked: pina_pod_primitives::PodU64,
+	pub reward_index: pina_pod_primitives::PodU64,
+	pub paused: pina_pod_primitives::PodBool,
 	pub bump: u8,
 }
 
@@ -30,9 +33,9 @@ impl PoolState {
 		admin: solana_pubkey::Pubkey,
 		stake_mint: solana_pubkey::Pubkey,
 		reward_mint: solana_pubkey::Pubkey,
-		total_staked: pina::PodU64,
-		reward_index: pina::PodU64,
-		paused: pina::PodBool,
+		total_staked: pina_pod_primitives::PodU64,
+		reward_index: pina_pod_primitives::PodU64,
+		paused: pina_pod_primitives::PodBool,
 		bump: u8,
 	) -> Self {
 		Self {
@@ -48,11 +51,8 @@ impl PoolState {
 	}
 
 	pub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {
-		if data.len() != core::mem::size_of::<Self>() {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let account = unsafe { &*(data.as_ptr() as *const Self) };
+		let account = bytemuck::try_from_bytes::<Self>(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != POOL_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
@@ -62,11 +62,8 @@ impl PoolState {
 	pub fn from_bytes_mut(
 		data: &mut [u8],
 	) -> Result<&mut Self, solana_program_error::ProgramError> {
-		if data.len() != core::mem::size_of::<Self>() {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let account = unsafe { &mut *(data.as_mut_ptr() as *mut Self) };
+		let account = bytemuck::try_from_bytes_mut::<Self>(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != POOL_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}

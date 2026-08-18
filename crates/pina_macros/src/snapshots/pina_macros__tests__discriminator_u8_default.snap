@@ -51,4 +51,6 @@ impl ::core::convert::TryFrom<u8> for MyDiscriminator {
         }
     }
 }
+unsafe impl ::pina::Zeroable for MyDiscriminator {}
+unsafe impl ::pina::Pod for MyDiscriminator {}
 ::pina::into_discriminator!(MyDiscriminator, u8);

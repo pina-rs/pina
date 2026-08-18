@@ -70,9 +70,11 @@ pub(crate) fn render_account_page(
 	}
 
 	let mut lines = Vec::new();
+	lines.push("use bytemuck::Pod;".to_string());
+	lines.push("use bytemuck::Zeroable;".to_string());
 	lines.push(String::new());
 	lines.push("#[repr(C)]".to_string());
-	lines.push("#[derive(Clone, Copy, Debug, PartialEq, Eq)]".to_string());
+	lines.push("#[derive(Clone, Copy, Debug, PartialEq, Eq, Pod, Zeroable)]".to_string());
 	lines.push(format!("pub struct {account_name} {{"));
 	lines.extend(field_lines);
 	lines.push("}".to_string());
@@ -121,13 +123,10 @@ pub(crate) fn render_account_page(
 		"\tpub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {"
 			.to_string(),
 	);
-	lines.push("\t\tif data.len() != core::mem::size_of::<Self>() {".to_string());
+	lines.push("\t\tlet account = bytemuck::try_from_bytes::<Self>(data)".to_string());
 	lines.push(
-		"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
 	);
-	lines.push("\t\t}".to_string());
-	lines.push("\t\t// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.".to_string());
-	lines.push("\t\tlet account = unsafe { &*(data.as_ptr() as *const Self) };".to_string());
 	if let Some(discriminator) = &discriminator {
 		lines.push(format!(
 			"\t\tif account.discriminator != {} {{",
@@ -146,13 +145,10 @@ pub(crate) fn render_account_page(
 		 solana_program_error::ProgramError> {"
 			.to_string(),
 	);
-	lines.push("\t\tif data.len() != core::mem::size_of::<Self>() {".to_string());
+	lines.push("\t\tlet account = bytemuck::try_from_bytes_mut::<Self>(data)".to_string());
 	lines.push(
-		"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
 	);
-	lines.push("\t\t}".to_string());
-	lines.push("\t\t// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.".to_string());
-	lines.push("\t\tlet account = unsafe { &mut *(data.as_mut_ptr() as *mut Self) };".to_string());
 	if let Some(discriminator) = &discriminator {
 		lines.push(format!(
 			"\t\tif account.discriminator != {} {{",

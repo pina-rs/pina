@@ -148,7 +148,7 @@ mod tests {
 
 	#[test]
 	fn realloc_instruction_roundtrip() {
-		let ix = ReallocIx::builder().len(PodU16::from(5)).build();
+		let ix = ReallocIx::builder().len(PodU16::from_primitive(5)).build();
 		let bytes = ix.to_bytes();
 		let parsed = ReallocIx::try_from_bytes(bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
 		assert_eq!(u16::from(parsed.len), 5);

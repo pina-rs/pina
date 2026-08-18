@@ -192,11 +192,11 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			.beneficiary(*self.beneficiary.address())
 			.mint(*self.mint.address())
 			.total_amount(args.total_amount)
-			.claimed_amount(PodU64::from(0))
+			.claimed_amount(PodU64::from_primitive(0))
 			.start_ts(args.start_ts)
 			.cliff_ts(args.cliff_ts)
 			.end_ts(args.end_ts)
-			.cancelled(PodBool::from(false))
+			.cancelled(PodBool::from_bool(false))
 			.bump(args.bump)
 			.build();
 		drop(vesting_state);
@@ -275,7 +275,7 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		}
 
 		let mut vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
-		vesting_state.claimed_amount = PodU64::from(next_claimed);
+		vesting_state.claimed_amount = PodU64::from_primitive(next_claimed);
 
 		associated_token_account::instructions::CreateIdempotent {
 			funding_account: self.beneficiary,
@@ -335,7 +335,7 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		}
 
 		let mut vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
-		vesting_state.cancelled = PodBool::from(true);
+		vesting_state.cancelled = PodBool::from_bool(true);
 
 		Ok(())
 	}
@@ -354,7 +354,9 @@ mod tests {
 
 	#[test]
 	fn instruction_roundtrip() {
-		let ix = ClaimInstruction::builder().amount(PodU64::from(10)).build();
+		let ix = ClaimInstruction::builder()
+			.amount(PodU64::from_primitive(10))
+			.build();
 		let bytes = ix.to_bytes();
 		let parsed = ClaimInstruction::try_from_bytes(bytes)
 			.unwrap_or_else(|e| panic!("decode failed: {e:?}"));

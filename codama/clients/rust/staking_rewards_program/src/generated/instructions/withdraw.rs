@@ -78,14 +78,7 @@ impl Withdraw {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
+		let data = bytemuck::bytes_of(&data).to_vec();
 
 		solana_instruction::Instruction {
 			program_id: crate::STAKING_REWARDS_PROGRAM_ID,
@@ -96,14 +89,14 @@ impl Withdraw {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct WithdrawInstructionData {
 	pub discriminator: u8,
-	pub amount: pina::PodU64,
+	pub amount: pina_pod_primitives::PodU64,
 }
 
 impl WithdrawInstructionData {
-	pub const fn new(amount: pina::PodU64) -> Self {
+	pub const fn new(amount: pina_pod_primitives::PodU64) -> Self {
 		Self {
 			discriminator: WITHDRAW_DISCRIMINATOR,
 			amount,

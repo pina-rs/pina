@@ -176,7 +176,7 @@ mod tests {
 	#[test]
 	fn update_cpi_instruction_roundtrip() {
 		let data = UpdateInstruction::builder()
-			.new_price(PodU64::from(99))
+			.new_price(PodU64::from_primitive(99))
 			.build();
 		let decoded = UpdateInstruction::try_from_bytes(data.to_bytes())
 			.unwrap_or_else(|e| panic!("decode update cpi bytes: {e:?}"));

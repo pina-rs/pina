@@ -11,7 +11,7 @@ use client::generated::instructions::OpenPositionInstructionData;
 use client::generated::instructions::Withdraw;
 use client::generated::instructions::WithdrawInstructionData;
 use client::generated::instructions::{self};
-use pina::PodU64;
+use pina_pod_primitives::PodU64;
 use solana_instruction::AccountMeta;
 use solana_pubkey::Pubkey;
 use solana_pubkey::pubkey;
@@ -68,16 +68,7 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 		init_ix.accounts[7],
 		AccountMeta::new_readonly(token_program, false)
 	);
-	assert_eq!(
-		init_ix.data,
-		unsafe {
-			core::slice::from_raw_parts(
-				&init_payload as *const _ as *const u8,
-				core::mem::size_of_val(&init_payload),
-			)
-		}
-		.to_vec()
-	);
+	assert_eq!(init_ix.data, bytemuck::bytes_of(&init_payload).to_vec());
 
 	let position_state = Pubkey::new_unique();
 	let open_position = OpenPosition::new(admin, pool_state, position_state);
@@ -90,16 +81,7 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 		AccountMeta::new_readonly(pool_state, false)
 	);
 	assert_eq!(open_ix.accounts[2], AccountMeta::new(position_state, false));
-	assert_eq!(
-		open_ix.data,
-		unsafe {
-			core::slice::from_raw_parts(
-				&open_payload as *const _ as *const u8,
-				core::mem::size_of_val(&open_payload),
-			)
-		}
-		.to_vec()
-	);
+	assert_eq!(open_ix.data, bytemuck::bytes_of(&open_payload).to_vec());
 
 	let user_stake_ata = Pubkey::new_unique();
 	let deposit = Deposit::new(
@@ -110,7 +92,7 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 		user_stake_ata,
 		token_program,
 	);
-	let deposit_payload = DepositInstructionData::new(PodU64::from(250));
+	let deposit_payload = DepositInstructionData::new(PodU64::from_primitive(250));
 	let deposit_ix = deposit.instruction(deposit_payload);
 	assert_eq!(deposit_ix.accounts.len(), 7);
 	assert_eq!(
@@ -132,13 +114,7 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 	);
 	assert_eq!(
 		deposit_ix.data,
-		unsafe {
-			core::slice::from_raw_parts(
-				&deposit_payload as *const _ as *const u8,
-				core::mem::size_of_val(&deposit_payload),
-			)
-		}
-		.to_vec()
+		bytemuck::bytes_of(&deposit_payload).to_vec()
 	);
 
 	let withdraw = Withdraw::new(
@@ -149,7 +125,7 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 		user_stake_ata,
 		token_program,
 	);
-	let withdraw_payload = WithdrawInstructionData::new(PodU64::from(125));
+	let withdraw_payload = WithdrawInstructionData::new(PodU64::from_primitive(125));
 	let withdraw_ix = withdraw.instruction(withdraw_payload);
 	assert_eq!(withdraw_ix.accounts.len(), 7);
 	assert_eq!(
@@ -167,13 +143,7 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 	);
 	assert_eq!(
 		withdraw_ix.data,
-		unsafe {
-			core::slice::from_raw_parts(
-				&withdraw_payload as *const _ as *const u8,
-				core::mem::size_of_val(&withdraw_payload),
-			)
-		}
-		.to_vec()
+		bytemuck::bytes_of(&withdraw_payload).to_vec()
 	);
 
 	let user_reward_ata = Pubkey::new_unique();
@@ -205,14 +175,5 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 		claim_ix.accounts[6],
 		AccountMeta::new_readonly(pubkey!("11111111111111111111111111111111"), false,)
 	);
-	assert_eq!(
-		claim_ix.data,
-		unsafe {
-			core::slice::from_raw_parts(
-				&claim_payload as *const _ as *const u8,
-				core::mem::size_of_val(&claim_payload),
-			)
-		}
-		.to_vec()
-	);
+	assert_eq!(claim_ix.data, bytemuck::bytes_of(&claim_payload).to_vec());
 }

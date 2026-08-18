@@ -132,7 +132,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		let mut oracle = self.oracle.as_account_mut::<OracleState>(&ID)?;
 		*oracle = OracleState::builder()
 			.authority(*self.payer.address())
-			.price(PodU64::from(0))
+			.price(PodU64::from_primitive(0))
 			.build();
 
 		Ok(())
@@ -204,7 +204,7 @@ mod tests {
 	#[test]
 	fn update_instruction_roundtrip() {
 		let instruction = UpdateInstruction::builder()
-			.new_price(PodU64::from(1_234))
+			.new_price(PodU64::from_primitive(1_234))
 			.build();
 		let bytes = instruction.to_bytes();
 		let decoded =
