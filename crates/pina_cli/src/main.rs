@@ -83,7 +83,7 @@ enum Commands {
 
 #[derive(Subcommand, Debug)]
 enum CodamaCommands {
-	/// Generate IDLs and Rust/JS clients for one or more examples.
+	/// Generate IDLs and Rust, JavaScript, and Dart clients for examples.
 	Generate {
 		/// Directory containing example program crates.
 		#[arg(long, default_value = "examples")]
@@ -100,6 +100,10 @@ enum CodamaCommands {
 		/// Output directory for generated JS clients.
 		#[arg(long, default_value = "codama/clients/js")]
 		js_out: PathBuf,
+
+		/// Output directory for the generated Dart package.
+		#[arg(long, default_value = "codama/clients/dart")]
+		dart_out: PathBuf,
 
 		/// Example name filter. Repeat to generate a subset.
 		#[arg(long = "example")]
@@ -131,9 +135,20 @@ fn main() {
 					idls_dir,
 					rust_out,
 					js_out,
+					dart_out,
 					examples,
 					npx,
-				} => run_codama_generate(examples_dir, idls_dir, rust_out, js_out, examples, npx),
+				} => {
+					run_codama_generate(
+						examples_dir,
+						idls_dir,
+						rust_out,
+						js_out,
+						dart_out,
+						examples,
+						npx,
+					);
+				}
 			}
 		}
 	}
@@ -336,6 +351,7 @@ fn run_codama_generate(
 	idls_dir: PathBuf,
 	rust_out: PathBuf,
 	js_out: PathBuf,
+	dart_out: PathBuf,
 	examples: Vec<String>,
 	npx: String,
 ) {
@@ -344,6 +360,7 @@ fn run_codama_generate(
 		idls_dir,
 		rust_out,
 		js_out,
+		dart_out,
 		examples,
 		npx,
 	};
@@ -357,7 +374,7 @@ fn run_codama_generate(
 	};
 
 	println!(
-		"{} Generated Codama IDLs and Rust/JS clients for {} example(s): {}",
+		"{} Generated Codama IDLs and Rust/JavaScript/Dart clients for {} example(s): {}",
 		"✔".green(),
 		generated_examples.len(),
 		generated_examples.join(", "),

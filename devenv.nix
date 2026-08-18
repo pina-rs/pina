@@ -32,6 +32,7 @@ in
       custom.sbpf-linker
       custom.surfpool
       custom.wait-for-them
+      dart
       dprint
       gcc
       git
@@ -229,10 +230,12 @@ in
           --idls-dir "$DEVENV_ROOT/codama/idls" \
           --rust-out "$DEVENV_ROOT/codama/clients/rust" \
           --js-out "$DEVENV_ROOT/codama/clients/js" \
+          --dart-out "$DEVENV_ROOT/codama/clients/dart" \
           --npx node
         dprint fmt "codama/**"
+        dart format "$DEVENV_ROOT/codama/clients/dart"
       '';
-      description = "Generate Codama IDLs and Rust/JS clients for all examples.";
+      description = "Generate Codama IDLs and Rust/JS/Dart clients for all examples.";
       binary = "bash";
     };
     "codama:test" = {

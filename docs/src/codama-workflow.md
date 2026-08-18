@@ -6,7 +6,7 @@ The flow has three stages:
 
 1. Generate Codama JSON from Rust programs (`pina idl`).
 2. Validate generated JSON against committed fixtures/tests.
-3. Render clients (JS with Codama renderers, Rust with `pina_codama_renderer`).
+3. Render clients (JS and Dart with Codama renderers, Rust with `pina_codama_renderer`).
 
 ## In This Repository
 
@@ -18,10 +18,10 @@ Generate and validate the whole workspace flow with `devenv` scripts:
 # Generate Codama IDLs for all examples.
 codama:idl:all
 
-# Generate Rust + JS clients.
+# Generate Rust + JS + Dart clients.
 codama:clients:generate
 
-# Generate IDLs + Rust/JS clients in one command.
+# Generate IDLs + Rust/JS/Dart clients in one command.
 pina codama generate
 
 # Run the complete Codama pipeline.
@@ -39,7 +39,22 @@ pnpm run test:quasar-svm
 Supporting scripts:
 
 - `scripts/generate-codama-idls.sh`: regenerates `codama/idls/*.json` fixtures for all examples.
-- `scripts/verify-codama-idls.sh`: regenerates IDLs/clients, verifies fixtures via Rust and JS tests, and enforces deterministic no-diff output.
+- `scripts/verify-codama-idls.sh`: regenerates IDLs/clients, verifies fixtures and generated clients with Rust, JS, and Dart tests, and enforces deterministic no-diff output (including untracked files).
+
+The generated Dart package lives in `codama/clients/dart`. It exposes one package-root library per example, pins dependency resolution in `pubspec.lock`, and checks all 20 example IDLs as a single inventory. CI runs `dart format`, `dart analyze --fatal-infos`, and `dart test` over the checked-in output.
+
+### Temporary upstream composition
+
+The Dart integration currently consumes unreleased Solana Kit fixes. The npm renderer is pinned to `codama-renderers-dart@0.5.0` and patched through pnpm with a deterministic Node ESM bundle composed from these exact upstream implementation commits:
+
+- schema normalization and package exports: [openbudgetfun/solana_kit#214](https://github.com/openbudgetfun/solana_kit/pull/214) at `54b49254584758fcc93a5b5b0b99a90100b5e9aa`
+- discriminator enforcement and exact top-level consumption: [openbudgetfun/solana_kit#215](https://github.com/openbudgetfun/solana_kit/pull/215) at `42a1e2cca3a93454693122b3c1d8b10c6fafebea`
+- fixed-capacity overflow rejection: [openbudgetfun/solana_kit#216](https://github.com/openbudgetfun/solana_kit/pull/216) at `fc48fe148cfd0887dae1601075f83960b6db0538`
+- wide enum discriminators: [openbudgetfun/solana_kit#219](https://github.com/openbudgetfun/solana_kit/pull/219) at `5cbe66cd7f4bea49a81509b3abe97c7a91b4bb9a`
+
+The composition also includes null-safe reads for omitted struct fields and instruction arguments. Those two changes are required for the implementation commits above to typecheck together and should move upstream before release.
+
+The Dart package uses immutable Git overrides for the runtime halves of [fixed-capacity rejection](https://github.com/openbudgetfun/solana_kit/pull/216), [canonical boolean and option tags](https://github.com/openbudgetfun/solana_kit/pull/217), and [canonical UTF-8](https://github.com/openbudgetfun/solana_kit/pull/218). Remove `patches/codama-renderers-dart@0.5.0.patch` and the `dependency_overrides` block only after released npm and pub.dev packages contain these changes and the byte-contract suite passes without them.
 
 ## In a Separate Project
 
@@ -65,9 +80,19 @@ const codama = await createFromFile("./idls/my_program.json");
 await codama.accept(renderJsVisitor("./clients/js/my_program"));
 ```
 
-The stock visitor emits the correct fixed-size wire layout, but its generic codecs are intentionally permissive. `pina codama generate` adds Pina's runtime boundary checks: over-capacity strings and vectors fail instead of being truncated, and decoders enforce discriminators, canonical booleans, and strict UTF-8.
+Generated clients are treated as an untrusted boundary. The checked-in contract suite requires fixed-capacity encoders to reject overflow and requires decoders to enforce discriminators, canonical boolean and option tags, exact top-level lengths, and embedded NUL preservation in semantic strings. Fixed byte arrays are intentionally opaque: generated clients preserve their bytes exactly, while the on-chain program's checked helpers validate any application-level length, UTF-8, or element-count convention inside them. A renderer version that cannot satisfy those contracts is rejected instead of producing a client with a different wire format.
 
-### 3. Generate Pina-style Rust clients (optional)
+### 3. Generate Dart clients with Codama
+
+`pina codama generate` renders the same IDLs into the checked-in Dart package at `codama/clients/dart`. Each program has a package-root entrypoint, for example:
+
+```dart
+import 'package:pina_codama_clients/profile_program.dart';
+```
+
+Run `codama:test` to resolve the committed lockfile, format the generated Dart, analyze it with fatal infos, and execute the byte-level contract tests.
+
+### 4. Generate Pina-style Rust clients (optional)
 
 This repository ships `crates/pina_codama_renderer`, which emits Rust models aligned with Pina's discriminator-first, fixed-size POD layouts.
 

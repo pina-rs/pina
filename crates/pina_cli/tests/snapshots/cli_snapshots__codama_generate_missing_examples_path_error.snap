@@ -1,6 +1,6 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
-assertion_line: 174
+assertion_line: 211
 info:
   program: pina
   args:
@@ -14,6 +14,8 @@ info:
     - target/cli-snapshot-temp/codama_generate_missing_examples/rust
     - "--js-out"
     - target/cli-snapshot-temp/codama_generate_missing_examples/js
+    - "--dart-out"
+    - target/cli-snapshot-temp/codama_generate_missing_examples/dart
     - "--npx"
     - target/cli-snapshot-temp/codama_generate_missing_examples/fake-npx.sh
 ---

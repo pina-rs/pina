@@ -6,20 +6,23 @@ use std::process::Output;
 use pina_codama_renderer::RenderConfig;
 use pina_codama_renderer::render_idl_file;
 
+use crate::dart_client::validate_dart_client_idls;
+use crate::dart_client::write_dart_package_barrels;
 use crate::error::CodamaError;
 use crate::generate_idl;
 use crate::js_client::harden_generated_clients;
 
-const JS_RENDER_SCRIPT: &str = r#"
+const CLIENT_RENDER_SCRIPT: &str = r#"
 import { renderVisitor as renderJsVisitor } from "@codama/renderers-js";
-import { createFromJson } from "codama";
+import { renderVisitor as renderDartVisitor } from "codama-renderers-dart";
+import { createFromJson, visit } from "codama";
 import { readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
-const [outputRoot, ...idlPaths] = process.argv.slice(1);
+const [jsOutputRoot, dartOutputRoot, ...idlPaths] = process.argv.slice(1);
 
-if (!outputRoot) {
-	throw new Error("missing output root argument");
+if (!jsOutputRoot || !dartOutputRoot) {
+	throw new Error("missing JavaScript or Dart output root argument");
 }
 
 for (const idlPath of idlPaths.sort()) {
@@ -27,7 +30,15 @@ for (const idlPath of idlPaths.sort()) {
 	const json = readFileSync(idlPath, "utf8");
 	const codama = createFromJson(json);
 	await codama.accept(
-		renderJsVisitor(join(outputRoot, name), {
+		renderJsVisitor(join(jsOutputRoot, name), {
+			formatCode: false,
+			deleteFolderBeforeRendering: true,
+		}),
+	);
+
+	visit(
+		codama.getRoot(),
+		renderDartVisitor(join(dartOutputRoot, "lib", "src", "generated", name), {
 			formatCode: false,
 			deleteFolderBeforeRendering: true,
 		}),
@@ -41,6 +52,7 @@ pub struct CodamaGenerateOptions {
 	pub idls_dir: PathBuf,
 	pub rust_out: PathBuf,
 	pub js_out: PathBuf,
+	pub dart_out: PathBuf,
 	pub examples: Vec<String>,
 	pub npx: String,
 }
@@ -64,6 +76,12 @@ pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, C
 	std::fs::create_dir_all(&options.js_out).map_err(|source| {
 		CodamaError::CreateDir {
 			path: options.js_out.clone(),
+			source,
+		}
+	})?;
+	std::fs::create_dir_all(&options.dart_out).map_err(|source| {
+		CodamaError::CreateDir {
+			path: options.dart_out.clone(),
 			source,
 		}
 	})?;
@@ -108,9 +126,11 @@ pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, C
 		})?;
 	}
 
-	// Generate JavaScript clients.
-	run_js_generation(options, &idl_paths)?;
+	// Validate Dart semantics before generating JavaScript and Dart clients.
+	validate_dart_client_idls(&options.dart_out, &examples, &idl_paths)?;
+	run_client_generation(options, &idl_paths)?;
 	harden_generated_clients(&options.js_out, &examples)?;
+	write_dart_package_barrels(&options.dart_out, &examples)?;
 
 	Ok(examples)
 }
@@ -162,19 +182,19 @@ fn collect_examples(options: &CodamaGenerateOptions) -> Result<Vec<String>, Coda
 	Ok(selected)
 }
 
-fn run_js_generation(
+fn run_client_generation(
 	options: &CodamaGenerateOptions,
 	idl_paths: &[PathBuf],
 ) -> Result<(), CodamaError> {
 	let output = if options.npx == "node" {
-		run_js_generation_with_node(options, idl_paths)?
+		run_client_generation_with_node(options, idl_paths)?
 	} else {
-		match run_js_generation_with_npx(options, idl_paths) {
+		match run_client_generation_with_npx(options, idl_paths) {
 			Ok(output) => output,
 			Err(source)
 				if source.kind() == std::io::ErrorKind::NotFound && options.npx == "npx" =>
 			{
-				run_js_generation_with_pnpm(options, idl_paths)?
+				run_client_generation_with_pnpm(options, idl_paths)?
 			}
 			Err(source) => {
 				return Err(CodamaError::RunCommand {
@@ -213,7 +233,7 @@ fn run_js_generation(
 	})
 }
 
-fn run_js_generation_with_npx(
+fn run_client_generation_with_npx(
 	options: &CodamaGenerateOptions,
 	idl_paths: &[PathBuf],
 ) -> std::io::Result<Output> {
@@ -225,11 +245,14 @@ fn run_js_generation_with_npx(
 		.arg("codama@1.10.1")
 		.arg("-p")
 		.arg("@codama/renderers-js@2.3.1")
+		.arg("-p")
+		.arg("codama-renderers-dart@0.5.0")
 		.arg("node")
 		.arg("--input-type=module")
 		.arg("-e")
-		.arg(JS_RENDER_SCRIPT)
-		.arg(&options.js_out);
+		.arg(CLIENT_RENDER_SCRIPT)
+		.arg(&options.js_out)
+		.arg(&options.dart_out);
 
 	for idl_path in idl_paths {
 		command.arg(idl_path);
@@ -238,7 +261,7 @@ fn run_js_generation_with_npx(
 	command.output()
 }
 
-fn run_js_generation_with_pnpm(
+fn run_client_generation_with_pnpm(
 	options: &CodamaGenerateOptions,
 	idl_paths: &[PathBuf],
 ) -> Result<Output, CodamaError> {
@@ -249,11 +272,14 @@ fn run_js_generation_with_pnpm(
 		.arg("codama@1.10.1")
 		.arg("--package")
 		.arg("@codama/renderers-js@2.3.1")
+		.arg("--package")
+		.arg("codama-renderers-dart@0.5.0")
 		.arg("node")
 		.arg("--input-type=module")
 		.arg("-e")
-		.arg(JS_RENDER_SCRIPT)
-		.arg(&options.js_out);
+		.arg(CLIENT_RENDER_SCRIPT)
+		.arg(&options.js_out)
+		.arg(&options.dart_out);
 
 	for idl_path in idl_paths {
 		command.arg(idl_path);
@@ -267,7 +293,7 @@ fn run_js_generation_with_pnpm(
 	})
 }
 
-fn run_js_generation_with_node(
+fn run_client_generation_with_node(
 	options: &CodamaGenerateOptions,
 	idl_paths: &[PathBuf],
 ) -> Result<Output, CodamaError> {
@@ -275,8 +301,9 @@ fn run_js_generation_with_node(
 	command
 		.arg("--input-type=module")
 		.arg("-e")
-		.arg(JS_RENDER_SCRIPT)
-		.arg(&options.js_out);
+		.arg(CLIENT_RENDER_SCRIPT)
+		.arg(&options.js_out)
+		.arg(&options.dart_out);
 
 	for idl_path in idl_paths {
 		command.arg(idl_path);

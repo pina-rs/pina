@@ -88,11 +88,19 @@ fn codama_generate_success_output_snapshot() {
 	let idls_dir = temp_dir.join("idls");
 	let rust_out = temp_dir.join("rust");
 	let js_out = temp_dir.join("js");
+	let dart_out = temp_dir.join("dart");
 	let js_generated = js_out.join("counter_program/src/generated");
+	let dart_generated = dart_out.join("lib/src/generated/counter_program");
 	fs::create_dir_all(&js_generated).unwrap_or_else(|error| {
 		panic!(
 			"failed to create fake JavaScript client directory {}: {error}",
 			js_generated.display()
+		)
+	});
+	fs::create_dir_all(&dart_generated).unwrap_or_else(|error| {
+		panic!(
+			"failed to create fake Dart client directory {}: {error}",
+			dart_generated.display()
 		)
 	});
 
@@ -109,6 +117,8 @@ fn codama_generate_success_output_snapshot() {
 		.arg(workspace_relative(&rust_out))
 		.arg("--js-out")
 		.arg(workspace_relative(&js_out))
+		.arg("--dart-out")
+		.arg(workspace_relative(&dart_out))
 		.arg("--example")
 		.arg("counter_program")
 		.arg("--npx")
@@ -130,6 +140,11 @@ fn codama_generate_success_output_snapshot() {
 			.join("counter_program")
 			.join("src/generated/mod.rs")
 			.display()
+	);
+	assert!(
+		dart_out.join("lib/counter_program.dart").is_file(),
+		"expected generated Dart package entrypoint at {}",
+		dart_out.join("lib/counter_program.dart").display()
 	);
 	assert!(
 		js_out
@@ -162,6 +177,8 @@ fn codama_generate_unknown_example_error_snapshot() {
 		.arg(workspace_relative(&temp_dir.join("rust")))
 		.arg("--js-out")
 		.arg(workspace_relative(&temp_dir.join("js")))
+		.arg("--dart-out")
+		.arg(workspace_relative(&temp_dir.join("dart")))
 		.arg("--example")
 		.arg("does_not_exist")
 		.arg("--npx")
@@ -187,6 +204,8 @@ fn codama_generate_missing_examples_path_error_snapshot() {
 		.arg(workspace_relative(&temp_dir.join("rust")))
 		.arg("--js-out")
 		.arg(workspace_relative(&temp_dir.join("js")))
+		.arg("--dart-out")
+		.arg(workspace_relative(&temp_dir.join("dart")))
 		.arg("--npx")
 		.arg(fake_npx);
 	assert_cmd_snapshot!("codama_generate_missing_examples_path_error", command);

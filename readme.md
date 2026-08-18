@@ -83,10 +83,10 @@ With `devenv`, the full workflow is available via built-in scripts:
 # Generate Codama IDLs for all examples.
 codama:idl:all
 
-# Generate Rust + JS clients.
+# Generate Rust + JS + Dart clients.
 codama:clients:generate
 
-# Generate IDLs + Rust/JS clients in one command.
+# Generate IDLs + Rust/JS/Dart clients in one command.
 pina codama generate
 
 # Run the complete Codama pipeline.
@@ -103,7 +103,7 @@ pnpm run test:quasar-svm
 
 Rust client generation in this repository uses the custom `pina_codama_renderer` crate (`crates/pina_codama_renderer`) instead of Codama's default Rust renderer. Generated Rust models are native zeropod schemas with discriminator-first storage views and recursive content validation. Instruction builders own and consume an initialized wire buffer; they do not expose a whole-object `to_bytes()` API. Unsupported variable-size or noncanonical layouts fail generation explicitly.
 
-`pina codama generate` also augments the stock JavaScript output with Pina's zeropod boundary checks. Generated encoders reject values that exceed fixed string/vector capacity rather than truncating them, and decoders enforce discriminators, canonical booleans, and strict UTF-8. Rendering a Pina IDL with the stock Codama JavaScript visitor alone does not add those runtime checks.
+`pina codama generate` also augments the stock JavaScript output with Pina's zeropod boundary checks. Generated encoders reject values that exceed fixed field capacity rather than truncating them, and decoders enforce discriminators plus canonical boolean and option tags. Fixed byte arrays remain opaque to generated clients: application helpers, such as the profile program's bounded-text and tag helpers, validate any length, UTF-8, or element-count semantics stored inside those arrays. Advanced semantic string codecs use strict UTF-8. Rendering a Pina IDL with the stock Codama JavaScript visitor alone does not add those runtime checks.
 
 End-to-end setup steps:
 

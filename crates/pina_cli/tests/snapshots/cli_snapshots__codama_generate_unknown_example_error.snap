@@ -13,6 +13,8 @@ info:
     - target/cli-snapshot-temp/codama_generate_unknown_example/rust
     - "--js-out"
     - target/cli-snapshot-temp/codama_generate_unknown_example/js
+    - "--dart-out"
+    - target/cli-snapshot-temp/codama_generate_unknown_example/dart
     - "--example"
     - does_not_exist
     - "--npx"
