@@ -753,6 +753,8 @@ fn checked_close_recipient_balance(
 		return Err(ProgramError::InvalidArgument);
 	}
 
+	account.check_borrow_mut()?;
+
 	checked_close_balance(account.lamports(), recipient.lamports()).inspect_err(|_| {
 		log!("Could not close account: lamport overflow");
 		log_caller();

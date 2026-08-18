@@ -355,10 +355,9 @@ pub fn allocate_account_with_bump<'a>(
 /// Maximum number of bytes an account may grow by in a single instruction.
 ///
 /// This limit is enforced by the Solana runtime. Attempting to grow an account
-/// by more than this amount will cause `resize` to return
-/// `ProgramError::InvalidRealloc`.
+/// by more than this amount returns `ProgramError::InvalidRealloc`.
 #[cfg(feature = "account-resize")]
-pub const MAX_PERMITTED_DATA_INCREASE: usize = 10_240;
+pub const MAX_PERMITTED_DATA_INCREASE: usize = pinocchio::account::MAX_PERMITTED_DATA_INCREASE;
 
 /// Reallocates an account to `new_size` bytes, adjusting rent automatically.
 ///
@@ -375,6 +374,13 @@ pub const MAX_PERMITTED_DATA_INCREASE: usize = 10_240;
 /// The Solana runtime limits account growth to [`MAX_PERMITTED_DATA_INCREASE`]
 /// (10 KiB) per top-level instruction. Exceeding this limit returns
 /// `ProgramError::InvalidRealloc`.
+///
+/// This helper rejects a single growth request larger than that limit before
+/// moving rent lamports. Pinocchio does not expose the account's original
+/// serialized length, so a later growth after an earlier reallocation in the
+/// same instruction can still fail during `resize` after rent lamports have
+/// moved. Propagate that error instead of catching it to preserve transaction
+/// atomicity.
 ///
 /// # Errors
 ///
@@ -413,6 +419,13 @@ pub fn realloc_account(
 /// The Solana runtime limits account growth to [`MAX_PERMITTED_DATA_INCREASE`]
 /// (10 KiB) per top-level instruction. Exceeding this limit returns
 /// `ProgramError::InvalidRealloc`.
+///
+/// This helper rejects a single growth request larger than that limit before
+/// moving rent lamports. Pinocchio does not expose the account's original
+/// serialized length, so a later growth after an earlier reallocation in the
+/// same instruction can still fail during `resize` after rent lamports have
+/// moved. Propagate that error instead of catching it to preserve transaction
+/// atomicity.
 ///
 /// # Errors
 ///
@@ -453,6 +466,14 @@ fn realloc_account_inner(
 	// Early return when the size is unchanged.
 	if new_size == current_size {
 		return Ok(());
+	}
+
+	// `resize` would reject either condition after rent movement. The original
+	// serialized length is not exposed, so cumulative growth is still checked by
+	// the runtime and its error must be propagated by callers.
+	account.check_borrow_mut()?;
+	if new_size.saturating_sub(current_size) > MAX_PERMITTED_DATA_INCREASE {
+		return Err(ProgramError::InvalidRealloc);
 	}
 
 	let rent = Rent::get()?;
