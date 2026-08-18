@@ -5,12 +5,12 @@ expression: output
 #[repr(C)]
 #[derive(
     ::pina::TypedBuilder,
-    ::pina::Pod,
-    ::pina::Zeroable,
     ::core::clone::Clone,
     ::core::marker::Copy,
     ::core::cmp::PartialEq,
-    ::core::cmp::Eq
+    ::core::cmp::Eq,
+    ::pina::Pod,
+    ::pina::Zeroable
 )]
 #[builder(builder_method(vis = "", name = __builder))]
 #[bytemuck(crate = "::pina::bytemuck")]
@@ -45,9 +45,16 @@ const __MYSTRUCT_ALIGNMENT_ASSERTIONS__: () = {
     );
 };
 impl MyStruct {
-    /// Zero out all bytes in the struct including padding bytes. This can be useful when closing an account.
+    /// Zero out all bytes after the discriminator, preserving it. This can be useful when closing an account.
+    #[allow(unsafe_code)]
     pub fn zeroed(&mut self) {
-        ::pina::bytemuck::write_zeroes(self);
+        unsafe {
+            ::core::ptr::write_bytes(
+                (self as *mut Self as *mut u8).add(AcctDisc::BYTES),
+                0,
+                ::core::mem::size_of::<Self>() - AcctDisc::BYTES,
+            );
+        }
     }
     pub fn to_bytes(&self) -> &[u8] {
         ::pina::bytemuck::bytes_of(self)

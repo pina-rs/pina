@@ -47,6 +47,4 @@ impl ::core::convert::TryFrom<u64> for HugeDiscriminator {
         }
     }
 }
-unsafe impl ::pina::Zeroable for HugeDiscriminator {}
-unsafe impl ::pina::Pod for HugeDiscriminator {}
 ::pina::into_discriminator!(HugeDiscriminator, u64);

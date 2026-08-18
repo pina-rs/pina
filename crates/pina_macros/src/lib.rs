@@ -25,6 +25,7 @@ use syn::punctuated::Punctuated;
 use crate::args::InstructionArgs;
 
 mod args;
+mod compact;
 
 #[cfg(test)]
 mod tests;
@@ -583,8 +584,13 @@ fn discriminator_impl(
 			}
 		}
 
-		unsafe impl #crate_path::Zeroable for #enum_name {}
-		unsafe impl #crate_path::Pod for #enum_name {}
+		// NOTE: the discriminator enum deliberately does NOT implement
+		// `Pod`/`Zeroable`. A fieldless enum with explicit discriminants has
+		// restricted validity (only the declared discriminants are valid
+		// values), so casting arbitrary bytes to `&#enum_name` would be
+		// unsound. Discriminators are read via `IntoDiscriminator`, which
+		// validates the primitive through `TryFrom` before constructing the
+		// enum.
 		#crate_path::into_discriminator!(#enum_name, #primitive);
 	};
 
@@ -834,6 +840,7 @@ fn account_impl(
 		crate_path,
 		discriminator,
 		variant,
+		compact,
 	} = args;
 	let (discriminator, variant) =
 		match resolve_discriminator_variant(&discriminator, variant, struct_name) {
@@ -845,16 +852,20 @@ fn account_impl(
 	let repr_attr: Attribute = syn::parse_quote!(#[repr(C)]);
 	item_struct.attrs.push(repr_attr);
 
-	// Add derive macros
-	let derives_to_add: [syn::Path; 7] = [
+	// Add derive macros. Compact accounts skip `Pod`/`Zeroable` because the
+	// on-chain representation is variable-size (header + tail), so the
+	// struct itself is never cast from account bytes.
+	let mut derives_to_add: Vec<syn::Path> = vec![
 		syn::parse_quote!(#crate_path::TypedBuilder),
-		syn::parse_quote!(#crate_path::Pod),
-		syn::parse_quote!(#crate_path::Zeroable),
 		syn::parse_quote!(::core::clone::Clone),
 		syn::parse_quote!(::core::marker::Copy),
 		syn::parse_quote!(::core::cmp::PartialEq),
 		syn::parse_quote!(::core::cmp::Eq),
 	];
+	if !compact.is_present() {
+		derives_to_add.push(syn::parse_quote!(#crate_path::Pod));
+		derives_to_add.push(syn::parse_quote!(#crate_path::Zeroable));
+	}
 
 	let derive_attr = item_struct
 		.attrs
@@ -898,12 +909,14 @@ fn account_impl(
 		syn::parse_quote!(#[builder(builder_method(vis = "", name = __builder))]);
 	item_struct.attrs.push(builder_attr);
 
-	let bytemuck_crate_str = format!(
-		"{}::bytemuck",
-		quote!(#crate_path).to_string().replace(' ', "")
-	);
-	let bytemuck_attr: Attribute = syn::parse_quote!(#[bytemuck(crate = #bytemuck_crate_str)]);
-	item_struct.attrs.push(bytemuck_attr);
+	if !compact.is_present() {
+		let bytemuck_crate_str = format!(
+			"{}::bytemuck",
+			quote!(#crate_path).to_string().replace(' ', "")
+		);
+		let bytemuck_attr: Attribute = syn::parse_quote!(#[bytemuck(crate = #bytemuck_crate_str)]);
+		item_struct.attrs.push(bytemuck_attr);
+	}
 
 	// Add discriminator field
 	let Fields::Named(named_fields) = &mut item_struct.fields else {
@@ -981,39 +994,15 @@ fn account_impl(
 
 	let builder_type_alias = format_ident!("{}BuilderType", struct_name);
 
-	let implementations = quote! {
-		#[allow(dead_code)]
-		type #builder_type_alias = #builder_name<(
-			([u8; #discriminator::BYTES],),
-			#(#builder_generics,)*
-		)>;
-
-		#assertions
-
-		impl #struct_name {
-			/// Zero out all bytes in the struct including padding bytes. This can be useful when closing an account.
-			pub fn zeroed(&mut self) {
-				#crate_path::bytemuck::write_zeroes(self);
-			}
-
-			pub fn to_bytes(&self) -> &[u8] {
-				#crate_path::bytemuck::bytes_of(self)
-			}
-
-			pub fn builder() -> #builder_type_alias {
-				let mut bytes = [0u8; #discriminator::BYTES];
-				<Self as #crate_path::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
-
-				Self::__builder().discriminator(bytes)
-			}
-		}
-
+	let has_discriminator_impl = quote! {
 		impl #crate_path::HasDiscriminator for #struct_name {
 			type Type = #discriminator;
 
 			const VALUE: Self::Type = #discriminator::#variant;
 		}
+	};
 
+	let account_validation_impl = quote! {
 		impl #crate_path::AccountValidation for #struct_name {
 			#[track_caller]
 			fn assert<F>(&self, condition: F) -> Result<&Self, #crate_path::ProgramError>
@@ -1078,6 +1067,85 @@ fn account_impl(
 					Ok(()) => Ok(self),
 				}
 			}
+		}
+	};
+
+	let inherent_impl = if compact.is_present() {
+		quote! {
+			impl #struct_name {
+				pub fn builder() -> #builder_type_alias {
+					let mut bytes = [0u8; #discriminator::BYTES];
+					<Self as #crate_path::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
+
+					Self::__builder().discriminator(bytes)
+				}
+			}
+		}
+	} else {
+		quote! {
+		impl #struct_name {
+			/// Zero out all bytes after the discriminator, preserving it. This can be useful when closing an account.
+			#[allow(unsafe_code)]
+			pub fn zeroed(&mut self) {
+				// SAFETY: the struct is `#[repr(C)]` with the discriminator as
+				// the first field, so bytes `[DISCRIMINATOR_BYTES..]` are the
+				// data fields. All fields are align-1 pod types (compile-time
+				// asserted), so the all-zero bit pattern is valid for each.
+				unsafe {
+					::core::ptr::write_bytes(
+						(self as *mut Self as *mut u8).add(#discriminator::BYTES),
+						0,
+						::core::mem::size_of::<Self>() - #discriminator::BYTES,
+					);
+				}
+			}
+
+			pub fn to_bytes(&self) -> &[u8] {
+				#crate_path::bytemuck::bytes_of(self)
+			}
+
+			pub fn builder() -> #builder_type_alias {
+				let mut bytes = [0u8; #discriminator::BYTES];
+				<Self as #crate_path::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
+
+				Self::__builder().discriminator(bytes)
+			}
+		}
+		}
+	};
+
+	let implementations = if compact.is_present() {
+		let compact_impls = match compact::compact_account_impl(&crate_path, &item_struct) {
+			Ok(v) => v,
+			Err(e) => return e.to_compile_error(),
+		};
+		quote! {
+		#[allow(dead_code)]
+		type #builder_type_alias = #builder_name<(
+			([u8; #discriminator::BYTES],),
+			#(#builder_generics,)*
+		)>;
+
+		#assertions
+
+			#inherent_impl
+			#compact_impls
+			#has_discriminator_impl
+			#account_validation_impl
+		}
+	} else {
+		quote! {
+		#[allow(dead_code)]
+		type #builder_type_alias = #builder_name<(
+			([u8; #discriminator::BYTES],),
+			#(#builder_generics,)*
+		)>;
+
+		#assertions
+
+			#inherent_impl
+			#has_discriminator_impl
+			#account_validation_impl
 		}
 	};
 

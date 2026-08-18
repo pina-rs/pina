@@ -130,3 +130,47 @@ fn test_account_assert_msg_returns_err_when_condition_false() {
 	assert!(result.is_err());
 	assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
 }
+
+#[test]
+fn test_zeroed_preserves_discriminator() {
+	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+
+	let mut config_state = ConfigState::builder()
+		.version(1)
+		.authority(authority)
+		.bump(255)
+		.build();
+
+	let mut expected_discriminator = [0u8; MyAccount::BYTES];
+	MyAccount::ConfigState.write_discriminator(&mut expected_discriminator);
+
+	config_state.zeroed();
+
+	// The discriminator is preserved.
+	assert_eq!(config_state.discriminator, expected_discriminator);
+
+	// All data fields are zeroed.
+	assert_eq!(config_state.version, 0);
+	assert_eq!(config_state.bump, 0);
+	assert_eq!(config_state.authority, Address::default());
+}
+
+#[test]
+fn test_zeroed_roundtrips_through_bytes() {
+	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+
+	let mut config_state = ConfigState::builder()
+		.version(7)
+		.authority(authority)
+		.bump(9)
+		.build();
+
+	config_state.zeroed();
+
+	// The zeroed struct still deserializes as a valid ConfigState because the
+	// discriminator is intact.
+	let bytes = config_state.to_bytes();
+	let deserialized = ConfigState::try_from_bytes(bytes).unwrap();
+	assert_eq!(deserialized.version, 0);
+	assert_eq!(deserialized.bump, 0);
+}
