@@ -30,7 +30,7 @@ use std::alloc::alloc;
 use std::alloc::dealloc;
 
 use pina::Address;
-use pina::introspection::assert_no_cpi;
+use pina::introspection::assert_current_instruction_program_id;
 use pina::introspection::get_current_instruction_index;
 use pina::introspection::get_instruction_count;
 use pina::introspection::has_instruction_after;
@@ -335,7 +335,7 @@ fn get_current_instruction_index_returns_correct_value() {
 }
 
 #[test]
-fn assert_no_cpi_passes_when_top_level() {
+fn current_instruction_program_id_accepts_match() {
 	let instructions = vec![FakeInstruction::simple(PROGRAM_A)];
 	let sysvar_data = build_sysvar_data(&instructions, 0);
 	let builder = AccountBuilder::sysvar(sysvar_data);
@@ -343,12 +343,12 @@ fn assert_no_cpi_passes_when_top_level() {
 	let mut accounts = [UNINIT];
 	let account = unsafe { deserialize_input(&mut input, &mut accounts) };
 
-	assert_no_cpi(account, &PROGRAM_A)
-		.unwrap_or_else(|e| panic!("assert_no_cpi should pass for top-level call: {e:?}"));
+	assert_current_instruction_program_id(account, &PROGRAM_A)
+		.unwrap_or_else(|e| panic!("program ID check should accept a match: {e:?}"));
 }
 
 #[test]
-fn assert_no_cpi_fails_when_program_id_mismatch() {
+fn current_instruction_program_id_rejects_mismatch() {
 	// Current instruction is PROGRAM_A, but we claim to be PROGRAM_B
 	let instructions = vec![FakeInstruction::simple(PROGRAM_A)];
 	let sysvar_data = build_sysvar_data(&instructions, 0);
@@ -357,12 +357,12 @@ fn assert_no_cpi_fails_when_program_id_mismatch() {
 	let mut accounts = [UNINIT];
 	let account = unsafe { deserialize_input(&mut input, &mut accounts) };
 
-	let result = assert_no_cpi(account, &PROGRAM_B);
+	let result = assert_current_instruction_program_id(account, &PROGRAM_B);
 	assert_eq!(result, Err(ProgramError::InvalidAccountData));
 }
 
 #[test]
-fn assert_no_cpi_checks_correct_index() {
+fn current_instruction_program_id_checks_correct_index() {
 	// 3 instructions: [A, B, C], current=1 → B is the current program
 	let instructions = vec![
 		FakeInstruction::simple(PROGRAM_A),
@@ -376,11 +376,11 @@ fn assert_no_cpi_checks_correct_index() {
 	let account = unsafe { deserialize_input(&mut input, &mut accounts) };
 
 	// B is at index 1, so this should pass
-	assert_no_cpi(account, &PROGRAM_B)
+	assert_current_instruction_program_id(account, &PROGRAM_B)
 		.unwrap_or_else(|e| panic!("should pass for PROGRAM_B at index 1: {e:?}"));
 
 	// A is NOT at index 1, so this should fail
-	let result = assert_no_cpi(account, &PROGRAM_A);
+	let result = assert_current_instruction_program_id(account, &PROGRAM_A);
 	assert_eq!(result, Err(ProgramError::InvalidAccountData));
 }
 
@@ -493,8 +493,8 @@ fn instructions_with_accounts_and_data() {
 	let count = get_instruction_count(account).unwrap_or_else(|e| panic!("failed: {e:?}"));
 	assert_eq!(count, 1);
 
-	assert_no_cpi(account, &PROGRAM_A)
-		.unwrap_or_else(|e| panic!("assert_no_cpi should pass: {e:?}"));
+	assert_current_instruction_program_id(account, &PROGRAM_A)
+		.unwrap_or_else(|e| panic!("program ID check should pass: {e:?}"));
 }
 
 #[test]
