@@ -11,8 +11,7 @@
 //! these tests:
 //!
 //! ```sh
-//! cargo build --release --target bpfel-unknown-none -p role_registry_program \
-//!     -Z build-std -F bpf-entrypoint
+//! cargo build-role-registry-program
 //! ```
 //!
 //! Then set `SBF_OUT_DIR` to the directory containing the `.so` file, or place
@@ -21,25 +20,23 @@
 //! ## Running
 //!
 //! ```sh
-//! SBF_OUT_DIR=target/bpfel-unknown-none/release \
+//! SBF_OUT_DIR=target/deploy \
 //!     cargo test -p role_registry_program --test e2e -- --nocapture
 //! ```
-
-use std::mem::size_of;
 
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
-use pina::PodBool;
-use pina::PodU64;
 use pina::ProgramError;
 use role_registry_program::AddRoleInstruction;
 use role_registry_program::DeactivateRoleInstruction;
 use role_registry_program::ID;
 use role_registry_program::InitializeInstruction;
 use role_registry_program::RegistryConfig;
+use role_registry_program::RegistryConfigZc;
 use role_registry_program::RegistryError;
 use role_registry_program::RoleEntry;
+use role_registry_program::RoleEntryZc;
 use role_registry_program::RotateAdminInstruction;
 use role_registry_program::UpdateRoleInstruction;
 use solana_account::Account;
@@ -112,34 +109,44 @@ fn pubkey_to_address(pk: &Pubkey) -> pina::Address {
 // ---------------------------------------------------------------------------
 
 fn initialize_ix_data(bump: u8) -> Vec<u8> {
-	let ix = InitializeInstruction::builder().bump(bump).build();
-	ix.to_bytes().to_vec()
+	let mut data = vec![0u8; InitializeInstruction::SIZE];
+	InitializeInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("initialize instruction failed: {error:?}"))
+		.bump = bump;
+	data
 }
 
 fn add_role_ix_data(role_id: u64, permissions: u64, bump: u8) -> Vec<u8> {
-	let ix = AddRoleInstruction::builder()
-		.role_id(PodU64::from(role_id))
-		.permissions(PodU64::from(permissions))
-		.bump(bump)
-		.build();
-	ix.to_bytes().to_vec()
+	let mut data = vec![0u8; AddRoleInstruction::SIZE];
+	let ix = AddRoleInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("add-role initialization failed: {error:?}"));
+	ix.role_id.set(role_id);
+	ix.permissions.set(permissions);
+	ix.bump = bump;
+	data
 }
 
 fn update_role_ix_data(permissions: u64) -> Vec<u8> {
-	let ix = UpdateRoleInstruction::builder()
-		.permissions(PodU64::from(permissions))
-		.build();
-	ix.to_bytes().to_vec()
+	let mut data = vec![0u8; UpdateRoleInstruction::SIZE];
+	UpdateRoleInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("update-role initialization failed: {error:?}"))
+		.permissions
+		.set(permissions);
+	data
 }
 
 fn deactivate_role_ix_data() -> Vec<u8> {
-	let ix = DeactivateRoleInstruction::builder().build();
-	ix.to_bytes().to_vec()
+	let mut data = vec![0u8; DeactivateRoleInstruction::SIZE];
+	DeactivateRoleInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("deactivate-role initialization failed: {error:?}"));
+	data
 }
 
 fn rotate_admin_ix_data() -> Vec<u8> {
-	let ix = RotateAdminInstruction::builder().build();
-	ix.to_bytes().to_vec()
+	let mut data = vec![0u8; RotateAdminInstruction::SIZE];
+	RotateAdminInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("rotate-admin initialization failed: {error:?}"));
+	data
 }
 
 // ---------------------------------------------------------------------------
@@ -149,12 +156,12 @@ fn rotate_admin_ix_data() -> Vec<u8> {
 /// Build a pre-populated `RegistryConfig` account for testing instructions
 /// that don't need to run Initialize first.
 fn registry_config_account(admin: &Pubkey, role_count: u64, bump: u8, lamports: u64) -> Account {
-	let state = RegistryConfig::builder()
-		.admin(pubkey_to_address(admin))
-		.role_count(PodU64::from(role_count))
-		.bump(bump)
-		.build();
-	let data = state.to_bytes().to_vec();
+	let mut data = vec![0u8; RegistryConfig::SIZE];
+	let state = RegistryConfig::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("registry initialization failed: {error:?}"));
+	state.admin = pubkey_to_address(admin);
+	state.role_count.set(role_count);
+	state.bump = bump;
 	Account {
 		lamports,
 		data,
@@ -175,15 +182,15 @@ fn role_entry_account(
 	bump: u8,
 	lamports: u64,
 ) -> Account {
-	let state = RoleEntry::builder()
-		.registry(pubkey_to_address(registry))
-		.role_id(PodU64::from(role_id))
-		.grantee(pubkey_to_address(grantee))
-		.permissions(PodU64::from(permissions))
-		.active(PodBool::from(active))
-		.bump(bump)
-		.build();
-	let data = state.to_bytes().to_vec();
+	let mut data = vec![0u8; RoleEntry::SIZE];
+	let state = RoleEntry::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("role-entry initialization failed: {error:?}"));
+	state.registry = pubkey_to_address(registry);
+	state.role_id.set(role_id);
+	state.grantee = pubkey_to_address(grantee);
+	state.permissions.set(permissions);
+	state.active.set(active);
+	state.bump = bump;
 	Account {
 		lamports,
 		data,
@@ -239,7 +246,7 @@ fn initialize_creates_registry_config() {
 		.get_account(&registry_pda)
 		.expect("registry_config PDA should exist after Initialize");
 
-	let registry_config: &RegistryConfig =
+	let registry_config: &RegistryConfigZc =
 		<RegistryConfig as pina::ZeroPodFixed>::from_bytes(&registry_account.data).unwrap();
 	assert_eq!(
 		registry_config.admin,
@@ -247,7 +254,7 @@ fn initialize_creates_registry_config() {
 		"admin should be stored in RegistryConfig"
 	);
 	assert_eq!(
-		u64::from(registry_config.role_count),
+		registry_config.role_count.get(),
 		0,
 		"role_count should start at 0"
 	);
@@ -318,9 +325,9 @@ fn full_flow_initialize_add_update_deactivate() {
 		.unwrap_or_else(|| panic!("registry_pda not found after Initialize"));
 
 	// Verify role_count == 0 after Initialize.
-	let registry_config: &RegistryConfig =
+	let registry_config: &RegistryConfigZc =
 		<RegistryConfig as pina::ZeroPodFixed>::from_bytes(&registry_after_init.data).unwrap();
-	assert_eq!(u64::from(registry_config.role_count), 0);
+	assert_eq!(registry_config.role_count.get(), 0);
 
 	// ----- Step 2: AddRole -----
 
@@ -369,22 +376,22 @@ fn full_flow_initialize_add_update_deactivate() {
 		.unwrap_or_else(|| panic!("admin not found after AddRole"));
 
 	// Verify role_count incremented to 1 and role entry is active.
-	let registry_config: &RegistryConfig =
+	let registry_config: &RegistryConfigZc =
 		<RegistryConfig as pina::ZeroPodFixed>::from_bytes(&registry_after_add.data).unwrap();
 	assert_eq!(
-		u64::from(registry_config.role_count),
+		registry_config.role_count.get(),
 		1,
 		"role_count should be 1 after AddRole"
 	);
 
-	let role_entry: &RoleEntry =
+	let role_entry: &RoleEntryZc =
 		<RoleEntry as pina::ZeroPodFixed>::from_bytes(&role_entry_after_add.data).unwrap();
 	assert!(
-		bool::from(role_entry.active),
+		role_entry.active.get(),
 		"role should be active after AddRole"
 	);
-	assert_eq!(u64::from(role_entry.permissions), 0b0000_0111);
-	assert_eq!(u64::from(role_entry.role_id), role_id);
+	assert_eq!(role_entry.permissions.get(), 0b0000_0111);
+	assert_eq!(role_entry.role_id.get(), role_id);
 
 	// ----- Step 3: UpdateRole -----
 
@@ -427,15 +434,15 @@ fn full_flow_initialize_add_update_deactivate() {
 		.unwrap_or_else(|| panic!("admin not found after UpdateRole"));
 
 	// Verify permissions were updated.
-	let role_entry: &RoleEntry =
+	let role_entry: &RoleEntryZc =
 		<RoleEntry as pina::ZeroPodFixed>::from_bytes(&role_entry_after_update.data).unwrap();
 	assert_eq!(
-		u64::from(role_entry.permissions),
+		role_entry.permissions.get(),
 		0b1111_1111,
 		"permissions should be updated after UpdateRole"
 	);
 	assert!(
-		bool::from(role_entry.active),
+		role_entry.active.get(),
 		"role should still be active after UpdateRole"
 	);
 
@@ -470,10 +477,10 @@ fn full_flow_initialize_add_update_deactivate() {
 		.get_account(&role_entry_pda)
 		.expect("role_entry_pda should exist after DeactivateRole");
 
-	let role_entry: &RoleEntry =
+	let role_entry: &RoleEntryZc =
 		<RoleEntry as pina::ZeroPodFixed>::from_bytes(&role_entry_after_deactivate.data).unwrap();
 	assert!(
-		!bool::from(role_entry.active),
+		!role_entry.active.get(),
 		"role should be inactive after DeactivateRole"
 	);
 
@@ -569,7 +576,7 @@ fn rotate_admin_changes_admin() {
 		.get_account(&registry_pda)
 		.expect("registry_pda should exist after RotateAdmin");
 
-	let registry_config: &RegistryConfig =
+	let registry_config: &RegistryConfigZc =
 		<RegistryConfig as pina::ZeroPodFixed>::from_bytes(&registry_account.data).unwrap();
 	assert_eq!(
 		registry_config.admin,
@@ -593,11 +600,8 @@ fn deactivate_inactive_role_fails() {
 	let role_id: u64 = 1;
 	let (role_entry_pda, role_entry_bump) = derive_role_entry_pda(&registry_pda, role_id);
 
-	let registry_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<RegistryConfig>());
-	let role_entry_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<RoleEntry>());
+	let registry_lamports = mollusk.sysvars.rent.minimum_balance(RegistryConfig::SIZE);
+	let role_entry_lamports = mollusk.sysvars.rent.minimum_balance(RoleEntry::SIZE);
 
 	// Pre-built accounts: active=false on the RoleEntry.
 	let registry_acct = registry_config_account(&admin, 1, registry_bump, registry_lamports);
@@ -652,10 +656,7 @@ fn wrong_admin_cannot_add_role() {
 	let role_id: u64 = 5;
 	let (role_entry_pda, role_entry_bump) = derive_role_entry_pda(&registry_pda, role_id);
 
-	let registry_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<RegistryConfig>());
+	let registry_lamports = mollusk.sysvars.rent.minimum_balance(RegistryConfig::SIZE);
 
 	// Pre-built RegistryConfig with admin = admin_a.
 	let registry_acct = registry_config_account(&admin_a, 0, registry_bump, registry_lamports);
@@ -720,11 +721,8 @@ fn update_role_on_wrong_registry_fails() {
 	// The role entry PDA is derived from registry A.
 	let (role_entry_pda, role_entry_bump) = derive_role_entry_pda(&registry_a_pda, role_id);
 
-	let registry_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<RegistryConfig>());
-	let role_entry_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<RoleEntry>());
+	let registry_lamports = mollusk.sysvars.rent.minimum_balance(RegistryConfig::SIZE);
+	let role_entry_lamports = mollusk.sysvars.rent.minimum_balance(RoleEntry::SIZE);
 
 	// Registry A account (correct registry for the role entry).
 	let _registry_a_acct = registry_config_account(&admin, 1, registry_a_bump, registry_lamports);

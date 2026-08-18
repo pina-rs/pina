@@ -40,30 +40,23 @@ pub(crate) fn render_account_page(
 	pda: Option<&PdaNode>,
 ) -> Result<String> {
 	let account_name = pascal(account.name.as_ref());
+	let zc_name = format!("{account_name}Zc");
 	let context = format!("account `{account_name}`");
 	let discriminator =
 		render_constant_discriminator(account.name.as_ref(), &account.discriminators, &context)?;
 
 	let data_type = account.data.get_nested_type_node();
 	let mut field_lines = Vec::new();
-	let mut ctor_args = Vec::new();
-	let mut ctor_inits = Vec::new();
-	let mut pod_fields = Vec::new();
-
 	for doc_line in render_docs(&account.docs, 0) {
 		field_lines.push(doc_line);
 	}
-
 	if let Some(discriminator) = &discriminator {
 		field_lines.push(format!("\tpub discriminator: {},", discriminator.ty));
-		pod_fields.push(("discriminator".to_string(), discriminator.ty.clone()));
 	}
-
 	for field in &data_type.fields {
 		if discriminator.is_some() && field.name.as_ref() == "discriminator" {
 			continue;
 		}
-
 		let field_name = snake(field.name.as_ref());
 		let field_context = format!("{account_name}.{field_name}");
 		let field_type = render_type_for_pod(&field.r#type, &field_context)?;
@@ -71,57 +64,15 @@ pub(crate) fn render_account_page(
 			field_lines.push(doc_line);
 		}
 		field_lines.push(format!("\tpub {field_name}: {field_type},"));
-		pod_fields.push((field_name.clone(), field_type.clone()));
-		ctor_args.push(format!("{field_name}: {field_type}"));
-		ctor_inits.push(format!("\t\t\t{field_name},"));
 	}
 
 	let mut lines = Vec::new();
+	lines.push("use pina::zeropod;".to_string());
 	lines.push(String::new());
-	lines.push("#[repr(C)]".to_string());
-	lines.push("#[derive(Clone, Copy, Debug, PartialEq, Eq)]".to_string());
+	lines.push("#[derive(pina::ZeroPod)]".to_string());
 	lines.push(format!("pub struct {account_name} {{"));
 	lines.extend(field_lines);
 	lines.push("}".to_string());
-	lines.push(String::new());
-
-	lines.push(format!("impl pina::PinaSerialize for {account_name} {{"));
-	lines.push("\tfn write_bytes(&self, output: &mut [u8]) {".to_string());
-	lines.push("\t\tassert_eq!(output.len(), core::mem::size_of::<Self>());".to_string());
-	lines.push("\t\toutput.fill(0);".to_string());
-	lines.push("\t\tlet mut offset = 0usize;".to_string());
-	for (field_name, field_type) in &pod_fields {
-		lines.push(format!(
-			"\t\tlet field_size = core::mem::size_of::<{field_type}>();"
-		));
-		lines.push(format!(
-			"\t\tpina::PinaSerialize::write_bytes(&self.{field_name}, &mut output[offset..offset \
-			 + field_size]);"
-		));
-		lines.push("\t\toffset += field_size;".to_string());
-	}
-	lines.push("\t\tdebug_assert_eq!(offset, output.len());".to_string());
-	lines.push("\t}".to_string());
-	lines.push("}".to_string());
-	lines.push(String::new());
-
-	lines.push(format!("impl pina::ZcValidate for {account_name} {{"));
-	lines.push("\tfn validate_ref(value: &Self) -> Result<(), pina::ZeroPodError> {".to_string());
-	for (field_name, field_type) in &pod_fields {
-		lines.push(format!(
-			"\t\t<{field_type} as pina::ZcValidate>::validate_ref(&value.{field_name})?;"
-		));
-	}
-	lines.push("\t\tOk(())".to_string());
-	lines.push("\t}".to_string());
-	lines.push("}".to_string());
-	lines.push(String::new());
-	lines.push(
-		"// SAFETY: all rendered fields are align-1, padding-free ZcElem values;".to_string(),
-	);
-	lines.push("// validate_ref recursively validates every field before safe access.".to_string());
-	lines.push("#[allow(unsafe_code)]".to_string());
-	lines.push(format!("unsafe impl pina::ZcElem for {account_name} {{}}"));
 	lines.push(String::new());
 
 	if let Some(discriminator) = &discriminator {
@@ -133,100 +84,83 @@ pub(crate) fn render_account_page(
 	}
 
 	lines.push(format!("impl {account_name} {{"));
-	lines.push("\tpub const LEN: usize = core::mem::size_of::<Self>();".to_string());
-	lines.push(String::new());
-
-	if ctor_args.is_empty() {
-		lines.push("\tpub const fn new() -> Self {".to_string());
-		lines.push("\t\tSelf {".to_string());
-
-		if let Some(discriminator) = &discriminator {
-			lines.push(format!("\t\t\tdiscriminator: {},", discriminator.name));
-		}
-
-		lines.push("\t\t}".to_string());
-		lines.push("\t}".to_string());
-	} else {
-		lines.push(format!(
-			"\tpub const fn new({}) -> Self {{",
-			ctor_args.join(", ")
-		));
-		lines.push("\t\tSelf {".to_string());
-
-		if let Some(discriminator) = &discriminator {
-			lines.push(format!("\t\t\tdiscriminator: {},", discriminator.name));
-		}
-
-		lines.extend(ctor_inits);
-		lines.push("\t\t}".to_string());
-		lines.push("\t}".to_string());
-	}
-
-	lines.push(String::new());
-	lines.push(
-		"\tpub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {"
-			.to_string(),
-	);
-	lines.push("\t\tlet account = pina::pod_from_bytes::<Self>(data)".to_string());
-	lines.push(
-		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
-	);
-	if let Some(discriminator) = &discriminator {
-		lines.push(format!(
-			"\t\tif account.discriminator != {} {{",
-			discriminator.name
-		));
-		lines.push(
-			"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
-		);
-		lines.push("\t\t}".to_string());
-	}
-	lines.push("\t\tOk(account)".to_string());
-	lines.push("\t}".to_string());
-	lines.push(String::new());
-	lines.push(
-		"\tpub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, \
-		 solana_program_error::ProgramError> {"
-			.to_string(),
-	);
-	lines.push("\t\tlet account = pina::pod_from_bytes_mut::<Self>(data)".to_string());
-	lines.push(
-		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
-	);
-	if let Some(discriminator) = &discriminator {
-		lines.push(format!(
-			"\t\tif account.discriminator != {} {{",
-			discriminator.name
-		));
-		lines.push(
-			"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
-		);
-		lines.push("\t\t}".to_string());
-	}
-	lines.push("\t\tOk(account)".to_string());
-	lines.push("\t}".to_string());
-	lines.push("}".to_string());
+	lines.push("\tpub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;".to_string());
 	lines.push(String::new());
 	lines.push(format!(
-		"impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for {account_name} {{"
+		"\tpub fn initialize(data: &mut [u8]) -> Result<&mut {zc_name}, \
+		 solana_program_error::ProgramError> {{"
 	));
-	lines.push("\ttype Error = solana_program_error::ProgramError;".to_string());
-	lines.push(String::new());
+	lines.push("\t\tif data.len() != Self::LEN {".to_string());
 	lines.push(
-		"\tfn try_from(account_info: &solana_account_info::AccountInfo<'a>) -> Result<Self, \
-		 Self::Error> {"
-			.to_string(),
-	);
-	lines.push(format!(
-		"\t\tif account_info.owner != &crate::{primary_program_const} {{"
-	));
-	lines.push(
-		"\t\t\treturn Err(solana_program_error::ProgramError::IncorrectProgramId);".to_string(),
+		"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
 	);
 	lines.push("\t\t}".to_string());
-	lines.push("\t\tlet data_ref = account_info.try_borrow_data()?;".to_string());
-	lines.push("\t\tlet account = Self::from_bytes(&data_ref)?;".to_string());
-	lines.push("\t\tOk(*account)".to_string());
+	lines.push("\t\tdata.fill(0);".to_string());
+	lines.push("\t\tlet account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)".to_string());
+	lines.push(
+		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
+	);
+	if let Some(discriminator) = &discriminator {
+		lines.push(format!(
+			"\t\taccount.discriminator = {};",
+			discriminator.name
+		));
+	}
+	lines.push("\t\tOk(account)".to_string());
+	lines.push("\t}".to_string());
+	lines.push(String::new());
+
+	lines.push(format!(
+		"\tpub fn from_bytes(data: &[u8]) -> Result<&{zc_name}, \
+		 solana_program_error::ProgramError> {{"
+	));
+	lines.push("\t\tif data.len() != Self::LEN {".to_string());
+	lines.push(
+		"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+	);
+	lines.push("\t\t}".to_string());
+	lines.push("\t\tlet account = <Self as pina::ZeroPodFixed>::from_bytes(data)".to_string());
+	lines.push(
+		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
+	);
+	if let Some(discriminator) = &discriminator {
+		lines.push(format!(
+			"\t\tif account.discriminator != {} {{",
+			discriminator.name
+		));
+		lines.push(
+			"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+		);
+		lines.push("\t\t}".to_string());
+	}
+	lines.push("\t\tOk(account)".to_string());
+	lines.push("\t}".to_string());
+	lines.push(String::new());
+
+	lines.push(format!(
+		"\tpub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut {zc_name}, \
+		 solana_program_error::ProgramError> {{"
+	));
+	lines.push("\t\tif data.len() != Self::LEN {".to_string());
+	lines.push(
+		"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+	);
+	lines.push("\t\t}".to_string());
+	lines.push("\t\tlet account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)".to_string());
+	lines.push(
+		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
+	);
+	if let Some(discriminator) = &discriminator {
+		lines.push(format!(
+			"\t\tif account.discriminator != {} {{",
+			discriminator.name
+		));
+		lines.push(
+			"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+		);
+		lines.push("\t\t}".to_string());
+	}
+	lines.push("\t\tOk(account)".to_string());
 	lines.push("\t}".to_string());
 	lines.push("}".to_string());
 

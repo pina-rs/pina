@@ -514,9 +514,30 @@ in
             --manifest-path examples/profile_program/Cargo.toml \
             --sbf-out-dir target/deploy \
             --features bpf-entrypoint
+          "$cargo_build_sbf_real" \
+            --skip-tools-install \
+            --tools-version v1.54 \
+            --manifest-path examples/role_registry_program/Cargo.toml \
+            --sbf-out-dir target/deploy \
+            --features bpf-entrypoint
+          "$cargo_build_sbf_real" \
+            --skip-tools-install \
+            --tools-version v1.54 \
+            --manifest-path examples/staking_rewards_program/Cargo.toml \
+            --sbf-out-dir target/deploy \
+            --features bpf-entrypoint
+          "$cargo_build_sbf_real" \
+            --skip-tools-install \
+            --tools-version v1.54 \
+            --manifest-path examples/vesting_program/Cargo.toml \
+            --sbf-out-dir target/deploy \
+            --features bpf-entrypoint
         else
           cargo build-escrow-program
           cargo build-profile-program
+          cargo build-role-registry-program
+          cargo build-staking-rewards-program
+          cargo build-vesting-program
         fi
         cargo test --locked -p pina_bpf bpf_build_ -- --ignored
 
@@ -956,6 +977,22 @@ in
 
         profile_bin=${lib.escapeShellArg "${currentDir}/.devenv/profile/bin"}
         export PATH="$profile_bin''${PATH:+:$PATH}"
+
+        # Git invokes hooks outside `devenv shell`, while clippy and the custom
+        # dylints compile native OpenSSL/libgit2 dependencies. Re-enter the
+        # pinned shell once so the compiler, SDK, and library paths are complete.
+        if [ -z "''${DEVENV_ROOT:-}" ]; then
+          exec ${pkgs.devenv}/bin/devenv shell -- "$profile_bin/lint:push"
+        fi
+
+        # The Nix clang wrapper does not infer Xcode's SDK when cc-rs compiles
+        # vendored C dependencies. Supply it explicitly without affecting Linux.
+        if [ "$(uname -s)" = "Darwin" ]; then
+          sdk_root="$(/usr/bin/xcrun --sdk macosx --show-sdk-path)"
+          export SDKROOT="$sdk_root"
+          export CFLAGS="-isysroot $sdk_root''${CFLAGS:+ $CFLAGS}"
+          export CXXFLAGS="-isysroot $sdk_root''${CXXFLAGS:+ $CXXFLAGS}"
+        fi
 
         run_step() {
           local name="$1"

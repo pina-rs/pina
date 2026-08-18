@@ -20,7 +20,7 @@
 					"- `PinaAccount` and zeropod validation for checked zero-copy access.",
 					"- `HasDiscriminator` linking this account to",
 					"`ProfileAccountType::ProfileState`.",
-					"- `TypedBuilder` for ergonomic construction.",
+					"- `initialize` and `try_from_bytes` helpers for caller-owned storage.",
 					"",
 					"Layout (231 bytes total):",
 					"```text",
@@ -67,8 +67,8 @@
 							"kind": "structFieldTypeNode",
 							"name": "name",
 							"docs": [
-								"The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8",
-								"bytes."
+								"The profile display name. The generated view uses one length byte plus",
+								"32 bytes of UTF-8 capacity."
 							],
 							"type": {
 								"kind": "fixedSizeTypeNode",
@@ -91,8 +91,8 @@
 							"kind": "structFieldTypeNode",
 							"name": "bio",
 							"docs": [
-								"A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8",
-								"bytes."
+								"A longer free-form bio. The generated view uses one length byte plus",
+								"128 bytes of UTF-8 capacity."
 							],
 							"type": {
 								"kind": "fixedSizeTypeNode",
@@ -115,8 +115,8 @@
 							"kind": "structFieldTypeNode",
 							"name": "tags",
 							"docs": [
-								"Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte",
-								"elements."
+								"Up to 8 tags. The generated view uses a two-byte count followed by",
+								"eight little-endian `u64` slots."
 							],
 							"type": {
 								"kind": "fixedSizeTypeNode",
@@ -187,8 +187,8 @@
 				"docs": [
 					"Instruction data for `Initialize`.",
 					"",
-					"Contains the PDA bump seed and the initial name/bio. The `PodString`",
-					"fields carry their own length prefix, so the client writes",
+					"Contains the PDA bump seed and the initial name/bio. The generated string",
+					"views carry their own length prefix, so the client writes",
 					"`discriminator + bump + len(name) + name + len(bio) + bio`."
 				],
 				"accounts": [

@@ -43,10 +43,10 @@ use crate::ir::InstructionAccountIr;
 use crate::ir::InstructionIr;
 use crate::ir::PdaIr;
 use crate::ir::PdaSeedIr;
-use crate::ir::PodEnumIr;
 use crate::ir::ProgramIr;
+use crate::ir::ZeroPodEnumIr;
 use crate::parse::types::rust_type_to_codama;
-use crate::parse::types::try_rust_type_to_codama_with_pod_enums;
+use crate::parse::types::try_rust_type_to_codama_with_zeropod_enums;
 
 /// Validate every IR type mapping and convert a `ProgramIr` into a Codama
 /// `RootNode`.
@@ -56,7 +56,7 @@ pub fn try_ir_to_root_node(ir: &ProgramIr) -> Result<RootNode, IdlError> {
 			validate_type_mapping(
 				&field.rust_type,
 				format!("account `{}.{}`", account.name, field.name),
-				&ir.pod_enums,
+				&ir.zeropod_enums,
 			)?;
 		}
 	}
@@ -66,7 +66,7 @@ pub fn try_ir_to_root_node(ir: &ProgramIr) -> Result<RootNode, IdlError> {
 			validate_type_mapping(
 				&argument.rust_type,
 				format!("instruction `{}.{}`", instruction.name, argument.name),
-				&ir.pod_enums,
+				&ir.zeropod_enums,
 			)?;
 		}
 	}
@@ -85,9 +85,9 @@ pub fn try_ir_to_root_node(ir: &ProgramIr) -> Result<RootNode, IdlError> {
 fn validate_type_mapping(
 	ty: &str,
 	context: String,
-	pod_enums: &[PodEnumIr],
+	zeropod_enums: &[ZeroPodEnumIr],
 ) -> Result<(), IdlError> {
-	try_rust_type_to_codama_with_pod_enums(ty, pod_enums)
+	try_rust_type_to_codama_with_zeropod_enums(ty, zeropod_enums)
 		.map(|_| ())
 		.map_err(|reason| {
 			IdlError::UnsupportedType {
@@ -102,17 +102,20 @@ fn validate_type_mapping(
 pub fn ir_to_root_node(ir: &ProgramIr) -> RootNode {
 	let mut program = ProgramNode::new(ir.name.as_str(), ir.public_key.as_str());
 
-	for pod_enum in &ir.pod_enums {
-		program = program.add_defined_type(build_pod_enum_node(pod_enum));
+	for zeropod_enum in &ir.zeropod_enums {
+		program = program.add_defined_type(build_zeropod_enum_node(zeropod_enum));
 	}
 
 	for account in &ir.accounts {
-		program = program.add_account(build_account_node(account, &ir.pod_enums));
+		program = program.add_account(build_account_node(account, &ir.zeropod_enums));
 	}
 
 	for instruction in &ir.instructions {
-		program =
-			program.add_instruction(build_instruction_node(instruction, &ir.pdas, &ir.pod_enums));
+		program = program.add_instruction(build_instruction_node(
+			instruction,
+			&ir.pdas,
+			&ir.zeropod_enums,
+		));
 	}
 
 	for pda in &ir.pdas {
@@ -126,8 +129,8 @@ pub fn ir_to_root_node(ir: &ProgramIr) -> RootNode {
 	RootNode::new(program)
 }
 
-fn build_pod_enum_node(pod_enum: &PodEnumIr) -> DefinedTypeNode {
-	let variants = pod_enum
+fn build_zeropod_enum_node(zeropod_enum: &ZeroPodEnumIr) -> DefinedTypeNode {
+	let variants = zeropod_enum
 		.variants
 		.iter()
 		.map(|variant| {
@@ -136,15 +139,15 @@ fn build_pod_enum_node(pod_enum: &PodEnumIr) -> DefinedTypeNode {
 			EnumVariantTypeNode::Empty(node)
 		})
 		.collect();
-	let format = match pod_enum.repr_size {
+	let format = match zeropod_enum.repr_size {
 		2 => NumberFormat::U16,
 		4 => NumberFormat::U32,
 		8 => NumberFormat::U64,
 		_ => NumberFormat::U8,
 	};
 	let mut node = DefinedTypeNode {
-		name: pod_enum.zc_name.as_str().into(),
-		docs: pod_enum.docs.clone().into(),
+		name: zeropod_enum.name.as_str().into(),
+		docs: zeropod_enum.docs.clone().into(),
 		r#type: Box::new(
 			EnumTypeNode {
 				variants,
@@ -154,18 +157,18 @@ fn build_pod_enum_node(pod_enum: &PodEnumIr) -> DefinedTypeNode {
 		),
 	};
 	if node.docs.is_empty() {
-		node.docs = vec![format!("Zero-copy companion for `{}`.", pod_enum.name)].into();
+		node.docs = vec![format!("Zeropod schema enum `{}`.", zeropod_enum.name)].into();
 	}
 	node
 }
 
-fn build_account_node(account: &AccountIr, pod_enums: &[PodEnumIr]) -> AccountNode {
+fn build_account_node(account: &AccountIr, zeropod_enums: &[ZeroPodEnumIr]) -> AccountNode {
 	let mut fields = vec![build_account_discriminator_field(&account.discriminator)];
 	fields.extend(
 		account
 			.fields
 			.iter()
-			.map(|field| build_struct_field(field, pod_enums)),
+			.map(|field| build_struct_field(field, zeropod_enums)),
 	);
 
 	let data = StructTypeNode::new(fields);
@@ -186,7 +189,7 @@ fn build_account_node(account: &AccountIr, pod_enums: &[PodEnumIr]) -> AccountNo
 fn build_instruction_node(
 	instruction: &InstructionIr,
 	pdas: &[PdaIr],
-	pod_enums: &[PodEnumIr],
+	zeropod_enums: &[ZeroPodEnumIr],
 ) -> InstructionNode {
 	let accounts: Vec<InstructionAccountNode> = instruction
 		.accounts
@@ -200,7 +203,7 @@ fn build_instruction_node(
 	arguments.extend(instruction.arguments.iter().map(|f| {
 		InstructionArgumentNode::new(
 			f.name.as_str(),
-			try_rust_type_to_codama_with_pod_enums(&f.rust_type, pod_enums)
+			try_rust_type_to_codama_with_zeropod_enums(&f.rust_type, zeropod_enums)
 				.unwrap_or_else(|_| rust_type_to_codama(&f.rust_type)),
 		)
 	}));
@@ -301,8 +304,8 @@ fn build_default_value(default_value: &DefaultValueIr) -> InstructionInputValueN
 	}
 }
 
-fn build_struct_field(field: &FieldIr, pod_enums: &[PodEnumIr]) -> StructFieldTypeNode {
-	let type_node = try_rust_type_to_codama_with_pod_enums(&field.rust_type, pod_enums)
+fn build_struct_field(field: &FieldIr, zeropod_enums: &[ZeroPodEnumIr]) -> StructFieldTypeNode {
+	let type_node = try_rust_type_to_codama_with_zeropod_enums(&field.rust_type, zeropod_enums)
 		.unwrap_or_else(|_| rust_type_to_codama(&field.rust_type));
 	let mut node = StructFieldTypeNode::new(field.name.as_str(), type_node);
 
@@ -421,7 +424,7 @@ mod tests {
 		let ir = ProgramIr {
 			name: "discriminator_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
-			pod_enums: vec![],
+			zeropod_enums: vec![],
 			accounts: vec![AccountIr {
 				name: "State".to_string(),
 				pda_name: None,
@@ -470,7 +473,7 @@ mod tests {
 		let ir = ProgramIr {
 			name: "unsupported_collection_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
-			pod_enums: vec![],
+			zeropod_enums: vec![],
 			accounts: vec![AccountIr {
 				name: "State".to_string(),
 				pda_name: None,
@@ -498,20 +501,19 @@ mod tests {
 	}
 
 	#[test]
-	fn lowers_local_pod_enum_companions() {
+	fn lowers_local_zeropod_enums() {
 		let ir = ProgramIr {
-			name: "pod_enum_program".to_string(),
+			name: "zeropod_enum_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
-			pod_enums: vec![PodEnumIr {
+			zeropod_enums: vec![ZeroPodEnumIr {
 				name: "Color".to_string(),
-				zc_name: "ColorZc".to_string(),
 				repr_size: 1,
 				variants: vec![
-					crate::ir::PodEnumVariantIr {
+					crate::ir::ZeroPodEnumVariantIr {
 						name: "Red".to_string(),
 						value: 0,
 					},
-					crate::ir::PodEnumVariantIr {
+					crate::ir::ZeroPodEnumVariantIr {
 						name: "Blue".to_string(),
 						value: 1,
 					},
@@ -524,12 +526,12 @@ mod tests {
 				fields: vec![
 					FieldIr {
 						name: "color".to_string(),
-						rust_type: "ColorZc".to_string(),
+						rust_type: "Color".to_string(),
 						docs: vec![],
 					},
 					FieldIr {
 						name: "colors".to_string(),
-						rust_type: "PodVec<ColorZc, 8>".to_string(),
+						rust_type: "Vec<Color, 8>".to_string(),
 						docs: vec![],
 					},
 				],
@@ -545,7 +547,7 @@ mod tests {
 		};
 
 		let root = try_ir_to_root_node(&ir).unwrap_or_else(|error| panic!("{error}"));
-		assert_eq!(root.program.defined_types[0].name.as_ref(), "colorZc");
+		assert_eq!(root.program.defined_types[0].name.as_ref(), "color");
 		let account = root.program.accounts[0].data.get_nested_type_node();
 		assert!(matches!(
 			account.fields[1].r#type.as_ref(),
@@ -562,7 +564,7 @@ mod tests {
 		let ir = ProgramIr {
 			name: "default_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
-			pod_enums: vec![],
+			zeropod_enums: vec![],
 			accounts: vec![],
 			instructions: vec![InstructionIr {
 				name: "initialize".to_string(),

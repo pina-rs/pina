@@ -29,12 +29,12 @@ pub enum VaultAccount {
 #[account(discriminator = VaultAccount)]
 pub struct VaultState {
 	pub authority: Address,
-	pub balance: PodU64,
+	pub balance: u64,
 }
 
 #[instruction(discriminator = VaultInstruction, variant = Withdraw)]
 pub struct WithdrawInstruction {
-	pub amount: PodU64,
+	pub amount: u64,
 }
 
 #[derive(Accounts, Debug)]
@@ -55,10 +55,10 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 			.assert_type::<VaultState>(&ID)?;
 
 		let mut vault = self.vault.as_account_mut::<VaultState>(&ID)?;
-		let current: u64 = vault.balance.into();
-		let amount: u64 = args.amount.into();
+		let current = vault.balance.get();
+		let amount = args.amount.get();
 
-		vault.balance = PodU64::from_primitive(current.saturating_sub(amount));
+		vault.balance.set(current.saturating_sub(amount));
 
 		Ok(())
 	}

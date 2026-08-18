@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const ALLOWS_DUPLICATE_MUTABLE_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
@@ -34,42 +36,42 @@ impl AllowsDuplicateMutable {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(0 + remaining_accounts.len());
 		accounts.extend_from_slice(remaining_accounts);
-		let mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];
-		pina::PinaSerialize::write_bytes(&data, &mut instruction_data);
-
 		solana_instruction::Instruction {
 			program_id: crate::ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_ID,
 			accounts,
-			data: instruction_data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct AllowsDuplicateMutableInstructionData {
-	pub discriminator: u8,
+	bytes: Vec<u8>,
 }
 
 impl AllowsDuplicateMutableInstructionData {
-	pub const fn new() -> Self {
-		Self {
-			discriminator: ALLOWS_DUPLICATE_MUTABLE_DISCRIMINATOR,
+	pub fn new(
+		configure: impl FnOnce(&mut AllowsDuplicateMutableInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes =
+			vec![0u8; <AllowsDuplicateMutableInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data =
+				<AllowsDuplicateMutableInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(
+					&mut bytes,
+				)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			data.discriminator = ALLOWS_DUPLICATE_MUTABLE_DISCRIMINATOR;
+			configure(data);
 		}
+		<AllowsDuplicateMutableInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
 }
 
-impl pina::PinaSerialize for AllowsDuplicateMutableInstructionData {
-	fn write_bytes(&self, output: &mut [u8]) {
-		assert_eq!(output.len(), core::mem::size_of::<Self>());
-		output.fill(0);
-		let mut offset = 0usize;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(
-			&self.discriminator,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		debug_assert_eq!(offset, output.len());
-	}
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct AllowsDuplicateMutableInstructionWire {
+	pub discriminator: u8,
 }

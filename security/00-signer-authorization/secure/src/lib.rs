@@ -25,12 +25,12 @@ pub enum VaultAccount {
 #[account(discriminator = VaultAccount)]
 pub struct VaultState {
 	pub authority: Address,
-	pub balance: PodU64,
+	pub balance: u64,
 }
 
 #[instruction(discriminator = VaultInstruction, variant = Withdraw)]
 pub struct WithdrawInstruction {
-	pub amount: PodU64,
+	pub amount: u64,
 }
 
 #[derive(Accounts, Debug)]
@@ -62,13 +62,15 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 			// Also verify the authority matches the vault's stored authority.
 			self.authority.assert_address(&vault.authority)?;
 
-			u64::from(vault.balance)
+			vault.balance.get()
 		};
 
 		let mut vault = self.vault.as_account_mut::<VaultState>(&ID)?;
-		let amount: u64 = args.amount.into();
+		let amount = args.amount.get();
 
-		vault.balance = PodU64::from(checked_withdraw_balance(current, amount)?);
+		vault
+			.balance
+			.set(checked_withdraw_balance(current, amount)?);
 
 		Ok(())
 	}

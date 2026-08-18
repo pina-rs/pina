@@ -217,7 +217,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "admin",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": true,
 						"isOptional": false
 					},
@@ -255,6 +255,17 @@
 						"isWritable": true,
 						"isSigner": false,
 						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "associatedTokenProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -326,7 +337,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "user",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": true,
 						"isOptional": false
 					},
@@ -407,7 +418,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "user",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": true,
 						"isOptional": false
 					},
@@ -438,6 +449,17 @@
 						"isWritable": true,
 						"isSigner": false,
 						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "associatedTokenProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -611,7 +633,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "user",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": true,
 						"isOptional": false
 					},
@@ -642,6 +664,17 @@
 						"isWritable": true,
 						"isSigner": false,
 						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "associatedTokenProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+						}
 					},
 					{
 						"kind": "instructionAccountNode",

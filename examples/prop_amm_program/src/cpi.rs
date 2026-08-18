@@ -120,8 +120,9 @@ pub fn initialize<'a>(ctx: &CpiContext<'a, accounts::Initialize<'a>, 3>) -> Prog
 	let program_account = ProgramAddressCheck::new(ctx.program);
 	program_account.assert_address(&ID)?;
 
-	let data = InitializeInstruction::builder().build();
-	ctx.invoke(&data.to_bytes(), &[])
+	let mut data = [0u8; InitializeInstruction::SIZE];
+	InitializeInstruction::initialize(&mut data)?;
+	ctx.invoke(&data, &[])
 }
 
 #[inline(always)]
@@ -132,8 +133,9 @@ pub fn update<'a>(
 	let program_account = ProgramAddressCheck::new(ctx.program);
 	program_account.assert_address(&ID)?;
 
-	let data = UpdateInstruction::builder().new_price(new_price).build();
-	ctx.invoke(&data.to_bytes(), &[])
+	let mut data = [0u8; UpdateInstruction::SIZE];
+	UpdateInstruction::initialize(&mut data)?.new_price = new_price;
+	ctx.invoke(&data, &[])
 }
 
 #[inline(always)]
@@ -144,10 +146,9 @@ pub fn rotate_authority<'a>(
 	let program_account = ProgramAddressCheck::new(ctx.program);
 	program_account.assert_address(&ID)?;
 
-	let data = RotateAuthorityInstruction::builder()
-		.new_authority(new_authority)
-		.build();
-	ctx.invoke(&data.to_bytes(), &[])
+	let mut data = [0u8; RotateAuthorityInstruction::SIZE];
+	RotateAuthorityInstruction::initialize(&mut data)?.new_authority = new_authority;
+	ctx.invoke(&data, &[])
 }
 
 #[inline(always)]
@@ -175,24 +176,25 @@ mod tests {
 
 	#[test]
 	fn update_cpi_instruction_roundtrip() {
-		let data = UpdateInstruction::builder()
-			.new_price(PodU64::from(99))
-			.build();
-		let bytes = data.to_bytes();
-		let decoded = UpdateInstruction::try_from_bytes(&bytes)
+		let mut data = [0u8; UpdateInstruction::SIZE];
+		UpdateInstruction::initialize(&mut data)
+			.unwrap_or_else(|e| panic!("initialize update cpi bytes: {e:?}"))
+			.new_price
+			.set(99);
+		let decoded = UpdateInstruction::try_from_bytes(&data)
 			.unwrap_or_else(|e| panic!("decode update cpi bytes: {e:?}"));
 
-		assert_eq!(u64::from(decoded.new_price), 99);
+		assert_eq!(decoded.new_price.get(), 99);
 	}
 
 	#[test]
 	fn rotate_authority_cpi_instruction_roundtrip() {
 		let next_authority = Address::new_from_array([7u8; ADDRESS_BYTES]);
-		let data = RotateAuthorityInstruction::builder()
-			.new_authority(next_authority)
-			.build();
-		let bytes = data.to_bytes();
-		let decoded = RotateAuthorityInstruction::try_from_bytes(&bytes)
+		let mut data = [0u8; RotateAuthorityInstruction::SIZE];
+		RotateAuthorityInstruction::initialize(&mut data)
+			.unwrap_or_else(|e| panic!("initialize rotate cpi bytes: {e:?}"))
+			.new_authority = next_authority;
+		let decoded = RotateAuthorityInstruction::try_from_bytes(&data)
 			.unwrap_or_else(|e| panic!("decode rotate cpi bytes: {e:?}"));
 
 		assert_eq!(decoded.new_authority, next_authority);

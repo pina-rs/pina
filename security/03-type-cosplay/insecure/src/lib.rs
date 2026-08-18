@@ -30,18 +30,18 @@ pub enum AppAccount {
 #[account(discriminator = AppAccount)]
 pub struct UserProfile {
 	pub authority: Address,
-	pub points: PodU64,
+	pub points: u64,
 }
 
 #[account(discriminator = AppAccount)]
 pub struct AdminConfig {
 	pub authority: Address,
-	pub fee: PodU64,
+	pub fee: u64,
 }
 
 #[instruction(discriminator = AppInstruction, variant = AdminAction)]
 pub struct AdminActionInstruction {
-	pub new_fee: PodU64,
+	pub new_fee: u64,
 }
 
 #[derive(Accounts, Debug)]

@@ -76,27 +76,27 @@ pub struct VestingState {
 	pub admin: Address,
 	pub beneficiary: Address,
 	pub mint: Address,
-	pub total_amount: PodU64,
-	pub claimed_amount: PodU64,
-	pub start_ts: PodU64,
-	pub cliff_ts: PodU64,
-	pub end_ts: PodU64,
-	pub cancelled: PodBool,
+	pub total_amount: u64,
+	pub claimed_amount: u64,
+	pub start_ts: u64,
+	pub cliff_ts: u64,
+	pub end_ts: u64,
+	pub cancelled: bool,
 	pub bump: u8,
 }
 
 #[instruction(discriminator = VestingInstruction::Initialize)]
 pub struct InitializeInstruction {
-	pub total_amount: PodU64,
-	pub start_ts: PodU64,
-	pub cliff_ts: PodU64,
-	pub end_ts: PodU64,
+	pub total_amount: u64,
+	pub start_ts: u64,
+	pub cliff_ts: u64,
+	pub end_ts: u64,
 	pub bump: u8,
 }
 
 #[instruction(discriminator = VestingInstruction::Claim)]
 pub struct ClaimInstruction {
-	pub amount: PodU64,
+	pub amount: u64,
 }
 
 #[instruction(discriminator = VestingInstruction::Cancel)]
@@ -104,22 +104,24 @@ pub struct CancelInstruction {}
 
 #[derive(Accounts, Debug)]
 pub struct InitializeAccounts<'a> {
-	pub admin: &'a AccountView,
+	pub admin: &'a mut AccountView,
 	pub beneficiary: &'a AccountView,
 	pub mint: &'a AccountView,
 	pub vesting_state: &'a mut AccountView,
 	pub vault: &'a AccountView,
+	pub associated_token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
 	pub token_program: &'a AccountView,
 }
 
 #[derive(Accounts, Debug)]
 pub struct ClaimAccounts<'a> {
-	pub beneficiary: &'a AccountView,
+	pub beneficiary: &'a mut AccountView,
 	pub mint: &'a AccountView,
 	pub vesting_state: &'a mut AccountView,
 	pub beneficiary_ata: &'a AccountView,
 	pub vault: &'a AccountView,
+	pub associated_token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
 	pub token_program: &'a AccountView,
 }
@@ -149,21 +151,23 @@ fn validate_schedule(start_ts: u64, cliff_ts: u64, end_ts: u64) -> ProgramResult
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = InitializeInstruction::try_from_bytes(data)?;
-		let start_ts = u64::from(args.start_ts);
-		let cliff_ts = u64::from(args.cliff_ts);
-		let end_ts = u64::from(args.end_ts);
+		let start_ts = args.start_ts.get();
+		let cliff_ts = args.cliff_ts.get();
+		let end_ts = args.end_ts.get();
 
 		validate_schedule(start_ts, cliff_ts, end_ts)?;
 
-		let vesting_seeds = VestingState::seeds(
-			self.admin.address(),
-			self.beneficiary.address(),
-			self.mint.address(),
-		);
+		let admin_address = *self.admin.address();
+		let beneficiary_address = *self.beneficiary.address();
+		let mint_address = *self.mint.address();
+		let vesting_seeds =
+			VestingState::seeds(&admin_address, &beneficiary_address, &mint_address);
 		let vesting_seeds_with_bump = vesting_seeds.with_bump(args.bump);
 
 		self.admin.assert_signer()?;
 		self.mint.assert_owners(&SPL_PROGRAM_IDS)?;
+		self.associated_token_program
+			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.vesting_state
@@ -187,18 +191,16 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		)?;
 
 		let mut vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
-		*vesting_state = VestingState::builder()
-			.admin(*self.admin.address())
-			.beneficiary(*self.beneficiary.address())
-			.mint(*self.mint.address())
-			.total_amount(args.total_amount)
-			.claimed_amount(PodU64::from(0))
-			.start_ts(args.start_ts)
-			.cliff_ts(args.cliff_ts)
-			.end_ts(args.end_ts)
-			.cancelled(PodBool::from(false))
-			.bump(args.bump)
-			.build();
+		vesting_state.admin = admin_address;
+		vesting_state.beneficiary = beneficiary_address;
+		vesting_state.mint = mint_address;
+		vesting_state.total_amount = args.total_amount;
+		vesting_state.claimed_amount.set(0);
+		vesting_state.start_ts = args.start_ts;
+		vesting_state.cliff_ts = args.cliff_ts;
+		vesting_state.end_ts = args.end_ts;
+		vesting_state.cancelled.set(false);
+		vesting_state.bump = args.bump;
 		drop(vesting_state);
 
 		associated_token_account::instructions::Create {
@@ -218,10 +220,12 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = ClaimInstruction::try_from_bytes(data)?;
-		let amount: u64 = args.amount.into();
+		let amount = args.amount.get();
 
 		self.beneficiary.assert_signer()?;
 		self.mint.assert_owners(&SPL_PROGRAM_IDS)?;
+		self.associated_token_program
+			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.vesting_state
@@ -254,9 +258,9 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 				vesting_state.admin,
 				vesting_state.beneficiary,
 				vesting_state.mint,
-				bool::from(vesting_state.cancelled),
-				u64::from(vesting_state.claimed_amount),
-				u64::from(vesting_state.total_amount),
+				vesting_state.cancelled.get(),
+				vesting_state.claimed_amount.get(),
+				vesting_state.total_amount.get(),
 			)
 		};
 		// Verify the vesting state is the PDA for the admin, beneficiary, and
@@ -275,7 +279,7 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		}
 
 		let mut vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
-		vesting_state.claimed_amount = PodU64::from(next_claimed);
+		vesting_state.claimed_amount.set(next_claimed);
 
 		associated_token_account::instructions::CreateIdempotent {
 			funding_account: self.beneficiary,
@@ -321,7 +325,7 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 				vesting_state.admin,
 				vesting_state.beneficiary,
 				vesting_state.mint,
-				bool::from(vesting_state.cancelled),
+				vesting_state.cancelled.get(),
 			)
 		};
 
@@ -335,7 +339,7 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		}
 
 		let mut vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
-		vesting_state.cancelled = PodBool::from(true);
+		vesting_state.cancelled.set(true);
 
 		Ok(())
 	}
@@ -354,11 +358,14 @@ mod tests {
 
 	#[test]
 	fn instruction_roundtrip() {
-		let ix = ClaimInstruction::builder().amount(PodU64::from(10)).build();
-		let bytes = ix.to_bytes();
+		let mut bytes = [0u8; ClaimInstruction::SIZE];
+		ClaimInstruction::initialize(&mut bytes)
+			.unwrap_or_else(|error| panic!("initialize failed: {error:?}"))
+			.amount
+			.set(10);
 		let parsed = ClaimInstruction::try_from_bytes(&bytes)
 			.unwrap_or_else(|e| panic!("decode failed: {e:?}"));
-		assert_eq!(u64::from(parsed.amount), 10);
+		assert_eq!(parsed.amount.get(), 10);
 	}
 
 	#[test]

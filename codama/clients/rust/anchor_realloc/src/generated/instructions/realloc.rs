@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const REALLOC_DISCRIMINATOR: u8 = 0u8;
 
 /// Accounts.
@@ -48,47 +50,39 @@ impl Realloc {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		let mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];
-		pina::PinaSerialize::write_bytes(&data, &mut instruction_data);
-
 		solana_instruction::Instruction {
 			program_id: crate::ANCHOR_REALLOC_ID,
 			accounts,
-			data: instruction_data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct ReallocInstructionData {
-	pub discriminator: u8,
-	pub len: pina::PodU16,
+	bytes: Vec<u8>,
 }
 
 impl ReallocInstructionData {
-	pub const fn new(len: pina::PodU16) -> Self {
-		Self {
-			discriminator: REALLOC_DISCRIMINATOR,
-			len,
+	pub fn new(
+		configure: impl FnOnce(&mut ReallocInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <ReallocInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <ReallocInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			data.discriminator = REALLOC_DISCRIMINATOR;
+			configure(data);
 		}
+		<ReallocInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
 }
 
-impl pina::PinaSerialize for ReallocInstructionData {
-	fn write_bytes(&self, output: &mut [u8]) {
-		assert_eq!(output.len(), core::mem::size_of::<Self>());
-		output.fill(0);
-		let mut offset = 0usize;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(
-			&self.discriminator,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodU16>();
-		pina::PinaSerialize::write_bytes(&self.len, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		debug_assert_eq!(offset, output.len());
-	}
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct ReallocInstructionWire {
+	pub discriminator: u8,
+	pub len: u16,
 }

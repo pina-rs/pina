@@ -37,7 +37,7 @@ pub enum TodoAccount {
 pub struct TodoState {
 	pub owner: Address,
 	pub bump: u8,
-	pub completed: PodBool,
+	pub completed: bool,
 	pub digest: [u8; 32],
 }
 
@@ -97,12 +97,10 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 
 		// Initialize account data
 		let mut todo = self.todo.as_account_mut::<TodoState>(&ID)?;
-		*todo = TodoState::builder()
-			.owner(*owner)
-			.bump(args.bump)
-			.completed(PodBool::from(false))
-			.digest(args.digest)
-			.build();
+		todo.owner = *owner;
+		todo.bump = args.bump;
+		todo.completed.set(false);
+		todo.digest = args.digest;
 
 		Ok(())
 	}
@@ -140,9 +138,9 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 			TodoInstruction::ToggleCompleted => {
 				let _ = ToggleCompletedInstruction::try_from_bytes(data)?;
 				let mut todo = self.todo.as_account_mut::<TodoState>(&ID)?;
-				let completed = bool::from(todo.completed);
+				let completed = todo.completed.get();
 
-				todo.completed = PodBool::from(!completed);
+				todo.completed.set(!completed);
 			}
 			TodoInstruction::UpdateDigest => {
 				let args = UpdateDigestInstruction::try_from_bytes(data)?;
@@ -187,8 +185,6 @@ pub mod entrypoint {
 
 #[cfg(test)]
 mod tests {
-	use core::mem::size_of;
-
 	use super::*;
 
 	#[test]
@@ -208,12 +204,12 @@ mod tests {
 
 	#[test]
 	fn todo_state_layout() {
-		assert_eq!(size_of::<TodoState>(), 67);
+		assert_eq!(TodoState::SIZE, 67);
 	}
 
 	#[test]
 	fn initialize_instruction_layout() {
-		assert_eq!(size_of::<InitializeInstruction>(), 34);
+		assert_eq!(InitializeInstruction::SIZE, 34);
 		assert!(InitializeInstruction::matches_discriminator(&[
 			TodoInstruction::Initialize as u8
 		]));
@@ -221,7 +217,7 @@ mod tests {
 
 	#[test]
 	fn update_digest_layout() {
-		assert_eq!(size_of::<UpdateDigestInstruction>(), 33);
+		assert_eq!(UpdateDigestInstruction::SIZE, 33);
 		assert!(UpdateDigestInstruction::matches_discriminator(&[
 			TodoInstruction::UpdateDigest as u8
 		]));

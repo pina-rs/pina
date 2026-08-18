@@ -2,139 +2,44 @@
 source: crates/pina_macros/src/tests.rs
 expression: output
 ---
-#[derive(
-    Debug,
-    ::pina::TypedBuilder,
-    ::core::clone::Clone,
-    ::core::marker::Copy,
-    ::core::cmp::PartialEq,
-    ::core::cmp::Eq
-)]
-#[repr(C)]
-#[builder(builder_method(vis = "", name = __builder))]
+#[derive(Debug, ::pina::zeropod::ZeroPod)]
 pub struct Transfer {
     discriminator: [u8; InstrDisc::BYTES],
     pub amount: PodU64,
 }
-#[allow(dead_code)]
-type TransferBuilderType = TransferBuilder<(([u8; InstrDisc::BYTES],), ())>;
-const __TRANSFER_ALIGNMENT_ASSERTIONS__: () = {
-    ::core::assert!(
-        ::core::mem::align_of:: < [u8; InstrDisc::BYTES] > () == 1,
-        concat!("The alignment of field `", "discriminator", "` with type `",
-        stringify!([u8; InstrDisc::BYTES]),
-        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
-    );
-    ::core::assert!(
-        ::core::mem::align_of:: < PodU64 > () == 1, concat!("The alignment of field `",
-        "amount", "` with type `", stringify!(PodU64),
-        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
-    );
-    ::core::assert!(
-        ::core::mem::align_of:: < Transfer > () == 1,
-        concat!("The alignment of struct `", stringify!(Transfer),
-        "` should be one so it can be used for zero-copy casts.")
-    );
-    ::core::assert!(
-        ::core::mem::size_of:: < Transfer > () == (0usize + ::core::mem::size_of:: < [u8;
-        InstrDisc::BYTES] > () + ::core::mem::size_of:: < PodU64 > ()), concat!("`",
-        stringify!(Transfer),
-        "` layout is padded. `#[pina]` discriminator-first zero-copy layouts must be tightly packed.")
-    );
-};
 impl Transfer {
-    pub fn to_bytes(&self) -> <Self as ::pina::PinaToBytes>::Bytes {
-        <Self as ::pina::PinaToBytes>::to_bytes(self)
-    }
-    pub fn try_from_bytes(data: &[u8]) -> Result<&Self, ::pina::ProgramError> {
-        if data.len() != ::core::mem::size_of::<Self>() {
+    /// The exact number of bytes required by the zeropod representation.
+    pub const SIZE: usize = <Self as ::pina::ZeroPodFixed>::SIZE;
+    /// Validate `data` and return zeropod's immutable zero-copy companion.
+    pub fn try_from_bytes(
+        data: &[u8],
+    ) -> Result<&<Self as ::pina::ZeroPodFixed>::Zc, ::pina::ProgramError> {
+        if data.len() != Self::SIZE
+            || !<Self as ::pina::HasDiscriminator>::matches_discriminator(data)
+        {
             return Err(::pina::ProgramError::InvalidInstructionData);
         }
         <Self as ::pina::ZeroPodFixed>::from_bytes(data)
             .map_err(|_| ::pina::ProgramError::InvalidInstructionData)
     }
-    pub fn builder() -> TransferBuilderType {
-        let mut bytes = [0u8; InstrDisc::BYTES];
-        <Self as ::pina::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
-        Self::__builder().discriminator(bytes)
+    /// Initialize caller-owned storage and return its mutable zero-copy view.
+    ///
+    /// The complete slice is initialized before zeropod validates it. The
+    /// returned borrow prevents the caller from observing or changing the raw
+    /// bytes while the typed view is live.
+    pub fn initialize(
+        data: &mut [u8],
+    ) -> Result<&mut <Self as ::pina::ZeroPodFixed>::Zc, ::pina::ProgramError> {
+        if data.len() != Self::SIZE {
+            return Err(::pina::ProgramError::InvalidInstructionData);
+        }
+        data.fill(0);
+        <Self as ::pina::HasDiscriminator>::write_discriminator(data);
+        <Self as ::pina::ZeroPodFixed>::from_bytes_mut(data)
+            .map_err(|_| ::pina::ProgramError::InvalidInstructionData)
     }
 }
 impl ::pina::HasDiscriminator for Transfer {
     type Type = InstrDisc;
     const VALUE: Self::Type = InstrDisc::Transfer;
-}
-const _: fn() = || {
-    fn assert_zc_elem<T: ::pina::ZcElem>() {}
-    assert_zc_elem::<[u8; InstrDisc::BYTES]>();
-    assert_zc_elem::<PodU64>();
-};
-impl ::pina::PinaSerialize for Transfer {
-    fn write_bytes(&self, output: &mut [u8]) {
-        ::core::assert!(output.len() == ::core::mem::size_of:: < Self > ());
-        output.fill(0);
-        let mut offset = 0usize;
-        let field_size = ::core::mem::size_of::<[u8; InstrDisc::BYTES]>();
-        <[u8; InstrDisc::BYTES] as ::pina::PinaSerialize>::write_bytes(
-            &self.discriminator,
-            &mut output[offset..offset + field_size],
-        );
-        offset += field_size;
-        let field_size = ::core::mem::size_of::<PodU64>();
-        <PodU64 as ::pina::PinaSerialize>::write_bytes(
-            &self.amount,
-            &mut output[offset..offset + field_size],
-        );
-        offset += field_size;
-        ::core::debug_assert!(offset == output.len());
-    }
-}
-impl ::pina::PinaToBytes for Transfer {
-    type Bytes = [u8; ::core::mem::size_of::<Transfer>()];
-    fn zeroed_bytes() -> Self::Bytes {
-        [0u8; ::core::mem::size_of::<Transfer>()]
-    }
-}
-impl ::pina::ZcValidate for Transfer {
-    fn validate_ref(value: &Self) -> Result<(), ::pina::ZeroPodError> {
-        <[u8; InstrDisc::BYTES] as ::pina::ZcValidate>::validate_ref(
-            &value.discriminator,
-        )?;
-        <PodU64 as ::pina::ZcValidate>::validate_ref(&value.amount)?;
-        Ok(())
-    }
-}
-#[allow(unsafe_code)]
-unsafe impl ::pina::ZcElem for Transfer {}
-impl ::pina::ZeroPodSchema for Transfer {
-    const LAYOUT: ::pina::LayoutKind = ::pina::LayoutKind::Fixed;
-}
-impl ::pina::ZeroPodFixed for Transfer {
-    type Zc = Transfer;
-    const SIZE: usize = ::core::mem::size_of::<Transfer>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, ::pina::ZeroPodError> {
-        <Self as ::pina::ZeroPodFixed>::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, ::pina::ZeroPodError> {
-        <Self as ::pina::ZeroPodFixed>::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), ::pina::ZeroPodError> {
-        if data.len() < Self::SIZE {
-            return Err(::pina::ZeroPodError::BufferTooSmall);
-        }
-        let zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as ::pina::ZcValidate>::validate_ref(zc)?;
-        Ok(())
-    }
-    unsafe fn from_bytes_unchecked(data: &[u8]) -> &Self::Zc {
-        &*(data.as_ptr() as *const Self::Zc)
-    }
-    unsafe fn from_bytes_mut_unchecked(data: &mut [u8]) -> &mut Self::Zc {
-        &mut *(data.as_mut_ptr() as *mut Self::Zc)
-    }
-}
-impl ::pina::ZcField for Transfer {
-    type Pod = Transfer;
-    const POD_SIZE: usize = ::core::mem::size_of::<Transfer>();
 }

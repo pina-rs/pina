@@ -15,7 +15,9 @@ pub struct Initialize {
 
 #[test]
 fn test_event_compiles() {
-	let event = Initialize::builder().choice(10).build();
+	let mut bytes = [0u8; Initialize::SIZE];
+	let event = Initialize::initialize(&mut bytes).unwrap();
+	event.choice = 10;
 	assert_eq!(event.choice, 10);
 
 	let disc = &<Initialize as HasDiscriminator>::VALUE;
@@ -24,9 +26,12 @@ fn test_event_compiles() {
 
 #[test]
 fn test_event_bytes() {
-	let event = Initialize::builder().choice(10).build();
-	let bytes = event.to_bytes();
+	let mut bytes = [0u8; Initialize::SIZE];
+	{
+		let event = Initialize::initialize(&mut bytes).unwrap();
+		event.choice = 10;
+	}
 	let from_bytes = Initialize::try_from_bytes(&bytes).unwrap();
-	assert_eq!(event.discriminator, from_bytes.discriminator);
-	assert_eq!(event.choice, from_bytes.choice);
+	assert_eq!(from_bytes.discriminator, [Event::Initialize as u8]);
+	assert_eq!(from_bytes.choice, 10);
 }

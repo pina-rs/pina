@@ -22,13 +22,13 @@ import {
 	type InstructionWithAccounts,
 	type InstructionWithData,
 	type ReadonlyAccount,
-	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
+	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
@@ -56,7 +56,7 @@ export type OpenPositionInstruction<
 	& InstructionWithAccounts<
 		[
 			TAccountUser extends string
-				? ReadonlySignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
+				? WritableSignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
 				: TAccountUser,
 			TAccountPoolState extends string ? ReadonlyAccount<TAccountPoolState>
 				: TAccountPoolState,
@@ -149,7 +149,7 @@ export function getOpenPositionInstruction<
 
 	// Original accounts.
 	const originalAccounts = {
-		user: { value: input.user ?? null, isWritable: false },
+		user: { value: input.user ?? null, isWritable: true },
 		poolState: { value: input.poolState ?? null, isWritable: false },
 		positionState: { value: input.positionState ?? null, isWritable: true },
 		systemProgram: { value: input.systemProgram ?? null, isWritable: false },

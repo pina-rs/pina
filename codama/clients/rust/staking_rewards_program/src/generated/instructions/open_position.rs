@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const OPEN_POSITION_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
@@ -47,9 +49,7 @@ impl OpenPosition {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.user, true,
-		));
+		accounts.push(solana_instruction::AccountMeta::new(self.user, true));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.pool_state,
 			false,
@@ -63,47 +63,40 @@ impl OpenPosition {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		let mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];
-		pina::PinaSerialize::write_bytes(&data, &mut instruction_data);
-
 		solana_instruction::Instruction {
 			program_id: crate::STAKING_REWARDS_PROGRAM_ID,
 			accounts,
-			data: instruction_data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct OpenPositionInstructionData {
-	pub discriminator: u8,
-	pub bump: u8,
+	bytes: Vec<u8>,
 }
 
 impl OpenPositionInstructionData {
-	pub const fn new(bump: u8) -> Self {
-		Self {
-			discriminator: OPEN_POSITION_DISCRIMINATOR,
-			bump,
+	pub fn new(
+		configure: impl FnOnce(&mut OpenPositionInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <OpenPositionInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data =
+				<OpenPositionInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			data.discriminator = OPEN_POSITION_DISCRIMINATOR;
+			configure(data);
 		}
+		<OpenPositionInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
 }
 
-impl pina::PinaSerialize for OpenPositionInstructionData {
-	fn write_bytes(&self, output: &mut [u8]) {
-		assert_eq!(output.len(), core::mem::size_of::<Self>());
-		output.fill(0);
-		let mut offset = 0usize;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(
-			&self.discriminator,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(&self.bump, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		debug_assert_eq!(offset, output.len());
-	}
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct OpenPositionInstructionWire {
+	pub discriminator: u8,
+	pub bump: u8,
 }

@@ -81,14 +81,14 @@ pub struct EscrowState {
 	pub maker: Address,
 	pub mint_a: Address,
 	pub mint_b: Address,
-	pub amount_a: PodU64,
-	pub amount_b: PodU64,
-	pub seed: PodU64,
+	pub amount_a: u64,
+	pub amount_b: u64,
+	pub seed: u64,
 	pub bump: u8,
 }
 ```
 
-The macro auto-injects a discriminator field as the first byte (set to `EscrowAccount::EscrowState`). It also derives `Pod`, `Zeroable`, `HasDiscriminator`, and `TypedBuilder`. All fields use fixed-size types (`Address` is 32 bytes, `PodU64` is 8 bytes little-endian) so the struct has a stable `#[repr(C)]` layout suitable for zero-copy reads.
+The macro auto-injects a discriminator field as the first byte (set to `EscrowAccount::EscrowState`) and derives zeropod's native-schema machinery. `EscrowStateZc` is the generated storage view: its integer fields are alignment-one little-endian wrappers, and account loaders return that validated view without copying.
 
 The `seed` and `bump` fields are stored so that PDA derivation can be verified on subsequent instructions without re-computing it.
 
@@ -99,9 +99,9 @@ The `seed` and `bump` fields are stored so that PDA derivation can be verified o
 ```rust
 #[instruction(discriminator = EscrowInstruction::Make)]
 pub struct MakeInstruction {
-	pub seed: PodU64,
-	pub amount_a: PodU64,
-	pub amount_b: PodU64,
+	pub seed: u64,
+	pub amount_a: u64,
+	pub amount_b: u64,
 	pub bump: u8,
 }
 

@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const TOGGLE_COMPLETED_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
@@ -48,42 +50,39 @@ impl ToggleCompleted {
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.todo, false));
 		accounts.extend_from_slice(remaining_accounts);
-		let mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];
-		pina::PinaSerialize::write_bytes(&data, &mut instruction_data);
-
 		solana_instruction::Instruction {
 			program_id: crate::TODO_PROGRAM_ID,
 			accounts,
-			data: instruction_data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct ToggleCompletedInstructionData {
-	pub discriminator: u8,
+	bytes: Vec<u8>,
 }
 
 impl ToggleCompletedInstructionData {
-	pub const fn new() -> Self {
-		Self {
-			discriminator: TOGGLE_COMPLETED_DISCRIMINATOR,
+	pub fn new(
+		configure: impl FnOnce(&mut ToggleCompletedInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <ToggleCompletedInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data =
+				<ToggleCompletedInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			data.discriminator = TOGGLE_COMPLETED_DISCRIMINATOR;
+			configure(data);
 		}
+		<ToggleCompletedInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
 }
 
-impl pina::PinaSerialize for ToggleCompletedInstructionData {
-	fn write_bytes(&self, output: &mut [u8]) {
-		assert_eq!(output.len(), core::mem::size_of::<Self>());
-		output.fill(0);
-		let mut offset = 0usize;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(
-			&self.discriminator,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		debug_assert_eq!(offset, output.len());
-	}
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct ToggleCompletedInstructionWire {
+	pub discriminator: u8,
 }

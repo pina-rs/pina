@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const CANCEL_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
@@ -64,42 +66,38 @@ impl Cancel {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		let mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];
-		pina::PinaSerialize::write_bytes(&data, &mut instruction_data);
-
 		solana_instruction::Instruction {
 			program_id: crate::VESTING_PROGRAM_ID,
 			accounts,
-			data: instruction_data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct CancelInstructionData {
-	pub discriminator: u8,
+	bytes: Vec<u8>,
 }
 
 impl CancelInstructionData {
-	pub const fn new() -> Self {
-		Self {
-			discriminator: CANCEL_DISCRIMINATOR,
+	pub fn new(
+		configure: impl FnOnce(&mut CancelInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <CancelInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <CancelInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			data.discriminator = CANCEL_DISCRIMINATOR;
+			configure(data);
 		}
+		<CancelInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
 }
 
-impl pina::PinaSerialize for CancelInstructionData {
-	fn write_bytes(&self, output: &mut [u8]) {
-		assert_eq!(output.len(), core::mem::size_of::<Self>());
-		output.fill(0);
-		let mut offset = 0usize;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(
-			&self.discriminator,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		debug_assert_eq!(offset, output.len());
-	}
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct CancelInstructionWire {
+	pub discriminator: u8,
 }

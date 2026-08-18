@@ -10,8 +10,7 @@
 //! tests:
 //!
 //! ```sh
-//! cargo build --release --target bpfel-unknown-none -p vesting_program \
-//!     -Z build-std -F bpf-entrypoint
+//! cargo build-vesting-program
 //! ```
 //!
 //! Then set `SBF_OUT_DIR` to the directory containing the `.so` file, or place
@@ -20,14 +19,13 @@
 //! ## Running
 //!
 //! ```sh
-//! SBF_OUT_DIR=target/bpfel-unknown-none/release \
+//! SBF_OUT_DIR=target/deploy \
 //!     cargo test -p vesting_program --test e2e -- --nocapture
 //! ```
 
 use mollusk_svm::Mollusk;
 use mollusk_svm::result::Check;
-use pina::PodBool;
-use pina::PodU64;
+use pina::ProgramError;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
@@ -37,6 +35,7 @@ use vesting_program::ClaimInstruction;
 use vesting_program::InitializeInstruction;
 use vesting_program::VestingError;
 use vesting_program::VestingState;
+use vesting_program::VestingStateZc;
 
 // ---------------------------------------------------------------------------
 // Well-known program IDs
@@ -120,7 +119,7 @@ fn derive_ata(wallet: &Pubkey, mint: &Pubkey) -> Pubkey {
 	ata
 }
 
-/// Build a serialized `VestingState` account with the given parameters.
+/// Initialize caller-owned account storage with the given state.
 fn vesting_state_account(
 	admin: &Pubkey,
 	beneficiary: &Pubkey,
@@ -134,19 +133,19 @@ fn vesting_state_account(
 	bump: u8,
 	lamports: u64,
 ) -> Account {
-	let state = VestingState::builder()
-		.admin(pubkey_to_address(admin))
-		.beneficiary(pubkey_to_address(beneficiary))
-		.mint(pubkey_to_address(mint))
-		.total_amount(PodU64::from(total_amount))
-		.claimed_amount(PodU64::from(claimed_amount))
-		.start_ts(PodU64::from(start_ts))
-		.cliff_ts(PodU64::from(cliff_ts))
-		.end_ts(PodU64::from(end_ts))
-		.cancelled(PodBool::from(cancelled))
-		.bump(bump)
-		.build();
-	let data = state.to_bytes().to_vec();
+	let mut data = vec![0u8; VestingState::SIZE];
+	let state = VestingState::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("vesting initialization failed: {error:?}"));
+	state.admin = pubkey_to_address(admin);
+	state.beneficiary = pubkey_to_address(beneficiary);
+	state.mint = pubkey_to_address(mint);
+	state.total_amount.set(total_amount);
+	state.claimed_amount.set(claimed_amount);
+	state.start_ts.set(start_ts);
+	state.cliff_ts.set(cliff_ts);
+	state.end_ts.set(end_ts);
+	state.cancelled.set(cancelled);
+	state.bump = bump;
 	Account {
 		lamports,
 		data,
@@ -188,16 +187,20 @@ fn mock_ata_account(lamports: u64) -> Account {
 
 /// Build instruction data for Cancel (just discriminator byte 2).
 fn cancel_ix_data() -> Vec<u8> {
-	let ix = CancelInstruction::builder().build();
-	ix.to_bytes().to_vec()
+	let mut data = vec![0u8; CancelInstruction::SIZE];
+	CancelInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("cancel initialization failed: {error:?}"));
+	data
 }
 
 /// Build instruction data for Claim (discriminator byte 1 + amount).
 fn claim_ix_data(amount: u64) -> Vec<u8> {
-	let ix = ClaimInstruction::builder()
-		.amount(PodU64::from(amount))
-		.build();
-	ix.to_bytes().to_vec()
+	let mut data = vec![0u8; ClaimInstruction::SIZE];
+	ClaimInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("claim initialization failed: {error:?}"))
+		.amount
+		.set(amount);
+	data
 }
 
 /// Build instruction data for Initialize.
@@ -208,14 +211,15 @@ fn initialize_ix_data(
 	end_ts: u64,
 	bump: u8,
 ) -> Vec<u8> {
-	let ix = InitializeInstruction::builder()
-		.total_amount(PodU64::from(total_amount))
-		.start_ts(PodU64::from(start_ts))
-		.cliff_ts(PodU64::from(cliff_ts))
-		.end_ts(PodU64::from(end_ts))
-		.bump(bump)
-		.build();
-	ix.to_bytes().to_vec()
+	let mut data = vec![0u8; InitializeInstruction::SIZE];
+	let ix = InitializeInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("initialize instruction failed: {error:?}"));
+	ix.total_amount.set(total_amount);
+	ix.start_ts.set(start_ts);
+	ix.cliff_ts.set(cliff_ts);
+	ix.end_ts.set(end_ts);
+	ix.bump = bump;
+	data
 }
 
 /// Token program account (non-executable stub — only needs the right address
@@ -233,9 +237,22 @@ fn token_program_account() -> (Pubkey, Account) {
 	)
 }
 
-const SKIP_MSG: &str = "[SKIP] vesting_program SBF binary not found. Build it first with `cargo \
-                        build --release --target bpfel-unknown-none -p vesting_program -Z \
-                        build-std -F bpf-entrypoint`.";
+/// Associated-token program stub used by validation-only fixtures.
+fn associated_token_program_account() -> (Pubkey, Account) {
+	(
+		spl_ata_program_id(),
+		Account {
+			lamports: 1,
+			data: vec![],
+			owner: solana_sdk_ids::bpf_loader::ID,
+			executable: true,
+			rent_epoch: 0,
+		},
+	)
+}
+
+const SKIP_MSG: &str =
+	"[SKIP] vesting_program SBF binary not found. Build it with `cargo build-vesting-program`.";
 
 // ---------------------------------------------------------------------------
 // Cancel Tests
@@ -254,10 +271,7 @@ fn cancel_sets_cancelled_flag() {
 	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
 	let vault = derive_ata(&vesting_pda, &mint);
 
-	let lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<VestingState>());
+	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -304,10 +318,10 @@ fn cancel_sets_cancelled_flag() {
 	let vesting_account = result
 		.get_account(&vesting_pda)
 		.expect("vesting_state account should exist after cancel");
-	let vesting_state: &VestingState =
+	let vesting_state: &VestingStateZc =
 		<VestingState as pina::ZeroPodFixed>::from_bytes(&vesting_account.data).unwrap();
 	assert!(
-		bool::from(vesting_state.cancelled),
+		vesting_state.cancelled.get(),
 		"cancelled flag should be true after Cancel"
 	);
 
@@ -330,10 +344,7 @@ fn cancel_already_cancelled_fails() {
 	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
 	let vault = derive_ata(&vesting_pda, &mint);
 
-	let lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<VestingState>());
+	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -394,10 +405,7 @@ fn cancel_wrong_admin_fails() {
 	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
 	let vault = derive_ata(&vesting_pda, &mint);
 
-	let lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<VestingState>());
+	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
 
 	// The wrong_admin signs but the vesting_state's admin field points to `admin`.
 	let instruction = Instruction::new_with_bytes(
@@ -443,9 +451,7 @@ fn cancel_wrong_admin_fails() {
 	mollusk.process_and_validate_instruction(
 		&instruction,
 		&accounts,
-		&[Check::instruction_err(
-			solana_instruction::error::InstructionError::Custom(0xC001_0001),
-		)],
+		&[Check::err(ProgramError::InvalidAccountData)],
 	);
 }
 
@@ -468,20 +474,18 @@ fn claim_already_cancelled_fails() {
 	let vault = derive_ata(&vesting_pda, &mint);
 	let beneficiary_ata = derive_ata(&beneficiary, &mint);
 
-	let lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<VestingState>());
+	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
 		&claim_ix_data(100),
 		vec![
-			AccountMeta::new_readonly(beneficiary, true), // beneficiary (signer)
-			AccountMeta::new_readonly(mint, false),       // mint
-			AccountMeta::new(vesting_pda, false),         // vesting_state (writable)
-			AccountMeta::new(beneficiary_ata, false),     // beneficiary_ata (writable)
-			AccountMeta::new(vault, false),               // vault (writable)
+			AccountMeta::new(beneficiary, true), // beneficiary (signer/funder)
+			AccountMeta::new_readonly(mint, false), // mint
+			AccountMeta::new(vesting_pda, false), // vesting_state (writable)
+			AccountMeta::new(beneficiary_ata, false), // beneficiary_ata (writable)
+			AccountMeta::new(vault, false),      // vault (writable)
+			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 		],
@@ -512,6 +516,7 @@ fn claim_already_cancelled_fails() {
 		(beneficiary_ata, mock_ata_account(0)),
 		(vault, mock_ata_account(1_000_000)),
 		mollusk_svm::program::keyed_account_for_system_program(),
+		associated_token_program_account(),
 		token_program_account(),
 	];
 
@@ -536,21 +541,19 @@ fn claim_too_large_fails() {
 	let vault = derive_ata(&vesting_pda, &mint);
 	let beneficiary_ata = derive_ata(&beneficiary, &mint);
 
-	let lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<VestingState>());
+	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
 
 	// Try to claim 600 when total is 1000 and already claimed 500 → next = 1100 > 1000.
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
 		&claim_ix_data(600),
 		vec![
-			AccountMeta::new_readonly(beneficiary, true),
+			AccountMeta::new(beneficiary, true),
 			AccountMeta::new_readonly(mint, false),
 			AccountMeta::new(vesting_pda, false),
 			AccountMeta::new(beneficiary_ata, false),
 			AccountMeta::new(vault, false),
+			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 		],
@@ -581,6 +584,7 @@ fn claim_too_large_fails() {
 		(beneficiary_ata, mock_ata_account(0)),
 		(vault, mock_ata_account(1_000_000)),
 		mollusk_svm::program::keyed_account_for_system_program(),
+		associated_token_program_account(),
 		token_program_account(),
 	];
 
@@ -606,21 +610,19 @@ fn claim_wrong_beneficiary_fails() {
 	let vault = derive_ata(&vesting_pda, &mint);
 	let wrong_beneficiary_ata = derive_ata(&wrong_beneficiary, &mint);
 
-	let lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<VestingState>());
+	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
 
 	// wrong_beneficiary signs, but vesting_state has `beneficiary` as the real one.
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
 		&claim_ix_data(100),
 		vec![
-			AccountMeta::new_readonly(wrong_beneficiary, true),
+			AccountMeta::new(wrong_beneficiary, true),
 			AccountMeta::new_readonly(mint, false),
 			AccountMeta::new(vesting_pda, false),
 			AccountMeta::new(wrong_beneficiary_ata, false),
 			AccountMeta::new(vault, false),
+			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 		],
@@ -651,6 +653,7 @@ fn claim_wrong_beneficiary_fails() {
 		(wrong_beneficiary_ata, mock_ata_account(0)),
 		(vault, mock_ata_account(1_000_000)),
 		mollusk_svm::program::keyed_account_for_system_program(),
+		associated_token_program_account(),
 		token_program_account(),
 	];
 
@@ -658,9 +661,7 @@ fn claim_wrong_beneficiary_fails() {
 	mollusk.process_and_validate_instruction(
 		&instruction,
 		&accounts,
-		&[Check::instruction_err(
-			solana_instruction::error::InstructionError::Custom(0xC001_0001),
-		)],
+		&[Check::err(ProgramError::InvalidAccountData)],
 	);
 }
 
@@ -692,6 +693,7 @@ fn initialize_invalid_schedule_start_after_cliff() {
 			AccountMeta::new_readonly(mint, false),
 			AccountMeta::new(vesting_pda, false),
 			AccountMeta::new(vault, false),
+			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 		],
@@ -710,6 +712,7 @@ fn initialize_invalid_schedule_start_after_cliff() {
 		(vesting_pda, Account::default()),
 		(vault, Account::default()),
 		mollusk_svm::program::keyed_account_for_system_program(),
+		associated_token_program_account(),
 		token_program_account(),
 	];
 
@@ -743,6 +746,7 @@ fn initialize_invalid_schedule_cliff_after_end() {
 			AccountMeta::new_readonly(mint, false),
 			AccountMeta::new(vesting_pda, false),
 			AccountMeta::new(vault, false),
+			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 		],
@@ -761,6 +765,7 @@ fn initialize_invalid_schedule_cliff_after_end() {
 		(vesting_pda, Account::default()),
 		(vault, Account::default()),
 		mollusk_svm::program::keyed_account_for_system_program(),
+		associated_token_program_account(),
 		token_program_account(),
 	];
 
@@ -788,10 +793,7 @@ fn benchmark_cu_cancel() {
 	let (vesting_pda, bump) = derive_vesting_pda(&admin, &beneficiary, &mint);
 	let vault = derive_ata(&vesting_pda, &mint);
 
-	let lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<VestingState>());
+	let lamports = mollusk.sysvars.rent.minimum_balance(VestingState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),

@@ -32,7 +32,6 @@ pinocchio-token = { workspace = true, optional = true, default-features = true }
 pinocchio-token-2022 = { workspace = true, optional = true, default-features = true }
 solana-address = { workspace = true, default-features = true }
 solana-program-log = { workspace = true, optional = true, features = ["macro"], default-features = true }
-typed-builder = { workspace = true, default-features = true }
 zeropod = { workspace = true, default-features = true }
 
 [dev-dependencies]

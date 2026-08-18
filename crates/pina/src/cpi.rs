@@ -152,7 +152,7 @@ pub fn create_program_account_with_bump<'a, T: PinaAccount>(
 ) -> ProgramResult {
 	// Allocate space, then initialize the discriminator so callers can safely
 	// obtain a typed account view immediately after this helper returns.
-	allocate_account_with_bump(target_account, payer, size_of::<T>(), owner, seeds, bump)?;
+	allocate_account_with_bump(target_account, payer, T::SIZE, owner, seeds, bump)?;
 	{
 		let mut data = target_account.try_borrow_mut()?;
 		T::write_discriminator(&mut data);

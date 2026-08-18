@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const CREATE_DISCRIMINATOR: u8 = 0u8;
 
 /// Accounts.
@@ -48,52 +50,40 @@ impl Create {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		let mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];
-		pina::PinaSerialize::write_bytes(&data, &mut instruction_data);
-
 		solana_instruction::Instruction {
 			program_id: crate::ANCHOR_FLOATS_ID,
 			accounts,
-			data: instruction_data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct CreateInstructionData {
-	pub discriminator: u8,
-	pub data_f32: pina::PodU32,
-	pub data_f64: pina::PodU64,
+	bytes: Vec<u8>,
 }
 
 impl CreateInstructionData {
-	pub const fn new(data_f32: pina::PodU32, data_f64: pina::PodU64) -> Self {
-		Self {
-			discriminator: CREATE_DISCRIMINATOR,
-			data_f32,
-			data_f64,
+	pub fn new(
+		configure: impl FnOnce(&mut CreateInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <CreateInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <CreateInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			data.discriminator = CREATE_DISCRIMINATOR;
+			configure(data);
 		}
+		<CreateInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
 }
 
-impl pina::PinaSerialize for CreateInstructionData {
-	fn write_bytes(&self, output: &mut [u8]) {
-		assert_eq!(output.len(), core::mem::size_of::<Self>());
-		output.fill(0);
-		let mut offset = 0usize;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(
-			&self.discriminator,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodU32>();
-		pina::PinaSerialize::write_bytes(&self.data_f32, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodU64>();
-		pina::PinaSerialize::write_bytes(&self.data_f64, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		debug_assert_eq!(offset, output.len());
-	}
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct CreateInstructionWire {
+	pub discriminator: u8,
+	pub data_f32: u32,
+	pub data_f64: u64,
 }

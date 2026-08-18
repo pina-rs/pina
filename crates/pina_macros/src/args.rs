@@ -94,18 +94,6 @@ impl SeedType {
 	/// The maximum byte length of a single seed.
 	pub(crate) const MAX_SEED_LEN: usize = 32;
 
-	/// The byte length of this seed type.
-	pub(crate) fn byte_size(&self) -> usize {
-		match self {
-			SeedType::Address => 32,
-			SeedType::U8 => 1,
-			SeedType::U16 => 2,
-			SeedType::U32 => 4,
-			SeedType::U64 => 8,
-			SeedType::Bytes(len) => *len,
-		}
-	}
-
 	/// The Rust type used for the constructor parameter.
 	pub(crate) fn param_type(&self) -> syn::Type {
 		match self {

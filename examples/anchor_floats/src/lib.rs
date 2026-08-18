@@ -35,21 +35,21 @@ pub enum FloatAccount {
 
 #[account(discriminator = FloatAccount)]
 pub struct FloatDataAccount {
-	pub data_f64: PodU64,
-	pub data_f32: PodU32,
+	pub data_f64: u64,
+	pub data_f32: u32,
 	pub authority: Address,
 }
 
 #[instruction(discriminator = FloatInstruction::Create)]
 pub struct CreateInstruction {
-	pub data_f32: PodU32,
-	pub data_f64: PodU64,
+	pub data_f32: u32,
+	pub data_f64: u64,
 }
 
 #[instruction(discriminator = FloatInstruction::Update)]
 pub struct UpdateInstruction {
-	pub data_f32: PodU32,
-	pub data_f64: PodU64,
+	pub data_f32: u32,
+	pub data_f64: u64,
 }
 
 #[derive(Accounts, Debug)]
@@ -65,14 +65,19 @@ pub struct UpdateAccounts<'a> {
 	pub authority: &'a AccountView,
 }
 
-fn apply_create(account: &mut FloatDataAccount, authority: &Address, data_f32: f32, data_f64: f64) {
-	account.data_f32 = PodU32::from(data_f32.to_bits());
-	account.data_f64 = PodU64::from(data_f64.to_bits());
+fn apply_create(
+	account: &mut FloatDataAccountZc,
+	authority: &Address,
+	data_f32: f32,
+	data_f64: f64,
+) {
+	account.data_f32.set(data_f32.to_bits());
+	account.data_f64.set(data_f64.to_bits());
 	account.authority = *authority;
 }
 
 fn apply_update(
-	account: &mut FloatDataAccount,
+	account: &mut FloatDataAccountZc,
 	authority: &Address,
 	data_f32: f32,
 	data_f64: f64,
@@ -81,8 +86,8 @@ fn apply_update(
 		return Err(FloatError::AuthorityMismatch.into());
 	}
 
-	account.data_f32 = PodU32::from(data_f32.to_bits());
-	account.data_f64 = PodU64::from(data_f64.to_bits());
+	account.data_f32.set(data_f32.to_bits());
+	account.data_f64.set(data_f64.to_bits());
 
 	Ok(())
 }
@@ -90,19 +95,14 @@ fn apply_update(
 impl<'a> ProcessAccountInfos<'a> for CreateAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = CreateInstruction::try_from_bytes(data)?;
-		let data_f32 = f32::from_bits(u32::from(args.data_f32));
-		let data_f64 = f64::from_bits(u64::from(args.data_f64));
+		let data_f32 = f32::from_bits(args.data_f32.get());
+		let data_f64 = f64::from_bits(args.data_f64.get());
 
 		self.authority.assert_signer()?;
 		self.account.assert_empty()?;
 		self.system_program.assert_address(&system::ID)?;
 
-		create_account(
-			self.authority,
-			self.account,
-			size_of::<FloatDataAccount>(),
-			&ID,
-		)?;
+		create_account(self.authority, self.account, FloatDataAccount::SIZE, &ID)?;
 
 		let mut account = self.account.as_account_mut::<FloatDataAccount>(&ID)?;
 		apply_create(&mut account, self.authority.address(), data_f32, data_f64);
@@ -114,8 +114,8 @@ impl<'a> ProcessAccountInfos<'a> for CreateAccounts<'a> {
 impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = UpdateInstruction::try_from_bytes(data)?;
-		let data_f32 = f32::from_bits(u32::from(args.data_f32));
-		let data_f64 = f64::from_bits(u64::from(args.data_f64));
+		let data_f32 = f32::from_bits(args.data_f32.get());
+		let data_f64 = f64::from_bits(args.data_f64.get());
 
 		self.authority.assert_signer()?;
 		self.account.assert_type::<FloatDataAccount>(&ID)?;
@@ -152,43 +152,44 @@ mod tests {
 
 	#[test]
 	fn create_instruction_roundtrip() {
-		let instruction = CreateInstruction::builder()
-			.data_f32(PodU32::from(1.0f32.to_bits()))
-			.data_f64(PodU64::from(2.0f64.to_bits()))
-			.build();
-		let bytes = instruction.to_bytes();
+		let mut bytes = [0u8; CreateInstruction::SIZE];
+		let instruction = CreateInstruction::initialize(&mut bytes)
+			.unwrap_or_else(|error| panic!("initialize: {error:?}"));
+		instruction.data_f32.set(1.0f32.to_bits());
+		instruction.data_f64.set(2.0f64.to_bits());
 		let decoded =
 			CreateInstruction::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
 
-		assert_eq!(f32::from_bits(u32::from(decoded.data_f32)), 1.0);
-		assert_eq!(f64::from_bits(u64::from(decoded.data_f64)), 2.0);
+		assert_eq!(f32::from_bits(decoded.data_f32.get()), 1.0);
+		assert_eq!(f64::from_bits(decoded.data_f64.get()), 2.0);
 	}
 
 	#[test]
 	fn update_instruction_roundtrip() {
-		let instruction = UpdateInstruction::builder()
-			.data_f32(PodU32::from(3.0f32.to_bits()))
-			.data_f64(PodU64::from(4.0f64.to_bits()))
-			.build();
-		let bytes = instruction.to_bytes();
+		let mut bytes = [0u8; UpdateInstruction::SIZE];
+		let instruction = UpdateInstruction::initialize(&mut bytes)
+			.unwrap_or_else(|error| panic!("initialize: {error:?}"));
+		instruction.data_f32.set(3.0f32.to_bits());
+		instruction.data_f64.set(4.0f64.to_bits());
 		let decoded =
 			UpdateInstruction::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
 
-		assert_eq!(f32::from_bits(u32::from(decoded.data_f32)), 3.0);
-		assert_eq!(f64::from_bits(u64::from(decoded.data_f64)), 4.0);
+		assert_eq!(f32::from_bits(decoded.data_f32.get()), 3.0);
+		assert_eq!(f64::from_bits(decoded.data_f64.get()), 4.0);
 	}
 
 	#[test]
 	fn apply_update_rejects_authority_mismatch() {
 		let authority: Address = [1u8; 32].into();
 		let wrong_authority: Address = [2u8; 32].into();
-		let mut account = FloatDataAccount::builder()
-			.data_f32(PodU32::from(1.0f32.to_bits()))
-			.data_f64(PodU64::from(2.0f64.to_bits()))
-			.authority(authority)
-			.build();
+		let mut bytes = [0u8; FloatDataAccount::SIZE];
+		let account = FloatDataAccount::initialize(&mut bytes)
+			.unwrap_or_else(|error| panic!("initialize: {error:?}"));
+		account.data_f32.set(1.0f32.to_bits());
+		account.data_f64.set(2.0f64.to_bits());
+		account.authority = authority;
 
-		let result = apply_update(&mut account, &wrong_authority, 3.0, 4.0);
+		let result = apply_update(account, &wrong_authority, 3.0, 4.0);
 		assert!(matches!(
 			result,
 			Err(ProgramError::Custom(code)) if code == FloatError::AuthorityMismatch as u32
@@ -198,16 +199,17 @@ mod tests {
 	#[test]
 	fn apply_update_updates_values() {
 		let authority: Address = [1u8; 32].into();
-		let mut account = FloatDataAccount::builder()
-			.data_f32(PodU32::from(1.0f32.to_bits()))
-			.data_f64(PodU64::from(2.0f64.to_bits()))
-			.authority(authority)
-			.build();
+		let mut bytes = [0u8; FloatDataAccount::SIZE];
+		let account = FloatDataAccount::initialize(&mut bytes)
+			.unwrap_or_else(|error| panic!("initialize: {error:?}"));
+		account.data_f32.set(1.0f32.to_bits());
+		account.data_f64.set(2.0f64.to_bits());
+		account.authority = authority;
 
-		let result = apply_update(&mut account, &authority, 3.0, 4.0);
+		let result = apply_update(account, &authority, 3.0, 4.0);
 		assert!(result.is_ok());
-		assert_eq!(f32::from_bits(u32::from(account.data_f32)), 3.0);
-		assert_eq!(f64::from_bits(u64::from(account.data_f64)), 4.0);
+		assert_eq!(f32::from_bits(account.data_f32.get()), 3.0);
+		assert_eq!(f64::from_bits(account.data_f64.get()), 4.0);
 	}
 
 	#[test]

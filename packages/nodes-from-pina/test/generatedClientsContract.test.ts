@@ -74,6 +74,8 @@ import {
 } from "../../../codama/clients/js/staking_rewards_program/src/generated/programs";
 
 const SYSTEM_PROGRAM_ADDRESS = "11111111111111111111111111111111";
+const ASSOCIATED_TOKEN_PROGRAM_ADDRESS =
+	"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
 
 const READONLY = 0;
 const WRITABLE = 1;
@@ -131,11 +133,12 @@ describe("vesting JS client contracts", () => {
 		} as any);
 		expect(initialize.programAddress).toBe(VESTING_PROGRAM_PROGRAM_ADDRESS);
 		expectAccountsMatch(initialize.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: WRITABLE },
 			{ address: beneficiary, role: READONLY },
 			{ address: mint, role: READONLY },
 			{ address: vestingState, role: WRITABLE },
 			{ address: vault, role: WRITABLE },
+			{ address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
 		]);
@@ -157,11 +160,12 @@ describe("vesting JS client contracts", () => {
 			amount: 25n,
 		} as any);
 		expectAccountsMatch(claim.accounts, [
-			{ address: beneficiary, role: READONLY },
+			{ address: beneficiary, role: WRITABLE },
 			{ address: mint, role: READONLY },
 			{ address: vestingState, role: WRITABLE },
 			{ address: beneficiaryAta, role: WRITABLE },
 			{ address: vault, role: WRITABLE },
+			{ address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
 		]);
@@ -389,12 +393,13 @@ describe("staking rewards JS client contracts", () => {
 		} as any);
 		expect(init.programAddress).toBe(STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS);
 		expectAccountsMatch(init.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: WRITABLE },
 			{ address: stakeMint, role: READONLY },
 			{ address: rewardMint, role: READONLY },
 			{ address: poolState, role: WRITABLE },
 			{ address: stakeVault, role: WRITABLE },
 			{ address: rewardVault, role: WRITABLE },
+			{ address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
 		]);
@@ -409,7 +414,7 @@ describe("staking rewards JS client contracts", () => {
 			bump: 4,
 		} as any);
 		expectAccountsMatch(openPosition.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: WRITABLE },
 			{ address: poolState, role: READONLY },
 			{ address: positionState, role: WRITABLE },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
@@ -429,11 +434,12 @@ describe("staking rewards JS client contracts", () => {
 			amount: 42n,
 		} as any);
 		expectAccountsMatch(deposit.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: WRITABLE },
 			{ address: stakeMint, role: READONLY },
 			{ address: poolState, role: WRITABLE },
 			{ address: positionState, role: WRITABLE },
 			{ address: userStakeAta, role: WRITABLE },
+			{ address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 		]);
@@ -473,11 +479,12 @@ describe("staking rewards JS client contracts", () => {
 			tokenProgram,
 		} as any);
 		expectAccountsMatch(claim.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: WRITABLE },
 			{ address: rewardMint, role: READONLY },
 			{ address: poolState, role: READONLY },
 			{ address: positionState, role: WRITABLE },
 			{ address: userRewardAta, role: WRITABLE },
+			{ address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 		]);

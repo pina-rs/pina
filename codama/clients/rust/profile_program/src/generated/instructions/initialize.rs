@@ -8,10 +8,12 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 /// Instruction data for `Initialize`.
 ///
-/// Contains the PDA bump seed and the initial name/bio. The `PodString`
-/// fields carry their own length prefix, so the client writes
+/// Contains the PDA bump seed and the initial name/bio. The generated string
+/// views carry their own length prefix, so the client writes
 /// `discriminator + bump + len(name) + name + len(bio) + bio`.
 pub const INITIALIZE_DISCRIMINATOR: u8 = 0u8;
 
@@ -58,57 +60,42 @@ impl Initialize {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		let mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];
-		pina::PinaSerialize::write_bytes(&data, &mut instruction_data);
-
 		solana_instruction::Instruction {
 			program_id: crate::PROFILE_PROGRAM_ID,
 			accounts,
-			data: instruction_data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct InitializeInstructionData {
-	pub discriminator: u8,
-	pub bump: u8,
-	pub name: pina::PodString<32, 1>,
-	pub bio: pina::PodString<128, 1>,
+	bytes: Vec<u8>,
 }
 
 impl InitializeInstructionData {
-	pub const fn new(bump: u8, name: pina::PodString<32, 1>, bio: pina::PodString<128, 1>) -> Self {
-		Self {
-			discriminator: INITIALIZE_DISCRIMINATOR,
-			bump,
-			name,
-			bio,
+	pub fn new(
+		configure: impl FnOnce(&mut InitializeInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <InitializeInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data =
+				<InitializeInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			data.discriminator = INITIALIZE_DISCRIMINATOR;
+			configure(data);
 		}
+		<InitializeInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
 }
 
-impl pina::PinaSerialize for InitializeInstructionData {
-	fn write_bytes(&self, output: &mut [u8]) {
-		assert_eq!(output.len(), core::mem::size_of::<Self>());
-		output.fill(0);
-		let mut offset = 0usize;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(
-			&self.discriminator,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(&self.bump, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodString<32, 1>>();
-		pina::PinaSerialize::write_bytes(&self.name, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodString<128, 1>>();
-		pina::PinaSerialize::write_bytes(&self.bio, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		debug_assert_eq!(offset, output.len());
-	}
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct InitializeInstructionWire {
+	pub discriminator: u8,
+	pub bump: u8,
+	pub name: pina::String<32>,
+	pub bio: pina::String<128>,
 }

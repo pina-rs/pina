@@ -16,6 +16,9 @@ rustflags = [
 build-bpf = "build --release --target bpfel-unknown-none -p pina_bpf -F bpf-entrypoint -Z build-std=core,alloc"
 build-escrow-program = "build-sbf --manifest-path examples/escrow_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
 build-profile-program = "build-sbf --manifest-path examples/profile_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
+build-role-registry-program = "build-sbf --manifest-path examples/role_registry_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
+build-staking-rewards-program = "build-sbf --manifest-path examples/staking_rewards_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
+build-vesting-program = "build-sbf --manifest-path examples/vesting_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
 dylint = ["bin", "cargo-dylint"]
 semver-checks = ["bin", "cargo-semver-checks"]
 workspaces = ["bin", "cargo-workspaces"]

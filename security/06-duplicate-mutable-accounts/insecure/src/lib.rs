@@ -29,12 +29,12 @@ pub enum LedgerAccount {
 #[account(discriminator = LedgerAccount)]
 pub struct Balance {
 	pub owner: Address,
-	pub amount: PodU64,
+	pub amount: u64,
 }
 
 #[instruction(discriminator = LedgerInstruction, variant = Transfer)]
 pub struct TransferInstruction {
-	pub amount: PodU64,
+	pub amount: u64,
 }
 
 #[derive(Accounts, Debug)]
@@ -55,15 +55,15 @@ impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
 		// BUG: No check that source != dest!
 		// If the same account is passed for both, the debit and credit
 		// operate on the same account.
-		let amount: u64 = args.amount.into();
+		let amount = args.amount.get();
 
 		let mut source = self.source.as_account_mut::<Balance>(&ID)?;
-		let source_amount: u64 = source.amount.into();
-		source.amount = PodU64::from_primitive(source_amount.saturating_sub(amount));
+		let source_amount = source.amount.get();
+		source.amount.set(source_amount.saturating_sub(amount));
 
 		let mut dest = self.dest.as_account_mut::<Balance>(&ID)?;
-		let dest_amount: u64 = dest.amount.into();
-		dest.amount = PodU64::from_primitive(dest_amount.saturating_add(amount));
+		let dest_amount = dest.amount.get();
+		dest.amount.set(dest_amount.saturating_add(amount));
 
 		Ok(())
 	}

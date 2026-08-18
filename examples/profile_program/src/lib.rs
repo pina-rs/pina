@@ -95,7 +95,7 @@ pub enum ProfileError {
 /// - `PinaAccount` and zeropod validation for checked zero-copy access.
 /// - `HasDiscriminator` linking this account to
 ///   `ProfileAccountType::ProfileState`.
-/// - `TypedBuilder` for ergonomic construction.
+/// - `initialize` and `try_from_bytes` helpers for caller-owned storage.
 ///
 /// Layout (231 bytes total):
 /// ```text
@@ -113,17 +113,17 @@ pub enum ProfileError {
 pub struct ProfileState {
 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
 	pub bump: u8,
-	/// The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8
-	/// bytes.
-	pub name: PodString<32>,
-	/// A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8
-	/// bytes.
-	pub bio: PodString<128>,
-	/// Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
-	/// elements.
-	pub tags: PodVec<PodU64, 8>,
+	/// The profile display name. The generated view uses one length byte plus
+	/// 32 bytes of UTF-8 capacity.
+	pub name: String<32>,
+	/// A longer free-form bio. The generated view uses one length byte plus
+	/// 128 bytes of UTF-8 capacity.
+	pub bio: String<128>,
+	/// Up to 8 tags. The generated view uses a two-byte count followed by
+	/// eight little-endian `u64` slots.
+	pub tags: Vec<u64, 8>,
 	/// Whether the profile is active.
-	pub active: PodBool,
+	pub active: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -132,40 +132,40 @@ pub struct ProfileState {
 
 /// Instruction data for `Initialize`.
 ///
-/// Contains the PDA bump seed and the initial name/bio. The `PodString`
-/// fields carry their own length prefix, so the client writes
+/// Contains the PDA bump seed and the initial name/bio. The generated string
+/// views carry their own length prefix, so the client writes
 /// `discriminator + bump + len(name) + name + len(bio) + bio`.
 #[instruction(discriminator = ProfileInstruction, variant = Initialize)]
 pub struct InitializeInstruction {
 	/// The PDA bump seed, computed off-chain.
 	pub bump: u8,
 	/// The initial display name (UTF-8, up to 32 bytes).
-	pub name: PodString<32>,
+	pub name: String<32>,
 	/// The initial bio (UTF-8, up to 128 bytes).
-	pub bio: PodString<128>,
+	pub bio: String<128>,
 }
 
 /// Instruction data for `UpdateProfile`. Replaces both name and bio.
 #[instruction(discriminator = ProfileInstruction, variant = UpdateProfile)]
 pub struct UpdateProfileInstruction {
 	/// The new display name (UTF-8, up to 32 bytes).
-	pub name: PodString<32>,
+	pub name: String<32>,
 	/// The new bio (UTF-8, up to 128 bytes).
-	pub bio: PodString<128>,
+	pub bio: String<128>,
 }
 
 /// Instruction data for `AddTag`. Appends a tag to the profile.
 #[instruction(discriminator = ProfileInstruction, variant = AddTag)]
 pub struct AddTagInstruction {
 	/// The tag value to append.
-	pub tag: PodU64,
+	pub tag: u64,
 }
 
 /// Instruction data for `RemoveTag`. Removes the tag at `index`.
 #[instruction(discriminator = ProfileInstruction, variant = RemoveTag)]
 pub struct RemoveTagInstruction {
 	/// The zero-based index of the tag to remove.
-	pub index: PodU64,
+	pub index: u64,
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +243,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		profile.name = args.name;
 		profile.bio = args.bio;
 		profile.tags.clear();
-		profile.active = PodBool::from(true);
+		profile.active.set(true);
 
 		log!("Profile initialized");
 
@@ -297,7 +297,7 @@ impl<'a> ProcessAccountInfos<'a> for ProfileAccounts<'a> {
 			}
 			ProfileInstruction::RemoveTag => {
 				let args = RemoveTagInstruction::try_from_bytes(data)?;
-				let index: u64 = args.index.into();
+				let index = args.index.get();
 
 				let mut profile = self.profile.as_account_mut::<ProfileState>(&ID)?;
 				let len = profile.tags.len();
@@ -380,7 +380,7 @@ mod tests {
 	fn profile_state_layout() {
 		// 1 (discriminator) + 1 (bump) + 33 (name) + 129 (bio) + 66 (tags)
 		// + 1 (active) = 231 bytes.
-		assert_eq!(size_of::<ProfileState>(), 231);
+		assert_eq!(ProfileState::SIZE, 231);
 	}
 
 	#[test]
@@ -392,18 +392,15 @@ mod tests {
 	}
 
 	#[test]
-	fn profile_state_builder() {
-		let state = ProfileState::builder()
-			.bump(42)
-			.name(PodString::default())
-			.bio(PodString::default())
-			.tags(PodVec::default())
-			.active(PodBool::from(true))
-			.build();
+	fn profile_state_initialization() {
+		let mut bytes = [0u8; ProfileState::SIZE];
+		let state = ProfileState::initialize(&mut bytes).unwrap();
+		state.bump = 42;
+		state.active.set(true);
 		assert_eq!(state.bump, 42);
 		assert!(state.name.is_empty());
 		assert!(state.tags.is_empty());
-		assert!(bool::from(state.active));
+		assert!(state.active.get());
 	}
 
 	#[test]
@@ -417,15 +414,14 @@ mod tests {
 
 	#[test]
 	fn pod_string_rejects_invalid_utf8() {
-		let mut name = PodString::<32>::default();
-		// 0xff is not valid UTF-8
-		assert!(name.try_set("\u{FFFD}").is_ok()); // replacement char is valid
-		// Direct byte-level corruption: set the length to 1 and write 0xff.
-		// Boundary validation must reject the invalid UTF-8.
-		let mut raw = [0u8; 33];
-		raw[0] = 1;
-		raw[1] = 0xff;
-		assert!(pod_from_bytes::<PodString<32>>(&raw).is_err());
+		let mut bytes = [0u8; ProfileState::SIZE];
+		bytes[0] = ProfileAccountType::ProfileState as u8;
+		bytes[2] = 1;
+		bytes[3] = 0xff;
+
+		// The account boundary validates active string bytes before exposing a
+		// zero-copy view. Inactive capacity remains unobserved.
+		assert!(ProfileState::try_from_bytes(&bytes).is_err());
 	}
 
 	#[test]
@@ -465,7 +461,7 @@ mod tests {
 	#[test]
 	fn initialize_instruction_data_layout() {
 		// 1 (discriminator) + 1 (bump) + 33 (name) + 129 (bio) = 164 bytes.
-		assert_eq!(size_of::<InitializeInstruction>(), 164);
+		assert_eq!(InitializeInstruction::SIZE, 164);
 		assert!(InitializeInstruction::matches_discriminator(&[
 			ProfileInstruction::Initialize as u8
 		]));
@@ -474,19 +470,19 @@ mod tests {
 	#[test]
 	fn update_profile_instruction_data_layout() {
 		// 1 (discriminator) + 33 (name) + 129 (bio) = 163 bytes.
-		assert_eq!(size_of::<UpdateProfileInstruction>(), 163);
+		assert_eq!(UpdateProfileInstruction::SIZE, 163);
 	}
 
 	#[test]
 	fn add_tag_instruction_data_layout() {
 		// 1 (discriminator) + 8 (tag) = 9 bytes.
-		assert_eq!(size_of::<AddTagInstruction>(), 9);
+		assert_eq!(AddTagInstruction::SIZE, 9);
 	}
 
 	#[test]
 	fn remove_tag_instruction_data_layout() {
 		// 1 (discriminator) + 8 (index) = 9 bytes.
-		assert_eq!(size_of::<RemoveTagInstruction>(), 9);
+		assert_eq!(RemoveTagInstruction::SIZE, 9);
 	}
 
 	#[test]

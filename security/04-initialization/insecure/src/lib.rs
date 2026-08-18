@@ -29,13 +29,13 @@ pub enum ConfigAccount {
 #[account(discriminator = ConfigAccount)]
 pub struct Config {
 	pub authority: Address,
-	pub value: PodU64,
+	pub value: u64,
 	pub bump: u8,
 }
 
 #[instruction(discriminator = ConfigInstruction, variant = Initialize)]
 pub struct InitializeInstruction {
-	pub value: PodU64,
+	pub value: u64,
 	pub bump: u8,
 }
 
@@ -70,11 +70,9 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		)?;
 
 		let mut config = self.config.as_account_mut::<Config>(&ID)?;
-		*config = Config::builder()
-			.authority(*self.authority.address())
-			.value(args.value)
-			.bump(args.bump)
-			.build();
+		config.authority = *self.authority.address();
+		config.value = args.value;
+		config.bump = args.bump;
 
 		Ok(())
 	}

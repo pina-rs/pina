@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 /// Instruction data for `AddTag`. Appends a tag to the profile.
 pub const ADD_TAG_DISCRIMINATOR: u8 = 2u8;
 
@@ -49,47 +51,39 @@ impl AddTag {
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.profile, false));
 		accounts.extend_from_slice(remaining_accounts);
-		let mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];
-		pina::PinaSerialize::write_bytes(&data, &mut instruction_data);
-
 		solana_instruction::Instruction {
 			program_id: crate::PROFILE_PROGRAM_ID,
 			accounts,
-			data: instruction_data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct AddTagInstructionData {
-	pub discriminator: u8,
-	pub tag: pina::PodU64,
+	bytes: Vec<u8>,
 }
 
 impl AddTagInstructionData {
-	pub const fn new(tag: pina::PodU64) -> Self {
-		Self {
-			discriminator: ADD_TAG_DISCRIMINATOR,
-			tag,
+	pub fn new(
+		configure: impl FnOnce(&mut AddTagInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <AddTagInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <AddTagInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			data.discriminator = ADD_TAG_DISCRIMINATOR;
+			configure(data);
 		}
+		<AddTagInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
 }
 
-impl pina::PinaSerialize for AddTagInstructionData {
-	fn write_bytes(&self, output: &mut [u8]) {
-		assert_eq!(output.len(), core::mem::size_of::<Self>());
-		output.fill(0);
-		let mut offset = 0usize;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(
-			&self.discriminator,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodU64>();
-		pina::PinaSerialize::write_bytes(&self.tag, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		debug_assert_eq!(offset, output.len());
-	}
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct AddTagInstructionWire {
+	pub discriminator: u8,
+	pub tag: u64,
 }

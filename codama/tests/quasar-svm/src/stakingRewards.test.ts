@@ -1,5 +1,6 @@
 import {
 	createKeyedMintAccount,
+	createKeyedSystemAccount,
 	QuasarSvm,
 	SPL_TOKEN_PROGRAM_ID,
 } from "@blueshift-gg/quasar-svm/kit";
@@ -101,7 +102,6 @@ describe("staking_rewards_program quasar e2e", () => {
 			rewardMint.address,
 			SPL_TOKEN_PROGRAM_ID as Address,
 		);
-
 		const initializePoolResult = svm.processInstruction(
 			getInitializePoolInstruction({
 				admin,
@@ -113,7 +113,14 @@ describe("staking_rewards_program quasar e2e", () => {
 				tokenProgram: SPL_TOKEN_PROGRAM_ID as Address,
 				bump: poolBump,
 			}),
-			[adminAccount, stakeMint, rewardMint],
+			[
+				adminAccount,
+				stakeMint,
+				rewardMint,
+				createKeyedSystemAccount(poolPda as Address, 0n),
+				createKeyedSystemAccount(stakeVault, 0n),
+				createKeyedSystemAccount(rewardVault, 0n),
+			],
 		);
 		initializePoolResult.assertSuccess();
 
@@ -144,6 +151,7 @@ describe("staking_rewards_program quasar e2e", () => {
 					initializePoolResult.account(poolPda),
 					"pool state should exist before openPosition",
 				),
+				createKeyedSystemAccount(positionPda as Address, 0n),
 			],
 		);
 		openPositionResult.assertSuccess();

@@ -10,13 +10,12 @@
 
 use counter_program::CounterState;
 use libfuzzer_sys::fuzz_target;
-use pina::PinaAccount;
 use role_registry_program::RegistryConfig;
 use role_registry_program::RoleEntry;
 
-const _: [(); 10] = [(); core::mem::size_of::<CounterState>()];
-const _: [(); 42] = [(); core::mem::size_of::<RegistryConfig>()];
-const _: [(); 83] = [(); core::mem::size_of::<RoleEntry>()];
+const _: [(); 10] = [(); CounterState::SIZE];
+const _: [(); 42] = [(); RegistryConfig::SIZE];
+const _: [(); 83] = [(); RoleEntry::SIZE];
 
 // Exercise every real account layout from one libFuzzer entry point. Defining
 // multiple `fuzz_target!` invocations in a binary emits duplicate linker symbols.

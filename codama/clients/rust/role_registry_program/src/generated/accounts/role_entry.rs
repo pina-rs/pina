@@ -8,98 +8,42 @@
 	clippy::too_many_arguments
 )]
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+use pina::zeropod;
+
+#[derive(pina::ZeroPod)]
 pub struct RoleEntry {
 	pub discriminator: u8,
 	pub registry: solana_pubkey::Pubkey,
-	pub role_id: pina::PodU64,
+	pub role_id: u64,
 	pub grantee: solana_pubkey::Pubkey,
-	pub permissions: pina::PodU64,
-	pub active: pina::PodBool,
+	pub permissions: u64,
+	pub active: bool,
 	pub bump: u8,
 }
-
-impl pina::PinaSerialize for RoleEntry {
-	fn write_bytes(&self, output: &mut [u8]) {
-		assert_eq!(output.len(), core::mem::size_of::<Self>());
-		output.fill(0);
-		let mut offset = 0usize;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(
-			&self.discriminator,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		let field_size = core::mem::size_of::<solana_pubkey::Pubkey>();
-		pina::PinaSerialize::write_bytes(&self.registry, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodU64>();
-		pina::PinaSerialize::write_bytes(&self.role_id, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<solana_pubkey::Pubkey>();
-		pina::PinaSerialize::write_bytes(&self.grantee, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodU64>();
-		pina::PinaSerialize::write_bytes(
-			&self.permissions,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodBool>();
-		pina::PinaSerialize::write_bytes(&self.active, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(&self.bump, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		debug_assert_eq!(offset, output.len());
-	}
-}
-
-impl pina::ZcValidate for RoleEntry {
-	fn validate_ref(value: &Self) -> Result<(), pina::ZeroPodError> {
-		<u8 as pina::ZcValidate>::validate_ref(&value.discriminator)?;
-		<solana_pubkey::Pubkey as pina::ZcValidate>::validate_ref(&value.registry)?;
-		<pina::PodU64 as pina::ZcValidate>::validate_ref(&value.role_id)?;
-		<solana_pubkey::Pubkey as pina::ZcValidate>::validate_ref(&value.grantee)?;
-		<pina::PodU64 as pina::ZcValidate>::validate_ref(&value.permissions)?;
-		<pina::PodBool as pina::ZcValidate>::validate_ref(&value.active)?;
-		<u8 as pina::ZcValidate>::validate_ref(&value.bump)?;
-		Ok(())
-	}
-}
-
-// SAFETY: all rendered fields are align-1, padding-free ZcElem values;
-// validate_ref recursively validates every field before safe access.
-#[allow(unsafe_code)]
-unsafe impl pina::ZcElem for RoleEntry {}
 
 pub const ROLE_ENTRY_DISCRIMINATOR: u8 = 2u8;
 
 impl RoleEntry {
-	pub const LEN: usize = core::mem::size_of::<Self>();
+	pub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;
 
-	pub const fn new(
-		registry: solana_pubkey::Pubkey,
-		role_id: pina::PodU64,
-		grantee: solana_pubkey::Pubkey,
-		permissions: pina::PodU64,
-		active: pina::PodBool,
-		bump: u8,
-	) -> Self {
-		Self {
-			discriminator: ROLE_ENTRY_DISCRIMINATOR,
-			registry,
-			role_id,
-			grantee,
-			permissions,
-			active,
-			bump,
+	pub fn initialize(
+		data: &mut [u8],
+	) -> Result<&mut RoleEntryZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
+		data.fill(0);
+		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
+		account.discriminator = ROLE_ENTRY_DISCRIMINATOR;
+		Ok(account)
 	}
 
-	pub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {
-		let account = pina::pod_from_bytes::<Self>(data)
+	pub fn from_bytes(data: &[u8]) -> Result<&RoleEntryZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		let account = <Self as pina::ZeroPodFixed>::from_bytes(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != ROLE_ENTRY_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
@@ -109,26 +53,16 @@ impl RoleEntry {
 
 	pub fn from_bytes_mut(
 		data: &mut [u8],
-	) -> Result<&mut Self, solana_program_error::ProgramError> {
-		let account = pina::pod_from_bytes_mut::<Self>(data)
+	) -> Result<&mut RoleEntryZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != ROLE_ENTRY_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		Ok(account)
-	}
-}
-
-impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for RoleEntry {
-	type Error = solana_program_error::ProgramError;
-
-	fn try_from(account_info: &solana_account_info::AccountInfo<'a>) -> Result<Self, Self::Error> {
-		if account_info.owner != &crate::ROLE_REGISTRY_PROGRAM_ID {
-			return Err(solana_program_error::ProgramError::IncorrectProgramId);
-		}
-		let data_ref = account_info.try_borrow_data()?;
-		let account = Self::from_bytes(&data_ref)?;
-		Ok(*account)
 	}
 }
 

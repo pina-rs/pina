@@ -25,13 +25,10 @@
 //!     cargo test -p profile_program --test e2e -- --include-ignored --nocapture
 //! ```
 
-use std::mem::size_of;
-
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
 use mollusk_svm::result::InstructionResult;
-use pina::PodU64;
 use pina::ProgramError;
 use profile_program::AddTagInstruction;
 use profile_program::ID;
@@ -39,6 +36,7 @@ use profile_program::InitializeInstruction;
 use profile_program::ProfileError;
 use profile_program::ProfileInstruction;
 use profile_program::ProfileState;
+use profile_program::ProfileStateZc;
 use profile_program::RemoveTagInstruction;
 use profile_program::UpdateProfileInstruction;
 use solana_account::Account;
@@ -119,16 +117,22 @@ fn update_profile_ix_data(name: &str, bio: &str) -> Vec<u8> {
 
 /// Build `AddTag` instruction data: discriminator + tag.
 fn add_tag_ix_data(tag: u64) -> Vec<u8> {
-	let ix = AddTagInstruction::builder().tag(PodU64::from(tag)).build();
-	ix.to_bytes().to_vec()
+	let mut data = vec![0u8; AddTagInstruction::SIZE];
+	AddTagInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("add-tag initialization failed: {error:?}"))
+		.tag
+		.set(tag);
+	data
 }
 
 /// Build `RemoveTag` instruction data: discriminator + index.
 fn remove_tag_ix_data(index: u64) -> Vec<u8> {
-	let ix = RemoveTagInstruction::builder()
-		.index(PodU64::from(index))
-		.build();
-	ix.to_bytes().to_vec()
+	let mut data = vec![0u8; RemoveTagInstruction::SIZE];
+	RemoveTagInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("remove-tag initialization failed: {error:?}"))
+		.index
+		.set(index);
+	data
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +165,7 @@ fn assert_profile(
 	let account = result
 		.get_account(profile)
 		.unwrap_or_else(|| panic!("profile account {profile} not found"));
-	let state: &ProfileState =
+	let state: &ProfileStateZc =
 		<ProfileState as pina::ZeroPodFixed>::from_bytes(&account.data).unwrap();
 	assert_eq!(state.name.as_str(), expected_name);
 	assert_eq!(state.bio.as_str(), expected_bio);
@@ -172,7 +176,7 @@ fn assert_profile(
 		.map(|t| u64::from(*t))
 		.collect();
 	assert_eq!(tags, expected_tags);
-	assert_eq!(bool::from(state.active), expected_active);
+	assert_eq!(state.active.get(), expected_active);
 }
 
 // ---------------------------------------------------------------------------
@@ -458,9 +462,9 @@ fn requires_signer() {
 /// The account and instruction layouts must match the documented sizes.
 #[test]
 fn account_layout_matches_state() {
-	assert_eq!(size_of::<ProfileState>(), 231);
-	assert_eq!(size_of::<InitializeInstruction>(), 164);
-	assert_eq!(size_of::<UpdateProfileInstruction>(), 163);
-	assert_eq!(size_of::<AddTagInstruction>(), 9);
-	assert_eq!(size_of::<RemoveTagInstruction>(), 9);
+	assert_eq!(ProfileState::SIZE, 231);
+	assert_eq!(InitializeInstruction::SIZE, 164);
+	assert_eq!(UpdateProfileInstruction::SIZE, 163);
+	assert_eq!(AddTagInstruction::SIZE, 9);
+	assert_eq!(RemoveTagInstruction::SIZE, 9);
 }

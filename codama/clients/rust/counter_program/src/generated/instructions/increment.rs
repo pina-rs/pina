@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 /// Instruction data for `Increment`. No extra payload beyond the
 /// discriminator byte.
 pub const INCREMENT_DISCRIMINATOR: u8 = 1u8;
@@ -50,42 +52,38 @@ impl Increment {
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.counter, false));
 		accounts.extend_from_slice(remaining_accounts);
-		let mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];
-		pina::PinaSerialize::write_bytes(&data, &mut instruction_data);
-
 		solana_instruction::Instruction {
 			program_id: crate::COUNTER_PROGRAM_ID,
 			accounts,
-			data: instruction_data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct IncrementInstructionData {
-	pub discriminator: u8,
+	bytes: Vec<u8>,
 }
 
 impl IncrementInstructionData {
-	pub const fn new() -> Self {
-		Self {
-			discriminator: INCREMENT_DISCRIMINATOR,
+	pub fn new(
+		configure: impl FnOnce(&mut IncrementInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <IncrementInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <IncrementInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			data.discriminator = INCREMENT_DISCRIMINATOR;
+			configure(data);
 		}
+		<IncrementInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
 }
 
-impl pina::PinaSerialize for IncrementInstructionData {
-	fn write_bytes(&self, output: &mut [u8]) {
-		assert_eq!(output.len(), core::mem::size_of::<Self>());
-		output.fill(0);
-		let mut offset = 0usize;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(
-			&self.discriminator,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		debug_assert_eq!(offset, output.len());
-	}
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct IncrementInstructionWire {
+	pub discriminator: u8,
 }

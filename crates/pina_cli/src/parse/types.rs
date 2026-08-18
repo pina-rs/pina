@@ -12,7 +12,7 @@ use codama_nodes::StringTypeNode;
 use codama_nodes::TypeNode;
 use quote::ToTokens;
 
-use crate::ir::PodEnumIr;
+use crate::ir::ZeroPodEnumIr;
 
 /// Map a Rust type name (as it appears in pina structs) to a Codama
 /// `TypeNode`.
@@ -25,13 +25,13 @@ pub fn rust_type_to_codama(ty: &str) -> TypeNode {
 /// Unsupported Pod collection layouts are rejected rather than silently
 /// emitted as public keys with an incorrect wire size.
 pub fn try_rust_type_to_codama(ty: &str) -> Result<TypeNode, String> {
-	try_rust_type_to_codama_with_pod_enums(ty, &[])
+	try_rust_type_to_codama_with_zeropod_enums(ty, &[])
 }
 
-/// Fallible type mapping with the local `PodEnum` companion registry.
-pub fn try_rust_type_to_codama_with_pod_enums(
+/// Fallible type mapping with the local zeropod enum registry.
+pub fn try_rust_type_to_codama_with_zeropod_enums(
 	ty: &str,
-	pod_enums: &[PodEnumIr],
+	zeropod_enums: &[ZeroPodEnumIr],
 ) -> Result<TypeNode, String> {
 	match ty {
 		"u8" => Ok(NumberTypeNode::le(NumberFormat::U8).into()),
@@ -47,13 +47,13 @@ pub fn try_rust_type_to_codama_with_pod_enums(
 		"PodBool" | "bool" => Ok(BooleanTypeNode::default().into()),
 		"Address" | "Pubkey" => Ok(PublicKeyTypeNode::new().into()),
 		_ => {
-			if pod_enums.iter().any(|pod_enum| pod_enum.zc_name == ty) {
+			if zeropod_enums.iter().any(|item| item.name == ty) {
 				return Ok(DefinedTypeLinkNode::new(ty).into());
 			}
 			// Handle fixed-size byte arrays like [u8; 32]
 			if let Some(size) = parse_byte_array(ty) {
 				Ok(FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), size).into())
-			} else if let Some(node) = parse_pod_collection(ty, pod_enums)? {
+			} else if let Some(node) = parse_pod_collection(ty, zeropod_enums)? {
 				Ok(node)
 			} else {
 				Err(format!(
@@ -64,7 +64,8 @@ pub fn try_rust_type_to_codama_with_pod_enums(
 	}
 }
 
-/// Parse a `PodString<N, PFX>` or `PodVec<T, N, PFX>` type into a semantic,
+/// Parse a zeropod `String`/`Vec` schema or explicit `PodString`/`PodVec`
+/// storage type into a semantic,
 /// fixed-size Codama node. `PodOption<T>` remains unsupported until its
 /// semantic mapping is represented in the generated client schema.
 ///
@@ -73,9 +74,16 @@ pub fn try_rust_type_to_codama_with_pod_enums(
 ///
 /// Returns `Ok(None)` for non-collection types and an error for collection
 /// layouts whose byte size cannot be resolved statically.
-fn parse_pod_collection(ty: &str, pod_enums: &[PodEnumIr]) -> Result<Option<TypeNode>, String> {
+fn parse_pod_collection(
+	ty: &str,
+	zeropod_enums: &[ZeroPodEnumIr],
+) -> Result<Option<TypeNode>, String> {
 	let Some((name, args)) = parse_generic_args(ty) else {
-		if ty == "PodString"
+		if ty == "String"
+			|| ty.starts_with("String<")
+			|| ty == "Vec"
+			|| ty.starts_with("Vec<")
+			|| ty == "PodString"
 			|| ty.starts_with("PodString<")
 			|| ty == "PodVec"
 			|| ty.starts_with("PodVec<")
@@ -89,7 +97,7 @@ fn parse_pod_collection(ty: &str, pod_enums: &[PodEnumIr]) -> Result<Option<Type
 	};
 
 	match name.as_str() {
-		"PodString" => {
+		"String" | "PodString" => {
 			if !(1..=2).contains(&args.len()) {
 				return Err(format!("`{ty}` expects one or two generic arguments"));
 			}
@@ -110,7 +118,7 @@ fn parse_pod_collection(ty: &str, pod_enums: &[PodEnumIr]) -> Result<Option<Type
 				FixedSizeTypeNode::<TypeNode>::new(string, size).into(),
 			))
 		}
-		"PodVec" => {
+		"Vec" | "PodVec" => {
 			if !(2..=3).contains(&args.len()) {
 				return Err(format!("`{ty}` expects two or three generic arguments"));
 			}
@@ -118,12 +126,12 @@ fn parse_pod_collection(ty: &str, pod_enums: &[PodEnumIr]) -> Result<Option<Type
 			let item_ty = args
 				.first()
 				.ok_or_else(|| format!("`{ty}` is missing its element type"))?;
-			if !is_known_fixed_size_type(item_ty, pod_enums) {
+			if !is_known_fixed_size_type(item_ty, zeropod_enums) {
 				return Err(format!(
 					"cannot determine the byte size of PodVec element `{item_ty}` in `{ty}`"
 				));
 			}
-			let mut item = try_rust_type_to_codama_with_pod_enums(item_ty, pod_enums)?;
+			let mut item = try_rust_type_to_codama_with_zeropod_enums(item_ty, zeropod_enums)?;
 			let n = parse_collection_size(args.get(1), ty, "capacity")?;
 			let pfx: usize = match args.get(2) {
 				Some(s) => parse_collection_size(Some(s), ty, "prefix size")?,
@@ -134,10 +142,10 @@ fn parse_pod_collection(ty: &str, pod_enums: &[PodEnumIr]) -> Result<Option<Type
 			// Wire layout: [count: PFX bytes][items: N × T]. Emit the full
 			// fixed size (prefix + elements) so generated clients decode the
 			// correct account size and field offsets.
-			let item_size = pod_enums
+			let item_size = zeropod_enums
 				.iter()
-				.find(|pod_enum| pod_enum.zc_name == *item_ty)
-				.map(|pod_enum| pod_enum.repr_size)
+				.find(|item| item.name == *item_ty)
+				.map(|item| item.repr_size)
 				.or_else(|| type_node_size(&item))
 				.ok_or_else(|| format!("cannot determine the byte size of `{item_ty}`"))?;
 			if matches!(item, TypeNode::Link(_)) {
@@ -201,7 +209,7 @@ fn prefix_number_type(pfx: usize, ty: &str) -> Result<NumberTypeNode, String> {
 	Ok(NumberTypeNode::le(format))
 }
 
-fn is_known_fixed_size_type(ty: &str, pod_enums: &[PodEnumIr]) -> bool {
+fn is_known_fixed_size_type(ty: &str, zeropod_enums: &[ZeroPodEnumIr]) -> bool {
 	matches!(
 		ty,
 		"u8" | "u16"
@@ -217,8 +225,10 @@ fn is_known_fixed_size_type(ty: &str, pod_enums: &[PodEnumIr]) -> bool {
 			| "PodBool"
 			| "bool" | "Address"
 			| "Pubkey"
-	) || pod_enums.iter().any(|pod_enum| pod_enum.zc_name == ty)
+	) || zeropod_enums.iter().any(|item| item.name == ty)
 		|| parse_byte_array(ty).is_some()
+		|| ty.starts_with("String<")
+		|| ty.starts_with("Vec<")
 		|| ty.starts_with("PodString<")
 		|| ty.starts_with("PodVec<")
 }

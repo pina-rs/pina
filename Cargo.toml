@@ -125,7 +125,6 @@ tempfile = { default-features = false, version = "^3" }
 thiserror = { default-features = false, version = "^2" }
 tokio = { default-features = false, version = "^1" }
 trybuild = { default-features = false, version = "^1" }
-typed-builder = { default-features = false, version = "^0.23" }
 walkdir = { default-features = false, version = "^2" }
 zeropod = { default-features = false, version = "0.3.5", features = ["solana-address", "solana-program-error"] }
 

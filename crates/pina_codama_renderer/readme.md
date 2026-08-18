@@ -22,10 +22,10 @@ cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
 
 <br>
 
-- Discriminator-first `#[repr(C)]` account/instruction/event structs
-- zeropod `ZcElem`/`ZcValidate` models and initialized field-wise serialization (no `borsh`)
-- `pina` types for alignment-safe integer fields
-- Type-safe instruction builders
+- Native account, instruction, event, and defined-type schemas deriving `pina::ZeroPod`
+- Discriminator-first generated storage views with recursive zeropod validation
+- Checked account initialization from caller-owned buffers
+- Type-safe instruction builders that own and consume their initialized wire buffers without exposing object representations
 
 ## Constraints
 

@@ -106,7 +106,7 @@ fn renders_semantic_pod_collection_types() {
 	assert_eq!(
 		render_type_for_pod(&string, "ProfileState.name")
 			.unwrap_or_else(|error| panic!("render failed: {error}")),
-		"pina::PodString<32, 1>"
+		"pina::String<32>"
 	);
 
 	let values = ArrayTypeNode::prefixed(
@@ -117,16 +117,16 @@ fn renders_semantic_pod_collection_types() {
 	assert_eq!(
 		render_type_for_pod(&values, "ProfileState.tags")
 			.unwrap_or_else(|error| panic!("render failed: {error}")),
-		"pina::PodVec<pina::PodU64, 8, 2>"
+		"pina::Vec<u64, 8>"
 	);
 
-	let color = FixedSizeTypeNode::<TypeNode>::new(DefinedTypeLinkNode::new("colorZc"), 1);
+	let color = FixedSizeTypeNode::<TypeNode>::new(DefinedTypeLinkNode::new("color"), 1);
 	let colors = ArrayTypeNode::prefixed(color, NumberTypeNode::le(NumberFormat::U16));
 	let colors = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(colors, 10));
 	assert_eq!(
 		render_type_for_pod(&colors, "Palette.colors")
 			.unwrap_or_else(|error| panic!("render failed: {error}")),
-		"pina::PodVec<crate::generated::types::ColorZc, 8, 2>"
+		"pina::Vec<crate::generated::types::Color, 8>"
 	);
 }
 
@@ -522,12 +522,12 @@ fn renders_defined_type_aliases_with_pod_wrappers() {
 }
 
 #[test]
-fn renders_pod_enum_companion_defined_type() {
+fn renders_zeropod_enum_defined_type() {
 	let mut red = EnumEmptyVariantTypeNode::new("red");
 	red.discriminator = Some(0);
 	let mut blue = EnumEmptyVariantTypeNode::new("blue");
 	blue.discriminator = Some(1);
-	let color = TypeNode::Link(DefinedTypeLinkNode::new("colorZc"));
+	let color = TypeNode::Link(DefinedTypeLinkNode::new("color"));
 	let color_item = FixedSizeTypeNode::<TypeNode>::new(color.clone(), 1);
 	let colors = ArrayTypeNode::prefixed(color_item, NumberTypeNode::le(NumberFormat::U16));
 	let colors = FixedSizeTypeNode::<TypeNode>::new(colors, 10);
@@ -552,7 +552,7 @@ fn renders_pod_enum_companion_defined_type() {
 		}],
 		instructions: vec![],
 		defined_types: vec![DefinedTypeNode {
-			name: "colorZc".into(),
+			name: "color".into(),
 			docs: vec!["A color stored on chain.".to_string()].into(),
 			r#type: Box::new(
 				EnumTypeNode {
@@ -575,18 +575,18 @@ fn renders_pod_enum_companion_defined_type() {
 	};
 	let root = RootNode::new(program);
 	let output_dir = unique_temp_dir("pina-codama-render-pod-enum");
-	let crate_dir = output_dir.join("pod_enum_program");
+	let crate_dir = output_dir.join("zeropod_enum_program");
 	render_root_node(&root, &crate_dir, &RenderConfig::default())
 		.unwrap_or_else(|error| panic!("render failed: {error}"));
 
-	let content = read_generated_file(&crate_dir, "types/color_zc.rs");
-	assert!(content.contains("#[derive(Clone, Copy, Debug, PartialEq, Eq, pina::PodEnum)]"));
+	let content = read_generated_file(&crate_dir, "types/color.rs");
+	assert!(content.contains("#[derive(Clone, Copy, Debug, PartialEq, Eq, pina::ZeroPod)]"));
 	assert!(content.contains("pub enum Color"));
 	assert!(content.contains("Red = 0"));
 	assert!(content.contains("Blue = 1"));
 	let account = read_generated_file(&crate_dir, "accounts/palette.rs");
-	assert!(account.contains("pub color: crate::generated::types::ColorZc"));
-	assert!(account.contains("pub colors: pina::PodVec<crate::generated::types::ColorZc, 8, 2>"));
+	assert!(account.contains("pub color: crate::generated::types::Color"));
+	assert!(account.contains("pub colors: pina::Vec<crate::generated::types::Color, 8>"));
 }
 
 #[test]

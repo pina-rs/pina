@@ -72,21 +72,21 @@ pub struct EscrowState {
 	pub mint_a: Address,
 	pub mint_b: Address,
 	/// The amount of token A that was sent by sender.
-	pub amount_a: PodU64,
+	pub amount_a: u64,
 	/// The amount of token B to be received by the recipient.
-	pub amount_b: PodU64,
-	pub seed: PodU64,
+	pub amount_b: u64,
+	pub seed: u64,
 	pub bump: u8,
 }
 
 #[instruction(discriminator = EscrowInstruction::Make)]
 pub struct MakeInstruction {
 	/// An ID of the transaction.
-	pub seed: PodU64,
+	pub seed: u64,
 	/// The amount of token A to be sent.
-	pub amount_a: PodU64,
+	pub amount_a: u64,
 	/// The amount of token B to be received.
-	pub amount_b: PodU64,
+	pub amount_b: u64,
 	pub bump: u8,
 }
 
@@ -116,7 +116,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		// Parse instruction and prepare PDA seeds
 		let args = MakeInstruction::try_from_bytes(data)?;
 		let maker_address = *self.maker.address();
-		let escrow_seeds = EscrowState::seeds(&maker_address, u64::from(args.seed));
+		let escrow_seeds = EscrowState::seeds(&maker_address, args.seed.get());
 		let escrow_seeds_with_bump = escrow_seeds.with_bump(args.bump);
 
 		// Validate accounts
@@ -163,15 +163,13 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 
 		// Initialize escrow state
 		let mut escrow = self.escrow.as_account_mut::<EscrowState>(&ID)?;
-		*escrow = EscrowState::builder()
-			.maker(*self.maker.address())
-			.mint_a(*self.mint_a.address())
-			.mint_b(*self.mint_b.address())
-			.amount_a(args.amount_a)
-			.amount_b(args.amount_b)
-			.seed(args.seed)
-			.bump(args.bump)
-			.build();
+		escrow.maker = *self.maker.address();
+		escrow.mint_a = *self.mint_a.address();
+		escrow.mint_b = *self.mint_b.address();
+		escrow.amount_a = args.amount_a;
+		escrow.amount_b = args.amount_b;
+		escrow.seed = args.seed;
+		escrow.bump = args.bump;
 		drop(escrow);
 
 		// Create the vault token account
@@ -340,10 +338,9 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		token::instructions::CloseAccount::new(self.vault, self.maker, self.escrow)
 			.invoke_signed_with_program(&signers, &token_program)?;
 
-		// Zero out escrow state and close
-		self.escrow.as_account_mut::<EscrowState>(&ID)?.zeroed();
-
-		self.escrow.close_with_recipient(self.maker)
+		// Clear the raw backing bytes while closing; typed zero-copy views never
+		// expose inactive storage for blanket mutation.
+		self.escrow.close_account_zeroed(self.maker)
 	}
 }
 
@@ -365,22 +362,22 @@ mod tests {
 	#[test]
 	fn seeds_build_expected_seed_arrays() {
 		let maker = Address::new_from_array([3u8; 32]);
-		let seed = PodU64::from(42);
+		let seed = 42u64;
 		let bump = 7u8;
 
-		let seeds = EscrowState::seeds(&maker, u64::from(seed));
+		let seeds = EscrowState::seeds(&maker, seed);
 		let slices = seeds.as_slices();
 		assert_eq!(slices.len(), 3);
 		assert_eq!(slices[0], b"escrow");
 		assert_eq!(slices[1], maker.as_ref());
-		assert_eq!(slices[2], seed.as_ref());
+		assert_eq!(slices[2], seed.to_le_bytes());
 
 		let with_bump = seeds.with_bump(bump);
 		let slices_with_bump = with_bump.as_slices();
 		assert_eq!(slices_with_bump.len(), 4);
 		assert_eq!(slices_with_bump[0], b"escrow");
 		assert_eq!(slices_with_bump[1], maker.as_ref());
-		assert_eq!(slices_with_bump[2], seed.as_ref());
+		assert_eq!(slices_with_bump[2], seed.to_le_bytes());
 		assert_eq!(slices_with_bump[3], &[bump]);
 	}
 

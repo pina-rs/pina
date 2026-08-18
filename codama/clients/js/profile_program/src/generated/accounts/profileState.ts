@@ -61,7 +61,7 @@ export function getProfileStateDiscriminatorBytes(): ReadonlyUint8Array {
  * - `PinaAccount` and zeropod validation for checked zero-copy access.
  * - `HasDiscriminator` linking this account to
  * `ProfileAccountType::ProfileState`.
- * - `TypedBuilder` for ergonomic construction.
+ * - `initialize` and `try_from_bytes` helpers for caller-owned storage.
  *
  * Layout (231 bytes total):
  * ```text
@@ -80,18 +80,18 @@ export type ProfileState = {
 	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
 	bump: number;
 	/**
-	 * The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8
-	 * bytes.
+	 * The profile display name. The generated view uses one length byte plus
+	 * 32 bytes of UTF-8 capacity.
 	 */
 	name: string;
 	/**
-	 * A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8
-	 * bytes.
+	 * A longer free-form bio. The generated view uses one length byte plus
+	 * 128 bytes of UTF-8 capacity.
 	 */
 	bio: string;
 	/**
-	 * Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
-	 * elements.
+	 * Up to 8 tags. The generated view uses a two-byte count followed by
+	 * eight little-endian `u64` slots.
 	 */
 	tags: Array<bigint>;
 	/** Whether the profile is active. */
@@ -102,18 +102,18 @@ export type ProfileStateArgs = {
 	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
 	bump: number;
 	/**
-	 * The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8
-	 * bytes.
+	 * The profile display name. The generated view uses one length byte plus
+	 * 32 bytes of UTF-8 capacity.
 	 */
 	name: string;
 	/**
-	 * A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8
-	 * bytes.
+	 * A longer free-form bio. The generated view uses one length byte plus
+	 * 128 bytes of UTF-8 capacity.
 	 */
 	bio: string;
 	/**
-	 * Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
-	 * elements.
+	 * Up to 8 tags. The generated view uses a two-byte count followed by
+	 * eight little-endian `u64` slots.
 	 */
 	tags: Array<number | bigint>;
 	/** Whether the profile is active. */

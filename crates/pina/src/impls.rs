@@ -1,7 +1,3 @@
-#![allow(unsafe_code)]
-
-use core::mem::size_of;
-
 use pinocchio::ProgramResult;
 #[cfg(feature = "token")]
 use pinocchio::account::Ref as AccountRef;
@@ -16,7 +12,6 @@ use crate::AsAccount;
 #[cfg(feature = "token")]
 use crate::AsTokenAccount;
 use crate::CloseAccountWithRecipient;
-use crate::HasDiscriminator;
 use crate::LamportTransfer;
 use crate::PinaAccount;
 use crate::ProgramError;
@@ -115,10 +110,7 @@ fn validate_program(account: &AccountView, program_id: &Address) -> ProgramResul
 }
 
 #[track_caller]
-fn validate_type<T: HasDiscriminator>(
-	account: &AccountView,
-	program_id: &Address,
-) -> ProgramResult {
+fn validate_type<T: PinaAccount>(account: &AccountView, program_id: &Address) -> ProgramResult {
 	validate_owner(account, program_id)?;
 
 	let data = account.try_borrow()?;
@@ -133,7 +125,7 @@ fn validate_type<T: HasDiscriminator>(
 		return Err(ProgramError::InvalidAccountData);
 	}
 
-	if data.len() != size_of::<T>() {
+	if data.len() != T::SIZE {
 		log!(
 			"address: {} has invalid data length for the account type",
 			account.address().as_ref()
@@ -141,6 +133,16 @@ fn validate_type<T: HasDiscriminator>(
 		log_caller();
 
 		return Err(ProgramError::AccountDataTooSmall);
+	}
+
+	if <T as crate::ZeroPodFixed>::validate(&data).is_err() {
+		log!(
+			"address: {} contains invalid zero-copy account data",
+			account.address().as_ref()
+		);
+		log_caller();
+
+		return Err(ProgramError::InvalidAccountData);
 	}
 
 	Ok(())
@@ -388,7 +390,7 @@ macro_rules! impl_account_info_validation {
 			}
 
 			#[track_caller]
-			fn assert_type<T: HasDiscriminator>(
+			fn assert_type<T: PinaAccount>(
 				self,
 				program_id: &Address,
 			) -> Result<Self, ProgramError> {
@@ -492,24 +494,24 @@ impl_account_info_validation!(&'a mut AccountView);
 
 impl AsAccount for AccountView {
 	#[track_caller]
-	fn as_account<T>(&self, program_id: &Address) -> Result<Ref<'_, T>, ProgramError>
+	fn as_account<T>(&self, program_id: &Address) -> Result<Ref<'_, T::Zc>, ProgramError>
 	where
 		T: PinaAccount,
 	{
 		self.assert_owner(program_id)?;
-		self.assert_data_len(size_of::<T>())?;
+		self.assert_data_len(T::SIZE)?;
 
 		Ref::try_map(self.try_borrow()?, |data| T::try_from_bytes(data))
 			.map_err(|(_guard, error)| error)
 	}
 
 	#[track_caller]
-	fn as_account_mut<T>(&mut self, program_id: &Address) -> Result<RefMut<'_, T>, ProgramError>
+	fn as_account_mut<T>(&mut self, program_id: &Address) -> Result<RefMut<'_, T::Zc>, ProgramError>
 	where
 		T: PinaAccount,
 	{
 		self.assert_owner(program_id)?;
-		self.assert_data_len(size_of::<T>())?;
+		self.assert_data_len(T::SIZE)?;
 
 		RefMut::try_map(self.try_borrow_mut()?, |data| T::try_from_bytes_mut(data))
 			.map_err(|(_guard, error)| error)
@@ -603,6 +605,7 @@ impl_account_validation!(
 
 #[cfg(feature = "token")]
 #[track_caller]
+#[allow(unsafe_code)]
 fn load_token_state<'a, T: ?Sized>(
 	account: &'a AccountView,
 	owners: &[Address],
@@ -620,9 +623,12 @@ fn load_token_state<'a, T: ?Sized>(
 			return Err(ProgramError::InvalidAccountData);
 		}
 
-		// SAFETY: the exact legacy layout or complete token-2022 extension
-		// layout was validated above. The owner is in the caller's allowlist,
-		// and the guard keeps the runtime borrow alive for the typed access.
+		// SAFETY: `from_bytes` is supplied by the pinned Pinocchio token crate.
+		// For legacy owners, `data.len() == base_len`. For Token-2022 owners,
+		// `validate_token_2022` has validated the exact base region, account-type
+		// marker, and complete extension layout. Both upstream base-state types
+		// are alignment one and contain only byte-valid fields. The `Ref` guard
+		// keeps the runtime borrow alive for the complete lifetime of `T`.
 		Ok(unsafe { from_bytes(data) })
 	})
 	.map_err(|(_, error)| {

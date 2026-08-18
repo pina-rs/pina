@@ -14,7 +14,8 @@ All notable changes to this project will be documented in this file.
 - Extend `#[derive(Accounts)]` to support `&'a mut AccountView` and `&'a mut [AccountView]`, and use mutable fields to infer writable accounts in generated IDLs.
 - Split close and realloc behavior: `close_with_recipient()` no longer zeroes account data implicitly, and realloc helpers are gated behind the new `account-resize` feature.
 - Replace Pina's local bytemuck primitive layer with zeropod's `ZcElem`, `ZcValidate`, `ZeroPodFixed`, and fixed-capacity collection model.
-- Replace raw whole-object `to_bytes()` casts with deterministic field-wise serialization so inactive `PodString` and `PodVec` capacity is zero-filled without reading uninitialized storage.
+- Separate native zeropod schemas from their generated zero-copy storage views. Account loaders now return `TypeZc`, and storage fields use zeropod's accessor methods.
+- Remove Pina's whole-object `to_bytes()`, `PinaSerialize`, generic `InstructionBuilder`, custom `PodEnum`, and generic pointer-cast helpers. Inactive string and vector capacity is no longer observable through Pina.
 
 ### Features
 
@@ -31,7 +32,7 @@ New mdt providers:
 - `podCollectionTypesTable` — collection types reference table
 - `podCollectionDescription` — collection type semantics
 
-Generated account, instruction, and event byte output is now owned and fully initialized. Collection serialization copies only active values and zero-fills inactive capacity while preserving the exact fixed-size on-chain layout.
+Account, instruction, and event schemas derive `zeropod::ZeroPod`. Their `initialize` helpers zero caller-owned storage, write the discriminator, and return the validated generated view. Generated client instruction builders own their fully initialized buffers and do not expose schema object representations.
 
 ### Documentation
 

@@ -24,13 +24,13 @@ import {
 	type InstructionWithAccounts,
 	type InstructionWithData,
 	type ReadonlyAccount,
-	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
+	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
@@ -51,6 +51,8 @@ export type InitializeInstruction<
 	TAccountMint extends string | AccountMeta<string> = string,
 	TAccountVestingState extends string | AccountMeta<string> = string,
 	TAccountVault extends string | AccountMeta<string> = string,
+	TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+		"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 	TAccountSystemProgram extends string | AccountMeta<string> =
 		"11111111111111111111111111111111",
 	TAccountTokenProgram extends string | AccountMeta<string> = string,
@@ -61,7 +63,7 @@ export type InitializeInstruction<
 	& InstructionWithAccounts<
 		[
 			TAccountAdmin extends string ?
-					& ReadonlySignerAccount<TAccountAdmin>
+					& WritableSignerAccount<TAccountAdmin>
 					& AccountSignerMeta<TAccountAdmin>
 				: TAccountAdmin,
 			TAccountBeneficiary extends string ? ReadonlyAccount<TAccountBeneficiary>
@@ -73,6 +75,9 @@ export type InitializeInstruction<
 				: TAccountVestingState,
 			TAccountVault extends string ? WritableAccount<TAccountVault>
 				: TAccountVault,
+			TAccountAssociatedTokenProgram extends string
+				? ReadonlyAccount<TAccountAssociatedTokenProgram>
+				: TAccountAssociatedTokenProgram,
 			TAccountSystemProgram extends string
 				? ReadonlyAccount<TAccountSystemProgram>
 				: TAccountSystemProgram,
@@ -145,6 +150,7 @@ export type InitializeInput<
 	TAccountMint extends string = string,
 	TAccountVestingState extends string = string,
 	TAccountVault extends string = string,
+	TAccountAssociatedTokenProgram extends string = string,
 	TAccountSystemProgram extends string = string,
 	TAccountTokenProgram extends string = string,
 > = {
@@ -153,6 +159,7 @@ export type InitializeInput<
 	mint: Address<TAccountMint>;
 	vestingState: Address<TAccountVestingState>;
 	vault: Address<TAccountVault>;
+	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
 	systemProgram?: Address<TAccountSystemProgram>;
 	tokenProgram: Address<TAccountTokenProgram>;
 	totalAmount: InitializeInstructionDataArgs["totalAmount"];
@@ -168,6 +175,7 @@ export function getInitializeInstruction<
 	TAccountMint extends string,
 	TAccountVestingState extends string,
 	TAccountVault extends string,
+	TAccountAssociatedTokenProgram extends string,
 	TAccountSystemProgram extends string,
 	TAccountTokenProgram extends string,
 	TProgramAddress extends Address = typeof VESTING_PROGRAM_PROGRAM_ADDRESS,
@@ -178,6 +186,7 @@ export function getInitializeInstruction<
 		TAccountMint,
 		TAccountVestingState,
 		TAccountVault,
+		TAccountAssociatedTokenProgram,
 		TAccountSystemProgram,
 		TAccountTokenProgram
 	>,
@@ -189,6 +198,7 @@ export function getInitializeInstruction<
 	TAccountMint,
 	TAccountVestingState,
 	TAccountVault,
+	TAccountAssociatedTokenProgram,
 	TAccountSystemProgram,
 	TAccountTokenProgram
 > {
@@ -198,11 +208,15 @@ export function getInitializeInstruction<
 
 	// Original accounts.
 	const originalAccounts = {
-		admin: { value: input.admin ?? null, isWritable: false },
+		admin: { value: input.admin ?? null, isWritable: true },
 		beneficiary: { value: input.beneficiary ?? null, isWritable: false },
 		mint: { value: input.mint ?? null, isWritable: false },
 		vestingState: { value: input.vestingState ?? null, isWritable: true },
 		vault: { value: input.vault ?? null, isWritable: true },
+		associatedTokenProgram: {
+			value: input.associatedTokenProgram ?? null,
+			isWritable: false,
+		},
 		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
 		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
 	};
@@ -215,6 +229,12 @@ export function getInitializeInstruction<
 	const args = { ...input };
 
 	// Resolve default values.
+	if (!accounts.associatedTokenProgram.value) {
+		accounts.associatedTokenProgram.value =
+			"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<
+				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+			>;
+	}
 	if (!accounts.systemProgram.value) {
 		accounts.systemProgram.value =
 			"11111111111111111111111111111111" as Address<
@@ -230,6 +250,7 @@ export function getInitializeInstruction<
 			getAccountMeta("mint", accounts.mint),
 			getAccountMeta("vestingState", accounts.vestingState),
 			getAccountMeta("vault", accounts.vault),
+			getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 			getAccountMeta("tokenProgram", accounts.tokenProgram),
 		],
@@ -244,6 +265,7 @@ export function getInitializeInstruction<
 		TAccountMint,
 		TAccountVestingState,
 		TAccountVault,
+		TAccountAssociatedTokenProgram,
 		TAccountSystemProgram,
 		TAccountTokenProgram
 	>);
@@ -260,8 +282,9 @@ export type ParsedInitializeInstruction<
 		mint: TAccountMetas[2];
 		vestingState: TAccountMetas[3];
 		vault: TAccountMetas[4];
-		systemProgram: TAccountMetas[5];
-		tokenProgram: TAccountMetas[6];
+		associatedTokenProgram: TAccountMetas[5];
+		systemProgram: TAccountMetas[6];
+		tokenProgram: TAccountMetas[7];
 	};
 	data: InitializeInstructionData;
 };
@@ -275,12 +298,12 @@ export function parseInitializeInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedInitializeInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 7) {
+	if (instruction.accounts.length < 8) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 7,
+				expectedAccountMetas: 8,
 			},
 		);
 	}
@@ -298,6 +321,7 @@ export function parseInitializeInstruction<
 			mint: getNextAccount(),
 			vestingState: getNextAccount(),
 			vault: getNextAccount(),
+			associatedTokenProgram: getNextAccount(),
 			systemProgram: getNextAccount(),
 			tokenProgram: getNextAccount(),
 		},

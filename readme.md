@@ -101,7 +101,7 @@ pnpm run test:quasar-svm
 
 <!-- {/codamaWorkflowCommands} -->
 
-Rust client generation in this repository uses the custom `pina_codama_renderer` crate (`crates/pina_codama_renderer`) instead of Codama's default Rust renderer. The generated Rust models use discriminator-first zeropod layouts, recursive content validation, and initialized field-wise serialization without `borsh`. Unsupported variable-size or noncanonical layouts fail generation explicitly.
+Rust client generation in this repository uses the custom `pina_codama_renderer` crate (`crates/pina_codama_renderer`) instead of Codama's default Rust renderer. Generated Rust models are native zeropod schemas with discriminator-first storage views and recursive content validation. Instruction builders own and consume an initialized wire buffer; they do not expose a whole-object `to_bytes()` API. Unsupported variable-size or noncanonical layouts fail generation explicitly.
 
 End-to-end setup steps:
 
@@ -373,7 +373,6 @@ For instruction payloads:
 
 The `#[discriminator]` macro generates:
 
-- `Pod` / `Zeroable` derives for the enum
 - `TryFrom<primitive>` and `Into<primitive>` conversions
 - `IntoDiscriminator` implementation (read/write/match discriminator bytes)
 
@@ -386,7 +385,7 @@ Optional attributes:
 
 <br>
 
-The `#[account]` macro wraps a struct with a discriminator field and derives `Pod`, `Zeroable`, `TypedBuilder`, and `HasDiscriminator`:
+The `#[account]` macro treats the struct as a native schema. It injects the discriminator, derives `zeropod::ZeroPod`, and exposes validated `ConfigZc` views over caller-owned account bytes:
 
 ```rust
 use pina::*;
@@ -399,7 +398,7 @@ pub enum MyAccount {
 #[account(discriminator = MyAccount)]
 pub struct Config {
 	pub authority: Address,
-	pub value: PodU64,
+	pub value: u64,
 	pub bump: u8,
 }
 ```
@@ -638,7 +637,7 @@ The full generic forms are `PodOption<T: ZcElem>`, `PodString<N, PFX = 1>`, and 
 
 <!-- {=podCollectionDescription} -->
 
-Collection types store data inline without allocation and can be embedded in Pina's zeropod account, instruction, and event layouts. Overflow is detected at insertion time — `try_set` / `try_push` return `Err(ZeroPodError::Overflow)` when capacity is exceeded. Pina's generated serialization writes active values into a zeroed destination, so inactive collection capacity is deterministic and never read from `MaybeUninit` storage.
+Collection types store data inline without allocation and can be embedded in Pina's zeropod account, instruction, and event schemas. Overflow is detected at insertion time — `try_set` / `try_push` return `Err(ZeroPodError::Overflow)` when capacity is exceeded. Inactive capacity is not part of the semantic value and Pina never exposes it through a whole-object byte view.
 
 After boundary validation, `PodString::as_str()` is safe. `PodVec` offers slice-based access via `as_slice()` / `as_slice_mut()`, and `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`.
 

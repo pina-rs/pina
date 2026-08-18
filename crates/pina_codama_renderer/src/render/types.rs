@@ -104,7 +104,12 @@ fn render_pod_collection_type(
 			}
 		})?;
 
-		return Ok(Some(format!("pina::PodString<{capacity}, {prefix_size}>")));
+		let string_type = if prefix_size == 1 {
+			format!("pina::String<{capacity}>")
+		} else {
+			format!("pina::PodString<{capacity}, {prefix_size}>")
+		};
+		return Ok(Some(string_type));
 	}
 
 	let TypeNode::Array(array) = inner else {
@@ -141,9 +146,12 @@ fn render_pod_collection_type(
 	let capacity = payload_size / item_size;
 	let item_type = render_type_for_pod(&array.item, context)?;
 
-	Ok(Some(format!(
-		"pina::PodVec<{item_type}, {capacity}, {prefix_size}>"
-	)))
+	let vector_type = if prefix_size == 2 {
+		format!("pina::Vec<{item_type}, {capacity}>")
+	} else {
+		format!("pina::PodVec<<{item_type} as pina::ZcField>::Pod, {capacity}, {prefix_size}>")
+	};
+	Ok(Some(vector_type))
 }
 
 fn render_prefix_size(number_type: &NumberTypeNode, context: &str) -> Result<usize> {
@@ -210,14 +218,14 @@ fn render_number_type_for_pod(number_type: &NumberTypeNode, context: &str) -> Re
 	match number_type.format {
 		NumberFormat::U8 => Ok("u8".to_string()),
 		NumberFormat::I8 => Ok("i8".to_string()),
-		NumberFormat::U16 => Ok("pina::PodU16".to_string()),
-		NumberFormat::I16 => Ok("pina::PodI16".to_string()),
-		NumberFormat::U32 => Ok("pina::PodU32".to_string()),
-		NumberFormat::I32 => Ok("pina::PodI32".to_string()),
-		NumberFormat::U64 => Ok("pina::PodU64".to_string()),
-		NumberFormat::I64 => Ok("pina::PodI64".to_string()),
-		NumberFormat::U128 => Ok("pina::PodU128".to_string()),
-		NumberFormat::I128 => Ok("pina::PodI128".to_string()),
+		NumberFormat::U16 => Ok("u16".to_string()),
+		NumberFormat::I16 => Ok("i16".to_string()),
+		NumberFormat::U32 => Ok("u32".to_string()),
+		NumberFormat::I32 => Ok("i32".to_string()),
+		NumberFormat::U64 => Ok("u64".to_string()),
+		NumberFormat::I64 => Ok("i64".to_string()),
+		NumberFormat::U128 => Ok("u128".to_string()),
+		NumberFormat::I128 => Ok("i128".to_string()),
 		NumberFormat::F32 | NumberFormat::F64 | NumberFormat::ShortU16 => {
 			Err(RenderError::UnsupportedType {
 				context: context.to_string(),
@@ -239,7 +247,7 @@ fn render_boolean_type(boolean_type: &BooleanTypeNode, context: &str) -> Result<
 			reason: "booleans must be encoded as little-endian u8".to_string(),
 		});
 	}
-	Ok("pina::PodBool".to_string())
+	Ok("bool".to_string())
 }
 
 pub(crate) fn render_defined_type_page(defined_type: &DefinedTypeNode) -> Result<String> {
@@ -250,7 +258,7 @@ pub(crate) fn render_defined_type_page(defined_type: &DefinedTypeNode) -> Result
 			render_defined_struct(name.as_str(), struct_type, &defined_type.docs)
 		}
 		TypeNode::Enum(enum_type) => {
-			render_defined_pod_enum(name.as_str(), enum_type, &defined_type.docs)
+			render_defined_zeropod_enum(name.as_str(), enum_type, &defined_type.docs)
 		}
 		TypeNode::Link(link) => {
 			Ok(format!(
@@ -265,20 +273,17 @@ pub(crate) fn render_defined_type_page(defined_type: &DefinedTypeNode) -> Result
 	}
 }
 
-fn render_defined_pod_enum(name: &str, enum_type: &EnumTypeNode, docs: &Docs) -> Result<String> {
-	let enum_name = name.strip_suffix("Zc").ok_or_else(|| {
-		RenderError::UnsupportedType {
-			context: format!("defined type `{name}`"),
-			kind: "enumTypeNode",
-			reason: "Pina POD enum defined types must use the `EnumZc` companion name".to_string(),
-		}
-	})?;
+fn render_defined_zeropod_enum(
+	name: &str,
+	enum_type: &EnumTypeNode,
+	docs: &Docs,
+) -> Result<String> {
 	let number = enum_type.size.get_nested_type_node();
 	if !matches!(number.endian, Endianness::Le) {
 		return Err(RenderError::UnsupportedType {
 			context: format!("defined type `{name}`"),
 			kind: "enumTypeNode",
-			reason: "Pina POD enums must use little-endian unsigned discriminants".to_string(),
+			reason: "zeropod enums must use little-endian unsigned discriminants".to_string(),
 		});
 	}
 	let repr = match number.format {
@@ -290,21 +295,23 @@ fn render_defined_pod_enum(name: &str, enum_type: &EnumTypeNode, docs: &Docs) ->
 			return Err(RenderError::UnsupportedType {
 				context: format!("defined type `{name}`"),
 				kind: "enumTypeNode",
-				reason: "Pina POD enums require u8, u16, u32, or u64 discriminants".to_string(),
+				reason: "zeropod enums require u8, u16, u32, or u64 discriminants".to_string(),
 			});
 		}
 	};
 
 	let mut lines = render_docs(docs, 0);
-	lines.push("#[derive(Clone, Copy, Debug, PartialEq, Eq, pina::PodEnum)]".to_string());
+	lines.insert(0, "use pina::zeropod;".to_string());
+	lines.insert(1, String::new());
+	lines.push("#[derive(Clone, Copy, Debug, PartialEq, Eq, pina::ZeroPod)]".to_string());
 	lines.push(format!("#[repr({repr})]"));
-	lines.push(format!("pub enum {enum_name} {{"));
+	lines.push(format!("pub enum {name} {{"));
 	for (index, variant) in enum_type.variants.iter().enumerate() {
 		let EnumVariantTypeNode::Empty(variant) = variant else {
 			return Err(RenderError::UnsupportedType {
 				context: format!("defined type `{name}`"),
 				kind: "enumTypeNode",
-				reason: "Pina POD enums support unit variants only".to_string(),
+				reason: "zeropod enums support unit variants only".to_string(),
 			});
 		};
 		let variant_name = pascal(variant.name.as_ref());
@@ -316,15 +323,12 @@ fn render_defined_pod_enum(name: &str, enum_type: &EnumTypeNode, docs: &Docs) ->
 }
 
 fn render_defined_struct(name: &str, struct_type: &StructTypeNode, docs: &Docs) -> Result<String> {
-	let mut lines = Vec::new();
+	let mut lines = vec!["use pina::zeropod;".to_string(), String::new()];
 	for doc_line in render_docs(docs, 0) {
 		lines.push(doc_line);
 	}
-	lines.push("#[repr(C)]".to_string());
-	lines.push("#[derive(Clone, Copy, Debug, PartialEq, Eq)]".to_string());
+	lines.push("#[derive(pina::ZeroPod)]".to_string());
 	lines.push(format!("pub struct {name} {{"));
-	let mut ctor_args = Vec::new();
-	let mut ctor_inits = Vec::new();
 	for field in &struct_type.fields {
 		let field_name = snake(field.name.as_ref());
 		let field_context = format!("{name}.{field_name}");
@@ -333,20 +337,7 @@ fn render_defined_struct(name: &str, struct_type: &StructTypeNode, docs: &Docs) 
 			lines.push(doc_line);
 		}
 		lines.push(format!("\tpub {field_name}: {field_type},"));
-		ctor_args.push(format!("{field_name}: {field_type}"));
-		ctor_inits.push(format!("\t\t\t{field_name},"));
 	}
-	lines.push("}".to_string());
-	lines.push(String::new());
-	lines.push(format!("impl {name} {{"));
-	lines.push(format!(
-		"\tpub const fn new({}) -> Self {{",
-		ctor_args.join(", ")
-	));
-	lines.push("\t\tSelf {".to_string());
-	lines.extend(ctor_inits);
-	lines.push("\t\t}".to_string());
-	lines.push("\t}".to_string());
 	lines.push("}".to_string());
 	Ok(lines.join("\n"))
 }

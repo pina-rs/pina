@@ -23,7 +23,7 @@ pub enum PayInstruction {
 
 #[instruction(discriminator = PayInstruction, variant = Pay)]
 pub struct PayInstructionData {
-	pub amount: PodU64,
+	pub amount: u64,
 }
 
 #[derive(Accounts, Debug)]

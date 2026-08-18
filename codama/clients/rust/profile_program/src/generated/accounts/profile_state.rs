@@ -8,8 +8,9 @@
 	clippy::too_many_arguments
 )]
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+use pina::zeropod;
+
+#[derive(pina::ZeroPod)]
 pub struct ProfileState {
 	/// On-chain profile state.
 	///
@@ -19,7 +20,7 @@ pub struct ProfileState {
 	/// - `PinaAccount` and zeropod validation for checked zero-copy access.
 	/// - `HasDiscriminator` linking this account to
 	/// `ProfileAccountType::ProfileState`.
-	/// - `TypedBuilder` for ergonomic construction.
+	/// - `initialize` and `try_from_bytes` helpers for caller-owned storage.
 	///
 	/// Layout (231 bytes total):
 	/// ```text
@@ -35,90 +36,42 @@ pub struct ProfileState {
 	pub discriminator: u8,
 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
 	pub bump: u8,
-	/// The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8
-	/// bytes.
-	pub name: pina::PodString<32, 1>,
-	/// A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8
-	/// bytes.
-	pub bio: pina::PodString<128, 1>,
-	/// Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
-	/// elements.
-	pub tags: pina::PodVec<pina::PodU64, 8, 2>,
+	/// The profile display name. The generated view uses one length byte plus
+	/// 32 bytes of UTF-8 capacity.
+	pub name: pina::String<32>,
+	/// A longer free-form bio. The generated view uses one length byte plus
+	/// 128 bytes of UTF-8 capacity.
+	pub bio: pina::String<128>,
+	/// Up to 8 tags. The generated view uses a two-byte count followed by
+	/// eight little-endian `u64` slots.
+	pub tags: pina::Vec<u64, 8>,
 	/// Whether the profile is active.
-	pub active: pina::PodBool,
+	pub active: bool,
 }
-
-impl pina::PinaSerialize for ProfileState {
-	fn write_bytes(&self, output: &mut [u8]) {
-		assert_eq!(output.len(), core::mem::size_of::<Self>());
-		output.fill(0);
-		let mut offset = 0usize;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(
-			&self.discriminator,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(&self.bump, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodString<32, 1>>();
-		pina::PinaSerialize::write_bytes(&self.name, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodString<128, 1>>();
-		pina::PinaSerialize::write_bytes(&self.bio, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodVec<pina::PodU64, 8, 2>>();
-		pina::PinaSerialize::write_bytes(&self.tags, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodBool>();
-		pina::PinaSerialize::write_bytes(&self.active, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		debug_assert_eq!(offset, output.len());
-	}
-}
-
-impl pina::ZcValidate for ProfileState {
-	fn validate_ref(value: &Self) -> Result<(), pina::ZeroPodError> {
-		<u8 as pina::ZcValidate>::validate_ref(&value.discriminator)?;
-		<u8 as pina::ZcValidate>::validate_ref(&value.bump)?;
-		<pina::PodString<32, 1> as pina::ZcValidate>::validate_ref(&value.name)?;
-		<pina::PodString<128, 1> as pina::ZcValidate>::validate_ref(&value.bio)?;
-		<pina::PodVec<pina::PodU64, 8, 2> as pina::ZcValidate>::validate_ref(&value.tags)?;
-		<pina::PodBool as pina::ZcValidate>::validate_ref(&value.active)?;
-		Ok(())
-	}
-}
-
-// SAFETY: all rendered fields are align-1, padding-free ZcElem values;
-// validate_ref recursively validates every field before safe access.
-#[allow(unsafe_code)]
-unsafe impl pina::ZcElem for ProfileState {}
 
 pub const PROFILE_STATE_DISCRIMINATOR: u8 = 1u8;
 
 impl ProfileState {
-	pub const LEN: usize = core::mem::size_of::<Self>();
+	pub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;
 
-	pub const fn new(
-		bump: u8,
-		name: pina::PodString<32, 1>,
-		bio: pina::PodString<128, 1>,
-		tags: pina::PodVec<pina::PodU64, 8, 2>,
-		active: pina::PodBool,
-	) -> Self {
-		Self {
-			discriminator: PROFILE_STATE_DISCRIMINATOR,
-			bump,
-			name,
-			bio,
-			tags,
-			active,
+	pub fn initialize(
+		data: &mut [u8],
+	) -> Result<&mut ProfileStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
+		data.fill(0);
+		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
+		account.discriminator = PROFILE_STATE_DISCRIMINATOR;
+		Ok(account)
 	}
 
-	pub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {
-		let account = pina::pod_from_bytes::<Self>(data)
+	pub fn from_bytes(data: &[u8]) -> Result<&ProfileStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		let account = <Self as pina::ZeroPodFixed>::from_bytes(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != PROFILE_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
@@ -128,26 +81,16 @@ impl ProfileState {
 
 	pub fn from_bytes_mut(
 		data: &mut [u8],
-	) -> Result<&mut Self, solana_program_error::ProgramError> {
-		let account = pina::pod_from_bytes_mut::<Self>(data)
+	) -> Result<&mut ProfileStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != PROFILE_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		Ok(account)
-	}
-}
-
-impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for ProfileState {
-	type Error = solana_program_error::ProgramError;
-
-	fn try_from(account_info: &solana_account_info::AccountInfo<'a>) -> Result<Self, Self::Error> {
-		if account_info.owner != &crate::PROFILE_PROGRAM_ID {
-			return Err(solana_program_error::ProgramError::IncorrectProgramId);
-		}
-		let data_ref = account_info.try_borrow_data()?;
-		let account = Self::from_bytes(&data_ref)?;
-		Ok(*account)
 	}
 }
 

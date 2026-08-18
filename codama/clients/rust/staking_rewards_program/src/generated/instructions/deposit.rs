@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const DEPOSIT_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
@@ -18,6 +20,7 @@ pub struct Deposit {
 	pub pool_state: solana_pubkey::Pubkey,
 	pub position_state: solana_pubkey::Pubkey,
 	pub user_stake_ata: solana_pubkey::Pubkey,
+	pub associated_token_program: solana_pubkey::Pubkey,
 	pub token_program: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
 }
@@ -37,6 +40,9 @@ impl Deposit {
 			pool_state,
 			position_state,
 			user_stake_ata,
+			associated_token_program: solana_pubkey::pubkey!(
+				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+			),
 			token_program,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
@@ -52,10 +58,8 @@ impl Deposit {
 		data: DepositInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(7 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.user, true,
-		));
+		let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
+		accounts.push(solana_instruction::AccountMeta::new(self.user, true));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.stake_mint,
 			false,
@@ -70,6 +74,10 @@ impl Deposit {
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.associated_token_program,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.token_program,
 			false,
 		));
@@ -78,47 +86,39 @@ impl Deposit {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		let mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];
-		pina::PinaSerialize::write_bytes(&data, &mut instruction_data);
-
 		solana_instruction::Instruction {
 			program_id: crate::STAKING_REWARDS_PROGRAM_ID,
 			accounts,
-			data: instruction_data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct DepositInstructionData {
-	pub discriminator: u8,
-	pub amount: pina::PodU64,
+	bytes: Vec<u8>,
 }
 
 impl DepositInstructionData {
-	pub const fn new(amount: pina::PodU64) -> Self {
-		Self {
-			discriminator: DEPOSIT_DISCRIMINATOR,
-			amount,
+	pub fn new(
+		configure: impl FnOnce(&mut DepositInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <DepositInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <DepositInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			data.discriminator = DEPOSIT_DISCRIMINATOR;
+			configure(data);
 		}
+		<DepositInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
 }
 
-impl pina::PinaSerialize for DepositInstructionData {
-	fn write_bytes(&self, output: &mut [u8]) {
-		assert_eq!(output.len(), core::mem::size_of::<Self>());
-		output.fill(0);
-		let mut offset = 0usize;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(
-			&self.discriminator,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodU64>();
-		pina::PinaSerialize::write_bytes(&self.amount, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		debug_assert_eq!(offset, output.len());
-	}
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct DepositInstructionWire {
+	pub discriminator: u8,
+	pub amount: u64,
 }

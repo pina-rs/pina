@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const ROTATE_AUTHORITY_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
@@ -42,50 +44,40 @@ impl RotateAuthority {
 			true,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		let mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];
-		pina::PinaSerialize::write_bytes(&data, &mut instruction_data);
-
 		solana_instruction::Instruction {
 			program_id: crate::PROP_AMM_PROGRAM_ID,
 			accounts,
-			data: instruction_data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct RotateAuthorityInstructionData {
-	pub discriminator: u8,
-	pub new_authority: solana_pubkey::Pubkey,
+	bytes: Vec<u8>,
 }
 
 impl RotateAuthorityInstructionData {
-	pub const fn new(new_authority: solana_pubkey::Pubkey) -> Self {
-		Self {
-			discriminator: ROTATE_AUTHORITY_DISCRIMINATOR,
-			new_authority,
+	pub fn new(
+		configure: impl FnOnce(&mut RotateAuthorityInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <RotateAuthorityInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data =
+				<RotateAuthorityInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			data.discriminator = ROTATE_AUTHORITY_DISCRIMINATOR;
+			configure(data);
 		}
+		<RotateAuthorityInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
 }
 
-impl pina::PinaSerialize for RotateAuthorityInstructionData {
-	fn write_bytes(&self, output: &mut [u8]) {
-		assert_eq!(output.len(), core::mem::size_of::<Self>());
-		output.fill(0);
-		let mut offset = 0usize;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(
-			&self.discriminator,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		let field_size = core::mem::size_of::<solana_pubkey::Pubkey>();
-		pina::PinaSerialize::write_bytes(
-			&self.new_authority,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		debug_assert_eq!(offset, output.len());
-	}
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct RotateAuthorityInstructionWire {
+	pub discriminator: u8,
+	pub new_authority: solana_pubkey::Pubkey,
 }

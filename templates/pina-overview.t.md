@@ -72,7 +72,7 @@ The full generic forms are `PodOption<T: ZcElem>`, `PodString<N, PFX = 1>`, and 
 
 <!-- {@podCollectionDescription} -->
 
-Collection types store data inline without allocation and can be embedded in Pina's zeropod account, instruction, and event layouts. Overflow is detected at insertion time — `try_set` / `try_push` return `Err(ZeroPodError::Overflow)` when capacity is exceeded. Pina's generated serialization writes active values into a zeroed destination, so inactive collection capacity is deterministic and never read from `MaybeUninit` storage.
+Collection types store data inline without allocation and can be embedded in Pina's zeropod account, instruction, and event schemas. Overflow is detected at insertion time — `try_set` / `try_push` return `Err(ZeroPodError::Overflow)` when capacity is exceeded. Inactive capacity is not part of the semantic value and Pina never exposes it through a whole-object byte view.
 
 After boundary validation, `PodString::as_str()` is safe. `PodVec` offers slice-based access via `as_slice()` / `as_slice_mut()`, and `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`.
 

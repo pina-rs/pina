@@ -1,4 +1,7 @@
-import { QuasarSvm } from "@blueshift-gg/quasar-svm/kit";
+import {
+	createKeyedSystemAccount,
+	QuasarSvm,
+} from "@blueshift-gg/quasar-svm/kit";
 import {
 	type Address,
 	generateKeyPairSigner,
@@ -78,7 +81,10 @@ describe("role_registry_program quasar e2e", () => {
 			registryConfig: registryPda,
 			bump: registryBump,
 		});
-		const initResult = svm.processInstruction(initIx, [adminAccount]);
+		const initResult = svm.processInstruction(initIx, [
+			adminAccount,
+			createKeyedSystemAccount(registryPda as Address, 0n),
+		]);
 		initResult.assertSuccess();
 
 		const registryAccount = expectSome(
@@ -108,6 +114,7 @@ describe("role_registry_program quasar e2e", () => {
 		const addRoleResult = svm.processInstruction(addRoleIx, [
 			adminAccount,
 			registryAccount,
+			createKeyedSystemAccount(roleEntryPda as Address, 0n),
 		]);
 		addRoleResult.assertSuccess();
 
@@ -211,7 +218,10 @@ describe("role_registry_program quasar e2e", () => {
 			registryConfig: registryPda,
 			bump: registryBump,
 		});
-		const initResult = svm.processInstruction(initIx, [adminAccount]);
+		const initResult = svm.processInstruction(initIx, [
+			adminAccount,
+			createKeyedSystemAccount(registryPda as Address, 0n),
+		]);
 		initResult.assertSuccess();
 		const registryAccount = expectSome(
 			initResult.account(registryPda),
@@ -234,6 +244,7 @@ describe("role_registry_program quasar e2e", () => {
 		const result = svm.processInstruction(addRoleIx, [
 			wrongAdminAccount,
 			registryAccount,
+			createKeyedSystemAccount(roleEntryPda as Address, 0n),
 		]);
 		expect(result.isError()).toBe(true);
 	});

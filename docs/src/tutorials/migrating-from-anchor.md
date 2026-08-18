@@ -365,12 +365,12 @@ pub enum EventDiscriminator {
 #[event(discriminator = EventDiscriminator)]
 #[derive(Debug)]
 pub struct MyEvent {
-	pub data: PodU64,
+	pub data: u64,
 	pub label: [u8; 8],
 }
 ```
 
-Pina events are `Pod` structs with explicit discriminators, just like accounts and instructions. They do not have a built-in `emit!` macro -- event emission is handled by writing bytes to the transaction log or via CPI patterns. The `#[event]` macro gives you `HasDiscriminator`, `Pod`, `Zeroable`, and `TypedBuilder`.
+Pina events are native zeropod schemas with explicit discriminators, just like accounts and instructions. The macro generates a validated `MyEventZc` storage view. Pina does not expose an object-representation `to_bytes()` method; event transport must use an API that owns and initializes its output buffer.
 
 See `examples/anchor_events` for the full parity port.
 

@@ -2,15 +2,7 @@
 source: crates/pina_macros/src/tests.rs
 expression: output
 ---
-#[repr(C)]
-#[derive(
-    ::pina::TypedBuilder,
-    ::core::clone::Clone,
-    ::core::marker::Copy,
-    ::core::cmp::PartialEq,
-    ::core::cmp::Eq
-)]
-#[builder(builder_method(vis = "", name = __builder))]
+#[derive(::pina::zeropod::ZeroPod)]
 pub struct LargeState {
     discriminator: [u8; MyAccount::BYTES],
     pub authority: [u8; 32],
@@ -22,93 +14,43 @@ pub struct LargeState {
     pub total_supply: PodU64,
     pub name: [u8; 32],
 }
-#[allow(dead_code)]
-type LargeStateBuilderType = LargeStateBuilder<
-    (([u8; MyAccount::BYTES],), (), (), (), (), (), (), (), ()),
->;
-const __LARGESTATE_ALIGNMENT_ASSERTIONS__: () = {
-    ::core::assert!(
-        ::core::mem::align_of:: < [u8; MyAccount::BYTES] > () == 1,
-        concat!("The alignment of field `", "discriminator", "` with type `",
-        stringify!([u8; MyAccount::BYTES]),
-        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
-    );
-    ::core::assert!(
-        ::core::mem::align_of:: < [u8; 32] > () == 1, concat!("The alignment of field `",
-        "authority", "` with type `", stringify!([u8; 32]),
-        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
-    );
-    ::core::assert!(
-        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
-        "bump", "` with type `", stringify!(u8),
-        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
-    );
-    ::core::assert!(
-        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
-        "treasury_bump", "` with type `", stringify!(u8),
-        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
-    );
-    ::core::assert!(
-        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
-        "mint_bump", "` with type `", stringify!(u8),
-        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
-    );
-    ::core::assert!(
-        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
-        "version", "` with type `", stringify!(u8),
-        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
-    );
-    ::core::assert!(
-        ::core::mem::align_of:: < [u8; 3] > () == 1, concat!("The alignment of field `",
-        "padding", "` with type `", stringify!([u8; 3]),
-        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
-    );
-    ::core::assert!(
-        ::core::mem::align_of:: < PodU64 > () == 1, concat!("The alignment of field `",
-        "total_supply", "` with type `", stringify!(PodU64),
-        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
-    );
-    ::core::assert!(
-        ::core::mem::align_of:: < [u8; 32] > () == 1, concat!("The alignment of field `",
-        "name", "` with type `", stringify!([u8; 32]),
-        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
-    );
-    ::core::assert!(
-        ::core::mem::align_of:: < LargeState > () == 1,
-        concat!("The alignment of struct `", stringify!(LargeState),
-        "` should be one so it can be used for zero-copy casts.")
-    );
-    ::core::assert!(
-        ::core::mem::size_of:: < LargeState > () == (0usize + ::core::mem::size_of:: <
-        [u8; MyAccount::BYTES] > () + ::core::mem::size_of:: < [u8; 32] > () +
-        ::core::mem::size_of:: < u8 > () + ::core::mem::size_of:: < u8 > () +
-        ::core::mem::size_of:: < u8 > () + ::core::mem::size_of:: < u8 > () +
-        ::core::mem::size_of:: < [u8; 3] > () + ::core::mem::size_of:: < PodU64 > () +
-        ::core::mem::size_of:: < [u8; 32] > ()), concat!("`", stringify!(LargeState),
-        "` layout is padded. `#[pina]` discriminator-first zero-copy layouts must be tightly packed.")
-    );
-};
 impl LargeState {
-    /// Zero out all bytes in the struct including padding bytes. This can be useful when closing an account.
-    #[allow(unsafe_code)]
-    pub fn zeroed(&mut self) {
-        unsafe { ::core::ptr::write_bytes(self as *mut Self, 0, 1) }
+    /// The exact number of bytes required by the zeropod representation.
+    pub const SIZE: usize = <Self as ::pina::ZeroPodFixed>::SIZE;
+    /// Validate `data` and return zeropod's immutable zero-copy companion.
+    pub fn try_from_bytes(
+        data: &[u8],
+    ) -> Result<&<Self as ::pina::ZeroPodFixed>::Zc, ::pina::ProgramError> {
+        if data.len() != Self::SIZE
+            || !<Self as ::pina::HasDiscriminator>::matches_discriminator(data)
+        {
+            return Err(::pina::ProgramError::InvalidAccountData);
+        }
+        <Self as ::pina::ZeroPodFixed>::from_bytes(data)
+            .map_err(|_| ::pina::ProgramError::InvalidAccountData)
     }
-    /// Returns a deterministic, fully initialized byte representation.
-    pub fn to_bytes(&self) -> <Self as ::pina::PinaToBytes>::Bytes {
-        <Self as ::pina::PinaToBytes>::to_bytes(self)
-    }
-    pub fn builder() -> LargeStateBuilderType {
-        let mut bytes = [0u8; MyAccount::BYTES];
-        <Self as ::pina::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
-        Self::__builder().discriminator(bytes)
+    /// Initialize caller-owned storage and return its mutable zero-copy view.
+    ///
+    /// The complete slice is initialized before zeropod validates it. The
+    /// returned borrow prevents the caller from observing or changing the raw
+    /// bytes while the typed view is live.
+    pub fn initialize(
+        data: &mut [u8],
+    ) -> Result<&mut <Self as ::pina::ZeroPodFixed>::Zc, ::pina::ProgramError> {
+        if data.len() != Self::SIZE {
+            return Err(::pina::ProgramError::InvalidAccountData);
+        }
+        data.fill(0);
+        <Self as ::pina::HasDiscriminator>::write_discriminator(data);
+        <Self as ::pina::ZeroPodFixed>::from_bytes_mut(data)
+            .map_err(|_| ::pina::ProgramError::InvalidAccountData)
     }
 }
 impl ::pina::HasDiscriminator for LargeState {
     type Type = MyAccount;
     const VALUE: Self::Type = MyAccount::LargeState;
 }
-impl ::pina::AccountValidation for LargeState {
+impl ::pina::AccountValidation for LargeStateZc {
     #[track_caller]
     fn assert<F>(&self, condition: F) -> Result<&Self, ::pina::ProgramError>
     where
@@ -170,159 +112,4 @@ impl ::pina::AccountValidation for LargeState {
         }
     }
 }
-const _: fn() = || {
-    fn assert_zc_elem<T: ::pina::ZcElem>() {}
-    assert_zc_elem::<[u8; MyAccount::BYTES]>();
-    assert_zc_elem::<[u8; 32]>();
-    assert_zc_elem::<u8>();
-    assert_zc_elem::<u8>();
-    assert_zc_elem::<u8>();
-    assert_zc_elem::<u8>();
-    assert_zc_elem::<[u8; 3]>();
-    assert_zc_elem::<PodU64>();
-    assert_zc_elem::<[u8; 32]>();
-};
-impl ::pina::PinaSerialize for LargeState {
-    fn write_bytes(&self, output: &mut [u8]) {
-        ::core::assert!(output.len() == ::core::mem::size_of:: < Self > ());
-        output.fill(0);
-        let mut offset = 0usize;
-        let field_size = ::core::mem::size_of::<[u8; MyAccount::BYTES]>();
-        <[u8; MyAccount::BYTES] as ::pina::PinaSerialize>::write_bytes(
-            &self.discriminator,
-            &mut output[offset..offset + field_size],
-        );
-        offset += field_size;
-        let field_size = ::core::mem::size_of::<[u8; 32]>();
-        <[u8; 32] as ::pina::PinaSerialize>::write_bytes(
-            &self.authority,
-            &mut output[offset..offset + field_size],
-        );
-        offset += field_size;
-        let field_size = ::core::mem::size_of::<u8>();
-        <u8 as ::pina::PinaSerialize>::write_bytes(
-            &self.bump,
-            &mut output[offset..offset + field_size],
-        );
-        offset += field_size;
-        let field_size = ::core::mem::size_of::<u8>();
-        <u8 as ::pina::PinaSerialize>::write_bytes(
-            &self.treasury_bump,
-            &mut output[offset..offset + field_size],
-        );
-        offset += field_size;
-        let field_size = ::core::mem::size_of::<u8>();
-        <u8 as ::pina::PinaSerialize>::write_bytes(
-            &self.mint_bump,
-            &mut output[offset..offset + field_size],
-        );
-        offset += field_size;
-        let field_size = ::core::mem::size_of::<u8>();
-        <u8 as ::pina::PinaSerialize>::write_bytes(
-            &self.version,
-            &mut output[offset..offset + field_size],
-        );
-        offset += field_size;
-        let field_size = ::core::mem::size_of::<[u8; 3]>();
-        <[u8; 3] as ::pina::PinaSerialize>::write_bytes(
-            &self.padding,
-            &mut output[offset..offset + field_size],
-        );
-        offset += field_size;
-        let field_size = ::core::mem::size_of::<PodU64>();
-        <PodU64 as ::pina::PinaSerialize>::write_bytes(
-            &self.total_supply,
-            &mut output[offset..offset + field_size],
-        );
-        offset += field_size;
-        let field_size = ::core::mem::size_of::<[u8; 32]>();
-        <[u8; 32] as ::pina::PinaSerialize>::write_bytes(
-            &self.name,
-            &mut output[offset..offset + field_size],
-        );
-        offset += field_size;
-        ::core::debug_assert!(offset == output.len());
-    }
-}
-impl ::pina::PinaToBytes for LargeState {
-    type Bytes = [u8; ::core::mem::size_of::<LargeState>()];
-    fn zeroed_bytes() -> Self::Bytes {
-        [0u8; ::core::mem::size_of::<LargeState>()]
-    }
-}
-impl ::pina::ZcValidate for LargeState {
-    fn validate_ref(value: &Self) -> Result<(), ::pina::ZeroPodError> {
-        <[u8; MyAccount::BYTES] as ::pina::ZcValidate>::validate_ref(
-            &value.discriminator,
-        )?;
-        <[u8; 32] as ::pina::ZcValidate>::validate_ref(&value.authority)?;
-        <u8 as ::pina::ZcValidate>::validate_ref(&value.bump)?;
-        <u8 as ::pina::ZcValidate>::validate_ref(&value.treasury_bump)?;
-        <u8 as ::pina::ZcValidate>::validate_ref(&value.mint_bump)?;
-        <u8 as ::pina::ZcValidate>::validate_ref(&value.version)?;
-        <[u8; 3] as ::pina::ZcValidate>::validate_ref(&value.padding)?;
-        <PodU64 as ::pina::ZcValidate>::validate_ref(&value.total_supply)?;
-        <[u8; 32] as ::pina::ZcValidate>::validate_ref(&value.name)?;
-        Ok(())
-    }
-}
-#[allow(unsafe_code)]
-unsafe impl ::pina::ZcElem for LargeState {}
-impl ::pina::ZeroPodSchema for LargeState {
-    const LAYOUT: ::pina::LayoutKind = ::pina::LayoutKind::Fixed;
-}
-impl ::pina::ZeroPodFixed for LargeState {
-    type Zc = LargeState;
-    const SIZE: usize = ::core::mem::size_of::<LargeState>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, ::pina::ZeroPodError> {
-        <Self as ::pina::ZeroPodFixed>::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, ::pina::ZeroPodError> {
-        <Self as ::pina::ZeroPodFixed>::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), ::pina::ZeroPodError> {
-        if data.len() < Self::SIZE {
-            return Err(::pina::ZeroPodError::BufferTooSmall);
-        }
-        let zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as ::pina::ZcValidate>::validate_ref(zc)?;
-        Ok(())
-    }
-    unsafe fn from_bytes_unchecked(data: &[u8]) -> &Self::Zc {
-        &*(data.as_ptr() as *const Self::Zc)
-    }
-    unsafe fn from_bytes_mut_unchecked(data: &mut [u8]) -> &mut Self::Zc {
-        &mut *(data.as_mut_ptr() as *mut Self::Zc)
-    }
-}
-impl ::pina::ZcField for LargeState {
-    type Pod = LargeState;
-    const POD_SIZE: usize = ::core::mem::size_of::<LargeState>();
-}
-impl ::pina::PinaAccount for LargeState {
-    fn validate(data: &[u8]) -> Result<(), ::pina::ProgramError> {
-        if !<Self as ::pina::HasDiscriminator>::matches_discriminator(data) {
-            return Err(::pina::ProgramError::InvalidAccountData);
-        }
-        <Self as ::pina::ZeroPodFixed>::validate(data)
-            .map_err(|_| ::pina::ProgramError::InvalidAccountData)
-    }
-    fn try_from_bytes(data: &[u8]) -> Result<&Self, ::pina::ProgramError> {
-        <Self as ::pina::PinaAccount>::validate(data)?;
-        if data.len() != ::core::mem::size_of::<Self>() {
-            return Err(::pina::ProgramError::InvalidAccountData);
-        }
-        <Self as ::pina::ZeroPodFixed>::from_bytes(data)
-            .map_err(|_| ::pina::ProgramError::InvalidAccountData)
-    }
-    fn try_from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, ::pina::ProgramError> {
-        <Self as ::pina::PinaAccount>::validate(data)?;
-        if data.len() != ::core::mem::size_of::<Self>() {
-            return Err(::pina::ProgramError::InvalidAccountData);
-        }
-        <Self as ::pina::ZeroPodFixed>::from_bytes_mut(data)
-            .map_err(|_| ::pina::ProgramError::InvalidAccountData)
-    }
-}
+impl ::pina::PinaAccount for LargeState {}

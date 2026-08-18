@@ -18,15 +18,24 @@ pub struct ConfigState {
 	pub bump: u8,
 }
 
+fn initialized_config(
+	data: &mut [u8; ConfigState::SIZE],
+	authority: Address,
+) -> &mut ConfigStateZc {
+	let config = ConfigState::initialize(data)
+		.unwrap_or_else(|error| panic!("account initialization failed: {error:?}"));
+	config.version = 1;
+	config.authority = authority;
+	config.bump = 255;
+	config
+}
+
 #[test]
 fn test_account_macro() {
 	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 
-	let config_state = ConfigState::builder()
-		.version(1)
-		.authority(authority)
-		.bump(255)
-		.build();
+	let mut data = [0u8; ConfigState::SIZE];
+	let config_state = initialized_config(&mut data, authority);
 
 	assert_eq!(config_state.version, 1);
 	assert_eq!(config_state.authority, authority);
@@ -42,11 +51,8 @@ fn test_account_macro() {
 fn test_account_assert_returns_ok_when_condition_true() {
 	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 
-	let config_state = ConfigState::builder()
-		.version(1)
-		.authority(authority)
-		.bump(255)
-		.build();
+	let mut data = [0u8; ConfigState::SIZE];
+	let config_state = initialized_config(&mut data, authority);
 
 	let result = config_state.assert(|s| s.version == 1);
 
@@ -57,27 +63,20 @@ fn test_account_assert_returns_ok_when_condition_true() {
 fn test_account_assert_returns_err_when_condition_false() {
 	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 
-	let config_state = ConfigState::builder()
-		.version(1)
-		.authority(authority)
-		.bump(255)
-		.build();
+	let mut data = [0u8; ConfigState::SIZE];
+	let config_state = initialized_config(&mut data, authority);
 
 	let result = config_state.assert(|s| s.version == 99);
 
-	assert!(result.is_err());
-	assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+	assert!(matches!(result, Err(ProgramError::InvalidAccountData)));
 }
 
 #[test]
 fn test_account_assert_mut_returns_ok_when_condition_true() {
 	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 
-	let mut config_state = ConfigState::builder()
-		.version(1)
-		.authority(authority)
-		.bump(255)
-		.build();
+	let mut data = [0u8; ConfigState::SIZE];
+	let config_state = initialized_config(&mut data, authority);
 
 	let result = config_state.assert_mut(|s| s.version == 1);
 
@@ -88,27 +87,20 @@ fn test_account_assert_mut_returns_ok_when_condition_true() {
 fn test_account_assert_mut_returns_err_when_condition_false() {
 	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 
-	let mut config_state = ConfigState::builder()
-		.version(1)
-		.authority(authority)
-		.bump(255)
-		.build();
+	let mut data = [0u8; ConfigState::SIZE];
+	let config_state = initialized_config(&mut data, authority);
 
 	let result = config_state.assert_mut(|s| s.version == 99);
 
-	assert!(result.is_err());
-	assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+	assert!(matches!(result, Err(ProgramError::InvalidAccountData)));
 }
 
 #[test]
 fn test_account_assert_msg_returns_ok_when_condition_true() {
 	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 
-	let config_state = ConfigState::builder()
-		.version(1)
-		.authority(authority)
-		.bump(255)
-		.build();
+	let mut data = [0u8; ConfigState::SIZE];
+	let config_state = initialized_config(&mut data, authority);
 
 	let result = config_state.assert_msg(|s| s.bump == 255, "bump must be 255");
 
@@ -119,14 +111,10 @@ fn test_account_assert_msg_returns_ok_when_condition_true() {
 fn test_account_assert_msg_returns_err_when_condition_false() {
 	let authority = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 
-	let config_state = ConfigState::builder()
-		.version(1)
-		.authority(authority)
-		.bump(255)
-		.build();
+	let mut data = [0u8; ConfigState::SIZE];
+	let config_state = initialized_config(&mut data, authority);
 
 	let result = config_state.assert_msg(|s| s.bump == 0, "bump must be 0");
 
-	assert!(result.is_err());
-	assert_eq!(result.unwrap_err(), ProgramError::InvalidAccountData);
+	assert!(matches!(result, Err(ProgramError::InvalidAccountData)));
 }

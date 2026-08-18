@@ -1,15 +1,9 @@
-//! Alignment-safe primitive wrappers for use in `#[repr(C)]` account structs.
+//! Zeropod's zero-copy storage types.
 //!
-//! Solana account data is a flat byte buffer with alignment 1. Standard Rust
-//! integers (`u16`, `u32`, `u64`, etc.) require alignment > 1 and therefore
-//! cannot be placed directly in a zero-copy struct without padding. The
-//! `Pod*` types in this module (re-exported from [`zeropod`]) wrap byte arrays
-//! and convert via little-endian encoding, making them safe to embed in any
-//! `#[repr(C)]` account layout.
+//! Application schemas should use native Rust field types and derive
+//! [`zeropod::ZeroPod`]. The derive generates a separate zero-copy view whose
+//! fields use these storage types. Byte slices are converted to validated views
+//! through [`zeropod::ZeroPodFixed`], so Pina does not expose an independent
+//! raw-casting API.
 
-mod primitives;
-mod serialize;
-
-pub use primitives::*;
-pub use serialize::*;
 pub use zeropod::pod::*;

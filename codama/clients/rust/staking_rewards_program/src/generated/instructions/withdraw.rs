@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const WITHDRAW_DISCRIMINATOR: u8 = 3u8;
 
 /// Accounts.
@@ -78,47 +80,39 @@ impl Withdraw {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		let mut instruction_data = vec![0u8; core::mem::size_of_val(&data)];
-		pina::PinaSerialize::write_bytes(&data, &mut instruction_data);
-
 		solana_instruction::Instruction {
 			program_id: crate::STAKING_REWARDS_PROGRAM_ID,
 			accounts,
-			data: instruction_data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct WithdrawInstructionData {
-	pub discriminator: u8,
-	pub amount: pina::PodU64,
+	bytes: Vec<u8>,
 }
 
 impl WithdrawInstructionData {
-	pub const fn new(amount: pina::PodU64) -> Self {
-		Self {
-			discriminator: WITHDRAW_DISCRIMINATOR,
-			amount,
+	pub fn new(
+		configure: impl FnOnce(&mut WithdrawInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <WithdrawInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <WithdrawInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			data.discriminator = WITHDRAW_DISCRIMINATOR;
+			configure(data);
 		}
+		<WithdrawInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
 }
 
-impl pina::PinaSerialize for WithdrawInstructionData {
-	fn write_bytes(&self, output: &mut [u8]) {
-		assert_eq!(output.len(), core::mem::size_of::<Self>());
-		output.fill(0);
-		let mut offset = 0usize;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(
-			&self.discriminator,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodU64>();
-		pina::PinaSerialize::write_bytes(&self.amount, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		debug_assert_eq!(offset, output.len());
-	}
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct WithdrawInstructionWire {
+	pub discriminator: u8,
+	pub amount: u64,
 }

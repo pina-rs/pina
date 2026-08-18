@@ -23,7 +23,7 @@ pub enum PoolInstruction {
 
 #[instruction(discriminator = PoolInstruction, variant = Deposit)]
 pub struct DepositInstruction {
-	pub amount: PodU64,
+	pub amount: u64,
 }
 
 #[derive(Accounts, Debug)]
@@ -44,7 +44,7 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 		let token = self.token_account.as_token_account()?;
 		let balance = token.amount();
 
-		let amount: u64 = args.amount.into();
+		let amount = args.amount.get();
 
 		if balance < amount {
 			return Err(ProgramError::InsufficientFunds);

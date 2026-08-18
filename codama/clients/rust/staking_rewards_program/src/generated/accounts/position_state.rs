@@ -8,104 +8,42 @@
 	clippy::too_many_arguments
 )]
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+use pina::zeropod;
+
+#[derive(pina::ZeroPod)]
 pub struct PositionState {
 	pub discriminator: u8,
 	pub pool: solana_pubkey::Pubkey,
 	pub owner: solana_pubkey::Pubkey,
-	pub staked_amount: pina::PodU64,
-	pub reward_debt: pina::PodU64,
-	pub pending_rewards: pina::PodU64,
+	pub staked_amount: u64,
+	pub reward_debt: u64,
+	pub pending_rewards: u64,
 	pub bump: u8,
 }
-
-impl pina::PinaSerialize for PositionState {
-	fn write_bytes(&self, output: &mut [u8]) {
-		assert_eq!(output.len(), core::mem::size_of::<Self>());
-		output.fill(0);
-		let mut offset = 0usize;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(
-			&self.discriminator,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		let field_size = core::mem::size_of::<solana_pubkey::Pubkey>();
-		pina::PinaSerialize::write_bytes(&self.pool, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<solana_pubkey::Pubkey>();
-		pina::PinaSerialize::write_bytes(&self.owner, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodU64>();
-		pina::PinaSerialize::write_bytes(
-			&self.staked_amount,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodU64>();
-		pina::PinaSerialize::write_bytes(
-			&self.reward_debt,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodU64>();
-		pina::PinaSerialize::write_bytes(
-			&self.pending_rewards,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(&self.bump, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		debug_assert_eq!(offset, output.len());
-	}
-}
-
-impl pina::ZcValidate for PositionState {
-	fn validate_ref(value: &Self) -> Result<(), pina::ZeroPodError> {
-		<u8 as pina::ZcValidate>::validate_ref(&value.discriminator)?;
-		<solana_pubkey::Pubkey as pina::ZcValidate>::validate_ref(&value.pool)?;
-		<solana_pubkey::Pubkey as pina::ZcValidate>::validate_ref(&value.owner)?;
-		<pina::PodU64 as pina::ZcValidate>::validate_ref(&value.staked_amount)?;
-		<pina::PodU64 as pina::ZcValidate>::validate_ref(&value.reward_debt)?;
-		<pina::PodU64 as pina::ZcValidate>::validate_ref(&value.pending_rewards)?;
-		<u8 as pina::ZcValidate>::validate_ref(&value.bump)?;
-		Ok(())
-	}
-}
-
-// SAFETY: all rendered fields are align-1, padding-free ZcElem values;
-// validate_ref recursively validates every field before safe access.
-#[allow(unsafe_code)]
-unsafe impl pina::ZcElem for PositionState {}
 
 pub const POSITION_STATE_DISCRIMINATOR: u8 = 2u8;
 
 impl PositionState {
-	pub const LEN: usize = core::mem::size_of::<Self>();
+	pub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;
 
-	pub const fn new(
-		pool: solana_pubkey::Pubkey,
-		owner: solana_pubkey::Pubkey,
-		staked_amount: pina::PodU64,
-		reward_debt: pina::PodU64,
-		pending_rewards: pina::PodU64,
-		bump: u8,
-	) -> Self {
-		Self {
-			discriminator: POSITION_STATE_DISCRIMINATOR,
-			pool,
-			owner,
-			staked_amount,
-			reward_debt,
-			pending_rewards,
-			bump,
+	pub fn initialize(
+		data: &mut [u8],
+	) -> Result<&mut PositionStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
+		data.fill(0);
+		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
+		account.discriminator = POSITION_STATE_DISCRIMINATOR;
+		Ok(account)
 	}
 
-	pub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {
-		let account = pina::pod_from_bytes::<Self>(data)
+	pub fn from_bytes(data: &[u8]) -> Result<&PositionStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		let account = <Self as pina::ZeroPodFixed>::from_bytes(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != POSITION_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
@@ -115,26 +53,16 @@ impl PositionState {
 
 	pub fn from_bytes_mut(
 		data: &mut [u8],
-	) -> Result<&mut Self, solana_program_error::ProgramError> {
-		let account = pina::pod_from_bytes_mut::<Self>(data)
+	) -> Result<&mut PositionStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != POSITION_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		Ok(account)
-	}
-}
-
-impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for PositionState {
-	type Error = solana_program_error::ProgramError;
-
-	fn try_from(account_info: &solana_account_info::AccountInfo<'a>) -> Result<Self, Self::Error> {
-		if account_info.owner != &crate::STAKING_REWARDS_PROGRAM_ID {
-			return Err(solana_program_error::ProgramError::IncorrectProgramId);
-		}
-		let data_ref = account_info.try_borrow_data()?;
-		let account = Self::from_bytes(&data_ref)?;
-		Ok(*account)
 	}
 }
 

@@ -8,104 +8,45 @@
 	clippy::too_many_arguments
 )]
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+use pina::zeropod;
+
+#[derive(pina::ZeroPod)]
 pub struct EscrowState {
 	pub discriminator: u8,
 	pub maker: solana_pubkey::Pubkey,
 	pub mint_a: solana_pubkey::Pubkey,
 	pub mint_b: solana_pubkey::Pubkey,
 	/// The amount of token A that was sent by sender.
-	pub amount_a: pina::PodU64,
+	pub amount_a: u64,
 	/// The amount of token B to be received by the recipient.
-	pub amount_b: pina::PodU64,
-	pub seed: pina::PodU64,
+	pub amount_b: u64,
+	pub seed: u64,
 	pub bump: u8,
 }
-
-impl pina::PinaSerialize for EscrowState {
-	fn write_bytes(&self, output: &mut [u8]) {
-		assert_eq!(output.len(), core::mem::size_of::<Self>());
-		output.fill(0);
-		let mut offset = 0usize;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(
-			&self.discriminator,
-			&mut output[offset..offset + field_size],
-		);
-		offset += field_size;
-		let field_size = core::mem::size_of::<solana_pubkey::Pubkey>();
-		pina::PinaSerialize::write_bytes(&self.maker, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<solana_pubkey::Pubkey>();
-		pina::PinaSerialize::write_bytes(&self.mint_a, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<solana_pubkey::Pubkey>();
-		pina::PinaSerialize::write_bytes(&self.mint_b, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodU64>();
-		pina::PinaSerialize::write_bytes(&self.amount_a, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodU64>();
-		pina::PinaSerialize::write_bytes(&self.amount_b, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<pina::PodU64>();
-		pina::PinaSerialize::write_bytes(&self.seed, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		let field_size = core::mem::size_of::<u8>();
-		pina::PinaSerialize::write_bytes(&self.bump, &mut output[offset..offset + field_size]);
-		offset += field_size;
-		debug_assert_eq!(offset, output.len());
-	}
-}
-
-impl pina::ZcValidate for EscrowState {
-	fn validate_ref(value: &Self) -> Result<(), pina::ZeroPodError> {
-		<u8 as pina::ZcValidate>::validate_ref(&value.discriminator)?;
-		<solana_pubkey::Pubkey as pina::ZcValidate>::validate_ref(&value.maker)?;
-		<solana_pubkey::Pubkey as pina::ZcValidate>::validate_ref(&value.mint_a)?;
-		<solana_pubkey::Pubkey as pina::ZcValidate>::validate_ref(&value.mint_b)?;
-		<pina::PodU64 as pina::ZcValidate>::validate_ref(&value.amount_a)?;
-		<pina::PodU64 as pina::ZcValidate>::validate_ref(&value.amount_b)?;
-		<pina::PodU64 as pina::ZcValidate>::validate_ref(&value.seed)?;
-		<u8 as pina::ZcValidate>::validate_ref(&value.bump)?;
-		Ok(())
-	}
-}
-
-// SAFETY: all rendered fields are align-1, padding-free ZcElem values;
-// validate_ref recursively validates every field before safe access.
-#[allow(unsafe_code)]
-unsafe impl pina::ZcElem for EscrowState {}
 
 pub const ESCROW_STATE_DISCRIMINATOR: u8 = 1u8;
 
 impl EscrowState {
-	pub const LEN: usize = core::mem::size_of::<Self>();
+	pub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;
 
-	pub const fn new(
-		maker: solana_pubkey::Pubkey,
-		mint_a: solana_pubkey::Pubkey,
-		mint_b: solana_pubkey::Pubkey,
-		amount_a: pina::PodU64,
-		amount_b: pina::PodU64,
-		seed: pina::PodU64,
-		bump: u8,
-	) -> Self {
-		Self {
-			discriminator: ESCROW_STATE_DISCRIMINATOR,
-			maker,
-			mint_a,
-			mint_b,
-			amount_a,
-			amount_b,
-			seed,
-			bump,
+	pub fn initialize(
+		data: &mut [u8],
+	) -> Result<&mut EscrowStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
+		data.fill(0);
+		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
+		account.discriminator = ESCROW_STATE_DISCRIMINATOR;
+		Ok(account)
 	}
 
-	pub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {
-		let account = pina::pod_from_bytes::<Self>(data)
+	pub fn from_bytes(data: &[u8]) -> Result<&EscrowStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		let account = <Self as pina::ZeroPodFixed>::from_bytes(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != ESCROW_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
@@ -115,26 +56,16 @@ impl EscrowState {
 
 	pub fn from_bytes_mut(
 		data: &mut [u8],
-	) -> Result<&mut Self, solana_program_error::ProgramError> {
-		let account = pina::pod_from_bytes_mut::<Self>(data)
+	) -> Result<&mut EscrowStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != ESCROW_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		Ok(account)
-	}
-}
-
-impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for EscrowState {
-	type Error = solana_program_error::ProgramError;
-
-	fn try_from(account_info: &solana_account_info::AccountInfo<'a>) -> Result<Self, Self::Error> {
-		if account_info.owner != &crate::ESCROW_PROGRAM_ID {
-			return Err(solana_program_error::ProgramError::IncorrectProgramId);
-		}
-		let data_ref = account_info.try_borrow_data()?;
-		let account = Self::from_bytes(&data_ref)?;
-		Ok(*account)
 	}
 }
 

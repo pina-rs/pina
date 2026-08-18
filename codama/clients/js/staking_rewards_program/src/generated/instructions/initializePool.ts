@@ -22,13 +22,13 @@ import {
 	type InstructionWithAccounts,
 	type InstructionWithData,
 	type ReadonlyAccount,
-	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
+	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
@@ -50,6 +50,8 @@ export type InitializePoolInstruction<
 	TAccountPoolState extends string | AccountMeta<string> = string,
 	TAccountStakeVault extends string | AccountMeta<string> = string,
 	TAccountRewardVault extends string | AccountMeta<string> = string,
+	TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+		"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 	TAccountSystemProgram extends string | AccountMeta<string> =
 		"11111111111111111111111111111111",
 	TAccountTokenProgram extends string | AccountMeta<string> = string,
@@ -60,7 +62,7 @@ export type InitializePoolInstruction<
 	& InstructionWithAccounts<
 		[
 			TAccountAdmin extends string ?
-					& ReadonlySignerAccount<TAccountAdmin>
+					& WritableSignerAccount<TAccountAdmin>
 					& AccountSignerMeta<TAccountAdmin>
 				: TAccountAdmin,
 			TAccountStakeMint extends string ? ReadonlyAccount<TAccountStakeMint>
@@ -73,6 +75,9 @@ export type InitializePoolInstruction<
 				: TAccountStakeVault,
 			TAccountRewardVault extends string ? WritableAccount<TAccountRewardVault>
 				: TAccountRewardVault,
+			TAccountAssociatedTokenProgram extends string
+				? ReadonlyAccount<TAccountAssociatedTokenProgram>
+				: TAccountAssociatedTokenProgram,
 			TAccountSystemProgram extends string
 				? ReadonlyAccount<TAccountSystemProgram>
 				: TAccountSystemProgram,
@@ -128,6 +133,7 @@ export type InitializePoolInput<
 	TAccountPoolState extends string = string,
 	TAccountStakeVault extends string = string,
 	TAccountRewardVault extends string = string,
+	TAccountAssociatedTokenProgram extends string = string,
 	TAccountSystemProgram extends string = string,
 	TAccountTokenProgram extends string = string,
 > = {
@@ -137,6 +143,7 @@ export type InitializePoolInput<
 	poolState: Address<TAccountPoolState>;
 	stakeVault: Address<TAccountStakeVault>;
 	rewardVault: Address<TAccountRewardVault>;
+	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
 	systemProgram?: Address<TAccountSystemProgram>;
 	tokenProgram: Address<TAccountTokenProgram>;
 	bump: InitializePoolInstructionDataArgs["bump"];
@@ -149,6 +156,7 @@ export function getInitializePoolInstruction<
 	TAccountPoolState extends string,
 	TAccountStakeVault extends string,
 	TAccountRewardVault extends string,
+	TAccountAssociatedTokenProgram extends string,
 	TAccountSystemProgram extends string,
 	TAccountTokenProgram extends string,
 	TProgramAddress extends Address =
@@ -161,6 +169,7 @@ export function getInitializePoolInstruction<
 		TAccountPoolState,
 		TAccountStakeVault,
 		TAccountRewardVault,
+		TAccountAssociatedTokenProgram,
 		TAccountSystemProgram,
 		TAccountTokenProgram
 	>,
@@ -173,6 +182,7 @@ export function getInitializePoolInstruction<
 	TAccountPoolState,
 	TAccountStakeVault,
 	TAccountRewardVault,
+	TAccountAssociatedTokenProgram,
 	TAccountSystemProgram,
 	TAccountTokenProgram
 > {
@@ -182,12 +192,16 @@ export function getInitializePoolInstruction<
 
 	// Original accounts.
 	const originalAccounts = {
-		admin: { value: input.admin ?? null, isWritable: false },
+		admin: { value: input.admin ?? null, isWritable: true },
 		stakeMint: { value: input.stakeMint ?? null, isWritable: false },
 		rewardMint: { value: input.rewardMint ?? null, isWritable: false },
 		poolState: { value: input.poolState ?? null, isWritable: true },
 		stakeVault: { value: input.stakeVault ?? null, isWritable: true },
 		rewardVault: { value: input.rewardVault ?? null, isWritable: true },
+		associatedTokenProgram: {
+			value: input.associatedTokenProgram ?? null,
+			isWritable: false,
+		},
 		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
 		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
 	};
@@ -200,6 +214,12 @@ export function getInitializePoolInstruction<
 	const args = { ...input };
 
 	// Resolve default values.
+	if (!accounts.associatedTokenProgram.value) {
+		accounts.associatedTokenProgram.value =
+			"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<
+				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+			>;
+	}
 	if (!accounts.systemProgram.value) {
 		accounts.systemProgram.value =
 			"11111111111111111111111111111111" as Address<
@@ -216,6 +236,7 @@ export function getInitializePoolInstruction<
 			getAccountMeta("poolState", accounts.poolState),
 			getAccountMeta("stakeVault", accounts.stakeVault),
 			getAccountMeta("rewardVault", accounts.rewardVault),
+			getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 			getAccountMeta("tokenProgram", accounts.tokenProgram),
 		],
@@ -231,6 +252,7 @@ export function getInitializePoolInstruction<
 		TAccountPoolState,
 		TAccountStakeVault,
 		TAccountRewardVault,
+		TAccountAssociatedTokenProgram,
 		TAccountSystemProgram,
 		TAccountTokenProgram
 	>);
@@ -248,8 +270,9 @@ export type ParsedInitializePoolInstruction<
 		poolState: TAccountMetas[3];
 		stakeVault: TAccountMetas[4];
 		rewardVault: TAccountMetas[5];
-		systemProgram: TAccountMetas[6];
-		tokenProgram: TAccountMetas[7];
+		associatedTokenProgram: TAccountMetas[6];
+		systemProgram: TAccountMetas[7];
+		tokenProgram: TAccountMetas[8];
 	};
 	data: InitializePoolInstructionData;
 };
@@ -263,12 +286,12 @@ export function parseInitializePoolInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedInitializePoolInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 8) {
+	if (instruction.accounts.length < 9) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 8,
+				expectedAccountMetas: 9,
 			},
 		);
 	}
@@ -287,6 +310,7 @@ export function parseInitializePoolInstruction<
 			poolState: getNextAccount(),
 			stakeVault: getNextAccount(),
 			rewardVault: getNextAccount(),
+			associatedTokenProgram: getNextAccount(),
 			systemProgram: getNextAccount(),
 			tokenProgram: getNextAccount(),
 		},
