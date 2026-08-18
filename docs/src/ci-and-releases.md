@@ -60,6 +60,7 @@ Notes:
 
 - this workflow intentionally uses **static** SBF estimates from `pina profile`, not runtime validator traces
 - the tradeoff is deliberate: static profiling is deterministic and stable for PR-vs-base comparison
+- reviewed redesigns may record an absolute total in `approvedTotals`; the allowance applies only while the base is below that total, so later increases are still evaluated normally
 - the tracked set should favor example programs that build reliably on both the PR head and the PR base with the gallery linker used in CI; richer CPI-heavy and token-heavy flows remain covered by the main `ci` and program E2E jobs
 - if the tracked set or thresholds need to change, update `scripts/compute-unit-policy.json`
 

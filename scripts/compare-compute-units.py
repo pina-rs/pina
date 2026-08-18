@@ -79,7 +79,14 @@ def delta_percent(base_value: int, head_value: int) -> float:
     return ((head_value - base_value) / base_value) * 100.0
 
 
-def classify(delta_cu: int, delta_pct: float, policy: dict[str, Any]) -> str:
+def classify(
+    program: str,
+    base_total_cu: int,
+    head_total_cu: int,
+    delta_cu: int,
+    delta_pct: float,
+    policy: dict[str, Any],
+) -> str:
     if delta_cu < 0:
         return "improved"
 
@@ -88,13 +95,25 @@ def classify(delta_cu: int, delta_pct: float, policy: dict[str, Any]) -> str:
 
     fail = policy["fail"]
     if delta_cu >= fail["deltaCu"] and delta_pct >= fail["deltaPercent"]:
-        return "fail"
+        status = "fail"
+    else:
+        warn = policy["warn"]
+        status = (
+            "warn"
+            if delta_cu >= warn["deltaCu"] and delta_pct >= warn["deltaPercent"]
+            else "within-policy"
+        )
 
-    warn = policy["warn"]
-    if delta_cu >= warn["deltaCu"] and delta_pct >= warn["deltaPercent"]:
-        return "warn"
+    approved_total = policy.get("approvedTotals", {}).get(program)
+    if (
+        status in {"fail", "warn"}
+        and approved_total is not None
+        and base_total_cu < approved_total
+        and head_total_cu <= approved_total
+    ):
+        return "approved"
 
-    return "within-policy"
+    return status
 
 
 def format_int(value: int) -> str:
@@ -116,6 +135,7 @@ def status_label(status: str) -> str:
         "improved": "✅ improved",
         "unchanged": "➖ unchanged",
         "within-policy": "✅ within policy",
+        "approved": "✅ approved redesign",
     }
     return labels[status]
 
@@ -142,6 +162,7 @@ def render_markdown(
         "Policy:",
         f"- warn when `total_cu` increases by at least +{warn['deltaCu']} CU and +{warn['deltaPercent']:.1f}%",
         f"- fail when `total_cu` increases by at least +{fail['deltaCu']} CU and +{fail['deltaPercent']:.1f}%",
+        "- explicit absolute totals approve reviewed redesigns once without weakening future relative checks",
         "- decreases and smaller increases are informational",
         "- values come from `pina profile` static SBF estimates, not runtime validator traces",
         "",
@@ -239,7 +260,14 @@ def main() -> int:
             head_total_cu = int(head["total_cu"])
             delta_cu = head_total_cu - base_total_cu
             delta_pct = delta_percent(base_total_cu, head_total_cu)
-            status = classify(delta_cu, delta_pct, policy)
+            status = classify(
+                program,
+                base_total_cu,
+                head_total_cu,
+                delta_cu,
+                delta_pct,
+                policy,
+            )
 
             comparisons.append(
                 {
