@@ -40,24 +40,23 @@ pub(crate) fn render_account_page(
 	pda: Option<&PdaNode>,
 ) -> Result<String> {
 	let account_name = pascal(account.name.as_ref());
+	let zc_name = format!("{account_name}Zc");
 	let context = format!("account `{account_name}`");
 	let discriminator =
 		render_constant_discriminator(account.name.as_ref(), &account.discriminators, &context)?;
 
 	let data_type = account.data.get_nested_type_node();
 	let mut field_lines = Vec::new();
-	let mut ctor_args = Vec::new();
-	let mut ctor_inits = Vec::new();
-
 	for doc_line in render_docs(&account.docs, 0) {
 		field_lines.push(doc_line);
 	}
-
 	if let Some(discriminator) = &discriminator {
 		field_lines.push(format!("\tpub discriminator: {},", discriminator.ty));
 	}
-
 	for field in &data_type.fields {
+		if discriminator.is_some() && field.name.as_ref() == "discriminator" {
+			continue;
+		}
 		let field_name = snake(field.name.as_ref());
 		let field_context = format!("{account_name}.{field_name}");
 		let field_type = render_type_for_pod(&field.r#type, &field_context)?;
@@ -65,14 +64,12 @@ pub(crate) fn render_account_page(
 			field_lines.push(doc_line);
 		}
 		field_lines.push(format!("\tpub {field_name}: {field_type},"));
-		ctor_args.push(format!("{field_name}: {field_type}"));
-		ctor_inits.push(format!("\t\t\t{field_name},"));
 	}
 
 	let mut lines = Vec::new();
+	lines.push("use pina::zeropod;".to_string());
 	lines.push(String::new());
-	lines.push("#[repr(C)]".to_string());
-	lines.push("#[derive(Clone, Copy, Debug, PartialEq, Eq)]".to_string());
+	lines.push("#[derive(pina::ZeroPod)]".to_string());
 	lines.push(format!("pub struct {account_name} {{"));
 	lines.extend(field_lines);
 	lines.push("}".to_string());
@@ -87,99 +84,89 @@ pub(crate) fn render_account_page(
 	}
 
 	lines.push(format!("impl {account_name} {{"));
-	lines.push("\tpub const LEN: usize = core::mem::size_of::<Self>();".to_string());
+	lines.push("\tpub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;".to_string());
 	lines.push(String::new());
-
-	if ctor_args.is_empty() {
-		lines.push("\tpub const fn new() -> Self {".to_string());
-		lines.push("\t\tSelf {".to_string());
-
-		if let Some(discriminator) = &discriminator {
-			lines.push(format!("\t\t\tdiscriminator: {},", discriminator.name));
-		}
-
-		lines.push("\t\t}".to_string());
-		lines.push("\t}".to_string());
-	} else {
-		lines.push(format!(
-			"\tpub const fn new({}) -> Self {{",
-			ctor_args.join(", ")
-		));
-		lines.push("\t\tSelf {".to_string());
-
-		if let Some(discriminator) = &discriminator {
-			lines.push(format!("\t\t\tdiscriminator: {},", discriminator.name));
-		}
-
-		lines.extend(ctor_inits);
-		lines.push("\t\t}".to_string());
-		lines.push("\t}".to_string());
-	}
-
-	lines.push(String::new());
+	lines.push("\t/// Initialize zero-valid account storage.".to_string());
+	lines.push("\t///".to_string());
+	lines.push("\t/// Every non-discriminator field must accept an all-zero".to_string());
 	lines.push(
-		"\tpub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {"
-			.to_string(),
+		"\t/// representation. Otherwise this method returns `InvalidAccountData`.".to_string(),
 	);
-	lines.push("\t\tif data.len() != core::mem::size_of::<Self>() {".to_string());
-	lines.push(
-		"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
-	);
-	lines.push("\t\t}".to_string());
-	lines.push("\t\t// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.".to_string());
-	lines.push("\t\tlet account = unsafe { &*(data.as_ptr() as *const Self) };".to_string());
-	if let Some(discriminator) = &discriminator {
-		lines.push(format!(
-			"\t\tif account.discriminator != {} {{",
-			discriminator.name
-		));
-		lines.push(
-			"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
-		);
-		lines.push("\t\t}".to_string());
-	}
-	lines.push("\t\tOk(account)".to_string());
-	lines.push("\t}".to_string());
-	lines.push(String::new());
-	lines.push(
-		"\tpub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, \
-		 solana_program_error::ProgramError> {"
-			.to_string(),
-	);
-	lines.push("\t\tif data.len() != core::mem::size_of::<Self>() {".to_string());
-	lines.push(
-		"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
-	);
-	lines.push("\t\t}".to_string());
-	lines.push("\t\t// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.".to_string());
-	lines.push("\t\tlet account = unsafe { &mut *(data.as_mut_ptr() as *mut Self) };".to_string());
-	if let Some(discriminator) = &discriminator {
-		lines.push(format!(
-			"\t\tif account.discriminator != {} {{",
-			discriminator.name
-		));
-		lines.push(
-			"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
-		);
-		lines.push("\t\t}".to_string());
-	}
-	lines.push("\t\tOk(account)".to_string());
-	lines.push("\t}".to_string());
-	lines.push("}".to_string());
-	lines.push(String::new());
 	lines.push(format!(
-		"impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for {account_name} {{"
+		"\tpub fn initialize(data: &mut [u8]) -> Result<&mut {zc_name}, \
+		 solana_program_error::ProgramError> {{"
 	));
-	lines.push("\ttype Error = solana_program_error::ProgramError;".to_string());
-	lines.push(String::new());
+	lines.push("\t\tif data.len() != Self::LEN {".to_string());
 	lines.push(
-		"\tfn try_from(account_info: &solana_account_info::AccountInfo<'a>) -> Result<Self, \
-		 Self::Error> {"
-			.to_string(),
+		"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
 	);
-	lines.push("\t\tlet data_ref = (*account_info.data).borrow();".to_string());
-	lines.push("\t\tlet account = Self::from_bytes(&data_ref)?;".to_string());
-	lines.push("\t\tOk(*account)".to_string());
+	lines.push("\t\t}".to_string());
+	lines.push("\t\tdata.fill(0);".to_string());
+	lines.push("\t\tlet account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)".to_string());
+	lines.push(
+		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
+	);
+	if let Some(discriminator) = &discriminator {
+		lines.push(format!(
+			"\t\taccount.discriminator = {};",
+			discriminator.name
+		));
+	}
+	lines.push("\t\tOk(account)".to_string());
+	lines.push("\t}".to_string());
+	lines.push(String::new());
+
+	lines.push(format!(
+		"\tpub fn from_bytes(data: &[u8]) -> Result<&{zc_name}, \
+		 solana_program_error::ProgramError> {{"
+	));
+	lines.push("\t\tif data.len() != Self::LEN {".to_string());
+	lines.push(
+		"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+	);
+	lines.push("\t\t}".to_string());
+	lines.push("\t\tlet account = <Self as pina::ZeroPodFixed>::from_bytes(data)".to_string());
+	lines.push(
+		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
+	);
+	if let Some(discriminator) = &discriminator {
+		lines.push(format!(
+			"\t\tif account.discriminator != {} {{",
+			discriminator.name
+		));
+		lines.push(
+			"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+		);
+		lines.push("\t\t}".to_string());
+	}
+	lines.push("\t\tOk(account)".to_string());
+	lines.push("\t}".to_string());
+	lines.push(String::new());
+
+	lines.push(format!(
+		"\tpub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut {zc_name}, \
+		 solana_program_error::ProgramError> {{"
+	));
+	lines.push("\t\tif data.len() != Self::LEN {".to_string());
+	lines.push(
+		"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+	);
+	lines.push("\t\t}".to_string());
+	lines.push("\t\tlet account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)".to_string());
+	lines.push(
+		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
+	);
+	if let Some(discriminator) = &discriminator {
+		lines.push(format!(
+			"\t\tif account.discriminator != {} {{",
+			discriminator.name
+		));
+		lines.push(
+			"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+		);
+		lines.push("\t\t}".to_string());
+	}
+	lines.push("\t\tOk(account)".to_string());
 	lines.push("\t}".to_string());
 	lines.push("}".to_string());
 

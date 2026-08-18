@@ -35,12 +35,12 @@ pub enum ReallocInstruction {
 
 #[instruction(discriminator = ReallocInstruction::Realloc)]
 pub struct ReallocIx {
-	pub len: PodU16,
+	pub len: u16,
 }
 
 #[instruction(discriminator = ReallocInstruction::Realloc2)]
 pub struct Realloc2Ix {
-	pub len: PodU16,
+	pub len: u16,
 }
 
 #[derive(Accounts, Debug)]
@@ -81,12 +81,13 @@ fn validate_distinct_realloc_targets(account1: &Address, account2: &Address) -> 
 impl<'a> ProcessAccountInfos<'a> for ReallocAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = ReallocIx::try_from_bytes(data)?;
-		let target_len = usize::from(u16::from(args.len));
+		let target_len = usize::from(args.len.get());
 
 		self.authority.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
 
 		validate_realloc_delta(self.sample.data_len(), target_len)?;
+		self.sample.assert_writable()?;
 
 		self.sample.resize(target_len)
 	}
@@ -95,7 +96,7 @@ impl<'a> ProcessAccountInfos<'a> for ReallocAccounts<'a> {
 impl<'a> ProcessAccountInfos<'a> for Realloc2Accounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = Realloc2Ix::try_from_bytes(data)?;
-		let base_len = usize::from(u16::from(args.len));
+		let base_len = usize::from(args.len.get());
 		let second_target_len = base_len
 			.checked_add(10)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
@@ -107,6 +108,8 @@ impl<'a> ProcessAccountInfos<'a> for Realloc2Accounts<'a> {
 		validate_realloc_delta(self.sample1.data_len(), base_len)?;
 		validate_realloc_delta(self.sample2.data_len(), second_target_len)?;
 
+		self.sample1.assert_writable()?;
+		self.sample2.assert_writable()?;
 		self.sample1.resize(base_len)?;
 
 		self.sample2.resize(second_target_len)
@@ -148,10 +151,11 @@ mod tests {
 
 	#[test]
 	fn realloc_instruction_roundtrip() {
-		let ix = ReallocIx::builder().len(PodU16::from(5)).build();
-		let bytes = ix.to_bytes();
-		let parsed = ReallocIx::try_from_bytes(bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
-		assert_eq!(u16::from(parsed.len), 5);
+		let mut bytes = [0u8; ReallocIx::SIZE];
+		let ix = ReallocIx::initialize(&mut bytes).unwrap_or_else(|e| panic!("encode: {e:?}"));
+		ix.len.set(5);
+		let parsed = ReallocIx::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
+		assert_eq!(parsed.len.get(), 5);
 	}
 
 	#[test]

@@ -13,14 +13,15 @@ But zero-copy is only defensible when the layout contract is tight. Unsafe or dy
 
 ## Decision
 
-Pina keeps zero-copy account and instruction handling as a core design choice, but only for fixed-size layouts that are validated before reinterpretation.
+Pina keeps zero-copy account and instruction handling as a core design choice, but delegates representation and byte-to-view conversion to zeropod's native derive model.
 
 In practice that means:
 
-- zero-copy types must be fixed-size and zeropod-compatible (`ZcElem` + `ZcValidate`)
+- application types are native schemas deriving `zeropod::ZeroPod`; loaders return the generated `TypeZc` storage view
 - typed loads must validate discriminator, size, content (`ZcValidate`), and relevant account identity constraints before use
 - dynamic, variable-length, or schema-driven reinterpretation is out of scope for the core loader model
-- performance-motivated `unsafe` is only acceptable when the soundness boundary is narrow and documented
+- Pina does not manually implement zeropod's unsafe traits, duplicate its pointer casts, or expose a schema/storage-view object representation as bytes
+- fixed-capacity inactive storage is unobservable through Pina APIs
 
 ## Consequences
 

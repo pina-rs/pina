@@ -94,18 +94,6 @@ impl SeedType {
 	/// The maximum byte length of a single seed.
 	pub(crate) const MAX_SEED_LEN: usize = 32;
 
-	/// The byte length of this seed type.
-	pub(crate) fn byte_size(&self) -> usize {
-		match self {
-			SeedType::Address => 32,
-			SeedType::U8 => 1,
-			SeedType::U16 => 2,
-			SeedType::U32 => 4,
-			SeedType::U64 => 8,
-			SeedType::Bytes(len) => *len,
-		}
-	}
-
 	/// The Rust type used for the constructor parameter.
 	pub(crate) fn param_type(&self) -> syn::Type {
 		match self {
@@ -416,6 +404,14 @@ impl FromMeta for Primitive {
 					"u16" => Ok(Primitive::U16),
 					"u32" => Ok(Primitive::U32),
 					"u64" => Ok(Primitive::U64),
+					"u128" => {
+						Err(darling::Error::custom(
+							"A discriminator with primitive `u128` (16 bytes) exceeds \
+							 `MAX_DISCRIMINATOR_SPACE` and cannot be safely used for zero-copy \
+							 layouts. Supported primitives: `u8`, `u16`, `u32`, `u64`.",
+						)
+						.with_span(&ident))
+					}
 					_ => {
 						Err(darling::Error::custom(
 							"Unsupported primitive type. Must be one of: `u8`, `u16`, `u32`, \

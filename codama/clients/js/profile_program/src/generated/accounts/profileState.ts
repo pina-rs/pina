@@ -8,6 +8,8 @@
 
 import {
 	type Account,
+	addDecoderSizePrefix,
+	addEncoderSizePrefix,
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
@@ -23,19 +25,37 @@ import {
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
 	fixEncoderSize,
+	getArrayDecoder,
+	getArrayEncoder,
 	getBooleanDecoder,
 	getBooleanEncoder,
-	getBytesDecoder,
-	getBytesEncoder,
+	getOptionDecoder,
+	getOptionEncoder,
 	getStructDecoder,
 	getStructEncoder,
+	getU16Decoder,
+	getU16Encoder,
+	getU64Decoder,
+	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	getUtf8Decoder,
+	getUtf8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
+	type Option,
+	type OptionOrNullable,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { findProfilePda, ProfileSeeds } from "../pdas";
+import {
+	fixZeroPodEncoderSize,
+	getZeroPodBooleanDecoder,
+	getZeroPodDiscriminatorDecoder,
+	getZeroPodOptionTagDecoder,
+	getZeroPodStringDecoder,
+} from "../zeropodCodecs";
 
 export const PROFILE_STATE_DISCRIMINATOR = 1;
 
@@ -49,12 +69,12 @@ export function getProfileStateDiscriminatorBytes(): ReadonlyUint8Array {
  * The `#[account]` macro generates:
  * - A discriminator field (`ProfileAccountType::ProfileState`) as the first
  * byte.
- * - `Pod` + `Zeroable` derives for zero-copy (de)serialization.
- * - `HasDiscriminator` linking this struct to
+ * - `PinaAccount` and zeropod validation for checked zero-copy access.
+ * - `HasDiscriminator` linking this account to
  * `ProfileAccountType::ProfileState`.
- * - `TypedBuilder` for ergonomic construction.
+ * - `initialize` and `try_from_bytes` helpers for caller-owned storage.
  *
- * Layout (231 bytes total):
+ * Layout (240 bytes total):
  * ```text
  * | offset | size | field          |
  * |--------|------|----------------|
@@ -63,52 +83,125 @@ export function getProfileStateDiscriminatorBytes(): ReadonlyUint8Array {
  * | 2      | 33   | name (PodString<32>)  |
  * | 35     | 129  | bio (PodString<128>)  |
  * | 164    | 66   | tags (PodVec<PodU64, 8>) |
- * | 230    | 1    | active (PodBool) |
+ * | 230    | 9    | favorite_tag (PodOption<PodU64>) |
+ * | 239    | 1    | active (PodBool) |
  * ```
  */
 export type ProfileState = {
+	discriminator: number;
 	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
 	bump: number;
 	/**
-	 * The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8
-	 * bytes.
+	 * The profile display name. The generated view uses one length byte plus
+	 * 32 bytes of UTF-8 capacity.
 	 */
-	name: ReadonlyUint8Array;
+	name: string;
 	/**
-	 * A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8
-	 * bytes.
+	 * A longer free-form bio. The generated view uses one length byte plus
+	 * 128 bytes of UTF-8 capacity.
 	 */
-	bio: ReadonlyUint8Array;
+	bio: string;
 	/**
-	 * Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
-	 * elements.
+	 * Up to 8 tags. The generated view uses a two-byte count followed by
+	 * eight little-endian `u64` slots.
 	 */
-	tags: ReadonlyUint8Array;
+	tags: Array<bigint>;
+	/**
+	 * An optional favourite tag. The generated view uses a one-byte tag and
+	 * an eight-byte value slot, even when the option is `None`.
+	 */
+	favoriteTag: Option<bigint>;
 	/** Whether the profile is active. */
 	active: boolean;
 };
 
-export type ProfileStateArgs = ProfileState;
+export type ProfileStateArgs = {
+	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
+	bump: number;
+	/**
+	 * The profile display name. The generated view uses one length byte plus
+	 * 32 bytes of UTF-8 capacity.
+	 */
+	name: string;
+	/**
+	 * A longer free-form bio. The generated view uses one length byte plus
+	 * 128 bytes of UTF-8 capacity.
+	 */
+	bio: string;
+	/**
+	 * Up to 8 tags. The generated view uses a two-byte count followed by
+	 * eight little-endian `u64` slots.
+	 */
+	tags: Array<number | bigint>;
+	/**
+	 * An optional favourite tag. The generated view uses a one-byte tag and
+	 * an eight-byte value slot, even when the option is `None`.
+	 */
+	favoriteTag: OptionOrNullable<number | bigint>;
+	/** Whether the profile is active. */
+	active: boolean;
+};
 
 /** Gets the encoder for {@link ProfileStateArgs} account data. */
 export function getProfileStateEncoder(): FixedSizeEncoder<ProfileStateArgs> {
-	return getStructEncoder([
-		["bump", getU8Encoder()],
-		["name", fixEncoderSize(getBytesEncoder(), 33)],
-		["bio", fixEncoderSize(getBytesEncoder(), 129)],
-		["tags", fixEncoderSize(getBytesEncoder(), 66)],
-		["active", getBooleanEncoder()],
-	]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"bump",
+			getU8Encoder(),
+		], [
+			"name",
+			fixZeroPodEncoderSize(
+				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+				33,
+			),
+		], [
+			"bio",
+			fixZeroPodEncoderSize(
+				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+				129,
+			),
+		], [
+			"tags",
+			fixZeroPodEncoderSize(
+				getArrayEncoder(getU64Encoder(), { size: getU16Encoder() }),
+				66,
+			),
+		], [
+			"favoriteTag",
+			getOptionEncoder(getU64Encoder(), { noneValue: "zeroes" }),
+		], ["active", getBooleanEncoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link ProfileState} account data. */
 export function getProfileStateDecoder(): FixedSizeDecoder<ProfileState> {
 	return getStructDecoder([
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(
+				PROFILE_STATE_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
 		["bump", getU8Decoder()],
-		["name", fixDecoderSize(getBytesDecoder(), 33)],
-		["bio", fixDecoderSize(getBytesDecoder(), 129)],
-		["tags", fixDecoderSize(getBytesDecoder(), 66)],
-		["active", getBooleanDecoder()],
+		["name", getZeroPodStringDecoder(getU8Decoder(), 33)],
+		["bio", getZeroPodStringDecoder(getU8Decoder(), 129)],
+		[
+			"tags",
+			fixDecoderSize(
+				getArrayDecoder(getU64Decoder(), { size: getU16Decoder() }),
+				66,
+			),
+		],
+		[
+			"favoriteTag",
+			getOptionDecoder(getU64Decoder(), {
+				prefix: getZeroPodOptionTagDecoder(getU8Decoder()),
+				noneValue: "zeroes",
+			}),
+		],
+		["active", getZeroPodBooleanDecoder()],
 	]);
 }
 

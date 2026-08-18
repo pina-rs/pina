@@ -10,20 +10,30 @@ import {
 	type AccountMeta,
 	type AccountSignerMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { HELLO_SOLANA_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const HELLO_DISCRIMINATOR = 0;
 
@@ -37,6 +47,7 @@ export type HelloInstruction<
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<
 		[
 			TAccountUser extends string
@@ -45,6 +56,38 @@ export type HelloInstruction<
 			...TRemainingAccounts,
 		]
 	>;
+
+export type HelloInstructionData = { discriminator: number };
+
+export type HelloInstructionDataArgs = {};
+
+export function getHelloInstructionDataEncoder(): FixedSizeEncoder<
+	HelloInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 0 }),
+	);
+}
+
+export function getHelloInstructionDataDecoder(): FixedSizeDecoder<
+	HelloInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(HELLO_DISCRIMINATOR, getU8Decoder()),
+	]]);
+}
+
+export function getHelloInstructionDataCodec(): FixedSizeCodec<
+	HelloInstructionDataArgs,
+	HelloInstructionData
+> {
+	return combineCodec(
+		getHelloInstructionDataEncoder(),
+		getHelloInstructionDataDecoder(),
+	);
+}
 
 export type HelloInput<TAccountUser extends string = string> = {
 	/**
@@ -77,6 +120,7 @@ export function getHelloInstruction<
 	return Object.freeze(
 		{
 			accounts: [getAccountMeta("user", accounts.user)],
+			data: getHelloInstructionDataEncoder().encode({}),
 			programAddress,
 		} as HelloInstruction<TProgramAddress, TAccountUser>,
 	);
@@ -94,13 +138,17 @@ export type ParsedHelloInstruction<
 		 */
 		user: TAccountMetas[0];
 	};
+	data: HelloInstructionData;
 };
 
 export function parseHelloInstruction<
 	TProgram extends string,
 	TAccountMetas extends readonly AccountMeta[],
 >(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedHelloInstruction<TProgram, TAccountMetas> {
 	if (instruction.accounts.length < 1) {
 		throw new SolanaError(
@@ -120,5 +168,6 @@ export function parseHelloInstruction<
 	return {
 		programAddress: instruction.programAddress,
 		accounts: { user: getNextAccount() },
+		data: getHelloInstructionDataDecoder().decode(instruction.data),
 	};
 }

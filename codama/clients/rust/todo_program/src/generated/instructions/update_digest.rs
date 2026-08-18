@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const UPDATE_DIGEST_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
@@ -48,35 +50,40 @@ impl UpdateDigest {
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.todo, false));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
-
 		solana_instruction::Instruction {
 			program_id: crate::TODO_PROGRAM_ID,
 			accounts,
-			data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct UpdateDigestInstructionData {
-	pub discriminator: u8,
-	pub digest: [u8; 32],
+	bytes: Vec<u8>,
 }
 
 impl UpdateDigestInstructionData {
-	pub const fn new(digest: [u8; 32]) -> Self {
-		Self {
-			discriminator: UPDATE_DIGEST_DISCRIMINATOR,
-			digest,
+	pub fn new(
+		configure: impl FnOnce(&mut UpdateDigestInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <UpdateDigestInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data =
+				<UpdateDigestInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			configure(data);
+			data.discriminator = UPDATE_DIGEST_DISCRIMINATOR;
 		}
+		<UpdateDigestInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
+}
+
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct UpdateDigestInstructionWire {
+	pub discriminator: u8,
+	pub digest: [u8; 32],
 }

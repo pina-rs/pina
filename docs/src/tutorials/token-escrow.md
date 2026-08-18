@@ -81,14 +81,14 @@ pub struct EscrowState {
 	pub maker: Address,
 	pub mint_a: Address,
 	pub mint_b: Address,
-	pub amount_a: PodU64,
-	pub amount_b: PodU64,
-	pub seed: PodU64,
+	pub amount_a: u64,
+	pub amount_b: u64,
+	pub seed: u64,
 	pub bump: u8,
 }
 ```
 
-The macro auto-injects a discriminator field as the first byte (set to `EscrowAccount::EscrowState`). It also derives `Pod`, `Zeroable`, `HasDiscriminator`, and `TypedBuilder`. All fields use fixed-size types (`Address` is 32 bytes, `PodU64` is 8 bytes little-endian) so the struct has a stable `#[repr(C)]` layout suitable for zero-copy reads.
+The macro auto-injects a discriminator field as the first byte (set to `EscrowAccount::EscrowState`) and derives zeropod's native-schema machinery. `EscrowStateZc` is the generated storage view: its integer fields are alignment-one little-endian wrappers, and account loaders return that validated view without copying.
 
 The `seed` and `bump` fields are stored so that PDA derivation can be verified on subsequent instructions without re-computing it.
 
@@ -99,9 +99,9 @@ The `seed` and `bump` fields are stored so that PDA derivation can be verified o
 ```rust
 #[instruction(discriminator = EscrowInstruction::Make)]
 pub struct MakeInstruction {
-	pub seed: PodU64,
-	pub amount_a: PodU64,
-	pub amount_b: PodU64,
+	pub seed: u64,
+	pub amount_a: u64,
+	pub amount_b: u64,
 	pub bump: u8,
 }
 
@@ -259,20 +259,32 @@ associated_token_account::instructions::Create {
 }
 .invoke()?;
 
-let decimals = self.mint_a.as_token_mint()?.decimals();
-token_2022::instructions::TransferChecked {
-	from: self.maker_ata_a,
-	to: self.vault,
-	authority: self.maker,
-	amount: args.amount_a.into(),
-	mint: self.mint_a,
+let token_program = *self.token_program.address();
+let decimals = self
+	.mint_a
+	.as_token_mint_for_program(&token_program)?
+	.decimals();
+drop(
+	self.mint_b
+		.as_token_mint_for_program(&token_program)?,
+);
+drop(self.maker_ata_a.as_associated_token_account_checked(
+	self.maker.address(),
+	self.mint_a.address(),
+	&token_program,
+)?);
+token::instructions::TransferChecked::new(
+	self.maker_ata_a,
+	self.mint_a,
+	self.vault,
+	self.maker,
+	args.amount_a.into(),
 	decimals,
-	token_program: self.token_program.address(),
-}
-.invoke()?;
+)
+.invoke_with_program(&token_program)?;
 ```
 
-Pina's `token` feature provides typed CPI instruction builders. You fill in the struct fields and call `.invoke()` -- the framework handles account meta construction and the CPI call.
+Pina's `token` feature provides typed CPI instruction builders. Construct the instruction with `new()` and invoke it through the validated token program account. The shared loader validates either the fixed SPL Token layout or a complete Token-2022 extension layout according to the selected program.
 
 The vault is an ATA owned by the escrow PDA. This means only the escrow program (signing with the PDA seeds) can later release the tokens.
 
@@ -298,22 +310,30 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			let escrow = self.escrow.as_account::<EscrowState>(&ID)?;
 			(escrow.maker, escrow.seed, escrow.bump, escrow.amount_b)
 		};
+		let token_program = *self.token_program.address();
+		let decimals_a = self
+			.mint_a
+			.as_token_mint_for_program(&token_program)?
+			.decimals();
+		let decimals_b = self
+			.mint_b
+			.as_token_mint_for_program(&token_program)?
+			.decimals();
 
 		// Verify the escrow is the PDA for the maker and seed, using the
 		// stored bump field (avoids re-deriving the canonical bump on-chain).
 		EscrowState::assert_seeds(self.escrow, &maker, u64::from(seed), &ID)?;
 
 		// Transfer token B: taker -> maker
-		token_2022::instructions::TransferChecked {
-			from: self.taker_ata_b,
-			mint: self.mint_b,
-			to: self.maker_ata_b,
-			authority: self.taker,
-			amount: u64::from(amount_b),
-			decimals: self.mint_b.as_token_2022_mint()?.decimals(),
-			token_program: self.token_program.address(),
-		}
-		.invoke()?;
+		token::instructions::TransferChecked::new(
+			self.taker_ata_b,
+			self.mint_b,
+			self.maker_ata_b,
+			self.taker,
+			u64::from(amount_b),
+			decimals_b,
+		)
+		.invoke_with_program(&token_program)?;
 
 		// Transfer token A: vault -> taker (PDA-signed)
 		let escrow_seeds = EscrowState::seeds(&maker, u64::from(seed));
@@ -322,25 +342,27 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		let escrow_signer = Signer::from(&seed_values);
 		let signers = [escrow_signer];
 
-		token_2022::instructions::TransferChecked {
-			from: self.vault,
-			mint: self.mint_a,
-			to: self.taker_ata_a,
-			authority: self.escrow,
-			amount: self.vault.as_token_2022_account()?.amount(),
-			decimals: self.mint_a.as_token_2022_mint()?.decimals(),
-			token_program: self.token_program.address(),
-		}
-		.invoke_signed(&signers)?;
+		let vault_amount = self
+			.vault
+			.as_associated_token_account_checked(
+				self.escrow.address(),
+				self.mint_a.address(),
+				&token_program,
+			)?
+			.amount();
+		token::instructions::TransferChecked::new(
+			self.vault,
+			self.mint_a,
+			self.taker_ata_a,
+			self.escrow,
+			vault_amount,
+			decimals_a,
+		)
+		.invoke_signed_with_program(&signers, &token_program)?;
 
 		// Close vault and escrow
-		token_2022::instructions::CloseAccount {
-			account: self.vault,
-			destination: self.maker,
-			authority: self.escrow,
-			token_program: self.token_program.address(),
-		}
-		.invoke_signed(&signers)?;
+		token::instructions::CloseAccount::new(self.vault, self.maker, self.escrow)
+			.invoke_signed_with_program(&signers, &token_program)?;
 
 		self.escrow.as_account_mut::<EscrowState>(&ID)?.zeroed();
 		self.escrow.close_with_recipient(self.maker)
@@ -348,7 +370,7 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 }
 ```
 
-The PDA signer is constructed from the same seeds used to derive the escrow address. `invoke_signed` passes these seeds to the runtime so it can verify the PDA signature.
+The PDA signer is constructed from the same seeds used to derive the escrow address. `invoke_signed_with_program` passes these seeds to the selected SPL Token program so the runtime can verify the PDA signature.
 
 `close_with_recipient` transfers the remaining lamports to the maker and closes the account. Use `zeroed()` first when the account data must be wiped before close.
 
@@ -403,7 +425,7 @@ mod tests {
 	#[test]
 	fn seeds_build_expected_seed_arrays() {
 		let maker = Address::new_from_array([3u8; 32]);
-		let seed = PodU64::from_primitive(42);
+		let seed = PodU64::from(42);
 		let bump = 7u8;
 
 		let seeds = EscrowState::seeds(&maker, u64::from(seed));

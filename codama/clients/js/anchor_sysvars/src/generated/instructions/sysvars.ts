@@ -9,19 +9,29 @@
 import {
 	type AccountMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
+	transformEncoder,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { ANCHOR_SYSVARS_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const SYSVARS_DISCRIMINATOR = 0;
 
@@ -37,6 +47,7 @@ export type SysvarsInstruction<
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<
 		[
 			TAccountClock extends string ? ReadonlyAccount<TAccountClock>
@@ -49,6 +60,38 @@ export type SysvarsInstruction<
 			...TRemainingAccounts,
 		]
 	>;
+
+export type SysvarsInstructionData = { discriminator: number };
+
+export type SysvarsInstructionDataArgs = {};
+
+export function getSysvarsInstructionDataEncoder(): FixedSizeEncoder<
+	SysvarsInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 0 }),
+	);
+}
+
+export function getSysvarsInstructionDataDecoder(): FixedSizeDecoder<
+	SysvarsInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(SYSVARS_DISCRIMINATOR, getU8Decoder()),
+	]]);
+}
+
+export function getSysvarsInstructionDataCodec(): FixedSizeCodec<
+	SysvarsInstructionDataArgs,
+	SysvarsInstructionData
+> {
+	return combineCodec(
+		getSysvarsInstructionDataEncoder(),
+		getSysvarsInstructionDataDecoder(),
+	);
+}
 
 export type SysvarsInput<
 	TAccountClock extends string = string,
@@ -90,21 +133,20 @@ export function getSysvarsInstruction<
 	>;
 
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze(
-		{
-			accounts: [
-				getAccountMeta("clock", accounts.clock),
-				getAccountMeta("rent", accounts.rent),
-				getAccountMeta("stakeHistory", accounts.stakeHistory),
-			],
-			programAddress,
-		} as SysvarsInstruction<
-			TProgramAddress,
-			TAccountClock,
-			TAccountRent,
-			TAccountStakeHistory
-		>,
-	);
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("clock", accounts.clock),
+			getAccountMeta("rent", accounts.rent),
+			getAccountMeta("stakeHistory", accounts.stakeHistory),
+		],
+		data: getSysvarsInstructionDataEncoder().encode({}),
+		programAddress,
+	} as SysvarsInstruction<
+		TProgramAddress,
+		TAccountClock,
+		TAccountRent,
+		TAccountStakeHistory
+	>);
 }
 
 export type ParsedSysvarsInstruction<
@@ -117,13 +159,17 @@ export type ParsedSysvarsInstruction<
 		rent: TAccountMetas[1];
 		stakeHistory: TAccountMetas[2];
 	};
+	data: SysvarsInstructionData;
 };
 
 export function parseSysvarsInstruction<
 	TProgram extends string,
 	TAccountMetas extends readonly AccountMeta[],
 >(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedSysvarsInstruction<TProgram, TAccountMetas> {
 	if (instruction.accounts.length < 3) {
 		throw new SolanaError(
@@ -147,5 +193,6 @@ export function parseSysvarsInstruction<
 			rent: getNextAccount(),
 			stakeHistory: getNextAccount(),
 		},
+		data: getSysvarsInstructionDataDecoder().decode(instruction.data),
 	};
 }

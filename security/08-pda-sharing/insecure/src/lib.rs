@@ -30,20 +30,20 @@ pub enum AppAccount {
 #[account(discriminator = AppAccount)]
 pub struct UserConfig {
 	pub authority: Address,
-	pub setting: PodU64,
+	pub setting: u64,
 	pub bump: u8,
 }
 
 #[account(discriminator = AppAccount)]
 pub struct UserVault {
 	pub authority: Address,
-	pub balance: PodU64,
+	pub balance: u64,
 	pub bump: u8,
 }
 
 #[instruction(discriminator = AppInstruction, variant = CreateConfig)]
 pub struct CreateConfigInstruction {
-	pub setting: PodU64,
+	pub setting: u64,
 }
 
 #[instruction(discriminator = AppInstruction, variant = CreateVault)]
@@ -74,11 +74,9 @@ impl<'a> ProcessAccountInfos<'a> for CreateConfigAccounts<'a> {
 			create_program_account::<UserConfig>(self.config, self.authority, &ID, seeds)?;
 
 		let mut config = self.config.as_account_mut::<UserConfig>(&ID)?;
-		*config = UserConfig::builder()
-			.authority(*self.authority.address())
-			.setting(args.setting)
-			.bump(bump)
-			.build();
+		config.authority = *self.authority.address();
+		config.setting = args.setting;
+		config.bump = bump;
 
 		Ok(())
 	}

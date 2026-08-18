@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const OPEN_POSITION_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
@@ -47,9 +49,7 @@ impl OpenPosition {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.user, true,
-		));
+		accounts.push(solana_instruction::AccountMeta::new(self.user, true));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.pool_state,
 			false,
@@ -63,35 +63,40 @@ impl OpenPosition {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
-
 		solana_instruction::Instruction {
 			program_id: crate::STAKING_REWARDS_PROGRAM_ID,
 			accounts,
-			data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct OpenPositionInstructionData {
-	pub discriminator: u8,
-	pub bump: u8,
+	bytes: Vec<u8>,
 }
 
 impl OpenPositionInstructionData {
-	pub const fn new(bump: u8) -> Self {
-		Self {
-			discriminator: OPEN_POSITION_DISCRIMINATOR,
-			bump,
+	pub fn new(
+		configure: impl FnOnce(&mut OpenPositionInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <OpenPositionInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data =
+				<OpenPositionInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			configure(data);
+			data.discriminator = OPEN_POSITION_DISCRIMINATOR;
 		}
+		<OpenPositionInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
+}
+
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct OpenPositionInstructionWire {
+	pub discriminator: u8,
+	pub bump: u8,
 }

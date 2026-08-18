@@ -90,7 +90,7 @@ pub enum TransferInstruction {
 #[instruction(discriminator = TransferInstruction::CpiTransfer)]
 pub struct CpiTransferInstruction {
 	/// Amount of lamports to transfer.
-	pub amount: PodU64,
+	pub amount: u64,
 }
 
 /// Instruction data for `DirectTransfer`.
@@ -100,7 +100,7 @@ pub struct CpiTransferInstruction {
 #[instruction(discriminator = TransferInstruction::DirectTransfer)]
 pub struct DirectTransferInstruction {
 	/// Amount of lamports to transfer.
-	pub amount: PodU64,
+	pub amount: u64,
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ pub struct DirectTransferAccounts<'a> {
 impl<'a> ProcessAccountInfos<'a> for CpiTransferAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = CpiTransferInstruction::try_from_bytes(data)?;
-		let amount: u64 = args.amount.into();
+		let amount = args.amount.get();
 
 		// --- Validate accounts ---
 
@@ -177,7 +177,7 @@ impl<'a> ProcessAccountInfos<'a> for CpiTransferAccounts<'a> {
 impl<'a> ProcessAccountInfos<'a> for DirectTransferAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = DirectTransferInstruction::try_from_bytes(data)?;
-		let amount: u64 = args.amount.into();
+		let amount = args.amount.get();
 
 		// --- Validate accounts ---
 
@@ -261,7 +261,7 @@ mod tests {
 	#[test]
 	fn cpi_transfer_instruction_layout() {
 		// CpiTransferInstruction: 1 (discriminator) + 8 (amount) = 9 bytes.
-		assert_eq!(size_of::<CpiTransferInstruction>(), 9);
+		assert_eq!(CpiTransferInstruction::SIZE, 9);
 		assert!(CpiTransferInstruction::matches_discriminator(&[
 			TransferInstruction::CpiTransfer as u8
 		]));
@@ -270,7 +270,7 @@ mod tests {
 	#[test]
 	fn direct_transfer_instruction_layout() {
 		// DirectTransferInstruction: 1 (discriminator) + 8 (amount) = 9 bytes.
-		assert_eq!(size_of::<DirectTransferInstruction>(), 9);
+		assert_eq!(DirectTransferInstruction::SIZE, 9);
 		assert!(DirectTransferInstruction::matches_discriminator(&[
 			TransferInstruction::DirectTransfer as u8
 		]));
@@ -285,7 +285,7 @@ mod tests {
 
 		let ix = CpiTransferInstruction::try_from_bytes(&data)
 			.unwrap_or_else(|e| panic!("failed: {e:?}"));
-		assert_eq!(u64::from(ix.amount), 1_000_000);
+		assert_eq!(ix.amount.get(), 1_000_000);
 	}
 
 	#[test]
@@ -296,7 +296,7 @@ mod tests {
 
 		let ix = DirectTransferInstruction::try_from_bytes(&data)
 			.unwrap_or_else(|e| panic!("failed: {e:?}"));
-		assert_eq!(u64::from(ix.amount), 500_000);
+		assert_eq!(ix.amount.get(), 500_000);
 	}
 
 	#[test]

@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const ROTATE_AUTHORITY_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
@@ -42,35 +44,40 @@ impl RotateAuthority {
 			true,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
-
 		solana_instruction::Instruction {
 			program_id: crate::PROP_AMM_PROGRAM_ID,
 			accounts,
-			data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct RotateAuthorityInstructionData {
-	pub discriminator: u8,
-	pub new_authority: solana_pubkey::Pubkey,
+	bytes: Vec<u8>,
 }
 
 impl RotateAuthorityInstructionData {
-	pub const fn new(new_authority: solana_pubkey::Pubkey) -> Self {
-		Self {
-			discriminator: ROTATE_AUTHORITY_DISCRIMINATOR,
-			new_authority,
+	pub fn new(
+		configure: impl FnOnce(&mut RotateAuthorityInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <RotateAuthorityInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data =
+				<RotateAuthorityInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			configure(data);
+			data.discriminator = ROTATE_AUTHORITY_DISCRIMINATOR;
 		}
+		<RotateAuthorityInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
+}
+
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct RotateAuthorityInstructionWire {
+	pub discriminator: u8,
+	pub new_authority: solana_pubkey::Pubkey,
 }

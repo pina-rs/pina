@@ -13,6 +13,10 @@ All notable changes to this project will be documented in this file.
 - Change `AsAccount::as_account` / `as_account_mut` to return guard-backed `Ref<T>` / `RefMut<T>` values.
 - Extend `#[derive(Accounts)]` to support `&'a mut AccountView` and `&'a mut [AccountView]`, and use mutable fields to infer writable accounts in generated IDLs.
 - Split close and realloc behavior: `close_with_recipient()` no longer zeroes account data implicitly, and realloc helpers are gated behind the new `account-resize` feature.
+- Replace Pina's local bytemuck primitive layer with zeropod's `ZcElem`, `ZcValidate`, `ZeroPodFixed`, and fixed-capacity collection model.
+- Separate native zeropod schemas from their generated zero-copy storage views. Account loaders now return `TypeZc`, and storage fields use zeropod's accessor methods.
+- Remove Pina's whole-object `to_bytes()`, `PinaSerialize`, generic `InstructionBuilder`, custom `PodEnum`, and generic pointer-cast helpers. Inactive string and vector capacity is no longer observable through Pina.
+- Token loaders no longer project Token-2022 bytes into legacy SPL Token state. Multi-program callers receive a guard-backed enum that preserves the concrete upstream type and extension layout.
 
 ### Features
 
@@ -20,43 +24,18 @@ All notable changes to this project will be documented in this file.
 - Preserve `TokenAccount` compatibility aliases through `pina::token` and `pina::token_2022` wrapper modules.
 - Infer writable Codama/IDL accounts from mutable `#[derive(Accounts)]` fields in `pina_cli`.
 
-#### Add PodOption, PodString, and PodVec collection types (pina_pod_primitives)
+#### Re-export zeropod collections and validation
 
-Fixed-capacity, alignment-1 collection types for zero-copy Solana account layouts:
-
-- `PodOption<T: Pod>` — fixed-size optional with 1-byte discriminant
-- `PodString<N, PFX=1>` — fixed-capacity string with length prefix
-- `PodVec<T: Pod, N, PFX=2>` — fixed-capacity vector with length prefix
-
-All implement `bytemuck::Pod` + `bytemuck::Zeroable`. Overflow returns `PodCollectionError`.
+Pina re-exports zeropod's fixed-capacity `PodOption`, `PodString`, and `PodVec` types. `PinaAccount` and macro-generated instruction/event parsers recursively validate tags, prefixes, active elements, booleans, enums, and UTF-8 at the byte boundary before returning typed references.
 
 New mdt providers:
 
 - `podCollectionTypesTable` — collection types reference table
 - `podCollectionDescription` — collection type semantics
 
-Updated documentation:
+Account, instruction, and event schemas derive `zeropod::ZeroPod`. Their `initialize` helpers zero caller-owned storage, write the discriminator, and return the validated generated view. Generated client instruction builders own their fully initialized buffers and do not expose schema object representations.
 
-- `pina_pod_primitives/readme.md` — added collection types section
-- `docs/src/core-concepts.md` — added Pod collection types section
-- `docs/src/crates-and-features.md` — added collection types and description
-- `readme.md` — added Pod collection types section
-- Updated `podTypesTable` and `podArithmeticDescription` providers to clarify integer-only scope
-
-### Refactoring
-
-#### Split `pina_pod_primitives/lib.rs` into multi-file module structure
-
-The monolithic `lib.rs` (2322 lines) was split into focused modules:
-
-- `pod_bool.rs` — PodBool type
-- `pod_numeric.rs` — PodU16..PodI128 via macros
-- `macros.rs` — define_pod_unsigned!/define_pod_signed! etc.
-- `error.rs` — PodCollectionError
-- `option.rs` — PodOption + kani proofs
-- `string.rs` — PodString + kani proofs
-- `vec.rs` — PodVec + kani proofs
-- `tests/` — unit tests per type
+Generated JavaScript codecs reject over-capacity values rather than truncating them and validate discriminators, booleans, and UTF-8 using the same canonical rules as the on-chain zeropod views.
 
 ### Documentation
 

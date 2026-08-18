@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const REQUIRE_EQ_DISCRIMINATOR: u8 = 3u8;
 
 /// Accounts.
@@ -31,33 +33,38 @@ impl RequireEq {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(0 + remaining_accounts.len());
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
-
 		solana_instruction::Instruction {
 			program_id: crate::ANCHOR_ERRORS_ID,
 			accounts,
-			data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct RequireEqInstructionData {
-	pub discriminator: u8,
+	bytes: Vec<u8>,
 }
 
 impl RequireEqInstructionData {
-	pub const fn new() -> Self {
-		Self {
-			discriminator: REQUIRE_EQ_DISCRIMINATOR,
+	pub fn new(
+		configure: impl FnOnce(&mut RequireEqInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <RequireEqInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <RequireEqInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			configure(data);
+			data.discriminator = REQUIRE_EQ_DISCRIMINATOR;
 		}
+		<RequireEqInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
+}
+
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct RequireEqInstructionWire {
+	pub discriminator: u8,
 }

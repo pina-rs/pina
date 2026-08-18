@@ -29,7 +29,6 @@ use counter_program::CounterState;
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
-use pina::PodU64;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
@@ -89,11 +88,11 @@ fn increment_ix_data() -> Vec<u8> {
 
 /// Build a counter account with the given state for testing.
 fn counter_account(bump: u8, count: u64, lamports: u64) -> Account {
-	let state = CounterState::builder()
-		.bump(bump)
-		.count(PodU64::from(count))
-		.build();
-	let data = state.to_bytes().to_vec();
+	let mut data = vec![0u8; CounterState::SIZE];
+	let state = CounterState::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("counter initialization failed: {error:?}"));
+	state.bump = bump;
+	state.count.set(count);
 	Account {
 		lamports,
 		data,
@@ -162,10 +161,7 @@ fn benchmark_cu_increment_counter() {
 	let authority = Pubkey::new_unique();
 	let (counter_pda, bump) = derive_counter_pda(&authority);
 
-	let lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<CounterState>());
+	let lamports = mollusk.sysvars.rent.minimum_balance(CounterState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -202,10 +198,7 @@ fn benchmark_cu_increment_counter_at_max() {
 	let authority = Pubkey::new_unique();
 	let (counter_pda, bump) = derive_counter_pda(&authority);
 
-	let lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<CounterState>());
+	let lamports = mollusk.sysvars.rent.minimum_balance(CounterState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -314,10 +307,7 @@ fn benchmark_cu_summary() {
 
 	let authority = Pubkey::new_unique();
 	let (counter_pda, bump) = derive_counter_pda(&authority);
-	let lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<CounterState>());
+	let lamports = mollusk.sysvars.rent.minimum_balance(CounterState::SIZE);
 
 	let authority_account = Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id());
 

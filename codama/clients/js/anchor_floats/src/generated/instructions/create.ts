@@ -20,6 +20,7 @@ import {
 	getU32Encoder,
 	getU64Decoder,
 	getU64Encoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
@@ -30,6 +31,7 @@ import {
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
@@ -37,6 +39,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { ANCHOR_FLOATS_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const CREATE_DISCRIMINATOR = 0;
 
@@ -69,7 +72,11 @@ export type CreateInstruction<
 		]
 	>;
 
-export type CreateInstructionData = { dataF32: number; dataF64: bigint };
+export type CreateInstructionData = {
+	discriminator: number;
+	dataF32: number;
+	dataF64: bigint;
+};
 
 export type CreateInstructionDataArgs = {
 	dataF32: number;
@@ -79,19 +86,26 @@ export type CreateInstructionDataArgs = {
 export function getCreateInstructionDataEncoder(): FixedSizeEncoder<
 	CreateInstructionDataArgs
 > {
-	return getStructEncoder([["dataF32", getU32Encoder()], [
-		"dataF64",
-		getU64Encoder(),
-	]]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"dataF32",
+			getU32Encoder(),
+		], ["dataF64", getU64Encoder()]]),
+		(value) => ({ ...value, discriminator: 0 }),
+	);
 }
 
 export function getCreateInstructionDataDecoder(): FixedSizeDecoder<
 	CreateInstructionData
 > {
-	return getStructDecoder([["dataF32", getU32Decoder()], [
-		"dataF64",
-		getU64Decoder(),
-	]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(CREATE_DISCRIMINATOR, getU8Decoder()),
+		],
+		["dataF32", getU32Decoder()],
+		["dataF64", getU64Decoder()],
+	]);
 }
 
 export function getCreateInstructionDataCodec(): FixedSizeCodec<

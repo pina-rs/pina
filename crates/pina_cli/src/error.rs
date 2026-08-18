@@ -32,6 +32,13 @@ pub enum IdlError {
 
 	#[error("{0}")]
 	Other(String),
+
+	#[error("Unsupported IDL type `{ty}` in {context}: {reason}")]
+	UnsupportedType {
+		ty: String,
+		context: String,
+		reason: String,
+	},
 }
 
 impl IdlError {
@@ -94,6 +101,12 @@ pub enum CodamaError {
 	RenderRust {
 		path: PathBuf,
 		source: pina_codama_renderer::RenderError,
+	},
+
+	#[error("Failed to harden generated JavaScript client at {path}: {source}")]
+	HardenJavaScript {
+		path: PathBuf,
+		source: std::io::Error,
 	},
 
 	#[error("Failed to run `{cmd}`: {source}")]

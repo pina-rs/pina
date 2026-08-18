@@ -8,35 +8,46 @@
 	clippy::too_many_arguments
 )]
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+use pina::zeropod;
+
+#[derive(pina::ZeroPod)]
 pub struct RegistryConfig {
 	pub discriminator: u8,
 	pub admin: solana_pubkey::Pubkey,
-	pub role_count: pina::PodU64,
+	pub role_count: u64,
 	pub bump: u8,
 }
 
 pub const REGISTRY_CONFIG_DISCRIMINATOR: u8 = 1u8;
 
 impl RegistryConfig {
-	pub const LEN: usize = core::mem::size_of::<Self>();
+	pub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;
 
-	pub const fn new(admin: solana_pubkey::Pubkey, role_count: pina::PodU64, bump: u8) -> Self {
-		Self {
-			discriminator: REGISTRY_CONFIG_DISCRIMINATOR,
-			admin,
-			role_count,
-			bump,
-		}
-	}
-
-	pub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {
-		if data.len() != core::mem::size_of::<Self>() {
+	/// Initialize zero-valid account storage.
+	///
+	/// Every non-discriminator field must accept an all-zero
+	/// representation. Otherwise this method returns `InvalidAccountData`.
+	pub fn initialize(
+		data: &mut [u8],
+	) -> Result<&mut RegistryConfigZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let account = unsafe { &*(data.as_ptr() as *const Self) };
+		data.fill(0);
+		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
+		account.discriminator = REGISTRY_CONFIG_DISCRIMINATOR;
+		Ok(account)
+	}
+
+	pub fn from_bytes(
+		data: &[u8],
+	) -> Result<&RegistryConfigZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		let account = <Self as pina::ZeroPodFixed>::from_bytes(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != REGISTRY_CONFIG_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
@@ -45,26 +56,16 @@ impl RegistryConfig {
 
 	pub fn from_bytes_mut(
 		data: &mut [u8],
-	) -> Result<&mut Self, solana_program_error::ProgramError> {
-		if data.len() != core::mem::size_of::<Self>() {
+	) -> Result<&mut RegistryConfigZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let account = unsafe { &mut *(data.as_mut_ptr() as *mut Self) };
+		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != REGISTRY_CONFIG_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		Ok(account)
-	}
-}
-
-impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for RegistryConfig {
-	type Error = solana_program_error::ProgramError;
-
-	fn try_from(account_info: &solana_account_info::AccountInfo<'a>) -> Result<Self, Self::Error> {
-		let data_ref = (*account_info.data).borrow();
-		let account = Self::from_bytes(&data_ref)?;
-		Ok(*account)
 	}
 }
 

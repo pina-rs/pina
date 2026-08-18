@@ -1,6 +1,5 @@
 ---
 source: crates/pina_cli/tests/examples.rs
-assertion_line: 67
 expression: idl
 ---
 {
@@ -22,8 +21,8 @@ expression: idl
           "- A discriminator field as the first byte of the struct.",
           "- `HasDiscriminator` implementation linking this struct to",
           "`HelloInstruction::Hello`.",
-          "- `Pod` and `Zeroable` derives for zero-copy deserialization.",
-          "- `TypedBuilder` for ergonomic construction in tests.",
+          "- A generated zeropod view plus checked `initialize` and `try_from_bytes`",
+          "helpers.",
           "",
           "`HelloInstructionData` has no payload fields — only the discriminator byte",
           "is needed to identify the instruction."
@@ -39,6 +38,22 @@ expression: idl
               "The user invoking the program. Must be a signer so we can trust the",
               "address is authentic."
             ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 0
+            }
           }
         ],
         "discriminators": [

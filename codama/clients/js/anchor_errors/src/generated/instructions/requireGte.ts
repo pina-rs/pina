@@ -9,12 +9,22 @@
 import {
 	type AccountMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { ANCHOR_ERRORS_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const REQUIRE_GTE_DISCRIMINATOR = 6;
 
@@ -25,7 +35,42 @@ export function getRequireGteDiscriminatorBytes(): ReadonlyUint8Array {
 export type RequireGteInstruction<
 	TProgram extends string = typeof ANCHOR_ERRORS_PROGRAM_ADDRESS,
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> = Instruction<TProgram> & InstructionWithAccounts<TRemainingAccounts>;
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<TRemainingAccounts>;
+
+export type RequireGteInstructionData = { discriminator: number };
+
+export type RequireGteInstructionDataArgs = {};
+
+export function getRequireGteInstructionDataEncoder(): FixedSizeEncoder<
+	RequireGteInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 6 }),
+	);
+}
+
+export function getRequireGteInstructionDataDecoder(): FixedSizeDecoder<
+	RequireGteInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(REQUIRE_GTE_DISCRIMINATOR, getU8Decoder()),
+	]]);
+}
+
+export function getRequireGteInstructionDataCodec(): FixedSizeCodec<
+	RequireGteInstructionDataArgs,
+	RequireGteInstructionData
+> {
+	return combineCodec(
+		getRequireGteInstructionDataEncoder(),
+		getRequireGteInstructionDataDecoder(),
+	);
+}
 
 export type RequireGteInput = {};
 
@@ -39,16 +84,22 @@ export function getRequireGteInstruction<
 		ANCHOR_ERRORS_PROGRAM_ADDRESS;
 
 	return Object.freeze(
-		{ programAddress } as RequireGteInstruction<TProgramAddress>,
+		{
+			data: getRequireGteInstructionDataEncoder().encode({}),
+			programAddress,
+		} as RequireGteInstruction<TProgramAddress>,
 	);
 }
 
 export type ParsedRequireGteInstruction<
 	TProgram extends string = typeof ANCHOR_ERRORS_PROGRAM_ADDRESS,
-> = { programAddress: Address<TProgram> };
+> = { programAddress: Address<TProgram>; data: RequireGteInstructionData };
 
 export function parseRequireGteInstruction<TProgram extends string>(
-	instruction: Instruction<TProgram>,
+	instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
 ): ParsedRequireGteInstruction<TProgram> {
-	return { programAddress: instruction.programAddress };
+	return {
+		programAddress: instruction.programAddress,
+		data: getRequireGteInstructionDataDecoder().decode(instruction.data),
+	};
 }

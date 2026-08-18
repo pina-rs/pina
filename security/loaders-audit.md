@@ -2,7 +2,7 @@
 
 _Audit date: 2026-03-23_
 
-_Status note (2026-04-22): the high-severity escaped-borrow findings in this audit were resolved by the guard-backed loader redesign that landed with the Pinocchio 0.11 migration. The implementation now lives in `crates/pina/src/impls.rs` rather than `crates/pina/src/loaders.rs`. Keep this document as historical context for why the API moved to `Ref<T>` / `RefMut<T>`-backed loaders._
+_Status note (2026-08-18): the high-severity escaped-borrow findings in this audit are resolved. Generic loaders return guard-backed zeropod views, and token loaders retain the concrete guard-backed state returned by either `pinocchio-token` or `pinocchio-token-2022`; Pina no longer casts between their base-state representations. The implementation now lives in `crates/pina/src/impls.rs` rather than `crates/pina/src/loaders.rs`. Keep this document as historical context for the API redesign._
 
 ## Scope
 

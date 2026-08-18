@@ -8,7 +8,7 @@ User profile registry built with Pina, demonstrating **Pod collections** — fix
 
 <br>
 
-- `PodString<N, PFX>` — fixed-capacity UTF-8 strings with a length prefix, validated with `try_as_str()` before storage.
+- `PodString<N, PFX>` — fixed-capacity UTF-8 strings validated at the instruction/account boundary and accessed with `as_str()`.
 - `PodVec<T, N, PFX>` — fixed-capacity element lists with a length prefix; push, pop, and in-place removal via `copy_within`.
 - `PodBool` — single-byte boolean flags.
 - Full lifecycle: initialize → update → add/remove tags, with custom `#[error]` codes for UTF-8, capacity, and index failures.
@@ -27,12 +27,13 @@ pina idl --path examples/profile_program --output codama/idls/profile_program.js
 <br>
 
 ```bash
-cargo build --release --target bpfel-unknown-none -p profile_program -Z build-std -F bpf-entrypoint
+cargo build-sbf --manifest-path examples/profile_program/Cargo.toml \
+    --sbf-out-dir target/deploy --features bpf-entrypoint
 ```
 
 Then run the end-to-end tests against the SBF binary:
 
 ```bash
-SBF_OUT_DIR=target/bpfel-unknown-none/release \
-    cargo test -p profile_program --test e2e -- --nocapture
+SBF_OUT_DIR=target/deploy \
+    cargo test -p profile_program --test e2e -- --include-ignored --nocapture
 ```

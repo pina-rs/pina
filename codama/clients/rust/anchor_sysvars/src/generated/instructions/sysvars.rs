@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const SYSVARS_DISCRIMINATOR: u8 = 0u8;
 
 /// Accounts.
@@ -53,33 +55,38 @@ impl Sysvars {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
-
 		solana_instruction::Instruction {
 			program_id: crate::ANCHOR_SYSVARS_ID,
 			accounts,
-			data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct SysvarsInstructionData {
-	pub discriminator: u8,
+	bytes: Vec<u8>,
 }
 
 impl SysvarsInstructionData {
-	pub const fn new() -> Self {
-		Self {
-			discriminator: SYSVARS_DISCRIMINATOR,
+	pub fn new(
+		configure: impl FnOnce(&mut SysvarsInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <SysvarsInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <SysvarsInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			configure(data);
+			data.discriminator = SYSVARS_DISCRIMINATOR;
 		}
+		<SysvarsInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
+}
+
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct SysvarsInstructionWire {
+	pub discriminator: u8,
 }

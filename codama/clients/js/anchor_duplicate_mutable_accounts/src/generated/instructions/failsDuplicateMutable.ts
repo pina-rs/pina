@@ -9,12 +9,21 @@
 import {
 	type AccountMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
+	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
@@ -22,6 +31,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { ANCHOR_DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const FAILS_DUPLICATE_MUTABLE_DISCRIMINATOR = 0;
 
@@ -37,6 +47,7 @@ export type FailsDuplicateMutableInstruction<
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<
 		[
 			TAccountAccount1 extends string ? WritableAccount<TAccountAccount1>
@@ -46,6 +57,41 @@ export type FailsDuplicateMutableInstruction<
 			...TRemainingAccounts,
 		]
 	>;
+
+export type FailsDuplicateMutableInstructionData = { discriminator: number };
+
+export type FailsDuplicateMutableInstructionDataArgs = {};
+
+export function getFailsDuplicateMutableInstructionDataEncoder(): FixedSizeEncoder<
+	FailsDuplicateMutableInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 0 }),
+	);
+}
+
+export function getFailsDuplicateMutableInstructionDataDecoder(): FixedSizeDecoder<
+	FailsDuplicateMutableInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(
+			FAILS_DUPLICATE_MUTABLE_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	]]);
+}
+
+export function getFailsDuplicateMutableInstructionDataCodec(): FixedSizeCodec<
+	FailsDuplicateMutableInstructionDataArgs,
+	FailsDuplicateMutableInstructionData
+> {
+	return combineCodec(
+		getFailsDuplicateMutableInstructionDataEncoder(),
+		getFailsDuplicateMutableInstructionDataDecoder(),
+	);
+}
 
 export type FailsDuplicateMutableInput<
 	TAccountAccount1 extends string = string,
@@ -83,19 +129,18 @@ export function getFailsDuplicateMutableInstruction<
 	>;
 
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze(
-		{
-			accounts: [
-				getAccountMeta("account1", accounts.account1),
-				getAccountMeta("account2", accounts.account2),
-			],
-			programAddress,
-		} as FailsDuplicateMutableInstruction<
-			TProgramAddress,
-			TAccountAccount1,
-			TAccountAccount2
-		>,
-	);
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("account1", accounts.account1),
+			getAccountMeta("account2", accounts.account2),
+		],
+		data: getFailsDuplicateMutableInstructionDataEncoder().encode({}),
+		programAddress,
+	} as FailsDuplicateMutableInstruction<
+		TProgramAddress,
+		TAccountAccount1,
+		TAccountAccount2
+	>);
 }
 
 export type ParsedFailsDuplicateMutableInstruction<
@@ -108,13 +153,17 @@ export type ParsedFailsDuplicateMutableInstruction<
 		account1: TAccountMetas[0];
 		account2: TAccountMetas[1];
 	};
+	data: FailsDuplicateMutableInstructionData;
 };
 
 export function parseFailsDuplicateMutableInstruction<
 	TProgram extends string,
 	TAccountMetas extends readonly AccountMeta[],
 >(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedFailsDuplicateMutableInstruction<TProgram, TAccountMetas> {
 	if (instruction.accounts.length < 2) {
 		throw new SolanaError(
@@ -134,5 +183,8 @@ export function parseFailsDuplicateMutableInstruction<
 	return {
 		programAddress: instruction.programAddress,
 		accounts: { account1: getNextAccount(), account2: getNextAccount() },
+		data: getFailsDuplicateMutableInstructionDataDecoder().decode(
+			instruction.data,
+		),
 	};
 }

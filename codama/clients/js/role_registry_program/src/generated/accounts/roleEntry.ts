@@ -34,8 +34,13 @@ import {
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { findRoleEntryPda, RoleEntrySeeds } from "../pdas";
+import {
+	getZeroPodBooleanDecoder,
+	getZeroPodDiscriminatorDecoder,
+} from "../zeropodCodecs";
 
 export const ROLE_ENTRY_DISCRIMINATOR = 2;
 
@@ -44,6 +49,7 @@ export function getRoleEntryDiscriminatorBytes(): ReadonlyUint8Array {
 }
 
 export type RoleEntry = {
+	discriminator: number;
 	registry: Address;
 	roleId: bigint;
 	grantee: Address;
@@ -63,24 +69,32 @@ export type RoleEntryArgs = {
 
 /** Gets the encoder for {@link RoleEntryArgs} account data. */
 export function getRoleEntryEncoder(): FixedSizeEncoder<RoleEntryArgs> {
-	return getStructEncoder([
-		["registry", getAddressEncoder()],
-		["roleId", getU64Encoder()],
-		["grantee", getAddressEncoder()],
-		["permissions", getU64Encoder()],
-		["active", getBooleanEncoder()],
-		["bump", getU8Encoder()],
-	]);
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["registry", getAddressEncoder()],
+			["roleId", getU64Encoder()],
+			["grantee", getAddressEncoder()],
+			["permissions", getU64Encoder()],
+			["active", getBooleanEncoder()],
+			["bump", getU8Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 2 }),
+	);
 }
 
 /** Gets the decoder for {@link RoleEntry} account data. */
 export function getRoleEntryDecoder(): FixedSizeDecoder<RoleEntry> {
 	return getStructDecoder([
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(ROLE_ENTRY_DISCRIMINATOR, getU8Decoder()),
+		],
 		["registry", getAddressDecoder()],
 		["roleId", getU64Decoder()],
 		["grantee", getAddressDecoder()],
 		["permissions", getU64Decoder()],
-		["active", getBooleanDecoder()],
+		["active", getZeroPodBooleanDecoder()],
 		["bump", getU8Decoder()],
 	]);
 }

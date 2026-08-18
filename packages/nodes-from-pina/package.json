@@ -3,28 +3,24 @@
 	"version": "0.8.0",
 	"description": "Helpers for converting Pina IDLs into Codama RootNodes",
 	"license": "MIT",
-	"repository": "https://github.com/pina-rs/pina/tree/main/packages/nodes-from-pina",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/pina-rs/pina.git",
+		"directory": "packages/nodes-from-pina"
+	},
 	"type": "commonjs",
 	"sideEffects": false,
-	"main": "./dist/index.node.cjs",
-	"module": "./dist/index.node.mjs",
-	"react-native": "./dist/index.react-native.mjs",
+	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
+	"react-native": "./dist/index.mjs",
 	"types": "./dist/types/index.d.ts",
 	"exports": {
 		"types": "./dist/types/index.d.ts",
-		"react-native": "./dist/index.react-native.mjs",
-		"browser": {
-			"import": "./dist/index.browser.mjs",
-			"require": "./dist/index.browser.cjs"
-		},
-		"node": {
-			"import": "./dist/index.node.mjs",
-			"require": "./dist/index.node.cjs"
-		}
+		"import": "./dist/index.mjs",
+		"require": "./dist/index.js"
 	},
 	"files": [
-		"./dist/types",
-		"./dist/index.*"
+		"./dist"
 	],
 	"scripts": {
 		"build": "rimraf dist && tsup && tsc -p ./tsconfig.declarations.json",

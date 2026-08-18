@@ -10,22 +10,32 @@ import {
 	type AccountMeta,
 	type AccountSignerMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyAccount,
-	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
+	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const CLAIM_DISCRIMINATOR = 4;
 
@@ -40,16 +50,19 @@ export type ClaimInstruction<
 	TAccountPoolState extends string | AccountMeta<string> = string,
 	TAccountPositionState extends string | AccountMeta<string> = string,
 	TAccountUserRewardAta extends string | AccountMeta<string> = string,
+	TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+		"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 	TAccountTokenProgram extends string | AccountMeta<string> = string,
 	TAccountSystemProgram extends string | AccountMeta<string> =
 		"11111111111111111111111111111111",
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<
 		[
 			TAccountUser extends string
-				? ReadonlySignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
+				? WritableSignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
 				: TAccountUser,
 			TAccountRewardMint extends string ? ReadonlyAccount<TAccountRewardMint>
 				: TAccountRewardMint,
@@ -61,6 +74,9 @@ export type ClaimInstruction<
 			TAccountUserRewardAta extends string
 				? WritableAccount<TAccountUserRewardAta>
 				: TAccountUserRewardAta,
+			TAccountAssociatedTokenProgram extends string
+				? ReadonlyAccount<TAccountAssociatedTokenProgram>
+				: TAccountAssociatedTokenProgram,
 			TAccountTokenProgram extends string
 				? ReadonlyAccount<TAccountTokenProgram>
 				: TAccountTokenProgram,
@@ -71,12 +87,45 @@ export type ClaimInstruction<
 		]
 	>;
 
+export type ClaimInstructionData = { discriminator: number };
+
+export type ClaimInstructionDataArgs = {};
+
+export function getClaimInstructionDataEncoder(): FixedSizeEncoder<
+	ClaimInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 4 }),
+	);
+}
+
+export function getClaimInstructionDataDecoder(): FixedSizeDecoder<
+	ClaimInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(CLAIM_DISCRIMINATOR, getU8Decoder()),
+	]]);
+}
+
+export function getClaimInstructionDataCodec(): FixedSizeCodec<
+	ClaimInstructionDataArgs,
+	ClaimInstructionData
+> {
+	return combineCodec(
+		getClaimInstructionDataEncoder(),
+		getClaimInstructionDataDecoder(),
+	);
+}
+
 export type ClaimInput<
 	TAccountUser extends string = string,
 	TAccountRewardMint extends string = string,
 	TAccountPoolState extends string = string,
 	TAccountPositionState extends string = string,
 	TAccountUserRewardAta extends string = string,
+	TAccountAssociatedTokenProgram extends string = string,
 	TAccountTokenProgram extends string = string,
 	TAccountSystemProgram extends string = string,
 > = {
@@ -85,6 +134,7 @@ export type ClaimInput<
 	poolState: Address<TAccountPoolState>;
 	positionState: Address<TAccountPositionState>;
 	userRewardAta: Address<TAccountUserRewardAta>;
+	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
 	tokenProgram: Address<TAccountTokenProgram>;
 	systemProgram?: Address<TAccountSystemProgram>;
 };
@@ -95,6 +145,7 @@ export function getClaimInstruction<
 	TAccountPoolState extends string,
 	TAccountPositionState extends string,
 	TAccountUserRewardAta extends string,
+	TAccountAssociatedTokenProgram extends string,
 	TAccountTokenProgram extends string,
 	TAccountSystemProgram extends string,
 	TProgramAddress extends Address =
@@ -106,6 +157,7 @@ export function getClaimInstruction<
 		TAccountPoolState,
 		TAccountPositionState,
 		TAccountUserRewardAta,
+		TAccountAssociatedTokenProgram,
 		TAccountTokenProgram,
 		TAccountSystemProgram
 	>,
@@ -117,6 +169,7 @@ export function getClaimInstruction<
 	TAccountPoolState,
 	TAccountPositionState,
 	TAccountUserRewardAta,
+	TAccountAssociatedTokenProgram,
 	TAccountTokenProgram,
 	TAccountSystemProgram
 > {
@@ -126,11 +179,15 @@ export function getClaimInstruction<
 
 	// Original accounts.
 	const originalAccounts = {
-		user: { value: input.user ?? null, isWritable: false },
+		user: { value: input.user ?? null, isWritable: true },
 		rewardMint: { value: input.rewardMint ?? null, isWritable: false },
 		poolState: { value: input.poolState ?? null, isWritable: false },
 		positionState: { value: input.positionState ?? null, isWritable: true },
 		userRewardAta: { value: input.userRewardAta ?? null, isWritable: true },
+		associatedTokenProgram: {
+			value: input.associatedTokenProgram ?? null,
+			isWritable: false,
+		},
 		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
 		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
 	};
@@ -140,6 +197,12 @@ export function getClaimInstruction<
 	>;
 
 	// Resolve default values.
+	if (!accounts.associatedTokenProgram.value) {
+		accounts.associatedTokenProgram.value =
+			"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<
+				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+			>;
+	}
 	if (!accounts.systemProgram.value) {
 		accounts.systemProgram.value =
 			"11111111111111111111111111111111" as Address<
@@ -155,9 +218,11 @@ export function getClaimInstruction<
 			getAccountMeta("poolState", accounts.poolState),
 			getAccountMeta("positionState", accounts.positionState),
 			getAccountMeta("userRewardAta", accounts.userRewardAta),
+			getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
 			getAccountMeta("tokenProgram", accounts.tokenProgram),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 		],
+		data: getClaimInstructionDataEncoder().encode({}),
 		programAddress,
 	} as ClaimInstruction<
 		TProgramAddress,
@@ -166,6 +231,7 @@ export function getClaimInstruction<
 		TAccountPoolState,
 		TAccountPositionState,
 		TAccountUserRewardAta,
+		TAccountAssociatedTokenProgram,
 		TAccountTokenProgram,
 		TAccountSystemProgram
 	>);
@@ -182,23 +248,28 @@ export type ParsedClaimInstruction<
 		poolState: TAccountMetas[2];
 		positionState: TAccountMetas[3];
 		userRewardAta: TAccountMetas[4];
-		tokenProgram: TAccountMetas[5];
-		systemProgram: TAccountMetas[6];
+		associatedTokenProgram: TAccountMetas[5];
+		tokenProgram: TAccountMetas[6];
+		systemProgram: TAccountMetas[7];
 	};
+	data: ClaimInstructionData;
 };
 
 export function parseClaimInstruction<
 	TProgram extends string,
 	TAccountMetas extends readonly AccountMeta[],
 >(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedClaimInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 7) {
+	if (instruction.accounts.length < 8) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 7,
+				expectedAccountMetas: 8,
 			},
 		);
 	}
@@ -216,8 +287,10 @@ export function parseClaimInstruction<
 			poolState: getNextAccount(),
 			positionState: getNextAccount(),
 			userRewardAta: getNextAccount(),
+			associatedTokenProgram: getNextAccount(),
 			tokenProgram: getNextAccount(),
 			systemProgram: getNextAccount(),
 		},
+		data: getClaimInstructionDataDecoder().decode(instruction.data),
 	};
 }

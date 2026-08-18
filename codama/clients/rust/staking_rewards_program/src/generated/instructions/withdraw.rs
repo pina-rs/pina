@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const WITHDRAW_DISCRIMINATOR: u8 = 3u8;
 
 /// Accounts.
@@ -78,35 +80,39 @@ impl Withdraw {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
-
 		solana_instruction::Instruction {
 			program_id: crate::STAKING_REWARDS_PROGRAM_ID,
 			accounts,
-			data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct WithdrawInstructionData {
-	pub discriminator: u8,
-	pub amount: pina::PodU64,
+	bytes: Vec<u8>,
 }
 
 impl WithdrawInstructionData {
-	pub const fn new(amount: pina::PodU64) -> Self {
-		Self {
-			discriminator: WITHDRAW_DISCRIMINATOR,
-			amount,
+	pub fn new(
+		configure: impl FnOnce(&mut WithdrawInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <WithdrawInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <WithdrawInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			configure(data);
+			data.discriminator = WITHDRAW_DISCRIMINATOR;
 		}
+		<WithdrawInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
+}
+
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct WithdrawInstructionWire {
+	pub discriminator: u8,
+	pub amount: u64,
 }

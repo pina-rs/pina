@@ -11,8 +11,6 @@ use pina::*;
 
 declare_id!("2UfG9UattL4UwPRzKEEj4F1mjoLqoFRbZbPt3dVBHFR2");
 
-const SPL_PROGRAM_IDS: [Address; 2] = [token::ID, token_2022::ID];
-
 #[discriminator]
 pub enum PoolInstruction {
 	Deposit = 0,
@@ -20,7 +18,7 @@ pub enum PoolInstruction {
 
 #[instruction(discriminator = PoolInstruction, variant = Deposit)]
 pub struct DepositInstruction {
-	pub amount: PodU64,
+	pub amount: u64,
 }
 
 #[derive(Accounts, Debug)]
@@ -35,13 +33,15 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 
 		self.depositor.assert_signer()?;
 
-		// SECURE: Verify ownership before deserialization.
+		// SECURE: The multi-program loader accepts only SPL Token or Token-2022
+		// and delegates both ownership and layout validation to that program's
+		// concrete upstream state type.
 		let token = self
 			.token_account
-			.as_token_account_checked_with_owners(&SPL_PROGRAM_IDS)?;
+			.as_token_account_for_program(self.token_account.owner())?;
 		let balance = token.amount();
 
-		let amount: u64 = args.amount.into();
+		let amount = args.amount.get();
 
 		if balance < amount {
 			return Err(ProgramError::InsufficientFunds);

@@ -29,7 +29,7 @@ pub enum RewardAccount {
 #[account(discriminator = RewardAccount)]
 pub struct RewardState {
 	pub authority: Address,
-	pub claimed: PodU64,
+	pub claimed: u64,
 }
 
 #[instruction(discriminator = RewardInstruction, variant = ClaimAndClose)]

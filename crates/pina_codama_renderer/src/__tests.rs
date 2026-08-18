@@ -6,14 +6,20 @@ use std::time::UNIX_EPOCH;
 
 use codama_nodes::AccountNode;
 use codama_nodes::AccountValueNode;
+use codama_nodes::ArrayTypeNode;
 use codama_nodes::BooleanTypeNode;
 use codama_nodes::ConstantDiscriminatorNode;
 use codama_nodes::ConstantPdaSeedNode;
 use codama_nodes::ConstantValueNode;
+use codama_nodes::DefinedTypeLinkNode;
 use codama_nodes::DefinedTypeNode;
 use codama_nodes::DiscriminatorNode;
 use codama_nodes::Docs;
 use codama_nodes::Endianness;
+use codama_nodes::EnumEmptyVariantTypeNode;
+use codama_nodes::EnumTypeNode;
+use codama_nodes::EnumVariantTypeNode;
+use codama_nodes::FixedSizeTypeNode;
 use codama_nodes::InstructionAccountNode;
 use codama_nodes::InstructionInputValueNode;
 use codama_nodes::InstructionNode;
@@ -21,6 +27,7 @@ use codama_nodes::IsSigner;
 use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
 use codama_nodes::NumberValueNode;
+use codama_nodes::OptionTypeNode;
 use codama_nodes::OptionalAccountStrategy;
 use codama_nodes::PdaLinkNode;
 use codama_nodes::PdaNode;
@@ -30,6 +37,7 @@ use codama_nodes::PdaValueNode;
 use codama_nodes::ProgramNode;
 use codama_nodes::PublicKeyTypeNode;
 use codama_nodes::RootNode;
+use codama_nodes::SizePrefixTypeNode;
 use codama_nodes::StringTypeNode;
 use codama_nodes::StringValueNode;
 use codama_nodes::StructFieldTypeNode;
@@ -39,6 +47,7 @@ use codama_nodes::U8;
 use codama_nodes::VariablePdaSeedNode;
 
 use super::render::seeds::render_variable_seed_parameter;
+use super::render::types::render_type_for_pod;
 use super::*;
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {
@@ -88,6 +97,155 @@ fn renders_counter_account_with_pod_types() {
 	let content = read_generated_file(&crate_dir, "accounts/counter_state.rs");
 
 	insta::assert_snapshot!("counter_state_account_rs", content);
+}
+
+#[test]
+fn renders_semantic_pod_collection_types() {
+	let string =
+		SizePrefixTypeNode::<TypeNode>::new(StringTypeNode::utf8(), NumberTypeNode::le(U8));
+	let string = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(string, 33));
+	assert_eq!(
+		render_type_for_pod(&string, "ProfileState.name")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::String<32>"
+	);
+
+	let values = ArrayTypeNode::prefixed(
+		NumberTypeNode::le(NumberFormat::U64),
+		NumberTypeNode::le(NumberFormat::U16),
+	);
+	let values = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(values, 66));
+	assert_eq!(
+		render_type_for_pod(&values, "ProfileState.tags")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::Vec<u64, 8>"
+	);
+
+	let color = FixedSizeTypeNode::<TypeNode>::new(DefinedTypeLinkNode::new("color"), 1);
+	let colors = ArrayTypeNode::prefixed(color, NumberTypeNode::le(NumberFormat::U16));
+	let colors = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(colors, 10));
+	assert_eq!(
+		render_type_for_pod(&colors, "Palette.colors")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::Vec<crate::generated::types::Color, 8>"
+	);
+}
+
+#[test]
+fn renders_semantic_pod_option_types() {
+	let native_option =
+		TypeNode::from(OptionTypeNode::fixed(NumberTypeNode::le(NumberFormat::U64)));
+	assert_eq!(
+		render_type_for_pod(&native_option, "ProfileState.favorite_tag")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"Option<u64>"
+	);
+
+	let explicit_option = TypeNode::from(OptionTypeNode {
+		fixed: Some(true),
+		item: Box::new(NumberTypeNode::le(NumberFormat::U64).into()),
+		prefix: NumberTypeNode::le(NumberFormat::U16).into(),
+	});
+	assert_eq!(
+		render_type_for_pod(&explicit_option, "ProfileState.legacy_tag")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::PodOption<<u64 as pina::ZcField>::Pod, 2>"
+	);
+
+	let u32_option = TypeNode::from(OptionTypeNode {
+		fixed: Some(true),
+		item: Box::new(NumberTypeNode::le(U8).into()),
+		prefix: NumberTypeNode::le(NumberFormat::U32).into(),
+	});
+	assert_eq!(
+		render_type_for_pod(&u32_option, "ProfileState.compatibility_flag")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::PodOption<<u8 as pina::ZcField>::Pod, 4>"
+	);
+
+	let options = ArrayTypeNode::prefixed(
+		OptionTypeNode::fixed(NumberTypeNode::le(NumberFormat::U16)),
+		NumberTypeNode::le(NumberFormat::U16),
+	);
+	let options = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(options, 11));
+	assert_eq!(
+		render_type_for_pod(&options, "ProfileState.values")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::Vec<Option<u16>, 3>"
+	);
+
+	let u16_options = ArrayTypeNode::prefixed(
+		OptionTypeNode {
+			fixed: Some(true),
+			item: Box::new(NumberTypeNode::le(U8).into()),
+			prefix: NumberTypeNode::le(NumberFormat::U16).into(),
+		},
+		NumberTypeNode::le(NumberFormat::U16),
+	);
+	let u16_options = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(u16_options, 8));
+	assert_eq!(
+		render_type_for_pod(&u16_options, "ProfileState.legacy_flags")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::Vec<pina::PodOption<<u8 as pina::ZcField>::Pod, 2>, 2>"
+	);
+
+	let wide_options = ArrayTypeNode::prefixed(
+		OptionTypeNode {
+			fixed: Some(true),
+			item: Box::new(NumberTypeNode::le(U8).into()),
+			prefix: NumberTypeNode::le(NumberFormat::U32).into(),
+		},
+		NumberTypeNode::le(NumberFormat::U16),
+	);
+	let wide_options = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(wide_options, 12));
+	assert_eq!(
+		render_type_for_pod(&wide_options, "ProfileState.compatibility_flags")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::Vec<pina::PodOption<<u8 as pina::ZcField>::Pod, 4>, 2>"
+	);
+}
+
+#[test]
+fn rejects_non_zeropod_option_layouts() {
+	let variable = TypeNode::from(OptionTypeNode::new(NumberTypeNode::le(NumberFormat::U64)));
+	let error = render_type_for_pod(&variable, "State.value")
+		.expect_err("variable option must not render as PodOption");
+	assert!(error.to_string().contains("fixed-size value slot"));
+
+	let variable_item = TypeNode::from(OptionTypeNode::fixed(StringTypeNode::utf8()));
+	let error = render_type_for_pod(&variable_item, "State.value")
+		.expect_err("variable option value must not render as PodOption");
+	assert!(error.to_string().contains("fixed byte size"));
+
+	for prefix in [
+		NumberTypeNode::be(NumberFormat::U16),
+		NumberTypeNode::le(NumberFormat::U64),
+	] {
+		let option = TypeNode::from(OptionTypeNode {
+			fixed: Some(true),
+			item: Box::new(NumberTypeNode::le(NumberFormat::U64).into()),
+			prefix: prefix.into(),
+		});
+		assert!(render_type_for_pod(&option, "State.value").is_err());
+	}
+
+	let invalid_nested_option = OptionTypeNode {
+		fixed: Some(true),
+		item: Box::new(NumberTypeNode::le(NumberFormat::U64).into()),
+		prefix: NumberTypeNode::le(NumberFormat::U64).into(),
+	};
+	let values =
+		ArrayTypeNode::prefixed(invalid_nested_option, NumberTypeNode::le(NumberFormat::U16));
+	let values = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(values, 18));
+	assert!(render_type_for_pod(&values, "State.values").is_err());
+
+	let overflowing_option = OptionTypeNode::fixed(FixedSizeTypeNode::<TypeNode>::new(
+		codama_nodes::BytesTypeNode::new(),
+		usize::MAX,
+	));
+	let values = ArrayTypeNode::prefixed(overflowing_option, NumberTypeNode::le(NumberFormat::U16));
+	let values = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(values, 2));
+	assert!(render_type_for_pod(&values, "State.values").is_err());
 }
 
 #[test]
@@ -236,11 +394,14 @@ fn renders_instruction_account_default_from_pda() {
 	insta::assert_snapshot!("instruction_account_default_from_pda", content);
 }
 
-#[test]
-fn renders_optional_accounts_with_program_fallback_strategy() {
+fn render_optional_accounts(
+	optional_account_strategy: Option<OptionalAccountStrategy>,
+	prefix: &str,
+) -> String {
 	let mut optional_signer = InstructionAccountNode::new("optionalSigner", false, false);
 	optional_signer.is_optional = Some(true);
 	optional_signer.is_signer = IsSigner::Either;
+	let required_account = InstructionAccountNode::new("requiredAccount", false, false);
 
 	let program = ProgramNode {
 		name: "optionalProgram".into(),
@@ -249,8 +410,8 @@ fn renders_optional_accounts_with_program_fallback_strategy() {
 		instructions: vec![InstructionNode {
 			name: "maybe".into(),
 			docs: Docs::default(),
-			optional_account_strategy: Some(OptionalAccountStrategy::ProgramId),
-			accounts: vec![optional_signer],
+			optional_account_strategy,
+			accounts: vec![optional_signer, required_account],
 			arguments: vec![],
 			extra_arguments: vec![],
 			remaining_accounts: vec![],
@@ -274,7 +435,7 @@ fn renders_optional_accounts_with_program_fallback_strategy() {
 		origin: None,
 		docs: Docs::default(),
 	};
-	let output_dir = unique_temp_dir("pina-codama-render-optional-fallback");
+	let output_dir = unique_temp_dir(prefix);
 	let crate_dir = output_dir.join("optional_program");
 	render_root_node(
 		&RootNode::new(program),
@@ -283,8 +444,73 @@ fn renders_optional_accounts_with_program_fallback_strategy() {
 	)
 	.unwrap_or_else(|e| panic!("render failed: {e}"));
 
-	let content = read_generated_file(&crate_dir, "instructions/maybe.rs");
+	read_generated_file(&crate_dir, "instructions/maybe.rs")
+}
+
+fn assert_optional_account_meta_order(content: &str, expects_program_fallback: bool) {
+	let optional_meta = "new_readonly(optional_signer, signer)";
+	let fallback_meta = "new_readonly(crate::OPTIONAL_PROGRAM_ID, false)";
+	let required_meta = "new_readonly(self.required_account, false)";
+	let optional_index = content
+		.find(optional_meta)
+		.unwrap_or_else(|| panic!("missing optional account meta:\n{content}"));
+	let required_index = content
+		.find(required_meta)
+		.unwrap_or_else(|| panic!("missing required account meta:\n{content}"));
+
+	assert!(
+		optional_index < required_index,
+		"optional account meta must precede the required account meta"
+	);
+
+	if expects_program_fallback {
+		let fallback_index = content
+			.find(fallback_meta)
+			.unwrap_or_else(|| panic!("missing program fallback meta:\n{content}"));
+
+		assert!(
+			optional_index < fallback_index && fallback_index < required_index,
+			"program fallback meta must preserve the optional account position"
+		);
+	} else {
+		assert!(
+			!content.contains(fallback_meta),
+			"omitted strategy must not render a program fallback meta"
+		);
+	}
+}
+
+#[test]
+fn renders_optional_accounts_with_program_fallback_strategy() {
+	let content = render_optional_accounts(
+		Some(OptionalAccountStrategy::ProgramId),
+		"pina-codama-render-optional-fallback",
+	);
+	assert_optional_account_meta_order(&content, true);
+
 	insta::assert_snapshot!("optional_accounts_with_program_fallback_strategy", content);
+}
+
+#[test]
+fn defaults_optional_accounts_to_program_fallback_strategy() {
+	let default_content = render_optional_accounts(None, "pina-codama-render-optional-default");
+	let explicit_content = render_optional_accounts(
+		Some(OptionalAccountStrategy::ProgramId),
+		"pina-codama-render-optional-explicit",
+	);
+
+	assert_eq!(default_content, explicit_content);
+	assert_optional_account_meta_order(&default_content, true);
+}
+
+#[test]
+fn renders_optional_accounts_with_omitted_strategy() {
+	let content = render_optional_accounts(
+		Some(OptionalAccountStrategy::Omitted),
+		"pina-codama-render-optional-omitted",
+	);
+
+	assert_optional_account_meta_order(&content, false);
 }
 
 #[test]
@@ -411,6 +637,74 @@ fn renders_defined_type_aliases_with_pod_wrappers() {
 
 	let content = read_generated_file(&crate_dir, "types/counter.rs");
 	insta::assert_snapshot!("defined_type_alias_counter_rs", content);
+}
+
+#[test]
+fn renders_zeropod_enum_defined_type() {
+	let mut red = EnumEmptyVariantTypeNode::new("red");
+	red.discriminator = Some(0);
+	let mut blue = EnumEmptyVariantTypeNode::new("blue");
+	blue.discriminator = Some(1);
+	let color = TypeNode::Link(DefinedTypeLinkNode::new("color"));
+	let color_item = FixedSizeTypeNode::<TypeNode>::new(color.clone(), 1);
+	let colors = ArrayTypeNode::prefixed(color_item, NumberTypeNode::le(NumberFormat::U16));
+	let colors = FixedSizeTypeNode::<TypeNode>::new(colors, 10);
+	let program = ProgramNode {
+		name: "podEnumProgram".into(),
+		public_key: "11111111111111111111111111111111".to_string(),
+		accounts: vec![AccountNode {
+			name: "palette".into(),
+			size: None,
+			docs: Docs::default(),
+			data: StructTypeNode::new(vec![
+				StructFieldTypeNode::new("discriminator", NumberTypeNode::le(U8)),
+				StructFieldTypeNode::new("color", color),
+				StructFieldTypeNode::new("colors", colors),
+			])
+			.into(),
+			pda: None,
+			discriminators: vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+				ConstantValueNode::new(NumberTypeNode::le(U8), NumberValueNode::new(1u8)),
+				0,
+			))],
+		}],
+		instructions: vec![],
+		defined_types: vec![DefinedTypeNode {
+			name: "color".into(),
+			docs: vec!["A color stored on chain.".to_string()].into(),
+			r#type: Box::new(
+				EnumTypeNode {
+					variants: vec![
+						EnumVariantTypeNode::Empty(red),
+						EnumVariantTypeNode::Empty(blue),
+					],
+					size: NumberTypeNode::le(U8).into(),
+				}
+				.into(),
+			),
+		}],
+		pdas: vec![],
+		errors: vec![],
+		events: vec![],
+		constants: vec![],
+		version: String::new(),
+		origin: None,
+		docs: Docs::default(),
+	};
+	let root = RootNode::new(program);
+	let output_dir = unique_temp_dir("pina-codama-render-pod-enum");
+	let crate_dir = output_dir.join("zeropod_enum_program");
+	render_root_node(&root, &crate_dir, &RenderConfig::default())
+		.unwrap_or_else(|error| panic!("render failed: {error}"));
+
+	let content = read_generated_file(&crate_dir, "types/color.rs");
+	assert!(content.contains("#[derive(Clone, Copy, Debug, PartialEq, Eq, pina::ZeroPod)]"));
+	assert!(content.contains("pub enum Color"));
+	assert!(content.contains("Red = 0"));
+	assert!(content.contains("Blue = 1"));
+	let account = read_generated_file(&crate_dir, "accounts/palette.rs");
+	assert!(account.contains("pub color: crate::generated::types::Color"));
+	assert!(account.contains("pub colors: pina::Vec<crate::generated::types::Color, 8>"));
 }
 
 #[test]

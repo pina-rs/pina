@@ -18,6 +18,7 @@ import {
 	getStructEncoder,
 	getU64Decoder,
 	getU64Encoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
@@ -26,6 +27,7 @@ import {
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
@@ -34,6 +36,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { TRANSFER_SOL_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const DIRECT_TRANSFER_DISCRIMINATOR = 1;
 
@@ -61,20 +64,35 @@ export type DirectTransferInstruction<
 		]
 	>;
 
-export type DirectTransferInstructionData = { amount: bigint };
+export type DirectTransferInstructionData = {
+	discriminator: number;
+	amount: bigint;
+};
 
 export type DirectTransferInstructionDataArgs = { amount: number | bigint };
 
 export function getDirectTransferInstructionDataEncoder(): FixedSizeEncoder<
 	DirectTransferInstructionDataArgs
 > {
-	return getStructEncoder([["amount", getU64Encoder()]]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"amount",
+			getU64Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 export function getDirectTransferInstructionDataDecoder(): FixedSizeDecoder<
 	DirectTransferInstructionData
 > {
-	return getStructDecoder([["amount", getU64Decoder()]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(
+			DIRECT_TRANSFER_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	], ["amount", getU64Decoder()]]);
 }
 
 export function getDirectTransferInstructionDataCodec(): FixedSizeCodec<

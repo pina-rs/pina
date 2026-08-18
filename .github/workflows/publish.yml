@@ -1,15 +1,15 @@
 name: publish
 
 # Single workflow that builds release artifacts, publishes packages, and
-# publishes the GitHub release. Triggered by a tag push (v*) so that crates.io
-# and npm trusted publishing (OIDC) accept the run. workflow_dispatch is
-# retained for manual retries where every package version already exists on its
-# registry (monochange skips them, so no OIDC/OTP path is hit).
+# publishes the GitHub release. release-pr.yml explicitly dispatches it after
+# creating the tag and draft release because a GITHUB_TOKEN tag push cannot
+# trigger another workflow. The tag trigger remains as a fallback for tags
+# created with credentials that are not subject to GitHub's recursion guard.
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to publish (for example v0.8.0). Only used for manual retries; the tag-push event is the primary trigger."
+        description: "Release tag to publish (for example v0.8.0). Used by the automated release handoff and manual retries."
         required: true
         type: string
   push:
@@ -224,11 +224,73 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
+      - name: prepare npm package
+        run: |
+          set -euo pipefail
+          npm install --global --prefix "$RUNNER_TEMP/npm-cli" npm@11.5.1
+          export PATH="$RUNNER_TEMP/npm-cli/bin:$PATH"
+          test "$(npm --version)" = "11.5.1"
+
+          pnpm install --frozen-lockfile
+          pnpm --filter codama-nodes-from-pina build
+
+          pack_report="$RUNNER_TEMP/codama-nodes-from-pina-pack.json"
+          npm pack ./packages/nodes-from-pina --dry-run --json > "$pack_report"
+          for required_file in \
+            dist/index.js \
+            dist/index.mjs \
+            dist/types/index.d.ts; do
+            jq -e --arg path "$required_file" \
+              'any(.[0].files[]; .path == $path)' \
+              "$pack_report" >/dev/null || {
+                echo "::error::npm package is missing $required_file" >&2
+                exit 1
+              }
+          done
+        shell: devenv shell -- bash -e {0}
       - name: check publish readiness
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
           NPM_CONFIG_PROVENANCE: "true"
-        run: monochange step publish-readiness --from HEAD --output "$RUNNER_TEMP/publish-readiness.json" --format json
+        run: |
+          set -euo pipefail
+          export PATH="$RUNNER_TEMP/npm-cli/bin:$PATH"
+          monochange step publish-readiness \
+            --from HEAD \
+            --output "$RUNNER_TEMP/publish-readiness.json" \
+            --format json
+        shell: devenv shell -- bash -e {0}
+      # Downstream Cargo packages cannot pass `cargo publish --dry-run` until
+      # their same-release dependencies exist in crates.io. Dry-run the
+      # independent packages here; monochange publishes them before dependents.
+      - name: dry-run independently publishable packages
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
+          NPM_CONFIG_PROVENANCE: "true"
+        run: |
+          set -euo pipefail
+          export PATH="$RUNNER_TEMP/npm-cli/bin:$PATH"
+          packages=(
+            codama-nodes-from-pina
+            pina_codama_renderer
+            pina_macros
+            pina_profile
+            pina_sdk_ids
+          )
+          for package in "${packages[@]}"; do
+            report="$RUNNER_TEMP/publish-dry-run-${package}.json"
+            monochange step publish-packages \
+              --dry-run \
+              --package "$package" \
+              --format json | tee "$report"
+            jq -e '
+              (.package_publish.packages | length == 1) and
+                all(
+                  .package_publish.packages[];
+                  ((.stderr // "") | test("(^|\\n)error:") | not)
+                )
+            ' "$report" >/dev/null
+          done
         shell: devenv shell -- bash -e {0}
       - name: publish packages with monochange
         env:
@@ -238,6 +300,8 @@ jobs:
           # the job log instead of being buffered until process exit.
           PUBLISH_STREAM_OUTPUT: "true"
         run: |
+          set -euo pipefail
+          export PATH="$RUNNER_TEMP/npm-cli/bin:$PATH"
           monochange step publish-packages \
             --log-level info \
             --all \

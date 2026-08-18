@@ -18,7 +18,7 @@ A performant Solana smart contract framework built on top of [pinocchio](https:/
 
 <!-- {=pinaFeatureHighlights} -->
 
-- **Zero-copy deserialization** — account data is reinterpreted in place via `bytemuck`, with no heap allocation.
+- **Validated zero-copy deserialization** — zeropod validates fixed-layout account data before Pina reinterprets it in place, with no heap allocation.
 - **`no_std` compatible** — all crates compile to the `bpfel-unknown-none` SBF target for on-chain deployment.
 - **Low compute units** — built on `pinocchio` instead of `solana-program`, saving thousands of CU per instruction.
 - **Discriminator system** — every account, instruction, and event type carries a typed discriminator as its first field.
@@ -101,7 +101,9 @@ pnpm run test:quasar-svm
 
 <!-- {/codamaWorkflowCommands} -->
 
-Rust client generation in this repository uses the custom `pina_codama_renderer` crate (`crates/pina_codama_renderer`) instead of Codama's default Rust renderer. The generated Rust models are Pina-compatible: discriminator-first layouts and bytemuck-based POD wrappers, without `borsh` serialization requirements. Because these clients are generated as fixed-size POD layouts, unsupported Codama patterns (e.g. variable-length strings/bytes, big-endian numbers, floats, non-UTF8 constant byte seeds, and non-fixed arrays) will fail generation with explicit renderer errors.
+Rust client generation in this repository uses the custom `pina_codama_renderer` crate (`crates/pina_codama_renderer`) instead of Codama's default Rust renderer. Generated Rust models are native zeropod schemas with discriminator-first storage views and recursive content validation. Instruction builders own and consume an initialized wire buffer; they do not expose a whole-object `to_bytes()` API. Unsupported variable-size or noncanonical layouts fail generation explicitly.
+
+`pina codama generate` also augments the stock JavaScript output with Pina's zeropod boundary checks. Generated encoders reject values that exceed fixed string/vector capacity rather than truncating them, and decoders enforce discriminators, canonical booleans, and strict UTF-8. Rendering a Pina IDL with the stock Codama JavaScript visitor alone does not add those runtime checks.
 
 End-to-end setup steps:
 
@@ -138,7 +140,7 @@ const codama = await createFromFile("./idls/my_program.json");
 await codama.accept(renderJsVisitor("./clients/js/my_program"));
 ```
 
-For Pina-style Rust client generation (discriminator-first, bytemuck POD types), use this repository's renderer:
+For Pina-style Rust client generation (discriminator-first, validated zeropod types), use this repository's renderer:
 
 ```sh
 cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
@@ -373,7 +375,6 @@ For instruction payloads:
 
 The `#[discriminator]` macro generates:
 
-- `Pod` / `Zeroable` derives for the enum
 - `TryFrom<primitive>` and `Into<primitive>` conversions
 - `IntoDiscriminator` implementation (read/write/match discriminator bytes)
 
@@ -386,7 +387,7 @@ Optional attributes:
 
 <br>
 
-The `#[account]` macro wraps a struct with a discriminator field and derives `Pod`, `Zeroable`, `TypedBuilder`, and `HasDiscriminator`:
+The `#[account]` macro treats the struct as a native schema. It injects the discriminator, derives `zeropod::ZeroPod`, and exposes validated `ConfigZc` views over caller-owned account bytes:
 
 ```rust
 use pina::*;
@@ -399,7 +400,7 @@ pub enum MyAccount {
 #[account(discriminator = MyAccount)]
 pub struct Config {
 	pub authority: Address,
-	pub value: PodU64,
+	pub value: u64,
 	pub bump: u8,
 }
 ```
@@ -509,7 +510,7 @@ On deserialized account data, chain assertions using the `AccountValidation` tra
 
 ```rust
 let state = account.as_account::<Config>(&program_id)?;
-state.assert(|s| s.value > PodU64::from_primitive(0))?;
+state.assert(|s| s.value > PodU64::from(0))?;
 state.assert_msg(|s| s.bump == 255, "bump must be 255")?;
 ```
 
@@ -530,7 +531,7 @@ pub struct MyAccounts<'a> {
 }
 ```
 
-The derive generates `TryFromAccountInfos` and `TryFrom<&mut [AccountView]>` implementations. Internally it uses `AccountsCursor` to walk the account slice left-to-right, which centralises duplicate-mutable-account checks without heap allocation. It validates that the exact number of accounts is provided, and it supports `&'a AccountView`, `&'a mut AccountView`, `&'a [AccountView]`, and `&'a mut [AccountView]` fields.
+The derive generates `TryFromAccountInfos` and `TryFrom<&mut [AccountView]>` implementations. Internally it uses `AccountsCursor` to walk the account slice left-to-right and reject writable aliases for mutable accounts parsed individually through `next_mut()`, without heap allocation. It validates that the exact number of accounts is provided unless the final field captures the remaining accounts, and it supports `&'a AccountView`, `&'a mut AccountView`, `&'a [AccountView]`, and `&'a mut [AccountView]` fields.
 
 Use the `#[pina(remaining)]` attribute on the last field to capture trailing accounts:
 
@@ -542,6 +543,8 @@ pub struct MyAccounts<'a> {
 	pub remaining: &'a [AccountView],
 }
 ```
+
+Remaining-account fields preserve the original account order and aliases. If a handler requires distinct trailing accounts, it must validate their addresses explicitly.
 
 ### Instruction authoring tips
 
@@ -577,7 +580,7 @@ Alignment-safe primitive wrappers for use in `#[repr(C)]` account structs. Solan
 | `PodU128` | `u128` | 16 bytes |
 | `PodI128` | `i128` | 16 bytes |
 
-All types are `#[repr(transparent)]` over byte arrays (or `u8` for `PodBool`) and implement `bytemuck::Pod` + `bytemuck::Zeroable`.
+All types are alignment-1 byte-backed values that implement zeropod's `ZcElem` and `ZcValidate` contracts.
 
 <!-- {/podTypesTable} -->
 
@@ -594,7 +597,7 @@ pub struct State {
 }
 
 // Create values.
-let amount = PodU64::from_primitive(1_000_000);
+let amount = PodU64::from(1_000_000);
 
 // Convert back.
 let raw: u64 = amount.into();
@@ -620,25 +623,25 @@ Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 
 <br>
 
-Fixed-capacity collections that store data inline with a length prefix, enabling zero-copy access inside `#[repr(C)]` account structs.
+Fixed-capacity collections that store fully initialized data inline without allocation.
 
 <!-- {=podCollectionTypesTable} -->
 
-| Type                       | Purpose                | Layout                                    |
-| -------------------------- | ---------------------- | ----------------------------------------- |
-| `PodOption<T: Pod>`        | Fixed-size `Option<T>` | 1-byte discriminant + `T`                 |
-| `PodString<N, PFX=1>`      | Fixed-capacity string  | `PFX`-byte length prefix + `N` data bytes |
-| `PodVec<T: Pod, N, PFX=2>` | Fixed-capacity vec     | `PFX`-byte length prefix + `N` elements   |
+| Type        | Purpose                | Layout                                    |
+| ----------- | ---------------------- | ----------------------------------------- |
+| `PodOption` | Fixed-size `Option<T>` | 1-byte discriminant + `T`                 |
+| `PodString` | Fixed-capacity string  | `PFX`-byte length prefix + `N` data bytes |
+| `PodVec`    | Fixed-capacity vec     | `PFX`-byte length prefix + `N` elements   |
 
-All collection types are `#[repr(C)]`, alignment-1, and implement `bytemuck::Pod` + `bytemuck::Zeroable`. Length prefixes (`PFX`) default to 1 byte for strings (max 255) and 2 bytes for vectors (max 65 535 elements).
+The full generic forms are `PodOption<T: ZcElem>`, `PodString<N, PFX = 1>`, and `PodVec<T: ZcElem, N, PFX = 2>`. All collection layouts are alignment 1 and padding-free when `T: ZcElem`. `ZcValidate` checks tags, length prefixes, active elements, and UTF-8 before safe access. Length prefixes (`PFX`) default to 1 byte for strings (max 255) and 2 bytes for vectors (max 65 535 elements).
 
 <!-- {/podCollectionTypesTable} -->
 
 <!-- {=podCollectionDescription} -->
 
-Collection types store data inline with a length prefix, enabling zero-copy access inside `#[repr(C)]` account structs. Overflow is detected at insertion time — `try_set` / `try_push` return `Err(PodCollectionError::Overflow)` when capacity is exceeded.
+Collection types store data inline without allocation and can be embedded in Pina's zeropod account, instruction, and event schemas. Overflow is detected at insertion time — `try_set` / `try_push` return `Err(ZeroPodError::Overflow)` when capacity is exceeded. Inactive capacity is not part of the semantic value and Pina never exposes it through a whole-object byte view.
 
-`PodString` provides UTF-8 validation via `try_as_str()`, while `PodVec` offers slice-based access via `as_slice()` / `as_mut_slice()`. `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`.
+After boundary validation, `PodString::as_str()` is safe. `PodVec` offers slice-based access via `as_slice()` / `as_slice_mut()`, and `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`.
 
 <!-- {/podCollectionDescription} -->
 

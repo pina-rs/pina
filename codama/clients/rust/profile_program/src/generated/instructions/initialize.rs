@@ -8,10 +8,12 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 /// Instruction data for `Initialize`.
 ///
-/// Contains the PDA bump seed and the initial name/bio. The `PodString`
-/// fields carry their own length prefix, so the client writes
+/// Contains the PDA bump seed and the initial name/bio. The generated string
+/// views carry their own length prefix, so the client writes
 /// `discriminator + bump + len(name) + name + len(bio) + bio`.
 pub const INITIALIZE_DISCRIMINATOR: u8 = 0u8;
 
@@ -58,39 +60,42 @@ impl Initialize {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
-
 		solana_instruction::Instruction {
 			program_id: crate::PROFILE_PROGRAM_ID,
 			accounts,
-			data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct InitializeInstructionData {
-	pub discriminator: u8,
-	pub bump: u8,
-	pub name: [u8; 33],
-	pub bio: [u8; 129],
+	bytes: Vec<u8>,
 }
 
 impl InitializeInstructionData {
-	pub const fn new(bump: u8, name: [u8; 33], bio: [u8; 129]) -> Self {
-		Self {
-			discriminator: INITIALIZE_DISCRIMINATOR,
-			bump,
-			name,
-			bio,
+	pub fn new(
+		configure: impl FnOnce(&mut InitializeInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <InitializeInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data =
+				<InitializeInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			configure(data);
+			data.discriminator = INITIALIZE_DISCRIMINATOR;
 		}
+		<InitializeInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
+}
+
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct InitializeInstructionWire {
+	pub discriminator: u8,
+	pub bump: u8,
+	pub name: pina::String<32>,
+	pub bio: pina::String<128>,
 }

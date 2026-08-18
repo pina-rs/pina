@@ -1,6 +1,5 @@
 ---
 source: crates/pina_cli/tests/fixtures.rs
-assertion_line: 38
 expression: idl
 ---
 {
@@ -19,6 +18,20 @@ expression: idl
         "data": {
           "kind": "structTypeNode",
           "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "discriminator",
+              "defaultValueStrategy": "omitted",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "defaultValue": {
+                "kind": "numberValueNode",
+                "number": 7
+              }
+            },
             {
               "kind": "structFieldTypeNode",
               "name": "bump",

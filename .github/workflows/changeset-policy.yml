@@ -39,6 +39,7 @@ jobs:
       - name: run changeset policy
         env:
           CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
         run: |
           set -euo pipefail
@@ -50,5 +51,36 @@ jobs:
           for label in "${labels[@]}"; do
             args+=(--label "$label")
           done
-          monochange "${args[@]}"
+
+          report="$RUNNER_TEMP/changeset-policy.json"
+          policy_status=0
+          monochange "${args[@]}" > "$report" || policy_status=$?
+          cat "$report"
+
+          if [ "$policy_status" -ne 0 ]; then
+            marker='<!-- monochange:changeset-policy -->'
+            comment="$(jq -r '.comment // empty' "$report" 2>/dev/null || true)"
+            if [ -n "$comment" ]; then
+              printf -v body '%s\n%s' "$marker" "$comment"
+              existing_id="$({
+                gh api --paginate \
+                  "repos/$GITHUB_REPOSITORY/issues/${{ github.event.pull_request.number }}/comments" \
+                  --jq ".[] | select(.user.login == \"github-actions[bot]\") | select(.body | contains(\"$marker\")) | .id"
+              } 2>/dev/null | head -n 1 || true)"
+
+              if [ -n "$existing_id" ]; then
+                gh api --method PATCH \
+                  "repos/$GITHUB_REPOSITORY/issues/comments/$existing_id" \
+                  -f "body=$body" >/dev/null || \
+                  echo "::warning::Could not update the changeset-policy comment."
+              else
+                gh api --method POST \
+                  "repos/$GITHUB_REPOSITORY/issues/${{ github.event.pull_request.number }}/comments" \
+                  -f "body=$body" >/dev/null || \
+                  echo "::warning::Could not post the changeset-policy comment."
+              fi
+            fi
+          fi
+
+          exit "$policy_status"
         shell: devenv shell -- bash -e {0}

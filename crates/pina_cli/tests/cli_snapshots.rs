@@ -88,6 +88,13 @@ fn codama_generate_success_output_snapshot() {
 	let idls_dir = temp_dir.join("idls");
 	let rust_out = temp_dir.join("rust");
 	let js_out = temp_dir.join("js");
+	let js_generated = js_out.join("counter_program/src/generated");
+	fs::create_dir_all(&js_generated).unwrap_or_else(|error| {
+		panic!(
+			"failed to create fake JavaScript client directory {}: {error}",
+			js_generated.display()
+		)
+	});
 
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command
@@ -122,6 +129,17 @@ fn codama_generate_success_output_snapshot() {
 		rust_out
 			.join("counter_program")
 			.join("src/generated/mod.rs")
+			.display()
+	);
+	assert!(
+		js_out
+			.join("counter_program")
+			.join("src/generated/zeropodCodecs.ts")
+			.is_file(),
+		"expected generated JavaScript validation helpers at {}",
+		js_out
+			.join("counter_program")
+			.join("src/generated/zeropodCodecs.ts")
 			.display()
 	);
 }

@@ -165,6 +165,36 @@ jobs:
           monochange --log-level=debug step publish-release --from-ref="HEAD" --draft --format json
         shell: devenv shell -- bash -e {0}
 
+      # A tag pushed with GITHUB_TOKEN does not trigger another workflow. Use
+      # workflow_dispatch explicitly so publish.yml always receives the release.
+      - name: dispatch release publishing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          release_record="$RUNNER_TEMP/release-record.json"
+          monochange step release-record --from HEAD --format json > "$release_record"
+
+          mapfile -t release_tags < <(
+            jq -r '.record.release_targets[] | select(.tag == true) | .tag_name' "$release_record"
+          )
+          if [ "${#release_tags[@]}" -eq 0 ]; then
+            echo "::error::The release record does not contain a publishable tag." >&2
+            exit 1
+          fi
+
+          for tag in "${release_tags[@]}"; do
+            if [[ "$tag" != v* ]]; then
+              echo "::error::Refusing to dispatch unexpected release tag '$tag'." >&2
+              exit 1
+            fi
+            gh workflow run publish.yml \
+              --repo "$GITHUB_REPOSITORY" \
+              --ref main \
+              --field "tag=$tag"
+          done
+        shell: devenv shell -- bash -e {0}
+
       - name: comment on released issues
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

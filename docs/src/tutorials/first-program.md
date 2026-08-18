@@ -84,7 +84,7 @@ The numeric value (`0`) becomes the first byte of the serialized instruction dat
 
 <br>
 
-The `#[instruction]` macro creates a `Pod`/`Zeroable` struct whose first field is an auto-injected discriminator byte. It also generates a `TypedBuilder` for ergonomic construction in tests:
+The `#[instruction]` macro creates a native zeropod schema whose first field is an auto-injected discriminator byte. Tests initialize caller-owned zeroed storage and configure the generated `HelloInstructionDataZc` view:
 
 ```rust
 #[instruction(discriminator = HelloInstruction::Hello)]

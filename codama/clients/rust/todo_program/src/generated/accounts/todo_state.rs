@@ -8,42 +8,45 @@
 	clippy::too_many_arguments
 )]
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+use pina::zeropod;
+
+#[derive(pina::ZeroPod)]
 pub struct TodoState {
 	pub discriminator: u8,
 	pub owner: solana_pubkey::Pubkey,
 	pub bump: u8,
-	pub completed: pina::PodBool,
+	pub completed: bool,
 	pub digest: [u8; 32],
 }
 
 pub const TODO_STATE_DISCRIMINATOR: u8 = 1u8;
 
 impl TodoState {
-	pub const LEN: usize = core::mem::size_of::<Self>();
+	pub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;
 
-	pub const fn new(
-		owner: solana_pubkey::Pubkey,
-		bump: u8,
-		completed: pina::PodBool,
-		digest: [u8; 32],
-	) -> Self {
-		Self {
-			discriminator: TODO_STATE_DISCRIMINATOR,
-			owner,
-			bump,
-			completed,
-			digest,
-		}
-	}
-
-	pub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {
-		if data.len() != core::mem::size_of::<Self>() {
+	/// Initialize zero-valid account storage.
+	///
+	/// Every non-discriminator field must accept an all-zero
+	/// representation. Otherwise this method returns `InvalidAccountData`.
+	pub fn initialize(
+		data: &mut [u8],
+	) -> Result<&mut TodoStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let account = unsafe { &*(data.as_ptr() as *const Self) };
+		data.fill(0);
+		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
+		account.discriminator = TODO_STATE_DISCRIMINATOR;
+		Ok(account)
+	}
+
+	pub fn from_bytes(data: &[u8]) -> Result<&TodoStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		let account = <Self as pina::ZeroPodFixed>::from_bytes(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != TODO_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
@@ -52,26 +55,16 @@ impl TodoState {
 
 	pub fn from_bytes_mut(
 		data: &mut [u8],
-	) -> Result<&mut Self, solana_program_error::ProgramError> {
-		if data.len() != core::mem::size_of::<Self>() {
+	) -> Result<&mut TodoStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let account = unsafe { &mut *(data.as_mut_ptr() as *mut Self) };
+		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != TODO_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		Ok(account)
-	}
-}
-
-impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for TodoState {
-	type Error = solana_program_error::ProgramError;
-
-	fn try_from(account_info: &solana_account_info::AccountInfo<'a>) -> Result<Self, Self::Error> {
-		let data_ref = (*account_info.data).borrow();
-		let account = Self::from_bytes(&data_ref)?;
-		Ok(*account)
 	}
 }
 

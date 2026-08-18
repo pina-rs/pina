@@ -49,24 +49,27 @@ pub(crate) fn render_instruction_page(
 	primary_program_const: &str,
 ) -> Result<String> {
 	let instruction_name = pascal(instruction.name.as_ref());
+	let wire_name = format!("{instruction_name}InstructionWire");
+	let wire_zc_name = format!("{wire_name}Zc");
+	let data_name = format!("{instruction_name}InstructionData");
 	let context = format!("instruction `{instruction_name}`");
 	let discriminator = render_constant_discriminator(
 		instruction.name.as_ref(),
 		&instruction.discriminators,
 		&context,
-	)?;
-	let discriminator = discriminator.ok_or_else(|| {
+	)?
+	.ok_or_else(|| {
 		RenderError::MissingDiscriminator {
 			context: context.clone(),
 		}
 	})?;
 
 	let mut lines = Vec::new();
-
+	lines.push("use pina::zeropod;".to_string());
+	lines.push(String::new());
 	for doc_line in render_docs(&instruction.docs, 0) {
 		lines.push(doc_line);
 	}
-
 	lines.push(format!(
 		"pub const {}: {} = {};",
 		discriminator.name, discriminator.ty, discriminator.value
@@ -75,27 +78,22 @@ pub(crate) fn render_instruction_page(
 	lines.push("/// Accounts.".to_string());
 	lines.push("#[derive(Clone, Debug)]".to_string());
 	lines.push(format!("pub struct {instruction_name} {{"));
-
 	for account in &instruction.accounts {
 		let (field_type, _) = render_instruction_account_field_type(account);
-
 		for doc_line in render_docs(&account.docs, 1) {
 			lines.push(doc_line);
 		}
-
 		lines.push(format!(
 			"\tpub {}: {},",
 			snake(account.name.as_ref()),
 			field_type
 		));
 	}
-
 	lines.push("}".to_string());
 	lines.push(String::new());
 
 	let mut new_params = Vec::new();
 	let mut new_inits = Vec::new();
-
 	for account in &instruction.accounts {
 		let field_name = snake(account.name.as_ref());
 		let (field_type, base_type) = render_instruction_account_field_type(account);
@@ -106,7 +104,6 @@ pub(crate) fn render_instruction_page(
 			primary_program_const,
 			program,
 		)?;
-
 		if let Some(default_expr) = default_value {
 			new_inits.push(format!("\t\t\t{field_name}: {default_expr},"));
 		} else {
@@ -126,8 +123,7 @@ pub(crate) fn render_instruction_page(
 	lines.push("\t}".to_string());
 	lines.push(String::new());
 	lines.push(format!(
-		"\tpub fn instruction(&self, data: {instruction_name}InstructionData) -> \
-		 solana_instruction::Instruction {{"
+		"\tpub fn instruction(&self, data: {data_name}) -> solana_instruction::Instruction {{"
 	));
 	lines.push("\t\tself.instruction_with_remaining_accounts(data, &[])".to_string());
 	lines.push("\t}".to_string());
@@ -135,7 +131,7 @@ pub(crate) fn render_instruction_page(
 	lines.push("\t#[allow(clippy::arithmetic_side_effects)]".to_string());
 	lines.push("\tpub fn instruction_with_remaining_accounts(".to_string());
 	lines.push("\t\t&self,".to_string());
-	lines.push(format!("\t\tdata: {instruction_name}InstructionData,"));
+	lines.push(format!("\t\tdata: {data_name},"));
 	lines.push("\t\tremaining_accounts: &[solana_instruction::AccountMeta],".to_string());
 	lines.push("\t) -> solana_instruction::Instruction {".to_string());
 	lines.push(format!(
@@ -147,60 +143,74 @@ pub(crate) fn render_instruction_page(
 		primary_program_const,
 	));
 	lines.push("\t\taccounts.extend_from_slice(remaining_accounts);".to_string());
-	lines.push("\t\t// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.".to_string());
-	lines.push("\t\tlet data = unsafe {".to_string());
-	lines.push("\t\t\tcore::slice::from_raw_parts(".to_string());
-	lines.push("\t\t\t\t&data as *const _ as *const u8,".to_string());
-	lines.push("\t\t\t\tcore::mem::size_of_val(&data),".to_string());
-	lines.push("\t\t\t)".to_string());
-	lines.push("\t\t\t.to_vec()".to_string());
-	lines.push("\t\t};".to_string());
-	lines.push(String::new());
 	lines.push("\t\tsolana_instruction::Instruction {".to_string());
 	lines.push(format!("\t\t\tprogram_id: crate::{primary_program_const},"));
 	lines.push("\t\t\taccounts,".to_string());
-	lines.push("\t\t\tdata,".to_string());
+	lines.push("\t\t\tdata: data.bytes,".to_string());
 	lines.push("\t\t}".to_string());
 	lines.push("\t}".to_string());
 	lines.push("}".to_string());
 	lines.push(String::new());
 
-	let mut data_fields = Vec::new();
-	data_fields.push(format!("\tpub discriminator: {},", discriminator.ty));
+	lines.push("/// Opaque, fully initialized instruction storage.".to_string());
+	lines.push(format!("pub struct {data_name} {{"));
+	lines.push("\tbytes: Vec<u8>,".to_string());
+	lines.push("}".to_string());
+	lines.push(String::new());
+	lines.push(format!("impl {data_name} {{"));
+	lines.push(format!(
+		"\tpub fn new(configure: impl FnOnce(&mut {wire_zc_name})) -> Result<Self, \
+		 solana_program_error::ProgramError> {{"
+	));
+	lines.push(format!(
+		"\t\tlet mut bytes = vec![0u8; <{wire_name} as pina::ZeroPodFixed>::SIZE];"
+	));
+	lines.push("\t\t{".to_string());
+	lines.push(format!(
+		"\t\t\tlet data = <{wire_name} as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)"
+	));
+	lines.push(
+		"\t\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;"
+			.to_string(),
+	);
+	lines.push("\t\t\tconfigure(data);".to_string());
+	// Security: The discriminator is framework-owned metadata. Writing it after
+	// the callback prevents otherwise valid user configuration from changing
+	// which on-chain instruction will receive the payload.
+	lines.push(format!(
+		"\t\t\tdata.discriminator = {};",
+		discriminator.name
+	));
+	lines.push("\t\t}".to_string());
+	lines.push(format!(
+		"\t\t<{wire_name} as pina::ZeroPodFixed>::validate(&bytes)"
+	));
+	lines.push(
+		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;"
+			.to_string(),
+	);
+	lines.push("\t\tOk(Self { bytes })".to_string());
+	lines.push("\t}".to_string());
+	lines.push("}".to_string());
+	lines.push(String::new());
 
-	let mut data_new_args = Vec::new();
-	let mut data_inits = Vec::new();
-	data_inits.push(format!("\t\t\tdiscriminator: {},", discriminator.name));
-
+	let mut wire_fields = vec![format!("\tpub discriminator: {},", discriminator.ty)];
 	for argument in &instruction.arguments {
+		if argument.name.as_ref() == "discriminator" {
+			continue;
+		}
 		let argument_name = snake(argument.name.as_ref());
 		let field_context = format!("{instruction_name}.{argument_name}");
 		let argument_type = render_type_for_pod(&argument.r#type, &field_context)?;
-
 		for doc_line in render_docs(&argument.docs, 1) {
-			data_fields.push(doc_line);
+			wire_fields.push(doc_line);
 		}
-
-		data_fields.push(format!("\tpub {argument_name}: {argument_type},"));
-		data_new_args.push(format!("{argument_name}: {argument_type}"));
-		data_inits.push(format!("\t\t\t{argument_name},"));
+		wire_fields.push(format!("\tpub {argument_name}: {argument_type},"));
 	}
-
-	lines.push("#[repr(C)]".to_string());
-	lines.push("#[derive(Clone, Copy, Debug, PartialEq, Eq)]".to_string());
-	lines.push(format!("pub struct {instruction_name}InstructionData {{"));
-	lines.extend(data_fields);
-	lines.push("}".to_string());
-	lines.push(String::new());
-	lines.push(format!("impl {instruction_name}InstructionData {{"));
-	lines.push(format!(
-		"\tpub const fn new({}) -> Self {{",
-		data_new_args.join(", ")
-	));
-	lines.push("\t\tSelf {".to_string());
-	lines.extend(data_inits);
-	lines.push("\t\t}".to_string());
-	lines.push("\t}".to_string());
+	lines.push("#[doc(hidden)]".to_string());
+	lines.push("#[derive(pina::ZeroPod)]".to_string());
+	lines.push(format!("pub struct {wire_name} {{"));
+	lines.extend(wire_fields);
 	lines.push("}".to_string());
 
 	Ok(lines.join("\n"))
@@ -249,10 +259,9 @@ fn render_instruction_account_metas(
 				lines.push("\t\t}".to_string());
 			}
 
-			if matches!(
-				instruction.optional_account_strategy,
-				Some(OptionalAccountStrategy::ProgramId)
-			) {
+			if instruction.optional_account_strategy.unwrap_or_default()
+				== OptionalAccountStrategy::ProgramId
+			{
 				lines.push("\t\telse {".to_string());
 				lines.push(format!(
 					"\t\t\taccounts.\

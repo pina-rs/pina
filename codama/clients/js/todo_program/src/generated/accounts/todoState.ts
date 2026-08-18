@@ -36,8 +36,14 @@ import {
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { findTodoPda, TodoSeeds } from "../pdas";
+import {
+	fixZeroPodEncoderSize,
+	getZeroPodBooleanDecoder,
+	getZeroPodDiscriminatorDecoder,
+} from "../zeropodCodecs";
 
 export const TODO_STATE_DISCRIMINATOR = 1;
 
@@ -46,30 +52,44 @@ export function getTodoStateDiscriminatorBytes(): ReadonlyUint8Array {
 }
 
 export type TodoState = {
+	discriminator: number;
 	owner: Address;
 	bump: number;
 	completed: boolean;
 	digest: ReadonlyUint8Array;
 };
 
-export type TodoStateArgs = TodoState;
+export type TodoStateArgs = {
+	owner: Address;
+	bump: number;
+	completed: boolean;
+	digest: ReadonlyUint8Array;
+};
 
 /** Gets the encoder for {@link TodoStateArgs} account data. */
 export function getTodoStateEncoder(): FixedSizeEncoder<TodoStateArgs> {
-	return getStructEncoder([
-		["owner", getAddressEncoder()],
-		["bump", getU8Encoder()],
-		["completed", getBooleanEncoder()],
-		["digest", fixEncoderSize(getBytesEncoder(), 32)],
-	]);
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["owner", getAddressEncoder()],
+			["bump", getU8Encoder()],
+			["completed", getBooleanEncoder()],
+			["digest", fixZeroPodEncoderSize(getBytesEncoder(), 32)],
+		]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link TodoState} account data. */
 export function getTodoStateDecoder(): FixedSizeDecoder<TodoState> {
 	return getStructDecoder([
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(TODO_STATE_DISCRIMINATOR, getU8Decoder()),
+		],
 		["owner", getAddressDecoder()],
 		["bump", getU8Decoder()],
-		["completed", getBooleanDecoder()],
+		["completed", getZeroPodBooleanDecoder()],
 		["digest", fixDecoderSize(getBytesDecoder(), 32)],
 	]);
 }

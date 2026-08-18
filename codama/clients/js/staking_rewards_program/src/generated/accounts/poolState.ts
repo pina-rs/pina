@@ -34,8 +34,13 @@ import {
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { findPoolPda, PoolSeeds } from "../pdas";
+import {
+	getZeroPodBooleanDecoder,
+	getZeroPodDiscriminatorDecoder,
+} from "../zeropodCodecs";
 
 export const POOL_STATE_DISCRIMINATOR = 1;
 
@@ -44,6 +49,7 @@ export function getPoolStateDiscriminatorBytes(): ReadonlyUint8Array {
 }
 
 export type PoolState = {
+	discriminator: number;
 	admin: Address;
 	stakeMint: Address;
 	rewardMint: Address;
@@ -65,26 +71,34 @@ export type PoolStateArgs = {
 
 /** Gets the encoder for {@link PoolStateArgs} account data. */
 export function getPoolStateEncoder(): FixedSizeEncoder<PoolStateArgs> {
-	return getStructEncoder([
-		["admin", getAddressEncoder()],
-		["stakeMint", getAddressEncoder()],
-		["rewardMint", getAddressEncoder()],
-		["totalStaked", getU64Encoder()],
-		["rewardIndex", getU64Encoder()],
-		["paused", getBooleanEncoder()],
-		["bump", getU8Encoder()],
-	]);
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["admin", getAddressEncoder()],
+			["stakeMint", getAddressEncoder()],
+			["rewardMint", getAddressEncoder()],
+			["totalStaked", getU64Encoder()],
+			["rewardIndex", getU64Encoder()],
+			["paused", getBooleanEncoder()],
+			["bump", getU8Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link PoolState} account data. */
 export function getPoolStateDecoder(): FixedSizeDecoder<PoolState> {
 	return getStructDecoder([
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(POOL_STATE_DISCRIMINATOR, getU8Decoder()),
+		],
 		["admin", getAddressDecoder()],
 		["stakeMint", getAddressDecoder()],
 		["rewardMint", getAddressDecoder()],
 		["totalStaked", getU64Decoder()],
 		["rewardIndex", getU64Decoder()],
-		["paused", getBooleanDecoder()],
+		["paused", getZeroPodBooleanDecoder()],
 		["bump", getU8Decoder()],
 	]);
 }

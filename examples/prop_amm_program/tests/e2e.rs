@@ -23,11 +23,11 @@
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
-use pina::PodU64;
 use pina::ProgramError;
 use prop_amm_program::ID;
 use prop_amm_program::InitializeInstruction;
 use prop_amm_program::OracleState;
+use prop_amm_program::OracleStateZc;
 use prop_amm_program::PropAmmError;
 use prop_amm_program::RotateAuthorityInstruction;
 use prop_amm_program::UPDATE_AUTHORITY;
@@ -82,28 +82,32 @@ fn system_account(lamports: u64) -> Account {
 	Account::new(lamports, 0, &solana_sdk_ids::system_program::id())
 }
 
-fn read_oracle(account: &Account) -> &OracleState {
+fn read_oracle(account: &Account) -> &OracleStateZc {
 	<OracleState as pina::ZeroPodFixed>::from_bytes(&account.data).unwrap()
 }
 
 fn initialize_ix_data() -> Vec<u8> {
-	InitializeInstruction::builder().build().to_bytes().to_vec()
+	let mut data = vec![0u8; InitializeInstruction::SIZE];
+	InitializeInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("initialize instruction failed: {error:?}"));
+	data
 }
 
 fn update_ix_data(new_price: u64) -> Vec<u8> {
-	UpdateInstruction::builder()
-		.new_price(PodU64::from(new_price))
-		.build()
-		.to_bytes()
-		.to_vec()
+	let mut data = vec![0u8; UpdateInstruction::SIZE];
+	UpdateInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("update instruction failed: {error:?}"))
+		.new_price
+		.set(new_price);
+	data
 }
 
 fn rotate_authority_ix_data(new_authority: &Pubkey) -> Vec<u8> {
-	RotateAuthorityInstruction::builder()
-		.new_authority(new_authority.to_bytes().into())
-		.build()
-		.to_bytes()
-		.to_vec()
+	let mut data = vec![0u8; RotateAuthorityInstruction::SIZE];
+	RotateAuthorityInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("rotate instruction failed: {error:?}"))
+		.new_authority = new_authority.to_bytes().into();
+	data
 }
 
 fn initialize_oracle(
@@ -147,7 +151,7 @@ fn initialize_creates_oracle() {
 	let oracle_state = read_oracle(&oracle_account);
 
 	assert_eq!(oracle_state.authority.as_ref(), payer.as_ref());
-	assert_eq!(u64::from(oracle_state.price), 0);
+	assert_eq!(oracle_state.price.get(), 0);
 }
 
 #[test]
@@ -187,7 +191,7 @@ fn rotate_authority_updates_oracle_authority() {
 	let oracle_state = read_oracle(&updated_oracle);
 
 	assert_eq!(oracle_state.authority.as_ref(), new_authority.as_ref());
-	assert_eq!(u64::from(oracle_state.price), 0);
+	assert_eq!(oracle_state.price.get(), 0);
 }
 
 #[test]
@@ -266,7 +270,7 @@ fn update_accepts_global_update_authority() {
 		"[CU] prop_amm update with authorized updater: {} compute units consumed",
 		result.compute_units_consumed
 	);
-	assert_eq!(u64::from(oracle_state.price), 1_234);
+	assert_eq!(oracle_state.price.get(), 1_234);
 	assert_eq!(oracle_state.authority.as_ref(), payer.as_ref());
 }
 

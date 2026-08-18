@@ -96,8 +96,9 @@ pub use pinocchio_associated_token_account as associated_token_account;
 pub use pinocchio_memo as memo;
 /// Re-export of `pinocchio_system` for system program CPI helpers.
 pub use pinocchio_system as system;
-/// Alignment-safe Pod primitive wrappers (`PodBool`, `PodU16`, `PodU64`,
-/// etc.).
+/// Zeropod's alignment-one storage primitives (`PodBool`, `PodU16`,
+/// `PodU64`, etc.). Prefer native field types in schemas; the `ZeroPod`
+/// derive selects these representation types for the generated `*Zc` view.
 pub use pod::*;
 /// Macro for creating a compile-time [`Address`] from a base-58 string
 /// literal.
@@ -114,28 +115,23 @@ pub use solana_program_log::Logger;
 /// Logs the current compute unit usage to the Solana runtime.
 #[cfg(feature = "logs")]
 pub use solana_program_log::log_cu_usage;
-/// Re-export of the [`typed_builder`] crate used by macro-generated code.
-///
-/// **Not part of the stable public API.** The underlying `typed_builder`
-/// version may change in minor releases. Do not depend on this re-export
-/// directly — add `typed_builder` to your own `Cargo.toml` if you need it.
-#[doc(hidden)]
-pub use typed_builder;
-/// Derive macro used by `#[account]` generated code.
-///
-/// **Not part of the stable public API.** See [`typed_builder`] for details.
-#[doc(hidden)]
-pub use typed_builder::TypedBuilder;
-/// Re-export of the [`zeropod`] crate for zero-copy serialization.
+/// Re-export of the [`zeropod`] crate for native schemas and validated
+/// zero-copy storage views.
 pub use zeropod;
 /// Declares whether a type uses a fixed or compact zero-copy layout.
 pub use zeropod::LayoutKind;
+/// Fixed-capacity UTF-8 string schema used by zeropod derives.
+pub use zeropod::String;
+/// Fixed-capacity vector schema used by zeropod derives.
+pub use zeropod::Vec;
 /// Marker trait for types that can be safely cast from any byte pattern.
 pub use zeropod::ZcElem;
 /// Maps a native Rust type to its pod (zero-copy) companion and byte size.
 pub use zeropod::ZcField;
 /// Validation trait for stored (pod) types.
 pub use zeropod::ZcValidate;
+/// Derives a validated zero-copy companion for a native schema.
+pub use zeropod::ZeroPod;
 /// Zero-copy access for compact (variable-length) types.
 pub use zeropod::ZeroPodCompact;
 /// Error type for zeropod validation failures.
@@ -154,8 +150,6 @@ pub use crate::pda::*;
 /// Core traits for account validation, deserialization, and instruction
 /// processing.
 pub use crate::traits::*;
-/// Typed instruction construction and account metadata helpers.
-pub use crate::transaction::InstructionBuilder;
 /// Utility functions for instruction parsing, assertions, and token address
 /// derivation.
 pub use crate::utils::*;

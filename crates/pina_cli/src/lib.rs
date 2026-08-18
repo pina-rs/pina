@@ -5,13 +5,15 @@ pub mod init;
 pub mod ir;
 pub mod parse;
 
+mod js_client;
+
 use std::path::Path;
 
 use codama_nodes::RootNode;
 
 pub use crate::codama::CodamaGenerateOptions;
 pub use crate::codama::generate_codama;
-use crate::codegen::ir_to_root_node;
+use crate::codegen::try_ir_to_root_node;
 use crate::error::IdlError;
 pub use crate::init::init_project;
 pub use crate::init::print_next_steps;
@@ -27,5 +29,5 @@ pub fn generate_idl(
 	name_override: Option<&str>,
 ) -> Result<RootNode, IdlError> {
 	let ir = parse_program(program_path, name_override)?;
-	Ok(ir_to_root_node(&ir))
+	try_ir_to_root_node(&ir)
 }

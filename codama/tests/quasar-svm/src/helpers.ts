@@ -65,6 +65,16 @@ export async function deriveAtaAddress(
 	return ata as Address;
 }
 
-export async function createAta(owner: Address, mint: Address, amount: bigint) {
-	return await createKeyedAssociatedTokenAccount(owner, mint, amount);
+export async function createAta(
+	owner: Address,
+	mint: Address,
+	amount: bigint,
+	tokenProgram: Address = SPL_TOKEN_PROGRAM_ID as Address,
+) {
+	return await createKeyedAssociatedTokenAccount(
+		owner,
+		mint,
+		amount,
+		tokenProgram,
+	);
 }

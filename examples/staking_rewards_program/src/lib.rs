@@ -85,9 +85,9 @@ pub struct PoolState {
 	pub admin: Address,
 	pub stake_mint: Address,
 	pub reward_mint: Address,
-	pub total_staked: PodU64,
-	pub reward_index: PodU64,
-	pub paused: PodBool,
+	pub total_staked: u64,
+	pub reward_index: u64,
+	pub paused: bool,
 	pub bump: u8,
 }
 
@@ -96,9 +96,9 @@ pub struct PoolState {
 pub struct PositionState {
 	pub pool: Address,
 	pub owner: Address,
-	pub staked_amount: PodU64,
-	pub reward_debt: PodU64,
-	pub pending_rewards: PodU64,
+	pub staked_amount: u64,
+	pub reward_debt: u64,
+	pub pending_rewards: u64,
 	pub bump: u8,
 }
 
@@ -114,12 +114,12 @@ pub struct OpenPositionInstruction {
 
 #[instruction(discriminator = StakingInstruction::Deposit)]
 pub struct DepositInstruction {
-	pub amount: PodU64,
+	pub amount: u64,
 }
 
 #[instruction(discriminator = StakingInstruction::Withdraw)]
 pub struct WithdrawInstruction {
-	pub amount: PodU64,
+	pub amount: u64,
 }
 
 #[instruction(discriminator = StakingInstruction::Claim)]
@@ -127,19 +127,20 @@ pub struct ClaimInstruction {}
 
 #[derive(Accounts, Debug)]
 pub struct InitializePoolAccounts<'a> {
-	pub admin: &'a AccountView,
+	pub admin: &'a mut AccountView,
 	pub stake_mint: &'a AccountView,
 	pub reward_mint: &'a AccountView,
 	pub pool_state: &'a mut AccountView,
 	pub stake_vault: &'a AccountView,
 	pub reward_vault: &'a AccountView,
+	pub associated_token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
 	pub token_program: &'a AccountView,
 }
 
 #[derive(Accounts, Debug)]
 pub struct OpenPositionAccounts<'a> {
-	pub user: &'a AccountView,
+	pub user: &'a mut AccountView,
 	pub pool_state: &'a AccountView,
 	pub position_state: &'a mut AccountView,
 	pub system_program: &'a AccountView,
@@ -147,11 +148,12 @@ pub struct OpenPositionAccounts<'a> {
 
 #[derive(Accounts, Debug)]
 pub struct DepositAccounts<'a> {
-	pub user: &'a AccountView,
+	pub user: &'a mut AccountView,
 	pub stake_mint: &'a AccountView,
 	pub pool_state: &'a mut AccountView,
 	pub position_state: &'a mut AccountView,
 	pub user_stake_ata: &'a AccountView,
+	pub associated_token_program: &'a AccountView,
 	pub token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
 }
@@ -169,11 +171,12 @@ pub struct WithdrawAccounts<'a> {
 
 #[derive(Accounts, Debug)]
 pub struct ClaimAccounts<'a> {
-	pub user: &'a AccountView,
+	pub user: &'a mut AccountView,
 	pub reward_mint: &'a AccountView,
 	pub pool_state: &'a AccountView,
 	pub position_state: &'a mut AccountView,
 	pub user_reward_ata: &'a AccountView,
+	pub associated_token_program: &'a AccountView,
 	pub token_program: &'a AccountView,
 	pub system_program: &'a AccountView,
 }
@@ -186,14 +189,14 @@ const POSITION_SEED_PREFIX: &[u8] = b"position";
 
 const SPL_PROGRAM_IDS: [Address; 2] = [token::ID, token_2022::ID];
 
-fn assert_pool_stake_mint(pool_state: &PoolState, stake_mint: &AccountView) -> ProgramResult {
+fn assert_pool_stake_mint(pool_state: &PoolStateZc, stake_mint: &AccountView) -> ProgramResult {
 	stake_mint
 		.assert_address(&pool_state.stake_mint)
 		.map(|_| ())
 		.map_err(|_| ProgramError::from(StakingError::InvalidPool))
 }
 
-fn assert_pool_reward_mint(pool_state: &PoolState, reward_mint: &AccountView) -> ProgramResult {
+fn assert_pool_reward_mint(pool_state: &PoolStateZc, reward_mint: &AccountView) -> ProgramResult {
 	reward_mint
 		.assert_address(&pool_state.reward_mint)
 		.map(|_| ())
@@ -203,7 +206,7 @@ fn assert_pool_reward_mint(pool_state: &PoolState, reward_mint: &AccountView) ->
 fn assert_position_access(
 	pool_state: &AccountView,
 	user: &AccountView,
-	position_state: &PositionState,
+	position_state: &PositionStateZc,
 ) -> ProgramResult {
 	pool_state
 		.assert_address(&position_state.pool)
@@ -225,6 +228,8 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 		self.admin.assert_signer()?;
 		self.stake_mint.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.reward_mint.assert_owners(&SPL_PROGRAM_IDS)?;
+		self.associated_token_program
+			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.pool_state
@@ -258,15 +263,13 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 
 		// Initialize pool state
 		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
-		*pool_state = PoolState::builder()
-			.admin(*self.admin.address())
-			.stake_mint(*self.stake_mint.address())
-			.reward_mint(*self.reward_mint.address())
-			.total_staked(PodU64::from(0))
-			.reward_index(PodU64::from(0))
-			.paused(PodBool::from(false))
-			.bump(args.bump)
-			.build();
+		pool_state.admin = *self.admin.address();
+		pool_state.stake_mint = *self.stake_mint.address();
+		pool_state.reward_mint = *self.reward_mint.address();
+		pool_state.total_staked.set(0);
+		pool_state.reward_index.set(0);
+		pool_state.paused.set(false);
+		pool_state.bump = args.bump;
 		drop(pool_state);
 
 		// Create stake vault
@@ -300,7 +303,8 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 		// Parse instruction and prepare PDA seeds
 		let args = OpenPositionInstruction::try_from_bytes(data)?;
 		let pool_address = *self.pool_state.address();
-		let position_seeds = PositionState::seeds(&pool_address, self.user.address());
+		let user_address = *self.user.address();
+		let position_seeds = PositionState::seeds(&pool_address, &user_address);
 		let position_seeds_with_bump = position_seeds.with_bump(args.bump);
 
 		// Validate accounts
@@ -315,7 +319,7 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 
 		// Check pool is not paused
 		let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
-		if bool::from(pool_state.paused) {
+		if pool_state.paused.get() {
 			return Err(StakingError::PoolPaused.into());
 		}
 
@@ -330,14 +334,12 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 
 		// Initialize position state
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
-		*position_state = PositionState::builder()
-			.pool(*self.pool_state.address())
-			.owner(*self.user.address())
-			.staked_amount(PodU64::from(0))
-			.reward_debt(PodU64::from(0))
-			.pending_rewards(PodU64::from(0))
-			.bump(args.bump)
-			.build();
+		position_state.pool = *self.pool_state.address();
+		position_state.owner = user_address;
+		position_state.staked_amount.set(0);
+		position_state.reward_debt.set(0);
+		position_state.pending_rewards.set(0);
+		position_state.bump = args.bump;
 
 		Ok(())
 	}
@@ -347,11 +349,13 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		// Parse instruction data
 		let args = DepositInstruction::try_from_bytes(data)?;
-		let amount: u64 = args.amount.into();
+		let amount = args.amount.get();
 
 		// Validate accounts
 		self.user.assert_signer()?;
 		self.stake_mint.assert_owners(&SPL_PROGRAM_IDS)?;
+		self.associated_token_program
+			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.pool_state
@@ -373,7 +377,7 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 			let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
 			let position_state = self.position_state.as_account::<PositionState>(&ID)?;
 
-			if bool::from(pool_state.paused) {
+			if pool_state.paused.get() {
 				return Err(StakingError::PoolPaused.into());
 			}
 
@@ -385,9 +389,9 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 			assert_position_access(self.pool_state, self.user, &position_state)?;
 
 			(
-				u64::from(position_state.staked_amount),
-				u64::from(position_state.reward_debt),
-				u64::from(pool_state.total_staked),
+				position_state.staked_amount.get(),
+				position_state.reward_debt.get(),
+				pool_state.total_staked.get(),
 			)
 		};
 
@@ -401,8 +405,8 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 
 		// Update position state
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
-		position_state.staked_amount = PodU64::from(next_staked);
-		position_state.reward_debt = PodU64::from(
+		position_state.staked_amount.set(next_staked);
+		position_state.reward_debt.set(
 			reward_debt
 				.checked_add(amount)
 				.ok_or(ProgramError::ArithmeticOverflow)?,
@@ -410,7 +414,7 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 
 		// Update pool state
 		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
-		pool_state.total_staked = PodU64::from(total_staked);
+		pool_state.total_staked.set(total_staked);
 
 		// Ensure user's stake ATA exists
 		associated_token_account::instructions::CreateIdempotent {
@@ -431,7 +435,7 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		// Parse instruction data
 		let args = WithdrawInstruction::try_from_bytes(data)?;
-		let amount: u64 = args.amount.into();
+		let amount = args.amount.get();
 
 		// Validate accounts
 		self.user.assert_signer()?;
@@ -457,7 +461,7 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 			let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
 			let position_state = self.position_state.as_account::<PositionState>(&ID)?;
 
-			if bool::from(pool_state.paused) {
+			if pool_state.paused.get() {
 				return Err(StakingError::PoolPaused.into());
 			}
 
@@ -469,8 +473,8 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 			assert_position_access(self.pool_state, self.user, &position_state)?;
 
 			(
-				u64::from(position_state.staked_amount),
-				u64::from(pool_state.total_staked),
+				position_state.staked_amount.get(),
+				pool_state.total_staked.get(),
 			)
 		};
 
@@ -480,11 +484,11 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 
 		// Update position state
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
-		position_state.staked_amount = PodU64::from(staked_amount - amount);
+		position_state.staked_amount.set(staked_amount - amount);
 
 		// Update pool state
 		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
-		pool_state.total_staked = PodU64::from(total_staked - amount);
+		pool_state.total_staked.set(total_staked - amount);
 
 		Ok(())
 	}
@@ -495,6 +499,8 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 		// Validate accounts
 		self.user.assert_signer()?;
 		self.reward_mint.assert_owners(&SPL_PROGRAM_IDS)?;
+		self.associated_token_program
+			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		self.pool_state
@@ -516,7 +522,7 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 			let pool_state = self.pool_state.as_account::<PoolState>(&ID)?;
 			let position_state = self.position_state.as_account::<PositionState>(&ID)?;
 
-			if bool::from(pool_state.paused) {
+			if pool_state.paused.get() {
 				return Err(StakingError::PoolPaused.into());
 			}
 
@@ -524,8 +530,8 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 			assert_position_access(self.pool_state, self.user, &position_state)?;
 
 			(
-				u64::from(position_state.pending_rewards),
-				u64::from(pool_state.reward_index),
+				position_state.pending_rewards.get(),
+				pool_state.reward_index.get(),
 			)
 		};
 
@@ -535,7 +541,7 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 			.ok_or(ProgramError::ArithmeticOverflow)?;
 
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
-		position_state.pending_rewards = PodU64::from(next_pending);
+		position_state.pending_rewards.set(next_pending);
 
 		// Ensure user's reward ATA exists
 		associated_token_account::instructions::CreateIdempotent {
@@ -567,13 +573,14 @@ mod tests {
 
 	#[test]
 	fn instruction_roundtrip() {
-		let ix = DepositInstruction::builder()
-			.amount(PodU64::from(50))
-			.build();
-		let bytes = ix.to_bytes();
-		let parsed = DepositInstruction::try_from_bytes(bytes)
+		let mut bytes = [0u8; DepositInstruction::SIZE];
+		DepositInstruction::initialize(&mut bytes)
+			.unwrap_or_else(|error| panic!("initialize failed: {error:?}"))
+			.amount
+			.set(50);
+		let parsed = DepositInstruction::try_from_bytes(&bytes)
 			.unwrap_or_else(|e| panic!("decode failed: {e:?}"));
-		assert_eq!(u64::from(parsed.amount), 50);
+		assert_eq!(parsed.amount.get(), 50);
 	}
 
 	#[test]

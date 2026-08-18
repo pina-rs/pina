@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 /// Instruction data for `RemoveTag`. Removes the tag at `index`.
 pub const REMOVE_TAG_DISCRIMINATOR: u8 = 3u8;
 
@@ -49,35 +51,39 @@ impl RemoveTag {
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.profile, false));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
-
 		solana_instruction::Instruction {
 			program_id: crate::PROFILE_PROGRAM_ID,
 			accounts,
-			data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct RemoveTagInstructionData {
-	pub discriminator: u8,
-	pub index: pina::PodU64,
+	bytes: Vec<u8>,
 }
 
 impl RemoveTagInstructionData {
-	pub const fn new(index: pina::PodU64) -> Self {
-		Self {
-			discriminator: REMOVE_TAG_DISCRIMINATOR,
-			index,
+	pub fn new(
+		configure: impl FnOnce(&mut RemoveTagInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <RemoveTagInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <RemoveTagInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			configure(data);
+			data.discriminator = REMOVE_TAG_DISCRIMINATOR;
 		}
+		<RemoveTagInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
+}
+
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct RemoveTagInstructionWire {
+	pub discriminator: u8,
+	pub index: u64,
 }

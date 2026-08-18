@@ -28,6 +28,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: detect changed crates
         id: changed
@@ -44,15 +45,22 @@ jobs:
             exit 0
           fi
 
-          # Build a JSON matrix of changed workspace packages.
+          # Build a JSON matrix of changed packages that belong to the root
+          # workspace. Standalone workspaces such as pina_fuzz must not be sent
+          # to `cargo mutants -p` from the repository root.
           packages=()
-          for manifest in crates/*/Cargo.toml; do
-            dir=$(dirname "$manifest")
-            pkg=$(basename "$dir")
+          workspace_root=$(pwd)
+          while IFS=$'\t' read -r pkg manifest; do
+            dir=${manifest#"$workspace_root/"}
+            dir=$(dirname "$dir")
             if echo "$changed_files" | grep -qE "^${dir}/(Cargo.toml|build.rs|src/|tests/|benches/|examples/)"; then
               packages+=("$pkg")
             fi
-          done
+          done < <(
+            cargo metadata --no-deps --format-version 1 |
+              jq -r --arg root "$workspace_root/crates/" \
+                '.packages[] | select(.manifest_path | startswith($root)) | [.name, .manifest_path] | @tsv'
+          )
 
           if [ ${#packages[@]} -eq 0 ]; then
             echo "any_changed=false" >> "$GITHUB_OUTPUT"
@@ -78,6 +86,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: setup
         uses: ./.github/actions/devenv
@@ -85,8 +94,23 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: run mutation tests for ${{ matrix.package }}
-        run: mutants:crate ${{ matrix.package }}
+        id: mutation_tests
+        continue-on-error: true
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: mutants:crate "$PACKAGE"
         shell: devenv shell -c -- bash -e {0}
+
+      # Historical misses are advisory on pull requests, but the failed step and
+      # summary must remain visible instead of presenting a false-green run.
+      - name: report mutation test outcome
+        if: always() && steps.mutation_tests.outcome == 'failure'
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          echo "::warning::Mutation testing found surviving mutants or could not complete for ${PACKAGE}. Review the uploaded report."
+          echo "### Mutation testing needs attention: \`${PACKAGE}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "The mutation step failed. Review the uploaded report for surviving mutants or infrastructure errors." >> "$GITHUB_STEP_SUMMARY"
 
       - name: upload mutants report
         if: always()

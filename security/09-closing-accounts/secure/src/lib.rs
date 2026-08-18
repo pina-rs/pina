@@ -24,7 +24,7 @@ pub enum RewardAccount {
 #[account(discriminator = RewardAccount)]
 pub struct RewardState {
 	pub authority: Address,
-	pub claimed: PodU64,
+	pub claimed: u64,
 }
 
 #[instruction(discriminator = RewardInstruction, variant = ClaimAndClose)]
@@ -54,12 +54,7 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAndCloseAccounts<'a> {
 
 		self.authority.assert_address(&reward_authority)?;
 
-		// SECURE: Zero the account data first, then close properly.
-		// zeroed() clears all bytes, preventing stale data reuse.
-		{
-			self.reward.as_account_mut::<RewardState>(&ID)?.zeroed();
-		}
-
-		self.reward.close_with_recipient(self.recipient)
+		// SECURE: clear the raw backing bytes, then close and reclaim rent.
+		self.reward.close_account_zeroed(self.recipient)
 	}
 }

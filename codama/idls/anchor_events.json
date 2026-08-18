@@ -11,6 +11,22 @@
 			{
 				"kind": "instructionNode",
 				"name": "initialize",
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					}
+				],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -33,6 +49,22 @@
 			{
 				"kind": "instructionNode",
 				"name": "testEvent",
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 1
+						}
+					}
+				],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -55,6 +87,22 @@
 			{
 				"kind": "instructionNode",
 				"name": "testEventCpi",
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 2
+						}
+					}
+				],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",

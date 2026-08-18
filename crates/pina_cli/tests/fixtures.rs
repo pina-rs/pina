@@ -33,7 +33,8 @@ fn fixture_programs_idl() {
 			.unwrap_or_else(|e| panic!("failed to parse fixture {}: {e}", fixture.display()));
 		let ir = assemble_program_ir(&file, &fixture_name)
 			.unwrap_or_else(|e| panic!("failed to assemble IR for {}: {e}", fixture.display()));
-		let idl = ir_to_root_node(&ir);
+		let idl = ir_to_root_node(&ir)
+			.unwrap_or_else(|e| panic!("failed to generate IDL for {}: {e}", fixture.display()));
 
 		insta::assert_json_snapshot!(fixture_name, idl);
 	}

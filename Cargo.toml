@@ -87,7 +87,6 @@ repository = "https://github.com/pina-rs/pina"
 rust-version = "1.89.0"
 
 [workspace.dependencies]
-bytemuck = { default-features = false, version = "^1", features = ["min_const_generics"] }
 clap = { default-features = false, version = "^4", features = ["derive", "std"] }
 codama-nodes = { default-features = false, version = "0.11.0" }
 darling = { default-features = false, version = "0.24.0" }
@@ -126,12 +125,14 @@ tempfile = { default-features = false, version = "^3" }
 thiserror = { default-features = false, version = "^2" }
 tokio = { default-features = false, version = "^1" }
 trybuild = { default-features = false, version = "^1" }
-typed-builder = { default-features = false, version = "^0.23" }
 walkdir = { default-features = false, version = "^2" }
 zeropod = { default-features = false, version = "0.3.5", features = ["solana-address", "solana-program-error"] }
 
 # publishable crates
-pina = { default-features = false, path = "crates/pina", version = "0.8.0" }
+# `pina` is a dev-dependency of `pina_macros`. This range lets Cargo verify
+# the packaged macros crate against the previously published 0.x release while
+# workspace tests continue to use the local path.
+pina = { default-features = false, path = "crates/pina", version = ">=0.8.0, <1.0.0" }
 pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.8.0" }
 pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.8.0" }
 pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.8.0" }
@@ -142,7 +143,6 @@ pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version
 cargo-semver-checks = { version = "0.50.0" }
 cargo-workspaces = { version = "0.4.2" }
 dylint-link = { version = "6.0.4", bins = ["dylint-link"] }
-kani-verifier = { version = "0.67.0", bins = ["kani", "cargo-kani"] }
 
 [workspace.metadata.dylint]
 libraries = [
@@ -182,7 +182,6 @@ level = "warn"
 check-cfg = [
 	'cfg(target_os, values("solana"))',
 	'cfg(target_feature, values("static-syscalls"))',
-	'cfg(kani)',
 ]
 
 [workspace.lints.clippy]

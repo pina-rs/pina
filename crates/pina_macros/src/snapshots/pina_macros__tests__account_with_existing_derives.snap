@@ -2,79 +2,59 @@
 source: crates/pina_macros/src/tests.rs
 expression: output
 ---
-#[derive(
-    Debug,
-    ::pina::TypedBuilder,
-    ::core::clone::Clone,
-    ::core::marker::Copy,
-    ::core::cmp::PartialEq,
-    ::core::cmp::Eq
-)]
-#[repr(C)]
-#[builder(builder_method(vis = "", name = __builder))]
+#[derive(Debug, ::pina::zeropod::ZeroPod)]
 pub struct GameState {
     discriminator: [u8; MyAccount::BYTES],
     pub score: u8,
     pub level: u8,
 }
-#[allow(dead_code)]
-type GameStateBuilderType = GameStateBuilder<(([u8; MyAccount::BYTES],), (), ())>;
-const __GAMESTATE_ALIGNMENT_ASSERTIONS__: () = {
-    ::core::assert!(
-        ::core::mem::align_of:: < [u8; MyAccount::BYTES] > () == 1,
-        concat!("The alignment of field `", "discriminator", "` with type `",
-        stringify!([u8; MyAccount::BYTES]),
-        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
-    );
-    ::core::assert!(
-        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
-        "score", "` with type `", stringify!(u8),
-        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
-    );
-    ::core::assert!(
-        ::core::mem::align_of:: < u8 > () == 1, concat!("The alignment of field `",
-        "level", "` with type `", stringify!(u8),
-        "` should be one. Consider using one of the exported `Pod*` types from the `pina` crate.")
-    );
-    ::core::assert!(
-        ::core::mem::align_of:: < GameState > () == 1,
-        concat!("The alignment of struct `", stringify!(GameState),
-        "` should be one so it can be used for zero-copy Pod casts.")
-    );
-    ::core::assert!(
-        ::core::mem::size_of:: < GameState > () == (0usize + ::core::mem::size_of:: <
-        [u8; MyAccount::BYTES] > () + ::core::mem::size_of:: < u8 > () +
-        ::core::mem::size_of:: < u8 > ()), concat!("`", stringify!(GameState),
-        "` layout is padded. `#[pina]` discriminator-first POD layouts must be tightly packed.")
-    );
-};
 impl GameState {
-    /// Zero out all bytes in the struct including padding bytes. This can be useful when closing an account.
-    #[allow(unsafe_code)]
-    pub fn zeroed(&mut self) {
-        unsafe { ::core::ptr::write_bytes(self as *mut Self, 0, 1) }
-    }
-    /// Returns the raw byte representation of the struct.
-    #[allow(unsafe_code)]
-    pub fn to_bytes(&self) -> &[u8] {
-        unsafe {
-            ::core::slice::from_raw_parts(
-                self as *const Self as *const u8,
-                ::core::mem::size_of::<Self>(),
-            )
+    /// The exact number of bytes required by the zeropod representation.
+    pub const SIZE: usize = <Self as ::pina::ZeroPodFixed>::SIZE;
+    /// Validate `data` and return zeropod's immutable zero-copy companion.
+    pub fn try_from_bytes(
+        data: &[u8],
+    ) -> Result<&<Self as ::pina::ZeroPodFixed>::Zc, ::pina::ProgramError> {
+        if data.len() != Self::SIZE
+            || !<Self as ::pina::HasDiscriminator>::matches_discriminator(data)
+        {
+            return Err(::pina::ProgramError::InvalidAccountData);
         }
+        <Self as ::pina::ZeroPodFixed>::from_bytes(data)
+            .map_err(|_| ::pina::ProgramError::InvalidAccountData)
     }
-    pub fn builder() -> GameStateBuilderType {
-        let mut bytes = [0u8; MyAccount::BYTES];
-        <Self as ::pina::HasDiscriminator>::VALUE.write_discriminator(&mut bytes);
-        Self::__builder().discriminator(bytes)
+    /// Initialize caller-owned storage and return its mutable zero-copy view.
+    ///
+    /// The complete slice is initialized before zeropod validates it. The
+    /// returned borrow prevents the caller from observing or changing the raw
+    /// bytes while the typed view is live.
+    ///
+    /// Every non-discriminator field must accept an all-zero representation.
+    /// In particular, an enum stored directly in this schema needs a variant
+    /// with discriminant zero. Schemas without a valid zero state return the
+    /// generated invalid-data error instead of exposing an unvalidated view.
+    ///
+    /// # Errors
+    ///
+    /// Returns the generated invalid-data error when `data` has the wrong
+    /// length or zeroed storage is not a valid zeropod representation.
+    pub fn initialize(
+        data: &mut [u8],
+    ) -> Result<&mut <Self as ::pina::ZeroPodFixed>::Zc, ::pina::ProgramError> {
+        if data.len() != Self::SIZE {
+            return Err(::pina::ProgramError::InvalidAccountData);
+        }
+        data.fill(0);
+        <Self as ::pina::HasDiscriminator>::write_discriminator(data);
+        <Self as ::pina::ZeroPodFixed>::from_bytes_mut(data)
+            .map_err(|_| ::pina::ProgramError::InvalidAccountData)
     }
 }
 impl ::pina::HasDiscriminator for GameState {
     type Type = MyAccount;
     const VALUE: Self::Type = MyAccount::GameState;
 }
-impl ::pina::AccountValidation for GameState {
+impl ::pina::AccountValidation for GameStateZc {
     #[track_caller]
     fn assert<F>(&self, condition: F) -> Result<&Self, ::pina::ProgramError>
     where
@@ -136,73 +116,4 @@ impl ::pina::AccountValidation for GameState {
         }
     }
 }
-impl ::pina::ZcValidate for GameState {
-    fn validate_ref(value: &Self) -> Result<(), ::pina::ZeroPodError> {
-        <[u8; MyAccount::BYTES] as ::pina::ZcValidate>::validate_ref(
-            &value.discriminator,
-        )?;
-        <u8 as ::pina::ZcValidate>::validate_ref(&value.score)?;
-        <u8 as ::pina::ZcValidate>::validate_ref(&value.level)?;
-        Ok(())
-    }
-}
-#[allow(unsafe_code)]
-unsafe impl ::pina::ZcElem for GameState {}
-impl ::pina::ZeroPodSchema for GameState {
-    const LAYOUT: ::pina::LayoutKind = ::pina::LayoutKind::Fixed;
-}
-impl ::pina::ZeroPodFixed for GameState {
-    type Zc = GameState;
-    const SIZE: usize = ::core::mem::size_of::<GameState>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, ::pina::ZeroPodError> {
-        <Self as ::pina::ZeroPodFixed>::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, ::pina::ZeroPodError> {
-        <Self as ::pina::ZeroPodFixed>::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), ::pina::ZeroPodError> {
-        if data.len() < Self::SIZE {
-            return Err(::pina::ZeroPodError::BufferTooSmall);
-        }
-        let zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as ::pina::ZcValidate>::validate_ref(zc)?;
-        Ok(())
-    }
-    unsafe fn from_bytes_unchecked(data: &[u8]) -> &Self::Zc {
-        &*(data.as_ptr() as *const Self::Zc)
-    }
-    unsafe fn from_bytes_mut_unchecked(data: &mut [u8]) -> &mut Self::Zc {
-        &mut *(data.as_mut_ptr() as *mut Self::Zc)
-    }
-}
-impl ::pina::ZcField for GameState {
-    type Pod = GameState;
-    const POD_SIZE: usize = ::core::mem::size_of::<GameState>();
-}
-impl ::pina::PinaAccount for GameState {
-    fn validate(data: &[u8]) -> Result<(), ::pina::ProgramError> {
-        if !<Self as ::pina::HasDiscriminator>::matches_discriminator(data) {
-            return Err(::pina::ProgramError::InvalidAccountData);
-        }
-        <Self as ::pina::ZeroPodFixed>::validate(data)
-            .map_err(|_| ::pina::ProgramError::InvalidAccountData)
-    }
-    fn try_from_bytes(data: &[u8]) -> Result<&Self, ::pina::ProgramError> {
-        <Self as ::pina::PinaAccount>::validate(data)?;
-        if data.len() != ::core::mem::size_of::<Self>() {
-            return Err(::pina::ProgramError::InvalidAccountData);
-        }
-        <Self as ::pina::ZeroPodFixed>::from_bytes(data)
-            .map_err(|_| ::pina::ProgramError::InvalidAccountData)
-    }
-    fn try_from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, ::pina::ProgramError> {
-        <Self as ::pina::PinaAccount>::validate(data)?;
-        if data.len() != ::core::mem::size_of::<Self>() {
-            return Err(::pina::ProgramError::InvalidAccountData);
-        }
-        <Self as ::pina::ZeroPodFixed>::from_bytes_mut(data)
-            .map_err(|_| ::pina::ProgramError::InvalidAccountData)
-    }
-}
+impl ::pina::PinaAccount for GameState {}

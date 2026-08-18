@@ -22,18 +22,20 @@ import {
 	type InstructionWithAccounts,
 	type InstructionWithData,
 	type ReadonlyAccount,
-	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
+	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const OPEN_POSITION_DISCRIMINATOR = 1;
 
@@ -55,7 +57,7 @@ export type OpenPositionInstruction<
 	& InstructionWithAccounts<
 		[
 			TAccountUser extends string
-				? ReadonlySignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
+				? WritableSignerAccount<TAccountUser> & AccountSignerMeta<TAccountUser>
 				: TAccountUser,
 			TAccountPoolState extends string ? ReadonlyAccount<TAccountPoolState>
 				: TAccountPoolState,
@@ -69,20 +71,32 @@ export type OpenPositionInstruction<
 		]
 	>;
 
-export type OpenPositionInstructionData = { bump: number };
+export type OpenPositionInstructionData = {
+	discriminator: number;
+	bump: number;
+};
 
-export type OpenPositionInstructionDataArgs = OpenPositionInstructionData;
+export type OpenPositionInstructionDataArgs = { bump: number };
 
 export function getOpenPositionInstructionDataEncoder(): FixedSizeEncoder<
 	OpenPositionInstructionDataArgs
 > {
-	return getStructEncoder([["bump", getU8Encoder()]]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"bump",
+			getU8Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 export function getOpenPositionInstructionDataDecoder(): FixedSizeDecoder<
 	OpenPositionInstructionData
 > {
-	return getStructDecoder([["bump", getU8Decoder()]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(OPEN_POSITION_DISCRIMINATOR, getU8Decoder()),
+	], ["bump", getU8Decoder()]]);
 }
 
 export function getOpenPositionInstructionDataCodec(): FixedSizeCodec<
@@ -136,7 +150,7 @@ export function getOpenPositionInstruction<
 
 	// Original accounts.
 	const originalAccounts = {
-		user: { value: input.user ?? null, isWritable: false },
+		user: { value: input.user ?? null, isWritable: true },
 		poolState: { value: input.poolState ?? null, isWritable: false },
 		positionState: { value: input.positionState ?? null, isWritable: true },
 		systemProgram: { value: input.systemProgram ?? null, isWritable: false },

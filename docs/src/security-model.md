@@ -81,13 +81,17 @@ Closing guidance under Pinocchio 0.11:
 
 ## Content validation (zeropod)
 
-Pina's zero-copy account model is built on [zeropod](https://crates.io/crates/zeropod): `bytemuck::Pod` guaranteed memory safety but not semantic validity. Zeropod's `ZcValidate` / `ZcElem` model makes **validation load-bearing**: every pod type validates itself, and `PinaAccount::try_from_bytes` / `as_account` reject non-canonical `PodBool` bytes, invalid UTF-8 in `PodString`, and overlength `PodVec` prefixes at the deserialization boundary.
+Pina's zero-copy account model is built on [zeropod](https://crates.io/crates/zeropod). Zeropod's generated storage view makes **validation load-bearing**: `PinaAccount::try_from_bytes` / `as_account` reject non-canonical booleans, invalid UTF-8, overlength vector prefixes, and invalid enum discriminants before returning a reference.
 
-The `#[account]` macro generates the zeropod trait impls directly on the account struct (the "direct pattern": `ZeroPodFixed` with `type Zc = Self`), keeping the discriminator as the first field. `PinaAccount::validate` checks the discriminator and content; `try_from_bytes` additionally enforces exact size.
+The `#[account]` macro uses the native struct only as a schema and derives `zeropod::ZeroPod`. For `Account`, zeropod generates `AccountZc`; loaders return that companion, not a reference to the native schema. `PinaAccount::validate` checks the discriminator and every field, while `try_from_bytes` additionally enforces exact size.
 
-### Unit enums (`#[derive(PodEnum)]`)
+### Unit enums
 
-Unit enums with explicit discriminants can be stored in accounts via `#[derive(PodEnum)]`, which generates an `EnumZc` zero-copy companion (`#[repr(transparent)]` over `[u8; N]`, alignment 1). The companion validates the discriminant at the deserialization boundary. Because the enum's validity is bit-pattern-restricted at the Rust type level, account structs store the `EnumZc` companion as the field type (never the bare enum) — invalid discriminants are rejected before any reference to the enum is formed.
+Unit enums with explicit discriminants can be native schema fields when they derive `zeropod::ZeroPod`. Zeropod generates an `EnumZc` companion that stores raw bytes and validates the discriminant before converting it to the native enum. Application schemas use the native enum; only generated storage views contain the companion.
+
+### Inactive capacity
+
+Fixed-capacity strings and vectors may contain uninitialized bytes outside their active range. Those bytes are intentionally unobservable: Pina exposes validated field accessors, never a byte slice over an in-memory schema or zero-copy view. Initialization starts from caller-owned, fully initialized account or instruction storage and returns a borrow tied to that storage.
 
 ## Testing strategy
 

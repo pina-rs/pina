@@ -17,7 +17,7 @@ import {
 	getUtf8Encoder,
 	lamports,
 } from "@solana/kit";
-import { LiteSVM } from "litesvm";
+import { FailedTransactionMetadata, LiteSVM } from "litesvm";
 import { describe, expect, test } from "vitest";
 import {
 	decodeRegistryConfig,
@@ -229,8 +229,14 @@ describe("role_registry_program e2e", () => {
 			bump: roleEntryBump,
 		});
 
-		// Build and attempt to send — expect it to throw
+		// LiteSVM reports program failures as metadata instead of throwing.
 		const tx = await buildAndSignTransaction(svm, wrongAdmin, [addRoleIx]);
-		expect(() => svm.sendTransaction(tx)).toThrow();
+		const result = svm.sendTransaction(tx);
+		expect(result).toBeInstanceOf(FailedTransactionMetadata);
+		if (!(result instanceof FailedTransactionMetadata)) {
+			throw new Error("wrong signer transaction unexpectedly succeeded");
+		}
+		expect(result.err().toString()).toContain("InvalidAccountData");
+		expect(svm.getAccount(roleEntryPda).exists).toBe(false);
 	});
 });

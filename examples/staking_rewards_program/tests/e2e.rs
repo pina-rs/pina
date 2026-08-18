@@ -11,8 +11,7 @@
 //! running these tests:
 //!
 //! ```sh
-//! cargo build --release --target bpfel-unknown-none -p staking_rewards_program \
-//!     -Z build-std -F bpf-entrypoint
+//! cargo build-staking-rewards-program
 //! ```
 //!
 //! Then set `SBF_OUT_DIR` to the directory containing the `.so` file, or
@@ -21,17 +20,13 @@
 //! ## Running
 //!
 //! ```sh
-//! SBF_OUT_DIR=target/bpfel-unknown-none/release \
+//! SBF_OUT_DIR=target/deploy \
 //!     cargo test -p staking_rewards_program --test e2e -- --nocapture
 //! ```
-
-use core::mem::size_of;
 
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
-use pina::PodBool;
-use pina::PodU64;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
@@ -40,7 +35,9 @@ use staking_rewards_program::ClaimInstruction;
 use staking_rewards_program::DepositInstruction;
 use staking_rewards_program::OpenPositionInstruction;
 use staking_rewards_program::PoolState;
+use staking_rewards_program::PoolStateZc;
 use staking_rewards_program::PositionState;
+use staking_rewards_program::PositionStateZc;
 use staking_rewards_program::StakingError;
 use staking_rewards_program::WithdrawInstruction;
 
@@ -141,16 +138,16 @@ fn pool_state_account(
 	bump: u8,
 	lamports: u64,
 ) -> Account {
-	let state = PoolState::builder()
-		.admin(pubkey_to_address(admin))
-		.stake_mint(pubkey_to_address(stake_mint))
-		.reward_mint(pubkey_to_address(reward_mint))
-		.total_staked(PodU64::from(total_staked))
-		.reward_index(PodU64::from(0))
-		.paused(PodBool::from(paused))
-		.bump(bump)
-		.build();
-	let data = state.to_bytes().to_vec();
+	let mut data = vec![0u8; PoolState::SIZE];
+	let state = PoolState::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("pool initialization failed: {error:?}"));
+	state.admin = pubkey_to_address(admin);
+	state.stake_mint = pubkey_to_address(stake_mint);
+	state.reward_mint = pubkey_to_address(reward_mint);
+	state.total_staked.set(total_staked);
+	state.reward_index.set(0);
+	state.paused.set(paused);
+	state.bump = bump;
 	Account {
 		lamports,
 		data,
@@ -170,15 +167,15 @@ fn position_state_account(
 	bump: u8,
 	lamports: u64,
 ) -> Account {
-	let state = PositionState::builder()
-		.pool(pubkey_to_address(pool))
-		.owner(pubkey_to_address(owner))
-		.staked_amount(PodU64::from(staked_amount))
-		.reward_debt(PodU64::from(reward_debt))
-		.pending_rewards(PodU64::from(pending_rewards))
-		.bump(bump)
-		.build();
-	let data = state.to_bytes().to_vec();
+	let mut data = vec![0u8; PositionState::SIZE];
+	let state = PositionState::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("position initialization failed: {error:?}"));
+	state.pool = pubkey_to_address(pool);
+	state.owner = pubkey_to_address(owner);
+	state.staked_amount.set(staked_amount);
+	state.reward_debt.set(reward_debt);
+	state.pending_rewards.set(pending_rewards);
+	state.bump = bump;
 	Account {
 		lamports,
 		data,
@@ -217,32 +214,55 @@ fn token_program_account() -> (Pubkey, Account) {
 	)
 }
 
+/// Associated-token program stub used by validation-only fixtures.
+fn associated_token_program_account() -> (Pubkey, Account) {
+	(
+		spl_ata_program_id(),
+		Account {
+			lamports: 1,
+			data: vec![],
+			owner: solana_sdk_ids::bpf_loader::ID,
+			executable: true,
+			rent_epoch: 0,
+		},
+	)
+}
+
 /// Instruction bytes for `OpenPosition`.
 fn open_position_ix_data(bump: u8) -> Vec<u8> {
-	let ix = OpenPositionInstruction::builder().bump(bump).build();
-	ix.to_bytes().to_vec()
+	let mut data = vec![0u8; OpenPositionInstruction::SIZE];
+	OpenPositionInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("open-position initialization failed: {error:?}"))
+		.bump = bump;
+	data
 }
 
 /// Instruction bytes for `Deposit`.
 fn deposit_ix_data(amount: u64) -> Vec<u8> {
-	let ix = DepositInstruction::builder()
-		.amount(PodU64::from(amount))
-		.build();
-	ix.to_bytes().to_vec()
+	let mut data = vec![0u8; DepositInstruction::SIZE];
+	DepositInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("deposit initialization failed: {error:?}"))
+		.amount
+		.set(amount);
+	data
 }
 
 /// Instruction bytes for `Withdraw`.
 fn withdraw_ix_data(amount: u64) -> Vec<u8> {
-	let ix = WithdrawInstruction::builder()
-		.amount(PodU64::from(amount))
-		.build();
-	ix.to_bytes().to_vec()
+	let mut data = vec![0u8; WithdrawInstruction::SIZE];
+	WithdrawInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("withdraw initialization failed: {error:?}"))
+		.amount
+		.set(amount);
+	data
 }
 
 /// Instruction bytes for `Claim`.
 fn claim_ix_data() -> Vec<u8> {
-	let ix = ClaimInstruction::builder().build();
-	ix.to_bytes().to_vec()
+	let mut data = vec![0u8; ClaimInstruction::SIZE];
+	ClaimInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("claim initialization failed: {error:?}"));
+	data
 }
 
 const SKIP_MSG: &str = "[SKIP] staking_rewards_program SBF binary not found. Build it first with \
@@ -274,7 +294,7 @@ fn open_position_creates_position_state() {
 	// Derive the canonical position PDA using the pool address and user address.
 	let (position_pda, bump) = derive_position_pda(&pool_state_key, &user);
 
-	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -317,11 +337,11 @@ fn open_position_creates_position_state() {
 		.expect("position_state account should exist after OpenPosition");
 	assert_eq!(
 		pos_account.data.len(),
-		size_of::<PositionState>(),
-		"position_state data should be exactly size_of::<PositionState>() bytes"
+		PositionState::SIZE,
+		"position_state data should be exactly PositionState::SIZE bytes"
 	);
 
-	let pos_state: &PositionState =
+	let pos_state: &PositionStateZc =
 		<PositionState as pina::ZeroPodFixed>::from_bytes(&pos_account.data).unwrap();
 	assert_eq!(
 		pos_state.pool.as_ref(),
@@ -334,17 +354,17 @@ fn open_position_creates_position_state() {
 		"position.owner should be the user"
 	);
 	assert_eq!(
-		u64::from(pos_state.staked_amount),
+		pos_state.staked_amount.get(),
 		0,
 		"staked_amount should start at zero"
 	);
 	assert_eq!(
-		u64::from(pos_state.reward_debt),
+		pos_state.reward_debt.get(),
 		0,
 		"reward_debt should start at zero"
 	);
 	assert_eq!(
-		u64::from(pos_state.pending_rewards),
+		pos_state.pending_rewards.get(),
 		0,
 		"pending_rewards should start at zero"
 	);
@@ -383,11 +403,8 @@ fn withdraw_updates_balances() {
 	let reward_mint = Pubkey::new_unique();
 	let user_stake_ata = derive_ata(&user, &stake_mint);
 
-	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
-	let pos_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<PositionState>());
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
+	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
 
 	// Withdraw 100 from a position with 200 staked; pool has 500 total.
 	let instruction = Instruction::new_with_bytes(
@@ -442,10 +459,10 @@ fn withdraw_updates_balances() {
 	let pos_account = result
 		.get_account(&position_state_key)
 		.expect("position_state should exist after Withdraw");
-	let pos_state: &PositionState =
+	let pos_state: &PositionStateZc =
 		<PositionState as pina::ZeroPodFixed>::from_bytes(&pos_account.data).unwrap();
 	assert_eq!(
-		u64::from(pos_state.staked_amount),
+		pos_state.staked_amount.get(),
 		100,
 		"staked_amount should be 200 - 100 = 100"
 	);
@@ -454,10 +471,10 @@ fn withdraw_updates_balances() {
 	let pool_account = result
 		.get_account(&pool_state_key)
 		.expect("pool_state should exist after Withdraw");
-	let pool_st: &PoolState =
+	let pool_st: &PoolStateZc =
 		<PoolState as pina::ZeroPodFixed>::from_bytes(&pool_account.data).unwrap();
 	assert_eq!(
-		u64::from(pool_st.total_staked),
+		pool_st.total_staked.get(),
 		400,
 		"total_staked should be 500 - 100 = 400"
 	);
@@ -485,11 +502,8 @@ fn withdraw_insufficient_balance_fails() {
 	let reward_mint = Pubkey::new_unique();
 	let user_stake_ata = derive_ata(&user, &stake_mint);
 
-	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
-	let pos_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<PositionState>());
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
+	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
 
 	// Position only has 100 staked; attempt to withdraw 200.
 	let instruction = Instruction::new_with_bytes(
@@ -559,11 +573,8 @@ fn withdraw_from_paused_pool_fails() {
 	let reward_mint = Pubkey::new_unique();
 	let user_stake_ata = derive_ata(&user, &stake_mint);
 
-	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
-	let pos_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<PositionState>());
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
+	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -634,11 +645,8 @@ fn withdraw_zero_amount_fails() {
 	let reward_mint = Pubkey::new_unique();
 	let user_stake_ata = derive_ata(&user, &stake_mint);
 
-	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
-	let pos_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<PositionState>());
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
+	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -709,11 +717,8 @@ fn withdraw_wrong_owner_fails() {
 	let reward_mint = Pubkey::new_unique();
 	let user_b_stake_ata = derive_ata(&user_b, &stake_mint);
 
-	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
-	let pos_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<PositionState>());
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
+	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -784,11 +789,8 @@ fn withdraw_wrong_pool_fails() {
 	let reward_mint = Pubkey::new_unique();
 	let user_stake_ata = derive_ata(&user, &stake_mint);
 
-	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
-	let pos_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<PositionState>());
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
+	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -866,11 +868,8 @@ fn deposit_paused_pool_fails() {
 	let reward_mint = Pubkey::new_unique();
 	let user_stake_ata = derive_ata(&user, &stake_mint);
 
-	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
-	let pos_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<PositionState>());
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
+	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -881,6 +880,7 @@ fn deposit_paused_pool_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_stake_ata, false),
+			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 		],
@@ -905,6 +905,7 @@ fn deposit_paused_pool_fails() {
 			user_stake_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		associated_token_program_account(),
 		token_program_account(),
 		keyed_account_for_system_program(),
 	];
@@ -933,11 +934,8 @@ fn deposit_zero_amount_fails() {
 	let reward_mint = Pubkey::new_unique();
 	let user_stake_ata = derive_ata(&user, &stake_mint);
 
-	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
-	let pos_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<PositionState>());
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
+	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -948,6 +946,7 @@ fn deposit_zero_amount_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_stake_ata, false),
+			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 		],
@@ -979,6 +978,7 @@ fn deposit_zero_amount_fails() {
 			user_stake_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		associated_token_program_account(),
 		token_program_account(),
 		keyed_account_for_system_program(),
 	];
@@ -1008,11 +1008,8 @@ fn deposit_wrong_stake_mint_fails() {
 	let reward_mint = Pubkey::new_unique();
 	let user_stake_ata = derive_ata(&user, &wrong_stake_mint);
 
-	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
-	let pos_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<PositionState>());
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
+	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -1023,6 +1020,7 @@ fn deposit_wrong_stake_mint_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_stake_ata, false),
+			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 		],
@@ -1054,6 +1052,7 @@ fn deposit_wrong_stake_mint_fails() {
 			user_stake_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		associated_token_program_account(),
 		token_program_account(),
 		keyed_account_for_system_program(),
 	];
@@ -1066,7 +1065,7 @@ fn deposit_wrong_stake_mint_fails() {
 }
 
 /// Depositing into a position that belongs to a different owner must fail with
-/// `InvalidAmount`.
+/// `Unauthorized`.
 ///
 /// The pool check (`position.pool == pool_state.address`) passes because we
 /// store the correct pool address in the position.  The owner check then fails
@@ -1088,11 +1087,8 @@ fn deposit_wrong_owner_fails() {
 	// ATA derived for user_b (the signer) — must match what the program checks.
 	let user_b_stake_ata = derive_ata(&user_b, &stake_mint);
 
-	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
-	let pos_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<PositionState>());
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
+	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -1103,6 +1099,7 @@ fn deposit_wrong_owner_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_b_stake_ata, false),
+			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 		],
@@ -1129,13 +1126,14 @@ fn deposit_wrong_owner_fails() {
 		(
 			position_state_key,
 			// pool matches pool_state_key so the pool check passes;
-			// owner is user_a so the owner check fires → InvalidAmount.
+			// owner is user_a so the owner check fires → Unauthorized.
 			position_state_account(&pool_state_key, &user_a, 0, 0, 0, 0, pos_lamports),
 		),
 		(
 			user_b_stake_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		associated_token_program_account(),
 		token_program_account(),
 		keyed_account_for_system_program(),
 	];
@@ -1143,7 +1141,7 @@ fn deposit_wrong_owner_fails() {
 	mollusk.process_and_validate_instruction(
 		&instruction,
 		&accounts,
-		&[Check::err(StakingError::InvalidAmount.into())],
+		&[Check::err(StakingError::Unauthorized.into())],
 	);
 }
 
@@ -1172,11 +1170,8 @@ fn claim_wrong_pool_fails() {
 	let stake_mint = Pubkey::new_unique();
 	let user_reward_ata = derive_ata(&user, &reward_mint);
 
-	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
-	let pos_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<PositionState>());
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
+	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -1187,6 +1182,7 @@ fn claim_wrong_pool_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_reward_ata, false),
+			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 		],
@@ -1218,6 +1214,7 @@ fn claim_wrong_pool_fails() {
 			user_reward_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		associated_token_program_account(),
 		token_program_account(),
 		keyed_account_for_system_program(),
 	];
@@ -1247,11 +1244,8 @@ fn claim_wrong_reward_mint_fails() {
 	let stake_mint = Pubkey::new_unique();
 	let user_reward_ata = derive_ata(&user, &wrong_reward_mint);
 
-	let pool_lamports = mollusk.sysvars.rent.minimum_balance(size_of::<PoolState>());
-	let pos_lamports = mollusk
-		.sysvars
-		.rent
-		.minimum_balance(size_of::<PositionState>());
+	let pool_lamports = mollusk.sysvars.rent.minimum_balance(PoolState::SIZE);
+	let pos_lamports = mollusk.sysvars.rent.minimum_balance(PositionState::SIZE);
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
@@ -1262,6 +1256,7 @@ fn claim_wrong_reward_mint_fails() {
 			AccountMeta::new(pool_state_key, false),
 			AccountMeta::new(position_state_key, false),
 			AccountMeta::new(user_reward_ata, false),
+			AccountMeta::new_readonly(spl_ata_program_id(), false),
 			AccountMeta::new_readonly(spl_token_program_id(), false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
 		],
@@ -1293,6 +1288,7 @@ fn claim_wrong_reward_mint_fails() {
 			user_reward_ata,
 			Account::new(1, 165, &spl_token_program_id()),
 		),
+		associated_token_program_account(),
 		token_program_account(),
 		keyed_account_for_system_program(),
 	];

@@ -25,7 +25,7 @@ pub enum TestAccountKind {
 
 #[account(crate = ::pina, discriminator = TestAccountKind)]
 pub struct BalanceState {
-	pub amount: PodU64,
+	pub amount: u64,
 }
 
 #[allow(dead_code)]
@@ -137,9 +137,10 @@ impl Drop for AlignedMemory {
 }
 
 fn build_balance_state_bytes(amount: u64) -> Vec<u8> {
-	let state = BalanceState::builder().amount(PodU64::from(amount)).build();
-
-	state.to_bytes().to_vec()
+	let mut bytes = vec![0u8; BalanceState::SIZE];
+	let state = BalanceState::initialize(&mut bytes).expect("valid account storage");
+	state.amount.set(amount);
+	bytes
 }
 
 fn fake_address(byte: u8) -> Address {
@@ -533,7 +534,7 @@ fn assert_type_rejects_wrong_owner_before_trusting_bytes() {
 
 #[test]
 fn assert_type_rejects_wrong_discriminator() {
-	let mut wrong_bytes = vec![0u8; size_of::<BalanceState>()];
+	let mut wrong_bytes = vec![0u8; BalanceState::SIZE];
 	wrong_bytes[0] = 99;
 	let unique_accounts = [AccountBuilder::new()
 		.address(fake_address(23))

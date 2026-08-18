@@ -10,14 +10,23 @@ import {
 	type AccountMeta,
 	type AccountSignerMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
@@ -26,6 +35,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { ESCROW_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const TAKE_DISCRIMINATOR = 2;
 
@@ -45,11 +55,14 @@ export type TakeInstruction<
 	TAccountEscrow extends string | AccountMeta<string> = string,
 	TAccountVault extends string | AccountMeta<string> = string,
 	TAccountTokenProgram extends string | AccountMeta<string> = string,
+	TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+		"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 	TAccountSystemProgram extends string | AccountMeta<string> =
 		"11111111111111111111111111111111",
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<
 		[
 			TAccountTaker extends string ?
@@ -60,7 +73,7 @@ export type TakeInstruction<
 				: TAccountMintA,
 			TAccountMintB extends string ? ReadonlyAccount<TAccountMintB>
 				: TAccountMintB,
-			TAccountTakerAtaA extends string ? ReadonlyAccount<TAccountTakerAtaA>
+			TAccountTakerAtaA extends string ? WritableAccount<TAccountTakerAtaA>
 				: TAccountTakerAtaA,
 			TAccountTakerAtaB extends string ? WritableAccount<TAccountTakerAtaB>
 				: TAccountTakerAtaB,
@@ -75,12 +88,47 @@ export type TakeInstruction<
 			TAccountTokenProgram extends string
 				? ReadonlyAccount<TAccountTokenProgram>
 				: TAccountTokenProgram,
+			TAccountAssociatedTokenProgram extends string
+				? ReadonlyAccount<TAccountAssociatedTokenProgram>
+				: TAccountAssociatedTokenProgram,
 			TAccountSystemProgram extends string
 				? ReadonlyAccount<TAccountSystemProgram>
 				: TAccountSystemProgram,
 			...TRemainingAccounts,
 		]
 	>;
+
+export type TakeInstructionData = { discriminator: number };
+
+export type TakeInstructionDataArgs = {};
+
+export function getTakeInstructionDataEncoder(): FixedSizeEncoder<
+	TakeInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 2 }),
+	);
+}
+
+export function getTakeInstructionDataDecoder(): FixedSizeDecoder<
+	TakeInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(TAKE_DISCRIMINATOR, getU8Decoder()),
+	]]);
+}
+
+export function getTakeInstructionDataCodec(): FixedSizeCodec<
+	TakeInstructionDataArgs,
+	TakeInstructionData
+> {
+	return combineCodec(
+		getTakeInstructionDataEncoder(),
+		getTakeInstructionDataDecoder(),
+	);
+}
 
 export type TakeInput<
 	TAccountTaker extends string = string,
@@ -93,6 +141,7 @@ export type TakeInput<
 	TAccountEscrow extends string = string,
 	TAccountVault extends string = string,
 	TAccountTokenProgram extends string = string,
+	TAccountAssociatedTokenProgram extends string = string,
 	TAccountSystemProgram extends string = string,
 > = {
 	taker: TransactionSigner<TAccountTaker>;
@@ -105,6 +154,7 @@ export type TakeInput<
 	escrow: Address<TAccountEscrow>;
 	vault: Address<TAccountVault>;
 	tokenProgram: Address<TAccountTokenProgram>;
+	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
 	systemProgram?: Address<TAccountSystemProgram>;
 };
 
@@ -119,6 +169,7 @@ export function getTakeInstruction<
 	TAccountEscrow extends string,
 	TAccountVault extends string,
 	TAccountTokenProgram extends string,
+	TAccountAssociatedTokenProgram extends string,
 	TAccountSystemProgram extends string,
 	TProgramAddress extends Address = typeof ESCROW_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -133,6 +184,7 @@ export function getTakeInstruction<
 		TAccountEscrow,
 		TAccountVault,
 		TAccountTokenProgram,
+		TAccountAssociatedTokenProgram,
 		TAccountSystemProgram
 	>,
 	config?: { programAddress?: TProgramAddress },
@@ -148,6 +200,7 @@ export function getTakeInstruction<
 	TAccountEscrow,
 	TAccountVault,
 	TAccountTokenProgram,
+	TAccountAssociatedTokenProgram,
 	TAccountSystemProgram
 > {
 	// Program address.
@@ -159,13 +212,17 @@ export function getTakeInstruction<
 		taker: { value: input.taker ?? null, isWritable: true },
 		mintA: { value: input.mintA ?? null, isWritable: false },
 		mintB: { value: input.mintB ?? null, isWritable: false },
-		takerAtaA: { value: input.takerAtaA ?? null, isWritable: false },
+		takerAtaA: { value: input.takerAtaA ?? null, isWritable: true },
 		takerAtaB: { value: input.takerAtaB ?? null, isWritable: true },
 		maker: { value: input.maker ?? null, isWritable: true },
 		makerAtaB: { value: input.makerAtaB ?? null, isWritable: true },
 		escrow: { value: input.escrow ?? null, isWritable: true },
 		vault: { value: input.vault ?? null, isWritable: true },
 		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+		associatedTokenProgram: {
+			value: input.associatedTokenProgram ?? null,
+			isWritable: false,
+		},
 		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
 	};
 	const accounts = originalAccounts as Record<
@@ -174,6 +231,12 @@ export function getTakeInstruction<
 	>;
 
 	// Resolve default values.
+	if (!accounts.associatedTokenProgram.value) {
+		accounts.associatedTokenProgram.value =
+			"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<
+				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+			>;
+	}
 	if (!accounts.systemProgram.value) {
 		accounts.systemProgram.value =
 			"11111111111111111111111111111111" as Address<
@@ -194,8 +257,10 @@ export function getTakeInstruction<
 			getAccountMeta("escrow", accounts.escrow),
 			getAccountMeta("vault", accounts.vault),
 			getAccountMeta("tokenProgram", accounts.tokenProgram),
+			getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 		],
+		data: getTakeInstructionDataEncoder().encode({}),
 		programAddress,
 	} as TakeInstruction<
 		TProgramAddress,
@@ -209,6 +274,7 @@ export function getTakeInstruction<
 		TAccountEscrow,
 		TAccountVault,
 		TAccountTokenProgram,
+		TAccountAssociatedTokenProgram,
 		TAccountSystemProgram
 	>);
 }
@@ -229,22 +295,27 @@ export type ParsedTakeInstruction<
 		escrow: TAccountMetas[7];
 		vault: TAccountMetas[8];
 		tokenProgram: TAccountMetas[9];
-		systemProgram: TAccountMetas[10];
+		associatedTokenProgram: TAccountMetas[10];
+		systemProgram: TAccountMetas[11];
 	};
+	data: TakeInstructionData;
 };
 
 export function parseTakeInstruction<
 	TProgram extends string,
 	TAccountMetas extends readonly AccountMeta[],
 >(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedTakeInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 11) {
+	if (instruction.accounts.length < 12) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 11,
+				expectedAccountMetas: 12,
 			},
 		);
 	}
@@ -267,7 +338,9 @@ export function parseTakeInstruction<
 			escrow: getNextAccount(),
 			vault: getNextAccount(),
 			tokenProgram: getNextAccount(),
+			associatedTokenProgram: getNextAccount(),
 			systemProgram: getNextAccount(),
 		},
+		data: getTakeInstructionDataDecoder().decode(instruction.data),
 	};
 }

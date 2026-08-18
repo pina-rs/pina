@@ -31,12 +31,12 @@ pub enum LedgerAccount {
 #[account(discriminator = LedgerAccount)]
 pub struct Balance {
 	pub owner: Address,
-	pub amount: PodU64,
+	pub amount: u64,
 }
 
 #[instruction(discriminator = LedgerInstruction, variant = Transfer)]
 pub struct TransferInstruction {
-	pub amount: PodU64,
+	pub amount: u64,
 }
 
 #[derive(Accounts, Debug)]
@@ -75,17 +75,17 @@ impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
 			return Err(LedgerError::DuplicateAccounts.into());
 		}
 
-		let amount: u64 = args.amount.into();
+		let amount = args.amount.get();
 
 		let mut source = self.source.as_account_mut::<Balance>(&ID)?;
-		let source_amount: u64 = source.amount.into();
+		let source_amount = source.amount.get();
 
 		let mut dest = self.dest.as_account_mut::<Balance>(&ID)?;
-		let dest_amount: u64 = dest.amount.into();
+		let dest_amount = dest.amount.get();
 
 		let (new_source, new_dest) = checked_transfer_balances(source_amount, dest_amount, amount)?;
-		source.amount = PodU64::from(new_source);
-		dest.amount = PodU64::from(new_dest);
+		source.amount.set(new_source);
+		dest.amount.set(new_dest);
 
 		Ok(())
 	}

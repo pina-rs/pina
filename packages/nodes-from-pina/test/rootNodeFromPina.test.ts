@@ -47,6 +47,7 @@ test("it can skip the default visitor", () => {
 	);
 
 	expect(root.kind).toBe("rootNode");
+	expect(root.program.accounts?.[0]).toBeDefined();
 	expect(root.program.accounts?.[0]?.size).toBeUndefined();
 });
 

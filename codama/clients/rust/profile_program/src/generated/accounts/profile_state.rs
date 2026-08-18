@@ -8,20 +8,21 @@
 	clippy::too_many_arguments
 )]
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+use pina::zeropod;
+
+#[derive(pina::ZeroPod)]
 pub struct ProfileState {
 	/// On-chain profile state.
 	///
 	/// The `#[account]` macro generates:
 	/// - A discriminator field (`ProfileAccountType::ProfileState`) as the first
 	/// byte.
-	/// - `Pod` + `Zeroable` derives for zero-copy (de)serialization.
-	/// - `HasDiscriminator` linking this struct to
+	/// - `PinaAccount` and zeropod validation for checked zero-copy access.
+	/// - `HasDiscriminator` linking this account to
 	/// `ProfileAccountType::ProfileState`.
-	/// - `TypedBuilder` for ergonomic construction.
+	/// - `initialize` and `try_from_bytes` helpers for caller-owned storage.
 	///
-	/// Layout (231 bytes total):
+	/// Layout (240 bytes total):
 	/// ```text
 	/// | offset | size | field          |
 	/// |--------|------|----------------|
@@ -30,52 +31,56 @@ pub struct ProfileState {
 	/// | 2      | 33   | name (PodString<32>)  |
 	/// | 35     | 129  | bio (PodString<128>)  |
 	/// | 164    | 66   | tags (PodVec<PodU64, 8>) |
-	/// | 230    | 1    | active (PodBool) |
+	/// | 230    | 9    | favorite_tag (PodOption<PodU64>) |
+	/// | 239    | 1    | active (PodBool) |
 	/// ```
 	pub discriminator: u8,
 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
 	pub bump: u8,
-	/// The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8
-	/// bytes.
-	pub name: [u8; 33],
-	/// A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8
-	/// bytes.
-	pub bio: [u8; 129],
-	/// Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte
-	/// elements.
-	pub tags: [u8; 66],
+	/// The profile display name. The generated view uses one length byte plus
+	/// 32 bytes of UTF-8 capacity.
+	pub name: pina::String<32>,
+	/// A longer free-form bio. The generated view uses one length byte plus
+	/// 128 bytes of UTF-8 capacity.
+	pub bio: pina::String<128>,
+	/// Up to 8 tags. The generated view uses a two-byte count followed by
+	/// eight little-endian `u64` slots.
+	pub tags: pina::Vec<u64, 8>,
+	/// An optional favourite tag. The generated view uses a one-byte tag and
+	/// an eight-byte value slot, even when the option is `None`.
+	pub favorite_tag: Option<u64>,
 	/// Whether the profile is active.
-	pub active: pina::PodBool,
+	pub active: bool,
 }
 
 pub const PROFILE_STATE_DISCRIMINATOR: u8 = 1u8;
 
 impl ProfileState {
-	pub const LEN: usize = core::mem::size_of::<Self>();
+	pub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;
 
-	pub const fn new(
-		bump: u8,
-		name: [u8; 33],
-		bio: [u8; 129],
-		tags: [u8; 66],
-		active: pina::PodBool,
-	) -> Self {
-		Self {
-			discriminator: PROFILE_STATE_DISCRIMINATOR,
-			bump,
-			name,
-			bio,
-			tags,
-			active,
-		}
-	}
-
-	pub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {
-		if data.len() != core::mem::size_of::<Self>() {
+	/// Initialize zero-valid account storage.
+	///
+	/// Every non-discriminator field must accept an all-zero
+	/// representation. Otherwise this method returns `InvalidAccountData`.
+	pub fn initialize(
+		data: &mut [u8],
+	) -> Result<&mut ProfileStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let account = unsafe { &*(data.as_ptr() as *const Self) };
+		data.fill(0);
+		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
+		account.discriminator = PROFILE_STATE_DISCRIMINATOR;
+		Ok(account)
+	}
+
+	pub fn from_bytes(data: &[u8]) -> Result<&ProfileStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		let account = <Self as pina::ZeroPodFixed>::from_bytes(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != PROFILE_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
@@ -84,26 +89,16 @@ impl ProfileState {
 
 	pub fn from_bytes_mut(
 		data: &mut [u8],
-	) -> Result<&mut Self, solana_program_error::ProgramError> {
-		if data.len() != core::mem::size_of::<Self>() {
+	) -> Result<&mut ProfileStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let account = unsafe { &mut *(data.as_mut_ptr() as *mut Self) };
+		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != PROFILE_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		Ok(account)
-	}
-}
-
-impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for ProfileState {
-	type Error = solana_program_error::ProgramError;
-
-	fn try_from(account_info: &solana_account_info::AccountInfo<'a>) -> Result<Self, Self::Error> {
-		let data_ref = (*account_info.data).borrow();
-		let account = Self::from_bytes(&data_ref)?;
-		Ok(*account)
 	}
 }
 

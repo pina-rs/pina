@@ -54,27 +54,27 @@ cargo add pina --features token
 | `PodU128` | `u128` | 16 bytes |
 | `PodI128` | `i128` | 16 bytes |
 
-All types are `#[repr(transparent)]` over byte arrays (or `u8` for `PodBool`) and implement `bytemuck::Pod` + `bytemuck::Zeroable`.
+All types are alignment-1 byte-backed values that implement zeropod's `ZcElem` and `ZcValidate` contracts.
 
 <!-- {/podTypesTable} -->
 
 <!-- {@podCollectionTypesTable} -->
 
-| Type                       | Purpose                | Layout                                    |
-| -------------------------- | ---------------------- | ----------------------------------------- |
-| `PodOption<T: Pod>`        | Fixed-size `Option<T>` | 1-byte discriminant + `T`                 |
-| `PodString<N, PFX=1>`      | Fixed-capacity string  | `PFX`-byte length prefix + `N` data bytes |
-| `PodVec<T: Pod, N, PFX=2>` | Fixed-capacity vec     | `PFX`-byte length prefix + `N` elements   |
+| Type        | Purpose                | Layout                                    |
+| ----------- | ---------------------- | ----------------------------------------- |
+| `PodOption` | Fixed-size `Option<T>` | 1-byte discriminant + `T`                 |
+| `PodString` | Fixed-capacity string  | `PFX`-byte length prefix + `N` data bytes |
+| `PodVec`    | Fixed-capacity vec     | `PFX`-byte length prefix + `N` elements   |
 
-All collection types are `#[repr(C)]`, alignment-1, and implement `bytemuck::Pod` + `bytemuck::Zeroable`. Length prefixes (`PFX`) default to 1 byte for strings (max 255) and 2 bytes for vectors (max 65 535 elements).
+The full generic forms are `PodOption<T: ZcElem>`, `PodString<N, PFX = 1>`, and `PodVec<T: ZcElem, N, PFX = 2>`. All collection layouts are alignment 1 and padding-free when `T: ZcElem`. `ZcValidate` checks tags, length prefixes, active elements, and UTF-8 before safe access. Length prefixes (`PFX`) default to 1 byte for strings (max 255) and 2 bytes for vectors (max 65 535 elements).
 
 <!-- {/podCollectionTypesTable} -->
 
 <!-- {@podCollectionDescription} -->
 
-Collection types store data inline with a length prefix, enabling zero-copy access inside `#[repr(C)]` account structs. Overflow is detected at insertion time — `try_set` / `try_push` return `Err(PodCollectionError::Overflow)` when capacity is exceeded.
+Collection types store data inline without allocation and can be embedded in Pina's zeropod account, instruction, and event schemas. Overflow is detected at insertion time — `try_set` / `try_push` return `Err(ZeroPodError::Overflow)` when capacity is exceeded. Inactive capacity is not part of the semantic value and Pina never exposes it through a whole-object byte view.
 
-`PodString` provides UTF-8 validation via `try_as_str()`, while `PodVec` offers slice-based access via `as_slice()` / `as_mut_slice()`. `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`.
+After boundary validation, `PodString::as_str()` is safe. `PodVec` offers slice-based access via `as_slice()` / `as_slice_mut()`, and `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`.
 
 <!-- {/podCollectionDescription} -->
 
@@ -101,7 +101,7 @@ Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 
 <!-- {@pinaFeatureHighlights} -->
 
-- **Zero-copy deserialization** — account data is reinterpreted in place via `bytemuck`, with no heap allocation.
+- **Validated zero-copy deserialization** — zeropod validates fixed-layout account data before Pina reinterprets it in place, with no heap allocation.
 - **`no_std` compatible** — all crates compile to the `bpfel-unknown-none` SBF target for on-chain deployment.
 - **Low compute units** — built on `pinocchio` instead of `solana-program`, saving thousands of CU per instruction.
 - **Discriminator system** — every account, instruction, and event type carries a typed discriminator as its first field.

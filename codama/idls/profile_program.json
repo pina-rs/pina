@@ -17,12 +17,12 @@
 					"The `#[account]` macro generates:",
 					"- A discriminator field (`ProfileAccountType::ProfileState`) as the first",
 					"byte.",
-					"- `Pod` + `Zeroable` derives for zero-copy (de)serialization.",
-					"- `HasDiscriminator` linking this struct to",
+					"- `PinaAccount` and zeropod validation for checked zero-copy access.",
+					"- `HasDiscriminator` linking this account to",
 					"`ProfileAccountType::ProfileState`.",
-					"- `TypedBuilder` for ergonomic construction.",
+					"- `initialize` and `try_from_bytes` helpers for caller-owned storage.",
 					"",
-					"Layout (231 bytes total):",
+					"Layout (240 bytes total):",
 					"```text",
 					"| offset | size | field          |",
 					"|--------|------|----------------|",
@@ -31,12 +31,27 @@
 					"| 2      | 33   | name (PodString<32>)  |",
 					"| 35     | 129  | bio (PodString<128>)  |",
 					"| 164    | 66   | tags (PodVec<PodU64, 8>) |",
-					"| 230    | 1    | active (PodBool) |",
+					"| 230    | 9    | favorite_tag (PodOption<PodU64>) |",
+					"| 239    | 1    | active (PodBool) |",
 					"```"
 				],
 				"data": {
 					"kind": "structTypeNode",
 					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "discriminator",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						},
 						{
 							"kind": "structFieldTypeNode",
 							"name": "bump",
@@ -53,14 +68,23 @@
 							"kind": "structFieldTypeNode",
 							"name": "name",
 							"docs": [
-								"The profile display name. `PodString<32>` = 1 length byte + 32 UTF-8",
-								"bytes."
+								"The profile display name. The generated view uses one length byte plus",
+								"32 bytes of UTF-8 capacity."
 							],
 							"type": {
 								"kind": "fixedSizeTypeNode",
 								"size": 33,
 								"type": {
-									"kind": "bytesTypeNode"
+									"kind": "sizePrefixTypeNode",
+									"type": {
+										"kind": "stringTypeNode",
+										"encoding": "utf8"
+									},
+									"prefix": {
+										"kind": "numberTypeNode",
+										"format": "u8",
+										"endian": "le"
+									}
 								}
 							}
 						},
@@ -68,14 +92,23 @@
 							"kind": "structFieldTypeNode",
 							"name": "bio",
 							"docs": [
-								"A longer free-form bio. `PodString<128>` = 1 length byte + 128 UTF-8",
-								"bytes."
+								"A longer free-form bio. The generated view uses one length byte plus",
+								"128 bytes of UTF-8 capacity."
 							],
 							"type": {
 								"kind": "fixedSizeTypeNode",
 								"size": 129,
 								"type": {
-									"kind": "bytesTypeNode"
+									"kind": "sizePrefixTypeNode",
+									"type": {
+										"kind": "stringTypeNode",
+										"encoding": "utf8"
+									},
+									"prefix": {
+										"kind": "numberTypeNode",
+										"format": "u8",
+										"endian": "le"
+									}
 								}
 							}
 						},
@@ -83,14 +116,49 @@
 							"kind": "structFieldTypeNode",
 							"name": "tags",
 							"docs": [
-								"Up to 8 tags. `PodVec<PodU64, 8>` = 2 count bytes + 8 × 8-byte",
-								"elements."
+								"Up to 8 tags. The generated view uses a two-byte count followed by",
+								"eight little-endian `u64` slots."
 							],
 							"type": {
 								"kind": "fixedSizeTypeNode",
 								"size": 66,
 								"type": {
-									"kind": "bytesTypeNode"
+									"kind": "arrayTypeNode",
+									"item": {
+										"kind": "numberTypeNode",
+										"format": "u64",
+										"endian": "le"
+									},
+									"count": {
+										"kind": "prefixedCountNode",
+										"prefix": {
+											"kind": "numberTypeNode",
+											"format": "u16",
+											"endian": "le"
+										}
+									}
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "favoriteTag",
+							"docs": [
+								"An optional favourite tag. The generated view uses a one-byte tag and",
+								"an eight-byte value slot, even when the option is `None`."
+							],
+							"type": {
+								"kind": "optionTypeNode",
+								"fixed": true,
+								"item": {
+									"kind": "numberTypeNode",
+									"format": "u64",
+									"endian": "le"
+								},
+								"prefix": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
 								}
 							}
 						},
@@ -142,8 +210,8 @@
 				"docs": [
 					"Instruction data for `Initialize`.",
 					"",
-					"Contains the PDA bump seed and the initial name/bio. The `PodString`",
-					"fields carry their own length prefix, so the client writes",
+					"Contains the PDA bump seed and the initial name/bio. The generated string",
+					"views carry their own length prefix, so the client writes",
 					"`discriminator + bump + len(name) + name + len(bio) + bio`."
 				],
 				"accounts": [
@@ -203,6 +271,20 @@
 				"arguments": [
 					{
 						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
 						"name": "bump",
 						"type": {
 							"kind": "numberTypeNode",
@@ -217,7 +299,16 @@
 							"kind": "fixedSizeTypeNode",
 							"size": 33,
 							"type": {
-								"kind": "bytesTypeNode"
+								"kind": "sizePrefixTypeNode",
+								"type": {
+									"kind": "stringTypeNode",
+									"encoding": "utf8"
+								},
+								"prefix": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								}
 							}
 						}
 					},
@@ -228,7 +319,16 @@
 							"kind": "fixedSizeTypeNode",
 							"size": 129,
 							"type": {
-								"kind": "bytesTypeNode"
+								"kind": "sizePrefixTypeNode",
+								"type": {
+									"kind": "stringTypeNode",
+									"encoding": "utf8"
+								},
+								"prefix": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								}
 							}
 						}
 					}
@@ -300,12 +400,35 @@
 				"arguments": [
 					{
 						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 1
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
 						"name": "name",
 						"type": {
 							"kind": "fixedSizeTypeNode",
 							"size": 33,
 							"type": {
-								"kind": "bytesTypeNode"
+								"kind": "sizePrefixTypeNode",
+								"type": {
+									"kind": "stringTypeNode",
+									"encoding": "utf8"
+								},
+								"prefix": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								}
 							}
 						}
 					},
@@ -316,7 +439,16 @@
 							"kind": "fixedSizeTypeNode",
 							"size": 129,
 							"type": {
-								"kind": "bytesTypeNode"
+								"kind": "sizePrefixTypeNode",
+								"type": {
+									"kind": "stringTypeNode",
+									"encoding": "utf8"
+								},
+								"prefix": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								}
 							}
 						}
 					}
@@ -386,6 +518,20 @@
 					}
 				],
 				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 2
+						}
+					},
 					{
 						"kind": "instructionArgumentNode",
 						"name": "tag",
@@ -461,6 +607,20 @@
 					}
 				],
 				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 3
+						}
+					},
 					{
 						"kind": "instructionArgumentNode",
 						"name": "index",

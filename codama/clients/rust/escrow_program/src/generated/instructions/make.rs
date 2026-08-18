@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const MAKE_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
@@ -19,6 +21,7 @@ pub struct Make {
 	pub maker_ata_a: solana_pubkey::Pubkey,
 	pub escrow: solana_pubkey::Pubkey,
 	pub vault: solana_pubkey::Pubkey,
+	pub associated_token_program: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
 	pub token_program: solana_pubkey::Pubkey,
 }
@@ -40,6 +43,9 @@ impl Make {
 			maker_ata_a,
 			escrow,
 			vault,
+			associated_token_program: solana_pubkey::pubkey!(
+				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+			),
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 			token_program,
 		}
@@ -55,10 +61,8 @@ impl Make {
 		data: MakeInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.maker, true,
-		));
+		let mut accounts = Vec::with_capacity(9 + remaining_accounts.len());
+		accounts.push(solana_instruction::AccountMeta::new(self.maker, true));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.mint_a,
 			false,
@@ -67,12 +71,16 @@ impl Make {
 			self.mint_b,
 			false,
 		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
+		accounts.push(solana_instruction::AccountMeta::new(
 			self.maker_ata_a,
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.escrow, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.vault, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.associated_token_program,
+			false,
+		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.system_program,
 			false,
@@ -82,46 +90,42 @@ impl Make {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
-
 		solana_instruction::Instruction {
 			program_id: crate::ESCROW_PROGRAM_ID,
 			accounts,
-			data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct MakeInstructionData {
-	pub discriminator: u8,
-	pub seed: pina::PodU64,
-	pub amount_a: pina::PodU64,
-	pub amount_b: pina::PodU64,
-	pub bump: u8,
+	bytes: Vec<u8>,
 }
 
 impl MakeInstructionData {
-	pub const fn new(
-		seed: pina::PodU64,
-		amount_a: pina::PodU64,
-		amount_b: pina::PodU64,
-		bump: u8,
-	) -> Self {
-		Self {
-			discriminator: MAKE_DISCRIMINATOR,
-			seed,
-			amount_a,
-			amount_b,
-			bump,
+	pub fn new(
+		configure: impl FnOnce(&mut MakeInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <MakeInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <MakeInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			configure(data);
+			data.discriminator = MAKE_DISCRIMINATOR;
 		}
+		<MakeInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
+}
+
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct MakeInstructionWire {
+	pub discriminator: u8,
+	pub seed: u64,
+	pub amount_a: u64,
+	pub amount_b: u64,
+	pub bump: u8,
 }

@@ -11,8 +11,8 @@
 //! tests:
 //!
 //! ```sh
-//! cargo build --release --target bpfel-unknown-none -p profile_program \
-//!     -Z build-std -F bpf-entrypoint
+//! cargo build-sbf --manifest-path examples/profile_program/Cargo.toml \
+//!     --sbf-out-dir target/deploy --features bpf-entrypoint
 //! ```
 //!
 //! Then set `SBF_OUT_DIR` to the directory containing the `.so` file, or place
@@ -21,17 +21,14 @@
 //! ## Running
 //!
 //! ```sh
-//! SBF_OUT_DIR=target/bpfel-unknown-none/release \
-//!     cargo test -p profile_program --test e2e -- --nocapture
+//! SBF_OUT_DIR=target/deploy \
+//!     cargo test -p profile_program --test e2e -- --include-ignored --nocapture
 //! ```
-
-use std::mem::size_of;
 
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
 use mollusk_svm::result::InstructionResult;
-use pina::PodU64;
 use pina::ProgramError;
 use profile_program::AddTagInstruction;
 use profile_program::ID;
@@ -39,6 +36,7 @@ use profile_program::InitializeInstruction;
 use profile_program::ProfileError;
 use profile_program::ProfileInstruction;
 use profile_program::ProfileState;
+use profile_program::ProfileStateZc;
 use profile_program::RemoveTagInstruction;
 use profile_program::UpdateProfileInstruction;
 use solana_account::Account;
@@ -59,12 +57,8 @@ fn program_id() -> Pubkey {
 	Pubkey::new_from_array(array)
 }
 
-/// Try to create a mollusk instance for the profile_program.
-///
-/// Returns `None` if the SBF binary cannot be found (e.g. the program has not
-/// been compiled yet). This allows tests to be skipped gracefully without
-/// triggering a panic-abort from the `no_std` panic handler.
-fn try_create_mollusk() -> Option<Mollusk> {
+/// Create a Mollusk instance for the compiled profile program.
+fn create_mollusk() -> Mollusk {
 	let so_name = "profile_program.so";
 	let search_dirs: Vec<std::path::PathBuf> = [
 		std::env::var("SBF_OUT_DIR").ok(),
@@ -76,22 +70,18 @@ fn try_create_mollusk() -> Option<Mollusk> {
 	.map(std::path::PathBuf::from)
 	.collect();
 
-	let found = search_dirs.iter().any(|dir| dir.join(so_name).is_file());
-	if !found {
-		return None;
-	}
+	assert!(
+		search_dirs.iter().any(|dir| dir.join(so_name).is_file()),
+		"profile_program SBF binary not found; build it before running ignored e2e tests"
+	);
 
-	Some(Mollusk::new(&program_id(), "profile_program"))
+	Mollusk::new(&program_id(), "profile_program")
 }
 
 /// Derive the profile PDA for a given authority pubkey.
 fn derive_profile_pda(authority: &Pubkey) -> (Pubkey, u8) {
 	Pubkey::find_program_address(&[b"profile", authority.as_ref()], &program_id())
 }
-
-const SKIP_MSG: &str = "[SKIP] profile_program SBF binary not found. Build it first with `cargo \
-                        build --release --target bpfel-unknown-none -p profile_program -Z \
-                        build-std -F bpf-entrypoint`.";
 
 // ---------------------------------------------------------------------------
 // Instruction data builders
@@ -127,16 +117,22 @@ fn update_profile_ix_data(name: &str, bio: &str) -> Vec<u8> {
 
 /// Build `AddTag` instruction data: discriminator + tag.
 fn add_tag_ix_data(tag: u64) -> Vec<u8> {
-	let ix = AddTagInstruction::builder().tag(PodU64::from(tag)).build();
-	ix.to_bytes().to_vec()
+	let mut data = vec![0u8; AddTagInstruction::SIZE];
+	AddTagInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("add-tag initialization failed: {error:?}"))
+		.tag
+		.set(tag);
+	data
 }
 
 /// Build `RemoveTag` instruction data: discriminator + index.
 fn remove_tag_ix_data(index: u64) -> Vec<u8> {
-	let ix = RemoveTagInstruction::builder()
-		.index(PodU64::from(index))
-		.build();
-	ix.to_bytes().to_vec()
+	let mut data = vec![0u8; RemoveTagInstruction::SIZE];
+	RemoveTagInstruction::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("remove-tag initialization failed: {error:?}"))
+		.index
+		.set(index);
+	data
 }
 
 // ---------------------------------------------------------------------------
@@ -169,7 +165,7 @@ fn assert_profile(
 	let account = result
 		.get_account(profile)
 		.unwrap_or_else(|| panic!("profile account {profile} not found"));
-	let state: &ProfileState =
+	let state: &ProfileStateZc =
 		<ProfileState as pina::ZeroPodFixed>::from_bytes(&account.data).unwrap();
 	assert_eq!(state.name.as_str(), expected_name);
 	assert_eq!(state.bio.as_str(), expected_bio);
@@ -180,7 +176,8 @@ fn assert_profile(
 		.map(|t| u64::from(*t))
 		.collect();
 	assert_eq!(tags, expected_tags);
-	assert_eq!(bool::from(state.active), expected_active);
+	assert!(state.favorite_tag.is_none());
+	assert_eq!(state.active.get(), expected_active);
 }
 
 // ---------------------------------------------------------------------------
@@ -194,11 +191,9 @@ fn assert_profile(
 /// `process_and_validate_instruction` calls, so each instruction is fed the
 /// previous result's accounts.
 #[test]
+#[ignore = "requires the profile_program SBF binary"]
 fn full_lifecycle() {
-	let Some(mollusk) = try_create_mollusk() else {
-		eprintln!("{SKIP_MSG}");
-		return;
-	};
+	let mollusk = create_mollusk();
 
 	let authority = Pubkey::new_unique();
 	let (profile, bump) = derive_profile_pda(&authority);
@@ -291,14 +286,12 @@ fn full_lifecycle() {
 	assert_profile(&result, &profile, "alice2", "updated bio", &[10, 30], true);
 }
 
-/// `Initialize` must reject invalid UTF-8 in the name and leave no account
-/// behind.
+/// `Initialize` must reject invalid UTF-8 in the name without creating the
+/// profile account.
 #[test]
+#[ignore = "requires the profile_program SBF binary"]
 fn initialize_rejects_invalid_utf8() {
-	let Some(mollusk) = try_create_mollusk() else {
-		eprintln!("{SKIP_MSG}");
-		return;
-	};
+	let mollusk = create_mollusk();
 
 	let authority = Pubkey::new_unique();
 	let (profile, bump) = derive_profile_pda(&authority);
@@ -321,19 +314,22 @@ fn initialize_rejects_invalid_utf8() {
 	let result = mollusk.process_and_validate_instruction(
 		&instruction,
 		&initialize_accounts(&authority, &profile),
-		&[Check::err(ProfileError::InvalidUtf8.into())],
+		&[Check::err(ProgramError::InvalidInstructionData)],
 	);
-	// Account must not have been created
-	assert!(result.get_account(&profile).is_none());
+	// Mollusk retains the input placeholder account after a failed instruction.
+	let account = result
+		.get_account(&profile)
+		.unwrap_or_else(|| panic!("profile input account missing"));
+	assert_eq!(account.lamports, 0);
+	assert!(account.data.is_empty());
+	assert_eq!(account.owner, solana_sdk_ids::system_program::id());
 }
 
 /// `AddTag` must reject a 9th tag once the `PodVec` capacity (8) is reached.
 #[test]
+#[ignore = "requires the profile_program SBF binary"]
 fn add_tag_rejects_overflow() {
-	let Some(mollusk) = try_create_mollusk() else {
-		eprintln!("{SKIP_MSG}");
-		return;
-	};
+	let mollusk = create_mollusk();
 
 	let authority = Pubkey::new_unique();
 	let (profile, bump) = derive_profile_pda(&authority);
@@ -396,11 +392,9 @@ fn add_tag_rejects_overflow() {
 
 /// `RemoveTag` must reject an index into an empty tag list.
 #[test]
+#[ignore = "requires the profile_program SBF binary"]
 fn remove_tag_rejects_out_of_range() {
-	let Some(mollusk) = try_create_mollusk() else {
-		eprintln!("{SKIP_MSG}");
-		return;
-	};
+	let mollusk = create_mollusk();
 
 	let authority = Pubkey::new_unique();
 	let (profile, bump) = derive_profile_pda(&authority);
@@ -443,11 +437,9 @@ fn remove_tag_rejects_out_of_range() {
 
 /// `Initialize` must require the authority's signature.
 #[test]
+#[ignore = "requires the profile_program SBF binary"]
 fn requires_signer() {
-	let Some(mollusk) = try_create_mollusk() else {
-		eprintln!("{SKIP_MSG}");
-		return;
-	};
+	let mollusk = create_mollusk();
 
 	let authority = Pubkey::new_unique();
 	let (profile, bump) = derive_profile_pda(&authority);
@@ -471,9 +463,9 @@ fn requires_signer() {
 /// The account and instruction layouts must match the documented sizes.
 #[test]
 fn account_layout_matches_state() {
-	assert_eq!(size_of::<ProfileState>(), 231);
-	assert_eq!(size_of::<InitializeInstruction>(), 164);
-	assert_eq!(size_of::<UpdateProfileInstruction>(), 163);
-	assert_eq!(size_of::<AddTagInstruction>(), 9);
-	assert_eq!(size_of::<RemoveTagInstruction>(), 9);
+	assert_eq!(ProfileState::SIZE, 240);
+	assert_eq!(InitializeInstruction::SIZE, 164);
+	assert_eq!(UpdateProfileInstruction::SIZE, 163);
+	assert_eq!(AddTagInstruction::SIZE, 9);
+	assert_eq!(RemoveTagInstruction::SIZE, 9);
 }

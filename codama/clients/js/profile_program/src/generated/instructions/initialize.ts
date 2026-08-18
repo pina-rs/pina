@@ -9,6 +9,8 @@
 import {
 	type AccountMeta,
 	type AccountSignerMeta,
+	addDecoderSizePrefix,
+	addEncoderSizePrefix,
 	type Address,
 	combineCodec,
 	fixDecoderSize,
@@ -16,12 +18,12 @@ import {
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
 	fixEncoderSize,
-	getBytesDecoder,
-	getBytesEncoder,
 	getStructDecoder,
 	getStructEncoder,
 	getU8Decoder,
 	getU8Encoder,
+	getUtf8Decoder,
+	getUtf8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
 	type InstructionWithData,
@@ -30,6 +32,7 @@ import {
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 	type WritableSignerAccount,
 } from "@solana/kit";
@@ -40,6 +43,11 @@ import {
 } from "@solana/program-client-core";
 import { findProfilePda } from "../pdas";
 import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import {
+	fixZeroPodEncoderSize,
+	getZeroPodDiscriminatorDecoder,
+	getZeroPodStringDecoder,
+} from "../zeropodCodecs";
 
 export const INITIALIZE_DISCRIMINATOR = 0;
 
@@ -73,29 +81,54 @@ export type InitializeInstruction<
 	>;
 
 export type InitializeInstructionData = {
+	discriminator: number;
 	bump: number;
-	name: ReadonlyUint8Array;
-	bio: ReadonlyUint8Array;
+	name: string;
+	bio: string;
 };
 
-export type InitializeInstructionDataArgs = InitializeInstructionData;
+export type InitializeInstructionDataArgs = {
+	bump: number;
+	name: string;
+	bio: string;
+};
 
 export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
 	InitializeInstructionDataArgs
 > {
-	return getStructEncoder([["bump", getU8Encoder()], [
-		"name",
-		fixEncoderSize(getBytesEncoder(), 33),
-	], ["bio", fixEncoderSize(getBytesEncoder(), 129)]]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"bump",
+			getU8Encoder(),
+		], [
+			"name",
+			fixZeroPodEncoderSize(
+				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+				33,
+			),
+		], [
+			"bio",
+			fixZeroPodEncoderSize(
+				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+				129,
+			),
+		]]),
+		(value) => ({ ...value, discriminator: 0 }),
+	);
 }
 
 export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
 	InitializeInstructionData
 > {
-	return getStructDecoder([["bump", getU8Decoder()], [
-		"name",
-		fixDecoderSize(getBytesDecoder(), 33),
-	], ["bio", fixDecoderSize(getBytesDecoder(), 129)]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder()),
+		],
+		["bump", getU8Decoder()],
+		["name", getZeroPodStringDecoder(getU8Decoder(), 33)],
+		["bio", getZeroPodStringDecoder(getU8Decoder(), 129)],
+	]);
 }
 
 export function getInitializeInstructionDataCodec(): FixedSizeCodec<

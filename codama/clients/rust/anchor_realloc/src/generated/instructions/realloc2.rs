@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const REALLOC2_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
@@ -55,35 +57,39 @@ impl Realloc2 {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
-
 		solana_instruction::Instruction {
 			program_id: crate::ANCHOR_REALLOC_ID,
 			accounts,
-			data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct Realloc2InstructionData {
-	pub discriminator: u8,
-	pub len: pina::PodU16,
+	bytes: Vec<u8>,
 }
 
 impl Realloc2InstructionData {
-	pub const fn new(len: pina::PodU16) -> Self {
-		Self {
-			discriminator: REALLOC2_DISCRIMINATOR,
-			len,
+	pub fn new(
+		configure: impl FnOnce(&mut Realloc2InstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <Realloc2InstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <Realloc2InstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			configure(data);
+			data.discriminator = REALLOC2_DISCRIMINATOR;
 		}
+		<Realloc2InstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
+}
+
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct Realloc2InstructionWire {
+	pub discriminator: u8,
+	pub len: u16,
 }

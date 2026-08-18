@@ -8,10 +8,27 @@
 pub struct ProgramIr {
 	pub name: String,
 	pub public_key: String,
+	pub zeropod_enums: Vec<ZeroPodEnumIr>,
 	pub accounts: Vec<AccountIr>,
 	pub instructions: Vec<InstructionIr>,
 	pub errors: Vec<ErrorIr>,
 	pub pdas: Vec<PdaIr>,
+}
+
+/// A local unit enum derived with zeropod and its generated companion.
+#[derive(Debug, Clone)]
+pub struct ZeroPodEnumIr {
+	pub name: String,
+	pub repr_size: usize,
+	pub variants: Vec<ZeroPodEnumVariantIr>,
+	pub docs: Vec<String>,
+}
+
+/// A unit variant and its explicit wire discriminant.
+#[derive(Debug, Clone)]
+pub struct ZeroPodEnumVariantIr {
+	pub name: String,
+	pub value: u32,
 }
 
 /// An on-chain account type decorated with `#[account]`.

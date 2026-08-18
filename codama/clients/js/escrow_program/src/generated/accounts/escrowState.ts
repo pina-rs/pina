@@ -32,8 +32,10 @@ import {
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { EscrowSeeds, findEscrowPda } from "../pdas";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const ESCROW_STATE_DISCRIMINATOR = 1;
 
@@ -42,6 +44,7 @@ export function getEscrowStateDiscriminatorBytes(): ReadonlyUint8Array {
 }
 
 export type EscrowState = {
+	discriminator: number;
 	maker: Address;
 	mintA: Address;
 	mintB: Address;
@@ -67,20 +70,31 @@ export type EscrowStateArgs = {
 
 /** Gets the encoder for {@link EscrowStateArgs} account data. */
 export function getEscrowStateEncoder(): FixedSizeEncoder<EscrowStateArgs> {
-	return getStructEncoder([
-		["maker", getAddressEncoder()],
-		["mintA", getAddressEncoder()],
-		["mintB", getAddressEncoder()],
-		["amountA", getU64Encoder()],
-		["amountB", getU64Encoder()],
-		["seed", getU64Encoder()],
-		["bump", getU8Encoder()],
-	]);
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["maker", getAddressEncoder()],
+			["mintA", getAddressEncoder()],
+			["mintB", getAddressEncoder()],
+			["amountA", getU64Encoder()],
+			["amountB", getU64Encoder()],
+			["seed", getU64Encoder()],
+			["bump", getU8Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 /** Gets the decoder for {@link EscrowState} account data. */
 export function getEscrowStateDecoder(): FixedSizeDecoder<EscrowState> {
 	return getStructDecoder([
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(
+				ESCROW_STATE_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
 		["maker", getAddressDecoder()],
 		["mintA", getAddressDecoder()],
 		["mintB", getAddressDecoder()],

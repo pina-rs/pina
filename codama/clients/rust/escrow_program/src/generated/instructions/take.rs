@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const TAKE_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
@@ -23,6 +25,7 @@ pub struct Take {
 	pub escrow: solana_pubkey::Pubkey,
 	pub vault: solana_pubkey::Pubkey,
 	pub token_program: solana_pubkey::Pubkey,
+	pub associated_token_program: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
 }
 
@@ -50,6 +53,9 @@ impl Take {
 			escrow,
 			vault,
 			token_program,
+			associated_token_program: solana_pubkey::pubkey!(
+				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+			),
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}
@@ -64,7 +70,7 @@ impl Take {
 		data: TakeInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(11 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(12 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.taker, true));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.mint_a,
@@ -74,7 +80,7 @@ impl Take {
 			self.mint_b,
 			false,
 		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
+		accounts.push(solana_instruction::AccountMeta::new(
 			self.taker_ata_a,
 			false,
 		));
@@ -94,37 +100,46 @@ impl Take {
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.associated_token_program,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.system_program,
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
-
 		solana_instruction::Instruction {
 			program_id: crate::ESCROW_PROGRAM_ID,
 			accounts,
-			data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct TakeInstructionData {
-	pub discriminator: u8,
+	bytes: Vec<u8>,
 }
 
 impl TakeInstructionData {
-	pub const fn new() -> Self {
-		Self {
-			discriminator: TAKE_DISCRIMINATOR,
+	pub fn new(
+		configure: impl FnOnce(&mut TakeInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <TakeInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <TakeInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			configure(data);
+			data.discriminator = TAKE_DISCRIMINATOR;
 		}
+		<TakeInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
+}
+
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct TakeInstructionWire {
+	pub discriminator: u8,
 }

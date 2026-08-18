@@ -60,20 +60,20 @@ pub struct TestState {
 	pub bump: u8,
 	pub _padding: u8,
 	pub _padding2: u8,
-	pub value: PodU64,
+	pub value: u64,
 }
 
 /// Instruction data for Initialize.
 #[instruction(crate = ::pina, discriminator = TestInstruction, variant = Initialize)]
 pub struct InitializeInstr {
 	pub bump: u8,
-	pub initial_value: PodU64,
+	pub initial_value: u64,
 }
 
 /// Instruction data for Update.
 #[instruction(crate = ::pina, discriminator = TestInstruction, variant = Update)]
 pub struct UpdateInstr {
-	pub new_value: PodU64,
+	pub new_value: u64,
 }
 
 /// Instruction data for Close (no extra fields).
@@ -118,24 +118,10 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.state_account.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
 
-		// In a real program, the CPI to system program creates the account
-		// with zeroed data. We simulate that by writing the full state
-		// (including discriminator) directly into the raw bytes.
-		let new_state = TestState::builder()
-			.bump(args.bump)
-			._padding(0)
-			._padding2(0)
-			.value(args.initial_value)
-			.build();
-		let state_bytes = new_state.to_bytes();
-
-		// Write directly to the account's raw data, bypassing discriminator
-		// validation (which would fail on zeroed/uninitialized data).
 		let mut account_data = self.state_account.try_borrow_mut()?;
-		if account_data.len() < state_bytes.len() {
-			return Err(ProgramError::AccountDataTooSmall);
-		}
-		account_data[..state_bytes.len()].copy_from_slice(state_bytes);
+		let state = TestState::initialize(&mut account_data)?;
+		state.bump = args.bump;
+		state.value = args.initial_value;
 
 		Ok(())
 	}
@@ -173,12 +159,9 @@ impl<'a> ProcessAccountInfos<'a> for CloseAccounts<'a> {
 			.assert_writable()?
 			.assert_type::<TestState>(&TEST_PROGRAM_ID)?;
 
-		// Zero account data before closing.
-		let mut state = self
-			.state_account
-			.as_account_mut::<TestState>(&TEST_PROGRAM_ID)?;
-		state.zeroed();
-		drop(state);
+		// Zero the raw account storage before transferring its lamports. Typed
+		// views intentionally cannot expose the complete backing allocation.
+		self.state_account.try_borrow_mut()?.fill(0);
 
 		// Transfer lamports back to authority (simulated via direct lamport
 		// manipulation).
@@ -469,13 +452,37 @@ unsafe fn deserialize_test_input<const MAX_ACCOUNTS: usize>(
 
 /// Create a `TestState` serialized as bytes with proper discriminator.
 fn build_test_state_bytes(bump: u8, value: u64) -> Vec<u8> {
-	let state = TestState::builder()
-		.bump(bump)
-		._padding(0)
-		._padding2(0)
-		.value(PodU64::from(value))
-		.build();
-	state.to_bytes().to_vec()
+	let mut data = vec![0u8; TestState::SIZE];
+	let state = TestState::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("state initialization failed: {error:?}"));
+	state.bump = bump;
+	state.value.set(value);
+	data
+}
+
+fn build_initialize_bytes(bump: u8, initial_value: u64) -> Vec<u8> {
+	let mut data = vec![0u8; InitializeInstr::SIZE];
+	let instruction = InitializeInstr::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("initialize instruction failed: {error:?}"));
+	instruction.bump = bump;
+	instruction.initial_value.set(initial_value);
+	data
+}
+
+fn build_update_bytes(new_value: u64) -> Vec<u8> {
+	let mut data = vec![0u8; UpdateInstr::SIZE];
+	UpdateInstr::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("update instruction failed: {error:?}"))
+		.new_value
+		.set(new_value);
+	data
+}
+
+fn build_close_bytes() -> Vec<u8> {
+	let mut data = vec![0u8; CloseInstr::SIZE];
+	CloseInstr::initialize(&mut data)
+		.unwrap_or_else(|error| panic!("close instruction failed: {error:?}"));
+	data
 }
 
 #[cfg(feature = "token")]
@@ -506,6 +513,13 @@ fn build_token_account_bytes(mint: &Address, owner: &Address, amount: u64) -> Ve
 	data
 }
 
+#[cfg(feature = "token")]
+fn add_token_2022_account_type(data: &mut Vec<u8>, account_type: token_2022::state::AccountType) {
+	const ACCOUNT_TYPE_INDEX: usize = token::state::TokenAccount::LEN;
+	data.resize(ACCOUNT_TYPE_INDEX + 1, 0);
+	data[ACCOUNT_TYPE_INDEX] = account_type as u8;
+}
+
 // ---------------------------------------------------------------------------
 // Test: Full account lifecycle
 // ---------------------------------------------------------------------------
@@ -521,13 +535,8 @@ fn full_account_lifecycle() {
 	// The state account is pre-created (as if system program CPI already ran)
 	// with the correct size and owner, but all data zeroed except discriminator
 	// won't be written yet.
-	let state_data = vec![0u8; size_of::<TestState>()];
-
-	let init_data = InitializeInstr::builder()
-		.bump(42)
-		.initial_value(PodU64::from(100))
-		.build();
-	let init_bytes = init_data.to_bytes();
+	let state_data = vec![0u8; TestState::SIZE];
+	let init_bytes = build_initialize_bytes(42, 100);
 
 	let accounts = [
 		AccountBuilder::new()
@@ -545,7 +554,7 @@ fn full_account_lifecycle() {
 		AccountBuilder::new().address(system::ID).executable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, init_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &init_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -558,12 +567,11 @@ fn full_account_lifecycle() {
 		.as_account::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("failed to read state after init: {e:?}"));
 	assert_eq!(state.bump, 42, "bump should be 42");
-	assert_eq!(u64::from(state.value), 100, "initial value should be 100");
+	assert_eq!(state.value.get(), 100, "initial value should be 100");
 
 	// --- Step 2: Update ---
 	// Reuse the same memory (state account now has initialized data).
-	let update_data = UpdateInstr::builder().new_value(PodU64::from(999)).build();
-	let update_bytes = update_data.to_bytes();
+	let update_bytes = build_update_bytes(999);
 
 	let state_bytes = build_test_state_bytes(42, 100);
 	let accounts = [
@@ -581,7 +589,7 @@ fn full_account_lifecycle() {
 			.is_writable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, update_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &update_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -593,13 +601,12 @@ fn full_account_lifecycle() {
 	let state = account_views[1]
 		.as_account::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("failed to read state after update: {e:?}"));
-	assert_eq!(u64::from(state.value), 999, "value should be 999");
+	assert_eq!(state.value.get(), 999, "value should be 999");
 	assert_eq!(state.bump, 42, "bump should remain 42");
 
 	// --- Step 3: Close ---
 	let state_bytes = build_test_state_bytes(42, 999);
-	let close_data = CloseInstr::builder().build();
-	let close_bytes = close_data.to_bytes();
+	let close_bytes = build_close_bytes();
 
 	let accounts = [
 		AccountBuilder::new()
@@ -616,7 +623,7 @@ fn full_account_lifecycle() {
 			.is_writable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, close_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &close_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -652,12 +659,8 @@ fn multi_instruction_flow_initialize_then_update() {
 	let state_key: Address = address!("3Jiy8N6ZGv3ueH9k3svLRaHscmQbE6v7W9FHJaGH2mki");
 
 	// --- Initialize with value=50 ---
-	let state_data = vec![0u8; size_of::<TestState>()];
-	let init_data = InitializeInstr::builder()
-		.bump(7)
-		.initial_value(PodU64::from(50))
-		.build();
-	let init_bytes = init_data.to_bytes();
+	let state_data = vec![0u8; TestState::SIZE];
+	let init_bytes = build_initialize_bytes(7, 50);
 
 	let accounts = [
 		AccountBuilder::new()
@@ -675,7 +678,7 @@ fn multi_instruction_flow_initialize_then_update() {
 		AccountBuilder::new().address(system::ID).executable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, init_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &init_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -687,13 +690,12 @@ fn multi_instruction_flow_initialize_then_update() {
 	let state = account_views[1]
 		.as_account::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("read failed: {e:?}"));
-	assert_eq!(u64::from(state.value), 50);
+	assert_eq!(state.value.get(), 50);
 	assert_eq!(state.bump, 7);
 
 	// --- Update to value=200 ---
 	let state_bytes = build_test_state_bytes(7, 50);
-	let update_data = UpdateInstr::builder().new_value(PodU64::from(200)).build();
-	let update_bytes = update_data.to_bytes();
+	let update_bytes = build_update_bytes(200);
 
 	let accounts = [
 		AccountBuilder::new()
@@ -710,7 +712,7 @@ fn multi_instruction_flow_initialize_then_update() {
 			.is_writable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, update_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &update_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -721,7 +723,7 @@ fn multi_instruction_flow_initialize_then_update() {
 	let state = account_views[1]
 		.as_account::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("read failed: {e:?}"));
-	assert_eq!(u64::from(state.value), 200);
+	assert_eq!(state.value.get(), 200);
 	assert_eq!(state.bump, 7, "bump should be preserved across update");
 }
 
@@ -735,10 +737,7 @@ fn multi_update_flow() {
 
 	for new_value in [20u64, 30, 40, 50, u64::MAX] {
 		let state_bytes = build_test_state_bytes(1, current_value);
-		let update_data = UpdateInstr::builder()
-			.new_value(PodU64::from(new_value))
-			.build();
-		let update_bytes = update_data.to_bytes();
+		let update_bytes = build_update_bytes(new_value);
 
 		let accounts = [
 			AccountBuilder::new()
@@ -755,7 +754,7 @@ fn multi_update_flow() {
 				.is_writable(true),
 		];
 
-		let mut input = unsafe { create_test_input(&accounts, update_bytes) };
+		let mut input = unsafe { create_test_input(&accounts, &update_bytes) };
 		let mut accts = [UNINIT; 10];
 		let (program_id, account_views, ix_data, _) =
 			unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -766,11 +765,7 @@ fn multi_update_flow() {
 		let state = account_views[1]
 			.as_account::<TestState>(&TEST_PROGRAM_ID)
 			.unwrap_or_else(|e| panic!("read failed: {e:?}"));
-		assert_eq!(
-			u64::from(state.value),
-			new_value,
-			"value should be {new_value}"
-		);
+		assert_eq!(state.value.get(), new_value, "value should be {new_value}");
 
 		current_value = new_value;
 	}
@@ -786,12 +781,8 @@ fn error_missing_signer_rejected() {
 	let authority_key: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 	let state_key: Address = address!("3Jiy8N6ZGv3ueH9k3svLRaHscmQbE6v7W9FHJaGH2mki");
 
-	let state_data = vec![0u8; size_of::<TestState>()];
-	let init_data = InitializeInstr::builder()
-		.bump(1)
-		.initial_value(PodU64::from(0))
-		.build();
-	let init_bytes = init_data.to_bytes();
+	let state_data = vec![0u8; TestState::SIZE];
+	let init_bytes = build_initialize_bytes(1, 0);
 
 	// Authority is NOT a signer.
 	let accounts = [
@@ -810,7 +801,7 @@ fn error_missing_signer_rejected() {
 		AccountBuilder::new().address(system::ID).executable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, init_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &init_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -831,8 +822,7 @@ fn error_wrong_program_owner_rejected() {
 	let state_key: Address = address!("3Jiy8N6ZGv3ueH9k3svLRaHscmQbE6v7W9FHJaGH2mki");
 
 	let state_bytes = build_test_state_bytes(1, 100);
-	let update_data = UpdateInstr::builder().new_value(PodU64::from(200)).build();
-	let update_bytes = update_data.to_bytes();
+	let update_bytes = build_update_bytes(200);
 
 	// Wrong owner — system::ID instead of TEST_PROGRAM_ID.
 	let wrong_owner = system::ID;
@@ -852,7 +842,7 @@ fn error_wrong_program_owner_rejected() {
 			.is_writable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, update_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &update_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -874,11 +864,10 @@ fn error_discriminator_mismatch_rejected() {
 
 	// Wrong discriminator — first byte is 99 instead of
 	// TestAccountType::TestState.
-	let mut bad_data = vec![0u8; size_of::<TestState>()];
+	let mut bad_data = vec![0u8; TestState::SIZE];
 	bad_data[0] = 99; // Wrong discriminator.
 
-	let update_data = UpdateInstr::builder().new_value(PodU64::from(200)).build();
-	let update_bytes = update_data.to_bytes();
+	let update_bytes = build_update_bytes(200);
 
 	let accounts = [
 		AccountBuilder::new()
@@ -895,7 +884,7 @@ fn error_discriminator_mismatch_rejected() {
 			.is_writable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, update_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &update_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -916,11 +905,10 @@ fn error_data_length_mismatch_rejected() {
 	let state_key: Address = address!("3Jiy8N6ZGv3ueH9k3svLRaHscmQbE6v7W9FHJaGH2mki");
 
 	// Data is too short — only 5 bytes when TestState needs
-	// size_of::<TestState>().
+	// TestState::SIZE.
 	let short_data = vec![TestAccountType::TestState as u8, 0, 0, 0, 0];
 
-	let update_data = UpdateInstr::builder().new_value(PodU64::from(200)).build();
-	let update_bytes = update_data.to_bytes();
+	let update_bytes = build_update_bytes(200);
 
 	let accounts = [
 		AccountBuilder::new()
@@ -937,7 +925,7 @@ fn error_data_length_mismatch_rejected() {
 			.is_writable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, update_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &update_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -1022,11 +1010,7 @@ fn error_wrong_program_id() {
 	let authority_key: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 	let wrong_program_id = system::ID;
 
-	let init_data = InitializeInstr::builder()
-		.bump(1)
-		.initial_value(PodU64::from(0))
-		.build();
-	let init_bytes = init_data.to_bytes();
+	let init_bytes = build_initialize_bytes(1, 0);
 
 	let accounts = [AccountBuilder::new()
 		.address(authority_key)
@@ -1037,7 +1021,7 @@ fn error_wrong_program_id() {
 
 	// Process with wrong program ID.
 	let result =
-		parse_instruction::<TestInstruction>(&wrong_program_id, &TEST_PROGRAM_ID, init_bytes);
+		parse_instruction::<TestInstruction>(&wrong_program_id, &TEST_PROGRAM_ID, &init_bytes);
 	assert!(result.is_err(), "should fail with wrong program ID");
 	assert_eq!(
 		result.unwrap_err(),
@@ -1052,11 +1036,7 @@ fn error_wrong_program_id() {
 fn error_not_enough_accounts() {
 	let authority_key: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 
-	let init_data = InitializeInstr::builder()
-		.bump(1)
-		.initial_value(PodU64::from(0))
-		.build();
-	let init_bytes = init_data.to_bytes();
+	let init_bytes = build_initialize_bytes(1, 0);
 
 	// Only 1 account, but Initialize needs 3.
 	let accounts = [AccountBuilder::new()
@@ -1066,7 +1046,7 @@ fn error_not_enough_accounts() {
 		.is_signer(true)
 		.is_writable(true)];
 
-	let mut input = unsafe { create_test_input(&accounts, init_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &init_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -1087,8 +1067,7 @@ fn error_non_writable_rejected() {
 	let state_key: Address = address!("3Jiy8N6ZGv3ueH9k3svLRaHscmQbE6v7W9FHJaGH2mki");
 
 	let state_bytes = build_test_state_bytes(1, 100);
-	let update_data = UpdateInstr::builder().new_value(PodU64::from(200)).build();
-	let update_bytes = update_data.to_bytes();
+	let update_bytes = build_update_bytes(200);
 
 	// State account is NOT writable.
 	let accounts = [
@@ -1106,7 +1085,7 @@ fn error_non_writable_rejected() {
 			.is_writable(false), // <-- not writable
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, update_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &update_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -1127,8 +1106,7 @@ fn error_empty_account_rejected_for_update() {
 	let authority_key: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 	let state_key: Address = address!("3Jiy8N6ZGv3ueH9k3svLRaHscmQbE6v7W9FHJaGH2mki");
 
-	let update_data = UpdateInstr::builder().new_value(PodU64::from(200)).build();
-	let update_bytes = update_data.to_bytes();
+	let update_bytes = build_update_bytes(200);
 
 	// Account has no data — it's empty.
 	let accounts = [
@@ -1145,7 +1123,7 @@ fn error_empty_account_rejected_for_update() {
 			.is_writable(true),
 	];
 
-	let mut input = unsafe { create_test_input(&accounts, update_bytes) };
+	let mut input = unsafe { create_test_input(&accounts, &update_bytes) };
 	let mut accts = [UNINIT; 10];
 	let (program_id, account_views, ix_data, _) =
 		unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
@@ -1397,7 +1375,7 @@ fn account_view_validation_chain() {
 		.and_then(|a| a.assert_not_empty())
 		.and_then(|a| a.assert_owner(&TEST_PROGRAM_ID))
 		.and_then(|a| a.assert_address(&key))
-		.and_then(|a| a.assert_data_len(size_of::<TestState>()))
+		.and_then(|a| a.assert_data_len(TestState::SIZE))
 		.and_then(|a| a.assert_type::<TestState>(&TEST_PROGRAM_ID));
 
 	assert!(
@@ -1446,7 +1424,7 @@ fn account_view_validation_chain_short_circuits() {
 #[test]
 fn account_data_roundtrip_through_account_view() {
 	let key: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
-	let state_data = vec![0u8; size_of::<TestState>()];
+	let state_data = vec![0u8; TestState::SIZE];
 
 	let accounts = [AccountBuilder::new()
 		.address(key)
@@ -1463,17 +1441,13 @@ fn account_data_roundtrip_through_account_view() {
 	// Write state directly to the raw account bytes (simulates initialization
 	// of a freshly created account with zeroed data).
 	{
-		let new_state = TestState::builder()
-			.bump(123)
-			._padding(0)
-			._padding2(0)
-			.value(PodU64::from(u64::MAX))
-			.build();
-		let state_bytes = new_state.to_bytes();
 		let mut account_data = account_views[0]
 			.try_borrow_mut()
 			.unwrap_or_else(|e| panic!("borrow failed: {e:?}"));
-		account_data[..state_bytes.len()].copy_from_slice(state_bytes);
+		let state = TestState::initialize(&mut account_data)
+			.unwrap_or_else(|e| panic!("initialization failed: {e:?}"));
+		state.bump = 123;
+		state.value.set(u64::MAX);
 	}
 
 	// Read state back via as_account (discriminator is now valid).
@@ -1481,7 +1455,7 @@ fn account_data_roundtrip_through_account_view() {
 		.as_account::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("read failed: {e:?}"));
 	assert_eq!(state.bump, 123);
-	assert_eq!(u64::from(state.value), u64::MAX);
+	assert_eq!(state.value.get(), u64::MAX);
 }
 
 /// Tests that modifying state through as_account_mut persists.
@@ -1507,14 +1481,14 @@ fn account_data_mutation_persists() {
 		let mut state = account_views[0]
 			.as_account_mut::<TestState>(&TEST_PROGRAM_ID)
 			.unwrap_or_else(|e| panic!("write failed: {e:?}"));
-		state.value = PodU64::from(12345);
+		state.value.set(12345);
 	}
 
 	// Verify persistence.
 	let state = account_views[0]
 		.as_account::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("read failed: {e:?}"));
-	assert_eq!(u64::from(state.value), 12345);
+	assert_eq!(state.value.get(), 12345);
 	assert_eq!(state.bump, 10, "bump should be unchanged");
 }
 
@@ -1553,7 +1527,7 @@ fn as_account_keeps_borrow_guard_alive_until_drop() {
 	let borrow = shadow
 		.try_borrow_mut()
 		.unwrap_or_else(|e| panic!("mutable borrow should succeed after drop: {e:?}"));
-	assert_eq!(borrow.len(), size_of::<TestState>());
+	assert_eq!(borrow.len(), TestState::SIZE);
 }
 
 /// Tests that as_account_mut blocks overlapping borrows until drop.
@@ -1579,7 +1553,7 @@ fn as_account_mut_blocks_overlapping_borrows_until_drop() {
 	let mut state = account
 		.as_account_mut::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("write failed: {e:?}"));
-	state.value = PodU64::from(88);
+	state.value.set(88);
 
 	assert!(matches!(
 		shadow.try_borrow(),
@@ -1595,7 +1569,7 @@ fn as_account_mut_blocks_overlapping_borrows_until_drop() {
 	let state = account
 		.as_account::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("read after drop failed: {e:?}"));
-	assert_eq!(u64::from(state.value), 88);
+	assert_eq!(state.value.get(), 88);
 }
 
 #[cfg(feature = "token")]
@@ -1696,8 +1670,8 @@ fn as_token_2022_mint_keeps_borrow_guard_alive_until_drop() {
 	let mint = account
 		.as_token_2022_mint()
 		.unwrap_or_else(|e| panic!("token-2022 mint load failed: {e:?}"));
-	assert_eq!(mint.decimals(), 9);
-	assert_eq!(mint.supply(), 42);
+	assert_eq!(mint.base.decimals(), 9);
+	assert_eq!(mint.base.supply(), 42);
 
 	assert!(matches!(
 		shadow.try_borrow_mut(),
@@ -1734,9 +1708,9 @@ fn as_token_2022_account_keeps_borrow_guard_alive_until_drop() {
 	let token_account = account
 		.as_token_2022_account()
 		.unwrap_or_else(|e| panic!("token-2022 account load failed: {e:?}"));
-	assert_eq!(token_account.amount(), 123);
-	assert_eq!(token_account.mint(), &mint);
-	assert_eq!(token_account.owner(), &owner);
+	assert_eq!(token_account.base.amount(), 123);
+	assert_eq!(token_account.base.mint(), &mint);
+	assert_eq!(token_account.base.owner(), &owner);
 
 	assert!(matches!(
 		shadow.try_borrow_mut(),
@@ -1750,11 +1724,15 @@ fn as_token_2022_account_keeps_borrow_guard_alive_until_drop() {
 
 #[cfg(feature = "token")]
 #[test]
-fn as_token_account_checked_with_owners_accepts_token_2022_owner() {
+fn as_token_account_for_program_preserves_token_2022_state() {
 	let token_account_key: Address = address!("6QWeT6FpJrm8AF1btu6WH2k2Xhq6t5vbheKVfQavmeoZ");
 	let mint: Address = address!("4hT5gDpr9HMmXzttW2Kz7LxyzKDn5XxhxL7sRKqGZo4x");
 	let owner: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
-	let token_account_data = build_token_account_bytes(&mint, &owner, 88);
+	let mut token_account_data = build_token_account_bytes(&mint, &owner, 88);
+	add_token_2022_account_type(
+		&mut token_account_data,
+		token_2022::state::AccountType::Account,
+	);
 
 	let accounts = [AccountBuilder::new()
 		.address(token_account_key)
@@ -1771,9 +1749,12 @@ fn as_token_account_checked_with_owners_accepts_token_2022_owner() {
 	let account = account_views[0];
 	let mut shadow = account_views[0];
 	let token_account = account
-		.as_token_account_checked_with_owners(&[token::ID, token_2022::ID])
-		.unwrap_or_else(|e| panic!("multi-owner token account load failed: {e:?}"));
+		.as_token_account_for_program(&token_2022::ID)
+		.unwrap_or_else(|e| panic!("token-program account load failed: {e:?}"));
 	assert_eq!(token_account.amount(), 88);
+	assert_eq!(token_account.program_id(), &token_2022::ID);
+	assert!(token_account.legacy().is_none());
+	assert!(token_account.token_2022().is_some());
 
 	assert!(matches!(
 		shadow.try_borrow_mut(),
@@ -1783,6 +1764,34 @@ fn as_token_account_checked_with_owners_accepts_token_2022_owner() {
 	drop(token_account);
 
 	assert!(shadow.try_borrow_mut().is_ok());
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_token_mint_for_program_preserves_token_2022_extensions() {
+	let mint_key: Address = address!("8qbHbw2BbbTHBW1sK7d7Yx4Z4DccnE9vrFica8FWHQrP");
+	let mut mint_data = build_token_mint_bytes(9, 42);
+	add_token_2022_account_type(&mut mint_data, token_2022::state::AccountType::Mint);
+
+	let accounts = [AccountBuilder::new()
+		.address(mint_key)
+		.owner(token_2022::ID)
+		.lamports(1_000_000)
+		.data(&mint_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let mint = account_views[0]
+		.as_token_mint_for_program(&token_2022::ID)
+		.unwrap_or_else(|error| panic!("token-program mint load failed: {error:?}"));
+	assert_eq!(mint.decimals(), 9);
+	assert_eq!(mint.program_id(), &token_2022::ID);
+	assert!(mint.legacy().is_none());
+	assert!(mint.token_2022().is_some());
 }
 
 #[cfg(feature = "token")]
@@ -1915,8 +1924,10 @@ fn as_token_2022_account_checked_accepts_extension_data() {
 	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
 	let owner: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
 	let mut token_account_data = build_token_account_bytes(&mint, &owner, 123);
-	// token-2022 accounts may carry extension data after the base layout.
-	token_account_data.extend_from_slice(&[0u8; 8]);
+	add_token_2022_account_type(
+		&mut token_account_data,
+		token_2022::state::AccountType::Account,
+	);
 
 	let accounts = [AccountBuilder::new()
 		.address(token_account_key)
@@ -1934,9 +1945,39 @@ fn as_token_2022_account_checked_accepts_extension_data() {
 	let token_account = account
 		.as_token_2022_account_checked()
 		.unwrap_or_else(|e| panic!("token-2022 account load failed: {e:?}"));
-	assert_eq!(token_account.amount(), 123);
-	assert_eq!(token_account.mint(), &mint);
-	assert_eq!(token_account.owner(), &owner);
+	assert_eq!(token_account.base.amount(), 123);
+	assert_eq!(token_account.base.mint(), &mint);
+	assert_eq!(token_account.base.owner(), &owner);
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_token_2022_account_checked_rejects_wrong_account_type() {
+	let token_account_key: Address = address!("4vJ9JU1bJJE96FWSJKv9J5xBqHkM7SspGq2pZ7uS5k4x");
+	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
+	let owner: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
+	let mut token_account_data = build_token_account_bytes(&mint, &owner, 123);
+	add_token_2022_account_type(
+		&mut token_account_data,
+		token_2022::state::AccountType::Mint,
+	);
+
+	let accounts = [AccountBuilder::new()
+		.address(token_account_key)
+		.owner(token_2022::ID)
+		.lamports(1_000_000)
+		.data(&token_account_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	assert!(matches!(
+		account_views[0].as_token_2022_account_checked(),
+		Err(ProgramError::InvalidAccountData)
+	));
 }
 
 #[cfg(feature = "token")]
@@ -1975,8 +2016,10 @@ fn as_associated_token_account_accepts_overlong_data() {
 	let (ata_address, _bump) = try_get_associated_token_address(&wallet, &mint, &token_2022::ID)
 		.unwrap_or_else(|| panic!("failed to derive ata"));
 	let mut token_account_data = build_token_account_bytes(&mint, &wallet, 99);
-	// token-2022 ATAs may carry extension data after the base layout.
-	token_account_data.extend_from_slice(&[0u8; 8]);
+	add_token_2022_account_type(
+		&mut token_account_data,
+		token_2022::state::AccountType::Account,
+	);
 
 	let accounts = [AccountBuilder::new()
 		.address(ata_address)
@@ -1996,6 +2039,34 @@ fn as_associated_token_account_accepts_overlong_data() {
 		.unwrap_or_else(|e| panic!("associated token account load failed: {e:?}"));
 	assert_eq!(token_account.amount(), 99);
 	assert_eq!(token_account.owner(), &wallet);
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn as_associated_token_account_rejects_overlong_legacy_data() {
+	let wallet: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
+	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
+	let (ata_address, _bump) = try_get_associated_token_address(&wallet, &mint, &token::ID)
+		.unwrap_or_else(|| panic!("failed to derive ata"));
+	let mut token_account_data = build_token_account_bytes(&mint, &wallet, 99);
+	token_account_data.push(0);
+
+	let accounts = [AccountBuilder::new()
+		.address(ata_address)
+		.owner(token::ID)
+		.lamports(1_000_000)
+		.data(&token_account_data)
+		.is_writable(true)];
+
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	assert!(matches!(
+		account_views[0].as_associated_token_account_checked(&wallet, &mint, &token::ID),
+		Err(ProgramError::InvalidAccountData)
+	));
 }
 
 // ---------------------------------------------------------------------------

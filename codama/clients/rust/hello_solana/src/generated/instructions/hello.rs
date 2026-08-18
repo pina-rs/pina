@@ -8,13 +8,15 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 /// The `#[instruction]` attribute macro generates:
 ///
 /// - A discriminator field as the first byte of the struct.
 /// - `HasDiscriminator` implementation linking this struct to
 /// `HelloInstruction::Hello`.
-/// - `Pod` and `Zeroable` derives for zero-copy deserialization.
-/// - `TypedBuilder` for ergonomic construction in tests.
+/// - A generated zeropod view plus checked `initialize` and `try_from_bytes`
+/// helpers.
 ///
 /// `HelloInstructionData` has no payload fields — only the discriminator byte
 /// is needed to identify the instruction.
@@ -48,33 +50,38 @@ impl Hello {
 			self.user, true,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
-
 		solana_instruction::Instruction {
 			program_id: crate::HELLO_SOLANA_ID,
 			accounts,
-			data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct HelloInstructionData {
-	pub discriminator: u8,
+	bytes: Vec<u8>,
 }
 
 impl HelloInstructionData {
-	pub const fn new() -> Self {
-		Self {
-			discriminator: HELLO_DISCRIMINATOR,
+	pub fn new(
+		configure: impl FnOnce(&mut HelloInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <HelloInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <HelloInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			configure(data);
+			data.discriminator = HELLO_DISCRIMINATOR;
 		}
+		<HelloInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
+}
+
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct HelloInstructionWire {
+	pub discriminator: u8,
 }

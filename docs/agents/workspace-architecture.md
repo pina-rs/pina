@@ -33,8 +33,8 @@ fn process_instruction(
 ### Discriminator system
 
 - Every account, instruction, and event type has a discriminator as its first field.
-- `#[discriminator]` generates conversions plus `Pod`/`Zeroable` implementations.
-- `#[account]`, `#[instruction]`, and `#[event]` inject discriminator fields and generate validation-related implementations.
+- `#[discriminator]` generates fixed-width byte conversions for the enum.
+- `#[account]`, `#[instruction]`, and `#[event]` inject discriminator fields, derive native zeropod storage views, and generate checked initialization and loading helpers.
 
 ### Account validation
 
@@ -58,4 +58,4 @@ Common alignment-safe wrapper types include:
 - `PodI16`
 - `PodI64`
 
-Use them in `#[repr(C)]` account structs with bytemuck-compatible layouts.
+Use them in `#[repr(C)]` account structs whose fields satisfy zeropod's `ZcElem` and `ZcValidate` contracts.

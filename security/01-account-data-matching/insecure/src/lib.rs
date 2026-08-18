@@ -29,7 +29,7 @@ pub enum EscrowAccount {
 #[account(discriminator = EscrowAccount)]
 pub struct EscrowState {
 	pub maker: Address,
-	pub amount: PodU64,
+	pub amount: u64,
 }
 
 #[instruction(discriminator = EscrowInstruction, variant = Take)]

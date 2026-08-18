@@ -43,14 +43,14 @@ pub enum EventDiscriminator {
 #[event(discriminator = EventDiscriminator)]
 #[derive(Debug)]
 pub struct MyEvent {
-	pub data: PodU64,
+	pub data: u64,
 	pub label: [u8; 8],
 }
 
 #[event(discriminator = EventDiscriminator)]
 #[derive(Debug)]
 pub struct MyOtherEvent {
-	pub data: PodU64,
+	pub data: u64,
 	pub label: [u8; 8],
 }
 
@@ -63,38 +63,38 @@ const LABEL_CPI: [u8; 8] = [b'c', b'p', b'i', 0, 0, 0, 0, 0];
 
 #[allow(dead_code)]
 pub enum EmittedEvent {
-	MyEvent(MyEvent),
-	MyOtherEvent(MyOtherEvent),
+	MyEvent([u8; MyEvent::SIZE]),
+	MyOtherEvent([u8; MyOtherEvent::SIZE]),
 }
 
 #[allow(dead_code)]
 fn build_event(instruction: EventsInstruction) -> EmittedEvent {
 	match instruction {
 		EventsInstruction::Initialize => {
-			EmittedEvent::MyEvent(
-				MyEvent::builder()
-					.data(PodU64::from(5))
-					.label(LABEL_HELLO)
-					.build(),
-			)
+			let mut bytes = [0u8; MyEvent::SIZE];
+			let event = MyEvent::initialize(&mut bytes)
+				.unwrap_or_else(|error| panic!("initialize event: {error:?}"));
+			event.data.set(5);
+			event.label = LABEL_HELLO;
+			EmittedEvent::MyEvent(bytes)
 		}
 
 		EventsInstruction::TestEvent => {
-			EmittedEvent::MyOtherEvent(
-				MyOtherEvent::builder()
-					.data(PodU64::from(6))
-					.label(LABEL_BYE)
-					.build(),
-			)
+			let mut bytes = [0u8; MyOtherEvent::SIZE];
+			let event = MyOtherEvent::initialize(&mut bytes)
+				.unwrap_or_else(|error| panic!("initialize event: {error:?}"));
+			event.data.set(6);
+			event.label = LABEL_BYE;
+			EmittedEvent::MyOtherEvent(bytes)
 		}
 
 		EventsInstruction::TestEventCpi => {
-			EmittedEvent::MyOtherEvent(
-				MyOtherEvent::builder()
-					.data(PodU64::from(7))
-					.label(LABEL_CPI)
-					.build(),
-			)
+			let mut bytes = [0u8; MyOtherEvent::SIZE];
+			let event = MyOtherEvent::initialize(&mut bytes)
+				.unwrap_or_else(|error| panic!("initialize event: {error:?}"));
+			event.data.set(7);
+			event.label = LABEL_CPI;
+			EmittedEvent::MyOtherEvent(bytes)
 		}
 	}
 }
@@ -123,48 +123,51 @@ mod tests {
 
 	#[test]
 	fn initialize_event_matches_expected_values() {
-		let event = match build_event(EventsInstruction::Initialize) {
-			EmittedEvent::MyEvent(event) => event,
+		let bytes = match build_event(EventsInstruction::Initialize) {
+			EmittedEvent::MyEvent(bytes) => bytes,
 			EmittedEvent::MyOtherEvent(_) => panic!("expected my event"),
 		};
+		let event = MyEvent::try_from_bytes(&bytes).unwrap();
 
-		assert_eq!(u64::from(event.data), 5);
+		assert_eq!(event.data.get(), 5);
 		assert_eq!(event.label, LABEL_HELLO);
 	}
 
 	#[test]
 	fn test_event_matches_expected_values() {
-		let event = match build_event(EventsInstruction::TestEvent) {
-			EmittedEvent::MyOtherEvent(event) => event,
+		let bytes = match build_event(EventsInstruction::TestEvent) {
+			EmittedEvent::MyOtherEvent(bytes) => bytes,
 			EmittedEvent::MyEvent(_) => panic!("expected other event"),
 		};
+		let event = MyOtherEvent::try_from_bytes(&bytes).unwrap();
 
-		assert_eq!(u64::from(event.data), 6);
+		assert_eq!(event.data.get(), 6);
 		assert_eq!(event.label, LABEL_BYE);
 	}
 
 	#[test]
 	fn test_event_cpi_matches_expected_values() {
-		let event = match build_event(EventsInstruction::TestEventCpi) {
-			EmittedEvent::MyOtherEvent(event) => event,
+		let bytes = match build_event(EventsInstruction::TestEventCpi) {
+			EmittedEvent::MyOtherEvent(bytes) => bytes,
 			EmittedEvent::MyEvent(_) => panic!("expected other event"),
 		};
+		let event = MyOtherEvent::try_from_bytes(&bytes).unwrap();
 
-		assert_eq!(u64::from(event.data), 7);
+		assert_eq!(event.data.get(), 7);
 		assert_eq!(event.label, LABEL_CPI);
 	}
 
 	#[test]
-	fn my_event_roundtrip_serialization() {
-		let event = MyEvent::builder()
-			.data(PodU64::from(5))
-			.label(LABEL_HELLO)
-			.build();
-		let bytes = event.to_bytes();
-		let decoded = MyEvent::try_from_bytes(bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
+	fn my_event_roundtrip_storage_view() {
+		let mut bytes = [0u8; MyEvent::SIZE];
+		let event = MyEvent::initialize(&mut bytes)
+			.unwrap_or_else(|error| panic!("initialize event: {error:?}"));
+		event.data.set(5);
+		event.label = LABEL_HELLO;
+		let decoded = MyEvent::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
 
 		assert_eq!(decoded.label, LABEL_HELLO);
-		assert_eq!(u64::from(decoded.data), 5);
+		assert_eq!(decoded.data.get(), 5);
 	}
 
 	#[test]

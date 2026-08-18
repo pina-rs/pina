@@ -18,23 +18,26 @@ import {
 	getStructEncoder,
 	getU64Decoder,
 	getU64Encoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
 	type InstructionWithData,
 	type ReadonlyAccount,
-	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
+	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { VESTING_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const CLAIM_DISCRIMINATOR = 1;
 
@@ -49,6 +52,8 @@ export type ClaimInstruction<
 	TAccountVestingState extends string | AccountMeta<string> = string,
 	TAccountBeneficiaryAta extends string | AccountMeta<string> = string,
 	TAccountVault extends string | AccountMeta<string> = string,
+	TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+		"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 	TAccountSystemProgram extends string | AccountMeta<string> =
 		"11111111111111111111111111111111",
 	TAccountTokenProgram extends string | AccountMeta<string> = string,
@@ -59,7 +64,7 @@ export type ClaimInstruction<
 	& InstructionWithAccounts<
 		[
 			TAccountBeneficiary extends string ?
-					& ReadonlySignerAccount<TAccountBeneficiary>
+					& WritableSignerAccount<TAccountBeneficiary>
 					& AccountSignerMeta<TAccountBeneficiary>
 				: TAccountBeneficiary,
 			TAccountMint extends string ? ReadonlyAccount<TAccountMint>
@@ -72,6 +77,9 @@ export type ClaimInstruction<
 				: TAccountBeneficiaryAta,
 			TAccountVault extends string ? WritableAccount<TAccountVault>
 				: TAccountVault,
+			TAccountAssociatedTokenProgram extends string
+				? ReadonlyAccount<TAccountAssociatedTokenProgram>
+				: TAccountAssociatedTokenProgram,
 			TAccountSystemProgram extends string
 				? ReadonlyAccount<TAccountSystemProgram>
 				: TAccountSystemProgram,
@@ -82,20 +90,29 @@ export type ClaimInstruction<
 		]
 	>;
 
-export type ClaimInstructionData = { amount: bigint };
+export type ClaimInstructionData = { discriminator: number; amount: bigint };
 
 export type ClaimInstructionDataArgs = { amount: number | bigint };
 
 export function getClaimInstructionDataEncoder(): FixedSizeEncoder<
 	ClaimInstructionDataArgs
 > {
-	return getStructEncoder([["amount", getU64Encoder()]]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"amount",
+			getU64Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 export function getClaimInstructionDataDecoder(): FixedSizeDecoder<
 	ClaimInstructionData
 > {
-	return getStructDecoder([["amount", getU64Decoder()]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(CLAIM_DISCRIMINATOR, getU8Decoder()),
+	], ["amount", getU64Decoder()]]);
 }
 
 export function getClaimInstructionDataCodec(): FixedSizeCodec<
@@ -114,6 +131,7 @@ export type ClaimInput<
 	TAccountVestingState extends string = string,
 	TAccountBeneficiaryAta extends string = string,
 	TAccountVault extends string = string,
+	TAccountAssociatedTokenProgram extends string = string,
 	TAccountSystemProgram extends string = string,
 	TAccountTokenProgram extends string = string,
 > = {
@@ -122,6 +140,7 @@ export type ClaimInput<
 	vestingState: Address<TAccountVestingState>;
 	beneficiaryAta: Address<TAccountBeneficiaryAta>;
 	vault: Address<TAccountVault>;
+	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
 	systemProgram?: Address<TAccountSystemProgram>;
 	tokenProgram: Address<TAccountTokenProgram>;
 	amount: ClaimInstructionDataArgs["amount"];
@@ -133,6 +152,7 @@ export function getClaimInstruction<
 	TAccountVestingState extends string,
 	TAccountBeneficiaryAta extends string,
 	TAccountVault extends string,
+	TAccountAssociatedTokenProgram extends string,
 	TAccountSystemProgram extends string,
 	TAccountTokenProgram extends string,
 	TProgramAddress extends Address = typeof VESTING_PROGRAM_PROGRAM_ADDRESS,
@@ -143,6 +163,7 @@ export function getClaimInstruction<
 		TAccountVestingState,
 		TAccountBeneficiaryAta,
 		TAccountVault,
+		TAccountAssociatedTokenProgram,
 		TAccountSystemProgram,
 		TAccountTokenProgram
 	>,
@@ -154,6 +175,7 @@ export function getClaimInstruction<
 	TAccountVestingState,
 	TAccountBeneficiaryAta,
 	TAccountVault,
+	TAccountAssociatedTokenProgram,
 	TAccountSystemProgram,
 	TAccountTokenProgram
 > {
@@ -163,11 +185,15 @@ export function getClaimInstruction<
 
 	// Original accounts.
 	const originalAccounts = {
-		beneficiary: { value: input.beneficiary ?? null, isWritable: false },
+		beneficiary: { value: input.beneficiary ?? null, isWritable: true },
 		mint: { value: input.mint ?? null, isWritable: false },
 		vestingState: { value: input.vestingState ?? null, isWritable: true },
 		beneficiaryAta: { value: input.beneficiaryAta ?? null, isWritable: true },
 		vault: { value: input.vault ?? null, isWritable: true },
+		associatedTokenProgram: {
+			value: input.associatedTokenProgram ?? null,
+			isWritable: false,
+		},
 		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
 		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
 	};
@@ -180,6 +206,12 @@ export function getClaimInstruction<
 	const args = { ...input };
 
 	// Resolve default values.
+	if (!accounts.associatedTokenProgram.value) {
+		accounts.associatedTokenProgram.value =
+			"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<
+				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+			>;
+	}
 	if (!accounts.systemProgram.value) {
 		accounts.systemProgram.value =
 			"11111111111111111111111111111111" as Address<
@@ -195,6 +227,7 @@ export function getClaimInstruction<
 			getAccountMeta("vestingState", accounts.vestingState),
 			getAccountMeta("beneficiaryAta", accounts.beneficiaryAta),
 			getAccountMeta("vault", accounts.vault),
+			getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 			getAccountMeta("tokenProgram", accounts.tokenProgram),
 		],
@@ -209,6 +242,7 @@ export function getClaimInstruction<
 		TAccountVestingState,
 		TAccountBeneficiaryAta,
 		TAccountVault,
+		TAccountAssociatedTokenProgram,
 		TAccountSystemProgram,
 		TAccountTokenProgram
 	>);
@@ -225,8 +259,9 @@ export type ParsedClaimInstruction<
 		vestingState: TAccountMetas[2];
 		beneficiaryAta: TAccountMetas[3];
 		vault: TAccountMetas[4];
-		systemProgram: TAccountMetas[5];
-		tokenProgram: TAccountMetas[6];
+		associatedTokenProgram: TAccountMetas[5];
+		systemProgram: TAccountMetas[6];
+		tokenProgram: TAccountMetas[7];
 	};
 	data: ClaimInstructionData;
 };
@@ -240,12 +275,12 @@ export function parseClaimInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedClaimInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 7) {
+	if (instruction.accounts.length < 8) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 7,
+				expectedAccountMetas: 8,
 			},
 		);
 	}
@@ -263,6 +298,7 @@ export function parseClaimInstruction<
 			vestingState: getNextAccount(),
 			beneficiaryAta: getNextAccount(),
 			vault: getNextAccount(),
+			associatedTokenProgram: getNextAccount(),
 			systemProgram: getNextAccount(),
 			tokenProgram: getNextAccount(),
 		},

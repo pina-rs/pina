@@ -32,8 +32,10 @@ import {
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { findPositionPda, PositionSeeds } from "../pdas";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const POSITION_STATE_DISCRIMINATOR = 2;
 
@@ -42,6 +44,7 @@ export function getPositionStateDiscriminatorBytes(): ReadonlyUint8Array {
 }
 
 export type PositionState = {
+	discriminator: number;
 	pool: Address;
 	owner: Address;
 	stakedAmount: bigint;
@@ -61,19 +64,30 @@ export type PositionStateArgs = {
 
 /** Gets the encoder for {@link PositionStateArgs} account data. */
 export function getPositionStateEncoder(): FixedSizeEncoder<PositionStateArgs> {
-	return getStructEncoder([
-		["pool", getAddressEncoder()],
-		["owner", getAddressEncoder()],
-		["stakedAmount", getU64Encoder()],
-		["rewardDebt", getU64Encoder()],
-		["pendingRewards", getU64Encoder()],
-		["bump", getU8Encoder()],
-	]);
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["pool", getAddressEncoder()],
+			["owner", getAddressEncoder()],
+			["stakedAmount", getU64Encoder()],
+			["rewardDebt", getU64Encoder()],
+			["pendingRewards", getU64Encoder()],
+			["bump", getU8Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 2 }),
+	);
 }
 
 /** Gets the decoder for {@link PositionState} account data. */
 export function getPositionStateDecoder(): FixedSizeDecoder<PositionState> {
 	return getStructDecoder([
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(
+				POSITION_STATE_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
 		["pool", getAddressDecoder()],
 		["owner", getAddressDecoder()],
 		["stakedAmount", getU64Decoder()],

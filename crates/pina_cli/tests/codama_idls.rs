@@ -60,8 +60,12 @@ fn extracted_definition_counts(example_path: &Path) -> (usize, usize, usize) {
 	let mut error_count = 0;
 
 	for file in &resolved {
-		instruction_count += extract_instruction_structs(&file.file).len();
-		account_count += extract_account_structs(&file.file).len();
+		instruction_count += extract_instruction_structs(&file.file)
+			.unwrap_or_else(|e| panic!("extract instructions: {e}"))
+			.len();
+		account_count += extract_account_structs(&file.file)
+			.unwrap_or_else(|e| panic!("extract accounts: {e}"))
+			.len();
 		error_count += extract_error_enums(&file.file).len();
 	}
 

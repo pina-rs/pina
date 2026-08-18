@@ -2,8 +2,10 @@ use heck::ToSnakeCase;
 use syn::File;
 use syn::Item;
 
+use super::discriminator::extract_discriminator_and_variant;
 use super::doc_comments::extract_docs;
 use super::types::type_to_string;
+use crate::error::IdlError;
 use crate::ir::FieldIr;
 
 /// A parsed `#[account(discriminator = ...)]` struct.
@@ -11,6 +13,7 @@ use crate::ir::FieldIr;
 pub struct AccountStruct {
 	pub name: String,
 	pub discriminator_enum: String,
+	pub variant: String,
 	pub fields: Vec<FieldIr>,
 	pub docs: Vec<String>,
 	/// The name of the PDA declared for this account via `#[pda(...)]`.
@@ -18,7 +21,12 @@ pub struct AccountStruct {
 }
 
 /// Extract all `#[account(...)]` structs from a file.
-pub fn extract_account_structs(file: &File) -> Vec<AccountStruct> {
+///
+/// # Errors
+///
+/// Returns an error when an account discriminator does not match the grammar
+/// accepted by the attribute macro.
+pub fn extract_account_structs(file: &File) -> Result<Vec<AccountStruct>, IdlError> {
 	let mut result = Vec::new();
 
 	for item in &file.items {
@@ -26,7 +34,9 @@ pub fn extract_account_structs(file: &File) -> Vec<AccountStruct> {
 			continue;
 		};
 
-		let Some(disc_enum) = get_account_discriminator_enum(&item_struct.attrs) else {
+		let Some((discriminator_enum, variant)) =
+			extract_discriminator_and_variant(&item_struct.attrs, "account", &item_struct.ident)?
+		else {
 			continue;
 		};
 
@@ -36,14 +46,15 @@ pub fn extract_account_structs(file: &File) -> Vec<AccountStruct> {
 
 		result.push(AccountStruct {
 			name: item_struct.ident.to_string(),
-			discriminator_enum: disc_enum,
+			discriminator_enum,
+			variant,
 			fields,
 			docs,
 			pda_name,
 		});
 	}
 
-	result
+	Ok(result)
 }
 
 /// Derive the IDL PDA name for a struct with a `#[pda(...)]` attribute.
@@ -62,51 +73,6 @@ fn extract_pda_name(attrs: &[syn::Attribute], struct_name: &str) -> Option<Strin
 			.unwrap_or(struct_name)
 			.to_snake_case(),
 	)
-}
-
-/// Parse the `discriminator = EnumType` from `#[account(discriminator =
-/// EnumType)]`. A `discriminator = EnumType::Variant` path is also accepted;
-/// only the enum name is returned.
-fn get_account_discriminator_enum(attrs: &[syn::Attribute]) -> Option<String> {
-	for attr in attrs {
-		if !attr.path().is_ident("account") {
-			continue;
-		}
-
-		let Ok(meta_list) = attr.parse_args_with(
-			syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
-		) else {
-			continue;
-		};
-
-		for meta in &meta_list {
-			if let syn::Meta::NameValue(nv) = meta
-				&& nv.path.is_ident("discriminator")
-			{
-				let disc = expr_to_ident_string(&nv.value);
-				return Some(
-					disc.split_once("::")
-						.map_or(disc.clone(), |(enum_name, _)| enum_name.to_owned()),
-				);
-			}
-		}
-	}
-
-	None
-}
-
-fn expr_to_ident_string(expr: &syn::Expr) -> String {
-	match expr {
-		syn::Expr::Path(p) => {
-			p.path
-				.segments
-				.iter()
-				.map(|s| s.ident.to_string())
-				.collect::<Vec<_>>()
-				.join("::")
-		}
-		_ => "unknown".to_owned(),
-	}
 }
 
 fn extract_named_fields(fields: &syn::Fields) -> Vec<FieldIr> {
@@ -148,14 +114,44 @@ mod tests {
 			}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let accounts = extract_account_structs(&file);
+		let accounts =
+			extract_account_structs(&file).unwrap_or_else(|e| panic!("extract failed: {e}"));
 		assert_eq!(accounts.len(), 1);
 		assert_eq!(accounts[0].name, "CounterState");
 		assert_eq!(accounts[0].discriminator_enum, "CounterAccountType");
+		assert_eq!(accounts[0].variant, "CounterState");
 		assert_eq!(accounts[0].fields.len(), 2);
 		assert_eq!(accounts[0].fields[0].name, "bump");
 		assert_eq!(accounts[0].fields[0].rust_type, "u8");
 		assert_eq!(accounts[0].fields[1].name, "count");
 		assert_eq!(accounts[0].fields[1].rust_type, "PodU64");
+	}
+
+	#[test]
+	fn extracts_account_path_variant() {
+		let source = r#"
+			#[account(discriminator = crate::types::CounterAccountType::Counter)]
+			pub struct CounterState {}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let accounts =
+			extract_account_structs(&file).unwrap_or_else(|e| panic!("extract failed: {e}"));
+
+		assert_eq!(accounts[0].discriminator_enum, "CounterAccountType");
+		assert_eq!(accounts[0].variant, "Counter");
+	}
+
+	#[test]
+	fn extracts_account_with_explicit_variant() {
+		let source = r#"
+			#[account(discriminator = crate::types::CounterAccountType, variant = Counter)]
+			pub struct CounterState {}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let accounts =
+			extract_account_structs(&file).unwrap_or_else(|e| panic!("extract failed: {e}"));
+
+		assert_eq!(accounts[0].discriminator_enum, "CounterAccountType");
+		assert_eq!(accounts[0].variant, "Counter");
 	}
 }

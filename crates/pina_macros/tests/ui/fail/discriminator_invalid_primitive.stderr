@@ -1,4 +1,4 @@
-error: Unsupported primitive type. Must be one of: `u8`, `u16`, `u32`, `u64`.
+error: A discriminator with primitive `u128` (16 bytes) exceeds `MAX_DISCRIMINATOR_SPACE` and cannot be safely used for zero-copy layouts. Supported primitives: `u8`, `u16`, `u32`, `u64`.
  --> tests/ui/fail/discriminator_invalid_primitive.rs:3:29
   |
 3 | #[discriminator(primitive = u128)]

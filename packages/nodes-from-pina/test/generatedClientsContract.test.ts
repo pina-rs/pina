@@ -74,6 +74,8 @@ import {
 } from "../../../codama/clients/js/staking_rewards_program/src/generated/programs";
 
 const SYSTEM_PROGRAM_ADDRESS = "11111111111111111111111111111111";
+const ASSOCIATED_TOKEN_PROGRAM_ADDRESS =
+	"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
 
 const READONLY = 0;
 const WRITABLE = 1;
@@ -131,11 +133,12 @@ describe("vesting JS client contracts", () => {
 		} as any);
 		expect(initialize.programAddress).toBe(VESTING_PROGRAM_PROGRAM_ADDRESS);
 		expectAccountsMatch(initialize.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: WRITABLE },
 			{ address: beneficiary, role: READONLY },
 			{ address: mint, role: READONLY },
 			{ address: vestingState, role: WRITABLE },
 			{ address: vault, role: WRITABLE },
+			{ address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
 		]);
@@ -157,11 +160,12 @@ describe("vesting JS client contracts", () => {
 			amount: 25n,
 		} as any);
 		expectAccountsMatch(claim.accounts, [
-			{ address: beneficiary, role: READONLY },
+			{ address: beneficiary, role: WRITABLE },
 			{ address: mint, role: READONLY },
 			{ address: vestingState, role: WRITABLE },
 			{ address: beneficiaryAta, role: WRITABLE },
 			{ address: vault, role: WRITABLE },
+			{ address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
 		]);
@@ -184,8 +188,14 @@ describe("vesting JS client contracts", () => {
 			{ address: vault, role: WRITABLE },
 			{ address: tokenProgram, role: READONLY },
 		]);
-		expect(cancel).not.toHaveProperty("data");
-		expect(parseCancelInstruction(cancel).accounts.admin.address).toBe(admin);
+		expect(Array.from(cancel.data)).toEqual([
+			VESTING_CANCEL_DISCRIMINATOR,
+		]);
+		const parsedCancel = parseCancelInstruction(cancel);
+		expect(parsedCancel.accounts.admin.address).toBe(admin);
+		expect(parsedCancel.data.discriminator).toBe(
+			VESTING_CANCEL_DISCRIMINATOR,
+		);
 	});
 
 	test("vesting discriminators are identified by instruction helpers", () => {
@@ -293,7 +303,9 @@ describe("role registry JS client contracts", () => {
 		expect(
 			parseDeactivateRoleInstruction(deactivateRole).accounts.roleEntry.address,
 		).toBe(roleEntry);
-		expect(deactivateRole).not.toHaveProperty("data");
+		expect(Array.from(deactivateRole.data)).toEqual([
+			ROLE_DEACTIVATE_ROLE_DISCRIMINATOR,
+		]);
 
 		const rotateAdmin = getRotateAdminInstruction({
 			admin,
@@ -305,9 +317,14 @@ describe("role registry JS client contracts", () => {
 			{ address: newAdmin, role: READONLY },
 			{ address: registryConfig, role: WRITABLE },
 		]);
-		expect(parseRotateAdminInstruction(rotateAdmin).accounts.newAdmin.address)
-			.toBe(newAdmin);
-		expect(rotateAdmin).not.toHaveProperty("data");
+		const parsedRotateAdmin = parseRotateAdminInstruction(rotateAdmin);
+		expect(parsedRotateAdmin.accounts.newAdmin.address).toBe(newAdmin);
+		expect(Array.from(rotateAdmin.data)).toEqual([
+			ROLE_ROTATE_ADMIN_DISCRIMINATOR,
+		]);
+		expect(parsedRotateAdmin.data.discriminator).toBe(
+			ROLE_ROTATE_ADMIN_DISCRIMINATOR,
+		);
 	});
 
 	test("role discriminators are identified by instruction helpers", () => {
@@ -376,12 +393,13 @@ describe("staking rewards JS client contracts", () => {
 		} as any);
 		expect(init.programAddress).toBe(STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS);
 		expectAccountsMatch(init.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: WRITABLE },
 			{ address: stakeMint, role: READONLY },
 			{ address: rewardMint, role: READONLY },
 			{ address: poolState, role: WRITABLE },
 			{ address: stakeVault, role: WRITABLE },
 			{ address: rewardVault, role: WRITABLE },
+			{ address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
 		]);
@@ -396,7 +414,7 @@ describe("staking rewards JS client contracts", () => {
 			bump: 4,
 		} as any);
 		expectAccountsMatch(openPosition.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: WRITABLE },
 			{ address: poolState, role: READONLY },
 			{ address: positionState, role: WRITABLE },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
@@ -416,11 +434,12 @@ describe("staking rewards JS client contracts", () => {
 			amount: 42n,
 		} as any);
 		expectAccountsMatch(deposit.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: WRITABLE },
 			{ address: stakeMint, role: READONLY },
 			{ address: poolState, role: WRITABLE },
 			{ address: positionState, role: WRITABLE },
 			{ address: userStakeAta, role: WRITABLE },
+			{ address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 		]);
@@ -460,18 +479,22 @@ describe("staking rewards JS client contracts", () => {
 			tokenProgram,
 		} as any);
 		expectAccountsMatch(claim.accounts, [
-			{ address: admin, role: READONLY },
+			{ address: admin, role: WRITABLE },
 			{ address: rewardMint, role: READONLY },
 			{ address: poolState, role: READONLY },
 			{ address: positionState, role: WRITABLE },
 			{ address: userRewardAta, role: WRITABLE },
+			{ address: ASSOCIATED_TOKEN_PROGRAM_ADDRESS, role: READONLY },
 			{ address: tokenProgram, role: READONLY },
 			{ address: SYSTEM_PROGRAM_ADDRESS, role: READONLY },
 		]);
 		expect(parseStakingClaimInstruction(claim).accounts.user.address).toBe(
 			admin,
 		);
-		expect(claim).not.toHaveProperty("data");
+		expect(Array.from(claim.data)).toEqual([STAKING_CLAIM_DISCRIMINATOR]);
+		expect(parseStakingClaimInstruction(claim).data.discriminator).toBe(
+			STAKING_CLAIM_DISCRIMINATOR,
+		);
 	});
 
 	test("staking discriminators are identified by instruction helpers", () => {

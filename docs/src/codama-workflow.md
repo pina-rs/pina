@@ -65,6 +65,8 @@ const codama = await createFromFile("./idls/my_program.json");
 await codama.accept(renderJsVisitor("./clients/js/my_program"));
 ```
 
+The stock visitor emits the correct fixed-size wire layout, but its generic codecs are intentionally permissive. `pina codama generate` adds Pina's runtime boundary checks: over-capacity strings and vectors fail instead of being truncated, and decoders enforce discriminators, canonical booleans, and strict UTF-8.
+
 ### 3. Generate Pina-style Rust clients (optional)
 
 This repository ships `crates/pina_codama_renderer`, which emits Rust models aligned with Pina's discriminator-first, fixed-size POD layouts.

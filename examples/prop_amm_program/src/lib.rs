@@ -28,8 +28,6 @@
 ))]
 extern crate std;
 
-use core::mem::size_of;
-
 use pina::*;
 
 pub mod cpi;
@@ -64,7 +62,7 @@ pub enum PropAmmAccountType {
 #[account(discriminator = PropAmmAccountType)]
 pub struct OracleState {
 	pub authority: Address,
-	pub price: PodU64,
+	pub price: u64,
 }
 
 #[instruction(discriminator = PropAmmInstruction::Initialize)]
@@ -72,7 +70,7 @@ pub struct InitializeInstruction {}
 
 #[instruction(discriminator = PropAmmInstruction::Update)]
 pub struct UpdateInstruction {
-	pub new_price: PodU64,
+	pub new_price: u64,
 }
 
 #[instruction(discriminator = PropAmmInstruction::RotateAuthority)]
@@ -100,7 +98,7 @@ pub struct RotateAuthorityAccounts<'a> {
 }
 
 fn oracle_size() -> usize {
-	size_of::<OracleState>()
+	OracleState::SIZE
 }
 
 fn assert_update_authority(authority: &AccountView) -> ProgramResult {
@@ -130,10 +128,8 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		create_account(self.payer, self.oracle, oracle_size(), &ID)?;
 
 		let mut oracle = self.oracle.as_account_mut::<OracleState>(&ID)?;
-		*oracle = OracleState::builder()
-			.authority(*self.payer.address())
-			.price(PodU64::from(0))
-			.build();
+		oracle.authority = *self.payer.address();
+		oracle.price.set(0);
 
 		Ok(())
 	}
@@ -203,23 +199,24 @@ mod tests {
 
 	#[test]
 	fn update_instruction_roundtrip() {
-		let instruction = UpdateInstruction::builder()
-			.new_price(PodU64::from(1_234))
-			.build();
-		let bytes = instruction.to_bytes();
+		let mut bytes = [0u8; UpdateInstruction::SIZE];
+		UpdateInstruction::initialize(&mut bytes)
+			.unwrap_or_else(|error| panic!("initialize: {error:?}"))
+			.new_price
+			.set(1_234);
 		let decoded =
-			UpdateInstruction::try_from_bytes(bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
+			UpdateInstruction::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
 
-		assert_eq!(u64::from(decoded.new_price), 1_234);
+		assert_eq!(decoded.new_price.get(), 1_234);
 	}
 
 	#[test]
 	fn rotate_authority_instruction_roundtrip() {
-		let instruction = RotateAuthorityInstruction::builder()
-			.new_authority([9u8; ADDRESS_BYTES].into())
-			.build();
-		let bytes = instruction.to_bytes();
-		let decoded = RotateAuthorityInstruction::try_from_bytes(bytes)
+		let mut bytes = [0u8; RotateAuthorityInstruction::SIZE];
+		RotateAuthorityInstruction::initialize(&mut bytes)
+			.unwrap_or_else(|error| panic!("initialize: {error:?}"))
+			.new_authority = [9u8; ADDRESS_BYTES].into();
+		let decoded = RotateAuthorityInstruction::try_from_bytes(&bytes)
 			.unwrap_or_else(|e| panic!("decode: {e:?}"));
 
 		assert_eq!(decoded.new_authority, Address::from([9u8; ADDRESS_BYTES]));

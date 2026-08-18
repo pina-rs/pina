@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 /// Instruction data for `UpdateProfile`. Replaces both name and bio.
 pub const UPDATE_PROFILE_DISCRIMINATOR: u8 = 1u8;
 
@@ -52,37 +54,41 @@ impl UpdateProfile {
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.profile, false));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
-
 		solana_instruction::Instruction {
 			program_id: crate::PROFILE_PROGRAM_ID,
 			accounts,
-			data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct UpdateProfileInstructionData {
-	pub discriminator: u8,
-	pub name: [u8; 33],
-	pub bio: [u8; 129],
+	bytes: Vec<u8>,
 }
 
 impl UpdateProfileInstructionData {
-	pub const fn new(name: [u8; 33], bio: [u8; 129]) -> Self {
-		Self {
-			discriminator: UPDATE_PROFILE_DISCRIMINATOR,
-			name,
-			bio,
+	pub fn new(
+		configure: impl FnOnce(&mut UpdateProfileInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <UpdateProfileInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data =
+				<UpdateProfileInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			configure(data);
+			data.discriminator = UPDATE_PROFILE_DISCRIMINATOR;
 		}
+		<UpdateProfileInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
+}
+
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct UpdateProfileInstructionWire {
+	pub discriminator: u8,
+	pub name: pina::String<32>,
+	pub bio: pina::String<128>,
 }

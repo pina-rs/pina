@@ -9,12 +9,22 @@
 import {
 	type AccountMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyUint8Array,
+	transformEncoder,
 } from "@solana/kit";
 import { ANCHOR_EVENTS_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const TEST_EVENT_DISCRIMINATOR = 1;
 
@@ -25,7 +35,42 @@ export function getTestEventDiscriminatorBytes(): ReadonlyUint8Array {
 export type TestEventInstruction<
 	TProgram extends string = typeof ANCHOR_EVENTS_PROGRAM_ADDRESS,
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> = Instruction<TProgram> & InstructionWithAccounts<TRemainingAccounts>;
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<TRemainingAccounts>;
+
+export type TestEventInstructionData = { discriminator: number };
+
+export type TestEventInstructionDataArgs = {};
+
+export function getTestEventInstructionDataEncoder(): FixedSizeEncoder<
+	TestEventInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
+}
+
+export function getTestEventInstructionDataDecoder(): FixedSizeDecoder<
+	TestEventInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(TEST_EVENT_DISCRIMINATOR, getU8Decoder()),
+	]]);
+}
+
+export function getTestEventInstructionDataCodec(): FixedSizeCodec<
+	TestEventInstructionDataArgs,
+	TestEventInstructionData
+> {
+	return combineCodec(
+		getTestEventInstructionDataEncoder(),
+		getTestEventInstructionDataDecoder(),
+	);
+}
 
 export type TestEventInput = {};
 
@@ -39,16 +84,22 @@ export function getTestEventInstruction<
 		ANCHOR_EVENTS_PROGRAM_ADDRESS;
 
 	return Object.freeze(
-		{ programAddress } as TestEventInstruction<TProgramAddress>,
+		{
+			data: getTestEventInstructionDataEncoder().encode({}),
+			programAddress,
+		} as TestEventInstruction<TProgramAddress>,
 	);
 }
 
 export type ParsedTestEventInstruction<
 	TProgram extends string = typeof ANCHOR_EVENTS_PROGRAM_ADDRESS,
-> = { programAddress: Address<TProgram> };
+> = { programAddress: Address<TProgram>; data: TestEventInstructionData };
 
 export function parseTestEventInstruction<TProgram extends string>(
-	instruction: Instruction<TProgram>,
+	instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
 ): ParsedTestEventInstruction<TProgram> {
-	return { programAddress: instruction.programAddress };
+	return {
+		programAddress: instruction.programAddress,
+		data: getTestEventInstructionDataDecoder().decode(instruction.data),
+	};
 }

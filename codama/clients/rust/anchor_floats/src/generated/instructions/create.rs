@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const CREATE_DISCRIMINATOR: u8 = 0u8;
 
 /// Accounts.
@@ -48,37 +50,40 @@ impl Create {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
-
 		solana_instruction::Instruction {
 			program_id: crate::ANCHOR_FLOATS_ID,
 			accounts,
-			data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct CreateInstructionData {
-	pub discriminator: u8,
-	pub data_f32: pina::PodU32,
-	pub data_f64: pina::PodU64,
+	bytes: Vec<u8>,
 }
 
 impl CreateInstructionData {
-	pub const fn new(data_f32: pina::PodU32, data_f64: pina::PodU64) -> Self {
-		Self {
-			discriminator: CREATE_DISCRIMINATOR,
-			data_f32,
-			data_f64,
+	pub fn new(
+		configure: impl FnOnce(&mut CreateInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <CreateInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <CreateInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			configure(data);
+			data.discriminator = CREATE_DISCRIMINATOR;
 		}
+		<CreateInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
+}
+
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct CreateInstructionWire {
+	pub discriminator: u8,
+	pub data_f32: u32,
+	pub data_f64: u64,
 }

@@ -8,6 +8,8 @@
 	clippy::too_many_arguments
 )]
 
+use pina::zeropod;
+
 pub const CLAIM_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
@@ -18,6 +20,7 @@ pub struct Claim {
 	pub vesting_state: solana_pubkey::Pubkey,
 	pub beneficiary_ata: solana_pubkey::Pubkey,
 	pub vault: solana_pubkey::Pubkey,
+	pub associated_token_program: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
 	pub token_program: solana_pubkey::Pubkey,
 }
@@ -37,6 +40,9 @@ impl Claim {
 			vesting_state,
 			beneficiary_ata,
 			vault,
+			associated_token_program: solana_pubkey::pubkey!(
+				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+			),
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 			token_program,
 		}
@@ -52,11 +58,8 @@ impl Claim {
 		data: ClaimInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(7 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.beneficiary,
-			true,
-		));
+		let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
+		accounts.push(solana_instruction::AccountMeta::new(self.beneficiary, true));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.mint, false,
 		));
@@ -70,6 +73,10 @@ impl Claim {
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.vault, false));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.associated_token_program,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.system_program,
 			false,
 		));
@@ -78,35 +85,39 @@ impl Claim {
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let data = unsafe {
-			core::slice::from_raw_parts(
-				&data as *const _ as *const u8,
-				core::mem::size_of_val(&data),
-			)
-			.to_vec()
-		};
-
 		solana_instruction::Instruction {
 			program_id: crate::VESTING_PROGRAM_ID,
 			accounts,
-			data,
+			data: data.bytes,
 		}
 	}
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Opaque, fully initialized instruction storage.
 pub struct ClaimInstructionData {
-	pub discriminator: u8,
-	pub amount: pina::PodU64,
+	bytes: Vec<u8>,
 }
 
 impl ClaimInstructionData {
-	pub const fn new(amount: pina::PodU64) -> Self {
-		Self {
-			discriminator: CLAIM_DISCRIMINATOR,
-			amount,
+	pub fn new(
+		configure: impl FnOnce(&mut ClaimInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
+		let mut bytes = vec![0u8; <ClaimInstructionWire as pina::ZeroPodFixed>::SIZE];
+		{
+			let data = <ClaimInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			configure(data);
+			data.discriminator = CLAIM_DISCRIMINATOR;
 		}
+		<ClaimInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		Ok(Self { bytes })
 	}
+}
+
+#[doc(hidden)]
+#[derive(pina::ZeroPod)]
+pub struct ClaimInstructionWire {
+	pub discriminator: u8,
+	pub amount: u64,
 }

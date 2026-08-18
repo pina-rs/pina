@@ -129,7 +129,12 @@ lockfile_commands = [
 [ecosystems.cargo.publish]
 enabled = true
 mode = "builtin"
-trusted_publishing = true
+trusted_publishing = { enabled = true, repository = "pina-rs/pina", workflow = "publish.yml", environment = "publisher" }
+
+# Published dev dependencies only need a compatible registry release; they do
+# not establish publication order between the new workspace versions.
+[ecosystems.cargo.publish_order]
+dependency_fields = ["dependencies", "build-dependencies"]
 
 [ecosystems.npm]
 enabled = true
@@ -139,7 +144,7 @@ lockfile_commands = [{ command = "pnpm install --lockfile-only" }]
 enabled = true
 mode = "builtin"
 registry = "npm"
-trusted_publishing = true
+trusted_publishing = { enabled = true, repository = "pina-rs/pina", workflow = "publish.yml", environment = "publisher" }
 
 [changesets.affected]
 enabled = true

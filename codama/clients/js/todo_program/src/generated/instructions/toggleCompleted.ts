@@ -10,14 +10,23 @@ import {
 	type AccountMeta,
 	type AccountSignerMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
@@ -27,6 +36,7 @@ import {
 } from "@solana/program-client-core";
 import { findTodoPda } from "../pdas";
 import { TODO_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const TOGGLE_COMPLETED_DISCRIMINATOR = 1;
 
@@ -41,6 +51,7 @@ export type ToggleCompletedInstruction<
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<
 		[
 			TAccountOwner extends string ?
@@ -52,6 +63,41 @@ export type ToggleCompletedInstruction<
 			...TRemainingAccounts,
 		]
 	>;
+
+export type ToggleCompletedInstructionData = { discriminator: number };
+
+export type ToggleCompletedInstructionDataArgs = {};
+
+export function getToggleCompletedInstructionDataEncoder(): FixedSizeEncoder<
+	ToggleCompletedInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
+}
+
+export function getToggleCompletedInstructionDataDecoder(): FixedSizeDecoder<
+	ToggleCompletedInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(
+			TOGGLE_COMPLETED_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	]]);
+}
+
+export function getToggleCompletedInstructionDataCodec(): FixedSizeCodec<
+	ToggleCompletedInstructionDataArgs,
+	ToggleCompletedInstructionData
+> {
+	return combineCodec(
+		getToggleCompletedInstructionDataEncoder(),
+		getToggleCompletedInstructionDataDecoder(),
+	);
+}
 
 export type ToggleCompletedAsyncInput<
 	TAccountOwner extends string = string,
@@ -95,19 +141,18 @@ export async function getToggleCompletedInstructionAsync<
 	}
 
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze(
-		{
-			accounts: [
-				getAccountMeta("owner", accounts.owner),
-				getAccountMeta("todo", accounts.todo),
-			],
-			programAddress,
-		} as ToggleCompletedInstruction<
-			TProgramAddress,
-			TAccountOwner,
-			TAccountTodo
-		>,
-	);
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("owner", accounts.owner),
+			getAccountMeta("todo", accounts.todo),
+		],
+		data: getToggleCompletedInstructionDataEncoder().encode({}),
+		programAddress,
+	} as ToggleCompletedInstruction<
+		TProgramAddress,
+		TAccountOwner,
+		TAccountTodo
+	>);
 }
 
 export type ToggleCompletedInput<
@@ -140,19 +185,18 @@ export function getToggleCompletedInstruction<
 	>;
 
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze(
-		{
-			accounts: [
-				getAccountMeta("owner", accounts.owner),
-				getAccountMeta("todo", accounts.todo),
-			],
-			programAddress,
-		} as ToggleCompletedInstruction<
-			TProgramAddress,
-			TAccountOwner,
-			TAccountTodo
-		>,
-	);
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("owner", accounts.owner),
+			getAccountMeta("todo", accounts.todo),
+		],
+		data: getToggleCompletedInstructionDataEncoder().encode({}),
+		programAddress,
+	} as ToggleCompletedInstruction<
+		TProgramAddress,
+		TAccountOwner,
+		TAccountTodo
+	>);
 }
 
 export type ParsedToggleCompletedInstruction<
@@ -164,13 +208,17 @@ export type ParsedToggleCompletedInstruction<
 		owner: TAccountMetas[0];
 		todo: TAccountMetas[1];
 	};
+	data: ToggleCompletedInstructionData;
 };
 
 export function parseToggleCompletedInstruction<
 	TProgram extends string,
 	TAccountMetas extends readonly AccountMeta[],
 >(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedToggleCompletedInstruction<TProgram, TAccountMetas> {
 	if (instruction.accounts.length < 2) {
 		throw new SolanaError(
@@ -190,5 +238,6 @@ export function parseToggleCompletedInstruction<
 	return {
 		programAddress: instruction.programAddress,
 		accounts: { owner: getNextAccount(), todo: getNextAccount() },
+		data: getToggleCompletedInstructionDataDecoder().decode(instruction.data),
 	};
 }

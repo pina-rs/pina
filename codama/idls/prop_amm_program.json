@@ -16,6 +16,20 @@
 					"fields": [
 						{
 							"kind": "structFieldTypeNode",
+							"name": "discriminator",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
 							"name": "authority",
 							"type": {
 								"kind": "publicKeyTypeNode"
@@ -83,6 +97,22 @@
 						}
 					}
 				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					}
+				],
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -122,6 +152,20 @@
 					}
 				],
 				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 1
+						}
+					},
 					{
 						"kind": "instructionArgumentNode",
 						"name": "newPrice",
@@ -171,6 +215,20 @@
 					}
 				],
 				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 2
+						}
+					},
 					{
 						"kind": "instructionArgumentNode",
 						"name": "newAuthority",

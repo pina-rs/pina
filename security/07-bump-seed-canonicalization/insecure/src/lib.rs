@@ -29,13 +29,13 @@ pub enum StoreAccount {
 #[account(discriminator = StoreAccount)]
 pub struct Data {
 	pub authority: Address,
-	pub value: PodU64,
+	pub value: u64,
 	pub bump: u8,
 }
 
 #[instruction(discriminator = StoreInstruction, variant = Create)]
 pub struct CreateInstruction {
-	pub value: PodU64,
+	pub value: u64,
 	pub bump: u8,
 }
 
@@ -70,11 +70,9 @@ impl<'a> ProcessAccountInfos<'a> for CreateAccounts<'a> {
 		create_program_account_with_bump::<Data>(self.data, self.authority, &ID, seeds, args.bump)?;
 
 		let mut data_account = self.data.as_account_mut::<Data>(&ID)?;
-		*data_account = Data::builder()
-			.authority(*self.authority.address())
-			.value(args.value)
-			.bump(args.bump)
-			.build();
+		data_account.authority = *self.authority.address();
+		data_account.value = args.value;
+		data_account.bump = args.bump;
 
 		Ok(())
 	}

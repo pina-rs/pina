@@ -61,8 +61,8 @@ pub enum HelloInstruction {
 /// - A discriminator field as the first byte of the struct.
 /// - `HasDiscriminator` implementation linking this struct to
 ///   `HelloInstruction::Hello`.
-/// - `Pod` and `Zeroable` derives for zero-copy deserialization.
-/// - `TypedBuilder` for ergonomic construction in tests.
+/// - A generated zeropod view plus checked `initialize` and `try_from_bytes`
+///   helpers.
 ///
 /// `HelloInstructionData` has no payload fields — only the discriminator byte
 /// is needed to identify the instruction.

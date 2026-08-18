@@ -212,7 +212,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 // 2. External crate imports
-use bytemuck::Pod;
+use pina::ZcElem;
 use pinocchio::ProgramResult;
 
 // 3. Internal crate imports
@@ -240,7 +240,7 @@ Use explicit conversion functions and avoid implicit casts.
 
 ```rust
 // Good
-let value = PodU64::from_primitive(100u64);
+let value = PodU64::from(100u64);
 let native: u64 = value.into();
 
 // Avoid

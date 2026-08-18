@@ -19,95 +19,13 @@ const BPF_ALIGN_OF_U128: usize = 8;
 const UNINIT: MaybeUninit<AccountView> = MaybeUninit::<AccountView>::uninit();
 const STATIC_ACCOUNT_DATA: usize = 88 + MAX_PERMITTED_DATA_INCREASE;
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(ZeroPod)]
 struct TestState {
 	discriminator: [u8; 1],
-	value: PodU64,
+	value: u64,
 }
 
-impl pina::ZcValidate for TestState {
-	fn validate_ref(value: &Self) -> Result<(), pina::ZeroPodError> {
-		<[u8; 1] as pina::ZcValidate>::validate_ref(&value.discriminator)?;
-		PodU64::validate_ref(&value.value)?;
-		Ok(())
-	}
-}
-
-// SAFETY: align 1, no padding, every bit pattern valid, validate_ref is
-// load-bearing.
-unsafe impl pina::ZcElem for TestState {}
-
-impl pina::ZeroPodSchema for TestState {
-	const LAYOUT: pina::LayoutKind = pina::LayoutKind::Fixed;
-}
-
-impl pina::ZeroPodFixed for TestState {
-	type Zc = TestState;
-
-	const SIZE: usize = size_of::<TestState>();
-
-	fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pina::ZeroPodError> {
-		<Self as pina::ZeroPodFixed>::validate(data)?;
-		Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-	}
-
-	fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pina::ZeroPodError> {
-		<Self as pina::ZeroPodFixed>::validate(data)?;
-		Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-	}
-
-	fn validate(data: &[u8]) -> Result<(), pina::ZeroPodError> {
-		if data.len() < Self::SIZE {
-			return Err(pina::ZeroPodError::BufferTooSmall);
-		}
-		let zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-		<Self::Zc as pina::ZcValidate>::validate_ref(zc)?;
-		Ok(())
-	}
-
-	unsafe fn from_bytes_unchecked(data: &[u8]) -> &Self::Zc {
-		&*(data.as_ptr() as *const Self::Zc)
-	}
-
-	unsafe fn from_bytes_mut_unchecked(data: &mut [u8]) -> &mut Self::Zc {
-		&mut *(data.as_mut_ptr() as *mut Self::Zc)
-	}
-}
-
-impl pina::ZcField for TestState {
-	type Pod = TestState;
-
-	const POD_SIZE: usize = size_of::<TestState>();
-}
-
-impl pina::PinaAccount for TestState {
-	fn validate(data: &[u8]) -> Result<(), pina::ProgramError> {
-		if !<Self as pina::HasDiscriminator>::matches_discriminator(data) {
-			return Err(pina::ProgramError::InvalidAccountData);
-		}
-		<Self as pina::ZeroPodFixed>::validate(data)
-			.map_err(|_| pina::ProgramError::InvalidAccountData)
-	}
-
-	fn try_from_bytes(data: &[u8]) -> Result<&Self, pina::ProgramError> {
-		<Self as pina::PinaAccount>::validate(data)?;
-		if data.len() != size_of::<Self>() {
-			return Err(pina::ProgramError::InvalidAccountData);
-		}
-		<Self as pina::ZeroPodFixed>::from_bytes(data)
-			.map_err(|_| pina::ProgramError::InvalidAccountData)
-	}
-
-	fn try_from_bytes_mut(data: &mut [u8]) -> Result<&mut Self, pina::ProgramError> {
-		<Self as pina::PinaAccount>::validate(data)?;
-		if data.len() != size_of::<Self>() {
-			return Err(pina::ProgramError::InvalidAccountData);
-		}
-		<Self as pina::ZeroPodFixed>::from_bytes_mut(data)
-			.map_err(|_| pina::ProgramError::InvalidAccountData)
-	}
-}
+impl PinaAccount for TestState {}
 
 impl HasDiscriminator for TestState {
 	type Type = u8;
@@ -282,18 +200,12 @@ unsafe fn deserialize_test_input<const MAX_ACCOUNTS: usize>(
 }
 
 fn build_test_state_bytes(value: u64) -> Vec<u8> {
-	let state = TestState {
-		discriminator: [TestState::VALUE],
-		value: PodU64::from(value),
-	};
-
-	unsafe {
-		core::slice::from_raw_parts(
-			&state as *const _ as *const u8,
-			core::mem::size_of_val(&state),
-		)
-	}
-	.to_vec()
+	let mut bytes = vec![0u8; TestState::SIZE];
+	TestState::write_discriminator(&mut bytes);
+	let state = <TestState as ZeroPodFixed>::from_bytes_mut(&mut bytes)
+		.expect("zeroed storage with a valid discriminator");
+	state.value.set(value);
+	bytes
 }
 
 #[cfg(feature = "token")]
@@ -345,7 +257,7 @@ fn as_account_rejects_overlapping_mutable_borrows_under_miri() {
 	let state = account
 		.as_account::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("typed load failed: {e:?}"));
-	assert_eq!(u64::from(state.value), 77);
+	assert_eq!(state.value.get(), 77);
 
 	assert!(matches!(
 		shadow.try_borrow_mut(),
@@ -378,7 +290,7 @@ fn as_account_mut_rejects_shared_and_mutable_reborrows_under_miri() {
 	let mut state = account
 		.as_account_mut::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("typed mutable load failed: {e:?}"));
-	state.value = PodU64::from(99);
+	state.value.set(99);
 
 	assert!(matches!(
 		shadow.try_borrow(),
@@ -394,7 +306,7 @@ fn as_account_mut_rejects_shared_and_mutable_reborrows_under_miri() {
 	let state = account
 		.as_account::<TestState>(&TEST_PROGRAM_ID)
 		.unwrap_or_else(|e| panic!("typed reload failed: {e:?}"));
-	assert_eq!(u64::from(state.value), 99);
+	assert_eq!(state.value.get(), 99);
 }
 
 #[cfg(feature = "token")]
@@ -434,7 +346,7 @@ fn as_token_mint_rejects_overlapping_mutable_borrows_under_miri() {
 
 #[cfg(feature = "token")]
 #[test]
-fn as_token_account_checked_with_owners_supports_token_2022_under_miri() {
+fn as_token_account_for_program_supports_token_2022_under_miri() {
 	let account_key: Address = address!("4vJ9JU1bJJE96FWSJKv9J5xBqHkM7SspGq2pZ7uS5k4x");
 	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
 	let owner: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
@@ -454,8 +366,8 @@ fn as_token_account_checked_with_owners_supports_token_2022_under_miri() {
 	let account = account_views[0];
 	let mut shadow = account_views[0];
 	let token_account = account
-		.as_token_account_checked_with_owners(&[token::ID, token_2022::ID])
-		.unwrap_or_else(|e| panic!("multi-owner token account load failed: {e:?}"));
+		.as_token_account_for_program(&token_2022::ID)
+		.unwrap_or_else(|e| panic!("token-program account load failed: {e:?}"));
 	assert_eq!(token_account.amount(), 55);
 	assert_eq!(token_account.mint(), &mint);
 	assert_eq!(token_account.owner(), &owner);

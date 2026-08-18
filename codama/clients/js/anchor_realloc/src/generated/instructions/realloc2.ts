@@ -18,6 +18,7 @@ import {
 	getStructEncoder,
 	getU16Decoder,
 	getU16Encoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
@@ -28,6 +29,7 @@ import {
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
@@ -35,6 +37,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { ANCHOR_REALLOC_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const REALLOC2_DISCRIMINATOR = 1;
 
@@ -70,20 +73,29 @@ export type Realloc2Instruction<
 		]
 	>;
 
-export type Realloc2InstructionData = { len: number };
+export type Realloc2InstructionData = { discriminator: number; len: number };
 
-export type Realloc2InstructionDataArgs = Realloc2InstructionData;
+export type Realloc2InstructionDataArgs = { len: number };
 
 export function getRealloc2InstructionDataEncoder(): FixedSizeEncoder<
 	Realloc2InstructionDataArgs
 > {
-	return getStructEncoder([["len", getU16Encoder()]]);
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"len",
+			getU16Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 1 }),
+	);
 }
 
 export function getRealloc2InstructionDataDecoder(): FixedSizeDecoder<
 	Realloc2InstructionData
 > {
-	return getStructDecoder([["len", getU16Decoder()]]);
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(REALLOC2_DISCRIMINATOR, getU8Decoder()),
+	], ["len", getU16Decoder()]]);
 }
 
 export function getRealloc2InstructionDataCodec(): FixedSizeCodec<

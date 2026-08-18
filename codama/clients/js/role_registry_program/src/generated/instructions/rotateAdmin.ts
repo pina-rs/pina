@@ -10,15 +10,24 @@ import {
 	type AccountMeta,
 	type AccountSignerMeta,
 	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
+	type InstructionWithData,
 	type ReadonlyAccount,
 	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
+	transformEncoder,
 	type WritableAccount,
 } from "@solana/kit";
 import {
@@ -26,6 +35,7 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const ROTATE_ADMIN_DISCRIMINATOR = 4;
 
@@ -41,6 +51,7 @@ export type RotateAdminInstruction<
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<
 		[
 			TAccountAdmin extends string ?
@@ -55,6 +66,38 @@ export type RotateAdminInstruction<
 			...TRemainingAccounts,
 		]
 	>;
+
+export type RotateAdminInstructionData = { discriminator: number };
+
+export type RotateAdminInstructionDataArgs = {};
+
+export function getRotateAdminInstructionDataEncoder(): FixedSizeEncoder<
+	RotateAdminInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 4 }),
+	);
+}
+
+export function getRotateAdminInstructionDataDecoder(): FixedSizeDecoder<
+	RotateAdminInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getZeroPodDiscriminatorDecoder(ROTATE_ADMIN_DISCRIMINATOR, getU8Decoder()),
+	]]);
+}
+
+export function getRotateAdminInstructionDataCodec(): FixedSizeCodec<
+	RotateAdminInstructionDataArgs,
+	RotateAdminInstructionData
+> {
+	return combineCodec(
+		getRotateAdminInstructionDataEncoder(),
+		getRotateAdminInstructionDataDecoder(),
+	);
+}
 
 export type RotateAdminInput<
 	TAccountAdmin extends string = string,
@@ -107,6 +150,7 @@ export function getRotateAdminInstruction<
 			getAccountMeta("newAdmin", accounts.newAdmin),
 			getAccountMeta("registryConfig", accounts.registryConfig),
 		],
+		data: getRotateAdminInstructionDataEncoder().encode({}),
 		programAddress,
 	} as RotateAdminInstruction<
 		TProgramAddress,
@@ -126,13 +170,17 @@ export type ParsedRotateAdminInstruction<
 		newAdmin: TAccountMetas[1];
 		registryConfig: TAccountMetas[2];
 	};
+	data: RotateAdminInstructionData;
 };
 
 export function parseRotateAdminInstruction<
 	TProgram extends string,
 	TAccountMetas extends readonly AccountMeta[],
 >(
-	instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas>,
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedRotateAdminInstruction<TProgram, TAccountMetas> {
 	if (instruction.accounts.length < 3) {
 		throw new SolanaError(
@@ -156,5 +204,6 @@ export function parseRotateAdminInstruction<
 			newAdmin: getNextAccount(),
 			registryConfig: getNextAccount(),
 		},
+		data: getRotateAdminInstructionDataDecoder().decode(instruction.data),
 	};
 }

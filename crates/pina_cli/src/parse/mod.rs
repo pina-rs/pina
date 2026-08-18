@@ -8,12 +8,14 @@ pub mod error_enum;
 pub mod instruction_data;
 pub mod module_resolver;
 pub mod pda_attr;
+pub mod pod_enum;
 pub mod program_id;
 pub mod seeds;
 pub mod types;
 pub mod validation;
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::Path;
 
 use heck::ToSnakeCase;
@@ -68,6 +70,7 @@ pub fn assemble_program_ir_multi(
 	let mut all_seed_constants = Vec::new();
 	let mut dispatch = Vec::new();
 	let mut all_validation_props = HashMap::new();
+	let mut all_zeropod_enums = Vec::new();
 	let mut public_key = None;
 	let mut pdas_ir = Vec::new();
 
@@ -77,10 +80,11 @@ pub fn assemble_program_ir_multi(
 		}
 
 		all_disc_enums.extend(discriminator::extract_discriminator_enums(file));
-		all_account_structs.extend(account_state::extract_account_structs(file));
-		all_instruction_structs.extend(instruction_data::extract_instruction_structs(file));
+		all_account_structs.extend(account_state::extract_account_structs(file)?);
+		all_instruction_structs.extend(instruction_data::extract_instruction_structs(file)?);
 		all_ix_accounts_structs.extend(accounts_struct::extract_accounts_structs(file));
 		all_errors.extend(error_enum::extract_error_enums(file));
+		all_zeropod_enums.extend(pod_enum::extract_zeropod_enums(file)?);
 
 		let file_dispatch = entrypoint::extract_dispatch_map(file);
 		if !file_dispatch.is_empty() {
@@ -109,6 +113,7 @@ pub fn assemble_program_ir_multi(
 		&all_instruction_structs,
 		&all_ix_accounts_structs,
 		&all_errors,
+		&all_zeropod_enums,
 		&dispatch,
 		&all_validation_props,
 		&pdas_ir,
@@ -130,6 +135,7 @@ fn assemble_from_extracted(
 	instruction_structs: &[instruction_data::InstructionStruct],
 	ix_accounts_structs: &[accounts_struct::AccountsStruct],
 	errors: &[ErrorIr],
+	zeropod_enums: &[crate::ir::ZeroPodEnumIr],
 	dispatch: &[entrypoint::DispatchEntry],
 	validation_props: &HashMap<String, HashMap<String, validation::AccountProperties>>,
 	pdas_ir: &[PdaIr],
@@ -143,7 +149,7 @@ fn assemble_from_extracted(
 			resolve_discriminator_value(
 				&discriminator_map,
 				&acct.discriminator_enum,
-				&acct.name,
+				&acct.variant,
 				"account",
 			)
 			.map(|disc_value| {
@@ -176,6 +182,7 @@ fn assemble_from_extracted(
 	let ir = ProgramIr {
 		name: program_name.to_owned(),
 		public_key,
+		zeropod_enums: zeropod_enums.to_vec(),
 		accounts,
 		instructions,
 		errors: errors.to_vec(),
@@ -198,6 +205,16 @@ fn assemble_from_extracted(
 /// Returns `Ok(())` when the IR is valid, or an [`IdlError`] describing the
 /// first set of violations found.
 pub fn validate_program_ir(ir: &ProgramIr) -> Result<(), IdlError> {
+	let mut zeropod_enum_names = HashSet::new();
+	for zeropod_enum in &ir.zeropod_enums {
+		if !zeropod_enum_names.insert(zeropod_enum.name.as_str()) {
+			return Err(IdlError::Other(format!(
+				"Duplicate ZeroPod enum `{}` cannot be flattened into one Codama program",
+				zeropod_enum.name
+			)));
+		}
+	}
+
 	let collisions = collision::find_discriminator_collisions(ir);
 
 	if !collisions.is_empty() {
@@ -420,6 +437,8 @@ fn infer_pda_name_for_field(field_name: &str, pdas: &[PdaIr]) -> Option<String> 
 
 #[cfg(test)]
 mod tests {
+	use codama_nodes::NestedTypeNodeTrait;
+
 	use super::*;
 	use crate::ir::PdaSeedIr;
 
@@ -638,5 +657,76 @@ mod tests {
 		assert!(message.contains("Could not resolve account discriminator"));
 		assert!(message.contains("MissingState"));
 		assert!(message.contains("ExampleAccount"));
+	}
+
+	#[test]
+	fn assemble_program_ir_collects_local_zeropod_enums() {
+		let source = r#"
+			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+
+			#[derive(ZeroPod)]
+			#[repr(u8)]
+			pub enum Color {
+				Red = 0,
+				Blue = 1,
+			}
+
+			#[discriminator]
+			pub enum ExampleAccount {
+				Palette = 0,
+			}
+
+			#[account(discriminator = ExampleAccount)]
+			pub struct Palette {
+				pub color: Color,
+				pub recent: Vec<Color, 8>,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|error| panic!("parse failed: {error}"));
+		let ir = assemble_program_ir(&file, "example")
+			.unwrap_or_else(|error| panic!("assemble failed: {error}"));
+
+		assert_eq!(ir.zeropod_enums.len(), 1);
+		assert_eq!(ir.zeropod_enums[0].name, "Color");
+		assert_eq!(ir.accounts[0].fields[0].rust_type, "Color");
+		assert_eq!(ir.accounts[0].fields[1].rust_type, "Vec<Color, 8>");
+
+		let root = crate::codegen::try_ir_to_root_node(&ir)
+			.unwrap_or_else(|error| panic!("lowering failed: {error}"));
+		assert_eq!(root.program.defined_types[0].name.as_ref(), "color");
+		let account = root.program.accounts[0].data.get_nested_type_node();
+		assert!(matches!(
+			account.fields[1].r#type.as_ref(),
+			codama_nodes::TypeNode::Link(_)
+		));
+		assert!(matches!(
+			account.fields[2].r#type.as_ref(),
+			codama_nodes::TypeNode::FixedSize(_)
+		));
+	}
+
+	#[test]
+	fn assemble_program_ir_rejects_duplicate_zeropod_enums() {
+		let first = syn::parse_file(
+			r#"
+				declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+				#[derive(ZeroPod)]
+				#[repr(u8)]
+				enum Color { Red = 0 }
+			"#,
+		)
+		.unwrap_or_else(|error| panic!("parse failed: {error}"));
+		let second = syn::parse_file(
+			r#"
+				#[derive(ZeroPod)]
+				#[repr(u8)]
+				enum Color { Blue = 0 }
+			"#,
+		)
+		.unwrap_or_else(|error| panic!("parse failed: {error}"));
+
+		let error = assemble_program_ir_multi(&[&first, &second], "example")
+			.expect_err("duplicate flattened companions must fail");
+		assert!(error.to_string().contains("Duplicate ZeroPod enum"));
 	}
 }

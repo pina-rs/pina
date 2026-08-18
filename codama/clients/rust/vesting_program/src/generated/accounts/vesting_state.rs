@@ -8,60 +8,51 @@
 	clippy::too_many_arguments
 )]
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+use pina::zeropod;
+
+#[derive(pina::ZeroPod)]
 pub struct VestingState {
 	pub discriminator: u8,
 	pub admin: solana_pubkey::Pubkey,
 	pub beneficiary: solana_pubkey::Pubkey,
 	pub mint: solana_pubkey::Pubkey,
-	pub total_amount: pina::PodU64,
-	pub claimed_amount: pina::PodU64,
-	pub start_ts: pina::PodU64,
-	pub cliff_ts: pina::PodU64,
-	pub end_ts: pina::PodU64,
-	pub cancelled: pina::PodBool,
+	pub total_amount: u64,
+	pub claimed_amount: u64,
+	pub start_ts: u64,
+	pub cliff_ts: u64,
+	pub end_ts: u64,
+	pub cancelled: bool,
 	pub bump: u8,
 }
 
 pub const VESTING_STATE_DISCRIMINATOR: u8 = 1u8;
 
 impl VestingState {
-	pub const LEN: usize = core::mem::size_of::<Self>();
+	pub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;
 
-	pub const fn new(
-		admin: solana_pubkey::Pubkey,
-		beneficiary: solana_pubkey::Pubkey,
-		mint: solana_pubkey::Pubkey,
-		total_amount: pina::PodU64,
-		claimed_amount: pina::PodU64,
-		start_ts: pina::PodU64,
-		cliff_ts: pina::PodU64,
-		end_ts: pina::PodU64,
-		cancelled: pina::PodBool,
-		bump: u8,
-	) -> Self {
-		Self {
-			discriminator: VESTING_STATE_DISCRIMINATOR,
-			admin,
-			beneficiary,
-			mint,
-			total_amount,
-			claimed_amount,
-			start_ts,
-			cliff_ts,
-			end_ts,
-			cancelled,
-			bump,
-		}
-	}
-
-	pub fn from_bytes(data: &[u8]) -> Result<&Self, solana_program_error::ProgramError> {
-		if data.len() != core::mem::size_of::<Self>() {
+	/// Initialize zero-valid account storage.
+	///
+	/// Every non-discriminator field must accept an all-zero
+	/// representation. Otherwise this method returns `InvalidAccountData`.
+	pub fn initialize(
+		data: &mut [u8],
+	) -> Result<&mut VestingStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let account = unsafe { &*(data.as_ptr() as *const Self) };
+		data.fill(0);
+		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
+		account.discriminator = VESTING_STATE_DISCRIMINATOR;
+		Ok(account)
+	}
+
+	pub fn from_bytes(data: &[u8]) -> Result<&VestingStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
+			return Err(solana_program_error::ProgramError::InvalidAccountData);
+		}
+		let account = <Self as pina::ZeroPodFixed>::from_bytes(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != VESTING_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
@@ -70,26 +61,16 @@ impl VestingState {
 
 	pub fn from_bytes_mut(
 		data: &mut [u8],
-	) -> Result<&mut Self, solana_program_error::ProgramError> {
-		if data.len() != core::mem::size_of::<Self>() {
+	) -> Result<&mut VestingStateZc, solana_program_error::ProgramError> {
+		if data.len() != Self::LEN {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
-		// SAFETY: the struct is `#[repr(C)]` with align-1 pod fields.
-		let account = unsafe { &mut *(data.as_mut_ptr() as *mut Self) };
+		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != VESTING_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		Ok(account)
-	}
-}
-
-impl<'a> TryFrom<&solana_account_info::AccountInfo<'a>> for VestingState {
-	type Error = solana_program_error::ProgramError;
-
-	fn try_from(account_info: &solana_account_info::AccountInfo<'a>) -> Result<Self, Self::Error> {
-		let data_ref = (*account_info.data).borrow();
-		let account = Self::from_bytes(&data_ref)?;
-		Ok(*account)
 	}
 }
 
