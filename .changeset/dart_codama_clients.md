@@ -1,4 +1,5 @@
 ---
+codama-nodes-from-pina: none
 pina_cli: feat
 ---
 
