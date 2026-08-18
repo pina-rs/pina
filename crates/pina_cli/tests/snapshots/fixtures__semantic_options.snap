@@ -1,0 +1,171 @@
+---
+source: crates/pina_cli/tests/fixtures.rs
+expression: idl
+---
+{
+  "kind": "rootNode",
+  "standard": "codama",
+  "version": "1.8.0",
+  "program": {
+    "kind": "programNode",
+    "name": "semanticOptions",
+    "publicKey": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+    "version": "0.0.0",
+    "accounts": [
+      {
+        "kind": "accountNode",
+        "name": "semanticOptionsState",
+        "docs": [
+          "Account exercising native and explicit zeropod option layouts."
+        ],
+        "data": {
+          "kind": "structTypeNode",
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "discriminator",
+              "defaultValueStrategy": "omitted",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "defaultValue": {
+                "kind": "numberValueNode",
+                "number": 1
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "native",
+              "docs": [
+                "The ergonomic one-byte-tag schema form."
+              ],
+              "type": {
+                "kind": "optionTypeNode",
+                "fixed": true,
+                "item": {
+                  "kind": "numberTypeNode",
+                  "format": "u64",
+                  "endian": "le"
+                },
+                "prefix": {
+                  "kind": "numberTypeNode",
+                  "format": "u8",
+                  "endian": "le"
+                }
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "wide",
+              "docs": [
+                "An explicit two-byte tag for compatibility with an existing ABI."
+              ],
+              "type": {
+                "kind": "optionTypeNode",
+                "fixed": true,
+                "item": {
+                  "kind": "numberTypeNode",
+                  "format": "u64",
+                  "endian": "le"
+                },
+                "prefix": {
+                  "kind": "numberTypeNode",
+                  "format": "u16",
+                  "endian": "le"
+                }
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "label",
+              "docs": [
+                "A nested fixed-capacity string."
+              ],
+              "type": {
+                "kind": "optionTypeNode",
+                "fixed": true,
+                "item": {
+                  "kind": "fixedSizeTypeNode",
+                  "size": 9,
+                  "type": {
+                    "kind": "sizePrefixTypeNode",
+                    "type": {
+                      "kind": "stringTypeNode",
+                      "encoding": "utf8"
+                    },
+                    "prefix": {
+                      "kind": "numberTypeNode",
+                      "format": "u8",
+                      "endian": "le"
+                    }
+                  }
+                },
+                "prefix": {
+                  "kind": "numberTypeNode",
+                  "format": "u8",
+                  "endian": "le"
+                }
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "values",
+              "docs": [
+                "Options remain fixed-size zeropod elements inside vectors."
+              ],
+              "type": {
+                "kind": "fixedSizeTypeNode",
+                "size": 11,
+                "type": {
+                  "kind": "arrayTypeNode",
+                  "item": {
+                    "kind": "optionTypeNode",
+                    "fixed": true,
+                    "item": {
+                      "kind": "numberTypeNode",
+                      "format": "u16",
+                      "endian": "le"
+                    },
+                    "prefix": {
+                      "kind": "numberTypeNode",
+                      "format": "u8",
+                      "endian": "le"
+                    }
+                  },
+                  "count": {
+                    "kind": "prefixedCountNode",
+                    "prefix": {
+                      "kind": "numberTypeNode",
+                      "format": "u16",
+                      "endian": "le"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 1
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -22,7 +22,7 @@ pub struct ProfileState {
 	/// `ProfileAccountType::ProfileState`.
 	/// - `initialize` and `try_from_bytes` helpers for caller-owned storage.
 	///
-	/// Layout (231 bytes total):
+	/// Layout (240 bytes total):
 	/// ```text
 	/// | offset | size | field          |
 	/// |--------|------|----------------|
@@ -31,7 +31,8 @@ pub struct ProfileState {
 	/// | 2      | 33   | name (PodString<32>)  |
 	/// | 35     | 129  | bio (PodString<128>)  |
 	/// | 164    | 66   | tags (PodVec<PodU64, 8>) |
-	/// | 230    | 1    | active (PodBool) |
+	/// | 230    | 9    | favorite_tag (PodOption<PodU64>) |
+	/// | 239    | 1    | active (PodBool) |
 	/// ```
 	pub discriminator: u8,
 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
@@ -45,6 +46,9 @@ pub struct ProfileState {
 	/// Up to 8 tags. The generated view uses a two-byte count followed by
 	/// eight little-endian `u64` slots.
 	pub tags: pina::Vec<u64, 8>,
+	/// An optional favourite tag. The generated view uses a one-byte tag and
+	/// an eight-byte value slot, even when the option is `None`.
+	pub favorite_tag: Option<u64>,
 	/// Whether the profile is active.
 	pub active: bool,
 }

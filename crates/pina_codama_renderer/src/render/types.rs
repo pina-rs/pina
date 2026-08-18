@@ -10,6 +10,7 @@ use codama_nodes::HasKind;
 use codama_nodes::NestedTypeNodeTrait;
 use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
+use codama_nodes::OptionTypeNode;
 use codama_nodes::StructTypeNode;
 use codama_nodes::TypeNode;
 
@@ -70,6 +71,7 @@ pub(crate) fn render_type_for_pod(r#type: &TypeNode, context: &str) -> Result<St
 				}
 			}
 		}
+		TypeNode::Option(option_type) => render_pod_option_type(option_type, context),
 		TypeNode::Link(link) => {
 			Ok(format!(
 				"crate::generated::types::{}",
@@ -83,6 +85,34 @@ pub(crate) fn render_type_for_pod(r#type: &TypeNode, context: &str) -> Result<St
 				reason: "node kind is not supported by pina_codama_renderer yet".to_string(),
 			})
 		}
+	}
+}
+
+fn render_pod_option_type(option: &OptionTypeNode, context: &str) -> Result<String> {
+	if option.fixed != Some(true) {
+		return Err(RenderError::UnsupportedType {
+			context: context.to_string(),
+			kind: "optionTypeNode",
+			reason: "zeropod options must use a fixed-size value slot".to_string(),
+		});
+	}
+
+	let prefix_size = render_option_prefix_size(option.prefix.get_nested_type_node(), context)?;
+	if fixed_type_node_size(&option.item).is_none() {
+		return Err(RenderError::UnsupportedType {
+			context: context.to_string(),
+			kind: option.item.kind(),
+			reason: "cannot determine the fixed byte size of the PodOption value".to_string(),
+		});
+	}
+	let item_type = render_type_for_pod(&option.item, context)?;
+
+	if prefix_size == 1 {
+		Ok(format!("Option<{item_type}>"))
+	} else {
+		Ok(format!(
+			"pina::PodOption<<{item_type} as pina::ZcField>::Pod, {prefix_size}>"
+		))
 	}
 }
 
@@ -178,6 +208,29 @@ fn render_prefix_size(number_type: &NumberTypeNode, context: &str) -> Result<usi
 	}
 }
 
+fn render_option_prefix_size(number_type: &NumberTypeNode, context: &str) -> Result<usize> {
+	if !matches!(number_type.endian, Endianness::Le) {
+		return Err(RenderError::UnsupportedType {
+			context: context.to_string(),
+			kind: "numberTypeNode",
+			reason: "PodOption tags must be little-endian".to_string(),
+		});
+	}
+
+	match number_type.format {
+		NumberFormat::U8 => Ok(1),
+		NumberFormat::U16 => Ok(2),
+		NumberFormat::U32 => Ok(4),
+		_ => {
+			Err(RenderError::UnsupportedType {
+				context: context.to_string(),
+				kind: "numberTypeNode",
+				reason: "PodOption tags must be u8, u16, or u32".to_string(),
+			})
+		}
+	}
+}
+
 fn fixed_type_node_size(node: &TypeNode) -> Option<usize> {
 	match node {
 		TypeNode::Number(number) => {
@@ -193,6 +246,16 @@ fn fixed_type_node_size(node: &TypeNode) -> Option<usize> {
 		TypeNode::Boolean(_) => Some(1),
 		TypeNode::PublicKey(_) => Some(32),
 		TypeNode::FixedSize(fixed) => Some(fixed.size),
+		TypeNode::Option(option) if option.fixed == Some(true) => {
+			let prefix_size = match option.prefix.get_nested_type_node().format {
+				NumberFormat::U8 => 1usize,
+				NumberFormat::U16 => 2,
+				NumberFormat::U32 => 4,
+				_ => return None,
+			};
+			fixed_type_node_size(&option.item)
+				.and_then(|item_size| prefix_size.checked_add(item_size))
+		}
 		TypeNode::Array(array) => {
 			match array.count.as_ref() {
 				CountNode::Fixed(count) => {

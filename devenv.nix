@@ -676,10 +676,13 @@ in
           --locked \
           -p pina \
           -p pina_cli \
+          -p pina_codama_renderer \
+          -p profile_program \
+          -p profile-program-client \
           --lcov \
           --output-path "$DEVENV_ROOT/target/coverage/lcov.info"
       '';
-      description = "Run coverage for pina + pina_cli and generate an lcov report.";
+      description = "Run focused Rust and generated-client coverage and generate an lcov report.";
       binary = "bash";
     };
     "coverage:vm:experimental" = {

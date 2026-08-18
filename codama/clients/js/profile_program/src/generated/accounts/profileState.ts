@@ -29,6 +29,8 @@ import {
 	getArrayEncoder,
 	getBooleanDecoder,
 	getBooleanEncoder,
+	getOptionDecoder,
+	getOptionEncoder,
 	getStructDecoder,
 	getStructEncoder,
 	getU16Decoder,
@@ -41,6 +43,8 @@ import {
 	getUtf8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
+	type Option,
+	type OptionOrNullable,
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
@@ -49,6 +53,7 @@ import {
 	fixZeroPodEncoderSize,
 	getZeroPodBooleanDecoder,
 	getZeroPodDiscriminatorDecoder,
+	getZeroPodOptionTagDecoder,
 	getZeroPodStringDecoder,
 } from "../zeropodCodecs";
 
@@ -69,7 +74,7 @@ export function getProfileStateDiscriminatorBytes(): ReadonlyUint8Array {
  * `ProfileAccountType::ProfileState`.
  * - `initialize` and `try_from_bytes` helpers for caller-owned storage.
  *
- * Layout (231 bytes total):
+ * Layout (240 bytes total):
  * ```text
  * | offset | size | field          |
  * |--------|------|----------------|
@@ -78,7 +83,8 @@ export function getProfileStateDiscriminatorBytes(): ReadonlyUint8Array {
  * | 2      | 33   | name (PodString<32>)  |
  * | 35     | 129  | bio (PodString<128>)  |
  * | 164    | 66   | tags (PodVec<PodU64, 8>) |
- * | 230    | 1    | active (PodBool) |
+ * | 230    | 9    | favorite_tag (PodOption<PodU64>) |
+ * | 239    | 1    | active (PodBool) |
  * ```
  */
 export type ProfileState = {
@@ -100,6 +106,11 @@ export type ProfileState = {
 	 * eight little-endian `u64` slots.
 	 */
 	tags: Array<bigint>;
+	/**
+	 * An optional favourite tag. The generated view uses a one-byte tag and
+	 * an eight-byte value slot, even when the option is `None`.
+	 */
+	favoriteTag: Option<bigint>;
 	/** Whether the profile is active. */
 	active: boolean;
 };
@@ -122,6 +133,11 @@ export type ProfileStateArgs = {
 	 * eight little-endian `u64` slots.
 	 */
 	tags: Array<number | bigint>;
+	/**
+	 * An optional favourite tag. The generated view uses a one-byte tag and
+	 * an eight-byte value slot, even when the option is `None`.
+	 */
+	favoriteTag: OptionOrNullable<number | bigint>;
 	/** Whether the profile is active. */
 	active: boolean;
 };
@@ -150,6 +166,9 @@ export function getProfileStateEncoder(): FixedSizeEncoder<ProfileStateArgs> {
 				getArrayEncoder(getU64Encoder(), { size: getU16Encoder() }),
 				66,
 			),
+		], [
+			"favoriteTag",
+			getOptionEncoder(getU64Encoder(), { noneValue: "zeroes" }),
 		], ["active", getBooleanEncoder()]]),
 		(value) => ({ ...value, discriminator: 1 }),
 	);
@@ -174,6 +193,13 @@ export function getProfileStateDecoder(): FixedSizeDecoder<ProfileState> {
 				getArrayDecoder(getU64Decoder(), { size: getU16Decoder() }),
 				66,
 			),
+		],
+		[
+			"favoriteTag",
+			getOptionDecoder(getU64Decoder(), {
+				prefix: getZeroPodOptionTagDecoder(getU8Decoder()),
+				noneValue: "zeroes",
+			}),
 		],
 		["active", getZeroPodBooleanDecoder()],
 	]);

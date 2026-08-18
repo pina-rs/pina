@@ -63,6 +63,21 @@ export function getZeroPodBooleanDecoder(): FixedSizeDecoder<boolean, 1> {
 	});
 }
 
+/** Accepts only zeropod's `None` and `Some` option tags. */
+export function getZeroPodOptionTagDecoder<
+	TDecoded extends Integer,
+	TSize extends number,
+>(
+	decoder: FixedSizeDecoder<TDecoded, TSize>,
+): FixedSizeDecoder<TDecoded, TSize> {
+	return transformDecoder(decoder, (value) => {
+		if (BigInt(value) !== 0n && BigInt(value) !== 1n) {
+			throw new RangeError(`invalid zeropod option tag: ${value}`);
+		}
+		return value;
+	});
+}
+
 /** Rejects data for a different account or instruction before decoding it. */
 export function getZeroPodDiscriminatorDecoder<
 	TDecoded extends Integer,

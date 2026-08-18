@@ -27,6 +27,7 @@ use codama_nodes::IsSigner;
 use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
 use codama_nodes::NumberValueNode;
+use codama_nodes::OptionTypeNode;
 use codama_nodes::OptionalAccountStrategy;
 use codama_nodes::PdaLinkNode;
 use codama_nodes::PdaNode;
@@ -128,6 +129,123 @@ fn renders_semantic_pod_collection_types() {
 			.unwrap_or_else(|error| panic!("render failed: {error}")),
 		"pina::Vec<crate::generated::types::Color, 8>"
 	);
+}
+
+#[test]
+fn renders_semantic_pod_option_types() {
+	let native_option =
+		TypeNode::from(OptionTypeNode::fixed(NumberTypeNode::le(NumberFormat::U64)));
+	assert_eq!(
+		render_type_for_pod(&native_option, "ProfileState.favorite_tag")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"Option<u64>"
+	);
+
+	let explicit_option = TypeNode::from(OptionTypeNode {
+		fixed: Some(true),
+		item: Box::new(NumberTypeNode::le(NumberFormat::U64).into()),
+		prefix: NumberTypeNode::le(NumberFormat::U16).into(),
+	});
+	assert_eq!(
+		render_type_for_pod(&explicit_option, "ProfileState.legacy_tag")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::PodOption<<u64 as pina::ZcField>::Pod, 2>"
+	);
+
+	let u32_option = TypeNode::from(OptionTypeNode {
+		fixed: Some(true),
+		item: Box::new(NumberTypeNode::le(U8).into()),
+		prefix: NumberTypeNode::le(NumberFormat::U32).into(),
+	});
+	assert_eq!(
+		render_type_for_pod(&u32_option, "ProfileState.compatibility_flag")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::PodOption<<u8 as pina::ZcField>::Pod, 4>"
+	);
+
+	let options = ArrayTypeNode::prefixed(
+		OptionTypeNode::fixed(NumberTypeNode::le(NumberFormat::U16)),
+		NumberTypeNode::le(NumberFormat::U16),
+	);
+	let options = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(options, 11));
+	assert_eq!(
+		render_type_for_pod(&options, "ProfileState.values")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::Vec<Option<u16>, 3>"
+	);
+
+	let u16_options = ArrayTypeNode::prefixed(
+		OptionTypeNode {
+			fixed: Some(true),
+			item: Box::new(NumberTypeNode::le(U8).into()),
+			prefix: NumberTypeNode::le(NumberFormat::U16).into(),
+		},
+		NumberTypeNode::le(NumberFormat::U16),
+	);
+	let u16_options = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(u16_options, 8));
+	assert_eq!(
+		render_type_for_pod(&u16_options, "ProfileState.legacy_flags")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::Vec<pina::PodOption<<u8 as pina::ZcField>::Pod, 2>, 2>"
+	);
+
+	let wide_options = ArrayTypeNode::prefixed(
+		OptionTypeNode {
+			fixed: Some(true),
+			item: Box::new(NumberTypeNode::le(U8).into()),
+			prefix: NumberTypeNode::le(NumberFormat::U32).into(),
+		},
+		NumberTypeNode::le(NumberFormat::U16),
+	);
+	let wide_options = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(wide_options, 12));
+	assert_eq!(
+		render_type_for_pod(&wide_options, "ProfileState.compatibility_flags")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::Vec<pina::PodOption<<u8 as pina::ZcField>::Pod, 4>, 2>"
+	);
+}
+
+#[test]
+fn rejects_non_zeropod_option_layouts() {
+	let variable = TypeNode::from(OptionTypeNode::new(NumberTypeNode::le(NumberFormat::U64)));
+	let error = render_type_for_pod(&variable, "State.value")
+		.expect_err("variable option must not render as PodOption");
+	assert!(error.to_string().contains("fixed-size value slot"));
+
+	let variable_item = TypeNode::from(OptionTypeNode::fixed(StringTypeNode::utf8()));
+	let error = render_type_for_pod(&variable_item, "State.value")
+		.expect_err("variable option value must not render as PodOption");
+	assert!(error.to_string().contains("fixed byte size"));
+
+	for prefix in [
+		NumberTypeNode::be(NumberFormat::U16),
+		NumberTypeNode::le(NumberFormat::U64),
+	] {
+		let option = TypeNode::from(OptionTypeNode {
+			fixed: Some(true),
+			item: Box::new(NumberTypeNode::le(NumberFormat::U64).into()),
+			prefix: prefix.into(),
+		});
+		assert!(render_type_for_pod(&option, "State.value").is_err());
+	}
+
+	let invalid_nested_option = OptionTypeNode {
+		fixed: Some(true),
+		item: Box::new(NumberTypeNode::le(NumberFormat::U64).into()),
+		prefix: NumberTypeNode::le(NumberFormat::U64).into(),
+	};
+	let values =
+		ArrayTypeNode::prefixed(invalid_nested_option, NumberTypeNode::le(NumberFormat::U16));
+	let values = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(values, 18));
+	assert!(render_type_for_pod(&values, "State.values").is_err());
+
+	let overflowing_option = OptionTypeNode::fixed(FixedSizeTypeNode::<TypeNode>::new(
+		codama_nodes::BytesTypeNode::new(),
+		usize::MAX,
+	));
+	let values = ArrayTypeNode::prefixed(overflowing_option, NumberTypeNode::le(NumberFormat::U16));
+	let values = TypeNode::from(FixedSizeTypeNode::<TypeNode>::new(values, 2));
+	assert!(render_type_for_pod(&values, "State.values").is_err());
 }
 
 #[test]

@@ -22,7 +22,7 @@
 					"`ProfileAccountType::ProfileState`.",
 					"- `initialize` and `try_from_bytes` helpers for caller-owned storage.",
 					"",
-					"Layout (231 bytes total):",
+					"Layout (240 bytes total):",
 					"```text",
 					"| offset | size | field          |",
 					"|--------|------|----------------|",
@@ -31,7 +31,8 @@
 					"| 2      | 33   | name (PodString<32>)  |",
 					"| 35     | 129  | bio (PodString<128>)  |",
 					"| 164    | 66   | tags (PodVec<PodU64, 8>) |",
-					"| 230    | 1    | active (PodBool) |",
+					"| 230    | 9    | favorite_tag (PodOption<PodU64>) |",
+					"| 239    | 1    | active (PodBool) |",
 					"```"
 				],
 				"data": {
@@ -136,6 +137,28 @@
 											"endian": "le"
 										}
 									}
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "favoriteTag",
+							"docs": [
+								"An optional favourite tag. The generated view uses a one-byte tag and",
+								"an eight-byte value slot, even when the option is `None`."
+							],
+							"type": {
+								"kind": "optionTypeNode",
+								"fixed": true,
+								"item": {
+									"kind": "numberTypeNode",
+									"format": "u64",
+									"endian": "le"
+								},
+								"prefix": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
 								}
 							}
 						},

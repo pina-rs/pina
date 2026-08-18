@@ -9,6 +9,8 @@
 //!   bytes). Zeropod validates UTF-8 at the instruction boundary before storage.
 //! - **`PodVec<T, N, PFX>`** — a fixed-capacity vector with a length prefix.
 //!   Used here for a list of up to 8 `PodU64` tags.
+//! - **`Option<T>`** — fixed-size optional data backed by `PodOption` in the
+//!   generated zero-copy view. Used here for an optional favourite tag.
 //! - **`PodBool`** — a single-byte boolean for the `active` flag.
 //!
 //! Because every field has an alignment-one zeropod representation, the whole
@@ -97,7 +99,7 @@ pub enum ProfileError {
 ///   `ProfileAccountType::ProfileState`.
 /// - `initialize` and `try_from_bytes` helpers for caller-owned storage.
 ///
-/// Layout (231 bytes total):
+/// Layout (240 bytes total):
 /// ```text
 /// | offset | size | field          |
 /// |--------|------|----------------|
@@ -106,7 +108,8 @@ pub enum ProfileError {
 /// | 2      | 33   | name (PodString<32>)  |
 /// | 35     | 129  | bio (PodString<128>)  |
 /// | 164    | 66   | tags (PodVec<PodU64, 8>) |
-/// | 230    | 1    | active (PodBool) |
+/// | 230    | 9    | favorite_tag (PodOption<PodU64>) |
+/// | 239    | 1    | active (PodBool) |
 /// ```
 #[account(discriminator = ProfileAccountType)]
 #[pda(seeds = [PROFILE_SEED, authority: Address], bump = bump)]
@@ -122,6 +125,9 @@ pub struct ProfileState {
 	/// Up to 8 tags. The generated view uses a two-byte count followed by
 	/// eight little-endian `u64` slots.
 	pub tags: Vec<u64, 8>,
+	/// An optional favourite tag. The generated view uses a one-byte tag and
+	/// an eight-byte value slot, even when the option is `None`.
+	pub favorite_tag: Option<u64>,
 	/// Whether the profile is active.
 	pub active: bool,
 }
@@ -243,6 +249,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		profile.name = args.name;
 		profile.bio = args.bio;
 		profile.tags.clear();
+		profile.favorite_tag.clear();
 		profile.active.set(true);
 
 		log!("Profile initialized");
@@ -379,8 +386,8 @@ mod tests {
 	#[test]
 	fn profile_state_layout() {
 		// 1 (discriminator) + 1 (bump) + 33 (name) + 129 (bio) + 66 (tags)
-		// + 1 (active) = 231 bytes.
-		assert_eq!(ProfileState::SIZE, 231);
+		// + 9 (favorite tag) + 1 (active) = 240 bytes.
+		assert_eq!(ProfileState::SIZE, 240);
 	}
 
 	#[test]
@@ -400,6 +407,7 @@ mod tests {
 		assert_eq!(state.bump, 42);
 		assert!(state.name.is_empty());
 		assert!(state.tags.is_empty());
+		assert!(state.favorite_tag.is_none());
 		assert!(state.active.get());
 	}
 

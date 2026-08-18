@@ -68,7 +68,7 @@ pnpm run test:quasar-svm
 
 ## Coverage
 
-Generate coverage locally for `pina` and `pina_cli`:
+Generate coverage locally for Pina's runtime, CLI, Codama renderer, and profile codec fixtures:
 
 ```bash
 coverage:all

@@ -4,8 +4,10 @@ use codama_nodes::BytesTypeNode;
 use codama_nodes::CountNode;
 use codama_nodes::DefinedTypeLinkNode;
 use codama_nodes::FixedSizeTypeNode;
+use codama_nodes::NestedTypeNodeTrait;
 use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
+use codama_nodes::OptionTypeNode;
 use codama_nodes::PublicKeyTypeNode;
 use codama_nodes::SizePrefixTypeNode;
 use codama_nodes::StringTypeNode;
@@ -58,13 +60,13 @@ pub fn try_rust_type_to_codama_with_zeropod_enums(
 	}
 }
 
-/// Parse a zeropod `String`/`Vec` schema or explicit `PodString`/`PodVec`
-/// storage type into a semantic,
-/// fixed-size Codama node. `PodOption<T>` remains unsupported until its
-/// semantic mapping is represented in the generated client schema.
+/// Parse a zeropod collection schema or explicit storage type into a semantic,
+/// fixed-size Codama node.
 ///
 /// - `PodString<N, PFX = 1>` maps to a fixed-size, size-prefixed UTF-8 string.
 /// - `PodVec<T, N, PFX = 2>` maps to a fixed-size, prefix-counted array.
+/// - `Option<T>` maps to a fixed option with zeropod's one-byte tag.
+/// - `PodOption<T, PFX = 1>` maps to a fixed option with an explicit tag width.
 ///
 /// Returns `Ok(None)` for non-collection types and an error for collection
 /// layouts whose byte size cannot be resolved statically.
@@ -81,6 +83,8 @@ fn parse_pod_collection(
 			|| ty.starts_with("PodString<")
 			|| ty == "PodVec"
 			|| ty.starts_with("PodVec<")
+			|| ty == "Option"
+			|| ty.starts_with("Option<")
 			|| ty == "PodOption"
 			|| ty.starts_with("PodOption<")
 		{
@@ -153,9 +157,87 @@ fn parse_pod_collection(
 			let array = ArrayTypeNode::prefixed(item, prefix);
 			Ok(Some(FixedSizeTypeNode::<TypeNode>::new(array, size).into()))
 		}
-		"PodOption" => Err(format!("`{ty}` is not yet supported by IDL generation")),
+		"Option" | "PodOption" => {
+			let valid_argument_count = if name == "Option" {
+				args.len() == 1
+			} else {
+				(1..=2).contains(&args.len())
+			};
+			if !valid_argument_count {
+				let expected = if name == "Option" {
+					"one generic argument"
+				} else {
+					"one or two generic arguments"
+				};
+				return Err(format!("`{ty}` expects {expected}"));
+			}
+
+			let item_ty = args
+				.first()
+				.ok_or_else(|| format!("`{ty}` is missing its element type"))?;
+			if name == "PodOption" && !is_known_zeropod_storage_type(item_ty) {
+				return Err(format!(
+					"`{ty}` requires an alignment-one zeropod storage element; use \
+					 `Option<{item_ty}>` for a native schema type"
+				));
+			}
+			if !is_known_fixed_size_type(item_ty, zeropod_enums) {
+				return Err(format!(
+					"cannot determine the byte size of PodOption element `{item_ty}` in `{ty}`"
+				));
+			}
+			let mut item = try_rust_type_to_codama_with_zeropod_enums(item_ty, zeropod_enums)?;
+			let item_size = zeropod_enums
+				.iter()
+				.find(|item| item.name == *item_ty)
+				.map(|item| item.repr_size)
+				.or_else(|| type_node_size(&item))
+				.ok_or_else(|| format!("cannot determine the byte size of `{item_ty}`"))?;
+			if matches!(item, TypeNode::Link(_)) {
+				item = FixedSizeTypeNode::<TypeNode>::new(item, item_size).into();
+			}
+
+			let pfx = match args.get(1) {
+				Some(value) => parse_collection_size(Some(value), ty, "prefix size")?,
+				None => 1,
+			};
+			validate_option_prefix_size(pfx, ty)?;
+			pfx.checked_add(item_size)
+				.ok_or_else(|| format!("`{ty}` byte size overflows usize"))?;
+			let prefix = prefix_number_type(pfx, ty)?;
+			Ok(Some(
+				OptionTypeNode {
+					fixed: Some(true),
+					item: Box::new(item),
+					prefix: prefix.into(),
+				}
+				.into(),
+			))
+		}
 		_ => Ok(None),
 	}
+}
+
+fn is_known_zeropod_storage_type(ty: &str) -> bool {
+	matches!(
+		ty,
+		"u8" | "i8"
+			| "PodU16"
+			| "PodU32"
+			| "PodU64"
+			| "PodU128"
+			| "PodI16"
+			| "PodI32"
+			| "PodI64"
+			| "PodI128"
+			| "PodBool"
+			| "Address"
+	) || parse_byte_array(ty).is_some()
+		|| ty.starts_with("String<")
+		|| ty.starts_with("Vec<")
+		|| ty.starts_with("PodString<")
+		|| ty.starts_with("PodVec<")
+		|| ty.starts_with("PodOption<")
 }
 
 fn parse_collection_size(value: Option<&String>, ty: &str, name: &str) -> Result<usize, String> {
@@ -170,6 +252,16 @@ fn validate_prefix_size(pfx: usize, ty: &str) -> Result<(), String> {
 		Ok(())
 	} else {
 		Err(format!("`{ty}` has unsupported prefix size {pfx}"))
+	}
+}
+
+fn validate_option_prefix_size(pfx: usize, ty: &str) -> Result<(), String> {
+	if matches!(pfx, 1 | 2 | 4) {
+		Ok(())
+	} else {
+		Err(format!(
+			"`{ty}` has unsupported option prefix size {pfx}; zeropod supports 1, 2, or 4 bytes"
+		))
 	}
 }
 
@@ -223,8 +315,10 @@ fn is_known_fixed_size_type(ty: &str, zeropod_enums: &[ZeroPodEnumIr]) -> bool {
 		|| parse_byte_array(ty).is_some()
 		|| ty.starts_with("String<")
 		|| ty.starts_with("Vec<")
+		|| ty.starts_with("Option<")
 		|| ty.starts_with("PodString<")
 		|| ty.starts_with("PodVec<")
+		|| ty.starts_with("PodOption<")
 }
 
 /// Compute the on-chain byte size of a fixed-size Codama type node.
@@ -245,6 +339,13 @@ fn type_node_size(node: &TypeNode) -> Option<usize> {
 		TypeNode::Boolean(_) => Some(1),
 		TypeNode::PublicKey(_) => Some(32),
 		TypeNode::FixedSize(fixed) => Some(fixed.size),
+		TypeNode::Option(option) if option.fixed == Some(true) => {
+			let prefix = option.prefix.get_nested_type_node();
+			number_type_size(prefix).and_then(|prefix_size| {
+				type_node_size(&option.item)
+					.and_then(|item_size| prefix_size.checked_add(item_size))
+			})
+		}
 		TypeNode::Array(array) => {
 			match array.count.as_ref() {
 				CountNode::Fixed(count) => {
@@ -254,6 +355,17 @@ fn type_node_size(node: &TypeNode) -> Option<usize> {
 			}
 		}
 		_ => None,
+	}
+}
+
+fn number_type_size(number: &NumberTypeNode) -> Option<usize> {
+	match number.format {
+		NumberFormat::U8 | NumberFormat::I8 => Some(1),
+		NumberFormat::U16 | NumberFormat::I16 => Some(2),
+		NumberFormat::U32 | NumberFormat::I32 => Some(4),
+		NumberFormat::U64 | NumberFormat::I64 => Some(8),
+		NumberFormat::U128 | NumberFormat::I128 => Some(16),
+		NumberFormat::F32 | NumberFormat::F64 | NumberFormat::ShortU16 => None,
 	}
 }
 
@@ -474,19 +586,119 @@ mod tests {
 	}
 
 	#[test]
+	fn maps_native_and_explicit_pod_options() {
+		let expected_u8: TypeNode = OptionTypeNode {
+			fixed: Some(true),
+			item: Box::new(NumberTypeNode::le(NumberFormat::U64).into()),
+			prefix: NumberTypeNode::le(NumberFormat::U8).into(),
+		}
+		.into();
+		assert_eq!(mapped("Option<u64>"), expected_u8);
+		assert_eq!(mapped("PodOption<PodU64>"), expected_u8);
+
+		let expected_u16: TypeNode = OptionTypeNode {
+			fixed: Some(true),
+			item: Box::new(NumberTypeNode::le(NumberFormat::U64).into()),
+			prefix: NumberTypeNode::le(NumberFormat::U16).into(),
+		}
+		.into();
+		assert_eq!(mapped("PodOption<PodU64, 2>"), expected_u16);
+	}
+
+	#[test]
+	fn maps_nested_pod_options_and_vectors() {
+		assert_eq!(type_node_size(&mapped("Option<PodString<8>>")), Some(10));
+		assert_eq!(type_node_size(&mapped("PodVec<Option<u16>, 3>")), Some(11));
+	}
+
+	#[test]
+	fn maps_options_over_local_enums_and_storage_types() {
+		let enums = [ZeroPodEnumIr {
+			name: "Color".to_owned(),
+			repr_size: 1,
+			variants: Vec::new(),
+			docs: Vec::new(),
+		}];
+		let option = try_rust_type_to_codama_with_zeropod_enums("Option<Color>", &enums)
+			.unwrap_or_else(|error| panic!("failed to map enum option: {error}"));
+		assert_eq!(type_node_size(&option), Some(2));
+		assert!(matches!(option, TypeNode::Option(_)));
+
+		for ty in [
+			"PodOption<u8>",
+			"PodOption<PodI16>",
+			"PodOption<Address>",
+			"PodOption<[u8; 4]>",
+			"PodOption<String<4>>",
+			"PodOption<Vec<u8, 2>>",
+			"PodOption<PodString<4>>",
+			"PodOption<PodVec<u8, 2>>",
+			"PodOption<PodOption<u8>>",
+		] {
+			mapped(ty);
+		}
+	}
+
+	#[test]
 	fn rejects_pod_collections_with_unresolved_sizes() {
 		for ty in [
 			"PodString<NAME_LEN>",
 			"PodVec<PodU64, { 4 + 4 }>",
 			"PodVec<MyPod, 8>",
+			"Option",
+			"Option<>",
+			"Option<u64, u64>",
+			"Option<MyPod>",
 			"PodOption",
 			"PodOption<>",
-			"PodOption<PodU64>",
+			"PodOption<u8, 1, 2>",
+			"PodOption<u64>",
 			"PodOption<PodU64, PodU64>",
+			"PodOption<MyPod>",
 		] {
 			let error = try_rust_type_to_codama(ty)
 				.expect_err("unresolved Pod collection sizes must be rejected");
 			assert!(error.contains(ty), "unexpected error for {ty}: {error}");
+		}
+	}
+
+	#[test]
+	fn rejects_pod_option_prefixes_zeropod_does_not_support() {
+		for ty in [
+			"PodOption<PodU64, 0>",
+			"PodOption<PodU64, 3>",
+			"PodOption<PodU64, 8>",
+		] {
+			let error = try_rust_type_to_codama(ty)
+				.expect_err("unsupported PodOption prefix must be rejected");
+			assert!(error.contains("supports 1, 2, or 4 bytes"), "{error}");
+		}
+	}
+
+	#[test]
+	fn rejects_pod_option_layout_size_overflow() {
+		let ty = format!("Option<[u8; {}]>", usize::MAX);
+		let error = try_rust_type_to_codama(&ty)
+			.expect_err("option layout whose total size overflows must be rejected");
+		assert!(error.contains("byte size overflows"), "{error}");
+	}
+
+	#[test]
+	fn computes_all_option_prefix_sizes_without_overflow() {
+		for (format, expected) in [
+			(NumberFormat::U16, Some(3)),
+			(NumberFormat::U32, Some(5)),
+			(NumberFormat::U64, Some(9)),
+			(NumberFormat::U128, Some(17)),
+			(NumberFormat::F32, None),
+		] {
+			let option: TypeNode = OptionTypeNode {
+				fixed: Some(true),
+				item: Box::new(NumberTypeNode::le(NumberFormat::U8).into()),
+				prefix: NumberTypeNode::le(format).into(),
+			}
+			.into();
+			assert_eq!(type_node_size(&option), expected);
 		}
 	}
 

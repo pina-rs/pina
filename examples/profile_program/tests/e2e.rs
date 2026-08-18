@@ -176,6 +176,7 @@ fn assert_profile(
 		.map(|t| u64::from(*t))
 		.collect();
 	assert_eq!(tags, expected_tags);
+	assert!(state.favorite_tag.is_none());
 	assert_eq!(state.active.get(), expected_active);
 }
 
@@ -462,7 +463,7 @@ fn requires_signer() {
 /// The account and instruction layouts must match the documented sizes.
 #[test]
 fn account_layout_matches_state() {
-	assert_eq!(ProfileState::SIZE, 231);
+	assert_eq!(ProfileState::SIZE, 240);
 	assert_eq!(InitializeInstruction::SIZE, 164);
 	assert_eq!(UpdateProfileInstruction::SIZE, 163);
 	assert_eq!(AddTagInstruction::SIZE, 9);

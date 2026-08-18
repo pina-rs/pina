@@ -2,7 +2,7 @@ use profile_program_client::generated::accounts::ProfileState;
 use profile_program_client::generated::instructions::Initialize;
 use profile_program_client::generated::instructions::InitializeInstructionData;
 
-const PROFILE_LEN: usize = 231;
+const PROFILE_LEN: usize = 240;
 
 fn valid_profile_bytes() -> [u8; PROFILE_LEN] {
 	let mut data = [0u8; PROFILE_LEN];
@@ -10,7 +10,7 @@ fn valid_profile_bytes() -> [u8; PROFILE_LEN] {
 	data[1] = 42;
 	data[2] = 1;
 	data[3] = b'A';
-	data[230] = 1;
+	data[239] = 1;
 	data
 }
 
@@ -23,6 +23,7 @@ fn profile_state_validates_semantic_pod_collections() {
 	assert_eq!(profile.name.as_str(), "A");
 	assert_eq!(profile.bio.as_str(), "");
 	assert!(profile.tags.is_empty());
+	assert!(profile.favorite_tag.is_none());
 }
 
 #[test]
@@ -38,6 +39,10 @@ fn profile_state_rejects_invalid_collection_data() {
 	let mut invalid_tags_length = valid_profile_bytes();
 	invalid_tags_length[164] = 9;
 	assert!(ProfileState::from_bytes(&invalid_tags_length).is_err());
+
+	let mut invalid_option_tag = valid_profile_bytes();
+	invalid_option_tag[230] = 2;
+	assert!(ProfileState::from_bytes(&invalid_option_tag).is_err());
 }
 
 #[test]
@@ -50,8 +55,20 @@ fn profile_state_ignores_inactive_collection_capacity() {
 	data[164] = 0;
 	data[165] = 0;
 	data[166..230].fill(0xff);
+	data[231..239].fill(0xff);
 
 	assert!(ProfileState::from_bytes(&data).is_ok());
+}
+
+#[test]
+fn profile_state_reads_some_option_value() {
+	let mut data = valid_profile_bytes();
+	data[230] = 1;
+	data[231..239].copy_from_slice(&42u64.to_le_bytes());
+
+	let profile =
+		ProfileState::from_bytes(&data).unwrap_or_else(|error| panic!("parse failed: {error}"));
+	assert_eq!(profile.favorite_tag.get().map(u64::from), Some(42));
 }
 
 #[test]

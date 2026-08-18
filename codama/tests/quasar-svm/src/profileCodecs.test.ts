@@ -1,4 +1,4 @@
-import { getU8Decoder } from "@solana/kit";
+import { getU16Decoder, getU8Decoder, isNone, isSome } from "@solana/kit";
 import { describe, expect, test } from "vitest";
 
 import {
@@ -8,7 +8,10 @@ import {
 	getProfileStateDecoder,
 	getProfileStateEncoder,
 } from "../../../clients/js/profile_program/src";
-import { getZeroPodEnumDecoder } from "../../../clients/js/profile_program/src/generated/zeropodCodecs";
+import {
+	getZeroPodEnumDecoder,
+	getZeroPodOptionTagDecoder,
+} from "../../../clients/js/profile_program/src/generated/zeropodCodecs";
 
 describe("profile generated codecs", () => {
 	test("instruction encoders prepend their discriminator", () => {
@@ -26,12 +29,12 @@ describe("profile generated codecs", () => {
 	});
 
 	test("account decoder consumes the discriminator before state", () => {
-		const data = new Uint8Array(231);
+		const data = new Uint8Array(240);
 		data[0] = 1;
 		data[1] = 42;
 		data[2] = 1;
 		data[3] = "A".charCodeAt(0);
-		data[230] = 1;
+		data[239] = 1;
 
 		const state = getProfileStateDecoder().decode(data);
 
@@ -40,15 +43,16 @@ describe("profile generated codecs", () => {
 		expect(state.name).toBe("A");
 		expect(state.bio).toBe("");
 		expect(state.tags).toEqual([]);
+		expect(isNone(state.favoriteTag)).toBe(true);
 		expect(state.active).toBe(true);
 	});
 
 	test("account decoder rejects collection lengths beyond capacity", () => {
-		const invalidName = new Uint8Array(231);
+		const invalidName = new Uint8Array(240);
 		invalidName[0] = 1;
 		invalidName[2] = 33;
 
-		const invalidTags = new Uint8Array(231);
+		const invalidTags = new Uint8Array(240);
 		invalidTags[0] = 1;
 		invalidTags[164] = 9;
 
@@ -71,6 +75,7 @@ describe("profile generated codecs", () => {
 				name: "",
 				bio: "",
 				tags: Array.from({ length: 9 }, (_, index) => BigInt(index)),
+				favoriteTag: null,
 				active: true,
 			})
 		).toThrow(/capacity/);
@@ -83,9 +88,60 @@ describe("profile generated codecs", () => {
 			.toThrow(/invalid discriminator/);
 
 		const account = emptyProfileAccount();
-		account[230] = 2;
+		account[239] = 2;
 		expect(() => getProfileStateDecoder().decode(account)).toThrow(
 			/invalid zeropod boolean/,
+		);
+	});
+
+	test("option codecs preserve values and reject non-canonical tags", () => {
+		const encoded = getProfileStateEncoder().encode({
+			bump: 7,
+			name: "",
+			bio: "",
+			tags: [],
+			favoriteTag: 42n,
+			active: true,
+		});
+		expect(Array.from(encoded.slice(230, 239))).toEqual([
+			1,
+			42,
+			0,
+			0,
+			0,
+			0,
+			0,
+			0,
+			0,
+		]);
+		const decoded = getProfileStateDecoder().decode(encoded);
+		expect(isSome(decoded.favoriteTag)).toBe(true);
+		if (isSome(decoded.favoriteTag)) {
+			expect(decoded.favoriteTag.value).toBe(42n);
+		}
+
+		const invalid = emptyProfileAccount();
+		invalid[230] = 2;
+		expect(() => getProfileStateDecoder().decode(invalid)).toThrow(
+			/invalid zeropod option tag/,
+		);
+
+		const inactivePayload = emptyProfileAccount();
+		inactivePayload.fill(0xff, 231, 239);
+		expect(
+			isNone(getProfileStateDecoder().decode(inactivePayload).favoriteTag),
+		).toBe(true);
+	});
+
+	test("wide option tags accept only zero and one", () => {
+		const decoder = getZeroPodOptionTagDecoder(getU16Decoder());
+		expect(decoder.decode(Uint8Array.of(0, 0))).toBe(0);
+		expect(decoder.decode(Uint8Array.of(1, 0))).toBe(1);
+		expect(() => decoder.decode(Uint8Array.of(2, 0))).toThrow(
+			/invalid zeropod option tag/,
+		);
+		expect(() => decoder.decode(Uint8Array.of(0, 1))).toThrow(
+			/invalid zeropod option tag/,
 		);
 	});
 
@@ -108,7 +164,7 @@ describe("profile generated codecs", () => {
 });
 
 function emptyProfileAccount(): Uint8Array {
-	const account = new Uint8Array(231);
+	const account = new Uint8Array(240);
 	account[0] = 1;
 	return account;
 }

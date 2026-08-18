@@ -69,6 +69,21 @@ export function getZeroPodBooleanDecoder(): FixedSizeDecoder<boolean, 1> {
 	});
 }
 
+/** Accepts only zeropod's `None` and `Some` option tags. */
+export function getZeroPodOptionTagDecoder<
+	TDecoded extends Integer,
+	TSize extends number,
+>(
+	decoder: FixedSizeDecoder<TDecoded, TSize>,
+): FixedSizeDecoder<TDecoded, TSize> {
+	return transformDecoder(decoder, (value) => {
+		if (BigInt(value) !== 0n && BigInt(value) !== 1n) {
+			throw new RangeError(`invalid zeropod option tag: ${value}`);
+		}
+		return value;
+	});
+}
+
 /** Rejects data for a different account or instruction before decoding it. */
 export function getZeroPodDiscriminatorDecoder<
 	TDecoded extends Integer,
@@ -166,6 +181,7 @@ fn harden_codec_source(source: &str) -> String {
 	for bits in [8, 16, 32, 64] {
 		hardened = replace_string_decoders(&hardened, bits);
 	}
+	hardened = harden_option_decoders(&hardened);
 	hardened = harden_enum_decoder(&hardened);
 
 	if let Some(discriminator) = discriminator_constant(&hardened).map(str::to_owned) {
@@ -192,6 +208,7 @@ fn harden_codec_source(source: &str) -> String {
 			"getZeroPodDiscriminatorDecoder(",
 		),
 		("getZeroPodEnumDecoder", "getZeroPodEnumDecoder("),
+		("getZeroPodOptionTagDecoder", "getZeroPodOptionTagDecoder("),
 		("getZeroPodStringDecoder", "getZeroPodStringDecoder("),
 	] {
 		if hardened.contains(marker) {
@@ -201,6 +218,9 @@ fn harden_codec_source(source: &str) -> String {
 
 	if helpers.is_empty() {
 		return hardened;
+	}
+	if hardened.contains("getZeroPodOptionTagDecoder(getU8Decoder())") {
+		hardened = ensure_kit_import(&hardened, "getU8Decoder");
 	}
 
 	for name in [
@@ -223,6 +243,82 @@ fn harden_codec_source(source: &str) -> String {
 	}
 
 	hardened
+}
+
+fn harden_option_decoders(source: &str) -> String {
+	let marker = "getOptionDecoder(";
+	let mut remaining = source;
+	let mut output = String::with_capacity(source.len());
+
+	while let Some(start) = remaining.find(marker) {
+		output.push_str(&remaining[..start]);
+		let call = &remaining[start..];
+		let Some(end) = matching_call_end(call) else {
+			output.push_str(call);
+			return output;
+		};
+		let mut hardened_call = call[..=end].to_owned();
+		if !hardened_call.contains("getZeroPodOptionTagDecoder(")
+			&& hardened_call.contains("noneValue: \"zeroes\"")
+		{
+			let mut wrapped_custom_prefix = false;
+			for bits in [8, 16, 32] {
+				let prefix = format!("prefix: getU{bits}Decoder()");
+				if hardened_call.contains(&prefix) {
+					hardened_call = hardened_call.replace(
+						&prefix,
+						&format!("prefix: getZeroPodOptionTagDecoder(getU{bits}Decoder())"),
+					);
+					wrapped_custom_prefix = true;
+					break;
+				}
+			}
+			if !wrapped_custom_prefix
+				&& let Some(none_value) = hardened_call.find("noneValue: \"zeroes\"")
+			{
+				hardened_call.insert_str(
+					none_value,
+					"prefix: getZeroPodOptionTagDecoder(getU8Decoder()), ",
+				);
+			}
+		}
+
+		output.push_str(&hardened_call);
+		remaining = &call[end + 1..];
+	}
+
+	output.push_str(remaining);
+	output
+}
+
+fn matching_call_end(call: &str) -> Option<usize> {
+	let mut depth = 0usize;
+	for (index, character) in call.char_indices() {
+		match character {
+			'(' => depth = depth.checked_add(1)?,
+			')' => {
+				depth = depth.checked_sub(1)?;
+				if depth == 0 {
+					return Some(index);
+				}
+			}
+			_ => {}
+		}
+	}
+	None
+}
+
+fn ensure_kit_import(source: &str, name: &str) -> String {
+	if source.contains(&format!("{name},")) {
+		return source.to_owned();
+	}
+
+	let Some(offset) = source.find(HELPER_IMPORT_PREFIX) else {
+		return source.to_owned();
+	};
+	let mut output = source.to_owned();
+	output.insert_str(offset + HELPER_IMPORT_PREFIX.len(), &format!("{name}, "));
+	output
 }
 
 fn harden_enum_decoder(source: &str) -> String {
@@ -371,5 +467,48 @@ export function getColorDecoder() {
 				.contains("getZeroPodEnumDecoder(getEnumDecoder(Color), [Color.Red, Color.Blue])")
 		);
 		assert!(hardened.contains("from \"../zeropodCodecs\""));
+	}
+
+	#[test]
+	fn hardens_default_and_explicit_option_tags() {
+		let source = r#"/** generated */
+import { getOptionDecoder, getOptionEncoder, getU16Decoder, getU16Encoder, getU64Decoder, getU64Encoder } from "@solana/kit";
+const defaultEncoder = getOptionEncoder(getU64Encoder(), { noneValue: "zeroes" });
+const defaultDecoder = getOptionDecoder(getU64Decoder(), { noneValue: "zeroes" });
+const wideDecoder = getOptionDecoder(getU64Decoder(), { prefix: getU16Decoder(), noneValue: "zeroes" });
+"#;
+
+		let hardened = harden_codec_source(source);
+		assert!(hardened.contains(
+			"getOptionDecoder(getU64Decoder(), { prefix: \
+			 getZeroPodOptionTagDecoder(getU8Decoder()), noneValue: \"zeroes\" })"
+		));
+		assert!(hardened.contains(
+			"prefix: getZeroPodOptionTagDecoder(getU16Decoder()), noneValue: \"zeroes\""
+		));
+		assert!(
+			hardened.contains("import { getZeroPodOptionTagDecoder } from \"../zeropodCodecs\"")
+		);
+		assert!(hardened.contains("getU8Decoder, "));
+		assert!(hardened.contains("getOptionEncoder(getU64Encoder(), { noneValue: \"zeroes\" })"));
+
+		let source_with_u8 = source.replace("getU16Decoder,", "getU16Decoder,\n    getU8Decoder,");
+		let hardened = harden_codec_source(&source_with_u8);
+		assert_eq!(hardened.matches("getU8Decoder,").count(), 1);
+	}
+
+	#[test]
+	fn option_hardener_is_idempotent_and_tolerates_incomplete_calls() {
+		let hardened = "getOptionDecoder(getU64Decoder(), { prefix: \
+		                getZeroPodOptionTagDecoder(getU8Decoder()), noneValue: \"zeroes\" })";
+		assert_eq!(harden_option_decoders(hardened), hardened);
+
+		let incomplete = "const decoder = getOptionDecoder(getU64Decoder();";
+		assert_eq!(harden_option_decoders(incomplete), incomplete);
+		assert_eq!(matching_call_end("getOptionDecoder)"), None);
+		assert_eq!(
+			ensure_kit_import("export const value = 1;", "getU8Decoder"),
+			"export const value = 1;"
+		);
 	}
 }
