@@ -79,7 +79,7 @@ pub fn assemble_program_ir_multi(
 			public_key = program_id::extract_program_id(file);
 		}
 
-		all_disc_enums.extend(discriminator::extract_discriminator_enums(file));
+		all_disc_enums.extend(discriminator::extract_discriminator_enums(file)?);
 		all_account_structs.extend(account_state::extract_account_structs(file)?);
 		all_instruction_structs.extend(instruction_data::extract_instruction_structs(file)?);
 		all_ix_accounts_structs.extend(accounts_struct::extract_accounts_structs(file));

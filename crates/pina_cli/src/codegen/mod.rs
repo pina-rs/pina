@@ -384,14 +384,79 @@ fn build_error_node(error: &ErrorIr) -> ErrorNode {
 #[cfg(test)]
 mod tests {
 	use codama_nodes::DefaultValueStrategy;
+	use codama_nodes::DiscriminatorNode;
 	use codama_nodes::InstructionInputValueNode;
 	use codama_nodes::NestedTypeNodeTrait;
+	use codama_nodes::NumberFormat;
 	use codama_nodes::PdaSeedValueValue;
 	use codama_nodes::PdaValuePda;
 	use codama_nodes::TypeNode;
 	use codama_nodes::ValueNode;
 
 	use super::*;
+
+	fn discriminator_number_format(discriminators: &[DiscriminatorNode]) -> NumberFormat {
+		let Some(DiscriminatorNode::Constant(discriminator)) = discriminators.first() else {
+			panic!("expected a constant discriminator");
+		};
+		let TypeNode::Number(number_type) = discriminator.constant.r#type.as_ref() else {
+			panic!("expected a numeric discriminator");
+		};
+
+		number_type.format
+	}
+
+	#[test]
+	fn preserves_source_discriminator_widths_in_codegen() {
+		for (primitive, repr_size, format) in [
+			("u16", 2, NumberFormat::U16),
+			("u32", 4, NumberFormat::U32),
+			("u64", 8, NumberFormat::U64),
+		] {
+			let source = format!(
+				r#"
+					declare_id!("11111111111111111111111111111111");
+
+					#[discriminator(crate = ::pina, primitive = {primitive}, final)]
+					pub enum WideDiscriminator {{
+						State = 1,
+						Update = 2,
+					}}
+
+					#[account(discriminator = WideDiscriminator::State)]
+					pub struct State {{}}
+
+					#[instruction(discriminator = WideDiscriminator::Update)]
+					pub struct Update {{}}
+				"#
+			);
+			let file = syn::parse_file(&source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+			let ir = crate::parse::assemble_program_ir(&file, "wide_discriminator")
+				.unwrap_or_else(|e| panic!("IDL extraction failed: {e}"));
+
+			assert_eq!(
+				ir.accounts[0].discriminator.repr_size, repr_size,
+				"account primitive {primitive}"
+			);
+			assert_eq!(
+				ir.instructions[0].discriminator.repr_size, repr_size,
+				"instruction primitive {primitive}"
+			);
+
+			let root =
+				try_ir_to_root_node(&ir).unwrap_or_else(|e| panic!("IDL codegen failed: {e}"));
+			assert_eq!(
+				discriminator_number_format(&root.program.accounts[0].discriminators),
+				format,
+				"account primitive {primitive}"
+			);
+			assert_eq!(
+				discriminator_number_format(&root.program.instructions[0].discriminators),
+				format,
+				"instruction primitive {primitive}"
+			);
+		}
+	}
 
 	#[test]
 	fn lowers_discriminators_into_encoded_data() {

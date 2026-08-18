@@ -1,5 +1,6 @@
 use syn::File;
 use syn::Item;
+use syn::ext::IdentExt;
 
 use crate::error::IdlError;
 
@@ -16,6 +17,62 @@ pub struct DiscriminatorEnum {
 pub struct DiscriminatorVariant {
 	pub name: String,
 	pub value: u64,
+}
+
+#[derive(Default)]
+struct DiscriminatorArgs {
+	primitive: Option<syn::Expr>,
+}
+
+impl syn::parse::Parse for DiscriminatorArgs {
+	fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
+		let mut args = Self::default();
+		let mut has_crate_path = false;
+		let mut is_final = false;
+
+		while !input.is_empty() {
+			let name = input.call(syn::Ident::parse_any)?;
+			match name.to_string().as_str() {
+				"primitive" => {
+					if args.primitive.is_some() {
+						return Err(syn::Error::new(
+							name.span(),
+							"duplicate `primitive` argument",
+						));
+					}
+					input.parse::<syn::Token![=]>()?;
+					args.primitive = Some(input.parse()?);
+				}
+				"crate" => {
+					if has_crate_path {
+						return Err(syn::Error::new(name.span(), "duplicate `crate` argument"));
+					}
+					input.parse::<syn::Token![=]>()?;
+					input.parse::<syn::Path>()?;
+					has_crate_path = true;
+				}
+				"final" => {
+					if is_final {
+						return Err(syn::Error::new(name.span(), "duplicate `final` argument"));
+					}
+					is_final = true;
+				}
+				_ => {
+					return Err(syn::Error::new(
+						name.span(),
+						format!("unknown discriminator argument `{name}`"),
+					));
+				}
+			}
+
+			if input.is_empty() {
+				break;
+			}
+			input.parse::<syn::Token![,]>()?;
+		}
+
+		Ok(args)
+	}
 }
 
 /// Parse the discriminator enum and variant used by an attribute macro.
@@ -145,7 +202,12 @@ fn invalid_discriminator(
 }
 
 /// Extract all `#[discriminator]` enums from a file.
-pub fn extract_discriminator_enums(file: &File) -> Vec<DiscriminatorEnum> {
+///
+/// # Errors
+///
+/// Returns an error when the attribute arguments or backing primitive do not
+/// match the `#[discriminator]` macro grammar.
+pub fn extract_discriminator_enums(file: &File) -> Result<Vec<DiscriminatorEnum>, IdlError> {
 	let mut result = Vec::new();
 
 	for item in &file.items {
@@ -156,7 +218,7 @@ pub fn extract_discriminator_enums(file: &File) -> Vec<DiscriminatorEnum> {
 			continue;
 		}
 
-		let repr_size = detect_repr_size(&item_enum.attrs);
+		let repr_size = discriminator_repr_size(item_enum)?;
 		let mut variants = Vec::new();
 		for variant in &item_enum.variants {
 			if let Some((_, expr)) = &variant.discriminant
@@ -176,27 +238,61 @@ pub fn extract_discriminator_enums(file: &File) -> Vec<DiscriminatorEnum> {
 		});
 	}
 
-	result
+	Ok(result)
 }
 
-/// Detect `#[repr(u8)]`, `#[repr(u16)]`, etc. Default to 1 byte.
-fn detect_repr_size(attrs: &[syn::Attribute]) -> usize {
-	for attr in attrs {
-		if !attr.path().is_ident("repr") {
-			continue;
-		}
-		let Ok(inner) = attr.parse_args::<syn::Ident>() else {
-			continue;
-		};
-		return match inner.to_string().as_str() {
-			"u16" => 2,
-			"u32" => 4,
-			"u64" => 8,
-			_ => 1,
-		};
+/// Parse the backing primitive from the source-level attribute macro grammar.
+fn discriminator_repr_size(item_enum: &syn::ItemEnum) -> Result<usize, IdlError> {
+	let Some(attr) = item_enum
+		.attrs
+		.iter()
+		.find(|attr| attr.path().is_ident("discriminator"))
+	else {
+		return Ok(1);
+	};
+	if matches!(attr.meta, syn::Meta::Path(_)) {
+		return Ok(1);
 	}
-	// The #[discriminator] macro defaults to u8 repr.
-	1
+	let args = attr
+		.parse_args::<DiscriminatorArgs>()
+		.map_err(|error| invalid_discriminator_enum(&item_enum.ident, error))?;
+	let Some(primitive) = args.primitive else {
+		return Ok(1);
+	};
+	let syn::Expr::Path(primitive) = primitive else {
+		return Err(invalid_discriminator_enum(
+			&item_enum.ident,
+			"`primitive` must be a primitive type path",
+		));
+	};
+	let Some(primitive) = primitive.path.get_ident() else {
+		return Err(invalid_discriminator_enum(
+			&item_enum.ident,
+			"`primitive` must be one of `u8`, `u16`, `u32`, or `u64`",
+		));
+	};
+
+	Ok(match primitive.to_string().as_str() {
+		"u8" => 1,
+		"u16" => 2,
+		"u32" => 4,
+		"u64" => 8,
+		_ => {
+			return Err(invalid_discriminator_enum(
+				&item_enum.ident,
+				"`primitive` must be one of `u8`, `u16`, `u32`, or `u64`",
+			));
+		}
+	})
+}
+
+fn invalid_discriminator_enum(
+	enum_name: &syn::Ident,
+	message: impl core::fmt::Display,
+) -> IdlError {
+	IdlError::Other(format!(
+		"Invalid `#[discriminator]` enum `{enum_name}`: {message}"
+	))
 }
 
 fn has_attr(attrs: &[syn::Attribute], name: &str) -> bool {
@@ -227,7 +323,8 @@ mod tests {
 			}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let enums = extract_discriminator_enums(&file);
+		let enums =
+			extract_discriminator_enums(&file).unwrap_or_else(|e| panic!("extract failed: {e}"));
 		assert_eq!(enums.len(), 1);
 		assert_eq!(enums[0].name, "MyInstruction");
 		assert_eq!(enums[0].variants.len(), 2);
@@ -236,5 +333,39 @@ mod tests {
 		assert_eq!(enums[0].variants[1].name, "Bar");
 		assert_eq!(enums[0].variants[1].value, 1);
 		assert_eq!(enums[0].repr_size, 1);
+	}
+
+	#[test]
+	fn extracts_source_level_primitive_widths() {
+		for (primitive, repr_size) in [("u16", 2), ("u32", 4), ("u64", 8)] {
+			let source = format!(
+				r#"
+					#[discriminator(primitive = {primitive})]
+					pub enum MyInstruction {{
+						Foo = 0,
+					}}
+				"#
+			);
+			let file = syn::parse_file(&source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+			let enums = extract_discriminator_enums(&file)
+				.unwrap_or_else(|e| panic!("extract failed: {e}"));
+
+			assert_eq!(enums[0].repr_size, repr_size, "primitive {primitive}");
+		}
+	}
+
+	#[test]
+	fn rejects_invalid_source_level_primitive() {
+		let source = r#"
+			#[discriminator(primitive = u128)]
+			pub enum MyInstruction {
+				Foo = 0,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let error = extract_discriminator_enums(&file)
+			.expect_err("unsupported primitive must fail extraction");
+
+		assert!(error.to_string().contains("u8`, `u16`, `u32`, or `u64"));
 	}
 }
