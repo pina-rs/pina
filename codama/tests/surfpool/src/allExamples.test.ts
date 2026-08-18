@@ -5,11 +5,14 @@ import { basename, dirname, resolve } from "node:path";
 import {
 	AccountRole,
 	address,
+	addSignersToInstruction,
 	appendTransactionMessageInstruction,
 	createKeyPairSignerFromBytes,
 	createSolanaRpc,
 	createTransactionMessage,
+	getAddressEncoder,
 	getBase64EncodedWireTransaction,
+	getProgramDerivedAddress,
 	getSignatureFromTransaction,
 	type Instruction,
 	sendTransactionWithoutConfirmingFactory,
@@ -18,6 +21,8 @@ import {
 	signTransactionMessageWithSigners,
 } from "@solana/kit";
 import { Surfnet } from "@solana/surfpool";
+
+type TestSigner = Awaited<ReturnType<typeof createKeyPairSignerFromBytes>>;
 
 const ROOT = resolve(import.meta.dirname, "../../../..");
 const IDL_DIRECTORY = resolve(ROOT, "codama/idls");
@@ -296,7 +301,7 @@ function rawInstruction(
 }
 
 async function createSubmitter(surfnet: Surfnet): Promise<{
-	payer: Awaited<ReturnType<typeof createKeyPairSignerFromBytes>>;
+	payer: TestSigner;
 	submit(instruction: Instruction): Promise<void>;
 }> {
 	const payer = await createKeyPairSignerFromBytes(surfnet.payerSecretKey);
@@ -350,6 +355,21 @@ async function createSubmitter(surfnet: Surfnet): Promise<{
 			);
 		},
 	};
+}
+
+async function fetchAccountData(
+	surfnet: Surfnet,
+	accountAddress: string,
+): Promise<Uint8Array> {
+	const rpc = createSolanaRpc(surfnet.rpcUrl);
+	const { value: account } = await rpc.getAccountInfo(
+		address(accountAddress),
+		{ encoding: "base64" },
+	).send();
+	assert.ok(account, `account ${accountAddress} was not created`);
+	const [encoded, encoding] = account.data;
+	assert.equal(encoding, "base64", "account data must be base64 encoded");
+	return new Uint8Array(Buffer.from(encoded, "base64"));
 }
 
 type ExpectedProgramError = string | { Custom: bigint };
@@ -573,9 +593,10 @@ async function runAccessGuardCase(
 async function runSpecificGuards(
 	descriptor: ExampleDescriptor,
 	submit: (instruction: Instruction) => Promise<void>,
-	payerAddress: string,
+	payer: TestSigner,
 	surfnet: Surfnet,
 ): Promise<void> {
+	const payerAddress = String(payer.address);
 	const payerSigner = {
 		address: address(payerAddress),
 		role: AccountRole.READONLY_SIGNER,
@@ -586,6 +607,10 @@ async function runSpecificGuards(
 	};
 
 	switch (descriptor.name) {
+		case "anchor_realloc": {
+			await runAnchorReallocGuards(descriptor, submit, payer, surfnet);
+			return;
+		}
 		case "hello_solana": {
 			const data = encodeInstruction(instructionByName(descriptor, "hello"));
 			await assertRejected(
@@ -683,6 +708,168 @@ async function runSpecificGuards(
 	}
 }
 
+const SYSTEM_PROGRAM_ID = "11111111111111111111111111111111";
+const SAMPLE_HEADER_SIZE = 34;
+
+function reallocInstructionData(
+	discriminator: number,
+	len: number,
+): Uint8Array {
+	assert.ok(Number.isInteger(len) && len >= 0 && len <= 0xffff);
+	return Uint8Array.of(discriminator, len & 0xff, len >>> 8);
+}
+
+async function deriveSampleAddress(
+	descriptor: ExampleDescriptor,
+	authority: string,
+) {
+	return getProgramDerivedAddress({
+		programAddress: address(descriptor.programId),
+		seeds: ["sample", getAddressEncoder().encode(address(authority))],
+	});
+}
+
+function assertSampleHeader(
+	data: Uint8Array,
+	bump: number,
+	authority: string,
+): void {
+	assert.ok(
+		data.length >= SAMPLE_HEADER_SIZE,
+		"sample must retain its authenticated header",
+	);
+	assert.equal(data[0], 1, "sample discriminator changed");
+	assert.equal(data[1], bump, "sample PDA bump changed");
+	assert.deepEqual(
+		data.slice(2, SAMPLE_HEADER_SIZE),
+		getAddressEncoder().encode(address(authority)),
+		"sample authority changed",
+	);
+}
+
+// These cases exercise the security contract introduced by the authority-bound
+// `Sample` PDA. They demonstrate the listed attacks fail without changing the
+// victim account; they are not a proof that the program has no other bugs.
+async function runAnchorReallocGuards(
+	descriptor: ExampleDescriptor,
+	submit: (instruction: Instruction) => Promise<void>,
+	payer: TestSigner,
+	surfnet: Surfnet,
+): Promise<void> {
+	const authority = String(payer.address);
+	const payerWritableSigner = {
+		address: payer.address,
+		role: AccountRole.WRITABLE_SIGNER,
+	};
+	const systemProgram = {
+		address: address(SYSTEM_PROGRAM_ID),
+		role: AccountRole.READONLY,
+	};
+	const [sample, bump] = await deriveSampleAddress(descriptor, authority);
+	const sampleWritable = { address: sample, role: AccountRole.WRITABLE };
+
+	await submit(rawInstruction(descriptor.programId, Uint8Array.of(2, bump), [
+		payerWritableSigner,
+		sampleWritable,
+		systemProgram,
+	]));
+	const initializedData = await fetchAccountData(surfnet, String(sample));
+	assert.equal(initializedData.length, SAMPLE_HEADER_SIZE);
+	assertSampleHeader(initializedData, bump, authority);
+
+	await submit(rawInstruction(
+		descriptor.programId,
+		reallocInstructionData(0, 98),
+		[payerWritableSigner, sampleWritable, systemProgram],
+	));
+	const grownData = await fetchAccountData(surfnet, String(sample));
+	assert.equal(grownData.length, 98, "authorized growth did not resize sample");
+	assertSampleHeader(grownData, bump, authority);
+
+	const attacker = await createKeyPairSignerFromBytes(
+		new Uint8Array(Surfnet.newKeypair().secretKey),
+	);
+	surfnet.fundSol(String(attacker.address), 1_000_000_000);
+	const attackerWritableSigner = {
+		address: attacker.address,
+		role: AccountRole.WRITABLE_SIGNER,
+	};
+	await assertRejected(
+		() =>
+			submit(addSignersToInstruction(
+				[attacker],
+				rawInstruction(
+					descriptor.programId,
+					reallocInstructionData(0, SAMPLE_HEADER_SIZE),
+					[attackerWritableSigner, sampleWritable, systemProgram],
+				),
+			)),
+		"an unrelated signer resized the victim's canonical sample PDA",
+		"InvalidSeeds",
+	);
+	assert.deepEqual(
+		await fetchAccountData(surfnet, String(sample)),
+		grownData,
+		"an unrelated signer mutated the victim sample",
+	);
+
+	const forgedAddress = Surfnet.newKeypair().publicKey;
+	const forgedData = new Uint8Array(SAMPLE_HEADER_SIZE);
+	forgedData[0] = 1;
+	forgedData[1] = bump;
+	forgedData.set(getAddressEncoder().encode(payer.address), 2);
+	surfnet.setAccount(
+		forgedAddress,
+		1_000_000,
+		forgedData,
+		descriptor.programId,
+	);
+	await assertRejected(
+		() =>
+			submit(rawInstruction(
+				descriptor.programId,
+				reallocInstructionData(0, 98),
+				[
+					payerWritableSigner,
+					{ address: address(forgedAddress), role: AccountRole.WRITABLE },
+					systemProgram,
+				],
+			)),
+		"a forged program-owned Sample header bypassed canonical PDA validation",
+		"InvalidSeeds",
+	);
+	assert.deepEqual(
+		await fetchAccountData(surfnet, forgedAddress),
+		forgedData,
+		"a forged Sample account was mutated",
+	);
+
+	await assertRejected(
+		() =>
+			submit(rawInstruction(
+				descriptor.programId,
+				reallocInstructionData(1, 98),
+				[payerWritableSigner, sampleWritable, sampleWritable, systemProgram],
+			)),
+		"duplicate resize targets were accepted",
+		{ Custom: 3017n },
+	);
+	assert.deepEqual(
+		await fetchAccountData(surfnet, String(sample)),
+		grownData,
+		"duplicate resize targets mutated the sample",
+	);
+
+	await submit(rawInstruction(
+		descriptor.programId,
+		reallocInstructionData(0, SAMPLE_HEADER_SIZE),
+		[payerWritableSigner, sampleWritable, systemProgram],
+	));
+	const shrunkData = await fetchAccountData(surfnet, String(sample));
+	assert.equal(shrunkData.length, SAMPLE_HEADER_SIZE);
+	assertSampleHeader(shrunkData, bump, authority);
+}
+
 async function runExample(descriptor: ExampleDescriptor): Promise<void> {
 	const surfnet = Surfnet.start();
 	try {
@@ -727,7 +914,7 @@ async function runExample(descriptor: ExampleDescriptor): Promise<void> {
 		await runSpecificGuards(
 			descriptor,
 			submit,
-			String(payer.address),
+			payer,
 			surfnet,
 		);
 	} finally {

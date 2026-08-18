@@ -33,28 +33,24 @@ This keeps code quality, behavior, documentation build health, feature-flag comp
 
 Every program is deployed at its declared ID and is exercised with a malformed discriminator and an otherwise-valid instruction sent at a different deployment address. Every program also has an explicit expected entrypoint result: either a successful invocation or its exact expected `ProgramError` after dispatch (for example, `NotEnoughAccountKeys` or a documented custom error). Stateful examples additionally receive attacker-controlled readonly account metadata and must return their expected runtime guard error. Negative assertions use Surfpool simulation logs and a returned `InstructionError`, so an RPC, build, or deployment failure cannot satisfy them.
 
-| Runtime guard                 | Surfpool adversarial case                                                                              |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Discriminator/data validation | Every example rejects an unknown discriminator before any state transition.                            |
-| Program-ID binding            | Every example rejects its own ELF when it is deployed at an attacker-controlled address.               |
-| Required account boundary     | Every selected IDL entrypoint with required accounts rejects an omitted account list.                  |
-| Stateful account metadata     | State-changing examples reject attacker-controlled readonly account sets with a runtime access error.  |
-| Signer authorization          | `hello_solana` rejects an unsigned user and accepts the same user only when marked as a signer.        |
-| Writable and alias checks     | `anchor_duplicate_mutable_accounts` rejects both a duplicate mutable alias and a non-writable account. |
-| Program address allowlist     | `anchor_declare_program` rejects an arbitrary account in place of its expected external program.       |
-| Owner constraint              | `anchor_system_accounts` rejects an account explicitly created with a non-System owner.                |
-| Sysvar address validation     | `anchor_sysvars` rejects ordinary accounts substituted for Clock, Rent, and Stake History.             |
+| Runtime guard                 | Surfpool adversarial case                                                                                                                                                 |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Discriminator/data validation | Every example rejects an unknown discriminator before any state transition.                                                                                               |
+| Program-ID binding            | Every example rejects its own ELF when it is deployed at an attacker-controlled address.                                                                                  |
+| Required account boundary     | Every selected IDL entrypoint with required accounts rejects an omitted account list.                                                                                     |
+| Stateful account metadata     | State-changing examples reject attacker-controlled readonly account sets with a runtime access error.                                                                     |
+| Signer authorization          | `hello_solana` rejects an unsigned user and accepts the same user only when marked as a signer.                                                                           |
+| Writable and alias checks     | `anchor_duplicate_mutable_accounts` rejects both a duplicate mutable alias and a non-writable account.                                                                    |
+| Program address allowlist     | `anchor_declare_program` rejects an arbitrary account in place of its expected external program.                                                                          |
+| Owner constraint              | `anchor_system_accounts` rejects an account explicitly created with a non-System owner.                                                                                   |
+| Sysvar address validation     | `anchor_sysvars` rejects ordinary accounts substituted for Clock, Rent, and Stake History.                                                                                |
+| Authority-bound PDA resize    | `anchor_realloc` proves initialize/grow/shrink for its owner and rejects an unrelated signer, a forged typed account, and duplicate resize targets without data mutation. |
 
 The broader Pina examples also run their purpose-built Mollusk, LiteSVM, and Quasar tests in `test:program-e2e`; these cover PDA derivation, ownership, token-account, arithmetic/range, initialization, and unauthorized-mutation flows that need program-specific state setup. Surfpool complements those tests with a full, deployed SBF boundary check. It provides evidence that the listed invariants hold for the tested attacks; it is not a proof that no other attack exists.
 
-### Known audit blockers
+### Known audit blocker
 
-Two source-level authorization findings remain outside the generic account-metadata checks and must be fixed before claiming the examples are secure against state-substitution attacks:
-
-- `anchor_realloc` currently accepts any signer together with a writable program-owned resize target; it does not bind the target to an authority, a typed state record, or a PDA. An attacker can therefore resize another user's eligible target account.
-- The `security/06-duplicate-mutable-accounts/secure` fixture checks distinct, program-owned balances but does not require that its signer matches the source balance's stored owner. It can debit a victim's logical balance into an attacker's destination.
-
-The follow-up source-fix PR must add stateful Surfpool exploit regressions for both findings: unauthorized calls must fail and leave the victim data unchanged, while the legitimate owner path must succeed. The generic harness intentionally does not treat its readonly-metadata rejection as evidence that either authorization invariant is already enforced.
+The `security/06-duplicate-mutable-accounts/secure` fixture checks distinct, program-owned balances but does not require that its signer matches the source balance's stored owner. It can debit a victim's logical balance into an attacker's destination. Its source fix needs a stateful regression: an unauthorized transfer must fail without changing either balance, while the legitimate owner path must succeed. The generic harness intentionally does not treat readonly-metadata rejection as evidence that this authorization invariant is enforced.
 
 ## Compute-unit regression policy
 
