@@ -19,6 +19,12 @@ pub enum AnchorReallocError {
 	/// 3017 -
 	#[error("")]
 	AccountDuplicateReallocs = 0xBC9,
+	/// 3018 -
+	#[error("")]
+	AccountDataTooSmall = 0xBCA,
+	/// 3019 -
+	#[error("")]
+	AuthorityMismatch = 0xBCB,
 }
 
 impl From<AnchorReallocError> for solana_program_error::ProgramError {
