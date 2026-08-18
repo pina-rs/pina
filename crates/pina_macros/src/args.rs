@@ -18,6 +18,11 @@ pub(crate) struct AccountArgs {
 	pub(crate) discriminator: syn::Path,
 	/// Set the variant of the discriminator enum.
 	pub(crate) variant: Option<syn::Ident>,
+	/// Enable compact mode: a fixed-size header followed by variable-length
+	/// tail segments (strings, vecs, options). The on-chain size is
+	/// `HEADER_SIZE + used tail bytes`.
+	#[darling(default)]
+	pub(crate) compact: darling::util::Flag,
 }
 
 /// Arguments for the `#[instruction(...)]` attribute macro.

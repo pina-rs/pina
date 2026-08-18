@@ -80,6 +80,43 @@ where
 	}
 }
 
+/// A compact account: a fixed-size header (discriminator + inline pod fields)
+/// followed by variable-length tail segments (strings, vecs, options) stored
+/// in the account buffer.
+///
+/// The on-chain size is `HEADER_SIZE + used tail bytes`, so rent is paid only
+/// for the data actually stored. The `#[account(compact)]` macro generates
+/// this impl plus validated `{Name}Ref` / `{Name}RefMut` views with tail
+/// accessors.
+///
+/// # Examples
+///
+/// ```ignore
+/// #[account(compact, discriminator = ProfileAccountType)]
+/// pub struct Profile {
+/// 	pub bump: u8,
+/// 	pub name: PodString<32>,
+/// 	pub bio: PodString<128>,
+/// 	pub tags: PodVec<PodU64, 8>,
+/// }
+///
+/// let profile = ProfileRef::new(&data)?;
+/// let name = profile.name()?;
+/// let tags = profile.tags()?;
+/// ```
+pub trait CompactAccount: HasDiscriminator {
+	/// The fixed-size header struct (discriminator + inline pod fields).
+	type Header: Pod;
+	/// The byte size of the header.
+	const HEADER_SIZE: usize;
+	/// Validate the discriminator, header, and all tail segments.
+	fn validate(data: &[u8]) -> Result<(), ProgramError>;
+	/// Validate and return a reference to the header.
+	fn header(data: &[u8]) -> Result<&Self::Header, ProgramError>;
+	/// Validate and return a mutable reference to the header.
+	fn header_mut(data: &mut [u8]) -> Result<&mut Self::Header, ProgramError>;
+}
+
 /// Validation trait for deserialized account data (e.g. `EscrowState`).
 ///
 /// Allows chaining arbitrary boolean assertions on the typed account, returning
