@@ -84,9 +84,17 @@ fn idl_success_output_snapshot() {
 #[test]
 fn codama_generate_success_output_snapshot() {
 	let temp_dir = reset_snapshot_dir("codama_generate_success");
+	let fake_npx = create_fake_npx(&temp_dir);
 	let idls_dir = temp_dir.join("idls");
 	let rust_out = temp_dir.join("rust");
 	let js_out = temp_dir.join("js");
+	let js_generated = js_out.join("counter_program/src/generated");
+	fs::create_dir_all(&js_generated).unwrap_or_else(|error| {
+		panic!(
+			"failed to create fake JavaScript client directory {}: {error}",
+			js_generated.display()
+		)
+	});
 
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command
@@ -104,7 +112,7 @@ fn codama_generate_success_output_snapshot() {
 		.arg("--example")
 		.arg("counter_program")
 		.arg("--npx")
-		.arg("node");
+		.arg(fake_npx);
 	assert_cmd_snapshot!("codama_generate_success_output", command);
 
 	assert!(
