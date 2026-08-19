@@ -76,7 +76,7 @@ pub fn assert_current_instruction_program_id(
 /// not expose invocation stack height. Use it only to validate the
 /// transaction-level instruction's program ID.
 #[deprecated(
-	since = "0.8.0",
+	since = "0.9.0",
 	note = "cannot detect self-CPI; use assert_current_instruction_program_id for the actual \
 	        guarantee"
 )]
