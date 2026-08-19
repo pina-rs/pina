@@ -1,6 +1,6 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
-assertion_line: 109
+assertion_line: 126
 info:
   program: pina
   args:
@@ -14,6 +14,8 @@ info:
     - target/cli-snapshot-temp/codama_generate_success/rust
     - "--js-out"
     - target/cli-snapshot-temp/codama_generate_success/js
+    - "--dart-out"
+    - target/cli-snapshot-temp/codama_generate_success/dart
     - "--example"
     - counter_program
     - "--npx"
@@ -22,6 +24,6 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-[32m✔[39m Generated Codama IDLs and Rust/JS clients for 1 example(s): counter_program
+[32m✔[39m Generated Codama IDLs and Rust/JavaScript/Dart clients for 1 example(s): counter_program
 
 ----- stderr -----

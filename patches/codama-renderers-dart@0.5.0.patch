@@ -1,0 +1,2774 @@
+diff --git a/dist/index.node.mjs b/dist/index.node.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..52aade044d5d72ed0aa1a09c3842fbc80a3a5914
+--- /dev/null
++++ b/dist/index.node.mjs
+@@ -0,0 +1,2768 @@
++import { existsSync, mkdirSync, writeFileSync } from 'fs';
++import { join, dirname, posix } from 'path';
++import { staticVisitor, extendVisitor, visit, NodeStack, LinkableDictionary, pipe, recordNodeStackVisitor, recordLinkablesOnFirstVisitVisitor, rootNodeVisitor } from '@codama/visitors-core';
++import { createRenderMap, addToRenderMap, mergeRenderMaps, deleteDirectory } from '@codama/renderers-core';
++import { execSync } from 'child_process';
++import { resolveNestedTypeNode, getAllInstructionsWithSubs } from '@codama/nodes';
++import { CodamaError, CODAMA_ERROR__UNEXPECTED_NODE_KIND } from '@codama/errors';
++
++// src/visitors/renderVisitor.ts
++function formatDartDirectory(dir) {
++  execSync(`dart format "${dir}"`, {
++    encoding: "utf-8",
++    timeout: 6e4,
++    stdio: ["pipe", "pipe", "pipe"]
++  });
++}
++
++// src/utils/normalizeRootNode.ts
++function normalizeRootNode(root) {
++  return normalizeNode(root);
++}
++function normalizeNode(value) {
++  if (Array.isArray(value)) {
++    return value.map(normalizeNode);
++  }
++  if (!isRecord(value)) {
++    return value;
++  }
++  const normalized = Object.fromEntries(
++    Object.entries(value).map(([key, child]) => [key, normalizeNode(child)])
++  );
++  switch (normalized.kind) {
++    case "rootNode":
++      setEmptyCollection(normalized, "additionalPrograms");
++      break;
++    case "programNode":
++      setEmptyCollection(normalized, "accounts");
++      setEmptyCollection(normalized, "constants");
++      setEmptyCollection(normalized, "definedTypes");
++      setEmptyCollection(normalized, "errors");
++      setEmptyCollection(normalized, "events");
++      setEmptyCollection(normalized, "instructions");
++      setEmptyCollection(normalized, "pdas");
++      break;
++    case "instructionNode":
++      setEmptyCollection(normalized, "accounts");
++      setEmptyCollection(normalized, "arguments");
++      break;
++    case "pdaNode":
++      setEmptyCollection(normalized, "seeds");
++      break;
++    case "structTypeNode":
++      setEmptyCollection(normalized, "fields");
++      break;
++    case "enumTypeNode":
++      setEmptyCollection(normalized, "variants");
++      break;
++    case "tupleTypeNode":
++      setEmptyCollection(normalized, "items");
++      break;
++    case "hiddenPrefixTypeNode":
++      setEmptyCollection(normalized, "prefix");
++      break;
++    case "hiddenSuffixTypeNode":
++      setEmptyCollection(normalized, "suffix");
++      break;
++  }
++  return normalized;
++}
++function isRecord(value) {
++  return typeof value === "object" && value !== null;
++}
++function setEmptyCollection(record, key) {
++  if (record[key] === void 0) {
++    record[key] = [];
++  }
++}
++
++// src/utils/nameTransformers.ts
++function pascalCase(str) {
++  return str.replace(/[-_\s]+(.)?/g, (_, c) => c ? c.toUpperCase() : "").replace(/^(.)/, (c) => c.toUpperCase());
++}
++function camelCase(str) {
++  const pascal = pascalCase(str);
++  return pascal.charAt(0).toLowerCase() + pascal.slice(1);
++}
++function snakeCase(str) {
++  return str.replace(/([A-Z])/g, "_$1").replace(/[-\s]+/g, "_").replace(/^_/, "").replace(/_+/g, "_").toLowerCase();
++}
++function createDartNameApi() {
++  return {
++    dataType: (name) => pascalCase(name),
++    encoderFunction: (name) => `get${pascalCase(name)}Encoder`,
++    decoderFunction: (name) => `get${pascalCase(name)}Decoder`,
++    codecFunction: (name) => `get${pascalCase(name)}Codec`,
++    accountFetchFunction: (name) => `fetch${pascalCase(name)}`,
++    accountFetchMaybeFunction: (name) => `fetchMaybe${pascalCase(name)}`,
++    accountDecodeFunction: (name) => `decode${pascalCase(name)}`,
++    accountSizeConstant: (name) => `${camelCase(name)}Size`,
++    pdaFindFunction: (name) => `find${pascalCase(name)}Pda`,
++    instructionFunction: (name) => `get${pascalCase(name)}Instruction`,
++    instructionParseFunction: (name) => `parse${pascalCase(name)}Instruction`,
++    programAddressConstant: (name) => `${camelCase(name)}ProgramAddress`,
++    errorConstant: (programName, errorName) => `${camelCase(programName)}Error${pascalCase(errorName)}`,
++    errorMessageFunction: (name) => `get${pascalCase(name)}ErrorMessage`,
++    enumVariant: (name) => camelCase(name),
++    sealedClassVariant: (parentName, variantName) => `${pascalCase(parentName)}${pascalCase(variantName)}`,
++    isTypeFunction: (name) => `is${pascalCase(name)}`,
++    fileName: (name) => snakeCase(name),
++    discriminatorConstant: (name) => `${camelCase(name)}Discriminator`
++  };
++}
++
++// src/utils/codecs.ts
++function bytesToDartHexList(bytes) {
++  const pairs = [];
++  for (let i = 0; i < bytes.length; i++) {
++    pairs.push(`0x${bytes[i].toString(16).padStart(2, "0")}`);
++  }
++  return `[${pairs.join(", ")}]`;
++}
++
++// src/utils/importMap.ts
++var DART_EXTERNAL_PACKAGE_MAP = {
++  // Dart core
++  dartTypedData: "dart:typed_data",
++  dartConvert: "dart:convert",
++  meta: "package:meta/meta.dart",
++  // solana_kit packages
++  solanaAddresses: "package:solana_kit_addresses/solana_kit_addresses.dart",
++  solanaCodecsCore: "package:solana_kit_codecs_core/solana_kit_codecs_core.dart",
++  solanaCodecsDataStructures: "package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structures.dart",
++  solanaCodecsNumbers: "package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart",
++  solanaCodecsStrings: "package:solana_kit_codecs_strings/solana_kit_codecs_strings.dart",
++  solanaErrors: "package:solana_kit_errors/solana_kit_errors.dart",
++  solanaAccounts: "package:solana_kit_accounts/solana_kit_accounts.dart",
++  solanaInstructions: "package:solana_kit_instructions/solana_kit_instructions.dart",
++  solanaPrograms: "package:solana_kit_programs/solana_kit_programs.dart",
++  solanaRpcTypes: "package:solana_kit_rpc_types/solana_kit_rpc_types.dart",
++  solanaSigners: "package:solana_kit_signers/solana_kit_signers.dart"
++};
++var DartImportMap = class {
++  _imports = /* @__PURE__ */ new Set();
++  /**
++   * Add a logical module name (resolved via DART_EXTERNAL_PACKAGE_MAP)
++   * or a raw Dart import URI.
++   */
++  add(module) {
++    this._imports.add(module);
++    return this;
++  }
++  /**
++   * Merge another DartImportMap into this one.
++   */
++  mergeWith(other) {
++    for (const imp of other._imports) {
++      this._imports.add(imp);
++    }
++    return this;
++  }
++  /**
++   * Check if this import map is empty.
++   */
++  get isEmpty() {
++    return this._imports.size === 0;
++  }
++  /**
++   * Get all raw module keys.
++   */
++  get modules() {
++    return new Set(this._imports);
++  }
++  /**
++   * Resolve all imports to Dart import URIs and return them sorted.
++   * @param internalMap Maps logical names to relative file paths for generated code cross-references.
++   */
++  resolve(internalMap = {}) {
++    const uris = /* @__PURE__ */ new Set();
++    for (const module of this._imports) {
++      if (module in internalMap) {
++        const uri = internalMap[module];
++        if (uri) {
++          uris.add(uri);
++        }
++      } else if (module in DART_EXTERNAL_PACKAGE_MAP) {
++        uris.add(DART_EXTERNAL_PACKAGE_MAP[module]);
++      } else if (isRawDartImportUri(module)) {
++        uris.add(module);
++      } else {
++        throw new Error(`Unresolved Dart import module "${module}"`);
++      }
++    }
++    return [...uris].sort((a, b) => {
++      const aWeight = a.startsWith("dart:") ? 0 : a.startsWith("package:") ? 1 : 2;
++      const bWeight = b.startsWith("dart:") ? 0 : b.startsWith("package:") ? 1 : 2;
++      if (aWeight !== bWeight) return aWeight - bWeight;
++      return a.localeCompare(b);
++    });
++  }
++  /**
++   * Render all imports as Dart import statements.
++   */
++  toString(internalMap = {}) {
++    const resolved = this.resolve(internalMap);
++    if (resolved.length === 0) return "";
++    const lines = [];
++    let lastPrefix = "";
++    for (const uri of resolved) {
++      const prefix = uri.startsWith("dart:") ? "dart" : uri.startsWith("package:") ? "package" : "relative";
++      if (lastPrefix && lastPrefix !== prefix) {
++        lines.push("");
++      }
++      lastPrefix = prefix;
++      lines.push(`import '${uri}';`);
++    }
++    return lines.join("\n");
++  }
++};
++function isRawDartImportUri(module) {
++  return module.startsWith("dart:") || module.startsWith("package:") || module.endsWith(".dart") && !module.includes(":");
++}
++
++// src/utils/fragment.ts
++function fragment(strings, ...values) {
++  const imports = new DartImportMap();
++  const parts = [];
++  for (let i = 0; i < strings.length; i++) {
++    parts.push(strings[i]);
++    if (i < values.length) {
++      const value = values[i];
++      if (value != null && typeof value === "object" && "imports" in value) {
++        parts.push(value.content);
++        imports.mergeWith(value.imports);
++      } else {
++        parts.push(String(value ?? ""));
++      }
++    }
++  }
++  return {
++    content: parts.join(""),
++    imports
++  };
++}
++function emptyFragment() {
++  return { content: "", imports: new DartImportMap() };
++}
++function fragmentFromString(content) {
++  return { content, imports: new DartImportMap() };
++}
++function mergeFragments(fragments, joiner) {
++  const imports = new DartImportMap();
++  const contents = [];
++  for (const frag of fragments) {
++    contents.push(frag.content);
++    imports.mergeWith(frag.imports);
++  }
++  return { content: joiner(contents), imports };
++}
++function use(typeName, module) {
++  const imports = new DartImportMap();
++  imports.add(module);
++  return { content: typeName, imports };
++}
++
++// src/utils/wellKnownAddresses.ts
++var WELL_KNOWN_ADDRESSES = /* @__PURE__ */ new Map([
++  // Agave / Solana native programs
++  ["11111111111111111111111111111111", "systemProgramAddress"],
++  ["AddressLookupTab1e1111111111111111111111111", "addressLookupTableProgramAddress"],
++  ["BPFLoader2111111111111111111111111111111111", "bpfLoaderProgramAddress"],
++  ["BPFLoader1111111111111111111111111111111111", "bpfLoaderDeprecatedProgramAddress"],
++  ["BPFLoaderUpgradeab1e11111111111111111111111", "bpfLoaderUpgradeableProgramAddress"],
++  ["ComputeBudget111111111111111111111111111111", "computeBudgetProgramAddress"],
++  ["Config1111111111111111111111111111111111111", "configProgramAddress"],
++  ["Ed25519SigVerify111111111111111111111111111", "ed25519ProgramAddress"],
++  ["Feature111111111111111111111111111111111111", "featureProgramAddress"],
++  ["1nc1nerator11111111111111111111111111111111", "incineratorAddress"],
++  ["LoaderV411111111111111111111111111111111111", "loaderV4ProgramAddress"],
++  ["NativeLoader1111111111111111111111111111", "nativeLoaderProgramAddress"],
++  ["KeccakSecp256k11111111111111111111111111111", "secp256k1ProgramAddress"],
++  ["Secp256r1SigVerify1111111111111111111111111", "secp256r1ProgramAddress"],
++  ["Stake11111111111111111111111111111111111111", "stakeProgramAddress"],
++  ["StakeConfig1111111111111111111111111111", "stakeConfigAddress"],
++  ["Vote111111111111111111111111111111111111111", "voteProgramAddress"],
++  ["ZkTokenProof1111111111111111111111111111111", "zkTokenProofProgramAddress"],
++  ["ZkE1Gama1Proof11111111111111111111111111111", "zkElgamalProofProgramAddress"],
++  // Sysvars
++  ["SysvarC1ock11111111111111111111111111111111", "sysvarClockAddress"],
++  ["Rent11111111111111111111111111111111111111", "sysvarRentAddress"],
++  ["11111111111111111111111111111111111111111111", "sysvarRecentBlockhashesAddress"],
++  // note: 44 chars
++  ["SysvarFees1111111111111111111111111111111111", "sysvarFeesAddress"],
++  ["Sysvar1nstruct1ons11111111111111111111111111", "sysvarInstructionsAddress"],
++  ["SysvarEpochSchedu1e111111111111111111111111", "sysvarEpochScheduleAddress"],
++  ["SysvarRewards111111111111111111111111111111", "sysvarRewardsAddress"],
++  ["SysvarStakeHistory1111111111111111111111111", "sysvarStakeHistoryAddress"],
++  ["SysvarS1otHashes111111111111111111111111111", "sysvarSlotHashesAddress"],
++  ["SysvarS1otHistory11111111111111111111111111", "sysvarSlotHistoryAddress"],
++  ["Sysvar1111111111111111111111111111111111111", "sysvarOwnerAddress"],
++  // SPL programs
++  ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "tokenProgramAddress"],
++  ["TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "token2022ProgramAddress"],
++  ["ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL", "associatedTokenProgramAddress"],
++  ["MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr", "memoProgramAddress"],
++  ["Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo", "memoLegacyProgramAddress"],
++  // Metaplex programs
++  ["metaqbxxU9qX8rZXkmUJ7haCrXXz2W1PSUq1Rn3E1od", "tokenMetadataProgramAddress"],
++  ["BGUMAp9V1mQ2KV8t34L5u3gZsXYZaYDBdKkc1xYk1qA1", "mplBubblegumProgramAddress"],
++  ["auth9SigNpDKz4s8cHr3MFBPS1phbRKLSCN3aBe9sS", "authRulesProgramAddress"],
++  ["CoREENxT6tW1Ho6BW6W5Z4N41ci5Xz2mmrR2kErmM5TR", "metaplexCoreProgramAddress"],
++  ["cmtMqR4bPM9sEV3bPnJQq5s2EnYw4N5vQ8hWhEd1xzS", "splAccountCompressionProgramAddress"],
++  ["noopb9skMVngR5Qi4sczwFr1jU4V4F7nm8xzFQK9C", "noopProgramAddress"],
++  // Well-known mints
++  ["So11111111111111111111111111111111111111112", "wrappedSolAddress"],
++  ["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "usdcAddress"],
++  ["Es9vMFrzaCERm6YKXx6bqKr1Rmd9b5v3J8rM5e4rfF4", "usdtAddress"]
++]);
++
++// src/utils/valueNodes.ts
++function getDartValueFragment(value, dartType) {
++  switch (value.kind) {
++    case "numberValueNode":
++      return fragmentFromString(
++        dartType === "BigInt" ? `BigInt.from(${value.number})` : String(value.number)
++      );
++    case "booleanValueNode":
++      return fragmentFromString(String(value.boolean));
++    case "stringValueNode":
++      return fragmentFromString(toDartStringLiteral(value.string));
++    case "noneValueNode":
++      return fragmentFromString("null");
++    case "bytesValueNode": {
++      if (value.encoding !== "base16") {
++        throw new Error(
++          `Unsupported deterministic bytes encoding: ${value.encoding}`
++        );
++      }
++      const clean = value.data.replace(/^0x/, "");
++      if (clean.length % 2 !== 0 || !/^[0-9a-f]*$/i.test(clean)) {
++        throw new Error(`Invalid hexadecimal bytes value: ${value.data}`);
++      }
++      const bytes = clean.match(/.{2}/g)?.map((byte) => `0x${byte}`) ?? [];
++      return fragment`${use("Uint8List", "dartTypedData")}.fromList([${fragmentFromString(bytes.join(", "))}])`;
++    }
++    case "publicKeyValueNode": {
++      const wellKnownName = WELL_KNOWN_ADDRESSES.get(value.publicKey);
++      return wellKnownName ? fragment`${use(wellKnownName, "solanaAddresses")}` : fragment`${use("Address", "solanaAddresses")}(${fragmentFromString(toDartStringLiteral(value.publicKey))})`;
++    }
++    default:
++      throw new Error(
++        `Unsupported deterministic Dart value node: ${value.kind}`
++      );
++  }
++}
++function isConstDartValueNode(value) {
++  switch (value.kind) {
++    case "numberValueNode":
++    case "booleanValueNode":
++    case "stringValueNode":
++    case "noneValueNode":
++    case "publicKeyValueNode":
++      return true;
++    default:
++      return false;
++  }
++}
++function toDartStringLiteral(value) {
++  return `'${value.replaceAll("\\", "\\\\").replaceAll("\n", "\\n").replaceAll("\r", "\\r").replaceAll("	", "\\t").replaceAll("\b", "\\b").replaceAll("\f", "\\f").replaceAll("$", "\\$").replaceAll("'", "\\'")}'`;
++}
++
++// src/utils/discriminators.ts
++function getDiscriminatorValidationFragment(node, scope) {
++  const discriminators = node.discriminators ?? [];
++  if (discriminators.length === 0) return emptyFragment();
++  const fields = getDiscriminatorFields(node);
++  const fragments = discriminators.map((discriminator) => {
++    switch (discriminator.kind) {
++      case "constantDiscriminatorNode":
++        return getConstantValidationFragment(
++          discriminator.constant,
++          discriminator.offset,
++          scope
++        );
++      case "fieldDiscriminatorNode": {
++        const field = fields.find(
++          (candidate) => candidate.name === discriminator.name
++        );
++        if (field?.defaultValue == null) {
++          throw new Error(
++            `Field discriminator "${discriminator.name}" on ${node.kind} "${node.name}" must reference a field with a default value.`
++          );
++        }
++        return getConstantValidationFragment(
++          {
++            type: field.type,
++            value: field.defaultValue
++          },
++          discriminator.offset,
++          scope
++        );
++      }
++      case "sizeDiscriminatorNode": {
++        if (!Number.isSafeInteger(discriminator.size) || discriminator.size < 0) {
++          throw new Error(
++            `Discriminator size must be a non-negative safe integer, got ${discriminator.size}.`
++          );
++        }
++        return fragment`if (bytes.length - offset != ${fragmentFromString(String(discriminator.size))}) {
++  throw ${use("SolanaError", "solanaErrors")}(
++    ${use("SolanaErrorCode", "solanaErrors")}.codecsInvalidByteLength,
++    {
++      'codecDescription': '${fragmentFromString(node.name)} discriminator',
++      'expected': ${fragmentFromString(String(discriminator.size))},
++      'bytesLength': bytes.length - offset,
++    },
++  );
++}`;
++      }
++    }
++  });
++  return mergeFragments(fragments, (contents) => contents.join("\n"));
++}
++function getConstantValidationFragment(constant, discriminatorOffset, scope) {
++  if (!Number.isSafeInteger(discriminatorOffset) || discriminatorOffset < 0) {
++    throw new Error(
++      `Discriminator offset must be a non-negative safe integer, got ${discriminatorOffset}.`
++    );
++  }
++  const manifest = visit(constant.type, scope.typeManifestVisitor);
++  const value = getDartValueFragment(
++    constant.value,
++    manifest.type.content
++  );
++  return fragment`${use("getConstantDecoder", "solanaCodecsDataStructures")}(
++  ${manifest.encoder}.encode(${value}),
++).read(bytes, offset + ${fragmentFromString(String(discriminatorOffset))});`;
++}
++function getDiscriminatorFields(node) {
++  if (node.kind === "accountNode") {
++    return resolveNestedTypeNode(node.data).fields ?? [];
++  }
++  return (node.arguments ?? []).map(
++    (argument) => ({
++      ...argument,
++      kind: "structFieldTypeNode"
++    })
++  );
++}
++
++// src/utils/exactDecoder.ts
++function getTopLevelDecoderFragment({
++  typeName,
++  description,
++  discriminatorValidation,
++  fromMapFields,
++  requireExactConsumption
++}) {
++  const validation = discriminatorValidation.content ? `    ${discriminatorValidation.content.replaceAll("\n", "\n    ")}
++` : "";
++  const consumptionCheck = requireExactConsumption ? `    if (newOffset != bytes.length) {
++      throwInvalidByteLength(newOffset - offset, bytes.length - offset);
++    }
++` : "";
++  const fixedSizeCheck = requireExactConsumption ? "bytesLength != structDecoder.fixedSize" : "bytesLength < structDecoder.fixedSize";
++  const result = fragment`  Never throwInvalidByteLength(int expected, int bytesLength) {
++    throw ${use("SolanaError", "solanaErrors")}(
++      ${use("SolanaErrorCode", "solanaErrors")}.codecsInvalidByteLength,
++      {
++        'codecDescription': '${fragmentFromString(description)}',
++        'expected': expected,
++        'bytesLength': bytesLength,
++      },
++    );
++  }
++
++  (${fragmentFromString(typeName)}, int) readTopLevel(Uint8List bytes, int offset) {
++${fragmentFromString(validation)}    final (map, newOffset) = structDecoder.read(bytes, offset);
++${fragmentFromString(consumptionCheck)}
++    return (
++      ${fragmentFromString(typeName)}(
++${fragmentFromString(fromMapFields)}
++      ),
++      newOffset,
++    );
++  }
++
++  return switch (structDecoder) {
++    ${use("FixedSizeDecoder", "solanaCodecsCore")}<Map<String, Object?>>() =>
++      ${use("FixedSizeDecoder", "solanaCodecsCore")}<${fragmentFromString(typeName)}>(
++        fixedSize: structDecoder.fixedSize,
++        read: (bytes, offset) {
++          final bytesLength = bytes.length - offset;
++          if (${fragmentFromString(fixedSizeCheck)}) {
++            throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
++          }
++          return readTopLevel(bytes, offset);
++        },
++      ),
++    ${use("VariableSizeDecoder", "solanaCodecsCore")}<Map<String, Object?>>() =>
++      ${use("VariableSizeDecoder", "solanaCodecsCore")}<${fragmentFromString(typeName)}>(
++        read: readTopLevel,
++        maxSize: structDecoder.maxSize,
++      ),
++  };`;
++  result.imports.mergeWith(discriminatorValidation.imports);
++  return result;
++}
++
++// src/utils/typeManifest.ts
++function emptyTypeManifest() {
++  return {
++    type: emptyFragment(),
++    encoder: emptyFragment(),
++    decoder: emptyFragment(),
++    value: emptyFragment(),
++    isEnum: false
++  };
++}
++
++// src/visitors/getTypeManifestVisitor.ts
++function getTypeManifestVisitor(input) {
++  const { nameApi, linkables, nonScalarEnums = [] } = input;
++  const baseVisitor = staticVisitor(
++    (node) => {
++      throw new CodamaError(CODAMA_ERROR__UNEXPECTED_NODE_KIND, {
++        expectedKinds: ["typeNode"],
++        kind: node.kind
++      });
++    },
++    {
++      keys: [
++        // Type nodes
++        "numberTypeNode",
++        "booleanTypeNode",
++        "stringTypeNode",
++        "publicKeyTypeNode",
++        "bytesTypeNode",
++        "arrayTypeNode",
++        "mapTypeNode",
++        "setTypeNode",
++        "tupleTypeNode",
++        "structTypeNode",
++        "structFieldTypeNode",
++        "enumTypeNode",
++        "enumEmptyVariantTypeNode",
++        "enumStructVariantTypeNode",
++        "enumTupleVariantTypeNode",
++        "optionTypeNode",
++        "remainderOptionTypeNode",
++        "zeroableOptionTypeNode",
++        "fixedSizeTypeNode",
++        "sizePrefixTypeNode",
++        "hiddenPrefixTypeNode",
++        "hiddenSuffixTypeNode",
++        "sentinelTypeNode",
++        "preOffsetTypeNode",
++        "postOffsetTypeNode",
++        "solAmountTypeNode",
++        "amountTypeNode",
++        "dateTimeTypeNode",
++        "definedTypeLinkNode",
++        // Context nodes (for links)
++        "definedTypeNode",
++        "accountNode",
++        "instructionNode"
++      ]
++    }
++  );
++  return extendVisitor(baseVisitor, {
++    visitNumberType(node, { self }) {
++      const { format, endian } = node;
++      const endianSuffix = endian === "be" ? ", NumberCodecConfig(endian: Endian.big)" : "";
++      const endianDecoderSuffix = endian === "be" ? ", NumberCodecConfig(endian: Endian.big)" : "";
++      const dartType = getNumberDartType(format);
++      const codecName = getNumberCodecName(format);
++      return {
++        // `BigInt` and other number types live in `dart:core` and need no import.
++        type: fragmentFromString(dartType),
++        encoder: fragment`${use(
++          `get${codecName}Encoder`,
++          "solanaCodecsNumbers"
++        )}(${endianSuffix ? fragmentFromString(endianSuffix.slice(2)) : fragmentFromString("")})`,
++        decoder: fragment`${use(
++          `get${codecName}Decoder`,
++          "solanaCodecsNumbers"
++        )}(${endianDecoderSuffix ? fragmentFromString(endianDecoderSuffix.slice(2)) : fragmentFromString("")})`,
++        value: emptyTypeManifest().value,
++        isEnum: false
++      };
++    },
++    visitBooleanType(_node, { self }) {
++      return {
++        type: fragmentFromString("bool"),
++        encoder: fragment`${use(
++          "getBooleanEncoder",
++          "solanaCodecsDataStructures"
++        )}()`,
++        decoder: fragment`${use(
++          "getBooleanDecoder",
++          "solanaCodecsDataStructures"
++        )}()`,
++        value: emptyTypeManifest().value,
++        isEnum: false
++      };
++    },
++    visitStringType(node, { self }) {
++      const { encoding } = node;
++      const codecMap = {
++        utf8: "Utf8",
++        base58: "Base58",
++        base64: "Base64",
++        base16: "Base16"
++      };
++      const codecName = codecMap[encoding] ?? "Utf8";
++      return {
++        type: fragmentFromString("String"),
++        encoder: fragment`${use(
++          `get${codecName}Encoder`,
++          "solanaCodecsStrings"
++        )}()`,
++        decoder: fragment`${use(
++          `get${codecName}Decoder`,
++          "solanaCodecsStrings"
++        )}()`,
++        value: emptyTypeManifest().value,
++        isEnum: false
++      };
++    },
++    visitPublicKeyType(_node, { self }) {
++      return {
++        type: fragment`${use("Address", "solanaAddresses")}`,
++        encoder: fragment`${use(
++          "getAddressEncoder",
++          "solanaAddresses"
++        )}()`,
++        decoder: fragment`${use(
++          "getAddressDecoder",
++          "solanaAddresses"
++        )}()`,
++        value: emptyTypeManifest().value,
++        isEnum: false
++      };
++    },
++    visitBytesType(_node, { self }) {
++      return {
++        type: fragment`${use("Uint8List", "dartTypedData")}`,
++        encoder: fragment`${use(
++          "getBytesEncoder",
++          "solanaCodecsDataStructures"
++        )}()`,
++        decoder: fragment`${use(
++          "getBytesDecoder",
++          "solanaCodecsDataStructures"
++        )}()`,
++        value: emptyTypeManifest().value,
++        isEnum: false
++      };
++    },
++    visitArrayType(node, { self }) {
++      const itemManifest = visit(node.item, self);
++      const encoderSizeExpr = getArraySizeExpression(node, "Encoder");
++      const decoderSizeExpr = getArraySizeExpression(node, "Decoder");
++      const itemType = fragmentFromString(itemManifest.type.content);
++      const itemEncoder = fragment`${use(
++        "transformEncoder",
++        "solanaCodecsCore"
++      )}(${itemManifest.encoder}, (${itemType} value) => value)`;
++      return {
++        type: fragment`List<${itemManifest.type}>`,
++        encoder: fragment`${use(
++          "getArrayEncoder",
++          "solanaCodecsDataStructures"
++        )}<${itemType}>(${itemEncoder}${encoderSizeExpr})`,
++        decoder: fragment`${use(
++          "getArrayDecoder",
++          "solanaCodecsDataStructures"
++        )}(${itemManifest.decoder}${decoderSizeExpr})`,
++        value: emptyTypeManifest().value,
++        isEnum: false
++      };
++    },
++    visitMapType(node, { self }) {
++      const keyManifest = visit(node.key, self);
++      const valueManifest = visit(node.value, self);
++      const encoderSizeExpr = getMapSizeExpression(node, "Encoder");
++      const decoderSizeExpr = getMapSizeExpression(node, "Decoder");
++      return {
++        type: fragment`Map<${keyManifest.type}, ${valueManifest.type}>`,
++        encoder: fragment`${use(
++          "getMapEncoder",
++          "solanaCodecsDataStructures"
++        )}(${keyManifest.encoder}, ${valueManifest.encoder}${encoderSizeExpr})`,
++        decoder: fragment`${use(
++          "getMapDecoder",
++          "solanaCodecsDataStructures"
++        )}(${keyManifest.decoder}, ${valueManifest.decoder}${decoderSizeExpr})`,
++        value: emptyTypeManifest().value,
++        isEnum: false
++      };
++    },
++    visitSetType(node, { self }) {
++      const itemManifest = visit(node.item, self);
++      const encoderSizeExpr = getSetSizeExpression(node, "Encoder");
++      const decoderSizeExpr = getSetSizeExpression(node, "Decoder");
++      return {
++        type: fragment`Set<${itemManifest.type}>`,
++        encoder: fragment`${use(
++          "getSetEncoder",
++          "solanaCodecsDataStructures"
++        )}(${itemManifest.encoder}${encoderSizeExpr})`,
++        decoder: fragment`${use(
++          "getSetDecoder",
++          "solanaCodecsDataStructures"
++        )}(${itemManifest.decoder}${decoderSizeExpr})`,
++        value: emptyTypeManifest().value,
++        isEnum: false
++      };
++    },
++    visitTupleType(node, { self }) {
++      const itemManifests = (node.items ?? []).map((item) => visit(item, self));
++      const typeList = itemManifests.map((m) => m.type.content).join(", ");
++      const encoderList = itemManifests.map((m) => m.encoder);
++      const decoderList = itemManifests.map((m) => m.decoder);
++      const typeFragment = fragment`(${fragmentFromString(typeList)})`;
++      for (const m of itemManifests) {
++        typeFragment.imports.mergeWith(m.type.imports);
++      }
++      const encoderListStr = encoderList.map((e) => e.content).join(", ");
++      const encoderFrag = fragment`${use(
++        "getTupleEncoder",
++        "solanaCodecsDataStructures"
++      )}([${fragmentFromString(encoderListStr)}])`;
++      for (const e of encoderList) {
++        encoderFrag.imports.mergeWith(e.imports);
++      }
++      const decoderListStr = decoderList.map((d) => d.content).join(", ");
++      const decoderFrag = fragment`${use(
++        "getTupleDecoder",
++        "solanaCodecsDataStructures"
++      )}([${fragmentFromString(decoderListStr)}])`;
++      for (const d of decoderList) {
++        decoderFrag.imports.mergeWith(d.imports);
++      }
++      return {
++        type: typeFragment,
++        encoder: encoderFrag,
++        decoder: decoderFrag,
++        value: emptyTypeManifest().value,
++        isEnum: false
++      };
++    },
++    visitStructType(node, { self }) {
++      const fields = (node.fields ?? []).map((f) => visit(f, self));
++      const fieldNames = (node.fields ?? []).map((f) => f.name);
++      const typeStr = "Map<String, Object?>";
++      const encoderFields = fields.map((f, i) => `('${fieldNames[i]}', ${f.encoder.content})`).join(", ");
++      const encoderFrag = fragment`${use(
++        "getStructEncoder",
++        "solanaCodecsDataStructures"
++      )}([${fragmentFromString(encoderFields)}])`;
++      for (const f of fields) {
++        encoderFrag.imports.mergeWith(f.encoder.imports);
++      }
++      const decoderFields = fields.map((f, i) => `('${fieldNames[i]}', ${f.decoder.content})`).join(", ");
++      const decoderFrag = fragment`${use(
++        "getStructDecoder",
++        "solanaCodecsDataStructures"
++      )}([${fragmentFromString(decoderFields)}])`;
++      for (const f of fields) {
++        decoderFrag.imports.mergeWith(f.decoder.imports);
++      }
++      return {
++        type: fragmentFromString(typeStr),
++        encoder: encoderFrag,
++        decoder: decoderFrag,
++        value: emptyTypeManifest().value,
++        isEnum: false
++      };
++    },
++    visitStructFieldType(node, { self }) {
++      return visit(node.type, self);
++    },
++    visitEnumType(node, { self }) {
++      const isScalar = (node.variants ?? []).every(
++        (v) => v.kind === "enumEmptyVariantTypeNode"
++      );
++      if (isScalar) {
++        return {
++          type: emptyTypeManifest().type,
++          // Will be replaced by the named type
++          encoder: emptyTypeManifest().encoder,
++          decoder: emptyTypeManifest().decoder,
++          value: emptyTypeManifest().value,
++          isEnum: true
++        };
++      }
++      return {
++        type: emptyTypeManifest().type,
++        encoder: emptyTypeManifest().encoder,
++        decoder: emptyTypeManifest().decoder,
++        value: emptyTypeManifest().value,
++        isEnum: false
++      };
++    },
++    visitEnumEmptyVariantType(_node, { self }) {
++      return emptyTypeManifest();
++    },
++    visitEnumStructVariantType(node, { self }) {
++      return visit(node.struct, self);
++    },
++    visitEnumTupleVariantType(node, { self }) {
++      return visit(node.tuple, self);
++    },
++    visitOptionType(node, { self }) {
++      const itemManifest = visit(node.item, self);
++      const itemTypeStr = itemManifest.type.content;
++      const resolvedPrefix = resolveNestedTypeNode(node.prefix);
++      const prefixExpr = resolvedPrefix.format !== "u8" ? `, prefix: ${getNumberCodecExpression(resolvedPrefix.format, "Encoder")}` : "";
++      const prefixDecoderExpr = resolvedPrefix.format !== "u8" ? `, prefix: ${getNumberCodecExpression(resolvedPrefix.format, "Decoder")}` : "";
++      const noneValueExpr = node.fixed ? ", noneValue: const ZeroesNoneValue()" : "";
++      return {
++        type: fragment`${itemManifest.type}?`,
++        encoder: fragment`${use(
++          "getNullableEncoder",
++          "solanaCodecsDataStructures"
++        )}<${fragmentFromString(itemTypeStr)}>(${itemManifest.encoder}${fragmentFromString(prefixExpr)}${fragmentFromString(noneValueExpr)})`,
++        decoder: fragment`${use(
++          "getNullableDecoder",
++          "solanaCodecsDataStructures"
++        )}<${fragmentFromString(itemTypeStr)}>(${itemManifest.decoder}${fragmentFromString(prefixDecoderExpr)}${fragmentFromString(noneValueExpr)})`,
++        value: emptyTypeManifest().value,
++        isEnum: false
++      };
++    },
++    visitRemainderOptionType(node, { self }) {
++      const itemManifest = visit(node.item, self);
++      const itemTypeStr = itemManifest.type.content;
++      return {
++        type: fragment`${itemManifest.type}?`,
++        encoder: fragment`${use(
++          "getNullableEncoder",
++          "solanaCodecsDataStructures"
++        )}<${fragmentFromString(itemTypeStr)}>(${itemManifest.encoder}, hasPrefix: false)`,
++        decoder: fragment`${use(
++          "getNullableDecoder",
++          "solanaCodecsDataStructures"
++        )}<${fragmentFromString(itemTypeStr)}>(${itemManifest.decoder}, hasPrefix: false)`,
++        value: emptyTypeManifest().value,
++        isEnum: false
++      };
++    },
++    visitZeroableOptionType(node, { self }) {
++      const itemManifest = visit(node.item, self);
++      const itemTypeStr = itemManifest.type.content;
++      return {
++        type: fragment`${itemManifest.type}?`,
++        encoder: fragment`${use(
++          "getNullableEncoder",
++          "solanaCodecsDataStructures"
++        )}<${fragmentFromString(itemTypeStr)}>(${itemManifest.encoder}, hasPrefix: false, noneValue: const ZeroesNoneValue())`,
++        decoder: fragment`${use(
++          "getNullableDecoder",
++          "solanaCodecsDataStructures"
++        )}<${fragmentFromString(itemTypeStr)}>(${itemManifest.decoder}, hasPrefix: false, noneValue: const ZeroesNoneValue())`,
++        value: emptyTypeManifest().value,
++        isEnum: false
++      };
++    },
++    visitFixedSizeType(node, { self }) {
++      const innerManifest = visit(node.type, self);
++      return {
++        type: innerManifest.type,
++        encoder: fragment`${use(
++          "fixEncoderSize",
++          "solanaCodecsCore"
++        )}(${innerManifest.encoder}, ${fragmentFromString(String(node.size))}, allowTruncation: false)`,
++        decoder: fragment`${use(
++          "fixDecoderSize",
++          "solanaCodecsCore"
++        )}(${innerManifest.decoder}, ${fragmentFromString(String(node.size))})`,
++        value: innerManifest.value,
++        isEnum: innerManifest.isEnum
++      };
++    },
++    visitSizePrefixType(node, { self }) {
++      const innerManifest = visit(node.type, self);
++      const bigIntFormats = /* @__PURE__ */ new Set(["u64", "u128", "i64", "i128"]);
++      let prefixManifest;
++      if (node.prefix.kind === "numberTypeNode" && bigIntFormats.has(node.prefix.format)) {
++        const codecName = getNumberCodecName(node.prefix.format);
++        prefixManifest = {
++          encoder: fragment`transformEncoder(${use(`get${codecName}Encoder`, "solanaCodecsNumbers")}(), (size) => BigInt.from(size))`,
++          decoder: fragment`transformDecoder(${use(`get${codecName}Decoder`, "solanaCodecsNumbers")}(), (size, _, __) => size.toInt())`
++        };
++      } else {
++        prefixManifest = visit(node.prefix, self);
++      }
++      return {
++        type: innerManifest.type,
++        encoder: fragment`${use(
++          "addEncoderSizePrefix",
++          "solanaCodecsCore"
++        )}(${innerManifest.encoder}, ${prefixManifest.encoder})`,
++        decoder: fragment`${use(
++          "addDecoderSizePrefix",
++          "solanaCodecsCore"
++        )}(${innerManifest.decoder}, ${prefixManifest.decoder})`,
++        value: innerManifest.value,
++        isEnum: innerManifest.isEnum
++      };
++    },
++    visitHiddenPrefixType(node, { self }) {
++      const innerManifest = visit(node.type, self);
++      const prefixes = (node.prefix ?? []).map((p) => getHiddenAffixManifest(p, self));
++      const prefixEncoders = prefixes.map((p) => p.encoder.content).join(", ");
++      const prefixDecoders = prefixes.map((p) => p.decoder.content).join(", ");
++      const encoderFrag = fragment`${use(
++        "getHiddenPrefixEncoder",
++        "solanaCodecsDataStructures"
++      )}(${innerManifest.encoder}, [${fragmentFromString(prefixEncoders)}])`;
++      for (const p of prefixes) {
++        encoderFrag.imports.mergeWith(p.encoder.imports);
++      }
++      const decoderFrag = fragment`${use(
++        "getHiddenPrefixDecoder",
++        "solanaCodecsDataStructures"
++      )}(${innerManifest.decoder}, [${fragmentFromString(prefixDecoders)}])`;
++      for (const p of prefixes) {
++        decoderFrag.imports.mergeWith(p.decoder.imports);
++      }
++      return {
++        type: innerManifest.type,
++        encoder: encoderFrag,
++        decoder: decoderFrag,
++        value: innerManifest.value,
++        isEnum: innerManifest.isEnum
++      };
++    },
++    visitHiddenSuffixType(node, { self }) {
++      const innerManifest = visit(node.type, self);
++      const suffixes = (node.suffix ?? []).map((s) => getHiddenAffixManifest(s, self));
++      const suffixEncoders = suffixes.map((s) => s.encoder.content).join(", ");
++      const suffixDecoders = suffixes.map((s) => s.decoder.content).join(", ");
++      const encoderFrag = fragment`${use(
++        "getHiddenSuffixEncoder",
++        "solanaCodecsDataStructures"
++      )}(${innerManifest.encoder}, [${fragmentFromString(suffixEncoders)}])`;
++      for (const s of suffixes) {
++        encoderFrag.imports.mergeWith(s.encoder.imports);
++      }
++      const decoderFrag = fragment`${use(
++        "getHiddenSuffixDecoder",
++        "solanaCodecsDataStructures"
++      )}(${innerManifest.decoder}, [${fragmentFromString(suffixDecoders)}])`;
++      for (const s of suffixes) {
++        decoderFrag.imports.mergeWith(s.decoder.imports);
++      }
++      return {
++        type: innerManifest.type,
++        encoder: encoderFrag,
++        decoder: decoderFrag,
++        value: innerManifest.value,
++        isEnum: innerManifest.isEnum
++      };
++    },
++    visitSentinelType(node, { self }) {
++      const innerManifest = visit(node.type, self);
++      const sentinelManifest = visit(node.sentinel, self);
++      return {
++        type: innerManifest.type,
++        encoder: fragment`${use(
++          "addEncoderSentinel",
++          "solanaCodecsCore"
++        )}(${innerManifest.encoder}, ${sentinelManifest.encoder})`,
++        decoder: fragment`${use(
++          "addDecoderSentinel",
++          "solanaCodecsCore"
++        )}(${innerManifest.decoder}, ${sentinelManifest.decoder})`,
++        value: innerManifest.value,
++        isEnum: innerManifest.isEnum
++      };
++    },
++    visitPreOffsetType(node, { self }) {
++      return visit(node.type, self);
++    },
++    visitPostOffsetType(node, { self }) {
++      return visit(node.type, self);
++    },
++    visitSolAmountType(node, { self }) {
++      return visit(node.number, self);
++    },
++    visitAmountType(node, { self }) {
++      return visit(node.number, self);
++    },
++    visitDateTimeType(node, { self }) {
++      return visit(node.number, self);
++    },
++    visitDefinedTypeLink(node, { self }) {
++      const name = node.name;
++      const typeName = nameApi.dataType(name);
++      const isNonScalar = nonScalarEnums.includes(node.name);
++      const moduleKey = `definedType:${snakeCase(name)}`;
++      return {
++        type: fragment`${use(typeName, moduleKey)}`,
++        encoder: fragment`${use(nameApi.encoderFunction(name), moduleKey)}()`,
++        decoder: fragment`${use(nameApi.decoderFunction(name), moduleKey)}()`,
++        value: emptyTypeManifest().value,
++        isEnum: !isNonScalar
++      };
++    },
++    visitDefinedType(node, { self }) {
++      return visit(node.type, self);
++    },
++    visitAccount(node, { self }) {
++      return visit(node.data, self);
++    },
++    visitInstruction(node, { self }) {
++      return emptyTypeManifest();
++    }
++  });
++}
++function getNumberDartType(format) {
++  switch (format) {
++    case "u8":
++    case "u16":
++    case "u32":
++    case "i8":
++    case "i16":
++    case "i32":
++    case "shortU16":
++      return "int";
++    case "u64":
++    case "u128":
++    case "i64":
++    case "i128":
++      return "BigInt";
++    case "f32":
++    case "f64":
++      return "double";
++    default:
++      return "int";
++  }
++}
++function getNumberCodecName(format) {
++  switch (format) {
++    case "u8":
++      return "U8";
++    case "u16":
++      return "U16";
++    case "u32":
++      return "U32";
++    case "u64":
++      return "U64";
++    case "u128":
++      return "U128";
++    case "i8":
++      return "I8";
++    case "i16":
++      return "I16";
++    case "i32":
++      return "I32";
++    case "i64":
++      return "I64";
++    case "i128":
++      return "I128";
++    case "f32":
++      return "F32";
++    case "f64":
++      return "F64";
++    case "shortU16":
++      return "ShortU16";
++    default:
++      return "U8";
++  }
++}
++function getNumberCodecExpression(format, codecType) {
++  const name = getNumberCodecName(format);
++  return `get${name}${codecType}()`;
++}
++function getArraySizeExpression(node, codecType) {
++  if (!("count" in node) || !node.count) return "";
++  const count = node.count;
++  switch (count.kind) {
++    case "fixedCountNode":
++      return `, size: FixedArraySize(${count.value})`;
++    case "remainderCountNode":
++      return ", size: RemainderArraySize()";
++    case "prefixedCountNode": {
++      const resolvedPrefix = resolveNestedTypeNode(count.prefix);
++      if (resolvedPrefix.format === "u32" && (!resolvedPrefix.endian || resolvedPrefix.endian === "le")) {
++        return "";
++      }
++      return `, size: PrefixedArraySize(${getNumberCodecExpression(resolvedPrefix.format, codecType)})`;
++    }
++    default:
++      return "";
++  }
++}
++function getMapSizeExpression(node, codecType) {
++  if (!("count" in node) || !node.count) return "";
++  const count = node.count;
++  switch (count.kind) {
++    case "fixedCountNode":
++      return `, size: FixedArraySize(${count.value})`;
++    case "remainderCountNode":
++      return ", size: RemainderArraySize()";
++    case "prefixedCountNode": {
++      const resolvedPrefix = resolveNestedTypeNode(count.prefix);
++      if (resolvedPrefix.format === "u32" && (!resolvedPrefix.endian || resolvedPrefix.endian === "le")) {
++        return "";
++      }
++      return `, size: PrefixedArraySize(${getNumberCodecExpression(resolvedPrefix.format, codecType)})`;
++    }
++    default:
++      return "";
++  }
++}
++function getSetSizeExpression(node, codecType) {
++  if (!("count" in node) || !node.count) return "";
++  const count = node.count;
++  switch (count.kind) {
++    case "fixedCountNode":
++      return `, size: FixedArraySize(${count.value})`;
++    case "remainderCountNode":
++      return ", size: RemainderArraySize()";
++    case "prefixedCountNode": {
++      const resolvedPrefix = resolveNestedTypeNode(count.prefix);
++      if (resolvedPrefix.format === "u32" && (!resolvedPrefix.endian || resolvedPrefix.endian === "le")) {
++        return "";
++      }
++      return `, size: PrefixedArraySize(${getNumberCodecExpression(resolvedPrefix.format, codecType)})`;
++    }
++    default:
++      return "";
++  }
++}
++function getHiddenAffixManifest(node, self) {
++  if (node?.kind !== "constantValueNode") {
++    const manifest = visit(node, self);
++    return { encoder: manifest.encoder, decoder: manifest.decoder };
++  }
++  const constantBytes = getConstantBytesExpression(node);
++  return {
++    encoder: fragment`${use("getConstantEncoder", "solanaCodecsDataStructures")}(${constantBytes})`,
++    decoder: fragment`${use("getConstantDecoder", "solanaCodecsDataStructures")}(${constantBytes})`
++  };
++}
++function getConstantBytesExpression(node) {
++  const valueNode = node.value;
++  const typeNode = node.type;
++  if (valueNode?.kind !== "numberValueNode") {
++    throw new Error(
++      `Unsupported hidden affix constant value kind: ${valueNode?.kind}`
++    );
++  }
++  const value = Number(valueNode.number);
++  if (typeNode?.kind === "numberTypeNode") {
++    return fragment`${use(`get${getNumberCodecName(typeNode.format)}Encoder`, "solanaCodecsNumbers")}().encode(${value})`;
++  }
++  if (typeNode?.kind === "preOffsetTypeNode") {
++    const inner = typeNode.type;
++    if (inner?.kind !== "numberTypeNode") {
++      throw new Error(
++        `Unsupported hidden affix pre-offset inner type kind: ${inner?.kind}`
++      );
++    }
++    return fragment`${use("padLeftEncoder", "solanaCodecsCore")}(${use(`get${getNumberCodecName(inner.format)}Encoder`, "solanaCodecsNumbers")}(), ${typeNode.offset}).encode(${value})`;
++  }
++  throw new Error(
++    `Unsupported hidden affix constant type kind: ${typeNode?.kind}`
++  );
++}
++
++// src/fragments/discriminatorConstants.ts
++function getDiscriminatorConstantsFragment(node, scope) {
++  const discriminators = node.discriminators ?? [];
++  if (discriminators.length === 0) return emptyFragment();
++  const name = node.name;
++  const constName = scope.nameApi.discriminatorConstant(name);
++  const fragments = [];
++  for (const disc of discriminators) {
++    switch (disc.kind) {
++      case "constantDiscriminatorNode": {
++        const constDisc = disc;
++        if (constDisc.constant.value.kind === "bytesValueNode") {
++          const bytes = hexToBytes(constDisc.constant.value.data);
++          const hexList = bytesToDartHexList(bytes);
++          fragments.push(
++            fragment`/// The discriminator bytes for this ${node.kind === "accountNode" ? "account" : "instruction"}.
++final ${constName} = ${use("Uint8List", "dartTypedData")}.fromList(${fragmentFromString(hexList)});`
++          );
++        }
++        break;
++      }
++      case "fieldDiscriminatorNode": {
++        const fieldDisc = disc;
++        fragments.push(
++          fragment`/// The discriminator field name: '${fragmentFromString(fieldDisc.name)}'.
++/// Offset: ${fragmentFromString(String(fieldDisc.offset))}.`
++        );
++        break;
++      }
++      case "sizeDiscriminatorNode": {
++        const sizeDisc = disc;
++        fragments.push(
++          fragment`/// This ${node.kind === "accountNode" ? "account" : "instruction"} has a size discriminator of ${fragmentFromString(String(sizeDisc.size))} bytes.`
++        );
++        break;
++      }
++    }
++  }
++  if (fragments.length === 0) return emptyFragment();
++  return mergeFragments(fragments, (cs) => cs.join("\n\n"));
++}
++function hexToBytes(hex) {
++  const clean = hex.replace(/^0x/, "");
++  const bytes = new Uint8Array(clean.length / 2);
++  for (let i = 0; i < clean.length; i += 2) {
++    bytes[i / 2] = parseInt(clean.slice(i, i + 2), 16);
++  }
++  return bytes;
++}
++
++// src/fragments/accountPage.ts
++function getAccountPageFragment(node, scope) {
++  const name = node.name;
++  const typeName = scope.nameApi.dataType(name);
++  const fields = resolveNestedTypeNode(node.data).fields ?? [];
++  const fieldManifests = fields.map((f) => ({
++    field: f,
++    manifest: visit(f.type, scope.typeManifestVisitor)
++  }));
++  const omittedFields = fields.filter(isOmittedDefaultField);
++  const constructorFields = fields.filter(
++    (field) => !isOmittedDefaultField(field)
++  );
++  const forcedFields = /* @__PURE__ */ new Set([
++    ...omittedFields,
++    ...fields.filter((field) => isFieldDiscriminator(field, node))
++  ]);
++  const fieldDefaults = new Map(
++    fieldManifests.flatMap(({ field, manifest }) => {
++      if (!forcedFields.has(field) || field.defaultValue == null) return [];
++      return [
++        [
++          field,
++          getDartValueFragment(field.defaultValue, manifest.type.content)
++        ]
++      ];
++    })
++  );
++  for (const field of forcedFields) {
++    if (!fieldDefaults.has(field)) {
++      throw new Error(
++        `Forced field "${field.name}" on account "${node.name}" must have a deterministic default value.`
++      );
++    }
++  }
++  const fieldDecls = fieldManifests.map(({ field: f, manifest }) => {
++    return `  final ${manifest.type.content} ${camelCase(f.name)};`;
++  }).join("\n");
++  const ctorParams = constructorFields.map((f) => `    required this.${camelCase(f.name)},`).join("\n");
++  const ctorInitializers = omittedFields.map((field) => {
++    const fieldName = camelCase(field.name);
++    return `${fieldName} = ${fieldDefaults.get(field).content}`;
++  }).join(",\n      ");
++  const ctorKeyword = omittedFields.every(
++    (field) => isConstDartValueNode(field.defaultValue)
++  ) ? "const " : "";
++  const ctorSignature = constructorFields.length === 0 ? `${ctorKeyword}${typeName}()${ctorInitializers ? ` : ${ctorInitializers}` : ""};` : `${ctorKeyword}${typeName}({
++${ctorParams}
++  })${ctorInitializers ? ` :
++      ${ctorInitializers}` : ""};`;
++  const eqChecks = fields.length === 0 ? "true" : fields.map(
++    (f) => `${camelCase(f.name)} == other.${camelCase(f.name)}`
++  ).join(" &&\n          ");
++  const hashFieldNames = fields.map((f) => camelCase(f.name));
++  const hashCodeExpr = hashFieldNames.length === 0 ? "0" : hashFieldNames.length === 1 ? `${hashFieldNames[0]}.hashCode` : `Object.hash(${hashFieldNames.join(", ")})`;
++  const toStringFields = fields.map(
++    (f) => `${camelCase(f.name)}: $${camelCase(f.name)}`
++  ).join(", ");
++  const encFields = fieldManifests.map(({ field: f, manifest }) => {
++    return `    ('${f.name}', ${manifest.encoder.content}),`;
++  }).join("\n");
++  const decFields = fieldManifests.map(({ field: f, manifest }) => {
++    return `    ('${f.name}', ${manifest.decoder.content}),`;
++  }).join("\n");
++  const toMapFields = fields.map((f) => {
++    const value = forcedFields.has(f) ? fieldDefaults.get(f).content : `value.${camelCase(f.name)}`;
++    return `      '${f.name}': ${value},`;
++  }).join("\n");
++  const fromMapFields = fieldManifests.filter(({ field }) => !isOmittedDefaultField(field)).map(({ field: f, manifest }) => {
++    const typeStr = manifest.type.content;
++    const isNullable = typeStr.endsWith("?");
++    const accessor = isNullable ? `map['${f.name}']` : `map['${f.name}']!`;
++    return `      ${camelCase(f.name)}: ${accessor} as ${typeStr},`;
++  }).join("\n");
++  const encoderName = scope.nameApi.encoderFunction(name);
++  const decoderName = scope.nameApi.decoderFunction(name);
++  const codecName = scope.nameApi.codecFunction(name);
++  const decodeFnName = scope.nameApi.accountDecodeFunction(name);
++  const sizeFragment = node.size != null ? fragment`
++/// The size of the [${fragmentFromString(typeName)}] account data in bytes.
++const int ${fragmentFromString(scope.nameApi.accountSizeConstant(name))} = ${fragmentFromString(String(node.size))};` : emptyFragment();
++  const discFragment = getDiscriminatorConstantsFragment(node, scope);
++  const discriminatorValidation = getDiscriminatorValidationFragment(
++    node,
++    scope
++  );
++  const topLevelDecoder = getTopLevelDecoderFragment({
++    typeName,
++    description: `${name} account decoder`,
++    discriminatorValidation,
++    fromMapFields,
++    requireExactConsumption: (node.discriminators ?? []).some(
++      (discriminator) => discriminator.kind === "sizeDiscriminatorNode"
++    )
++  });
++  const parts = [
++    fragment`// Auto-generated. Do not edit.
++// ignore_for_file: type=lint
++
++${use("Uint8List", "dartTypedData")}
++${use("immutable", "meta")}
++${use("Encoder", "solanaCodecsCore")}
++${use("Decoder", "solanaCodecsCore")}
++${use("Codec", "solanaCodecsCore")}
++${use("combineCodec", "solanaCodecsCore")}
++${use("transformEncoder", "solanaCodecsCore")}
++${use("transformDecoder", "solanaCodecsCore")}
++${use("getStructEncoder", "solanaCodecsDataStructures")}
++${use("getStructDecoder", "solanaCodecsDataStructures")}
++${use("Account", "solanaAccounts")}
++${use("EncodedAccount", "solanaAccounts")}
++${use("decodeAccount", "solanaAccounts")}
++
++@immutable
++class ${fragmentFromString(typeName)} {
++  ${fragmentFromString(ctorSignature)}
++
++${fragmentFromString(fieldDecls)}
++
++  @override
++  bool operator ==(Object other) =>
++      identical(this, other) ||
++      other is ${fragmentFromString(typeName)} &&
++          runtimeType == other.runtimeType &&
++          ${fragmentFromString(eqChecks)};
++
++  @override
++  int get hashCode => ${fragmentFromString(hashCodeExpr)};
++
++  @override
++  String toString() => '${fragmentFromString(typeName)}(${fragmentFromString(toStringFields)})';
++}`
++  ];
++  if (sizeFragment.content) parts.push(sizeFragment);
++  if (discFragment.content) parts.push(discFragment);
++  parts.push(fragment`
++Encoder<${fragmentFromString(typeName)}> ${fragmentFromString(encoderName)}() {
++  final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
++${fragmentFromString(encFields)}
++  ]);
++
++  return transformEncoder(
++    structEncoder,
++    (${fragmentFromString(typeName)} value) => <String, Object?>{
++${fragmentFromString(toMapFields)}
++    },
++  );
++}
++
++Decoder<${fragmentFromString(typeName)}> ${fragmentFromString(decoderName)}() {
++  final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
++${fragmentFromString(decFields)}
++  ]);
++
++${topLevelDecoder}
++}
++
++Codec<${fragmentFromString(typeName)}, ${fragmentFromString(typeName)}> ${fragmentFromString(codecName)}() {
++  return combineCodec(${fragmentFromString(encoderName)}(), ${fragmentFromString(decoderName)}());
++}
++
++Account<${fragmentFromString(typeName)}> ${fragmentFromString(decodeFnName)}(EncodedAccount encodedAccount) {
++  return decodeAccount(encodedAccount, ${fragmentFromString(decoderName)}());
++}`);
++  const result = mergeFragments(parts, (cs) => cs.join("\n\n"));
++  for (const { manifest } of fieldManifests) {
++    result.imports.mergeWith(manifest.encoder.imports);
++    result.imports.mergeWith(manifest.decoder.imports);
++    result.imports.mergeWith(manifest.type.imports);
++  }
++  for (const defaultValue of fieldDefaults.values()) {
++    result.imports.mergeWith(defaultValue.imports);
++  }
++  return result;
++}
++function isOmittedDefaultField(field) {
++  return field.defaultValue != null && field.defaultValueStrategy === "omitted";
++}
++function isFieldDiscriminator(field, node) {
++  return (node.discriminators ?? []).some(
++    (discriminator) => discriminator.kind === "fieldDiscriminatorNode" && discriminator.name === field.name
++  );
++}
++
++// src/fragments/errorPage.ts
++function getErrorPageFragment(programNode, scope) {
++  const errors = programNode.errors ?? [];
++  if (errors.length === 0) return emptyFragment();
++  const programName = programNode.name;
++  const errorConstants = errors.map((err) => {
++    const constName = scope.nameApi.errorConstant(
++      programName,
++      err.name
++    );
++    const hexCode = `0x${err.code.toString(16)}`;
++    const docs = err.docs?.length ? err.docs.map((d) => `/// ${d}`).join("\n") + "\n" : "";
++    const message = err.message ? `/// Message: "${err.message}"
++` : "";
++    return `${docs}${message}const int ${constName} = ${hexCode}; // ${err.code}`;
++  }).join("\n\n");
++  const messageEntries = errors.map((err) => {
++    const constName = scope.nameApi.errorConstant(
++      programName,
++      err.name
++    );
++    const message = err.message ?? err.name;
++    return `    ${constName}: '${escapeString(message)}',`;
++  }).join("\n");
++  const errorMessageFnName = scope.nameApi.errorMessageFunction(programName);
++  const isErrorFnName = `is${pascalCase(programName)}Error`;
++  return fragment`// Auto-generated. Do not edit.
++// ignore_for_file: type=lint, constant_identifier_names
++
++/// Error codes for the ${fragmentFromString(pascalCase(programName))} program.
++
++${fragmentFromString(errorConstants)}
++
++/// Map of error codes to human-readable messages.
++const Map<int, String> _${fragmentFromString(camelCase(programName))}ErrorMessages = {
++${fragmentFromString(messageEntries)}
++};
++
++/// Get the error message for a ${fragmentFromString(pascalCase(programName))} program error code.
++String? ${fragmentFromString(errorMessageFnName)}(int code) {
++  return _${fragmentFromString(camelCase(programName))}ErrorMessages[code];
++}
++
++/// Check if an error code belongs to the ${fragmentFromString(pascalCase(programName))} program.
++bool ${fragmentFromString(isErrorFnName)}(int code) {
++  return _${fragmentFromString(camelCase(programName))}ErrorMessages.containsKey(code);
++}`;
++}
++function escapeString(str) {
++  return str.replace(/'/g, "\\'").replace(/\n/g, "\\n");
++}
++
++// src/fragments/indexPage.ts
++function getIndexPageFragment(fileNames, relativePath = "") {
++  if (fileNames.length === 0) {
++    return fragmentFromString(
++      "// Auto-generated. Do not edit.\n// ignore_for_file: type=lint\n"
++    );
++  }
++  const exports = fileNames.sort().map((f) => {
++    const path = relativePath ? `${relativePath}/${f}` : f;
++    return `export '${path}';`;
++  }).join("\n");
++  return fragmentFromString(
++    `// Auto-generated. Do not edit.
++// ignore_for_file: type=lint
++
++${exports}
++`
++  );
++}
++function getRootIndexPageFragment(categories) {
++  const exports = categories.sort().map((cat) => `export '${cat}/${cat}.dart';`).join("\n");
++  return fragmentFromString(
++    `// Auto-generated. Do not edit.
++// ignore_for_file: type=lint
++
++${exports}
++`
++  );
++}
++function getInstructionPageFragment(node, scope) {
++  const name = node.name;
++  const typeName = scope.nameApi.dataType(name);
++  const instrFnName = scope.nameApi.instructionFunction(name);
++  const parseFnName = scope.nameApi.instructionParseFunction(name);
++  const accounts = node.accounts ?? [];
++  const allArgs = node.arguments ?? [];
++  const optionalAccountStrategy = node.optionalAccountStrategy ?? "programId";
++  if (optionalAccountStrategy !== "programId" && optionalAccountStrategy !== "omitted") {
++    throw new Error(
++      `Unsupported optional account strategy on instruction "${node.name}": ${optionalAccountStrategy}`
++    );
++  }
++  const args = allArgs.filter(
++    (arg) => !isDiscriminatorArg(arg, node) && !isOmittedDefaultArgument(arg)
++  );
++  const dataClassName = `${typeName}InstructionData`;
++  const allArgManifests = (node.arguments ?? []).map((arg) => ({
++    arg,
++    manifest: visit(arg.type, scope.typeManifestVisitor)
++  }));
++  const argDefaultValues = new Map(
++    allArgManifests.flatMap(({ arg, manifest }) => {
++      if (arg.defaultValue == null) return [];
++      const needsRenderedDefault = isOmittedDefaultArgument(arg) || isDiscriminatorArg(arg, node) || arg.defaultValue.kind !== "accountBumpValueNode";
++      if (!needsRenderedDefault) return [];
++      return [
++        [
++          arg,
++          getDartValueFragment(arg.defaultValue, manifest.type.content)
++        ]
++      ];
++    })
++  );
++  for (const arg of allArgs.filter(
++    (candidate) => isDiscriminatorArg(candidate, node)
++  )) {
++    if (!argDefaultValues.has(arg)) {
++      throw new Error(
++        `Field discriminator "${arg.name}" on instruction "${node.name}" must reference a field with a default value.`
++      );
++    }
++  }
++  const dataFieldDecls = allArgManifests.map(({ arg, manifest }) => {
++    const fieldName = camelCase(arg.name);
++    return `  final ${manifest.type.content} ${fieldName};`;
++  }).join("\n");
++  const dataCtorParams = allArgManifests.map(({ arg, manifest }) => {
++    const fieldName = camelCase(arg.name);
++    if (isOmittedDefaultArgument(arg)) return "";
++    if (isDiscriminatorArg(arg, node)) {
++      return isConstDefaultValue(arg.defaultValue) ? `    this.${fieldName} = ${argDefaultValues.get(arg).content},` : `    ${manifest.type.content}? ${fieldName},`;
++    }
++    return `    required this.${fieldName},`;
++  }).filter(Boolean).join("\n");
++  const dataCtorInitializers = allArgManifests.map(({ arg }) => {
++    const fieldName = camelCase(arg.name);
++    if (isOmittedDefaultArgument(arg)) {
++      return `      ${fieldName} = ${argDefaultValues.get(arg).content}`;
++    }
++    if (isDiscriminatorArg(arg, node) && !isConstDefaultValue(arg.defaultValue)) {
++      return `      ${fieldName} = ${fieldName} ?? ${argDefaultValues.get(arg).content}`;
++    }
++    return null;
++  }).filter((value) => value !== null).join(",\n");
++  const encFields = allArgManifests.map(({ arg, manifest }) => {
++    return `    ('${arg.name}', ${manifest.encoder.content}),`;
++  }).join("\n");
++  const decFields = allArgManifests.map(({ arg, manifest }) => {
++    return `    ('${arg.name}', ${manifest.decoder.content}),`;
++  }).join("\n");
++  const toMapFields = allArgs.map((arg) => {
++    const value = isOmittedDefaultArgument(arg) || isDiscriminatorArg(arg, node) ? argDefaultValues.get(arg).content : `value.${camelCase(arg.name)}`;
++    return `      '${arg.name}': ${value},`;
++  }).join("\n");
++  const fromMapFields = allArgManifests.filter(({ arg }) => !isOmittedDefaultArgument(arg)).map(({ arg, manifest }) => {
++    const typeStr = manifest.type.content;
++    const isNullable = typeStr.endsWith("?");
++    const accessor = isNullable ? `map['${arg.name}']` : `map['${arg.name}']!`;
++    return `      ${camelCase(arg.name)}: ${accessor} as ${typeStr},`;
++  }).join("\n");
++  const dataCtorKeyword = allArgs.every(
++    (arg) => !isOmittedDefaultArgument(arg) || isConstDartValueNode(arg.defaultValue)
++  ) && allArgs.every(
++    (arg) => !isDiscriminatorArg(arg, node) || isConstDefaultValue(arg.defaultValue)
++  ) ? "const " : "";
++  const dataCtorSignature = dataCtorParams ? `${dataCtorKeyword}${dataClassName}({
++${dataCtorParams}
++  })${dataCtorInitializers ? ` :
++${dataCtorInitializers}` : ""};` : `${dataCtorKeyword}${dataClassName}()${dataCtorInitializers ? ` :
++${dataCtorInitializers}` : ""};`;
++  const dataEncoderName = `get${typeName}InstructionDataEncoder`;
++  const dataDecoderName = `get${typeName}InstructionDataDecoder`;
++  const dataCodecName = `get${typeName}InstructionDataCodec`;
++  const argNames = new Set(args.map((a) => camelCase(a.name)));
++  const accountNames = new Set(accounts.map((a) => camelCase(a.name)));
++  const hasProgramAddressCollision = argNames.has("programAddress") || accountNames.has("programAddress");
++  const instrProgramParam = hasProgramAddressCollision ? "instructionProgramAddress" : "programAddress";
++  const accountParams = accounts.map((acc) => {
++    const fieldName = camelCase(acc.name);
++    const isRequired = !(acc.isOptional ?? false);
++    return isRequired ? `  required Address ${fieldName},` : `  Address? ${fieldName},`;
++  }).join("\n");
++  const argManifestMap = new Map(allArgManifests.map(({ arg, manifest }) => [arg, manifest]));
++  const argParams = args.map((arg) => {
++    const manifest = argManifestMap.get(arg);
++    const fieldName = camelCase(arg.name);
++    const typeStr = manifest.type.content;
++    const hasDefault = arg.defaultValue != null && arg.defaultValue.kind !== "accountBumpValueNode";
++    if (hasDefault) {
++      const nullableType = typeStr.endsWith("?") ? typeStr : `${typeStr}?`;
++      return `  ${nullableType} ${fieldName},`;
++    }
++    return `  required ${typeStr} ${fieldName},`;
++  }).join("\n");
++  const accountMetas = accounts.map((acc) => {
++    const fieldName = camelCase(acc.name);
++    const role = getAccountRole(acc);
++    const isOptional = acc.isOptional ?? false;
++    if (isOptional) {
++      if (optionalAccountStrategy === "omitted") {
++        return `    if (${fieldName} != null) AccountMeta(address: ${fieldName}, role: ${role}),`;
++      }
++      return `    if (${fieldName} != null) AccountMeta(address: ${fieldName}, role: ${role}) else AccountMeta(address: ${instrProgramParam}, role: AccountRole.readonly),`;
++    }
++    return `    AccountMeta(address: ${fieldName}, role: ${role}),`;
++  }).join("\n");
++  const dataConstruction = allArgs.map((arg) => {
++    const fieldName = camelCase(arg.name);
++    if (isOmittedDefaultArgument(arg) || isDiscriminatorArg(arg, node)) {
++      return "";
++    }
++    const skipDefault = arg.defaultValue?.kind === "accountBumpValueNode";
++    return `      ${fieldName}: ${fieldName}${arg.defaultValue != null && !skipDefault ? ` ?? ${argDefaultValues.get(arg).content}` : ""},`;
++  }).filter(Boolean).join("\n");
++  const discFragment = getDiscriminatorConstantsFragment(node, scope);
++  const discriminatorValidation = getDiscriminatorValidationFragment(
++    node,
++    scope
++  );
++  const topLevelDecoder = getTopLevelDecoderFragment({
++    typeName: dataClassName,
++    description: `${name} instruction decoder`,
++    discriminatorValidation,
++    fromMapFields,
++    requireExactConsumption: true
++  });
++  const parts = [
++    fragment`// Auto-generated. Do not edit.
++// ignore_for_file: type=lint
++
++${use("Uint8List", "dartTypedData")}
++${use("immutable", "meta")}
++${use("Encoder", "solanaCodecsCore")}
++${use("Decoder", "solanaCodecsCore")}
++${use("Codec", "solanaCodecsCore")}
++${use("combineCodec", "solanaCodecsCore")}
++${use("transformEncoder", "solanaCodecsCore")}
++${use("transformDecoder", "solanaCodecsCore")}
++${use("getStructEncoder", "solanaCodecsDataStructures")}
++${use("getStructDecoder", "solanaCodecsDataStructures")}
++${use("Address", "solanaAddresses")}
++${use("Instruction", "solanaInstructions")}
++${use("AccountMeta", "solanaInstructions")}
++${use("AccountRole", "solanaInstructions")}`
++  ];
++  if (discFragment.content) parts.push(discFragment);
++  parts.push(fragment`
++@immutable
++class ${fragmentFromString(dataClassName)} {
++  ${fragmentFromString(dataCtorSignature)}
++
++${fragmentFromString(dataFieldDecls)}
++}`);
++  parts.push(fragment`
++Encoder<${fragmentFromString(dataClassName)}> ${fragmentFromString(dataEncoderName)}() {
++  final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
++${fragmentFromString(encFields)}
++  ]);
++
++  return transformEncoder(
++    structEncoder,
++    (${fragmentFromString(dataClassName)} value) => <String, Object?>{
++${fragmentFromString(toMapFields)}
++    },
++  );
++}
++
++Decoder<${fragmentFromString(dataClassName)}> ${fragmentFromString(dataDecoderName)}() {
++  final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
++${fragmentFromString(decFields)}
++  ]);
++
++${topLevelDecoder}
++}
++
++Codec<${fragmentFromString(dataClassName)}, ${fragmentFromString(dataClassName)}> ${fragmentFromString(dataCodecName)}() {
++  return combineCodec(${fragmentFromString(dataEncoderName)}(), ${fragmentFromString(dataDecoderName)}());
++}`);
++  parts.push(fragment`
++/// Creates a [${fragmentFromString(typeName)}] instruction.
++Instruction ${fragmentFromString(instrFnName)}({
++  required Address ${fragmentFromString(instrProgramParam)},
++${fragmentFromString(accountParams)}
++${fragmentFromString(argParams)}
++}) {
++  final instructionData = ${fragmentFromString(dataClassName)}(
++${fragmentFromString(dataConstruction)}
++  );
++
++  return Instruction(
++    programAddress: ${fragmentFromString(instrProgramParam)},
++    accounts: [
++${fragmentFromString(accountMetas)}
++    ],
++    data: ${fragmentFromString(dataEncoderName)}().encode(instructionData),
++  );
++}`);
++  parts.push(fragment`
++/// Parses a [${fragmentFromString(typeName)}] instruction from raw instruction data.
++${fragmentFromString(dataClassName)} ${fragmentFromString(parseFnName)}(Instruction instruction) {
++  return ${fragmentFromString(dataDecoderName)}().decode(instruction.data!);
++}`);
++  const result = mergeFragments(parts, (cs) => cs.join("\n"));
++  for (const { manifest } of allArgManifests) {
++    result.imports.mergeWith(manifest.encoder.imports);
++    result.imports.mergeWith(manifest.decoder.imports);
++    result.imports.mergeWith(manifest.type.imports);
++  }
++  for (const defaultValue of argDefaultValues.values()) {
++    result.imports.mergeWith(defaultValue.imports);
++  }
++  return result;
++}
++function getAccountRole(acc) {
++  const isSigner = acc.isSigner === true || acc.isSigner === "either";
++  const isWritable = acc.isWritable ?? false;
++  if (isSigner && isWritable) return "AccountRole.writableSigner";
++  if (isSigner) return "AccountRole.readonlySigner";
++  if (isWritable) return "AccountRole.writable";
++  return "AccountRole.readonly";
++}
++function isDiscriminatorArg(arg, node) {
++  const discriminators = node.discriminators ?? [];
++  return discriminators.some(
++    (d) => d.kind === "fieldDiscriminatorNode" && d.name === arg.name
++  );
++}
++function isConstDefaultValue(defaultValue) {
++  if (!defaultValue) return false;
++  switch (defaultValue.kind) {
++    case "numberValueNode":
++    case "booleanValueNode":
++    case "stringValueNode":
++    case "noneValueNode":
++      return true;
++    default:
++      return false;
++  }
++}
++function isOmittedDefaultArgument(arg) {
++  return arg.defaultValue != null && arg.defaultValueStrategy === "omitted";
++}
++function getPdaPageFragment(node, scope) {
++  const name = node.name;
++  const findFnName = scope.nameApi.pdaFindFunction(name);
++  const seedsClassName = `${pascalCase(name)}Seeds`;
++  const seeds = node.seeds ?? [];
++  const hasByteSeeds = seeds.some(
++    (seed) => seed.kind === "constantPdaSeedNode" && seed.value.kind === "bytesValueNode"
++  );
++  const variableSeeds = seeds.filter(
++    (s) => s.kind === "variablePdaSeedNode"
++  );
++  seeds.filter(
++    (s) => s.kind === "constantPdaSeedNode"
++  );
++  const hasSeedsClass = variableSeeds.length > 0;
++  const seedManifests = [];
++  const seedFieldDecls = variableSeeds.map((s) => {
++    if (s.kind !== "variablePdaSeedNode") return "";
++    const manifest = visit(s.type, scope.typeManifestVisitor);
++    seedManifests.push(manifest);
++    return `  final ${manifest.type.content} ${camelCase(s.name)};`;
++  }).join("\n");
++  const seedCtorParams = variableSeeds.map((s) => {
++    if (s.kind !== "variablePdaSeedNode") return "";
++    return `    required this.${camelCase(s.name)},`;
++  }).join("\n");
++  const seedValues = [];
++  for (const seed of seeds) {
++    if (seed.kind === "constantPdaSeedNode") {
++      if (seed.value.kind === "bytesValueNode") {
++        seedValues.push(`    Uint8List.fromList(${bytesValueToDart(seed.value.data)}),`);
++      } else if (seed.value.kind === "stringValueNode") {
++        seedValues.push(`    '${seed.value.string}',`);
++      } else if (seed.value.kind === "publicKeyValueNode") {
++        const wellKnownSeedName = WELL_KNOWN_ADDRESSES.get(seed.value.publicKey);
++        if (wellKnownSeedName) {
++          use(wellKnownSeedName, "solanaAddresses");
++          seedValues.push(
++            `    getAddressEncoder().encode(${wellKnownSeedName}),`
++          );
++        } else {
++          seedValues.push(
++            `    getAddressEncoder().encode(Address('${seed.value.publicKey}')),`
++          );
++        }
++      } else if (seed.value.kind === "numberValueNode") {
++        const manifest = visit(seed.type, scope.typeManifestVisitor);
++        seedManifests.push(manifest);
++        seedValues.push(`    ${manifest.encoder.content}.encode(${seed.value.number}),`);
++      }
++    } else if (seed.kind === "variablePdaSeedNode") {
++      const manifest = visit(seed.type, scope.typeManifestVisitor);
++      seedManifests.push(manifest);
++      seedValues.push(
++        `    ${manifest.encoder.content}.encode(seeds.${camelCase(seed.name)}),`
++      );
++    }
++  }
++  const wellKnownProgramName = node.programId ? WELL_KNOWN_ADDRESSES.get(node.programId) : void 0;
++  if (wellKnownProgramName) {
++    use(wellKnownProgramName, "solanaAddresses");
++  }
++  const programIdParam = node.programId ? wellKnownProgramName ? `Address programAddress = ${wellKnownProgramName}` : `Address programAddress = const Address('${node.programId}')` : "required Address programAddress";
++  const typedDataImport = hasByteSeeds ? use("Uint8List", "dartTypedData") : fragmentFromString("");
++  const metaImport = hasSeedsClass ? use("immutable", "meta") : fragmentFromString("");
++  const parts = [
++    fragment`// Auto-generated. Do not edit.
++// ignore_for_file: type=lint
++
++${typedDataImport}
++${metaImport}
++${use("Address", "solanaAddresses")}
++${use("getAddressEncoder", "solanaAddresses")}
++${use("getProgramDerivedAddress", "solanaAddresses")}`
++  ];
++  if (hasSeedsClass) {
++    parts.push(fragment`
++@immutable
++class ${fragmentFromString(seedsClassName)} {
++  const ${fragmentFromString(seedsClassName)}({
++${fragmentFromString(seedCtorParams)}
++  });
++
++${fragmentFromString(seedFieldDecls)}
++}`);
++  }
++  const seedsParam = hasSeedsClass ? `  required ${seedsClassName} seeds,` : "";
++  parts.push(fragment`
++/// Finds the program derived address for [${fragmentFromString(pascalCase(name))}].
++Future<(Address, int)> ${fragmentFromString(findFnName)}({
++${fragmentFromString(seedsParam)}
++  ${fragmentFromString(programIdParam)},
++}) async {
++  final seedValues = <Object>[
++${fragmentFromString(seedValues.join("\n"))}
++  ];
++
++  return getProgramDerivedAddress(
++    programAddress: programAddress,
++    seeds: seedValues,
++  );
++}`);
++  const result = mergeFragments(parts, (cs) => cs.join("\n"));
++  for (const manifest of seedManifests) {
++    result.imports.mergeWith(manifest.encoder.imports);
++    result.imports.mergeWith(manifest.type.imports);
++  }
++  return result;
++}
++function bytesValueToDart(hex) {
++  const clean = hex.replace(/^0x/, "");
++  const pairs = [];
++  for (let i = 0; i < clean.length; i += 2) {
++    pairs.push(`0x${clean.slice(i, i + 2)}`);
++  }
++  return `[${pairs.join(", ")}]`;
++}
++function getProgramPageFragment(node, scope) {
++  const name = node.name;
++  const addressConstName = scope.nameApi.programAddressConstant(name);
++  const wellKnownName = WELL_KNOWN_ADDRESSES.get(node.publicKey);
++  const addressDeclaration = wellKnownName ? addressConstName === wellKnownName ? fragment`// Auto-generated. Do not edit.
++// ignore_for_file: type=lint
++
++/// The address of the ${fragmentFromString(pascalCase(name))} program.
++export 'package:solana_kit_addresses/solana_kit_addresses.dart' show ${fragmentFromString(wellKnownName)};` : fragment`${use(wellKnownName, "solanaAddresses")}
++
++// Auto-generated. Do not edit.
++// ignore_for_file: type=lint
++
++/// The address of the ${fragmentFromString(pascalCase(name))} program.
++const ${fragmentFromString(addressConstName)} = ${fragmentFromString(wellKnownName)};` : fragment`// Auto-generated. Do not edit.
++// ignore_for_file: type=lint
++
++${use("Address", "solanaAddresses")}
++
++/// The address of the ${fragmentFromString(pascalCase(name))} program.
++const ${fragmentFromString(addressConstName)} = Address('${fragmentFromString(node.publicKey)}');`;
++  const parts = [addressDeclaration];
++  const accounts = node.accounts ?? [];
++  if (accounts.length > 0) {
++    const accountVariants = accounts.map((acc) => `  ${camelCase(acc.name)},`).join("\n");
++    parts.push(fragment`
++/// Known accounts for the ${fragmentFromString(pascalCase(name))} program.
++enum ${fragmentFromString(pascalCase(name))}Account {
++${fragmentFromString(accountVariants)}
++}`);
++  }
++  const instructions = getAllInstructionsWithSubs(node);
++  if (instructions.length > 0) {
++    const programName = pascalCase(name);
++    const instructionEnum = `${programName}Instruction`;
++    const instrVariants = instructions.map((instr) => `  ${camelCase(instr.name)},`).join("\n");
++    parts.push(fragment`
++/// Known instructions for the ${fragmentFromString(programName)} program.
++enum ${fragmentFromString(instructionEnum)} {
++${fragmentFromString(instrVariants)}
++}`);
++    const identifiableInstructions = instructions.map((instruction) => ({
++      instruction,
++      condition: getInstructionDiscriminatorCondition(instruction, scope)
++    })).filter(({ condition }) => condition !== null);
++    if (identifiableInstructions.length > 0) {
++      const identifyBranches = identifiableInstructions.map(
++        ({ instruction, condition }) => fragment`  if (${condition}) {
++    return ${fragmentFromString(instructionEnum)}.${fragmentFromString(camelCase(instruction.name))};
++  }`
++      );
++      const parsedBase = `Parsed${programName}Instruction`;
++      const parsedClasses = instructions.map((instruction) => {
++        const instructionName = pascalCase(instruction.name);
++        const variant = camelCase(instruction.name);
++        const parsedClass = `Parsed${instructionName}`;
++        const dataClass = `${instructionName}InstructionData`;
++        return fragment`/// A parsed ${fragmentFromString(instructionName)} instruction.
++final class ${fragmentFromString(parsedClass)} extends ${fragmentFromString(parsedBase)} {
++  const ${fragmentFromString(parsedClass)}({required this.data})
++      : super(${fragmentFromString(instructionEnum)}.${fragmentFromString(variant)});
++
++  final ${use(dataClass, "../instructions/instructions.dart")} data;
++}`;
++      });
++      const parseBranches = instructions.map((instruction) => {
++        const instructionName = pascalCase(instruction.name);
++        const variant = camelCase(instruction.name);
++        const parsedClass = `Parsed${instructionName}`;
++        const parseFunction = scope.nameApi.instructionParseFunction(
++          instruction.name
++        );
++        return fragment`    ${fragmentFromString(instructionEnum)}.${fragmentFromString(variant)} => ${fragmentFromString(parsedClass)}(
++      data: ${use(parseFunction, "../instructions/instructions.dart")}(instruction),
++    ),`;
++      });
++      parts.push(fragment`
++/// Identifies the type of a ${fragmentFromString(programName)} instruction.
++${fragmentFromString(instructionEnum)} identify${fragmentFromString(programName)}Instruction(
++  ${use("Uint8List", "dartTypedData")} data,
++) {
++${mergeFragments(identifyBranches, (cs) => cs.join("\n"))}
++
++  throw ${use("SolanaError", "solanaErrors")}(
++    ${use("SolanaErrorCode", "solanaErrors")}.programClientsFailedToIdentifyInstruction,
++    {
++      'instructionData': data,
++      'programName': '${fragmentFromString(name)}',
++    },
++  );
++}
++
++/// A parsed instruction from the ${fragmentFromString(programName)} program.
++sealed class ${fragmentFromString(parsedBase)} {
++  const ${fragmentFromString(parsedBase)}(this.instructionType);
++
++  final ${fragmentFromString(instructionEnum)} instructionType;
++}
++
++${mergeFragments(parsedClasses, (cs) => cs.join("\n\n"))}
++
++/// Parses a ${fragmentFromString(programName)} instruction.
++${fragmentFromString(parsedBase)} parse${fragmentFromString(programName)}Instruction(
++  ${use("Instruction", "solanaInstructions")} instruction,
++) {
++  return switch (identify${fragmentFromString(programName)}Instruction(
++    instruction.data ?? Uint8List(0),
++  )) {
++${mergeFragments(parseBranches, (cs) => cs.join("\n"))}
++  };
++}`);
++    }
++  }
++  return mergeFragments(parts, (cs) => cs.join("\n"));
++}
++function getInstructionDiscriminatorCondition(instruction, scope) {
++  const discriminators = instruction.discriminators ?? [];
++  if (discriminators.length === 0) return null;
++  const conditions = discriminators.map((discriminator) => {
++    switch (discriminator.kind) {
++      case "sizeDiscriminatorNode":
++        return fragment`data.length == ${discriminator.size}`;
++      case "constantDiscriminatorNode": {
++        const manifest = visit(
++          discriminator.constant.type,
++          scope.typeManifestVisitor
++        );
++        const value = getValueFragment(
++          discriminator.constant.value,
++          manifest.type.content
++        );
++        if (value === null) return null;
++        return fragment`${use("containsBytes", "solanaCodecsCore")}(data, ${manifest.encoder}.encode(${value}), ${discriminator.offset})`;
++      }
++      case "fieldDiscriminatorNode": {
++        const argument = (instruction.arguments ?? []).find(
++          (candidate) => candidate.name === discriminator.name
++        );
++        if (argument?.defaultValue == null) return null;
++        const manifest = visit(argument.type, scope.typeManifestVisitor);
++        const value = getValueFragment(
++          argument.defaultValue,
++          manifest.type.content
++        );
++        if (value === null) return null;
++        return fragment`${use("containsBytes", "solanaCodecsCore")}(data, ${manifest.encoder}.encode(${value}), ${discriminator.offset})`;
++      }
++    }
++  });
++  if (conditions.some((condition) => condition === null)) return null;
++  return mergeFragments(conditions, (cs) => cs.join(" && "));
++}
++function getValueFragment(value, dartType) {
++  switch (value.kind) {
++    case "numberValueNode":
++      return fragmentFromString(
++        dartType === "BigInt" ? `BigInt.from(${value.number})` : String(value.number)
++      );
++    case "booleanValueNode":
++      return fragmentFromString(String(value.boolean));
++    case "stringValueNode":
++      return fragmentFromString(`'${value.string.replaceAll("'", "\\'")}'`);
++    case "bytesValueNode": {
++      const clean = value.data.replace(/^0x/, "");
++      const bytes = clean.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) ?? [];
++      return fragment`${use("Uint8List", "dartTypedData")}.fromList([${fragmentFromString(bytes.join(", "))}])`;
++    }
++    default:
++      return null;
++  }
++}
++function getTypePageFragment(node, scope) {
++  const name = node.name;
++  scope.nameApi.dataType(name);
++  const typeNode = node.type;
++  if (typeNode.kind === "enumTypeNode") {
++    const isScalar = (typeNode.variants ?? []).every(
++      (v) => v.kind === "enumEmptyVariantTypeNode"
++    );
++    if (isScalar) {
++      return getScalarEnumPageFragment(node, scope);
++    }
++    return getDataEnumPageFragment(node, scope);
++  }
++  if (typeNode.kind === "structTypeNode") {
++    return getStructPageFragment(node, scope);
++  }
++  return getTypeAliasPageFragment(node, scope);
++}
++function getScalarEnumPageFragment(node, scope) {
++  const name = node.name;
++  const typeName = scope.nameApi.dataType(name);
++  const enumNode = node.type;
++  if (enumNode.kind !== "enumTypeNode") return emptyFragment();
++  const variants = (enumNode.variants ?? []).map((v) => {
++    const variantName = scope.nameApi.enumVariant(v.name);
++    return variantName;
++  });
++  const variantLines = variants.map((v) => `  ${v},`).join("\n");
++  const encoderName = scope.nameApi.encoderFunction(name);
++  const decoderName = scope.nameApi.decoderFunction(name);
++  const codecName = scope.nameApi.codecFunction(name);
++  const resolvedSize = resolveNestedTypeNode(enumNode.size);
++  const sizeType = resolvedSize.format ?? "u8";
++  const sizeCodecName = getNumberCodecName2(sizeType);
++  const isU64 = sizeType === "u64";
++  const encodedVariantIndex = isU64 ? "BigInt.from(value.index)" : "value.index";
++  const decodedVariant = isU64 ? `(BigInt value, Uint8List bytes, int offset) {
++      if (value.isNegative || value >= BigInt.from(${typeName}.values.length)) {
++        throw RangeError('Invalid ${typeName} discriminator: ' + value.toString());
++      }
++      return ${typeName}.values[value.toInt()];
++    }` : `(int value, Uint8List bytes, int offset) => ${typeName}.values[value]`;
++  return fragment`// Auto-generated. Do not edit.
++// ignore_for_file: type=lint
++
++${use("Uint8List", "dartTypedData")}
++${use("Encoder", "solanaCodecsCore")}
++${use("Decoder", "solanaCodecsCore")}
++${use("Codec", "solanaCodecsCore")}
++${use("combineCodec", "solanaCodecsCore")}
++${use("transformEncoder", "solanaCodecsCore")}
++${use("transformDecoder", "solanaCodecsCore")}
++${use(`get${sizeCodecName}Encoder`, "solanaCodecsNumbers")}
++${use(`get${sizeCodecName}Decoder`, "solanaCodecsNumbers")}
++
++enum ${fragmentFromString(typeName)} {
++${fragmentFromString(variantLines)}
++}
++
++Encoder<${fragmentFromString(typeName)}> ${fragmentFromString(encoderName)}() {
++  return transformEncoder(
++    get${fragmentFromString(sizeCodecName)}Encoder(),
++    (${fragmentFromString(typeName)} value) => ${fragmentFromString(encodedVariantIndex)},
++  );
++}
++
++Decoder<${fragmentFromString(typeName)}> ${fragmentFromString(decoderName)}() {
++  return transformDecoder(
++    get${fragmentFromString(sizeCodecName)}Decoder(),
++    ${fragmentFromString(decodedVariant)},
++  );
++}
++
++Codec<${fragmentFromString(typeName)}, ${fragmentFromString(typeName)}> ${fragmentFromString(codecName)}() {
++  return combineCodec(${fragmentFromString(encoderName)}(), ${fragmentFromString(decoderName)}());
++}`;
++}
++function getDataEnumPageFragment(node, scope) {
++  const name = node.name;
++  const typeName = scope.nameApi.dataType(name);
++  const enumNode = node.type;
++  if (enumNode.kind !== "enumTypeNode") return emptyFragment();
++  const variantClasses = [];
++  const encoderVariants = [];
++  const decoderVariants = [];
++  const encodeCases = [];
++  const decodeCases = [];
++  const allVariantManifests = [];
++  const variants = enumNode.variants ?? [];
++  for (let i = 0; i < variants.length; i++) {
++    const variant = variants[i];
++    const variantName = pascalCase(variant.name);
++    const variantClassName = scope.nameApi.sealedClassVariant(
++      name,
++      variant.name
++    );
++    if (variant.kind === "enumEmptyVariantTypeNode") {
++      variantClasses.push(`final class ${variantClassName} extends ${typeName} {
++  const ${variantClassName}();
++
++  @override
++  bool operator ==(Object other) =>
++      identical(this, other) || other is ${variantClassName};
++
++  @override
++  int get hashCode => runtimeType.hashCode;
++
++  @override
++  String toString() => '${typeName}.${variantName}()';
++}`);
++      encoderVariants.push(
++        `(${i}, getStructEncoder(<(String, Encoder<Object?>)>[]))`
++      );
++      decoderVariants.push(
++        `(${i}, transformDecoder<Map<String, Object?>, Map<String, Object?>>(getStructDecoder(<(String, Decoder<Object?>)>[]), (Map<String, Object?> map, Uint8List bytes, int offset) => <String, Object?>{}))`
++      );
++      encodeCases.push(`${variantClassName}() => <String, Object?>{'__kind': ${i}},`);
++      decodeCases.push(`case ${i}: return const ${variantClassName}();`);
++    } else if (variant.kind === "enumStructVariantTypeNode") {
++      const resolvedStruct = resolveNestedTypeNode(variant.struct);
++      const fields = resolvedStruct.fields ?? [];
++      const fieldManifests = fields.map((f) => ({
++        field: f,
++        manifest: visit(f.type, scope.typeManifestVisitor)
++      }));
++      for (const { manifest } of fieldManifests) {
++        allVariantManifests.push(manifest);
++      }
++      const fieldDecls = fieldManifests.map(({ field: f, manifest }) => {
++        return `  final ${manifest.type.content} ${camelCase(f.name)};`;
++      }).join("\n");
++      const ctorParams = fields.map((f) => `    required this.${camelCase(f.name)},`).join("\n");
++      const ctorSignature = fields.length === 0 ? `  const ${variantClassName}();` : `  const ${variantClassName}({
++${ctorParams}
++  });`;
++      const eqChecks = fields.length === 0 ? "true" : fields.map((f) => `${camelCase(f.name)} == other.${camelCase(f.name)}`).join(" &&\n          ");
++      const hashExpression = getHashExpression(
++        fields.map((f) => camelCase(f.name))
++      );
++      const toStringFields = fields.map((f) => `${camelCase(f.name)}: $${camelCase(f.name)}`).join(", ");
++      variantClasses.push(`final class ${variantClassName} extends ${typeName} {
++${ctorSignature}
++
++${fieldDecls}
++
++  @override
++  bool operator ==(Object other) =>
++      identical(this, other) ||
++      other is ${variantClassName} &&
++          ${eqChecks};
++
++  @override
++  int get hashCode => ${hashExpression};
++
++  @override
++  String toString() => '${typeName}.${variantName}(${toStringFields})';
++}`);
++      const encFields = fieldManifests.map(({ field: f, manifest }) => {
++        return `('${f.name}', ${manifest.encoder.content})`;
++      }).join(", ");
++      const decFields = fieldManifests.map(({ field: f, manifest }) => {
++        return `('${f.name}', ${manifest.decoder.content})`;
++      }).join(", ");
++      const fromMapFields = fieldManifests.map(
++        ({ field: f, manifest }) => {
++          const typeStr = manifest.type.content;
++          const isNullable = typeStr.endsWith("?");
++          const accessor = isNullable ? `map['${f.name}']` : `map['${f.name}']!`;
++          return `${camelCase(f.name)}: ${accessor} as ${typeStr}`;
++        }
++      ).join(", ");
++      fields.map(
++        (f) => `'${f.name}': value.${camelCase(f.name)}`
++      ).join(", ");
++      encoderVariants.push(
++        `(${i}, getStructEncoder([${encFields}]))`
++      );
++      decoderVariants.push(
++        `(${i}, transformDecoder<Map<String, Object?>, Map<String, Object?>>(getStructDecoder([${decFields}]), (Map<String, Object?> map, Uint8List bytes, int offset) => map))`
++      );
++      const structPattern = fields.length === 0 ? "" : fields.map((f) => `${camelCase(f.name)}: final ${camelCase(f.name)}`).join(", ");
++      const structMapEntries = fields.length === 0 ? "" : `, ${fields.map((f) => `'${f.name}': ${camelCase(f.name)}`).join(", ")}`;
++      encodeCases.push(`${variantClassName}(${structPattern}) => <String, Object?>{'__kind': ${i}${structMapEntries}},`);
++      decodeCases.push(`case ${i}: return ${variantClassName}(${fromMapFields.replace(/\n/g, " ").replace(/,$/, "")});`);
++    } else if (variant.kind === "enumTupleVariantTypeNode") {
++      const resolvedTuple = resolveNestedTypeNode(variant.tuple);
++      const items = resolvedTuple.items ?? [];
++      if (items.length === 1) {
++        const manifest = visit(items[0], scope.typeManifestVisitor);
++        allVariantManifests.push(manifest);
++        variantClasses.push(`final class ${variantClassName} extends ${typeName} {
++  const ${variantClassName}(this.value);
++
++  final ${manifest.type.content} value;
++
++  @override
++  bool operator ==(Object other) =>
++      identical(this, other) ||
++      other is ${variantClassName} && value == other.value;
++
++  @override
++  int get hashCode => value.hashCode;
++
++  @override
++  String toString() => '${typeName}.${variantName}($value)';
++}`);
++        encoderVariants.push(
++          `(${i}, transformEncoder<${manifest.type.content}, Map<String, Object?>>(${manifest.encoder.content}, (Map<String, Object?> map) => map['value']! as ${manifest.type.content}))`
++        );
++        decoderVariants.push(
++          `(${i}, transformDecoder<${manifest.type.content}, Map<String, Object?>>(${manifest.decoder.content}, (${manifest.type.content} value, Uint8List bytes, int offset) => <String, Object?>{'value': value}))`
++        );
++        encodeCases.push(`${variantClassName}(value: final value) => <String, Object?>{'__kind': ${i}, 'value': value},`);
++        decodeCases.push(`case ${i}: return ${variantClassName}(map['value']! as ${manifest.type.content});`);
++      }
++    }
++  }
++  const encoderName = scope.nameApi.encoderFunction(name);
++  const decoderName = scope.nameApi.decoderFunction(name);
++  const codecName = scope.nameApi.codecFunction(name);
++  const resolvedSize = resolveNestedTypeNode(enumNode.size);
++  const sizeType = resolvedSize.format ?? "u8";
++  const sizeCodecName = getNumberCodecName2(sizeType);
++  const result = fragment`// Auto-generated. Do not edit.
++// ignore_for_file: type=lint
++
++${use("Uint8List", "dartTypedData")}
++${use("Encoder", "solanaCodecsCore")}
++${use("Decoder", "solanaCodecsCore")}
++${use("Codec", "solanaCodecsCore")}
++${use("combineCodec", "solanaCodecsCore")}
++${use("transformEncoder", "solanaCodecsCore")}
++${use("transformDecoder", "solanaCodecsCore")}
++${use("getStructEncoder", "solanaCodecsDataStructures")}
++${use("getStructDecoder", "solanaCodecsDataStructures")}
++${use("getDiscriminatedUnionEncoder", "solanaCodecsDataStructures")}
++${use("getDiscriminatedUnionDecoder", "solanaCodecsDataStructures")}
++${use(`get${sizeCodecName}Encoder`, "solanaCodecsNumbers")}
++${use(`get${sizeCodecName}Decoder`, "solanaCodecsNumbers")}
++
++sealed class ${fragmentFromString(typeName)} {
++  const ${fragmentFromString(typeName)}();
++}
++
++${fragmentFromString(variantClasses.join("\n\n"))}
++
++Encoder<${fragmentFromString(typeName)}> ${fragmentFromString(encoderName)}() {
++  return transformEncoder<Map<String, Object?>, ${fragmentFromString(typeName)}>(
++    getDiscriminatedUnionEncoder([
++      ${fragmentFromString(encoderVariants.join(",\n      "))},
++    ], size: get${fragmentFromString(sizeCodecName)}Encoder()),
++    (${fragmentFromString(typeName)} value) => switch (value) {
++      ${fragmentFromString(encodeCases.join("\n      "))}
++    },
++  );
++}
++
++Decoder<${fragmentFromString(typeName)}> ${fragmentFromString(decoderName)}() {
++  return transformDecoder<Map<String, Object?>, ${fragmentFromString(typeName)}>(
++    getDiscriminatedUnionDecoder([
++      ${fragmentFromString(decoderVariants.join(",\n      "))},
++    ], size: get${fragmentFromString(sizeCodecName)}Decoder()),
++    (Map<String, Object?> map, Uint8List bytes, int offset) {
++      switch (map['__kind']) {
++        ${fragmentFromString(decodeCases.join("\n        "))}
++      }
++      throw StateError('Unsupported ${typeName} discriminator: \${map['__kind']}');
++    },
++  );
++}
++
++Codec<${fragmentFromString(typeName)}, ${fragmentFromString(typeName)}> ${fragmentFromString(codecName)}() {
++  return combineCodec(${fragmentFromString(encoderName)}(), ${fragmentFromString(decoderName)}());
++}`;
++  for (const manifest of allVariantManifests) {
++    result.imports.mergeWith(manifest.encoder.imports);
++    result.imports.mergeWith(manifest.decoder.imports);
++    result.imports.mergeWith(manifest.type.imports);
++  }
++  return result;
++}
++function getStructPageFragment(node, scope) {
++  const name = node.name;
++  const typeName = scope.nameApi.dataType(name);
++  const structNode = node.type;
++  if (structNode.kind !== "structTypeNode") return emptyFragment();
++  const fields = structNode.fields ?? [];
++  const fieldManifests = fields.map((f) => ({
++    field: f,
++    manifest: visit(f.type, scope.typeManifestVisitor)
++  }));
++  const fieldDecls = fieldManifests.map(({ field: f, manifest }) => {
++    return `  final ${manifest.type.content} ${camelCase(f.name)};`;
++  }).join("\n");
++  const ctorParams = fields.map((f) => `    required this.${camelCase(f.name)},`).join("\n");
++  const ctorSignature = fields.length === 0 ? `  const ${typeName}();` : `  const ${typeName}({
++${ctorParams}
++  });`;
++  const eqChecks = fields.length === 0 ? "true" : fields.map(
++    (f) => `${camelCase(f.name)} == other.${camelCase(f.name)}`
++  ).join(" &&\n          ");
++  fields.length === 0 ? "runtimeType" : fields.map((f) => camelCase(f.name)).join(", ");
++  const toStringFields = fields.map(
++    (f) => `${camelCase(f.name)}: $${camelCase(f.name)}`
++  ).join(", ");
++  const encoderName = scope.nameApi.encoderFunction(name);
++  const decoderName = scope.nameApi.decoderFunction(name);
++  const codecName = scope.nameApi.codecFunction(name);
++  const encFields = fieldManifests.map(({ field: f, manifest }) => {
++    return `    ('${f.name}', ${manifest.encoder.content}),`;
++  }).join("\n");
++  const decFields = fieldManifests.map(({ field: f, manifest }) => {
++    return `    ('${f.name}', ${manifest.decoder.content}),`;
++  }).join("\n");
++  const toMapFields = fields.map(
++    (f) => `      '${f.name}': value.${camelCase(f.name)},`
++  ).join("\n");
++  const fromMapFields = fieldManifests.map(({ field: f, manifest }) => {
++    const typeStr = manifest.type.content;
++    const isNullable = typeStr.endsWith("?");
++    const accessor = isNullable ? `map['${f.name}']` : `map['${f.name}']!`;
++    return `      ${camelCase(f.name)}: ${accessor} as ${typeStr},`;
++  }).join("\n");
++  const result = fragment`// Auto-generated. Do not edit.
++// ignore_for_file: type=lint
++
++${use("Uint8List", "dartTypedData")}
++${use("immutable", "meta")}
++${use("Encoder", "solanaCodecsCore")}
++${use("Decoder", "solanaCodecsCore")}
++${use("Codec", "solanaCodecsCore")}
++${use("combineCodec", "solanaCodecsCore")}
++${use("transformEncoder", "solanaCodecsCore")}
++${use("transformDecoder", "solanaCodecsCore")}
++${use("getStructEncoder", "solanaCodecsDataStructures")}
++${use("getStructDecoder", "solanaCodecsDataStructures")}
++
++@immutable
++class ${fragmentFromString(typeName)} {
++${fragmentFromString(ctorSignature)}
++
++${fragmentFromString(fieldDecls)}
++
++  @override
++  bool operator ==(Object other) =>
++      identical(this, other) ||
++      other is ${fragmentFromString(typeName)} &&
++          runtimeType == other.runtimeType &&
++          ${fragmentFromString(eqChecks)};
++
++  @override
++  int get hashCode => ${fragmentFromString(getHashExpression(fields.map((f) => camelCase(f.name))))};
++
++  @override
++  String toString() => '${fragmentFromString(typeName)}(${fragmentFromString(toStringFields)})';
++}
++
++Encoder<${fragmentFromString(typeName)}> ${fragmentFromString(encoderName)}() {
++  final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
++${fragmentFromString(encFields)}
++  ]);
++
++  return transformEncoder(
++    structEncoder,
++    (${fragmentFromString(typeName)} value) => <String, Object?>{
++${fragmentFromString(toMapFields)}
++    },
++  );
++}
++
++Decoder<${fragmentFromString(typeName)}> ${fragmentFromString(decoderName)}() {
++  final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
++${fragmentFromString(decFields)}
++  ]);
++
++  return transformDecoder(
++    structDecoder,
++    (Map<String, Object?> map, Uint8List bytes, int offset) => ${fragmentFromString(typeName)}(
++${fragmentFromString(fromMapFields)}
++    ),
++  );
++}
++
++Codec<${fragmentFromString(typeName)}, ${fragmentFromString(typeName)}> ${fragmentFromString(codecName)}() {
++  return combineCodec(${fragmentFromString(encoderName)}(), ${fragmentFromString(decoderName)}());
++}`;
++  for (const { manifest } of fieldManifests) {
++    result.imports.mergeWith(manifest.encoder.imports);
++    result.imports.mergeWith(manifest.decoder.imports);
++    result.imports.mergeWith(manifest.type.imports);
++  }
++  return result;
++}
++function getTypeAliasPageFragment(node, scope) {
++  const name = node.name;
++  const typeName = scope.nameApi.dataType(name);
++  const manifest = visit(node.type, scope.typeManifestVisitor);
++  const encoderName = scope.nameApi.encoderFunction(name);
++  const decoderName = scope.nameApi.decoderFunction(name);
++  const codecName = scope.nameApi.codecFunction(name);
++  return fragment`// Auto-generated. Do not edit.
++// ignore_for_file: type=lint
++
++${use("Encoder", "solanaCodecsCore")}
++${use("Decoder", "solanaCodecsCore")}
++${use("Codec", "solanaCodecsCore")}
++${use("combineCodec", "solanaCodecsCore")}
++
++typedef ${fragmentFromString(typeName)} = ${manifest.type};
++
++Encoder<${fragmentFromString(typeName)}> ${fragmentFromString(encoderName)}() {
++  return ${manifest.encoder};
++}
++
++Decoder<${fragmentFromString(typeName)}> ${fragmentFromString(decoderName)}() {
++  return ${manifest.decoder};
++}
++
++Codec<${fragmentFromString(typeName)}, ${fragmentFromString(typeName)}> ${fragmentFromString(codecName)}() {
++  return combineCodec(${fragmentFromString(encoderName)}(), ${fragmentFromString(decoderName)}());
++}`;
++}
++function getHashExpression(fields) {
++  if (fields.length === 0) return "runtimeType.hashCode";
++  if (fields.length === 1) return `${fields[0]}.hashCode`;
++  return `Object.hash(${fields.join(", ")})`;
++}
++function getNumberCodecName2(format) {
++  switch (format) {
++    case "u8":
++      return "U8";
++    case "u16":
++      return "U16";
++    case "u32":
++      return "U32";
++    case "u64":
++      return "U64";
++    case "u128":
++      return "U128";
++    case "i8":
++      return "I8";
++    case "i16":
++      return "I16";
++    case "i32":
++      return "I32";
++    case "i64":
++      return "I64";
++    case "i128":
++      return "I128";
++    case "f32":
++      return "F32";
++    case "f64":
++      return "F64";
++    case "shortU16":
++      return "ShortU16";
++    default:
++      return "U8";
++  }
++}
++
++// src/visitors/getRenderMapVisitor.ts
++function getRenderMapVisitor(options = {}) {
++  const nameApi = {
++    ...createDartNameApi(),
++    ...options.nameApi
++  };
++  options.dependencyMap ?? {};
++  const stack = new NodeStack();
++  const linkables = new LinkableDictionary();
++  const typeManifestVisitor = getTypeManifestVisitor({
++    nameApi,
++    linkables});
++  const scope = {
++    nameApi,
++    typeManifestVisitor};
++  return pipe(
++    staticVisitor(
++      () => createRenderMap(),
++      {
++        keys: [
++          "rootNode",
++          "programNode",
++          "accountNode",
++          "definedTypeNode",
++          "instructionNode",
++          "pdaNode"
++        ]
++      }
++    ),
++    (v) => extendVisitor(v, {
++      visitRoot(node, { self }) {
++        const programMaps = [
++          visit(node.program, self),
++          ...(node.additionalPrograms ?? []).map((p) => visit(p, self))
++        ];
++        const mergedProgramMap = mergeRenderMaps(programMaps);
++        const categoryMaps = getSharedCategoryIndexMaps(mergedProgramMap);
++        return mergeRenderMaps([mergedProgramMap, ...categoryMaps]);
++      },
++      visitProgram(node, { self }) {
++        const programName = node.name;
++        const maps = [];
++        const accountFiles = [];
++        const instructionFiles = [];
++        const typeFiles = [];
++        const pdaFiles = [];
++        const errorFiles = [];
++        const programFiles = [];
++        for (const account of node.accounts ?? []) {
++          maps.push(visit(account, self));
++          accountFiles.push(`${snakeCase(account.name)}.dart`);
++        }
++        for (const instruction of node.instructions ?? []) {
++          maps.push(visit(instruction, self));
++          instructionFiles.push(
++            `${snakeCase(instruction.name)}.dart`
++          );
++        }
++        for (const definedType of node.definedTypes ?? []) {
++          maps.push(visit(definedType, self));
++          typeFiles.push(
++            `${snakeCase(definedType.name)}.dart`
++          );
++        }
++        for (const pda of node.pdas ?? []) {
++          maps.push(visit(pda, self));
++          pdaFiles.push(`${snakeCase(pda.name)}.dart`);
++        }
++        const programFragment = getProgramPageFragment(node, scope);
++        const programFileName = `${snakeCase(programName)}.dart`;
++        programFiles.push(programFileName);
++        let programMap = createRenderMap();
++        programMap = addToRenderMap(programMap, `programs/${programFileName}`, programFragment);
++        maps.push(programMap);
++        const errors = node.errors ?? [];
++        if (errors.length > 0) {
++          const errorFragment = getErrorPageFragment(node, scope);
++          const errorFileName = `${snakeCase(programName)}.dart`;
++          errorFiles.push(errorFileName);
++          let errorMap = createRenderMap();
++          errorMap = addToRenderMap(errorMap, `errors/${errorFileName}`, errorFragment);
++          maps.push(errorMap);
++        }
++        const categories = [];
++        if (accountFiles.length > 0) categories.push("accounts");
++        if (instructionFiles.length > 0) categories.push("instructions");
++        if (typeFiles.length > 0) categories.push("types");
++        if (pdaFiles.length > 0) categories.push("pdas");
++        if (errorFiles.length > 0) categories.push("errors");
++        if (programFiles.length > 0) categories.push("programs");
++        if (categories.length > 0) {
++          let rootMap = createRenderMap();
++          rootMap = addToRenderMap(
++            rootMap,
++            `${snakeCase(programName)}.dart`,
++            getRootIndexPageFragment(categories)
++          );
++          maps.push(rootMap);
++        }
++        return mergeRenderMaps(maps);
++      },
++      visitAccount(node, { self }) {
++        const fileName = `${snakeCase(node.name)}.dart`;
++        const frag = getAccountPageFragment(node, scope);
++        let map = createRenderMap();
++        map = addToRenderMap(map, `accounts/${fileName}`, frag);
++        return map;
++      },
++      visitDefinedType(node, { self }) {
++        const fileName = `${snakeCase(node.name)}.dart`;
++        const frag = getTypePageFragment(node, scope);
++        let map = createRenderMap();
++        map = addToRenderMap(map, `types/${fileName}`, frag);
++        return map;
++      },
++      visitInstruction(node, { self }) {
++        const fileName = `${snakeCase(node.name)}.dart`;
++        const frag = getInstructionPageFragment(node, scope);
++        let map = createRenderMap();
++        map = addToRenderMap(map, `instructions/${fileName}`, frag);
++        return map;
++      },
++      visitPda(node, { self }) {
++        const fileName = `${snakeCase(node.name)}.dart`;
++        const frag = getPdaPageFragment(node, scope);
++        let map = createRenderMap();
++        map = addToRenderMap(map, `pdas/${fileName}`, frag);
++        return map;
++      }
++    }),
++    (v) => recordNodeStackVisitor(v, stack),
++    (v) => recordLinkablesOnFirstVisitVisitor(v, linkables)
++  );
++}
++function getSharedCategoryIndexMaps(renderMap) {
++  const categories = /* @__PURE__ */ new Map();
++  const categoryIndexNames = {
++    accounts: "accounts.dart",
++    instructions: "instructions.dart",
++    types: "types.dart",
++    pdas: "pdas.dart",
++    errors: "errors.dart",
++    programs: "programs.dart"
++  };
++  for (const renderPath of renderMap.keys()) {
++    const match = renderPath.match(
++      /^(accounts|instructions|types|pdas|errors|programs)\/([^/]+\.dart)$/
++    );
++    if (!match) continue;
++    const [, category, fileName] = match;
++    if (fileName === categoryIndexNames[category]) continue;
++    if (!categories.has(category)) {
++      categories.set(category, /* @__PURE__ */ new Set());
++    }
++    categories.get(category).add(fileName);
++  }
++  const maps = [];
++  for (const [category, files] of categories.entries()) {
++    const sortedFiles = [...files].sort();
++    let map = createRenderMap();
++    map = addToRenderMap(
++      map,
++      `${category}/${categoryIndexNames[category]}`,
++      getIndexPageFragment(sortedFiles)
++    );
++    maps.push(map);
++  }
++  return maps;
++}
++
++// src/visitors/renderVisitor.ts
++function renderVisitor(outputDir, options = {}) {
++  const {
++    deleteFolderBeforeRendering = true,
++    formatCode = false,
++    nameApi,
++    dependencyMap
++  } = options;
++  return rootNodeVisitor((root) => {
++    const normalizedRoot = normalizeRootNode(root);
++    if (deleteFolderBeforeRendering && existsSync(outputDir)) {
++      deleteDirectory(outputDir);
++    }
++    const renderMap = visit(
++      normalizedRoot,
++      getRenderMapVisitor({ nameApi, dependencyMap })
++    );
++    const typePathMap = {};
++    for (const renderPath of renderMap.keys()) {
++      const match = renderPath.match(/^(?:.*\/)?types\/([a-z0-9_]+)\.dart$/);
++      if (match) {
++        typePathMap[`definedType:${match[1]}`] = renderPath;
++      }
++    }
++    for (const [filePath, frag] of renderMap.entries()) {
++      const fullPath = join(outputDir, filePath);
++      const dir = dirname(fullPath);
++      if (!existsSync(dir)) {
++        mkdirSync(dir, { recursive: true });
++      }
++      const fileDir = dirname(filePath);
++      const internalMap = {};
++      for (const [key, typePath] of Object.entries(typePathMap)) {
++        if (typePath === filePath) {
++          internalMap[key] = "";
++          continue;
++        }
++        let rel = posix.relative(fileDir, typePath);
++        if (!rel.startsWith(".")) {
++          rel = `./${rel}`;
++        }
++        internalMap[key] = rel;
++      }
++      const content = resolveFragmentContent(frag, dependencyMap ?? {}, internalMap);
++      writeFileSync(fullPath, content, "utf-8");
++    }
++    if (formatCode) {
++      formatDartDirectory(outputDir);
++    }
++  });
++}
++function resolveFragmentContent(frag, dependencyMap, internalMap = {}) {
++  const { content, imports } = frag;
++  const importStr = imports.toString({
++    ...internalMap,
++    ...dependencyMap
++  });
++  if (!importStr) {
++    return content + "\n";
++  }
++  const lines = content.split("\n");
++  const headerLines = [];
++  let restIndex = 0;
++  for (let i = 0; i < lines.length; i++) {
++    if (lines[i].startsWith("//") || lines[i].trim() === "") {
++      headerLines.push(lines[i]);
++      restIndex = i + 1;
++    } else {
++      break;
++    }
++  }
++  const header = headerLines.join("\n");
++  const rest = lines.slice(restIndex).join("\n");
++  const cleanContent = cleanFragmentContent(rest);
++  return `${header}
++
++${importStr}
++
++${cleanContent}
++`;
++}
++function cleanFragmentContent(content) {
++  const lines = content.split("\n");
++  const cleanLines = lines.filter((line) => {
++    const trimmed = line.trim();
++    if (/^[a-zA-Z][a-zA-Z0-9]*$/.test(trimmed)) {
++      return false;
++    }
++    return true;
++  });
++  return cleanLines.join("\n");
++}
++
++// src/index.ts
++var src_default = renderVisitor;
++
++export { DART_EXTERNAL_PACKAGE_MAP, DartImportMap, createDartNameApi, src_default as default, getRenderMapVisitor, getTypeManifestVisitor, normalizeRootNode, renderVisitor };
++//# sourceMappingURL=index.node.js.map
++//# sourceMappingURL=index.node.js.map

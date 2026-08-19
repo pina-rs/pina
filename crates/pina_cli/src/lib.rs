@@ -5,6 +5,7 @@ pub mod init;
 pub mod ir;
 pub mod parse;
 
+mod dart_client;
 mod js_client;
 
 use std::path::Path;

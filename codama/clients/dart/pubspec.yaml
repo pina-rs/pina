@@ -1,0 +1,46 @@
+name: pina_codama_clients
+description: Generated Dart clients and byte-level contracts for Pina examples.
+publish_to: none
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+
+dependencies:
+  meta: ^1.16.0
+  solana_kit_accounts: ^0.7.0
+  solana_kit_addresses: ^0.7.0
+  solana_kit_codecs_core: ^0.7.0
+  solana_kit_codecs_data_structures: ^0.7.0
+  solana_kit_codecs_numbers: ^0.7.0
+  solana_kit_codecs_strings: ^0.7.0
+  solana_kit_errors: ^0.7.0
+  solana_kit_instructions: ^0.7.0
+  solana_kit_rpc_types: ^0.7.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.0
+
+# Temporary immutable overrides for unreleased Solana Kit codec fixes. Remove
+# these Git pins after PRs #216, #217, and #218 are available from pub.dev.
+dependency_overrides:
+  solana_kit_codecs_core:
+    git:
+      url: https://github.com/openbudgetfun/solana_kit.git
+      ref: 53efa0869bd63efdc40b87e9ccc997ec500fe315
+      path: packages/solana_kit_codecs_core
+  solana_kit_codecs_data_structures:
+    git:
+      url: https://github.com/openbudgetfun/solana_kit.git
+      ref: 53efa0869bd63efdc40b87e9ccc997ec500fe315
+      path: packages/solana_kit_codecs_data_structures
+  solana_kit_codecs_strings:
+    git:
+      url: https://github.com/openbudgetfun/solana_kit.git
+      ref: 53efa0869bd63efdc40b87e9ccc997ec500fe315
+      path: packages/solana_kit_codecs_strings
+  solana_kit_errors:
+    git:
+      url: https://github.com/openbudgetfun/solana_kit.git
+      ref: 53efa0869bd63efdc40b87e9ccc997ec500fe315
+      path: packages/solana_kit_errors
