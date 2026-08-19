@@ -7,9 +7,9 @@
 		"test:types": "tsc --noEmit -p tsconfig.json"
 	},
 	"devDependencies": {
-		"@solana/kit": "^6.10.0",
+		"@solana/kit": "^7.1.0",
 		"@solana/surfpool": "^1.5.0",
-		"@types/node": "^25.5.0",
-		"typescript": "^5.9.3"
+		"@types/node": "^26.2.0",
+		"typescript": "^7.0.2"
 	}
 }

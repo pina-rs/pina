@@ -6,6 +6,6 @@
 		"test": "node validate-idls.mjs"
 	},
 	"devDependencies": {
-		"codama": "^1.10.0"
+		"codama": "^1.10.1"
 	}
 }
