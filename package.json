@@ -12,14 +12,14 @@
 	},
 	"dependencies": {
 		"@codama/renderers-js": "^2.3.1",
-		"codama": "^1.10.0",
+		"codama": "^1.10.1",
 		"codama-renderers-dart": "0.5.1"
 	},
 	"devDependencies": {
 		"@solana/surfpool": "^1.5.0",
-		"@solana/kit": "^6.10.0",
-		"@solana/program-client-core": "^6.10.0",
-		"@types/node": "^25.5.0",
-		"typescript": "^5.9.3"
+		"@solana/kit": "^7.1.0",
+		"@solana/program-client-core": "^7.1.0",
+		"@types/node": "^26.2.0",
+		"typescript": "^7.0.2"
 	}
 }
