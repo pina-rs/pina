@@ -13,15 +13,31 @@ if [[ "$MODE" != "write" && "$MODE" != "--check" ]]; then
 	exit 2
 fi
 
-if ! command -v taplo >/dev/null 2>&1; then
-	echo "taplo is required to preserve the Pina development dependency range." >&2
-	exit 1
-fi
+read_manifest_values() {
+	cargo metadata \
+		--format-version 1 \
+		--locked \
+		--manifest-path "$MANIFEST" \
+		--no-deps |
+		jq -er '
+			[
+				.packages[]
+				| select(.name == "pina_macros")
+				| .version,
+				  (.dependencies[] | select(.name == "pina" and .kind == "dev") | .req)
+			]
+			| select(length == 2)
+			| .[]
+		'
+}
 
-if ! current_range="$(taplo get --file-path "$MANIFEST" --strip-newline workspace.dependencies.pina.version 2>/dev/null)"; then
-	echo "Cargo.toml must define workspace.dependencies.pina.version." >&2
+if ! manifest_values="$(read_manifest_values)"; then
+	echo "Cargo metadata must contain exactly one pina_macros package and its Pina development dependency." >&2
 	exit 1
 fi
+workspace_version="$(sed -n '1p' <<<"$manifest_values")"
+readonly workspace_version
+current_range="$(sed -n '2p' <<<"$manifest_values")"
 if [[ "$current_range" == "$EXPECTED_RANGE" ]]; then
 	exit 0
 fi
@@ -31,8 +47,7 @@ if [[ "$MODE" == "--check" ]]; then
 	exit 1
 fi
 
-workspace_version="$(taplo get --file-path "$MANIFEST" --strip-newline workspace.package.version)"
-if [[ "$current_range" != "$workspace_version" ]]; then
+if [[ "$current_range" != "^$workspace_version" ]]; then
 	echo "Refusing to replace unexpected Pina dependency range '$current_range'." >&2
 	exit 1
 fi
@@ -43,7 +58,7 @@ if [[ "$matching_lines" != "1" ]]; then
 	exit 1
 fi
 
-PINA_CURRENT_RANGE="$current_range" \
+PINA_CURRENT_RANGE="$workspace_version" \
 	PINA_EXPECTED_RANGE="$EXPECTED_RANGE" \
 	perl -pi -e '
 		if (/^pina = /) {
@@ -52,7 +67,11 @@ PINA_CURRENT_RANGE="$current_range" \
 		}
 	' "$MANIFEST"
 
-updated_range="$(taplo get --file-path "$MANIFEST" --strip-newline workspace.dependencies.pina.version)"
+if ! manifest_values="$(read_manifest_values)"; then
+	echo "Cargo metadata became invalid after restoring the Pina development dependency range." >&2
+	exit 1
+fi
+updated_range="$(sed -n '2p' <<<"$manifest_values")"
 if [[ "$updated_range" != "$EXPECTED_RANGE" ]]; then
 	echo "Failed to restore the Pina development dependency range." >&2
 	exit 1
