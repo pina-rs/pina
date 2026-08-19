@@ -118,7 +118,7 @@ jobs:
   tag:
     if: github.repository_owner == 'pina-rs' && needs.create.outputs.is_release_commit == 'true'
     needs: create
-    timeout-minutes: 10
+    timeout-minutes: 20
     runs-on: ubuntu-24.04
     permissions:
       actions: write
