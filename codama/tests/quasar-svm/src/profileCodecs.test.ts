@@ -1,4 +1,10 @@
-import { getU16Decoder, getU8Decoder, isNone, isSome } from "@solana/kit";
+import {
+	getU16Decoder,
+	getU8Decoder,
+	isNone,
+	isSome,
+	type ReadonlyUint8Array,
+} from "@solana/kit";
 import { describe, expect, test } from "vitest";
 
 import {
@@ -174,7 +180,7 @@ function boundedText(value: string, capacity: number): Uint8Array {
 	return bytes;
 }
 
-function readBoundedText(bytes: Uint8Array): string {
+function readBoundedText(bytes: ReadonlyUint8Array): string {
 	const length = bytes[0] ?? 0;
 	if (length > bytes.length - 1) {
 		throw new RangeError("bounded text length exceeds capacity");
@@ -200,7 +206,7 @@ function boundedTags(values: readonly bigint[]): Uint8Array {
 	return bytes;
 }
 
-function readBoundedTags(bytes: Uint8Array): bigint[] {
+function readBoundedTags(bytes: ReadonlyUint8Array): bigint[] {
 	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 	const length = view.getUint16(0, true);
 	if (length > 8) {
