@@ -999,3 +999,25 @@ fn rejects_symlinked_generated_directory() {
 		"keep"
 	);
 }
+
+#[cfg(unix)]
+#[test]
+fn rejects_dangling_symlinked_generated_directory() {
+	use std::os::unix::fs::symlink;
+
+	let root = load_fixture_root("counter_program");
+	let output_dir = unique_temp_dir("pina-codama-render-dangling-symlink");
+	let crate_dir = output_dir.join("client");
+	let dangling_target = output_dir.join("external/does-not-exist");
+	fs::create_dir_all(crate_dir.join("src"))
+		.unwrap_or_else(|error| panic!("failed to create crate directory: {error}"));
+	symlink(&dangling_target, crate_dir.join("src/generated"))
+		.unwrap_or_else(|error| panic!("failed to create dangling symlink: {error}"));
+
+	let error = render_root_node(&root, &crate_dir, &RenderConfig::default())
+		.err()
+		.unwrap_or_else(|| panic!("expected dangling symlinked output path to fail"));
+
+	assert!(matches!(error, RenderError::UnsafeOutputPath { .. }));
+	assert!(!dangling_target.exists());
+}

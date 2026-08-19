@@ -36,7 +36,7 @@ pub(crate) fn render_errors_page(program: &ProgramNode) -> String {
 		}
 		lines.push(format!(
 			"\t#[error({})]",
-			rust_string_literal(&error.message)
+			error_format_literal(&error.message)
 		));
 		lines.push(format!(
 			"\t{} = 0x{:X},",
@@ -59,4 +59,32 @@ pub(crate) fn render_errors_page(program: &ProgramNode) -> String {
 	lines.push("}".to_string());
 
 	lines.join("\n")
+}
+
+fn error_format_literal(message: &str) -> String {
+	let escaped = message.replace('{', "{{").replace('}', "}}");
+	rust_string_literal(&escaped)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::error_format_literal;
+
+	#[derive(Debug, thiserror::Error)]
+	enum BraceError {
+		#[error("invalid {{key}} and unexpected }}")]
+		Invalid,
+	}
+
+	#[test]
+	fn escapes_thiserror_format_braces() {
+		assert_eq!(
+			error_format_literal("invalid {key} and unexpected }"),
+			r#""invalid {{key}} and unexpected }}""#
+		);
+		assert_eq!(
+			BraceError::Invalid.to_string(),
+			"invalid {key} and unexpected }"
+		);
+	}
 }

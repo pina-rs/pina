@@ -191,19 +191,21 @@ fn validate_generated_dir(crate_dir: &Path, generated_folder: &Path) -> Result<P
 			unreachable!("components were validated above");
 		};
 		current.push(component);
-		if current.exists() {
-			let metadata = fs::symlink_metadata(&current).map_err(|source| {
-				RenderError::ReadFile {
+		let metadata = match fs::symlink_metadata(&current) {
+			Ok(metadata) => metadata,
+			Err(source) if source.kind() == std::io::ErrorKind::NotFound => continue,
+			Err(source) => {
+				return Err(RenderError::ReadFile {
 					path: current.clone(),
 					source,
-				}
-			})?;
-			if metadata.file_type().is_symlink() {
-				return Err(RenderError::UnsafeOutputPath {
-					path: current,
-					reason: "generated output path must not traverse symbolic links".to_string(),
 				});
 			}
+		};
+		if metadata.file_type().is_symlink() {
+			return Err(RenderError::UnsafeOutputPath {
+				path: current,
+				reason: "generated output path must not traverse symbolic links".to_string(),
+			});
 		}
 	}
 
