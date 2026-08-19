@@ -154,7 +154,7 @@ trusted_publishing = { enabled = true, repository = "pina-rs/pina", workflow = "
 [changesets.affected]
 enabled = true
 required = true
-skip_labels = ["release", "dependencies"]
+skip_labels = ["release"]
 comment_on_failure = true
 changed_paths = ["codecov.yml"]
 ignored_paths = [
