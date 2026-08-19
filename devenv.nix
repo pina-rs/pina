@@ -361,6 +361,15 @@ in
       description = "Run workspace tests and compile the standalone fuzz targets.";
       binary = "bash";
     };
+    "test:fuzz:smoke" = {
+      exec = ''
+        set -euo pipefail
+        export PATH=${pkgs.cargo-fuzz}/bin:"$PATH"
+        ${pkgs.bash}/bin/bash ${lib.escapeShellArg "${currentDir}/scripts/run-fuzz-smoke.sh"}
+      '';
+      description = "Replay the committed fuzz corpus and run every target for a bounded duration.";
+      binary = "bash";
+    };
     "test:miri" = {
       exec = ''
         set -euo pipefail
@@ -968,12 +977,21 @@ in
       description = "Run RustSec advisory audit for Cargo.lock.";
       binary = "bash";
     };
+    "security:npm-audit" = {
+      exec = ''
+        set -euo pipefail
+        ${pkgs.pnpm}/bin/pnpm --dir ${lib.escapeShellArg currentDir} audit
+      '';
+      description = "Fail on moderate-or-higher advisories in the pnpm lockfile.";
+      binary = "bash";
+    };
     "verify:security" = {
       exec = ''
         set -euo pipefail
         security:dylint
         security:deny
         security:audit
+        security:npm-audit
       '';
       description = "Run all custom and dependency security checks.";
       binary = "bash";
