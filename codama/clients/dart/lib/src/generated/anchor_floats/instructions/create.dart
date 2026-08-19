@@ -53,12 +53,13 @@ Decoder<CreateInstructionData> getCreateInstructionDataDecoder() {
     });
   }
 
-  (CreateInstructionData, int) readExact(Uint8List bytes, int offset) {
+  (CreateInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
+
     return (
       CreateInstructionData(
         dataF32: map['dataF32']! as int,
@@ -77,12 +78,12 @@ Decoder<CreateInstructionData> getCreateInstructionDataDecoder() {
           if (bytesLength != structDecoder.fixedSize) {
             throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
           }
-          return readExact(bytes, offset);
+          return readTopLevel(bytes, offset);
         },
       ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<CreateInstructionData>(
-        read: readExact,
+        read: readTopLevel,
         maxSize: structDecoder.maxSize,
       ),
   };

@@ -46,7 +46,7 @@ getAllowsDuplicateMutableInstructionDataDecoder() {
     });
   }
 
-  (AllowsDuplicateMutableInstructionData, int) readExact(
+  (AllowsDuplicateMutableInstructionData, int) readTopLevel(
     Uint8List bytes,
     int offset,
   ) {
@@ -55,6 +55,7 @@ getAllowsDuplicateMutableInstructionDataDecoder() {
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
+
     return (AllowsDuplicateMutableInstructionData(), newOffset);
   }
 
@@ -67,12 +68,12 @@ getAllowsDuplicateMutableInstructionDataDecoder() {
           if (bytesLength != structDecoder.fixedSize) {
             throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
           }
-          return readExact(bytes, offset);
+          return readTopLevel(bytes, offset);
         },
       ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<AllowsDuplicateMutableInstructionData>(
-        read: readExact,
+        read: readTopLevel,
         maxSize: structDecoder.maxSize,
       ),
   };

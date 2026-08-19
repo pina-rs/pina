@@ -48,12 +48,13 @@ Decoder<CpiTransferInstructionData> getCpiTransferInstructionDataDecoder() {
     });
   }
 
-  (CpiTransferInstructionData, int) readExact(Uint8List bytes, int offset) {
+  (CpiTransferInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
+
     return (
       CpiTransferInstructionData(amount: map['amount']! as BigInt),
       newOffset,
@@ -69,12 +70,12 @@ Decoder<CpiTransferInstructionData> getCpiTransferInstructionDataDecoder() {
           if (bytesLength != structDecoder.fixedSize) {
             throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
           }
-          return readExact(bytes, offset);
+          return readTopLevel(bytes, offset);
         },
       ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<CpiTransferInstructionData>(
-        read: readExact,
+        read: readTopLevel,
         maxSize: structDecoder.maxSize,
       ),
   };

@@ -46,7 +46,7 @@ getFailsDuplicateMutableInstructionDataDecoder() {
     });
   }
 
-  (FailsDuplicateMutableInstructionData, int) readExact(
+  (FailsDuplicateMutableInstructionData, int) readTopLevel(
     Uint8List bytes,
     int offset,
   ) {
@@ -55,6 +55,7 @@ getFailsDuplicateMutableInstructionDataDecoder() {
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
+
     return (FailsDuplicateMutableInstructionData(), newOffset);
   }
 
@@ -67,12 +68,12 @@ getFailsDuplicateMutableInstructionDataDecoder() {
           if (bytesLength != structDecoder.fixedSize) {
             throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
           }
-          return readExact(bytes, offset);
+          return readTopLevel(bytes, offset);
         },
       ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<FailsDuplicateMutableInstructionData>(
-        read: readExact,
+        read: readTopLevel,
         maxSize: structDecoder.maxSize,
       ),
   };

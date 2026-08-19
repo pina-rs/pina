@@ -11,7 +11,7 @@ overrides:
   ws@>=8.0.0 <8.21.0: 8.21.0
 
 patchedDependencies:
-  codama-renderers-dart@0.5.0: c56dc909b364c3e28c5b256f1b20aa11002dd6dc5862db607b86023eaa8167b5
+  codama-renderers-dart@0.5.0: d8ae66d39eeb6f9150743c8d9c27aa8f4d6a4ce78239689bd2a715c91dc184c4
 
 importers:
 
@@ -25,7 +25,7 @@ importers:
         version: 1.10.0
       codama-renderers-dart:
         specifier: 0.5.0
-        version: 0.5.0(patch_hash=c56dc909b364c3e28c5b256f1b20aa11002dd6dc5862db607b86023eaa8167b5)
+        version: 0.5.0(patch_hash=d8ae66d39eeb6f9150743c8d9c27aa8f4d6a4ce78239689bd2a715c91dc184c4)
     devDependencies:
       '@solana/kit':
         specifier: ^6.10.0
@@ -3818,7 +3818,7 @@ snapshots:
     dependencies:
       readdirp: 4.1.2
 
-  codama-renderers-dart@0.5.0(patch_hash=c56dc909b364c3e28c5b256f1b20aa11002dd6dc5862db607b86023eaa8167b5):
+  codama-renderers-dart@0.5.0(patch_hash=d8ae66d39eeb6f9150743c8d9c27aa8f4d6a4ce78239689bd2a715c91dc184c4):
     dependencies:
       '@codama/errors': 1.10.0
       '@codama/nodes': 1.10.0

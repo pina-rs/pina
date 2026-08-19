@@ -48,12 +48,13 @@ Decoder<RemoveTagInstructionData> getRemoveTagInstructionDataDecoder() {
     });
   }
 
-  (RemoveTagInstructionData, int) readExact(Uint8List bytes, int offset) {
+  (RemoveTagInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(3)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
+
     return (
       RemoveTagInstructionData(index: map['index']! as BigInt),
       newOffset,
@@ -69,12 +70,12 @@ Decoder<RemoveTagInstructionData> getRemoveTagInstructionDataDecoder() {
           if (bytesLength != structDecoder.fixedSize) {
             throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
           }
-          return readExact(bytes, offset);
+          return readTopLevel(bytes, offset);
         },
       ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<RemoveTagInstructionData>(
-        read: readExact,
+        read: readTopLevel,
         maxSize: structDecoder.maxSize,
       ),
   };

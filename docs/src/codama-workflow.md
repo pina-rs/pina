@@ -48,7 +48,7 @@ The generated Dart package lives in `codama/clients/dart`. It exposes one packag
 The Dart integration currently consumes unreleased Solana Kit fixes. The npm renderer is pinned to `codama-renderers-dart@0.5.0` and patched through pnpm with a deterministic Node ESM bundle composed from these exact upstream implementation commits:
 
 - schema normalization and package exports: [openbudgetfun/solana_kit#214](https://github.com/openbudgetfun/solana_kit/pull/214) at `54b49254584758fcc93a5b5b0b99a90100b5e9aa`
-- discriminator enforcement and exact top-level consumption: [openbudgetfun/solana_kit#215](https://github.com/openbudgetfun/solana_kit/pull/215) at `42a1e2cca3a93454693122b3c1d8b10c6fafebea`
+- discriminator enforcement, exact instruction decoding, and capacity-aware account decoding: [openbudgetfun/solana_kit#215](https://github.com/openbudgetfun/solana_kit/pull/215) at `823c408c00e15b93157ca69778231ef56c1958cf`
 - fixed-capacity overflow rejection: [openbudgetfun/solana_kit#216](https://github.com/openbudgetfun/solana_kit/pull/216) at `fc48fe148cfd0887dae1601075f83960b6db0538`
 - wide enum discriminators: [openbudgetfun/solana_kit#219](https://github.com/openbudgetfun/solana_kit/pull/219) at `5cbe66cd7f4bea49a81509b3abe97c7a91b4bb9a`
 

@@ -44,12 +44,13 @@ Decoder<TestEventCpiInstructionData> getTestEventCpiInstructionDataDecoder() {
     });
   }
 
-  (TestEventCpiInstructionData, int) readExact(Uint8List bytes, int offset) {
+  (TestEventCpiInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
+
     return (TestEventCpiInstructionData(), newOffset);
   }
 
@@ -62,12 +63,12 @@ Decoder<TestEventCpiInstructionData> getTestEventCpiInstructionDataDecoder() {
           if (bytesLength != structDecoder.fixedSize) {
             throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
           }
-          return readExact(bytes, offset);
+          return readTopLevel(bytes, offset);
         },
       ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<TestEventCpiInstructionData>(
-        read: readExact,
+        read: readTopLevel,
         maxSize: structDecoder.maxSize,
       ),
   };

@@ -53,12 +53,13 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
     });
   }
 
-  (InitializeInstructionData, int) readExact(Uint8List bytes, int offset) {
+  (InitializeInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
+
     return (
       InitializeInstructionData(
         bump: map['bump']! as int,
@@ -77,12 +78,12 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
           if (bytesLength != structDecoder.fixedSize) {
             throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
           }
-          return readExact(bytes, offset);
+          return readTopLevel(bytes, offset);
         },
       ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<InitializeInstructionData>(
-        read: readExact,
+        read: readTopLevel,
         maxSize: structDecoder.maxSize,
       ),
   };

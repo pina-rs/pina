@@ -42,12 +42,13 @@ Decoder<RequireGteInstructionData> getRequireGteInstructionDataDecoder() {
     });
   }
 
-  (RequireGteInstructionData, int) readExact(Uint8List bytes, int offset) {
+  (RequireGteInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(6)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
+
     return (RequireGteInstructionData(), newOffset);
   }
 
@@ -60,12 +61,12 @@ Decoder<RequireGteInstructionData> getRequireGteInstructionDataDecoder() {
           if (bytesLength != structDecoder.fixedSize) {
             throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
           }
-          return readExact(bytes, offset);
+          return readTopLevel(bytes, offset);
         },
       ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<RequireGteInstructionData>(
-        read: readExact,
+        read: readTopLevel,
         maxSize: structDecoder.maxSize,
       ),
   };

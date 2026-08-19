@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:pina_codama_clients/anchor_realloc.dart'
+    show Sample, getSampleDecoder, getSampleEncoder;
 import 'package:pina_codama_clients/profile_program.dart';
 import 'package:solana_kit_accounts/solana_kit_accounts.dart';
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -166,13 +168,35 @@ void main() {
       expect(decoded.favoriteTag, isNull);
     });
 
-    test('requires exact account data length', () {
+    test('rejects truncation and permits trailing account capacity', () {
       final bytes = getProfileStateEncoder().encode(_profile());
       final account = _encodedProfile(bytes);
       final oversized = _encodedProfile(Uint8List.fromList([...bytes, 0]));
+      final truncated = _encodedProfile(
+        Uint8List.sublistView(bytes, 0, bytes.length - 1),
+      );
 
       expect(decodeProfileState(account).data.discriminator, 1);
-      expect(() => decodeProfileState(oversized), throwsA(isA<SolanaError>()));
+      expect(decodeProfileState(oversized).data.discriminator, 1);
+      expect(() => decodeProfileState(truncated), throwsA(isA<SolanaError>()));
+    });
+  });
+
+  group('resizable account codec', () {
+    test('decodes a fixed header with trailing resized capacity', () {
+      final canonical = getSampleEncoder().encode(
+        const Sample(bump: 254, authority: systemAddress),
+      );
+      final resized = Uint8List.fromList([
+        ...canonical,
+        ...List<int>.filled(128, 0xa5),
+      ]);
+
+      final decoded = getSampleDecoder().decode(resized);
+
+      expect(decoded.discriminator, 1);
+      expect(decoded.bump, 254);
+      expect(decoded.authority, systemAddress);
     });
   });
 

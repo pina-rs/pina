@@ -48,12 +48,13 @@ Decoder<ReallocInstructionData> getReallocInstructionDataDecoder() {
     });
   }
 
-  (ReallocInstructionData, int) readExact(Uint8List bytes, int offset) {
+  (ReallocInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
+
     return (ReallocInstructionData(len: map['len']! as int), newOffset);
   }
 
@@ -66,12 +67,12 @@ Decoder<ReallocInstructionData> getReallocInstructionDataDecoder() {
           if (bytesLength != structDecoder.fixedSize) {
             throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
           }
-          return readExact(bytes, offset);
+          return readTopLevel(bytes, offset);
         },
       ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<ReallocInstructionData>(
-        read: readExact,
+        read: readTopLevel,
         maxSize: structDecoder.maxSize,
       ),
   };
@@ -98,7 +99,7 @@ Instruction getReallocInstruction({
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: authority, role: AccountRole.readonlySigner),
+      AccountMeta(address: authority, role: AccountRole.writableSigner),
       AccountMeta(address: sample, role: AccountRole.writable),
       AccountMeta(address: systemProgram, role: AccountRole.readonly),
     ],

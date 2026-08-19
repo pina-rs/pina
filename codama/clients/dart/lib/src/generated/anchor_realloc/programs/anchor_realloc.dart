@@ -16,11 +16,17 @@ const anchorReallocProgramAddress = Address(
   'Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS',
 );
 
+/// Known accounts for the AnchorRealloc program.
+enum AnchorReallocAccount { sample }
+
 /// Known instructions for the AnchorRealloc program.
-enum AnchorReallocInstruction { realloc, realloc2 }
+enum AnchorReallocInstruction { initialize, realloc, realloc2 }
 
 /// Identifies the type of a AnchorRealloc instruction.
 AnchorReallocInstruction identifyAnchorReallocInstruction(Uint8List data) {
+  if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+    return AnchorReallocInstruction.initialize;
+  }
   if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return AnchorReallocInstruction.realloc;
   }
@@ -39,6 +45,14 @@ sealed class ParsedAnchorReallocInstruction {
   const ParsedAnchorReallocInstruction(this.instructionType);
 
   final AnchorReallocInstruction instructionType;
+}
+
+/// A parsed Initialize instruction.
+final class ParsedInitialize extends ParsedAnchorReallocInstruction {
+  const ParsedInitialize({required this.data})
+    : super(AnchorReallocInstruction.initialize);
+
+  final InitializeInstructionData data;
 }
 
 /// A parsed Realloc instruction.
@@ -64,6 +78,9 @@ ParsedAnchorReallocInstruction parseAnchorReallocInstruction(
   return switch (identifyAnchorReallocInstruction(
     instruction.data ?? Uint8List(0),
   )) {
+    AnchorReallocInstruction.initialize => ParsedInitialize(
+      data: parseInitializeInstruction(instruction),
+    ),
     AnchorReallocInstruction.realloc => ParsedRealloc(
       data: parseReallocInstruction(instruction),
     ),

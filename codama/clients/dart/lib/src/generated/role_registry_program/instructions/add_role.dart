@@ -60,12 +60,13 @@ Decoder<AddRoleInstructionData> getAddRoleInstructionDataDecoder() {
     });
   }
 
-  (AddRoleInstructionData, int) readExact(Uint8List bytes, int offset) {
+  (AddRoleInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
+
     return (
       AddRoleInstructionData(
         roleId: map['roleId']! as BigInt,
@@ -85,12 +86,12 @@ Decoder<AddRoleInstructionData> getAddRoleInstructionDataDecoder() {
           if (bytesLength != structDecoder.fixedSize) {
             throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
           }
-          return readExact(bytes, offset);
+          return readTopLevel(bytes, offset);
         },
       ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<AddRoleInstructionData>(
-        read: readExact,
+        read: readTopLevel,
         maxSize: structDecoder.maxSize,
       ),
   };

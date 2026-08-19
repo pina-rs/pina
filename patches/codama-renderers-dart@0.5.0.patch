@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..52aade044d5d72ed0aa1a09c3842fbc80a3a5914
 --- /dev/null
 +++ b/dist/index.node.mjs
-@@ -0,0 +1,2760 @@
+@@ -0,0 +1,2768 @@
 +import { existsSync, mkdirSync, writeFileSync } from 'fs';
 +import { join, dirname, posix } from 'path';
 +import { staticVisitor, extendVisitor, visit, NodeStack, LinkableDictionary, pipe, recordNodeStackVisitor, recordLinkablesOnFirstVisitVisitor, rootNodeVisitor } from '@codama/visitors-core';
@@ -454,14 +454,20 @@ index 0000000000000000000000000000000000000000..52aade044d5d72ed0aa1a09c3842fbc8
 +}
 +
 +// src/utils/exactDecoder.ts
-+function getExactDecoderFragment({
++function getTopLevelDecoderFragment({
 +  typeName,
 +  description,
 +  discriminatorValidation,
-+  fromMapFields
++  fromMapFields,
++  requireExactConsumption
 +}) {
 +  const validation = discriminatorValidation.content ? `    ${discriminatorValidation.content.replaceAll("\n", "\n    ")}
 +` : "";
++  const consumptionCheck = requireExactConsumption ? `    if (newOffset != bytes.length) {
++      throwInvalidByteLength(newOffset - offset, bytes.length - offset);
++    }
++` : "";
++  const fixedSizeCheck = requireExactConsumption ? "bytesLength != structDecoder.fixedSize" : "bytesLength < structDecoder.fixedSize";
 +  const result = fragment`  Never throwInvalidByteLength(int expected, int bytesLength) {
 +    throw ${use("SolanaError", "solanaErrors")}(
 +      ${use("SolanaErrorCode", "solanaErrors")}.codecsInvalidByteLength,
@@ -473,11 +479,9 @@ index 0000000000000000000000000000000000000000..52aade044d5d72ed0aa1a09c3842fbc8
 +    );
 +  }
 +
-+  (${fragmentFromString(typeName)}, int) readExact(Uint8List bytes, int offset) {
++  (${fragmentFromString(typeName)}, int) readTopLevel(Uint8List bytes, int offset) {
 +${fragmentFromString(validation)}    final (map, newOffset) = structDecoder.read(bytes, offset);
-+    if (newOffset != bytes.length) {
-+      throwInvalidByteLength(newOffset - offset, bytes.length - offset);
-+    }
++${fragmentFromString(consumptionCheck)}
 +    return (
 +      ${fragmentFromString(typeName)}(
 +${fragmentFromString(fromMapFields)}
@@ -492,15 +496,15 @@ index 0000000000000000000000000000000000000000..52aade044d5d72ed0aa1a09c3842fbc8
 +        fixedSize: structDecoder.fixedSize,
 +        read: (bytes, offset) {
 +          final bytesLength = bytes.length - offset;
-+          if (bytesLength != structDecoder.fixedSize) {
++          if (${fragmentFromString(fixedSizeCheck)}) {
 +            throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
 +          }
-+          return readExact(bytes, offset);
++          return readTopLevel(bytes, offset);
 +        },
 +      ),
 +    ${use("VariableSizeDecoder", "solanaCodecsCore")}<Map<String, Object?>>() =>
 +      ${use("VariableSizeDecoder", "solanaCodecsCore")}<${fragmentFromString(typeName)}>(
-+        read: readExact,
++        read: readTopLevel,
 +        maxSize: structDecoder.maxSize,
 +      ),
 +  };`;
@@ -1309,11 +1313,14 @@ index 0000000000000000000000000000000000000000..52aade044d5d72ed0aa1a09c3842fbc8
 +    node,
 +    scope
 +  );
-+  const exactDecoder = getExactDecoderFragment({
++  const topLevelDecoder = getTopLevelDecoderFragment({
 +    typeName,
 +    description: `${name} account decoder`,
 +    discriminatorValidation,
-+    fromMapFields
++    fromMapFields,
++    requireExactConsumption: (node.discriminators ?? []).some(
++      (discriminator) => discriminator.kind === "sizeDiscriminatorNode"
++    )
 +  });
 +  const parts = [
 +    fragment`// Auto-generated. Do not edit.
@@ -1374,7 +1381,7 @@ index 0000000000000000000000000000000000000000..52aade044d5d72ed0aa1a09c3842fbc8
 +${fragmentFromString(decFields)}
 +  ]);
 +
-+${exactDecoder}
++${topLevelDecoder}
 +}
 +
 +Codec<${fragmentFromString(typeName)}, ${fragmentFromString(typeName)}> ${fragmentFromString(codecName)}() {
@@ -1625,11 +1632,12 @@ index 0000000000000000000000000000000000000000..52aade044d5d72ed0aa1a09c3842fbc8
 +    node,
 +    scope
 +  );
-+  const exactDecoder = getExactDecoderFragment({
++  const topLevelDecoder = getTopLevelDecoderFragment({
 +    typeName: dataClassName,
 +    description: `${name} instruction decoder`,
 +    discriminatorValidation,
-+    fromMapFields
++    fromMapFields,
++    requireExactConsumption: true
 +  });
 +  const parts = [
 +    fragment`// Auto-generated. Do not edit.
@@ -1677,7 +1685,7 @@ index 0000000000000000000000000000000000000000..52aade044d5d72ed0aa1a09c3842fbc8
 +${fragmentFromString(decFields)}
 +  ]);
 +
-+${exactDecoder}
++${topLevelDecoder}
 +}
 +
 +Codec<${fragmentFromString(dataClassName)}, ${fragmentFromString(dataClassName)}> ${fragmentFromString(dataCodecName)}() {
