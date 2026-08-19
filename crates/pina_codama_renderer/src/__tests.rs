@@ -917,6 +917,28 @@ fn refuses_to_delete_an_unmanaged_directory() {
 }
 
 #[test]
+fn refuses_to_delete_unmanaged_files_inside_a_generated_directory() {
+	let root = load_fixture_root("counter_program");
+	let crate_dir = unique_temp_dir("pina-codama-render-mixed-output");
+	render_root_node(&root, &crate_dir, &RenderConfig::default())
+		.unwrap_or_else(|error| panic!("initial render failed: {error}"));
+	let sentinel_path = crate_dir.join("src/generated/keep.txt");
+	fs::write(&sentinel_path, "user-authored")
+		.unwrap_or_else(|error| panic!("failed to write user file: {error}"));
+
+	let error = render_root_node(&root, &crate_dir, &RenderConfig::default())
+		.err()
+		.unwrap_or_else(|| panic!("expected mixed generated directory to be rejected"));
+
+	assert!(matches!(error, RenderError::UnsafeOutputPath { .. }));
+	assert_eq!(
+		fs::read_to_string(&sentinel_path)
+			.unwrap_or_else(|error| panic!("failed to read user file: {error}")),
+		"user-authored"
+	);
+}
+
+#[test]
 fn render_failure_preserves_last_known_good_output() {
 	let root = load_fixture_root("counter_program");
 	let crate_dir = unique_temp_dir("pina-codama-render-preserve");

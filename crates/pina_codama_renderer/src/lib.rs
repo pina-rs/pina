@@ -281,6 +281,59 @@ fn validate_existing_generated_dir(path: &Path, require_managed: bool) -> Result
 						.to_string(),
 				});
 			}
+
+			validate_renderer_managed_tree(path)?;
+		}
+	}
+
+	Ok(())
+}
+
+fn validate_renderer_managed_tree(path: &Path) -> Result<()> {
+	for entry in fs::read_dir(path).map_err(|source| {
+		RenderError::ReadFile {
+			path: path.to_path_buf(),
+			source,
+		}
+	})? {
+		let entry = entry.map_err(|source| {
+			RenderError::ReadFile {
+				path: path.to_path_buf(),
+				source,
+			}
+		})?;
+		let entry_path = entry.path();
+		let metadata = fs::symlink_metadata(&entry_path).map_err(|source| {
+			RenderError::ReadFile {
+				path: entry_path.clone(),
+				source,
+			}
+		})?;
+
+		if metadata.is_dir() {
+			validate_renderer_managed_tree(&entry_path)?;
+			continue;
+		}
+
+		if !metadata.is_file() {
+			return Err(RenderError::UnsafeOutputPath {
+				path: entry_path,
+				reason: "generated output tree contains an unmanaged entry".to_string(),
+			});
+		}
+
+		let source = fs::read_to_string(&entry_path).map_err(|source| {
+			RenderError::ReadFile {
+				path: entry_path.clone(),
+				source,
+			}
+		})?;
+		if !source.starts_with(GENERATED_HEADER) {
+			return Err(RenderError::UnsafeOutputPath {
+				path: entry_path,
+				reason: "refusing to delete a generated directory containing unmanaged files"
+					.to_string(),
+			});
 		}
 	}
 
