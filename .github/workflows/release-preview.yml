@@ -20,6 +20,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: setup
         uses: ./.github/actions/devenv
@@ -31,18 +32,56 @@ jobs:
           set -euo pipefail
           echo "## Release Preview" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          if ls .changeset/*.md 1>/dev/null 2>&1; then
-            echo "### Changesets found:" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            for f in .changeset/*.md; do
-              echo "--- $f ---" >> "$GITHUB_STEP_SUMMARY"
-              cat "$f" >> "$GITHUB_STEP_SUMMARY"
-              echo "" >> "$GITHUB_STEP_SUMMARY"
-            done
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "No changesets found in .changeset/" >> "$GITHUB_STEP_SUMMARY"
+          if ! ls .changeset/*.md 1>/dev/null 2>&1; then
+            release_record="$RUNNER_TEMP/release-record.json"
+            release_record_error="$RUNNER_TEMP/release-record-error.txt"
+
+            if ! monochange step release-record \
+              --from HEAD \
+              --format json \
+              > "$release_record" \
+              2> "$release_record_error"; then
+              echo "Failed to generate the release record." >&2
+              cat "$release_record_error" >&2
+              exit 1
+            fi
+
+            resolved_commit="$(jq -r '.resolved_commit // "<missing>"' "$release_record")"
+            record_commit="$(jq -r '.record_commit // "<missing>"' "$release_record")"
+            release_target_count="$(jq -r '.record.release_targets | length' "$release_record")"
+
+            if [[ "$resolved_commit" == "$record_commit" ]] &&
+              ((release_target_count > 0)); then
+              echo "### Prepared release record" >> "$GITHUB_STEP_SUMMARY"
+              echo '```json' >> "$GITHUB_STEP_SUMMARY"
+              jq '{
+                commit: .record_commit,
+                versions: .record.versions,
+                released_packages: .record.released_packages
+              }' "$release_record" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+
+            if [[ "$resolved_commit" != "$record_commit" ]]; then
+              echo "Release record does not resolve to HEAD:" >&2
+              echo "  resolved commit: $resolved_commit" >&2
+              echo "  record commit:   $record_commit" >&2
+            fi
+            if ((release_target_count == 0)); then
+              echo "Release record contains no release targets." >&2
+            fi
+            exit 1
           fi
+
+          echo "### Changesets found:" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          for f in .changeset/*.md; do
+            echo "--- $f ---" >> "$GITHUB_STEP_SUMMARY"
+            cat "$f" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "### Dry-run output:" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
