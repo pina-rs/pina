@@ -161,12 +161,12 @@ cargo nextest run  # Faster parallel test execution
 
 <!-- {@pinaCliCommands} -->
 
-| Command                  | Description                                           |
-| ------------------------ | ----------------------------------------------------- |
-| `pina init <name>`       | Scaffold a new Pina program project                   |
-| `pina idl --path <dir>`  | Generate a Codama IDL JSON from a Pina program        |
-| `pina profile <path.so>` | Static CU profiler for compiled SBF binaries          |
-| `pina codama generate`   | Generate Codama IDLs and Rust/JS clients for examples |
+| Command                  | Description                                    |
+| ------------------------ | ---------------------------------------------- |
+| `pina init <name>`       | Scaffold a new Pina program project            |
+| `pina idl --path <dir>`  | Generate a Codama IDL JSON from a Pina program |
+| `pina profile <path.so>` | Static CU profiler for compiled SBF binaries   |
+| `pina codama generate`   | Generate Codama IDLs and Rust/JS/Dart clients  |
 
 <!-- {/pinaCliCommands} -->
 

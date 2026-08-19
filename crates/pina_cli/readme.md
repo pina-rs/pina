@@ -70,7 +70,7 @@ pina profile target/deploy/my_program.so --output report.json
 
 <br>
 
-Generate Codama IDLs and Rust/JS clients from one or more example program crates.
+Generate Codama IDLs and Rust/JavaScript/Dart clients from one or more example program crates.
 
 ```bash
 pina codama generate
@@ -159,10 +159,11 @@ Keep in mind:
 
 `test:idl` treats the generated IDL as an API contract. It checks that:
 
-- every example regenerates deterministically into `codama/idls`, `codama/clients/js`, and `codama/clients/rust`
+- every example regenerates deterministically into `codama/idls`, `codama/clients/js`, `codama/clients/rust`, and `codama/clients/dart`
 - generated JSON passes Codama's JS validator
 - generated JS clients typecheck
 - generated Rust clients compile
+- generated Dart clients resolve with the lockfile, format cleanly, pass static analysis, and pass codec contract tests
 - for every example, generated instruction/account/error counts match the source declarations:
   - `#[instruction]`
   - `#[account]`

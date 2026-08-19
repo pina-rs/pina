@@ -15,7 +15,7 @@ The GitHub CI workflow verifies:
   - `token-only` (`build:pina:token-only` + `test:pina:token-only`)
   - `all-features` (`build:pina:all-features` + `test:pina:all-features`)
 - `test:program-e2e` (Example program tests, SBF builds, mollusk-svm integration tests, and BPF artifact verification)
-- `test:idl` (regenerate `codama/idls`, `codama/clients/rust`, `codama/clients/js`, validate outputs, and fail on any diff)
+- `test:idl` (regenerate `codama/idls` and the Rust, JavaScript, and Dart clients; validate every output; and fail on any diff)
 - `cargo build --locked`
 - `cargo build --all-features --locked`
 
