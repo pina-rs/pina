@@ -309,6 +309,86 @@ fn as_account_mut_rejects_shared_and_mutable_reborrows_under_miri() {
 	assert_eq!(state.value.get(), 99);
 }
 
+#[test]
+fn close_with_recipient_rejects_an_active_alias_borrow_under_miri() {
+	let state_bytes = build_test_state_bytes(22);
+	let accounts = [
+		AccountBuilder::new()
+			.address(Address::new_from_array([1; ADDRESS_BYTES]))
+			.owner(TEST_PROGRAM_ID)
+			.lamports(700)
+			.data(&state_bytes)
+			.is_writable(true),
+		AccountBuilder::new()
+			.address(Address::new_from_array([2; ADDRESS_BYTES]))
+			.lamports(300)
+			.is_writable(true),
+	];
+
+	let mut input = unsafe { create_test_input(&accounts, &[]) };
+	let mut accts = [UNINIT; 4];
+	let (account_views, _) = unsafe { deserialize_test_input::<4>(&mut input, &mut accts) };
+	let source_alias = account_views[0];
+	let source_lamports = account_views[0].lamports();
+	let recipient_lamports = account_views[1].lamports();
+	let source_data_len = account_views[0].data_len();
+	let data = source_alias
+		.try_borrow()
+		.unwrap_or_else(|error| panic!("borrow source alias: {error:?}"));
+	let (source, recipient) = account_views.split_at_mut(1);
+
+	let result = source[0].close_with_recipient(&mut recipient[0]);
+
+	assert_eq!(result, Err(ProgramError::AccountBorrowFailed));
+	assert_eq!(source[0].lamports(), source_lamports);
+	assert_eq!(recipient[0].lamports(), recipient_lamports);
+	assert_eq!(source[0].data_len(), source_data_len);
+	drop(data);
+}
+
+#[cfg(feature = "account-resize")]
+#[test]
+fn realloc_rejects_an_active_alias_borrow_under_miri() {
+	let state_bytes = build_test_state_bytes(33);
+	let accounts = [
+		AccountBuilder::new()
+			.address(Address::new_from_array([3; ADDRESS_BYTES]))
+			.owner(TEST_PROGRAM_ID)
+			.lamports(700)
+			.data(&state_bytes)
+			.is_writable(true),
+		AccountBuilder::new()
+			.address(Address::new_from_array([4; ADDRESS_BYTES]))
+			.lamports(300)
+			.is_writable(true),
+	];
+
+	let mut input = unsafe { create_test_input(&accounts, &[]) };
+	let mut accts = [UNINIT; 4];
+	let (account_views, _) = unsafe { deserialize_test_input::<4>(&mut input, &mut accts) };
+	let source_alias = account_views[0];
+	let source_lamports = account_views[0].lamports();
+	let payer_lamports = account_views[1].lamports();
+	let source_data_len = account_views[0].data_len();
+	let data = source_alias
+		.try_borrow()
+		.unwrap_or_else(|error| panic!("borrow source alias: {error:?}"));
+	let (source, payer) = account_views.split_at_mut(1);
+
+	let result = realloc_account(
+		&mut source[0],
+		source_data_len + 1,
+		&mut payer[0],
+		&TEST_PROGRAM_ID,
+	);
+
+	assert_eq!(result, Err(ProgramError::AccountBorrowFailed));
+	assert_eq!(source[0].lamports(), source_lamports);
+	assert_eq!(payer[0].lamports(), payer_lamports);
+	assert_eq!(source[0].data_len(), source_data_len);
+	drop(data);
+}
+
 #[cfg(feature = "token")]
 #[test]
 fn as_token_mint_rejects_overlapping_mutable_borrows_under_miri() {

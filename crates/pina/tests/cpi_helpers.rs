@@ -102,6 +102,72 @@ fn realloc_functions_are_exported() {
 	) -> pinocchio::ProgramResult = realloc_account_zero;
 }
 
+#[cfg(feature = "account-resize")]
+#[test]
+fn realloc_rejects_an_active_borrow_before_moving_rent() {
+	let owner = Address::new_from_array([9u8; 32]);
+	let mut stored_account = TestAccount::<8>::new(Address::new_from_array([1u8; 32]), false, true);
+	let mut stored_payer = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
+	let mut account = stored_account.view();
+	let duplicate = account;
+	let mut payer = stored_payer.view();
+	let account_lamports = account.lamports();
+	let payer_lamports = payer.lamports();
+	let data = duplicate
+		.try_borrow()
+		.unwrap_or_else(|error| panic!("borrow account data: {error:?}"));
+
+	let result = realloc_account(&mut account, 16, &mut payer, &owner);
+
+	assert_eq!(result, Err(ProgramError::AccountBorrowFailed));
+	assert_eq!(account.lamports(), account_lamports);
+	assert_eq!(payer.lamports(), payer_lamports);
+	assert_eq!(account.data_len(), 8);
+	drop(data);
+}
+
+#[cfg(feature = "account-resize")]
+#[test]
+fn realloc_rejects_oversized_single_growth_before_moving_rent() {
+	let owner = Address::new_from_array([9u8; 32]);
+	let mut stored_account = TestAccount::<8>::new(Address::new_from_array([1u8; 32]), false, true);
+	let mut stored_payer = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
+	let mut account = stored_account.view();
+	let mut payer = stored_payer.view();
+	let account_lamports = account.lamports();
+	let payer_lamports = payer.lamports();
+	let new_size = account.data_len() + MAX_PERMITTED_DATA_INCREASE + 1;
+
+	let result = realloc_account(&mut account, new_size, &mut payer, &owner);
+
+	assert_eq!(result, Err(ProgramError::InvalidRealloc));
+	assert_eq!(account.lamports(), account_lamports);
+	assert_eq!(payer.lamports(), payer_lamports);
+	assert_eq!(account.data_len(), 8);
+}
+
+#[cfg(feature = "account-resize")]
+#[test]
+fn realloc_allows_the_maximum_single_growth_through_preflight() {
+	let owner = Address::new_from_array([9u8; 32]);
+	let mut stored_account = TestAccount::<8>::new(Address::new_from_array([1u8; 32]), false, true);
+	let mut stored_payer = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
+	let mut account = stored_account.view();
+	let mut payer = stored_payer.view();
+	let account_lamports = account.lamports();
+	let payer_lamports = payer.lamports();
+	let new_size = account.data_len() + MAX_PERMITTED_DATA_INCREASE;
+
+	let result = realloc_account(&mut account, new_size, &mut payer, &owner);
+
+	// Host tests cannot load the on-chain Rent sysvar. Reaching that error proves
+	// the exact runtime growth limit passed the preflight `>` check.
+	assert_eq!(result, Err(ProgramError::UnsupportedSysvar));
+	assert_eq!(account.lamports(), account_lamports);
+	assert_eq!(payer.lamports(), payer_lamports);
+	assert_eq!(account.data_len(), 8);
+}
+
 #[repr(C)]
 struct TestAccount<const N: usize> {
 	header: RuntimeAccount,

@@ -518,6 +518,44 @@ fn close_with_recipient_overflow_preserves_balances_and_data() {
 }
 
 #[test]
+fn close_with_recipient_active_borrow_preserves_balances_and_data() {
+	let state_bytes = build_balance_state_bytes(55);
+	let unique_accounts = [
+		AccountBuilder::new()
+			.address(fake_address(22))
+			.owner(system::ID)
+			.lamports(300)
+			.is_writable(true),
+		AccountBuilder::new()
+			.address(fake_address(23))
+			.owner(TEST_PROGRAM_ID)
+			.lamports(700)
+			.data(&state_bytes)
+			.is_writable(true),
+	];
+
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 1, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+	let recipient_before = account_views[0].lamports();
+	let source_before = account_views[1].lamports();
+	let data_len_before = account_views[1].data_len();
+	let (recipient, sources) = account_views.split_at_mut(1);
+	let (source, duplicate) = sources.split_at_mut(1);
+	let data = duplicate[0]
+		.try_borrow()
+		.unwrap_or_else(|error| panic!("borrow duplicate account data: {error:?}"));
+
+	let result = source[0].close_with_recipient(&mut recipient[0]);
+
+	assert_eq!(result, Err(ProgramError::AccountBorrowFailed));
+	assert_eq!(recipient[0].lamports(), recipient_before);
+	assert_eq!(source[0].lamports(), source_before);
+	assert_eq!(source[0].data_len(), data_len_before);
+	assert!(!source[0].is_data_empty());
+	drop(data);
+}
+
+#[test]
 fn assert_type_rejects_wrong_owner_before_trusting_bytes() {
 	let unique_accounts = [AccountBuilder::new()
 		.address(fake_address(22))
