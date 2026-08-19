@@ -27,6 +27,9 @@ struct DiscriminatorArgs {
 impl syn::parse::Parse for DiscriminatorArgs {
 	fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
 		let mut args = Self::default();
+		// `crate` and `final` belong to the proc macro's public grammar. IDL
+		// extraction validates their shape and uniqueness but does not otherwise
+		// need their values.
 		let mut has_crate_path = false;
 		let mut is_final = false;
 
@@ -266,10 +269,7 @@ fn discriminator_repr_size(item_enum: &syn::ItemEnum) -> Result<usize, IdlError>
 		));
 	};
 	let Some(primitive) = primitive.path.get_ident() else {
-		return Err(invalid_discriminator_enum(
-			&item_enum.ident,
-			"`primitive` must be one of `u8`, `u16`, `u32`, or `u64`",
-		));
+		return Err(invalid_primitive(&item_enum.ident));
 	};
 
 	Ok(match primitive.to_string().as_str() {
@@ -277,13 +277,15 @@ fn discriminator_repr_size(item_enum: &syn::ItemEnum) -> Result<usize, IdlError>
 		"u16" => 2,
 		"u32" => 4,
 		"u64" => 8,
-		_ => {
-			return Err(invalid_discriminator_enum(
-				&item_enum.ident,
-				"`primitive` must be one of `u8`, `u16`, `u32`, or `u64`",
-			));
-		}
+		_ => return Err(invalid_primitive(&item_enum.ident)),
 	})
+}
+
+fn invalid_primitive(enum_name: &syn::Ident) -> IdlError {
+	invalid_discriminator_enum(
+		enum_name,
+		"`primitive` must be one of `u8`, `u16`, `u32`, or `u64`",
+	)
 }
 
 fn invalid_discriminator_enum(
