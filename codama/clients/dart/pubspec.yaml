@@ -27,20 +27,20 @@ dependency_overrides:
   solana_kit_codecs_core:
     git:
       url: https://github.com/openbudgetfun/solana_kit.git
-      ref: fc48fe148cfd0887dae1601075f83960b6db0538
+      ref: 53efa0869bd63efdc40b87e9ccc997ec500fe315
       path: packages/solana_kit_codecs_core
   solana_kit_codecs_data_structures:
     git:
       url: https://github.com/openbudgetfun/solana_kit.git
-      ref: f26e9cd0e3f6248c9b93204910b7ca8f347a4580
+      ref: 53efa0869bd63efdc40b87e9ccc997ec500fe315
       path: packages/solana_kit_codecs_data_structures
   solana_kit_codecs_strings:
     git:
       url: https://github.com/openbudgetfun/solana_kit.git
-      ref: f72d3a33abc0b2825320dbd5f7df0397e8790438
+      ref: 53efa0869bd63efdc40b87e9ccc997ec500fe315
       path: packages/solana_kit_codecs_strings
   solana_kit_errors:
     git:
       url: https://github.com/openbudgetfun/solana_kit.git
-      ref: f26e9cd0e3f6248c9b93204910b7ca8f347a4580
+      ref: 53efa0869bd63efdc40b87e9ccc997ec500fe315
       path: packages/solana_kit_errors

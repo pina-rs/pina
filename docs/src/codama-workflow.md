@@ -43,18 +43,18 @@ Supporting scripts:
 
 The generated Dart package lives in `codama/clients/dart`. It exposes one package-root library per example, pins dependency resolution in `pubspec.lock`, and checks all 20 example IDLs as a single inventory. CI runs `dart format`, `dart analyze --fatal-infos`, and `dart test` over the checked-in output.
 
-### Temporary upstream composition
+### Temporary upstream release bridge
 
-The Dart integration currently consumes unreleased Solana Kit fixes. The npm renderer is pinned to `codama-renderers-dart@0.5.0` and patched through pnpm with a deterministic Node ESM bundle composed from these exact upstream implementation commits:
+The required Solana Kit fixes are merged upstream but are not yet published. The npm renderer remains pinned to `codama-renderers-dart@0.5.0` and patched through pnpm with a deterministic Node ESM bundle composed from these exact upstream implementation commits:
 
 - schema normalization and package exports: [openbudgetfun/solana_kit#214](https://github.com/openbudgetfun/solana_kit/pull/214) at `54b49254584758fcc93a5b5b0b99a90100b5e9aa`
 - discriminator enforcement, exact instruction decoding, and capacity-aware account decoding: [openbudgetfun/solana_kit#215](https://github.com/openbudgetfun/solana_kit/pull/215) at `823c408c00e15b93157ca69778231ef56c1958cf`
 - fixed-capacity overflow rejection: [openbudgetfun/solana_kit#216](https://github.com/openbudgetfun/solana_kit/pull/216) at `fc48fe148cfd0887dae1601075f83960b6db0538`
 - wide enum discriminators: [openbudgetfun/solana_kit#219](https://github.com/openbudgetfun/solana_kit/pull/219) at `5cbe66cd7f4bea49a81509b3abe97c7a91b4bb9a`
 
-The composition also includes null-safe reads for omitted struct fields and instruction arguments. Those two changes are required for the implementation commits above to typecheck together and should move upstream before release.
+The composition also includes the merged null-safe handling for omitted struct fields and instruction arguments.
 
-The Dart package uses immutable Git overrides for the runtime halves of [fixed-capacity rejection](https://github.com/openbudgetfun/solana_kit/pull/216), [canonical boolean and option tags](https://github.com/openbudgetfun/solana_kit/pull/217), and [canonical UTF-8](https://github.com/openbudgetfun/solana_kit/pull/218). Remove `patches/codama-renderers-dart@0.5.0.patch` and the `dependency_overrides` block only after released npm and pub.dev packages contain these changes and the byte-contract suite passes without them.
+The Dart package pins the runtime halves of [fixed-capacity rejection](https://github.com/openbudgetfun/solana_kit/pull/216), [canonical boolean and option tags](https://github.com/openbudgetfun/solana_kit/pull/217), and [canonical UTF-8](https://github.com/openbudgetfun/solana_kit/pull/218) to the immutable, post-merge Solana Kit commit `53efa0869bd63efdc40b87e9ccc997ec500fe315`. Remove `patches/codama-renderers-dart@0.5.0.patch` and the `dependency_overrides` block only after released npm and pub.dev packages contain these changes and the byte-contract suite passes without them.
 
 ## In a Separate Project
 
