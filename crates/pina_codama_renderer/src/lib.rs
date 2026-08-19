@@ -3,6 +3,7 @@ mod render;
 
 use std::collections::BTreeMap;
 use std::fs;
+use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -48,9 +49,12 @@ pub fn render_idl_file(path: &Path, crate_dir: &Path, config: &RenderConfig) -> 
 }
 
 pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig) -> Result<()> {
-	ensure_crate_scaffold(crate_dir, root.program.name.as_ref())?;
+	let generated_dir = validate_generated_dir(crate_dir, &config.generated_folder)?;
+	let files = render_program_to_files(root)?;
+	validate_generated_sources(&files)?;
+	validate_existing_generated_dir(&generated_dir, config.delete_folder_before_rendering)?;
 
-	let generated_dir = crate_dir.join(&config.generated_folder);
+	ensure_crate_scaffold(crate_dir, root.program.name.as_ref())?;
 
 	if config.delete_folder_before_rendering && generated_dir.exists() {
 		fs::remove_dir_all(&generated_dir).map_err(|source| {
@@ -60,8 +64,6 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 			}
 		})?;
 	}
-
-	let files = render_program_to_files(root)?;
 
 	write_files(&generated_dir, files)
 }
@@ -95,7 +97,7 @@ fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>>
 	files.insert(PathBuf::from("mod.rs"), page(&render_root_mod(program)));
 	files.insert(
 		PathBuf::from("programs.rs"),
-		page(&render_programs_mod(&program_constants)),
+		page(&render_programs_mod(&program_constants)?),
 	);
 
 	// Account files
@@ -160,6 +162,217 @@ fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>>
 	}
 
 	Ok(files)
+}
+
+fn validate_generated_dir(crate_dir: &Path, generated_folder: &Path) -> Result<PathBuf> {
+	let mut has_component = false;
+	for component in generated_folder.components() {
+		has_component = true;
+		if !matches!(component, Component::Normal(_)) {
+			return Err(RenderError::UnsafeOutputPath {
+				path: generated_folder.to_path_buf(),
+				reason: "expected a non-empty relative path without `.` or `..` components"
+					.to_string(),
+			});
+		}
+	}
+
+	if !has_component {
+		return Err(RenderError::UnsafeOutputPath {
+			path: generated_folder.to_path_buf(),
+			reason: "expected a non-empty relative path".to_string(),
+		});
+	}
+
+	let generated_dir = crate_dir.join(generated_folder);
+	let mut current = crate_dir.to_path_buf();
+	for component in generated_folder.components() {
+		let Component::Normal(component) = component else {
+			unreachable!("components were validated above");
+		};
+		current.push(component);
+		let metadata = match fs::symlink_metadata(&current) {
+			Ok(metadata) => metadata,
+			Err(source) if source.kind() == std::io::ErrorKind::NotFound => continue,
+			Err(source) => {
+				return Err(RenderError::ReadFile {
+					path: current.clone(),
+					source,
+				});
+			}
+		};
+		if metadata.file_type().is_symlink() {
+			return Err(RenderError::UnsafeOutputPath {
+				path: current,
+				reason: "generated output path must not traverse symbolic links".to_string(),
+			});
+		}
+	}
+
+	Ok(generated_dir)
+}
+
+fn validate_generated_sources(files: &BTreeMap<PathBuf, String>) -> Result<()> {
+	for (path, source) in files {
+		syn::parse_file(source).map_err(|error| {
+			RenderError::InvalidGeneratedSource {
+				path: path.clone(),
+				reason: error.to_string(),
+			}
+		})?;
+	}
+	Ok(())
+}
+
+fn validate_existing_generated_dir(path: &Path, require_managed: bool) -> Result<()> {
+	if !path.exists() {
+		return Ok(());
+	}
+
+	let metadata = fs::symlink_metadata(path).map_err(|source| {
+		RenderError::ReadFile {
+			path: path.to_path_buf(),
+			source,
+		}
+	})?;
+	if !metadata.is_dir() {
+		return Err(RenderError::UnsafeOutputPath {
+			path: path.to_path_buf(),
+			reason: "generated output path exists but is not a directory".to_string(),
+		});
+	}
+
+	validate_tree_has_no_symlinks(path)?;
+
+	if require_managed {
+		let mut entries = fs::read_dir(path).map_err(|source| {
+			RenderError::ReadFile {
+				path: path.to_path_buf(),
+				source,
+			}
+		})?;
+		if entries
+			.next()
+			.transpose()
+			.map_err(|source| {
+				RenderError::ReadFile {
+					path: path.to_path_buf(),
+					source,
+				}
+			})?
+			.is_some()
+		{
+			let marker_path = path.join("mod.rs");
+			if !marker_path.is_file() {
+				return Err(RenderError::UnsafeOutputPath {
+					path: path.to_path_buf(),
+					reason: "refusing to delete a directory not created by this renderer"
+						.to_string(),
+				});
+			}
+			let marker = fs::read_to_string(&marker_path).map_err(|source| {
+				RenderError::ReadFile {
+					path: marker_path.clone(),
+					source,
+				}
+			})?;
+			if !marker.starts_with(GENERATED_HEADER) {
+				return Err(RenderError::UnsafeOutputPath {
+					path: path.to_path_buf(),
+					reason: "refusing to delete a directory not created by this renderer"
+						.to_string(),
+				});
+			}
+
+			validate_renderer_managed_tree(path)?;
+		}
+	}
+
+	Ok(())
+}
+
+fn validate_renderer_managed_tree(path: &Path) -> Result<()> {
+	for entry in fs::read_dir(path).map_err(|source| {
+		RenderError::ReadFile {
+			path: path.to_path_buf(),
+			source,
+		}
+	})? {
+		let entry = entry.map_err(|source| {
+			RenderError::ReadFile {
+				path: path.to_path_buf(),
+				source,
+			}
+		})?;
+		let entry_path = entry.path();
+		let metadata = fs::symlink_metadata(&entry_path).map_err(|source| {
+			RenderError::ReadFile {
+				path: entry_path.clone(),
+				source,
+			}
+		})?;
+
+		if metadata.is_dir() {
+			validate_renderer_managed_tree(&entry_path)?;
+			continue;
+		}
+
+		if !metadata.is_file() {
+			return Err(RenderError::UnsafeOutputPath {
+				path: entry_path,
+				reason: "generated output tree contains an unmanaged entry".to_string(),
+			});
+		}
+
+		let source = fs::read_to_string(&entry_path).map_err(|source| {
+			RenderError::ReadFile {
+				path: entry_path.clone(),
+				source,
+			}
+		})?;
+		if !source.starts_with(GENERATED_HEADER) {
+			return Err(RenderError::UnsafeOutputPath {
+				path: entry_path,
+				reason: "refusing to delete a generated directory containing unmanaged files"
+					.to_string(),
+			});
+		}
+	}
+
+	Ok(())
+}
+
+fn validate_tree_has_no_symlinks(path: &Path) -> Result<()> {
+	for entry in fs::read_dir(path).map_err(|source| {
+		RenderError::ReadFile {
+			path: path.to_path_buf(),
+			source,
+		}
+	})? {
+		let entry = entry.map_err(|source| {
+			RenderError::ReadFile {
+				path: path.to_path_buf(),
+				source,
+			}
+		})?;
+		let entry_path = entry.path();
+		let file_type = entry.file_type().map_err(|source| {
+			RenderError::ReadFile {
+				path: entry_path.clone(),
+				source,
+			}
+		})?;
+		if file_type.is_symlink() {
+			return Err(RenderError::UnsafeOutputPath {
+				path: entry_path,
+				reason: "generated output tree must not contain symbolic links".to_string(),
+			});
+		}
+		if file_type.is_dir() {
+			validate_tree_has_no_symlinks(&entry_path)?;
+		}
+	}
+	Ok(())
 }
 
 #[cfg(test)]

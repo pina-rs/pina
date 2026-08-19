@@ -8,6 +8,7 @@ use codama_nodes::NumberFormat;
 use codama_nodes::TypeNode;
 use codama_nodes::ValueNode;
 
+use super::helpers::canonical_pubkey;
 use super::helpers::cast_signed;
 use super::helpers::cast_unsigned;
 use super::types::render_type_for_pod;
@@ -125,10 +126,11 @@ pub(crate) fn render_constant_seed_expression(
 			render_number_seed_expression(r#type, &number_value.number, context)
 		}
 		ConstantPdaSeedValue::PublicKey(public_key_value) => {
-			Ok(format!(
-				"solana_pubkey::pubkey!(\"{}\").as_ref()",
-				public_key_value.public_key
-			))
+			let public_key = canonical_pubkey(
+				&public_key_value.public_key,
+				&format!("{context} public key seed"),
+			)?;
+			Ok(format!("solana_pubkey::pubkey!(\"{public_key}\").as_ref()"))
 		}
 		ConstantPdaSeedValue::Constant(constant_value) => {
 			match constant_value.value.as_ref() {

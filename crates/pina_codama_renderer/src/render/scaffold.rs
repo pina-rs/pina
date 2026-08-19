@@ -81,7 +81,6 @@ pub(crate) fn write_files(base: &Path, files: BTreeMap<PathBuf, String>) -> Resu
 
 #[cfg(test)]
 mod tests {
-	use std::path::PathBuf;
 	use std::time::SystemTime;
 	use std::time::UNIX_EPOCH;
 
@@ -93,10 +92,10 @@ mod tests {
 			.duration_since(UNIX_EPOCH)
 			.unwrap_or_default()
 			.as_nanos();
-		let crate_dir =
-			PathBuf::from(std::env::temp_dir()).join(format!("pina-scaffold-{unique_id}"));
+		let crate_dir = std::env::temp_dir().join(format!("pina-scaffold-{unique_id}"));
 
-		ensure_crate_scaffold(&crate_dir, "DemoProgram").expect("should write scaffold");
+		ensure_crate_scaffold(&crate_dir, "DemoProgram")
+			.unwrap_or_else(|error| panic!("should write scaffold: {error}"));
 		let cargo_toml = fs::read_to_string(crate_dir.join("Cargo.toml"))
 			.unwrap_or_else(|err| panic!("failed to read generated Cargo.toml: {err}"));
 
@@ -104,6 +103,7 @@ mod tests {
 		assert!(!cargo_toml.contains("workspace = true ,"));
 		assert!(!cargo_toml.contains("\n\t[dependencies]"));
 
-		fs::remove_dir_all(&crate_dir).expect("cleanup test scaffold dir");
+		fs::remove_dir_all(&crate_dir)
+			.unwrap_or_else(|error| panic!("cleanup test scaffold dir: {error}"));
 	}
 }

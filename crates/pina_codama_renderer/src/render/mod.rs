@@ -13,6 +13,7 @@ pub(crate) use accounts::render_account_page;
 pub(crate) use accounts::render_accounts_mod;
 pub(crate) use errors::render_errors_mod;
 pub(crate) use errors::render_errors_page;
+pub(crate) use helpers::GENERATED_HEADER;
 pub(crate) use helpers::page;
 pub(crate) use helpers::program_id_const_name;
 pub(crate) use helpers::snake;

@@ -12,6 +12,7 @@ use codama_nodes::PdaValuePda;
 use codama_nodes::ProgramNode;
 
 use super::discriminator::render_constant_discriminator;
+use super::helpers::canonical_pubkey;
 use super::helpers::pascal;
 use super::helpers::program_id_const_name;
 use super::helpers::render_docs;
@@ -467,7 +468,13 @@ fn render_instruction_account_default_value(
 
 	let value = match default_value {
 		InstructionInputValueNode::PublicKeyValue(public_key) => {
-			format!("solana_pubkey::pubkey!(\"{}\")", public_key.public_key)
+			let context = format!(
+				"instruction `{}` account `{}` public key default",
+				pascal(instruction.name.as_ref()),
+				snake(account.name.as_ref())
+			);
+			let public_key = canonical_pubkey(&public_key.public_key, &context)?;
+			format!("solana_pubkey::pubkey!(\"{public_key}\")")
 		}
 		InstructionInputValueNode::ProgramIdValue(_) => {
 			format!("crate::{primary_program_const}")
