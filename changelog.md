@@ -43,6 +43,380 @@ Generated JavaScript codecs reject over-capacity values rather than truncating t
 - Document the explicit `zeroed()` then `close_with_recipient()` close flow.
 - Regenerate Codama IDLs and committed Rust/JS clients for the updated writable-account inference.
 
+## [0.9.0](https://github.com/pina-rs/pina/releases/tag/v0.9.0) (2026-08-19)
+
+Grouped release for `core`.
+
+### Breaking Changes
+
+#### Enforce writability at account parse time: `AccountsCursor::next_mut` now validates that the account is marked writable in the instruction before returning a `&mut AccountView`, and `remaining_mut` validates every trailing account. A `&mut AccountView` (or `&mut [AccountView]`) field is now the single source of truth for writable accounts — the separate `assert_writable()` call is no longer required for mutable fields.
+
+_Packages:_ _pina_
+
+##### Migration guide
+
+- **Remove redundant `assert_writable()` calls.** Any `assert_writable()` invoked on a field declared as `&'a mut AccountView` (or inside a `&'a mut [AccountView]` remaining slice) is now redundant and can be deleted. The check happens once, during `try_from`/`try_from_account_infos`, before any instruction processing.
+- **Keep `assert_writable()` on immutable fields.** Accounts declared as `&'a AccountView` that must be writable (for example, CPI targets the program never mutates directly) still require an explicit `assert_writable()` call.
+- **`remaining_mut` now returns `Result`.** `AccountsCursor::remaining_mut` changed from `&'a mut [AccountView]` to `Result<&'a mut [AccountView], ProgramError>` and rejects the call when any remaining account is not writable. The `#[derive(Accounts)]` expansion was updated accordingly; manual cursor users must add `?`.
+- **Behavior change.** Programs that previously declared `&mut` fields without asserting writability will now fail with `ProgramError::InvalidAccountData` when a non-writable account is passed. This is the intended fix: a mutable view of a non-writable account is never legitimate.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #172](https://github.com/pina-rs/pina/pull/172)
+
+#### Bind Anchor Realloc Samples to Their Authority
+
+_Packages:_ _core_
+
+`examples/anchor_realloc` is now a secure, intentionally non-ABI-compatible adaptation of Anchor's test fixture. It adds `Initialize` (discriminator `2`) and creates a per-authority sample PDA at `[b"sample", authority]`. `Realloc` still uses discriminator `0`, but its authority must now be writable and a signer, its sample must be initialized at the canonical PDA, and its `len` includes the 34-byte authenticated `Sample` header.
+
+`Realloc2` (discriminator `1`) no longer resizes two arbitrary accounts. It validates both authenticated targets and returns `AccountDuplicateReallocs` before mutation, matching Anchor's duplicate-reallocation regression intent.
+
+This removes the previous capability for an unrelated signer to resize an arbitrary writable account owned by the program. Regenerate Codama clients and initialize the sample before calling `Realloc`.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #203](https://github.com/pina-rs/pina/pull/203) · _Related issues:_ [#205](https://github.com/pina-rs/pina/issues/205)
+
+#### Refresh workspace dependencies
+
+_Packages:_ _pina_, _pina_cli_
+
+Refresh workspace dependencies to their latest compatible versions.
+
+- Bump `pinocchio-token` to `0.7` and `pinocchio-token-2022` to `0.4` (drops the `token_program` field from `TransferChecked`/`CloseAccount`; examples now use the `new()` constructors).
+- Bump `codama-nodes` to `0.11` (spec `1.8.0`), `mollusk-svm` to `0.15`, `solana-account` to `4`, `solana-system-interface` to `3`, `insta-cmd` to `0.7`, and `object` to `0.40`.
+- Bump the JS Codama toolchain (`codama` to `1.10`, `@codama/renderers-js` to `2.3`) and regenerate all IDLs and Rust/JS clients.
+- Upgrade the workspace to `syn` 3, including the public `pina_cli` parsing API, and release the temporary derive-crate pins used during the migration.
+- Resolves `RUSTSEC-2026-0097` (unsound `rand` 0.7.3) and `RUSTSEC-2026-0173` (unmaintained `proc-macro-error2`), dropping them from the dependency tree, and updates `jiff`, `defmt`, `env_logger`, `solana-logger`, and `crossbeam-epoch` to patched versions.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #167](https://github.com/pina-rs/pina/pull/167) · _Related issues:_ [#165](https://github.com/pina-rs/pina/issues/165), [#166](https://github.com/pina-rs/pina/issues/166), [#167](https://github.com/pina-rs/pina/issues/167), [#168](https://github.com/pina-rs/pina/issues/168), [#169](https://github.com/pina-rs/pina/issues/169), [#170](https://github.com/pina-rs/pina/issues/170), [#171](https://github.com/pina-rs/pina/issues/171), [#172](https://github.com/pina-rs/pina/issues/172), [#173](https://github.com/pina-rs/pina/issues/173), [#174](https://github.com/pina-rs/pina/issues/174), [#175](https://github.com/pina-rs/pina/issues/175), [#176](https://github.com/pina-rs/pina/issues/176), [#177](https://github.com/pina-rs/pina/issues/177), [#179](https://github.com/pina-rs/pina/issues/179), [#180](https://github.com/pina-rs/pina/issues/180), [#181](https://github.com/pina-rs/pina/issues/181), [#185](https://github.com/pina-rs/pina/issues/185), [#186](https://github.com/pina-rs/pina/issues/186), [#187](https://github.com/pina-rs/pina/issues/187), [#189](https://github.com/pina-rs/pina/issues/189), [#195](https://github.com/pina-rs/pina/issues/195)
+
+#### Upgrade workspace to Pinocchio 0.11
+
+_Packages:_ _core_
+
+Upgrade the workspace to Pinocchio 0.11 and migrate Pina's core account APIs to the new mutable `AccountView` model.
+
+Breaking changes include:
+
+- entrypoints, `TryFromAccountInfos`, and downstream account parsing now use `&mut [AccountView]`
+- `ProcessAccountInfos::process` now consumes `self`
+- `AsAccount::as_account` and `as_account_mut` now return guard-backed `Ref` / `RefMut` values instead of bare references
+- `#[derive(Accounts)]` now supports mutable account refs and slices, and writable IDL inference now follows mutable fields
+- close helpers no longer implicitly zero or resize account data; callers can keep the explicit `zeroed()` flow or use the new `close_account_zeroed()` helper when stale bytes must be cleared before close
+
+This release also upgrades the Pinocchio companion crates, adds the standalone `memo` and `account-resize` features, preserves token account compatibility aliases, refreshes docs/examples/security guidance for the new borrow model, and regenerates the affected Codama IDLs and generated clients.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #149](https://github.com/pina-rs/pina/pull/149)
+
+#### Port to zeropod
+
+_Packages:_ _pina_, _pina_cli_, _pina_macros_, _pina_codama_renderer_
+
+Replace pina's own pod primitives (`pina_pod_primitives`, based on `bytemuck`) with [zeropod](https://crates.io/crates/zeropod) as the primitives library. This is a major change to the account model:
+
+- **`pina_pod_primitives` is deleted.** Its types (`PodU64`, `PodBool`, `PodString`, `PodVec`, `PodOption`) are re-exported from `zeropod` with the same names.
+- **`bytemuck::Pod` and `Zeroable` are removed from Pina's public account model.** `pina::Pod` / `pina::Zeroable` re-exports are gone; transitive Solana dependencies may still use bytemuck internally.
+- **`AccountDeserialize` is replaced by `PinaAccount`.** Account schemas derive `zeropod::ZeroPod`; loaders return the generated `AccountZc` companion rather than reinterpreting the native schema as account memory.
+- **Content validation at the deserialization boundary.** Non-canonical `PodBool` bytes, invalid UTF-8 in `PodString`, and overlength `PodVec` prefixes are now rejected by `try_from_bytes` / `as_account` instead of silently accepted.
+- **`PodString::as_str()` is now safe** (validated at the boundary); `as_str_unchecked` / `try_as_str` are gone.
+- **`PodU64::from_primitive` is replaced by `From<u64>`** (zeropod's API). `from_primitive` callers should use `PodU64::from(n)` or `n.into()`.
+- **`PodBool::from_bool` is replaced by `From<bool>`**.
+- **`PodVec::as_mut_slice` is renamed to `as_slice_mut`** (zeropod's API).
+- The `#[account]`, `#[instruction]`, and `#[event]` macros derive `zeropod::ZeroPod` and expose checked `try_from_bytes` / `initialize` helpers. Pina no longer generates `to_bytes()` or any whole-object serialization API.
+- Macro-generated schemas use a closed field grammar: native integers and booleans, Pina's Pod scalar wrappers, the exact Pina `Address`, literal-length byte arrays, and native scalar options. Generics, custom/nested mappings, enums, `NonZero*`, `char`, raw `PodOption`, and string/vector collections are rejected at macro expansion.
+- Runtime loaders return the generated zero-copy representation, whose audited scalar fields are read and changed with zeropod's `get` / `set` accessors. Bounded text and list examples use fully initialized byte arrays with checked semantic helpers.
+- Direct zeropod derives and manual `PinaAccount` / `ZeroPodFixed` implementations remain advanced escape hatches outside Pina's audited macro-generated contract; their authors own all zeropod safety invariants.
+- `PinaSerialize`, Pina's generic `InstructionBuilder`, the custom `PodEnum` derive, and Pina's generic raw-cast helpers are removed. Zeropod owns the byte-to-view boundary.
+- The `#[discriminator]` macro no longer emits `unsafe impl Pod` / `unsafe impl Zeroable` for enums.
+- Codama-generated clients validate zeropod fields before zero-copy access. Instruction construction owns a fully initialized buffer and never exposes a schema or storage view as raw bytes.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #195](https://github.com/pina-rs/pina/pull/195) · _Closed issues:_ [#193](https://github.com/pina-rs/pina/issues/193) · _Related issues:_ [#194](https://github.com/pina-rs/pina/issues/194), [#205](https://github.com/pina-rs/pina/issues/205)
+
+#### Use zeropod's native enum schema support
+
+_Packages:_ _pina_macros_
+
+Remove Pina's custom `PodEnum` derive in favor of zeropod's standalone native enum schema support. Pina's audited `#[account]`, `#[instruction]`, and `#[event]` schemas reject enum and custom `ZcField` fields because the macro cannot establish their full mapping and validation-order invariants. Standalone enums can still derive `zeropod::ZeroPod` for advanced direct zeropod integrations outside that closed contract.
+
+```rust
+use pina::ZeroPod;
+
+#[derive(ZeroPod)]
+#[repr(u8)]
+enum Color {
+	Red = 0,
+	Green = 1,
+	Blue = 2,
+}
+
+let color = Color::from_bytes(&[1]);
+```
+
+For macro-generated Pina schemas, store an audited scalar discriminant and convert it to a domain enum only after explicit semantic validation.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #195](https://github.com/pina-rs/pina/pull/195) · _Closed issues:_ [#193](https://github.com/pina-rs/pina/issues/193) · _Related issues:_ [#194](https://github.com/pina-rs/pina/issues/194), [#205](https://github.com/pina-rs/pina/issues/205)
+
+### Features
+
+#### Add fuzz harness infrastructure for pina-rs targeting `PinaAccount::try_from_bytes` and `parse_instruction`.
+
+_Packages:_ _pina_
+
+- New `crates/pina_fuzz/` crate with `libfuzzer-sys` integration
+- Fuzz targets for account deserialization of `CounterState`, `RegistryConfig`, and `RoleEntry`
+- Fuzz targets for instruction parsing of `CounterInstruction` and `RegistryInstruction`
+- Uses real workspace example programs (counter_program, role_registry_program) for authentic account/instruction types
+- Compiles both standalone fuzz binaries during the normal CI test task so broken dependencies and entry points cannot silently merge
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #172](https://github.com/pina-rs/pina/pull/172) · _Related issues:_ [#165](https://github.com/pina-rs/pina/issues/165), [#166](https://github.com/pina-rs/pina/issues/166), [#167](https://github.com/pina-rs/pina/issues/167), [#168](https://github.com/pina-rs/pina/issues/168), [#169](https://github.com/pina-rs/pina/issues/169), [#170](https://github.com/pina-rs/pina/issues/170), [#171](https://github.com/pina-rs/pina/issues/171), [#172](https://github.com/pina-rs/pina/issues/172), [#173](https://github.com/pina-rs/pina/issues/173), [#174](https://github.com/pina-rs/pina/issues/174), [#175](https://github.com/pina-rs/pina/issues/175), [#176](https://github.com/pina-rs/pina/issues/176), [#177](https://github.com/pina-rs/pina/issues/177), [#179](https://github.com/pina-rs/pina/issues/179), [#180](https://github.com/pina-rs/pina/issues/180), [#181](https://github.com/pina-rs/pina/issues/181), [#185](https://github.com/pina-rs/pina/issues/185), [#186](https://github.com/pina-rs/pina/issues/186), [#187](https://github.com/pina-rs/pina/issues/187), [#189](https://github.com/pina-rs/pina/issues/189), [#195](https://github.com/pina-rs/pina/issues/195)
+
+#### Re-export zeropod fixed-capacity collection types
+
+_Packages:_ _pina_
+
+Replace Pina's local collection implementation with re-exports of zeropod's allocation-free `PodOption`, `PodString`, and `PodVec` storage types for advanced direct zeropod integrations. Pina's macro-generated account, instruction, and event schemas deliberately reject string/vector collection fields because not every upstream construction path initializes inactive capacity. Macro schemas support semantic `Option<scalar>` fields through an exact audited `PodOption` mapping; use fully initialized fixed byte arrays plus checked helpers for bounded text and lists.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #147](https://github.com/pina-rs/pina/pull/147) · _Related issues:_ [#205](https://github.com/pina-rs/pina/issues/205)
+
+#### feat: add typed `#[pda]` attribute for PDA seed declarations
+
+_Packages:_ _pina_, _pina_cli_, _pina_macros_, _pina_codama_renderer_
+
+Adds a `#[pda(seeds = [...], bump = <field>)]` attribute macro for `#[account]` structs, inspired by Quasar's typed seed declarations. The macro generates owned seed structs (`XxxSeeds` / `XxxSeedsWithBump`), `seeds()` / `as_slices()` / `with_bump()` helpers, `try_find_pda()` / `find_pda()` derivation helpers, and `assert_seeds()` stored-bump verification when a bump field is declared.
+
+Supported seed types: `Address`, `u8`, `u16`, `u32`, `u64`, `[u8; N]`, and `const &[u8]` references. The CLI parses the attribute for IDL generation with accurate seed types (fixing the escrow `u64` seed being mis-typed as an address in generated clients), and the renderer emits `find_pda` / `create_pda` helpers for linked accounts. All examples now use the attribute instead of manual seed macros.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #194](https://github.com/pina-rs/pina/pull/194)
+
+#### Resolve PDA-derived account defaults in clients
+
+_Packages:_ _pina_cli_, _pina_codama_renderer_
+
+Resolve explicit PDA-derived account defaults in generated clients. Codama lowering now preserves deterministic PDA default metadata from account seeds, and the Rust renderer emits builders that derive those defaults while keeping signer and writable expectations explicit.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #158](https://github.com/pina-rs/pina/pull/158) · _Closed issues:_ [#144](https://github.com/pina-rs/pina/issues/144)
+
+- **pina_cli**: Generate deterministic Dart clients for every example IDL alongside the Rust and JavaScript clients. Add package-root exports, strict semantic IDL validation, pinned dependency resolution, and byte-level tests covering Pina's zeropod account and instruction wire contracts.
+
+#### Add UX improvements and parallel file I/O to the pina CLI
+
+_Packages:_ _pina_cli_
+
+Add UX improvements and parallel file I/O to the `pina` CLI.
+
+- **Parallel file reading**: `resolve_crate` reads sibling module files in parallel via `rayon` while preserving deterministic parsing and error reporting.
+- **Colored output**: Error messages and success indicators now use `owo-colors` for semantic terminal styling.
+- **Summary table**: `pina idl` prints a `comfy-table` summary showing instruction, account, PDA, and error counts after generation.
+- **`docs` subcommand**: `pina docs <topic>` renders bundled `.t.md` documentation in-terminal using `termimad`, with `PINA_TEMPLATES_DIR` support for custom topics.
+- **New dependencies**: `rayon`, `owo-colors`, `comfy-table` (8.0), and `termimad` (0.35.1).
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #156](https://github.com/pina-rs/pina/pull/156)
+
+#### Add semantic zeropod `String<N, PFX>`, `Vec<T, N, PFX>`, and fixed `Option<T>` parsing to the IDL toolchain for legacy IDLs and advanced direct zeropod integrations. Pina's audited account, instruction, and event macros accept only scalar `Option<T>` and reject string/vector, explicit `PodOption`, enum, custom, and nested layouts. Generated clients for supported Pina schemas therefore use scalar options and fully initialized fixed byte arrays; layouts Codama cannot represent faithfully fail generation instead of falling back to public keys.
+
+_Packages:_ _pina_cli_
+
+Encode account and instruction discriminators in generated clients, map signed Pod numeric elements at their real sizes, preserve generic capacity parameters during IDL extraction, reject noncanonical `PodString` length prefixes, initialize discriminators in typed account-creation helpers, and run the profile program's real SBF lifecycle in CI.
+
+Generated JavaScript codecs validate discriminators, canonical booleans, and scalar-option tags. Advanced collection codecs reject values that exceed fixed capacity, decode UTF-8 strictly, and preserve embedded NUL characters, but those collection layouts are outside Pina's macro-generated schema contract.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #171](https://github.com/pina-rs/pina/pull/171) · _Related issues:_ [#205](https://github.com/pina-rs/pina/issues/205)
+
+#### Support `discriminator = Enum::Variant` in the `#[instruction]`, `#[account]`, and `#[event]` attribute macros, replacing the separate `variant = Variant` argument.
+
+_Packages:_ _pina_macros_
+
+```rust
+// Before
+#[instruction(discriminator = VestingInstruction, variant = Initialize)]
+pub struct InitializeInstruction {
+	// ...
+}
+
+// After
+#[instruction(discriminator = VestingInstruction::Initialize)]
+pub struct InitializeInstruction {
+	// ...
+}
+```
+
+The shorthand form is unchanged: when the struct name matches the variant, `discriminator = Enum` alone still works.
+
+```rust
+#[instruction(discriminator = VestingInstruction)]
+pub struct Initialize {
+	// ...
+}
+```
+
+##### Migration guide
+
+- Replace `#[instruction(discriminator = Enum, variant = Variant)]` with `#[instruction(discriminator = Enum::Variant)]`. The same applies to `#[account(...)]` and `#[event(...)]`.
+- The old `variant = Variant` argument remains supported for backwards compatibility. When it is present, the complete `discriminator` value is treated as the enum path, which preserves qualified forms such as `crate::types::Enum, variant = Variant`.
+- `pina_cli` IDL extraction understands all three forms: `Enum::Variant`, `Enum` + `variant = Variant`, and bare `Enum` (variant defaults to the struct name). The `pina init` template now emits the new syntax.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #172](https://github.com/pina-rs/pina/pull/172) · _Related issues:_ [#165](https://github.com/pina-rs/pina/issues/165), [#166](https://github.com/pina-rs/pina/issues/166), [#167](https://github.com/pina-rs/pina/issues/167), [#168](https://github.com/pina-rs/pina/issues/168), [#169](https://github.com/pina-rs/pina/issues/169), [#170](https://github.com/pina-rs/pina/issues/170), [#171](https://github.com/pina-rs/pina/issues/171), [#172](https://github.com/pina-rs/pina/issues/172), [#173](https://github.com/pina-rs/pina/issues/173), [#174](https://github.com/pina-rs/pina/issues/174), [#175](https://github.com/pina-rs/pina/issues/175), [#176](https://github.com/pina-rs/pina/issues/176), [#177](https://github.com/pina-rs/pina/issues/177), [#179](https://github.com/pina-rs/pina/issues/179), [#180](https://github.com/pina-rs/pina/issues/180), [#181](https://github.com/pina-rs/pina/issues/181), [#185](https://github.com/pina-rs/pina/issues/185), [#186](https://github.com/pina-rs/pina/issues/186), [#187](https://github.com/pina-rs/pina/issues/187), [#189](https://github.com/pina-rs/pina/issues/189), [#195](https://github.com/pina-rs/pina/issues/195)
+
+### Fixes
+
+#### Improve Codama IDL extraction coverage
+
+_Packages:_ _core_
+
+Improve Codama IDL extraction coverage so grouped match arms, accountless instructions, and instruction-only programs generate complete IDL and client surfaces. Document the supported extractor shapes and validation guarantees across the README, CLI docs, and mdBook.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #132](https://github.com/pina-rs/pina/pull/132)
+
+#### Correct the CPI introspection guarantee
+
+_Packages:_ _pina_
+
+Expose `assert_current_instruction_program_id` for the guarantee the Instructions sysvar can actually provide. Deprecate the misleading `assert_no_cpi` name because transaction-level instruction metadata cannot detect self-CPI.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #204](https://github.com/pina-rs/pina/pull/204)
+
+#### Add semantic zeropod `String<N, PFX>`, `Vec<T, N, PFX>`, and fixed `Option<T>` parsing to the IDL toolchain for legacy IDLs and advanced direct zeropod integrations. Pina's audited account, instruction, and event macros accept only scalar `Option<T>` and reject string/vector, explicit `PodOption`, enum, custom, and nested layouts. Generated clients for supported Pina schemas therefore use scalar options and fully initialized fixed byte arrays; layouts Codama cannot represent faithfully fail generation instead of falling back to public keys.
+
+_Packages:_ _pina_, _pina_codama_renderer_
+
+Encode account and instruction discriminators in generated clients, map signed Pod numeric elements at their real sizes, preserve generic capacity parameters during IDL extraction, reject noncanonical `PodString` length prefixes, initialize discriminators in typed account-creation helpers, and run the profile program's real SBF lifecycle in CI.
+
+Generated JavaScript codecs validate discriminators, canonical booleans, and scalar-option tags. Advanced collection codecs reject values that exceed fixed capacity, decode UTF-8 strictly, and preserve embedded NUL characters, but those collection layouts are outside Pina's macro-generated schema contract.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #171](https://github.com/pina-rs/pina/pull/171) · _Related issues:_ [#205](https://github.com/pina-rs/pina/issues/205)
+
+#### Preflight fallible account mutations
+
+_Packages:_ _pina_
+
+Check active borrows and the per-instruction growth limit before moving rent or closing account balances, so expected validation failures do not leave helper callers with partially mutated in-memory state.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #201](https://github.com/pina-rs/pina/pull/201)
+
+- **pina**: Harden the token account loaders without local casts. SPL Token accounts retain Pinocchio's legacy state type, while Token-2022 accounts retain its complete `StateWithExtensions` type and validation. The new `TokenMintRef` and `TokenAccountRef` enums provide common field access for code that supports either program, while still exposing the concrete Token-2022 state when extensions are needed. Associated-token loaders validate against the explicitly selected program, so valid extensions are accepted without accepting overlong legacy accounts, malformed extensions, or mixed-program account sets.
+
+#### Support `discriminator = Enum::Variant` in the `#[instruction]`, `#[account]`, and `#[event]` attribute macros, replacing the separate `variant = Variant` argument.
+
+_Packages:_ _pina_cli_
+
+```rust
+// Before
+#[instruction(discriminator = VestingInstruction, variant = Initialize)]
+pub struct InitializeInstruction {
+	// ...
+}
+
+// After
+#[instruction(discriminator = VestingInstruction::Initialize)]
+pub struct InitializeInstruction {
+	// ...
+}
+```
+
+The shorthand form is unchanged: when the struct name matches the variant, `discriminator = Enum` alone still works.
+
+```rust
+#[instruction(discriminator = VestingInstruction)]
+pub struct Initialize {
+	// ...
+}
+```
+
+##### Migration guide
+
+- Replace `#[instruction(discriminator = Enum, variant = Variant)]` with `#[instruction(discriminator = Enum::Variant)]`. The same applies to `#[account(...)]` and `#[event(...)]`.
+- The old `variant = Variant` argument remains supported for backwards compatibility. When it is present, the complete `discriminator` value is treated as the enum path, which preserves qualified forms such as `crate::types::Enum, variant = Variant`.
+- `pina_cli` IDL extraction understands all three forms: `Enum::Variant`, `Enum` + `variant = Variant`, and bare `Enum` (variant defaults to the struct name). The `pina init` template now emits the new syntax.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #172](https://github.com/pina-rs/pina/pull/172) · _Related issues:_ [#165](https://github.com/pina-rs/pina/issues/165), [#166](https://github.com/pina-rs/pina/issues/166), [#167](https://github.com/pina-rs/pina/issues/167), [#168](https://github.com/pina-rs/pina/issues/168), [#169](https://github.com/pina-rs/pina/issues/169), [#170](https://github.com/pina-rs/pina/issues/170), [#171](https://github.com/pina-rs/pina/issues/171), [#172](https://github.com/pina-rs/pina/issues/172), [#173](https://github.com/pina-rs/pina/issues/173), [#174](https://github.com/pina-rs/pina/issues/174), [#175](https://github.com/pina-rs/pina/issues/175), [#176](https://github.com/pina-rs/pina/issues/176), [#177](https://github.com/pina-rs/pina/issues/177), [#179](https://github.com/pina-rs/pina/issues/179), [#180](https://github.com/pina-rs/pina/issues/180), [#181](https://github.com/pina-rs/pina/issues/181), [#185](https://github.com/pina-rs/pina/issues/185), [#186](https://github.com/pina-rs/pina/issues/186), [#187](https://github.com/pina-rs/pina/issues/187), [#189](https://github.com/pina-rs/pina/issues/189), [#195](https://github.com/pina-rs/pina/issues/195)
+
+- **pina_cli**: Use the published `codama-renderers-dart@0.5.1` renderer and Solana Kit Dart `^0.8.0` runtime packages for generated clients, removing the temporary renderer patch and Git dependency overrides.
+
+#### Preserve wide discriminator encodings
+
+_Packages:_ _pina_cli_
+
+Parse the complete discriminator attribute grammar when generating Codama IDLs and preserve `u16`, `u32`, and `u64` discriminator widths instead of silently lowering them to `u8`.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #200](https://github.com/pina-rs/pina/pull/200)
+
+#### Refresh workspace dependencies
+
+_Packages:_ _pina_macros_, _pina_codama_renderer_, _pina_profile_, _pina_sdk_ids_
+
+Refresh workspace dependencies to their latest compatible versions.
+
+- Bump `pinocchio-token` to `0.7` and `pinocchio-token-2022` to `0.4` (drops the `token_program` field from `TransferChecked`/`CloseAccount`; examples now use the `new()` constructors).
+- Bump `codama-nodes` to `0.11` (spec `1.8.0`), `mollusk-svm` to `0.15`, `solana-account` to `4`, `solana-system-interface` to `3`, `insta-cmd` to `0.7`, and `object` to `0.40`.
+- Bump the JS Codama toolchain (`codama` to `1.10`, `@codama/renderers-js` to `2.3`) and regenerate all IDLs and Rust/JS clients.
+- Upgrade the workspace to `syn` 3, including the public `pina_cli` parsing API, and release the temporary derive-crate pins used during the migration.
+- Resolves `RUSTSEC-2026-0097` (unsound `rand` 0.7.3) and `RUSTSEC-2026-0173` (unmaintained `proc-macro-error2`), dropping them from the dependency tree, and updates `jiff`, `defmt`, `env_logger`, `solana-logger`, and `crossbeam-epoch` to patched versions.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #167](https://github.com/pina-rs/pina/pull/167) · _Related issues:_ [#165](https://github.com/pina-rs/pina/issues/165), [#166](https://github.com/pina-rs/pina/issues/166), [#167](https://github.com/pina-rs/pina/issues/167), [#168](https://github.com/pina-rs/pina/issues/168), [#169](https://github.com/pina-rs/pina/issues/169), [#170](https://github.com/pina-rs/pina/issues/170), [#171](https://github.com/pina-rs/pina/issues/171), [#172](https://github.com/pina-rs/pina/issues/172), [#173](https://github.com/pina-rs/pina/issues/173), [#174](https://github.com/pina-rs/pina/issues/174), [#175](https://github.com/pina-rs/pina/issues/175), [#176](https://github.com/pina-rs/pina/issues/176), [#177](https://github.com/pina-rs/pina/issues/177), [#179](https://github.com/pina-rs/pina/issues/179), [#180](https://github.com/pina-rs/pina/issues/180), [#181](https://github.com/pina-rs/pina/issues/181), [#185](https://github.com/pina-rs/pina/issues/185), [#186](https://github.com/pina-rs/pina/issues/186), [#187](https://github.com/pina-rs/pina/issues/187), [#189](https://github.com/pina-rs/pina/issues/189), [#195](https://github.com/pina-rs/pina/issues/195)
+
+- **pina_macros**: Improve the `#[discriminator]` size-assertion error message: it now reports the primitive's byte width (e.g. `u128` (16 bytes)) and lists the supported primitives (`u8`, `u16`, `u32`, `u64`), instead of only naming the symbolic `MAX_DISCRIMINATOR_SPACE` constant.
+- **pina_macros**: Replace latent panic paths in the proc macros with spanned compile errors and explicit internal-error panics. `#[derive(Accounts)]` now reports a clear error instead of panicking if the input shape is ever accepted by `darling` without named fields, and the remaining `unwrap()` calls on provably-safe values carry explanatory messages. Add trybuild negative tests for `#[derive(Accounts)]` on enums and tuple structs.
+
+#### Harden generated output boundaries
+
+_Packages:_ _pina_codama_renderer_
+
+Reject unsafe names and literals before rendering, validate generated Rust before replacing existing output, and constrain cleanup to managed files within the requested destination.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #198](https://github.com/pina-rs/pina/pull/198)
+
+- **core**: Repair regressions discovered while auditing the recently merged pull requests. Ensure the npm package is built and verified before publication, publish its real CommonJS, ESM, and declaration entry points, build CPI-heavy examples with Solana's supported SBF toolchain, include the associated-token program in escrow instructions, and harden the release, development-shell, fuzz, mutation, and end-to-end workflows that guard the workspace. Pull-request mutation tests remain advisory, but surviving mutants now appear as a failed step and explicit summary instead of a false-green result.
+- **codama-nodes-from-pina**: Update the Codama dependency to 1.10.1 and refresh the JavaScript development and test toolchain.
+
+### Documentation
+
+#### Improve documentation for guard-backed account access, cursor safety, inline_always allowance, and the log macro.
+
+_Packages:_ _pina_
+
+- **A1**: Add a "Guard lifetime" section to `AsAccount` explaining that `Ref`/`RefMut` guards block incompatible borrows while alive and should be dropped before later mutable access or CPIs.
+- **A2**: Document that `AccountsCursor::next_mut` rejects aliases for individually parsed mutable fields, while `peek` performs no validation and `remaining_mut` deliberately preserves trailing-account aliases.
+- **H2**: Annotate `#![allow(clippy::inline_always)]` with a rationale comment explaining CU optimization for on-chain programs.
+- **H3**: Move the `log!` format-arg limitation into a dedicated `# Limitations` doc section.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #177](https://github.com/pina-rs/pina/pull/177) · _Related issues:_ [#165](https://github.com/pina-rs/pina/issues/165), [#166](https://github.com/pina-rs/pina/issues/166), [#167](https://github.com/pina-rs/pina/issues/167), [#168](https://github.com/pina-rs/pina/issues/168), [#169](https://github.com/pina-rs/pina/issues/169), [#170](https://github.com/pina-rs/pina/issues/170), [#171](https://github.com/pina-rs/pina/issues/171), [#172](https://github.com/pina-rs/pina/issues/172), [#173](https://github.com/pina-rs/pina/issues/173), [#174](https://github.com/pina-rs/pina/issues/174), [#175](https://github.com/pina-rs/pina/issues/175), [#176](https://github.com/pina-rs/pina/issues/176), [#177](https://github.com/pina-rs/pina/issues/177), [#179](https://github.com/pina-rs/pina/issues/179), [#180](https://github.com/pina-rs/pina/issues/180), [#181](https://github.com/pina-rs/pina/issues/181), [#185](https://github.com/pina-rs/pina/issues/185), [#186](https://github.com/pina-rs/pina/issues/186), [#187](https://github.com/pina-rs/pina/issues/187), [#189](https://github.com/pina-rs/pina/issues/189), [#195](https://github.com/pina-rs/pina/issues/195)
+
+#### Refresh shared documentation after Pinocchio 0.11 migration
+
+_Packages:_ _core_
+
+Refresh the shared documentation after the Pinocchio 0.11 migration. This expands feature-selection guidance, adds explicit instruction-authoring tips for the new mutable `AccountView` and guard-backed loader model, clarifies close-account safety with `close_account_zeroed()`, and updates the security and design notes to match the current APIs.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #151](https://github.com/pina-rs/pina/pull/151)
+
+#### Correct the CPI introspection guarantee
+
+_Packages:_ _pina_cli_
+
+Expose `assert_current_instruction_program_id` for the guarantee the Instructions sysvar can actually provide. Deprecate the misleading `assert_no_cpi` name because transaction-level instruction metadata cannot detect self-CPI.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #204](https://github.com/pina-rs/pina/pull/204)
+
+### Notes
+
+#### Keep prebuilt sbpf-linker available in devenv
+
+_Packages:_ _core_
+
+Keep the prebuilt `custom.sbpf-linker` package available in `devenv` so BPF and binary-size jobs can find `sbpf-linker` on `PATH`, while disabling the package's Nix `installCheckPhase`. The upstream binary now requires linker inputs and `--output`, so invoking it with no arguments during the install check fails on Linux; on Darwin the same check also exposed a stale Homebrew LLVM load path. Skipping the install check unblocks `devenv shell` without removing the linker used by CI.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #161](https://github.com/pina-rs/pina/pull/161)
+
+#### Refresh devenv.lock
+
+_Packages:_ _core_
+
+Refresh `devenv.lock` to pick up the latest `ifiokjr/nixpkgs` fixes for `pnpm-standalone` activation in CI.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #107](https://github.com/pina-rs/pina/pull/107)
+
+- **core**: Repair regressions discovered while auditing the recently merged pull requests. Ensure the npm package is built and verified before publication, publish its real CommonJS, ESM, and declaration entry points, build CPI-heavy examples with Solana's supported SBF toolchain, include the associated-token program in escrow instructions, and harden the release, development-shell, fuzz, mutation, and end-to-end workflows that guard the workspace. Pull-request mutation tests remain advisory, but surviving mutants now appear as a failed step and explicit summary instead of a false-green result.
+- **pina_profile**: Replace `.expect()`/`.unwrap()` calls in pina_profile tests with `unwrap_or_else` and explicit, descriptive panic messages per repo conventions.
+- **codama-nodes-from-pina**: Generate deterministic Dart clients for every example IDL alongside the Rust and JavaScript clients. Add package-root exports, strict semantic IDL validation, pinned dependency resolution, and byte-level tests covering Pina's zeropod account and instruction wire contracts.
+
 ## 0.8.0 (2026-03-30)
 
 ### Breaking Changes
