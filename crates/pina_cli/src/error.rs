@@ -115,6 +115,9 @@ pub enum CodamaError {
 		source: Box<dyn std::error::Error + Send + Sync>,
 	},
 
+	#[error("Dart client IDL validation failed at {path}: {message}")]
+	DartClientValidation { path: PathBuf, message: String },
+
 	#[error("Failed to run `{cmd}`: {source}")]
 	RunCommand { cmd: String, source: std::io::Error },
 

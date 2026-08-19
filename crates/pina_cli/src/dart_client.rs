@@ -192,9 +192,9 @@ fn validate_option_type(
 }
 
 fn dart_error(path: impl AsRef<Path>, message: String) -> CodamaError {
-	CodamaError::DartClient {
+	CodamaError::DartClientValidation {
 		path: path.as_ref().to_path_buf(),
-		source: Box::new(std::io::Error::other(message)),
+		message,
 	}
 }
 
