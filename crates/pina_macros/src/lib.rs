@@ -65,7 +65,7 @@ fn add_derive(item: &mut ItemStruct, derive: syn::Path) -> syn::Result<()> {
 /// that is allowed to observe and mutate that storage.
 fn generate_view_helpers(
 	crate_path: &syn::Path,
-	error: proc_macro2::TokenStream,
+	error: &proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
 	quote! {
 		/// The exact number of bytes required by the zeropod representation.
@@ -970,7 +970,7 @@ fn account_impl(
 
 	let view_helpers = generate_view_helpers(
 		&crate_path,
-		quote!(#crate_path::ProgramError::InvalidAccountData),
+		&quote!(#crate_path::ProgramError::InvalidAccountData),
 	);
 
 	let implementations = quote! {
@@ -1260,7 +1260,7 @@ fn pda_impl(
 				let field_type = ty.field_type();
 				let param_type = ty.param_type();
 				let param_type_lt = ty.param_type_lt();
-				let stored_expr = ty.to_stored_expr(name);
+				let stored_expr = ty.stored_expr(name);
 				let slice_expr = ty.slice_expr(name);
 				let slice_expr_with_bump = ty.slice_expr_inner(name);
 				let doc = format!("The `{name}` seed.");
@@ -1285,7 +1285,6 @@ fn pda_impl(
 
 	// The `seeds()` constructor params (with a shared lifetime) and the
 	// `try_find_pda`/`find_pda`/`assert_seeds` params
-	let seeds_params = seeds_params_lt;
 	let find_params = {
 		let mut params = seed_params.clone();
 		params.push(quote!(program_id: &Address));
@@ -1333,7 +1332,7 @@ fn pda_impl(
 
 		impl #struct_name {
 			/// Build the PDA seeds for this account.
-			pub fn seeds<'a>(#(#seeds_params,)*) -> #seeds_name<'a> {
+			pub fn seeds<'a>(#(#seeds_params_lt,)*) -> #seeds_name<'a> {
 				#seeds_name {
 					#(#seed_param_names: #seed_stored_exprs,)*
 				}
@@ -1578,7 +1577,7 @@ fn instruction_impl(
 
 	let view_helpers = generate_view_helpers(
 		&crate_path,
-		quote!(#crate_path::ProgramError::InvalidInstructionData),
+		&quote!(#crate_path::ProgramError::InvalidInstructionData),
 	);
 
 	let implementations = quote! {
@@ -1734,7 +1733,7 @@ fn event_impl(
 
 	let view_helpers = generate_view_helpers(
 		&crate_path,
-		quote!(#crate_path::ProgramError::InvalidInstructionData),
+		&quote!(#crate_path::ProgramError::InvalidInstructionData),
 	);
 	let implementations = quote! {
 		impl #struct_name {

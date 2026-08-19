@@ -106,7 +106,7 @@ impl<'a> ProgramAddressCheck<'a> {
 	}
 
 	#[inline(always)]
-	fn assert_address(&self, expected: &Address) -> ProgramResult {
+	fn assert_address(self, expected: &Address) -> ProgramResult {
 		if self.address != expected {
 			return Err(ProgramError::IncorrectProgramId);
 		}

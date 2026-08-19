@@ -1,5 +1,9 @@
-// darling's derive expansions emit `continue` in generated code.
+// Darling's derive expansions emit `continue` in generated code.
 #![allow(clippy::needless_continue)]
+#![expect(
+	unused_qualifications,
+	reason = "darling emits qualified paths whose spans point to its input fields"
+)]
 
 use darling::FromDeriveInput;
 use darling::FromField;
@@ -129,7 +133,7 @@ impl SeedType {
 	}
 
 	/// The expression that stores a constructor parameter in the struct field.
-	pub(crate) fn to_stored_expr(&self, param: &syn::Ident) -> proc_macro2::TokenStream {
+	pub(crate) fn stored_expr(&self, param: &syn::Ident) -> proc_macro2::TokenStream {
 		match self {
 			SeedType::Address | SeedType::Bytes(_) => quote::quote!(#param),
 			SeedType::U8 => quote::quote!([#param]),
@@ -376,7 +380,7 @@ impl ToTokens for Primitive {
 impl Primitive {
 	/// The byte width of the primitive, used to produce a concrete error
 	/// message if it ever exceeds `MAX_DISCRIMINATOR_SPACE`.
-	pub(crate) fn byte_size(&self) -> usize {
+	pub(crate) fn byte_size(self) -> usize {
 		match self {
 			Primitive::U8 => 1,
 			Primitive::U16 => 2,

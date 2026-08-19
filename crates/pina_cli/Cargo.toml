@@ -13,6 +13,7 @@ description = "CLI tool for Pina Solana programs (IDL generation and more)"
 [[bin]]
 name = "pina"
 path = "src/main.rs"
+doc = false
 
 [dependencies]
 clap = { workspace = true, default-features = true }

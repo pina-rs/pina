@@ -148,7 +148,6 @@ fn extract_accounts_struct_from_body(expr: &Expr) -> Option<String> {
 		Expr::MethodCall(mc) if mc.method == "process" => {
 			extract_accounts_struct_from_body(&mc.receiver)
 		}
-		Expr::MethodCall(_) => None,
 		Expr::Try(t) => extract_accounts_struct_from_body(&t.expr),
 		Expr::Call(call) => extract_accounts_struct_from_call(call),
 		Expr::Block(b) => {
