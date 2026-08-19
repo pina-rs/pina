@@ -263,25 +263,6 @@ unsafe fn deserialize_input(
 }
 
 // ---------------------------------------------------------------------------
-// Helper: build sysvar AccountView
-// ---------------------------------------------------------------------------
-
-/// Construct a sysvar AccountView from fake instructions.
-///
-/// Returns (input, accounts) which must be kept alive.
-/// Use the returned AccountView reference for testing.
-macro_rules! sysvar_account {
-	($instructions:expr, $current_index:expr) => {{
-		let sysvar_data = build_sysvar_data($instructions, $current_index);
-		let builder = AccountBuilder::sysvar(sysvar_data);
-		let mut input = unsafe { create_sysvar_input(&builder, &[]) };
-		let mut accounts = [UNINIT];
-		let account = unsafe { deserialize_input(&mut input, &mut accounts) };
-		(input, accounts, account)
-	}};
-}
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

@@ -24,6 +24,7 @@ pub struct FunctionFacts {
 	pub calls: Vec<CallInfo>,
 	pub has_match: bool,
 	pub has_byte_string: bool,
+	pub paths: Vec<String>,
 }
 
 pub fn collect_function_facts(body: &Body<'_>) -> FunctionFacts {
@@ -188,6 +189,18 @@ fn collect_from_expr(expr: &Expr<'_>, facts: &mut FunctionFacts) {
 			if matches!(lit.node, LitKind::ByteStr(..)) {
 				facts.has_byte_string = true;
 			}
+		}
+		ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) => {
+			facts.paths.push(
+				path.segments
+					.iter()
+					.map(|segment| segment.ident.name.as_str())
+					.collect::<Vec<_>>()
+					.join("::"),
+			);
+		}
+		ExprKind::Path(rustc_hir::QPath::TypeRelative(_, segment)) => {
+			facts.paths.push(segment.ident.name.as_str().to_string());
 		}
 		_ => {}
 	}

@@ -7,6 +7,10 @@
 //! program-owned account merely by presenting it as writable.
 
 #![allow(clippy::inline_always)]
+#![expect(
+	clippy::len_without_is_empty,
+	reason = "zeropod generates len accessors for scalar wire fields, not collections"
+)]
 #![no_std]
 
 #[cfg(all(
@@ -141,7 +145,7 @@ fn validate_distinct_realloc_targets(account1: &Address, account2: &Address) -> 
 	Ok(())
 }
 
-fn validate_sample(sample: &AccountView, authority: &Address) -> ProgramResult {
+fn validate_sample(sample: AccountView, authority: &Address) -> ProgramResult {
 	sample
 		.assert_not_empty()?
 		.assert_writable()?
@@ -216,7 +220,7 @@ impl<'a> ProcessAccountInfos<'a> for ReallocAccounts<'a> {
 
 		self.authority.assert_signer()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
-		validate_sample(self.sample, &authority_key)?;
+		validate_sample(*self.sample, &authority_key)?;
 		validate_target_len(target_len)?;
 		validate_realloc_delta(self.sample.data_len(), target_len)?;
 
@@ -237,8 +241,8 @@ impl<'a> ProcessAccountInfos<'a> for Realloc2Accounts<'a> {
 		// though these are immutable Rust borrows for duplicate alias safety.
 		self.sample1.assert_writable()?;
 		self.sample2.assert_writable()?;
-		validate_sample(self.sample1, &authority_key)?;
-		validate_sample(self.sample2, &authority_key)?;
+		validate_sample(*self.sample1, &authority_key)?;
+		validate_sample(*self.sample2, &authority_key)?;
 
 		validate_distinct_realloc_targets(self.sample1.address(), self.sample2.address())
 	}

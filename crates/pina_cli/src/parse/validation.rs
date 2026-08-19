@@ -166,13 +166,11 @@ fn collect_assertions_from_expr(expr: &Expr, props: &mut HashMap<String, Account
 				if matches!(
 					method.as_deref(),
 					Some("assert_seeds" | "assert_seeds_with_bump" | "assert_canonical_bump")
-				) {
-					if let Some(first_arg) = call.args.first() {
-						if let Some(field_name) = resolve_self_field(first_arg) {
-							let entry = props.entry(field_name).or_default();
-							apply_assertion("assert_seeds", &call.args, entry);
-						}
-					}
+				) && let Some(first_arg) = call.args.first()
+					&& let Some(field_name) = resolve_self_field(first_arg)
+				{
+					let entry = props.entry(field_name).or_default();
+					apply_assertion("assert_seeds", &call.args, entry);
 				}
 			}
 

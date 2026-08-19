@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::path::Path;
 
 use walkdir::WalkDir;
@@ -122,11 +123,7 @@ pub fn harden_generated_clients(
 ) -> Result<(), CodamaError> {
 	for program in programs {
 		let generated = output_root.join(program).join("src/generated");
-		for entry in WalkDir::new(&generated)
-			.min_depth(2)
-			.max_depth(2)
-			.into_iter()
-		{
+		for entry in WalkDir::new(&generated).min_depth(2).max_depth(2) {
 			let entry = entry.map_err(|source| {
 				CodamaError::HardenJavaScript {
 					path: generated.clone(),
@@ -343,7 +340,7 @@ fn harden_enum_decoder(source: &str) -> String {
 
 	let mut hardened = String::with_capacity(source.len() + values.len());
 	hardened.push_str(&source[..expression_start]);
-	hardened.push_str(&format!("getZeroPodEnumDecoder({expression}, [{values}])"));
+	let _ = write!(hardened, "getZeroPodEnumDecoder({expression}, [{values}])");
 	hardened.push_str(&source[expression_end..]);
 	hardened
 }
@@ -400,9 +397,10 @@ fn replace_string_decoders(source: &str, bits: u8) -> String {
 			continue;
 		}
 
-		output.push_str(&format!(
+		let _ = write!(
+			output,
 			"getZeroPodStringDecoder(getU{bits}Decoder(), {fixed_bytes})"
-		));
+		);
 		remaining = &remaining[value_end + 1..];
 	}
 

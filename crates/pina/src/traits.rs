@@ -692,6 +692,10 @@ impl<'a> AccountsCursor<'a> {
 	}
 
 	/// Parse the next account as an immutable account field.
+	#[expect(
+		clippy::should_implement_trait,
+		reason = "this cursor operation is fallible and intentionally returns Result"
+	)]
 	pub fn next(&mut self) -> Result<&'a AccountView, ProgramError> {
 		let accounts = core::mem::take(&mut self.remaining);
 		let (account, rest) = accounts
@@ -714,8 +718,8 @@ impl<'a> AccountsCursor<'a> {
 			.split_first_mut()
 			.ok_or(ProgramError::NotEnoughAccountKeys)?;
 		self.remaining = rest;
-		validate_writable(account)?;
-		self.track_mutable_account(account)?;
+		validate_writable(*account)?;
+		self.track_mutable_account(*account)?;
 
 		Ok(account)
 	}
@@ -731,8 +735,7 @@ impl<'a> AccountsCursor<'a> {
 	/// This is the trailing-account counterpart to [`Self::next`] and is used by
 	/// immutable `#[pina(remaining)]` fields.
 	pub fn take_remaining(&mut self) -> &'a [AccountView] {
-		let remaining = core::mem::take(&mut self.remaining);
-		remaining
+		&*core::mem::take(&mut self.remaining)
 	}
 
 	/// Consume and return the unparsed trailing accounts.
@@ -748,7 +751,7 @@ impl<'a> AccountsCursor<'a> {
 	pub fn remaining_mut(&mut self) -> Result<&'a mut [AccountView], ProgramError> {
 		let remaining = core::mem::take(&mut self.remaining);
 		for account in &*remaining {
-			validate_writable(account)?;
+			validate_writable(*account)?;
 		}
 
 		Ok(remaining)
@@ -768,7 +771,7 @@ impl<'a> AccountsCursor<'a> {
 	///
 	/// This check protects fields parsed individually through [`Self::next_mut`].
 	/// It does not inspect pairs contained entirely within [`Self::remaining_mut`].
-	fn track_mutable_account(&self, account: &AccountView) -> Result<(), ProgramError> {
+	fn track_mutable_account(&self, account: AccountView) -> Result<(), ProgramError> {
 		if !account.is_writable() {
 			return Ok(());
 		}

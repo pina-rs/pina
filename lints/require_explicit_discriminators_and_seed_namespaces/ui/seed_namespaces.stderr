@@ -1,0 +1,10 @@
+warning: seed-based example code should use explicit byte-string namespaces and visible discriminator markers
+  --> $DIR/seed_namespaces.rs:42:2
+   |
+LL |     account.assert_seeds(seeds);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use byte-string seed prefixes such as `b"config"` and keep `#[discriminator]` / `#[instruction(...)]` annotations explicit
+   = note: `#[warn(require_explicit_discriminators_and_seed_namespaces)]` on by default
+
+warning: 1 warning emitted

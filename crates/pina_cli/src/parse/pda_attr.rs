@@ -61,9 +61,7 @@ pub fn extract_pda_from_attributes(file: &File, seed_constants: &[SeedConstant])
 						resolved = false;
 						break;
 					};
-					let Some(constant) =
-						seed_constants.iter().find(|c| c.name == ident.to_string())
-					else {
+					let Some(constant) = seed_constants.iter().find(|c| *ident == c.name) else {
 						resolved = false;
 						break;
 					};
@@ -109,7 +107,7 @@ enum PdaAttrSeed {
 	Variable { name: String, rust_type: String },
 }
 
-impl syn::parse::Parse for PdaAttrArgs {
+impl Parse for PdaAttrArgs {
 	fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
 		let mut seeds = None;
 
@@ -192,7 +190,7 @@ fn seed_type_to_string(ty: &syn::Type) -> String {
 			type_path
 				.path
 				.get_ident()
-				.map_or_else(|| "Address".to_string(), |ident| ident.to_string())
+				.map_or_else(|| "Address".to_string(), ToString::to_string)
 		}
 		syn::Type::Array(array) => {
 			let len = match &array.len {

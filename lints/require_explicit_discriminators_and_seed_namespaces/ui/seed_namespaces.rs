@@ -1,0 +1,46 @@
+#![allow(dead_code)]
+
+struct AccountView;
+
+impl AccountView {
+	fn assert_seeds(&self, _seeds: &[&[u8]]) {}
+}
+
+struct State;
+
+impl State {
+	fn seeds(_authority: &[u8]) -> [&'static [u8]; 1] {
+		[b"state"]
+	}
+}
+
+const CONFIG_SEED: &[u8] = b"config";
+const SEED: &[u8] = b"generic";
+
+fn process_named_constant(account: &AccountView, authority: &[u8]) {
+	let seeds = &[CONFIG_SEED, authority];
+	account.assert_seeds(seeds);
+}
+
+fn process_generated_builder(account: &AccountView, authority: &[u8]) {
+	let seeds = State::seeds(authority);
+	account.assert_seeds(&seeds);
+}
+
+fn process_named_seed(account: &AccountView, authority: &[u8]) {
+	let seeds = &[SEED, authority];
+	account.assert_seeds(seeds);
+}
+
+fn process_inline_namespace(account: &AccountView, authority: &[u8]) {
+	let seeds = &[b"inline".as_slice(), authority];
+	account.assert_seeds(seeds);
+}
+
+fn process_missing_namespace(account: &AccountView, authority: &[u8]) {
+	let seeds = &[authority];
+	account.assert_seeds(seeds);
+	//~^ WARN: seed-based example code should use explicit byte-string namespaces and visible discriminator markers
+}
+
+fn main() {}

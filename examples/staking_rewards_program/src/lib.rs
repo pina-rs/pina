@@ -189,14 +189,14 @@ const POSITION_SEED_PREFIX: &[u8] = b"position";
 
 const SPL_PROGRAM_IDS: [Address; 2] = [token::ID, token_2022::ID];
 
-fn assert_pool_stake_mint(pool_state: &PoolStateZc, stake_mint: &AccountView) -> ProgramResult {
+fn assert_pool_stake_mint(pool_state: &PoolStateZc, stake_mint: AccountView) -> ProgramResult {
 	stake_mint
 		.assert_address(&pool_state.stake_mint)
 		.map(|_| ())
 		.map_err(|_| ProgramError::from(StakingError::InvalidPool))
 }
 
-fn assert_pool_reward_mint(pool_state: &PoolStateZc, reward_mint: &AccountView) -> ProgramResult {
+fn assert_pool_reward_mint(pool_state: &PoolStateZc, reward_mint: AccountView) -> ProgramResult {
 	reward_mint
 		.assert_address(&pool_state.reward_mint)
 		.map(|_| ())
@@ -204,8 +204,8 @@ fn assert_pool_reward_mint(pool_state: &PoolStateZc, reward_mint: &AccountView) 
 }
 
 fn assert_position_access(
-	pool_state: &AccountView,
-	user: &AccountView,
+	pool_state: AccountView,
+	user: AccountView,
 	position_state: &PositionStateZc,
 ) -> ProgramResult {
 	pool_state
@@ -385,8 +385,8 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 				return Err(StakingError::InvalidAmount.into());
 			}
 
-			assert_pool_stake_mint(&pool_state, self.stake_mint)?;
-			assert_position_access(self.pool_state, self.user, &position_state)?;
+			assert_pool_stake_mint(&pool_state, *self.stake_mint)?;
+			assert_position_access(*self.pool_state, *self.user, &position_state)?;
 
 			(
 				position_state.staked_amount.get(),
@@ -469,8 +469,8 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 				return Err(StakingError::InvalidAmount.into());
 			}
 
-			assert_pool_stake_mint(&pool_state, self.stake_mint)?;
-			assert_position_access(self.pool_state, self.user, &position_state)?;
+			assert_pool_stake_mint(&pool_state, *self.stake_mint)?;
+			assert_position_access(*self.pool_state, *self.user, &position_state)?;
 
 			(
 				position_state.staked_amount.get(),
@@ -526,8 +526,8 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 				return Err(StakingError::PoolPaused.into());
 			}
 
-			assert_pool_reward_mint(&pool_state, self.reward_mint)?;
-			assert_position_access(self.pool_state, self.user, &position_state)?;
+			assert_pool_reward_mint(&pool_state, *self.reward_mint)?;
+			assert_position_access(*self.pool_state, *self.user, &position_state)?;
 
 			(
 				position_state.pending_rewards.get(),

@@ -14,6 +14,7 @@ use pinocchio::account::MAX_PERMITTED_DATA_INCREASE;
 use pinocchio::entrypoint;
 
 const TEST_PROGRAM_ID: Address = address!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+const SYSVAR_OWNER: Address = address!("Sysvar1111111111111111111111111111111111111");
 const BPF_ALIGN_OF_U128: usize = 8;
 const UNINIT: MaybeUninit<AccountView> = MaybeUninit::<AccountView>::uninit();
 const STATIC_ACCOUNT_DATA: usize = 88 + MAX_PERMITTED_DATA_INCREASE;
@@ -613,6 +614,24 @@ fn assert_program_rejects_wrong_identity_and_non_executable_targets() {
 		account_views[1].assert_program(&system::ID),
 		Err(ProgramError::InvalidAccountData)
 	);
+}
+
+#[test]
+fn account_validation_accepts_matching_metadata() {
+	let address = fake_address(30);
+	let unique_accounts = [AccountBuilder::new()
+		.address(address)
+		.owner(SYSVAR_OWNER)
+		.executable(true)];
+
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+	let account = &account_views[0];
+
+	assert!(account.assert_executable().is_ok());
+	assert!(account.assert_empty().is_ok());
+	assert!(account.assert_sysvar(&address).is_ok());
+	assert!(account.assert_owners(&[SYSVAR_OWNER]).is_ok());
 }
 
 #[test]

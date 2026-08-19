@@ -101,7 +101,7 @@ fn oracle_size() -> usize {
 	OracleState::SIZE
 }
 
-fn assert_update_authority(authority: &AccountView) -> ProgramResult {
+fn assert_update_authority(authority: AccountView) -> ProgramResult {
 	if authority.address() == &UPDATE_AUTHORITY {
 		return Ok(());
 	}
@@ -109,7 +109,7 @@ fn assert_update_authority(authority: &AccountView) -> ProgramResult {
 	Err(PropAmmError::UnauthorizedUpdateAuthority.into())
 }
 
-fn assert_oracle_authority(authority: &AccountView, expected: &Address) -> ProgramResult {
+fn assert_oracle_authority(authority: AccountView, expected: &Address) -> ProgramResult {
 	if authority.address() == expected {
 		return Ok(());
 	}
@@ -140,7 +140,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 		let args = UpdateInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
-		assert_update_authority(self.authority)?;
+		assert_update_authority(*self.authority)?;
 		self.oracle.assert_type::<OracleState>(&ID)?;
 
 		let mut oracle = self.oracle.as_account_mut::<OracleState>(&ID)?;
@@ -159,7 +159,7 @@ impl<'a> ProcessAccountInfos<'a> for RotateAuthorityAccounts<'a> {
 
 		{
 			let oracle = self.oracle.as_account::<OracleState>(&ID)?;
-			assert_oracle_authority(self.authority, &oracle.authority)?;
+			assert_oracle_authority(*self.authority, &oracle.authority)?;
 		}
 
 		let mut oracle = self.oracle.as_account_mut::<OracleState>(&ID)?;

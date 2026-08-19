@@ -20,8 +20,10 @@ use crate::log_caller;
 
 const SYSVAR_ID: Address = crate::address!("Sysvar1111111111111111111111111111111111111");
 
+// `AccountView` is a pointer-sized `Copy` handle. Passing it by value through
+// these private validators copies only that handle, never the account data.
 #[track_caller]
-fn validate_signer(account: &AccountView) -> ProgramResult {
+fn validate_signer(account: AccountView) -> ProgramResult {
 	if !account.is_signer() {
 		log!(
 			"address: {} is missing a required signature",
@@ -36,7 +38,7 @@ fn validate_signer(account: &AccountView) -> ProgramResult {
 }
 
 #[track_caller]
-pub(crate) fn validate_writable(account: &AccountView) -> ProgramResult {
+pub(crate) fn validate_writable(account: AccountView) -> ProgramResult {
 	if !account.is_writable() {
 		log!(
 			"address: {} has not been marked as writable",
@@ -51,7 +53,7 @@ pub(crate) fn validate_writable(account: &AccountView) -> ProgramResult {
 }
 
 #[track_caller]
-fn validate_executable(account: &AccountView) -> ProgramResult {
+fn validate_executable(account: AccountView) -> ProgramResult {
 	if !account.executable() {
 		log!("address: {} is not executable", account.address().as_ref());
 		log_caller();
@@ -63,7 +65,7 @@ fn validate_executable(account: &AccountView) -> ProgramResult {
 }
 
 #[track_caller]
-fn validate_data_len(account: &AccountView, len: usize) -> ProgramResult {
+fn validate_data_len(account: AccountView, len: usize) -> ProgramResult {
 	if account.data_len() != len {
 		log!(
 			"address: {} has an incorrect length",
@@ -78,7 +80,7 @@ fn validate_data_len(account: &AccountView, len: usize) -> ProgramResult {
 }
 
 #[track_caller]
-fn validate_empty(account: &AccountView) -> ProgramResult {
+fn validate_empty(account: AccountView) -> ProgramResult {
 	if !account.is_data_empty() {
 		log!("address: {} is not empty", account.address().as_ref());
 		log_caller();
@@ -90,7 +92,7 @@ fn validate_empty(account: &AccountView) -> ProgramResult {
 }
 
 #[track_caller]
-fn validate_not_empty(account: &AccountView) -> ProgramResult {
+fn validate_not_empty(account: AccountView) -> ProgramResult {
 	if account.is_data_empty() {
 		log!("address: {} is empty", account.address().as_ref());
 		log_caller();
@@ -102,13 +104,13 @@ fn validate_not_empty(account: &AccountView) -> ProgramResult {
 }
 
 #[track_caller]
-fn validate_program(account: &AccountView, program_id: &Address) -> ProgramResult {
+fn validate_program(account: AccountView, program_id: &Address) -> ProgramResult {
 	validate_address(account, program_id)?;
 	validate_executable(account)
 }
 
 #[track_caller]
-fn validate_type<T: PinaAccount>(account: &AccountView, program_id: &Address) -> ProgramResult {
+fn validate_type<T: PinaAccount>(account: AccountView, program_id: &Address) -> ProgramResult {
 	validate_owner(account, program_id)?;
 
 	let data = account.try_borrow()?;
@@ -147,13 +149,13 @@ fn validate_type<T: PinaAccount>(account: &AccountView, program_id: &Address) ->
 }
 
 #[track_caller]
-fn validate_sysvar(account: &AccountView, sysvar_id: &Address) -> ProgramResult {
+fn validate_sysvar(account: AccountView, sysvar_id: &Address) -> ProgramResult {
 	validate_owner(account, &SYSVAR_ID)?;
 	validate_address(account, sysvar_id)
 }
 
 #[track_caller]
-fn validate_owner(account: &AccountView, owner: &Address) -> ProgramResult {
+fn validate_owner(account: AccountView, owner: &Address) -> ProgramResult {
 	let account_owner = account.owner();
 
 	if account_owner.ne(owner) {
@@ -172,7 +174,7 @@ fn validate_owner(account: &AccountView, owner: &Address) -> ProgramResult {
 }
 
 #[track_caller]
-fn validate_owners(account: &AccountView, owners: &[Address]) -> ProgramResult {
+fn validate_owners(account: AccountView, owners: &[Address]) -> ProgramResult {
 	let account_owner = account.owner();
 
 	if owners.contains(account_owner) {
@@ -190,7 +192,7 @@ fn validate_owners(account: &AccountView, owners: &[Address]) -> ProgramResult {
 }
 
 #[track_caller]
-fn validate_address(account: &AccountView, addr: &Address) -> ProgramResult {
+fn validate_address(account: AccountView, addr: &Address) -> ProgramResult {
 	if account.address() == addr {
 		return Ok(());
 	}
@@ -206,7 +208,7 @@ fn validate_address(account: &AccountView, addr: &Address) -> ProgramResult {
 }
 
 #[track_caller]
-fn validate_addresses(account: &AccountView, addresses: &[Address]) -> ProgramResult {
+fn validate_addresses(account: AccountView, addresses: &[Address]) -> ProgramResult {
 	if addresses.contains(account.address()) {
 		return Ok(());
 	}
@@ -218,7 +220,7 @@ fn validate_addresses(account: &AccountView, addresses: &[Address]) -> ProgramRe
 }
 
 #[track_caller]
-fn validate_seeds(account: &AccountView, seeds: &[&[u8]], program_id: &Address) -> ProgramResult {
+fn validate_seeds(account: AccountView, seeds: &[&[u8]], program_id: &Address) -> ProgramResult {
 	let Some((pda, _bump)) = crate::try_find_program_address(seeds, program_id) else {
 		log!(
 			"could not find program address from seeds with program id: {}",
@@ -245,7 +247,7 @@ fn validate_seeds(account: &AccountView, seeds: &[&[u8]], program_id: &Address) 
 
 #[track_caller]
 fn validate_seeds_with_bump(
-	account: &AccountView,
+	account: AccountView,
 	seeds: &[&[u8]],
 	program_id: &Address,
 ) -> ProgramResult {
@@ -278,7 +280,7 @@ fn validate_seeds_with_bump(
 
 #[track_caller]
 fn validate_canonical_bump(
-	account: &AccountView,
+	account: AccountView,
 	seeds: &[&[u8]],
 	program_id: &Address,
 ) -> Result<u8, ProgramError> {
@@ -310,7 +312,7 @@ fn validate_canonical_bump(
 #[inline(always)]
 #[track_caller]
 fn validate_associated_token_address(
-	account: &AccountView,
+	account: AccountView,
 	wallet: &Address,
 	mint: &Address,
 	token_program: &Address,
@@ -347,42 +349,42 @@ macro_rules! impl_account_info_validation {
 		impl<'a> AccountInfoValidation for $type {
 			#[track_caller]
 			fn assert_signer(self) -> Result<Self, ProgramError> {
-				validate_signer(self)?;
+				validate_signer(*self)?;
 
 				Ok(self)
 			}
 
 			#[track_caller]
 			fn assert_writable(self) -> Result<Self, ProgramError> {
-				validate_writable(self)?;
+				validate_writable(*self)?;
 
 				Ok(self)
 			}
 
 			#[track_caller]
 			fn assert_executable(self) -> Result<Self, ProgramError> {
-				validate_executable(self)?;
+				validate_executable(*self)?;
 
 				Ok(self)
 			}
 
 			#[track_caller]
 			fn assert_data_len(self, len: usize) -> Result<Self, ProgramError> {
-				validate_data_len(self, len)?;
+				validate_data_len(*self, len)?;
 
 				Ok(self)
 			}
 
 			#[track_caller]
 			fn assert_empty(self) -> Result<Self, ProgramError> {
-				validate_empty(self)?;
+				validate_empty(*self)?;
 
 				Ok(self)
 			}
 
 			#[track_caller]
 			fn assert_not_empty(self) -> Result<Self, ProgramError> {
-				validate_not_empty(self)?;
+				validate_not_empty(*self)?;
 
 				Ok(self)
 			}
@@ -392,49 +394,49 @@ macro_rules! impl_account_info_validation {
 				self,
 				program_id: &Address,
 			) -> Result<Self, ProgramError> {
-				validate_type::<T>(self, program_id)?;
+				validate_type::<T>(*self, program_id)?;
 
 				Ok(self)
 			}
 
 			#[track_caller]
 			fn assert_program(self, program_id: &Address) -> Result<Self, ProgramError> {
-				validate_program(self, program_id)?;
+				validate_program(*self, program_id)?;
 
 				Ok(self)
 			}
 
 			#[track_caller]
 			fn assert_sysvar(self, sysvar_id: &Address) -> Result<Self, ProgramError> {
-				validate_sysvar(self, sysvar_id)?;
+				validate_sysvar(*self, sysvar_id)?;
 
 				Ok(self)
 			}
 
 			#[track_caller]
 			fn assert_address(self, address: &Address) -> Result<Self, ProgramError> {
-				validate_address(self, address)?;
+				validate_address(*self, address)?;
 
 				Ok(self)
 			}
 
 			#[track_caller]
 			fn assert_addresses(self, addresses: &[Address]) -> Result<Self, ProgramError> {
-				validate_addresses(self, addresses)?;
+				validate_addresses(*self, addresses)?;
 
 				Ok(self)
 			}
 
 			#[track_caller]
 			fn assert_owner(self, owner: &Address) -> Result<Self, ProgramError> {
-				validate_owner(self, owner)?;
+				validate_owner(*self, owner)?;
 
 				Ok(self)
 			}
 
 			#[track_caller]
 			fn assert_owners(self, owners: &[Address]) -> Result<Self, ProgramError> {
-				validate_owners(self, owners)?;
+				validate_owners(*self, owners)?;
 
 				Ok(self)
 			}
@@ -445,7 +447,7 @@ macro_rules! impl_account_info_validation {
 				seeds: &[&[u8]],
 				program_id: &Address,
 			) -> Result<Self, ProgramError> {
-				validate_seeds(self, seeds, program_id)?;
+				validate_seeds(*self, seeds, program_id)?;
 
 				Ok(self)
 			}
@@ -456,7 +458,7 @@ macro_rules! impl_account_info_validation {
 				seeds: &[&[u8]],
 				program_id: &Address,
 			) -> Result<Self, ProgramError> {
-				validate_seeds_with_bump(self, seeds, program_id)?;
+				validate_seeds_with_bump(*self, seeds, program_id)?;
 
 				Ok(self)
 			}
@@ -467,7 +469,7 @@ macro_rules! impl_account_info_validation {
 				seeds: &[&[u8]],
 				program_id: &Address,
 			) -> Result<u8, ProgramError> {
-				validate_canonical_bump(self, seeds, program_id)
+				validate_canonical_bump(*self, seeds, program_id)
 			}
 
 			#[cfg(feature = "token")]
@@ -479,7 +481,7 @@ macro_rules! impl_account_info_validation {
 				mint: &Address,
 				token_program: &Address,
 			) -> Result<Self, ProgramError> {
-				validate_associated_token_address(self, wallet, mint, token_program)?;
+				validate_associated_token_address(*self, wallet, mint, token_program)?;
 
 				Ok(self)
 			}
@@ -741,8 +743,8 @@ fn checked_close_balance(sender_balance: u64, recipient_balance: u64) -> Result<
 
 #[track_caller]
 fn checked_close_recipient_balance(
-	account: &AccountView,
-	recipient: &AccountView,
+	account: AccountView,
+	recipient: AccountView,
 ) -> Result<u64, ProgramError> {
 	account.assert_writable()?;
 	recipient.assert_writable()?;
@@ -818,7 +820,7 @@ impl LamportTransfer for AccountView {
 impl CloseAccountWithRecipient for AccountView {
 	#[track_caller]
 	fn close_with_recipient(&mut self, recipient: &mut AccountView) -> ProgramResult {
-		let new_balance = checked_close_recipient_balance(self, recipient)?;
+		let new_balance = checked_close_recipient_balance(*self, *recipient)?;
 		recipient.set_lamports(new_balance);
 		self.set_lamports(0);
 		self.close()
@@ -826,7 +828,7 @@ impl CloseAccountWithRecipient for AccountView {
 
 	#[track_caller]
 	fn close_account_zeroed(&mut self, recipient: &mut AccountView) -> ProgramResult {
-		let new_balance = checked_close_recipient_balance(self, recipient)?;
+		let new_balance = checked_close_recipient_balance(*self, *recipient)?;
 
 		{
 			let mut data = self.try_borrow_mut()?;
