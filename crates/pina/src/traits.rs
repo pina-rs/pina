@@ -731,8 +731,7 @@ impl<'a> AccountsCursor<'a> {
 	/// This is the trailing-account counterpart to [`Self::next`] and is used by
 	/// immutable `#[pina(remaining)]` fields.
 	pub fn take_remaining(&mut self) -> &'a [AccountView] {
-		let remaining = core::mem::take(&mut self.remaining);
-		remaining
+		(core::mem::take(&mut self.remaining)) as _
 	}
 
 	/// Consume and return the unparsed trailing accounts.

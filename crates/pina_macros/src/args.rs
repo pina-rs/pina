@@ -271,7 +271,7 @@ fn parse_seed_list(input: syn::parse::ParseStream) -> syn::Result<Vec<PdaSeedArg
 
 /// Parse a typed seed parameter type.
 fn parse_seed_type(ty: &syn::Type) -> syn::Result<SeedType> {
-	let error = |span: &dyn quote::ToTokens| {
+	let error = |span: &dyn ToTokens| {
 		syn::Error::new_spanned(
 			span,
 			"unsupported seed type; expected `Address`, `u8`, `u16`, `u32`, `u64`, or `[u8; N]`",
@@ -302,7 +302,7 @@ fn parse_seed_type(ty: &syn::Type) -> syn::Result<SeedType> {
 			if ident != "u8" {
 				return Err(error(ty));
 			}
-			let syn::Expr::Lit(lit) = &array.len else {
+			let Expr::Lit(lit) = &array.len else {
 				return Err(error(ty));
 			};
 			let syn::Lit::Int(int) = &lit.lit else {

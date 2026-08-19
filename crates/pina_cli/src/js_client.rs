@@ -122,11 +122,7 @@ pub fn harden_generated_clients(
 ) -> Result<(), CodamaError> {
 	for program in programs {
 		let generated = output_root.join(program).join("src/generated");
-		for entry in WalkDir::new(&generated)
-			.min_depth(2)
-			.max_depth(2)
-			.into_iter()
-		{
+		for entry in WalkDir::new(&generated).min_depth(2).max_depth(2) {
 			let entry = entry.map_err(|source| {
 				CodamaError::HardenJavaScript {
 					path: generated.clone(),
