@@ -6,6 +6,14 @@ expression: output
 pub struct EmptyEvent {
     discriminator: [u8; EventDisc::BYTES],
 }
+const _: fn() = || {
+    fn assert_storage<T: ::pina::ZcElem>() {}
+    assert_storage::<EmptyEventZc>();
+};
+const _: () = {
+    ::core::assert!(::core::mem::align_of:: < EmptyEventZc > () == 1);
+    ::core::assert!(::core::mem::size_of:: < EmptyEventZc > () == EventDisc::BYTES);
+};
 impl EmptyEvent {
     /// The exact number of bytes required by the zeropod representation.
     pub const SIZE: usize = <Self as ::pina::ZeroPodFixed>::SIZE;
@@ -27,10 +35,9 @@ impl EmptyEvent {
     /// returned borrow prevents the caller from observing or changing the raw
     /// bytes while the typed view is live.
     ///
-    /// Every non-discriminator field must accept an all-zero representation.
-    /// In particular, an enum stored directly in this schema needs a variant
-    /// with discriminant zero. Schemas without a valid zero state return the
-    /// generated invalid-data error instead of exposing an unvalidated view.
+    /// Every accepted field has an audited all-zero representation. The macro
+    /// rejects custom types and other layouts whose zero state cannot be
+    /// established by Pina's closed schema grammar.
     ///
     /// # Errors
     ///

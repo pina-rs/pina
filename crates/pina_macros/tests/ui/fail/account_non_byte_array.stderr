@@ -1,0 +1,5 @@
+error: only `[u8; N]` arrays with a literal length are supported in Pina schemas
+  --> tests/ui/fail/account_non_byte_array.rs:10:14
+   |
+10 |     pub values: [u16; 4],
+   |                 ^^^^^^^^

@@ -1,21 +1,22 @@
-//! Profile program — demonstrates Pod collections (`PodString`, `PodVec`) in
-//! on-chain account state.
+//! Profile program — demonstrates wire-compatible, fully initialized bounded
+//! fields in on-chain account state.
 //!
-//! This example shows how to store variable-length data in zero-copy account
-//! layouts using pina's fixed-capacity Pod collections:
+//! Pina's macro-generated zero-copy boundary intentionally accepts only
+//! storage whose complete backing bytes are always initialized. This example
+//! retains the established string/vector wire layout with fixed byte arrays
+//! and small checked semantic helpers:
 //!
-//! - **`PodString<N, PFX>`** — a fixed-capacity UTF-8 string with a length
-//!   prefix. Used here for the profile `name` (32 bytes) and `bio` (128
-//!   bytes). Zeropod validates UTF-8 at the instruction boundary before storage.
-//! - **`PodVec<T, N, PFX>`** — a fixed-capacity vector with a length prefix.
-//!   Used here for a list of up to 8 `PodU64` tags.
+//! - **`[u8; 33]` / `[u8; 129]`** — one length byte followed by fully
+//!   initialized UTF-8 capacity.
+//! - **`[u8; 66]`** — a two-byte little-endian count followed by eight
+//!   little-endian `u64` slots.
 //! - **`Option<T>`** — fixed-size optional data backed by `PodOption` in the
 //!   generated zero-copy view. Used here for an optional favourite tag.
 //! - **`PodBool`** — a single-byte boolean for the `active` flag.
 //!
-//! Because every field has an alignment-one zeropod representation, the whole
-//! account is validated and accessed in place by
-//! `as_account::<ProfileState>()`, without allocating or copying its data.
+//! Every mutation writes a fully initialized array, so reading the complete
+//! account backing slice remains sound. Semantic helpers validate lengths and
+//! UTF-8 before exposing values.
 //!
 //! ## Instructions
 //!
@@ -77,7 +78,7 @@ pub enum ProfileAccountType {
 #[error]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProfileError {
-	/// A `PodString` field contained invalid UTF-8.
+	/// A bounded string field contained invalid UTF-8.
 	InvalidUtf8 = 0,
 	/// The tag list is full (capacity 8).
 	TagOverflow = 1,
@@ -105,9 +106,9 @@ pub enum ProfileError {
 /// |--------|------|----------------|
 /// | 0      | 1    | discriminator  |
 /// | 1      | 1    | bump           |
-/// | 2      | 33   | name (PodString<32>)  |
-/// | 35     | 129  | bio (PodString<128>)  |
-/// | 164    | 66   | tags (PodVec<PodU64, 8>) |
+/// | 2      | 33   | bounded name bytes   |
+/// | 35     | 129  | bounded bio bytes    |
+/// | 164    | 66   | bounded tag bytes    |
 /// | 230    | 9    | favorite_tag (PodOption<PodU64>) |
 /// | 239    | 1    | active (PodBool) |
 /// ```
@@ -116,15 +117,12 @@ pub enum ProfileError {
 pub struct ProfileState {
 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
 	pub bump: u8,
-	/// The profile display name. The generated view uses one length byte plus
-	/// 32 bytes of UTF-8 capacity.
-	pub name: String<32>,
-	/// A longer free-form bio. The generated view uses one length byte plus
-	/// 128 bytes of UTF-8 capacity.
-	pub bio: String<128>,
-	/// Up to 8 tags. The generated view uses a two-byte count followed by
-	/// eight little-endian `u64` slots.
-	pub tags: Vec<u64, 8>,
+	/// One length byte followed by 32 fully initialized UTF-8 bytes.
+	pub name: [u8; 33],
+	/// One length byte followed by 128 fully initialized UTF-8 bytes.
+	pub bio: [u8; 129],
+	/// A two-byte count followed by eight little-endian `u64` slots.
+	pub tags: [u8; 66],
 	/// An optional favourite tag. The generated view uses a one-byte tag and
 	/// an eight-byte value slot, even when the option is `None`.
 	pub favorite_tag: Option<u64>,
@@ -138,26 +136,301 @@ pub struct ProfileState {
 
 /// Instruction data for `Initialize`.
 ///
-/// Contains the PDA bump seed and the initial name/bio. The generated string
-/// views carry their own length prefix, so the client writes
-/// `discriminator + bump + len(name) + name + len(bio) + bio`.
+/// Contains the PDA bump seed and fixed-width encodings of the initial name and
+/// bio. The name occupies 33 bytes and the bio occupies 129 bytes. Each field
+/// starts with a one-byte payload length, followed by its UTF-8 payload and
+/// zero padding through the end of the field.
 #[instruction(discriminator = ProfileInstruction, variant = Initialize)]
 pub struct InitializeInstruction {
 	/// The PDA bump seed, computed off-chain.
 	pub bump: u8,
-	/// The initial display name (UTF-8, up to 32 bytes).
-	pub name: String<32>,
-	/// The initial bio (UTF-8, up to 128 bytes).
-	pub bio: String<128>,
+	/// The initial display name (length byte plus 32-byte capacity).
+	pub name: [u8; 33],
+	/// The initial bio (length byte plus 128-byte capacity).
+	pub bio: [u8; 129],
 }
 
 /// Instruction data for `UpdateProfile`. Replaces both name and bio.
 #[instruction(discriminator = ProfileInstruction, variant = UpdateProfile)]
 pub struct UpdateProfileInstruction {
-	/// The new display name (UTF-8, up to 32 bytes).
-	pub name: String<32>,
-	/// The new bio (UTF-8, up to 128 bytes).
-	pub bio: String<128>,
+	/// The new display name (length byte plus 32-byte capacity).
+	pub name: [u8; 33],
+	/// The new bio (length byte plus 128-byte capacity).
+	pub bio: [u8; 129],
+}
+
+const TAG_CAPACITY: usize = 8;
+const TAG_PREFIX_BYTES: usize = 2;
+const TAG_BYTES: usize = size_of::<u64>();
+const TAG_FIELD_BYTES: usize = TAG_PREFIX_BYTES + TAG_CAPACITY * TAG_BYTES;
+
+/// Encode UTF-8 into a fully initialized, one-byte-length-prefixed field.
+///
+/// `N` includes the prefix byte. The remaining `N - 1` bytes are the maximum
+/// payload capacity and unused capacity is always zeroed.
+///
+/// # Errors
+///
+/// Returns [`ProgramError::InvalidInstructionData`] when `N` has no prefix
+/// byte, or when `value` cannot fit in the one-byte length or fixed capacity.
+pub fn encode_bounded_text<const N: usize>(value: &str) -> Result<[u8; N], ProgramError> {
+	let capacity = N
+		.checked_sub(1)
+		.ok_or(ProgramError::InvalidInstructionData)?;
+	let length = u8::try_from(value.len()).map_err(|_| ProgramError::InvalidInstructionData)?;
+
+	if value.len() > capacity {
+		return Err(ProgramError::InvalidInstructionData);
+	}
+
+	let mut bytes = [0u8; N];
+	bytes[0] = length;
+	let value_end = 1 + value.len();
+	bytes[1..value_end].copy_from_slice(value.as_bytes());
+
+	Ok(bytes)
+}
+
+fn bounded_text(bytes: &[u8]) -> Result<&str, ProgramError> {
+	let Some((&length, capacity)) = bytes.split_first() else {
+		return Err(ProgramError::InvalidInstructionData);
+	};
+	let length = usize::from(length);
+
+	if length > capacity.len() {
+		return Err(ProgramError::InvalidInstructionData);
+	}
+
+	core::str::from_utf8(&capacity[..length]).map_err(|_| ProfileError::InvalidUtf8.into())
+}
+
+fn tag_count(bytes: &[u8; TAG_FIELD_BYTES]) -> Result<usize, ProgramError> {
+	let count = usize::from(u16::from_le_bytes([bytes[0], bytes[1]]));
+
+	if count > TAG_CAPACITY {
+		return Err(ProgramError::InvalidAccountData);
+	}
+
+	Ok(count)
+}
+
+fn tag_range(index: usize) -> core::ops::Range<usize> {
+	let start = TAG_PREFIX_BYTES + index * TAG_BYTES;
+	start..start + TAG_BYTES
+}
+
+impl ProfileStateZc {
+	/// Return the validated profile name.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidAccountData`] when the stored length or
+	/// UTF-8 payload is invalid.
+	pub fn name_text(&self) -> Result<&str, ProgramError> {
+		bounded_text(&self.name).map_err(|_| ProgramError::InvalidAccountData)
+	}
+
+	/// Return the validated profile bio.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidAccountData`] when the stored length or
+	/// UTF-8 payload is invalid.
+	pub fn bio_text(&self) -> Result<&str, ProgramError> {
+		bounded_text(&self.bio).map_err(|_| ProgramError::InvalidAccountData)
+	}
+
+	/// Replace the profile name and zero every inactive capacity byte.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidInstructionData`] when `value` exceeds the
+	/// fixed name capacity.
+	pub fn write_name_text(&mut self, value: &str) -> ProgramResult {
+		self.name = encode_bounded_text(value)?;
+		Ok(())
+	}
+
+	/// Replace the profile bio and zero every inactive capacity byte.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidInstructionData`] when `value` exceeds the
+	/// fixed bio capacity.
+	pub fn write_bio_text(&mut self, value: &str) -> ProgramResult {
+		self.bio = encode_bounded_text(value)?;
+		Ok(())
+	}
+
+	/// Return the number of active tags after validating the stored count.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidAccountData`] when the stored count exceeds
+	/// `TAG_CAPACITY`.
+	pub fn tag_count(&self) -> Result<usize, ProgramError> {
+		tag_count(&self.tags)
+	}
+
+	/// Return a copied tag value, or `None` when `index` is out of range.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidAccountData`] when the stored count exceeds
+	/// `TAG_CAPACITY`.
+	pub fn tag(&self, index: usize) -> Result<Option<u64>, ProgramError> {
+		if index >= self.tag_count()? {
+			return Ok(None);
+		}
+
+		let range = tag_range(index);
+		let bytes: [u8; TAG_BYTES] = self.tags[range]
+			.try_into()
+			.map_err(|_| ProgramError::InvalidAccountData)?;
+
+		Ok(Some(u64::from_le_bytes(bytes)))
+	}
+
+	/// Reset the tag field to its canonical, fully initialized empty state.
+	pub fn clear_tags(&mut self) {
+		self.tags.fill(0);
+	}
+
+	/// Append a tag without ever creating uninitialized backing bytes.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidAccountData`] for an invalid stored count,
+	/// or [`ProfileError::TagOverflow`] when all tag slots are active.
+	pub fn push_tag(&mut self, value: u64) -> ProgramResult {
+		let count = self.tag_count()?;
+
+		if count == TAG_CAPACITY {
+			return Err(ProfileError::TagOverflow.into());
+		}
+
+		let next_count = u16::try_from(count + 1).map_err(|_| ProgramError::InvalidAccountData)?;
+		self.tags[tag_range(count)].copy_from_slice(&value.to_le_bytes());
+		self.tags[..TAG_PREFIX_BYTES].copy_from_slice(&next_count.to_le_bytes());
+
+		Ok(())
+	}
+
+	/// Remove a tag while preserving the established contiguous wire layout.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidAccountData`] for an invalid stored count,
+	/// or [`ProfileError::TagNotFound`] when `index` is not active.
+	pub fn remove_tag(&mut self, index: usize) -> ProgramResult {
+		let count = self.tag_count()?;
+
+		if index >= count {
+			return Err(ProfileError::TagNotFound.into());
+		}
+
+		let destination = tag_range(index).start;
+		let source = tag_range(index + 1).start;
+		let active_end = tag_range(count).start;
+		let next_count = u16::try_from(count - 1).map_err(|_| ProgramError::InvalidAccountData)?;
+		self.tags.copy_within(source..active_end, destination);
+		self.tags[tag_range(count - 1)].fill(0);
+		self.tags[..TAG_PREFIX_BYTES].copy_from_slice(&next_count.to_le_bytes());
+
+		Ok(())
+	}
+}
+
+impl InitializeInstructionZc {
+	/// Return the validated initial profile name.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidInstructionData`] when the encoded length
+	/// exceeds the fixed capacity, or [`ProfileError::InvalidUtf8`] when the
+	/// active payload is not valid UTF-8.
+	pub fn name_text(&self) -> Result<&str, ProgramError> {
+		bounded_text(&self.name)
+	}
+
+	/// Return the validated initial profile bio.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidInstructionData`] when the encoded length
+	/// exceeds the fixed capacity, or [`ProfileError::InvalidUtf8`] when the
+	/// active payload is not valid UTF-8.
+	pub fn bio_text(&self) -> Result<&str, ProgramError> {
+		bounded_text(&self.bio)
+	}
+
+	/// Encode an initial profile name into fully initialized storage.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidInstructionData`] when `value` exceeds the
+	/// fixed name capacity.
+	pub fn write_name_text(&mut self, value: &str) -> ProgramResult {
+		self.name = encode_bounded_text(value)?;
+		Ok(())
+	}
+
+	/// Encode an initial profile bio into fully initialized storage.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidInstructionData`] when `value` exceeds the
+	/// fixed bio capacity.
+	pub fn write_bio_text(&mut self, value: &str) -> ProgramResult {
+		self.bio = encode_bounded_text(value)?;
+		Ok(())
+	}
+}
+
+impl UpdateProfileInstructionZc {
+	/// Return the validated replacement profile name.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidInstructionData`] when the encoded length
+	/// exceeds the fixed capacity, or [`ProfileError::InvalidUtf8`] when the
+	/// active payload is not valid UTF-8.
+	pub fn name_text(&self) -> Result<&str, ProgramError> {
+		bounded_text(&self.name)
+	}
+
+	/// Return the validated replacement profile bio.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidInstructionData`] when the encoded length
+	/// exceeds the fixed capacity, or [`ProfileError::InvalidUtf8`] when the
+	/// active payload is not valid UTF-8.
+	pub fn bio_text(&self) -> Result<&str, ProgramError> {
+		bounded_text(&self.bio)
+	}
+
+	/// Encode a replacement profile name into fully initialized storage.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidInstructionData`] when `value` exceeds the
+	/// fixed name capacity.
+	pub fn write_name_text(&mut self, value: &str) -> ProgramResult {
+		self.name = encode_bounded_text(value)?;
+		Ok(())
+	}
+
+	/// Encode a replacement profile bio into fully initialized storage.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidInstructionData`] when `value` exceeds the
+	/// fixed bio capacity.
+	pub fn write_bio_text(&mut self, value: &str) -> ProgramResult {
+		self.bio = encode_bounded_text(value)?;
+		Ok(())
+	}
 }
 
 /// Instruction data for `AddTag`. Appends a tag to the profile.
@@ -228,8 +501,8 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 
 		// Validate UTF-8 before storing anything on-chain (boundary validation
 		// already guarantees this, but keep the explicit check for clarity).
-		let _ = args.name.as_str();
-		let _ = args.bio.as_str();
+		let _ = args.name_text()?;
+		let _ = args.bio_text()?;
 
 		// Create the PDA account
 		create_program_account_with_bump::<ProfileState>(
@@ -242,13 +515,13 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 
 		// Initialize account data
 		let mut profile = self.profile.as_account_mut::<ProfileState>(&ID)?;
-		// The newly allocated account buffer is already zero-initialized. Assign
-		// fields in place so the inactive capacity of zeropod collections stays
-		// initialized instead of being replaced by `PodVec::default()` storage.
+		// These fixed arrays came from initialized instruction bytes and retain the
+		// established bounded-field wire format without importing uninitialized
+		// inactive collection capacity.
 		profile.bump = args.bump;
 		profile.name = args.name;
 		profile.bio = args.bio;
-		profile.tags.clear();
+		profile.clear_tags();
 		profile.favorite_tag.clear();
 		profile.active.set(true);
 
@@ -282,8 +555,8 @@ impl<'a> ProcessAccountInfos<'a> for ProfileAccounts<'a> {
 		match instruction {
 			ProfileInstruction::UpdateProfile => {
 				let args = UpdateProfileInstruction::try_from_bytes(data)?;
-				let _ = args.name.as_str();
-				let _ = args.bio.as_str();
+				let _ = args.name_text()?;
+				let _ = args.bio_text()?;
 
 				let mut profile = self.profile.as_account_mut::<ProfileState>(&ID)?;
 				profile.name = args.name;
@@ -295,10 +568,7 @@ impl<'a> ProcessAccountInfos<'a> for ProfileAccounts<'a> {
 				let args = AddTagInstruction::try_from_bytes(data)?;
 
 				let mut profile = self.profile.as_account_mut::<ProfileState>(&ID)?;
-				profile
-					.tags
-					.try_push(args.tag)
-					.map_err(|_| ProfileError::TagOverflow)?;
+				profile.push_tag(args.tag.get())?;
 
 				log!("Tag added");
 			}
@@ -307,16 +577,8 @@ impl<'a> ProcessAccountInfos<'a> for ProfileAccounts<'a> {
 				let index = args.index.get();
 
 				let mut profile = self.profile.as_account_mut::<ProfileState>(&ID)?;
-				let len = profile.tags.len();
 				let index = usize::try_from(index).map_err(|_| ProfileError::TagNotFound)?;
-				if index >= len {
-					return Err(ProfileError::TagNotFound.into());
-				}
-
-				// Shift remaining tags left, then pop the (now duplicated)
-				// last slot to decrement the length prefix.
-				profile.tags.as_slice_mut().copy_within(index + 1.., index);
-				let _ = profile.tags.pop();
+				profile.remove_tag(index)?;
 
 				log!("Tag removed");
 			}
@@ -405,65 +667,69 @@ mod tests {
 		state.bump = 42;
 		state.active.set(true);
 		assert_eq!(state.bump, 42);
-		assert!(state.name.is_empty());
-		assert!(state.tags.is_empty());
+		assert_eq!(state.name_text().unwrap(), "");
+		assert_eq!(state.tag_count().unwrap(), 0);
 		assert!(state.favorite_tag.is_none());
 		assert!(state.active.get());
 	}
 
 	#[test]
-	fn pod_string_roundtrip() {
-		let mut name = PodString::<32>::default();
-		assert!(name.try_set("alice").is_ok());
-		assert_eq!(name.as_str(), "alice");
-		assert_eq!(name.len(), 5);
-		assert_eq!(name.capacity(), 32);
+	fn bounded_string_roundtrip() {
+		let empty = encode_bounded_text::<33>("")
+			.unwrap_or_else(|error| panic!("empty encoding failed: {error:?}"));
+		let name = encode_bounded_text::<33>("alice")
+			.unwrap_or_else(|error| panic!("encoding failed: {error:?}"));
+
+		assert_eq!(empty, [0u8; 33]);
+		assert_eq!(bounded_text(&name), Ok("alice"));
+		assert!(name[6..].iter().all(|byte| *byte == 0));
 	}
 
 	#[test]
-	fn pod_string_rejects_invalid_utf8() {
+	fn bounded_string_rejects_invalid_utf8() {
 		let mut bytes = [0u8; ProfileState::SIZE];
-		bytes[0] = ProfileAccountType::ProfileState as u8;
-		bytes[2] = 1;
-		bytes[3] = 0xff;
+		let state = ProfileState::initialize(&mut bytes).unwrap();
+		state.name[0] = 1;
+		state.name[1] = 0xff;
 
-		// The account boundary validates active string bytes before exposing a
-		// zero-copy view. Inactive capacity remains unobserved.
-		assert!(ProfileState::try_from_bytes(&bytes).is_err());
+		assert_eq!(state.name_text(), Err(ProgramError::InvalidAccountData));
 	}
 
 	#[test]
-	fn pod_string_capacity_overflow() {
-		let mut name = PodString::<32>::default();
-		let long = "x".repeat(33);
-		assert!(name.try_set(&long).is_err());
-	}
+	fn bounded_string_rejects_length_over_capacity() {
+		let mut name = [0u8; 33];
+		name[0] = 33;
 
-	#[test]
-	fn pod_vec_roundtrip() {
-		let mut tags = PodVec::<PodU64, 8>::default();
-		assert!(tags.try_push(PodU64::from(1)).is_ok());
-		assert!(tags.try_push(PodU64::from(2)).is_ok());
-		assert_eq!(tags.len(), 2);
 		assert_eq!(
-			u64::from(tags.get(0).copied().unwrap_or_else(|| PodU64::from(0))),
-			1
+			bounded_text(&name),
+			Err(ProgramError::InvalidInstructionData)
 		);
-		assert_eq!(
-			u64::from(tags.get(1).copied().unwrap_or_else(|| PodU64::from(0))),
-			2
-		);
-		assert_eq!(tags.pop(), Some(PodU64::from(2)));
-		assert_eq!(tags.len(), 1);
 	}
 
 	#[test]
-	fn pod_vec_capacity_overflow() {
-		let mut tags = PodVec::<PodU64, 8>::default();
+	fn bounded_tags_roundtrip() {
+		let mut bytes = [0u8; ProfileState::SIZE];
+		let state = ProfileState::initialize(&mut bytes).unwrap();
+		state.push_tag(1).unwrap();
+		state.push_tag(2).unwrap();
+
+		assert_eq!(state.tag_count(), Ok(2));
+		assert_eq!(state.tag(0), Ok(Some(1)));
+		assert_eq!(state.tag(1), Ok(Some(2)));
+		state.remove_tag(0).unwrap();
+		assert_eq!(state.tag_count(), Ok(1));
+		assert_eq!(state.tag(0), Ok(Some(2)));
+	}
+
+	#[test]
+	fn bounded_tags_reject_capacity_overflow() {
+		let mut bytes = [0u8; ProfileState::SIZE];
+		let state = ProfileState::initialize(&mut bytes).unwrap();
 		for i in 0..8 {
-			assert!(tags.try_push(PodU64::from(i)).is_ok());
+			state.push_tag(i).unwrap();
 		}
-		assert!(tags.try_push(PodU64::from(8)).is_err());
+
+		assert_eq!(state.push_tag(8), Err(ProfileError::TagOverflow.into()));
 	}
 
 	#[test]
@@ -495,14 +761,89 @@ mod tests {
 
 	#[test]
 	fn initialize_instruction_try_from_bytes() {
-		let mut data = std::vec![ProfileInstruction::Initialize as u8, 42u8];
-		data.extend_from_slice(&[3u8, b'a', b'l', b'i']); // len=3, "ali"
-		data.extend_from_slice(&[0u8; 29]); // remaining name capacity
-		data.extend_from_slice(&[0u8; 129]); // empty bio
+		let mut data = [0u8; InitializeInstruction::SIZE];
+		let initialized = InitializeInstruction::initialize(&mut data)
+			.unwrap_or_else(|error| panic!("initialization failed: {error:?}"));
+		initialized.bump = 42;
+		initialized
+			.write_name_text("ali")
+			.unwrap_or_else(|error| panic!("name encoding failed: {error:?}"));
 		let ix = InitializeInstruction::try_from_bytes(&data)
 			.unwrap_or_else(|e| panic!("failed: {e:?}"));
 		assert_eq!(ix.bump, 42);
-		assert_eq!(ix.name.as_str(), "ali");
+		assert_eq!(ix.name_text(), Ok("ali"));
+	}
+
+	#[test]
+	fn initialize_instruction_reports_invalid_utf8() {
+		let mut data = [0u8; InitializeInstruction::SIZE];
+		let initialized = InitializeInstruction::initialize(&mut data)
+			.unwrap_or_else(|error| panic!("initialization failed: {error:?}"));
+		initialized.name[0] = 1;
+		initialized.name[1] = 0xff;
+
+		assert_eq!(
+			initialized.name_text(),
+			Err(ProfileError::InvalidUtf8.into())
+		);
+	}
+
+	#[test]
+	fn semantic_mutations_preserve_valid_profile_storage() {
+		let mut bytes = [0u8; ProfileState::SIZE];
+
+		{
+			let state = ProfileState::initialize(&mut bytes)
+				.unwrap_or_else(|error| panic!("initialization failed: {error:?}"));
+			state
+				.write_name_text("alice")
+				.unwrap_or_else(|error| panic!("name write failed: {error:?}"));
+			state
+				.write_bio_text("hello")
+				.unwrap_or_else(|error| panic!("bio write failed: {error:?}"));
+		}
+		{
+			let state = ProfileState::try_from_bytes(&bytes)
+				.unwrap_or_else(|error| panic!("validation failed: {error:?}"));
+			assert_eq!(state.name_text(), Ok("alice"));
+			assert_eq!(state.bio_text(), Ok("hello"));
+		}
+
+		{
+			let state = ProfileState::try_from_bytes_mut(&mut bytes)
+				.unwrap_or_else(|error| panic!("validation failed: {error:?}"));
+			state
+				.push_tag(7)
+				.unwrap_or_else(|error| panic!("tag push failed: {error:?}"));
+			state.favorite_tag.set(Some(PodU64::from(7)));
+			state.active.set(true);
+		}
+		{
+			let state = ProfileState::try_from_bytes(&bytes)
+				.unwrap_or_else(|error| panic!("validation failed: {error:?}"));
+			assert_eq!(state.tag_count(), Ok(1));
+			assert_eq!(state.tag(0), Ok(Some(7)));
+			assert_eq!(state.favorite_tag.get(), Some(PodU64::from(7)));
+			assert!(state.active.get());
+		}
+
+		{
+			let state = ProfileState::try_from_bytes_mut(&mut bytes)
+				.unwrap_or_else(|error| panic!("validation failed: {error:?}"));
+			state
+				.remove_tag(0)
+				.unwrap_or_else(|error| panic!("tag removal failed: {error:?}"));
+			state.clear_tags();
+			state.favorite_tag.clear();
+			state.active.set(false);
+		}
+		{
+			let state = ProfileState::try_from_bytes(&bytes)
+				.unwrap_or_else(|error| panic!("validation failed: {error:?}"));
+			assert_eq!(state.tag_count(), Ok(0));
+			assert_eq!(state.favorite_tag.get(), None);
+			assert!(!state.active.get());
+		}
 	}
 
 	#[test]

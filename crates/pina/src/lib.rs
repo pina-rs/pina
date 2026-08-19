@@ -115,8 +115,12 @@ pub use solana_program_log::Logger;
 /// Logs the current compute unit usage to the Solana runtime.
 #[cfg(feature = "logs")]
 pub use solana_program_log::log_cu_usage;
-/// Re-export of the [`zeropod`] crate for native schemas and validated
-/// zero-copy storage views.
+/// Re-export of the [`zeropod`] crate for advanced direct use.
+///
+/// Pina's audited zero-copy contract is the closed field grammar enforced by
+/// [`account`], [`instruction`], and [`event`]. Direct zeropod derives and
+/// manual trait implementations are outside that contract and must uphold
+/// zeropod's complete safety invariants themselves.
 pub use zeropod;
 /// Declares whether a type uses a fixed or compact zero-copy layout.
 pub use zeropod::LayoutKind;

@@ -4,7 +4,7 @@ pina_macros: major
 
 # Use zeropod's native enum schema support
 
-Remove Pina's custom `PodEnum` derive. Unit enums used in account, instruction, or event schemas now derive `zeropod::ZeroPod` together with their containing schema. Application fields use the native enum type; zeropod generates and validates the alignment-one `EnumZc` storage companion.
+Remove Pina's custom `PodEnum` derive in favor of zeropod's standalone native enum schema support. Pina's audited `#[account]`, `#[instruction]`, and `#[event]` schemas reject enum and custom `ZcField` fields because the macro cannot establish their full mapping and validation-order invariants. Standalone enums can still derive `zeropod::ZeroPod` for advanced direct zeropod integrations outside that closed contract.
 
 ```rust
 use pina::ZeroPod;
@@ -17,11 +17,7 @@ enum Color {
 	Blue = 2,
 }
 
-#[account(discriminator = MyAccount)]
-struct Palette {
-	color: Color,
-	brightness: u64,
-}
+let color = Color::from_bytes(&[1]);
 ```
 
-This keeps native domain types in application schemas while ensuring untrusted bytes are validated before the generated zero-copy view is returned.
+For macro-generated Pina schemas, store an audited scalar discriminant and convert it to a domain enum only after explicit semantic validation.

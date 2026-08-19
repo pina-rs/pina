@@ -1,0 +1,5 @@
+error: `char` is not a zero-copy field: not every 32-bit pattern is a valid character
+  --> tests/ui/fail/event_char_field.rs:10:13
+   |
+10 |     pub value: char,
+   |                ^^^^

@@ -18,7 +18,9 @@ Replace pina's own pod primitives (`pina_pod_primitives`, based on `bytemuck`) w
 - **`PodBool::from_bool` is replaced by `From<bool>`**.
 - **`PodVec::as_mut_slice` is renamed to `as_slice_mut`** (zeropod's API).
 - The `#[account]`, `#[instruction]`, and `#[event]` macros derive `zeropod::ZeroPod` and expose checked `try_from_bytes` / `initialize` helpers. Pina no longer generates `to_bytes()` or any whole-object serialization API.
-- Native schema fields use ordinary Rust values. Runtime loaders return the generated zero-copy representation, whose fields are read and changed with zeropod's `get` / `set` and collection accessors.
+- Macro-generated schemas use a closed field grammar: native integers and booleans, Pina's Pod scalar wrappers, the exact Pina `Address`, literal-length byte arrays, and native scalar options. Generics, custom/nested mappings, enums, `NonZero*`, `char`, raw `PodOption`, and string/vector collections are rejected at macro expansion.
+- Runtime loaders return the generated zero-copy representation, whose audited scalar fields are read and changed with zeropod's `get` / `set` accessors. Bounded text and list examples use fully initialized byte arrays with checked semantic helpers.
+- Direct zeropod derives and manual `PinaAccount` / `ZeroPodFixed` implementations remain advanced escape hatches outside Pina's audited macro-generated contract; their authors own all zeropod safety invariants.
 - `PinaSerialize`, Pina's generic `InstructionBuilder`, the custom `PodEnum` derive, and Pina's generic raw-cast helpers are removed. Zeropod owns the byte-to-view boundary.
 - The `#[discriminator]` macro no longer emits `unsafe impl Pod` / `unsafe impl Zeroable` for enums.
 - Codama-generated clients validate zeropod fields before zero-copy access. Instruction construction owns a fully initialized buffer and never exposes a schema or storage view as raw bytes.

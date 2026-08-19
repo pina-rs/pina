@@ -9,8 +9,6 @@
 import {
 	type AccountMeta,
 	type AccountSignerMeta,
-	addDecoderSizePrefix,
-	addEncoderSizePrefix,
 	type Address,
 	combineCodec,
 	fixDecoderSize,
@@ -18,12 +16,12 @@ import {
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
 	fixEncoderSize,
+	getBytesDecoder,
+	getBytesEncoder,
 	getStructDecoder,
 	getStructEncoder,
 	getU8Decoder,
 	getU8Encoder,
-	getUtf8Decoder,
-	getUtf8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
 	type InstructionWithData,
@@ -45,7 +43,6 @@ import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 import {
 	fixZeroPodEncoderSize,
 	getZeroPodDiscriminatorDecoder,
-	getZeroPodStringDecoder,
 } from "../zeropodCodecs";
 
 export const UPDATE_PROFILE_DISCRIMINATOR = 1;
@@ -76,11 +73,14 @@ export type UpdateProfileInstruction<
 
 export type UpdateProfileInstructionData = {
 	discriminator: number;
-	name: string;
-	bio: string;
+	name: ReadonlyUint8Array;
+	bio: ReadonlyUint8Array;
 };
 
-export type UpdateProfileInstructionDataArgs = { name: string; bio: string };
+export type UpdateProfileInstructionDataArgs = {
+	name: ReadonlyUint8Array;
+	bio: ReadonlyUint8Array;
+};
 
 export function getUpdateProfileInstructionDataEncoder(): FixedSizeEncoder<
 	UpdateProfileInstructionDataArgs
@@ -88,17 +88,8 @@ export function getUpdateProfileInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
 			"name",
-			fixZeroPodEncoderSize(
-				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
-				33,
-			),
-		], [
-			"bio",
-			fixZeroPodEncoderSize(
-				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
-				129,
-			),
-		]]),
+			fixZeroPodEncoderSize(getBytesEncoder(), 33),
+		], ["bio", fixZeroPodEncoderSize(getBytesEncoder(), 129)]]),
 		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
@@ -114,8 +105,8 @@ export function getUpdateProfileInstructionDataDecoder(): FixedSizeDecoder<
 				getU8Decoder(),
 			),
 		],
-		["name", getZeroPodStringDecoder(getU8Decoder(), 33)],
-		["bio", getZeroPodStringDecoder(getU8Decoder(), 129)],
+		["name", fixDecoderSize(getBytesDecoder(), 33)],
+		["bio", fixDecoderSize(getBytesDecoder(), 129)],
 	]);
 }
 

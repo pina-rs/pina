@@ -12,9 +12,10 @@ use pina::zeropod;
 
 /// Instruction data for `Initialize`.
 ///
-/// Contains the PDA bump seed and the initial name/bio. The generated string
-/// views carry their own length prefix, so the client writes
-/// `discriminator + bump + len(name) + name + len(bio) + bio`.
+/// Contains the PDA bump seed and fixed-width encodings of the initial name and
+/// bio. The name occupies 33 bytes and the bio occupies 129 bytes. Each field
+/// starts with a one-byte payload length, followed by its UTF-8 payload and
+/// zero padding through the end of the field.
 pub const INITIALIZE_DISCRIMINATOR: u8 = 0u8;
 
 /// Accounts.
@@ -96,6 +97,6 @@ impl InitializeInstructionData {
 pub struct InitializeInstructionWire {
 	pub discriminator: u8,
 	pub bump: u8,
-	pub name: pina::String<32>,
-	pub bio: pina::String<128>,
+	pub name: [u8; 33],
+	pub bio: [u8; 129],
 }

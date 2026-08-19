@@ -13,15 +13,17 @@ But zero-copy is only defensible when the layout contract is tight. Unsafe or dy
 
 ## Decision
 
-Pina keeps zero-copy account and instruction handling as a core design choice, but delegates representation and byte-to-view conversion to zeropod's native derive model.
+Pina keeps zero-copy account and instruction handling as a core design choice. Zeropod owns representation and byte-to-view conversion, while Pina's macros enforce a closed supported field grammar before invoking its derive.
 
 In practice that means:
 
-- application types are native schemas deriving `zeropod::ZeroPod`; loaders return the generated `TypeZc` storage view
+- macro-generated application schemas accept only audited scalar, address, byte-array, and scalar-option fields; loaders return the generated `TypeZc` storage view
 - typed loads must validate discriminator, size, content (`ZcValidate`), and relevant account identity constraints before use
 - dynamic, variable-length, or schema-driven reinterpretation is out of scope for the core loader model
+- custom/nested `ZcField` mappings, enum-typed payload fields, generic schemas, and `PodString`/`PodVec` or `String`/`Vec` fields are outside the macro-generated contract
 - Pina does not manually implement zeropod's unsafe traits, duplicate its pointer casts, or expose a schema/storage-view object representation as bytes
-- fixed-capacity inactive storage is unobservable through Pina APIs
+- bounded text and lists use fully initialized fixed byte arrays with checked semantic helpers
+- manual `PinaAccount` / `ZeroPodFixed` implementations are advanced escape hatches whose authors own all zeropod safety invariants
 
 ## Consequences
 
@@ -36,6 +38,12 @@ Costs:
 - some data models must use explicit versioning or companion accounts instead of variable-length in-place layouts
 - loader APIs need stronger lifetime coupling than a simple `&T` return type can provide
 - future extensions must prove they preserve layout and aliasing safety, not just correctness in happy-path tests
+
+### Comparison with Quasar
+
+Quasar does not avoid collection fields. At commit [`b0de7db`](https://github.com/blueshift-gg/quasar/tree/b0de7db4cd271654a2dcf78807dd865e98e0b339), its account derive classifies `String` and `Vec` as dynamic fields, maps them to `PodString` and `PodVec`, and places the generated compact schema in a hidden child module ([layout generation](https://github.com/blueshift-gg/quasar/blob/b0de7db4cd271654a2dcf78807dd865e98e0b339/derive/src/account/layout.rs)). Quasar then encapsulates dynamic access behind compact read views, load-mutate-save guards, and explicit writer commits. A commit resizes the account to the active compact tail before saving it ([dynamic access](https://github.com/blueshift-gg/quasar/blob/b0de7db4cd271654a2dcf78807dd865e98e0b339/derive/src/account/dynamic.rs)). Its compile-pass coverage explicitly accepts bounded `String` and `Vec` account fields ([collection example](https://github.com/blueshift-gg/quasar/blob/b0de7db4cd271654a2dcf78807dd865e98e0b339/lang/tests/compile_pass/account_string_vec_alias.rs)).
+
+Pina deliberately does not claim parity with that compact representation in this decision. Pina preserves its existing fixed wire layouts, so its macros reject fixed-capacity collection fields until Pina has an equally closed design that prevents inactive backing capacity from becoming observable.
 
 ## Alternatives considered
 

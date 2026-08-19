@@ -10,6 +10,75 @@ pub struct FlipBit {
     pub offset: u8,
     pub value: u8,
 }
+const _: fn(u8) -> ::core::primitive::u8 = |value| value;
+const _: fn() = || {
+    fn assert_mapping<T: ::pina::ZcField<Pod = ::core::primitive::u8>>() {}
+    fn assert_storage<T: ::pina::ZcElem>() {}
+    assert_mapping::<u8>();
+    assert_storage::<::core::primitive::u8>();
+};
+const _: () = {
+    ::core::assert!(::core::mem::align_of:: < ::core::primitive::u8 > () == 1);
+    ::core::assert!(
+        ::core::mem::size_of:: < ::core::primitive::u8 > () == < u8 as ::pina::ZcField >
+        ::POD_SIZE,
+    );
+};
+const _: fn(u8) -> ::core::primitive::u8 = |value| value;
+const _: fn() = || {
+    fn assert_mapping<T: ::pina::ZcField<Pod = ::core::primitive::u8>>() {}
+    fn assert_storage<T: ::pina::ZcElem>() {}
+    assert_mapping::<u8>();
+    assert_storage::<::core::primitive::u8>();
+};
+const _: () = {
+    ::core::assert!(::core::mem::align_of:: < ::core::primitive::u8 > () == 1);
+    ::core::assert!(
+        ::core::mem::size_of:: < ::core::primitive::u8 > () == < u8 as ::pina::ZcField >
+        ::POD_SIZE,
+    );
+};
+const _: fn(u8) -> ::core::primitive::u8 = |value| value;
+const _: fn() = || {
+    fn assert_mapping<T: ::pina::ZcField<Pod = ::core::primitive::u8>>() {}
+    fn assert_storage<T: ::pina::ZcElem>() {}
+    assert_mapping::<u8>();
+    assert_storage::<::core::primitive::u8>();
+};
+const _: () = {
+    ::core::assert!(::core::mem::align_of:: < ::core::primitive::u8 > () == 1);
+    ::core::assert!(
+        ::core::mem::size_of:: < ::core::primitive::u8 > () == < u8 as ::pina::ZcField >
+        ::POD_SIZE,
+    );
+};
+const _: fn(u8) -> ::core::primitive::u8 = |value| value;
+const _: fn() = || {
+    fn assert_mapping<T: ::pina::ZcField<Pod = ::core::primitive::u8>>() {}
+    fn assert_storage<T: ::pina::ZcElem>() {}
+    assert_mapping::<u8>();
+    assert_storage::<::core::primitive::u8>();
+};
+const _: () = {
+    ::core::assert!(::core::mem::align_of:: < ::core::primitive::u8 > () == 1);
+    ::core::assert!(
+        ::core::mem::size_of:: < ::core::primitive::u8 > () == < u8 as ::pina::ZcField >
+        ::POD_SIZE,
+    );
+};
+const _: fn() = || {
+    fn assert_storage<T: ::pina::ZcElem>() {}
+    assert_storage::<FlipBitZc>();
+};
+const _: () = {
+    ::core::assert!(::core::mem::align_of:: < FlipBitZc > () == 1);
+    ::core::assert!(
+        ::core::mem::size_of:: < FlipBitZc > () == MyInstruction::BYTES +
+        ::core::mem::size_of:: < ::core::primitive::u8 > () + ::core::mem::size_of:: <
+        ::core::primitive::u8 > () + ::core::mem::size_of:: < ::core::primitive::u8 > ()
+        + ::core::mem::size_of:: < ::core::primitive::u8 > ()
+    );
+};
 impl FlipBit {
     /// The exact number of bytes required by the zeropod representation.
     pub const SIZE: usize = <Self as ::pina::ZeroPodFixed>::SIZE;
@@ -31,10 +100,9 @@ impl FlipBit {
     /// returned borrow prevents the caller from observing or changing the raw
     /// bytes while the typed view is live.
     ///
-    /// Every non-discriminator field must accept an all-zero representation.
-    /// In particular, an enum stored directly in this schema needs a variant
-    /// with discriminant zero. Schemas without a valid zero state return the
-    /// generated invalid-data error instead of exposing an unvalidated view.
+    /// Every accepted field has an audited all-zero representation. The macro
+    /// rejects custom types and other layouts whose zero state cannot be
+    /// established by Pina's closed schema grammar.
     ///
     /// # Errors
     ///

@@ -1,0 +1,36 @@
+error[E0308]: mismatched types
+  --> tests/ui/fail/account_shadowed_address.rs:17:1
+   |
+17 | #[account(discriminator = Kind)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `pina::Address`, found `Address`
+   |
+   = note: `Address` and `pina::Address` have similar names, but are actually distinct types
+note: `Address` is defined in the current crate
+  --> tests/ui/fail/account_shadowed_address.rs:4:1
+   |
+ 4 | pub struct Address([u8; 32]);
+   | ^^^^^^^^^^^^^^^^^^
+note: `pina::Address` is defined in crate `solana_address`
+  --> $CARGO/solana-address-$VERSION/src/lib.rs
+   |
+   | pub struct Address(pub(crate) [u8; 32]);
+   | ^^^^^^^^^^^^^^^^^^
+   = note: this error originates in the attribute macro `account` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0271]: type mismatch resolving `<Address as ZcField>::Pod == Address`
+  --> tests/ui/fail/account_shadowed_address.rs:19:13
+   |
+19 |     pub owner: Address,
+   |                ^^^^^^^ type mismatch resolving `<Address as ZcField>::Pod == Address`
+   |
+note: expected this to be `pina::Address`
+  --> tests/ui/fail/account_shadowed_address.rs:7:13
+   |
+ 7 |     type Pod = [u8; 32];
+   |                ^^^^^^^^
+note: required by a bound in `assert_mapping`
+  --> tests/ui/fail/account_shadowed_address.rs:17:1
+   |
+17 | #[account(discriminator = Kind)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `assert_mapping`
+   = note: this error originates in the attribute macro `account` (in Nightly builds, run with -Z macro-backtrace for more info)

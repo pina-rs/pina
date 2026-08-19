@@ -383,8 +383,10 @@ in
 
         MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-symbolic-alignment-check" \
           cargo +"$TOOLCHAIN" miri test --locked -p pina --test miri_loader_guards --all-features
+        MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-symbolic-alignment-check" \
+          cargo +"$TOOLCHAIN" miri test --locked -p pina --test schema_boundary --all-features
       '';
-      description = "Run the dedicated Miri regression suite for guard-backed loader behavior.";
+      description = "Run Miri regressions for loader guards and macro-generated schema storage.";
       binary = "bash";
     };
     "test:pina:default" = {

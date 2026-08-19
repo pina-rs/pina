@@ -1,0 +1,8 @@
+error: `#[zeropod(...)]` cannot override a Pina account, instruction, or event layout
+  --> tests/ui/fail/account_zeropod_override.rs:9:1
+   |
+ 9 | / #[zeropod(crate = pina::zeropod)]
+10 | | pub struct Overridden {
+11 | |     pub value: u64,
+12 | | }
+   | |_^

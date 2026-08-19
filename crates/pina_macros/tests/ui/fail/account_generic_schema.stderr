@@ -1,0 +1,5 @@
+error: Pina zero-copy schemas cannot be generic; use concrete audited field types
+ --> tests/ui/fail/account_generic_schema.rs:9:19
+  |
+9 | pub struct Generic<T> {
+  |                   ^^^

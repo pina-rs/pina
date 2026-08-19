@@ -1,0 +1,5 @@
+error: unsupported `Option` payload; only native integer and boolean scalars are accepted (no nested options, collections, arrays, addresses, pod wrappers, or custom types)
+  --> tests/ui/fail/account_nested_option.rs:10:20
+   |
+10 |     pub value: Option<Option<u64>>,
+   |                       ^^^^^^^^^^^

@@ -6,7 +6,6 @@ use pina::*;
 pub enum MyInstruction {
 	FlipBit = 0,
 	Another = 1,
-	Collections = 2,
 }
 
 #[instruction(crate = ::pina, discriminator = MyInstruction)]
@@ -20,12 +19,6 @@ pub struct FlipBit {
 	pub offset: u8,
 	/// The value to set the bit to: `0` or `1`.
 	pub value: u8,
-}
-
-#[instruction(crate = ::pina, discriminator = MyInstruction)]
-pub struct Collections {
-	pub name: String<4>,
-	pub values: Vec<u16, 2>,
 }
 
 #[test]
@@ -55,18 +48,4 @@ fn test_instruction_macro() {
 	assert_eq!(flip_bit_from_bytes.array_index, 2);
 	assert_eq!(flip_bit_from_bytes.offset, 3);
 	assert_eq!(flip_bit_from_bytes.value, 1);
-}
-
-#[test]
-fn partial_collections_stay_inside_caller_owned_storage() {
-	let mut bytes = [0u8; Collections::SIZE];
-	{
-		let data = Collections::initialize(&mut bytes)
-			.unwrap_or_else(|error| panic!("instruction initialization failed: {error:?}"));
-		assert!(data.name.set("hi"));
-		assert!(data.values.push(PodU16::from(0x1234)));
-	}
-
-	assert_eq!(bytes, [2, 2, b'h', b'i', 0, 0, 1, 0, 0x34, 0x12, 0, 0]);
-	assert!(Collections::try_from_bytes(&bytes).is_ok());
 }
