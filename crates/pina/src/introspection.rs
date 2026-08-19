@@ -3,9 +3,8 @@
 //! These utilities enable on-chain programs to inspect the transaction-level
 //! instruction list. Common use cases include:
 //!
-//! - **Flash loan guards** — verify the current instruction is not being invoked
-//!   via CPI so that atomic flash-loan exploits are prevented.
-//! - **CPI depth checks** — ensure instructions are top-level calls.
+//! - **Program checks** — verify the transaction-level instruction at the
+//!   current index targets the expected program.
 //! - **Sandwich detection** — check whether a specific program appears before or
 //!   after the current instruction in the transaction.
 //!
@@ -19,11 +18,12 @@ use pinocchio::sysvars::instructions::Instructions;
 
 use crate::ProgramResult;
 
-/// Verifies the current instruction is not being invoked via CPI.
+/// Verifies the transaction-level instruction at the current index targets the
+/// expected program.
 ///
-/// This is useful for flash loan guards: a program can ensure it is the
-/// top-level caller by checking that the instruction at the current index
-/// in the sysvar has a matching `program_id`.
+/// The Instructions sysvar does not expose CPI stack height. A self-CPI has the
+/// same program ID as its transaction-level parent, so this check must not be
+/// used as a no-CPI or flash-loan guard.
 ///
 /// # Arguments
 ///
@@ -46,17 +46,19 @@ use crate::ProgramResult;
 /// # Example
 ///
 /// ```ignore
-/// use pina::introspection::assert_no_cpi;
+/// use pina::introspection::assert_current_instruction_program_id;
 ///
 /// fn process(accounts: &mut [AccountView], program_id: &Address) -> ProgramResult {
 ///     let instructions_account = &accounts[0];
-///     // Ensure we are not being called via CPI
-///     assert_no_cpi(instructions_account, program_id)?;
+///     assert_current_instruction_program_id(instructions_account, program_id)?;
 ///     // ... rest of the instruction logic
 ///     Ok(())
 /// }
 /// ```
-pub fn assert_no_cpi(instructions_account: &AccountView, program_id: &Address) -> ProgramResult {
+pub fn assert_current_instruction_program_id(
+	instructions_account: &AccountView,
+	program_id: &Address,
+) -> ProgramResult {
 	let instructions = Instructions::try_from(instructions_account)?;
 	let current_index = instructions.load_current_index();
 	let current_ix = instructions.load_instruction_at(current_index as usize)?;
@@ -66,6 +68,20 @@ pub fn assert_no_cpi(instructions_account: &AccountView, program_id: &Address) -
 	}
 
 	Ok(())
+}
+
+/// Deprecated alias for [`assert_current_instruction_program_id`].
+///
+/// This function cannot detect self-CPI because the Instructions sysvar does
+/// not expose invocation stack height. Use it only to validate the
+/// transaction-level instruction's program ID.
+#[deprecated(
+	since = "0.9.0",
+	note = "cannot detect self-CPI; use assert_current_instruction_program_id for the actual \
+	        guarantee"
+)]
+pub fn assert_no_cpi(instructions_account: &AccountView, program_id: &Address) -> ProgramResult {
+	assert_current_instruction_program_id(instructions_account, program_id)
 }
 
 /// Returns the total number of instructions in the transaction.

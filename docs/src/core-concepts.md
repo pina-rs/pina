@@ -165,7 +165,7 @@ let fee = balance.checked_mul(3u64).unwrap_or(PodU64::MAX);
 
 The `pina::introspection` module provides helpers for reading the Instructions sysvar at runtime. This enables:
 
-- **Flash loan guards** — verify the current instruction is not being invoked via CPI (`assert_no_cpi`)
+- **Program checks** — verify that the transaction-level instruction at the current index targets the expected program (`assert_current_instruction_program_id`). The Instructions sysvar cannot distinguish self-CPI, so this is not a no-CPI or flash-loan guard.
 - **Transaction inspection** — count instructions (`get_instruction_count`) or find the current index (`get_current_instruction_index`)
 - **Sandwich detection** — check whether a specific program appears before or after the current instruction (`has_instruction_before`, `has_instruction_after`)
 
