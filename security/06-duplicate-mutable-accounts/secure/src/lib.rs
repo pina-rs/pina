@@ -16,6 +16,7 @@ declare_id!("BQrm6HUK9J6GRn6Pk7Gz7bu7RegbdseodfbBdHf8topX");
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LedgerError {
 	DuplicateAccounts = 0,
+	UnauthorizedSigner = 1,
 }
 
 #[discriminator]
@@ -67,7 +68,7 @@ fn validate_source_authority(authority: &Address, source_owner: &Address) -> Pro
 		return Ok(());
 	}
 
-	Err(ProgramError::InvalidAccountData)
+	Err(LedgerError::UnauthorizedSigner.into())
 }
 
 impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
@@ -132,7 +133,7 @@ mod tests {
 
 		let result = validate_source_authority(&unrelated_signer, &source_owner);
 
-		assert_eq!(result, Err(ProgramError::InvalidAccountData));
+		assert_eq!(result, Err(LedgerError::UnauthorizedSigner.into()));
 	}
 
 	#[test]
