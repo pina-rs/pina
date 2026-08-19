@@ -7,9 +7,8 @@ The GitHub CI workflow verifies:
 - `lint:clippy`
 - `lint:format`
 - `verify:docs`
-- `verify:security` (Rust security checks plus moderate-or-higher npm lockfile advisories)
+- `verify:security`
 - `test:all` (`cargo test --all-features --locked`)
-- `test:fuzz:smoke` (replay committed seeds, then fuzz every target for 30 seconds)
 - `feature-matrix` for `pina` across explicit configurations:
   - `default` (`build:pina:default` + `test:pina:default`)
   - `no-default` (`build:pina:no-default-only` + `test:pina:no-default` + `doc:pina:no-default`)
@@ -23,19 +22,35 @@ The GitHub CI workflow verifies:
 Separate PR workflows also verify:
 
 - `binary-size` for SBF artifact size reporting
+- `surfpool` builds each example SBF program and exercises its runtime guards through the Surfpool SDK
 - `compute-units` for tracked static CU regression reporting vs the PR base revision
 
 This keeps code quality, behavior, documentation build health, feature-flag compatibility, and performance visibility aligned.
 
-## Dependency and bootstrap integrity
+## Surfpool example security checks
 
-CI installs Devenv from the immutable revision in `devenv.lock`, configures the Devenv binary cache with its static endpoint and public key, and includes the environment lockfiles in tool-cache keys. The shared security task also runs `pnpm audit` at the moderate severity threshold. Weekly grouped Dependabot updates keep the npm lockfile current without making every newly available package version a blocking PR check.
+`test:surfpool` builds every current example program and starts a fresh SDK-managed Surfpool instance for each one. Fresh instances are required because several Anchor-parity fixtures intentionally share a program ID. The harness has an explicit inventory assertion: adding an example crate or generated IDL without adding it to the test matrix fails immediately. A missing `.so` artifact also fails immediately; there are no best-effort skips.
 
-## Fuzz smoke testing
+Every program is deployed at its declared ID and is exercised with a malformed discriminator and an otherwise-valid instruction sent at a different deployment address. Every program also has an explicit expected entrypoint result: either a successful invocation or its exact expected `ProgramError` after dispatch (for example, `NotEnoughAccountKeys` or a documented custom error). Stateful examples additionally receive attacker-controlled readonly account metadata and must return their expected runtime guard error. Negative assertions use Surfpool simulation logs and a returned `InstructionError`, so an RPC, build, or deployment failure cannot satisfy them.
 
-The `fuzz` CI job runs in parallel with the rest of CI. It installs `cargo-fuzz` from the Nixpkgs revision locked by `devenv.lock`, replays every input under `crates/pina_fuzz/fuzz/seed_corpus/`, and gives each fuzz target 30 seconds of mutation time. Keeping both targets in one bounded job limits runner overhead and avoids adding their durations to the main test job's critical path.
+| Runtime guard                 | Surfpool adversarial case                                                                                                                                                 |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Discriminator/data validation | Every example rejects an unknown discriminator before any state transition.                                                                                               |
+| Program-ID binding            | Every example rejects its own ELF when it is deployed at an attacker-controlled address.                                                                                  |
+| Required account boundary     | Every selected IDL entrypoint with required accounts rejects an omitted account list.                                                                                     |
+| Stateful account metadata     | State-changing examples reject attacker-controlled readonly account sets with a runtime access error.                                                                     |
+| Signer authorization          | `hello_solana` rejects an unsigned user and accepts the same user only when marked as a signer.                                                                           |
+| Writable and alias checks     | `anchor_duplicate_mutable_accounts` rejects both a duplicate mutable alias and a non-writable account.                                                                    |
+| Program address allowlist     | `anchor_declare_program` rejects an arbitrary account in place of its expected external program.                                                                          |
+| Owner constraint              | `anchor_system_accounts` rejects an account explicitly created with a non-System owner.                                                                                   |
+| Sysvar address validation     | `anchor_sysvars` rejects ordinary accounts substituted for Clock, Rent, and Stake History.                                                                                |
+| Authority-bound PDA resize    | `anchor_realloc` proves initialize/grow/shrink for its owner and rejects an unrelated signer, a forged typed account, and duplicate resize targets without data mutation. |
 
-Failed runs upload `crates/pina_fuzz/fuzz/artifacts/`. After reproducing a useful artifact locally, add it to the corresponding seed corpus so later CI runs replay the regression before mutation starts.
+The broader Pina examples also run their purpose-built Mollusk, LiteSVM, and Quasar tests in `test:program-e2e`; these cover PDA derivation, ownership, token-account, arithmetic/range, initialization, and unauthorized-mutation flows that need program-specific state setup. Surfpool complements those tests with a full, deployed SBF boundary check. It provides evidence that the listed invariants hold for the tested attacks; it is not a proof that no other attack exists.
+
+### Known audit blocker
+
+The `security/06-duplicate-mutable-accounts/secure` fixture checks distinct, program-owned balances but does not require that its signer matches the source balance's stored owner. It can debit a victim's logical balance into an attacker's destination. Its source fix needs a stateful regression: an unauthorized transfer must fail without changing either balance, while the legitimate owner path must succeed. The generic harness intentionally does not treat readonly-metadata rejection as evidence that this authorization invariant is enforced.
 
 ## Compute-unit regression policy
 
