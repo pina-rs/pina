@@ -1,7 +1,7 @@
-//! SECURE: Duplicate account check enforced.
+//! SECURE: Source authorization and duplicate account checks enforced.
 //!
-//! This program verifies that source and destination accounts are distinct
-//! before processing a transfer.
+//! This program verifies that the signer owns the source balance and that the
+//! source and destination accounts are distinct before processing a transfer.
 
 #![no_std]
 
@@ -16,6 +16,7 @@ declare_id!("BQrm6HUK9J6GRn6Pk7Gz7bu7RegbdseodfbBdHf8topX");
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LedgerError {
 	DuplicateAccounts = 0,
+	UnauthorizedSigner = 1,
 }
 
 #[discriminator]
@@ -62,6 +63,14 @@ fn checked_transfer_balances(
 	Ok((new_source, new_dest))
 }
 
+fn validate_source_authority(authority: &Address, source_owner: &Address) -> ProgramResult {
+	if authority == source_owner {
+		return Ok(());
+	}
+
+	Err(LedgerError::UnauthorizedSigner.into())
+}
+
 impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = TransferInstruction::try_from_bytes(data)?;
@@ -74,6 +83,10 @@ impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
 		if self.source.address() == self.dest.address() {
 			return Err(LedgerError::DuplicateAccounts.into());
 		}
+
+		// SECURE: Only the source balance owner may authorize the transfer.
+		let source_owner = self.source.as_account::<Balance>(&ID)?.owner;
+		validate_source_authority(self.authority.address(), &source_owner)?;
 
 		let amount = args.amount.get();
 
@@ -111,5 +124,24 @@ mod tests {
 	fn checked_transfer_balances_transfers_exact_amount() {
 		let result = checked_transfer_balances(10, 4, 3);
 		assert_eq!(result, Ok((7, 7)));
+	}
+
+	#[test]
+	fn validate_source_authority_rejects_unrelated_signer() {
+		let source_owner = Address::new_from_array([1; 32]);
+		let unrelated_signer = Address::new_from_array([2; 32]);
+
+		let result = validate_source_authority(&unrelated_signer, &source_owner);
+
+		assert_eq!(result, Err(LedgerError::UnauthorizedSigner.into()));
+	}
+
+	#[test]
+	fn validate_source_authority_accepts_owner() {
+		let source_owner = Address::new_from_array([1; 32]);
+
+		let result = validate_source_authority(&source_owner, &source_owner);
+
+		assert_eq!(result, Ok(()));
 	}
 }
