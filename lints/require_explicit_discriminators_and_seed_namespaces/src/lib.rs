@@ -57,15 +57,26 @@ impl<'tcx> LateLintPass<'tcx> for RequireExplicitDiscriminatorsAndSeedNamespaces
 		}
 
 		let facts = shared::collect_function_facts(body);
+		let has_named_seed_constant = facts.paths.iter().any(|path| {
+			path.rsplit("::")
+				.next()
+				.is_some_and(|name| name == "SEED" || name.ends_with("_SEED"))
+		});
+		let uses_generated_seed_builder = facts.paths.iter().any(|path| path == "seeds");
+		let seed_assertion = facts.calls.iter().find(|call| {
+			call.method == "assert_seeds"
+				|| call.method == "assert_canonical_bump"
+				|| call.method == "assert_seeds_with_bump"
+		});
 		if !facts.has_byte_string
-			&& facts.calls.iter().any(|call| {
-				call.method == "assert_seeds"
-					|| call.method == "assert_canonical_bump"
-					|| call.method == "assert_seeds_with_bump"
-			}) {
+			&& !has_named_seed_constant
+			&& !uses_generated_seed_builder
+			&& let Some(seed_assertion) = seed_assertion
+		{
 			cx.lint(
 				REQUIRE_EXPLICIT_DISCRIMINATORS_AND_SEED_NAMESPACES,
 				|diag| {
+					diag.span(seed_assertion.span);
 					diag.primary_message(
 						"seed-based example code should use explicit byte-string namespaces and \
 						 visible discriminator markers",
@@ -77,5 +88,13 @@ impl<'tcx> LateLintPass<'tcx> for RequireExplicitDiscriminatorsAndSeedNamespaces
 				},
 			);
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	#[test]
+	fn ui() {
+		dylint_testing::ui_test(env!("CARGO_PKG_NAME"), "ui");
 	}
 }
