@@ -192,62 +192,11 @@ fn classify_plain_path(
 	segment: &syn::PathSegment,
 	crate_path: &syn::Path,
 ) -> syn::Result<AuditedField> {
+	if let Some(audited) = classify_scalar(segment, crate_path) {
+		return Ok(audited);
+	}
+
 	match segment.ident.to_string().as_str() {
-		"u8" | "i8" => Ok(audited_direct_scalar(&segment.ident)),
-		"u16" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodU16),
-			))
-		}
-		"u32" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodU32),
-			))
-		}
-		"u64" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodU64),
-			))
-		}
-		"u128" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodU128),
-			))
-		}
-		"i16" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodI16),
-			))
-		}
-		"i32" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodI32),
-			))
-		}
-		"i64" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodI64),
-			))
-		}
-		"i128" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodI128),
-			))
-		}
-		"bool" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodBool),
-			))
-		}
 		"PodU16" | "PodU32" | "PodU64" | "PodU128" | "PodI16" | "PodI32" | "PodI64" | "PodI128"
 		| "PodBool" => {
 			Ok(AuditedField {
@@ -352,66 +301,23 @@ fn classify_option_scalar(ty: &Type, crate_path: &syn::Path) -> syn::Result<Audi
 	if !segment.arguments.is_empty() {
 		return Err(nested_option(ty));
 	}
-	let name = segment.ident.to_string();
+	classify_scalar(segment, crate_path).ok_or_else(|| nested_option(ty))
+}
 
-	match name.as_str() {
-		"u8" | "i8" => Ok(audited_direct_scalar(&segment.ident)),
-		"u16" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodU16),
-			))
-		}
-		"u32" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodU32),
-			))
-		}
-		"u64" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodU64),
-			))
-		}
-		"u128" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodU128),
-			))
-		}
-		"i16" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodI16),
-			))
-		}
-		"i32" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodI32),
-			))
-		}
-		"i64" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodI64),
-			))
-		}
-		"i128" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodI128),
-			))
-		}
-		"bool" => {
-			Ok(audited_native_scalar(
-				&segment.ident,
-				quote!(#crate_path::PodBool),
-			))
-		}
-		_ => Err(nested_option(ty)),
-	}
+fn classify_scalar(segment: &syn::PathSegment, crate_path: &syn::Path) -> Option<AuditedField> {
+	Some(match segment.ident.to_string().as_str() {
+		"u8" | "i8" => audited_direct_scalar(&segment.ident),
+		"u16" => audited_native_scalar(&segment.ident, quote!(#crate_path::PodU16)),
+		"u32" => audited_native_scalar(&segment.ident, quote!(#crate_path::PodU32)),
+		"u64" => audited_native_scalar(&segment.ident, quote!(#crate_path::PodU64)),
+		"u128" => audited_native_scalar(&segment.ident, quote!(#crate_path::PodU128)),
+		"i16" => audited_native_scalar(&segment.ident, quote!(#crate_path::PodI16)),
+		"i32" => audited_native_scalar(&segment.ident, quote!(#crate_path::PodI32)),
+		"i64" => audited_native_scalar(&segment.ident, quote!(#crate_path::PodI64)),
+		"i128" => audited_native_scalar(&segment.ident, quote!(#crate_path::PodI128)),
+		"bool" => audited_native_scalar(&segment.ident, quote!(#crate_path::PodBool)),
+		_ => return None,
+	})
 }
 
 fn audited_direct_scalar(ident: &syn::Ident) -> AuditedField {
