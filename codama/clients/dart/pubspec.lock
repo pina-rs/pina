@@ -277,190 +277,186 @@ packages:
     dependency: "direct main"
     description:
       name: solana_kit_accounts
-      sha256: "0c841c506a15c9f0e518123f18eb215512a0488ce6b4c7ab8b712809c6c57f41"
+      sha256: "748e8bd05a3cca1745f33d326ac1dd1601ffb553b1977d5afbac1d607b8057da"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_address:
     dependency: transitive
     description:
       name: solana_kit_address
-      sha256: c6d1501353c9264cc31cfcab4acebeb81e743d8cd27023d3c2a31d6a7ee4ff69
+      sha256: "56c7b79d7f2f2cb13555d026eebbb9fcb044609b57f55d4f7ef7fa32229cb181"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_address_constants:
     dependency: transitive
     description:
       name: solana_kit_address_constants
-      sha256: "4e5f975e027e87c0de6923c768c34ff22495bcd9b8c9603b9fa7be67652b4aef"
+      sha256: "00ce95c7f4a99c00125f43e97c14963aa6d4b31f39d82ce5055c32cfef4d2cb4"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_addresses:
     dependency: "direct main"
     description:
       name: solana_kit_addresses
-      sha256: "5e17f580361293e3515c0b2b6ebd83e8e1721b68905b7fc71470d39b12f81acb"
+      sha256: "9905a61995a3c50e64b6b935ced606ee63c8b4ac67cabb41f38cf4ace155d496"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_codecs_core:
     dependency: "direct main"
     description:
-      path: "packages/solana_kit_codecs_core"
-      ref: "53efa0869bd63efdc40b87e9ccc997ec500fe315"
-      resolved-ref: "53efa0869bd63efdc40b87e9ccc997ec500fe315"
-      url: "https://github.com/openbudgetfun/solana_kit.git"
-    source: git
-    version: "0.7.0"
+      name: solana_kit_codecs_core
+      sha256: "4f4ccfaede90050022ea17625049953bd044ce061db030589a89ebdc1c56bc98"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.8.0"
   solana_kit_codecs_data_structures:
     dependency: "direct main"
     description:
-      path: "packages/solana_kit_codecs_data_structures"
-      ref: "53efa0869bd63efdc40b87e9ccc997ec500fe315"
-      resolved-ref: "53efa0869bd63efdc40b87e9ccc997ec500fe315"
-      url: "https://github.com/openbudgetfun/solana_kit.git"
-    source: git
-    version: "0.7.0"
+      name: solana_kit_codecs_data_structures
+      sha256: af35f6b713c82a533ebb0a098db6020ac31838efe5e5089527f209de0591fe95
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.8.0"
   solana_kit_codecs_numbers:
     dependency: "direct main"
     description:
       name: solana_kit_codecs_numbers
-      sha256: "3f70d461149c3d990dcbdac8aa6aa642327348e048e0cf5acf7d8d1929101979"
+      sha256: "52d1001716a2dc3abeddd7a6aa542f86b26d8d66915d9fe9430e8ac47e432ffc"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_codecs_strings:
     dependency: "direct main"
     description:
-      path: "packages/solana_kit_codecs_strings"
-      ref: "53efa0869bd63efdc40b87e9ccc997ec500fe315"
-      resolved-ref: "53efa0869bd63efdc40b87e9ccc997ec500fe315"
-      url: "https://github.com/openbudgetfun/solana_kit.git"
-    source: git
-    version: "0.7.0"
+      name: solana_kit_codecs_strings
+      sha256: e244431c487c58d488463ed7d3a8e8365ff1d774411464b582fdba364db1ae92
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.8.0"
   solana_kit_errors:
     dependency: "direct main"
     description:
-      path: "packages/solana_kit_errors"
-      ref: "53efa0869bd63efdc40b87e9ccc997ec500fe315"
-      resolved-ref: "53efa0869bd63efdc40b87e9ccc997ec500fe315"
-      url: "https://github.com/openbudgetfun/solana_kit.git"
-    source: git
-    version: "0.7.0"
+      name: solana_kit_errors
+      sha256: "4341a42f1efe363c68e538d13871c6d7848f0dff3a41d86f813da713ec10c7eb"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.8.0"
   solana_kit_fast_stable_stringify:
     dependency: transitive
     description:
       name: solana_kit_fast_stable_stringify
-      sha256: "3d0e15f20d68874253d8453e61a8d0511c96231b2bf4951d3bd296bc1bdb0c3b"
+      sha256: "7cc293c91ddda54ee5054efcac2ecf8b7cdf0af4b73f2e9086bc2575984407a1"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_instructions:
     dependency: "direct main"
     description:
       name: solana_kit_instructions
-      sha256: "4639aedd5e81b927ba98b7d52ace8d6e12b4613c8737d6787fdd25e0395fc4cf"
+      sha256: "61493f7b6f75fb11602d92f69090e9edfe997feec25046a328f58482eec7dc24"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_keys:
     dependency: transitive
     description:
       name: solana_kit_keys
-      sha256: "5962a783e83b626a1d321416d7d82c77b6c27c844b9a8f434b36ff1be55b7d07"
+      sha256: "436ee01872c1f29c7515625691d0726be659aa8e3c4377e101aa2cf631e91c07"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_rpc:
     dependency: transitive
     description:
       name: solana_kit_rpc
-      sha256: "3d82b353cebcf1d62c0ae1ccdacd3f0b7e4e7323838e54323228d0d0df7a7bac"
+      sha256: "48f5fcba55a7347e2b7295fabd4b9a26b67b712150c4f8a0500517fdb57b9b28"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_rpc_api:
     dependency: transitive
     description:
       name: solana_kit_rpc_api
-      sha256: "5997c561320e058df1c03d4e553c78f4a2d9253deb43cafa72d7c4ea31b57915"
+      sha256: ddb0021f6d773dd24afec3b9e75ee771b96b5cd64892c5955fecc7381b5b41ab
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_rpc_parsed_types:
     dependency: transitive
     description:
       name: solana_kit_rpc_parsed_types
-      sha256: "6fa2eb9e10a1be62fa8da73d7dc7f5b497919cb6b1afd7c61adb6d1ef863958d"
+      sha256: "54ed95d7b1bf06474490bbb6657dda766d7ca511f38465b8f71d7505827f517f"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_rpc_spec:
     dependency: transitive
     description:
       name: solana_kit_rpc_spec
-      sha256: "0cb4fc19911d61725171343339259f5ec9c59038b069b18e84a22e696ff54e5f"
+      sha256: "9fb63943d8dd70934760b87ef47c670b8a3492aa4745d3552c846b2439c20935"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_rpc_spec_types:
     dependency: transitive
     description:
       name: solana_kit_rpc_spec_types
-      sha256: "7cf99e5b94c5e5e695417b1042fc02d7e4716ae01aa2f4fa9c8cc20b2852776a"
+      sha256: "2dde3a8c4ffe4e85dab32220f57c269c8aa564ba98724aa296247b6bc426836c"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_rpc_transformers:
     dependency: transitive
     description:
       name: solana_kit_rpc_transformers
-      sha256: "9481887fa71febd0861c9bc873d7874bb10262f2aef9bd2b2a8ebc42222a67e5"
+      sha256: cbd3785bb3bfcbf16a21717e57bec9a5219eb5156b8ed0983b58a0bb9c3889ac
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_rpc_transport_http:
     dependency: transitive
     description:
       name: solana_kit_rpc_transport_http
-      sha256: "48be116fb6e0125990c39b43435455488b697bc39fb2460681212c2b2668863b"
+      sha256: "814605e17b45f3808ea54ee34d09caff576288697208146691fbe4e662fcedaf"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_rpc_types:
     dependency: "direct main"
     description:
       name: solana_kit_rpc_types
-      sha256: fb24ea700354a465067659fb0cf6f6fe1988dc5078048742b789da139be94e7d
+      sha256: ebf98c6cd3241b696947ec67fdc63dbb3c178641e4c814086bb3fba1e6efc64a
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_subscribable:
     dependency: transitive
     description:
       name: solana_kit_subscribable
-      sha256: "9973884354a129cd0acd0285fefc562cf8d57f944f2d8a6f1a2a59e9e4bd8d4d"
+      sha256: "26e8db74375c4b231c85add5ddc422367eb0f97b8b873b3f11a2a0ab271e7d03"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_transaction_messages:
     dependency: transitive
     description:
       name: solana_kit_transaction_messages
-      sha256: "939fb503b80b0645231dec0208b895c15d286ae00a3083efea56aaf69cb89c87"
+      sha256: "5053ee50625ab50cf776d7cf7de7a60d05b782dafadc317a110db83e1ddf7414"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   solana_kit_transactions:
     dependency: transitive
     description:
       name: solana_kit_transactions
-      sha256: "81bbab33699c6b0910cbefac774b18ced68a20b2e00fc7e9a77427199dd3bcc1"
+      sha256: "1e00268c3d279b7e4435db3b06118959392e5e769f30d7a1b01dae062c1062d2"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.0"
+    version: "0.8.0"
   source_map_stack_trace:
     dependency: transitive
     description:

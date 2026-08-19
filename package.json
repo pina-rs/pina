@@ -13,7 +13,7 @@
 	"dependencies": {
 		"@codama/renderers-js": "^2.3.1",
 		"codama": "^1.10.0",
-		"codama-renderers-dart": "0.5.0"
+		"codama-renderers-dart": "0.5.1"
 	},
 	"devDependencies": {
 		"@solana/surfpool": "^1.5.0",
