@@ -831,7 +831,7 @@ The `pina docs` subcommand renders built-in reference topics. Set the `PINA_TEMP
 | [`anchor_floats`](examples/anchor_floats)                                         | Anchor float account/update behavior with authority checks                  |
 | [`anchor_system_accounts`](examples/anchor_system_accounts)                       | Anchor system-owned account constraint parity                               |
 | [`anchor_sysvars`](examples/anchor_sysvars)                                       | Anchor sysvar account validation parity                                     |
-| [`anchor_realloc`](examples/anchor_realloc)                                       | Anchor realloc constraint parity for growth-limit and duplicate checks      |
+| [`anchor_realloc`](examples/anchor_realloc)                                       | Secure realloc lifecycle with authority-bound PDA and duplicate checks      |
 
 ## Security
 

@@ -36,7 +36,7 @@ This page tracks sequential parity ports from `solana-foundation/anchor/tests` i
 - [ ] `optional`
 - [ ] `pda-derivation`
 - [ ] `pyth`
-- [x] `realloc` -> `examples/anchor_realloc` (adapted)
+- [x] `realloc` -> `examples/anchor_realloc` (security-adapted: per-authority PDA instead of Anchor's global test fixture)
 - [ ] `relations-derivation`
 - [ ] `safety-checks`
 - [ ] `spl`

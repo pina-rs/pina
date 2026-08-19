@@ -24,13 +24,13 @@ import {
 	type InstructionWithAccounts,
 	type InstructionWithData,
 	type ReadonlyAccount,
-	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
+	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
@@ -59,7 +59,7 @@ export type Realloc2Instruction<
 	& InstructionWithAccounts<
 		[
 			TAccountAuthority extends string ?
-					& ReadonlySignerAccount<TAccountAuthority>
+					& WritableSignerAccount<TAccountAuthority>
 					& AccountSignerMeta<TAccountAuthority>
 				: TAccountAuthority,
 			TAccountSample1 extends string ? WritableAccount<TAccountSample1>
@@ -148,7 +148,7 @@ export function getRealloc2Instruction<
 
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
+		authority: { value: input.authority ?? null, isWritable: true },
 		sample1: { value: input.sample1 ?? null, isWritable: true },
 		sample2: { value: input.sample2 ?? null, isWritable: true },
 		systemProgram: { value: input.systemProgram ?? null, isWritable: false },

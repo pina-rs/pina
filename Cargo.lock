@@ -216,7 +216,12 @@ dependencies = [
 name = "anchor_realloc"
 version = "0.0.0"
 dependencies = [
+ "mollusk-svm",
  "pina",
+ "solana-account",
+ "solana-instruction",
+ "solana-pubkey",
+ "solana-sdk-ids",
 ]
 
 [[package]]

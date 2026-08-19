@@ -16,8 +16,6 @@ import {
 	type FixedSizeEncoder,
 	getStructDecoder,
 	getStructEncoder,
-	getU16Decoder,
-	getU16Encoder,
 	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
@@ -34,18 +32,20 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { findSamplePda } from "../pdas";
 import { ANCHOR_REALLOC_PROGRAM_ADDRESS } from "../programs";
 import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
-export const REALLOC_DISCRIMINATOR = 0;
+export const INITIALIZE_DISCRIMINATOR = 2;
 
-export function getReallocDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(REALLOC_DISCRIMINATOR);
+export function getInitializeDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR);
 }
 
-export type ReallocInstruction<
+export type InitializeInstruction<
 	TProgram extends string = typeof ANCHOR_REALLOC_PROGRAM_ADDRESS,
 	TAccountAuthority extends string | AccountMeta<string> = string,
 	TAccountSample extends string | AccountMeta<string> = string,
@@ -70,65 +70,153 @@ export type ReallocInstruction<
 		]
 	>;
 
-export type ReallocInstructionData = { discriminator: number; len: number };
+export type InitializeInstructionData = { discriminator: number; bump: number };
 
-export type ReallocInstructionDataArgs = { len: number };
+export type InitializeInstructionDataArgs = { bump: number };
 
-export function getReallocInstructionDataEncoder(): FixedSizeEncoder<
-	ReallocInstructionDataArgs
+export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
+	InitializeInstructionDataArgs
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"len",
-			getU16Encoder(),
+			"bump",
+			getU8Encoder(),
 		]]),
-		(value) => ({ ...value, discriminator: 0 }),
+		(value) => ({ ...value, discriminator: 2 }),
 	);
 }
 
-export function getReallocInstructionDataDecoder(): FixedSizeDecoder<
-	ReallocInstructionData
+export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
+	InitializeInstructionData
 > {
 	return getStructDecoder([[
 		"discriminator",
-		getZeroPodDiscriminatorDecoder(REALLOC_DISCRIMINATOR, getU8Decoder()),
-	], ["len", getU16Decoder()]]);
+		getZeroPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder()),
+	], ["bump", getU8Decoder()]]);
 }
 
-export function getReallocInstructionDataCodec(): FixedSizeCodec<
-	ReallocInstructionDataArgs,
-	ReallocInstructionData
+export function getInitializeInstructionDataCodec(): FixedSizeCodec<
+	InitializeInstructionDataArgs,
+	InitializeInstructionData
 > {
 	return combineCodec(
-		getReallocInstructionDataEncoder(),
-		getReallocInstructionDataDecoder(),
+		getInitializeInstructionDataEncoder(),
+		getInitializeInstructionDataDecoder(),
 	);
 }
 
-export type ReallocInput<
+export type InitializeAsyncInput<
 	TAccountAuthority extends string = string,
 	TAccountSample extends string = string,
 	TAccountSystemProgram extends string = string,
 > = {
-	/**
-	 * The sample authority. It pays rent on growth and receives excess rent on
-	 * shrink, so it must be writable as well as a signer.
-	 */
+	/** Funds creation and becomes the sample's resize authority. */
 	authority: TransactionSigner<TAccountAuthority>;
-	sample: Address<TAccountSample>;
+	/** Empty PDA derived from `[b"sample", authority]`. */
+	sample?: Address<TAccountSample>;
 	systemProgram?: Address<TAccountSystemProgram>;
-	len: ReallocInstructionDataArgs["len"];
+	bump: InitializeInstructionDataArgs["bump"];
 };
 
-export function getReallocInstruction<
+export async function getInitializeInstructionAsync<
 	TAccountAuthority extends string,
 	TAccountSample extends string,
 	TAccountSystemProgram extends string,
 	TProgramAddress extends Address = typeof ANCHOR_REALLOC_PROGRAM_ADDRESS,
 >(
-	input: ReallocInput<TAccountAuthority, TAccountSample, TAccountSystemProgram>,
+	input: InitializeAsyncInput<
+		TAccountAuthority,
+		TAccountSample,
+		TAccountSystemProgram
+	>,
 	config?: { programAddress?: TProgramAddress },
-): ReallocInstruction<
+): Promise<
+	InitializeInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountSample,
+		TAccountSystemProgram
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		ANCHOR_REALLOC_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: true },
+		sample: { value: input.sample ?? null, isWritable: true },
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.sample.value) {
+		accounts.sample.value = await findSamplePda({
+			authority: getAddressFromResolvedInstructionAccount(
+				"authority",
+				accounts.authority.value,
+			),
+		});
+	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("sample", accounts.sample),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getInitializeInstructionDataEncoder().encode(
+			args as InitializeInstructionDataArgs,
+		),
+		programAddress,
+	} as InitializeInstruction<
+		TProgramAddress,
+		TAccountAuthority,
+		TAccountSample,
+		TAccountSystemProgram
+	>);
+}
+
+export type InitializeInput<
+	TAccountAuthority extends string = string,
+	TAccountSample extends string = string,
+	TAccountSystemProgram extends string = string,
+> = {
+	/** Funds creation and becomes the sample's resize authority. */
+	authority: TransactionSigner<TAccountAuthority>;
+	/** Empty PDA derived from `[b"sample", authority]`. */
+	sample: Address<TAccountSample>;
+	systemProgram?: Address<TAccountSystemProgram>;
+	bump: InitializeInstructionDataArgs["bump"];
+};
+
+export function getInitializeInstruction<
+	TAccountAuthority extends string,
+	TAccountSample extends string,
+	TAccountSystemProgram extends string,
+	TProgramAddress extends Address = typeof ANCHOR_REALLOC_PROGRAM_ADDRESS,
+>(
+	input: InitializeInput<
+		TAccountAuthority,
+		TAccountSample,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): InitializeInstruction<
 	TProgramAddress,
 	TAccountAuthority,
 	TAccountSample,
@@ -167,11 +255,11 @@ export function getReallocInstruction<
 			getAccountMeta("sample", accounts.sample),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 		],
-		data: getReallocInstructionDataEncoder().encode(
-			args as ReallocInstructionDataArgs,
+		data: getInitializeInstructionDataEncoder().encode(
+			args as InitializeInstructionDataArgs,
 		),
 		programAddress,
-	} as ReallocInstruction<
+	} as InitializeInstruction<
 		TProgramAddress,
 		TAccountAuthority,
 		TAccountSample,
@@ -179,24 +267,22 @@ export function getReallocInstruction<
 	>);
 }
 
-export type ParsedReallocInstruction<
+export type ParsedInitializeInstruction<
 	TProgram extends string = typeof ANCHOR_REALLOC_PROGRAM_ADDRESS,
 	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
 	programAddress: Address<TProgram>;
 	accounts: {
-		/**
-		 * The sample authority. It pays rent on growth and receives excess rent on
-		 * shrink, so it must be writable as well as a signer.
-		 */
+		/** Funds creation and becomes the sample's resize authority. */
 		authority: TAccountMetas[0];
+		/** Empty PDA derived from `[b"sample", authority]`. */
 		sample: TAccountMetas[1];
 		systemProgram: TAccountMetas[2];
 	};
-	data: ReallocInstructionData;
+	data: InitializeInstructionData;
 };
 
-export function parseReallocInstruction<
+export function parseInitializeInstruction<
 	TProgram extends string,
 	TAccountMetas extends readonly AccountMeta[],
 >(
@@ -204,7 +290,7 @@ export function parseReallocInstruction<
 		& Instruction<TProgram>
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedReallocInstruction<TProgram, TAccountMetas> {
+): ParsedInitializeInstruction<TProgram, TAccountMetas> {
 	if (instruction.accounts.length < 3) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
@@ -227,6 +313,6 @@ export function parseReallocInstruction<
 			sample: getNextAccount(),
 			systemProgram: getNextAccount(),
 		},
-		data: getReallocInstructionDataDecoder().decode(instruction.data),
+		data: getInitializeInstructionDataDecoder().decode(instruction.data),
 	};
 }

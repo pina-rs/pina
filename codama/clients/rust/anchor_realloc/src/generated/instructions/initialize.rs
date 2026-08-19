@@ -10,39 +10,40 @@
 
 use pina::zeropod;
 
-/// Resizes the complete account-data buffer to `len` bytes.
-///
-/// `len` includes the fixed [`Sample`] header and therefore cannot be smaller
-/// than [`Sample::SIZE`].
-pub const REALLOC_DISCRIMINATOR: u8 = 0u8;
+/// Creates the per-authority sample PDA.
+pub const INITIALIZE_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
-pub struct Realloc {
-	/// The sample authority. It pays rent on growth and receives excess rent on
-	/// shrink, so it must be writable as well as a signer.
+pub struct Initialize {
+	/// Funds creation and becomes the sample's resize authority.
 	pub authority: solana_pubkey::Pubkey,
+	/// Empty PDA derived from `[b"sample", authority]`.
 	pub sample: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
 }
 
-impl Realloc {
-	pub fn new(authority: solana_pubkey::Pubkey, sample: solana_pubkey::Pubkey) -> Self {
+impl Initialize {
+	pub fn new(authority: solana_pubkey::Pubkey) -> Self {
 		Self {
 			authority,
-			sample,
+			sample: solana_pubkey::Pubkey::find_program_address(
+				&["sample".as_bytes(), authority.as_ref()],
+				&crate::ANCHOR_REALLOC_ID,
+			)
+			.0,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}
 
-	pub fn instruction(&self, data: ReallocInstructionData) -> solana_instruction::Instruction {
+	pub fn instruction(&self, data: InitializeInstructionData) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
 	#[allow(clippy::arithmetic_side_effects)]
 	pub fn instruction_with_remaining_accounts(
 		&self,
-		data: ReallocInstructionData,
+		data: InitializeInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
@@ -62,22 +63,23 @@ impl Realloc {
 }
 
 /// Opaque, fully initialized instruction storage.
-pub struct ReallocInstructionData {
+pub struct InitializeInstructionData {
 	bytes: Vec<u8>,
 }
 
-impl ReallocInstructionData {
+impl InitializeInstructionData {
 	pub fn new(
-		configure: impl FnOnce(&mut ReallocInstructionWireZc),
+		configure: impl FnOnce(&mut InitializeInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <ReallocInstructionWire as pina::ZeroPodFixed>::SIZE];
+		let mut bytes = vec![0u8; <InitializeInstructionWire as pina::ZeroPodFixed>::SIZE];
 		{
-			let data = <ReallocInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			let data =
+				<InitializeInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
+					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 			configure(data);
-			data.discriminator = REALLOC_DISCRIMINATOR;
+			data.discriminator = INITIALIZE_DISCRIMINATOR;
 		}
-		<ReallocInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
+		<InitializeInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
 			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
@@ -85,7 +87,7 @@ impl ReallocInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::ZeroPod)]
-pub struct ReallocInstructionWire {
+pub struct InitializeInstructionWire {
 	pub discriminator: u8,
-	pub len: u16,
+	pub bump: u8,
 }

@@ -10,6 +10,11 @@
 
 use pina::zeropod;
 
+/// Exercises Anchor's duplicate-reallocation guard.
+///
+/// Both sample accounts must be the same canonical PDA for the signer, so the
+/// instruction always rejects with `AccountDuplicateReallocs` before any
+/// account is resized. It is intentionally not a two-target mutation API.
 pub const REALLOC2_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
@@ -46,10 +51,7 @@ impl Realloc2 {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.authority,
-			true,
-		));
+		accounts.push(solana_instruction::AccountMeta::new(self.authority, true));
 		accounts.push(solana_instruction::AccountMeta::new(self.sample1, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.sample2, false));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(

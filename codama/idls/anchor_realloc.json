@@ -7,17 +7,203 @@
 		"name": "anchorRealloc",
 		"publicKey": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
 		"version": "0.0.0",
+		"accounts": [
+			{
+				"kind": "accountNode",
+				"name": "sample",
+				"docs": [
+					"The authenticated header at the start of every resizable sample account.",
+					"",
+					"Bytes after this fixed header are deliberately not exposed as a typed",
+					"collection. The example tests allocation and rent behaviour, not a data",
+					"serialization format; only the header participates in program logic."
+				],
+				"data": {
+					"kind": "structTypeNode",
+					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "discriminator",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "bump",
+							"docs": [
+								"Canonical PDA bump, persisted for inexpensive validation on resize."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "authority",
+							"docs": [
+								"The only signer permitted to resize this sample."
+							],
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						}
+					]
+				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "sample"
+				},
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			}
+		],
 		"instructions": [
 			{
 				"kind": "instructionNode",
-				"name": "realloc",
+				"name": "initialize",
+				"docs": [
+					"Creates the per-authority sample PDA."
+				],
 				"accounts": [
 					{
 						"kind": "instructionAccountNode",
 						"name": "authority",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": true,
-						"isOptional": false
+						"isOptional": false,
+						"docs": [
+							"Funds creation and becomes the sample's resize authority."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "sample",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"Empty PDA derived from `[b\"sample\", authority]`."
+						],
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "sample"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 2
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "bump",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 2
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "realloc",
+				"docs": [
+					"Resizes the complete account-data buffer to `len` bytes.",
+					"",
+					"`len` includes the fixed [`Sample`] header and therefore cannot be smaller",
+					"than [`Sample::SIZE`]."
+				],
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": true,
+						"isSigner": true,
+						"isOptional": false,
+						"docs": [
+							"The sample authority. It pays rent on growth and receives excess rent on",
+							"shrink, so it must be writable as well as a signer."
+						]
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -85,11 +271,18 @@
 			{
 				"kind": "instructionNode",
 				"name": "realloc2",
+				"docs": [
+					"Exercises Anchor's duplicate-reallocation guard.",
+					"",
+					"Both sample accounts must be the same canonical PDA for the signer, so the",
+					"instruction always rejects with `AccountDuplicateReallocs` before any",
+					"account is resized. It is intentionally not a two-target mutation API."
+				],
 				"accounts": [
 					{
 						"kind": "instructionAccountNode",
 						"name": "authority",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": true,
 						"isOptional": false
 					},
@@ -164,6 +357,32 @@
 				]
 			}
 		],
+		"pdas": [
+			{
+				"kind": "pdaNode",
+				"name": "sample",
+				"seeds": [
+					{
+						"kind": "constantPdaSeedNode",
+						"type": {
+							"kind": "stringTypeNode",
+							"encoding": "utf8"
+						},
+						"value": {
+							"kind": "stringValueNode",
+							"string": "sample"
+						}
+					},
+					{
+						"kind": "variablePdaSeedNode",
+						"name": "authority",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					}
+				]
+			}
+		],
 		"errors": [
 			{
 				"kind": "errorNode",
@@ -175,6 +394,18 @@
 				"kind": "errorNode",
 				"name": "accountDuplicateReallocs",
 				"code": 3017,
+				"message": ""
+			},
+			{
+				"kind": "errorNode",
+				"name": "accountDataTooSmall",
+				"code": 3018,
+				"message": ""
+			},
+			{
+				"kind": "errorNode",
+				"name": "authorityMismatch",
+				"code": 3019,
 				"message": ""
 			}
 		]

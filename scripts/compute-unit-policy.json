@@ -14,5 +14,8 @@
 	"fail": {
 		"deltaCu": 500,
 		"deltaPercent": 10.0
+	},
+	"approvedTotals": {
+		"anchor_realloc": 4114
 	}
 }

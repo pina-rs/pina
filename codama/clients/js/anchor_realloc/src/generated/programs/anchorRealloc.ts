@@ -9,40 +9,70 @@
 import {
 	type Address,
 	assertIsInstructionWithAccounts,
+	type ClientWithRpc,
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
 	extendClient,
 	type ExtendedClient,
+	type GetAccountInfoApi,
+	type GetMultipleAccountsApi,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
 	SolanaError,
 } from "@solana/kit";
 import {
+	addSelfFetchFunctions,
 	addSelfPlanAndSendFunctions,
+	type SelfFetchFunctions,
 	type SelfPlanAndSendFunctions,
 } from "@solana/program-client-core";
+import { getSampleCodec, type Sample, type SampleArgs } from "../accounts";
 import {
+	getInitializeInstructionAsync,
 	getRealloc2Instruction,
 	getReallocInstruction,
+	type InitializeAsyncInput,
+	type ParsedInitializeInstruction,
 	type ParsedRealloc2Instruction,
 	type ParsedReallocInstruction,
+	parseInitializeInstruction,
 	parseRealloc2Instruction,
 	parseReallocInstruction,
 	type Realloc2Input,
 	type ReallocInput,
 } from "../instructions";
+import { findSamplePda } from "../pdas";
 
 export const ANCHOR_REALLOC_PROGRAM_ADDRESS =
 	"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS" as Address<
 		"Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
 	>;
 
+export enum AnchorReallocAccount {
+	Sample,
+}
+
+export function identifyAnchorReallocAccount(
+	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): AnchorReallocAccount {
+	const data = "data" in account ? account.data : account;
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return AnchorReallocAccount.Sample;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+		{ accountData: data, programName: "anchorRealloc" },
+	);
+}
+
 export enum AnchorReallocInstruction {
+	Initialize,
 	Realloc,
 	Realloc2,
 }
@@ -51,6 +81,9 @@ export function identifyAnchorReallocInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): AnchorReallocInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return AnchorReallocInstruction.Initialize;
+	}
 	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
 		return AnchorReallocInstruction.Realloc;
 	}
@@ -66,6 +99,8 @@ export function identifyAnchorReallocInstruction(
 export type ParsedAnchorReallocInstruction<
 	TProgram extends string = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
 > =
+	| { instructionType: AnchorReallocInstruction.Initialize }
+		& ParsedInitializeInstruction<TProgram>
 	| { instructionType: AnchorReallocInstruction.Realloc }
 		& ParsedReallocInstruction<TProgram>
 	| { instructionType: AnchorReallocInstruction.Realloc2 }
@@ -78,6 +113,13 @@ export function parseAnchorReallocInstruction<TProgram extends string>(
 ): ParsedAnchorReallocInstruction<TProgram> {
 	const instructionType = identifyAnchorReallocInstruction(instruction);
 	switch (instructionType) {
+		case AnchorReallocInstruction.Initialize: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: AnchorReallocInstruction.Initialize,
+				...parseInitializeInstruction(instruction),
+			};
+		}
 		case AnchorReallocInstruction.Realloc: {
 			assertIsInstructionWithAccounts(instruction);
 			return {
@@ -104,12 +146,26 @@ export function parseAnchorReallocInstruction<TProgram extends string>(
 }
 
 export type AnchorReallocPlugin = {
+	accounts: AnchorReallocPluginAccounts;
 	instructions: AnchorReallocPluginInstructions;
+	pdas: AnchorReallocPluginPdas;
+	identifyAccount: typeof identifyAnchorReallocAccount;
 	identifyInstruction: typeof identifyAnchorReallocInstruction;
 	parseInstruction: typeof parseAnchorReallocInstruction;
 };
 
+export type AnchorReallocPluginAccounts = {
+	sample:
+		& ReturnType<typeof getSampleCodec>
+		& SelfFetchFunctions<SampleArgs, Sample>;
+};
+
 export type AnchorReallocPluginInstructions = {
+	initialize: (
+		input: InitializeAsyncInput,
+	) =>
+		& ReturnType<typeof getInitializeInstructionAsync>
+		& SelfPlanAndSendFunctions;
 	realloc: (
 		input: ReallocInput,
 	) => ReturnType<typeof getReallocInstruction> & SelfPlanAndSendFunctions;
@@ -118,7 +174,10 @@ export type AnchorReallocPluginInstructions = {
 	) => ReturnType<typeof getRealloc2Instruction> & SelfPlanAndSendFunctions;
 };
 
+export type AnchorReallocPluginPdas = { sample: typeof findSamplePda };
+
 export type AnchorReallocPluginRequirements =
+	& ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi>
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
@@ -128,12 +187,20 @@ export function anchorReallocProgram() {
 	): ExtendedClient<T, { anchorRealloc: AnchorReallocPlugin }> => {
 		return extendClient(client, {
 			anchorRealloc: <AnchorReallocPlugin> {
+				accounts: { sample: addSelfFetchFunctions(client, getSampleCodec()) },
 				instructions: {
+					initialize: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getInitializeInstructionAsync(input),
+						),
 					realloc: (input) =>
 						addSelfPlanAndSendFunctions(client, getReallocInstruction(input)),
 					realloc2: (input) =>
 						addSelfPlanAndSendFunctions(client, getRealloc2Instruction(input)),
 				},
+				pdas: { sample: findSamplePda },
+				identifyAccount: identifyAnchorReallocAccount,
 				identifyInstruction: identifyAnchorReallocInstruction,
 				parseInstruction: parseAnchorReallocInstruction,
 			},

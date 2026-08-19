@@ -21,7 +21,7 @@ The `examples/` workspace members demonstrate practical usage patterns:
 - `anchor_floats`: float data account create/update flow with authority validation.
 - `anchor_system_accounts`: system-program owner validation parity.
 - `anchor_sysvars`: clock/rent/stake-history sysvar validation parity.
-- `anchor_realloc`: realloc growth and duplicate-target safety checks.
+- `anchor_realloc`: authority-bound PDA realloc lifecycle, growth limits, and duplicate-target safety checks.
 
 Use examples as reference implementations for account layout, instruction parsing, and validation ordering.
 
