@@ -49,6 +49,7 @@ jobs:
 
             resolved_commit="$(jq -r '.resolved_commit // "<missing>"' "$release_record")"
             record_commit="$(jq -r '.record_commit // "<missing>"' "$release_record")"
+            distance="$(jq -r '.distance // -1' "$release_record")"
             release_target_count="$(jq -r '.record.release_targets | length' "$release_record")"
 
             if [[ "$resolved_commit" == "$record_commit" ]] &&
@@ -61,6 +62,16 @@ jobs:
                 released_packages: .record.released_packages
               }' "$release_record" >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+
+            subject="$(git log -1 --pretty=%s)"
+            body="$(git log -1 --pretty=%B)"
+            if ((distance > 0)) &&
+              [[ "$subject" != chore\(release\):\ prepare\ release* ]] &&
+              ! grep -q '<!-- monochange:release-record:start -->' <<<"$body"; then
+              echo "### No pending release" >> "$GITHUB_STEP_SUMMARY"
+              echo "No changesets remain after the previous prepared release." >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
 
