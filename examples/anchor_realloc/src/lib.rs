@@ -20,7 +20,6 @@ use pina::*;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
-const MAX_PERMITTED_DATA_INCREASE: usize = 10_240;
 const SAMPLE_SEED: &[u8] = b"sample";
 
 #[error]
@@ -170,6 +169,8 @@ fn validate_sample(sample: &AccountView, authority: &Address) -> ProgramResult {
 	let seeds = Sample::seeds(authority).with_bump(bump);
 	sample.assert_seeds_with_bump(&seeds.as_slices(), &ID)?;
 
+	// The PDA check is the primary authority control. Retain the stored value as
+	// defense in depth against accidental writes from future program instructions.
 	if stored_authority != *authority {
 		return Err(ReallocError::AuthorityMismatch.into());
 	}
@@ -225,6 +226,8 @@ impl<'a> ProcessAccountInfos<'a> for ReallocAccounts<'a> {
 
 impl<'a> ProcessAccountInfos<'a> for Realloc2Accounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
+		// Realloc2 is only a duplicate-target regression. Its legacy `len` field
+		// remains in the wire format but must not reintroduce a second mutation path.
 		let _ = Realloc2Ix::try_from_bytes(data)?;
 		let authority_key = *self.authority.address();
 
