@@ -1,0 +1,84 @@
+# Pina CLI
+
+The `pina` command scaffolds programs, extracts Codama IDLs, renders clients, reads bundled reference material, and profiles compiled SBF binaries. It is designed for both interactive use and scripted or agent-driven discovery.
+
+## Install
+
+Install the prebuilt npm package. It selects the native binary for the current operating system, CPU, and Linux C library:
+
+```bash
+npm install --global @pina-rs/cli
+pina --version
+```
+
+Or install from crates.io with Rust:
+
+```bash
+cargo install pina_cli
+pina --version
+```
+
+Inside this repository, enter the development shell and use the `pina` shortcut:
+
+```bash
+devenv shell
+pina --help
+```
+
+The shortcut runs `cargo run -p pina_cli -- ...` against the checked-out source.
+
+## Command map
+
+| Command                                        | Purpose                                              | Primary output        |
+| ---------------------------------------------- | ---------------------------------------------------- | --------------------- |
+| [`pina init`](./init.md)                       | Create a new program scaffold                        | Files plus next steps |
+| [`pina idl`](./idl.md)                         | Extract a Codama root-node IDL                       | JSON                  |
+| [`pina docs`](./docs.md)                       | List or render bundled terminal docs                 | Terminal text         |
+| [`pina profile`](./profile.md)                 | Estimate per-function SBF compute cost               | Text or JSON          |
+| [`pina codama generate`](./codama-generate.md) | Generate IDLs and Rust, JavaScript, and Dart clients | Generated directories |
+
+## Discover the interface
+
+The help tree is intentionally self-describing:
+
+```bash
+pina --help
+pina idl --help
+pina docs --help
+pina init --help
+pina profile --help
+pina codama --help
+pina codama generate --help
+```
+
+Long help includes the input contract, output behavior, defaults, and copyable examples. Run `pina docs` with no topic to discover the bundled architecture references.
+
+## Streams and exit codes
+
+| Command           | stdout                            | stderr                              |
+| ----------------- | --------------------------------- | ----------------------------------- |
+| `idl`             | JSON when `--output` is omitted   | Progress, extraction counts, errors |
+| `docs`            | Topic index or rendered Markdown  | Errors                              |
+| `init`            | Created path and next steps       | Errors                              |
+| `profile`         | Report when `--output` is omitted | Errors                              |
+| `codama generate` | Completion summary                | Errors and renderer failures        |
+
+Successful commands exit with code `0`. Operational failures exit with code `1`. Invalid command-line syntax is rejected by Clap with a non-zero usage error before an operation begins.
+
+For reliable automation, capture stdout only when the command documents it as machine-readable. See [Automation and Agent Usage](./automation.md) for a compact discovery protocol.
+
+## Path behavior
+
+Relative paths are resolved from the process working directory. Output commands create their documented output directories where applicable, but `pina idl --output` expects the parent directory to exist. Existing files at explicit output paths are overwritten after the command validates its inputs.
+
+## Environment
+
+The CLI reads one optional environment variable:
+
+| Variable             | Used by     | Meaning                                          |
+| -------------------- | ----------- | ------------------------------------------------ |
+| `PINA_TEMPLATES_DIR` | `pina docs` | Directory containing custom `<topic>.t.md` files |
+
+No configuration file is required.
+
+Agents that maintain Pina projects can install the companion [`@pina-rs/skill`](../agent-skill.md) package.

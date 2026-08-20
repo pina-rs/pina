@@ -128,6 +128,8 @@ fn write_file(path: &Path, contents: &str) -> Result<(), InitError> {
 }
 
 fn cargo_toml_template(package_name: &str) -> String {
+	let pina_version = env!("CARGO_PKG_VERSION");
+
 	format!(
 		r#"[package]
 name = "{package_name}"
@@ -142,10 +144,10 @@ crate-type = ["cdylib", "lib"]
 bpf-entrypoint = []
 
 [dependencies]
-pina = {{ version = "0.5.0", features = ["logs", "derive"] }}
+pina = {{ version = "{pina_version}", features = ["logs", "derive"] }}
 
 [dev-dependencies]
-mollusk-svm = "0.0.14"
+mollusk-svm = "0.15.0"
 "#
 	)
 }
@@ -375,8 +377,11 @@ mod tests {
 		let cargo = fs::read_to_string(dir.path.join("Cargo.toml"))
 			.unwrap_or_else(|err| panic!("expected Cargo.toml to be readable: {err}"));
 		assert!(cargo.contains("name = \"my_program\""));
-		assert!(cargo.contains("pina = { version = \"0.5.0\""));
-		assert!(cargo.contains("mollusk-svm"));
+		assert!(cargo.contains(&format!(
+			"pina = {{ version = \"{}\"",
+			env!("CARGO_PKG_VERSION")
+		)));
+		assert!(cargo.contains("mollusk-svm = \"0.15.0\""));
 	}
 
 	#[test]

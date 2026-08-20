@@ -1,0 +1,17 @@
+{
+	"name": "@pina-rs/cli-freebsd-x64",
+	"version": "0.9.0",
+	"description": "Prebuilt Pina CLI binary for FreeBSD x64",
+	"homepage": "https://pina.rs",
+	"bugs": { "url": "https://github.com/pina-rs/pina/issues" },
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/pina-rs/pina.git",
+		"directory": "packages/pina__cli-freebsd-x64"
+	},
+	"files": ["bin"],
+	"os": ["freebsd"],
+	"cpu": ["x64"],
+	"publishConfig": { "access": "public", "provenance": true }
+}

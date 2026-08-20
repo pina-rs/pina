@@ -8,8 +8,15 @@
 use darling::FromDeriveInput;
 use darling::FromField;
 use darling::FromMeta;
+use darling::ast::Data;
+use darling::util::Flag;
+use darling::util::Ignored;
 use quote::ToTokens;
 use syn::Expr;
+use syn::Generics;
+use syn::Ident;
+use syn::Path;
+use syn::Type;
 use syn::ext::IdentExt;
 
 /// Arguments for the `#[account(...)]` attribute macro.
@@ -17,11 +24,11 @@ use syn::ext::IdentExt;
 pub(crate) struct AccountArgs {
 	/// Set the path to the crate
 	#[darling(default = "default_crate_path", rename = "crate")]
-	pub(crate) crate_path: syn::Path,
+	pub(crate) crate_path: Path,
 	/// Set the discriminator enum for this account.
-	pub(crate) discriminator: syn::Path,
+	pub(crate) discriminator: Path,
 	/// Set the variant of the discriminator enum.
-	pub(crate) variant: Option<syn::Ident>,
+	pub(crate) variant: Option<Ident>,
 }
 
 /// Arguments for the `#[instruction(...)]` attribute macro.
@@ -29,11 +36,11 @@ pub(crate) struct AccountArgs {
 pub(crate) struct InstructionArgs {
 	/// Set the path to the crate
 	#[darling(default = "default_crate_path", rename = "crate")]
-	pub(crate) crate_path: syn::Path,
+	pub(crate) crate_path: Path,
 	/// Set the discriminator enum for this instruction.
-	pub(crate) discriminator: syn::Path,
+	pub(crate) discriminator: Path,
 	/// Set the variant of the discriminator enum.
-	pub(crate) variant: Option<syn::Ident>,
+	pub(crate) variant: Option<Ident>,
 }
 
 /// Arguments for the `#[event(...)]` attribute macro.
@@ -41,11 +48,11 @@ pub(crate) struct InstructionArgs {
 pub(crate) struct EventArgs {
 	/// Set the path to the crate
 	#[darling(default = "default_crate_path", rename = "crate")]
-	pub(crate) crate_path: syn::Path,
+	pub(crate) crate_path: Path,
 	/// Set the discriminator enum for this event.
-	pub(crate) discriminator: syn::Path,
+	pub(crate) discriminator: Path,
 	/// Set the variant of the discriminator enum.
-	pub(crate) variant: Option<syn::Ident>,
+	pub(crate) variant: Option<Ident>,
 }
 
 /// Arguments for the `#[error(...)]` attribute macro.
@@ -53,21 +60,21 @@ pub(crate) struct EventArgs {
 pub(crate) struct ErrorArgs {
 	/// Set the path to the crate
 	#[darling(default = "default_crate_path", rename = "crate")]
-	pub(crate) crate_path: syn::Path,
+	pub(crate) crate_path: Path,
 	/// Set whether the error enum is in it's final form.
 	#[darling(rename = "final")]
-	pub(crate) is_final: darling::util::Flag,
+	pub(crate) is_final: Flag,
 }
 
 /// Arguments for the `#[pda(...)]` attribute macro.
 #[derive(Debug)]
 pub(crate) struct PdaArgs {
 	/// Set the path to the crate
-	pub(crate) crate_path: syn::Path,
+	pub(crate) crate_path: Path,
 	/// The typed PDA seed list.
 	pub(crate) seeds: Vec<PdaSeedArg>,
 	/// The name of the field that stores the PDA bump seed.
-	pub(crate) bump: Option<syn::Ident>,
+	pub(crate) bump: Option<Ident>,
 }
 
 /// A single element of a `#[pda(seeds = [...])]` list.
@@ -76,9 +83,9 @@ pub(crate) enum PdaSeedArg {
 	/// A byte-string literal seed (e.g. `b"counter"`).
 	Constant(Vec<u8>),
 	/// A reference to a `const &[u8]` seed (e.g. `COUNTER_SEED`).
-	ConstantRef(syn::Path),
+	ConstantRef(Path),
 	/// A typed dynamic seed (e.g. `authority: Address`).
-	Variable { name: syn::Ident, ty: SeedType },
+	Variable { name: Ident, ty: SeedType },
 }
 
 /// The supported typed PDA seed parameter types.
@@ -99,7 +106,7 @@ impl SeedType {
 	pub(crate) const MAX_SEED_LEN: usize = 32;
 
 	/// The Rust type used for the constructor parameter.
-	pub(crate) fn param_type(&self) -> syn::Type {
+	pub(crate) fn param_type(self) -> Type {
 		match self {
 			SeedType::Address => syn::parse_quote!(&Address),
 			SeedType::U8 => syn::parse_quote!(u8),
@@ -113,7 +120,7 @@ impl SeedType {
 	/// The constructor parameter type with an explicit lifetime, used by the
 	/// `seeds()` method so multiple `&Address` parameters can share one
 	/// lifetime.
-	pub(crate) fn param_type_lt(&self) -> syn::Type {
+	pub(crate) fn param_type_lt(self) -> Type {
 		match self {
 			SeedType::Address => syn::parse_quote!(&'a Address),
 			_ => self.param_type(),
@@ -121,7 +128,7 @@ impl SeedType {
 	}
 
 	/// The field type stored in the generated seeds struct.
-	pub(crate) fn field_type(&self) -> syn::Type {
+	pub(crate) fn field_type(self) -> Type {
 		match self {
 			SeedType::Address => syn::parse_quote!(&'a Address),
 			SeedType::U8 => syn::parse_quote!([u8; 1]),
@@ -133,7 +140,7 @@ impl SeedType {
 	}
 
 	/// The expression that stores a constructor parameter in the struct field.
-	pub(crate) fn stored_expr(&self, param: &syn::Ident) -> proc_macro2::TokenStream {
+	pub(crate) fn stored_expr(&self, param: &Ident) -> proc_macro2::TokenStream {
 		match self {
 			SeedType::Address | SeedType::Bytes(_) => quote::quote!(#param),
 			SeedType::U8 => quote::quote!([#param]),
@@ -144,7 +151,7 @@ impl SeedType {
 	}
 
 	/// The expression that turns a struct field into a seed byte slice.
-	pub(crate) fn slice_expr(&self, field: &syn::Ident) -> proc_macro2::TokenStream {
+	pub(crate) fn slice_expr(self, field: &Ident) -> proc_macro2::TokenStream {
 		match self {
 			SeedType::Address => quote::quote!(self.#field.as_ref()),
 			SeedType::U8 | SeedType::U16 | SeedType::U32 | SeedType::U64 | SeedType::Bytes(_) => {
@@ -155,7 +162,7 @@ impl SeedType {
 
 	/// The expression that turns a field of the inner seeds struct into a
 	/// seed byte slice (used by the `SeedsWithBump` wrapper).
-	pub(crate) fn slice_expr_inner(&self, field: &syn::Ident) -> proc_macro2::TokenStream {
+	pub(crate) fn slice_expr_inner(self, field: &Ident) -> proc_macro2::TokenStream {
 		match self {
 			SeedType::Address => quote::quote!(self.inner.#field.as_ref()),
 			SeedType::U8 | SeedType::U16 | SeedType::U32 | SeedType::U64 | SeedType::Bytes(_) => {
@@ -172,7 +179,7 @@ impl syn::parse::Parse for PdaArgs {
 		let mut bump = None;
 
 		while !input.is_empty() {
-			let key: syn::Ident = input.call(syn::Ident::parse_any)?;
+			let key: Ident = input.call(Ident::parse_any)?;
 			input.parse::<syn::Token![=]>()?;
 
 			if key == "seeds" {
@@ -242,14 +249,14 @@ fn parse_seed_list(input: syn::parse::ParseStream) -> syn::Result<Vec<PdaSeedArg
 			}
 			seeds.push(PdaSeedArg::Constant(value));
 		} else if content.peek2(syn::Token![:]) && !content.peek3(syn::Token![:]) {
-			let name: syn::Ident = content.parse()?;
+			let name: Ident = content.parse()?;
 			content.parse::<syn::Token![:]>()?;
-			let ty: syn::Type = content.parse()?;
+			let ty: Type = content.parse()?;
 			let ty = parse_seed_type(&ty)?;
 			seeds.push(PdaSeedArg::Variable { name, ty });
 		} else {
 			// A path to a `const &[u8]` seed (e.g. `COUNTER_SEED`).
-			let path: syn::Path = content.parse()?;
+			let path: Path = content.parse()?;
 			seeds.push(PdaSeedArg::ConstantRef(path));
 		}
 
@@ -274,7 +281,7 @@ fn parse_seed_list(input: syn::parse::ParseStream) -> syn::Result<Vec<PdaSeedArg
 }
 
 /// Parse a typed seed parameter type.
-fn parse_seed_type(ty: &syn::Type) -> syn::Result<SeedType> {
+fn parse_seed_type(ty: &Type) -> syn::Result<SeedType> {
 	let error = |span: &dyn ToTokens| {
 		syn::Error::new_spanned(
 			span,
@@ -283,7 +290,7 @@ fn parse_seed_type(ty: &syn::Type) -> syn::Result<SeedType> {
 	};
 
 	match ty {
-		syn::Type::Path(type_path) => {
+		Type::Path(type_path) => {
 			let Some(ident) = type_path.path.get_ident() else {
 				return Err(error(ty));
 			};
@@ -296,8 +303,8 @@ fn parse_seed_type(ty: &syn::Type) -> syn::Result<SeedType> {
 				_ => Err(error(ident)),
 			}
 		}
-		syn::Type::Array(array) => {
-			let syn::Type::Path(item_path) = &*array.elem else {
+		Type::Array(array) => {
+			let Type::Path(item_path) = &*array.elem else {
 				return Err(error(ty));
 			};
 			let Some(ident) = item_path.path.get_ident() else {
@@ -330,7 +337,7 @@ fn parse_seed_type(ty: &syn::Type) -> syn::Result<SeedType> {
 	}
 }
 
-fn default_crate_path() -> syn::Path {
+fn default_crate_path() -> Path {
 	syn::parse_str("::pina")
 		.unwrap_or_else(|e| panic!("internal error: failed to parse default crate path: {e}"))
 }
@@ -348,10 +355,10 @@ pub(crate) struct DiscriminatorArgs {
 	pub(crate) primitive: Primitive,
 	/// Set the path to the crate
 	#[darling(default = "default_crate_path", rename = "crate")]
-	pub(crate) crate_path: syn::Path,
+	pub(crate) crate_path: Path,
 	/// Set whether the error enum is in it's final form.
 	#[darling(rename = "final")]
-	pub(crate) is_final: darling::util::Flag,
+	pub(crate) is_final: Flag,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -435,18 +442,18 @@ impl FromMeta for Primitive {
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(pina), supports(struct_named))]
 pub(crate) struct AccountsInput {
-	pub(crate) ident: syn::Ident,
-	pub(crate) generics: syn::Generics,
-	pub(crate) data: darling::ast::Data<darling::util::Ignored, AccountsField>,
+	pub(crate) ident: Ident,
+	pub(crate) generics: Generics,
+	pub(crate) data: Data<Ignored, AccountsField>,
 	#[darling(default = "default_crate_path", rename = "crate")]
-	pub(crate) crate_path: syn::Path,
+	pub(crate) crate_path: Path,
 }
 
 #[derive(Debug, FromField)]
 #[darling(attributes(pina))]
 pub(crate) struct AccountsField {
-	pub(crate) ident: Option<syn::Ident>,
-	pub(crate) ty: syn::Type,
+	pub(crate) ident: Option<Ident>,
+	pub(crate) ty: Type,
 	#[darling(default)]
-	pub(crate) remaining: darling::util::Flag,
+	pub(crate) remaining: Flag,
 }

@@ -12,6 +12,6 @@ exit_code: 2
 ----- stdout -----
 
 ----- stderr -----
-error: a value is required for '--example <EXAMPLES>' but none was supplied
+error: a value is required for '--example <NAME>' but none was supplied
 
 For more information, try '--help'.

@@ -1,0 +1,28 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - codama
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Run Codama IDL and client-generation workflows.
+
+Use the generate subcommand to extract every selected program IDL and render the corresponding Rust, JavaScript, and Dart clients.
+
+Usage: pina codama <COMMAND>
+
+Commands:
+  generate
+          Generate IDLs and Rust, JavaScript, and Dart clients
+  help
+          Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')
+
+----- stderr -----

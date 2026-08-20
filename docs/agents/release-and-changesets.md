@@ -60,9 +60,19 @@ dprint fmt .changeset/* --allow-no-files
 - `pina_sdk_ids`
 - `pina_cli`
 - `pina_codama_renderer`
-- `pina`
 - `pina_profile`
-- `codama-nodes-from-pina`
+- `pina_codama_nodes`
+- `pina_cli_npm`
+- `pina_cli_darwin_arm64`
+- `pina_cli_darwin_x64`
+- `pina_cli_freebsd_x64`
+- `pina_cli_linux_arm64_gnu`
+- `pina_cli_linux_arm64_musl`
+- `pina_cli_linux_x64_gnu`
+- `pina_cli_linux_x64_musl`
+- `pina_cli_win32_arm64_msvc`
+- `pina_cli_win32_x64_msvc`
+- `pina_skill`
 
 A single changeset file may reference multiple packages. All publishable packages share one release identity via the `core` group, so any changeset bumps the whole group to the same version.
 

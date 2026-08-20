@@ -1,12 +1,15 @@
 {
-	"name": "pina-codama-tests",
+	"name": "@pina-rs/workspace",
 	"private": true,
 	"type": "module",
 	"scripts": {
 		"generate": "cargo run -p pina_cli -- codama generate --npx node",
 		"check:js": "tsc --noEmit -p codama/tsconfig.json",
-		"test:nodes-from-pina": "pnpm --filter codama-nodes-from-pina test",
+		"build:codama-nodes": "pnpm --filter @pina-rs/codama-nodes build",
+		"check:npm-packages": "node scripts/npm/check-packages.mjs",
+		"test:codama-nodes": "pnpm --filter @pina-rs/codama-nodes test",
 		"test:idls": "pnpm --filter pina-codama-idl-tests test",
+		"test:npm-packages": "node --test scripts/npm/tests/*.test.mjs",
 		"test:quasar-svm": "pnpm --filter pina-quasar-svm-e2e test",
 		"test": "pnpm run generate && pnpm run check:js"
 	},

@@ -73,6 +73,125 @@ fn create_fake_npx(temp_dir: &Path) -> String {
 }
 
 #[test]
+fn root_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.arg("--help");
+	assert_cmd_snapshot!("root_help", command);
+}
+
+#[test]
+fn idl_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["idl", "--help"]);
+	assert_cmd_snapshot!("idl_help", command);
+}
+
+#[test]
+fn docs_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["docs", "--help"]);
+	assert_cmd_snapshot!("docs_help", command);
+}
+
+#[test]
+fn docs_index_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.arg("docs");
+	assert_cmd_snapshot!("docs_index", command);
+}
+
+#[test]
+fn docs_unknown_topic_error_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["docs", "unknown-topic"]);
+	assert_cmd_snapshot!("docs_unknown_topic_error", command);
+}
+
+#[test]
+fn init_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["init", "--help"]);
+	assert_cmd_snapshot!("init_help", command);
+}
+
+#[test]
+fn profile_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["profile", "--help"]);
+	assert_cmd_snapshot!("profile_help", command);
+}
+
+#[test]
+fn codama_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["codama", "--help"]);
+	assert_cmd_snapshot!("codama_help", command);
+}
+
+#[test]
+fn codama_generate_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["codama", "generate", "--help"]);
+	assert_cmd_snapshot!("codama_generate_help", command);
+}
+
+#[test]
+fn idl_stdout_is_machine_readable_json() {
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.current_dir(workspace_root())
+		.args(["idl", "--path", "examples/anchor_declare_id", "--compact"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina idl: {error}"));
+
+	assert!(output.status.success());
+	serde_json::from_slice::<serde_json::Value>(&output.stdout)
+		.unwrap_or_else(|error| panic!("IDL stdout was not valid JSON: {error}"));
+	assert!(String::from_utf8_lossy(&output.stderr).contains("IDL generation complete"));
+}
+
+#[test]
+fn idl_output_file_is_machine_readable_json() {
+	let temp_dir = reset_snapshot_dir("idl_output_file");
+	let output_path = temp_dir.join("anchor_declare_id.json");
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.current_dir(workspace_root())
+		.args([
+			"idl",
+			"--path",
+			"examples/anchor_declare_id",
+			"--output",
+			&workspace_relative(&output_path),
+		])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina idl: {error}"));
+
+	assert!(output.status.success());
+	assert!(output.stdout.is_empty());
+	let json = fs::read(&output_path).unwrap_or_else(|error| {
+		panic!(
+			"failed to read generated IDL {}: {error}",
+			output_path.display()
+		)
+	});
+	serde_json::from_slice::<serde_json::Value>(&json)
+		.unwrap_or_else(|error| panic!("generated IDL was not valid JSON: {error}"));
+	assert!(String::from_utf8_lossy(&output.stderr).contains("Wrote"));
+}
+
+#[test]
+fn idl_legacy_pretty_flag_remains_accepted() {
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.current_dir(workspace_root())
+		.args(["idl", "--path", "examples/anchor_declare_id", "--pretty"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina idl: {error}"));
+
+	assert!(output.status.success());
+	serde_json::from_slice::<serde_json::Value>(&output.stdout)
+		.unwrap_or_else(|error| panic!("IDL stdout was not valid JSON: {error}"));
+}
+
+#[test]
 fn idl_success_output_snapshot() {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command

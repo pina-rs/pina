@@ -1,0 +1,47 @@
+{
+	"name": "@pina-rs/cli",
+	"version": "0.9.0",
+	"description": "Prebuilt Pina CLI for scaffolding Solana programs, generating IDLs and clients, and profiling SBF binaries",
+	"keywords": [
+		"cli",
+		"codama",
+		"pina",
+		"pinocchio",
+		"solana"
+	],
+	"homepage": "https://pina.rs",
+	"bugs": {
+		"url": "https://github.com/pina-rs/pina/issues"
+	},
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/pina-rs/pina.git",
+		"directory": "packages/pina__cli"
+	},
+	"bin": {
+		"pina": "bin/pina.cjs"
+	},
+	"files": [
+		"bin",
+		"README.md"
+	],
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	},
+	"optionalDependencies": {
+		"@pina-rs/cli-darwin-arm64": "^0.9.0",
+		"@pina-rs/cli-darwin-x64": "^0.9.0",
+		"@pina-rs/cli-freebsd-x64": "^0.9.0",
+		"@pina-rs/cli-linux-arm64-gnu": "^0.9.0",
+		"@pina-rs/cli-linux-arm64-musl": "^0.9.0",
+		"@pina-rs/cli-linux-x64-gnu": "^0.9.0",
+		"@pina-rs/cli-linux-x64-musl": "^0.9.0",
+		"@pina-rs/cli-win32-arm64-msvc": "^0.9.0",
+		"@pina-rs/cli-win32-x64-msvc": "^0.9.0"
+	},
+	"engines": {
+		"node": ">=18"
+	}
+}

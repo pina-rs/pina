@@ -95,8 +95,52 @@ type = "cargo"
 path = "crates/pina_sdk_ids"
 type = "cargo"
 
-[package."codama-nodes-from-pina"]
+[package.pina_codama_nodes]
 path = "packages/nodes-from-pina"
+type = "npm"
+
+[package.pina_cli_npm]
+path = "packages/pina__cli"
+type = "npm"
+
+[package.pina_cli_darwin_arm64]
+path = "packages/pina__cli-darwin-arm64"
+type = "npm"
+
+[package.pina_cli_darwin_x64]
+path = "packages/pina__cli-darwin-x64"
+type = "npm"
+
+[package.pina_cli_freebsd_x64]
+path = "packages/pina__cli-freebsd-x64"
+type = "npm"
+
+[package.pina_cli_linux_arm64_gnu]
+path = "packages/pina__cli-linux-arm64-gnu"
+type = "npm"
+
+[package.pina_cli_linux_arm64_musl]
+path = "packages/pina__cli-linux-arm64-musl"
+type = "npm"
+
+[package.pina_cli_linux_x64_gnu]
+path = "packages/pina__cli-linux-x64-gnu"
+type = "npm"
+
+[package.pina_cli_linux_x64_musl]
+path = "packages/pina__cli-linux-x64-musl"
+type = "npm"
+
+[package.pina_cli_win32_arm64_msvc]
+path = "packages/pina__cli-win32-arm64-msvc"
+type = "npm"
+
+[package.pina_cli_win32_x64_msvc]
+path = "packages/pina__cli-win32-x64-msvc"
+type = "npm"
+
+[package.pina_skill]
+path = "packages/pina__skill"
 type = "npm"
 
 [group.core]
@@ -107,7 +151,18 @@ packages = [
 	"pina_codama_renderer",
 	"pina_profile",
 	"pina_sdk_ids",
-	"codama-nodes-from-pina",
+	"pina_codama_nodes",
+	"pina_cli_npm",
+	"pina_cli_darwin_arm64",
+	"pina_cli_darwin_x64",
+	"pina_cli_freebsd_x64",
+	"pina_cli_linux_arm64_gnu",
+	"pina_cli_linux_arm64_musl",
+	"pina_cli_linux_x64_gnu",
+	"pina_cli_linux_x64_musl",
+	"pina_cli_win32_arm64_msvc",
+	"pina_cli_win32_x64_msvc",
+	"pina_skill",
 ]
 release = true
 tag = true

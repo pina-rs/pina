@@ -20,10 +20,13 @@ install:all
 You can also scaffold a new project directly with the CLI:
 
 ```bash
+npm install --global @pina-rs/cli
 pina init my_program
 ```
 
-See `pina init --help` for options like `--path` and `--force`.
+See `pina init --help` for options like `--path` and `--force`. The [CLI reference](./cli/index.md) documents every command, output contract, and automation workflow.
+
+For agent-assisted project work, install the [Pina skill](./agent-skill.md).
 
 If `pnpm-workspace.yaml` sets `useNodeVersion`, `devenv shell` activates the matching pnpm-managed `node`/`npm`/`npx`/`corepack` toolchain automatically.
 

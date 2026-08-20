@@ -1,0 +1,32 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - docs
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Read bundled Pina reference documentation in the terminal.
+
+Run without TOPIC to list every bundled topic. Set `PINA_TEMPLATES_DIR` to a directory containing `<topic>.t.md` files to override or add topics.
+
+Usage: pina docs [TOPIC]
+
+Arguments:
+  [TOPIC]
+          Topic to render. Omit to list bundled topics
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina docs
+  pina docs pina-overview
+  pina docs pina-idl
+  PINA_TEMPLATES_DIR=./templates pina docs team-conventions
+
+----- stderr -----

@@ -1,119 +1,16 @@
+mod cli;
+
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
 use clap::Parser;
-use clap::Subcommand;
 use comfy_table::Table;
 use owo_colors::OwoColorize;
 
-#[derive(Parser, Debug)]
-#[command(
-	name = "pina",
-	version,
-	about = "CLI tool for Pina Solana programs",
-	after_help = "🤖 Agent Note: To understand the IDL extraction rules or architecture, run \
-	              `pina docs <topic>`. Topics are derived from the project's MDT templates."
-)]
-struct Cli {
-	#[command(subcommand)]
-	command: Commands,
-}
-
-#[derive(Subcommand, Debug)]
-enum Commands {
-	/// Generate Codama IDL JSON from a Pina program crate.
-	Idl {
-		/// Program crate directory (must contain Cargo.toml and src/lib.rs).
-		#[arg(short, long, default_value = ".")]
-		path: PathBuf,
-
-		/// Output file. Writes to stdout when omitted.
-		#[arg(short, long)]
-		output: Option<PathBuf>,
-
-		/// Override the program name (defaults to the package name from
-		/// Cargo.toml).
-		#[arg(short, long)]
-		name: Option<String>,
-
-		/// Pretty-print the JSON output.
-		#[arg(long, default_value_t = true)]
-		pretty: bool,
-	},
-	/// Show a documentation topic from the project templates.
-	Docs {
-		/// The documentation topic (e.g., `pina-idl`, `pina-overview`).
-		topic: String,
-	},
-	/// Initialize a new Pina program project.
-	Init {
-		/// Package name for the new project (for example: `my_program`).
-		name: String,
-
-		/// Target directory for the generated project.
-		///
-		/// Defaults to `./<name>`.
-		#[arg(short, long)]
-		path: Option<PathBuf>,
-
-		/// Overwrite scaffold files when they already exist.
-		#[arg(long, default_value_t = false)]
-		force: bool,
-	},
-	/// Static CU profiler for compiled SBF programs.
-	Profile {
-		/// Path to the compiled SBF `.so` file.
-		path: PathBuf,
-
-		/// Output as JSON instead of text.
-		#[arg(long, default_value_t = false)]
-		json: bool,
-
-		/// Write output to a file instead of stdout.
-		#[arg(short, long)]
-		output: Option<PathBuf>,
-	},
-	/// Codama generation workflows.
-	Codama {
-		#[command(subcommand)]
-		command: CodamaCommands,
-	},
-}
-
-#[derive(Subcommand, Debug)]
-enum CodamaCommands {
-	/// Generate IDLs and Rust, JavaScript, and Dart clients for examples.
-	Generate {
-		/// Directory containing example program crates.
-		#[arg(long, default_value = "examples")]
-		examples_dir: PathBuf,
-
-		/// Output directory for generated IDL JSON files.
-		#[arg(long, default_value = "codama/idls")]
-		idls_dir: PathBuf,
-
-		/// Output directory for generated Rust clients.
-		#[arg(long, default_value = "codama/clients/rust")]
-		rust_out: PathBuf,
-
-		/// Output directory for generated JS clients.
-		#[arg(long, default_value = "codama/clients/js")]
-		js_out: PathBuf,
-
-		/// Output directory for the generated Dart package.
-		#[arg(long, default_value = "codama/clients/dart")]
-		dart_out: PathBuf,
-
-		/// Example name filter. Repeat to generate a subset.
-		#[arg(long = "example")]
-		examples: Vec<String>,
-
-		/// Executable used to invoke npx.
-		#[arg(long, default_value = "npx")]
-		npx: String,
-	},
-}
+use crate::cli::Cli;
+use crate::cli::CodamaCommands;
+use crate::cli::Commands;
 
 fn main() {
 	let cli = Cli::parse();
@@ -123,9 +20,10 @@ fn main() {
 			path,
 			output,
 			name,
-			pretty,
-		} => run_idl(path.as_path(), output.as_deref(), name.as_deref(), pretty),
-		Commands::Docs { topic } => run_docs(&topic),
+			compact,
+			pretty: _,
+		} => run_idl(path.as_path(), output.as_deref(), name.as_deref(), !compact),
+		Commands::Docs { topic } => run_docs(topic.as_deref()),
 		Commands::Init { name, path, force } => run_init(name.as_str(), path.as_deref(), force),
 		Commands::Profile { path, json, output } => run_profile(&path, json, output.as_deref()),
 		Commands::Codama { command } => {
@@ -163,7 +61,6 @@ fn run_idl(path: &Path, output: Option<&Path>, name: Option<&str>, pretty: bool)
 		}
 	};
 
-	// Print Summary Table
 	let mut table = Table::new();
 	table.load_style(comfy_table::presets::UTF8_FULL_CONDENSED);
 	table.set_header(vec!["Component", "Count"]);
@@ -175,8 +72,8 @@ fn run_idl(path: &Path, output: Option<&Path>, name: Option<&str>, pretty: bool)
 	table.add_row(vec!["PDAs", &root.program.pdas.len().to_string()]);
 	table.add_row(vec!["Errors", &root.program.errors.len().to_string()]);
 
-	println!("\n{} ──", "✨ Generation Complete".green().bold());
-	println!("{table}");
+	eprintln!("{}", "IDL generation complete".green().bold());
+	eprintln!("{table}");
 
 	let json = if pretty {
 		serde_json::to_string_pretty(&root)
@@ -203,13 +100,28 @@ fn run_idl(path: &Path, output: Option<&Path>, name: Option<&str>, pretty: bool)
 			std::process::exit(1);
 		}
 
+		eprintln!("Wrote {}", output.display());
+
 		return;
 	}
 
-	println!("\n{json}");
+	println!("{json}");
 }
 
-fn run_docs(topic: &str) {
+fn run_docs(topic: Option<&str>) {
+	let Some(topic) = topic else {
+		println!("Bundled documentation topics:");
+
+		for (name, description) in BUNDLED_DOC_TOPICS {
+			println!("  {name:<14} {description}");
+		}
+
+		println!("\nRun `pina docs <topic>` to open a topic.");
+		println!("Set PINA_TEMPLATES_DIR to load additional `<topic>.t.md` files.");
+
+		return;
+	};
+
 	let mut attempted_paths = Vec::new();
 
 	if let Ok(template_dir) = std::env::var("PINA_TEMPLATES_DIR") {
@@ -239,12 +151,12 @@ fn run_docs(topic: &str) {
 		return;
 	}
 
-	eprintln!(
-		"{} Topic `{}` not found. Available bundled topics: {}.",
-		"Error".red().bold(),
-		topic,
-		BUNDLED_DOC_TOPICS.join(", ")
-	);
+	eprintln!("{} Topic `{}` not found.", "Error".red().bold(), topic);
+	eprintln!("Bundled topics:");
+
+	for (name, description) in BUNDLED_DOC_TOPICS {
+		eprintln!("  {name:<14} {description}");
+	}
 
 	if !attempted_paths.is_empty() {
 		eprintln!("Attempted template paths:");
@@ -259,7 +171,13 @@ fn run_docs(topic: &str) {
 	std::process::exit(1);
 }
 
-const BUNDLED_DOC_TOPICS: &[&str] = &["pina-idl", "pina-overview"];
+const BUNDLED_DOC_TOPICS: &[(&str, &str)] = &[
+	("pina-idl", "IDL extraction rules and supported Rust shapes"),
+	(
+		"pina-overview",
+		"framework concepts, crates, features, and workflows",
+	),
+];
 
 fn bundled_docs(topic: &str) -> Option<&'static str> {
 	match topic {

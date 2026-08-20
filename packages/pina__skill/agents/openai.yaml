@@ -1,0 +1,7 @@
+interface:
+  display_name: "Pina"
+  short_description: "Build and maintain secure Pina programs"
+  default_prompt: "Use $pina to create or improve this Pina Solana program."
+
+policy:
+  allow_implicit_invocation: true

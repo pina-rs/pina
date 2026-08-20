@@ -8,6 +8,8 @@ This book is the single place for project documentation. It complements API refe
 
 - The project's goals and trade-offs.
 - Setup and day-to-day development workflow.
+- A complete CLI reference, including automation-safe output contracts.
+- Installation and operating guidance for the packaged Pina agent skill.
 - Core framework concepts (`#[account]`, `#[instruction]`, `#[derive(Accounts)]`, discriminator model, and validation chains).
 - Architecture decision records for the project's long-lived invariants and trade-offs.
 - Codama IDL/client-generation workflow (including external-project invocation).

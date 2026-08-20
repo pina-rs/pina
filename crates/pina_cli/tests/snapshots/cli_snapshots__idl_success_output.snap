@@ -1,6 +1,5 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
-assertion_line: 81
 info:
   program: pina
   args:
@@ -11,17 +10,6 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-
-[1m[32m✨ Generation Complete[39m[0m ──
-┌──────────────┬───────┐
-│ Component    ┆ Count │
-╞══════════════╪═══════╡
-│ Instructions ┆ 1     │
-│ Accounts     ┆ 0     │
-│ PDAs         ┆ 0     │
-│ Errors       ┆ 0     │
-└──────────────┴───────┘
-
 {
   "kind": "rootNode",
   "standard": "codama",
@@ -75,3 +63,12 @@ exit_code: 0
 }
 
 ----- stderr -----
+[1m[32mIDL generation complete[39m[0m
+┌──────────────┬───────┐
+│ Component    ┆ Count │
+╞══════════════╪═══════╡
+│ Instructions ┆ 1     │
+│ Accounts     ┆ 0     │
+│ PDAs         ┆ 0     │
+│ Errors       ┆ 0     │
+└──────────────┴───────┘
