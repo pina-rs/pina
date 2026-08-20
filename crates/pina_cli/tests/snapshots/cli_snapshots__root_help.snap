@@ -1,0 +1,48 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Build, inspect, and generate artifacts for Pina Solana programs.
+
+Use 'pina init' to start a program, 'pina idl' to inspect its public interface, 'pina codama generate' to render clients, and 'pina profile' to inspect a compiled SBF binary.
+
+Usage: pina <COMMAND>
+
+Commands:
+  idl
+          Generate a Codama IDL from a Pina program crate
+  docs
+          Read bundled Pina reference documentation in the terminal
+  init
+          Initialize a new Pina program project
+  profile
+          Profile compute-unit costs in a compiled SBF program
+  codama
+          Run Codama IDL and client-generation workflows
+  help
+          Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+
+Examples:
+  pina init counter_program
+  pina idl --path ./programs/counter_program --output ./idls/counter_program.json
+  pina codama generate --example counter_program
+  pina profile ./target/deploy/counter_program.so --json
+
+Agent discovery:
+  Run 'pina <command> --help' for command-specific inputs, outputs, and examples.
+  Run 'pina docs' to list the bundled architecture and IDL reference topics.
+
+----- stderr -----

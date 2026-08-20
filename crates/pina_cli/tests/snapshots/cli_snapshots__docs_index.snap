@@ -1,0 +1,18 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - docs
+---
+success: true
+exit_code: 0
+----- stdout -----
+Bundled documentation topics:
+  pina-idl       IDL extraction rules and supported Rust shapes
+  pina-overview  framework concepts, crates, features, and workflows
+
+Run `pina docs <topic>` to open a topic.
+Set PINA_TEMPLATES_DIR to load additional `<topic>.t.md` files.
+
+----- stderr -----

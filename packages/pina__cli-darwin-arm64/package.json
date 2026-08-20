@@ -1,0 +1,17 @@
+{
+	"name": "@pina-rs/cli-darwin-arm64",
+	"version": "0.9.0",
+	"description": "Prebuilt Pina CLI binary for macOS arm64",
+	"homepage": "https://pina.rs",
+	"bugs": { "url": "https://github.com/pina-rs/pina/issues" },
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/pina-rs/pina.git",
+		"directory": "packages/pina__cli-darwin-arm64"
+	},
+	"files": ["bin"],
+	"os": ["darwin"],
+	"cpu": ["arm64"],
+	"publishConfig": { "access": "public", "provenance": true }
+}

@@ -1,0 +1,18 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - docs
+    - unknown-topic
+---
+success: false
+exit_code: 1
+----- stdout -----
+
+----- stderr -----
+[1m[31mError[39m[0m Topic `unknown-topic` not found.
+Bundled topics:
+  pina-idl       IDL extraction rules and supported Rust shapes
+  pina-overview  framework concepts, crates, features, and workflows
+Set PINA_TEMPLATES_DIR to a directory containing `<topic>.t.md` to load custom docs.

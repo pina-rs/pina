@@ -1,0 +1,18 @@
+{
+	"name": "@pina-rs/cli-linux-arm64-gnu",
+	"version": "0.9.0",
+	"description": "Prebuilt Pina CLI binary for Linux arm64 (glibc)",
+	"homepage": "https://pina.rs",
+	"bugs": { "url": "https://github.com/pina-rs/pina/issues" },
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/pina-rs/pina.git",
+		"directory": "packages/pina__cli-linux-arm64-gnu"
+	},
+	"files": ["bin"],
+	"os": ["linux"],
+	"cpu": ["arm64"],
+	"libc": ["glibc"],
+	"publishConfig": { "access": "public", "provenance": true }
+}

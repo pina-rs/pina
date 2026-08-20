@@ -33,9 +33,11 @@ env:
 
 jobs:
   upload_assets:
+    name: build ${{ matrix.target }}
     if: >-
       github.repository_owner == 'pina-rs' &&
       startsWith(inputs.tag || github.ref_name, 'v')
+    # Upload native archives to the draft release and attest their provenance.
     permissions:
       attestations: write
       contents: write
@@ -90,6 +92,7 @@ jobs:
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
+          persist-credentials: false
       - name: install rust toolchain
         uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
         with:
@@ -123,10 +126,12 @@ jobs:
           checksum: sha256,sha512
 
   attest_assets:
+    name: attest release assets
     if: >-
       github.repository_owner == 'pina-rs' &&
       startsWith(inputs.tag || github.ref_name, 'v')
     needs: upload_assets
+    # Read release archives, then attach OIDC-backed provenance attestations.
     permissions:
       attestations: write
       contents: write
@@ -185,8 +190,10 @@ jobs:
           done
 
   publish:
+    name: publish packages and release
     needs: attest_assets
     environment: publisher
+    # Use OIDC for registry publishing, then publish the draft GitHub release.
     permissions:
       contents: write
       id-token: write
@@ -209,6 +216,7 @@ jobs:
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
+          persist-credentials: false
       - name: setup
         uses: ./.github/actions/devenv
         with:
@@ -224,7 +232,10 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
-      - name: prepare npm package
+          package-manager-cache: false
+      - name: prepare npm packages
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           npm install --global --prefix "$RUNNER_TEMP/npm-cli" npm@11.5.1
@@ -232,9 +243,22 @@ jobs:
           test "$(npm --version)" = "11.5.1"
 
           pnpm install --frozen-lockfile
-          pnpm --filter codama-nodes-from-pina build
+          pnpm run build:codama-nodes
+          pnpm run check:npm-packages
+          pnpm run test:npm-packages
 
-          pack_report="$RUNNER_TEMP/codama-nodes-from-pina-pack.json"
+          assets_dir="$RUNNER_TEMP/release-assets"
+          mkdir -p "$assets_dir"
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "pina-*-${RELEASE_TAG}.tar.gz" \
+            --pattern "pina-*-${RELEASE_TAG}.zip" \
+            --dir "$assets_dir"
+          node scripts/npm/package-cli.mjs \
+            --release-tag "$RELEASE_TAG" \
+            --assets-dir "$assets_dir"
+
+          pack_report="$RUNNER_TEMP/pina-codama-nodes-pack.json"
           npm pack ./packages/nodes-from-pina --dry-run --json > "$pack_report"
           for required_file in \
             dist/index.js \
@@ -244,6 +268,36 @@ jobs:
               'any(.[0].files[]; .path == $path)' \
               "$pack_report" >/dev/null || {
                 echo "::error::npm package is missing $required_file" >&2
+                exit 1
+              }
+          done
+
+          npm pack ./packages/pina__cli --dry-run --json > "$RUNNER_TEMP/pina-cli-pack.json"
+          jq -e 'any(.[0].files[]; .path == "bin/pina.cjs")' \
+            "$RUNNER_TEMP/pina-cli-pack.json" >/dev/null
+
+          npm pack ./packages/pina__skill --dry-run --json > "$RUNNER_TEMP/pina-skill-pack.json"
+          for required_file in SKILL.md agents/openai.yaml references/program-authoring.md bin/pina-skill.cjs; do
+            jq -e --arg path "$required_file" \
+              'any(.[0].files[]; .path == $path)' \
+              "$RUNNER_TEMP/pina-skill-pack.json" >/dev/null || {
+                echo "::error::@pina-rs/skill is missing $required_file" >&2
+                exit 1
+              }
+          done
+
+          for package_dir in packages/pina__cli-*; do
+            package_name="$(jq -r .name "$package_dir/package.json")"
+            binary_name=pina
+            case "$package_name" in
+              *-win32-*) binary_name=pina.exe ;;
+            esac
+            platform_report="$RUNNER_TEMP/$(basename "$package_dir")-pack.json"
+            npm pack "$package_dir" --dry-run --json > "$platform_report"
+            jq -e --arg path "bin/$binary_name" \
+              'any(.[0].files[]; .path == $path)' \
+              "$platform_report" >/dev/null || {
+                echo "::error::$package_name is missing bin/$binary_name" >&2
                 exit 1
               }
           done
@@ -271,7 +325,17 @@ jobs:
           set -euo pipefail
           export PATH="$RUNNER_TEMP/npm-cli/bin:$PATH"
           packages=(
-            codama-nodes-from-pina
+            pina_codama_nodes
+            pina_cli_darwin_arm64
+            pina_cli_darwin_x64
+            pina_cli_freebsd_x64
+            pina_cli_linux_arm64_gnu
+            pina_cli_linux_arm64_musl
+            pina_cli_linux_x64_gnu
+            pina_cli_linux_x64_musl
+            pina_cli_win32_arm64_msvc
+            pina_cli_win32_x64_msvc
+            pina_skill
             pina_codama_renderer
             pina_macros
             pina_profile
@@ -309,6 +373,6 @@ jobs:
             --format json
         shell: devenv shell -- bash -e {0}
       - name: publish draft release
-        run: gh release edit "$RELEASE_TAG" --draft=false --latest --repo "${{ github.repository }}"
+        run: gh release edit "$RELEASE_TAG" --draft=false --latest --repo "$GITHUB_REPOSITORY"
         env:
           GH_TOKEN: ${{ github.token }}

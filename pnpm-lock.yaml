@@ -25,14 +25,14 @@ importers:
         version: 0.5.1
     devDependencies:
       '@solana/kit':
-        specifier: ^7.1.0
-        version: 7.1.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@7.0.2)
+        specifier: ^6.10.0
+        version: 6.10.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@7.0.2)
       '@solana/program-client-core':
-        specifier: ^7.1.0
-        version: 7.1.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@7.0.2)
+        specifier: ^6.10.0
+        version: 6.10.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@7.0.2)
       '@solana/surfpool':
         specifier: ^1.5.0
-        version: 1.5.0(@solana/kit@7.1.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@7.0.2))
+        version: 1.5.0(@solana/kit@6.10.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@7.0.2))
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0
@@ -127,6 +127,56 @@ importers:
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@26.2.0)(vite@7.3.5(@types/node@26.2.0))
+
+  packages/pina__cli:
+    optionalDependencies:
+      '@pina-rs/cli-darwin-arm64':
+        specifier: ^0.9.0
+        version: link:../pina__cli-darwin-arm64
+      '@pina-rs/cli-darwin-x64':
+        specifier: ^0.9.0
+        version: link:../pina__cli-darwin-x64
+      '@pina-rs/cli-freebsd-x64':
+        specifier: ^0.9.0
+        version: link:../pina__cli-freebsd-x64
+      '@pina-rs/cli-linux-arm64-gnu':
+        specifier: ^0.9.0
+        version: link:../pina__cli-linux-arm64-gnu
+      '@pina-rs/cli-linux-arm64-musl':
+        specifier: ^0.9.0
+        version: link:../pina__cli-linux-arm64-musl
+      '@pina-rs/cli-linux-x64-gnu':
+        specifier: ^0.9.0
+        version: link:../pina__cli-linux-x64-gnu
+      '@pina-rs/cli-linux-x64-musl':
+        specifier: ^0.9.0
+        version: link:../pina__cli-linux-x64-musl
+      '@pina-rs/cli-win32-arm64-msvc':
+        specifier: ^0.9.0
+        version: link:../pina__cli-win32-arm64-msvc
+      '@pina-rs/cli-win32-x64-msvc':
+        specifier: ^0.9.0
+        version: link:../pina__cli-win32-x64-msvc
+
+  packages/pina__cli-darwin-arm64: {}
+
+  packages/pina__cli-darwin-x64: {}
+
+  packages/pina__cli-freebsd-x64: {}
+
+  packages/pina__cli-linux-arm64-gnu: {}
+
+  packages/pina__cli-linux-arm64-musl: {}
+
+  packages/pina__cli-linux-x64-gnu: {}
+
+  packages/pina__cli-linux-x64-musl: {}
+
+  packages/pina__cli-win32-arm64-msvc: {}
+
+  packages/pina__cli-win32-x64-msvc: {}
+
+  packages/pina__skill: {}
 
 packages:
 
@@ -3996,6 +4046,13 @@ snapshots:
 
   '@solana/surfpool-linux-x64-gnu@1.5.0':
     optional: true
+
+  '@solana/surfpool@1.5.0(@solana/kit@6.10.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@7.0.2))':
+    optionalDependencies:
+      '@solana/kit': 6.10.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@7.0.2)
+      '@solana/surfpool-darwin-arm64': 1.5.0
+      '@solana/surfpool-darwin-x64': 1.5.0
+      '@solana/surfpool-linux-x64-gnu': 1.5.0
 
   '@solana/surfpool@1.5.0(@solana/kit@7.1.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@7.0.2))':
     optionalDependencies:

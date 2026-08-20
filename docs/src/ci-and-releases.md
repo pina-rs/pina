@@ -8,7 +8,8 @@ The GitHub CI workflow verifies:
 - `lint:format`
 - `verify:docs`
 - `verify:security`
-- `test:all` (`cargo test --all-features --locked`)
+- `test:all` (workspace Rust tests, standalone fuzz-target compilation, and npm package tests)
+- `test:npm-packages` (scoped package metadata, native-target coverage, launchers, and skill installation)
 - `feature-matrix` for `pina` across explicit configurations:
   - `default` (`build:pina:default` + `test:pina:default`)
   - `no-default` (`build:pina:no-default-only` + `test:pina:no-default` + `doc:pina:no-default`)
@@ -104,13 +105,22 @@ The `docs-pages` workflow publishes the mdBook to GitHub Pages:
 - Build command: `docs:build` (output in `docs/book`)
 - Deploy target: GitHub Pages (`https://pina-rs.github.io/pina/`)
 
-## CLI asset releases
+## CLI and npm releases
 
 The `publish` workflow builds and uploads the `pina` CLI binary for all supported platforms on release tag pushes (`v*`):
 
 - Trigger: tag push `v*` (created by the `release-pr` workflow after a release PR merges)
 - Build scope: `crates/pina_cli` only (`bin = "pina"`)
 - Artifacts: `pina-<target>-<tag>` archives with `sha256`/`sha512` checksums, attested with build provenance
+
+After attestation, the publish job downloads those same archives and fills the platform-specific npm packages. `@pina-rs/cli` uses optional dependencies to install the matching native package without compiling Rust. The release target and npm package matrices are checked one-to-one for:
+
+- macOS arm64 and x64
+- Linux arm64 and x64 with glibc or musl
+- Windows arm64 and x64
+- FreeBSD x64
+
+The same trusted-publishing workflow also publishes `@pina-rs/codama-nodes` and `@pina-rs/skill`. Dry-run package inspection verifies the CLI launchers, native binaries, Codama CommonJS/ESM/type entrypoints, and skill runtime files before any registry write.
 
 ## Release workflow
 

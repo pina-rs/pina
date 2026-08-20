@@ -363,8 +363,19 @@ in
           --manifest-path ${lib.escapeShellArg "${currentDir}/crates/pina_fuzz/fuzz/Cargo.toml"} \
           --all-targets \
           --locked
+        test:npm-packages
       '';
-      description = "Run workspace tests and compile the standalone fuzz targets.";
+      description = "Run workspace tests, compile fuzz targets, and verify npm packages.";
+      binary = "bash";
+    };
+    "test:npm-packages" = {
+      exec = ''
+        set -euo pipefail
+        pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
+        pnpm --dir "$DEVENV_ROOT" run check:npm-packages
+        pnpm --dir "$DEVENV_ROOT" run test:npm-packages
+      '';
+      description = "Verify npm package metadata, platform coverage, launchers, and the skill installer.";
       binary = "bash";
     };
     "test:fuzz:smoke" = {

@@ -1,0 +1,53 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - codama
+    - generate
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Generate IDLs and Rust, JavaScript, and Dart clients.
+
+Discovers Pina programs below `EXAMPLES_DIR`, optionally filters them with repeatable --example arguments, writes IDLs, and renders all three client targets. The command fails when a requested example does not exist or a renderer exits unsuccessfully.
+
+Usage: pina codama generate [OPTIONS]
+
+Options:
+      --examples-dir <DIR>
+          Directory containing Pina program crates. Defaults to `examples`
+
+      --idls-dir <DIR>
+          Directory for generated Codama IDL JSON files. Defaults to `codama/idls`
+
+      --rust-out <DIR>
+          Directory for generated Rust client crates. Defaults to `codama/clients/rust`
+
+      --js-out <DIR>
+          Directory for generated JavaScript client packages. Defaults to `codama/clients/js`
+
+      --dart-out <DIR>
+          Directory for the generated Dart client package. Defaults to `codama/clients/dart`
+
+      --example <NAME>
+          Program name to generate. Repeat to select multiple programs. When omitted, every program below --examples-dir is generated
+
+      --npx <COMMAND>
+          Executable used to invoke the Codama JavaScript renderers. Defaults to `npx`
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina codama generate
+  pina codama generate --example counter_program --example todo_program
+  pina codama generate --examples-dir ./programs --idls-dir ./idls \
+                --rust-out ./clients/rust --js-out ./clients/js --dart-out ./clients/dart
+
+Requirements:
+  The selected --npx executable, or the default pnpm fallback, must be available when JavaScript and Dart client rendering runs.
+
+----- stderr -----

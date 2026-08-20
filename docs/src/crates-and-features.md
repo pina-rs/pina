@@ -2,14 +2,17 @@
 
 <!-- {=pinaWorkspacePackages} -->
 
-| Crate                  | Path                          | Description                                                       |
-| ---------------------- | ----------------------------- | ----------------------------------------------------------------- |
-| `pina`                 | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types. |
-| `pina_macros`          | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.    |
-| `pina_cli`             | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding.  |
-| `pina_codama_renderer` | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.     |
-| `pina_profile`         | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                     |
-| `pina_sdk_ids`         | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.         |
+| Package                 | Path                          | Description                                                       |
+| ----------------------- | ----------------------------- | ----------------------------------------------------------------- |
+| `pina`                  | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types. |
+| `pina_macros`           | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.    |
+| `pina_cli`              | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding.  |
+| `pina_codama_renderer`  | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.     |
+| `pina_profile`          | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                     |
+| `pina_sdk_ids`          | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.         |
+| `@pina-rs/codama-nodes` | `packages/nodes-from-pina`    | Pina IDL conversion and normalization for Codama root nodes.      |
+| `@pina-rs/cli`          | `packages/pina__cli`          | npm launcher for the prebuilt platform-specific CLI packages.     |
+| `@pina-rs/skill`        | `packages/pina__skill`        | Agent guidance and a non-destructive local skill installer.       |
 
 <!-- {/pinaWorkspacePackages} -->
 
@@ -79,6 +82,7 @@ Commands:
 | ------------------------ | ---------------------------------------------- |
 | `pina init <name>`       | Scaffold a new Pina program project            |
 | `pina idl --path <dir>`  | Generate a Codama IDL JSON from a Pina program |
+| `pina docs [topic]`      | List or render bundled terminal documentation  |
 | `pina profile <path.so>` | Static CU profiler for compiled SBF binaries   |
 | `pina codama generate`   | Generate Codama IDLs and Rust/JS/Dart clients  |
 

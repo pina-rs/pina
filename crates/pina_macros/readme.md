@@ -28,6 +28,7 @@ cargo add pina_macros
 - `#[account]`: defines discriminator-first account POD structs and generated builders.
 - `#[instruction]`: defines discriminator-first instruction data POD structs.
 - `#[event]`: defines discriminator-first event POD structs.
+- `#[pda]`: defines typed PDA seed, derivation, and validation helpers.
 - `#[error]`: maps custom enums to `ProgramError::Custom(code)`.
 - `#[derive(Accounts)]`: parses `&mut [AccountView]` into a named struct of shared and/or mutable account references.
 

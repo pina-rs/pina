@@ -6,11 +6,20 @@ CLI and library for generating Codama IDLs from Pina programs.
 
 The binary name is `pina`.
 
+The complete command reference is published in the [Pina CLI book](https://pina-rs.github.io/pina/cli/index.html).
+
 [![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][unlicense-image]][unlicense-link] [![codecov][codecov-image]][codecov-link]
 
 ## Installation
 
 <br>
+
+```bash
+npm install --global @pina-rs/cli
+pina --help
+```
+
+Or install through Cargo:
 
 ```bash
 cargo install pina_cli
@@ -41,6 +50,21 @@ pina idl --path ./examples/counter_program --output ./codama/idls/counter_progra
 
 # Override program name in generated output.
 pina idl --path ./examples/counter_program --name my_program_alias
+
+# Emit compact, machine-readable JSON on stdout.
+pina idl --path ./examples/counter_program --compact > counter_program.json
+```
+
+IDL JSON is the only stdout output when `--output` is omitted. Progress and extraction counts are written to stderr.
+
+### `pina docs`
+
+List bundled reference topics or render one in the terminal.
+
+```bash
+pina docs
+pina docs pina-overview
+pina docs pina-idl
 ```
 
 ### `pina init`

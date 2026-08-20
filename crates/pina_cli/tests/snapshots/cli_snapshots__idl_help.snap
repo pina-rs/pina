@@ -1,0 +1,40 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - idl
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Generate a Codama IDL from a Pina program crate.
+
+Parses the crate rooted at PATH, follows Rust modules from src/lib.rs, and emits a Codama root-node JSON document. JSON is written to stdout unless OUTPUT is supplied; progress and the extraction summary are written to stderr.
+
+Usage: pina idl [OPTIONS]
+
+Options:
+  -p, --path <DIR>
+          Program crate directory containing Cargo.toml and src/lib.rs. Defaults to the current directory
+
+  -o, --output <FILE>
+          Write the JSON document to FILE instead of stdout
+
+  -n, --name <NAME>
+          Override the program name inferred from Cargo.toml
+
+      --compact
+          Emit compact JSON instead of the default pretty-printed JSON
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina idl
+  pina idl --path ./programs/counter_program
+  pina idl -p ./programs/counter_program -o ./idls/counter_program.json
+  pina idl -p ./programs/counter_program --compact
+
+----- stderr -----
