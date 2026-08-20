@@ -3,6 +3,9 @@
 use pina::Address;
 use pina::CpiContext;
 use pina::CpiHandle;
+use pina::CpiProgramId;
+use pina::PdaSigner;
+use pina::Program;
 use pina::ProgramError;
 use pina::ToCpiAccounts;
 use pina::combine_seeds_with_bump;
@@ -81,6 +84,40 @@ fn combine_seeds_with_bump_too_many_seeds_fails() {
 
 	let result = combine_seeds_with_bump(&seeds, &bump);
 	assert!(result.is_err());
+}
+
+#[test]
+fn pda_signer_borrows_owned_seed_array() {
+	let seed_a: &[u8] = b"escrow";
+	let seed_b: &[u8] = &[9, 8, 7];
+	let bump: &[u8] = &[42];
+	let signer = PdaSigner::from_slices([seed_a, seed_b, bump]);
+	let _borrowed = signer.as_signer();
+
+	assert_eq!(&*signer.as_seeds()[0], b"escrow");
+	assert_eq!(&*signer.as_seeds()[1], &[9, 8, 7]);
+	assert_eq!(&*signer.as_seeds()[2], &[42]);
+}
+
+#[test]
+fn pda_signer_from_slice_array_matches_constructor() {
+	let seed_a: &[u8] = b"escrow";
+	let bump: &[u8] = &[42];
+	let signer = PdaSigner::from([seed_a, bump]);
+
+	assert_eq!(&*signer.as_seeds()[0], b"escrow");
+	assert_eq!(&*signer.as_seeds()[1], &[42]);
+}
+
+#[test]
+fn pda_signer_from_seed_array_matches_constructor() {
+	let seed_a: &[u8] = b"escrow";
+	let bump: &[u8] = &[42];
+	let seed_array = [pina::Seed::from(seed_a), pina::Seed::from(bump)];
+	let signer = PdaSigner::from(seed_array);
+
+	assert_eq!(&*signer.as_seeds()[0], b"escrow");
+	assert_eq!(&*signer.as_seeds()[1], &[42]);
 }
 
 #[cfg(feature = "account-resize")]
@@ -176,12 +213,21 @@ struct TestAccount<const N: usize> {
 
 impl<const N: usize> TestAccount<N> {
 	fn new(address: Address, is_signer: bool, is_writable: bool) -> Self {
+		Self::new_with_executable(address, is_signer, is_writable, false)
+	}
+
+	fn new_with_executable(
+		address: Address,
+		is_signer: bool,
+		is_writable: bool,
+		executable: bool,
+	) -> Self {
 		Self {
 			header: RuntimeAccount {
 				borrow_state: NOT_BORROWED,
 				is_signer: u8::from(is_signer),
 				is_writable: u8::from(is_writable),
-				executable: 0,
+				executable: u8::from(executable),
 				padding: [0; 4],
 				address,
 				owner: Address::new_from_array([9u8; 32]),
@@ -195,6 +241,12 @@ impl<const N: usize> TestAccount<N> {
 	fn view(&mut self) -> AccountView {
 		unsafe { AccountView::new_unchecked(core::ptr::addr_of_mut!(self.header)) }
 	}
+}
+
+struct ExampleProgram;
+
+impl CpiProgramId for ExampleProgram {
+	const ID: Address = Address::new_from_array([6u8; 32]);
 }
 
 #[derive(Clone, Copy)]
@@ -255,4 +307,34 @@ fn cpi_context_accepts_typed_account_structs() {
 	assert!(ordered[0].is_writable());
 	assert_eq!(ordered[1].address(), second_view.address());
 	assert!(!ordered[1].is_writable());
+}
+
+#[test]
+fn program_wrapper_validates_executable_program_address() {
+	let mut stored_program =
+		TestAccount::<8>::new_with_executable(ExampleProgram::ID, false, false, true);
+	let program_view = stored_program.view();
+	let program = Program::<ExampleProgram>::new(&program_view)
+		.unwrap_or_else(|e| panic!("program validation: {e:?}"));
+	let copied_program = program;
+	let cloned_program = program.clone();
+	let debug_output = format!("{program:?}");
+
+	assert_eq!(program.address(), &ExampleProgram::ID);
+	assert_eq!(program.account().address(), &ExampleProgram::ID);
+	assert_eq!(copied_program.address(), &ExampleProgram::ID);
+	assert_eq!(cloned_program.address(), &ExampleProgram::ID);
+	assert!(debug_output.contains("Program"));
+}
+
+#[test]
+fn program_wrapper_rejects_wrong_address() {
+	let wrong_address = Address::new_from_array([7u8; 32]);
+	let mut stored_program =
+		TestAccount::<8>::new_with_executable(wrong_address, false, false, true);
+	let program_view = stored_program.view();
+	let error = Program::<ExampleProgram>::new(&program_view)
+		.expect_err("wrong program address should fail validation");
+
+	assert_eq!(error, ProgramError::InvalidAccountData);
 }

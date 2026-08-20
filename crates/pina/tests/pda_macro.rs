@@ -136,6 +136,31 @@ fn seeds_with_bump_appends_bump_seed() {
 }
 
 #[test]
+fn seeds_with_bump_builds_cpi_seed_array() {
+	let authority = unique_address(21);
+	let seeds = TestState::seeds(&authority, 42, 1, [0xAB; 8], 7, 99).with_bump(5);
+	let seed_array = seeds.as_seed_array();
+
+	assert_eq!(seed_array.len(), 8);
+	assert_eq!(&*seed_array[0], b"test");
+	assert_eq!(&*seed_array[1], authority.as_ref());
+	assert_eq!(&*seed_array[7], &[5u8]);
+}
+
+#[test]
+fn seeds_with_bump_builds_pda_signer() {
+	let authority = unique_address(22);
+	let seeds = CounterState::seeds(&authority).with_bump(9);
+	let signer = seeds.to_signer();
+	let _borrowed = signer.as_signer();
+
+	assert_eq!(signer.as_seeds().len(), 3);
+	assert_eq!(&*signer.as_seeds()[0], b"counter");
+	assert_eq!(&*signer.as_seeds()[1], authority.as_ref());
+	assert_eq!(&*signer.as_seeds()[2], &[9u8]);
+}
+
+#[test]
 fn seeds_with_bump_keeps_seed_order() {
 	let authority = unique_address(3);
 	let seeds = TestState::seeds(&authority, 42, 1, [0xAB; 8], 7, 99);

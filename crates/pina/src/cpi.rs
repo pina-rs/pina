@@ -25,6 +25,7 @@ use pinocchio_system::instructions::Assign;
 use pinocchio_system::instructions::CreateAccount;
 use pinocchio_system::instructions::Transfer;
 
+use crate::AccountInfoValidation;
 use crate::CloseAccountWithRecipient;
 #[cfg(feature = "account-resize")]
 use crate::LamportTransfer;
@@ -226,6 +227,14 @@ pub fn allocate_account<'a>(
 /// # Examples
 ///
 /// ```ignore
+/// let escrow_seeds = EscrowState::seeds(&maker, seed).with_bump(bump);
+/// let escrow_signer = escrow_seeds.to_signer();
+/// let signers = [escrow_signer.as_signer()];
+/// ```
+///
+/// For untyped seed slices, use this lower-level helper directly:
+///
+/// ```ignore
 /// let seeds: &[&[u8]] = &[b"escrow", authority.address().as_ref()];
 /// let bump_bytes = [bump];
 /// let combined = combine_seeds_with_bump(seeds, &bump_bytes)?;
@@ -252,6 +261,60 @@ pub fn combine_seeds_with_bump<'a>(
 	storage[seeds_len] = Seed::from(bump.as_slice());
 
 	Ok(storage)
+}
+
+/// Stack-backed PDA signer seeds for Pinocchio CPI calls.
+///
+/// Pinocchio's [`Signer`] borrows a seed array. This type owns that fixed-size
+/// array so generated PDA helpers can return one compact value, and callers can
+/// pass [`PdaSigner::as_signer`] into `invoke_signed` APIs without manually
+/// assembling temporary seed storage.
+#[derive(Clone, Debug)]
+#[must_use]
+pub struct PdaSigner<'a, const SEEDS: usize> {
+	seeds: [Seed<'a>; SEEDS],
+}
+
+impl<'a, const SEEDS: usize> PdaSigner<'a, SEEDS> {
+	/// Build a PDA signer from byte-slice seeds.
+	#[inline(always)]
+	pub fn from_slices(seeds: [&'a [u8]; SEEDS]) -> Self {
+		Self {
+			seeds: seeds.map(Seed::from),
+		}
+	}
+
+	/// Build a PDA signer from Pinocchio seed values.
+	#[inline(always)]
+	pub const fn from_seed_array(seeds: [Seed<'a>; SEEDS]) -> Self {
+		Self { seeds }
+	}
+
+	/// Return the owned seed array.
+	#[inline(always)]
+	pub const fn as_seeds(&self) -> &[Seed<'a>; SEEDS] {
+		&self.seeds
+	}
+
+	/// Borrow these seeds as a Pinocchio CPI signer.
+	#[inline(always)]
+	pub fn as_signer(&self) -> Signer<'a, '_> {
+		Signer::from(&self.seeds)
+	}
+}
+
+impl<'a, const SEEDS: usize> From<[Seed<'a>; SEEDS]> for PdaSigner<'a, SEEDS> {
+	#[inline(always)]
+	fn from(seeds: [Seed<'a>; SEEDS]) -> Self {
+		Self::from_seed_array(seeds)
+	}
+}
+
+impl<'a, const SEEDS: usize> From<[&'a [u8]; SEEDS]> for PdaSigner<'a, SEEDS> {
+	#[inline(always)]
+	fn from(seeds: [&'a [u8]; SEEDS]) -> Self {
+		Self::from_slices(seeds)
+	}
 }
 
 /// Allocates space for a new program account with user-provided bump.
@@ -635,6 +698,70 @@ impl<'a> CpiHandle<'a> {
 	#[inline(always)]
 	fn account_view(self) -> &'a AccountView {
 		self.view
+	}
+}
+
+/// Marker trait for a known CPI target program.
+///
+/// Generated CPI modules should emit a zero-sized program marker that
+/// implements this trait. Pair it with [`Program`] to validate the executable
+/// account once, before constructing Pinocchio-style instruction builders.
+pub trait CpiProgramId {
+	/// Canonical program address.
+	const ID: Address;
+}
+
+/// A validated CPI target program account.
+///
+/// This wrapper makes program-ID verification structural for generated CPI
+/// builders. It stores the original account view so callers can keep the
+/// executable account in the same typed accounts struct as the rest of the CPI
+/// inputs.
+#[must_use]
+pub struct Program<'a, T: CpiProgramId> {
+	account: &'a AccountView,
+	_marker: core::marker::PhantomData<T>,
+}
+
+impl<T: CpiProgramId> Clone for Program<'_, T> {
+	#[inline(always)]
+	fn clone(&self) -> Self {
+		*self
+	}
+}
+
+impl<T: CpiProgramId> Copy for Program<'_, T> {}
+
+impl<T: CpiProgramId> core::fmt::Debug for Program<'_, T> {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		f.debug_struct("Program")
+			.field("account", &self.account)
+			.finish_non_exhaustive()
+	}
+}
+
+impl<'a, T: CpiProgramId> Program<'a, T> {
+	/// Validate `account` as the expected executable program.
+	#[inline(always)]
+	pub fn new(account: &'a AccountView) -> Result<Self, ProgramError> {
+		account.assert_program(&T::ID)?;
+
+		Ok(Self {
+			account,
+			_marker: core::marker::PhantomData,
+		})
+	}
+
+	/// The validated program account.
+	#[inline(always)]
+	pub const fn account(&self) -> &'a AccountView {
+		self.account
+	}
+
+	/// The validated program address.
+	#[inline(always)]
+	pub fn address(&self) -> &'a Address {
+		self.account.address()
 	}
 }
 

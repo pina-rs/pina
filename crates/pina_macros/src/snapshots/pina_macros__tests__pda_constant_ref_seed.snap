@@ -75,4 +75,12 @@ impl<'a> CounterStateSeedsWithBump<'a> {
     pub fn as_slices(&self) -> [&[u8]; 3usize] {
         [COUNTER_SEED, self.inner.authority.as_ref(), &self._bump]
     }
+    /// The seeds as Pinocchio CPI seed values, including the bump seed.
+    pub fn as_seed_array(&self) -> [::pina::Seed<'_>; 3usize] {
+        self.as_slices().map(::pina::Seed::from)
+    }
+    /// The seeds as an owned PDA signer helper.
+    pub fn to_signer(&self) -> ::pina::PdaSigner<'_, 3usize> {
+        ::pina::PdaSigner::from_seed_array(self.as_seed_array())
+    }
 }

@@ -312,11 +312,9 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		.invoke_with_program(&token_program)?;
 
 		// Prepare escrow signer for vault operations
-		let escrow_seeds = EscrowState::seeds(&maker, u64::from(seed));
-		let escrow_seeds_with_bump = escrow_seeds.with_bump(bump);
-		let seed_values = escrow_seeds_with_bump.as_slices().map(Seed::from);
-		let escrow_signer = Signer::from(&seed_values);
-		let signers = [escrow_signer];
+		let escrow_seeds = EscrowState::seeds(&maker, u64::from(seed)).with_bump(bump);
+		let escrow_signer = escrow_seeds.to_signer();
+		let signers = [escrow_signer.as_signer()];
 
 		// Transfer token A from vault to taker
 		token::instructions::TransferChecked::new(
