@@ -50,4 +50,8 @@ unknown-git = "deny"
 allow-registry = [
 	"https://github.com/rust-lang/crates.io-index",
 ]
-allow-git = []
+allow-git = [
+	# crates.io releases compatible with the Solana dev dependencies are yanked.
+	# Cargo.toml and Cargo.lock pin this source to an exact upstream revision.
+	"https://github.com/droundy/arrayref.git",
+]

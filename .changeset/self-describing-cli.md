@@ -8,9 +8,39 @@ pina_codama_nodes:
 pina_cli_npm:
   bump: minor
   type: feat
+pina_cli_darwin_arm64:
+  bump: minor
+  type: feat
+pina_cli_darwin_x64:
+  bump: minor
+  type: feat
+pina_cli_freebsd_x64:
+  bump: minor
+  type: feat
+pina_cli_linux_arm64_gnu:
+  bump: minor
+  type: feat
+pina_cli_linux_arm64_musl:
+  bump: minor
+  type: feat
+pina_cli_linux_x64_gnu:
+  bump: minor
+  type: feat
+pina_cli_linux_x64_musl:
+  bump: minor
+  type: feat
+pina_cli_win32_arm64_msvc:
+  bump: minor
+  type: feat
+pina_cli_win32_x64_msvc:
+  bump: minor
+  type: feat
 pina_skill:
   bump: minor
   type: feat
+pina_macros:
+  bump: patch
+  type: fix
 ---
 
 # Make Pina Tooling Self-Describing
