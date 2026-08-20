@@ -95,6 +95,19 @@ Library surface:
 - `pina_cli::generate_idl(program_path, name_override)`
 - `pina_cli::init_project(path, package_name, force)`
 
+Generated program feature flags:
+
+| Feature          | Default | Description                                                                 |
+| ---------------- | ------- | --------------------------------------------------------------------------- |
+| `bpf-entrypoint` | No      | Compiles the on-chain entrypoint for SBF deployment builds.                 |
+| `cpi`            | No      | Exposes that program's typed on-chain CPI builders for downstream programs. |
+
+Keep `cpi` disabled for deployed programs that do not need to export their CPI surface. Consumer programs can opt in explicitly:
+
+```toml
+other_program = { version = "...", default-features = false, features = ["cpi"] }
+```
+
 ## `crates/pina`
 
 `no_std` crate containing alignment-safe POD primitive wrappers (`PodBool`, `PodU*`, `PodI*`) and fixed-capacity collection types (`PodOption`, `PodString`, `PodVec`) shared by `pina` and generated clients.

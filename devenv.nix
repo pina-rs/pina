@@ -713,6 +713,7 @@ in
           -p pina \
           -p pina_cli \
           -p pina_codama_renderer \
+          -p prop_amm_program \
           -p profile_program \
           -p profile-program-client \
           --lcov \
