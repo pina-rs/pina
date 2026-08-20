@@ -28,9 +28,10 @@
 ))]
 extern crate std;
 
-use pina::*;
-
+#[cfg(feature = "cpi")]
 pub mod cpi;
+
+use pina::*;
 
 declare_id!("55555555555555555555555555555555555555555555");
 
