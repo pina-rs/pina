@@ -210,6 +210,16 @@ pub(crate) fn expand(
 			pub fn as_slices(&self) -> [&[u8]; #seed_count_with_bump] {
 				[#(#seed_constants,)* #(#seed_slice_exprs_with_bump,)* &self._bump]
 			}
+
+			/// The seeds as Pinocchio CPI seed values, including the bump seed.
+			pub fn as_seed_array(&self) -> [#crate_path::Seed<'_>; #seed_count_with_bump] {
+				self.as_slices().map(#crate_path::Seed::from)
+			}
+
+			/// The seeds as an owned PDA signer helper.
+			pub fn to_signer(&self) -> #crate_path::PdaSigner<'_, #seed_count_with_bump> {
+				#crate_path::PdaSigner::from_seed_array(self.as_seed_array())
+			}
 		}
 	};
 

@@ -1,12 +1,12 @@
-//! Generated-style CPI helpers for the `prop_amm_program` example.
+//! Generated-style CPI builders for the `prop_amm_program` example.
 //!
-//! This module is a concrete prototype for what future Pina/Codama-generated
-//! on-chain CPI account structs could look like when paired with
-//! `pina::CpiHandle`, `pina::ToCpiAccounts`, and `pina::CpiContext`.
+//! This module is a concrete prototype for future Pina/Codama-generated
+//! on-chain CPI helpers. The exported surface mirrors Pinocchio's instruction
+//! structs: build an instruction value, then call `.invoke()` or
+//! `.invoke_signed()` with a validated program account.
 //!
-//! Unlike the off-chain Codama client, these structs are allocator-free and use
-//! const-generic account counts so they remain compatible with Pina's on-chain
-//! `no_std` constraints.
+//! The builders stay allocator-free by using `pina::CpiHandle`,
+//! `pina::ToCpiAccounts`, and const-generic account counts under the hood.
 
 use pina::*;
 
@@ -14,6 +14,17 @@ use crate::ID;
 use crate::InitializeInstruction;
 use crate::RotateAuthorityInstruction;
 use crate::UpdateInstruction;
+
+/// Marker for the Prop AMM program ID used by generated CPI builders.
+#[derive(Clone, Copy, Debug)]
+pub struct PropAmmProgram;
+
+impl CpiProgramId for PropAmmProgram {
+	const ID: Address = ID;
+}
+
+/// A validated Prop AMM executable program account.
+pub type ProgramAccount<'a> = Program<'a, PropAmmProgram>;
 
 pub mod accounts {
 	use super::*;
@@ -94,80 +105,141 @@ pub mod accounts {
 	}
 }
 
-#[derive(Clone, Copy, Debug)]
-struct ProgramAddressCheck<'a> {
-	address: &'a Address,
-}
+pub mod instructions {
+	use super::*;
 
-impl<'a> ProgramAddressCheck<'a> {
-	#[inline(always)]
-	const fn new(address: &'a Address) -> Self {
-		Self { address }
+	#[derive(Clone, Copy, Debug)]
+	#[must_use]
+	pub struct Initialize<'a> {
+		accounts: accounts::Initialize<'a>,
 	}
 
-	#[inline(always)]
-	fn assert_address(self, expected: &Address) -> ProgramResult {
-		if self.address != expected {
-			return Err(ProgramError::IncorrectProgramId);
+	impl<'a> Initialize<'a> {
+		#[inline(always)]
+		pub const fn new(accounts: accounts::Initialize<'a>) -> Self {
+			Self { accounts }
 		}
 
-		Ok(())
+		#[inline(always)]
+		pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
+			let program_account = program.account();
+			program_account.assert_program(&ID)?;
+
+			self.invoke_signed(program, &[])
+		}
+
+		#[inline(always)]
+		pub fn invoke_signed(
+			&self,
+			program: &ProgramAccount<'_>,
+			signers: &[Signer<'_, '_>],
+		) -> ProgramResult {
+			let data = [0u8; InitializeInstruction::SIZE];
+			let program_account = program.account();
+			program_account.assert_program(&ID)?;
+			let ctx = CpiContext::new(program_account.address(), self.accounts);
+
+			ctx.invoke(&data, signers)
+		}
+	}
+
+	#[derive(Clone, Copy, Debug)]
+	#[must_use]
+	pub struct Update<'a> {
+		accounts: accounts::Update<'a>,
+		new_price: PodU64,
+	}
+
+	impl<'a> Update<'a> {
+		#[inline(always)]
+		pub const fn new(accounts: accounts::Update<'a>, new_price: PodU64) -> Self {
+			Self {
+				accounts,
+				new_price,
+			}
+		}
+
+		#[inline(always)]
+		pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
+			let program_account = program.account();
+			program_account.assert_program(&ID)?;
+
+			self.invoke_signed(program, &[])
+		}
+
+		#[inline(always)]
+		pub fn invoke_signed(
+			&self,
+			program: &ProgramAccount<'_>,
+			signers: &[Signer<'_, '_>],
+		) -> ProgramResult {
+			let mut data = [0u8; UpdateInstruction::SIZE];
+			UpdateInstruction::initialize(&mut data)?.new_price = self.new_price;
+			let program_account = program.account();
+			program_account.assert_program(&ID)?;
+			let ctx = CpiContext::new(program_account.address(), self.accounts);
+
+			ctx.invoke(&data, signers)
+		}
+	}
+
+	#[derive(Clone, Copy, Debug)]
+	#[must_use]
+	pub struct RotateAuthority<'a> {
+		accounts: accounts::RotateAuthority<'a>,
+		new_authority: Address,
+	}
+
+	impl<'a> RotateAuthority<'a> {
+		#[inline(always)]
+		pub const fn new(accounts: accounts::RotateAuthority<'a>, new_authority: Address) -> Self {
+			Self {
+				accounts,
+				new_authority,
+			}
+		}
+
+		#[inline(always)]
+		pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
+			let program_account = program.account();
+			program_account.assert_program(&ID)?;
+
+			self.invoke_signed(program, &[])
+		}
+
+		#[inline(always)]
+		pub fn invoke_signed(
+			&self,
+			program: &ProgramAccount<'_>,
+			signers: &[Signer<'_, '_>],
+		) -> ProgramResult {
+			let mut data = [0u8; RotateAuthorityInstruction::SIZE];
+			RotateAuthorityInstruction::initialize(&mut data)?.new_authority = self.new_authority;
+			let program_account = program.account();
+			program_account.assert_program(&ID)?;
+			let ctx = CpiContext::new(program_account.address(), self.accounts);
+
+			ctx.invoke(&data, signers)
+		}
 	}
 }
 
 #[inline(always)]
-pub fn initialize<'a>(ctx: &CpiContext<'a, accounts::Initialize<'a>, 3>) -> ProgramResult {
-	let program_account = ProgramAddressCheck::new(ctx.program);
-	program_account.assert_address(&ID)?;
-
-	let mut data = [0u8; InitializeInstruction::SIZE];
-	InitializeInstruction::initialize(&mut data)?;
-	ctx.invoke(&data, &[])
+pub const fn initialize(accounts: accounts::Initialize<'_>) -> instructions::Initialize<'_> {
+	instructions::Initialize::new(accounts)
 }
 
 #[inline(always)]
-pub fn update<'a>(
-	ctx: &CpiContext<'a, accounts::Update<'a>, 2>,
-	new_price: PodU64,
-) -> ProgramResult {
-	let program_account = ProgramAddressCheck::new(ctx.program);
-	program_account.assert_address(&ID)?;
-
-	let mut data = [0u8; UpdateInstruction::SIZE];
-	UpdateInstruction::initialize(&mut data)?.new_price = new_price;
-	ctx.invoke(&data, &[])
+pub const fn update(accounts: accounts::Update<'_>, new_price: PodU64) -> instructions::Update<'_> {
+	instructions::Update::new(accounts, new_price)
 }
 
 #[inline(always)]
-pub fn rotate_authority<'a>(
-	ctx: &CpiContext<'a, accounts::RotateAuthority<'a>, 2>,
-	new_authority: Address,
-) -> ProgramResult {
-	let program_account = ProgramAddressCheck::new(ctx.program);
-	program_account.assert_address(&ID)?;
-
-	let mut data = [0u8; RotateAuthorityInstruction::SIZE];
-	RotateAuthorityInstruction::initialize(&mut data)?.new_authority = new_authority;
-	ctx.invoke(&data, &[])
-}
-
-#[inline(always)]
-pub fn initialize_context(
-	accounts: accounts::Initialize<'_>,
-) -> CpiContext<'_, accounts::Initialize<'_>, 3> {
-	CpiContext::new(&ID, accounts)
-}
-
-#[inline(always)]
-pub fn update_context(accounts: accounts::Update<'_>) -> CpiContext<'_, accounts::Update<'_>, 2> {
-	CpiContext::new(&ID, accounts)
-}
-
-#[inline(always)]
-pub fn rotate_authority_context(
+pub const fn rotate_authority(
 	accounts: accounts::RotateAuthority<'_>,
-) -> CpiContext<'_, accounts::RotateAuthority<'_>, 2> {
-	CpiContext::new(&ID, accounts)
+	new_authority: Address,
+) -> instructions::RotateAuthority<'_> {
+	instructions::RotateAuthority::new(accounts, new_authority)
 }
 
 #[cfg(test)]
@@ -201,13 +273,7 @@ mod tests {
 	}
 
 	#[test]
-	fn program_address_check_rejects_wrong_program() {
-		let wrong_program = Address::new_from_array([3u8; ADDRESS_BYTES]);
-		let program_account = ProgramAddressCheck::new(&wrong_program);
-		let error = program_account
-			.assert_address(&ID)
-			.expect_err("reject wrong cpi program id");
-
-		assert_eq!(error, ProgramError::IncorrectProgramId);
+	fn generated_program_marker_uses_program_id() {
+		assert_eq!(PropAmmProgram::ID, ID);
 	}
 }
