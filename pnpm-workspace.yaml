@@ -6,6 +6,9 @@ packages:
   - codama/tests/quasar-svm
   - codama/tests/surfpool
 
+linkWorkspacePackages: true
+preferWorkspacePackages: true
+
 allowBuilds:
   esbuild: true
   koffi: true
