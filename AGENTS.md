@@ -14,6 +14,7 @@ Pina is a Rust workspace for building performant, `no_std` Solana programs on to
 
 - GitHub issue titles must be written in title case (e.g. `Add Miri Coverage for Account Loader Aliasing Rules`). Do not use commit-style prefixes like `fix:` / `feat:` / `docs:` in issue titles.
 - Pull request titles must follow Conventional Commits (e.g. `feat(loaders): preserve borrow guard lifetime`).
+- Never merge a `chore(release): prepare release` pull request. Release pull requests must remain open until Ifiok Jr. (`@ifiokjr`) explicitly decides to merge them himself.
 
 ## Common commands
 
