@@ -1,5 +1,9 @@
 # `pina_codama_renderer`
 
+<p align="center">
+	<img src="https://raw.githubusercontent.com/pina-rs/pina/main/.github/assets/logo.png" alt="The Pina logo: a low-poly origami pineapple" width="140">
+</p>
+
 <br>
 
 Codama Rust renderer that generates Pina-style validated zeropod models and discriminator-first layouts from Codama JSON IDLs. It is not published to crates.io and is used internally by the `pina codama generate` workflow.

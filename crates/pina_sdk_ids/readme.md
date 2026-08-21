@@ -1,5 +1,9 @@
 # `pina_sdk_ids`
 
+<p align="center">
+	<img src="https://raw.githubusercontent.com/pina-rs/pina/main/.github/assets/logo.png" alt="The Pina logo: a low-poly origami pineapple" width="140">
+</p>
+
 <br>
 
 Typed constants for well-known Solana program IDs and sysvar IDs.

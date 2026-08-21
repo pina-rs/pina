@@ -1,5 +1,9 @@
 # @pina-rs/codama-nodes
 
+<p align="center">
+	<img src="https://raw.githubusercontent.com/pina-rs/pina/main/.github/assets/logo.png" alt="The Pina logo: a low-poly origami pineapple" width="140">
+</p>
+
 Utilities for consuming Pina-generated IDLs and turning them into Codama `RootNode`s.
 
 ## Install

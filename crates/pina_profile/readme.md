@@ -1,5 +1,9 @@
 # pina_profile
 
+<p align="center">
+	<img src="https://raw.githubusercontent.com/pina-rs/pina/main/.github/assets/logo.png" alt="The Pina logo: a low-poly origami pineapple" width="140">
+</p>
+
 Static CU (Compute Unit) profiler for Solana SBF programs.
 
 Analyzes compiled `.so` ELF binaries to estimate per-function compute unit costs without requiring a running validator.
