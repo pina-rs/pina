@@ -112,6 +112,12 @@ pub(crate) fn expand(
 
 	let seed_count = args.seeds.len();
 	let seed_count_with_bump = seed_count + 1;
+	let lifetime_marker = seed_fields
+		.is_empty()
+		.then(|| quote!(_marker: ::core::marker::PhantomData<&'a ()>,));
+	let lifetime_marker_init = seed_fields
+		.is_empty()
+		.then(|| quote!(_marker: ::core::marker::PhantomData,));
 	let seeds_doc = format!("The PDA seeds for `{struct_name}`.");
 	let seeds_with_bump_doc =
 		format!("The PDA seeds for `{struct_name}`, including the bump seed.");
@@ -155,6 +161,7 @@ pub(crate) fn expand(
 		pub struct #seeds_name<'a> {
 			#(#seed_field_docs)*
 			#(#seed_fields,)*
+			#lifetime_marker
 		}
 
 		#[doc = #seeds_with_bump_doc]
@@ -168,6 +175,7 @@ pub(crate) fn expand(
 			pub fn seeds<'a>(#(#constructor_seed_params,)*) -> #seeds_name<'a> {
 				#seeds_name {
 					#(#seed_param_names: #seed_stored_exprs,)*
+					#lifetime_marker_init
 				}
 			}
 

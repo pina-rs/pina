@@ -118,7 +118,7 @@ fn path_to_string(path: &syn::Path) -> String {
 ///
 /// The `State` suffix is stripped so `CounterState` produces the `counter`
 /// PDA, matching the naming convention used by the example programs.
-fn pda_name_for_struct(struct_name: &str) -> String {
+pub(super) fn pda_name_for_struct(struct_name: &str) -> String {
 	let stripped = struct_name.strip_suffix("State").unwrap_or(struct_name);
 	if stripped.is_empty() {
 		return struct_name.to_snake_case();

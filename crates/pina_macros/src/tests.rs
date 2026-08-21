@@ -632,3 +632,13 @@ fn pda_constant_ref_seed() {
 	let output = pretty(pda_impl(args, input));
 	insta::assert_snapshot!("pda_constant_ref_seed", output);
 }
+
+#[test]
+fn pda_constant_only_seed() {
+	let args = quote! { crate = ::pina, seeds = [b"authority"] };
+	let input = quote! {
+		pub struct AuthorityState {}
+	};
+	let output = pretty(pda_impl(args, input));
+	insta::assert_snapshot!("pda_constant_only_seed", output);
+}

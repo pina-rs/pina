@@ -38,9 +38,14 @@ pub enum PinaBpfAccountType {
 }
 
 #[account(discriminator = PinaBpfAccountType)]
+#[pda(seeds = [STATE_SEED_PREFIX], bump = bump)]
 pub struct State {
 	pub bump: u8,
 }
+
+/// Typed schema for the data-free PDA that signs the CPI regression.
+#[pda(seeds = [CPI_AUTHORITY_SEED_PREFIX])]
+pub struct AuthorityState {}
 
 #[instruction(discriminator = PinaBpfInstruction::Hello)]
 pub struct HelloInstruction {}
@@ -185,12 +190,12 @@ impl<'a> ProcessAccountInfos<'a> for ForwardRotateWithPdaAccounts<'a> {
 		#[cfg(feature = "cpi-runtime-tests")]
 		{
 			let args = ForwardRotateWithPdaInstruction::try_from_bytes(data)?;
-			let bump = [args.bump];
-			let signer = PdaSigner::from_slices([CPI_AUTHORITY_SEED_PREFIX, bump.as_slice()]);
+			let seeds = AuthorityState::seeds().with_bump(args.bump);
+			let signer = seeds.to_signer();
 			let signers = [signer.as_signer()];
 
 			self.authority
-				.assert_seeds_with_bump(&[CPI_AUTHORITY_SEED_PREFIX, bump.as_slice()], &ID)?;
+				.assert_seeds_with_bump(&seeds.as_slices(), &ID)?;
 			let program = prop_amm_cpi::ProgramAccount::new(self.prop_amm_program)?;
 			let accounts = prop_amm_cpi::RotateAuthorityAccounts::new(self.oracle, self.authority)?;
 

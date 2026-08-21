@@ -35,10 +35,10 @@ import {
 import { getStateCodec, type State, type StateArgs } from "../accounts";
 import {
 	type CreatePdaInput,
-	type ForwardRotateWithPdaInput,
+	type ForwardRotateWithPdaAsyncInput,
 	type ForwardRotateWithSignerInput,
 	getCreatePdaInstruction,
-	getForwardRotateWithPdaInstruction,
+	getForwardRotateWithPdaInstructionAsync,
 	getForwardRotateWithSignerInstruction,
 	getHelloInstruction,
 	type HelloInput,
@@ -51,6 +51,7 @@ import {
 	parseForwardRotateWithSignerInstruction,
 	parseHelloInstruction,
 } from "../instructions";
+import { findAuthorityPda, findStatePda } from "../pdas";
 
 export const PINA_BPF_PROGRAM_ADDRESS =
 	"2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe" as Address<
@@ -160,6 +161,7 @@ export function parsePinaBpfInstruction<TProgram extends string>(
 export type PinaBpfPlugin = {
 	accounts: PinaBpfPluginAccounts;
 	instructions: PinaBpfPluginInstructions;
+	pdas: PinaBpfPluginPdas;
 	identifyAccount: typeof identifyPinaBpfAccount;
 	identifyInstruction: typeof identifyPinaBpfInstruction;
 	parseInstruction: typeof parsePinaBpfInstruction;
@@ -181,13 +183,18 @@ export type PinaBpfPluginInstructions = {
 		& ReturnType<typeof getForwardRotateWithSignerInstruction>
 		& SelfPlanAndSendFunctions;
 	forwardRotateWithPda: (
-		input: ForwardRotateWithPdaInput,
+		input: ForwardRotateWithPdaAsyncInput,
 	) =>
-		& ReturnType<typeof getForwardRotateWithPdaInstruction>
+		& ReturnType<typeof getForwardRotateWithPdaInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	createPda: (
 		input: CreatePdaInput,
 	) => ReturnType<typeof getCreatePdaInstruction> & SelfPlanAndSendFunctions;
+};
+
+export type PinaBpfPluginPdas = {
+	state: typeof findStatePda;
+	authority: typeof findAuthorityPda;
 };
 
 export type PinaBpfPluginRequirements =
@@ -213,11 +220,12 @@ export function pinaBpfProgram() {
 					forwardRotateWithPda: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getForwardRotateWithPdaInstruction(input),
+							getForwardRotateWithPdaInstructionAsync(input),
 						),
 					createPda: (input) =>
 						addSelfPlanAndSendFunctions(client, getCreatePdaInstruction(input)),
 				},
+				pdas: { state: findStatePda, authority: findAuthorityPda },
 				identifyAccount: identifyPinaBpfAccount,
 				identifyInstruction: identifyPinaBpfInstruction,
 				parseInstruction: parsePinaBpfInstruction,

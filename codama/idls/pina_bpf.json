@@ -39,6 +39,10 @@
 						}
 					]
 				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "state"
+				},
 				"discriminators": [
 					{
 						"kind": "constantDiscriminatorNode",
@@ -182,7 +186,14 @@
 						"name": "authority",
 						"isWritable": false,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "authority"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -313,6 +324,42 @@
 								"kind": "numberValueNode",
 								"number": 3
 							}
+						}
+					}
+				]
+			}
+		],
+		"pdas": [
+			{
+				"kind": "pdaNode",
+				"name": "state",
+				"seeds": [
+					{
+						"kind": "constantPdaSeedNode",
+						"type": {
+							"kind": "stringTypeNode",
+							"encoding": "utf8"
+						},
+						"value": {
+							"kind": "stringValueNode",
+							"string": "state"
+						}
+					}
+				]
+			},
+			{
+				"kind": "pdaNode",
+				"name": "authority",
+				"seeds": [
+					{
+						"kind": "constantPdaSeedNode",
+						"type": {
+							"kind": "stringTypeNode",
+							"encoding": "utf8"
+						},
+						"value": {
+							"kind": "stringValueNode",
+							"string": "cpi-authority"
 						}
 					}
 				]
