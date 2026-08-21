@@ -15,6 +15,7 @@ use pina::*;
 
 declare_id!("2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe");
 
+#[cfg(feature = "cpi-runtime-tests")]
 const PROP_AMM_PROGRAM_ID: Address = address!("55555555555555555555555555555555555555555555");
 
 /// Seed namespace for the PDA used to authorize the generated CPI regression.
@@ -75,6 +76,7 @@ pub struct CreatePdaAccounts<'a> {
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
+#[cfg(feature = "cpi-runtime-tests")]
 mod prop_amm_cpi {
 	use super::*;
 
@@ -155,55 +157,81 @@ fn process_hello(data: &[u8]) -> ProgramResult {
 
 impl<'a> ProcessAccountInfos<'a> for ForwardRotateAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
-		let args = ForwardRotateWithSignerInstruction::try_from_bytes(data)?;
+		#[cfg(feature = "cpi-runtime-tests")]
+		{
+			let args = ForwardRotateWithSignerInstruction::try_from_bytes(data)?;
 
-		self.authority.assert_signer()?;
-		let program = prop_amm_cpi::ProgramAccount::new(self.prop_amm_program)?;
-		let accounts = prop_amm_cpi::RotateAuthorityAccounts::new(self.oracle, self.authority)?;
-		self.prop_amm_program.assert_program(&PROP_AMM_PROGRAM_ID)?;
+			self.authority.assert_signer()?;
+			let program = prop_amm_cpi::ProgramAccount::new(self.prop_amm_program)?;
+			let accounts = prop_amm_cpi::RotateAuthorityAccounts::new(self.oracle, self.authority)?;
+			self.prop_amm_program.assert_program(&PROP_AMM_PROGRAM_ID)?;
 
-		prop_amm_cpi::RotateAuthority::new(accounts, args.new_authority).invoke(&program)
+			prop_amm_cpi::RotateAuthority::new(accounts, args.new_authority).invoke(&program)
+		}
+
+		#[cfg(not(feature = "cpi-runtime-tests"))]
+		{
+			let _ = (self, data);
+			Err(ProgramError::InvalidInstructionData)
+		}
 	}
 }
 
-#[cfg_attr(not(any(test, feature = "bpf-entrypoint")), allow(dead_code))]
 impl ForwardRotateAccounts<'_> {
 	fn process_with_pda(self, data: &[u8]) -> ProgramResult {
-		let args = ForwardRotateWithPdaInstruction::try_from_bytes(data)?;
-		let bump = [args.bump];
-		let signer = PdaSigner::from_slices([CPI_AUTHORITY_SEED_PREFIX, bump.as_slice()]);
-		let signers = [signer.as_signer()];
+		#[cfg(feature = "cpi-runtime-tests")]
+		{
+			let args = ForwardRotateWithPdaInstruction::try_from_bytes(data)?;
+			let bump = [args.bump];
+			let signer = PdaSigner::from_slices([CPI_AUTHORITY_SEED_PREFIX, bump.as_slice()]);
+			let signers = [signer.as_signer()];
 
-		self.authority
-			.assert_seeds_with_bump(&[b"cpi-authority", bump.as_slice()], &ID)?;
-		let program = prop_amm_cpi::ProgramAccount::new(self.prop_amm_program)?;
-		let accounts = prop_amm_cpi::RotateAuthorityAccounts::new(self.oracle, self.authority)?;
-		self.prop_amm_program.assert_program(&PROP_AMM_PROGRAM_ID)?;
+			self.authority
+				.assert_seeds_with_bump(&[b"cpi-authority", bump.as_slice()], &ID)?;
+			let program = prop_amm_cpi::ProgramAccount::new(self.prop_amm_program)?;
+			let accounts = prop_amm_cpi::RotateAuthorityAccounts::new(self.oracle, self.authority)?;
+			self.prop_amm_program.assert_program(&PROP_AMM_PROGRAM_ID)?;
 
-		prop_amm_cpi::RotateAuthority::new(accounts, args.new_authority)
-			.invoke_signed(&program, &signers)
+			prop_amm_cpi::RotateAuthority::new(accounts, args.new_authority)
+				.invoke_signed(&program, &signers)
+		}
+
+		#[cfg(not(feature = "cpi-runtime-tests"))]
+		{
+			let _ = (self, data);
+			Err(ProgramError::InvalidInstructionData)
+		}
 	}
 }
 
 impl<'a> ProcessAccountInfos<'a> for CreatePdaAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
-		let args = CreatePdaInstruction::try_from_bytes(data)?;
+		#[cfg(feature = "cpi-runtime-tests")]
+		{
+			let args = CreatePdaInstruction::try_from_bytes(data)?;
 
-		self.payer.assert_signer()?.assert_writable()?;
-		self.state.assert_empty()?;
-		self.system_program.assert_address(&system::ID)?;
-		create_program_account_with_bump::<State>(
-			self.state,
-			self.payer,
-			&ID,
-			&[STATE_SEED_PREFIX],
-			args.bump,
-		)?;
+			self.payer.assert_signer()?.assert_writable()?;
+			self.state.assert_empty()?;
+			self.system_program.assert_address(&system::ID)?;
+			create_program_account_with_bump::<State>(
+				self.state,
+				self.payer,
+				&ID,
+				&[STATE_SEED_PREFIX],
+				args.bump,
+			)?;
 
-		let mut state = self.state.as_account_mut::<State>(&ID)?;
-		state.bump = args.bump;
+			let mut state = self.state.as_account_mut::<State>(&ID)?;
+			state.bump = args.bump;
 
-		Ok(())
+			Ok(())
+		}
+
+		#[cfg(not(feature = "cpi-runtime-tests"))]
+		{
+			let _ = (self, data);
+			Err(ProgramError::InvalidInstructionData)
+		}
 	}
 }
 

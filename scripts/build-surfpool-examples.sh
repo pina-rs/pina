@@ -31,11 +31,18 @@ while IFS= read -r manifest; do
 
 	echo "Building ${example_name} for Surfpool"
 	rm -f -- "$direct_artifact" "$library_artifact"
+	features=(bpf-entrypoint)
+	if [[ "$example_name" == "pina_bpf" ]]; then
+		features+=(cpi-runtime-tests)
+	fi
 	cargo-build-sbf \
 		--skip-tools-install \
 		--tools-version "$TOOLS_VERSION" \
 		--manifest-path "$manifest" \
-		--features bpf-entrypoint \
+		--features "$(
+			IFS=,
+			echo "${features[*]}"
+		)" \
 		--sbf-out-dir "$OUT_DIR"
 
 	if [[ ! -f "$direct_artifact" && ! -f "$library_artifact" ]]; then
