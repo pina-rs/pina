@@ -20,10 +20,7 @@ fn manifest() -> &'static str {
 
 fn expect_idl_error(root: &Path, context: &str) -> IdlError {
 	match parse_program(root, None) {
-		Ok(ir) => {
-			std::mem::forget(ir);
-			panic!("{context}");
-		}
+		Ok(_) => panic!("{context}"),
 		Err(error) => error,
 	}
 }
@@ -143,7 +140,7 @@ fn rejects_manifests_without_a_package_name() {
 	);
 
 	let error = expect_idl_error(dir.path(), "package name must be required");
-	assert!(error.to_string().contains("package name"));
+	assert!(error.to_string().contains("[package].name"));
 }
 
 #[test]
@@ -186,7 +183,7 @@ fn rejects_multiple_entrypoint_dispatch_sources() {
 	.unwrap_or_else(|error| panic!("write duplicate module: {error}"));
 
 	let error = expect_idl_error(dir.path(), "ambiguous dispatch must fail closed");
-	assert!(error.to_string().contains("multiple entrypoint dispatch"));
+	assert!(error.to_string().contains("Multiple entrypoint dispatch"));
 }
 
 #[test]
@@ -203,7 +200,7 @@ fn rejects_malformed_pda_attributes() {
 
 	let error = expect_idl_error(dir.path(), "malformed PDA must fail closed");
 	assert!(error.to_string().contains("VaultState"));
-	assert!(error.to_string().contains("pda"));
+	assert!(error.to_string().contains("PDA"));
 }
 
 #[test]

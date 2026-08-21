@@ -37,7 +37,7 @@ The output file is replaced if it exists. Its parent directory must already exis
 
 ## What the extractor reads
 
-The extractor starts at `src/lib.rs` and follows Rust `mod` declarations, including `#[path = "..."]` modules. It derives the public IDL from source shapes rather than requiring a separate schema file.
+The extractor starts at `src/lib.rs` and follows Rust `mod` declarations, including `#[path = "..."]` modules. Missing unconditional module files are errors. Missing modules behind `#[cfg(...)]` are treated as inactive because their configuration may not apply to the IDL build. It derives the public IDL from source shapes rather than requiring a separate schema file.
 
 It recognizes:
 
@@ -61,6 +61,6 @@ pina idl -p ./programs/counter_program --name counter_v2
 
 ## Failure modes
 
-The command exits unsuccessfully when the path is not a readable program crate, modules cannot be resolved, declarations conflict, a supported schema cannot be represented safely, or JSON/output-file writing fails. Diagnostics include source or path context where available.
+The command exits unsuccessfully when the path is not a readable program crate, `[package].name` is absent, modules cannot be resolved, more than one source file defines `process_instruction`, declarations conflict, PDA attributes or validation links cannot be resolved, a supported schema cannot be represented safely, or JSON/output-file writing fails. Diagnostics include source or path context where available. These checks are fail-closed: the CLI does not silently omit malformed PDA metadata or choose one of several entrypoint dispatch sources.
 
 For complete client generation, continue with [`pina codama generate`](./codama-generate.md).
