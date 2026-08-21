@@ -43,6 +43,124 @@ Generated JavaScript codecs reject over-capacity values rather than truncating t
 - Document the explicit `zeroed()` then `close_with_recipient()` close flow.
 - Regenerate Codama IDLs and committed Rust/JS clients for the updated writable-account inference.
 
+## [0.10.0](https://github.com/pina-rs/pina/releases/tag/v0.10.0) (2026-08-21)
+
+Grouped release for `core`.
+
+### Breaking Changes
+
+#### Enforce CPI signer and PDA target invariants
+
+_Packages:_ _pina_
+
+Make CPI signer metadata describe the called instruction instead of inheriting outer-instruction privileges. Generated-style builders can now request signer accounts explicitly, so both transaction signatures and `invoke_signed` PDA seeds satisfy the same typed CPI API without forwarding unrelated signatures.
+
+Require `CpiContext` to receive a validated `Program<T>` and reject PDA account creation when the supplied account address does not match the requested seeds, bump, and owner. This prevents independently signing accounts from bypassing PDA derivation checks on both zero-balance and pre-funded allocation paths.
+
+When migrating, replace the raw program address passed to `CpiContext::new` with `Program::<YourProgram>::new(program_account)?`, and add the target program marker as the context's program type parameter. This deliberately breaks the previous constructor so program-ID validation cannot be bypassed accidentally.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #219](https://github.com/pina-rs/pina/pull/219)
+
+### Features
+
+#### Improve PDA signer and CPI builder ergonomics
+
+_Packages:_ _pina_, _pina_cli_, _pina_macros_
+
+Adds a stack-backed `PdaSigner` helper, generated `#[pda]` seed conversions for Pinocchio CPI signing, and a validated `Program<T>` wrapper for generated CPI builders. The Prop AMM generated-style CPI prototype now exposes Pinocchio-style builders with `.invoke()` and `.invoke_signed()` methods behind an opt-in `cpi` feature.
+
+Generated `pina init` programs now declare `default = []`, `bpf-entrypoint = []`, and `cpi = []`, and include a starter `src/cpi.rs` module that is only compiled when consumers explicitly enable `features = ["cpi"]`.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #216](https://github.com/pina-rs/pina/pull/216)
+
+#### Add strict mutable trailing accounts
+
+_Packages:_ _pina_, _pina_macros_
+
+Add opt-in `#[pina(remaining, distinct)]` parsing for programs whose mutable trailing accounts must have unique addresses. Existing `#[pina(remaining)]` pass-through behavior remains unchanged for instructions that intentionally accept aliases.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #220](https://github.com/pina-rs/pina/pull/220)
+
+#### Make Pina Tooling Self-Describing
+
+_Packages:_ _pina_cli_, _pina_codama_nodes_, _pina_cli_npm_, _pina_cli_darwin_arm64_, _pina_cli_darwin_x64_, _pina_cli_freebsd_x64_, _pina_cli_linux_arm64_gnu_, _pina_cli_linux_arm64_musl_, _pina_cli_linux_x64_gnu_, _pina_cli_linux_x64_musl_, _pina_cli_win32_arm64_msvc_, _pina_cli_win32_x64_msvc_, _pina_skill_
+
+Add comprehensive CLI help, stable machine-readable IDL output, bundled documentation discovery, and a complete mdBook CLI reference. Publish prebuilt CLI packages for every release target, rename the Codama helpers to `@pina-rs/codama-nodes`, and add the installable `@pina-rs/skill` agent guide. Split macro expansion code into focused modules without changing generated output.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #215](https://github.com/pina-rs/pina/pull/215)
+
+### Fixes
+
+#### Remove Clippy warnings without changing public ergonomics
+
+_Packages:_ _pina_, _pina_cli_, _pina_macros_
+
+Clean up macro and code-generation helpers, remove dead test scaffolding, and pass Pina's pointer-sized `AccountView` handle by value inside private validators. Public account-validation and cursor APIs remain unchanged, and no account data is copied.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #213](https://github.com/pina-rs/pina/pull/213)
+
+#### Make IDL extraction fail closed
+
+_Packages:_ _pina_, _pina_cli_, _pina_macros_
+
+Reject incomplete or ambiguous program source graphs instead of silently emitting partial Codama metadata. IDL generation now resolves explicit module paths, distinguishes missing conditional modules from missing required files, validates package names and entrypoint ownership, and requires PDA attributes and inferred PDA account links to resolve exactly.
+
+Keep account and PDA naming on one canonical path, including structs named exactly `State`. Constant-only `#[pda]` declarations now generate valid typed seed helpers, allowing data-free signer PDAs to use the same `seeds().with_bump(...)` API and generated client defaults as state-bearing PDAs.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #221](https://github.com/pina-rs/pina/pull/221)
+
+#### Enforce CPI signer and PDA target invariants
+
+_Packages:_ _pina_cli_
+
+Make CPI signer metadata describe the called instruction instead of inheriting outer-instruction privileges. Generated-style builders can now request signer accounts explicitly, so both transaction signatures and `invoke_signed` PDA seeds satisfy the same typed CPI API without forwarding unrelated signatures.
+
+Require `CpiContext` to receive a validated `Program<T>` and reject PDA account creation when the supplied account address does not match the requested seeds, bump, and owner. This prevents independently signing accounts from bypassing PDA derivation checks on both zero-balance and pre-funded allocation paths.
+
+When migrating, replace the raw program address passed to `CpiContext::new` with `Program::<YourProgram>::new(program_account)?`, and add the target program marker as the context's program type parameter. This deliberately breaks the previous constructor so program-ID validation cannot be bypassed accidentally.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #219](https://github.com/pina-rs/pina/pull/219)
+
+#### Make Pina Tooling Self-Describing
+
+_Packages:_ _pina_macros_
+
+Add comprehensive CLI help, stable machine-readable IDL output, bundled documentation discovery, and a complete mdBook CLI reference. Publish prebuilt CLI packages for every release target, rename the Codama helpers to `@pina-rs/codama-nodes`, and add the installable `@pina-rs/skill` agent guide. Split macro expansion code into focused modules without changing generated output.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #215](https://github.com/pina-rs/pina/pull/215)
+
+### Documentation
+
+#### Add the Pina logo
+
+_Packages:_ _pina_, _pina_cli_, _pina_macros_, _pina_codama_renderer_, _pina_profile_, _pina_sdk_ids_, _pina_codama_nodes_, _pina_cli_npm_, _pina_skill_
+
+Introduce the low-poly origami pineapple mark across the project: README and crate/npm readme headers, the mdBook intro page, and the book favicon. Canonical asset lives at `.github/assets/logo.png`.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #223](https://github.com/pina-rs/pina/pull/223)
+
+#### Unslop and cross-check documentation
+
+_Packages:_ _pina_, _pina_cli_, _pina_macros_, _pina_codama_renderer_, _pina_sdk_ids_
+
+Polish and verify the documentation corpus:
+
+- Correct the license badge to Apache-2.0 (the workspace license) across the root, crate, and CLI readmes, and fix the broken `license` link in the root readme.
+- Re-sync the compiled-in `pina docs` templates with the mdt providers so the CLI serves current content (Dart clients, npm packages, feature-selection and instruction-authoring tips).
+- Fix stale references: the nonexistent `test_utils_solana` module, a duplicate `crates/pina` entry and incomplete Pod type list in the workspace architecture guide, and a duplicate `crates/pina` heading in the crates-and-features book page.
+- Tighten example readmes: cut filler ("built with Pina", "reference example"), correct inaccurate claims (escrow Token-2022 validation, staking ATA idempotency, prop-amm CPI builder naming, float bit-pattern storage, `#[event(discriminator)]`), add missing e2e-test notes, and align heading and code-fence style.
+- Note the authoritative `security:dylint` task in the lints readme and drop duplicated renderer description text.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #218](https://github.com/pina-rs/pina/pull/218)
+
+#### Document example production boundaries
+
+_Packages:_ _pina_
+
+Mark the staking and vesting programs as account and bookkeeping scaffolds, state their intentionally missing economic behavior, and add a production-readiness gate for teams adapting Pina examples to asset-bearing programs.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #222](https://github.com/pina-rs/pina/pull/222)
+
 ## [0.9.0](https://github.com/pina-rs/pina/releases/tag/v0.9.0) (2026-08-19)
 
 Grouped release for `core`.

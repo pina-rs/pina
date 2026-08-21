@@ -77,7 +77,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.9.0"
+version = "0.10.0"
 edition = "2024"
 homepage = "https://pina.rs"
 keywords = ["solana", "pinocchio"]
@@ -133,11 +133,11 @@ zeropod = { default-features = false, version = "0.3.5", features = ["solana-add
 # the packaged macros crate against the previously published 0.x release while
 # workspace tests continue to use the local path.
 pina = { default-features = false, path = "crates/pina", version = ">=0.8.0, <1.0.0" }
-pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.9.0" }
-pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.9.0" }
-pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.9.0" }
-pina_profile = { default-features = false, path = "crates/pina_profile", version = "0.9.0" }
-pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.9.0" }
+pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.10.0" }
+pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.10.0" }
+pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.10.0" }
+pina_profile = { default-features = false, path = "crates/pina_profile", version = "0.10.0" }
+pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.10.0" }
 
 [workspace.metadata.bin]
 cargo-semver-checks = { version = "0.50.0" }
