@@ -1,0 +1,15 @@
+error[E0308]: mismatched types
+  --> tests/ui/cpi_context_rejects_raw_address.rs:17:33
+   |
+17 |     let _context = CpiContext::new(&raw_program_address, NoAccounts);
+   |                    --------------- ^^^^^^^^^^^^^^^^^^^^ expected `Program<'_, _>`, found `&Address`
+   |                    |
+   |                    arguments to this function are incorrect
+   |
+   = note: expected struct `Program<'_, _>`
+           found reference `&Address`
+note: associated function defined here
+  --> src/cpi.rs
+   |
+   |     pub const fn new(program: Program<'a, P>, accounts: T) -> Self {
+   |                  ^^^

@@ -74,6 +74,7 @@ pub struct CreatePdaAccounts<'a> {
 	pub system_program: &'a AccountView,
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 mod prop_amm_cpi {
 	use super::*;
 
@@ -98,7 +99,7 @@ mod prop_amm_cpi {
 		) -> Result<Self, ProgramError> {
 			Ok(Self {
 				oracle: CpiHandle::writable(oracle)?,
-				authority: CpiHandle::readonly(authority),
+				authority: CpiHandle::readonly_signer(authority),
 			})
 		}
 	}
@@ -123,6 +124,8 @@ mod prop_amm_cpi {
 		}
 
 		pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
+			program.account().assert_program(&PROP_AMM_PROGRAM_ID)?;
+
 			self.invoke_signed(program, &[])
 		}
 
@@ -134,7 +137,8 @@ mod prop_amm_cpi {
 			let mut data = [0u8; 1 + ADDRESS_BYTES];
 			data[0] = 2;
 			data[1..].copy_from_slice(self.new_authority.as_ref());
-			let context = CpiContext::new(program.address(), self.accounts);
+			let context = CpiContext::new(*program, self.accounts);
+			program.account().assert_program(&PROP_AMM_PROGRAM_ID)?;
 
 			context.invoke(&data, signers)
 		}
@@ -156,12 +160,14 @@ impl<'a> ProcessAccountInfos<'a> for ForwardRotateAccounts<'a> {
 		self.authority.assert_signer()?;
 		let program = prop_amm_cpi::ProgramAccount::new(self.prop_amm_program)?;
 		let accounts = prop_amm_cpi::RotateAuthorityAccounts::new(self.oracle, self.authority)?;
+		self.prop_amm_program.assert_program(&PROP_AMM_PROGRAM_ID)?;
 
 		prop_amm_cpi::RotateAuthority::new(accounts, args.new_authority).invoke(&program)
 	}
 }
 
-impl<'a> ForwardRotateAccounts<'a> {
+#[cfg_attr(not(any(test, feature = "bpf-entrypoint")), allow(dead_code))]
+impl ForwardRotateAccounts<'_> {
 	fn process_with_pda(self, data: &[u8]) -> ProgramResult {
 		let args = ForwardRotateWithPdaInstruction::try_from_bytes(data)?;
 		let bump = [args.bump];
@@ -169,9 +175,10 @@ impl<'a> ForwardRotateAccounts<'a> {
 		let signers = [signer.as_signer()];
 
 		self.authority
-			.assert_seeds_with_bump(&[CPI_AUTHORITY_SEED_PREFIX, bump.as_slice()], &ID)?;
+			.assert_seeds_with_bump(&[b"cpi-authority", bump.as_slice()], &ID)?;
 		let program = prop_amm_cpi::ProgramAccount::new(self.prop_amm_program)?;
 		let accounts = prop_amm_cpi::RotateAuthorityAccounts::new(self.oracle, self.authority)?;
+		self.prop_amm_program.assert_program(&PROP_AMM_PROGRAM_ID)?;
 
 		prop_amm_cpi::RotateAuthority::new(accounts, args.new_authority)
 			.invoke_signed(&program, &signers)
