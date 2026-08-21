@@ -34,8 +34,10 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { findVestingPda } from "../pdas";
 import { VESTING_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
@@ -146,6 +148,151 @@ export function getInitializeInstructionDataCodec(): FixedSizeCodec<
 		getInitializeInstructionDataEncoder(),
 		getInitializeInstructionDataDecoder(),
 	);
+}
+
+export type InitializeAsyncInput<
+	TAccountAdmin extends string = string,
+	TAccountBeneficiary extends string = string,
+	TAccountMint extends string = string,
+	TAccountVestingState extends string = string,
+	TAccountVault extends string = string,
+	TAccountAssociatedTokenProgram extends string = string,
+	TAccountSystemProgram extends string = string,
+	TAccountTokenProgram extends string = string,
+> = {
+	admin: TransactionSigner<TAccountAdmin>;
+	beneficiary: Address<TAccountBeneficiary>;
+	mint: Address<TAccountMint>;
+	vestingState?: Address<TAccountVestingState>;
+	vault: Address<TAccountVault>;
+	associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
+	systemProgram?: Address<TAccountSystemProgram>;
+	tokenProgram: Address<TAccountTokenProgram>;
+	totalAmount: InitializeInstructionDataArgs["totalAmount"];
+	startTs: InitializeInstructionDataArgs["startTs"];
+	cliffTs: InitializeInstructionDataArgs["cliffTs"];
+	endTs: InitializeInstructionDataArgs["endTs"];
+	bump: InitializeInstructionDataArgs["bump"];
+};
+
+export async function getInitializeInstructionAsync<
+	TAccountAdmin extends string,
+	TAccountBeneficiary extends string,
+	TAccountMint extends string,
+	TAccountVestingState extends string,
+	TAccountVault extends string,
+	TAccountAssociatedTokenProgram extends string,
+	TAccountSystemProgram extends string,
+	TAccountTokenProgram extends string,
+	TProgramAddress extends Address = typeof VESTING_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: InitializeAsyncInput<
+		TAccountAdmin,
+		TAccountBeneficiary,
+		TAccountMint,
+		TAccountVestingState,
+		TAccountVault,
+		TAccountAssociatedTokenProgram,
+		TAccountSystemProgram,
+		TAccountTokenProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	InitializeInstruction<
+		TProgramAddress,
+		TAccountAdmin,
+		TAccountBeneficiary,
+		TAccountMint,
+		TAccountVestingState,
+		TAccountVault,
+		TAccountAssociatedTokenProgram,
+		TAccountSystemProgram,
+		TAccountTokenProgram
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		VESTING_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		admin: { value: input.admin ?? null, isWritable: true },
+		beneficiary: { value: input.beneficiary ?? null, isWritable: false },
+		mint: { value: input.mint ?? null, isWritable: false },
+		vestingState: { value: input.vestingState ?? null, isWritable: true },
+		vault: { value: input.vault ?? null, isWritable: true },
+		associatedTokenProgram: {
+			value: input.associatedTokenProgram ?? null,
+			isWritable: false,
+		},
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.vestingState.value) {
+		accounts.vestingState.value = await findVestingPda({
+			admin: getAddressFromResolvedInstructionAccount(
+				"admin",
+				accounts.admin.value,
+			),
+			beneficiary: getAddressFromResolvedInstructionAccount(
+				"beneficiary",
+				accounts.beneficiary.value,
+			),
+			mint: getAddressFromResolvedInstructionAccount(
+				"mint",
+				accounts.mint.value,
+			),
+		});
+	}
+	if (!accounts.associatedTokenProgram.value) {
+		accounts.associatedTokenProgram.value =
+			"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<
+				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+			>;
+	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("admin", accounts.admin),
+			getAccountMeta("beneficiary", accounts.beneficiary),
+			getAccountMeta("mint", accounts.mint),
+			getAccountMeta("vestingState", accounts.vestingState),
+			getAccountMeta("vault", accounts.vault),
+			getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+			getAccountMeta("tokenProgram", accounts.tokenProgram),
+		],
+		data: getInitializeInstructionDataEncoder().encode(
+			args as InitializeInstructionDataArgs,
+		),
+		programAddress,
+	} as InitializeInstruction<
+		TProgramAddress,
+		TAccountAdmin,
+		TAccountBeneficiary,
+		TAccountMint,
+		TAccountVestingState,
+		TAccountVault,
+		TAccountAssociatedTokenProgram,
+		TAccountSystemProgram,
+		TAccountTokenProgram
+	>);
 }
 
 export type InitializeInput<

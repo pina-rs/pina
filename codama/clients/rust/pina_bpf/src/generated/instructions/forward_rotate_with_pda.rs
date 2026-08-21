@@ -21,14 +21,14 @@ pub struct ForwardRotateWithPda {
 }
 
 impl ForwardRotateWithPda {
-	pub fn new(
-		oracle: solana_pubkey::Pubkey,
-		authority: solana_pubkey::Pubkey,
-		prop_amm_program: solana_pubkey::Pubkey,
-	) -> Self {
+	pub fn new(oracle: solana_pubkey::Pubkey, prop_amm_program: solana_pubkey::Pubkey) -> Self {
 		Self {
 			oracle,
-			authority,
+			authority: solana_pubkey::Pubkey::find_program_address(
+				&["cpi-authority".as_bytes()],
+				&crate::PINA_BPF_ID,
+			)
+			.0,
 			prop_amm_program,
 		}
 	}

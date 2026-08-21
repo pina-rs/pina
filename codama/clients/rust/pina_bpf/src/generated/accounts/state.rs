@@ -62,3 +62,16 @@ impl State {
 		Ok(account)
 	}
 }
+
+impl State {
+	pub fn find_pda() -> (solana_pubkey::Pubkey, u8) {
+		solana_pubkey::Pubkey::find_program_address(&["state".as_bytes()], &crate::PINA_BPF_ID)
+	}
+
+	pub fn create_pda(bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+		solana_pubkey::Pubkey::create_program_address(
+			&["state".as_bytes(), &[bump]],
+			&crate::PINA_BPF_ID,
+		)
+	}
+}

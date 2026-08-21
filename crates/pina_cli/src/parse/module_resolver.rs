@@ -39,7 +39,7 @@ pub fn resolve_crate(src_dir: &Path, lib_path: &Path) -> Result<Vec<ResolvedFile
 		path: lib_path.to_path_buf(),
 		file,
 	}];
-	let mut pending = discover_module_paths(src_dir, &files[0].file, &mut seen);
+	let mut pending = discover_module_paths(src_dir, &files[0].file, &mut seen)?;
 
 	while !pending.is_empty() {
 		let read_modules: Vec<(PendingModule, String)> = pending
@@ -59,7 +59,7 @@ pub fn resolve_crate(src_dir: &Path, lib_path: &Path) -> Result<Vec<ResolvedFile
 				&module.child_base_dir,
 				&file,
 				&mut seen,
-			));
+			)?);
 			files.push(ResolvedFile {
 				path: module.path,
 				file,
@@ -77,7 +77,7 @@ fn discover_module_paths(
 	base_dir: &Path,
 	file: &syn::File,
 	seen: &mut Vec<PathBuf>,
-) -> Vec<PendingModule> {
+) -> Result<Vec<PendingModule>, IdlError> {
 	let mut modules = Vec::new();
 
 	for item in &file.items {
@@ -91,16 +91,45 @@ fn discover_module_paths(
 		}
 
 		let mod_name = item_mod.ident.to_string();
-		let candidates = [
-			base_dir.join(format!("{mod_name}.rs")),
-			base_dir.join(&mod_name).join("mod.rs"),
-		];
+		let explicit_path = module_path_attribute(item_mod)?;
+		let candidates = explicit_path.as_ref().map_or_else(
+			|| {
+				vec![
+					base_dir.join(format!("{mod_name}.rs")),
+					base_dir.join(&mod_name).join("mod.rs"),
+				]
+			},
+			|path| vec![base_dir.join(path)],
+		);
 
-		let Some(mod_path) = candidates.iter().find(|p| p.is_file()) else {
-			// Missing module files are skipped to preserve support for cfg-gated or
-			// externally-provided modules.
-			continue;
+		let existing_candidates = candidates
+			.iter()
+			.filter(|path| path.is_file())
+			.collect::<Vec<_>>();
+		let Some(mod_path) = existing_candidates.first().copied() else {
+			if is_cfg_gated(item_mod) {
+				continue;
+			}
+
+			let missing_path = candidates
+				.first()
+				.cloned()
+				.unwrap_or_else(|| base_dir.join(format!("{mod_name}.rs")));
+			return Err(IdlError::io(
+				missing_path,
+				std::io::Error::new(
+					std::io::ErrorKind::NotFound,
+					format!("module `{mod_name}` has no source file"),
+				),
+			));
 		};
+		if explicit_path.is_none() && existing_candidates.len() > 1 {
+			return Err(IdlError::Other(format!(
+				"Module `{mod_name}` is ambiguous; both {} and {} exist",
+				existing_candidates[0].display(),
+				existing_candidates[1].display(),
+			)));
+		}
 
 		if seen.contains(mod_path) {
 			continue;
@@ -108,10 +137,10 @@ fn discover_module_paths(
 
 		seen.push(mod_path.clone());
 
-		let child_base_dir = if mod_path.file_name().is_some_and(|n| n == "mod.rs") {
+		let child_base_dir = if mod_path.file_name().is_some_and(|name| name == "mod.rs") {
 			mod_path.parent().unwrap_or(base_dir).to_path_buf()
 		} else {
-			base_dir.join(&mod_name)
+			mod_path.with_extension("")
 		};
 
 		modules.push(PendingModule {
@@ -120,7 +149,43 @@ fn discover_module_paths(
 		});
 	}
 
-	modules
+	Ok(modules)
+}
+
+fn is_cfg_gated(item_mod: &syn::ItemMod) -> bool {
+	item_mod
+		.attrs
+		.iter()
+		.any(|attr| attr.path().is_ident("cfg"))
+}
+
+fn module_path_attribute(item_mod: &syn::ItemMod) -> Result<Option<PathBuf>, IdlError> {
+	let Some(attr) = item_mod
+		.attrs
+		.iter()
+		.find(|attr| attr.path().is_ident("path"))
+	else {
+		return Ok(None);
+	};
+
+	let syn::Meta::NameValue(name_value) = &attr.meta else {
+		return Err(IdlError::Other(format!(
+			"Module `{}` has an invalid `#[path]` attribute",
+			item_mod.ident
+		)));
+	};
+	let syn::Expr::Lit(syn::ExprLit {
+		lit: syn::Lit::Str(path),
+		..
+	}) = &name_value.value
+	else {
+		return Err(IdlError::Other(format!(
+			"Module `{}` has a non-string `#[path]` attribute",
+			item_mod.ident
+		)));
+	};
+
+	Ok(Some(PathBuf::from(path.value())))
 }
 
 #[cfg(test)]
@@ -178,7 +243,27 @@ mod tests {
 	}
 
 	#[test]
-	fn skips_missing_modules_gracefully() {
+	fn rejects_ambiguous_implicit_module_files() {
+		let dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
+		let src = dir.path().join("src");
+		let state_dir = src.join("state");
+		fs::create_dir_all(&state_dir).unwrap_or_else(|e| panic!("mkdir: {e}"));
+		fs::write(src.join("lib.rs"), "mod state;").unwrap_or_else(|e| panic!("write: {e}"));
+		fs::write(src.join("state.rs"), "pub struct FlatState;")
+			.unwrap_or_else(|e| panic!("write: {e}"));
+		fs::write(state_dir.join("mod.rs"), "pub struct NestedState;")
+			.unwrap_or_else(|e| panic!("write: {e}"));
+
+		let error = resolve_crate(&src, &src.join("lib.rs"))
+			.expect_err("ambiguous implicit module files must fail");
+		let message = error.to_string();
+		assert!(message.contains("Module `state` is ambiguous"));
+		assert!(message.contains("state.rs"));
+		assert!(message.contains("state/mod.rs"));
+	}
+
+	#[test]
+	fn rejects_missing_unconditional_modules() {
 		let dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
 		let src = dir.path().join("src");
 		fs::create_dir_all(&src).unwrap_or_else(|e| panic!("mkdir: {e}"));
@@ -186,10 +271,90 @@ mod tests {
 		fs::write(src.join("lib.rs"), "mod nonexistent;\npub fn hello() {}")
 			.unwrap_or_else(|e| panic!("write: {e}"));
 
+		let error = resolve_crate(&src, &src.join("lib.rs"))
+			.expect_err("missing unconditional modules must fail");
+		assert!(matches!(error, IdlError::Io { .. }));
+		assert!(error.to_string().contains("nonexistent.rs"));
+	}
+
+	#[test]
+	fn skips_missing_cfg_gated_modules() {
+		let dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
+		let src = dir.path().join("src");
+		fs::create_dir_all(&src).unwrap_or_else(|e| panic!("mkdir: {e}"));
+		fs::write(
+			src.join("lib.rs"),
+			"#[cfg(feature = \"client\")]\nmod client;\npub fn hello() {}",
+		)
+		.unwrap_or_else(|e| panic!("write: {e}"));
+
 		let files =
 			resolve_crate(&src, &src.join("lib.rs")).unwrap_or_else(|e| panic!("resolve: {e}"));
-		// Should still resolve lib.rs, just skip the missing module.
 		assert_eq!(files.len(), 1);
+	}
+
+	#[test]
+	fn resolves_explicit_path_module() {
+		let dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
+		let src = dir.path().join("src");
+		let generated = src.join("generated");
+		fs::create_dir_all(&generated).unwrap_or_else(|e| panic!("mkdir: {e}"));
+		fs::write(
+			src.join("lib.rs"),
+			"#[path = \"generated/state.rs\"]\nmod state;",
+		)
+		.unwrap_or_else(|e| panic!("write: {e}"));
+		fs::write(generated.join("state.rs"), "pub struct State;")
+			.unwrap_or_else(|e| panic!("write: {e}"));
+
+		let files =
+			resolve_crate(&src, &src.join("lib.rs")).unwrap_or_else(|e| panic!("resolve: {e}"));
+		assert_eq!(files.len(), 2);
+		assert!(
+			files
+				.iter()
+				.any(|file| file.path.ends_with("generated/state.rs"))
+		);
+	}
+
+	#[test]
+	fn rejects_malformed_path_attribute() {
+		let dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
+		let src = dir.path().join("src");
+		fs::create_dir_all(&src).unwrap_or_else(|e| panic!("mkdir: {e}"));
+		fs::write(src.join("lib.rs"), "#[path(\"state.rs\")] mod state;")
+			.unwrap_or_else(|e| panic!("write: {e}"));
+
+		let error = resolve_crate(&src, &src.join("lib.rs"))
+			.expect_err("malformed path attributes must fail");
+		assert!(error.to_string().contains("invalid `#[path]`"));
+	}
+
+	#[test]
+	fn rejects_non_string_path_attribute() {
+		let dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
+		let src = dir.path().join("src");
+		fs::create_dir_all(&src).unwrap_or_else(|e| panic!("mkdir: {e}"));
+		fs::write(src.join("lib.rs"), "#[path = 7] mod state;")
+			.unwrap_or_else(|e| panic!("write: {e}"));
+
+		let error = resolve_crate(&src, &src.join("lib.rs"))
+			.expect_err("non-string path attributes must fail");
+		assert!(error.to_string().contains("non-string `#[path]`"));
+	}
+
+	#[test]
+	fn rejects_malformed_path_attribute_in_child_module() {
+		let dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
+		let src = dir.path().join("src");
+		fs::create_dir_all(&src).unwrap_or_else(|e| panic!("mkdir: {e}"));
+		fs::write(src.join("lib.rs"), "mod state;").unwrap_or_else(|e| panic!("write: {e}"));
+		fs::write(src.join("state.rs"), "#[path(\"nested.rs\")] mod nested;")
+			.unwrap_or_else(|e| panic!("write: {e}"));
+
+		let error = resolve_crate(&src, &src.join("lib.rs"))
+			.expect_err("malformed nested path attributes must fail");
+		assert!(error.to_string().contains("invalid `#[path]`"));
 	}
 
 	#[test]

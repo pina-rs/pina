@@ -42,14 +42,28 @@ pub fn parse_program(
 	let cargo_contents =
 		std::fs::read_to_string(&cargo_toml).map_err(|e| IdlError::io(&cargo_toml, e))?;
 
-	let package_name =
-		extract_package_name(&cargo_contents).unwrap_or_else(|| "unknown_program".to_owned());
+	let package_name = extract_package_name(&cargo_contents)
+		.ok_or_else(|| IdlError::missing_package_name(&cargo_toml))?;
 
 	let src_dir = program_path.join("src");
 	let lib_path = src_dir.join("lib.rs");
 
 	let resolved_files = module_resolver::resolve_crate(&src_dir, &lib_path)?;
 	let syn_files: Vec<&syn::File> = resolved_files.iter().map(|rf| &rf.file).collect();
+	let has_instruction_structs = syn_files.iter().try_fold(false, |found, file| {
+		instruction_data::extract_instruction_structs(file)
+			.map(|instructions| found || !instructions.is_empty())
+	})?;
+	let entrypoint_source_count = syn_files
+		.iter()
+		.filter(|file| entrypoint::has_process_instruction(file))
+		.count();
+	if entrypoint_source_count > 1 {
+		return Err(IdlError::ambiguous_entrypoint(entrypoint_source_count));
+	}
+	if has_instruction_structs && entrypoint_source_count == 0 {
+		return Err(IdlError::NoEntrypoint);
+	}
 
 	assemble_program_ir_multi(&syn_files, name_override.unwrap_or(&package_name))
 }
@@ -67,12 +81,16 @@ pub fn assemble_program_ir_multi(
 	let mut all_instruction_structs = Vec::new();
 	let mut all_ix_accounts_structs = Vec::new();
 	let mut all_errors = Vec::new();
-	let mut all_seed_constants = Vec::new();
 	let mut dispatch = Vec::new();
+	let mut dispatch_source_count = 0;
 	let mut all_validation_props = HashMap::new();
 	let mut all_zeropod_enums = Vec::new();
 	let mut public_key = None;
 	let mut pdas_ir = Vec::new();
+	let all_seed_constants = files
+		.iter()
+		.flat_map(|file| seeds::extract_seed_constants(file))
+		.collect::<Vec<_>>();
 
 	for file in files {
 		if public_key.is_none() {
@@ -88,6 +106,10 @@ pub fn assemble_program_ir_multi(
 
 		let file_dispatch = entrypoint::extract_dispatch_map(file);
 		if !file_dispatch.is_empty() {
+			dispatch_source_count += 1;
+			if dispatch_source_count > 1 {
+				return Err(IdlError::ambiguous_entrypoint(dispatch_source_count));
+			}
 			dispatch = file_dispatch;
 		}
 
@@ -96,9 +118,8 @@ pub fn assemble_program_ir_multi(
 
 		let file_seed_constants = seeds::extract_seed_constants(file);
 		let file_pdas = seeds::extract_pda_from_seed_macros(file, &file_seed_constants);
-		let file_attr_pdas = pda_attr::extract_pda_from_attributes(file, &file_seed_constants);
+		let file_attr_pdas = pda_attr::extract_pda_from_attributes(file, &all_seed_constants)?;
 
-		all_seed_constants.extend(file_seed_constants);
 		pdas_ir.extend(file_pdas);
 		pdas_ir.extend(file_attr_pdas);
 	}
@@ -166,6 +187,14 @@ fn assemble_from_extracted(
 
 	// Step 3: Build instructions IR by connecting dispatch, accounts structs,
 	// instruction data, and validation properties.
+	for account in &accounts {
+		if let Some(pda_name) = &account.pda_name
+			&& !pdas_ir.iter().any(|pda| pda.name == *pda_name)
+		{
+			return Err(IdlError::unresolved_pda(&account.name));
+		}
+	}
+
 	let instructions = if dispatch.is_empty() {
 		build_accountless_instructions_from_structs(instruction_structs, &discriminator_map)?
 	} else {
@@ -195,6 +224,32 @@ fn assemble_from_extracted(
 	Ok(ir)
 }
 
+fn build_accountless_instructions_from_structs(
+	instruction_structs: &[instruction_data::InstructionStruct],
+	discriminator_map: &HashMap<(String, String), DiscriminatorIr>,
+) -> Result<Vec<InstructionIr>, IdlError> {
+	instruction_structs
+		.iter()
+		.map(|ix_struct| {
+			resolve_discriminator_value(
+				discriminator_map,
+				&ix_struct.discriminator_enum,
+				&ix_struct.variant,
+				"instruction",
+			)
+			.map(|discriminator| {
+				InstructionIr {
+					name: ix_struct.variant.to_snake_case(),
+					accounts: Vec::new(),
+					arguments: ix_struct.fields.clone(),
+					discriminator,
+					docs: ix_struct.docs.clone(),
+				}
+			})
+		})
+		.collect()
+}
+
 /// Run static validation checks on a fully assembled [`ProgramIr`].
 ///
 /// Currently checks:
@@ -211,6 +266,16 @@ pub fn validate_program_ir(ir: &ProgramIr) -> Result<(), IdlError> {
 			return Err(IdlError::Other(format!(
 				"Duplicate ZeroPod enum `{}` cannot be flattened into one Codama program",
 				zeropod_enum.name
+			)));
+		}
+	}
+
+	let mut pda_names = HashSet::new();
+	for pda in &ir.pdas {
+		if !pda_names.insert(pda.name.as_str()) {
+			return Err(IdlError::Other(format!(
+				"Duplicate PDA definition `{}` cannot be flattened into one Codama program",
+				pda.name
 			)));
 		}
 	}
@@ -270,10 +335,13 @@ fn extract_package_name(cargo_contents: &str) -> Option<String> {
 			in_package = false;
 			continue;
 		}
-		if in_package && let Some(rest) = trimmed.strip_prefix("name") {
-			let rest = rest.trim().strip_prefix('=')?;
-			let rest = rest.trim().trim_matches('"');
-			return Some(rest.to_owned());
+		if in_package
+			&& let Some((key, value)) = trimmed.split_once('=')
+			&& key.trim() == "name"
+		{
+			let value = value.trim();
+			let name = value.strip_prefix('"')?.strip_suffix('"')?;
+			return (!name.is_empty()).then(|| name.to_owned());
 		}
 	}
 	None
@@ -297,32 +365,6 @@ pub fn build_discriminator_map(
 		}
 	}
 	map
-}
-
-fn build_accountless_instructions_from_structs(
-	instruction_structs: &[instruction_data::InstructionStruct],
-	discriminator_map: &HashMap<(String, String), DiscriminatorIr>,
-) -> Result<Vec<InstructionIr>, IdlError> {
-	instruction_structs
-		.iter()
-		.map(|ix_struct| {
-			resolve_discriminator_value(
-				discriminator_map,
-				&ix_struct.discriminator_enum,
-				&ix_struct.variant,
-				"instruction",
-			)
-			.map(|discriminator| {
-				InstructionIr {
-					name: ix_struct.variant.to_snake_case(),
-					accounts: Vec::new(),
-					arguments: ix_struct.fields.clone(),
-					discriminator,
-					docs: ix_struct.docs.clone(),
-				}
-			})
-		})
-		.collect()
 }
 
 fn build_instructions_from_dispatch(
@@ -357,7 +399,7 @@ fn build_instructions_from_dispatch(
 				})?;
 
 			let val_props = validation_props.get(accounts_struct_name);
-			build_instruction_accounts(accts_struct, val_props, pdas_ir)
+			build_instruction_accounts(accts_struct, val_props, pdas_ir)?
 		} else {
 			Vec::new()
 		};
@@ -385,7 +427,7 @@ fn build_instruction_accounts(
 	accts_struct: &accounts_struct::AccountsStruct,
 	val_props: Option<&HashMap<String, validation::AccountProperties>>,
 	pdas_ir: &[PdaIr],
-) -> Vec<InstructionAccountIr> {
+) -> Result<Vec<InstructionAccountIr>, IdlError> {
 	accts_struct
 		.fields
 		.iter()
@@ -396,12 +438,15 @@ fn build_instruction_accounts(
 				.unwrap_or_default();
 
 			let pda_name = if props.is_pda {
-				infer_pda_name_for_field(&field.name, pdas_ir)
+				Some(
+					infer_pda_name_for_field(&field.name, pdas_ir)
+						.ok_or_else(|| IdlError::unresolved_pda(&field.name))?,
+				)
 			} else {
 				None
 			};
 
-			InstructionAccountIr {
+			Ok(InstructionAccountIr {
 				name: field.name.clone(),
 				is_writable: field.is_mutable || props.is_writable,
 				is_signer: props.is_signer,
@@ -410,7 +455,7 @@ fn build_instruction_accounts(
 				is_pda: props.is_pda,
 				pda_name,
 				docs: field.docs.clone(),
-			}
+			})
 		})
 		.collect()
 }
@@ -420,6 +465,7 @@ fn infer_pda_name_for_field(field_name: &str, pdas: &[PdaIr]) -> Option<String> 
 		field_name.to_owned(),
 		field_name.trim_end_matches("_account").to_owned(),
 		field_name.trim_end_matches("_pda").to_owned(),
+		field_name.trim_end_matches("_state").to_owned(),
 	];
 
 	for candidate in candidates {
@@ -466,6 +512,10 @@ mod tests {
 		assert_eq!(
 			infer_pda_name_for_field("vault_account", &pdas),
 			Some("vault".to_owned())
+		);
+		assert_eq!(
+			infer_pda_name_for_field("counter_state", &pdas),
+			Some("counter".to_owned())
 		);
 		assert_eq!(infer_pda_name_for_field("unknown", &pdas), None);
 	}
@@ -728,5 +778,111 @@ mod tests {
 		let error = assemble_program_ir_multi(&[&first, &second], "example")
 			.expect_err("duplicate flattened companions must fail");
 		assert!(error.to_string().contains("Duplicate ZeroPod enum"));
+	}
+
+	#[test]
+	fn assemble_program_ir_rejects_multiple_dispatch_sources() {
+		let first = syn::parse_file(
+			r#"
+				declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+				fn process_instruction() {
+					match instruction {
+						ExampleInstruction::Run => RunAccounts::try_from(accounts)?.process(data),
+					}
+				}
+			"#,
+		)
+		.unwrap_or_else(|error| panic!("parse failed: {error}"));
+		let second = syn::parse_file(
+			r#"
+				fn process_instruction() {
+					match instruction {
+						ExampleInstruction::Run => RunAccounts::try_from(accounts)?.process(data),
+					}
+				}
+			"#,
+		)
+		.unwrap_or_else(|error| panic!("parse failed: {error}"));
+
+		let error = assemble_program_ir_multi(&[&first, &second], "example")
+			.expect_err("multiple dispatch sources must fail");
+		assert!(error.to_string().contains("sources found (2)"));
+	}
+
+	#[test]
+	fn validate_program_ir_rejects_duplicate_pdas() {
+		let pda = PdaIr {
+			name: "vault".to_owned(),
+			seeds: Vec::new(),
+		};
+		let ir = ProgramIr {
+			name: "example".to_owned(),
+			public_key: "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS".to_owned(),
+			zeropod_enums: Vec::new(),
+			accounts: Vec::new(),
+			instructions: Vec::new(),
+			errors: Vec::new(),
+			pdas: vec![pda.clone(), pda],
+		};
+
+		let error = validate_program_ir(&ir).expect_err("duplicate PDAs must fail");
+		assert!(
+			error
+				.to_string()
+				.contains("Duplicate PDA definition `vault`")
+		);
+	}
+
+	#[test]
+	fn assemble_from_extracted_rejects_unresolved_account_pda_link() {
+		let discriminator = discriminator::DiscriminatorEnum {
+			name: "ExampleAccount".to_owned(),
+			variants: vec![discriminator::DiscriminatorVariant {
+				name: "Vault".to_owned(),
+				value: 1,
+			}],
+			repr_size: 1,
+		};
+		let account = account_state::AccountStruct {
+			name: "VaultState".to_owned(),
+			discriminator_enum: "ExampleAccount".to_owned(),
+			variant: "Vault".to_owned(),
+			fields: Vec::new(),
+			docs: Vec::new(),
+			pda_name: Some("vault".to_owned()),
+		};
+
+		let error = assemble_from_extracted(
+			"example",
+			"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS".to_owned(),
+			&[discriminator],
+			&[account],
+			&[],
+			&[],
+			&[],
+			&[],
+			&[],
+			&HashMap::new(),
+			&[],
+		)
+		.expect_err("unresolved account PDA links must fail");
+
+		assert!(error.to_string().contains("Account `VaultState`"));
+	}
+
+	#[test]
+	fn extracts_exact_package_name() {
+		let manifest = r#"
+			[workspace.package]
+			name = "wrong"
+
+			[package]
+			name = "example_program"
+		"#;
+
+		assert_eq!(
+			extract_package_name(manifest).as_deref(),
+			Some("example_program")
+		);
 	}
 }

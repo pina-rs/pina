@@ -1,4 +1,3 @@
-use heck::ToSnakeCase;
 use syn::File;
 use syn::Item;
 
@@ -67,12 +66,7 @@ fn extract_pda_name(attrs: &[syn::Attribute], struct_name: &str) -> Option<Strin
 		return None;
 	}
 
-	Some(
-		struct_name
-			.strip_suffix("State")
-			.unwrap_or(struct_name)
-			.to_snake_case(),
-	)
+	Some(super::pda_attr::pda_name_for_struct(struct_name))
 }
 
 fn extract_named_fields(fields: &syn::Fields) -> Vec<FieldIr> {

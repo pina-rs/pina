@@ -52,6 +52,21 @@ pub fn extract_dispatch_map(file: &File) -> Vec<DispatchEntry> {
 	entries
 }
 
+/// Return whether a source file defines a top-level or inline-module
+/// `process_instruction` function.
+pub fn has_process_instruction(file: &File) -> bool {
+	file.items.iter().any(|item| {
+		matches!(item, Item::Fn(function) if function.sig.ident == "process_instruction")
+			|| matches!(
+				item,
+				Item::Mod(module)
+					if module.content.as_ref().is_some_and(|(_, items)| items.iter().any(|inner| {
+						matches!(inner, Item::Fn(function) if function.sig.ident == "process_instruction")
+					}))
+			)
+	})
+}
+
 fn extract_from_fn_body(stmts: &[Stmt], entries: &mut Vec<DispatchEntry>) {
 	for stmt in stmts {
 		let Stmt::Expr(expr, _) = stmt else {
@@ -188,6 +203,20 @@ fn expr_is_ident(expr: &Expr, ident: &str) -> bool {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[test]
+	fn detects_accountless_process_instruction() {
+		let file = syn::parse_file(
+			r#"
+				mod entrypoint {
+					fn process_instruction() { Ok(()) }
+				}
+			"#,
+		)
+		.unwrap_or_else(|error| panic!("parse failed: {error}"));
+
+		assert!(has_process_instruction(&file));
+	}
 
 	#[test]
 	fn extracts_dispatch_entries() {

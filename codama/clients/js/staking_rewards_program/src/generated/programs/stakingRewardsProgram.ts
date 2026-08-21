@@ -45,10 +45,10 @@ import {
 	type DepositInput,
 	getClaimInstruction,
 	getDepositInstruction,
-	getInitializePoolInstruction,
+	getInitializePoolInstructionAsync,
 	getOpenPositionInstruction,
 	getWithdrawInstruction,
-	type InitializePoolInput,
+	type InitializePoolAsyncInput,
 	type OpenPositionInput,
 	parseClaimInstruction,
 	type ParsedClaimInstruction,
@@ -210,9 +210,9 @@ export type StakingRewardsProgramPluginAccounts = {
 
 export type StakingRewardsProgramPluginInstructions = {
 	initializePool: (
-		input: InitializePoolInput,
+		input: InitializePoolAsyncInput,
 	) =>
-		& ReturnType<typeof getInitializePoolInstruction>
+		& ReturnType<typeof getInitializePoolInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	openPosition: (
 		input: OpenPositionInput,
@@ -255,7 +255,7 @@ export function stakingRewardsProgramProgram() {
 					initializePool: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializePoolInstruction(input),
+							getInitializePoolInstructionAsync(input),
 						),
 					openPosition: (input) =>
 						addSelfPlanAndSendFunctions(

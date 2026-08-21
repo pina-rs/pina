@@ -33,6 +33,7 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { findAuthorityPda } from "../pdas";
 import { PINA_BPF_PROGRAM_ADDRESS } from "../programs";
 import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
@@ -111,6 +112,79 @@ export function getForwardRotateWithPdaInstructionDataCodec(): FixedSizeCodec<
 		getForwardRotateWithPdaInstructionDataEncoder(),
 		getForwardRotateWithPdaInstructionDataDecoder(),
 	);
+}
+
+export type ForwardRotateWithPdaAsyncInput<
+	TAccountOracle extends string = string,
+	TAccountAuthority extends string = string,
+	TAccountPropAmmProgram extends string = string,
+> = {
+	oracle: Address<TAccountOracle>;
+	authority?: Address<TAccountAuthority>;
+	propAmmProgram: Address<TAccountPropAmmProgram>;
+	bump: ForwardRotateWithPdaInstructionDataArgs["bump"];
+	newAuthority: ForwardRotateWithPdaInstructionDataArgs["newAuthority"];
+};
+
+export async function getForwardRotateWithPdaInstructionAsync<
+	TAccountOracle extends string,
+	TAccountAuthority extends string,
+	TAccountPropAmmProgram extends string,
+	TProgramAddress extends Address = typeof PINA_BPF_PROGRAM_ADDRESS,
+>(
+	input: ForwardRotateWithPdaAsyncInput<
+		TAccountOracle,
+		TAccountAuthority,
+		TAccountPropAmmProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	ForwardRotateWithPdaInstruction<
+		TProgramAddress,
+		TAccountOracle,
+		TAccountAuthority,
+		TAccountPropAmmProgram
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ?? PINA_BPF_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		oracle: { value: input.oracle ?? null, isWritable: true },
+		authority: { value: input.authority ?? null, isWritable: false },
+		propAmmProgram: { value: input.propAmmProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.authority.value) {
+		accounts.authority.value = await findAuthorityPda();
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("oracle", accounts.oracle),
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("propAmmProgram", accounts.propAmmProgram),
+		],
+		data: getForwardRotateWithPdaInstructionDataEncoder().encode(
+			args as ForwardRotateWithPdaInstructionDataArgs,
+		),
+		programAddress,
+	} as ForwardRotateWithPdaInstruction<
+		TProgramAddress,
+		TAccountOracle,
+		TAccountAuthority,
+		TAccountPropAmmProgram
+	>);
 }
 
 export type ForwardRotateWithPdaInput<

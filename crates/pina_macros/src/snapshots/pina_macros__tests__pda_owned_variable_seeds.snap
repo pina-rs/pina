@@ -1,0 +1,81 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+pub struct NumericState {
+    pub nonce: u64,
+    pub tag: [u8; 8],
+}
+///The PDA seeds for `NumericState`.
+#[derive(Clone, Copy)]
+pub struct NumericStateSeeds<'a> {
+    ///The `nonce` seed.
+    ///The `tag` seed.
+    pub nonce: [u8; 8],
+    pub tag: [u8; 8usize],
+    _marker: ::core::marker::PhantomData<&'a ()>,
+}
+///The PDA seeds for `NumericState`, including the bump seed.
+pub struct NumericStateSeedsWithBump<'a> {
+    inner: NumericStateSeeds<'a>,
+    _bump: [u8; 1],
+}
+impl NumericState {
+    /// Build the PDA seeds for this account.
+    pub fn seeds<'a>(nonce: u64, tag: [u8; 8usize]) -> NumericStateSeeds<'a> {
+        NumericStateSeeds {
+            nonce: nonce.to_le_bytes(),
+            tag: tag,
+            _marker: ::core::marker::PhantomData,
+        }
+    }
+    /// Find the canonical PDA for this account and its bump seed.
+    pub fn try_find_pda(
+        nonce: u64,
+        tag: [u8; 8usize],
+        program_id: &Address,
+    ) -> ::core::option::Option<(::pina::Address, u8)> {
+        let seeds = Self::seeds(nonce, tag);
+        ::pina::try_find_program_address(&seeds.as_slices(), program_id)
+    }
+    /// Find the canonical PDA for this account and its bump seed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no valid PDA exists for the given seeds.
+    pub fn find_pda(
+        nonce: u64,
+        tag: [u8; 8usize],
+        program_id: &Address,
+    ) -> (::pina::Address, u8) {
+        Self::try_find_pda(nonce, tag, program_id)
+            .unwrap_or_else(|| panic!("could not find program address from seeds"))
+    }
+}
+impl<'a> NumericStateSeeds<'a> {
+    /// The seeds as byte slices, without the bump seed.
+    pub fn as_slices(&self) -> [&[u8]; 3usize] {
+        [b"numeric", &self.nonce, &self.tag]
+    }
+    /// Append the bump seed to the seeds.
+    pub fn with_bump(&self, bump: u8) -> NumericStateSeedsWithBump<'a> {
+        NumericStateSeedsWithBump {
+            inner: *self,
+            _bump: [bump],
+        }
+    }
+}
+impl<'a> NumericStateSeedsWithBump<'a> {
+    /// The seeds as byte slices, including the bump seed.
+    pub fn as_slices(&self) -> [&[u8]; 4usize] {
+        [b"numeric", &self.inner.nonce, &self.inner.tag, &self._bump]
+    }
+    /// The seeds as Pinocchio CPI seed values, including the bump seed.
+    pub fn as_seed_array(&self) -> [::pina::Seed<'_>; 4usize] {
+        self.as_slices().map(::pina::Seed::from)
+    }
+    /// The seeds as an owned PDA signer helper.
+    pub fn to_signer(&self) -> ::pina::PdaSigner<'_, 4usize> {
+        ::pina::PdaSigner::from_seed_array(self.as_seed_array())
+    }
+}

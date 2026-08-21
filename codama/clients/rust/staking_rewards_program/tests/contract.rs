@@ -35,7 +35,11 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 	let admin = Pubkey::new_unique();
 	let stake_mint = Pubkey::new_unique();
 	let reward_mint = Pubkey::new_unique();
-	let pool_state = Pubkey::new_unique();
+	let pool_state = Pubkey::find_program_address(
+		&[b"pool", stake_mint.as_ref(), reward_mint.as_ref()],
+		&program_id,
+	)
+	.0;
 	let stake_vault = Pubkey::new_unique();
 	let reward_vault = Pubkey::new_unique();
 	let token_program = Pubkey::new_unique();
@@ -45,7 +49,6 @@ fn staking_rewards_program_client_has_expected_contract_shape() {
 		admin,
 		stake_mint,
 		reward_mint,
-		pool_state,
 		stake_vault,
 		reward_vault,
 		token_program,

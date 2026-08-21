@@ -30,6 +30,7 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
+import { findStatePda } from "../pdas";
 import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const STATE_DISCRIMINATOR = 1;
@@ -117,4 +118,22 @@ export async function fetchAllMaybeState(
 ): Promise<MaybeAccount<State>[]> {
 	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
 	return maybeAccounts.map((maybeAccount) => decodeState(maybeAccount));
+}
+
+export async function fetchStateFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<Account<State>> {
+	const maybeAccount = await fetchMaybeStateFromSeeds(rpc, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
+}
+
+export async function fetchMaybeStateFromSeeds(
+	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	config: FetchAccountConfig & { programAddress?: Address } = {},
+): Promise<MaybeAccount<State>> {
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findStatePda({ programAddress });
+	return await fetchMaybeState(rpc, address, fetchConfig);
 }

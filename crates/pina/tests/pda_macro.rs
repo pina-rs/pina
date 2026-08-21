@@ -85,6 +85,17 @@ pub struct CounterState {
 	pub bump: u8,
 }
 
+/// A signer PDA whose derivation has no variable seeds.
+#[pda(crate = ::pina, seeds = [b"authority"])]
+pub struct AuthorityState {}
+
+/// A PDA whose variable seeds are all stored by value.
+#[pda(crate = ::pina, seeds = [b"numeric", nonce: u64, tag: [u8; 8]])]
+pub struct NumericState {
+	pub nonce: u64,
+	pub tag: [u8; 8],
+}
+
 fn build_test_state_bytes(authority: Address, bump: u8) -> Vec<u8> {
 	let mut bytes = vec![0u8; TestState::SIZE];
 	let state = TestState::initialize(&mut bytes).expect("valid account storage");
@@ -133,6 +144,24 @@ fn seeds_with_bump_appends_bump_seed() {
 	assert_eq!(slices[5], &7u16.to_le_bytes());
 	assert_eq!(slices[6], &99u32.to_le_bytes());
 	assert_eq!(slices[7], &[5u8]);
+}
+
+#[test]
+fn constant_only_seeds_preserve_the_generated_lifetime() {
+	let seeds = AuthorityState::seeds();
+	assert_eq!(seeds.as_slices(), [b"authority".as_slice()]);
+
+	let signer_seeds = seeds.with_bump(7);
+	assert_eq!(signer_seeds.as_slices(), [b"authority".as_slice(), &[7]],);
+}
+
+#[test]
+fn owned_variable_seeds_preserve_the_generated_lifetime() {
+	let seeds = NumericState::seeds(42, [3; 8]);
+	assert_eq!(
+		seeds.as_slices(),
+		[b"numeric".as_slice(), &42u64.to_le_bytes(), &[3; 8]],
+	);
 }
 
 #[test]

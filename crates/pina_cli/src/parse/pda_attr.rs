@@ -20,14 +20,22 @@ use syn::Item;
 use syn::parse::Parse;
 
 use super::seeds::SeedConstant;
+use crate::error::IdlError;
 use crate::ir::PdaIr;
 use crate::ir::PdaSeedIr;
 /// Extract PDA declarations from `#[pda(...)]` attributes on account structs.
 ///
 /// Constant seed references (e.g. `COUNTER_SEED`) are resolved through the
-/// file's `const &[u8]` declarations. A PDA whose constant cannot be resolved
-/// is skipped so IDL generation can still proceed for other accounts.
-pub fn extract_pda_from_attributes(file: &File, seed_constants: &[SeedConstant]) -> Vec<PdaIr> {
+/// file's `const &[u8]` declarations.
+///
+/// # Errors
+///
+/// Returns an error when an attribute is malformed, a seed type does not match
+/// the on-chain macro grammar, or a constant seed cannot be resolved uniquely.
+pub fn extract_pda_from_attributes(
+	file: &File,
+	seed_constants: &[SeedConstant],
+) -> Result<Vec<PdaIr>, IdlError> {
 	let mut pdas = Vec::new();
 
 	for item in &file.items {
@@ -43,28 +51,45 @@ pub fn extract_pda_from_attributes(file: &File, seed_constants: &[SeedConstant])
 			continue;
 		};
 
-		let Ok(args) = attr.parse_args_with(PdaAttrArgs::parse) else {
-			// Malformed attributes are rejected by the compiler; skip them
-			// here so IDL generation can still proceed for other accounts.
-			continue;
-		};
+		let account = item_struct.ident.to_string();
+		let args = attr
+			.parse_args_with(PdaAttrArgs::parse)
+			.map_err(|error| IdlError::invalid_pda(&account, error))?;
 
 		let name = pda_name_for_struct(&item_struct.ident.to_string());
 		let mut seeds = Vec::with_capacity(args.seeds.len());
-		let mut resolved = true;
 
 		for seed in args.seeds {
 			match seed {
 				PdaAttrSeed::Constant(value) => seeds.push(PdaSeedIr::Constant { value }),
 				PdaAttrSeed::ConstantRef(path) => {
-					let Some(ident) = path.get_ident() else {
-						resolved = false;
-						break;
-					};
-					let Some(constant) = seed_constants.iter().find(|c| *ident == c.name) else {
-						resolved = false;
-						break;
-					};
+					let ident = path
+						.segments
+						.last()
+						.expect("syn paths always contain at least one segment")
+						.ident
+						.to_string();
+					let mut matches = seed_constants
+						.iter()
+						.filter(|constant| constant.name == ident);
+					let constant = matches.next().ok_or_else(|| {
+						IdlError::invalid_pda(
+							&account,
+							format!(
+								"constant seed `{}` could not be resolved",
+								path_to_string(&path)
+							),
+						)
+					})?;
+					if matches.next().is_some() {
+						return Err(IdlError::invalid_pda(
+							&account,
+							format!(
+								"constant seed `{}` is ambiguous across source modules",
+								path_to_string(&path)
+							),
+						));
+					}
 					seeds.push(PdaSeedIr::Constant {
 						value: constant.value.clone(),
 					});
@@ -75,19 +100,25 @@ pub fn extract_pda_from_attributes(file: &File, seed_constants: &[SeedConstant])
 			}
 		}
 
-		if resolved {
-			pdas.push(PdaIr { name, seeds });
-		}
+		pdas.push(PdaIr { name, seeds });
 	}
 
-	pdas
+	Ok(pdas)
+}
+
+fn path_to_string(path: &syn::Path) -> String {
+	path.segments
+		.iter()
+		.map(|segment| segment.ident.to_string())
+		.collect::<Vec<_>>()
+		.join("::")
 }
 
 /// The IDL name for a PDA declared on a struct.
 ///
 /// The `State` suffix is stripped so `CounterState` produces the `counter`
 /// PDA, matching the naming convention used by the example programs.
-fn pda_name_for_struct(struct_name: &str) -> String {
+pub(super) fn pda_name_for_struct(struct_name: &str) -> String {
 	let stripped = struct_name.strip_suffix("State").unwrap_or(struct_name);
 	if stripped.is_empty() {
 		return struct_name.to_snake_case();
@@ -163,7 +194,7 @@ fn parse_seed_list(input: syn::parse::ParseStream) -> syn::Result<Vec<PdaAttrSee
 			let name: syn::Ident = content.parse()?;
 			content.parse::<syn::Token![:]>()?;
 			let ty: syn::Type = content.parse()?;
-			let rust_type = seed_type_to_string(&ty);
+			let rust_type = seed_type_to_string(&ty)?;
 			seeds.push(PdaAttrSeed::Variable {
 				name: name.to_string(),
 				rust_type,
@@ -184,27 +215,49 @@ fn parse_seed_list(input: syn::parse::ParseStream) -> syn::Result<Vec<PdaAttrSee
 }
 
 /// Convert a typed seed parameter type to its IDL Rust type name.
-fn seed_type_to_string(ty: &syn::Type) -> String {
+fn seed_type_to_string(ty: &syn::Type) -> syn::Result<String> {
+	let unsupported = || {
+		syn::Error::new_spanned(
+			ty,
+			"unsupported seed type; expected `Address`, `u8`, `u16`, `u32`, `u64`, or `[u8; N]`",
+		)
+	};
+
 	match ty {
 		syn::Type::Path(type_path) => {
-			type_path
-				.path
-				.get_ident()
-				.map_or_else(|| "Address".to_string(), ToString::to_string)
+			let Some(ident) = type_path.path.get_ident() else {
+				return Err(unsupported());
+			};
+			match ident.to_string().as_str() {
+				"Address" | "u8" | "u16" | "u32" | "u64" => Ok(ident.to_string()),
+				_ => Err(unsupported()),
+			}
 		}
 		syn::Type::Array(array) => {
-			let len = match &array.len {
-				syn::Expr::Lit(lit) => {
-					match &lit.lit {
-						syn::Lit::Int(int) => int.base10_parse::<usize>().unwrap_or(0),
-						_ => 0,
-					}
-				}
-				_ => 0,
+			let syn::Type::Path(element) = &*array.elem else {
+				return Err(unsupported());
 			};
-			format!("[u8; {len}]")
+			if !element.path.is_ident("u8") {
+				return Err(unsupported());
+			}
+			let syn::Expr::Lit(literal) = &array.len else {
+				return Err(unsupported());
+			};
+			let syn::Lit::Int(length) = &literal.lit else {
+				return Err(unsupported());
+			};
+			let len = length.base10_parse::<usize>().map_err(|error| {
+				syn::Error::new_spanned(ty, format!("invalid seed array length: {error}"))
+			})?;
+			if !(1..=32).contains(&len) {
+				return Err(syn::Error::new_spanned(
+					ty,
+					"seed array length must be between 1 and 32",
+				));
+			}
+			Ok(format!("[u8; {len}]"))
 		}
-		_ => "Address".to_string(),
+		_ => Err(unsupported()),
 	}
 }
 
@@ -226,7 +279,8 @@ mod tests {
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
 		let constants = super::super::seeds::extract_seed_constants(&file);
-		let pdas = extract_pda_from_attributes(&file, &constants);
+		let pdas = extract_pda_from_attributes(&file, &constants)
+			.unwrap_or_else(|error| panic!("extract failed: {error}"));
 
 		assert_eq!(pdas.len(), 1);
 		assert_eq!(pdas[0].name, "counter");
@@ -254,7 +308,8 @@ mod tests {
 			}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let pdas = extract_pda_from_attributes(&file, &[]);
+		let pdas = extract_pda_from_attributes(&file, &[])
+			.unwrap_or_else(|error| panic!("extract failed: {error}"));
 
 		assert_eq!(pdas.len(), 1);
 		assert_eq!(pdas[0].name, "escrow");
@@ -277,7 +332,8 @@ mod tests {
 			}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let pdas = extract_pda_from_attributes(&file, &[]);
+		let pdas = extract_pda_from_attributes(&file, &[])
+			.unwrap_or_else(|error| panic!("extract failed: {error}"));
 
 		assert!(matches!(
 			&pdas[0].seeds[2],
@@ -305,7 +361,8 @@ mod tests {
 			}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let pdas = extract_pda_from_attributes(&file, &[]);
+		let pdas = extract_pda_from_attributes(&file, &[])
+			.unwrap_or_else(|error| panic!("extract failed: {error}"));
 
 		assert_eq!(pdas.len(), 2);
 		assert_eq!(pdas[0].name, "registry_config");
@@ -313,7 +370,7 @@ mod tests {
 	}
 
 	#[test]
-	fn skips_pda_with_unresolved_constant_seed() {
+	fn rejects_pda_with_unresolved_constant_seed() {
 		let source = r#"
 			#[account(discriminator = CounterAccount)]
 			#[pda(seeds = [MISSING_SEED, authority: Address], bump = bump)]
@@ -323,12 +380,10 @@ mod tests {
 			}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let pdas = extract_pda_from_attributes(&file, &[]);
+		let error = extract_pda_from_attributes(&file, &[])
+			.expect_err("unresolved constant seeds must fail");
 
-		assert!(
-			pdas.is_empty(),
-			"unresolved constant seeds must skip the PDA"
-		);
+		assert!(error.to_string().contains("MISSING_SEED"));
 	}
 
 	#[test]
@@ -340,15 +395,14 @@ mod tests {
 			}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let pdas = extract_pda_from_attributes(&file, &[]);
+		let pdas = extract_pda_from_attributes(&file, &[])
+			.unwrap_or_else(|error| panic!("extract failed: {error}"));
 
 		assert!(pdas.is_empty());
 	}
 
 	#[test]
-	fn extracts_pda_with_unknown_seed_type() {
-		// The compiler rejects unknown seed types; the CLI passes the type
-		// string through so the IDL still reflects the declaration.
+	fn rejects_pda_with_unknown_seed_type() {
 		let source = r#"
 			#[account(discriminator = BrokenAccount)]
 			#[pda(seeds = [b"broken", authority: NotAType], bump = bump)]
@@ -358,18 +412,14 @@ mod tests {
 			}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let pdas = extract_pda_from_attributes(&file, &[]);
+		let error =
+			extract_pda_from_attributes(&file, &[]).expect_err("unknown seed types must fail");
 
-		assert_eq!(pdas.len(), 1);
-		assert!(matches!(
-			&pdas[0].seeds[1],
-			PdaSeedIr::Variable { name, rust_type }
-				if name == "authority" && rust_type == "NotAType"
-		));
+		assert!(error.to_string().contains("unsupported seed type"));
 	}
 
 	#[test]
-	fn skips_malformed_pda_attributes() {
+	fn rejects_malformed_pda_attributes() {
 		let source = r#"
 			#[account(discriminator = BrokenAccount)]
 			#[pda(seeds)]
@@ -378,14 +428,16 @@ mod tests {
 			}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let pdas = extract_pda_from_attributes(&file, &[]);
+		let error =
+			extract_pda_from_attributes(&file, &[]).expect_err("malformed attributes must fail");
 
-		assert!(pdas.is_empty(), "malformed attributes must skip the PDA");
+		assert!(error.to_string().contains("BrokenState"));
 	}
 
 	#[test]
-	fn skips_pda_with_multi_segment_constant_path() {
+	fn resolves_pda_with_multi_segment_constant_path() {
 		let source = r#"
+			const SEED: &[u8] = b"seed";
 			#[account(discriminator = BrokenAccount)]
 			#[pda(seeds = [crate::SEED, authority: Address], bump = bump)]
 			pub struct BrokenState {
@@ -394,12 +446,14 @@ mod tests {
 			}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let pdas = extract_pda_from_attributes(&file, &[]);
+		let constants = super::super::seeds::extract_seed_constants(&file);
+		let pdas = extract_pda_from_attributes(&file, &constants)
+			.unwrap_or_else(|error| panic!("extract failed: {error}"));
 
-		assert!(
-			pdas.is_empty(),
-			"multi-segment constant paths must skip the PDA"
-		);
+		assert!(matches!(
+			&pdas[0].seeds[0],
+			PdaSeedIr::Constant { value } if value == b"seed"
+		));
 	}
 
 	#[test]
@@ -413,43 +467,43 @@ mod tests {
 			}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let pdas = extract_pda_from_attributes(&file, &[]);
+		let pdas = extract_pda_from_attributes(&file, &[])
+			.unwrap_or_else(|error| panic!("extract failed: {error}"));
 
 		assert_eq!(pdas.len(), 1);
 		assert_eq!(pdas[0].name, "counter");
 	}
 
 	#[test]
-	fn skips_pda_with_duplicate_seeds_argument() {
+	fn rejects_pda_with_duplicate_seeds_argument() {
 		let source = r#"
 			#[account(discriminator = BrokenAccount)]
 			#[pda(seeds = [b"broken"], seeds = [b"again"])]
 			pub struct BrokenState {}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let pdas = extract_pda_from_attributes(&file, &[]);
+		let error = extract_pda_from_attributes(&file, &[])
+			.expect_err("duplicate `seeds` arguments must fail");
 
-		assert!(
-			pdas.is_empty(),
-			"duplicate `seeds` arguments must skip the PDA"
-		);
+		assert!(error.to_string().contains("duplicate `seeds`"));
 	}
 
 	#[test]
-	fn skips_pda_with_unknown_argument() {
+	fn rejects_pda_with_unknown_argument() {
 		let source = r#"
 			#[account(discriminator = BrokenAccount)]
 			#[pda(seeds = [b"broken"], unknown = 5)]
 			pub struct BrokenState {}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let pdas = extract_pda_from_attributes(&file, &[]);
+		let error =
+			extract_pda_from_attributes(&file, &[]).expect_err("unknown arguments must fail");
 
-		assert!(pdas.is_empty(), "unknown arguments must skip the PDA");
+		assert!(error.to_string().contains("unknown `#[pda]` argument"));
 	}
 
 	#[test]
-	fn extracts_pda_with_const_length_byte_array_seed() {
+	fn rejects_pda_with_const_length_byte_array_seed() {
 		let source = r#"
 			#[account(discriminator = PositionAccount)]
 			#[pda(seeds = [b"position", owner: Address, tag: [u8; SIZE]], bump = bump)]
@@ -460,17 +514,14 @@ mod tests {
 			}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let pdas = extract_pda_from_attributes(&file, &[]);
+		let error = extract_pda_from_attributes(&file, &[])
+			.expect_err("non-literal array lengths must fail");
 
-		assert!(matches!(
-			&pdas[0].seeds[2],
-			PdaSeedIr::Variable { name, rust_type }
-				if name == "tag" && rust_type == "[u8; 0]"
-		));
+		assert!(error.to_string().contains("unsupported seed type"));
 	}
 
 	#[test]
-	fn extracts_pda_with_char_literal_array_length() {
+	fn rejects_pda_with_char_literal_array_length() {
 		let source = r#"
 			#[account(discriminator = PositionAccount)]
 			#[pda(seeds = [b"position", owner: Address, tag: [u8; 'a']], bump = bump)]
@@ -481,17 +532,14 @@ mod tests {
 			}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let pdas = extract_pda_from_attributes(&file, &[]);
+		let error = extract_pda_from_attributes(&file, &[])
+			.expect_err("non-integer array lengths must fail");
 
-		assert!(matches!(
-			&pdas[0].seeds[2],
-			PdaSeedIr::Variable { name, rust_type }
-				if name == "tag" && rust_type == "[u8; 0]"
-		));
+		assert!(error.to_string().contains("unsupported seed type"));
 	}
 
 	#[test]
-	fn extracts_pda_with_reference_seed_type() {
+	fn rejects_pda_with_reference_seed_type() {
 		let source = r#"
 			#[account(discriminator = PositionAccount)]
 			#[pda(seeds = [b"position", owner: &[u8]], bump = bump)]
@@ -501,13 +549,73 @@ mod tests {
 			}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let pdas = extract_pda_from_attributes(&file, &[]);
+		let error =
+			extract_pda_from_attributes(&file, &[]).expect_err("reference seed types must fail");
 
-		assert!(matches!(
-			&pdas[0].seeds[1],
-			PdaSeedIr::Variable { name, rust_type }
-				if name == "owner" && rust_type == "Address"
-		));
+		assert!(error.to_string().contains("unsupported seed type"));
+	}
+
+	#[test]
+	fn rejects_ambiguous_constant_seed() {
+		let source = r#"
+			#[account(discriminator = CounterAccount)]
+			#[pda(seeds = [SEED], bump = bump)]
+			pub struct CounterState { pub bump: u8 }
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let constants = [
+			SeedConstant {
+				name: "SEED".to_owned(),
+				value: b"first".to_vec(),
+			},
+			SeedConstant {
+				name: "SEED".to_owned(),
+				value: b"second".to_vec(),
+			},
+		];
+
+		let error = extract_pda_from_attributes(&file, &constants)
+			.expect_err("ambiguous constants must fail");
+		assert!(error.to_string().contains("ambiguous"));
+	}
+
+	#[test]
+	fn rejects_invalid_seed_array_element_and_length() {
+		for seed_type in [
+			"[u16; 8]",
+			"[(u8, u8); 8]",
+			"[u8; 0]",
+			"[u8; 33]",
+			"[u8; 999999999999999999999999999999999999999999]",
+		] {
+			let source = format!(
+				r#"
+					#[account(discriminator = PositionAccount)]
+					#[pda(seeds = [tag: {seed_type}], bump = bump)]
+					pub struct PositionState {{ pub bump: u8 }}
+				"#,
+			);
+			let file = syn::parse_file(&source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+
+			assert!(
+				extract_pda_from_attributes(&file, &[]).is_err(),
+				"{seed_type} must be rejected"
+			);
+		}
+	}
+
+	#[test]
+	fn rejects_multi_segment_seed_type() {
+		let source = r#"
+			#[account(discriminator = PositionAccount)]
+			#[pda(seeds = [owner: pinocchio::Address], bump = bump)]
+			pub struct PositionState { pub bump: u8 }
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let error = extract_pda_from_attributes(&file, &[])
+			.expect_err("multi-segment seed types must fail");
+
+		assert!(error.to_string().contains("unsupported seed type"));
 	}
 
 	#[test]

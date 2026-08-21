@@ -31,7 +31,6 @@ impl InitializePool {
 		admin: solana_pubkey::Pubkey,
 		stake_mint: solana_pubkey::Pubkey,
 		reward_mint: solana_pubkey::Pubkey,
-		pool_state: solana_pubkey::Pubkey,
 		stake_vault: solana_pubkey::Pubkey,
 		reward_vault: solana_pubkey::Pubkey,
 		token_program: solana_pubkey::Pubkey,
@@ -40,7 +39,11 @@ impl InitializePool {
 			admin,
 			stake_mint,
 			reward_mint,
-			pool_state,
+			pool_state: solana_pubkey::Pubkey::find_program_address(
+				&["pool".as_bytes(), stake_mint.as_ref(), reward_mint.as_ref()],
+				&crate::STAKING_REWARDS_PROGRAM_ID,
+			)
+			.0,
 			stake_vault,
 			reward_vault,
 			associated_token_program: solana_pubkey::pubkey!(
