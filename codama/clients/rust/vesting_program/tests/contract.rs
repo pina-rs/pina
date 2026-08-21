@@ -26,19 +26,21 @@ fn vesting_program_client_has_expected_contract_shape() {
 	let admin = Pubkey::new_unique();
 	let beneficiary = Pubkey::new_unique();
 	let mint = Pubkey::new_unique();
-	let vesting_state = Pubkey::new_unique();
+	let vesting_state = Pubkey::find_program_address(
+		&[
+			b"vesting",
+			admin.as_ref(),
+			beneficiary.as_ref(),
+			mint.as_ref(),
+		],
+		&program_id,
+	)
+	.0;
 	let vault = Pubkey::new_unique();
 	let token_program = Pubkey::new_unique();
 	let associated_token_program = pubkey!("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
 
-	let initialize = Initialize::new(
-		admin,
-		beneficiary,
-		mint,
-		vesting_state,
-		vault,
-		token_program,
-	);
+	let initialize = Initialize::new(admin, beneficiary, mint, vault, token_program);
 	let init_payload = InitializeInstructionData::new(|data| {
 		data.total_amount.set(1_000);
 		data.start_ts.set(200);
