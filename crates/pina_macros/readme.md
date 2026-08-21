@@ -1,5 +1,9 @@
 # `pina_macros`
 
+<p align="center">
+	<img src="https://raw.githubusercontent.com/pina-rs/pina/main/.github/assets/logo.png" alt="The Pina logo: a low-poly origami pineapple" width="140">
+</p>
+
 <br>
 
 Procedural macros for building Pina programs with less boilerplate.

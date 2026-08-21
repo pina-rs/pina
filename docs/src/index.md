@@ -1,5 +1,9 @@
 # Pina
 
+<p align="center">
+	<img src="./assets/logo.png" alt="The Pina logo: a low-poly origami pineapple" width="160">
+</p>
+
 Pina is a high-performance Solana smart-contract framework built on top of [`pinocchio`](https://github.com/anza-xyz/pinocchio). The project focuses on low compute-unit usage, small dependency surface area, and strong account validation ergonomics for on-chain Rust programs.
 
 This book is the single place for project documentation. It complements API reference docs by describing architecture, patterns, workflows, and quality standards used across the repository.
