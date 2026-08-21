@@ -10,12 +10,13 @@ import {
 	appendTransactionMessageInstruction,
 	createKeyPairSignerFromBytes,
 	createSolanaRpc,
+	createSolanaRpcSubscriptions,
 	createTransactionMessage,
 	getAddressEncoder,
 	getBase64EncodedWireTransaction,
 	getProgramDerivedAddress,
 	type Instruction,
-	sendTransactionWithoutConfirmingFactory,
+	sendAndConfirmTransactionFactory,
 	setTransactionMessageFeePayerSigner,
 	setTransactionMessageLifetimeUsingBlockhash,
 	signTransactionMessageWithSigners,
@@ -75,7 +76,11 @@ async function createSubmitter(surfnet: Surfnet): Promise<{
 }> {
 	const payer = await createKeyPairSignerFromBytes(surfnet.payerSecretKey);
 	const rpc = createSolanaRpc(surfnet.rpcUrl);
-	const sendTransaction = sendTransactionWithoutConfirmingFactory({ rpc });
+	const rpcSubscriptions = createSolanaRpcSubscriptions(surfnet.wsUrl);
+	const sendAndConfirmTransaction = sendAndConfirmTransactionFactory({
+		rpc,
+		rpcSubscriptions,
+	});
 
 	return {
 		payer,
@@ -92,6 +97,9 @@ async function createSubmitter(surfnet: Surfnet): Promise<{
 				),
 			);
 			const signed = await signTransactionMessageWithSigners(message);
+			const confirmable = signed as Parameters<
+				typeof sendAndConfirmTransaction
+			>[0];
 			const simulated = await rpc.simulateTransaction(
 				getBase64EncodedWireTransaction(signed),
 				{ encoding: "base64", sigVerify: true },
@@ -104,7 +112,7 @@ async function createSubmitter(surfnet: Surfnet): Promise<{
 				});
 			}
 
-			await sendTransaction(signed, { commitment: "confirmed" });
+			await sendAndConfirmTransaction(confirmable, { commitment: "confirmed" });
 		},
 	};
 }

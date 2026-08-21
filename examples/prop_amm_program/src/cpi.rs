@@ -122,9 +122,6 @@ pub mod instructions {
 
 		#[inline(always)]
 		pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
-			let program_account = program.account();
-			program_account.assert_program(&ID)?;
-
 			self.invoke_signed(program, &[])
 		}
 
@@ -135,8 +132,6 @@ pub mod instructions {
 			signers: &[Signer<'_, '_>],
 		) -> ProgramResult {
 			let data = [0u8; InitializeInstruction::SIZE];
-			let program_account = program.account();
-			program_account.assert_program(&ID)?;
 			let ctx = CpiContext::new(*program, self.accounts);
 
 			ctx.invoke(&data, signers)
@@ -161,9 +156,6 @@ pub mod instructions {
 
 		#[inline(always)]
 		pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
-			let program_account = program.account();
-			program_account.assert_program(&ID)?;
-
 			self.invoke_signed(program, &[])
 		}
 
@@ -175,8 +167,6 @@ pub mod instructions {
 		) -> ProgramResult {
 			let mut data = [0u8; UpdateInstruction::SIZE];
 			UpdateInstruction::initialize(&mut data)?.new_price = self.new_price;
-			let program_account = program.account();
-			program_account.assert_program(&ID)?;
 			let ctx = CpiContext::new(*program, self.accounts);
 
 			ctx.invoke(&data, signers)
@@ -201,9 +191,6 @@ pub mod instructions {
 
 		#[inline(always)]
 		pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
-			let program_account = program.account();
-			program_account.assert_program(&ID)?;
-
 			self.invoke_signed(program, &[])
 		}
 
@@ -215,8 +202,6 @@ pub mod instructions {
 		) -> ProgramResult {
 			let mut data = [0u8; RotateAuthorityInstruction::SIZE];
 			RotateAuthorityInstruction::initialize(&mut data)?.new_authority = self.new_authority;
-			let program_account = program.account();
-			program_account.assert_program(&ID)?;
 			let ctx = CpiContext::new(*program, self.accounts);
 
 			ctx.invoke(&data, signers)

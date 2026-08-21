@@ -107,7 +107,9 @@ getForwardRotateWithPdaInstructionDataCodec() {
 /// Creates a [ForwardRotateWithPda] instruction.
 Instruction getForwardRotateWithPdaInstruction({
   required Address programAddress,
-
+  required Address oracle,
+  required Address authority,
+  required Address propAmmProgram,
   required int bump,
   required Address newAuthority,
 }) {
@@ -118,7 +120,11 @@ Instruction getForwardRotateWithPdaInstruction({
 
   return Instruction(
     programAddress: programAddress,
-    accounts: [],
+    accounts: [
+      AccountMeta(address: oracle, role: AccountRole.writable),
+      AccountMeta(address: authority, role: AccountRole.readonly),
+      AccountMeta(address: propAmmProgram, role: AccountRole.readonly),
+    ],
     data: getForwardRotateWithPdaInstructionDataEncoder().encode(
       instructionData,
     ),

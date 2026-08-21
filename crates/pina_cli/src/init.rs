@@ -384,8 +384,6 @@ pub mod instructions {{
 		) -> ProgramResult {{
 			let mut data = [0u8; InitializeInstruction::SIZE];
 			InitializeInstruction::initialize(&mut data)?.value = self.value;
-			let program_account = program.account();
-			program_account.assert_program(&ID)?;
 			let ctx = CpiContext::new(*program, self.accounts);
 
 			ctx.invoke(&data, signers)

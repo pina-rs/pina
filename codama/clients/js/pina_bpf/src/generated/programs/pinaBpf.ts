@@ -136,6 +136,7 @@ export function parsePinaBpfInstruction<TProgram extends string>(
 			};
 		}
 		case PinaBpfInstruction.ForwardRotateWithPda: {
+			assertIsInstructionWithAccounts(instruction);
 			return {
 				instructionType: PinaBpfInstruction.ForwardRotateWithPda,
 				...parseForwardRotateWithPdaInstruction(instruction),

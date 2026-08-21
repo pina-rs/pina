@@ -14,11 +14,23 @@ pub const FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
-pub struct ForwardRotateWithPda {}
+pub struct ForwardRotateWithPda {
+	pub oracle: solana_pubkey::Pubkey,
+	pub authority: solana_pubkey::Pubkey,
+	pub prop_amm_program: solana_pubkey::Pubkey,
+}
 
 impl ForwardRotateWithPda {
-	pub fn new() -> Self {
-		Self {}
+	pub fn new(
+		oracle: solana_pubkey::Pubkey,
+		authority: solana_pubkey::Pubkey,
+		prop_amm_program: solana_pubkey::Pubkey,
+	) -> Self {
+		Self {
+			oracle,
+			authority,
+			prop_amm_program,
+		}
 	}
 
 	pub fn instruction(
@@ -34,7 +46,16 @@ impl ForwardRotateWithPda {
 		data: ForwardRotateWithPdaInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(0 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
+		accounts.push(solana_instruction::AccountMeta::new(self.oracle, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.authority,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.prop_amm_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::PINA_BPF_ID,

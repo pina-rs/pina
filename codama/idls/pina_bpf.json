@@ -169,6 +169,29 @@
 			{
 				"kind": "instructionNode",
 				"name": "forwardRotateWithPda",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "oracle",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "propAmmProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false
+					}
+				],
 				"arguments": [
 					{
 						"kind": "instructionArgumentNode",

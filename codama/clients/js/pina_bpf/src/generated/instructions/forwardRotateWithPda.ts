@@ -22,9 +22,17 @@ import {
 	type Instruction,
 	type InstructionWithAccounts,
 	type InstructionWithData,
+	type ReadonlyAccount,
 	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
 	transformEncoder,
+	type WritableAccount,
 } from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	type ResolvedInstructionAccount,
+} from "@solana/program-client-core";
 import { PINA_BPF_PROGRAM_ADDRESS } from "../programs";
 import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
@@ -36,11 +44,25 @@ export function getForwardRotateWithPdaDiscriminatorBytes(): ReadonlyUint8Array 
 
 export type ForwardRotateWithPdaInstruction<
 	TProgram extends string = typeof PINA_BPF_PROGRAM_ADDRESS,
+	TAccountOracle extends string | AccountMeta<string> = string,
+	TAccountAuthority extends string | AccountMeta<string> = string,
+	TAccountPropAmmProgram extends string | AccountMeta<string> = string,
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
 	& InstructionWithData<ReadonlyUint8Array>
-	& InstructionWithAccounts<TRemainingAccounts>;
+	& InstructionWithAccounts<
+		[
+			TAccountOracle extends string ? WritableAccount<TAccountOracle>
+				: TAccountOracle,
+			TAccountAuthority extends string ? ReadonlyAccount<TAccountAuthority>
+				: TAccountAuthority,
+			TAccountPropAmmProgram extends string
+				? ReadonlyAccount<TAccountPropAmmProgram>
+				: TAccountPropAmmProgram,
+			...TRemainingAccounts,
+		]
+	>;
 
 export type ForwardRotateWithPdaInstructionData = {
 	discriminator: number;
@@ -91,45 +113,116 @@ export function getForwardRotateWithPdaInstructionDataCodec(): FixedSizeCodec<
 	);
 }
 
-export type ForwardRotateWithPdaInput = {
+export type ForwardRotateWithPdaInput<
+	TAccountOracle extends string = string,
+	TAccountAuthority extends string = string,
+	TAccountPropAmmProgram extends string = string,
+> = {
+	oracle: Address<TAccountOracle>;
+	authority: Address<TAccountAuthority>;
+	propAmmProgram: Address<TAccountPropAmmProgram>;
 	bump: ForwardRotateWithPdaInstructionDataArgs["bump"];
 	newAuthority: ForwardRotateWithPdaInstructionDataArgs["newAuthority"];
 };
 
 export function getForwardRotateWithPdaInstruction<
+	TAccountOracle extends string,
+	TAccountAuthority extends string,
+	TAccountPropAmmProgram extends string,
 	TProgramAddress extends Address = typeof PINA_BPF_PROGRAM_ADDRESS,
 >(
-	input: ForwardRotateWithPdaInput,
+	input: ForwardRotateWithPdaInput<
+		TAccountOracle,
+		TAccountAuthority,
+		TAccountPropAmmProgram
+	>,
 	config?: { programAddress?: TProgramAddress },
-): ForwardRotateWithPdaInstruction<TProgramAddress> {
+): ForwardRotateWithPdaInstruction<
+	TProgramAddress,
+	TAccountOracle,
+	TAccountAuthority,
+	TAccountPropAmmProgram
+> {
 	// Program address.
 	const programAddress = config?.programAddress ?? PINA_BPF_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		oracle: { value: input.oracle ?? null, isWritable: true },
+		authority: { value: input.authority ?? null, isWritable: false },
+		propAmmProgram: { value: input.propAmmProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
 
 	// Original args.
 	const args = { ...input };
 
-	return Object.freeze(
-		{
-			data: getForwardRotateWithPdaInstructionDataEncoder().encode(
-				args as ForwardRotateWithPdaInstructionDataArgs,
-			),
-			programAddress,
-		} as ForwardRotateWithPdaInstruction<TProgramAddress>,
-	);
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("oracle", accounts.oracle),
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("propAmmProgram", accounts.propAmmProgram),
+		],
+		data: getForwardRotateWithPdaInstructionDataEncoder().encode(
+			args as ForwardRotateWithPdaInstructionDataArgs,
+		),
+		programAddress,
+	} as ForwardRotateWithPdaInstruction<
+		TProgramAddress,
+		TAccountOracle,
+		TAccountAuthority,
+		TAccountPropAmmProgram
+	>);
 }
 
 export type ParsedForwardRotateWithPdaInstruction<
 	TProgram extends string = typeof PINA_BPF_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
 	programAddress: Address<TProgram>;
+	accounts: {
+		oracle: TAccountMetas[0];
+		authority: TAccountMetas[1];
+		propAmmProgram: TAccountMetas[2];
+	};
 	data: ForwardRotateWithPdaInstructionData;
 };
 
-export function parseForwardRotateWithPdaInstruction<TProgram extends string>(
-	instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
-): ParsedForwardRotateWithPdaInstruction<TProgram> {
+export function parseForwardRotateWithPdaInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedForwardRotateWithPdaInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 3) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 3,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
 	return {
 		programAddress: instruction.programAddress,
+		accounts: {
+			oracle: getNextAccount(),
+			authority: getNextAccount(),
+			propAmmProgram: getNextAccount(),
+		},
 		data: getForwardRotateWithPdaInstructionDataDecoder().decode(
 			instruction.data,
 		),
