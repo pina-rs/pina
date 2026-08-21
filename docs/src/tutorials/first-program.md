@@ -287,4 +287,4 @@ For full integration tests that simulate the Solana runtime, add `mollusk-svm` a
 - Add on-chain state with `#[account]` -- see the `counter_program` example.
 - Handle multiple instructions by adding more variants to your discriminator enum.
 - Add PDA-based accounts with `create_program_account_with_bump`.
-- Follow the [Token Escrow Tutorial](./token-escrow.md) for a real-world program with token transfers and CPI.
+- Follow the [Token Escrow Tutorial](./token-escrow.md) for a production-shaped exercise with token transfers and CPI, then apply the [Production Readiness](../production-readiness.md) gate before deployment.

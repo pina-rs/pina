@@ -61,6 +61,8 @@ pina idl --path ./examples/counter_program --output ./codama/idls/counter_progra
 
 See [Codama Workflow](./codama-workflow.md) for end-to-end generation and external-project usage.
 
+Before adapting an example for a program that controls assets, work through the [Production Readiness](./production-readiness.md) gate. Examples demonstrate scoped framework behavior; they are not audited deployment templates.
+
 ## Build this documentation
 
 <!-- {=docsBuildCommand} -->
