@@ -39,6 +39,7 @@ use pda::expand as pda_impl;
 ///
 /// Fields can be shared or mutable `AccountView` references. A final slice
 /// field annotated with `#[pina(remaining)]` captures all trailing accounts.
+/// Add `distinct` to reject duplicate mutable trailing-account addresses.
 ///
 /// # Example
 ///
@@ -49,6 +50,13 @@ use pda::expand as pda_impl;
 ///     state: &'a mut AccountView,
 ///     #[pina(remaining)]
 ///     remaining: &'a [AccountView],
+/// }
+///
+/// #[derive(Accounts)]
+/// struct SettleAccounts<'a> {
+///     authority: &'a AccountView,
+///     #[pina(remaining, distinct)]
+///     positions: &'a mut [AccountView],
 /// }
 /// ```
 #[proc_macro_derive(Accounts, attributes(pina))]

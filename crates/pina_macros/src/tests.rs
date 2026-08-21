@@ -491,6 +491,20 @@ fn accounts_derive_with_mutable_remaining() {
 }
 
 #[test]
+fn accounts_derive_with_distinct_mutable_remaining() {
+	let input = quote! {
+		#[pina(crate = ::pina)]
+		pub struct TransferAccounts<'a> {
+			pub authority: &'a AccountView,
+			#[pina(remaining, distinct)]
+			pub extra: &'a mut [AccountView],
+		}
+	};
+	let output = pretty(accounts_derive_impl(input));
+	insta::assert_snapshot!("accounts_derive_with_distinct_mutable_remaining", output);
+}
+
+#[test]
 fn accounts_derive_single_field() {
 	let input = quote! {
 		#[pina(crate = ::pina)]

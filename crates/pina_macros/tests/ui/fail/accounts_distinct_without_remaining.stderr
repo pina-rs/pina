@@ -1,0 +1,5 @@
+error: `distinct` is only valid with `#[pina(remaining)]`
+ --> tests/ui/fail/accounts_distinct_without_remaining.rs:6:6
+  |
+6 |     pub payer: &'a mut AccountView,
+  |         ^^^^^

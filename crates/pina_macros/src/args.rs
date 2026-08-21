@@ -456,4 +456,6 @@ pub(crate) struct AccountsField {
 	pub(crate) ty: Type,
 	#[darling(default)]
 	pub(crate) remaining: Flag,
+	#[darling(default)]
+	pub(crate) distinct: Flag,
 }

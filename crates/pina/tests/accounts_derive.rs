@@ -56,6 +56,14 @@ struct TestAccountsRemainingMut<'a> {
 	pub remaining: &'a mut [AccountView],
 }
 
+#[derive(Accounts)]
+#[pina(crate = pina)]
+struct TestAccountsRemainingMutDistinct<'a> {
+	pub one: &'a AccountView,
+	#[pina(remaining, distinct)]
+	pub remaining: &'a mut [AccountView],
+}
+
 #[test]
 fn test_accounts_derive_exact() {
 	let ix_data = [3u8; 100];
@@ -205,6 +213,35 @@ fn test_accounts_derive_mutable_remaining_rejects_readonly_accounts() {
 		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
 
 	let result = TestAccountsRemainingMut::try_from_account_infos(accounts);
+	assert!(matches!(result, Err(ProgramError::InvalidAccountData)));
+}
+
+#[test]
+fn test_accounts_derive_distinct_mutable_remaining_accepts_unique_accounts() {
+	let ix_data = [3u8; 100];
+	let mut input = create_input(4, &ix_data);
+	let mut accounts = [UNINIT; 4];
+
+	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
+	let accounts: &mut [AccountView] =
+		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
+
+	let parsed = TestAccountsRemainingMutDistinct::try_from_account_infos(accounts).unwrap();
+	assert_ne!(parsed.one.address(), parsed.remaining[0].address());
+	assert_eq!(parsed.remaining.len(), 3);
+}
+
+#[test]
+fn test_accounts_derive_distinct_mutable_remaining_rejects_readonly_accounts() {
+	let ix_data = [3u8; 100];
+	let mut input = create_input_with_writability(3, &ix_data, |index| index != 2);
+	let mut accounts = [UNINIT; 3];
+
+	let count = unsafe { deserialize(input.as_mut_ptr(), &mut accounts) }.1;
+	let accounts: &mut [AccountView] =
+		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
+
+	let result = TestAccountsRemainingMutDistinct::try_from_account_infos(accounts);
 	assert!(matches!(result, Err(ProgramError::InvalidAccountData)));
 }
 

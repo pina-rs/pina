@@ -122,7 +122,7 @@ Traits in `crates/pina/src/impls.rs` provide typed conversion paths from raw `Ac
 
 ## Account cursors
 
-`AccountsCursor` is the runtime layer used by `#[derive(Accounts)]`. It advances through the account slice from left to right and rejects writable aliases for mutable accounts parsed individually through `next_mut()`, without heap allocation. Explicit trailing-account capture via `#[pina(remaining)]` is pass-through: it preserves account order and aliases, so handlers that require distinct trailing accounts must validate their addresses.
+`AccountsCursor` is the runtime layer used by `#[derive(Accounts)]`. It advances through the account slice from left to right and rejects writable aliases for mutable accounts parsed individually through `next_mut()`, without heap allocation. Explicit trailing-account capture via `#[pina(remaining)]` is pass-through and preserves account order and aliases. Use `#[pina(remaining, distinct)]` on a mutable trailing slice when duplicate addresses must be rejected by the generated parser.
 
 ## Instruction authoring tips
 
