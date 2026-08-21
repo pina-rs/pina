@@ -92,7 +92,7 @@ fn discover_module_paths(
 
 		let mod_name = item_mod.ident.to_string();
 		let explicit_path = module_path_attribute(item_mod)?;
-		let candidates = explicit_path.map_or_else(
+		let candidates = explicit_path.as_ref().map_or_else(
 			|| {
 				vec![
 					base_dir.join(format!("{mod_name}.rs")),
@@ -102,7 +102,11 @@ fn discover_module_paths(
 			|path| vec![base_dir.join(path)],
 		);
 
-		let Some(mod_path) = candidates.iter().find(|path| path.is_file()) else {
+		let existing_candidates = candidates
+			.iter()
+			.filter(|path| path.is_file())
+			.collect::<Vec<_>>();
+		let Some(mod_path) = existing_candidates.first().copied() else {
 			if is_cfg_gated(item_mod) {
 				continue;
 			}
@@ -119,6 +123,13 @@ fn discover_module_paths(
 				),
 			));
 		};
+		if explicit_path.is_none() && existing_candidates.len() > 1 {
+			return Err(IdlError::Other(format!(
+				"Module `{mod_name}` is ambiguous; both {} and {} exist",
+				existing_candidates[0].display(),
+				existing_candidates[1].display(),
+			)));
+		}
 
 		if seen.contains(mod_path) {
 			continue;
@@ -229,6 +240,26 @@ mod tests {
 			resolve_crate(&src, &src.join("lib.rs")).unwrap_or_else(|e| panic!("resolve: {e}"));
 		assert_eq!(files.len(), 2);
 		assert!(files.iter().any(|f| f.path.ends_with("mod.rs")));
+	}
+
+	#[test]
+	fn rejects_ambiguous_implicit_module_files() {
+		let dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
+		let src = dir.path().join("src");
+		let state_dir = src.join("state");
+		fs::create_dir_all(&state_dir).unwrap_or_else(|e| panic!("mkdir: {e}"));
+		fs::write(src.join("lib.rs"), "mod state;").unwrap_or_else(|e| panic!("write: {e}"));
+		fs::write(src.join("state.rs"), "pub struct FlatState;")
+			.unwrap_or_else(|e| panic!("write: {e}"));
+		fs::write(state_dir.join("mod.rs"), "pub struct NestedState;")
+			.unwrap_or_else(|e| panic!("write: {e}"));
+
+		let error = resolve_crate(&src, &src.join("lib.rs"))
+			.expect_err("ambiguous implicit module files must fail");
+		let message = error.to_string();
+		assert!(message.contains("Module `state` is ambiguous"));
+		assert!(message.contains("state.rs"));
+		assert!(message.contains("state/mod.rs"));
 	}
 
 	#[test]

@@ -89,6 +89,13 @@ pub struct CounterState {
 #[pda(crate = ::pina, seeds = [b"authority"])]
 pub struct AuthorityState {}
 
+/// A PDA whose variable seeds are all stored by value.
+#[pda(crate = ::pina, seeds = [b"numeric", nonce: u64, tag: [u8; 8]])]
+pub struct NumericState {
+	pub nonce: u64,
+	pub tag: [u8; 8],
+}
+
 fn build_test_state_bytes(authority: Address, bump: u8) -> Vec<u8> {
 	let mut bytes = vec![0u8; TestState::SIZE];
 	let state = TestState::initialize(&mut bytes).expect("valid account storage");
@@ -146,6 +153,15 @@ fn constant_only_seeds_preserve_the_generated_lifetime() {
 
 	let signer_seeds = seeds.with_bump(7);
 	assert_eq!(signer_seeds.as_slices(), [b"authority".as_slice(), &[7]],);
+}
+
+#[test]
+fn owned_variable_seeds_preserve_the_generated_lifetime() {
+	let seeds = NumericState::seeds(42, [3; 8]);
+	assert_eq!(
+		seeds.as_slices(),
+		[b"numeric".as_slice(), &42u64.to_le_bytes(), &[3; 8]],
+	);
 }
 
 #[test]

@@ -105,6 +105,11 @@ impl SeedType {
 	/// The maximum byte length of a single seed.
 	pub(crate) const MAX_SEED_LEN: usize = 32;
 
+	/// Whether the generated seed field borrows data for its lifetime.
+	pub(crate) const fn borrows(self) -> bool {
+		matches!(self, Self::Address)
+	}
+
 	/// The Rust type used for the constructor parameter.
 	pub(crate) fn param_type(self) -> Type {
 		match self {

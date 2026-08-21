@@ -79,6 +79,7 @@ pub(crate) fn expand(
 	let mut seed_slice_exprs = Vec::new();
 	let mut seed_slice_exprs_with_bump = Vec::new();
 	let mut seed_constants = Vec::new();
+	let mut has_borrowed_seed = false;
 
 	for seed in &args.seeds {
 		match seed {
@@ -90,6 +91,7 @@ pub(crate) fn expand(
 				seed_constants.push(quote!(#path));
 			}
 			PdaSeedArg::Variable { name, ty } => {
+				has_borrowed_seed |= ty.borrows();
 				let field_type = ty.field_type();
 				let param_type = ty.param_type();
 				let param_type_lt = ty.param_type_lt();
@@ -112,12 +114,10 @@ pub(crate) fn expand(
 
 	let seed_count = args.seeds.len();
 	let seed_count_with_bump = seed_count + 1;
-	let lifetime_marker = seed_fields
-		.is_empty()
-		.then(|| quote!(_marker: ::core::marker::PhantomData<&'a ()>,));
-	let lifetime_marker_init = seed_fields
-		.is_empty()
-		.then(|| quote!(_marker: ::core::marker::PhantomData,));
+	let lifetime_marker =
+		(!has_borrowed_seed).then(|| quote!(_marker: ::core::marker::PhantomData<&'a ()>,));
+	let lifetime_marker_init =
+		(!has_borrowed_seed).then(|| quote!(_marker: ::core::marker::PhantomData,));
 	let seeds_doc = format!("The PDA seeds for `{struct_name}`.");
 	let seeds_with_bump_doc =
 		format!("The PDA seeds for `{struct_name}`, including the bump seed.");
