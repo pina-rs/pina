@@ -3,7 +3,8 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"test": "node src/allExamples.test.ts",
+		"test": "node src/allExamples.test.ts && node --test src/cpiInvariants.test.ts",
+		"test:cpi-invariants": "node --test src/cpiInvariants.test.ts",
 		"test:types": "tsc --noEmit -p tsconfig.json"
 	},
 	"devDependencies": {

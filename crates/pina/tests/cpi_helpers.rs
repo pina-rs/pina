@@ -281,6 +281,15 @@ fn cpi_handle_preserves_writable_and_signer_flags() {
 }
 
 #[test]
+fn non_signer_cpi_handle_does_not_forward_transaction_signature() {
+	let mut signed = TestAccount::<8>::new(Address::new_from_array([8u8; 32]), true, false);
+	let signed_view = signed.view();
+	let handle = CpiHandle::readonly(&signed_view);
+
+	assert!(!handle.is_signer());
+}
+
+#[test]
 fn cpi_handle_rejects_readonly_writable_requests() {
 	let mut readonly = TestAccount::<8>::new(Address::new_from_array([3u8; 32]), false, false);
 	let readonly_view = readonly.view();
