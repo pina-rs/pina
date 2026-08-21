@@ -1,0 +1,5 @@
+error: `#[pina(remaining, distinct)]` requires a mutable account slice
+ --> tests/ui/fail/accounts_distinct_immutable_remaining.rs:6:6
+  |
+6 |     pub remaining: &'a [AccountView],
+  |         ^^^^^^^^^

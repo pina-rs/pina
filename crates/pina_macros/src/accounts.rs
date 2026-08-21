@@ -56,6 +56,14 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 	let mut seen_remaining = false;
 
 	for field in fields.iter() {
+		if field.distinct.is_present() && !field.remaining.is_present() {
+			return syn::Error::new_spanned(
+				&field.ident,
+				"`distinct` is only valid with `#[pina(remaining)]`",
+			)
+			.to_compile_error();
+		}
+
 		if !field.remaining.is_present() {
 			continue;
 		}
@@ -86,10 +94,19 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 				.to_compile_error();
 			}
 
+			let is_mut = is_mut_reference(&field.ty);
+			if field.distinct.is_present() && !is_mut {
+				return syn::Error::new_spanned(
+					&field.ident,
+					"`#[pina(remaining, distinct)]` requires a mutable account slice",
+				)
+				.to_compile_error();
+			}
+
 			remaining_field = field
 				.ident
 				.as_ref()
-				.map(|ident| (ident, is_mut_reference(&field.ty)));
+				.map(|ident| (ident, is_mut, field.distinct.is_present()));
 			continue;
 		}
 
@@ -110,14 +127,16 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 			cursor.finish_exact()?;
 		}
 	});
-	let remaining_binding = remaining_field.map(|(field, is_mut)| {
-		if is_mut {
+	let remaining_binding = remaining_field.map(|(field, is_mut, is_distinct)| {
+		if is_distinct {
+			quote! { let #field = cursor.remaining_mut_distinct()?; }
+		} else if is_mut {
 			quote! { let #field = cursor.remaining_mut()?; }
 		} else {
 			quote! { let #field = cursor.take_remaining(); }
 		}
 	});
-	let remaining_field_ident = remaining_field.map(|(field, _)| quote!(#field,));
+	let remaining_field_ident = remaining_field.map(|(field, ..)| quote!(#field,));
 
 	quote! {
 		impl #impl_generics #crate_path::ParseAccounts #ty_generics for #struct_name #ty_generics #where_clause {

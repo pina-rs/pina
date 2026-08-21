@@ -45,6 +45,15 @@ struct RemainingPassthrough<'a> {
 	pub rest: &'a mut [AccountView],
 }
 
+#[derive(Accounts, Debug)]
+#[pina(crate = pina)]
+#[allow(dead_code)]
+struct DistinctRemaining<'a> {
+	pub first: &'a AccountView,
+	#[pina(remaining, distinct)]
+	pub rest: &'a mut [AccountView],
+}
+
 struct AccountBuilder {
 	address: Address,
 	owner: Address,
@@ -393,6 +402,30 @@ fn remaining_accounts_preserve_duplicate_order_and_aliasing() {
 		Err(ProgramError::AccountBorrowFailed)
 	));
 	drop(duplicated_borrow);
+}
+
+#[test]
+fn distinct_remaining_accounts_reject_duplicate_mutable_addresses() {
+	let unique_accounts = [
+		AccountBuilder::new()
+			.address(fake_address(41))
+			.owner(TEST_PROGRAM_ID)
+			.is_writable(true),
+		AccountBuilder::new()
+			.address(fake_address(42))
+			.owner(TEST_PROGRAM_ID)
+			.is_writable(true),
+	];
+
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 1, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+	let result = DistinctRemaining::try_from(account_views);
+
+	assert!(matches!(
+		result,
+		Err(ProgramError::Custom(error))
+			if error == PinaProgramError::DuplicateMutableAccount as u32
+	));
 }
 
 #[test]

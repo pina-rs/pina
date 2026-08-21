@@ -669,7 +669,9 @@ pub trait CloseAccountWithRecipient {
 /// advances through the account slice from left to right, supports explicit
 /// trailing-account capture, and rejects writable aliases for mutable accounts
 /// parsed individually through [`Self::next_mut`]. Trailing accounts returned
-/// by [`Self::remaining_mut`] preserve their original order and aliasing.
+/// by [`Self::remaining_mut`] preserve their original order and aliasing. Use
+/// [`Self::remaining_mut_distinct`] when every mutable trailing account must
+/// have a unique address.
 pub struct AccountsCursor<'a> {
 	remaining: &'a mut [AccountView],
 }
@@ -757,6 +759,26 @@ impl<'a> AccountsCursor<'a> {
 		Ok(remaining)
 	}
 
+	/// Consume and return distinct writable trailing accounts.
+	///
+	/// This is the strict counterpart to [`Self::remaining_mut`]. Every account
+	/// must be writable and every address must occur exactly once. The check is
+	/// allocation-free and preserves the original account order.
+	pub fn remaining_mut_distinct(&mut self) -> Result<&'a mut [AccountView], ProgramError> {
+		let remaining = core::mem::take(&mut self.remaining);
+		for (index, account) in remaining.iter().enumerate() {
+			validate_writable(*account)?;
+			if remaining[..index]
+				.iter()
+				.any(|previous| previous.address() == account.address())
+			{
+				return Err(PinaProgramError::DuplicateMutableAccount.into());
+			}
+		}
+
+		Ok(remaining)
+	}
+
 	/// Require that no unparsed accounts remain.
 	pub fn finish_exact(&self) -> Result<(), ProgramError> {
 		if self.remaining.is_empty() {
@@ -771,6 +793,7 @@ impl<'a> AccountsCursor<'a> {
 	///
 	/// This check protects fields parsed individually through [`Self::next_mut`].
 	/// It does not inspect pairs contained entirely within [`Self::remaining_mut`].
+	/// [`Self::remaining_mut_distinct`] performs that stricter trailing check.
 	fn track_mutable_account(&self, account: AccountView) -> Result<(), ProgramError> {
 		if !account.is_writable() {
 			return Ok(());
