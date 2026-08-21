@@ -8,6 +8,12 @@
 	clippy::too_many_arguments
 )]
 
+pub(crate) mod r#create_pda;
+pub(crate) mod r#forward_rotate_with_pda;
+pub(crate) mod r#forward_rotate_with_signer;
 pub(crate) mod r#hello;
 
+pub use self::r#create_pda::*;
+pub use self::r#forward_rotate_with_pda::*;
+pub use self::r#forward_rotate_with_signer::*;
 pub use self::r#hello::*;

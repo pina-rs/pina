@@ -8,9 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-pub mod accounts;
-pub mod instructions;
-pub mod programs;
+pub(crate) mod r#state;
 
-#[allow(unused_imports)]
-pub(crate) use programs::*;
+pub use self::r#state::*;

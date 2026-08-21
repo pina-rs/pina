@@ -8,27 +8,47 @@
 
 import {
 	type Address,
+	assertIsInstructionWithAccounts,
+	type ClientWithRpc,
 	type ClientWithTransactionPlanning,
 	type ClientWithTransactionSending,
 	containsBytes,
 	extendClient,
 	type ExtendedClient,
+	type GetAccountInfoApi,
+	type GetMultipleAccountsApi,
 	getU8Encoder,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
 	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
 	SolanaError,
 } from "@solana/kit";
 import {
+	addSelfFetchFunctions,
 	addSelfPlanAndSendFunctions,
+	type SelfFetchFunctions,
 	type SelfPlanAndSendFunctions,
 } from "@solana/program-client-core";
+import { getStateCodec, type State, type StateArgs } from "../accounts";
 import {
+	type CreatePdaInput,
+	type ForwardRotateWithPdaInput,
+	type ForwardRotateWithSignerInput,
+	getCreatePdaInstruction,
+	getForwardRotateWithPdaInstruction,
+	getForwardRotateWithSignerInstruction,
 	getHelloInstruction,
 	type HelloInput,
+	parseCreatePdaInstruction,
+	type ParsedCreatePdaInstruction,
+	type ParsedForwardRotateWithPdaInstruction,
+	type ParsedForwardRotateWithSignerInstruction,
 	type ParsedHelloInstruction,
+	parseForwardRotateWithPdaInstruction,
+	parseForwardRotateWithSignerInstruction,
 	parseHelloInstruction,
 } from "../instructions";
 
@@ -37,8 +57,28 @@ export const PINA_BPF_PROGRAM_ADDRESS =
 		"2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe"
 	>;
 
+export enum PinaBpfAccount {
+	State,
+}
+
+export function identifyPinaBpfAccount(
+	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
+): PinaBpfAccount {
+	const data = "data" in account ? account.data : account;
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return PinaBpfAccount.State;
+	}
+	throw new SolanaError(
+		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
+		{ accountData: data, programName: "pinaBpf" },
+	);
+}
+
 export enum PinaBpfInstruction {
 	Hello,
+	ForwardRotateWithSigner,
+	ForwardRotateWithPda,
+	CreatePda,
 }
 
 export function identifyPinaBpfInstruction(
@@ -47,6 +87,15 @@ export function identifyPinaBpfInstruction(
 	const data = "data" in instruction ? instruction.data : instruction;
 	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
 		return PinaBpfInstruction.Hello;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return PinaBpfInstruction.ForwardRotateWithSigner;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return PinaBpfInstruction.ForwardRotateWithPda;
+	}
+	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+		return PinaBpfInstruction.CreatePda;
 	}
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
@@ -57,8 +106,14 @@ export function identifyPinaBpfInstruction(
 export type ParsedPinaBpfInstruction<
 	TProgram extends string = "2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe",
 > =
-	& { instructionType: PinaBpfInstruction.Hello }
-	& ParsedHelloInstruction<TProgram>;
+	| { instructionType: PinaBpfInstruction.Hello }
+		& ParsedHelloInstruction<TProgram>
+	| { instructionType: PinaBpfInstruction.ForwardRotateWithSigner }
+		& ParsedForwardRotateWithSignerInstruction<TProgram>
+	| { instructionType: PinaBpfInstruction.ForwardRotateWithPda }
+		& ParsedForwardRotateWithPdaInstruction<TProgram>
+	| { instructionType: PinaBpfInstruction.CreatePda }
+		& ParsedCreatePdaInstruction<TProgram>;
 
 export function parsePinaBpfInstruction<TProgram extends string>(
 	instruction:
@@ -73,6 +128,26 @@ export function parsePinaBpfInstruction<TProgram extends string>(
 				...parseHelloInstruction(instruction),
 			};
 		}
+		case PinaBpfInstruction.ForwardRotateWithSigner: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: PinaBpfInstruction.ForwardRotateWithSigner,
+				...parseForwardRotateWithSignerInstruction(instruction),
+			};
+		}
+		case PinaBpfInstruction.ForwardRotateWithPda: {
+			return {
+				instructionType: PinaBpfInstruction.ForwardRotateWithPda,
+				...parseForwardRotateWithPdaInstruction(instruction),
+			};
+		}
+		case PinaBpfInstruction.CreatePda: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: PinaBpfInstruction.CreatePda,
+				...parseCreatePdaInstruction(instruction),
+			};
+		}
 		default:
 			throw new SolanaError(
 				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
@@ -82,18 +157,40 @@ export function parsePinaBpfInstruction<TProgram extends string>(
 }
 
 export type PinaBpfPlugin = {
+	accounts: PinaBpfPluginAccounts;
 	instructions: PinaBpfPluginInstructions;
+	identifyAccount: typeof identifyPinaBpfAccount;
 	identifyInstruction: typeof identifyPinaBpfInstruction;
 	parseInstruction: typeof parsePinaBpfInstruction;
+};
+
+export type PinaBpfPluginAccounts = {
+	state:
+		& ReturnType<typeof getStateCodec>
+		& SelfFetchFunctions<StateArgs, State>;
 };
 
 export type PinaBpfPluginInstructions = {
 	hello: (
 		input: HelloInput,
 	) => ReturnType<typeof getHelloInstruction> & SelfPlanAndSendFunctions;
+	forwardRotateWithSigner: (
+		input: ForwardRotateWithSignerInput,
+	) =>
+		& ReturnType<typeof getForwardRotateWithSignerInstruction>
+		& SelfPlanAndSendFunctions;
+	forwardRotateWithPda: (
+		input: ForwardRotateWithPdaInput,
+	) =>
+		& ReturnType<typeof getForwardRotateWithPdaInstruction>
+		& SelfPlanAndSendFunctions;
+	createPda: (
+		input: CreatePdaInput,
+	) => ReturnType<typeof getCreatePdaInstruction> & SelfPlanAndSendFunctions;
 };
 
 export type PinaBpfPluginRequirements =
+	& ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi>
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
@@ -103,10 +200,24 @@ export function pinaBpfProgram() {
 	): ExtendedClient<T, { pinaBpf: PinaBpfPlugin }> => {
 		return extendClient(client, {
 			pinaBpf: <PinaBpfPlugin> {
+				accounts: { state: addSelfFetchFunctions(client, getStateCodec()) },
 				instructions: {
 					hello: (input) =>
 						addSelfPlanAndSendFunctions(client, getHelloInstruction(input)),
+					forwardRotateWithSigner: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getForwardRotateWithSignerInstruction(input),
+						),
+					forwardRotateWithPda: (input) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getForwardRotateWithPdaInstruction(input),
+						),
+					createPda: (input) =>
+						addSelfPlanAndSendFunctions(client, getCreatePdaInstruction(input)),
 				},
+				identifyAccount: identifyPinaBpfAccount,
 				identifyInstruction: identifyPinaBpfInstruction,
 				parseInstruction: parsePinaBpfInstruction,
 			},
