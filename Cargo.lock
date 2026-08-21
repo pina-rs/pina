@@ -2356,6 +2356,7 @@ dependencies = [
  "proptest",
  "solana-address",
  "solana-program-log",
+ "trybuild",
  "zeropod",
 ]
 

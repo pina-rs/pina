@@ -6,4 +6,7 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./createPda";
+export * from "./forwardRotateWithPda";
+export * from "./forwardRotateWithSigner";
 export * from "./hello";

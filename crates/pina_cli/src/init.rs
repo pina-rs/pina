@@ -341,8 +341,8 @@ pub mod accounts {{
 			system_program: &'a AccountView,
 		) -> Result<Self, ProgramError> {{
 			Ok(Self {{
-				payer: CpiHandle::writable(payer)?,
-				state: CpiHandle::writable(state)?,
+				payer: CpiHandle::writable_signer(payer)?,
+				state: CpiHandle::writable_signer(state)?,
 				system_program: CpiHandle::readonly(system_program),
 			}})
 		}}
@@ -384,9 +384,7 @@ pub mod instructions {{
 		) -> ProgramResult {{
 			let mut data = [0u8; InitializeInstruction::SIZE];
 			InitializeInstruction::initialize(&mut data)?.value = self.value;
-			let program_account = program.account();
-			program_account.assert_program(&ID)?;
-			let ctx = CpiContext::new(program_account.address(), self.accounts);
+			let ctx = CpiContext::new(*program, self.accounts);
 
 			ctx.invoke(&data, signers)
 		}}

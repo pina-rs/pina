@@ -43,8 +43,8 @@ pub mod accounts {
 			system_program: &'a AccountView,
 		) -> Result<Self, ProgramError> {
 			Ok(Self {
-				payer: CpiHandle::writable(payer)?,
-				oracle: CpiHandle::writable(oracle)?,
+				payer: CpiHandle::writable_signer(payer)?,
+				oracle: CpiHandle::writable_signer(oracle)?,
 				system_program: CpiHandle::readonly(system_program),
 			})
 		}
@@ -69,7 +69,7 @@ pub mod accounts {
 		) -> Result<Self, ProgramError> {
 			Ok(Self {
 				oracle: CpiHandle::writable(oracle)?,
-				authority: CpiHandle::readonly(authority),
+				authority: CpiHandle::readonly_signer(authority),
 			})
 		}
 	}
@@ -93,7 +93,7 @@ pub mod accounts {
 		) -> Result<Self, ProgramError> {
 			Ok(Self {
 				oracle: CpiHandle::writable(oracle)?,
-				authority: CpiHandle::readonly(authority),
+				authority: CpiHandle::readonly_signer(authority),
 			})
 		}
 	}
@@ -122,9 +122,6 @@ pub mod instructions {
 
 		#[inline(always)]
 		pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
-			let program_account = program.account();
-			program_account.assert_program(&ID)?;
-
 			self.invoke_signed(program, &[])
 		}
 
@@ -135,9 +132,7 @@ pub mod instructions {
 			signers: &[Signer<'_, '_>],
 		) -> ProgramResult {
 			let data = [0u8; InitializeInstruction::SIZE];
-			let program_account = program.account();
-			program_account.assert_program(&ID)?;
-			let ctx = CpiContext::new(program_account.address(), self.accounts);
+			let ctx = CpiContext::new(*program, self.accounts);
 
 			ctx.invoke(&data, signers)
 		}
@@ -161,9 +156,6 @@ pub mod instructions {
 
 		#[inline(always)]
 		pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
-			let program_account = program.account();
-			program_account.assert_program(&ID)?;
-
 			self.invoke_signed(program, &[])
 		}
 
@@ -175,9 +167,7 @@ pub mod instructions {
 		) -> ProgramResult {
 			let mut data = [0u8; UpdateInstruction::SIZE];
 			UpdateInstruction::initialize(&mut data)?.new_price = self.new_price;
-			let program_account = program.account();
-			program_account.assert_program(&ID)?;
-			let ctx = CpiContext::new(program_account.address(), self.accounts);
+			let ctx = CpiContext::new(*program, self.accounts);
 
 			ctx.invoke(&data, signers)
 		}
@@ -201,9 +191,6 @@ pub mod instructions {
 
 		#[inline(always)]
 		pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
-			let program_account = program.account();
-			program_account.assert_program(&ID)?;
-
 			self.invoke_signed(program, &[])
 		}
 
@@ -215,9 +202,7 @@ pub mod instructions {
 		) -> ProgramResult {
 			let mut data = [0u8; RotateAuthorityInstruction::SIZE];
 			RotateAuthorityInstruction::initialize(&mut data)?.new_authority = self.new_authority;
-			let program_account = program.account();
-			program_account.assert_program(&ID)?;
-			let ctx = CpiContext::new(program_account.address(), self.accounts);
+			let ctx = CpiContext::new(*program, self.accounts);
 
 			ctx.invoke(&data, signers)
 		}

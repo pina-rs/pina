@@ -360,6 +360,13 @@ pub fn allocate_account_with_bump<'a>(
 	// Combine seeds
 	let bump_array = [bump];
 	let combined_seeds = combine_seeds_with_bump(seeds, &bump_array)?;
+	let mut derivation_seeds: [&[u8]; MAX_SEEDS] = [&[]; MAX_SEEDS];
+	derivation_seeds[..seeds.len()].copy_from_slice(seeds);
+	derivation_seeds[seeds.len()] = bump_array.as_slice();
+	let expected_address = crate::create_program_address(&derivation_seeds[..=seeds.len()], owner)?;
+	if target_account.address() != &expected_address {
+		return Err(ProgramError::InvalidSeeds);
+	}
 	let seeds_slice = &combined_seeds[..=seeds.len()];
 	let signer = Signer::from(seeds_slice);
 	let signers = &[signer];
@@ -644,6 +651,7 @@ pub fn close_account_zeroed(
 pub struct CpiHandle<'a> {
 	view: &'a AccountView,
 	writable: bool,
+	signer: bool,
 }
 
 impl<'a> CpiHandle<'a> {
@@ -653,6 +661,21 @@ impl<'a> CpiHandle<'a> {
 		Self {
 			view,
 			writable: false,
+			signer: false,
+		}
+	}
+
+	/// Construct a read-only handle that the callee requires to sign.
+	///
+	/// The signer bit describes the target instruction schema, not the outer
+	/// instruction's current privileges. This permits [`Signer`] seeds passed to
+	/// [`CpiContext::invoke`] to satisfy PDA signer requirements.
+	#[inline(always)]
+	pub const fn readonly_signer(view: &'a AccountView) -> Self {
+		Self {
+			view,
+			writable: false,
+			signer: true,
 		}
 	}
 
@@ -669,6 +692,25 @@ impl<'a> CpiHandle<'a> {
 		Ok(Self {
 			view,
 			writable: true,
+			signer: false,
+		})
+	}
+
+	/// Construct a writable handle that the callee requires to sign.
+	///
+	/// Returns `InvalidAccountData` when the source account was not declared
+	/// writable in the current instruction. The runtime verifies the requested
+	/// signer privilege during invocation or derives it from supplied PDA seeds.
+	#[inline(always)]
+	pub fn writable_signer(view: &'a AccountView) -> Result<Self, ProgramError> {
+		if !view.is_writable() {
+			return Err(ProgramError::InvalidAccountData);
+		}
+
+		Ok(Self {
+			view,
+			writable: true,
+			signer: true,
 		})
 	}
 
@@ -684,10 +726,10 @@ impl<'a> CpiHandle<'a> {
 		self.writable
 	}
 
-	/// Whether the underlying account signed the current instruction.
+	/// Whether the target instruction requires this account to sign.
 	#[inline(always)]
-	pub fn is_signer(&self) -> bool {
-		self.view.is_signer()
+	pub const fn is_signer(&self) -> bool {
+		self.signer
 	}
 
 	#[inline(always)]
@@ -784,20 +826,22 @@ pub trait ToCpiAccounts<'a, const ACCOUNTS: usize> {
 /// remaining-account support while preserving `no_std` compatibility.
 #[derive(Clone, Copy, Debug)]
 #[must_use]
-pub struct CpiContext<'a, T, const ACCOUNTS: usize>
+pub struct CpiContext<'a, P, T, const ACCOUNTS: usize>
 where
+	P: CpiProgramId,
 	T: ToCpiAccounts<'a, ACCOUNTS>,
 {
 	pub accounts: T,
-	pub program: &'a Address,
+	pub program: Program<'a, P>,
 }
 
-impl<'a, T, const ACCOUNTS: usize> CpiContext<'a, T, ACCOUNTS>
+impl<'a, P, T, const ACCOUNTS: usize> CpiContext<'a, P, T, ACCOUNTS>
 where
+	P: CpiProgramId,
 	T: ToCpiAccounts<'a, ACCOUNTS>,
 {
 	#[inline(always)]
-	pub const fn new(program: &'a Address, accounts: T) -> Self {
+	pub const fn new(program: Program<'a, P>, accounts: T) -> Self {
 		Self { accounts, program }
 	}
 
@@ -812,7 +856,7 @@ where
 		let instruction_accounts = handles.map(CpiHandle::instruction_account);
 		let account_views = handles.map(CpiHandle::account_view);
 		let instruction = InstructionView {
-			program_id: self.program,
+			program_id: self.program.address(),
 			data,
 			accounts: &instruction_accounts,
 		};

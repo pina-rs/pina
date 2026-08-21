@@ -8,11 +8,13 @@ use pina::PdaSigner;
 use pina::Program;
 use pina::ProgramError;
 use pina::ToCpiAccounts;
+use pina::allocate_account_with_bump;
 use pina::combine_seeds_with_bump;
 #[cfg(feature = "account-resize")]
 use pina::realloc_account;
 #[cfg(feature = "account-resize")]
 use pina::realloc_account_zero;
+use pina::try_find_program_address;
 use pinocchio::AccountView;
 #[cfg(feature = "account-resize")]
 use pinocchio::account::MAX_PERMITTED_DATA_INCREASE;
@@ -268,8 +270,8 @@ fn cpi_handle_preserves_writable_and_signer_flags() {
 	let writable_view = writable.view();
 	let readonly_view = readonly.view();
 
-	let writable_handle =
-		CpiHandle::writable(&writable_view).unwrap_or_else(|e| panic!("writable handle: {e:?}"));
+	let writable_handle = CpiHandle::writable_signer(&writable_view)
+		.unwrap_or_else(|e| panic!("writable signer handle: {e:?}"));
 	let readonly_handle = CpiHandle::readonly(&readonly_view);
 
 	assert!(writable_handle.is_writable());
@@ -281,12 +283,86 @@ fn cpi_handle_preserves_writable_and_signer_flags() {
 }
 
 #[test]
+fn non_signer_cpi_handle_does_not_forward_transaction_signature() {
+	let mut signed = TestAccount::<8>::new(Address::new_from_array([8u8; 32]), true, false);
+	let signed_view = signed.view();
+	let handle = CpiHandle::readonly(&signed_view);
+
+	assert!(!handle.is_signer());
+}
+
+#[test]
+fn signer_cpi_handles_encode_target_instruction_requirements() {
+	let mut account = TestAccount::<8>::new(Address::new_from_array([8u8; 32]), false, true);
+	let view = account.view();
+	let readonly = CpiHandle::readonly_signer(&view);
+	let writable = CpiHandle::writable_signer(&view)
+		.unwrap_or_else(|e| panic!("writable signer handle: {e:?}"));
+
+	assert!(readonly.is_signer());
+	assert!(!readonly.is_writable());
+	assert!(writable.is_signer());
+	assert!(writable.is_writable());
+}
+
+#[test]
 fn cpi_handle_rejects_readonly_writable_requests() {
 	let mut readonly = TestAccount::<8>::new(Address::new_from_array([3u8; 32]), false, false);
 	let readonly_view = readonly.view();
 
 	let result = CpiHandle::writable(&readonly_view);
 	assert!(matches!(result, Err(ProgramError::InvalidAccountData)));
+	let signer_result = CpiHandle::writable_signer(&readonly_view);
+	assert!(matches!(
+		signer_result,
+		Err(ProgramError::InvalidAccountData)
+	));
+}
+
+fn assert_noncanonical_allocation_rejected(lamports: u64) {
+	let owner = Address::new_from_array([5u8; 32]);
+	let seeds: &[&[u8]] = &[b"state"];
+	let (expected, bump) =
+		try_find_program_address(seeds, &owner).unwrap_or_else(|| panic!("expected state PDA"));
+	let wrong_address = if expected == Address::new_from_array([7u8; 32]) {
+		Address::new_from_array([8u8; 32])
+	} else {
+		Address::new_from_array([7u8; 32])
+	};
+	let mut target = TestAccount::<0>::new(wrong_address, true, true);
+	target.header.lamports = lamports;
+	let mut payer = TestAccount::<0>::new(Address::new_from_array([6u8; 32]), true, true);
+	let target_view = target.view();
+	let payer_view = payer.view();
+
+	let result = allocate_account_with_bump(&target_view, &payer_view, 8, &owner, seeds, bump);
+	assert!(matches!(result, Err(ProgramError::InvalidSeeds)));
+}
+
+#[test]
+fn allocation_rejects_noncanonical_zero_balance_target_before_cpi() {
+	assert_noncanonical_allocation_rejected(0);
+}
+
+#[test]
+fn allocation_rejects_noncanonical_prefunded_target_before_cpi() {
+	assert_noncanonical_allocation_rejected(1_000_000);
+}
+
+#[test]
+fn allocation_accepts_canonical_target_before_rent_lookup() {
+	let owner = Address::new_from_array([5u8; 32]);
+	let seeds: &[&[u8]] = &[b"state"];
+	let (address, bump) =
+		try_find_program_address(seeds, &owner).unwrap_or_else(|| panic!("expected state PDA"));
+	let mut target = TestAccount::<0>::new(address, false, true);
+	target.header.lamports = 0;
+	let mut payer = TestAccount::<0>::new(Address::new_from_array([6u8; 32]), true, true);
+	let target_view = target.view();
+	let payer_view = payer.view();
+
+	let result = allocate_account_with_bump(&target_view, &payer_view, 8, &owner, seeds, bump);
+	assert_eq!(result, Err(ProgramError::UnsupportedSysvar));
 }
 
 #[test]
@@ -299,14 +375,19 @@ fn cpi_context_accepts_typed_account_structs() {
 		first: CpiHandle::writable(&first_view).unwrap_or_else(|e| panic!("first handle: {e:?}")),
 		second: CpiHandle::readonly(&second_view),
 	};
-	let program = Address::new_from_array([6u8; 32]);
-	let context = CpiContext::new(&program, accounts);
+	let mut stored_program =
+		TestAccount::<8>::new_with_executable(ExampleProgram::ID, false, false, true);
+	let program_view = stored_program.view();
+	let program = Program::<ExampleProgram>::new(&program_view)
+		.unwrap_or_else(|e| panic!("program validation: {e:?}"));
+	let context = CpiContext::new(program, accounts);
 	let ordered = context.accounts.to_cpi_handles();
 
 	assert_eq!(ordered[0].address(), first_view.address());
 	assert!(ordered[0].is_writable());
 	assert_eq!(ordered[1].address(), second_view.address());
 	assert!(!ordered[1].is_writable());
+	assert_eq!(context.invoke(&[], &[]), Ok(()));
 }
 
 #[test]
