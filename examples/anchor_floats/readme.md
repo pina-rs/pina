@@ -1,4 +1,4 @@
-# anchor_floats
+# `anchor_floats`
 
 <br>
 
@@ -8,7 +8,7 @@ Pina parity port of Anchor's float account-data patterns.
 
 <br>
 
-- Float storage in account data using `PodU32`/`PodU64` bit patterns.
+- Float storage in account data via `u32`/`u64` bit-pattern fields with `to_bits`/`from_bits` conversion.
 - Authority-gated updates.
 - Account initialization and mutation flows.
 
@@ -24,7 +24,7 @@ Pina parity port of Anchor's float account-data patterns.
 
 <br>
 
-```sh
+```bash
 cargo test -p anchor_floats
 pina idl --path examples/anchor_floats --output codama/idls/anchor_floats.json
 ```

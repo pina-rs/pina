@@ -2,7 +2,7 @@
 
 <br>
 
-Minimal Pina program example.
+Minimal Pina program.
 
 ## What it covers
 

@@ -31,4 +31,4 @@ Use `mollusk-svm` for Solana VM simulation in tests.
 
 Programs are typically tested as regular Rust libraries without the `bpf-entrypoint` feature.
 
-Related utilities are available from `test_utils_solana`.
+The workspace `solana-*` crates (`solana-account`, `solana-instruction`, `solana-pubkey`, etc.) are available as dev-dependencies for building host-side fixtures.

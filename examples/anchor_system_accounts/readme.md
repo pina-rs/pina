@@ -1,4 +1,4 @@
-# anchor_system_accounts
+# `anchor_system_accounts`
 
 <br>
 
@@ -24,7 +24,7 @@ Pina parity port of Anchor's system-account ownership checks.
 
 <br>
 
-```sh
+```bash
 cargo test -p anchor_system_accounts
 pina idl --path examples/anchor_system_accounts --output codama/idls/anchor_system_accounts.json
 ```

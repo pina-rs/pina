@@ -2,7 +2,7 @@
 
 <br>
 
-User profile registry built with Pina, demonstrating fully initialized bounded text and list fields stored inline in zero-copy account state.
+User profile registry demonstrating fully initialized bounded text and list fields stored inline in zero-copy account state.
 
 ## What it covers
 

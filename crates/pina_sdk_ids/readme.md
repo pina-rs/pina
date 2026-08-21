@@ -6,7 +6,7 @@ Typed constants for well-known Solana program IDs and sysvar IDs.
 
 Each module exposes an `ID` constant declared via `solana_address::declare_id!`.
 
-[![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][unlicense-image]][unlicense-link] [![codecov][codecov-image]][codecov-link]
+[![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][license-image]][license-link] [![codecov][codecov-image]][codecov-link]
 
 ## Installation
 
@@ -57,7 +57,7 @@ let clock_sysvar_id = sysvar::clock::ID;
 [docs-link]: https://docs.rs/pina_sdk_ids/
 [ci-status-image]: https://github.com/pina-rs/pina/workflows/ci/badge.svg
 [ci-status-link]: https://github.com/pina-rs/pina/actions?query=workflow:ci
-[unlicense-image]: https://img.shields.io/badge/license-Unlicense-blue.svg?style=flat-square
-[unlicense-link]: https://opensource.org/license/unlicense
+[license-image]: https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=flat-square
+[license-link]: https://www.apache.org/licenses/LICENSE-2.0
 [codecov-image]: https://codecov.io/github/pina-rs/pina/graph/badge.svg?token=87K799Q78I
 [codecov-link]: https://codecov.io/github/pina-rs/pina

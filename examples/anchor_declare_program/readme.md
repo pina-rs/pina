@@ -1,4 +1,4 @@
-# anchor_declare_program
+# `anchor_declare_program`
 
 <br>
 
@@ -10,7 +10,7 @@ Pina parity port of Anchor's `declare-program` behavior.
 
 - Modeling external program IDs.
 - Validating executable program accounts.
-- Guarding CPI-style paths with explicit program checks.
+- Guarding cross-program paths with explicit program-ID validation.
 
 ## Differences From Anchor
 
@@ -24,7 +24,7 @@ Pina parity port of Anchor's `declare-program` behavior.
 
 <br>
 
-```sh
+```bash
 cargo test -p anchor_declare_program
 pina idl --path examples/anchor_declare_program --output codama/idls/anchor_declare_program.json
 ```

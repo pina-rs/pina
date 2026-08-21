@@ -1,10 +1,10 @@
-# pina_bpf
+# `pina_bpf`
 
 <br>
 
-A minimal BPF-targeted example migrated from `pinocchio-bpf-starter` to `pina`.
+BPF-targeted example ported from `pinocchio-bpf-starter` to `pina`.
 
-## What Changed
+## What this demonstrates
 
 <br>
 

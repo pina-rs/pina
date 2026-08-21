@@ -10,6 +10,16 @@
 
 <!-- {/pinaFeatureFlags} -->
 
+<!-- {@pinaFeatureSelectionTips} -->
+
+- `derive` is the normal choice for program crates; disable it only when you want the low-level runtime traits without the proc macros.
+- `logs` is useful during **initial development and debugging**, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
+- `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
+- `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.
+- `account-resize` only unlocks realloc helpers such as `realloc_account()` and `realloc_account_zero()`. Close helpers still do not implicitly resize or zero account data.
+
+<!-- {/pinaFeatureSelectionTips} -->
+
 <!-- {@pinaProjectDescription} -->
 
 A performant Solana smart contract framework built on top of [pinocchio](https://github.com/anza-xyz/pinocchio) — a zero-dependency alternative to `solana-program` that massively reduces compute units and dependency bloat.
@@ -78,14 +88,17 @@ Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 
 <!-- {@pinaWorkspacePackages} -->
 
-| Crate                  | Path                          | Description                                                       |
-| ---------------------- | ----------------------------- | ----------------------------------------------------------------- |
-| `pina`                 | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types. |
-| `pina_macros`          | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.    |
-| `pina_cli`             | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding.  |
-| `pina_codama_renderer` | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.     |
-| `pina_profile`         | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                     |
-| `pina_sdk_ids`         | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.         |
+| Package                 | Path                          | Description                                                       |
+| ----------------------- | ----------------------------- | ----------------------------------------------------------------- |
+| `pina`                  | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types. |
+| `pina_macros`           | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.    |
+| `pina_cli`              | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding.  |
+| `pina_codama_renderer`  | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.     |
+| `pina_profile`          | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                     |
+| `pina_sdk_ids`          | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.         |
+| `@pina-rs/codama-nodes` | `packages/nodes-from-pina`    | Pina IDL conversion and normalization for Codama root nodes.      |
+| `@pina-rs/cli`          | `packages/pina__cli`          | npm launcher for the prebuilt platform-specific CLI packages.     |
+| `@pina-rs/skill`        | `packages/pina__skill`        | Agent guidance and a non-destructive local skill installer.       |
 
 <!-- {/pinaWorkspacePackages} -->
 
@@ -100,6 +113,16 @@ Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 - **CPI helpers** — PDA account creation, lamport transfers, and token operations.
 
 <!-- {/pinaFeatureHighlights} -->
+
+<!-- {@pinaInstructionAuthoringTips} -->
+
+- Entry points should accept `&mut [AccountView]` and dispatch with `Accounts::try_from(accounts)?.process(data)`.
+- Use `&AccountView` for read-only accounts and `&mut AccountView` only when you need mutable loaders, direct lamport mutation, `close_*` helpers, or writable IDL inference.
+- Keep `assert_writable()` explicit even on `&mut AccountView`. Type-level mutability unlocks mutable APIs, but the runtime still decides whether the account is writable for the current instruction.
+- `as_account()` / `as_account_mut()` return `Ref<T>` / `RefMut<T>` borrow guards. Copy out the fields you need and `drop(...)` the guard before CPIs or later mutable borrows.
+- Keep validation chains direct inside `process(self, ...)` when possible. That makes audits easier and gives `pina idl` the clearest signal for signer, writable, PDA, and default-account inference.
+
+<!-- {/pinaInstructionAuthoringTips} -->
 
 <!-- {@sbfBuildInstructions} -->
 
@@ -132,8 +155,8 @@ cargo nextest run  # Faster parallel test execution
 [docs-link]: https://docs.rs/pina/
 [ci-status-image]: https://github.com/pina-rs/pina/workflows/ci/badge.svg
 [ci-status-link]: https://github.com/pina-rs/pina/actions?query=workflow:ci
-[unlicense-image]: https://img.shields.io/badge/license-Unlicense-blue.svg?style=flat-square
-[unlicense-link]: https://opensource.org/license/unlicense
+[license-image]: https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=flat-square
+[license-link]: https://www.apache.org/licenses/LICENSE-2.0
 [codecov-image]: https://codecov.io/github/pina-rs/pina/graph/badge.svg?token=87K799Q78I
 [codecov-link]: https://codecov.io/github/pina-rs/pina
 
@@ -141,12 +164,13 @@ cargo nextest run  # Faster parallel test execution
 
 <!-- {@pinaCliCommands} -->
 
-| Command                  | Description                                           |
-| ------------------------ | ----------------------------------------------------- |
-| `pina init <name>`       | Scaffold a new Pina program project                   |
-| `pina idl --path <dir>`  | Generate a Codama IDL JSON from a Pina program        |
-| `pina profile <path.so>` | Static CU profiler for compiled SBF binaries          |
-| `pina codama generate`   | Generate Codama IDLs and Rust/JS clients for examples |
+| Command                  | Description                                    |
+| ------------------------ | ---------------------------------------------- |
+| `pina init <name>`       | Scaffold a new Pina program project            |
+| `pina idl --path <dir>`  | Generate a Codama IDL JSON from a Pina program |
+| `pina docs [topic]`      | List or render bundled terminal documentation  |
+| `pina profile <path.so>` | Static CU profiler for compiled SBF binaries   |
+| `pina codama generate`   | Generate Codama IDLs and Rust/JS/Dart clients  |
 
 <!-- {/pinaCliCommands} -->
 
@@ -181,8 +205,18 @@ The profiler decodes each SBF instruction opcode and assigns costs: regular inst
 - **Always call `assert_empty()`** before account initialization to prevent reinitialization attacks
 - **Always verify program accounts** with `assert_address()` / `assert_program()` before CPI invocations
 - **Use `assert_type::<T>()`** to prevent type cosplay — it checks discriminator, owner, and data size
-- **Use `close_with_recipient()` with `zeroed()`** to safely close accounts and prevent revival attacks
+- **Use `close_account_zeroed()` or `zeroed()` + `close_with_recipient()`** when stale account bytes must be invalidated before close
 - **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
 - **Namespace PDA seeds** with type-specific prefixes to prevent PDA sharing across account types
 
 <!-- {/pinaSecurityBestPractices} -->
+
+<!-- {@pinaCloseAccountGuidance} -->
+
+Closing guidance under Pinocchio 0.11:
+
+- `close_with_recipient()` transfers lamports and closes the account handle, but it does not zero or resize account data for you.
+- When stale bytes must be invalidated, use `close_account_zeroed()` or manually call `zeroed()` before `close_with_recipient()`.
+- The `account-resize` feature only affects realloc helpers; it does not change close semantics.
+
+<!-- {/pinaCloseAccountGuidance} -->

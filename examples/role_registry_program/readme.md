@@ -2,7 +2,7 @@
 
 <br>
 
-Role-based registry and configuration scaffold built with Pina.
+Role-based registry and configuration scaffold.
 
 ## What it covers
 
@@ -10,8 +10,10 @@ Role-based registry and configuration scaffold built with Pina.
 
 - Registry configuration PDA initialization.
 - Per-role PDA entries keyed by registry + role id.
-- Admin rotation, role updates, and deactivation flows.
+- `Initialize`, `AddRole`, `UpdateRole`, `DeactivateRole`, and `RotateAdmin` flows.
 - Explicit validation chains for signer, writable, and PDA checks.
+
+The `tests/e2e.rs` file exercises the full role lifecycle through Mollusk.
 
 ## Run
 

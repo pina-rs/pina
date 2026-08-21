@@ -6,7 +6,7 @@ Procedural macros for building Pina programs with less boilerplate.
 
 This crate powers the attributes/derives re-exported by `pina`.
 
-[![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][unlicense-image]][unlicense-link] [![codecov][codecov-image]][codecov-link]
+[![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][license-image]][license-link] [![codecov][codecov-image]][codecov-link]
 
 ## Installation
 
@@ -113,7 +113,7 @@ pub enum ExampleError {
 [docs-link]: https://docs.rs/pina_macros/
 [ci-status-image]: https://github.com/pina-rs/pina/workflows/ci/badge.svg
 [ci-status-link]: https://github.com/pina-rs/pina/actions?query=workflow:ci
-[unlicense-image]: https://img.shields.io/badge/license-Unlicense-blue.svg?style=flat-square
-[unlicense-link]: https://opensource.org/license/unlicense
+[license-image]: https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=flat-square
+[license-link]: https://www.apache.org/licenses/LICENSE-2.0
 [codecov-image]: https://codecov.io/github/pina-rs/pina/graph/badge.svg?token=87K799Q78I
 [codecov-link]: https://codecov.io/github/pina-rs/pina

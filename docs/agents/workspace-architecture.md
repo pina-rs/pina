@@ -7,7 +7,6 @@
 - `crates/pina_sdk_ids` — typed Solana program and sysvar IDs
 - `crates/pina_cli` — CLI/library for IDL generation and Codama workflows
 - `crates/pina_codama_renderer` — repository-local Codama Rust renderer
-- `crates/pina` — alignment-safe POD primitives
 - `crates/pina_profile` — static CU profiler for compiled SBF programs
 
 There are also multiple examples and security fixtures under `examples/` and `security/`.
@@ -56,6 +55,8 @@ Common alignment-safe wrapper types include:
 - `PodU64`
 - `PodU128`
 - `PodI16`
+- `PodI32`
 - `PodI64`
+- `PodI128`
 
 Use them in `#[repr(C)]` account structs whose fields satisfy zeropod's `ZcElem` and `ZcValidate` contracts.
