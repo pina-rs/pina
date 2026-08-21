@@ -52,12 +52,9 @@ pub fn extract_pda_from_attributes(
 		};
 
 		let account = item_struct.ident.to_string();
-		let args = attr.parse_args_with(PdaAttrArgs::parse).map_err(|error| {
-			IdlError::InvalidPda {
-				account: account.clone(),
-				message: error.to_string(),
-			}
-		})?;
+		let args = attr
+			.parse_args_with(PdaAttrArgs::parse)
+			.map_err(|error| IdlError::invalid_pda(&account, error))?;
 
 		let name = pda_name_for_struct(&item_struct.ident.to_string());
 		let mut seeds = Vec::with_capacity(args.seeds.len());
@@ -76,22 +73,22 @@ pub fn extract_pda_from_attributes(
 						.iter()
 						.filter(|constant| constant.name == ident);
 					let constant = matches.next().ok_or_else(|| {
-						IdlError::InvalidPda {
-							account: account.clone(),
-							message: format!(
+						IdlError::invalid_pda(
+							&account,
+							format!(
 								"constant seed `{}` could not be resolved",
 								path_to_string(&path)
 							),
-						}
+						)
 					})?;
 					if matches.next().is_some() {
-						return Err(IdlError::InvalidPda {
-							account: account.clone(),
-							message: format!(
+						return Err(IdlError::invalid_pda(
+							&account,
+							format!(
 								"constant seed `{}` is ambiguous across source modules",
 								path_to_string(&path)
 							),
-						});
+						));
 					}
 					seeds.push(PdaSeedIr::Constant {
 						value: constant.value.clone(),

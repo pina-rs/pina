@@ -42,11 +42,8 @@ pub fn parse_program(
 	let cargo_contents =
 		std::fs::read_to_string(&cargo_toml).map_err(|e| IdlError::io(&cargo_toml, e))?;
 
-	let package_name = extract_package_name(&cargo_contents).ok_or_else(|| {
-		IdlError::MissingPackageName {
-			path: cargo_toml.clone(),
-		}
-	})?;
+	let package_name = extract_package_name(&cargo_contents)
+		.ok_or_else(|| IdlError::missing_package_name(&cargo_toml))?;
 
 	let src_dir = program_path.join("src");
 	let lib_path = src_dir.join("lib.rs");
@@ -62,9 +59,7 @@ pub fn parse_program(
 		.filter(|file| entrypoint::has_process_instruction(file))
 		.count();
 	if entrypoint_source_count > 1 {
-		return Err(IdlError::AmbiguousEntrypoint {
-			count: entrypoint_source_count,
-		});
+		return Err(IdlError::ambiguous_entrypoint(entrypoint_source_count));
 	}
 	if has_instruction_structs && entrypoint_source_count == 0 {
 		return Err(IdlError::NoEntrypoint);
@@ -113,9 +108,7 @@ pub fn assemble_program_ir_multi(
 		if !file_dispatch.is_empty() {
 			dispatch_source_count += 1;
 			if dispatch_source_count > 1 {
-				return Err(IdlError::AmbiguousEntrypoint {
-					count: dispatch_source_count,
-				});
+				return Err(IdlError::ambiguous_entrypoint(dispatch_source_count));
 			}
 			dispatch = file_dispatch;
 		}
@@ -198,9 +191,7 @@ fn assemble_from_extracted(
 		if let Some(pda_name) = &account.pda_name
 			&& !pdas_ir.iter().any(|pda| pda.name == *pda_name)
 		{
-			return Err(IdlError::UnresolvedPda {
-				account: account.name.clone(),
-			});
+			return Err(IdlError::unresolved_pda(&account.name));
 		}
 	}
 
@@ -448,11 +439,8 @@ fn build_instruction_accounts(
 
 			let pda_name = if props.is_pda {
 				Some(
-					infer_pda_name_for_field(&field.name, pdas_ir).ok_or_else(|| {
-						IdlError::UnresolvedPda {
-							account: field.name.clone(),
-						}
-					})?,
+					infer_pda_name_for_field(&field.name, pdas_ir)
+						.ok_or_else(|| IdlError::unresolved_pda(&field.name))?,
 				)
 			} else {
 				None
@@ -818,7 +806,7 @@ mod tests {
 
 		let error = assemble_program_ir_multi(&[&first, &second], "example")
 			.expect_err("multiple dispatch sources must fail");
-		assert!(matches!(error, IdlError::AmbiguousEntrypoint { count: 2 }));
+		assert!(error.to_string().contains("sources found (2)"));
 	}
 
 	#[test]
@@ -879,10 +867,7 @@ mod tests {
 		)
 		.expect_err("unresolved account PDA links must fail");
 
-		assert!(matches!(
-			error,
-			IdlError::UnresolvedPda { account } if account == "VaultState"
-		));
+		assert!(error.to_string().contains("Account `VaultState`"));
 	}
 
 	#[test]

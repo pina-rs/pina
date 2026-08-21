@@ -18,20 +18,6 @@ pub enum IdlError {
 	#[error("No entrypoint dispatch found (process_instruction match missing)")]
 	NoEntrypoint,
 
-	#[error("Cargo manifest at {path} does not define `[package].name`")]
-	MissingPackageName { path: PathBuf },
-
-	#[error("Multiple entrypoint dispatch sources found ({count}); IDL extraction is ambiguous")]
-	AmbiguousEntrypoint { count: usize },
-
-	#[error("Could not extract PDA `{account}`: {message}")]
-	InvalidPda { account: String, message: String },
-
-	#[error(
-		"Account `{account}` is validated as a PDA but no matching PDA definition was resolved"
-	)]
-	UnresolvedPda { account: String },
-
 	#[error("Could not resolve accounts struct `{name}` referenced in entrypoint dispatch")]
 	UnresolvedAccounts { name: String },
 
@@ -68,6 +54,29 @@ impl IdlError {
 			path: path.into(),
 			message: err.to_string(),
 		}
+	}
+
+	pub(crate) fn missing_package_name(path: &std::path::Path) -> Self {
+		Self::Other(format!(
+			"Cargo manifest at {} does not define `[package].name`",
+			path.display()
+		))
+	}
+
+	pub(crate) fn ambiguous_entrypoint(count: usize) -> Self {
+		Self::Other(format!(
+			"Multiple entrypoint dispatch sources found ({count}); IDL extraction is ambiguous"
+		))
+	}
+
+	pub(crate) fn invalid_pda(account: &str, message: impl std::fmt::Display) -> Self {
+		Self::Other(format!("Could not extract PDA `{account}`: {message}"))
+	}
+
+	pub(crate) fn unresolved_pda(account: &str) -> Self {
+		Self::Other(format!(
+			"Account `{account}` is validated as a PDA but no matching PDA definition was resolved"
+		))
 	}
 }
 
