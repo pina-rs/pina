@@ -17,6 +17,15 @@ pina_codama_renderer:
 pina_profile:
   bump: none
   type: docs
+pina_cli_npm:
+  bump: none
+  type: docs
+pina_codama_nodes:
+  bump: none
+  type: docs
+pina_skill:
+  bump: none
+  type: docs
 ---
 
 # Add the Pina logo
