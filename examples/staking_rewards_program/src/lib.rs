@@ -1,14 +1,16 @@
-//! Staking and rewards distribution scaffold built with pina.
+//! Staking account and rewards-bookkeeping scaffold built with pina.
 //!
-//! This example keeps a realistic staking lifecycle in place:
+//! This example demonstrates the account and validation shape of a staking
+//! lifecycle:
 //! - initialize a rewards pool
 //! - open per-user positions
-//! - deposit and withdraw stake
-//! - claim rewards against a position account
+//! - record deposits and withdrawals
+//! - update reward bookkeeping against a position account
 //!
-//! The first scaffold focuses on deterministic account structure and IDL
-//! extraction. Token transfer logic can be layered in after the accounting
-//! contract is stable.
+//! This is not a staking product. Deposit, withdraw, and claim do not transfer
+//! tokens, and the example does not define reward emissions, funding, or
+//! solvency. See the example README and the book's production-readiness guide
+//! before adapting it for an asset-bearing program.
 
 #![allow(clippy::inline_always)]
 #![no_std]

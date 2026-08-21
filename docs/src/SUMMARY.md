@@ -31,6 +31,7 @@
 - [Anchor `lang-v2` review](./anchor-next-review.md)
 - [Accounts cursor runtime draft](./accounts-cursor-runtime-draft.md)
 - [Security Model](./security-model.md)
+- [Production Readiness](./production-readiness.md)
 - [Development Workflow](./development-workflow.md)
 - [CI and Releases](./ci-and-releases.md)
 - [Review Follow-ups](./review-follow-ups.md)

@@ -98,3 +98,5 @@ Fixed-capacity strings and vectors may contain uninitialized bytes outside their
 - Unit tests for negative validation cases.
 - Regression tests for every previously fixed bug class.
 - Integration tests for cross-account invariants where mutation order matters.
+
+These framework guarantees do not validate an application's economic design. Use the [Production Readiness](./production-readiness.md) gate before deploying an asset-bearing program.

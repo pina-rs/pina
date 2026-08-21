@@ -14,5 +14,6 @@ This book is the single place for project documentation. It complements API refe
 - Architecture decision records for the project's long-lived invariants and trade-offs.
 - Codama IDL/client-generation workflow (including external-project invocation).
 - Guidance for examples and security-focused development.
+- A production-readiness gate for asset-bearing programs.
 - CI/release pipeline expectations.
 - A practical recommendations roadmap for improving goal alignment.

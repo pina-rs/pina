@@ -1,13 +1,17 @@
-//! Token vesting and lockup scaffold built with pina.
+//! Vesting schedule-state and account-validation scaffold built with pina.
 //!
-//! This example keeps the core production-shaped contract in place:
+//! This example demonstrates the account and validation shape of a vesting
+//! lifecycle:
 //! - initialize a vesting schedule
 //! - create a PDA-owned vault ATA
-//! - claim vested amounts
-//! - cancel a remaining schedule
+//! - record claimed amounts
+//! - record schedule cancellation
 //!
-//! The first scaffold focuses on account structure, validation chains, and
-//! deterministic IDL extraction. Token transfer wiring can be layered in later.
+//! This is not a vesting product. Claim and cancel do not read the clock or
+//! transfer tokens, so the code does not enforce a cliff, calculate vested
+//! entitlement, release funds, or return funds after cancellation. See the
+//! example README and the book's production-readiness guide before adapting it
+//! for an asset-bearing program.
 
 #![allow(clippy::inline_always)]
 #![no_std]
