@@ -1,4 +1,4 @@
-# anchor_errors
+# `anchor_errors`
 
 <br>
 
@@ -9,7 +9,7 @@ Pina parity port of Anchor's custom error handling patterns.
 <br>
 
 - Stable custom error numbering.
-- Guard helpers (`require_eq`, `require_neq`, etc.).
+- Guard helpers (`require_eq`, `require_neq`, `require_gt`, `require_gte`).
 - Deterministic mapping from instruction variants to errors.
 
 ## Differences From Anchor
@@ -24,7 +24,7 @@ Pina parity port of Anchor's custom error handling patterns.
 
 <br>
 
-```sh
+```bash
 cargo test -p anchor_errors
 pina idl --path examples/anchor_errors --output codama/idls/anchor_errors.json
 ```

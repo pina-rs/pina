@@ -2,7 +2,7 @@
 
 <br>
 
-Token vesting and lockup scaffold built with Pina.
+Token vesting and lockup scaffold.
 
 ## What it covers
 
@@ -12,6 +12,8 @@ Token vesting and lockup scaffold built with Pina.
 - Vault ATA creation for the schedule account.
 - Claim and cancel flows with explicit validation chains.
 - Token-program account validation and ATA scaffolding.
+
+Token transfers are not wired in; this example is an account-structure scaffold. The `tests/e2e.rs` file exercises the schedule lifecycle through Mollusk.
 
 ## Run
 

@@ -2,7 +2,7 @@
 
 <br>
 
-Token escrow reference program built with Pina.
+Token escrow program.
 
 ## What it covers
 
@@ -10,7 +10,7 @@ Token escrow reference program built with Pina.
 
 - Escrow lifecycle with `Make` and `Take` instructions.
 - Vault PDA handling and seed validation.
-- Token account checks and transfer flow.
+- Token and Token-2022 program validation with ATA checks and the transfer flow.
 
 ## Run
 

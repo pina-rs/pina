@@ -2,15 +2,15 @@
 
 <br>
 
-Reference counter example built with Pina.
+PDA-backed counter program.
 
 ## What it covers
 
 <br>
 
-- PDA-backed account creation.
+- PDA-seeded accounts with `#[account]` / `#[pda]`.
 - Counter state mutation (`Initialize`, `Increment`).
-- Account validation chains and zero-copy state layout.
+- Validation chains via `.assert_signer()?.assert_writable()?` and zeropod state views.
 
 ## Run
 

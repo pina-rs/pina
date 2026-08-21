@@ -1,4 +1,4 @@
-# anchor_events
+# `anchor_events`
 
 <br>
 
@@ -8,7 +8,7 @@ Pina parity port of Anchor's event definitions and serialization semantics.
 
 <br>
 
-- Event discriminators with `#[event]`.
+- Event discriminators with `#[event(discriminator = ...)]`.
 - Deterministic event payload encoding/decoding.
 - Instruction-to-event mapping logic.
 
@@ -24,7 +24,7 @@ Pina parity port of Anchor's event definitions and serialization semantics.
 
 <br>
 
-```sh
+```bash
 cargo test -p anchor_events
 pina idl --path examples/anchor_events --output codama/idls/anchor_events.json
 ```

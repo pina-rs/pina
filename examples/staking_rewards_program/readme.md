@@ -2,7 +2,7 @@
 
 <br>
 
-Staking and rewards distribution scaffold built with Pina.
+Staking and rewards distribution scaffold.
 
 ## What it covers
 
@@ -11,7 +11,9 @@ Staking and rewards distribution scaffold built with Pina.
 - Pool initialization with stake and reward vault ATAs.
 - Per-user position PDAs keyed by pool + owner.
 - Deposit, withdraw, and claim bookkeeping flows.
-- Token-program validation and idempotent ATA creation.
+- Token-program validation and ATA creation (eager for pool vaults, idempotent for deposits).
+
+The `tests/e2e.rs` file exercises the staking lifecycle through Mollusk.
 
 ## Run
 

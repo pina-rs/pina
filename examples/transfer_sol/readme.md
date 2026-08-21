@@ -2,7 +2,7 @@
 
 <br>
 
-SOL transfer example showing two transfer patterns.
+Two SOL transfer patterns: CPI and direct lamport mutation.
 
 ## What it covers
 

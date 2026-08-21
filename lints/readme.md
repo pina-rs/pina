@@ -45,14 +45,7 @@ Run the full lint set with:
 cargo dylint --all -- --all-targets
 ```
 
-That command is the easiest way to check:
-
-- workspace crates
-- tests
-- examples
-- security fixtures
-
-If you only want to inspect a specific package, run `cargo dylint` with that package's manifest or build scope instead.
+Inside the repository, the `security:dylint` devenv task is the authoritative way to run these lints over the examples and security fixtures. The quick command above works for an ad-hoc check of workspace crates, tests, examples, and security fixtures, but it also visits dependency crates, so its results can differ from the CI task.
 
 ## Lints shipped by Pina
 

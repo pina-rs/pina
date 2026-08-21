@@ -2,7 +2,7 @@
 
 <br>
 
-PDA-backed todo state example.
+PDA-backed todo state program.
 
 ## What it covers
 

@@ -2,11 +2,9 @@
 
 <br>
 
-Repository-local Codama Rust renderer that generates Pina-style validated zeropod models and discriminator-first layouts from Codama JSON IDLs.
+Codama Rust renderer that generates Pina-style validated zeropod models and discriminator-first layouts from Codama JSON IDLs. It is not published to crates.io and is used internally by the `pina codama generate` workflow.
 
-[![CI][ci-status-image]][ci-status-link] [![License][unlicense-image]][unlicense-link]
-
-> **Note:** This crate is not published to crates.io. It is used internally by the `pina codama generate` workflow.
+[![CI][ci-status-image]][ci-status-link] [![License][license-image]][license-link]
 
 ## Usage
 
@@ -41,5 +39,5 @@ The renderer only supports fixed-size layouts. The following Codama patterns wil
 
 [ci-status-image]: https://github.com/pina-rs/pina/workflows/ci/badge.svg
 [ci-status-link]: https://github.com/pina-rs/pina/actions?query=workflow:ci
-[unlicense-image]: https://img.shields.io/badge/license-Unlicense-blue.svg?style=flat-square
-[unlicense-link]: https://opensource.org/license/unlicense
+[license-image]: https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=flat-square
+[license-link]: https://www.apache.org/licenses/LICENSE-2.0

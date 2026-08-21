@@ -1,4 +1,4 @@
-# anchor_duplicate_mutable_accounts
+# `anchor_duplicate_mutable_accounts`
 
 <br>
 
@@ -24,7 +24,7 @@ Pina parity port of Anchor's duplicate mutable account checks.
 
 <br>
 
-```sh
+```bash
 cargo test -p anchor_duplicate_mutable_accounts
 pina idl --path examples/anchor_duplicate_mutable_accounts --output codama/idls/anchor_duplicate_mutable_accounts.json
 ```

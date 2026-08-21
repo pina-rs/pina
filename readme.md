@@ -8,7 +8,7 @@ A performant Solana smart contract framework built on top of [pinocchio](https:/
 
 <!-- {/pinaProjectDescription} -->
 
-[![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][unlicense-image]][unlicense-link] [![codecov][codecov-image]][codecov-link]
+[![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][license-image]][license-link] [![codecov][codecov-image]][codecov-link]
 
 > Pina is currently unaudited and still hardening. See [SECURITY.md](./SECURITY.md) for the current readiness statement, supported versions, and private vulnerability reporting instructions.
 
@@ -212,7 +212,7 @@ That last count-parity check is important because it catches silent extraction r
 - `logs` is useful during **initial development and debugging**, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
 - `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
 - `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.
-- `account-resize` only unlocks realloc helpers such as `realloc_account()` and `realloc_account_zero()`. Close helpers still do not implicitly resize or zero account data.
+- `account-resize` only enables realloc helpers such as `realloc_account()` and `realloc_account_zero()`. Close helpers still do not implicitly resize or zero account data.
 
 <!-- {/pinaFeatureSelectionTips} -->
 
@@ -220,7 +220,7 @@ That last count-parity check is important because it catches silent extraction r
 
 <br>
 
-Comprehensive project documentation now lives in the mdBook under `docs/`.
+Project documentation lives in the mdBook under `docs/`.
 
 For repository-level security posture and reporting guidance, see [SECURITY.md](./SECURITY.md). For example-driven guidance, see [security/readme.md](./security/readme.md).
 
@@ -575,7 +575,7 @@ Remaining-account fields preserve the original account order and aliases. If a h
 
 - Entry points should accept `&mut [AccountView]` and dispatch with `Accounts::try_from(accounts)?.process(data)`.
 - Use `&AccountView` for read-only accounts and `&mut AccountView` only when you need mutable loaders, direct lamport mutation, `close_*` helpers, or writable IDL inference.
-- Keep `assert_writable()` explicit even on `&mut AccountView`. Type-level mutability unlocks mutable APIs, but the runtime still decides whether the account is writable for the current instruction.
+- Keep `assert_writable()` explicit even on `&mut AccountView`. Type-level mutability enables mutable APIs, but the runtime still decides whether the account is writable for the current instruction.
 - `as_account()` / `as_account_mut()` return `Ref<T>` / `RefMut<T>` borrow guards. Copy out the fields you need and `drop(...)` the guard before CPIs or later mutable borrows.
 - Keep validation chains direct inside `process(self, ...)` when possible. That makes audits easier and gives `pina idl` the clearest signal for signer, writable, PDA, and default-account inference.
 
@@ -898,7 +898,7 @@ Contributions are welcome! Please open an issue or pull request on [GitHub](http
 
 <br>
 
-Licensed under the [Apache License, Version 2.0](license).
+Licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
 <!-- {=pinaBadgeLinks} -->
 
@@ -908,8 +908,8 @@ Licensed under the [Apache License, Version 2.0](license).
 [docs-link]: https://docs.rs/pina/
 [ci-status-image]: https://github.com/pina-rs/pina/workflows/ci/badge.svg
 [ci-status-link]: https://github.com/pina-rs/pina/actions?query=workflow:ci
-[unlicense-image]: https://img.shields.io/badge/license-Unlicense-blue.svg?style=flat-square
-[unlicense-link]: https://opensource.org/license/unlicense
+[license-image]: https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=flat-square
+[license-link]: https://www.apache.org/licenses/LICENSE-2.0
 [codecov-image]: https://codecov.io/github/pina-rs/pina/graph/badge.svg?token=87K799Q78I
 [codecov-link]: https://codecov.io/github/pina-rs/pina
 
