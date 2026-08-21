@@ -30,7 +30,7 @@ An attacker can:
 
 <br>
 
-See [`secure/src/lib.rs`](secure/src/lib.rs). The program calls `assert_empty()?.assert_writable()?` before creating the account, ensuring the account hasn't been initialized yet.
+See [`secure/src/lib.rs`](secure/src/lib.rs). The program calls `assert_empty()?.assert_writable()?` before creating the account, so an already-initialized account is rejected.
 
 ## Pina API Reference
 

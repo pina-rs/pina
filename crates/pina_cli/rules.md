@@ -7,7 +7,7 @@ These rules describe the source shapes Pina's IDL extractor recognizes most reli
 - Keep `declare_id!` in the crate once and only once.
 - Pina starts parsing from `src/lib.rs` and recursively follows `mod` declarations.
 - The parser does **not** require a single-file layout, but it only sees files that are reachable from this module graph.
-- Any module names are fine (for example `accounts`, `instructions`, `state`, or custom names) as long as they’re connected from `lib.rs`.
+- Any module names are fine (for example `accounts`, `instructions`, `state`, or custom names) as long as they are connected from `lib.rs`.
 - Avoid placing IDL-relevant definitions behind `mod` paths the parser never visits.
 
 ## 2. Make instruction and account discriminators explicit
