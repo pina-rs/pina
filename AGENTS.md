@@ -4,6 +4,7 @@ Pina is a Rust workspace for building performant, `no_std` Solana programs on to
 
 ## Repo defaults
 
+- **Always run commands inside `devenv shell`** so the nix-managed toolchain (cargo, mdt, dprint, clippy, etc.) is used instead of stale cargo-installed or system binaries.
 - Use `devenv` for the development shell and repo task runner.
 - Use `cargo` for workspace tasks; use `pnpm` only for JS/Codama subprojects.
 - Format with `fix:format` or `dprint fmt`; do not run `rustfmt` directly.
