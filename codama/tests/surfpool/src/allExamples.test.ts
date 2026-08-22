@@ -45,6 +45,7 @@ const EXAMPLE_PROGRAMS = [
 	"counter_program",
 	"escrow_program",
 	"hello_solana",
+	"optional_accounts_program",
 	"pina_bpf",
 	"profile_program",
 	"prop_amm_program",
@@ -475,6 +476,11 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 		programError: "NotEnoughAccountKeys",
 	},
 	hello_solana: { instruction: "hello", accounts: "payerSigner" },
+	optional_accounts_program: {
+		instruction: "init",
+		accounts: "none",
+		programError: "NotEnoughAccountKeys",
+	},
 	pina_bpf: { instruction: "hello", accounts: "none" },
 	profile_program: {
 		instruction: "initialize",
@@ -523,6 +529,7 @@ const ACCESS_GUARD_PROGRAMS: Partial<
 	counter_program: "InvalidAccountData",
 	escrow_program: "InvalidAccountData",
 	hello_solana: "MissingRequiredSignature",
+	optional_accounts_program: "MissingRequiredSignature",
 	profile_program: "InvalidAccountData",
 	prop_amm_program: "InvalidAccountData",
 	role_registry_program: "InvalidAccountData",

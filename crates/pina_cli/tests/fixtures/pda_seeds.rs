@@ -51,7 +51,7 @@ pub mod entrypoint {
 		let instruction: PdaInstruction = parse_instruction(program_id, &ID, data)?;
 
 		match instruction {
-			PdaInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
+			PdaInstruction::Initialize => InitializeAccounts::try_from((program_id, accounts))?.process(data),
 		}
 	}
 }

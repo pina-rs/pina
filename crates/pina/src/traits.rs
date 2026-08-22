@@ -672,14 +672,22 @@ pub trait CloseAccountWithRecipient {
 /// by [`Self::remaining_mut`] preserve their original order and aliasing. Use
 /// [`Self::remaining_mut_distinct`] when every mutable trailing account must
 /// have a unique address.
+///
+/// Optional account slots ([`Self::next_opt`] and [`Self::next_mut_opt`]) keep
+/// the account count fixed: a slot holding the executing program's own address
+/// marks the value as absent, matching the readonly filler emitted by the
+/// generated Codama clients.
 pub struct AccountsCursor<'a> {
+	program_id: Address,
 	remaining: &'a mut [AccountView],
 }
 
 impl<'a> AccountsCursor<'a> {
-	/// Create a cursor over an instruction account slice.
-	pub fn new(accounts: &'a mut [AccountView]) -> Self {
+	/// Create a cursor over an instruction account slice for the given
+	/// executing program.
+	pub fn new(program_id: Address, accounts: &'a mut [AccountView]) -> Self {
 		Self {
+			program_id,
 			remaining: accounts,
 		}
 	}
@@ -724,6 +732,50 @@ impl<'a> AccountsCursor<'a> {
 		self.track_mutable_account(*account)?;
 
 		Ok(account)
+	}
+
+	/// Parse the next account as an optional immutable account field.
+	///
+	/// The slot counts toward the fixed account layout either way. A slot
+	/// holding the executing program's own address marks the value as absent
+	/// and yields [`None`]; any other address is returned as [`Some`].
+	pub fn next_opt(&mut self) -> Result<Option<&'a AccountView>, ProgramError> {
+		let accounts = core::mem::take(&mut self.remaining);
+		let (account, rest) = accounts
+			.split_first_mut()
+			.ok_or(ProgramError::NotEnoughAccountKeys)?;
+		self.remaining = rest;
+
+		if account.address() == &self.program_id {
+			return Ok(None);
+		}
+
+		Ok(Some(account))
+	}
+
+	/// Parse the next account as an optional mutable account field.
+	///
+	/// Like [`Self::next_mut`], the account must be marked writable whenever a
+	/// value is present; otherwise a `ProgramError::InvalidAccountData` error
+	/// is returned. A slot holding the executing program's own address marks
+	/// the value as absent and yields [`None`] without any writability
+	/// requirements, matching the readonly filler emitted by the generated
+	/// clients.
+	pub fn next_mut_opt(&mut self) -> Result<Option<&'a mut AccountView>, ProgramError> {
+		let accounts = core::mem::take(&mut self.remaining);
+		let (account, rest) = accounts
+			.split_first_mut()
+			.ok_or(ProgramError::NotEnoughAccountKeys)?;
+		self.remaining = rest;
+
+		if account.address() == &self.program_id {
+			return Ok(None);
+		}
+
+		validate_writable(*account)?;
+		self.track_mutable_account(*account)?;
+
+		Ok(Some(account))
 	}
 
 	/// Return the unparsed trailing accounts without advancing the cursor.
@@ -791,9 +843,10 @@ impl<'a> AccountsCursor<'a> {
 	/// Reject a mutable account that aliases a writable account still in the
 	/// cursor's remaining slice.
 	///
-	/// This check protects fields parsed individually through [`Self::next_mut`].
-	/// It does not inspect pairs contained entirely within [`Self::remaining_mut`].
-	/// [`Self::remaining_mut_distinct`] performs that stricter trailing check.
+/// This check protects fields parsed individually through [`Self::next_mut`]
+/// and [`Self::next_mut_opt`]. It does not inspect pairs contained entirely
+/// within [`Self::remaining_mut`]. [`Self::remaining_mut_distinct`] performs
+/// that stricter trailing check.
 	fn track_mutable_account(&self, account: AccountView) -> Result<(), ProgramError> {
 		if !account.is_writable() {
 			return Ok(());
@@ -841,14 +894,17 @@ pub trait ParseAccounts<'a>: Sized {
 /// }
 ///
 /// // Then used in the entrypoint:
-/// let accounts = InitEscrow::try_from_account_infos(accounts)?;
+/// let accounts = InitEscrow::try_from_account_infos(program_id, accounts)?;
 /// ```
 pub trait TryFromAccountInfos<'a>: Sized {
 	/// Convert the raw instruction account slice into a typed accounts struct.
 	///
 	/// Implementations should validate account order, count, and invariants
 	/// required by the instruction before returning `Self`.
-	fn try_from_account_infos(accounts: &'a mut [AccountView]) -> Result<Self, ProgramError>;
+	fn try_from_account_infos(
+		program_id: &Address,
+		accounts: &'a mut [AccountView],
+	) -> Result<Self, ProgramError>;
 }
 
 /// Instruction processor.
@@ -873,7 +929,7 @@ pub trait TryFromAccountInfos<'a>: Sized {
 /// }
 ///
 /// // Called from the entrypoint:
-/// InitEscrow::try_from_account_infos(accounts)?.process(data)?;
+/// InitEscrow::try_from_account_infos(program_id, accounts)?.process(data)?;
 /// ```
 pub trait ProcessAccountInfos<'a>: TryFromAccountInfos<'a> {
 	/// Execute the instruction logic after accounts have been validated and

@@ -244,8 +244,12 @@ pub mod entrypoint {
 		let instruction: CounterInstruction = parse_instruction(program_id, &ID, data)?;
 
 		match instruction {
-			CounterInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
-			CounterInstruction::Increment => IncrementAccounts::try_from(accounts)?.process(data),
+			CounterInstruction::Initialize => {
+				InitializeAccounts::try_from((program_id, accounts))?.process(data)
+			}
+			CounterInstruction::Increment => {
+				IncrementAccounts::try_from((program_id, accounts))?.process(data)
+			}
 		}
 	}
 }

@@ -267,7 +267,7 @@ pub fn process_instruction(
 	let instruction: {program_title}Instruction = parse_instruction(program_id, &ID, data)?;
 	match instruction {{
 		{program_title}Instruction::Initialize => {{
-			InitializeAccounts::try_from(accounts)?.process(data)
+			InitializeAccounts::try_from((program_id, accounts))?.process(data)
 		}}
 	}}
 }}
@@ -292,7 +292,7 @@ pub fn process_instruction(
 	let instruction: {program_title}Instruction = parse_instruction(program_id, &ID, data)?;
 	match instruction {{
 		{program_title}Instruction::Initialize => {{
-			InitializeAccounts::try_from(accounts)?.process(data)
+			InitializeAccounts::try_from((program_id, accounts))?.process(data)
 		}}
 	}}
 }}

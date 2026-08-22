@@ -181,9 +181,11 @@ fn process_instruction(
 	let instruction: TestInstruction = parse_instruction(program_id, &TEST_PROGRAM_ID, data)?;
 
 	match instruction {
-		TestInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
-		TestInstruction::Update => UpdateAccounts::try_from(accounts)?.process(data),
-		TestInstruction::Close => CloseAccounts::try_from(accounts)?.process(data),
+		TestInstruction::Initialize => {
+			InitializeAccounts::try_from((program_id, accounts))?.process(data)
+		}
+		TestInstruction::Update => UpdateAccounts::try_from((program_id, accounts))?.process(data),
+		TestInstruction::Close => CloseAccounts::try_from((program_id, accounts))?.process(data),
 	}
 }
 
@@ -2101,7 +2103,7 @@ fn try_from_account_infos_maps_correctly() {
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
-	let update_accounts = UpdateAccounts::try_from(account_views)
+	let update_accounts = UpdateAccounts::try_from((&TEST_PROGRAM_ID, account_views))
 		.unwrap_or_else(|e| panic!("failed to deserialize accounts: {e:?}"));
 
 	assert_eq!(
@@ -2135,7 +2137,7 @@ fn try_from_account_infos_rejects_too_many() {
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
 	// UpdateAccounts expects exactly 2 accounts; 3 should fail.
-	let result = UpdateAccounts::try_from(account_views);
+	let result = UpdateAccounts::try_from((&TEST_PROGRAM_ID, account_views));
 	assert!(result.is_err(), "should fail with too many accounts");
 	assert!(
 		result.is_err_and(|error| error.eq(&PinaProgramError::TooManyAccountKeys.into())),

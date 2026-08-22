@@ -36,7 +36,7 @@ pub mod entrypoint {
 
 		match instruction {
 			SingleInstructionDiscriminator::DoThing => {
-				DoThingAccounts::try_from(accounts)?.process(data)
+				DoThingAccounts::try_from((program_id, accounts))?.process(data)
 			}
 		}
 	}

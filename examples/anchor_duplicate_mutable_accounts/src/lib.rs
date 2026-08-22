@@ -93,7 +93,7 @@ pub mod entrypoint {
 
 		match instruction {
 			DuplicateMutableInstruction::FailsDuplicateMutable => {
-				DuplicateMutableAccounts::try_from(accounts)?.process(data)
+				DuplicateMutableAccounts::try_from((program_id, accounts))?.process(data)
 			}
 
 			DuplicateMutableInstruction::AllowsDuplicateMutable => {
@@ -102,7 +102,7 @@ pub mod entrypoint {
 			}
 
 			DuplicateMutableInstruction::AllowsDuplicateReadonly => {
-				DuplicateReadonlyAccounts::try_from(accounts)?.process(data)
+				DuplicateReadonlyAccounts::try_from((program_id, accounts))?.process(data)
 			}
 		}
 	}

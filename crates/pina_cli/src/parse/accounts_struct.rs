@@ -17,6 +17,9 @@ pub struct AccountsField {
 	pub name: String,
 	pub docs: Vec<String>,
 	pub is_mutable: bool,
+	/// Whether the field is wrapped in `Option<...>`, marking the account
+	/// slot as optional in generated clients.
+	pub is_optional: bool,
 }
 
 /// Extract all `#[derive(Accounts)]` structs from a file.
@@ -78,11 +81,17 @@ fn extract_account_fields(fields: &syn::Fields) -> Vec<AccountsField> {
 				.map_or_else(|| "unknown".to_owned(), ToString::to_string);
 			let docs = extract_docs(&field.attrs);
 			let is_mutable = type_is_mutable_account(&field.ty);
+			let (is_optional, inner_is_mutable) = type_is_optional_account(&field.ty)
+				.map_or((false, None), |inner| (true, Some(inner)));
+			// An optional mutable account (`Option<&mut AccountView>`) still
+			// declares a writable slot for provided values.
+			let is_mutable = is_mutable || inner_is_mutable == Some(true);
 
 			AccountsField {
 				name,
 				docs,
 				is_mutable,
+				is_optional,
 			}
 		})
 		.collect()
@@ -94,6 +103,31 @@ fn type_is_mutable_account(ty: &syn::Type) -> bool {
 	};
 
 	reference.mutability.is_some()
+}
+
+/// Detect `Option<&AccountView>` / `Option<&mut AccountView>` fields and
+/// report whether the wrapped reference is mutable.
+fn type_is_optional_account(ty: &syn::Type) -> Option<bool> {
+	let syn::Type::Path(type_path) = ty else {
+		return None;
+	};
+
+	let segment = type_path.path.segments.last()?;
+	if segment.ident != "Option" {
+		return None;
+	}
+
+	let syn::PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+		return None;
+	};
+
+	let [syn::GenericArgument::Type(syn::Type::Reference(reference))] =
+		arguments.args.iter().collect::<Vec<_>>().as_slice()
+	else {
+		return None;
+	};
+
+	Some(reference.mutability.is_some())
 }
 
 #[cfg(test)]
@@ -143,5 +177,50 @@ mod tests {
 		assert!(!structs[0].fields[0].is_mutable);
 		assert!(structs[0].fields[1].is_mutable);
 		assert!(structs[0].fields[2].is_mutable);
+	}
+
+	#[test]
+	fn extracts_optional_account_fields() {
+		let source = r#"
+			#[derive(Accounts, Debug)]
+			pub struct MakeAccounts<'a> {
+				pub maker: &'a mut AccountView,
+				pub escrow: Option<&'a mut AccountView>,
+				pub witness: Option<&'a AccountView>,
+				pub system_program: &'a AccountView,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let structs = extract_accounts_structs(&file);
+
+		assert_eq!(structs.len(), 1);
+		let fields = &structs[0].fields;
+		assert_eq!(fields.len(), 4);
+
+		assert!(!fields[0].is_optional && fields[0].is_mutable);
+		assert!(fields[1].is_optional && fields[1].is_mutable);
+		assert!(fields[2].is_optional && !fields[2].is_mutable);
+		assert!(!fields[3].is_optional && !fields[3].is_mutable);
+	}
+
+	/// Fully qualified `Option` paths and unsupported inner types must not be
+	/// treated as optional account slots.
+	#[test]
+	fn ignores_non_reference_option_fields() {
+		let source = r#"
+			#[derive(Accounts, Debug)]
+			pub struct WeirdAccounts<'a> {
+				pub maker: &'a AccountView,
+				pub amount: Option<u64>,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let structs = extract_accounts_structs(&file);
+
+		let fields = &structs[0].fields;
+		assert!(!fields[0].is_optional);
+		// A non-reference `Option` is not an account slot at all.
+		assert!(!fields[1].is_optional);
+		assert!(!fields[1].is_mutable);
 	}
 }

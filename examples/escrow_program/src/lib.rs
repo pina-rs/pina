@@ -41,8 +41,12 @@ pub mod entrypoint {
 		let instruction: EscrowInstruction = parse_instruction(program_id, &ID, data)?;
 
 		match instruction {
-			EscrowInstruction::Make => MakeAccounts::try_from(accounts)?.process(data),
-			EscrowInstruction::Take => TakeAccounts::try_from(accounts)?.process(data),
+			EscrowInstruction::Make => {
+				MakeAccounts::try_from((program_id, accounts))?.process(data)
+			}
+			EscrowInstruction::Take => {
+				TakeAccounts::try_from((program_id, accounts))?.process(data)
+			}
 		}
 	}
 }

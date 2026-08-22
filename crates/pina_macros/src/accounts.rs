@@ -111,13 +111,20 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 		}
 
 		field_idents.push(ident);
-		let parse_field = if is_mut_reference(&field.ty) {
-			quote! { let #ident = cursor.next_mut()?; }
-		} else if is_reference(&field.ty) {
-			quote! { let #ident = cursor.next()?; }
-		} else {
-			let ty = &field.ty;
-			quote! { let #ident = <#ty as #crate_path::ParseAccounts>::parse_accounts(cursor)?; }
+		let parse_field = match account_field_kind(&field.ty) {
+			Ok(AccountFieldKind::Mutable) => quote! { let #ident = cursor.next_mut()?; },
+			Ok(AccountFieldKind::Immutable) => quote! { let #ident = cursor.next()?; },
+			Ok(AccountFieldKind::OptionalMutable) => {
+				quote! { let #ident = cursor.next_mut_opt()?; }
+			}
+			Ok(AccountFieldKind::OptionalImmutable) => {
+				quote! { let #ident = cursor.next_opt()?; }
+			}
+			Ok(AccountFieldKind::Nested) => {
+				let ty = &field.ty;
+				quote! { let #ident = <#ty as #crate_path::ParseAccounts>::parse_accounts(cursor)?; }
+			}
+			Err(error) => return error.to_compile_error(),
 		};
 		parse_fields.push(parse_field);
 	}
@@ -155,9 +162,10 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
 		impl #impl_generics #crate_path::TryFromAccountInfos #ty_generics for #struct_name #ty_generics #where_clause {
 			fn try_from_account_infos(
+				program_id: &#crate_path::Address,
 				accounts: & #lifetime mut [#crate_path::AccountView],
 			) -> ::core::result::Result<Self, #crate_path::ProgramError> {
-				let mut cursor = #crate_path::AccountsCursor::new(accounts);
+				let mut cursor = #crate_path::AccountsCursor::new(*program_id, accounts);
 				let parsed = <Self as #crate_path::ParseAccounts>::parse_accounts(&mut cursor)?;
 				#finish_exact
 
@@ -165,11 +173,13 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 			}
 		}
 
-		impl #impl_generics ::core::convert::TryFrom<& #lifetime mut [#crate_path::AccountView]> for #struct_name #ty_generics #where_clause {
+		impl #impl_generics ::core::convert::TryFrom<(& #lifetime #crate_path::Address, & #lifetime mut [#crate_path::AccountView])> for #struct_name #ty_generics #where_clause {
 			type Error = #crate_path::ProgramError;
 
-			fn try_from(accounts: & #lifetime mut [#crate_path::AccountView]) -> ::core::result::Result<Self, Self::Error> {
-				<Self as #crate_path::TryFromAccountInfos>::try_from_account_infos(accounts)
+			fn try_from(
+				(program_id, accounts): (& #lifetime #crate_path::Address, & #lifetime mut [#crate_path::AccountView]),
+			) -> ::core::result::Result<Self, Self::Error> {
+				<Self as #crate_path::TryFromAccountInfos>::try_from_account_infos(program_id, accounts)
 			}
 		}
 	}
@@ -181,4 +191,85 @@ fn is_reference(ty: &Type) -> bool {
 
 fn is_mut_reference(ty: &Type) -> bool {
 	matches!(ty, Type::Reference(reference) if reference.mutability.is_some())
+}
+
+/// How `#[derive(Accounts)]` parses a single named field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AccountFieldKind {
+	/// `&AccountView` — required immutable slot.
+	Immutable,
+	/// `&mut AccountView` — required writable slot.
+	Mutable,
+	/// `Option<&AccountView>` — optional immutable slot.
+	OptionalImmutable,
+	/// `Option<&mut AccountView>` — optional writable slot.
+	OptionalMutable,
+	/// Any other type — delegated to its own `ParseAccounts` impl.
+	Nested,
+}
+
+/// Classify an `Accounts` field type for code generation.
+///
+/// Returns an error for `Option<T>` wrappers whose inner type is not an
+/// account reference, since those cannot be mapped onto fixed account slots.
+fn account_field_kind(ty: &Type) -> Result<AccountFieldKind, syn::Error> {
+	if let Some(kind) = option_inner_kind(ty)? {
+		return Ok(kind);
+	}
+
+	if is_mut_reference(ty) {
+		return Ok(AccountFieldKind::Mutable);
+	}
+
+	if is_reference(ty) {
+		return Ok(AccountFieldKind::Immutable);
+	}
+
+	Ok(AccountFieldKind::Nested)
+}
+
+/// Detect `Option<...>` wrappers and classify their inner reference.
+///
+/// Returns `Ok(None)` when the type is not an `Option` at all and `Err`
+/// when the wrapped type cannot be used as a fixed account slot.
+fn option_inner_kind(ty: &Type) -> Result<Option<AccountFieldKind>, syn::Error> {
+	let Type::Path(type_path) = ty else {
+		return Ok(None);
+	};
+
+	let Some(segment) = type_path.path.segments.last() else {
+		return Ok(None);
+	};
+
+	if segment.ident != "Option" {
+		return Ok(None);
+	}
+
+	let syn::PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+		return Err(syn::Error::new_spanned(
+			ty,
+			"`Option` account fields require explicit type arguments, e.g. `Option<&AccountView>`",
+		));
+	};
+
+	let [syn::GenericArgument::Type(inner)] = arguments.args.iter().collect::<Vec<_>>().as_slice()
+	else {
+		return Err(syn::Error::new_spanned(
+			ty,
+			"`Option` account fields take exactly one type argument",
+		));
+	};
+
+	match inner {
+		Type::Reference(reference) if reference.mutability.is_some() => {
+			Ok(Some(AccountFieldKind::OptionalMutable))
+		}
+		Type::Reference(_) => Ok(Some(AccountFieldKind::OptionalImmutable)),
+		_ => {
+			Err(syn::Error::new_spanned(
+				ty,
+				"only `Option<&AccountView>` and `Option<&mut AccountView>` fields are supported",
+			))
+		}
+	}
 }

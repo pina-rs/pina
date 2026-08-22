@@ -357,6 +357,7 @@ const expectedPrograms = <String>[
   'counter_program',
   'escrow_program',
   'hello_solana',
+  'optional_accounts_program',
   'pina_bpf',
   'profile_program',
   'prop_amm_program',

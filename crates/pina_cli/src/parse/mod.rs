@@ -450,7 +450,7 @@ fn build_instruction_accounts(
 				name: field.name.clone(),
 				is_writable: field.is_mutable || props.is_writable,
 				is_signer: props.is_signer,
-				is_optional: false,
+				is_optional: field.is_optional,
 				default_value: props.default_value,
 				is_pda: props.is_pda,
 				pda_name,
@@ -588,7 +588,7 @@ mod tests {
 
 					match instruction {
 						DuplicateMutableInstruction::FailsDuplicateMutable => {
-							DuplicateMutableAccounts::try_from(accounts)?.process(data)
+							DuplicateMutableAccounts::try_from((program_id, accounts))?.process(data)
 						}
 						DuplicateMutableInstruction::AllowsDuplicateMutable => {
 							let _ = AllowsDuplicateMutableInstruction::try_from_bytes(data)?;
@@ -648,7 +648,7 @@ mod tests {
 
 					match instruction {
 						MutableInstruction::Initialize => {
-							InitializeAccounts::try_from(accounts)?.process(data)
+							InitializeAccounts::try_from((program_id, accounts))?.process(data)
 						}
 					}
 				}

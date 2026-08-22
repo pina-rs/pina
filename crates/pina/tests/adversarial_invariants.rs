@@ -348,7 +348,7 @@ fn duplicate_mutable_accounts_are_rejected_by_cursor_runtime() {
 
 	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 1, 4);
 	let account_views = initialized_account_views(&mut accounts, count);
-	let result = DuplicateMutablePair::try_from(account_views);
+	let result = DuplicateMutablePair::try_from((&TEST_PROGRAM_ID, account_views));
 
 	assert!(matches!(
 		result,
@@ -377,7 +377,7 @@ fn remaining_accounts_preserve_duplicate_order_and_aliasing() {
 
 	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 2, 6);
 	let account_views = initialized_account_views(&mut accounts, count);
-	let parsed = RemainingPassthrough::try_from(account_views)
+	let parsed = RemainingPassthrough::try_from((&TEST_PROGRAM_ID, account_views))
 		.unwrap_or_else(|error| panic!("failed to derive remaining accounts: {error:?}"));
 
 	assert_eq!(parsed.first.address(), &first_key);

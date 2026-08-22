@@ -57,8 +57,8 @@ pub mod entrypoint {
 		let instruction: MultiInstruction = parse_instruction(program_id, &ID, data)?;
 
 		match instruction {
-			MultiInstruction::Create => CreateAccounts::try_from(accounts)?.process(data),
-			MultiInstruction::Update => UpdateAccounts::try_from(accounts)?.process(data),
+			MultiInstruction::Create => CreateAccounts::try_from((program_id, accounts))?.process(data),
+			MultiInstruction::Update => UpdateAccounts::try_from((program_id, accounts))?.process(data),
 		}
 	}
 }

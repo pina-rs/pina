@@ -36,7 +36,7 @@ pub mod entrypoint {
 		let instruction: ValidationInstruction = parse_instruction(program_id, &ID, data)?;
 
 		match instruction {
-			ValidationInstruction::Validate => ValidateAccounts::try_from(accounts)?.process(data),
+			ValidationInstruction::Validate => ValidateAccounts::try_from((program_id, accounts))?.process(data),
 		}
 	}
 }

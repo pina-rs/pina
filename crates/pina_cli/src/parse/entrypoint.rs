@@ -12,7 +12,7 @@ pub struct DispatchEntry {
 	/// The accounts struct name (e.g. `"InitializeAccounts"`).
 	///
 	/// `None` means the instruction arm does not route through a
-	/// `StructName::try_from(accounts)?.process(data)` pattern and therefore has
+	/// `StructName::try_from((program_id, accounts))?.process(data)` pattern and therefore has
 	/// no extractable accounts metadata.
 	pub accounts_struct: Option<String>,
 }
@@ -22,7 +22,7 @@ pub struct DispatchEntry {
 /// Looks for patterns like:
 /// ```ignore
 /// match instruction {
-///     Enum::Variant => AccountsStruct::try_from(accounts)?.process(data),
+///     Enum::Variant => AccountsStruct::try_from((program_id, accounts))?.process(data),
 /// }
 /// ```
 pub fn extract_dispatch_map(file: &File) -> Vec<DispatchEntry> {
@@ -100,7 +100,7 @@ fn extract_from_expr(expr: &Expr, entries: &mut Vec<DispatchEntry>) {
 }
 
 /// Parse a single match arm like:
-/// `Enum::Variant => StructName::try_from(accounts)?.process(data)`
+/// `Enum::Variant => StructName::try_from((program_id, accounts))?.process(data)`
 fn parse_match_arm(arm: &syn::Arm) -> Vec<DispatchEntry> {
 	let variants = extract_variant_names(&arm.pat);
 	if variants.is_empty() {
@@ -157,7 +157,7 @@ fn extract_variant_names(pat: &syn::Pat) -> Vec<String> {
 }
 
 /// Extract the accounts struct name from an expression like:
-/// `StructName::try_from(accounts)?.process(data)`
+/// `StructName::try_from((program_id, accounts))?.process(data)`
 fn extract_accounts_struct_from_body(expr: &Expr) -> Option<String> {
 	match expr {
 		Expr::MethodCall(mc) if mc.method == "process" => {
@@ -189,8 +189,15 @@ fn extract_accounts_struct_from_call(call: &syn::ExprCall) -> Option<String> {
 		return None;
 	}
 
-	if call.args.len() != 1 || !expr_is_ident(call.args.first()?, "accounts") {
-		return None;
+	// Accept both `Struct::try_from(accounts)` (legacy fixtures) and the
+	// current `Struct::try_from((program_id, accounts))` shape.
+	let args = call.args.iter().collect::<Vec<_>>();
+	match args.as_slice() {
+		[arg] if expr_is_ident(arg, "accounts") => {}
+		[Expr::Tuple(tuple)]
+			if tuple.elems.len() == 2
+				&& tuple.elems.iter().any(|arg| expr_is_ident(arg, "accounts")) => {}
+		_ => return None,
 	}
 
 	Some(path.path.segments.first()?.ident.to_string())
@@ -230,10 +237,10 @@ mod tests {
 					let instruction: CounterInstruction = parse_instruction(program_id, &ID, data)?;
 					match instruction {
 						CounterInstruction::Initialize => {
-							InitializeAccounts::try_from(accounts)?.process(data)
+							InitializeAccounts::try_from((program_id, accounts))?.process(data)
 						}
 						CounterInstruction::Increment => {
-							IncrementAccounts::try_from(accounts)?.process(data)
+							IncrementAccounts::try_from((program_id, accounts))?.process(data)
 						}
 					}
 				}
@@ -265,7 +272,7 @@ mod tests {
 				) -> ProgramResult {
 					let instruction: HelloInstruction = parse_instruction(program_id, &ID, data)?;
 					match instruction {
-						HelloInstruction::Hello => HelloAccounts::try_from(accounts)?.process(data),
+						HelloInstruction::Hello => HelloAccounts::try_from((program_id, accounts))?.process(data),
 					}
 				}
 			}
@@ -292,10 +299,10 @@ mod tests {
 					let instruction: TodoInstruction = parse_instruction(program_id, &ID, data)?;
 					match instruction {
 						TodoInstruction::Initialize => {
-							InitializeAccounts::try_from(accounts)?.process(data)
+							InitializeAccounts::try_from((program_id, accounts))?.process(data)
 						}
 						TodoInstruction::ToggleCompleted | TodoInstruction::UpdateDigest => {
-							UpdateAccounts::try_from(accounts)?.process(data)
+							UpdateAccounts::try_from((program_id, accounts))?.process(data)
 						}
 					}
 				}
@@ -331,7 +338,7 @@ mod tests {
 							Ok(())
 						}
 						DuplicateMutableInstruction::AllowsDuplicateReadonly => {
-							DuplicateReadonlyAccounts::try_from(accounts)?.process(data)
+							DuplicateReadonlyAccounts::try_from((program_id, accounts))?.process(data)
 						}
 					}
 				}

@@ -61,7 +61,7 @@ pub mod entrypoint {
 		let instruction: DocsInstruction = parse_instruction(program_id, &ID, data)?;
 
 		match instruction {
-			DocsInstruction::Create => CreateDocumentAccounts::try_from(accounts)?.process(data),
+			DocsInstruction::Create => CreateDocumentAccounts::try_from((program_id, accounts))?.process(data),
 		}
 	}
 }

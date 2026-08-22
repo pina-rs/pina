@@ -19,6 +19,7 @@ use codama_nodes::IsSigner;
 use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
 use codama_nodes::NumberValueNode;
+use codama_nodes::OptionalAccountStrategy;
 use codama_nodes::PdaLinkNode;
 use codama_nodes::PdaNode;
 use codama_nodes::PdaSeedNode;
@@ -176,6 +177,11 @@ fn build_instruction_node(
 		accounts,
 		arguments,
 		discriminators,
+		optional_account_strategy: instruction
+			.accounts
+			.iter()
+			.any(|account| account.is_optional)
+			.then_some(OptionalAccountStrategy::ProgramId),
 		..Default::default()
 	};
 
@@ -219,6 +225,12 @@ fn build_pda_default_value(
 	instruction: &InstructionIr,
 	pdas: &[PdaIr],
 ) -> Option<InstructionInputValueNode> {
+	// Optional slots mean "absent" when omitted, so they never carry a
+	// derived default value that would silently materialize an account.
+	if account.is_optional {
+		return None;
+	}
+
 	let pda_name = account.pda_name.as_ref()?;
 	let pda = pdas.iter().find(|pda| pda.name == *pda_name)?;
 	let mut seed_values = Vec::new();
@@ -394,6 +406,7 @@ mod tests {
 	use codama_nodes::ValueNode;
 
 	use super::*;
+	use crate::ir::PdaSeedIr;
 
 	fn discriminator_number_format(discriminators: &[DiscriminatorNode]) -> NumberFormat {
 		let Some(DiscriminatorNode::Constant(discriminator)) = discriminators.first() else {
@@ -509,6 +522,126 @@ mod tests {
 			argument.default_value.as_ref(),
 			Some(InstructionInputValueNode::NumberValue(_))
 		));
+	}
+
+	#[test]
+	fn optional_accounts_never_carry_pda_default_values() {
+		let ir = ProgramIr {
+			name: "optional_pda_program".to_string(),
+			public_key: "11111111111111111111111111111111".to_string(),
+			zeropod_enums: vec![],
+			accounts: vec![],
+			instructions: vec![InstructionIr {
+				name: "touch".to_string(),
+				accounts: vec![
+					InstructionAccountIr {
+						name: "authority".to_string(),
+						is_writable: false,
+						is_signer: true,
+						is_optional: false,
+						default_value: None,
+						is_pda: false,
+						pda_name: None,
+						docs: vec![],
+					},
+					// An optional PDA must stay a plain optional slot.
+					InstructionAccountIr {
+						name: "store".to_string(),
+						is_writable: true,
+						is_signer: false,
+						is_optional: true,
+						default_value: None,
+						is_pda: true,
+						pda_name: Some("store".to_string()),
+						docs: vec![],
+					},
+				],
+				arguments: vec![],
+				discriminator: DiscriminatorIr {
+					value: 1,
+					repr_size: 1,
+				},
+				docs: vec![],
+			}],
+			errors: vec![],
+			pdas: vec![PdaIr {
+				name: "store".to_string(),
+				seeds: vec![crate::ir::PdaSeedIr::Constant {
+					value: b"store".to_vec(),
+				}],
+			}],
+		};
+
+		let root = ir_to_root_node(&ir).unwrap_or_else(|error| panic!("{error}"));
+		assert!(
+			root.program.instructions[0].accounts[1]
+				.default_value
+				.is_none(),
+			"optional accounts must not gain derived defaults"
+		);
+	}
+
+	#[test]
+	fn sets_program_id_strategy_only_when_accounts_are_optional() {
+		let discriminator = DiscriminatorIr {
+			value: 1,
+			repr_size: 1,
+		};
+		let account = |name: &str, is_optional: bool| {
+			InstructionAccountIr {
+				name: name.to_string(),
+				is_writable: false,
+				is_signer: false,
+				is_optional,
+				default_value: None,
+				is_pda: false,
+				pda_name: None,
+				docs: vec![],
+			}
+		};
+
+		let build_ir = |accounts: Vec<InstructionAccountIr>| {
+			ProgramIr {
+				name: "strategy_program".to_string(),
+				public_key: "11111111111111111111111111111111".to_string(),
+				zeropod_enums: vec![],
+				accounts: vec![],
+				instructions: vec![InstructionIr {
+					name: "do_it".to_string(),
+					accounts,
+					arguments: vec![],
+					discriminator: discriminator.clone(),
+					docs: vec![],
+				}],
+				errors: vec![],
+				pdas: vec![],
+			}
+		};
+
+		let required = ir_to_root_node(&build_ir(vec![
+			account("authority", false),
+			account("state", false),
+		]))
+		.unwrap_or_else(|error| panic!("{error}"));
+		assert_eq!(
+			required.program.instructions[0].optional_account_strategy, None,
+			"required-only instructions keep the default strategy"
+		);
+
+		let optional = ir_to_root_node(&build_ir(vec![
+			account("authority", false),
+			account("witness", true),
+		]))
+		.unwrap_or_else(|error| panic!("{error}"));
+		assert_eq!(
+			optional.program.instructions[0].optional_account_strategy,
+			Some(OptionalAccountStrategy::ProgramId)
+		);
+		assert_eq!(
+			optional.program.instructions[0].accounts[1].is_optional,
+			Some(true),
+			"optional accounts are preserved on the node"
+		);
 	}
 
 	#[test]

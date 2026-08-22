@@ -122,7 +122,35 @@ Traits in `crates/pina/src/impls.rs` provide typed conversion paths from raw `Ac
 
 ## Account cursors
 
-`AccountsCursor` is the runtime layer used by `#[derive(Accounts)]`. It advances through the account slice from left to right and rejects writable aliases for mutable accounts parsed individually through `next_mut()`, without heap allocation. Explicit trailing-account capture via `#[pina(remaining)]` preserves account order and duplicate addresses; mutable trailing slices still reject readonly accounts. Use `#[pina(remaining, distinct)]` on a mutable trailing slice when duplicate addresses must also be rejected by the generated parser.
+`AccountsCursor` is the runtime layer used by `#[derive(Accounts)]`. It advances through the account slice from left to right and rejects writable aliases for mutable accounts parsed individually through `next_mut()`, without heap allocation. Explicit trailing-account capture via `#[pina(remaining)]` preserves account order and duplicate addresses; mutable trailing slices still reject readonly accounts. Use `#[pina(remaining, distinct)]` on a mutable trailing slice when duplicate addresses must also be rejected by the generated parser. Optional slots via `Option<&AccountView>` / `Option<&mut AccountView>` keep the account count fixed: a slot holding the executing program's own address parses as `None`, matching the readonly filler that generated Codama clients emit for omitted optional accounts.
+
+## Optional accounts
+
+Account fields wrapped in `Option` mark a slot as optional while keeping the instruction's account count fixed:
+
+```rust
+#[derive(Accounts)]
+pub struct MakeAccounts<'a> {
+	pub maker: &'a mut AccountView,
+	pub escrow: Option<&'a mut AccountView>,
+	pub witness: Option<&'a AccountView>,
+}
+```
+
+Only `Option<&'a AccountView>` and `Option<&'a mut AccountView>` are supported; other inner types fail to compile.
+
+The absent convention is the executing program's own address. Generated Codama clients fill an omitted optional slot with a readonly account meta pointing at the program address, so transactions never change length, and on-chain parsing maps any slot whose address equals `program_id` back to `None`. Because the filler is readonly, provided values still enforce their declared writability through `next_mut_opt()`.
+
+Program logic branches on presence with plain pattern matching:
+
+```rust
+match self.escrow {
+    Some(escrow) => escrow.assert_type::<EscrowState>(&ID)?,
+    None => {}
+}
+```
+
+Optional signers are validated only when present (`if let Some(witness) = self.witness { witness.assert_signer()?; }`). In generated clients an optional signer input is a `TransactionSigner`, so providing one attaches the signature automatically.
 
 ## Instruction authoring tips
 

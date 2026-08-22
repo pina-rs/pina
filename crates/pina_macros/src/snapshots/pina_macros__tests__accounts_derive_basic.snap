@@ -1,6 +1,5 @@
 ---
 source: crates/pina_macros/src/tests.rs
-assertion_line: 417
 expression: output
 ---
 impl<'a> ::pina::ParseAccounts<'a> for InitAccounts<'a> {
@@ -19,19 +18,24 @@ impl<'a> ::pina::ParseAccounts<'a> for InitAccounts<'a> {
 }
 impl<'a> ::pina::TryFromAccountInfos<'a> for InitAccounts<'a> {
     fn try_from_account_infos(
+        program_id: &::pina::Address,
         accounts: &'a mut [::pina::AccountView],
     ) -> ::core::result::Result<Self, ::pina::ProgramError> {
-        let mut cursor = ::pina::AccountsCursor::new(accounts);
+        let mut cursor = ::pina::AccountsCursor::new(*program_id, accounts);
         let parsed = <Self as ::pina::ParseAccounts>::parse_accounts(&mut cursor)?;
         cursor.finish_exact()?;
         Ok(parsed)
     }
 }
-impl<'a> ::core::convert::TryFrom<&'a mut [::pina::AccountView]> for InitAccounts<'a> {
+impl<'a> ::core::convert::TryFrom<(&'a ::pina::Address, &'a mut [::pina::AccountView])>
+for InitAccounts<'a> {
     type Error = ::pina::ProgramError;
     fn try_from(
-        accounts: &'a mut [::pina::AccountView],
+        (program_id, accounts): (&'a ::pina::Address, &'a mut [::pina::AccountView]),
     ) -> ::core::result::Result<Self, Self::Error> {
-        <Self as ::pina::TryFromAccountInfos>::try_from_account_infos(accounts)
+        <Self as ::pina::TryFromAccountInfos>::try_from_account_infos(
+            program_id,
+            accounts,
+        )
     }
 }

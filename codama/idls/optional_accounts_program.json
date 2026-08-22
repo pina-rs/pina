@@ -1,0 +1,402 @@
+{
+	"kind": "rootNode",
+	"standard": "codama",
+	"version": "1.8.0",
+	"program": {
+		"kind": "programNode",
+		"name": "optionalAccountsProgram",
+		"publicKey": "ccdMMVpwebk8NxwJdY4CndxkLKUTM6fkaFUteAfFeci",
+		"version": "0.0.0",
+		"accounts": [
+			{
+				"kind": "accountNode",
+				"name": "storeState",
+				"docs": [
+					"On-chain store state touched through the optional mutable slot.",
+					"",
+					"Layout (10 bytes): 1 discriminator + 1 bump + 8 count."
+				],
+				"data": {
+					"kind": "structTypeNode",
+					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "discriminator",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "bump",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "count",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u64",
+								"endian": "le"
+							}
+						}
+					]
+				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "store"
+				},
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			}
+		],
+		"instructions": [
+			{
+				"kind": "instructionNode",
+				"name": "init",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": true,
+						"isSigner": true,
+						"isOptional": false,
+						"docs": [
+							"Pays for account creation and seeds the store PDA."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "store",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"The store PDA account (must be empty — not yet created)."
+						],
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "store"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"The system program, required for the create-account CPI."
+						],
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "bump",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "touch",
+				"optionalAccountStrategy": "programId",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false,
+						"docs": [
+							"The store's authority. Must sign."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "store",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": true,
+						"docs": [
+							"When present, the counter inside is incremented by one."
+						]
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 1
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "inspect",
+				"optionalAccountStrategy": "programId",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false,
+						"docs": [
+							"The transaction fee payer; always required."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "store",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": true,
+						"docs": [
+							"When present, must be the caller's store PDA."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "witness",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": true,
+						"docs": [
+							"When present, must have signed the transaction."
+						]
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 2
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 2
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "note",
+				"optionalAccountStrategy": "programId",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false,
+						"docs": [
+							"The transaction fee payer; always required."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "note",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": true,
+						"docs": [
+							"An arbitrary readonly account attached as context."
+						]
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 3
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 3
+							}
+						}
+					}
+				]
+			}
+		],
+		"pdas": [
+			{
+				"kind": "pdaNode",
+				"name": "store",
+				"seeds": [
+					{
+						"kind": "constantPdaSeedNode",
+						"type": {
+							"kind": "stringTypeNode",
+							"encoding": "utf8"
+						},
+						"value": {
+							"kind": "stringValueNode",
+							"string": "store"
+						}
+					},
+					{
+						"kind": "variablePdaSeedNode",
+						"name": "authority",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					}
+				]
+			}
+		]
+	}
+}

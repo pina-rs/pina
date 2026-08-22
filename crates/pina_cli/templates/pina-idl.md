@@ -32,8 +32,12 @@ pub mod entrypoint {
 
 		// Prefer one routed arm per variant when possible.
 		match ix {
-			MyInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
-			MyInstruction::Update => UpdateAccounts::try_from(accounts)?.process(data),
+			MyInstruction::Initialize => {
+				InitializeAccounts::try_from((program_id, accounts))?.process(data)
+			}
+			MyInstruction::Update => {
+				UpdateAccounts::try_from((program_id, accounts))?.process(data)
+			}
 		}
 	}
 }
@@ -43,9 +47,9 @@ pub mod entrypoint {
 
 ```rust
 match ix {
-	MyInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
+	MyInstruction::Initialize => InitializeAccounts::try_from((program_id, accounts))?.process(data),
 	MyInstruction::Toggle | MyInstruction::Update => {
-		UpdateAccounts::try_from(accounts)?.process(data)
+		UpdateAccounts::try_from((program_id, accounts))?.process(data)
 	}
 }
 ```
@@ -58,7 +62,7 @@ match ix {
 		let _ = PingInstruction::try_from_bytes(data)?;
 		Ok(())
 	}
-	MyInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
+	MyInstruction::Initialize => InitializeAccounts::try_from((program_id, accounts))?.process(data),
 }
 ```
 
@@ -138,8 +142,8 @@ pub struct MyState {
 
 The extractor currently supports these dispatch shapes:
 
-- Canonical routed arms: `Variant => Accounts::try_from(accounts)?.process(data)`
-- Grouped routed arms: `VariantA | VariantB => SharedAccounts::try_from(accounts)?.process(data)`
+- Canonical routed arms: `Variant => Accounts::try_from((program_id, accounts))?.process(data)`
+- Grouped routed arms: `VariantA | VariantB => SharedAccounts::try_from((program_id, accounts))?.process(data)`
 - Accountless arms: `Variant => { let _ = Payload::try_from_bytes(data)?; Ok(()) }`
 - Accountless entrypoint fallback: if a single `process_instruction` exists but has no recognizable dispatch map, Pina emits zero-account instruction nodes from the declared payload structs.
 
