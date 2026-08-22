@@ -149,7 +149,9 @@ pub mod entrypoint {
 		let instruction: HelloInstruction = parse_instruction(program_id, &ID, data)?;
 
 		match instruction {
-			HelloInstruction::Hello => HelloAccounts::try_from(accounts)?.process(data),
+			HelloInstruction::Hello => {
+				HelloAccounts::try_from((program_id, accounts))?.process(data)
+			}
 		}
 	}
 }

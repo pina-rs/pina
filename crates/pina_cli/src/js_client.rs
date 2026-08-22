@@ -174,6 +174,7 @@ fn is_codec_source(path: &Path) -> bool {
 fn harden_codec_source(source: &str) -> String {
 	let mut hardened = source.replace("fixEncoderSize(", "fixZeroPodEncoderSize(");
 	hardened = hardened.replace("getBooleanDecoder()", "getZeroPodBooleanDecoder()");
+	hardened = harden_optional_account_parsers(&hardened);
 
 	for bits in [8, 16, 32, 64] {
 		hardened = replace_string_decoders(&hardened, bits);
@@ -240,6 +241,39 @@ fn harden_codec_source(source: &str) -> String {
 	}
 
 	hardened
+}
+
+/// Compare optional fillers against the instruction's effective program
+/// address, including builder overrides used for custom deployments.
+fn harden_optional_account_parsers(source: &str) -> String {
+	const PREFIX: &str = "return accountMeta.address === ";
+
+	let mut remaining = source;
+	let mut output = String::with_capacity(source.len());
+	while let Some(start) = remaining.find(PREFIX) {
+		output.push_str(&remaining[..start + PREFIX.len()]);
+		let comparison = &remaining[start + PREFIX.len()..];
+		let end = comparison
+			.char_indices()
+			.find_map(|(index, character)| {
+				(!character.is_ascii_alphanumeric() && character != '_' && character != '.')
+					.then_some(index)
+			})
+			.unwrap_or(comparison.len());
+		if end == comparison.len() {
+			output.push_str(comparison);
+			return output;
+		}
+		if end == 0 {
+			remaining = comparison;
+			continue;
+		}
+		output.push_str("instruction.programAddress");
+		remaining = &comparison[end..];
+	}
+
+	output.push_str(remaining);
+	output
 }
 
 fn harden_option_decoders(source: &str) -> String {
@@ -444,6 +478,56 @@ const decoder = getStructDecoder([["discriminator", getU8Decoder()], ["name", fi
 	fn leaves_non_codec_sources_unchanged() {
 		let source = "export const value = 1;\n";
 		assert_eq!(harden_codec_source(source), source);
+	}
+
+	#[test]
+	fn optional_account_parsers_use_the_effective_program_address() {
+		let source = r#"const getNextOptionalAccount = () => {
+	const accountMeta = getNextAccount();
+	return accountMeta.address === DEFAULT_PROGRAM_ADDRESS
+		? undefined
+		: accountMeta;
+};
+"#;
+		let expected = source.replace(
+			"accountMeta.address === DEFAULT_PROGRAM_ADDRESS",
+			"accountMeta.address === instruction.programAddress",
+		);
+		let hardened = harden_optional_account_parsers(source);
+		assert_eq!(hardened, expected);
+		assert_eq!(harden_optional_account_parsers(&hardened), expected);
+		let single_line =
+			"return accountMeta.address === DEFAULT_PROGRAM_ADDRESS ? undefined : accountMeta;\n";
+		assert_eq!(
+			harden_optional_account_parsers(single_line),
+			single_line.replace(
+				"accountMeta.address === DEFAULT_PROGRAM_ADDRESS",
+				"accountMeta.address === instruction.programAddress",
+			)
+		);
+		let incomplete = "return accountMeta.address === DEFAULT_PROGRAM_ADDRESS";
+		assert_eq!(harden_optional_account_parsers(incomplete), incomplete);
+	}
+
+	#[test]
+	fn optional_account_parser_hardening_scans_every_comparison() {
+		let source = r#"return accountMeta.address === (DEFAULT_PROGRAM_ADDRESS)
+	? undefined
+	: accountMeta;
+return accountMeta.address === FIRST_PROGRAM_ADDRESS
+	? undefined
+	: accountMeta;
+return accountMeta.address === SECOND_PROGRAM_ADDRESS
+	? undefined
+	: accountMeta;
+"#;
+		let expected = source
+			.replacen("FIRST_PROGRAM_ADDRESS", "instruction.programAddress", 1)
+			.replacen("SECOND_PROGRAM_ADDRESS", "instruction.programAddress", 1);
+
+		let hardened = harden_optional_account_parsers(source);
+		assert_eq!(hardened, expected);
+		assert_eq!(harden_optional_account_parsers(&hardened), expected);
 	}
 
 	#[test]

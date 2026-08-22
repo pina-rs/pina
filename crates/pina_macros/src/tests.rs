@@ -548,6 +548,50 @@ fn accounts_derive_default_crate() {
 	insta::assert_snapshot!("accounts_derive_default_crate", output);
 }
 
+#[test]
+fn accounts_derive_with_optional_accounts() {
+	let input = quote! {
+		#[pina(crate = ::pina)]
+		pub struct MakeAccounts<'a> {
+			pub maker: &'a mut AccountView,
+			pub escrow: Option<&'a mut AccountView>,
+			pub witness: Option<&'a AccountView>,
+			pub system_program: &'a AccountView,
+		}
+	};
+	let output = pretty(accounts_derive_impl(input));
+	insta::assert_snapshot!("accounts_derive_with_optional_accounts", output);
+}
+
+#[test]
+fn accounts_derive_rejects_option_of_non_reference() {
+	let input = quote! {
+		#[pina(crate = ::pina)]
+		pub struct BadAccounts<'a> {
+			pub payer: &'a AccountView,
+			pub weird: Option<u8>,
+		}
+	};
+	let output = pretty(accounts_derive_impl(input));
+	insta::assert_snapshot!("accounts_derive_rejects_option_of_non_reference", output);
+}
+
+#[test]
+fn accounts_derive_rejects_option_without_type_argument() {
+	let input = quote! {
+		#[pina(crate = ::pina)]
+		pub struct BadAccounts<'a> {
+			pub payer: &'a AccountView,
+			pub weird: Option,
+		}
+	};
+	let output = pretty(accounts_derive_impl(input));
+	insta::assert_snapshot!(
+		"accounts_derive_rejects_option_without_type_argument",
+		output
+	);
+}
+
 // ---------------------------------------------------------------------------
 // #[pda] snapshots
 // ---------------------------------------------------------------------------

@@ -227,11 +227,11 @@ pub mod entrypoint {
 
 		match instruction {
 			TransferInstruction::CpiTransfer => {
-				CpiTransferAccounts::try_from(accounts)?.process(data)
+				CpiTransferAccounts::try_from((program_id, accounts))?.process(data)
 			}
 
 			TransferInstruction::DirectTransfer => {
-				DirectTransferAccounts::try_from(accounts)?.process(data)
+				DirectTransferAccounts::try_from((program_id, accounts))?.process(data)
 			}
 		}
 	}

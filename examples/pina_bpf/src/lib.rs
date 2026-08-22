@@ -261,13 +261,14 @@ pub mod entrypoint {
 		match instruction {
 			PinaBpfInstruction::Hello => process_hello(instruction_data),
 			PinaBpfInstruction::ForwardRotateWithSigner => {
-				ForwardRotateAccounts::try_from(accounts)?.process(instruction_data)
+				ForwardRotateAccounts::try_from((program_id, accounts))?.process(instruction_data)
 			}
 			PinaBpfInstruction::ForwardRotateWithPda => {
-				ForwardRotateWithPdaAccounts::try_from(accounts)?.process(instruction_data)
+				ForwardRotateWithPdaAccounts::try_from((program_id, accounts))?
+					.process(instruction_data)
 			}
 			PinaBpfInstruction::CreatePda => {
-				CreatePdaAccounts::try_from(accounts)?.process(instruction_data)
+				CreatePdaAccounts::try_from((program_id, accounts))?.process(instruction_data)
 			}
 		}
 	}

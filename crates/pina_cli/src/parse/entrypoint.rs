@@ -11,18 +11,20 @@ pub struct DispatchEntry {
 	pub variant: String,
 	/// The accounts struct name (e.g. `"InitializeAccounts"`).
 	///
-	/// `None` means the instruction arm does not route through a
-	/// `StructName::try_from(accounts)?.process(data)` pattern and therefore has
-	/// no extractable accounts metadata.
+	/// `None` means the instruction arm does not route through either supported
+	/// account conversion: `StructName::try_from(accounts)` or the canonical
+	/// `StructName::try_from((program_id, accounts))`. Such an arm has no
+	/// extractable accounts metadata.
 	pub accounts_struct: Option<String>,
 }
 
 /// Extract the instruction dispatch map from `process_instruction` functions.
 ///
-/// Looks for patterns like:
+/// Looks for the canonical pattern and the legacy account-only equivalent:
 /// ```ignore
 /// match instruction {
-///     Enum::Variant => AccountsStruct::try_from(accounts)?.process(data),
+///     Enum::Variant => AccountsStruct::try_from((program_id, accounts))?.process(data),
+///     Enum::Legacy => AccountsStruct::try_from(accounts)?.process(data),
 /// }
 /// ```
 pub fn extract_dispatch_map(file: &File) -> Vec<DispatchEntry> {
@@ -99,8 +101,7 @@ fn extract_from_expr(expr: &Expr, entries: &mut Vec<DispatchEntry>) {
 	}
 }
 
-/// Parse a single match arm like:
-/// `Enum::Variant => StructName::try_from(accounts)?.process(data)`
+/// Parse a match arm that uses either supported account conversion form.
 fn parse_match_arm(arm: &syn::Arm) -> Vec<DispatchEntry> {
 	let variants = extract_variant_names(&arm.pat);
 	if variants.is_empty() {
@@ -156,8 +157,9 @@ fn extract_variant_names(pat: &syn::Pat) -> Vec<String> {
 	}
 }
 
-/// Extract the accounts struct name from an expression like:
-/// `StructName::try_from(accounts)?.process(data)`
+/// Extract the accounts struct name from an expression that uses either
+/// `StructName::try_from(accounts)` or the canonical
+/// `StructName::try_from((program_id, accounts))` form.
 fn extract_accounts_struct_from_body(expr: &Expr) -> Option<String> {
 	match expr {
 		Expr::MethodCall(mc) if mc.method == "process" => {
@@ -189,8 +191,16 @@ fn extract_accounts_struct_from_call(call: &syn::ExprCall) -> Option<String> {
 		return None;
 	}
 
-	if call.args.len() != 1 || !expr_is_ident(call.args.first()?, "accounts") {
-		return None;
+	// Accept both `Struct::try_from(accounts)` (legacy fixtures) and the
+	// current `Struct::try_from((program_id, accounts))` shape.
+	let args = call.args.iter().collect::<Vec<_>>();
+	match args.as_slice() {
+		[arg] if expr_is_ident(arg, "accounts") => {}
+		[Expr::Tuple(tuple)]
+			if tuple.elems.len() == 2
+				&& expr_is_ident(&tuple.elems[0], "program_id")
+				&& expr_is_ident(&tuple.elems[1], "accounts") => {}
+		_ => return None,
 	}
 
 	Some(path.path.segments.first()?.ident.to_string())
@@ -230,10 +240,10 @@ mod tests {
 					let instruction: CounterInstruction = parse_instruction(program_id, &ID, data)?;
 					match instruction {
 						CounterInstruction::Initialize => {
-							InitializeAccounts::try_from(accounts)?.process(data)
+							InitializeAccounts::try_from((program_id, accounts))?.process(data)
 						}
 						CounterInstruction::Increment => {
-							IncrementAccounts::try_from(accounts)?.process(data)
+							IncrementAccounts::try_from((program_id, accounts))?.process(data)
 						}
 					}
 				}
@@ -265,7 +275,7 @@ mod tests {
 				) -> ProgramResult {
 					let instruction: HelloInstruction = parse_instruction(program_id, &ID, data)?;
 					match instruction {
-						HelloInstruction::Hello => HelloAccounts::try_from(accounts)?.process(data),
+						HelloInstruction::Hello => HelloAccounts::try_from((program_id, accounts))?.process(data),
 					}
 				}
 			}
@@ -292,10 +302,10 @@ mod tests {
 					let instruction: TodoInstruction = parse_instruction(program_id, &ID, data)?;
 					match instruction {
 						TodoInstruction::Initialize => {
-							InitializeAccounts::try_from(accounts)?.process(data)
+							InitializeAccounts::try_from((program_id, accounts))?.process(data)
 						}
 						TodoInstruction::ToggleCompleted | TodoInstruction::UpdateDigest => {
-							UpdateAccounts::try_from(accounts)?.process(data)
+							UpdateAccounts::try_from((program_id, accounts))?.process(data)
 						}
 					}
 				}
@@ -331,7 +341,7 @@ mod tests {
 							Ok(())
 						}
 						DuplicateMutableInstruction::AllowsDuplicateReadonly => {
-							DuplicateReadonlyAccounts::try_from(accounts)?.process(data)
+							DuplicateReadonlyAccounts::try_from((program_id, accounts))?.process(data)
 						}
 					}
 				}
@@ -372,5 +382,22 @@ mod tests {
 		assert_eq!(dispatch[0].accounts_struct, None);
 		assert_eq!(dispatch[1].variant, "HelperProcess");
 		assert_eq!(dispatch[1].accounts_struct, None);
+	}
+
+	#[test]
+	fn rejects_misordered_or_unrelated_try_from_tuples() {
+		for expression in [
+			syn::parse_quote!(Accounts::try_from((accounts, program_id))),
+			syn::parse_quote!(Accounts::try_from((other, accounts))),
+			syn::parse_quote!(Accounts::try_from((program_id, other))),
+		] {
+			assert_eq!(extract_accounts_struct_from_call(&expression), None);
+		}
+
+		let valid = syn::parse_quote!(Accounts::try_from((program_id, accounts)));
+		assert_eq!(
+			extract_accounts_struct_from_call(&valid),
+			Some("Accounts".to_owned())
+		);
 	}
 }

@@ -47,9 +47,15 @@ pub mod entrypoint {
 		let instruction: VestingInstruction = parse_instruction(program_id, &ID, data)?;
 
 		match instruction {
-			VestingInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
-			VestingInstruction::Claim => ClaimAccounts::try_from(accounts)?.process(data),
-			VestingInstruction::Cancel => CancelAccounts::try_from(accounts)?.process(data),
+			VestingInstruction::Initialize => {
+				InitializeAccounts::try_from((program_id, accounts))?.process(data)
+			}
+			VestingInstruction::Claim => {
+				ClaimAccounts::try_from((program_id, accounts))?.process(data)
+			}
+			VestingInstruction::Cancel => {
+				CancelAccounts::try_from((program_id, accounts))?.process(data)
+			}
 		}
 	}
 }

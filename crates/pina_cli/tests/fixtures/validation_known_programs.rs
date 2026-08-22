@@ -41,7 +41,7 @@ pub mod entrypoint {
 
 		match instruction {
 			KnownProgramInstruction::ValidatePrograms => {
-				ValidateProgramsAccounts::try_from(accounts)?.process(data)
+				ValidateProgramsAccounts::try_from((program_id, accounts))?.process(data)
 			}
 		}
 	}

@@ -100,7 +100,10 @@ pub fn assemble_program_ir_multi(
 		all_disc_enums.extend(discriminator::extract_discriminator_enums(file)?);
 		all_account_structs.extend(account_state::extract_account_structs(file)?);
 		all_instruction_structs.extend(instruction_data::extract_instruction_structs(file)?);
-		all_ix_accounts_structs.extend(accounts_struct::extract_accounts_structs(file));
+		all_ix_accounts_structs.extend(
+			accounts_struct::extract_accounts_structs(file)
+				.map_err(|error| IdlError::Other(error.to_string()))?,
+		);
 		all_errors.extend(error_enum::extract_error_enums(file));
 		all_zeropod_enums.extend(pod_enum::extract_zeropod_enums(file)?);
 
@@ -450,7 +453,7 @@ fn build_instruction_accounts(
 				name: field.name.clone(),
 				is_writable: field.is_mutable || props.is_writable,
 				is_signer: props.is_signer,
-				is_optional: false,
+				is_optional: field.is_optional,
 				default_value: props.default_value,
 				is_pda: props.is_pda,
 				pda_name,
@@ -588,7 +591,7 @@ mod tests {
 
 					match instruction {
 						DuplicateMutableInstruction::FailsDuplicateMutable => {
-							DuplicateMutableAccounts::try_from(accounts)?.process(data)
+							DuplicateMutableAccounts::try_from((program_id, accounts))?.process(data)
 						}
 						DuplicateMutableInstruction::AllowsDuplicateMutable => {
 							let _ = AllowsDuplicateMutableInstruction::try_from_bytes(data)?;
@@ -648,7 +651,7 @@ mod tests {
 
 					match instruction {
 						MutableInstruction::Initialize => {
-							InitializeAccounts::try_from(accounts)?.process(data)
+							InitializeAccounts::try_from((program_id, accounts))?.process(data)
 						}
 					}
 				}
@@ -787,7 +790,7 @@ mod tests {
 				declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 				fn process_instruction() {
 					match instruction {
-						ExampleInstruction::Run => RunAccounts::try_from(accounts)?.process(data),
+						ExampleInstruction::Run => RunAccounts::try_from((program_id, accounts))?.process(data),
 					}
 				}
 			"#,
@@ -797,7 +800,7 @@ mod tests {
 			r#"
 				fn process_instruction() {
 					match instruction {
-						ExampleInstruction::Run => RunAccounts::try_from(accounts)?.process(data),
+						ExampleInstruction::Run => RunAccounts::try_from((program_id, accounts))?.process(data),
 					}
 				}
 			"#,

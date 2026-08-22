@@ -1,0 +1,7 @@
+---
+source: crates/pina_macros/src/tests.rs
+expression: output
+---
+::core::compile_error! {
+    "only `Option<&AccountView>` and `Option<&mut AccountView>` fields are supported"
+}

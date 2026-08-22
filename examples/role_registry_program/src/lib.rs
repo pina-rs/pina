@@ -38,21 +38,23 @@ pub mod entrypoint {
 
 		match instruction {
 			RegistryInstruction::Initialize => {
-				InitializeAccounts::try_from(accounts)?.process(data)
+				InitializeAccounts::try_from((program_id, accounts))?.process(data)
 			}
 
-			RegistryInstruction::AddRole => AddRoleAccounts::try_from(accounts)?.process(data),
+			RegistryInstruction::AddRole => {
+				AddRoleAccounts::try_from((program_id, accounts))?.process(data)
+			}
 
 			RegistryInstruction::UpdateRole => {
-				UpdateRoleAccounts::try_from(accounts)?.process(data)
+				UpdateRoleAccounts::try_from((program_id, accounts))?.process(data)
 			}
 
 			RegistryInstruction::DeactivateRole => {
-				DeactivateRoleAccounts::try_from(accounts)?.process(data)
+				DeactivateRoleAccounts::try_from((program_id, accounts))?.process(data)
 			}
 
 			RegistryInstruction::RotateAdmin => {
-				RotateAdminAccounts::try_from(accounts)?.process(data)
+				RotateAdminAccounts::try_from((program_id, accounts))?.process(data)
 			}
 		}
 	}

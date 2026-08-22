@@ -107,14 +107,14 @@ You can pass multiple `--idl` flags or `--idl-dir`.
 
 The extractor currently supports these dispatch shapes:
 
-- Canonical routed arms: `Variant => Accounts::try_from(accounts)?.process(data)`
-- Grouped routed arms: `VariantA | VariantB => SharedAccounts::try_from(accounts)?.process(data)`
+- Canonical routed arms: `Variant => Accounts::try_from((program_id, accounts))?.process(data)`
+- Grouped routed arms: `VariantA | VariantB => SharedAccounts::try_from((program_id, accounts))?.process(data)`
 - Accountless arms: `Variant => { let _ = Payload::try_from_bytes(data)?; Ok(()) }`
 - Accountless entrypoint fallback: if a single `process_instruction` exists but has no recognizable dispatch map, Pina emits zero-account instruction nodes from the declared payload structs.
 
 Keep in mind:
 
-- Account metadata is only inferred for routed `Accounts::try_from(accounts)` arms.
+- Account metadata is only inferred for routed `Accounts::try_from((program_id, accounts))` arms.
 - Signer/PDA/default-account inference still depends on direct `self.field.assert_*()` chains inside `impl ProcessAccountInfos`. A field inferred as a PDA must resolve to a declared `#[pda]`; generation fails instead of emitting an incomplete link.
 - Writable inference comes from either direct `assert_writable()` chains or mutable `#[derive(Accounts)]` fields such as `&'a mut AccountView`.
 - If you hide routing or validation behind helper layers, instruction nodes may still exist, but account metadata becomes less complete.
@@ -160,8 +160,12 @@ pub mod entrypoint {
 
 		// Prefer one routed arm per variant when possible.
 		match ix {
-			MyInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
-			MyInstruction::Update => UpdateAccounts::try_from(accounts)?.process(data),
+			MyInstruction::Initialize => {
+				InitializeAccounts::try_from((program_id, accounts))?.process(data)
+			}
+			MyInstruction::Update => {
+				UpdateAccounts::try_from((program_id, accounts))?.process(data)
+			}
 		}
 	}
 }
@@ -171,9 +175,9 @@ pub mod entrypoint {
 
 ```rust
 match ix {
-	MyInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
+	MyInstruction::Initialize => InitializeAccounts::try_from((program_id, accounts))?.process(data),
 	MyInstruction::Toggle | MyInstruction::Update => {
-		UpdateAccounts::try_from(accounts)?.process(data)
+		UpdateAccounts::try_from((program_id, accounts))?.process(data)
 	}
 }
 ```
@@ -186,7 +190,7 @@ match ix {
 		let _ = PingInstruction::try_from_bytes(data)?;
 		Ok(())
 	}
-	MyInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
+	MyInstruction::Initialize => InitializeAccounts::try_from((program_id, accounts))?.process(data),
 }
 ```
 

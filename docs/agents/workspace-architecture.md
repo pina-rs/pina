@@ -24,7 +24,7 @@ fn process_instruction(
 ) -> ProgramResult {
 	let instruction: MyInstruction = parse_instruction(program_id, &ID, data)?;
 	match instruction {
-		MyInstruction::Action => MyAccounts::try_from(accounts)?.process(data),
+		MyInstruction::Action => MyAccounts::try_from((program_id, accounts))?.process(data),
 	}
 }
 ```

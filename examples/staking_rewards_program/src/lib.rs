@@ -44,14 +44,20 @@ pub mod entrypoint {
 
 		match instruction {
 			StakingInstruction::InitializePool => {
-				InitializePoolAccounts::try_from(accounts)?.process(data)
+				InitializePoolAccounts::try_from((program_id, accounts))?.process(data)
 			}
 			StakingInstruction::OpenPosition => {
-				OpenPositionAccounts::try_from(accounts)?.process(data)
+				OpenPositionAccounts::try_from((program_id, accounts))?.process(data)
 			}
-			StakingInstruction::Deposit => DepositAccounts::try_from(accounts)?.process(data),
-			StakingInstruction::Withdraw => WithdrawAccounts::try_from(accounts)?.process(data),
-			StakingInstruction::Claim => ClaimAccounts::try_from(accounts)?.process(data),
+			StakingInstruction::Deposit => {
+				DepositAccounts::try_from((program_id, accounts))?.process(data)
+			}
+			StakingInstruction::Withdraw => {
+				WithdrawAccounts::try_from((program_id, accounts))?.process(data)
+			}
+			StakingInstruction::Claim => {
+				ClaimAccounts::try_from((program_id, accounts))?.process(data)
+			}
 		}
 	}
 }

@@ -471,6 +471,7 @@ in
           -p anchor_system_accounts \
           -p anchor_sysvars \
           -p escrow_program \
+          -p optional_accounts_program \
           -p pina_bpf \
           -p profile_program
 
@@ -538,6 +539,12 @@ in
           "$cargo_build_sbf_real" \
             --skip-tools-install \
             --tools-version v1.54 \
+            --manifest-path examples/optional_accounts_program/Cargo.toml \
+            --sbf-out-dir target/deploy \
+            --features bpf-entrypoint
+          "$cargo_build_sbf_real" \
+            --skip-tools-install \
+            --tools-version v1.54 \
             --manifest-path examples/profile_program/Cargo.toml \
             --sbf-out-dir target/deploy \
             --features bpf-entrypoint
@@ -561,6 +568,7 @@ in
             --features bpf-entrypoint
         else
           cargo build-escrow-program
+          cargo build-optional-accounts-program
           cargo build-profile-program
           cargo build-role-registry-program
           cargo build-staking-rewards-program
@@ -577,6 +585,10 @@ in
             -p role_registry_program --test e2e \
             -p staking_rewards_program --test e2e \
             -p vesting_program --test e2e \
+            -- --include-ignored --nocapture
+        SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
+          cargo test --locked \
+            -p optional_accounts_program --test on_chain \
             -- --include-ignored --nocapture
 
         # Run LiteSVM e2e tests with the generated TypeScript clients.

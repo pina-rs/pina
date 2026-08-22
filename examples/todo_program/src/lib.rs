@@ -175,9 +175,11 @@ pub mod entrypoint {
 		let instruction: TodoInstruction = parse_instruction(program_id, &ID, data)?;
 
 		match instruction {
-			TodoInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
+			TodoInstruction::Initialize => {
+				InitializeAccounts::try_from((program_id, accounts))?.process(data)
+			}
 			TodoInstruction::ToggleCompleted | TodoInstruction::UpdateDigest => {
-				UpdateAccounts::try_from(accounts)?.process(data)
+				UpdateAccounts::try_from((program_id, accounts))?.process(data)
 			}
 		}
 	}

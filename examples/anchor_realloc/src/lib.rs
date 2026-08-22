@@ -263,9 +263,15 @@ pub mod entrypoint {
 		let instruction: ReallocInstruction = parse_instruction(program_id, &ID, data)?;
 
 		match instruction {
-			ReallocInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
-			ReallocInstruction::Realloc => ReallocAccounts::try_from(accounts)?.process(data),
-			ReallocInstruction::Realloc2 => Realloc2Accounts::try_from(accounts)?.process(data),
+			ReallocInstruction::Initialize => {
+				InitializeAccounts::try_from((program_id, accounts))?.process(data)
+			}
+			ReallocInstruction::Realloc => {
+				ReallocAccounts::try_from((program_id, accounts))?.process(data)
+			}
+			ReallocInstruction::Realloc2 => {
+				Realloc2Accounts::try_from((program_id, accounts))?.process(data)
+			}
 		}
 	}
 }

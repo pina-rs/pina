@@ -267,7 +267,7 @@ pub fn process_instruction(
 	let instruction: {program_title}Instruction = parse_instruction(program_id, &ID, data)?;
 	match instruction {{
 		{program_title}Instruction::Initialize => {{
-			InitializeAccounts::try_from(accounts)?.process(data)
+			InitializeAccounts::try_from((program_id, accounts))?.process(data)
 		}}
 	}}
 }}
@@ -292,7 +292,7 @@ pub fn process_instruction(
 	let instruction: {program_title}Instruction = parse_instruction(program_id, &ID, data)?;
 	match instruction {{
 		{program_title}Instruction::Initialize => {{
-			InitializeAccounts::try_from(accounts)?.process(data)
+			InitializeAccounts::try_from((program_id, accounts))?.process(data)
 		}}
 	}}
 }}
@@ -342,7 +342,7 @@ pub mod accounts {{
 		) -> Result<Self, ProgramError> {{
 			Ok(Self {{
 				payer: CpiHandle::writable_signer(payer)?,
-				state: CpiHandle::writable_signer(state)?,
+				state: CpiHandle::writable(state)?,
 				system_program: CpiHandle::readonly(system_program),
 			}})
 		}}
@@ -523,6 +523,8 @@ mod tests {
 		assert!(cpi.contains("pub type ProgramAccount<'a>"));
 		assert!(cpi.contains("pub mod accounts"));
 		assert!(cpi.contains("pub mod instructions"));
+		assert!(cpi.contains("state: CpiHandle::writable(state)?"));
+		assert!(!cpi.contains("state: CpiHandle::writable_signer(state)?"));
 		assert!(cpi.contains("InitializeInstruction::initialize"));
 	}
 

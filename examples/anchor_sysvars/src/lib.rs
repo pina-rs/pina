@@ -62,7 +62,9 @@ pub mod entrypoint {
 	) -> ProgramResult {
 		let instruction: SysvarsInstruction = parse_instruction(program_id, &ID, data)?;
 		match instruction {
-			SysvarsInstruction::Sysvars => SysvarsAccounts::try_from(accounts)?.process(data),
+			SysvarsInstruction::Sysvars => {
+				SysvarsAccounts::try_from((program_id, accounts))?.process(data)
+			}
 		}
 	}
 }

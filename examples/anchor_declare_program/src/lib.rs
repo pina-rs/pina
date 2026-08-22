@@ -78,7 +78,7 @@ pub mod entrypoint {
 
 		match instruction {
 			DeclareProgramInstruction::ValidateExternalProgram => {
-				ValidateExternalProgramAccounts::try_from(accounts)?.process(data)
+				ValidateExternalProgramAccounts::try_from((program_id, accounts))?.process(data)
 			}
 		}
 	}

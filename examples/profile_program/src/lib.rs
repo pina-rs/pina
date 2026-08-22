@@ -612,10 +612,14 @@ pub mod entrypoint {
 		let instruction: ProfileInstruction = parse_instruction(program_id, &ID, data)?;
 
 		match instruction {
-			ProfileInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
+			ProfileInstruction::Initialize => {
+				InitializeAccounts::try_from((program_id, accounts))?.process(data)
+			}
 			ProfileInstruction::UpdateProfile
 			| ProfileInstruction::AddTag
-			| ProfileInstruction::RemoveTag => ProfileAccounts::try_from(accounts)?.process(data),
+			| ProfileInstruction::RemoveTag => {
+				ProfileAccounts::try_from((program_id, accounts))?.process(data)
+			}
 		}
 	}
 }

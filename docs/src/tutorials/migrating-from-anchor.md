@@ -468,7 +468,9 @@ pub mod entrypoint {
 		let instruction: MyInstruction = parse_instruction(program_id, &ID, data)?;
 
 		match instruction {
-			MyInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
+			MyInstruction::Initialize => {
+				InitializeAccounts::try_from((program_id, accounts))?.process(data)
+			}
 		}
 	}
 }

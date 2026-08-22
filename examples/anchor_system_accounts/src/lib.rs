@@ -56,7 +56,7 @@ pub mod entrypoint {
 
 		match instruction {
 			SystemAccountsInstruction::Initialize => {
-				InitializeAccounts::try_from(accounts)?.process(data)
+				InitializeAccounts::try_from((program_id, accounts))?.process(data)
 			}
 		}
 	}

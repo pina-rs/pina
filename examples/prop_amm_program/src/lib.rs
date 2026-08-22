@@ -185,10 +185,14 @@ pub mod entrypoint {
 		let instruction: PropAmmInstruction = parse_instruction(program_id, &ID, data)?;
 
 		match instruction {
-			PropAmmInstruction::Initialize => InitializeAccounts::try_from(accounts)?.process(data),
-			PropAmmInstruction::Update => UpdateAccounts::try_from(accounts)?.process(data),
+			PropAmmInstruction::Initialize => {
+				InitializeAccounts::try_from((program_id, accounts))?.process(data)
+			}
+			PropAmmInstruction::Update => {
+				UpdateAccounts::try_from((program_id, accounts))?.process(data)
+			}
 			PropAmmInstruction::RotateAuthority => {
-				RotateAuthorityAccounts::try_from(accounts)?.process(data)
+				RotateAuthorityAccounts::try_from((program_id, accounts))?.process(data)
 			}
 		}
 	}
