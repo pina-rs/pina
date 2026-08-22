@@ -570,20 +570,39 @@ async function runExpectedEntrypointCase(
 async function runAccessGuardCase(
 	descriptor: ExampleDescriptor,
 	submit: (instruction: Instruction) => Promise<void>,
+	payerAddress: string,
 ): Promise<void> {
 	const expectedProgramError = ACCESS_GUARD_PROGRAMS[descriptor.name];
 	if (!expectedProgramError) return;
 
 	const instruction = instructionByName(
 		descriptor,
-		EXPECTED_ENTRYPOINT_CASES[descriptor.name].instruction,
+		descriptor.name === "optional_accounts_program"
+			? "inspect"
+			: EXPECTED_ENTRYPOINT_CASES[descriptor.name].instruction,
 	);
 	const accountCount = instruction.accounts?.length ?? 0;
 	assert.ok(accountCount > 0, `${descriptor.name} access case has no accounts`);
-	const attackerAccounts = Array.from({ length: accountCount }, () => ({
-		address: address(Surfnet.newKeypair().publicKey),
-		role: AccountRole.READONLY,
-	}));
+	const attackerAccounts = descriptor.name === "optional_accounts_program"
+		? [
+			{
+				address: address(payerAddress),
+				role: AccountRole.READONLY_SIGNER,
+			},
+			{
+				address: address(descriptor.programId),
+				role: AccountRole.READONLY,
+			},
+			{
+				address: address(Surfnet.newKeypair().publicKey),
+				role: AccountRole.READONLY,
+			},
+		]
+		: Array.from({ length: accountCount }, () => ({
+			address: address(Surfnet.newKeypair().publicKey),
+			role: AccountRole.READONLY,
+		}));
+	assert.equal(attackerAccounts.length, accountCount);
 
 	await assertRejected(
 		() =>
@@ -916,7 +935,7 @@ async function runExample(descriptor: ExampleDescriptor): Promise<void> {
 			submit,
 			String(payer.address),
 		);
-		await runAccessGuardCase(descriptor, submit);
+		await runAccessGuardCase(descriptor, submit, String(payer.address));
 
 		await runSpecificGuards(
 			descriptor,
