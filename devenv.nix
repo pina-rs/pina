@@ -1097,7 +1097,7 @@ in
     "docs:sync" = {
       exec = ''
         set -euo pipefail
-        mdt update --path "$DEVENV_ROOT"
+        ${custom.mdt}/bin/mdt update --path "$DEVENV_ROOT"
       '';
       description = "Sync reusable documentation blocks with mdt.";
       binary = "bash";
