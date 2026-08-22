@@ -1,6 +1,6 @@
 {
 	"name": "@pina-rs/cli",
-	"version": "0.9.0",
+	"version": "0.10.0",
 	"description": "Prebuilt Pina CLI for scaffolding Solana programs, generating IDLs and clients, and profiling SBF binaries",
 	"keywords": [
 		"cli",
