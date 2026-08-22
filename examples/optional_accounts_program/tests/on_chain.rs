@@ -106,9 +106,10 @@ fn payer_account() -> Account {
 	Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id())
 }
 
-fn store_account(count: u64, lamports: u64) -> Account {
+fn store_account(bump: u8, count: u64, lamports: u64) -> Account {
 	let mut data = vec![0u8; 10];
 	data[0] = 1; // StoreState discriminator.
+	data[1] = bump;
 	data[2..10].copy_from_slice(&count.to_le_bytes());
 	Account {
 		lamports,
@@ -144,7 +145,7 @@ fn touch_with_omitted_optional_slot_parses_as_none_on_chain() {
 		&touch_ix(&authority, None),
 		&vec![
 			(authority, payer_account()),
-			(store, store_account(0, lamports)),
+			(store, store_account(bump, 0, lamports)),
 		],
 		&[Check::success()],
 	);
@@ -181,7 +182,7 @@ fn touch_with_provided_optional_slot_increments_the_counter() {
 		&touch_ix(&authority, Some(&store)),
 		&vec![
 			(authority, payer_account()),
-			(store, store_account(0, lamports)),
+			(store, store_account(bump, 0, lamports)),
 		],
 		&[Check::success()],
 	);
@@ -220,17 +221,19 @@ fn inspect_enforces_signer_only_when_witness_is_provided() {
 		&inspect_ix(&authority, Some(&store), None),
 		&vec![
 			(authority, payer_account()),
-			(store, store_account(0, lamports)),
+			(store, store_account(bump, 0, lamports)),
 		],
 		&[Check::success()],
 	);
 
 	// An unsigned witness in the optional slot is rejected by the runtime.
+	let mut unsigned_witness_ix = inspect_ix(&authority, Some(&store), Some(&unsigned_witness));
+	unsigned_witness_ix.accounts[2].is_signer = false;
 	mollusk.process_and_validate_instruction(
-		&inspect_ix(&authority, Some(&store), Some(&unsigned_witness)),
+		&unsigned_witness_ix,
 		&vec![
 			(authority, payer_account()),
-			(store, store_account(0, lamports)),
+			(store, store_account(bump, 0, lamports)),
 			(unsigned_witness, payer_account()),
 		],
 		&[Check::err(
@@ -241,12 +244,12 @@ fn inspect_enforces_signer_only_when_witness_is_provided() {
 	// A valid StoreState account derived for a different authority must not be
 	// accepted merely because its owner and discriminator match.
 	let other_authority = Pubkey::new_unique();
-	let (wrong_store, _) = derive_store(&other_authority);
+	let (wrong_store, wrong_bump) = derive_store(&other_authority);
 	mollusk.process_and_validate_instruction(
 		&inspect_ix(&authority, Some(&wrong_store), None),
 		&vec![
 			(authority, payer_account()),
-			(wrong_store, store_account(0, lamports)),
+			(wrong_store, store_account(wrong_bump, 0, lamports)),
 		],
 		&[Check::err(solana_program_error::ProgramError::InvalidSeeds)],
 	);
