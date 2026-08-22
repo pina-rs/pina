@@ -843,10 +843,10 @@ impl<'a> AccountsCursor<'a> {
 	/// Reject a mutable account that aliases a writable account still in the
 	/// cursor's remaining slice.
 	///
-/// This check protects fields parsed individually through [`Self::next_mut`]
-/// and [`Self::next_mut_opt`]. It does not inspect pairs contained entirely
-/// within [`Self::remaining_mut`]. [`Self::remaining_mut_distinct`] performs
-/// that stricter trailing check.
+	/// This check protects fields parsed individually through [`Self::next_mut`]
+	/// and [`Self::next_mut_opt`]. It does not inspect pairs contained entirely
+	/// within [`Self::remaining_mut`]. [`Self::remaining_mut_distinct`] performs
+	/// that stricter trailing check.
 	fn track_mutable_account(&self, account: AccountView) -> Result<(), ProgramError> {
 		if !account.is_writable() {
 			return Ok(());

@@ -12,12 +12,10 @@
 //! The program must be compiled to an SBF binary first:
 //!
 //! ```sh
-//! cargo build --release --target bpfel-unknown-none \
-//!     -p optional_accounts_program -Z build-std -F bpf-entrypoint
+//! devenv shell -- cargo build-optional-accounts-program
 //! ```
 //!
-//! Then set `SBF_OUT_DIR`, or place the `.so` in `tests/fixtures/`. Without a
-//! binary the tests skip gracefully.
+//! Then set `SBF_OUT_DIR`, or place the `.so` in `tests/fixtures/`.
 
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
@@ -37,7 +35,7 @@ const INIT: u8 = 0;
 const TOUCH: u8 = 1;
 const INSPECT: u8 = 2;
 
-fn try_create_mollusk() -> Option<Mollusk> {
+fn create_mollusk() -> Mollusk {
 	let so_name = "optional_accounts_program.so";
 	let search_dirs: Vec<std::path::PathBuf> = [
 		std::env::var("SBF_OUT_DIR").ok(),
@@ -49,11 +47,13 @@ fn try_create_mollusk() -> Option<Mollusk> {
 	.map(std::path::PathBuf::from)
 	.collect();
 
-	if !search_dirs.iter().any(|dir| dir.join(so_name).is_file()) {
-		return None;
-	}
+	assert!(
+		search_dirs.iter().any(|dir| dir.join(so_name).is_file()),
+		"optional_accounts_program SBF binary not found; build it before running ignored on-chain \
+		 tests"
+	);
 
-	Some(Mollusk::new(&PROGRAM_ID, "optional_accounts_program"))
+	Mollusk::new(&PROGRAM_ID, "optional_accounts_program")
 }
 
 fn derive_store(authority: &Pubkey) -> (Pubkey, u8) {
@@ -120,11 +120,9 @@ fn store_account(count: u64, lamports: u64) -> Account {
 }
 
 #[test]
+#[ignore = "requires the optional_accounts_program SBF binary"]
 fn touch_with_omitted_optional_slot_parses_as_none_on_chain() {
-	let Some(mollusk) = try_create_mollusk() else {
-		eprintln!("[SKIP] optional_accounts_program SBF binary not found.");
-		return;
-	};
+	let mollusk = create_mollusk();
 
 	let authority = Pubkey::new_unique();
 	let (store, bump) = derive_store(&authority);
@@ -161,11 +159,9 @@ fn touch_with_omitted_optional_slot_parses_as_none_on_chain() {
 }
 
 #[test]
+#[ignore = "requires the optional_accounts_program SBF binary"]
 fn touch_with_provided_optional_slot_increments_the_counter() {
-	let Some(mollusk) = try_create_mollusk() else {
-		eprintln!("[SKIP] optional_accounts_program SBF binary not found.");
-		return;
-	};
+	let mollusk = create_mollusk();
 
 	let authority = Pubkey::new_unique();
 	let (store, bump) = derive_store(&authority);
@@ -200,11 +196,9 @@ fn touch_with_provided_optional_slot_increments_the_counter() {
 }
 
 #[test]
+#[ignore = "requires the optional_accounts_program SBF binary"]
 fn inspect_enforces_signer_only_when_witness_is_provided() {
-	let Some(mollusk) = try_create_mollusk() else {
-		eprintln!("[SKIP] optional_accounts_program SBF binary not found.");
-		return;
-	};
+	let mollusk = create_mollusk();
 
 	let authority = Pubkey::new_unique();
 	let unsigned_witness = Pubkey::new_unique();
@@ -242,5 +236,18 @@ fn inspect_enforces_signer_only_when_witness_is_provided() {
 		&[Check::err(
 			solana_program_error::ProgramError::MissingRequiredSignature,
 		)],
+	);
+
+	// A valid StoreState account derived for a different authority must not be
+	// accepted merely because its owner and discriminator match.
+	let other_authority = Pubkey::new_unique();
+	let (wrong_store, _) = derive_store(&other_authority);
+	mollusk.process_and_validate_instruction(
+		&inspect_ix(&authority, Some(&wrong_store), None),
+		&vec![
+			(authority, payer_account()),
+			(wrong_store, store_account(0, lamports)),
+		],
+		&[Check::err(solana_program_error::ProgramError::InvalidSeeds)],
 	);
 }

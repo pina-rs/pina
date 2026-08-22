@@ -211,10 +211,12 @@ fn build_instruction_account_node(
 		node.docs = account.docs.clone().into();
 	}
 
-	if let Some(default_value) = &account.default_value {
-		node.default_value = Box::new(Some(build_default_value(default_value)));
-	} else if let Some(default_value) = build_pda_default_value(account, instruction, pdas) {
-		node.default_value = Box::new(Some(default_value));
+	if !account.is_optional {
+		if let Some(default_value) = &account.default_value {
+			node.default_value = Box::new(Some(build_default_value(default_value)));
+		} else if let Some(default_value) = build_pda_default_value(account, instruction, pdas) {
+			node.default_value = Box::new(Some(default_value));
+		}
 	}
 
 	node
@@ -225,12 +227,6 @@ fn build_pda_default_value(
 	instruction: &InstructionIr,
 	pdas: &[PdaIr],
 ) -> Option<InstructionInputValueNode> {
-	// Optional slots mean "absent" when omitted, so they never carry a
-	// derived default value that would silently materialize an account.
-	if account.is_optional {
-		return None;
-	}
-
 	let pda_name = account.pda_name.as_ref()?;
 	let pda = pdas.iter().find(|pda| pda.name == *pda_name)?;
 	let mut seed_values = Vec::new();
@@ -525,7 +521,7 @@ mod tests {
 	}
 
 	#[test]
-	fn optional_accounts_never_carry_pda_default_values() {
+	fn optional_accounts_never_carry_default_values() {
 		let ir = ProgramIr {
 			name: "optional_pda_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
@@ -555,6 +551,18 @@ mod tests {
 						pda_name: Some("store".to_string()),
 						docs: vec![],
 					},
+					InstructionAccountIr {
+						name: "system_program".to_string(),
+						is_writable: false,
+						is_signer: false,
+						is_optional: true,
+						default_value: Some(DefaultValueIr::PublicKey(
+							"11111111111111111111111111111111".to_owned(),
+						)),
+						is_pda: false,
+						pda_name: None,
+						docs: vec![],
+					},
 				],
 				arguments: vec![],
 				discriminator: DiscriminatorIr {
@@ -578,6 +586,12 @@ mod tests {
 				.default_value
 				.is_none(),
 			"optional accounts must not gain derived defaults"
+		);
+		assert!(
+			root.program.instructions[0].accounts[2]
+				.default_value
+				.is_none(),
+			"optional accounts must not retain explicit defaults"
 		);
 	}
 

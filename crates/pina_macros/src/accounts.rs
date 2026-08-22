@@ -193,6 +193,18 @@ fn is_mut_reference(ty: &Type) -> bool {
 	matches!(ty, Type::Reference(reference) if reference.mutability.is_some())
 }
 
+fn is_account_view(ty: &Type) -> bool {
+	let Type::Path(type_path) = ty else {
+		return false;
+	};
+
+	type_path
+		.path
+		.segments
+		.last()
+		.is_some_and(|segment| segment.ident == "AccountView")
+}
+
 /// How `#[derive(Accounts)]` parses a single named field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AccountFieldKind {
@@ -261,15 +273,48 @@ fn option_inner_kind(ty: &Type) -> Result<Option<AccountFieldKind>, syn::Error> 
 	};
 
 	match inner {
-		Type::Reference(reference) if reference.mutability.is_some() => {
+		Type::Reference(reference)
+			if is_account_view(&reference.elem) && reference.mutability.is_some() =>
+		{
 			Ok(Some(AccountFieldKind::OptionalMutable))
 		}
-		Type::Reference(_) => Ok(Some(AccountFieldKind::OptionalImmutable)),
+		Type::Reference(reference) if is_account_view(&reference.elem) => {
+			Ok(Some(AccountFieldKind::OptionalImmutable))
+		}
 		_ => {
 			Err(syn::Error::new_spanned(
 				ty,
 				"only `Option<&AccountView>` and `Option<&mut AccountView>` fields are supported",
 			))
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn optional_fields_require_account_view_references() {
+		for ty in [
+			syn::parse_quote!(Option<&u64>),
+			syn::parse_quote!(Option<&mut u64>),
+			syn::parse_quote!(Option<&[AccountView]>),
+		] {
+			let error =
+				account_field_kind(&ty).expect_err("non-AccountView references must be rejected");
+			assert!(error.to_string().contains("Option<&AccountView>"));
+		}
+
+		assert_eq!(
+			account_field_kind(&syn::parse_quote!(Option<&pina::AccountView>))
+				.expect("qualified AccountView reference"),
+			AccountFieldKind::OptionalImmutable
+		);
+		assert_eq!(
+			account_field_kind(&syn::parse_quote!(Option<&mut pina::AccountView>))
+				.expect("qualified mutable AccountView reference"),
+			AccountFieldKind::OptionalMutable
+		);
 	}
 }

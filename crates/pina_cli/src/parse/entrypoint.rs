@@ -196,7 +196,8 @@ fn extract_accounts_struct_from_call(call: &syn::ExprCall) -> Option<String> {
 		[arg] if expr_is_ident(arg, "accounts") => {}
 		[Expr::Tuple(tuple)]
 			if tuple.elems.len() == 2
-				&& tuple.elems.iter().any(|arg| expr_is_ident(arg, "accounts")) => {}
+				&& expr_is_ident(&tuple.elems[0], "program_id")
+				&& expr_is_ident(&tuple.elems[1], "accounts") => {}
 		_ => return None,
 	}
 
@@ -379,5 +380,22 @@ mod tests {
 		assert_eq!(dispatch[0].accounts_struct, None);
 		assert_eq!(dispatch[1].variant, "HelperProcess");
 		assert_eq!(dispatch[1].accounts_struct, None);
+	}
+
+	#[test]
+	fn rejects_misordered_or_unrelated_try_from_tuples() {
+		for expression in [
+			syn::parse_quote!(Accounts::try_from((accounts, program_id))),
+			syn::parse_quote!(Accounts::try_from((other, accounts))),
+			syn::parse_quote!(Accounts::try_from((program_id, other))),
+		] {
+			assert_eq!(extract_accounts_struct_from_call(&expression), None);
+		}
+
+		let valid = syn::parse_quote!(Accounts::try_from((program_id, accounts)));
+		assert_eq!(
+			extract_accounts_struct_from_call(&valid),
+			Some("Accounts".to_owned())
+		);
 	}
 }

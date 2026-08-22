@@ -95,6 +95,15 @@ fn inspect_covers_every_optional_presence_combination() {
 	assert_eq!(witness_only.accounts[2].pubkey, WITNESS);
 	assert!(witness_only.accounts[2].is_signer);
 	assert!(!witness_only.accounts[2].is_writable);
+
+	// Both present: each slot retains its independently inferred privileges.
+	let both_present = build(Some(STORE), Some(WITNESS));
+	assert_eq!(both_present.accounts[1].pubkey, STORE);
+	assert!(!both_present.accounts[1].is_writable);
+	assert!(!both_present.accounts[1].is_signer);
+	assert_eq!(both_present.accounts[2].pubkey, WITNESS);
+	assert!(both_present.accounts[2].is_signer);
+	assert!(!both_present.accounts[2].is_writable);
 }
 
 #[test]

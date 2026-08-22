@@ -419,7 +419,7 @@ fn distinct_remaining_accounts_reject_duplicate_mutable_addresses() {
 
 	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 1, 4);
 	let account_views = initialized_account_views(&mut accounts, count);
-	let result = DistinctRemaining::try_from(account_views);
+	let result = DistinctRemaining::try_from((&TEST_PROGRAM_ID, account_views));
 
 	assert!(matches!(
 		result,

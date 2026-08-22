@@ -26,8 +26,8 @@ dylint_linting::declare_late_lint! {
 	///
 	/// ```ignore
 	/// match ix {
-	/// 	MyInstruction::Initialize => InitializeAccounts::try_from_account_infos(accounts)?.process(data),
-	/// 	MyInstruction::Update => UpdateAccounts::try_from_account_infos(accounts)?.process(data),
+	/// 	MyInstruction::Initialize => InitializeAccounts::try_from((program_id, accounts))?.process(data),
+	/// 	MyInstruction::Update => UpdateAccounts::try_from((program_id, accounts))?.process(data),
 	/// }
 	/// ```
 	pub REQUIRE_CANONICAL_INSTRUCTION_DISPATCH_FOR_IDL,

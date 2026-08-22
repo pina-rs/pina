@@ -16,6 +16,7 @@
 import {
 	AccountRole,
 	type Address,
+	address,
 	assertAccountExists,
 	generateKeyPairSigner,
 	getAddressEncoder,
@@ -32,6 +33,7 @@ import {
 	getInspectInstruction,
 	getNoteInstruction,
 	getTouchInstruction,
+	parseInspectInstruction,
 } from "../../../clients/js/optional_accounts_program/src/generated/instructions";
 import { OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../../../clients/js/optional_accounts_program/src/generated/programs";
 import { airdrop, buildAndSignTransaction, findProgramBinary } from "./helpers";
@@ -39,9 +41,13 @@ import { airdrop, buildAndSignTransaction, findProgramBinary } from "./helpers";
 const PROGRAM_NAME = "optional_accounts_program";
 const PROGRAM_ADDRESS = OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
 
-function loadProgram(): { svm: LiteSVM } | null {
+function loadProgram(): { svm: LiteSVM } {
 	const soPath = findProgramBinary(PROGRAM_NAME);
-	if (!soPath) return null;
+	if (!soPath) {
+		throw new Error(
+			`${PROGRAM_NAME}.so not found; build SBF binaries before running this suite`,
+		);
+	}
 
 	const svm = new LiteSVM();
 	svm.addProgramFromFile(PROGRAM_ADDRESS, soPath);
@@ -71,15 +77,22 @@ function initInstruction(
 }
 
 describe("optional_accounts_program e2e", () => {
+	test("parses omitted slots against a custom program address", async () => {
+		const authority = await generateKeyPairSigner();
+		const customProgramAddress = address("11111111111111111111111111111111");
+		const instruction = getInspectInstruction(
+			{ authority },
+			{ programAddress: customProgramAddress },
+		);
+		const parsed = parseInspectInstruction(instruction);
+
+		expect(parsed.programAddress).toBe(customProgramAddress);
+		expect(parsed.accounts.store).toBeUndefined();
+		expect(parsed.accounts.witness).toBeUndefined();
+	});
+
 	test("init creates the store PDA with the required baseline layout", async () => {
-		const loaded = loadProgram();
-		if (!loaded) {
-			console.log(
-				`[SKIP] ${PROGRAM_NAME}.so not found. Build SBF binaries first.`,
-			);
-			return;
-		}
-		const { svm } = loaded;
+		const { svm } = loadProgram();
 
 		const authority = await generateKeyPairSigner();
 		airdrop(svm, authority.address);
@@ -98,14 +111,7 @@ describe("optional_accounts_program e2e", () => {
 	});
 
 	test("touch: omitted optional mutable slot parses as None; provided slot increments", async () => {
-		const loaded = loadProgram();
-		if (!loaded) {
-			console.log(
-				`[SKIP] ${PROGRAM_NAME}.so not found. Build SBF binaries first.`,
-			);
-			return;
-		}
-		const { svm } = loaded;
+		const { svm } = loadProgram();
 
 		const authority = await generateKeyPairSigner();
 		airdrop(svm, authority.address);
@@ -143,14 +149,7 @@ describe("optional_accounts_program e2e", () => {
 	});
 
 	test("inspect: optional signer enforced when present, skippable when omitted", async () => {
-		const loaded = loadProgram();
-		if (!loaded) {
-			console.log(
-				`[SKIP] ${PROGRAM_NAME}.so not found. Build SBF binaries first.`,
-			);
-			return;
-		}
-		const { svm } = loaded;
+		const { svm } = loadProgram();
 
 		const authority = await generateKeyPairSigner();
 		const witness = await generateKeyPairSigner();
@@ -208,14 +207,7 @@ describe("optional_accounts_program e2e", () => {
 	});
 
 	test("note: arbitrary readonly account accepted when provided", async () => {
-		const loaded = loadProgram();
-		if (!loaded) {
-			console.log(
-				`[SKIP] ${PROGRAM_NAME}.so not found. Build SBF binaries first.`,
-			);
-			return;
-		}
-		const { svm } = loaded;
+		const { svm } = loadProgram();
 
 		const authority = await generateKeyPairSigner();
 		const noteHolder = await generateKeyPairSigner();

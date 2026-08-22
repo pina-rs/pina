@@ -231,7 +231,9 @@ fn test_accounts_derive_distinct_mutable_remaining_accepts_unique_accounts() {
 	let accounts: &mut [AccountView] =
 		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
 
-	let parsed = TestAccountsRemainingMutDistinct::try_from_account_infos(accounts).unwrap();
+	let parsed =
+		TestAccountsRemainingMutDistinct::try_from_account_infos(&MOCK_PROGRAM_ID, accounts)
+			.unwrap();
 	assert_ne!(parsed.one.address(), parsed.remaining[0].address());
 	assert_eq!(parsed.remaining.len(), 3);
 }
@@ -246,7 +248,8 @@ fn test_accounts_derive_distinct_mutable_remaining_rejects_readonly_accounts() {
 	let accounts: &mut [AccountView] =
 		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
 
-	let result = TestAccountsRemainingMutDistinct::try_from_account_infos(accounts);
+	let result =
+		TestAccountsRemainingMutDistinct::try_from_account_infos(&MOCK_PROGRAM_ID, accounts);
 	assert!(matches!(result, Err(ProgramError::InvalidAccountData)));
 }
 
@@ -427,6 +430,7 @@ struct TestAccountsOptionalMut<'a> {
 
 #[derive(Accounts)]
 #[pina(crate = pina)]
+#[allow(dead_code)]
 struct TestAccountsOptionalLeadingMut<'a> {
 	pub optional: Option<&'a mut AccountView>,
 	pub one: &'a mut AccountView,
@@ -546,6 +550,7 @@ fn test_accounts_derive_optional_mutable_present() {
 
 	let test_accounts =
 		TestAccountsOptionalMut::try_from_account_infos(&MOCK_PROGRAM_ID, accounts).unwrap();
+	assert_eq!(test_accounts.one.address(), &key_from_byte(1));
 	assert_eq!(
 		test_accounts
 			.optional
@@ -576,6 +581,7 @@ fn test_accounts_derive_optional_mutable_absent() {
 
 	let test_accounts =
 		TestAccountsOptionalMut::try_from_account_infos(&MOCK_PROGRAM_ID, accounts).unwrap();
+	assert_eq!(test_accounts.one.address(), &key_from_byte(1));
 	assert!(test_accounts.optional.is_none());
 }
 
@@ -652,5 +658,6 @@ fn test_accounts_derive_optional_mutable_allows_readonly_duplicate() {
 		TestAccountsOptionalThenImmutable::try_from_account_infos(&MOCK_PROGRAM_ID, accounts);
 	assert!(result.is_ok());
 	let parsed = result.unwrap();
+	assert!(parsed.optional.is_some());
 	assert_eq!(parsed.one.address(), &shared_key);
 }

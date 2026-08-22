@@ -91,34 +91,28 @@ fn collect_assertions_from_stmt(
 			collect_assertions_from_expr(expr, props, bindings);
 		}
 
-		Stmt::Local(local) if local.init.is_some() => {
-			let init = local.init.as_ref().expect("checked above");
+		Stmt::Local(local) => {
+			let field_name = local
+				.init
+				.as_ref()
+				.and_then(|init| resolve_self_field(&init.expr, bindings));
+			remove_pattern_idents(&local.pat, bindings);
 
 			// Aliases such as `if let Some(escrow) = &self.escrow` or
 			// `let escrow = self.escrow.as_ref()` capture an account field, so
 			// assertions written against the alias must be attributed back to
 			// the originating field.
-			if let Some(field_name) = resolve_self_field(&init.expr, bindings) {
+			if let Some(field_name) = field_name {
 				bind_pattern_idents(&local.pat, &field_name, bindings);
 			}
 
-			collect_assertions_from_expr(&init.expr, props, bindings);
+			let Some(init) = &local.init else {
+				return;
+			};
 
+			collect_assertions_from_expr(&init.expr, props, bindings);
 			if let Some((_, diverge)) = &init.diverge {
 				collect_assertions_from_expr(diverge, props, bindings);
-			}
-		}
-
-		Stmt::Item(Item::Impl(item_impl)) => {
-			// Nested impl blocks (unlikely but handle gracefully).
-			for ii in &item_impl.items {
-				let ImplItem::Fn(f) = ii else {
-					continue;
-				};
-
-				for s in &f.block.stmts {
-					collect_assertions_from_stmt(s, props, bindings);
-				}
 			}
 		}
 
@@ -176,6 +170,43 @@ fn bind_pattern_idents(pat: &Pat, field_name: &str, bindings: &mut HashMap<Strin
 	}
 }
 
+/// Remove every identifier introduced by `pat` from the current lexical scope.
+fn remove_pattern_idents(pat: &Pat, bindings: &mut HashMap<String, String>) {
+	match pat {
+		Pat::Ident(ident) => {
+			bindings.remove(&ident.ident.to_string());
+		}
+		Pat::Reference(reference) => remove_pattern_idents(&reference.pat, bindings),
+		Pat::Type(typed) => remove_pattern_idents(&typed.pat, bindings),
+		Pat::Or(or_pattern) => {
+			for alternative in &or_pattern.cases {
+				remove_pattern_idents(alternative, bindings);
+			}
+		}
+		Pat::Slice(slice) => {
+			for element in &slice.elems {
+				remove_pattern_idents(element, bindings);
+			}
+		}
+		Pat::Tuple(tuple) => {
+			for element in &tuple.elems {
+				remove_pattern_idents(element, bindings);
+			}
+		}
+		Pat::TupleStruct(tuple_struct) => {
+			for element in &tuple_struct.elems {
+				remove_pattern_idents(element, bindings);
+			}
+		}
+		Pat::Struct(pattern_struct) => {
+			for member in &pattern_struct.fields {
+				remove_pattern_idents(&member.pat, bindings);
+			}
+		}
+		_ => {}
+	}
+}
+
 fn collect_assertions_from_expr(
 	expr: &Expr,
 	props: &mut HashMap<String, AccountProperties>,
@@ -204,23 +235,26 @@ fn collect_assertions_from_expr(
 		}
 
 		Expr::Block(b) => {
+			let mut block_bindings = bindings.clone();
 			for stmt in &b.block.stmts {
-				collect_assertions_from_stmt(stmt, props, bindings);
+				collect_assertions_from_stmt(stmt, props, &mut block_bindings);
 			}
 		}
 
 		Expr::If(if_expr) => {
-			// `if let Some(alias) = &self.field` binds account aliases for
-			// both branches of the conditional.
-			bind_let_bindings(&if_expr.cond, bindings);
-			collect_assertions_from_expr(&if_expr.cond, props, bindings);
+			// An `if let` alias exists only in the `then` branch. The `else`
+			// branch and surrounding block retain their original bindings.
+			let mut then_bindings = bindings.clone();
+			bind_let_bindings(&if_expr.cond, &mut then_bindings);
+			collect_assertions_from_expr(&if_expr.cond, props, &mut then_bindings);
 
 			for stmt in &if_expr.then_branch.stmts {
-				collect_assertions_from_stmt(stmt, props, bindings);
+				collect_assertions_from_stmt(stmt, props, &mut then_bindings);
 			}
 
 			if let Some((_, else_expr)) = &if_expr.else_branch {
-				collect_assertions_from_expr(else_expr, props, bindings);
+				let mut else_bindings = bindings.clone();
+				collect_assertions_from_expr(else_expr, props, &mut else_bindings);
 			}
 		}
 
@@ -673,6 +707,8 @@ mod tests {
 					if let Some(escrow) = &self.escrow {
 						escrow.assert_signer()?;
 					}
+					let escrow = unrelated;
+					escrow.assert_writable()?;
 					Ok(())
 				}
 			}
@@ -680,7 +716,109 @@ mod tests {
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
 		let all = extract_validation_properties(&file);
 		let props = &all["MyAccounts"];
-		assert!(props.len() == 1, "only the bound field gains properties");
-		assert!(props.contains_key("escrow"));
+		assert_eq!(props.len(), 1, "only the bound field gains properties");
+		assert!(props["escrow"].is_signer);
+		assert!(!props["escrow"].is_writable);
+	}
+
+	#[test]
+	fn if_let_alias_is_not_visible_in_the_else_branch() {
+		let source = r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					let account = self.authority;
+					if let Some(account) = &self.optional {
+						account.assert_signer()?;
+					} else {
+						account.assert_writable()?;
+					}
+					Ok(())
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let all = extract_validation_properties(&file);
+		let props = &all["MyAccounts"];
+		assert!(props["optional"].is_signer);
+		assert!(!props["optional"].is_writable);
+		assert!(props["authority"].is_writable);
+		assert!(!props["authority"].is_signer);
+	}
+
+	#[test]
+	fn ignores_assertions_in_non_executed_declarations_and_control_flow() {
+		let source = r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					while false {
+						self.optional.assert_writable()?;
+					}
+					let deferred = || {
+						self.authority.assert_signer()?;
+						Ok(())
+					};
+					impl Helper {
+						fn deferred(self) -> ProgramResult {
+							self.counter.assert_writable()?;
+							Ok(())
+						}
+					}
+					Ok(())
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let all = extract_validation_properties(&file);
+		assert!(all["MyAccounts"].is_empty());
+	}
+
+	#[test]
+	fn traverses_let_else_and_parenthesized_aliases() {
+		let source = r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					let shadowed;
+					let typed: &AccountView = self.typed;
+					typed.assert_signer()?;
+					let Some(account) = self.optional else {
+						self.fallback.assert_signer()?;
+					};
+					(account).assert_writable()?;
+					Ok(())
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let all = extract_validation_properties(&file);
+		assert!(all["MyAccounts"]["optional"].is_writable);
+		assert!(all["MyAccounts"]["fallback"].is_signer);
+		assert!(all["MyAccounts"]["typed"].is_signer);
+	}
+
+	#[test]
+	fn recursively_tracks_identifiers_in_supported_patterns() {
+		use syn::parse::Parser as _;
+
+		for (source, names) in [
+			("account", &["account"][..]),
+			("&account", &["account"][..]),
+			("left | right", &["left", "right"][..]),
+			("[first, second]", &["first", "second"][..]),
+			("(first, second)", &["first", "second"][..]),
+			("Some(account)", &["account"][..]),
+			("Shape { account }", &["account"][..]),
+		] {
+			let pattern = Pat::parse_multi
+				.parse_str(source)
+				.unwrap_or_else(|error| panic!("failed to parse {source}: {error}"));
+			let mut bindings = HashMap::new();
+			bind_pattern_idents(&pattern, "field", &mut bindings);
+			for name in names {
+				assert_eq!(bindings.get(*name).map(String::as_str), Some("field"));
+			}
+
+			remove_pattern_idents(&pattern, &mut bindings);
+			assert!(bindings.is_empty());
+		}
 	}
 }

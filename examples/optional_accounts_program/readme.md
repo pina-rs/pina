@@ -25,7 +25,11 @@ The number of accounts stays fixed for every instruction. When a caller omits an
 ## Running the tests
 
 ```sh
-cargo test -p optional_accounts_program
+devenv shell -- cargo test -p optional_accounts_program
+devenv shell -- cargo build-optional-accounts-program
+devenv shell -- env SBF_OUT_DIR=target/deploy cargo test \
+  -p optional_accounts_program --test on_chain -- \
+  --include-ignored --nocapture
 ```
 
 The Surfpool end-to-end coverage lives in `codama/tests/surfpool/src/` and the LiteSVM client tests in `codama/tests/litesvm/src/optionalAccounts.test.ts`.

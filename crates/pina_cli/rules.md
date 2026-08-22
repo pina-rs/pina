@@ -23,7 +23,7 @@ This keeps the on-chain layout predictable and gives the extractor a clear path 
 ## 3. Keep dispatch canonical
 
 - Prefer a single `match` over the parsed instruction enum inside `process_instruction`.
-- Prefer routed arms that call the corresponding accounts type: `SomeAccounts::try_from(accounts)?.process(data)`.
+- Prefer routed arms that call the corresponding accounts type: `SomeAccounts::try_from((program_id, accounts))?.process(data)`.
 - Grouped `|` arms that share the same accounts type are supported.
 - Accountless arms are supported when an instruction only parses payload bytes or returns `Ok(())`.
 - Avoid hiding routing behind trait objects, closures, or helper layers if you want the IDL to remain easy to inspect.

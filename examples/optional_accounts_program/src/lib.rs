@@ -226,6 +226,7 @@ impl<'a> ProcessAccountInfos<'a> for InspectAccounts<'a> {
 		match self.store {
 			Some(store) => {
 				store.assert_type::<StoreState>(&ID)?;
+				StoreState::assert_seeds(store, self.authority.address(), &ID)?;
 				let state = store.as_account::<StoreState>(&ID)?;
 				log!("store count: {}", state.count.get());
 			}

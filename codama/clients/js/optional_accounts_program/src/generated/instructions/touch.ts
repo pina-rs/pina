@@ -178,7 +178,7 @@ export function parseTouchInstruction<
 	};
 	const getNextOptionalAccount = () => {
 		const accountMeta = getNextAccount();
-		return accountMeta.address === OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS
+		return accountMeta.address === instruction.programAddress
 			? undefined
 			: accountMeta;
 	};

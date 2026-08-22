@@ -100,7 +100,10 @@ pub fn assemble_program_ir_multi(
 		all_disc_enums.extend(discriminator::extract_discriminator_enums(file)?);
 		all_account_structs.extend(account_state::extract_account_structs(file)?);
 		all_instruction_structs.extend(instruction_data::extract_instruction_structs(file)?);
-		all_ix_accounts_structs.extend(accounts_struct::extract_accounts_structs(file));
+		all_ix_accounts_structs.extend(
+			accounts_struct::extract_accounts_structs(file)
+				.map_err(|error| IdlError::Other(error.to_string()))?,
+		);
 		all_errors.extend(error_enum::extract_error_enums(file));
 		all_zeropod_enums.extend(pod_enum::extract_zeropod_enums(file)?);
 

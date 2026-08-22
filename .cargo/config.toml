@@ -15,6 +15,7 @@ rustflags = [
 [alias]
 build-bpf = "build --release --target bpfel-unknown-none -p pina_bpf -F bpf-entrypoint -Z build-std=core,alloc"
 build-escrow-program = "build-sbf --manifest-path examples/escrow_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
+build-optional-accounts-program = "build-sbf --manifest-path examples/optional_accounts_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
 build-profile-program = "build-sbf --manifest-path examples/profile_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
 build-role-registry-program = "build-sbf --manifest-path examples/role_registry_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
 build-staking-rewards-program = "build-sbf --manifest-path examples/staking_rewards_program/Cargo.toml --sbf-out-dir target/deploy --features bpf-entrypoint"
