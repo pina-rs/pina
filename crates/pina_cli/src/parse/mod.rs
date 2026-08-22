@@ -790,7 +790,7 @@ mod tests {
 				declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 				fn process_instruction() {
 					match instruction {
-						ExampleInstruction::Run => RunAccounts::try_from(accounts)?.process(data),
+						ExampleInstruction::Run => RunAccounts::try_from((program_id, accounts))?.process(data),
 					}
 				}
 			"#,
@@ -800,7 +800,7 @@ mod tests {
 			r#"
 				fn process_instruction() {
 					match instruction {
-						ExampleInstruction::Run => RunAccounts::try_from(accounts)?.process(data),
+						ExampleInstruction::Run => RunAccounts::try_from((program_id, accounts))?.process(data),
 					}
 				}
 			"#,

@@ -385,8 +385,8 @@ fn create_input_with_layout(
 		// Account data.
 		let mut account = [0u8; STATIC_ACCOUNT_DATA + size_of::<u64>()];
 		account[0] = NON_DUP_MARKER;
+		account[1] = u8::from(is_signer(i));
 		account[2] = u8::from(is_writable(i));
-		account[3] = u8::from(is_signer(i));
 		// Give each account its configured address so alias checks and
 		// optional-slot sentinels behave deterministically.
 		account[8..40].copy_from_slice(key(i).as_ref());
@@ -467,6 +467,20 @@ unsafe fn slice_input<'a, const CAP: usize>(
 
 fn unique_keys(index: usize) -> Address {
 	key_from_byte((index + 1) as u8)
+}
+
+#[test]
+fn test_input_layout_preserves_signer_and_writable_flags() {
+	let mut input =
+		create_input_with_layout(2, &[], |index| index == 0, |index| index == 1, unique_keys);
+	let mut accounts = [UNINIT; 2];
+	// SAFETY: the buffer encodes exactly two accounts.
+	let accounts = unsafe { slice_input(&mut input, &mut accounts) };
+
+	assert!(accounts[0].is_writable());
+	assert!(!accounts[0].is_signer());
+	assert!(!accounts[1].is_writable());
+	assert!(accounts[1].is_signer());
 }
 
 #[test]

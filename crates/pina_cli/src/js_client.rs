@@ -260,9 +260,13 @@ fn harden_optional_account_parsers(source: &str) -> String {
 					.then_some(index)
 			})
 			.unwrap_or(comparison.len());
-		if end == 0 || end == comparison.len() {
+		if end == comparison.len() {
 			output.push_str(comparison);
 			return output;
+		}
+		if end == 0 {
+			remaining = comparison;
+			continue;
 		}
 		output.push_str("instruction.programAddress");
 		remaining = &comparison[end..];
@@ -503,6 +507,27 @@ const decoder = getStructDecoder([["discriminator", getU8Decoder()], ["name", fi
 		);
 		let incomplete = "return accountMeta.address === DEFAULT_PROGRAM_ADDRESS";
 		assert_eq!(harden_optional_account_parsers(incomplete), incomplete);
+	}
+
+	#[test]
+	fn optional_account_parser_hardening_scans_every_comparison() {
+		let source = r#"return accountMeta.address === (DEFAULT_PROGRAM_ADDRESS)
+	? undefined
+	: accountMeta;
+return accountMeta.address === FIRST_PROGRAM_ADDRESS
+	? undefined
+	: accountMeta;
+return accountMeta.address === SECOND_PROGRAM_ADDRESS
+	? undefined
+	: accountMeta;
+"#;
+		let expected = source
+			.replacen("FIRST_PROGRAM_ADDRESS", "instruction.programAddress", 1)
+			.replacen("SECOND_PROGRAM_ADDRESS", "instruction.programAddress", 1);
+
+		let hardened = harden_optional_account_parsers(source);
+		assert_eq!(hardened, expected);
+		assert_eq!(harden_optional_account_parsers(&hardened), expected);
 	}
 
 	#[test]
