@@ -1,6 +1,6 @@
 {
 	"name": "@pina-rs/cli-darwin-arm64",
-	"version": "0.9.0",
+	"version": "0.10.0",
 	"description": "Prebuilt Pina CLI binary for macOS arm64",
 	"homepage": "https://pina.rs",
 	"bugs": { "url": "https://github.com/pina-rs/pina/issues" },
