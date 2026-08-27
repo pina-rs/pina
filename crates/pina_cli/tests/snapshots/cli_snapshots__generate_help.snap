@@ -1,0 +1,47 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - generate
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Generate configured clients for the current Pina program.
+
+Discovers the project, refreshes its IDL, and generates only the selected client ecosystems. Repeat --client to override Pina.toml. Rust-only generation does not invoke Node.js.
+
+Usage: pina generate [OPTIONS]
+
+Options:
+  -p, --project <DIR>
+          Directory inside the project to discover. Defaults to the current directory
+
+      --client <LANGUAGE>
+          Client ecosystem to generate. Repeat to override Pina.toml
+          
+          [possible values: rust, typescript, dart]
+
+  -o, --output <DIR>
+          Override the configured client output directory
+
+      --npx <COMMAND>
+          Executable used to invoke JavaScript or Dart renderers. Defaults to npx
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina generate
+  pina generate --client rust
+  pina generate --client typescript --client dart
+  pina generate --project ./programs/counter --output ./generated
+
+Configuration:
+  [clients]
+  output = "clients"
+  languages = ["rust", "typescript"]
+
+----- stderr -----

@@ -39,6 +39,28 @@ cargo run -p pina_cli -- --help
 
 <br>
 
+### `pina build`
+
+Build the discovered program for SBF and publish its IDL.
+
+```bash
+pina build
+pina build --features logs,cpi --no-default-features
+```
+
+Outputs use Cargo's target directory: `deploy/<library>.so` and `idl/<library>.json`.
+
+### `pina generate`
+
+Generate the clients selected in `Pina.toml`, or override them for one invocation.
+
+```bash
+pina generate
+pina generate --client rust --client typescript
+```
+
+Rust-only generation does not require Node.js.
+
 ### `pina idl`
 
 <br>
@@ -75,7 +97,7 @@ pina docs pina-idl
 
 <br>
 
-Scaffold a new Pina program project.
+Scaffold a new project-aware Pina program with `Pina.toml`.
 
 ```bash
 pina init my_program

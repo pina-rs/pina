@@ -16,9 +16,12 @@ path = "src/main.rs"
 doc = false
 
 [dependencies]
+atomic-write-file = { workspace = true }
+cargo_metadata = { workspace = true, default-features = true }
 clap = { workspace = true, default-features = true }
 codama-nodes = { workspace = true, default-features = true }
 comfy-table = "8.0.0"
+fs2 = { workspace = true, default-features = true }
 heck = { workspace = true, default-features = true }
 owo-colors = "4.0"
 pina_codama_renderer = { workspace = true }
@@ -31,6 +34,7 @@ serde_json = { workspace = true, default-features = true }
 syn = { workspace = true, default-features = true, features = ["full", "extra-traits", "visit", "printing"] }
 termimad = "0.35.1"
 thiserror = { workspace = true, default-features = true }
+toml = { workspace = true, default-features = true }
 walkdir = { workspace = true, default-features = true }
 
 [dev-dependencies]

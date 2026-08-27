@@ -83,6 +83,12 @@ impl IdlError {
 /// Errors produced during end-to-end Codama generation.
 #[derive(Debug, thiserror::Error)]
 pub enum CodamaError {
+	#[error(transparent)]
+	Project(#[from] crate::project::ProjectError),
+
+	#[error("No programs were selected for generation")]
+	NoPrograms,
+
 	#[error("Failed to read examples directory at {path}: {source}")]
 	ReadExamples {
 		path: PathBuf,
@@ -100,6 +106,9 @@ pub enum CodamaError {
 		path: PathBuf,
 		source: std::io::Error,
 	},
+
+	#[error("Refusing unsafe generated-client output path {path}: {reason}")]
+	UnsafeOutput { path: PathBuf, reason: String },
 
 	#[error("IDL generation failed for `{example}` ({path}): {source}")]
 	GenerateIdl {
@@ -251,7 +260,7 @@ mod tests {
 		};
 		let msg = err.to_string();
 		assert!(msg.contains("npx codama"));
-		assert!(msg.contains("1"));
+		assert!(msg.contains('1'));
 		assert!(msg.contains("permission denied"));
 	}
 }

@@ -6,6 +6,8 @@ The installed CLI is authoritative:
 
 ```sh
 pina --help
+pina build --help
+pina generate --help
 pina idl --help
 pina docs --help
 pina init --help
@@ -14,6 +16,30 @@ pina codama generate --help
 ```
 
 Use `pina docs` to list bundled terminal topics. Custom topics can be supplied through `PINA_TEMPLATES_DIR` when a project maintains its own operational guidance.
+
+## Daily project workflow
+
+Run project-aware commands from the program directory or any descendant. Pina uses the nearest ancestor `Pina.toml`; an existing unambiguous Cargo package also works without configuration.
+
+```sh
+pina build
+pina generate
+```
+
+`pina build` compiles SBF with the required `bpf-entrypoint` feature and refreshes the IDL. Pass program features explicitly when required:
+
+```sh
+pina build --features logs,cpi --no-default-features
+```
+
+The library target name determines the canonical outputs:
+
+```text
+<cargo-target>/deploy/<library-name>.so
+<cargo-target>/idl/<library-name>.json
+```
+
+`pina generate` refreshes that IDL and renders the client languages selected in `Pina.toml`. Override the selection for one run with repeatable `--client rust`, `--client typescript`, or `--client dart` flags. Generated ecosystem roots may be replaced, so keep hand-written code outside them.
 
 ## IDL extraction
 
@@ -31,9 +57,9 @@ pina idl --path ./programs/counter_program --compact | jq -e '.program'
 
 Treat the IDL as a public contract. Review instruction, account, PDA, error, and type changes rather than accepting generated churn wholesale.
 
-## Client generation
+## Repository-wide client generation
 
-Generate every selected client target with:
+Use the legacy Codama surface when a repository intentionally generates clients for several example programs in one command:
 
 ```sh
 pina codama generate --examples-dir ./programs --idls-dir ./idls \

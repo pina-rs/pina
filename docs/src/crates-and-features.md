@@ -78,13 +78,13 @@ Commands:
 
 <!-- {=pinaCliCommands} -->
 
-| Command                  | Description                                    |
-| ------------------------ | ---------------------------------------------- |
-| `pina init <name>`       | Scaffold a new Pina program project            |
-| `pina idl --path <dir>`  | Generate a Codama IDL JSON from a Pina program |
-| `pina docs [topic]`      | List or render bundled terminal documentation  |
-| `pina profile <path.so>` | Static CU profiler for compiled SBF binaries   |
-| `pina codama generate`   | Generate Codama IDLs and Rust/JS/Dart clients  |
+- `pina init <name>` — scaffold a project-aware Pina program
+- `pina build` — build SBF and publish the program IDL
+- `pina generate` — generate configured Rust, TypeScript, or Dart clients
+- `pina idl --path <dir>` — generate a Codama IDL JSON from a Pina program
+- `pina docs [topic]` — list or render bundled terminal documentation
+- `pina profile <path.so>` — profile a compiled SBF binary statically
+- `pina codama generate` — run the legacy repository-wide client workflow
 
 <!-- {/pinaCliCommands} -->
 

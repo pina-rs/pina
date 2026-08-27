@@ -31,7 +31,9 @@ The shortcut runs `cargo run -p pina_cli -- ...` against the checked-out source.
 
 | Command                                        | Purpose                                              | Primary output        |
 | ---------------------------------------------- | ---------------------------------------------------- | --------------------- |
-| [`pina init`](./init.md)                       | Create a new program scaffold                        | Files plus next steps |
+| [`pina init`](./init.md)                       | Create a project-aware program scaffold              | Files plus next steps |
+| [`pina build`](./build.md)                     | Build SBF and refresh the program IDL                | SBF and IDL files     |
+| [`pina generate`](./generate.md)               | Generate configured client ecosystems                | Generated clients     |
 | [`pina idl`](./idl.md)                         | Extract a Codama root-node IDL                       | JSON                  |
 | [`pina docs`](./docs.md)                       | List or render bundled terminal docs                 | Terminal text         |
 | [`pina profile`](./profile.md)                 | Estimate per-function SBF compute cost               | Text or JSON          |
@@ -43,6 +45,8 @@ The help tree is intentionally self-describing:
 
 ```bash
 pina --help
+pina build --help
+pina generate --help
 pina idl --help
 pina docs --help
 pina init --help
@@ -60,6 +64,8 @@ Long help includes the input contract, output behavior, defaults, and copyable e
 | `idl`             | JSON when `--output` is omitted   | Progress, extraction counts, errors |
 | `docs`            | Topic index or rendered Markdown  | Errors                              |
 | `init`            | Created path and next steps       | Errors                              |
+| `build`           | Published artifact summary        | Cargo output and errors             |
+| `generate`        | IDL and client summary            | Renderer output and errors          |
 | `profile`         | Report when `--output` is omitted | Errors                              |
 | `codama generate` | Completion summary                | Errors and renderer failures        |
 
@@ -73,12 +79,12 @@ Relative paths are resolved from the process working directory. Output commands 
 
 ## Environment
 
-The CLI reads one optional environment variable:
+Project-aware commands read `Pina.toml` and respect standard Cargo variables such as `CARGO_TARGET_DIR` and `CARGO`. The CLI also reads one Pina-specific optional environment variable:
 
 | Variable             | Used by     | Meaning                                          |
 | -------------------- | ----------- | ------------------------------------------------ |
 | `PINA_TEMPLATES_DIR` | `pina docs` | Directory containing custom `<topic>.t.md` files |
 
-No configuration file is required.
+No configuration file is required for an unambiguous Cargo package. `pina init` creates a small `Pina.toml` so every tool and agent discovers the same program and client choices.
 
 Agents that maintain Pina projects can install the companion [`@pina-rs/skill`](../agent-skill.md) package.

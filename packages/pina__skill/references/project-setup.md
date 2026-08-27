@@ -8,7 +8,11 @@ Start a program with the installed CLI so the generated Pina version, feature na
 pina init counter_program
 cd counter_program
 cargo test
+pina build
+pina generate
 ```
+
+The scaffold pins the nightly toolchain and `rust-src` needed by `pina build`; install its compatible linker with `cargo install sbpf-linker --version 0.1.8 --locked` before the first SBF build. TypeScript client generation also requires Node.js with npm and `npx`. Keep the generated `Pina.toml` as the project-local discovery and client-selection contract.
 
 Use `pina init --help` before selecting a destination or replacing existing scaffold files. The command preserves existing files unless the user explicitly supplies `--force`; inspect the destination before using that flag.
 
