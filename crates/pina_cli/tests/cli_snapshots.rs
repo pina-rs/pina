@@ -205,10 +205,110 @@ fn docs_unknown_topic_error_snapshot() {
 }
 
 #[test]
+fn docs_load_bundled_and_custom_topics() {
+	let bundled = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["docs", "pina-overview"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to load bundled docs: {error}"));
+	assert!(bundled.status.success());
+	assert!(String::from_utf8_lossy(&bundled.stdout).contains("Pina"));
+
+	let templates = reset_snapshot_dir("custom_docs");
+	fs::write(templates.join("local.t.md"), "# Local Pina docs\n")
+		.unwrap_or_else(|error| panic!("failed to write custom docs: {error}"));
+	let custom = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["docs", "local"])
+		.env("PINA_TEMPLATES_DIR", &templates)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to load custom docs: {error}"));
+	assert!(custom.status.success());
+	assert!(String::from_utf8_lossy(&custom.stdout).contains("Local Pina docs"));
+}
+
+#[test]
+fn docs_report_custom_template_failures_and_attempted_paths() {
+	let templates = reset_snapshot_dir("invalid_custom_docs");
+	fs::write(templates.join("invalid.t.md"), [0xff])
+		.unwrap_or_else(|error| panic!("failed to write invalid custom docs: {error}"));
+	let invalid = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["docs", "invalid"])
+		.env("PINA_TEMPLATES_DIR", &templates)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run invalid custom docs: {error}"));
+	assert!(!invalid.status.success());
+	assert!(String::from_utf8_lossy(&invalid.stderr).contains("Failed to read template"));
+
+	let missing = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["docs", "missing"])
+		.env("PINA_TEMPLATES_DIR", &templates)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run missing custom docs: {error}"));
+	assert!(!missing.status.success());
+	assert!(String::from_utf8_lossy(&missing.stderr).contains("Attempted template paths"));
+}
+
+#[test]
 fn init_help_snapshot() {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command.args(["init", "--help"]);
 	assert_cmd_snapshot!("init_help", command);
+}
+
+#[test]
+fn keys_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["keys", "--help"]);
+	assert_cmd_snapshot!("keys_help", command);
+}
+
+#[test]
+fn keys_sync_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["keys", "sync", "--help"]);
+	assert_cmd_snapshot!("keys_sync_help", command);
+}
+
+#[test]
+fn keys_show_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["keys", "show", "--help"]);
+	assert_cmd_snapshot!("keys_show_help", command);
+}
+
+#[test]
+fn keys_new_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["keys", "new", "--help"]);
+	assert_cmd_snapshot!("keys_new_help", command);
+}
+
+#[test]
+fn doctor_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["doctor", "--help"]);
+	assert_cmd_snapshot!("doctor_help", command);
+}
+
+#[test]
+fn completions_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["completions", "--help"]);
+	assert_cmd_snapshot!("completions_help", command);
+}
+
+#[test]
+fn bash_completions_are_written_to_stdout() {
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["completions", "bash"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to generate completions: {error}"));
+	let stdout = String::from_utf8_lossy(&output.stdout);
+
+	assert!(output.status.success());
+	assert!(output.stderr.is_empty());
+	assert!(stdout.contains("_pina"));
+	assert!(stdout.contains("doctor"));
+	assert!(stdout.contains("completions"));
 }
 
 #[test]
@@ -329,6 +429,32 @@ fn idl_output_file_is_machine_readable_json() {
 	serde_json::from_slice::<serde_json::Value>(&json)
 		.unwrap_or_else(|error| panic!("generated IDL was not valid JSON: {error}"));
 	assert!(String::from_utf8_lossy(&output.stderr).contains("Wrote"));
+}
+
+#[test]
+fn idl_reports_generation_and_output_write_failures() {
+	let generation = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.current_dir(workspace_root())
+		.args(["idl", "--path", "target/definitely-missing-program"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run invalid IDL generation: {error}"));
+	assert!(!generation.status.success());
+	assert!(String::from_utf8_lossy(&generation.stderr).contains("Error"));
+
+	let output_dir = reset_snapshot_dir("idl_output_write_failure");
+	let write = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.current_dir(workspace_root())
+		.args([
+			"idl",
+			"--path",
+			"examples/anchor_declare_id",
+			"--output",
+			&workspace_relative(&output_dir),
+		])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run IDL output failure: {error}"));
+	assert!(!write.status.success());
+	assert!(String::from_utf8_lossy(&write.stderr).contains("Failed to write"));
 }
 
 #[test]

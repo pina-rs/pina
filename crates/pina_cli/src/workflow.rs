@@ -512,6 +512,7 @@ fn parse_version(value: &str) -> Option<semver::Version> {
 #[cfg(test)]
 mod tests {
 	use std::fs;
+	#[cfg(unix)]
 	use std::process::ExitStatus;
 
 	use super::*;
@@ -952,6 +953,7 @@ mod tests {
 			program_dir: root.clone(),
 			package_name: "fixture".to_owned(),
 			library_name: "fixture".to_owned(),
+			library_source: root.join("src/lib.rs"),
 			target_dir: root.join("target"),
 			idl_dir: root.join("target/idl"),
 			clients_dir: root.join("clients"),

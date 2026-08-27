@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
+use clap_complete::Shell;
 
 /// Build, inspect, and generate artifacts for Pina Solana programs.
 #[derive(Parser, Debug)]
@@ -19,20 +20,22 @@ use clap::ValueEnum;
 	              test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, \
 	              'pina dev' for a persistent Surfpool network, 'pina generate' for selected \
 	              client ecosystems, 'pina deploy' for explicit cluster deployment, and 'pina \
-	              verify' for deployed-program verification. Low-level IDL, profiling, terminal \
-	              documentation, and the legacy repository-wide Codama workflow remain available.",
+	              verify' for deployed-program verification. Use 'pina doctor' for agent-readable \
+	              diagnostics, 'pina keys' for program identity, and 'pina completions' for shell \
+	              integration. Low-level IDL, profiling, terminal documentation, and the legacy \
+	              repository-wide Codama workflow remain available.",
 	next_line_help = true,
 	arg_required_else_help = true,
 	after_help = "Examples:\n  pina init counter_program\n  cd counter_program && pina build\n  \
 	              pina test\n  pina test --unit\n  pina dev --yes\n  pina generate --client rust \
-	              --client typescript\n  pina idl --path ./programs/counter_program --output \
-	              ./idls/counter_program.json\n  pina profile ./target/deploy/counter_program.so \
-	              --json\n  pina deploy --cluster localnet --payer ~/.config/solana/id.json \
-	              --upgrade-authority ~/.config/solana/id.json --dry-run\n\nAgent discovery:\n  \
-	              Run 'pina <command> --help' for command-specific inputs, outputs, and \
-	              examples.\n  Run 'pina docs' to list the bundled architecture and IDL reference \
-	              topics.\n  For deployment verification, run 'pina verify --help' and then \
-	              inspect the selected leaf command."
+	              --client typescript\n  pina doctor --json\n  pina keys\n  pina idl --path \
+	              ./programs/counter_program --output ./idls/counter_program.json\n  pina profile \
+	              ./target/deploy/counter_program.so --json\n  pina deploy --cluster localnet \
+	              --payer ~/.config/solana/id.json --upgrade-authority ~/.config/solana/id.json \
+	              --dry-run\n\nAgent discovery:\n  Run 'pina <command> --help' for \
+	              command-specific inputs, outputs, and examples.\n  Run 'pina docs' to list the \
+	              bundled architecture and IDL reference topics.\n  For deployment verification, \
+	              run 'pina verify --help' and then inspect the selected leaf command."
 )]
 pub(crate) struct Cli {
 	#[command(subcommand)]
@@ -191,6 +194,81 @@ pub(crate) enum Commands {
 		force: bool,
 	},
 
+	/// Inspect or synchronize the current program's identity.
+	///
+	/// Run without a subcommand to compare the source `declare_id!` with the
+	/// conventional local keypair. `pina keys sync` explicitly updates only that
+	/// string literal after validating an unambiguous declaration and keypair.
+	#[command(
+		after_help = "Examples:\n  pina keys\n  pina keys show --json\n  pina keys --path \
+		              ./programs/counter\n  pina keys sync\n  pina keys sync --keypair \
+		              ./keys/counter-keypair.json\n  pina keys new\n  pina keys new --force"
+	)]
+	Keys {
+		/// Inspect or synchronize a specific program crate. Defaults to the nearest project.
+		#[arg(
+			short,
+			long,
+			global = true,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		path: PathBuf,
+
+		/// Use KEYPAIR instead of `target/deploy/<program>-keypair.json`.
+		#[arg(long, global = true, value_name = "KEYPAIR")]
+		keypair: Option<PathBuf>,
+
+		/// Emit a stable machine-readable JSON document.
+		#[arg(long, global = true)]
+		json: bool,
+
+		#[command(subcommand)]
+		command: Option<KeysCommands>,
+	},
+
+	/// Diagnose the current project and development toolchain.
+	///
+	/// Checks project discovery, source identity, conventional artifact paths,
+	/// and relevant Rust, Solana, Surfpool, and configured client tools. Missing
+	/// required prerequisites or a project produce an unsuccessful exit.
+	#[command(
+		after_help = "Examples:\n  pina doctor\n  pina doctor --json\n  pina doctor --path \
+		              ./programs/counter\n\nAgent use:\n  `pina doctor --json` emits \
+		              schemaVersion, status, project, tools, checks, and findings without color \
+		              or progress output."
+	)]
+	Doctor {
+		/// Diagnose the nearest program package at or above DIR.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		path: PathBuf,
+
+		/// Emit a stable machine-readable JSON document.
+		#[arg(long)]
+		json: bool,
+	},
+
+	/// Generate shell completion scripts.
+	///
+	/// Writes the selected completion script to stdout so it can be redirected,
+	/// sourced, or installed by a package manager without temporary files.
+	#[command(after_help = "Examples:\n  pina completions bash > \
+	                        ~/.local/share/bash-completion/completions/pina\n  pina completions \
+	                        zsh > ~/.zfunc/_pina\n  pina completions fish > \
+	                        ~/.config/fish/completions/pina.fish")]
+	Completions {
+		/// Shell whose completion script should be generated.
+		#[arg(value_enum, value_name = "SHELL")]
+		shell: Shell,
+	},
+
 	/// Test a Pina program with fast native tests or an isolated Surfpool instance.
 	///
 	/// The default workflow builds the actual SBF shared object, verifies that it
@@ -284,14 +362,24 @@ pub(crate) enum Commands {
 	/// stdout by default. Use --json for machine-readable output and --output
 	/// to write either format to a file.
 	#[command(
-		after_help = "Examples:\n  pina profile ./target/deploy/counter_program.so\n  pina \
-		              profile ./target/deploy/counter_program.so --json\n  pina profile \
+		after_help = "Examples:\n  pina profile\n  pina profile --json\n  pina profile --project \
+		              ./programs/counter_program\n  pina profile \
+		              ./target/deploy/counter_program.so --json\n  pina profile \
 		              ./target/deploy/counter_program.so --json -o ./profile.json"
 	)]
 	Profile {
-		/// Compiled SBF shared object to analyze.
+		/// Compiled SBF shared object. Omit to discover the current project's artifact.
 		#[arg(value_name = "PROGRAM.SO")]
-		path: PathBuf,
+		path: Option<PathBuf>,
+
+		/// Project used for artifact discovery when PROGRAM.SO is omitted.
+		#[arg(
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
 
 		/// Emit machine-readable JSON instead of the text report.
 		#[arg(long)]
@@ -675,6 +763,30 @@ pub(crate) enum ClientArg {
 	Rust,
 	Typescript,
 	Dart,
+}
+
+/// Program identity operations.
+#[derive(Subcommand, Debug)]
+pub(crate) enum KeysCommands {
+	/// Show the source and local keypair program IDs without changing files.
+	Show,
+
+	/// Update the source `declare_id!` from a validated local keypair.
+	///
+	/// It fails before writing when the keypair is missing or malformed, the
+	/// address is invalid, or source contains zero or multiple declarations.
+	Sync,
+
+	/// Generate a local keypair and synchronize the source program ID.
+	///
+	/// Existing keypairs are preserved unless --force explicitly authorizes
+	/// identity rotation. Platforms where private permissions cannot be guaranteed
+	/// fail before creating secret material.
+	New {
+		/// Replace an existing keypair and rotate the source program ID.
+		#[arg(long)]
+		force: bool,
+	},
 }
 
 /// Deployed-program verification operations.

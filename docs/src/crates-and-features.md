@@ -83,9 +83,13 @@ Commands:
 - `pina generate` — generate configured Rust, TypeScript, or Dart clients
 - `pina test [--unit]` — run native/Mollusk or SBF/Surfpool tests
 - `pina dev [--yes]` — run Surfpool's persistent watch/redeploy loop
+- `pina verify` — compare deployments and record verified source
 - `pina idl --path <dir>` — generate a Codama IDL JSON from a Pina program
 - `pina docs [topic]` — list or render bundled terminal documentation
-- `pina profile <path.so>` — profile a compiled SBF binary statically
+- `pina keys [show|sync|new]` — inspect or explicitly update program identity
+- `pina doctor [--json]` — diagnose project and toolchain readiness
+- `pina completions <shell>` — generate a shell completion script
+- `pina profile [path.so]` — profile a compiled or discovered SBF binary statically
 - `pina deploy` — plan and execute an explicit cluster deployment
 - `pina codama generate` — run the legacy repository-wide client workflow
 

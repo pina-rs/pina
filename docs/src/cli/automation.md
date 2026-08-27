@@ -34,6 +34,13 @@ pina test --help
 pina dev --help
 ```
 
+For project diagnostics and identity:
+
+```bash
+pina doctor --help
+pina keys --help
+```
+
 For framework and extractor constraints:
 
 ```bash
@@ -68,6 +75,20 @@ Profile a binary as JSON:
 pina profile ./target/deploy/counter_program.so --json > /tmp/profile.json
 jq -e '.functions | type == "array"' /tmp/profile.json
 ```
+
+Diagnose project readiness through the versioned JSON contract:
+
+```bash
+pina doctor --json > /tmp/pina-doctor.json
+```
+
+Read-only identity inspection is also JSON-safe:
+
+```bash
+pina keys show --json > /tmp/pina-keys.json
+```
+
+These commands write no progress or ANSI styling to stdout. Doctor check IDs and statuses are stable agent inputs; do not parse the human report when JSON is available.
 
 Inspect a deployment without executing a child process:
 

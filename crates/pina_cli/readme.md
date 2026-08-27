@@ -147,10 +147,13 @@ pina dev --network devnet
 Static CU profiler for compiled SBF programs.
 
 ```bash
+pina profile
 pina profile target/deploy/my_program.so
 pina profile target/deploy/my_program.so --json
 pina profile target/deploy/my_program.so --output report.json
 ```
+
+When no binary is supplied, Pina discovers the current project's canonical deploy artifact. Output publication rejects aliases, hardlinks, symbolic links, and reparse points that could overwrite the input program.
 
 ### `pina deploy`
 

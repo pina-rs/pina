@@ -1,0 +1,36 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - doctor
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Diagnose the current project and development toolchain.
+
+Checks project discovery, source identity, conventional artifact paths, and relevant Rust, Solana, Surfpool, and configured client tools. Missing required prerequisites or a project produce an unsuccessful exit.
+
+Usage: pina doctor [OPTIONS]
+
+Options:
+  -p, --path <DIR>
+          Diagnose the nearest program package at or above DIR
+
+      --json
+          Emit a stable machine-readable JSON document
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina doctor
+  pina doctor --json
+  pina doctor --path ./programs/counter
+
+Agent use:
+  `pina doctor --json` emits schemaVersion, status, project, tools, checks, and findings without color or progress output.
+
+----- stderr -----

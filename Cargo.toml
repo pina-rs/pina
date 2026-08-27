@@ -97,11 +97,13 @@ base64 = "0.22.1"
 bs58 = "0.5.1"
 cargo_metadata = { default-features = false, version = "^0.23" }
 clap = { default-features = false, version = "^4", features = ["derive", "std"] }
+clap_complete = { default-features = false, version = "^4" }
 codama-nodes = { default-features = false, version = "0.11.0" }
 darling = { default-features = false, version = "0.24.0" }
 ed25519-dalek = { version = "2.2.0", default-features = false }
 flate2 = { default-features = true, version = "1.1.2" }
 fs2 = { default-features = false, version = "^0.4" }
+getrandom = { default-features = false, version = "0.4.2" }
 heck = { default-features = false, version = "^0.5" }
 http = { default-features = false, version = "^1" }
 insta = { default-features = false, version = "^1" }
@@ -121,6 +123,7 @@ prettyplease = { default-features = false, version = "^0.3" }
 proc-macro2 = { default-features = false, version = "^1" }
 proptest = { default-features = false, version = "^1", features = ["std"] }
 quote = { default-features = false, version = "^1" }
+same-file = { default-features = false, version = "^1" }
 semver = { default-features = false, version = "^1" }
 serde = { default-features = false, version = "^1" }
 serde_json = { default-features = false, version = "^1", features = ["std"] }

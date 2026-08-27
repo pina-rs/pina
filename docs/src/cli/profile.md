@@ -5,22 +5,27 @@ Estimate compute-unit costs in a compiled Solana SBF shared object without start
 ## Synopsis
 
 ```text
-pina profile [OPTIONS] <PROGRAM.SO>
+pina profile [OPTIONS] [PROGRAM.SO]
 ```
 
 | Input                 | Default  | Meaning                                       |
 | --------------------- | -------- | --------------------------------------------- |
-| `PROGRAM.SO`          | required | Compiled SBF ELF shared object.               |
+| `PROGRAM.SO`          | detected | Compiled SBF ELF shared object.               |
+| `--project <DIR>`     | `.`      | Start directory for artifact discovery.       |
 | `--json`              | off      | Emit structured JSON instead of a text table. |
 | `-o, --output <FILE>` | stdout   | Write the selected format to a file.          |
 
 ## Examples
 
 ```bash
+pina profile
+pina profile --project ./programs/counter_program
 pina profile ./target/deploy/counter_program.so
 pina profile ./target/deploy/counter_program.so --json
 pina profile ./target/deploy/counter_program.so --json --output ./profile.json
 ```
+
+The positional path remains supported for scripts and custom artifacts. When it is omitted, Pina discovers the nearest Cargo program and profiles the canonical `<cargo-target>/deploy/<lib-target>.so` artifact. Discovery fails with the exact expected path when the program has not been built.
 
 JSON includes program and binary metadata, aggregate instruction/syscall/CU counts, and a per-function array with offsets, sizes, and estimates.
 
@@ -32,4 +37,4 @@ This is a deterministic comparison tool, not a replacement for runtime measureme
 
 ## Safety and failures
 
-The command refuses to use the input binary itself as `--output`. It also fails for unreadable files, invalid ELF data, binaries without an SBF text section, output creation errors, and JSON serialization errors.
+The command compares filesystem identity and refuses an output that is the input binary, a hardlink to it, or below a symbolic-link/reparse-point path. Reports are published atomically, so a failed write cannot truncate an existing destination or the input binary. Profiling also fails for unreadable files, invalid ELF data, binaries without an SBF text section, output creation errors, and JSON serialization errors.

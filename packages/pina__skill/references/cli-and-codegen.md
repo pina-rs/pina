@@ -17,6 +17,9 @@ pina docs --help
 pina init --help
 pina test --help
 pina dev --help
+pina keys --help
+pina doctor --help
+pina completions --help
 pina profile --help
 pina deploy --help
 pina codama generate --help
@@ -49,6 +52,19 @@ The library target name determines the canonical outputs:
 ```
 
 `pina generate` refreshes that IDL and renders the client languages selected in `Pina.toml`. Override the selection for one run with repeatable `--client rust`, `--client typescript`, or `--client dart` flags. Generated ecosystem roots may be replaced, so keep hand-written code outside them.
+
+## Project diagnostics and identity
+
+Use the versioned diagnostic report before changing a project:
+
+```sh
+pina doctor --json
+pina keys show --json
+```
+
+`doctor --json` keeps stdout valid JSON and returns a failing exit status when required project or SBF prerequisites are unavailable. Its tool requirements follow the clients selected in `Pina.toml`.
+
+Treat program identity changes as security-sensitive. `pina keys sync` validates an existing Ed25519 keypair and updates exactly one parsed `declare_id!`. `pina keys new` creates a local identity; only `pina keys new --force` may rotate an existing one. Never copy or print keypair bytes. On platforms where Pina cannot guarantee private permissions, generate the keypair with trusted platform tooling and then run `pina keys sync --keypair <path>`.
 
 ## Deterministic build artifacts
 
@@ -130,11 +146,12 @@ Pina's generated clients preserve discriminator-first layouts and zeropod bounda
 Profile a compiled shared object:
 
 ```sh
+pina profile
 pina profile ./target/deploy/counter_program.so
 pina profile ./target/deploy/counter_program.so --json --output ./profile.json
 ```
 
-The report is a static estimate, not a validator execution trace. Use it for deterministic comparisons and investigate material changes in context.
+When the path is omitted, Pina discovers `<cargo-target>/deploy/<library-name>.so`. The report is a static estimate, not a validator execution trace. Use it for deterministic comparisons and investigate material changes in context. Output files are written atomically and cannot alias the input binary through hardlinks or linked paths.
 
 # Verified deployments
 

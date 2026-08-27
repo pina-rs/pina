@@ -1,0 +1,33 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - completions
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Generate shell completion scripts.
+
+Writes the selected completion script to stdout so it can be redirected, sourced, or installed by a package manager without temporary files.
+
+Usage: pina completions <SHELL>
+
+Arguments:
+  <SHELL>
+          Shell whose completion script should be generated
+          
+          [possible values: bash, elvish, fish, powershell, zsh]
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina completions bash > ~/.local/share/bash-completion/completions/pina
+  pina completions zsh > ~/.zfunc/_pina
+  pina completions fish > ~/.config/fish/completions/pina.fish
+
+----- stderr -----

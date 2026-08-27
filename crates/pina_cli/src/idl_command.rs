@@ -11,7 +11,7 @@ use crate::cli::ExportArg;
 use crate::cli::IdlCommands;
 use crate::cli::IdlExportEncodingArg;
 use crate::cli::IdlGenerateArgs;
-use crate::run_idl;
+use crate::commands::run_idl;
 
 pub(crate) fn run_idl_command(command: Option<IdlCommands>, generate: &IdlGenerateArgs) {
 	match command {

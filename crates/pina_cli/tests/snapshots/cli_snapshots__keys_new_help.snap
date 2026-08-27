@@ -1,0 +1,35 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - keys
+    - new
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Generate a local keypair and synchronize the source program ID.
+
+Existing keypairs are preserved unless --force explicitly authorizes identity rotation. Platforms where private permissions cannot be guaranteed fail before creating secret material.
+
+Usage: pina keys new [OPTIONS]
+
+Options:
+      --force
+          Replace an existing keypair and rotate the source program ID
+
+  -p, --path <DIR>
+          Inspect or synchronize a specific program crate. Defaults to the nearest project
+
+      --keypair <KEYPAIR>
+          Use KEYPAIR instead of `target/deploy/<program>-keypair.json`
+
+      --json
+          Emit a stable machine-readable JSON document
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+----- stderr -----

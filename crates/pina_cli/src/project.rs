@@ -37,12 +37,14 @@ impl ClientLanguage {
 }
 
 /// Resolved paths and package metadata for one Pina program.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Project {
 	pub root: PathBuf,
 	pub program_dir: PathBuf,
 	pub package_name: String,
 	pub library_name: String,
+	pub library_source: PathBuf,
 	pub target_dir: PathBuf,
 	pub idl_dir: PathBuf,
 	pub clients_dir: PathBuf,
@@ -129,9 +131,28 @@ pub enum ProjectError {
 		 directory or add Pina.toml. Candidates: {candidates}"
 	)]
 	AmbiguousWorkspace { path: PathBuf, candidates: String },
+
+	#[error("Cargo package {package} does not define a Rust library target")]
+	MissingLibraryTarget { package: String },
 }
 
 impl Project {
+	/// Return the canonical SBF artifact published by `pina build`.
+	#[must_use]
+	pub fn sbf_artifact(&self) -> PathBuf {
+		self.target_dir
+			.join("deploy")
+			.join(format!("{}.so", self.library_name))
+	}
+
+	/// Return the conventional local deployment keypair path.
+	#[must_use]
+	pub fn keypair(&self) -> PathBuf {
+		self.target_dir
+			.join("deploy")
+			.join(format!("{}-keypair.json", self.library_name))
+	}
+
 	/// Discover a project from `start`, preferring the nearest `Pina.toml` and
 	/// falling back to Cargo metadata for existing projects.
 	///
@@ -192,7 +213,7 @@ impl Project {
 		let metadata = cargo_metadata(&root, Some(&manifest_path))?;
 		let package = package_for_manifest(&metadata, &manifest_path, &root)?;
 		let target_dir = metadata.target_directory.as_std_path().to_path_buf();
-		let library_name = library_name(package);
+		let (library_name, library_source) = library_details(package)?;
 		let idl_dir = config
 			.project
 			.idl_dir
@@ -207,6 +228,7 @@ impl Project {
 			program_dir,
 			package_name: package.name.to_string(),
 			library_name,
+			library_source,
 			idl_dir,
 			target_dir,
 			clients_dir,
@@ -257,7 +279,7 @@ impl Project {
 			});
 		};
 
-		let library_name = library_name(package);
+		let (library_name, library_source) = library_details(package)?;
 		let root = program_dir.to_path_buf();
 		let target_dir = metadata.target_directory.as_std_path().to_path_buf();
 
@@ -265,6 +287,7 @@ impl Project {
 			program_dir: root.clone(),
 			package_name: package.name.to_string(),
 			library_name,
+			library_source,
 			idl_dir: target_dir.join("idl"),
 			target_dir,
 			clients_dir: root.join("clients"),
@@ -377,8 +400,8 @@ fn package_for_manifest<'a>(
 		})
 }
 
-fn library_name(package: &Package) -> String {
-	package
+fn library_details(package: &Package) -> Result<(String, PathBuf), ProjectError> {
+	let target = package
 		.targets
 		.iter()
 		.find(|target| {
@@ -387,10 +410,16 @@ fn library_name(package: &Package) -> String {
 				.iter()
 				.any(|kind| matches!(kind, TargetKind::Lib | TargetKind::CDyLib))
 		})
-		.map_or_else(
-			|| package.name.replace('-', "_"),
-			|target| target.name.clone(),
-		)
+		.ok_or_else(|| {
+			ProjectError::MissingLibraryTarget {
+				package: package.name.to_string(),
+			}
+		})?;
+
+	Ok((
+		target.name.clone(),
+		target.src_path.as_std_path().to_path_buf(),
+	))
 }
 
 fn cargo_metadata(start: &Path, manifest_path: Option<&Path>) -> Result<Metadata, ProjectError> {
@@ -764,7 +793,7 @@ languages = ["rust", "dart"]
 	}
 
 	#[test]
-	fn cargo_metadata_falls_back_to_the_package_name_without_a_library_target() {
+	fn cargo_metadata_rejects_packages_without_a_library_target() {
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 		fs::create_dir_all(temp.path().join("src"))
 			.unwrap_or_else(|error| panic!("failed to create source directory: {error}"));
@@ -776,10 +805,10 @@ languages = ["rust", "dart"]
 		fs::write(temp.path().join("src/main.rs"), "fn main() {}")
 			.unwrap_or_else(|error| panic!("failed to write binary: {error}"));
 
-		let project = Project::discover(temp.path())
-			.unwrap_or_else(|error| panic!("discovery failed: {error}"));
+		let error = Project::discover(temp.path())
+			.expect_err("a Pina program must define a library target");
 
-		assert_eq!(project.library_name, "binary_package");
+		assert!(matches!(error, ProjectError::MissingLibraryTarget { .. }));
 	}
 
 	#[test]

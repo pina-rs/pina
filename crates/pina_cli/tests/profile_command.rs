@@ -3,6 +3,7 @@
 //! Builds minimal synthetic SBF ELF binaries and exercises the CLI end-to-end.
 
 use std::io::Write;
+use std::path::Path;
 use std::process::Command;
 
 use object::Architecture;
@@ -111,6 +112,8 @@ fn cli_profile_output_to_file() {
 		.suffix(".json")
 		.tempfile()
 		.unwrap_or_else(|e| panic!("temp: {e}"));
+	let output_path = std::fs::canonicalize(output_file.path())
+		.unwrap_or_else(|error| panic!("canonicalize output failed: {error}"));
 
 	let result = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.args([
@@ -118,7 +121,7 @@ fn cli_profile_output_to_file() {
 			elf_file.path().to_str().unwrap(),
 			"--json",
 			"--output",
-			output_file.path().to_str().unwrap(),
+			output_path.to_str().unwrap(),
 		])
 		.output()
 		.unwrap_or_else(|e| panic!("failed to run pina profile --output: {e}"));
@@ -129,8 +132,8 @@ fn cli_profile_output_to_file() {
 		String::from_utf8_lossy(&result.stderr)
 	);
 
-	let content = std::fs::read_to_string(output_file.path())
-		.unwrap_or_else(|e| panic!("read output file: {e}"));
+	let content =
+		std::fs::read_to_string(&output_path).unwrap_or_else(|e| panic!("read output file: {e}"));
 	let parsed: serde_json::Value = serde_json::from_str(&content)
 		.unwrap_or_else(|e| panic!("invalid JSON in output file: {e}"));
 	assert!(parsed["functions"].is_array());
@@ -171,17 +174,208 @@ fn cli_profile_non_elf_fails() {
 fn cli_profile_refuses_overwrite_input() {
 	let elf_data = build_sbf_elf(80, &[]);
 	let file = write_temp_elf(&elf_data);
-	let path_str = file.path().to_str().unwrap();
+	let canonical_path = std::fs::canonicalize(file.path())
+		.unwrap_or_else(|error| panic!("canonicalize input failed: {error}"));
+	let path = canonical_path.as_path();
+	let path_str = path.to_str().unwrap();
+	let output_path = path
+		.parent()
+		.expect("temporary file has a parent")
+		.join(".")
+		.join(path.file_name().expect("temporary file has a name"));
+	let before = std::fs::read(path).unwrap_or_else(|error| panic!("input read failed: {error}"));
 
 	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
-		.args(["profile", path_str, "--output", path_str])
+		.args([
+			"profile",
+			path_str,
+			"--output",
+			output_path.to_str().expect("UTF-8 output path"),
+		])
 		.output()
 		.unwrap_or_else(|e| panic!("failed to run: {e}"));
 
 	assert!(!output.status.success());
 	let stderr = String::from_utf8_lossy(&output.stderr);
 	assert!(
-		stderr.contains("Refusing to overwrite"),
+		stderr.contains("path resolves to the input program"),
 		"expected overwrite guard: {stderr}"
+	);
+	assert_eq!(
+		std::fs::read(path).unwrap_or_else(|error| panic!("input read failed: {error}")),
+		before
+	);
+}
+
+#[test]
+fn cli_profile_refuses_hardlink_output_without_changing_input() {
+	let elf_data = build_sbf_elf(80, &[]);
+	let file = write_temp_elf(&elf_data);
+	let input_path = std::fs::canonicalize(file.path())
+		.unwrap_or_else(|error| panic!("canonicalize input failed: {error}"));
+	let output_path = input_path.with_extension("hardlink.so");
+	std::fs::hard_link(&input_path, &output_path)
+		.unwrap_or_else(|error| panic!("hardlink failed: {error}"));
+
+	let result = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args([
+			"profile",
+			input_path.to_str().expect("UTF-8 input path"),
+			"--output",
+			output_path.to_str().expect("UTF-8 output path"),
+		])
+		.output()
+		.unwrap_or_else(|error| panic!("profile failed to launch: {error}"));
+
+	assert!(!result.status.success());
+	assert!(String::from_utf8_lossy(&result.stderr).contains("path resolves to the input program"));
+	assert_eq!(
+		std::fs::read(file.path()).unwrap_or_else(|error| panic!("input read failed: {error}")),
+		elf_data
+	);
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_profile_refuses_symlinked_output_ancestor() {
+	use std::os::unix::fs::symlink;
+
+	let elf_data = build_sbf_elf(80, &[]);
+	let file = write_temp_elf(&elf_data);
+	let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
+	let root = std::fs::canonicalize(temp.path())
+		.unwrap_or_else(|error| panic!("canonicalize temp failed: {error}"));
+	let target = root.join("target");
+	let link = root.join("linked");
+	std::fs::create_dir(&target).unwrap_or_else(|error| panic!("target create failed: {error}"));
+	symlink(&target, &link).unwrap_or_else(|error| panic!("symlink failed: {error}"));
+	let output_path = link.join("report.json");
+
+	let result = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args([
+			"profile",
+			file.path().to_str().expect("UTF-8 input path"),
+			"--output",
+			output_path.to_str().expect("UTF-8 output path"),
+		])
+		.output()
+		.unwrap_or_else(|error| panic!("profile failed to launch: {error}"));
+
+	assert!(!result.status.success());
+	assert!(
+		String::from_utf8_lossy(&result.stderr)
+			.contains("path contains a symbolic link or reparse point")
+	);
+	assert!(!target.join("report.json").exists());
+}
+
+#[test]
+fn cli_profile_discovers_current_project_artifact() {
+	let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
+	let source_dir = temp.path().join("src");
+	let artifact_dir = temp.path().join("target/deploy");
+	std::fs::create_dir_all(&source_dir)
+		.unwrap_or_else(|error| panic!("create source failed: {error}"));
+	std::fs::create_dir_all(&artifact_dir)
+		.unwrap_or_else(|error| panic!("create artifact failed: {error}"));
+	std::fs::write(
+		temp.path().join("Cargo.toml"),
+		"[package]\nname = \"profile-demo\"\nversion = \"0.1.0\"\nedition = \
+		 \"2024\"\n\n[lib]\ncrate-type = [\"cdylib\", \"lib\"]\n",
+	)
+	.unwrap_or_else(|error| panic!("manifest write failed: {error}"));
+	std::fs::write(source_dir.join("lib.rs"), "pub fn placeholder() {}\n")
+		.unwrap_or_else(|error| panic!("source write failed: {error}"));
+	std::fs::write(
+		artifact_dir.join("profile_demo.so"),
+		build_sbf_elf(160, &[("process_instruction", 0, 160)]),
+	)
+	.unwrap_or_else(|error| panic!("artifact write failed: {error}"));
+
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.current_dir(temp.path())
+		.args(["profile", "--json"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run discovered profile: {error}"));
+
+	assert!(
+		output.status.success(),
+		"profile failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let parsed: serde_json::Value = serde_json::from_slice(&output.stdout)
+		.unwrap_or_else(|error| panic!("invalid profile JSON: {error}"));
+	assert_eq!(parsed["total_instructions"], 20);
+}
+
+#[test]
+fn cli_profile_reports_the_expected_missing_artifact() {
+	let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
+	std::fs::create_dir_all(temp.path().join("src"))
+		.unwrap_or_else(|error| panic!("create source failed: {error}"));
+	std::fs::write(
+		temp.path().join("Cargo.toml"),
+		"[package]\nname = \"missing-demo\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+	)
+	.unwrap_or_else(|error| panic!("manifest write failed: {error}"));
+	std::fs::write(temp.path().join("src/lib.rs"), "pub fn placeholder() {}\n")
+		.unwrap_or_else(|error| panic!("source write failed: {error}"));
+
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.current_dir(temp.path())
+		.arg("profile")
+		.output()
+		.unwrap_or_else(|error| panic!("profile failed to launch: {error}"));
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	let relative_artifact = Path::new("target").join("deploy").join("missing_demo.so");
+	let quoted_artifact = format!("{relative_artifact:?}");
+	let escaped_artifact = quoted_artifact
+		.chars()
+		.flat_map(char::escape_default)
+		.collect::<String>();
+	let expected_suffix = escaped_artifact
+		.strip_prefix("\\\"")
+		.unwrap_or_else(|| panic!("quoted artifact lacks an opening quote: {escaped_artifact}"));
+
+	assert!(!output.status.success());
+	assert!(stderr.contains(expected_suffix), "{stderr}");
+	assert!(
+		stderr.contains("build the program before profiling"),
+		"{stderr}"
+	);
+}
+
+#[test]
+fn cli_profile_fails_closed_when_cargo_metadata_is_invalid() {
+	let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
+	let artifact_dir = temp.path().join("target/deploy");
+	std::fs::create_dir_all(temp.path().join("src"))
+		.unwrap_or_else(|error| panic!("source create failed: {error}"));
+	std::fs::create_dir_all(&artifact_dir)
+		.unwrap_or_else(|error| panic!("artifact create failed: {error}"));
+	std::fs::write(
+		temp.path().join("Cargo.toml"),
+		"[package]\nname = \"fallback-demo\"\nthis is not valid TOML\n",
+	)
+	.unwrap_or_else(|error| panic!("manifest write failed: {error}"));
+	std::fs::write(temp.path().join("src/lib.rs"), "pub fn placeholder() {}\n")
+		.unwrap_or_else(|error| panic!("source write failed: {error}"));
+	std::fs::write(
+		artifact_dir.join("fallback_demo.so"),
+		build_sbf_elf(80, &[("fallback", 0, 80)]),
+	)
+	.unwrap_or_else(|error| panic!("artifact write failed: {error}"));
+
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.current_dir(temp.path())
+		.args(["profile", "--json"])
+		.output()
+		.unwrap_or_else(|error| panic!("profile failed to launch: {error}"));
+
+	assert!(!output.status.success());
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(
+		stderr.contains("Cargo metadata discovery failed"),
+		"{stderr}"
 	);
 }

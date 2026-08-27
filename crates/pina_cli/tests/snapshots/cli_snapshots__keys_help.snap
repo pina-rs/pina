@@ -1,0 +1,50 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - keys
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Inspect or synchronize the current program's identity.
+
+Run without a subcommand to compare the source `declare_id!` with the conventional local keypair. `pina keys sync` explicitly updates only that string literal after validating an unambiguous declaration and keypair.
+
+Usage: pina keys [OPTIONS] [COMMAND]
+
+Commands:
+  show
+          Show the source and local keypair program IDs without changing files
+  sync
+          Update the source `declare_id!` from a validated local keypair
+  new
+          Generate a local keypair and synchronize the source program ID
+  help
+          Print this message or the help of the given subcommand(s)
+
+Options:
+  -p, --path <DIR>
+          Inspect or synchronize a specific program crate. Defaults to the nearest project
+
+      --keypair <KEYPAIR>
+          Use KEYPAIR instead of `target/deploy/<program>-keypair.json`
+
+      --json
+          Emit a stable machine-readable JSON document
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina keys
+  pina keys show --json
+  pina keys --path ./programs/counter
+  pina keys sync
+  pina keys sync --keypair ./keys/counter-keypair.json
+  pina keys new
+  pina keys new --force
+
+----- stderr -----

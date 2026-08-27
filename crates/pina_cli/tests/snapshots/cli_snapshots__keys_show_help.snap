@@ -1,0 +1,27 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - keys
+    - show
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Show the source and local keypair program IDs without changing files
+
+Usage: pina keys show [OPTIONS]
+
+Options:
+  -p, --path <DIR>
+          Inspect or synchronize a specific program crate. Defaults to the nearest project
+      --keypair <KEYPAIR>
+          Use KEYPAIR instead of `target/deploy/<program>-keypair.json`
+      --json
+          Emit a stable machine-readable JSON document
+  -h, --help
+          Print help
+
+----- stderr -----
