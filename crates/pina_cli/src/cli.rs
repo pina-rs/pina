@@ -18,19 +18,21 @@ use clap::ValueEnum;
 	              'pina init' to start a program, 'pina build' for its SBF binary and IDL, 'pina \
 	              test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, \
 	              'pina dev' for a persistent Surfpool network, 'pina generate' for selected \
-	              client ecosystems, and 'pina verify' for deployed-program verification. \
-	              Low-level IDL, profiling, terminal documentation, and the legacy \
-	              repository-wide Codama workflow remain available.",
+	              client ecosystems, 'pina deploy' for explicit cluster deployment, and 'pina \
+	              verify' for deployed-program verification. Low-level IDL, profiling, terminal \
+	              documentation, and the legacy repository-wide Codama workflow remain available.",
 	next_line_help = true,
 	arg_required_else_help = true,
 	after_help = "Examples:\n  pina init counter_program\n  cd counter_program && pina build\n  \
 	              pina test\n  pina test --unit\n  pina dev --yes\n  pina generate --client rust \
 	              --client typescript\n  pina idl --path ./programs/counter_program --output \
 	              ./idls/counter_program.json\n  pina profile ./target/deploy/counter_program.so \
-	              --json\n\nAgent discovery:\n  Run 'pina <command> --help' for command-specific \
-	              inputs, outputs, and examples.\n  Run 'pina docs' to list the bundled \
-	              architecture and IDL reference topics.\n  For deployment verification, run \
-	              'pina verify --help' and then inspect the selected leaf command."
+	              --json\n  pina deploy --cluster localnet --payer ~/.config/solana/id.json \
+	              --upgrade-authority ~/.config/solana/id.json --dry-run\n\nAgent discovery:\n  \
+	              Run 'pina <command> --help' for command-specific inputs, outputs, and \
+	              examples.\n  Run 'pina docs' to list the bundled architecture and IDL reference \
+	              topics.\n  For deployment verification, run 'pina verify --help' and then \
+	              inspect the selected leaf command."
 )]
 pub(crate) struct Cli {
 	#[command(subcommand)]
@@ -324,6 +326,87 @@ pub(crate) enum Commands {
 			value_name = "COMMAND"
 		)]
 		solana_verify: OsString,
+	},
+
+	/// Deploy a compiled Pina program through the Solana CLI.
+	///
+	/// Resolves the program artifact from a Cargo program crate or an explicit
+	/// --program path, validates every keypair, prints the complete plan,
+	/// and invokes `solana program deploy`. A cluster or RPC URL is always
+	/// required. Remote writes require confirmation or --yes; mainnet also
+	/// requires --allow-mainnet. Custom remote URLs require the same acknowledgement
+	/// because their cluster identity cannot be proven.
+	#[command(after_help = r"Examples:
+  pina deploy --cluster localnet \
+    --payer ~/.config/solana/id.json \
+    --upgrade-authority ~/.config/solana/id.json
+  pina deploy --build --cluster devnet \
+    --payer ./keys/devnet-payer.json \
+    --upgrade-authority ./keys/devnet-authority.json
+  pina deploy --program ./artifacts/my_program.so \
+    --program-keypair ./keys/my_program.json \
+    --cluster http://127.0.0.1:8899 \
+    --payer ./keys/local-payer.json \
+    --upgrade-authority ./keys/local-authority.json --dry-run --json
+
+Safety:
+  No cluster is selected by default. --cluster accepts a named cluster or explicit RPC URL.
+  Custom URL user information, queries, and fragments are rejected. Accepted hosts and paths
+  remain visible in plans and process listings, so never put a secret anywhere in the URL.
+  Prefer a named cluster when possible.
+  Remote deployment prompts for the word deploy; use --yes only in reviewed automation.
+  Mainnet and custom remote deployment additionally require --allow-mainnet.
+  --dry-run never builds or deploys and --json is available only with --dry-run.")]
+	Deploy {
+		/// Directory used for Pina.toml or Cargo metadata project discovery.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Existing SBF shared object. Conflicts with --build.
+		#[arg(long, value_name = "PROGRAM.SO", conflicts_with = "build")]
+		program: Option<PathBuf>,
+
+		/// Run Pina's project-aware SBF build before final deployment planning.
+		#[arg(long, conflicts_with = "dry_run")]
+		build: bool,
+
+		/// Keypair whose public key is the deployed program address.
+		#[arg(long, value_name = "KEYPAIR")]
+		program_keypair: Option<PathBuf>,
+
+		/// Keypair authorized to upgrade the deployed program.
+		#[arg(long, value_name = "KEYPAIR")]
+		upgrade_authority: PathBuf,
+
+		/// Keypair that pays the deployment transaction fees.
+		#[arg(long, value_name = "KEYPAIR")]
+		payer: PathBuf,
+
+		/// Named cluster or explicit HTTP(S) RPC URL. No target is selected by default.
+		#[arg(long, value_name = "CLUSTER|URL")]
+		cluster: String,
+
+		/// Print the resolved deployment plan without building or deploying.
+		#[arg(long, conflicts_with = "yes")]
+		dry_run: bool,
+
+		/// Emit the dry-run plan as JSON. Requires --dry-run.
+		#[arg(long, requires = "dry_run")]
+		json: bool,
+
+		/// Skip the remote deployment confirmation prompt.
+		#[arg(long)]
+		yes: bool,
+
+		/// Acknowledge that mainnet-beta or a custom remote endpoint can affect real assets.
+		#[arg(long, conflicts_with = "dry_run")]
+		allow_mainnet: bool,
 	},
 
 	/// Run Codama IDL and client-generation workflows.

@@ -152,6 +152,18 @@ pina profile target/deploy/my_program.so --json
 pina profile target/deploy/my_program.so --output report.json
 ```
 
+### `pina deploy`
+
+Plan an explicit deployment without contacting a cluster:
+
+```bash
+pina deploy --project ./programs/my_program --cluster devnet \
+  --upgrade-authority ./keys/devnet-authority.json \
+  --payer ./keys/devnet-payer.json --dry-run --json
+```
+
+Every remote write requires confirmation or `--yes`; named mainnet and custom remote endpoints also require `--allow-mainnet`. Query-bearing RPC URLs are rejected because the external Agave `solana` executable receives its endpoint through process arguments. Keypair reads are size-bounded and, on Unix, require owner-private permissions. The program keypair is validated against `declare_id!` before planning and revalidated immediately before deployment.
+
 ### `pina codama generate`
 
 <br>

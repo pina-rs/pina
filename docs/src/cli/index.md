@@ -1,6 +1,6 @@
 # Pina CLI
 
-The `pina` command scaffolds programs, extracts Codama IDLs, renders clients, reads bundled reference material, and profiles compiled SBF binaries. It is designed for both interactive use and scripted or agent-driven discovery.
+The `pina` command scaffolds programs, extracts Codama IDLs, renders clients, reads bundled reference material, profiles compiled SBF binaries, and plans explicit deployments. It is designed for both interactive use and scripted or agent-driven discovery.
 
 ## Install
 
@@ -40,6 +40,7 @@ The shortcut runs `cargo run -p pina_cli -- ...` against the checked-out source.
 | [`pina idl`](./idl.md)                         | Extract a Codama root-node IDL                               | JSON                                      |
 | [`pina docs`](./docs.md)                       | List or render bundled terminal docs                         | Terminal text                             |
 | [`pina profile`](./profile.md)                 | Estimate per-function SBF compute cost                       | Text or JSON                              |
+| [`pina deploy`](./deploy.md)                   | Plan and execute an explicit cluster deployment              | Plan or JSON                              |
 | [`pina codama generate`](./codama-generate.md) | Generate IDLs and Rust, JavaScript, and Dart clients         | Generated directories                     |
 
 ## Discover the interface
@@ -59,6 +60,7 @@ pina idl --help
 pina docs --help
 pina init --help
 pina profile --help
+pina deploy --help
 pina codama --help
 pina codama generate --help
 ```
@@ -79,6 +81,7 @@ Long help includes the input contract, output behavior, defaults, and copyable e
 | `test`            | Child test-runner output          | Build output and errors             |
 | `dev`             | Surfpool UI and logs              | Build output and errors             |
 | `profile`         | Report when `--output` is omitted | Errors                              |
+| `deploy`          | Inspectable plan and completion   | Confirmation, progress, errors      |
 | `codama generate` | Completion summary                | Errors and renderer failures        |
 
 Successful commands exit with code `0`. Operational failures exit with code `1`. Verification hash mismatches exit with code `2`. Invalid command-line syntax is rejected by Clap with a non-zero usage error before an operation begins.

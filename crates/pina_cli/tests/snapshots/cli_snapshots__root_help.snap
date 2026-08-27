@@ -10,7 +10,7 @@ exit_code: 0
 ----- stdout -----
 Build, test, inspect, and generate artifacts for Pina Solana programs.
 
-Use 'pina init' to start a program, 'pina build' for its SBF binary and IDL, 'pina test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent Surfpool network, 'pina generate' for selected client ecosystems, and 'pina verify' for deployed-program verification. Low-level IDL, profiling, terminal documentation, and the legacy repository-wide Codama workflow remain available.
+Use 'pina init' to start a program, 'pina build' for its SBF binary and IDL, 'pina test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent Surfpool network, 'pina generate' for selected client ecosystems, 'pina deploy' for explicit cluster deployment, and 'pina verify' for deployed-program verification. Low-level IDL, profiling, terminal documentation, and the legacy repository-wide Codama workflow remain available.
 
 Usage: pina <COMMAND>
 
@@ -33,6 +33,8 @@ Commands:
           Profile compute-unit costs in a compiled SBF program
   verify
           Verify deployed programs and publish source-build records
+  deploy
+          Deploy a compiled Pina program through the Solana CLI
   codama
           Run Codama IDL and client-generation workflows
   help
@@ -54,6 +56,7 @@ Examples:
   pina generate --client rust --client typescript
   pina idl --path ./programs/counter_program --output ./idls/counter_program.json
   pina profile ./target/deploy/counter_program.so --json
+  pina deploy --cluster localnet --payer ~/.config/solana/id.json --upgrade-authority ~/.config/solana/id.json --dry-run
 
 Agent discovery:
   Run 'pina <command> --help' for command-specific inputs, outputs, and examples.

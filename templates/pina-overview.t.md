@@ -172,6 +172,7 @@ cargo nextest run  # Faster parallel test execution
 - `pina idl --path <dir>` — generate a Codama IDL JSON from a Pina program
 - `pina docs [topic]` — list or render bundled terminal documentation
 - `pina profile <path.so>` — profile a compiled SBF binary statically
+- `pina deploy` — plan and execute an explicit cluster deployment
 - `pina codama generate` — run the legacy repository-wide client workflow
 
 <!-- {/pinaCliCommands} -->
