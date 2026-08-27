@@ -86,3 +86,4 @@ crates/pina_fuzz/target/
 .ant-colony/
 .mdt/
 **/.cache/
+.pi/

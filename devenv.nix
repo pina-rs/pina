@@ -40,7 +40,7 @@ in
       libiconv
       mdbook
       custom.monochange
-      nodejs_22
+      nodejs_24
       pnpm
       llvm.bintools
       llvm.clang
