@@ -27,6 +27,13 @@ pina verify check --help
 pina verify record --help
 ```
 
+For project testing and a persistent local network:
+
+```bash
+pina test --help
+pina dev --help
+```
+
 For framework and extractor constraints:
 
 ```bash
@@ -77,6 +84,9 @@ jq -e '.functions | type == "array"' /tmp/profile.json
 - Never infer a repository, revision, cluster, authority, or uploader. The build record binds source provenance; every network target and signing identity remains explicit.
 - Use `--yes` only for a reviewed record plan. Mainnet submissions additionally require `--acknowledge-mainnet`; transaction export requires neither flag.
 - Never put secrets in a custom RPC URL. Pina passes the RPC origin to `solana-verify` as argv.
+- Use `pina test --unit` when only native Rust or Mollusk tests are required.
+- Treat a missing `tests/surfpool` package or built `.so` as a failed integration setup, not a skip.
+- `pina dev` is offline unless `--network` or a credential-free HTTP(S) `--rpc-url` is explicitly supplied. The URL is visible in Surfpool's process arguments, so never place a secret anywhere in it.
 
 ## Stable verification
 

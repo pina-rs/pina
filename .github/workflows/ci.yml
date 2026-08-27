@@ -82,6 +82,22 @@ jobs:
       - name: test CLI portability
         run: cargo test --locked --all-features -p pina_cli
 
+  pina-test:
+    timeout-minutes: 90
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: verify isolated Surfpool test support
+        run: verify:pina-test
+        shell: devenv shell -c -- bash -e {0}
+
   fuzz:
     timeout-minutes: 30
     runs-on: ubuntu-24.04

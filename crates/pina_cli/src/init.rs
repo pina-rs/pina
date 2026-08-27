@@ -4,6 +4,10 @@ use std::path::PathBuf;
 
 use heck::ToUpperCamelCase;
 
+// A non-system placeholder keeps the generated Surfpool deployment executable.
+// Users must still replace it before sharing or deploying the project.
+const PLACEHOLDER_PROGRAM_ID: &str = "Fg6PaFpoGXkYsidMpWxTWqkZkkM8NufCHCX9ddLKBqd7";
+
 /// Errors produced during project initialization.
 #[derive(Debug, thiserror::Error)]
 pub enum InitError {
@@ -32,6 +36,8 @@ const SCAFFOLD_FILES: &[&str] = &[
 	"src/cpi.rs",
 	"tests/integration.rs",
 	"rust-toolchain.toml",
+	"tests/surfpool/Cargo.toml",
+	"tests/surfpool/src/lib.rs",
 ];
 const SBPF_LINKER_VERSION: &str = "0.1.8";
 
@@ -66,6 +72,7 @@ pub fn init_project(project_dir: &Path, package_name: &str, force: bool) -> Resu
 		project_dir.to_path_buf(),
 		project_dir.join("src"),
 		project_dir.join("tests"),
+		project_dir.join("tests/surfpool/src"),
 		project_dir.join(".cargo"),
 	] {
 		fs::create_dir_all(&dir).map_err(|source| InitError::Io { path: dir, source })?;
@@ -79,13 +86,15 @@ pub fn init_project(project_dir: &Path, package_name: &str, force: bool) -> Resu
 	write_file(&paths[3], &gitignore_template())?;
 	write_file(&paths[4], &cargo_config_template(package_name))?;
 	write_file(&paths[5], &lib_template(package_name, &program_title))?;
-	write_file(&paths[6], &entrypoint_template(&program_title))?;
+	write_file(&paths[6], &entrypoint_template())?;
 	write_file(&paths[7], &cpi_template(&program_title))?;
 	write_file(
 		&paths[8],
 		&integration_test_template(package_name, &program_title),
 	)?;
 	write_file(&paths[9], &rust_toolchain_template())?;
+	write_file(&paths[10], &surfpool_cargo_toml_template(package_name))?;
+	write_file(&paths[11], &surfpool_test_template(&program_title))?;
 
 	Ok(())
 }
@@ -97,7 +106,9 @@ pub fn print_next_steps(project_dir: &Path, _package_name: &str) {
 	println!();
 	println!("    cd {}", project_dir.display());
 	println!("    pina build                     # build SBF and generate the IDL");
-	println!("    cargo test                     # run tests");
+	println!("    pina test --unit               # fast native and Mollusk tests");
+	println!("    pina test                      # build SBF and test with Surfpool");
+	println!("    pina dev --yes                 # create and review the Surfpool runbook");
 	println!("    pina generate                  # generate configured clients");
 	println!();
 	println!("  Update the program address in src/lib.rs with your deployed program ID.");
@@ -166,7 +177,12 @@ cpi = []
 pina = {{ version = "{pina_version}", features = ["logs", "derive"] }}
 
 [dev-dependencies]
+# Keep fast native instruction tests on the workspace-supported Mollusk release.
 mollusk-svm = "0.15.0"
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(target_os, values("solana"))']
 "#
 	)
 }
@@ -193,7 +209,10 @@ TypeScript client generation requires Node.js with npm and `npx`.
 - Build a deterministic deployable with Solana Verify: `pina build --verify`
 - Generate configured clients: `pina generate`
 - Build (all features): `cargo build --all-features`
-- Test: `cargo test`
+- Fast native/Mollusk tests: `pina test --unit`
+- SBF integration tests on an isolated Surfpool instance: `pina test`
+- Persistent development Surfnet: `pina dev --yes` on the first run, then
+  review and commit the generated `txtx.yml`
 - Export typed CPI builders for another program:
   `features = ["cpi"]`
 
@@ -251,7 +270,7 @@ fn lib_template(package_name: &str, program_title: &str) -> String {
 #![no_std]
 
 #[cfg(all(
-	not(any(target_os = "solana", target_arch = "bpf")),
+	not(target_arch = "bpf"),
 	not(feature = "bpf-entrypoint"),
 	not(test)
 ))]
@@ -265,8 +284,8 @@ pub mod cpi;
 
 use pina::*;
 
-// Replace this with your deployed program address.
-declare_id!("11111111111111111111111111111111");
+// Replace this with your deployed program address before sharing the project.
+declare_id!("{PLACEHOLDER_PROGRAM_ID}");
 
 #[discriminator]
 pub enum {program_title}Instruction {{
@@ -311,29 +330,37 @@ pub fn process_instruction(
 	)
 }
 
-fn entrypoint_template(program_title: &str) -> String {
+fn surfpool_cargo_toml_template(package_name: &str) -> String {
+	let pina_version = env!("CARGO_PKG_VERSION");
+
 	format!(
-		r"use pina::*;
+		r#"[package]
+name = "{package_name}-surfpool-tests"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Keep Surfpool's host runtime dependency graph isolated from the program's
+# native Mollusk tests and SBF build.
+[workspace]
+
+[dependencies]
+pina_test = "{pina_version}"
+program_under_test = {{ package = "{package_name}", path = "../.." }}
+"#
+	)
+}
+
+fn entrypoint_template() -> String {
+	r"use pina::*;
 
 use crate::*;
 
-nostd_entrypoint!(process_instruction);
-
-#[inline(always)]
-pub fn process_instruction(
-	program_id: &Address,
-	accounts: &mut [AccountView],
-	data: &[u8],
-) -> ProgramResult {{
-	let instruction: {program_title}Instruction = parse_instruction(program_id, &ID, data)?;
-	match instruction {{
-		{program_title}Instruction::Initialize => {{
-			InitializeAccounts::try_from((program_id, accounts))?.process(data)
-		}}
-	}}
-}}
+// Size entrypoint storage for this scaffold's largest account list. Keeping
+// the default transaction-wide maximum would waste compute during decoding.
+nostd_entrypoint!(process_instruction, 3);
 "
-	)
+	.to_owned()
 }
 
 fn cpi_template(program_title: &str) -> String {
@@ -480,6 +507,68 @@ fn parse_instruction_rejects_wrong_program_id() {{
 	)
 }
 
+fn surfpool_test_template(program_title: &str) -> String {
+	format!(
+		r#"use std::path::PathBuf;
+
+use pina_test::AccountMeta;
+use pina_test::Instruction;
+use pina_test::OfflineSurfnet;
+use pina_test::Pubkey;
+
+use program_under_test::{program_title}Instruction;
+use program_under_test::ID;
+
+/// Deploy the real SBF artifact to an isolated, offline Surfnet.
+///
+/// `pina test` supplies the artifact path and runs ignored Surfpool tests after
+/// building SBF. Keeping this ignored during `cargo test` preserves the fast
+/// native/Mollusk loop.
+#[test]
+#[ignore = "run with `pina test`"]
+fn initialize_runs_on_surfpool() {{
+	pina_test::run(async {{
+		let artifact = std::env::var_os("PINA_SBF_ARTIFACT")
+			.map(PathBuf::from)
+			.expect("PINA_SBF_ARTIFACT is set by `pina test`");
+		assert!(artifact.is_file(), "missing SBF artifact: {{}}", artifact.display());
+
+		let mut surfnet = OfflineSurfnet::start()
+			.await
+			.expect("start isolated Surfpool instance");
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+
+		surfnet
+			.deploy_program(program_id, &artifact)
+			.expect("deploy SBF program");
+		assert!(
+			surfnet
+				.program_is_executable(&program_id)
+				.expect("fetch deployed program account"),
+			"deployed program account is not executable"
+		);
+
+		let state = Pubkey::new_unique();
+		let instruction = Instruction::new_with_bytes(
+			program_id,
+			&[{program_title}Instruction::Initialize as u8, 42],
+			vec![
+				AccountMeta::new(surfnet.payer(), true),
+				AccountMeta::new(state, false),
+				AccountMeta::new_readonly(Pubkey::default(), false),
+			],
+		);
+		surfnet
+			.send_instruction(instruction)
+			.expect("execute Initialize instruction");
+
+		surfnet.stop().expect("stop isolated Surfpool instance");
+	}});
+}}
+"#
+	)
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -539,6 +628,20 @@ mod tests {
 			.unwrap_or_else(|err| panic!("expected Pina.toml to be readable: {err}"));
 		assert!(config.contains("program = \".\""));
 		assert!(config.contains("languages = [\"rust\", \"typescript\"]"));
+		assert!(!cargo.contains("pina_test"));
+		assert!(!cargo.contains("surfpool-tests"));
+		assert!(!cargo.contains("surfpool-sdk"));
+
+		let surfpool_cargo = fs::read_to_string(dir.path.join("tests/surfpool/Cargo.toml"))
+			.unwrap_or_else(|err| panic!("expected Surfpool Cargo.toml to be readable: {err}"));
+		assert!(surfpool_cargo.contains("name = \"my_program-surfpool-tests\""));
+		assert!(surfpool_cargo.contains("[workspace]"));
+		assert!(surfpool_cargo.contains(&format!("pina_test = \"{}\"", env!("CARGO_PKG_VERSION"))));
+		assert!(
+			surfpool_cargo
+				.contains("program_under_test = { package = \"my_program\", path = \"../..\" }")
+		);
+		assert!(!surfpool_cargo.contains("surfpool-sdk"));
 	}
 
 	#[test]
@@ -550,7 +653,8 @@ mod tests {
 		let entrypoint = fs::read_to_string(dir.path.join("src/entrypoint.rs"))
 			.unwrap_or_else(|err| panic!("expected entrypoint.rs to be readable: {err}"));
 		assert!(entrypoint.contains("nostd_entrypoint!"));
-		assert!(entrypoint.contains("MyProgramInstruction"));
+		assert!(entrypoint.contains("use crate::*;"));
+		assert!(!entrypoint.contains("pub fn process_instruction"));
 	}
 
 	#[test]
@@ -607,6 +711,24 @@ mod tests {
 	}
 
 	#[test]
+	fn init_project_creates_real_surfpool_test() {
+		let dir = TempDir::new("surfpool");
+		init_project(&dir.path, "my_program", false)
+			.unwrap_or_else(|err| panic!("expected init to succeed: {err}"));
+
+		let test = fs::read_to_string(dir.path.join("tests/surfpool/src/lib.rs"))
+			.unwrap_or_else(|err| panic!("expected Surfpool lib.rs to be readable: {err}"));
+		assert!(test.contains("OfflineSurfnet::start()"));
+		assert!(test.contains("PINA_SBF_ARTIFACT"));
+		assert!(test.contains("deploy_program"));
+		assert!(test.contains("send_instruction"));
+		assert!(test.contains("execute Initialize instruction"));
+		assert!(test.contains("let mut surfnet"));
+		assert!(test.contains("surfnet.stop()"));
+		assert!(!test.contains("Uncomment"));
+	}
+
+	#[test]
 	fn init_project_lib_references_entrypoint_module() {
 		let dir = TempDir::new("lib_entrypoint");
 		init_project(&dir.path, "my_program", false)
@@ -618,6 +740,7 @@ mod tests {
 		assert!(lib.contains("#[cfg(feature = \"cpi\")]"));
 		assert!(lib.contains("pub mod cpi;"));
 		assert!(lib.contains("process_instruction"));
+		assert!(!lib.contains("surfpool-tests"));
 	}
 
 	#[test]
@@ -661,6 +784,21 @@ mod tests {
 	}
 
 	#[test]
+	fn init_project_reports_final_surfpool_test_write_failure() {
+		let dir = TempDir::new("surfpool_write_failure");
+		let blocked_file = dir.path.join("tests/surfpool/src/lib.rs");
+		fs::create_dir_all(&blocked_file)
+			.unwrap_or_else(|err| panic!("expected blocking directory creation to succeed: {err}"));
+
+		let result = init_project(&dir.path, "my_program", true);
+
+		assert!(matches!(
+			result,
+			Err(InitError::Io { path, .. }) if path == blocked_file
+		));
+	}
+
+	#[test]
 	fn init_project_rejects_invalid_name() {
 		let dir = TempDir::new("invalid_name");
 		let result = init_project(&dir.path, "not valid", false);
@@ -682,5 +820,44 @@ mod tests {
 			.unwrap_or_else(|err| panic!("expected integration.rs to be readable: {err}"));
 		// The `use` import should use underscores (Rust ident).
 		assert!(test.contains("use my_cool_program::*;"));
+	}
+
+	#[test]
+	fn surfpool_manifest_alias_avoids_support_crate_name_collisions() {
+		for package_name in ["pina-test", "pina_test"] {
+			let dir = TempDir::new(package_name);
+			init_project(&dir.path, package_name, false)
+				.unwrap_or_else(|err| panic!("expected {package_name} init to succeed: {err}"));
+			let manifest = dir.path.join("tests/surfpool/Cargo.toml");
+			let manifest = fs::read_to_string(&manifest)
+				.unwrap_or_else(|err| panic!("read generated manifest for {package_name}: {err}"));
+			let manifest: toml::Value = toml::from_str(&manifest)
+				.unwrap_or_else(|err| panic!("parse generated manifest for {package_name}: {err}"));
+			let dependencies = manifest
+				.get("dependencies")
+				.and_then(toml::Value::as_table)
+				.unwrap_or_else(|| panic!("dependencies must be a table for {package_name}"));
+
+			assert_eq!(dependencies.len(), 2);
+			assert_eq!(
+				dependencies.get("pina_test").and_then(toml::Value::as_str),
+				Some(env!("CARGO_PKG_VERSION"))
+			);
+			let program = dependencies
+				.get("program_under_test")
+				.and_then(toml::Value::as_table)
+				.unwrap_or_else(|| panic!("program alias must be a table for {package_name}"));
+			assert_eq!(
+				program.get("package").and_then(toml::Value::as_str),
+				Some(package_name)
+			);
+			assert_eq!(
+				program.get("path").and_then(toml::Value::as_str),
+				Some("../..")
+			);
+			let source = fs::read_to_string(dir.path.join("tests/surfpool/src/lib.rs"))
+				.unwrap_or_else(|err| panic!("read generated test for {package_name}: {err}"));
+			assert!(source.contains("use program_under_test::"));
+		}
 	}
 }

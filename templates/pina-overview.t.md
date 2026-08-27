@@ -167,6 +167,8 @@ cargo nextest run  # Faster parallel test execution
 - `pina init <name>` — scaffold a project-aware Pina program
 - `pina build` — build SBF and publish the program IDL
 - `pina generate` — generate configured Rust, TypeScript, or Dart clients
+- `pina test [--unit]` — run native/Mollusk or SBF/Surfpool tests
+- `pina dev [--yes]` — run Surfpool's persistent watch/redeploy loop
 - `pina idl --path <dir>` — generate a Codama IDL JSON from a Pina program
 - `pina docs [topic]` — list or render bundled terminal documentation
 - `pina profile <path.so>` — profile a compiled SBF binary statically

@@ -1686,10 +1686,11 @@ mod tests {
 			npx: runner.display().to_string(),
 			cluster: "devnet".to_owned(),
 		};
-		assert!(matches!(
-			fetch_idl(&client, program_id),
-			Err(IdlMetadataError::ProgramMismatch { .. })
-		));
+		let error = fetch_idl(&client, program_id).expect_err("mismatched program must fail");
+		assert!(
+			matches!(error, IdlMetadataError::ProgramMismatch { .. }),
+			"unexpected mismatch error: {error:?}"
+		);
 
 		let oversized = vec![0; 16 * 1024 * 1024 + 1];
 		let capture = directory.path().join("args-oversized.txt");
@@ -1747,7 +1748,11 @@ mod tests {
 	fn fake_runner(directory: &Path, capture: &Path, stdout: &str) -> PathBuf {
 		use std::os::unix::fs::PermissionsExt;
 
-		let runner = directory.join("fake-npx.sh");
+		let fixture_name = capture
+			.file_stem()
+			.and_then(|name| name.to_str())
+			.unwrap_or("runner");
+		let runner = directory.join(format!("fake-npx-{fixture_name}.sh"));
 		let script = format!(
 			"#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\nprintf '{}'\n",
 			capture.display(),

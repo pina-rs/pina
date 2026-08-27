@@ -368,6 +368,63 @@ in
       description = "Run workspace tests, compile fuzz targets, and verify npm packages.";
       binary = "bash";
     };
+    "build:pina-test" = {
+      exec = ''
+        set -euo pipefail
+        cargo check \
+          --manifest-path "$DEVENV_ROOT/crates/pina_test/Cargo.toml" \
+          --all-targets \
+          --locked
+      '';
+      description = "Check the isolated host-side pina_test package with its committed lockfile.";
+      binary = "bash";
+    };
+    "test:pina-test" = {
+      exec = ''
+        set -euo pipefail
+        cargo test \
+          --manifest-path "$DEVENV_ROOT/crates/pina_test/Cargo.toml" \
+          --all-targets \
+          --locked
+      '';
+      description = "Test the isolated host-side pina_test package.";
+      binary = "bash";
+    };
+    "lint:pina-test" = {
+      exec = ''
+        set -euo pipefail
+        cargo clippy \
+          --manifest-path "$DEVENV_ROOT/crates/pina_test/Cargo.toml" \
+          --all-targets \
+          --locked \
+          -- \
+          -D warnings
+      '';
+      description = "Lint the isolated host-side pina_test package.";
+      binary = "bash";
+    };
+    "doc:pina-test" = {
+      exec = ''
+        set -euo pipefail
+        RUSTDOCFLAGS="-D warnings" cargo doc \
+          --manifest-path "$DEVENV_ROOT/crates/pina_test/Cargo.toml" \
+          --no-deps \
+          --locked
+      '';
+      description = "Build warning-free API documentation for pina_test.";
+      binary = "bash";
+    };
+    "verify:pina-test" = {
+      exec = ''
+        set -euo pipefail
+        build:pina-test
+        test:pina-test
+        lint:pina-test
+        doc:pina-test
+      '';
+      description = "Run locked check, test, Clippy, and documentation gates for pina_test.";
+      binary = "bash";
+    };
     "test:npm-packages" = {
       exec = ''
         set -euo pipefail
@@ -710,6 +767,13 @@ in
         "$DEVENV_ROOT/scripts/build-surfpool-examples.sh"
         pnpm --dir "$DEVENV_ROOT/codama/tests/surfpool" run test:types
         pnpm --dir "$DEVENV_ROOT/codama/tests/surfpool" run test
+        cargo test \
+          --locked \
+          -p pina_cli \
+          --test generated_surfpool \
+          -- \
+          --ignored \
+          --nocapture
       '';
       description = "Build, deploy, and adversarially exercise every SBF example through the Surfpool SDK.";
       binary = "bash";
@@ -730,8 +794,24 @@ in
           -p profile-program-client \
           --lcov \
           --output-path "$DEVENV_ROOT/target/coverage/lcov.info"
+        coverage:pina-test
       '';
       description = "Run focused Rust and generated-client coverage and generate an lcov report.";
+      binary = "bash";
+    };
+    "coverage:pina-test" = {
+      exec = ''
+        set -euo pipefail
+        mkdir -p "$DEVENV_ROOT/target/coverage"
+        rm -rf "$DEVENV_ROOT/target/pina-test-llvm-cov-target"
+        CARGO_TARGET_DIR="$DEVENV_ROOT/target/pina-test-llvm-cov-target" cargo llvm-cov \
+          --manifest-path "$DEVENV_ROOT/crates/pina_test/Cargo.toml" \
+          --all-targets \
+          --locked \
+          --lcov \
+          --output-path "$DEVENV_ROOT/target/coverage/pina-test.info"
+      '';
+      description = "Generate coverage for the isolated pina_test package.";
       binary = "bash";
     };
     "coverage:vm:experimental" = {
@@ -1017,6 +1097,35 @@ in
       description = "Run RustSec advisory audit for Cargo.lock.";
       binary = "bash";
     };
+    "security:pina-test:deny" = {
+      exec = ''
+        set -euo pipefail
+        cd "$DEVENV_ROOT/crates/pina_test"
+        cargo-deny check bans licenses sources
+      '';
+      description = "Run the package-specific dependency policy for pina_test.";
+      binary = "bash";
+    };
+    "security:pina-test:audit" = {
+      exec = ''
+        set -euo pipefail
+        rm -rf "$DEVENV_ROOT/target/advisory-db-pina-test"
+        cargo-audit audit \
+          --db "$DEVENV_ROOT/target/advisory-db-pina-test" \
+          --url "https://github.com/RustSec/advisory-db.git" \
+          --deny yanked \
+          --ignore RUSTSEC-2022-0093 \
+          --ignore RUSTSEC-2024-0344 \
+          --ignore RUSTSEC-2024-0421 \
+          --ignore RUSTSEC-2026-0098 \
+          --ignore RUSTSEC-2026-0099 \
+          --ignore RUSTSEC-2026-0104 \
+          --ignore RUSTSEC-2026-0258 \
+          --file "$DEVENV_ROOT/crates/pina_test/Cargo.lock"
+      '';
+      description = "Audit pina_test's lockfile with narrow offline-only advisory exceptions.";
+      binary = "bash";
+    };
     "security:npm-audit" = {
       exec = ''
         set -euo pipefail
@@ -1031,6 +1140,8 @@ in
         security:dylint
         security:deny
         security:audit
+        security:pina-test:deny
+        security:pina-test:audit
         security:npm-audit
       '';
       description = "Run all custom and dependency security checks.";

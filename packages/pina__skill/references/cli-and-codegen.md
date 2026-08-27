@@ -15,6 +15,8 @@ pina idl diff --help
 pina idl publish --help
 pina docs --help
 pina init --help
+pina test --help
+pina dev --help
 pina profile --help
 pina codama generate --help
 ```
@@ -27,6 +29,8 @@ Run project-aware commands from the program directory or any descendant. Pina us
 
 ```sh
 pina build
+pina test --unit
+pina test
 pina generate
 ```
 
@@ -58,6 +62,10 @@ This requires an exact `solana-verify 0.5.1` installation, a working Docker-comp
 The successful command prints the canonical `target/deploy` artifact, the generated IDL, a content-addressed SBF artifact, and its Pina-local build-record path. Keep the printed record and adjacent SBF together; consumers recompute the executable hash before trusting the record.
 
 `pina build --verify` creates deterministic build inputs and outputs. It does not compare the artifact with an on-chain program or record an on-chain verification result.
+
+## Testing and development
+
+Use `pina test --unit` for native/Mollusk tests and `pina test` for the generated SBF/Surfpool integration package under `tests/surfpool`. Cargo remains attached to the terminal in both modes. `pina dev` delegates persistent artifact watching and redeployment to Surfpool, which owns terminal input, output, errors, prompts, and Ctrl-C until it exits. Its default is offline, so select `--network` or `--rpc-url` only when remote state is required. Prefer a named network. Explicit RPC URLs must be credential-free HTTP(S) URLs with a host and no user information, query, fragment, or control character. They are visible in Surfpool's child-process arguments, so never put a secret anywhere in the host, path, or other URL text. On the first run, use `pina dev --yes`, then inspect and commit the `txtx.yml` runbook Surfpool creates.
 
 ## IDL extraction
 

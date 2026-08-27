@@ -62,6 +62,9 @@ members = [
 	"security/10-sysvar-address-checking/secure",
 ]
 exclude = [
+	# Surfpool 1.5 requires Agave 4.1 while the workspace's Mollusk 0.15 uses
+	# Agave 4.2. Keep host-side Surfpool support in its own dependency island.
+	"crates/pina_test",
 	"security/00-signer-authorization/insecure",
 	"security/01-account-data-matching/insecure",
 	"security/02-owner-checks/insecure",
@@ -100,6 +103,7 @@ ed25519-dalek = { version = "2.2.0", default-features = false }
 flate2 = { default-features = true, version = "1.1.2" }
 fs2 = { default-features = false, version = "^0.4" }
 heck = { default-features = false, version = "^0.5" }
+http = { default-features = false, version = "^1" }
 insta = { default-features = false, version = "^1" }
 insta-cmd = { default-features = false, version = "^0.7.0" }
 mollusk-svm = { default-features = false, version = "0.15.0" }
@@ -117,6 +121,7 @@ prettyplease = { default-features = false, version = "^0.3" }
 proc-macro2 = { default-features = false, version = "^1" }
 proptest = { default-features = false, version = "^1", features = ["std"] }
 quote = { default-features = false, version = "^1" }
+semver = { default-features = false, version = "^1" }
 serde = { default-features = false, version = "^1" }
 serde_json = { default-features = false, version = "^1", features = ["std"] }
 solana-account = { version = "^4", default-features = false }
@@ -191,6 +196,7 @@ edition_2024_expr_fragment_specifier = "allow"
 [workspace.lints.rust.unexpected_cfgs]
 level = "warn"
 check-cfg = [
+	'cfg(coverage)',
 	'cfg(target_os, values("solana"))',
 	'cfg(target_feature, values("static-syscalls"))',
 ]
