@@ -21,7 +21,17 @@ fn main() {
 			project,
 			features,
 			no_default_features,
-		} => run_build(project, features, no_default_features),
+			verify,
+			solana_verify,
+		} => {
+			run_build(
+				project,
+				features,
+				no_default_features,
+				verify,
+				solana_verify,
+			);
+		}
 		Commands::Generate {
 			project,
 			clients,
@@ -64,13 +74,35 @@ fn main() {
 	}
 }
 
-fn run_build(project: PathBuf, features: Vec<String>, no_default_features: bool) {
+fn run_build(
+	project: PathBuf,
+	features: Vec<String>,
+	no_default_features: bool,
+	verify: bool,
+	solana_verify: std::ffi::OsString,
+) {
 	let options = pina_cli::build::BuildOptions {
 		project_dir: project,
 		features,
 		no_default_features,
 	};
-	let output = match pina_cli::build::build_project_with_options(&options) {
+	let output = if verify {
+		pina_cli::build::build_project_verified_with_options(
+			&options,
+			&pina_cli::build::VerifyBuildOptions {
+				executable: solana_verify,
+			},
+		)
+		.map(|verified| {
+			(
+				verified.build,
+				Some((verified.verifiable_artifact, verified.verification_manifest)),
+			)
+		})
+	} else {
+		pina_cli::build::build_project_with_options(&options).map(|build| (build, None))
+	};
+	let (output, verification_manifest) = match output {
 		Ok(output) => output,
 		Err(error) => {
 			eprintln!("{} {}", "Error".red().bold(), error);
@@ -81,6 +113,10 @@ fn run_build(project: PathBuf, features: Vec<String>, no_default_features: bool)
 	println!("{} Built {}", "✔".green(), output.package_name);
 	println!("  SBF  {}", output.sbf_artifact.display());
 	println!("  IDL  {}", output.idl.display());
+	if let Some((artifact, manifest)) = verification_manifest {
+		println!("  Verified SBF {}", artifact.display());
+		println!("  Build record {}", manifest.display());
+	}
 }
 
 fn run_generate(project: PathBuf, clients: Vec<ClientArg>, output: Option<PathBuf>, npx: String) {

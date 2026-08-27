@@ -31,7 +31,9 @@ quote = { workspace = true, default-features = true }
 rayon = "1.10"
 serde = { workspace = true, features = ["derive"], default-features = true }
 serde_json = { workspace = true, default-features = true }
+sha2 = { version = "0.10.9", default-features = true }
 syn = { workspace = true, default-features = true, features = ["full", "extra-traits", "visit", "printing"] }
+tempfile = { workspace = true, default-features = true }
 termimad = "0.35.1"
 thiserror = { workspace = true, default-features = true }
 toml = { workspace = true, default-features = true }

@@ -272,6 +272,17 @@ impl Project {
 			root,
 		})
 	}
+
+	/// Resolve the Cargo workspace root that owns this program.
+	///
+	/// # Errors
+	///
+	/// Returns an error when Cargo metadata cannot be loaded.
+	pub fn workspace_root(&self) -> Result<PathBuf, ProjectError> {
+		let manifest_path = self.program_dir.join("Cargo.toml");
+		cargo_metadata(&self.root, Some(&manifest_path))
+			.map(|metadata| metadata.workspace_root.as_std_path().to_path_buf())
+	}
 }
 
 fn resolve_config_path(

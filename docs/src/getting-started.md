@@ -41,6 +41,14 @@ cargo test
 
 <!-- {/buildAndTestCommands} -->
 
+For a deterministic Docker build suitable for Solana's verified-build workflow, install `solana-verify` 0.5.1, start Docker, commit the complete source tree, and run:
+
+```bash
+pina build --verify
+```
+
+This produces the canonical deploy artifact plus a hash-bound Pina build record. It does not perform on-chain verification. See [`pina build`](./cli/build.md#deterministic-verified-build-artifacts) for the trust model, prerequisites, and limitations.
+
 ## Common quality checks
 
 <!-- {=commonQualityChecksCommands} -->
