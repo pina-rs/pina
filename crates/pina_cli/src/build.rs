@@ -1,7 +1,10 @@
 //! Project-aware SBF and IDL build workflow.
 
 use std::collections::BTreeSet;
+use std::ffi::OsStr;
 use std::ffi::OsString;
+use std::fs::File;
+use std::fs::OpenOptions;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -98,6 +101,12 @@ pub enum BuildError {
 		path: PathBuf,
 		source: std::io::Error,
 	},
+
+	#[error("Failed to lock build outputs using {path}: {source}")]
+	LockPublication {
+		path: PathBuf,
+		source: std::io::Error,
+	},
 }
 
 /// Build the discovered program for SBF and write its Codama IDL.
@@ -140,31 +149,10 @@ pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput,
 		.into_iter()
 		.collect::<Vec<_>>()
 		.join(",");
-	let command_label = format!(
-		"{} build --release --target bpfel-unknown-none -p {} -Z build-std --features {}",
-		PathBuf::from(&cargo).display(),
-		project.package_name,
-		features
-	);
+	let args = cargo_build_args(&project, &manifest_path, &features, options);
+	let command_label = command_label(&cargo, &args);
 	let mut command = Command::new(&cargo);
-	command
-		.current_dir(&project.root)
-		.arg("build")
-		.arg("--release")
-		.arg("--target")
-		.arg("bpfel-unknown-none")
-		.arg("--manifest-path")
-		.arg(&manifest_path)
-		.arg("-p")
-		.arg(&project.package_name)
-		.arg("-Z")
-		.arg("build-std")
-		.arg("--features")
-		.arg(&features);
-
-	if options.no_default_features {
-		command.arg("--no-default-features");
-	}
+	command.current_dir(&project.root).args(&args);
 
 	let status = command.status().map_err(|source| {
 		BuildError::RunCargo {
@@ -191,18 +179,15 @@ pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput,
 		});
 	}
 
-	let idl = generate_idl(&project.program_dir, None).map_err(|source| {
-		BuildError::GenerateIdl {
-			package: project.package_name.clone(),
-			source,
-		}
-	})?;
-	let json = serde_json::to_string_pretty(&idl).map_err(|source| {
-		BuildError::SerializeIdl {
-			package: project.package_name.clone(),
-			source,
-		}
-	})?;
+	let idl =
+		generate_idl(&project.program_dir, Some(&project.library_name)).map_err(|source| {
+			BuildError::GenerateIdl {
+				package: project.package_name.clone(),
+				source,
+			}
+		})?;
+	let json = serde_json::to_string_pretty(&idl)
+		.map_err(|source| serialize_idl_error(&project.package_name, source))?;
 
 	std::fs::create_dir_all(&project.idl_dir).map_err(|source| {
 		BuildError::CreateIdlDir {
@@ -223,6 +208,7 @@ pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput,
 		.join(format!("{}.json", project.library_name));
 	let sbf_artifact = deploy_dir.join(format!("{}.so", project.library_name));
 	publish_outputs(
+		&project.target_dir.join(".pina-build.lock"),
 		&idl_path,
 		json.as_bytes(),
 		&compiler_artifact,
@@ -236,7 +222,59 @@ pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput,
 	})
 }
 
+fn cargo_build_args(
+	project: &Project,
+	manifest_path: &Path,
+	features: &str,
+	options: &BuildOptions,
+) -> Vec<OsString> {
+	let mut args = vec![
+		OsString::from("build"),
+		OsString::from("--release"),
+		OsString::from("--target"),
+		OsString::from("bpfel-unknown-none"),
+		OsString::from("--target-dir"),
+		project.target_dir.as_os_str().to_owned(),
+		OsString::from("--manifest-path"),
+		manifest_path.as_os_str().to_owned(),
+		OsString::from("-p"),
+		OsString::from(&project.package_name),
+		OsString::from("-Z"),
+		OsString::from("build-std=core,alloc"),
+		OsString::from("--features"),
+		OsString::from(features),
+	];
+
+	if options.no_default_features {
+		args.push(OsString::from("--no-default-features"));
+	}
+
+	args
+}
+
+fn command_label(cargo: &OsStr, args: &[OsString]) -> String {
+	std::iter::once(cargo)
+		.chain(args.iter().map(OsString::as_os_str))
+		.map(debug_argument)
+		.collect::<Vec<_>>()
+		.join(" ")
+}
+
+#[allow(clippy::unnecessary_debug_formatting)]
+fn debug_argument(argument: &OsStr) -> String {
+	// Debug formatting preserves argument boundaries and escapes non-Unicode bytes.
+	format!("{argument:?}")
+}
+
+fn serialize_idl_error(package: &str, source: serde_json::Error) -> BuildError {
+	BuildError::SerializeIdl {
+		package: package.to_owned(),
+		source,
+	}
+}
+
 fn publish_outputs(
+	lock_path: &Path,
 	idl_path: &Path,
 	idl: &[u8],
 	compiler_artifact: &Path,
@@ -244,6 +282,7 @@ fn publish_outputs(
 ) -> Result<(), BuildError> {
 	use std::io::Write;
 
+	let _lock = acquire_publication_lock(lock_path)?;
 	let previous_idl = match std::fs::read(idl_path) {
 		Ok(contents) => Some(contents),
 		Err(source) if source.kind() == std::io::ErrorKind::NotFound => None,
@@ -260,13 +299,10 @@ fn publish_outputs(
 			source,
 		}
 	})?;
-	idl_file.write_all(idl).map_err(|source| {
-		BuildError::WriteIdl {
-			path: idl_path.to_path_buf(),
-			source,
-		}
-	})?;
-	let mut source_file = std::fs::File::open(compiler_artifact).map_err(|source| {
+	idl_file
+		.write_all(idl)
+		.map_err(|source| write_idl_error(idl_path, source))?;
+	let mut source_file = File::open(compiler_artifact).map_err(|source| {
 		BuildError::StageArtifact {
 			source_path: compiler_artifact.to_path_buf(),
 			source,
@@ -285,29 +321,85 @@ fn publish_outputs(
 		}
 	})?;
 
-	idl_file.commit().map_err(|source| {
-		BuildError::WriteIdl {
-			path: idl_path.to_path_buf(),
-			source,
-		}
-	})?;
+	idl_file
+		.commit()
+		.map_err(|source| write_idl_error(idl_path, source))?;
 
 	if let Err(publish) = artifact_file.commit() {
-		if let Err(rollback) = restore_idl(idl_path, previous_idl.as_deref()) {
-			return Err(BuildError::RollbackIdl {
-				path: idl_path.to_path_buf(),
-				publish,
-				rollback,
-			});
-		}
-
-		return Err(BuildError::PublishArtifact {
-			path: sbf_artifact.to_path_buf(),
-			source: publish,
-		});
+		return Err(handle_publish_failure(
+			idl_path,
+			sbf_artifact,
+			previous_idl.as_deref(),
+			publish,
+		));
 	}
 
 	Ok(())
+}
+
+#[derive(Debug)]
+struct PublicationLock(File);
+
+impl Drop for PublicationLock {
+	fn drop(&mut self) {
+		let _ = fs2::FileExt::unlock(&self.0);
+	}
+}
+
+fn acquire_publication_lock(path: &Path) -> Result<PublicationLock, BuildError> {
+	let file = OpenOptions::new()
+		.read(true)
+		.write(true)
+		.create(true)
+		.truncate(false)
+		.open(path)
+		.map_err(|source| publication_lock_error(path, source))?;
+	fs2::FileExt::lock_exclusive(&file).map_err(|source| publication_lock_error(path, source))?;
+
+	Ok(PublicationLock(file))
+}
+
+fn publication_lock_error(path: &Path, source: std::io::Error) -> BuildError {
+	BuildError::LockPublication {
+		path: path.to_path_buf(),
+		source,
+	}
+}
+
+fn handle_publish_failure(
+	idl_path: &Path,
+	sbf_artifact: &Path,
+	previous_idl: Option<&[u8]>,
+	publish: std::io::Error,
+) -> BuildError {
+	match restore_idl(idl_path, previous_idl) {
+		Ok(()) => {
+			BuildError::PublishArtifact {
+				path: sbf_artifact.to_path_buf(),
+				source: publish,
+			}
+		}
+		Err(rollback) => rollback_idl_error(idl_path, publish, rollback),
+	}
+}
+
+fn write_idl_error(path: &Path, source: std::io::Error) -> BuildError {
+	BuildError::WriteIdl {
+		path: path.to_path_buf(),
+		source,
+	}
+}
+
+fn rollback_idl_error(
+	path: &Path,
+	publish: std::io::Error,
+	rollback: std::io::Error,
+) -> BuildError {
+	BuildError::RollbackIdl {
+		path: path.to_path_buf(),
+		publish,
+		rollback,
+	}
 }
 
 fn restore_idl(path: &Path, previous: Option<&[u8]>) -> std::io::Result<()> {
@@ -323,4 +415,205 @@ fn restore_idl(path: &Path, previous: Option<&[u8]>) -> std::io::Result<()> {
 	let mut file = AtomicWriteFile::open(path)?;
 	file.write_all(previous)?;
 	file.commit()
+}
+
+#[cfg(test)]
+mod tests {
+	use std::fs;
+
+	use tempfile::TempDir;
+
+	use super::*;
+
+	#[test]
+	fn build_wrapper_forwards_discovery_errors() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let error = build_project(&temp.path().join("missing"))
+			.expect_err("missing project should fail discovery");
+
+		assert!(matches!(error, BuildError::Project(_)));
+	}
+
+	#[test]
+	fn publication_replaces_both_outputs_repeatedly() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let idl = temp.path().join("program.json");
+		let compiler = temp.path().join("compiler.so");
+		let artifact = temp.path().join("program.so");
+		let lock = temp.path().join("build.lock");
+		fs::write(&compiler, b"first artifact")
+			.unwrap_or_else(|error| panic!("failed to write compiler artifact: {error}"));
+
+		publish_outputs(&lock, &idl, b"first idl", &compiler, &artifact)
+			.unwrap_or_else(|error| panic!("initial publish failed: {error}"));
+		fs::write(&compiler, b"second artifact")
+			.unwrap_or_else(|error| panic!("failed to replace compiler artifact: {error}"));
+		publish_outputs(&lock, &idl, b"second idl", &compiler, &artifact)
+			.unwrap_or_else(|error| panic!("repeat publish failed: {error}"));
+
+		assert_eq!(fs::read(&idl).unwrap_or_default(), b"second idl");
+		assert_eq!(fs::read(&artifact).unwrap_or_default(), b"second artifact");
+	}
+
+	#[test]
+	fn publication_lock_excludes_another_publisher() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let lock_path = temp.path().join("build.lock");
+		let first = acquire_publication_lock(&lock_path)
+			.unwrap_or_else(|error| panic!("failed to acquire first lock: {error}"));
+		let second = OpenOptions::new()
+			.read(true)
+			.write(true)
+			.open(&lock_path)
+			.unwrap_or_else(|error| panic!("failed to open second lock handle: {error}"));
+
+		assert!(fs2::FileExt::try_lock_exclusive(&second).is_err());
+		drop(first);
+		fs2::FileExt::try_lock_exclusive(&second)
+			.unwrap_or_else(|error| panic!("lock should be released: {error}"));
+	}
+
+	#[test]
+	fn publication_lock_errors_preserve_the_lock_path() {
+		let error = acquire_publication_lock(Path::new("missing-parent/build.lock"))
+			.expect_err("missing lock parent should fail");
+		assert!(matches!(error, BuildError::LockPublication { .. }));
+
+		let error = publication_lock_error(
+			Path::new("build.lock"),
+			std::io::Error::other("lock failure"),
+		);
+		assert!(error.to_string().contains("build.lock"));
+	}
+
+	#[test]
+	fn publication_reports_staging_and_destination_errors() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let idl = temp.path().join("program.json");
+		let artifact = temp.path().join("program.so");
+		let missing = temp.path().join("missing.so");
+		let lock = temp.path().join("build.lock");
+		assert!(matches!(
+			publish_outputs(&lock, &idl, b"idl", &missing, &artifact),
+			Err(BuildError::StageArtifact { .. })
+		));
+
+		let compiler = temp.path().join("compiler.so");
+		fs::write(&compiler, b"artifact")
+			.unwrap_or_else(|error| panic!("failed to write compiler artifact: {error}"));
+		let missing_parent = temp.path().join("missing/program.so");
+		assert!(matches!(
+			publish_outputs(&lock, &idl, b"idl", &compiler, &missing_parent),
+			Err(BuildError::StageArtifact { .. })
+		));
+
+		let idl_missing_parent = temp.path().join("idl/program.json");
+		assert!(matches!(
+			publish_outputs(&lock, &idl_missing_parent, b"idl", &compiler, &artifact),
+			Err(BuildError::WriteIdl { .. })
+		));
+
+		let compiler_directory = temp.path().join("compiler-directory");
+		fs::create_dir(&compiler_directory)
+			.unwrap_or_else(|error| panic!("failed to create compiler directory: {error}"));
+		assert!(matches!(
+			publish_outputs(&lock, &idl, b"idl", &compiler_directory, &artifact),
+			Err(BuildError::StageArtifact { .. })
+		));
+	}
+
+	#[test]
+	fn publication_rolls_back_the_idl_when_artifact_commit_fails() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let idl = temp.path().join("program.json");
+		let compiler = temp.path().join("compiler.so");
+		let artifact = temp.path().join("artifact-directory");
+		let lock = temp.path().join("build.lock");
+		fs::write(&idl, b"previous idl")
+			.unwrap_or_else(|error| panic!("failed to write previous IDL: {error}"));
+		fs::write(&compiler, b"artifact")
+			.unwrap_or_else(|error| panic!("failed to write compiler artifact: {error}"));
+		fs::create_dir(&artifact)
+			.unwrap_or_else(|error| panic!("failed to create artifact directory: {error}"));
+
+		let error = publish_outputs(&lock, &idl, b"new idl", &compiler, &artifact)
+			.expect_err("publishing over a directory should fail");
+
+		assert!(matches!(error, BuildError::PublishArtifact { .. }));
+		assert_eq!(fs::read(&idl).unwrap_or_default(), b"previous idl");
+	}
+
+	#[test]
+	fn restore_idl_handles_present_absent_and_missing_previous_outputs() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let idl = temp.path().join("program.json");
+		fs::write(&idl, b"current")
+			.unwrap_or_else(|error| panic!("failed to write current IDL: {error}"));
+
+		restore_idl(&idl, Some(b"previous"))
+			.unwrap_or_else(|error| panic!("failed to restore previous IDL: {error}"));
+		assert_eq!(fs::read(&idl).unwrap_or_default(), b"previous");
+		restore_idl(&idl, None).unwrap_or_else(|error| panic!("failed to remove new IDL: {error}"));
+		assert!(!idl.exists());
+		restore_idl(&idl, None)
+			.unwrap_or_else(|error| panic!("missing IDL should already be restored: {error}"));
+
+		let directory = temp.path().join("directory");
+		fs::create_dir(&directory)
+			.unwrap_or_else(|error| panic!("failed to create directory: {error}"));
+		assert!(restore_idl(&directory, None).is_err());
+	}
+
+	#[test]
+	fn publication_rejects_an_unreadable_existing_idl() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let idl = temp.path().join("idl-directory");
+		let compiler = temp.path().join("compiler.so");
+		let artifact = temp.path().join("program.so");
+		let lock = temp.path().join("build.lock");
+		fs::create_dir(&idl)
+			.unwrap_or_else(|error| panic!("failed to create IDL directory: {error}"));
+		fs::write(&compiler, b"artifact")
+			.unwrap_or_else(|error| panic!("failed to write compiler artifact: {error}"));
+
+		assert!(matches!(
+			publish_outputs(&lock, &idl, b"idl", &compiler, &artifact),
+			Err(BuildError::ReadPreviousIdl { .. })
+		));
+	}
+
+	#[test]
+	fn publication_error_helpers_preserve_context() {
+		let write = write_idl_error(Path::new("program.json"), std::io::Error::other("write"));
+		assert!(matches!(write, BuildError::WriteIdl { .. }));
+		let rollback = rollback_idl_error(
+			Path::new("program.json"),
+			std::io::Error::other("publish"),
+			std::io::Error::other("rollback"),
+		);
+		assert!(matches!(rollback, BuildError::RollbackIdl { .. }));
+
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let directory = temp.path().join("idl-directory");
+		fs::create_dir(&directory)
+			.unwrap_or_else(|error| panic!("failed to create IDL directory: {error}"));
+		let rollback = handle_publish_failure(
+			&directory,
+			Path::new("program.so"),
+			None,
+			std::io::Error::other("publish"),
+		);
+		assert!(matches!(rollback, BuildError::RollbackIdl { .. }));
+	}
+
+	#[test]
+	fn idl_serialization_error_preserves_package_context() {
+		let error = serialize_idl_error(
+			"counter",
+			serde_json::Error::io(std::io::Error::other("serializer failure")),
+		);
+
+		assert!(matches!(error, BuildError::SerializeIdl { .. }));
+		assert!(error.to_string().contains("counter"));
+	}
 }

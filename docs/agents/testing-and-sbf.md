@@ -13,7 +13,7 @@ cargo build-escrow-program
 This expands to:
 
 ```sh
-cargo build --release --target bpfel-unknown-none -p escrow_program -Z build-std -F bpf-entrypoint
+cargo build --release --target bpfel-unknown-none -p escrow_program -Z build-std=core,alloc -F bpf-entrypoint
 ```
 
 Linker flags are configured in `.cargo/config.toml`.

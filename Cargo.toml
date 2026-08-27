@@ -94,6 +94,7 @@ cargo_metadata = { default-features = false, version = "^0.23" }
 clap = { default-features = false, version = "^4", features = ["derive", "std"] }
 codama-nodes = { default-features = false, version = "0.11.0" }
 darling = { default-features = false, version = "0.24.0" }
+fs2 = { default-features = false, version = "^0.4" }
 heck = { default-features = false, version = "^0.5" }
 insta = { default-features = false, version = "^1" }
 insta-cmd = { default-features = false, version = "^0.7.0" }

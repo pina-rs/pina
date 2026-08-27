@@ -1,8 +1,10 @@
 use std::collections::BTreeSet;
+use std::ffi::OsStr;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::ExitStatus;
+use std::process::Stdio;
 
 use atomic_write_file::AtomicWriteFile;
 use pina_codama_renderer::RenderConfig;
@@ -21,7 +23,7 @@ import { createFromJson, visit } from "codama";
 import { readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
-const [renderer, outputRoot, ...idlPaths] = process.argv.slice(1);
+const [renderer, outputRoot, ...idlPaths] = process.argv.slice(2);
 
 if (!renderer || !outputRoot) {
 	throw new Error("missing renderer or output root argument");
@@ -86,12 +88,19 @@ pub struct ProjectGenerateOutput {
 #[derive(Debug)]
 struct GenerationPlan {
 	programs: Vec<(String, PathBuf)>,
+	override_idl_names: bool,
 	idls_dir: PathBuf,
 	rust_out: PathBuf,
 	typescript_out: PathBuf,
 	dart_out: PathBuf,
 	clients: BTreeSet<ClientLanguage>,
 	npx: String,
+}
+
+struct BoundedOutput {
+	status: ExitStatus,
+	stdout: Vec<u8>,
+	stderr: Vec<u8>,
 }
 
 pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, CodamaError> {
@@ -102,6 +111,7 @@ pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, C
 		.collect();
 	let plan = GenerationPlan {
 		programs,
+		override_idl_names: false,
 		idls_dir: options.idls_dir.clone(),
 		rust_out: options.rust_out.clone(),
 		typescript_out: options.js_out.clone(),
@@ -148,6 +158,7 @@ pub fn generate_project_clients(
 	validate_render_target(&clients_dir)?;
 	let plan = GenerationPlan {
 		programs: vec![(project.library_name.clone(), project.program_dir.clone())],
+		override_idl_names: true,
 		idls_dir: project.idl_dir.clone(),
 		rust_out: clients_dir.join("rust"),
 		typescript_out: clients_dir.join("typescript"),
@@ -186,17 +197,13 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 
 	for path in selected_output_dirs(plan) {
 		validate_render_target(path)?;
-		std::fs::create_dir_all(path).map_err(|source| {
-			CodamaError::CreateDir {
-				path: path.to_path_buf(),
-				source,
-			}
-		})?;
+		create_output_dir(path)?;
 	}
 
 	let mut idl_paths = Vec::with_capacity(plan.programs.len());
 	for (example, program_path) in &plan.programs {
-		let idl = generate_idl(program_path, None).map_err(|source| {
+		let name_override = plan.override_idl_names.then_some(example.as_str());
+		let idl = generate_idl(program_path, name_override).map_err(|source| {
 			CodamaError::GenerateIdl {
 				example: example.clone(),
 				path: program_path.clone(),
@@ -226,12 +233,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 		for (example, idl_path) in examples.iter().zip(idl_paths.iter()) {
 			let crate_dir = plan.rust_out.join(example);
 			validate_render_target(&crate_dir)?;
-			render_idl_file(idl_path, &crate_dir, &render_config).map_err(|source| {
-				CodamaError::RenderRust {
-					path: crate_dir.clone(),
-					source,
-				}
-			})?;
+			render_rust_client(idl_path, &crate_dir, &render_config)?;
 		}
 	}
 
@@ -257,13 +259,30 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	Ok(idl_paths)
 }
 
-fn validate_render_target(path: &Path) -> Result<(), CodamaError> {
-	let absolute = std::path::absolute(path).map_err(|source| {
+fn create_output_dir(path: &Path) -> Result<(), CodamaError> {
+	std::fs::create_dir_all(path).map_err(|source| {
 		CodamaError::CreateDir {
 			path: path.to_path_buf(),
 			source,
 		}
-	})?;
+	})
+}
+
+fn render_rust_client(
+	idl_path: &Path,
+	crate_dir: &Path,
+	config: &RenderConfig,
+) -> Result<(), CodamaError> {
+	render_idl_file(idl_path, crate_dir, config).map_err(|source| {
+		CodamaError::RenderRust {
+			path: crate_dir.to_path_buf(),
+			source,
+		}
+	})
+}
+
+fn validate_render_target(path: &Path) -> Result<(), CodamaError> {
+	let absolute = std::path::absolute(path).map_err(|source| create_dir_error(path, source))?;
 
 	if absolute.parent().is_none() {
 		return Err(CodamaError::UnsafeOutput {
@@ -272,21 +291,78 @@ fn validate_render_target(path: &Path) -> Result<(), CodamaError> {
 		});
 	}
 
-	for ancestor in absolute.ancestors() {
-		if let Ok(metadata) = std::fs::symlink_metadata(ancestor)
-			&& metadata.file_type().is_symlink()
-		{
-			return Err(CodamaError::UnsafeOutput {
-				path: path.to_path_buf(),
-				reason: format!(
-					"generation targets cannot traverse symbolic link {}",
-					ancestor.display()
-				),
-			});
+	validate_existing_render_tree(path, &absolute)
+}
+
+fn validate_existing_render_tree(root: &Path, path: &Path) -> Result<(), CodamaError> {
+	let metadata = match std::fs::symlink_metadata(path) {
+		Ok(metadata) => metadata,
+		Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+		Err(source) => return Err(create_dir_error(path, source)),
+	};
+
+	if is_link_like(&metadata) {
+		return Err(unsafe_output_link(root, path));
+	}
+
+	if !metadata.is_dir() {
+		return Err(CodamaError::UnsafeOutput {
+			path: root.to_path_buf(),
+			reason: "generation output targets must be directories".to_owned(),
+		});
+	}
+
+	for entry in walkdir::WalkDir::new(path).follow_links(false).min_depth(1) {
+		let entry =
+			entry.map_err(|source| create_dir_error(path, std::io::Error::other(source)))?;
+		let metadata = std::fs::symlink_metadata(entry.path())
+			.map_err(|source| create_dir_error(entry.path(), source))?;
+		if is_link_like(&metadata) {
+			return Err(unsafe_output_link(root, entry.path()));
 		}
 	}
 
 	Ok(())
+}
+
+fn unsafe_output_link(root: &Path, link: &Path) -> CodamaError {
+	CodamaError::UnsafeOutput {
+		path: root.to_path_buf(),
+		reason: format!(
+			"generation output trees cannot contain symbolic link {}",
+			link.display()
+		),
+	}
+}
+
+fn create_dir_error(path: &Path, source: std::io::Error) -> CodamaError {
+	CodamaError::CreateDir {
+		path: path.to_path_buf(),
+		source,
+	}
+}
+
+fn is_link_like(metadata: &std::fs::Metadata) -> bool {
+	if metadata.file_type().is_symlink() {
+		return true;
+	}
+
+	#[cfg(windows)]
+	{
+		use std::os::windows::fs::MetadataExt;
+
+		return has_windows_reparse_attribute(metadata.file_attributes());
+	}
+
+	#[cfg(not(windows))]
+	false
+}
+
+#[cfg(windows)]
+const fn has_windows_reparse_attribute(attributes: u32) -> bool {
+	const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+
+	attributes & FILE_ATTRIBUTE_REPARSE_POINT != 0
 }
 
 fn write_idl_atomic(path: &Path, contents: &[u8]) -> std::io::Result<()> {
@@ -367,8 +443,12 @@ fn run_client_generation(
 	renderer: ClientLanguage,
 	idl_paths: &[PathBuf],
 ) -> Result<(), CodamaError> {
-	let output = if plan.npx == "node" {
-		run_client_generation_with_node(plan, renderer, idl_paths)?
+	if idl_paths.is_empty() {
+		return Err(CodamaError::NoPrograms);
+	}
+
+	let output = if Path::new(&plan.npx).file_stem() == Some(OsStr::new("node")) {
+		run_client_generation_with_node(plan, renderer, idl_paths, OsStr::new(&plan.npx))?
 	} else {
 		match run_client_generation_with_npx(plan, renderer, idl_paths) {
 			Ok(output) => output,
@@ -384,7 +464,7 @@ fn run_client_generation(
 		}
 	};
 
-	if output.success() {
+	if output.status.success() {
 		return Ok(());
 	}
 
@@ -394,21 +474,49 @@ fn run_client_generation(
 		plan.npx.clone()
 	};
 
-	Err(command_failed(cmd, output))
+	Err(command_error(cmd, &output))
 }
 
-fn command_failed(cmd: String, status: ExitStatus) -> CodamaError {
+fn command_error(cmd: String, output: &BoundedOutput) -> CodamaError {
+	let stderr = diagnostic_text(&output.stderr);
+	let stdout = diagnostic_text(&output.stdout);
+	let details = if !stderr.is_empty() {
+		format!(": {stderr}")
+	} else if !stdout.is_empty() {
+		format!(": {stdout}")
+	} else if output.status.code().is_none() {
+		format!(": {}", output.status)
+	} else {
+		String::new()
+	};
+
 	CodamaError::CommandFailed {
 		cmd,
-		status: status.to_string(),
+		status: output.status.code().unwrap_or(-1),
+		details,
 	}
+}
+
+fn diagnostic_text(bytes: &[u8]) -> String {
+	String::from_utf8_lossy(bytes)
+		.trim()
+		.chars()
+		.fold(String::new(), |mut output, character| {
+			if character.is_control() {
+				output.extend(character.escape_default());
+			} else {
+				output.push(character);
+			}
+
+			output
+		})
 }
 
 fn run_client_generation_with_npx(
 	plan: &GenerationPlan,
 	renderer: ClientLanguage,
 	idl_paths: &[PathBuf],
-) -> std::io::Result<ExitStatus> {
+) -> std::io::Result<BoundedOutput> {
 	let mut command = Command::new(&plan.npx);
 
 	command.arg("-y").arg("-p").arg("codama@1.10.1");
@@ -416,8 +524,7 @@ fn run_client_generation_with_npx(
 	command
 		.arg("node")
 		.arg("--input-type=module")
-		.arg("-e")
-		.arg(CLIENT_RENDER_SCRIPT)
+		.arg("-")
 		.arg(renderer.as_str())
 		.arg(renderer_output(plan, renderer));
 
@@ -425,22 +532,21 @@ fn run_client_generation_with_npx(
 		command.arg(idl_path);
 	}
 
-	command.status()
+	run_bounded(&mut command, Some(CLIENT_RENDER_SCRIPT.as_bytes()))
 }
 
 fn run_client_generation_with_pnpm(
 	plan: &GenerationPlan,
 	renderer: ClientLanguage,
 	idl_paths: &[PathBuf],
-) -> Result<ExitStatus, CodamaError> {
+) -> Result<BoundedOutput, CodamaError> {
 	let mut command = Command::new("pnpm");
 	command.arg("dlx").arg("--package").arg("codama@1.10.1");
 	add_pnpm_renderer_package(&mut command, renderer);
 	command
 		.arg("node")
 		.arg("--input-type=module")
-		.arg("-e")
-		.arg(CLIENT_RENDER_SCRIPT)
+		.arg("-")
 		.arg(renderer.as_str())
 		.arg(renderer_output(plan, renderer));
 
@@ -448,7 +554,7 @@ fn run_client_generation_with_pnpm(
 		command.arg(idl_path);
 	}
 
-	command.status().map_err(|source| {
+	run_bounded(&mut command, Some(CLIENT_RENDER_SCRIPT.as_bytes())).map_err(|source| {
 		CodamaError::RunCommand {
 			cmd: "pnpm".to_string(),
 			source,
@@ -460,12 +566,12 @@ fn run_client_generation_with_node(
 	plan: &GenerationPlan,
 	renderer: ClientLanguage,
 	idl_paths: &[PathBuf],
-) -> Result<ExitStatus, CodamaError> {
-	let mut command = Command::new("node");
+	node: &OsStr,
+) -> Result<BoundedOutput, CodamaError> {
+	let mut command = Command::new(node);
 	command
 		.arg("--input-type=module")
-		.arg("-e")
-		.arg(CLIENT_RENDER_SCRIPT)
+		.arg("-")
 		.arg(renderer.as_str())
 		.arg(renderer_output(plan, renderer));
 
@@ -473,12 +579,112 @@ fn run_client_generation_with_node(
 		command.arg(idl_path);
 	}
 
-	command.status().map_err(|source| {
+	run_bounded(&mut command, Some(CLIENT_RENDER_SCRIPT.as_bytes())).map_err(|source| {
 		CodamaError::RunCommand {
 			cmd: "node".to_string(),
 			source,
 		}
 	})
+}
+
+fn run_bounded(command: &mut Command, input: Option<&[u8]>) -> std::io::Result<BoundedOutput> {
+	use std::io::Write;
+
+	let mut child = command
+		.stdin(if input.is_some() {
+			Stdio::piped()
+		} else {
+			Stdio::null()
+		})
+		.stdout(Stdio::piped())
+		.stderr(Stdio::piped())
+		.spawn()?;
+	let stdout = child
+		.stdout
+		.take()
+		.ok_or_else(|| std::io::Error::other("renderer stdout pipe was not created"))?;
+	let stderr = child
+		.stderr
+		.take()
+		.ok_or_else(|| std::io::Error::other("renderer stderr pipe was not created"))?;
+
+	let stdin = if input.is_some() {
+		Some(
+			child
+				.stdin
+				.take()
+				.ok_or_else(|| std::io::Error::other("renderer stdin pipe was not created"))?,
+		)
+	} else {
+		None
+	};
+
+	std::thread::scope(|scope| {
+		let stdin = stdin.zip(input).map(|(mut stdin, input)| {
+			scope.spawn(move || allow_closed_stdin(stdin.write_all(input)))
+		});
+		let stdout = scope.spawn(|| read_tail(stdout));
+		let stderr = scope.spawn(|| read_tail(stderr));
+		let status = child.wait()?;
+		if let Some(stdin) = stdin {
+			join_writer(stdin)?;
+		}
+		let stdout = join_reader(stdout)?;
+		let stderr = join_reader(stderr)?;
+
+		Ok(BoundedOutput {
+			status,
+			stdout,
+			stderr,
+		})
+	})
+}
+
+fn allow_closed_stdin(result: std::io::Result<()>) -> std::io::Result<()> {
+	match result {
+		Ok(()) => Ok(()),
+		Err(source) if source.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
+		Err(source) => Err(source),
+	}
+}
+
+fn join_writer(
+	handle: std::thread::ScopedJoinHandle<'_, std::io::Result<()>>,
+) -> std::io::Result<()> {
+	handle
+		.join()
+		.map_err(|_| std::io::Error::other("renderer input writer panicked"))?
+}
+
+fn read_tail(reader: impl std::io::Read) -> std::io::Result<Vec<u8>> {
+	const MAX_CAPTURE_BYTES: usize = 16 * 1024;
+
+	let mut reader = std::io::BufReader::new(reader);
+	let mut chunk = [0u8; 4096];
+	let mut captured = Vec::with_capacity(MAX_CAPTURE_BYTES);
+
+	loop {
+		let read = std::io::Read::read(&mut reader, &mut chunk)?;
+
+		if read == 0 {
+			return Ok(captured);
+		}
+
+		captured.extend_from_slice(&chunk[..read]);
+
+		if captured.len() > MAX_CAPTURE_BYTES {
+			let overflow = captured.len() - MAX_CAPTURE_BYTES;
+			captured.drain(..overflow);
+		}
+	}
+}
+
+fn join_reader(
+	handle: std::thread::ScopedJoinHandle<'_, std::io::Result<Vec<u8>>>,
+) -> std::io::Result<Vec<u8>> {
+	handle
+		.join()
+		.map_err(|_| std::io::Error::other("renderer output reader panicked"))?
 }
 
 fn renderer_output(plan: &GenerationPlan, renderer: ClientLanguage) -> &Path {
@@ -511,24 +717,349 @@ fn add_pnpm_renderer_package(command: &mut Command, renderer: ClientLanguage) {
 
 #[cfg(test)]
 mod tests {
+	use std::collections::BTreeSet;
+	use std::io::Cursor;
+	use std::process::Command;
+
 	use super::*;
+
+	fn output(status: ExitStatus, stdout: &[u8], stderr: &[u8]) -> BoundedOutput {
+		BoundedOutput {
+			status,
+			stdout: stdout.to_vec(),
+			stderr: stderr.to_vec(),
+		}
+	}
+
+	fn empty_plan(npx: impl Into<String>) -> GenerationPlan {
+		GenerationPlan {
+			programs: Vec::new(),
+			override_idl_names: false,
+			idls_dir: PathBuf::from("idl"),
+			rust_out: PathBuf::from("rust"),
+			typescript_out: PathBuf::from("typescript"),
+			dart_out: PathBuf::from("dart"),
+			clients: BTreeSet::new(),
+			npx: npx.into(),
+		}
+	}
+
+	#[cfg(unix)]
+	fn exit_status(code: i32) -> ExitStatus {
+		use std::os::unix::process::ExitStatusExt;
+
+		ExitStatus::from_raw(code << 8)
+	}
+
+	#[cfg(windows)]
+	fn exit_status(code: i32) -> ExitStatus {
+		use std::os::windows::process::ExitStatusExt;
+
+		ExitStatus::from_raw(code as u32)
+	}
+
+	#[test]
+	fn command_failure_prefers_stderr_then_stdout() {
+		let stderr = command_error(
+			"renderer".to_owned(),
+			&output(exit_status(2), b"stdout", b"stderr"),
+		)
+		.to_string();
+		let stdout = command_error(
+			"renderer".to_owned(),
+			&output(exit_status(3), b"stdout", b""),
+		)
+		.to_string();
+		let empty =
+			command_error("renderer".to_owned(), &output(exit_status(4), b"", b"")).to_string();
+
+		assert!(stderr.contains("stderr"));
+		assert!(!stderr.contains("stdout"));
+		assert!(stdout.contains("stdout"));
+		assert!(empty.contains("status 4"));
+	}
+
+	#[test]
+	fn command_failure_escapes_untrusted_terminal_controls() {
+		let error = command_error(
+			"renderer".to_owned(),
+			&output(exit_status(2), b"", b"first\n\t\x1b[31msecond\xff\r\n"),
+		)
+		.to_string();
+
+		assert!(error.contains("first\\n\\t\\u{1b}[31msecond�"));
+		assert!(!error.chars().any(char::is_control));
+	}
+
+	#[test]
+	fn bounded_reader_keeps_only_the_tail() {
+		let bytes = vec![b'a'; 20 * 1024];
+		let captured = read_tail(Cursor::new(bytes))
+			.unwrap_or_else(|error| panic!("failed to capture output: {error}"));
+
+		assert_eq!(captured.len(), 16 * 1024);
+		assert!(captured.iter().all(|byte| *byte == b'a'));
+	}
+
+	#[test]
+	fn bounded_runner_captures_stdout_and_stderr() {
+		#[cfg(windows)]
+		let mut command = {
+			let mut command = Command::new("cmd");
+			command.args(["/C", "echo stdout & echo stderr 1>&2 & exit /B 7"]);
+			command
+		};
+		#[cfg(not(windows))]
+		let mut command = {
+			let mut command = Command::new("sh");
+			command.args(["-c", "printf stdout; printf stderr >&2; exit 7"]);
+			command
+		};
+		let captured = run_bounded(&mut command, None)
+			.unwrap_or_else(|error| panic!("failed to run command: {error}"));
+
+		assert_eq!(captured.status.code(), Some(7));
+		assert_eq!(captured.stdout.trim_ascii_end(), b"stdout");
+		assert!(String::from_utf8_lossy(&captured.stderr).contains("stderr"));
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn bounded_runner_preserves_failure_when_the_child_closes_stdin() {
+		let mut command = Command::new("sh");
+		command.args(["-c", "printf 'renderer failed' >&2; exit 9"]);
+		let input = vec![b'x'; 1024 * 1024];
+		let captured = run_bounded(&mut command, Some(&input))
+			.unwrap_or_else(|error| panic!("failed to run command: {error}"));
+
+		assert_eq!(captured.status.code(), Some(9));
+		assert!(String::from_utf8_lossy(&captured.stderr).contains("renderer failed"));
+	}
+
+	#[test]
+	fn stdin_writer_only_ignores_a_closed_child_pipe() {
+		assert!(allow_closed_stdin(Ok(())).is_ok());
+		assert!(
+			allow_closed_stdin(Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))).is_ok()
+		);
+
+		let error = allow_closed_stdin(Err(std::io::Error::from(
+			std::io::ErrorKind::PermissionDenied,
+		)))
+		.expect_err("unrelated stdin errors must be preserved");
+		assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+	}
+
+	#[test]
+	fn selected_output_directories_follow_requested_clients() {
+		let plan = GenerationPlan {
+			programs: Vec::new(),
+			override_idl_names: false,
+			idls_dir: PathBuf::from("idl"),
+			rust_out: PathBuf::from("rust"),
+			typescript_out: PathBuf::from("typescript"),
+			dart_out: PathBuf::from("dart"),
+			clients: [
+				ClientLanguage::Rust,
+				ClientLanguage::Typescript,
+				ClientLanguage::Dart,
+			]
+			.into_iter()
+			.collect(),
+			npx: "npx".to_owned(),
+		};
+
+		assert_eq!(
+			selected_output_dirs(&plan),
+			vec![
+				Path::new("rust"),
+				Path::new("typescript"),
+				Path::new("dart")
+			]
+		);
+		assert_eq!(
+			renderer_output(&plan, ClientLanguage::Rust),
+			Path::new("rust")
+		);
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn client_runner_reports_spawn_and_renderer_failures() {
+		use std::os::unix::fs::PermissionsExt;
+
+		let missing = empty_plan("definitely-missing-pina-renderer-command");
+		let idls = [PathBuf::from("program.json")];
+		assert!(matches!(
+			run_client_generation(&missing, ClientLanguage::Typescript, &idls),
+			Err(CodamaError::RunCommand { .. })
+		));
+
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let script = temp.path().join("node");
+		std::fs::write(&script, "#!/bin/sh\nprintf 'renderer failed' >&2\nexit 9\n")
+			.unwrap_or_else(|error| panic!("failed to write renderer: {error}"));
+		std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755))
+			.unwrap_or_else(|error| panic!("failed to make renderer executable: {error}"));
+		let failing = empty_plan(script.to_string_lossy());
+		let error = run_client_generation(&failing, ClientLanguage::Dart, &idls)
+			.expect_err("renderer failure should be reported");
+
+		assert!(error.to_string().contains("renderer failed"));
+		let node_output = run_client_generation_with_node(
+			&failing,
+			ClientLanguage::Typescript,
+			&idls,
+			script.as_os_str(),
+		)
+		.unwrap_or_else(|error| panic!("failed to run fake node: {error}"));
+		assert_eq!(node_output.status.code(), Some(9));
+		assert!(matches!(
+			run_client_generation_with_node(
+				&failing,
+				ClientLanguage::Typescript,
+				&idls,
+				OsStr::new("definitely-missing-node"),
+			),
+			Err(CodamaError::RunCommand { .. })
+		));
+	}
+
+	#[test]
+	fn renderer_command_helpers_cover_each_language() {
+		for language in [
+			ClientLanguage::Rust,
+			ClientLanguage::Typescript,
+			ClientLanguage::Dart,
+		] {
+			let mut npx = Command::new("npx");
+			add_npx_renderer_package(&mut npx, language);
+			assert!(npx.get_args().next().is_some());
+
+			let mut pnpm = Command::new("pnpm");
+			add_pnpm_renderer_package(&mut pnpm, language);
+			assert!(pnpm.get_args().next().is_some());
+		}
+	}
+
+	#[test]
+	fn renderer_rejects_an_empty_idl_set_without_spawning() {
+		assert!(matches!(
+			run_client_generation(
+				&empty_plan("definitely-missing-pina-renderer-command"),
+				ClientLanguage::Typescript,
+				&[],
+			),
+			Err(CodamaError::NoPrograms)
+		));
+	}
+
+	#[test]
+	fn create_directory_error_preserves_the_target() {
+		let error = create_dir_error(Path::new("clients"), std::io::Error::other("failure"));
+
+		assert!(matches!(error, CodamaError::CreateDir { .. }));
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let file = temp.path().join("file");
+		std::fs::write(&file, b"blocked")
+			.unwrap_or_else(|error| panic!("failed to create blocking file: {error}"));
+		assert!(matches!(
+			create_output_dir(&file),
+			Err(CodamaError::CreateDir { .. })
+		));
+	}
+
+	#[test]
+	fn generation_plan_reports_directory_and_idl_failures() {
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let temp_root = std::fs::canonicalize(temp.path())
+			.unwrap_or_else(|error| panic!("failed to canonicalize temp dir: {error}"));
+		let blocked_idls = temp_root.join("blocked-idls");
+		std::fs::write(&blocked_idls, b"file")
+			.unwrap_or_else(|error| panic!("failed to block IDL directory: {error}"));
+		let mut plan = empty_plan("npx");
+		plan.idls_dir = blocked_idls;
+		let error = generate_plan(&plan).expect_err("blocked Rust output should fail");
+		assert!(
+			matches!(error, CodamaError::CreateDir { .. }),
+			"unexpected error: {error}"
+		);
+
+		plan.idls_dir = temp_root.join("idls");
+		plan.rust_out = temp_root.join("blocked-rust");
+		plan.clients.insert(ClientLanguage::Rust);
+		std::fs::write(&plan.rust_out, b"file")
+			.unwrap_or_else(|error| panic!("failed to block Rust directory: {error}"));
+		let error = generate_plan(&plan).expect_err("blocked Rust output should fail");
+		assert!(
+			matches!(error, CodamaError::UnsafeOutput { .. }),
+			"unexpected error: {error}"
+		);
+
+		plan.clients.clear();
+		plan.programs = vec![("missing".to_owned(), temp_root.join("missing-program"))];
+		assert!(matches!(
+			generate_plan(&plan),
+			Err(CodamaError::GenerateIdl { .. })
+		));
+	}
+
+	#[test]
+	fn generation_plan_reports_idl_write_and_rust_render_failures() {
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let temp_root = std::fs::canonicalize(temp.path())
+			.unwrap_or_else(|error| panic!("failed to canonicalize temp dir: {error}"));
+		let program = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello_solana");
+		let mut plan = empty_plan("npx");
+		plan.idls_dir = temp_root.join("idls");
+		plan.programs = vec![("hello_solana".to_owned(), program)];
+		std::fs::create_dir_all(plan.idls_dir.join("hello_solana.json"))
+			.unwrap_or_else(|error| panic!("failed to block IDL output: {error}"));
+		assert!(matches!(
+			generate_plan(&plan),
+			Err(CodamaError::WriteIdl { .. })
+		));
+
+		std::fs::remove_dir_all(&plan.idls_dir)
+			.unwrap_or_else(|error| panic!("failed to clear IDL output: {error}"));
+		let invalid_idl = temp_root.join("invalid.json");
+		std::fs::write(&invalid_idl, b"not json")
+			.unwrap_or_else(|error| panic!("failed to write invalid IDL: {error}"));
+		assert!(matches!(
+			render_rust_client(
+				&invalid_idl,
+				&temp_root.join("rust"),
+				&RenderConfig::default(),
+			),
+			Err(CodamaError::RenderRust { .. })
+		));
+	}
 
 	#[cfg(unix)]
 	#[test]
 	fn command_failure_preserves_signal_status() {
 		use std::os::unix::process::ExitStatusExt;
 
-		let error = command_failed("renderer".to_owned(), ExitStatus::from_raw(15));
+		let output = BoundedOutput {
+			status: ExitStatus::from_raw(15),
+			stdout: Vec::new(),
+			stderr: Vec::new(),
+		};
+		let error = command_error("renderer".to_owned(), &output);
 		let message = error.to_string();
 
 		assert!(message.contains("signal"));
 		assert!(message.contains("15"));
-		assert!(!message.contains("-1"));
+		assert!(message.contains("-1"));
 	}
 
 	#[cfg(unix)]
 	#[test]
-	fn render_target_rejects_symlink_ancestor() {
+	fn render_target_allows_a_symlinked_prefix_but_rejects_the_target() {
 		use std::os::unix::fs::symlink;
 
 		let temp =
@@ -539,21 +1070,61 @@ mod tests {
 			.unwrap_or_else(|error| panic!("failed to create real dir: {error}"));
 		symlink(&real, &link).unwrap_or_else(|error| panic!("failed to create symlink: {error}"));
 
-		let error = validate_render_target(&link.join("generated"))
-			.expect_err("symlink traversal should be rejected");
+		validate_render_target(&link.join("generated"))
+			.unwrap_or_else(|error| panic!("symlinked prefix should be allowed: {error}"));
+		let error = validate_render_target(&link).expect_err("symlink target should be rejected");
 
 		assert!(error.to_string().contains("symbolic link"));
 	}
 
+	#[cfg(unix)]
+	#[test]
+	fn render_target_rejects_a_symlink_inside_the_output_tree() {
+		use std::os::unix::fs::symlink;
+
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let output = temp.path().join("clients");
+		let external = temp.path().join("external");
+		std::fs::create_dir_all(&output)
+			.unwrap_or_else(|error| panic!("failed to create output dir: {error}"));
+		std::fs::create_dir_all(&external)
+			.unwrap_or_else(|error| panic!("failed to create external dir: {error}"));
+		symlink(&external, output.join("escape"))
+			.unwrap_or_else(|error| panic!("failed to create symlink: {error}"));
+
+		let error = validate_render_target(&output)
+			.expect_err("a link inside the deletion boundary should be rejected");
+		assert!(error.to_string().contains("escape"));
+	}
+
 	#[test]
 	fn render_target_rejects_filesystem_root() {
-		let root = if cfg!(windows) {
-			Path::new(r"C:\")
-		} else {
-			Path::new("/")
-		};
+		#[cfg(windows)]
+		let root = Path::new(r"C:\");
+		#[cfg(not(windows))]
+		let root = Path::new("/");
 		let error = validate_render_target(root).expect_err("filesystem root should be rejected");
 
 		assert!(error.to_string().contains("filesystem roots"));
+	}
+
+	#[test]
+	fn render_target_reports_inspection_errors() {
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let invalid = temp.path().join("x".repeat(32 * 1024));
+		assert!(matches!(
+			validate_render_target(&invalid),
+			Err(CodamaError::CreateDir { .. })
+		));
+	}
+
+	#[cfg(windows)]
+	#[test]
+	fn windows_reparse_point_flag_is_detected() {
+		assert!(has_windows_reparse_attribute(0x0400));
+		assert!(has_windows_reparse_attribute(0x0410));
+		assert!(!has_windows_reparse_attribute(0x0010));
 	}
 }

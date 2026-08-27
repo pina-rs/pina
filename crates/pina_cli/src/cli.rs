@@ -10,6 +10,7 @@ use clap::ValueEnum;
 #[derive(Parser, Debug)]
 #[command(
 	name = "pina",
+	bin_name = "pina",
 	version,
 	about = "Build, inspect, and generate artifacts for Pina Solana programs",
 	long_about = "Build, inspect, and generate artifacts for Pina Solana programs.\n\nUse 'pina \

@@ -341,7 +341,14 @@ fn codama_generate_missing_examples_path_error_snapshot() {
 		.arg(workspace_relative(&temp_dir.join("dart")))
 		.arg("--npx")
 		.arg(fake_npx);
-	assert_cmd_snapshot!("codama_generate_missing_examples_path_error", command);
+	let output = command
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina codama generate: {error}"));
+	let stderr = String::from_utf8_lossy(&output.stderr);
+
+	assert!(!output.status.success());
+	assert!(stderr.contains("Failed to read examples directory"));
+	assert!(stderr.contains("missing_examples"));
 }
 
 #[test]

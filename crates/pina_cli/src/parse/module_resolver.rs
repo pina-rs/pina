@@ -256,7 +256,7 @@ mod tests {
 
 		let error = resolve_crate(&src, &src.join("lib.rs"))
 			.expect_err("ambiguous implicit module files must fail");
-		let message = error.to_string();
+		let message = error.to_string().replace('\\', "/");
 		assert!(message.contains("Module `state` is ambiguous"));
 		assert!(message.contains("state.rs"));
 		assert!(message.contains("state/mod.rs"));

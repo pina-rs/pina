@@ -24,11 +24,17 @@ Format with the project's configured formatter. In the Pina repository, use `fix
 
 ## SBF builds
 
-Use the project's pinned toolchain and `.cargo/config.toml`. A common Pina build shape is:
+Prefer the project-aware build, which uses the discovered program, pinned toolchain, and Cargo target directory:
+
+```sh
+pina build
+```
+
+Use the equivalent low-level Cargo command only when diagnosing the compiler or linker invocation:
 
 ```sh
 cargo build --release --target bpfel-unknown-none \
-  -p counter_program -Z build-std -F bpf-entrypoint
+  -p counter_program -Z build-std=core,alloc -F bpf-entrypoint
 ```
 
 Do not silently skip an SBF-dependent test because the artifact is missing. Build it or report the missing prerequisite.

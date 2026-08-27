@@ -33,3 +33,5 @@ clients/
 ```
 
 Pina rejects filesystem-root and symbolic-link generation targets before a renderer runs. `pina codama generate` remains available for the repository-wide, explicitly pathed compatibility workflow.
+
+See [Project Configuration](./configuration.md) for client defaults and the distinction between configuration-relative and command-line paths.

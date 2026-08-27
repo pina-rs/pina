@@ -153,8 +153,12 @@ pub enum CodamaError {
 	#[error("Failed to run `{cmd}`: {source}")]
 	RunCommand { cmd: String, source: std::io::Error },
 
-	#[error("`{cmd}` failed ({status})")]
-	CommandFailed { cmd: String, status: String },
+	#[error("`{cmd}` failed with status {status}{details}")]
+	CommandFailed {
+		cmd: String,
+		status: i32,
+		details: String,
+	},
 }
 
 #[cfg(test)]
@@ -251,10 +255,12 @@ mod tests {
 	fn codama_error_command_failed_display() {
 		let err = CodamaError::CommandFailed {
 			cmd: "npx codama".to_owned(),
-			status: "exit status: 1".to_owned(),
+			status: 1,
+			details: ": permission denied".to_owned(),
 		};
 		let msg = err.to_string();
 		assert!(msg.contains("npx codama"));
 		assert!(msg.contains('1'));
+		assert!(msg.contains("permission denied"));
 	}
 }

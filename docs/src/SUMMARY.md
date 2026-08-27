@@ -7,6 +7,7 @@
   - [Initialize a Program](./cli/init.md)
   - [Build a Program](./cli/build.md)
   - [Generate Clients](./cli/generate.md)
+  - [Project Configuration](./cli/configuration.md)
   - [Generate an IDL](./cli/idl.md)
   - [Read Terminal Docs](./cli/docs.md)
   - [Profile an SBF Program](./cli/profile.md)

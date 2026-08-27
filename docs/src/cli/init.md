@@ -44,11 +44,18 @@ The scaffold includes:
 - a typed instruction discriminator and starter instruction;
 - an `Accounts` struct with signer validation;
 - an SBF Cargo target and `cargo build-program` alias;
+- a pinned nightly Rust toolchain with the `rust-src` component;
 - host-side discriminator and program-ID smoke tests;
 - Pina and Mollusk dependencies;
 - project-local discovery and client-generation settings in `Pina.toml`.
 
 Replace the placeholder system-program address in `src/lib.rs` with the deployed program address before deployment.
+
+Install `sbpf-linker` once before the first SBF build:
+
+```bash
+cargo install sbpf-linker --version 0.1.8 --locked
+```
 
 ## Existing destinations
 
@@ -68,3 +75,5 @@ pina generate
 ```
 
 Use `pina init --help` for the authoritative command-line surface.
+
+See [Project Configuration](./configuration.md) for every generated `Pina.toml` field.
