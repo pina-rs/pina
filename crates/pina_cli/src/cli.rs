@@ -16,8 +16,10 @@ use clap::ValueEnum;
 	about = "Build, inspect, and generate artifacts for Pina Solana programs",
 	long_about = "Build, inspect, and generate artifacts for Pina Solana programs.\n\nUse 'pina \
 	              init' to start a program, 'pina build' for its SBF binary and IDL, and 'pina \
-	              generate' for selected client ecosystems. Low-level IDL, profiling, terminal \
-	              documentation, and the legacy repository-wide Codama workflow remain available.",
+	              generate' for selected client ecosystems. Use 'pina build --verify' and 'pina \
+	              verify' for reproducible deployed-program verification. Low-level IDL, \
+	              profiling, terminal documentation, and the legacy repository-wide Codama \
+	              workflow remain available.",
 	next_line_help = true,
 	arg_required_else_help = true,
 	after_help = "Examples:\n  pina init counter_program\n  cd counter_program && pina build\n  \
@@ -25,7 +27,9 @@ use clap::ValueEnum;
 	              ./programs/counter_program --output ./idls/counter_program.json\n  pina profile \
 	              ./target/deploy/counter_program.so --json\n\nAgent discovery:\n  Run 'pina \
 	              <command> --help' for command-specific inputs, outputs, and examples.\n  Run \
-	              'pina docs' to list the bundled architecture and IDL reference topics."
+	              'pina docs' to list the bundled architecture and IDL reference topics.\n  For \
+	              deployment verification, run 'pina verify --help' and then inspect the selected \
+	              leaf command."
 )]
 pub(crate) struct Cli {
 	#[command(subcommand)]
@@ -226,6 +230,32 @@ pub(crate) enum Commands {
 		output: Option<PathBuf>,
 	},
 
+	/// Verify deployed programs and publish source-build records.
+	///
+	/// Uses the official solana-verify 0.5.1 executable. `check` is read-only;
+	/// `record` is the only subcommand that writes on-chain state. Remote
+	/// submission and status use the mainnet verifier service.
+	#[command(after_help = r#"Examples:
+  pina verify check --program-id <ADDRESS> --cluster devnet
+  pina verify record --program-id <ADDRESS> --cluster devnet \
+    --build-record ./target/pina/verifiable/my_program-<HASH>.json \
+    --authority ./authority.json --yes
+  pina verify submit --program-id <ADDRESS> --uploader <ADDRESS>
+  pina verify status --program-id <ADDRESS>"#)]
+	Verify {
+		#[command(subcommand)]
+		command: VerifyCommands,
+
+		/// solana-verify 0.5.1 executable. Pina never installs it.
+		#[arg(
+			long,
+			default_value = "solana-verify",
+			hide_default_value = true,
+			value_name = "COMMAND"
+		)]
+		solana_verify: OsString,
+	},
+
 	/// Run Codama IDL and client-generation workflows.
 	///
 	/// Use the generate subcommand to extract every selected program IDL and
@@ -242,6 +272,161 @@ pub(crate) enum ClientArg {
 	Rust,
 	Typescript,
 	Dart,
+}
+
+/// Deployed-program verification operations.
+#[derive(Subcommand, Debug)]
+pub(crate) enum VerifyCommands {
+	/// Compare a local SBF executable with a deployed program.
+	///
+	/// Uses solana-verify's trailing-zero-aware executable and deployed-program
+	/// hashes. Exits 0 on a match, 2 on a mismatch, and 1 on an operational error.
+	#[command(after_help = r#"Examples:
+  pina verify check --program-id <ADDRESS> --cluster devnet
+  pina verify check --program-id <ADDRESS> --cluster mainnet-beta \
+    --program ./target/deploy/my_program.so
+  pina verify check --program-id <ADDRESS> --cluster https://rpc.example.com \
+    --project ./programs/my_program
+
+Output and status:
+  Exit 0 means the executables match. Exit 2 means the comparison completed but
+  hashes differ. Exit 1 means validation, RPC, or tool failure. Custom RPC URLs
+  must be credential-free origins because RPC URLs are visible in process argv."#)]
+	Check {
+		/// Deployed program address.
+		#[arg(long, value_name = "ADDRESS")]
+		program_id: String,
+
+		/// Solana cluster alias or HTTP(S) RPC URL. Always explicit.
+		#[arg(long, value_name = "CLUSTER")]
+		cluster: String,
+
+		/// Local SBF executable. Conflicts with --project discovery.
+		#[arg(long, value_name = "PROGRAM.SO", conflicts_with = "project")]
+		program: Option<PathBuf>,
+
+		/// Directory used to discover the executable. Defaults to the current directory.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+	},
+
+	/// Build from an immutable repository revision and record verification metadata.
+	///
+	/// This writes on-chain state after the official repository build matches the
+	/// deployed executable. The authority signs and pays transaction fees because
+	/// solana-verify 0.5.1 does not support a separate payer.
+	#[command(after_help = r#"Examples:
+  pina verify record --program-id <ADDRESS> --cluster devnet \
+    --build-record ./target/pina/verifiable/my_program-<HASH>.json \
+    --authority ./upgrade-authority.json --yes
+
+  pina verify record --program-id <ADDRESS> --cluster mainnet-beta \
+    --build-record ./target/pina/verifiable/my_program-<HASH>.json \
+    --authority ./upgrade-authority.json --yes --acknowledge-mainnet
+
+  pina verify record --program-id <ADDRESS> --cluster mainnet-beta \
+    --build-record ./target/pina/verifiable/my_program-<HASH>.json \
+    --export <MULTISIG_ADDRESS> --output ./verification.tx \
+    --export-encoding base64
+
+Safety:
+  The build record binds the validated artifact hash to its public repository,
+  full revision, build paths, library, and Cargo features. Interactive recording
+  requires typing `record`; automation requires --yes. Submissions to mainnet and
+  unknown remote RPC origins additionally require --acknowledge-mainnet. Export
+  never submits or rebuilds the repository; remote verification begins only after
+  the exported transaction is submitted. Export does not require that acknowledgement."#)]
+	Record {
+		/// Deployed program address.
+		#[arg(long, value_name = "ADDRESS")]
+		program_id: String,
+
+		/// Solana cluster alias or HTTP(S) RPC URL. Always explicit.
+		#[arg(long, value_name = "CLUSTER")]
+		cluster: String,
+
+		/// Content-addressed record produced by `pina build --verify`.
+		#[arg(long, value_name = "FILE")]
+		build_record: PathBuf,
+
+		/// Upgrade-authority keypair. It also pays fees with solana-verify 0.5.1.
+		#[arg(long, value_name = "KEYPAIR", required_unless_present = "export")]
+		authority: Option<PathBuf>,
+
+		/// Export without submitting. Optionally provide a public authority address.
+		#[arg(
+			long,
+			num_args = 0..=1,
+			default_missing_value = "",
+			requires = "output",
+			value_name = "AUTHORITY"
+		)]
+		export: Option<String>,
+
+		/// Write only the validated encoded transaction payload to FILE.
+		#[arg(long, value_name = "FILE", requires = "export")]
+		output: Option<PathBuf>,
+
+		/// Encoding for the exported transaction: base64 or base58.
+		#[arg(
+			long,
+			value_enum,
+			value_name = "ENCODING",
+			requires = "export",
+			hide_possible_values = true
+		)]
+		export_encoding: Option<ExportEncodingArg>,
+
+		/// Confirm recording without an interactive prompt. Has no effect on export.
+		#[arg(long, conflicts_with = "export")]
+		yes: bool,
+
+		/// Acknowledge submission to mainnet or an unknown remote endpoint.
+		#[arg(long)]
+		acknowledge_mainnet: bool,
+	},
+
+	/// Submit an existing on-chain verification record to the mainnet remote verifier.
+	#[command(
+		after_help = "Example:\n  pina verify submit --program-id <ADDRESS> --uploader \
+		              <ADDRESS>\n\n\\
+		              This command always targets the official mainnet remote verifier. UPLOADER is the \
+		              \\
+		              public address that created the on-chain verification record; it is not a keypair."
+	)]
+	Submit {
+		/// Program address whose recorded build should be verified.
+		#[arg(long, value_name = "ADDRESS")]
+		program_id: String,
+
+		/// Public address that uploaded the verification record.
+		#[arg(long, value_name = "ADDRESS")]
+		uploader: String,
+	},
+
+	/// Read the mainnet remote-verifier status for a program.
+	#[command(
+		after_help = "Example:\n  pina verify status --program-id <ADDRESS>\n\nThis command is \\
+		              read-only and always queries the official mainnet remote verifier."
+	)]
+	Status {
+		/// Program address to inspect.
+		#[arg(long, value_name = "ADDRESS")]
+		program_id: String,
+	},
+}
+
+/// Transaction encoding supported by solana-verify exports.
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub(crate) enum ExportEncodingArg {
+	Base64,
+	Base58,
 }
 
 /// Codama-related generation workflows.

@@ -1,6 +1,8 @@
 mod cli;
 
 use std::fs;
+use std::io::IsTerminal;
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -12,6 +14,8 @@ use crate::cli::Cli;
 use crate::cli::ClientArg;
 use crate::cli::CodamaCommands;
 use crate::cli::Commands;
+use crate::cli::ExportEncodingArg;
+use crate::cli::VerifyCommands;
 
 fn main() {
 	let cli = Cli::parse();
@@ -48,6 +52,10 @@ fn main() {
 		Commands::Docs { topic } => run_docs(topic.as_deref()),
 		Commands::Init { name, path, force } => run_init(name.as_str(), path.as_deref(), force),
 		Commands::Profile { path, json, output } => run_profile(&path, json, output.as_deref()),
+		Commands::Verify {
+			command,
+			solana_verify,
+		} => run_verify(command, solana_verify),
 		Commands::Codama { command } => {
 			match command {
 				CodamaCommands::Generate {
@@ -72,6 +80,254 @@ fn main() {
 			}
 		}
 	}
+}
+
+fn run_verify(command: VerifyCommands, solana_verify: std::ffi::OsString) {
+	let executor = pina_cli::verification::SystemVerifyExecutor::new(solana_verify);
+
+	match command {
+		VerifyCommands::Check {
+			program_id,
+			cluster,
+			program,
+			project,
+		} => run_verify_check(&executor, program_id, &cluster, program, project),
+		VerifyCommands::Record {
+			program_id,
+			cluster,
+			build_record,
+			authority,
+			export,
+			output,
+			export_encoding,
+			yes,
+			acknowledge_mainnet,
+		} => {
+			run_verify_record(
+				&executor,
+				program_id,
+				&cluster,
+				build_record,
+				authority,
+				export,
+				output,
+				export_encoding,
+				yes,
+				acknowledge_mainnet,
+			);
+		}
+		VerifyCommands::Submit {
+			program_id,
+			uploader,
+		} => {
+			let output = pina_cli::verification::submit_program(&executor, &program_id, &uploader)
+				.unwrap_or_else(|error| exit_verify_error(error));
+			write_process_output(&output, true);
+		}
+		VerifyCommands::Status { program_id } => {
+			let output = pina_cli::verification::status_program(&executor, &program_id)
+				.unwrap_or_else(|error| exit_verify_error(error));
+			write_process_output(&output, true);
+		}
+	}
+}
+
+fn run_verify_check(
+	executor: &pina_cli::verification::SystemVerifyExecutor,
+	program_id: String,
+	cluster: &str,
+	program: Option<PathBuf>,
+	project: PathBuf,
+) {
+	let cluster = cluster
+		.parse::<pina_cli::verification::Cluster>()
+		.unwrap_or_else(|error| exit_verify_error(error));
+	let result = pina_cli::verification::check_program(
+		executor,
+		&pina_cli::verification::CheckOptions {
+			program_id,
+			cluster,
+			program,
+			project_dir: project,
+		},
+	)
+	.unwrap_or_else(|error| exit_verify_error(error));
+
+	match result {
+		pina_cli::verification::CheckResult::Match { hash } => {
+			println!("{} Program executable matches", "✔".green());
+			println!("  Hash {hash}");
+		}
+		pina_cli::verification::CheckResult::Mismatch { local, deployed } => {
+			eprintln!("{} Program executables differ", "Error".red().bold());
+			eprintln!("  Local    {local}");
+			eprintln!("  Deployed {deployed}");
+			std::process::exit(2);
+		}
+	}
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_verify_record(
+	executor: &pina_cli::verification::SystemVerifyExecutor,
+	program_id: String,
+	cluster: &str,
+	build_record: PathBuf,
+	authority: Option<PathBuf>,
+	export: Option<String>,
+	output: Option<PathBuf>,
+	export_encoding: Option<ExportEncodingArg>,
+	yes: bool,
+	acknowledge_mainnet: bool,
+) {
+	let cluster = cluster
+		.parse::<pina_cli::verification::Cluster>()
+		.unwrap_or_else(|error| exit_verify_error(error));
+	let is_export = export.is_some();
+	let export_encoding = match export_encoding.unwrap_or(ExportEncodingArg::Base58) {
+		ExportEncodingArg::Base64 => pina_cli::verification::ExportEncoding::Base64,
+		ExportEncodingArg::Base58 => pina_cli::verification::ExportEncoding::Base58,
+	};
+	let options = pina_cli::verification::RecordOptions {
+		program_id,
+		cluster,
+		build_record,
+		authority,
+		export_authority: export,
+		export_output: output.clone(),
+		export_encoding,
+		confirmed: is_export || yes,
+		mainnet_acknowledged: acknowledge_mainnet,
+	};
+
+	let mut input = std::io::stdin().lock();
+	let mut diagnostics = std::io::stderr().lock();
+	let plan = prepare_and_confirm_record(
+		&options,
+		std::io::stdin().is_terminal(),
+		&mut input,
+		&mut diagnostics,
+	)
+	.unwrap_or_else(|error| exit_verify_error(error));
+	drop(input);
+	drop(diagnostics);
+
+	let result = pina_cli::verification::execute_record(executor, &plan)
+		.unwrap_or_else(|error| exit_verify_error(error));
+
+	if is_export {
+		let _ = std::io::stderr().lock().write_all(&result.stdout);
+		write_process_output(&result, false);
+		if let Some(path) = output {
+			println!(
+				"{} Exported verification transaction to {}",
+				"✔".green(),
+				escaped_path(&path)
+			);
+		}
+	} else {
+		write_process_output(&result, true);
+	}
+}
+
+fn prepare_and_confirm_record(
+	options: &pina_cli::verification::RecordOptions,
+	is_terminal: bool,
+	input: &mut impl std::io::BufRead,
+	diagnostics: &mut impl Write,
+) -> Result<pina_cli::verification::RecordPlan, pina_cli::verification::VerifyError> {
+	if !options.confirmed && !is_terminal {
+		return Err(pina_cli::verification::VerifyError::ConfirmationRequired);
+	}
+
+	let mut plan = pina_cli::verification::prepare_record(options)?;
+
+	if !options.confirmed {
+		let review = plan.review();
+		let _ = writeln!(diagnostics, "Verification record plan:");
+		let _ = writeln!(
+			diagnostics,
+			"  Build record {}",
+			escaped_path(&review.build_record)
+		);
+		let _ = writeln!(diagnostics, "  Program      {}", review.program_id);
+		let _ = writeln!(diagnostics, "  Cluster      {}", review.cluster);
+		let _ = writeln!(diagnostics, "  Repository   {}", review.repository);
+		let _ = writeln!(diagnostics, "  Revision     {}", review.revision);
+		let _ = writeln!(
+			diagnostics,
+			"  Mount        {}",
+			escaped_text(&review.mount_path)
+		);
+		let _ = writeln!(
+			diagnostics,
+			"  Workspace    {}",
+			escaped_text(&review.workspace_path)
+		);
+		let _ = writeln!(diagnostics, "  Library      {}", review.library_name);
+		let features = display_features(&review.features);
+		let _ = writeln!(diagnostics, "  Features     {features}");
+		let _ = writeln!(
+			diagnostics,
+			"  Defaults     {}",
+			if review.default_features {
+				"enabled"
+			} else {
+				"disabled"
+			}
+		);
+		let _ = writeln!(diagnostics, "  Hash         {}", review.executable_hash);
+		let _ = writeln!(diagnostics, "  Authority    {}", review.authority);
+		let _ = writeln!(
+			diagnostics,
+			"  Keypair      {}",
+			escaped_path(&review.authority_path)
+		);
+		let _ = write!(diagnostics, "Type `record` to submit this transaction: ");
+		let _ = diagnostics.flush();
+		let mut answer = String::new();
+
+		if !input
+			.read_line(&mut answer)
+			.is_ok_and(|_| answer.trim() == "record")
+		{
+			return Err(pina_cli::verification::VerifyError::ConfirmationRequired);
+		}
+		plan.confirm();
+	}
+
+	Ok(plan)
+}
+
+#[allow(clippy::unnecessary_debug_formatting)]
+fn escaped_path(path: &Path) -> String {
+	format!("{path:?}")
+}
+
+fn escaped_text(value: &str) -> String {
+	value.chars().flat_map(char::escape_default).collect()
+}
+
+fn display_features(features: &[String]) -> String {
+	if features.is_empty() {
+		"(none)".to_owned()
+	} else {
+		features.join(",")
+	}
+}
+
+fn write_process_output(output: &pina_cli::verification::ProcessOutput, include_stdout: bool) {
+	if include_stdout {
+		let _ = std::io::stdout().lock().write_all(&output.stdout);
+	}
+
+	let _ = std::io::stderr().lock().write_all(&output.stderr);
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn exit_verify_error(error: pina_cli::verification::VerifyError) -> ! {
+	eprintln!("{} {}", "Error".red().bold(), error);
+	std::process::exit(error.exit_code());
 }
 
 fn run_build(
@@ -406,4 +662,191 @@ fn run_codama_generate(
 		generated_examples.len(),
 		generated_examples.join(", "),
 	);
+}
+
+#[cfg(test)]
+mod tests {
+	use std::fs;
+	use std::io::Cursor;
+
+	use ed25519_dalek::SigningKey;
+	use sha2::Digest;
+	use sha2::Sha256;
+	use tempfile::TempDir;
+
+	use super::display_features;
+	use super::escaped_path;
+	use super::escaped_text;
+	use super::prepare_and_confirm_record;
+
+	#[test]
+	fn escapes_control_characters_in_confirmation_paths() {
+		let rendered = escaped_path(std::path::Path::new("record\n\u{1b}[31m.json"));
+
+		assert_eq!(rendered, "\"record\\n\\u{1b}[31m.json\"");
+		assert!(!rendered.contains('\n'));
+		assert!(!rendered.contains('\u{1b}'));
+		assert_eq!(display_features(&[]), "(none)");
+		assert_eq!(
+			escaped_text("path with spaces\n\u{1b}"),
+			"path with spaces\\n\\u{1b}"
+		);
+		assert_eq!(
+			display_features(&["logs".to_owned(), "trace".to_owned()]),
+			"logs,trace"
+		);
+	}
+
+	fn record_options(temp: &TempDir, confirmed: bool) -> pina_cli::verification::RecordOptions {
+		let artifact_bytes = vec![7_u8; 128];
+		let hash = format!("{:x}", Sha256::digest(&artifact_bytes));
+		let record_dir = temp.path().join("record with spaces");
+		fs::create_dir_all(&record_dir).unwrap();
+		let record = record_dir.join(format!("fixture-{hash}.json"));
+		let artifact = record.with_extension("so");
+		let json = serde_json::json!({
+			"schemaVersion": 1,
+			"packageName": "fixture",
+			"libraryName": "fixture",
+			"executableHash": hash,
+			"solanaVerifyVersion": "0.5.1",
+			"build": {
+				"mountPath": "mount with spaces\n\u{1b}[33m",
+				"workspacePath": "workspace\n\u{1b}[34m",
+				"programPath": "programs/fixture",
+				"libraryName": "fixture",
+				"features": ["bpf-entrypoint"],
+				"defaultFeatures": true,
+				"cargoLockSha256": "a".repeat(64),
+			},
+			"source": {
+				"repository": "https://github.com/pina-rs/pina",
+				"revision": "0123456789abcdef0123456789abcdef01234567",
+				"dirty": false,
+			},
+			"diagnostics": [],
+		});
+		fs::write(&artifact, artifact_bytes).unwrap();
+		fs::write(&record, serde_json::to_vec(&json).unwrap()).unwrap();
+
+		let authority = temp.path().join("keypair with spaces.json");
+		let signing_key = SigningKey::from_bytes(&[3_u8; 32]);
+		let public = signing_key.verifying_key().to_bytes();
+		let bytes = [signing_key.to_bytes().as_slice(), public.as_slice()].concat();
+		fs::write(&authority, serde_json::to_vec(&bytes).unwrap()).unwrap();
+		#[cfg(unix)]
+		{
+			use std::os::unix::fs::PermissionsExt;
+
+			fs::set_permissions(&authority, fs::Permissions::from_mode(0o600)).unwrap();
+		}
+
+		pina_cli::verification::RecordOptions {
+			program_id: "11111111111111111111111111111111".to_owned(),
+			cluster: "devnet".parse().unwrap(),
+			build_record: record,
+			authority: Some(authority),
+			export_authority: None,
+			export_output: None,
+			export_encoding: pina_cli::verification::ExportEncoding::Base58,
+			confirmed,
+			mainnet_acknowledged: false,
+		}
+	}
+
+	#[cfg(any(target_os = "linux", target_os = "macos"))]
+	#[test]
+	fn confirmation_prepares_exactly_the_plan_that_is_reviewed() {
+		let temp = TempDir::new().unwrap();
+		let options = record_options(&temp, false);
+		let mut diagnostics = Vec::new();
+		let error = prepare_and_confirm_record(
+			&options,
+			false,
+			&mut Cursor::new(b"record\n"),
+			&mut diagnostics,
+		)
+		.err()
+		.unwrap();
+		assert!(matches!(
+			error,
+			pina_cli::verification::VerifyError::ConfirmationRequired
+		));
+		assert!(diagnostics.is_empty());
+
+		let error =
+			prepare_and_confirm_record(&options, true, &mut Cursor::new(b"no\n"), &mut diagnostics)
+				.err()
+				.unwrap();
+		assert!(matches!(
+			error,
+			pina_cli::verification::VerifyError::ConfirmationRequired
+		));
+
+		diagnostics.clear();
+		let plan = prepare_and_confirm_record(
+			&options,
+			true,
+			&mut Cursor::new(b"record\n"),
+			&mut diagnostics,
+		)
+		.unwrap();
+		let rendered = String::from_utf8_lossy(&diagnostics);
+		assert!(rendered.contains("record with spaces"));
+		assert!(rendered.contains("fixture-"));
+		assert!(rendered.contains("keypair with spaces.json"));
+		assert!(rendered.contains("Mount        mount with spaces\\n\\u{1b}[33m"));
+		assert!(rendered.contains("Workspace    workspace\\n\\u{1b}[34m"));
+		assert!(rendered.contains("Features     bpf-entrypoint"));
+		assert!(rendered.contains("Defaults     enabled"));
+		assert_eq!(plan.review().program_id, options.program_id);
+		drop(plan);
+
+		let mut json: serde_json::Value =
+			serde_json::from_slice(&fs::read(&options.build_record).unwrap()).unwrap();
+		json["build"]["defaultFeatures"] = serde_json::Value::Bool(false);
+		fs::write(&options.build_record, serde_json::to_vec(&json).unwrap()).unwrap();
+		diagnostics.clear();
+		prepare_and_confirm_record(
+			&options,
+			true,
+			&mut Cursor::new(b"record\n"),
+			&mut diagnostics,
+		)
+		.unwrap();
+		assert!(
+			String::from_utf8(diagnostics)
+				.unwrap()
+				.contains("Defaults     disabled")
+		);
+
+		let confirmed = record_options(&temp, true);
+		prepare_and_confirm_record(
+			&confirmed,
+			false,
+			&mut Cursor::new(Vec::<u8>::new()),
+			&mut Vec::new(),
+		)
+		.unwrap();
+	}
+
+	#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+	#[test]
+	fn confirmation_fails_closed_on_unsupported_hosts() {
+		let temp = TempDir::new().unwrap();
+		let options = record_options(&temp, false);
+		let error = prepare_and_confirm_record(
+			&options,
+			true,
+			&mut Cursor::new(b"record\n"),
+			&mut Vec::new(),
+		)
+		.err()
+		.unwrap();
+
+		assert!(matches!(
+			error,
+			pina_cli::verification::VerifyError::UnsupportedRecordHost { .. }
+		));
+	}
 }

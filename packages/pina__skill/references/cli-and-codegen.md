@@ -94,3 +94,25 @@ pina profile ./target/deploy/counter_program.so --json --output ./profile.json
 ```
 
 The report is a static estimate, not a validator execution trace. Use it for deterministic comparisons and investigate material changes in context.
+
+# Verified deployments
+
+Use the content-addressed record produced by the deterministic build. Never invent or override its repository, revision, paths, library, or Cargo feature set.
+
+```bash
+pina build --verify
+pina verify check --program-id <ADDRESS> --cluster devnet
+pina verify record \
+  --program-id <ADDRESS> \
+  --cluster devnet \
+  --build-record ./target/pina/verifiable/my_program-<HASH>.json \
+  --authority ./upgrade-authority.json
+```
+
+`pina verify check` is read-only: it compares the local artifact with the deployed executable and returns exit code `2` for a completed hash mismatch. Do not retry that result as an infrastructure failure.
+
+`pina verify record` rebuilds the exact repository revision from the validated build record and writes verification metadata on-chain. Review the program, cluster, record, and authority before adding `--yes`; mainnet and unknown remote RPC origins additionally require `--acknowledge-mainnet`.
+
+Use `pina verify record --export [AUTHORITY] --output verification.tx` when another signer or multisig must submit the transaction. Export performs Pina's deployed-hash preflight but never submits or rebuilds the repository, does not require `--yes` or `--acknowledge-mainnet`, and writes only the validated base58 or base64 transaction payload. Remote verification begins only after the exported transaction is submitted.
+
+`pina verify submit --program-id <ADDRESS> --uploader <ADDRESS>` submits an existing record to the official mainnet remote verifier. `pina verify status --program-id <ADDRESS>` is the corresponding read-only mainnet status query. Never place credentials in an RPC URL; the URL is necessarily visible in child-process arguments.

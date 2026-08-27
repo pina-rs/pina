@@ -1,0 +1,47 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - verify
+    - check
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Compare a local SBF executable with a deployed program.
+
+Uses solana-verify's trailing-zero-aware executable and deployed-program hashes. Exits 0 on a match, 2 on a mismatch, and 1 on an operational error.
+
+Usage: pina verify check [OPTIONS] --program-id <ADDRESS> --cluster <CLUSTER>
+
+Options:
+      --program-id <ADDRESS>
+          Deployed program address
+
+      --cluster <CLUSTER>
+          Solana cluster alias or HTTP(S) RPC URL. Always explicit
+
+      --program <PROGRAM.SO>
+          Local SBF executable. Conflicts with --project discovery
+
+  -p, --project <DIR>
+          Directory used to discover the executable. Defaults to the current directory
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina verify check --program-id <ADDRESS> --cluster devnet
+  pina verify check --program-id <ADDRESS> --cluster mainnet-beta \
+    --program ./target/deploy/my_program.so
+  pina verify check --program-id <ADDRESS> --cluster https://rpc.example.com \
+    --project ./programs/my_program
+
+Output and status:
+  Exit 0 means the executables match. Exit 2 means the comparison completed but
+  hashes differ. Exit 1 means validation, RPC, or tool failure. Custom RPC URLs
+  must be credential-free origins because RPC URLs are visible in process argv.
+
+----- stderr -----

@@ -61,6 +61,22 @@ pina generate --client rust --client typescript
 
 Rust-only generation does not require Node.js.
 
+### `pina verify`
+
+Build deterministically, compare the artifact with a deployed program, and publish a source record:
+
+```bash
+pina build --verify
+pina verify check --program-id <ADDRESS> --cluster devnet
+pina verify record \
+  --program-id <ADDRESS> \
+  --cluster devnet \
+  --build-record ./target/pina/verifiable/my_program-<HASH>.json \
+  --authority ./upgrade-authority.json
+```
+
+See the [verification command reference](https://pina-rs.github.io/pina/cli/verify.html) for exit codes, mainnet acknowledgement, multisig export, remote submission, and keypair/RPC safety rules.
+
 ### `pina idl`
 
 <br>

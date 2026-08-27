@@ -6,6 +6,7 @@ pub mod init;
 pub mod ir;
 pub mod parse;
 pub mod project;
+pub mod verification;
 
 mod dart_client;
 mod js_client;

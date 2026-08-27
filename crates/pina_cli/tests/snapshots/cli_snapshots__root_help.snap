@@ -10,7 +10,7 @@ exit_code: 0
 ----- stdout -----
 Build, inspect, and generate artifacts for Pina Solana programs.
 
-Use 'pina init' to start a program, 'pina build' for its SBF binary and IDL, and 'pina generate' for selected client ecosystems. Low-level IDL, profiling, terminal documentation, and the legacy repository-wide Codama workflow remain available.
+Use 'pina init' to start a program, 'pina build' for its SBF binary and IDL, and 'pina generate' for selected client ecosystems. Use 'pina build --verify' and 'pina verify' for reproducible deployed-program verification. Low-level IDL, profiling, terminal documentation, and the legacy repository-wide Codama workflow remain available.
 
 Usage: pina <COMMAND>
 
@@ -27,6 +27,8 @@ Commands:
           Initialize a new Pina program project
   profile
           Profile compute-unit costs in a compiled SBF program
+  verify
+          Verify deployed programs and publish source-build records
   codama
           Run Codama IDL and client-generation workflows
   help
@@ -49,5 +51,6 @@ Examples:
 Agent discovery:
   Run 'pina <command> --help' for command-specific inputs, outputs, and examples.
   Run 'pina docs' to list the bundled architecture and IDL reference topics.
+  For deployment verification, run 'pina verify --help' and then inspect the selected leaf command.
 
 ----- stderr -----

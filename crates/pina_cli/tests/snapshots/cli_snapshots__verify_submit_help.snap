@@ -1,0 +1,32 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - verify
+    - submit
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Submit an existing on-chain verification record to the mainnet remote verifier
+
+Usage: pina verify submit --program-id <ADDRESS> --uploader <ADDRESS>
+
+Options:
+      --program-id <ADDRESS>
+          Program address whose recorded build should be verified
+      --uploader <ADDRESS>
+          Public address that uploaded the verification record
+  -h, --help
+          Print help
+
+Example:
+  pina verify submit --program-id <ADDRESS> --uploader <ADDRESS>
+
+\
+		              This command always targets the official mainnet remote verifier. UPLOADER is the \
+		              public address that created the on-chain verification record; it is not a keypair.
+
+----- stderr -----
