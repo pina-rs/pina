@@ -136,6 +136,41 @@ fn profile_help_snapshot() {
 }
 
 #[test]
+fn verify_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["verify", "--help"]);
+	assert_cmd_snapshot!("verify_help", command);
+}
+
+#[test]
+fn verify_check_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["verify", "check", "--help"]);
+	assert_cmd_snapshot!("verify_check_help", command);
+}
+
+#[test]
+fn verify_record_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["verify", "record", "--help"]);
+	assert_cmd_snapshot!("verify_record_help", command);
+}
+
+#[test]
+fn verify_submit_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["verify", "submit", "--help"]);
+	assert_cmd_snapshot!("verify_submit_help", command);
+}
+
+#[test]
+fn verify_status_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["verify", "status", "--help"]);
+	assert_cmd_snapshot!("verify_status_help", command);
+}
+
+#[test]
 fn codama_help_snapshot() {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command.args(["codama", "--help"]);

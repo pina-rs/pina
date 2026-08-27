@@ -1,0 +1,72 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - verify
+    - record
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Build from an immutable repository revision and record verification metadata.
+
+This writes on-chain state after the official repository build matches the deployed executable. The authority signs and pays transaction fees because solana-verify 0.5.1 does not support a separate payer.
+
+Usage: pina verify record [OPTIONS] --program-id <ADDRESS> --cluster <CLUSTER> --build-record <FILE>
+
+Options:
+      --program-id <ADDRESS>
+          Deployed program address
+
+      --cluster <CLUSTER>
+          Solana cluster alias or HTTP(S) RPC URL. Always explicit
+
+      --build-record <FILE>
+          Content-addressed record produced by `pina build --verify`
+
+      --authority <KEYPAIR>
+          Upgrade-authority keypair. It also pays fees with solana-verify 0.5.1
+
+      --export [<AUTHORITY>]
+          Export without submitting. Optionally provide a public authority address
+
+      --output <FILE>
+          Write only the validated encoded transaction payload to FILE
+
+      --export-encoding <ENCODING>
+          Encoding for the exported transaction: base64 or base58
+
+      --yes
+          Confirm recording without an interactive prompt. Has no effect on export
+
+      --acknowledge-mainnet
+          Acknowledge submission to mainnet or an unknown remote endpoint
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina verify record --program-id <ADDRESS> --cluster devnet \
+    --build-record ./target/pina/verifiable/my_program-<HASH>.json \
+    --authority ./upgrade-authority.json --yes
+
+  pina verify record --program-id <ADDRESS> --cluster mainnet-beta \
+    --build-record ./target/pina/verifiable/my_program-<HASH>.json \
+    --authority ./upgrade-authority.json --yes --acknowledge-mainnet
+
+  pina verify record --program-id <ADDRESS> --cluster mainnet-beta \
+    --build-record ./target/pina/verifiable/my_program-<HASH>.json \
+    --export <MULTISIG_ADDRESS> --output ./verification.tx \
+    --export-encoding base64
+
+Safety:
+  The build record binds the validated artifact hash to its public repository,
+  full revision, build paths, library, and Cargo features. Interactive recording
+  requires typing `record`; automation requires --yes. Submissions to mainnet and
+  unknown remote RPC origins additionally require --acknowledge-mainnet. Export
+  never submits or rebuilds the repository; remote verification begins only after
+  the exported transaction is submitted. Export does not require that acknowledgement.
+
+----- stderr -----

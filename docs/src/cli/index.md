@@ -33,6 +33,7 @@ The shortcut runs `cargo run -p pina_cli -- ...` against the checked-out source.
 | ---------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------- |
 | [`pina init`](./init.md)                       | Create a project-aware program scaffold                      | Files plus next steps                     |
 | [`pina build`](./build.md)                     | Build SBF, optionally with deterministic verification inputs | SBF, IDL, and optional build-record files |
+| [`pina verify`](./verify.md)                   | Compare deployments and record verified source               | Status or transaction                     |
 | [`pina generate`](./generate.md)               | Generate configured client ecosystems                        | Generated clients                         |
 | [`pina idl`](./idl.md)                         | Extract a Codama root-node IDL                               | JSON                                      |
 | [`pina docs`](./docs.md)                       | List or render bundled terminal docs                         | Terminal text                             |
@@ -46,6 +47,11 @@ The help tree is intentionally self-describing:
 ```bash
 pina --help
 pina build --help
+pina verify --help
+pina verify check --help
+pina verify record --help
+pina verify submit --help
+pina verify status --help
 pina generate --help
 pina idl --help
 pina docs --help
@@ -65,11 +71,13 @@ Long help includes the input contract, output behavior, defaults, and copyable e
 | `docs`            | Topic index or rendered Markdown  | Errors                              |
 | `init`            | Created path and next steps       | Errors                              |
 | `build`           | Published artifact summary        | Cargo output and errors             |
+| `verify check`    | Matching hash                     | Mismatch hashes and errors          |
+| `verify record`   | Upstream streamed progress        | Upstream diagnostics and errors     |
 | `generate`        | IDL and client summary            | Renderer output and errors          |
 | `profile`         | Report when `--output` is omitted | Errors                              |
 | `codama generate` | Completion summary                | Errors and renderer failures        |
 
-Successful commands exit with code `0`. Operational failures exit with code `1`. Invalid command-line syntax is rejected by Clap with a non-zero usage error before an operation begins.
+Successful commands exit with code `0`. Operational failures exit with code `1`. Verification hash mismatches exit with code `2`. Invalid command-line syntax is rejected by Clap with a non-zero usage error before an operation begins.
 
 For reliable automation, capture stdout only when the command documents it as machine-readable. See [Automation and Agent Usage](./automation.md) for a compact discovery protocol.
 

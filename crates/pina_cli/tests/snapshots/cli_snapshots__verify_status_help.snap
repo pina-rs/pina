@@ -1,0 +1,29 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - verify
+    - status
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Read the mainnet remote-verifier status for a program
+
+Usage: pina verify status --program-id <ADDRESS>
+
+Options:
+      --program-id <ADDRESS>
+          Program address to inspect
+  -h, --help
+          Print help
+
+Example:
+  pina verify status --program-id <ADDRESS>
+
+This command is \
+		              read-only and always queries the official mainnet remote verifier.
+
+----- stderr -----

@@ -1,0 +1,45 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - verify
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Verify deployed programs and publish source-build records.
+
+Uses the official solana-verify 0.5.1 executable. `check` is read-only; `record` is the only subcommand that writes on-chain state. Remote submission and status use the mainnet verifier service.
+
+Usage: pina verify [OPTIONS] <COMMAND>
+
+Commands:
+  check
+          Compare a local SBF executable with a deployed program
+  record
+          Build from an immutable repository revision and record verification metadata
+  submit
+          Submit an existing on-chain verification record to the mainnet remote verifier
+  status
+          Read the mainnet remote-verifier status for a program
+  help
+          Print this message or the help of the given subcommand(s)
+
+Options:
+      --solana-verify <COMMAND>
+          solana-verify 0.5.1 executable. Pina never installs it
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina verify check --program-id <ADDRESS> --cluster devnet
+  pina verify record --program-id <ADDRESS> --cluster devnet \
+    --build-record ./target/pina/verifiable/my_program-<HASH>.json \
+    --authority ./authority.json --yes
+  pina verify submit --program-id <ADDRESS> --uploader <ADDRESS>
+  pina verify status --program-id <ADDRESS>
+
+----- stderr -----

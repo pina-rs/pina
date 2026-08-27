@@ -6,6 +6,7 @@
 - [Pina CLI](./cli/index.md)
   - [Initialize a Program](./cli/init.md)
   - [Build a Program](./cli/build.md)
+  - [Verify a Deployed Program](./cli/verify.md)
   - [Generate Clients](./cli/generate.md)
   - [Project Configuration](./cli/configuration.md)
   - [Generate an IDL](./cli/idl.md)

@@ -19,6 +19,14 @@ pina codama --help
 pina codama generate --help
 ```
 
+For deployment verification, inspect the group and selected leaf:
+
+```bash
+pina verify --help
+pina verify check --help
+pina verify record --help
+```
+
 For framework and extractor constraints:
 
 ```bash
@@ -64,6 +72,11 @@ jq -e '.functions | type == "array"' /tmp/profile.json
 - Use repeated `--example` flags instead of assuming comma-separated parsing.
 - Inspect `pina docs` before requesting a topic.
 - Never use the input `.so` path as the profile output path.
+- Treat exit code `2` from `verify check` or `verify record` as a verified hash mismatch, not an operational failure.
+- Run `pina build --verify` first and pass its printed content-addressed JSON path to `pina verify record --build-record`.
+- Never infer a repository, revision, cluster, authority, or uploader. The build record binds source provenance; every network target and signing identity remains explicit.
+- Use `--yes` only for a reviewed record plan. Mainnet submissions additionally require `--acknowledge-mainnet`; transaction export requires neither flag.
+- Never put secrets in a custom RPC URL. Pina passes the RPC origin to `solana-verify` as argv.
 
 ## Stable verification
 
