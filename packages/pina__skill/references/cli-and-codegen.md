@@ -9,6 +9,10 @@ pina --help
 pina build --help
 pina generate --help
 pina idl --help
+pina idl generate --help
+pina idl fetch --help
+pina idl diff --help
+pina idl publish --help
 pina docs --help
 pina init --help
 pina profile --help
@@ -57,10 +61,11 @@ The successful command prints the canonical `target/deploy` artifact, the genera
 
 ## IDL extraction
 
-Generate a Codama root-node document from a program crate:
+Generate a Codama root-node document from a program crate. Bare invocation remains compatible; `generate` makes the operation explicit:
 
 ```sh
 pina idl --path ./programs/counter_program --output ./idls/counter_program.json
+pina idl generate --path ./programs/counter_program --output ./idls/counter_program.json
 ```
 
 Without `--output`, JSON is the only stdout content; progress and extraction counts go to stderr. This makes the command safe in pipelines:
@@ -70,6 +75,33 @@ pina idl --path ./programs/counter_program --compact | jq -e '.program'
 ```
 
 Treat the IDL as a public contract. Review instruction, account, PDA, error, and type changes rather than accepting generated churn wholesale.
+
+## Canonical on-chain IDLs
+
+Network IDL operations always require an explicit cluster. Fetch the canonical direct, zlib-compressed UTF-8 Codama IDL under the fixed `idl` seed:
+
+```sh
+pina idl fetch --cluster devnet --program-id <PROGRAM_ADDRESS> --output ./idl.json
+pina idl diff --cluster devnet --program-id <PROGRAM_ADDRESS> --file ./idl.json
+```
+
+`diff` compares parsed JSON: object order and whitespace are ignored, but array order is preserved. Exit status `0` means equal, `2` means different, and `1` means the command failed.
+
+Direct publication requires the canonical upgrade-authority keypair and explicit confirmation (`--yes` in automation):
+
+```sh
+pina idl publish --cluster devnet --file ./idl.json \
+  --authority ~/.config/solana/upgrade-authority.json --yes
+```
+
+For review, multisig, or DAO signing, export every transaction the official planner requires without submitting any:
+
+```sh
+pina idl publish --cluster mainnet-beta --file ./idl.json \
+  --export <MULTISIG_ADDRESS> --output ./idl-plan.txt
+```
+
+Do not describe an export as one transaction. Preserve the complete upstream `[Transaction #N]` framing and order. An exported authority is a noop signer; do not combine `--export <ADDRESS>` with local authority or payer keypairs.
 
 ## Repository-wide client generation
 

@@ -9,11 +9,23 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-Generate a Codama IDL from a Pina program crate.
+Generate, inspect, and publish canonical Codama IDLs.
 
-Parses the crate rooted at PATH, follows Rust modules from src/lib.rs, and emits a Codama root-node JSON document. JSON is written to stdout unless OUTPUT is supplied; progress and the extraction summary are written to stderr.
+Bare invocation preserves local generation: it parses PATH and emits a Codama root-node JSON document. The generate subcommand spells that action explicitly. Fetch, diff, and publish manage canonical `idl` metadata for a deployed program through the pinned official Program Metadata client.
 
-Usage: pina idl [OPTIONS]
+Usage: pina idl [OPTIONS] [COMMAND]
+
+Commands:
+  generate
+          Generate a Codama IDL from local Pina source
+  fetch
+          Fetch a direct zlib/UTF-8 canonical on-chain IDL for a deployed program
+  diff
+          Compare a local IDL with canonical on-chain metadata
+  publish
+          Create or update the canonical on-chain IDL metadata account
+  help
+          Print this message or the help of the given subcommand(s)
 
 Options:
   -p, --path <DIR>

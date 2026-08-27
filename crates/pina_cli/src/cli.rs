@@ -130,42 +130,24 @@ pub(crate) enum Commands {
 		npx: String,
 	},
 
-	/// Generate a Codama IDL from a Pina program crate.
+	/// Generate, inspect, and publish canonical Codama IDLs.
 	///
-	/// Parses the crate rooted at PATH, follows Rust modules from src/lib.rs,
-	/// and emits a Codama root-node JSON document. JSON is written to stdout
-	/// unless OUTPUT is supplied; progress and the extraction summary are
-	/// written to stderr.
+	/// Bare invocation preserves local generation: it parses PATH and emits a
+	/// Codama root-node JSON document. The generate subcommand spells that action
+	/// explicitly. Fetch, diff, and publish manage canonical `idl` metadata for a
+	/// deployed program through the pinned official Program Metadata client.
 	#[command(after_help = "Examples:\n  pina idl\n  pina idl --path \
 	                        ./programs/counter_program\n  pina idl -p ./programs/counter_program \
 	                        -o ./idls/counter_program.json\n  pina idl -p \
 	                        ./programs/counter_program --compact")]
 	Idl {
-		/// Program crate directory containing Cargo.toml and src/lib.rs. Defaults to the current directory.
-		#[arg(
-			short,
-			long,
-			default_value = ".",
-			hide_default_value = true,
-			value_name = "DIR"
-		)]
-		path: PathBuf,
+		/// IDL generation and canonical on-chain publication operation.
+		#[command(subcommand)]
+		command: Option<IdlCommands>,
 
-		/// Write the JSON document to FILE instead of stdout.
-		#[arg(short, long, value_name = "FILE")]
-		output: Option<PathBuf>,
-
-		/// Override the program name inferred from Cargo.toml.
-		#[arg(short, long, value_name = "NAME")]
-		name: Option<String>,
-
-		/// Emit compact JSON instead of the default pretty-printed JSON.
-		#[arg(long)]
-		compact: bool,
-
-		/// Preserve compatibility with the former explicit pretty-print flag.
-		#[arg(long, hide = true, conflicts_with = "compact")]
-		pretty: bool,
+		/// IDL generation options used when no subcommand is supplied.
+		#[command(flatten)]
+		generate: IdlGenerateArgs,
 	},
 
 	/// Read bundled Pina reference documentation in the terminal.
@@ -264,6 +246,256 @@ pub(crate) enum Commands {
 		#[command(subcommand)]
 		command: CodamaCommands,
 	},
+}
+
+/// Arguments shared by `pina idl` and `pina idl generate`.
+#[derive(clap::Args, Debug)]
+pub(crate) struct IdlGenerateArgs {
+	/// Program crate directory containing Cargo.toml and src/lib.rs. Defaults to the current directory.
+	#[arg(
+		short,
+		long,
+		default_value = ".",
+		hide_default_value = true,
+		value_name = "DIR"
+	)]
+	pub(crate) path: PathBuf,
+
+	/// Write the JSON document to FILE instead of stdout.
+	#[arg(short, long, value_name = "FILE")]
+	pub(crate) output: Option<PathBuf>,
+
+	/// Override the program name inferred from Cargo.toml.
+	#[arg(short, long, value_name = "NAME")]
+	pub(crate) name: Option<String>,
+
+	/// Emit compact JSON instead of the default pretty-printed JSON.
+	#[arg(long)]
+	pub(crate) compact: bool,
+
+	/// Preserve compatibility with the former explicit pretty-print flag.
+	#[arg(long, hide = true, conflicts_with = "compact")]
+	pub(crate) pretty: bool,
+}
+
+/// IDL generation and Program Metadata workflows.
+#[derive(Subcommand, Debug)]
+pub(crate) enum IdlCommands {
+	/// Generate a Codama IDL from local Pina source.
+	#[command(
+		after_help = "Examples:\n  pina idl generate\n  pina idl generate --path \
+		              ./programs/counter --output ./target/idl/counter.json\n\nCompatibility:\n  \
+		              Bare 'pina idl [OPTIONS]' remains equivalent to this command."
+	)]
+	Generate(IdlGenerateArgs),
+
+	/// Fetch a direct zlib/UTF-8 canonical on-chain IDL for a deployed program.
+	#[command(
+		after_help = "Examples:\n  pina idl fetch --cluster devnet --program-id <ADDRESS>\n  pina \
+		              idl fetch --cluster mainnet-beta --program-id <ADDRESS> --output \
+		              ./idl.json\n\nRequirements:\n  Uses the pinned official \
+		              @solana-program/program-metadata package through npx. The canonical \
+		              metadata seed is always 'idl'. URL, external-account, and other encoding \
+		              formats fail closed in this initial workflow."
+	)]
+	Fetch {
+		/// Solana cluster moniker or HTTP(S) RPC URL. This is always explicit.
+		#[arg(long, value_name = "CLUSTER")]
+		cluster: String,
+
+		/// Deployed program address. Inferred from the local IDL when omitted.
+		#[arg(long, value_name = "ADDRESS")]
+		program_id: Option<String>,
+
+		/// Directory inside the local project used for program ID inference.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Write the fetched IDL to FILE instead of stdout.
+		#[arg(short, long, value_name = "FILE")]
+		output: Option<PathBuf>,
+
+		/// Emit a machine-readable result envelope.
+		#[arg(long, conflicts_with = "output")]
+		json: bool,
+
+		/// npx-compatible runner for the pinned official package. May download version 0.9.0.
+		#[arg(
+			long,
+			default_value = "npx",
+			hide_default_value = true,
+			value_name = "COMMAND"
+		)]
+		npx: String,
+	},
+
+	/// Compare a local IDL with canonical on-chain metadata.
+	#[command(
+		after_help = "Examples:\n  pina idl diff --cluster devnet --program-id <ADDRESS>\n  pina \
+		              idl diff --cluster mainnet-beta --file ./target/idl/program.json \
+		              --program-id <ADDRESS> --json\n\nComparison:\n  JSON object key order and \
+		              whitespace are ignored. A difference exits with status 2, making the \
+		              command useful in CI."
+	)]
+	Diff {
+		/// Solana cluster moniker or HTTP(S) RPC URL. This is always explicit.
+		#[arg(long, value_name = "CLUSTER")]
+		cluster: String,
+
+		/// Deployed program address. Inferred from the local IDL when omitted.
+		#[arg(long, value_name = "ADDRESS")]
+		program_id: Option<String>,
+
+		/// Directory inside the local project used for IDL generation and discovery.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Compare FILE instead of generating the local project IDL.
+		#[arg(long, value_name = "FILE")]
+		file: Option<PathBuf>,
+
+		/// Emit a machine-readable comparison result.
+		#[arg(long)]
+		json: bool,
+
+		/// npx-compatible runner for the pinned official package. May download version 0.9.0.
+		#[arg(
+			long,
+			default_value = "npx",
+			hide_default_value = true,
+			value_name = "COMMAND"
+		)]
+		npx: String,
+	},
+
+	/// Create or update the canonical on-chain IDL metadata account.
+	#[command(
+		after_help = "Examples:\n  pina idl publish --cluster devnet --authority \
+		              ~/.config/solana/id.json --yes\n  pina idl publish --cluster mainnet-beta \
+		              --program-id <ADDRESS> --file ./idl.json --authority \
+		              ./upgrade-authority.json --export --output ./idl-plan.txt\n  pina idl \
+		              publish --cluster mainnet-beta --program-id <ADDRESS> --file ./idl.json \
+		              --export <MULTISIG> --output ./idl-update.txt\n\nSafety:\n  Publication is \
+		              canonical, uses compressed inline JSON under the fixed 'idl' seed, and \
+		              requires explicit confirmation. --export plans every required transaction \
+		              without submitting any. An optional --export authority supports multisigs."
+	)]
+	Publish {
+		/// Solana cluster moniker or HTTP(S) RPC URL. This is always explicit.
+		#[arg(long, value_name = "CLUSTER")]
+		cluster: String,
+
+		/// Deployed program address. Inferred from the local IDL when omitted.
+		#[arg(long, value_name = "ADDRESS")]
+		program_id: Option<String>,
+
+		/// Directory inside the local project used for IDL generation and discovery.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Publish FILE instead of generating the local project IDL.
+		#[arg(long, value_name = "FILE")]
+		file: Option<PathBuf>,
+
+		/// Upgrade-authority keypair for direct publication.
+		#[arg(long, value_name = "KEYPAIR")]
+		authority: Option<PathBuf>,
+
+		/// Fee and rent payer keypair. Defaults to --authority.
+		#[arg(long, value_name = "KEYPAIR", requires = "authority")]
+		payer: Option<PathBuf>,
+
+		/// Export every planned transaction instead of submitting. Optionally use ADDRESS as a noop multisig authority.
+		#[arg(
+			long,
+			value_name = "ADDRESS",
+			num_args = 0..=1,
+			default_missing_value = "__pina_local_export__"
+		)]
+		export: Option<ExportArg>,
+
+		/// Write every exported transaction to FILE instead of stdout.
+		#[arg(short, long, value_name = "FILE", requires = "export")]
+		output: Option<PathBuf>,
+
+		/// Encoding for an exported multisig transaction.
+		#[arg(long, value_enum, default_value = "base64", requires = "export")]
+		export_encoding: IdlExportEncodingArg,
+
+		/// Skip the interactive publication confirmation.
+		#[arg(long, conflicts_with = "export")]
+		yes: bool,
+
+		/// Emit a machine-readable result envelope.
+		#[arg(long, conflicts_with = "export")]
+		json: bool,
+
+		/// Priority fee in micro-lamports per compute unit.
+		#[arg(long, default_value_t = 100_000, value_name = "MICROLAMPORTS")]
+		priority_fee: u64,
+
+		/// npx-compatible runner for the pinned official package. May download version 0.9.0.
+		#[arg(
+			long,
+			default_value = "npx",
+			hide_default_value = true,
+			value_name = "COMMAND"
+		)]
+		npx: String,
+	},
+}
+
+/// Supported official transaction export encodings.
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub(crate) enum IdlExportEncodingArg {
+	Base58,
+	Base64,
+}
+
+/// Authority selection for no-submit transaction export.
+#[derive(Debug, Clone)]
+pub(crate) enum ExportArg {
+	Local,
+	Authority(String),
+}
+
+impl std::str::FromStr for ExportArg {
+	type Err = String;
+
+	fn from_str(value: &str) -> Result<Self, Self::Err> {
+		if value == "__pina_local_export__" {
+			Ok(Self::Local)
+		} else {
+			Ok(Self::Authority(value.to_owned()))
+		}
+	}
+}
+
+impl ExportArg {
+	pub(crate) fn authority(&self) -> Option<&str> {
+		match self {
+			Self::Local => None,
+			Self::Authority(authority) => Some(authority),
+		}
+	}
 }
 
 /// Client ecosystems supported by project-aware generation.

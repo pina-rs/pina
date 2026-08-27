@@ -1,0 +1,36 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - idl
+    - generate
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Generate a Codama IDL from local Pina source
+
+Usage: pina idl generate [OPTIONS]
+
+Options:
+  -p, --path <DIR>
+          Program crate directory containing Cargo.toml and src/lib.rs. Defaults to the current directory
+  -o, --output <FILE>
+          Write the JSON document to FILE instead of stdout
+  -n, --name <NAME>
+          Override the program name inferred from Cargo.toml
+      --compact
+          Emit compact JSON instead of the default pretty-printed JSON
+  -h, --help
+          Print help
+
+Examples:
+  pina idl generate
+  pina idl generate --path ./programs/counter --output ./target/idl/counter.json
+
+Compatibility:
+  Bare 'pina idl [OPTIONS]' remains equivalent to this command.
+
+----- stderr -----

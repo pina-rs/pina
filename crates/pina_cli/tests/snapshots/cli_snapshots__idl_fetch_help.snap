@@ -1,0 +1,40 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - idl
+    - fetch
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Fetch a direct zlib/UTF-8 canonical on-chain IDL for a deployed program
+
+Usage: pina idl fetch [OPTIONS] --cluster <CLUSTER>
+
+Options:
+      --cluster <CLUSTER>
+          Solana cluster moniker or HTTP(S) RPC URL. This is always explicit
+      --program-id <ADDRESS>
+          Deployed program address. Inferred from the local IDL when omitted
+  -p, --project <DIR>
+          Directory inside the local project used for program ID inference
+  -o, --output <FILE>
+          Write the fetched IDL to FILE instead of stdout
+      --json
+          Emit a machine-readable result envelope
+      --npx <COMMAND>
+          npx-compatible runner for the pinned official package. May download version 0.9.0
+  -h, --help
+          Print help
+
+Examples:
+  pina idl fetch --cluster devnet --program-id <ADDRESS>
+  pina idl fetch --cluster mainnet-beta --program-id <ADDRESS> --output ./idl.json
+
+Requirements:
+  Uses the pinned official @solana-program/program-metadata package through npx. The canonical metadata seed is always 'idl'. URL, external-account, and other encoding formats fail closed in this initial workflow.
+
+----- stderr -----

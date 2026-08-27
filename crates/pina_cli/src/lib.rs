@@ -2,6 +2,7 @@ pub mod build;
 pub mod codama;
 pub mod codegen;
 pub mod error;
+pub mod idl_metadata;
 pub mod init;
 pub mod ir;
 pub mod parse;

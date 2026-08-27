@@ -1,0 +1,40 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - idl
+    - diff
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Compare a local IDL with canonical on-chain metadata
+
+Usage: pina idl diff [OPTIONS] --cluster <CLUSTER>
+
+Options:
+      --cluster <CLUSTER>
+          Solana cluster moniker or HTTP(S) RPC URL. This is always explicit
+      --program-id <ADDRESS>
+          Deployed program address. Inferred from the local IDL when omitted
+  -p, --project <DIR>
+          Directory inside the local project used for IDL generation and discovery
+      --file <FILE>
+          Compare FILE instead of generating the local project IDL
+      --json
+          Emit a machine-readable comparison result
+      --npx <COMMAND>
+          npx-compatible runner for the pinned official package. May download version 0.9.0
+  -h, --help
+          Print help
+
+Examples:
+  pina idl diff --cluster devnet --program-id <ADDRESS>
+  pina idl diff --cluster mainnet-beta --file ./target/idl/program.json --program-id <ADDRESS> --json
+
+Comparison:
+  JSON object key order and whitespace are ignored. A difference exits with status 2, making the command useful in CI.
+
+----- stderr -----

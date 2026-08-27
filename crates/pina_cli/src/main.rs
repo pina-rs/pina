@@ -1,4 +1,5 @@
 mod cli;
+mod idl_command;
 
 use std::fs;
 use std::io::IsTerminal;
@@ -42,13 +43,7 @@ fn main() {
 			output,
 			npx,
 		} => run_generate(project, clients, output, npx),
-		Commands::Idl {
-			path,
-			output,
-			name,
-			compact,
-			pretty: _,
-		} => run_idl(path.as_path(), output.as_deref(), name.as_deref(), !compact),
+		Commands::Idl { command, generate } => idl_command::run_idl_command(command, &generate),
 		Commands::Docs { topic } => run_docs(topic.as_deref()),
 		Commands::Init { name, path, force } => run_init(name.as_str(), path.as_deref(), force),
 		Commands::Profile { path, json, output } => run_profile(&path, json, output.as_deref()),

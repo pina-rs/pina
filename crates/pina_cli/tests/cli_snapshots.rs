@@ -101,6 +101,34 @@ fn idl_help_snapshot() {
 }
 
 #[test]
+fn idl_generate_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["idl", "generate", "--help"]);
+	assert_cmd_snapshot!("idl_generate_help", command);
+}
+
+#[test]
+fn idl_fetch_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["idl", "fetch", "--help"]);
+	assert_cmd_snapshot!("idl_fetch_help", command);
+}
+
+#[test]
+fn idl_diff_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["idl", "diff", "--help"]);
+	assert_cmd_snapshot!("idl_diff_help", command);
+}
+
+#[test]
+fn idl_publish_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["idl", "publish", "--help"]);
+	assert_cmd_snapshot!("idl_publish_help", command);
+}
+
+#[test]
 fn docs_help_snapshot() {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command.args(["docs", "--help"]);
@@ -238,6 +266,30 @@ fn idl_legacy_pretty_flag_remains_accepted() {
 	assert!(output.status.success());
 	serde_json::from_slice::<serde_json::Value>(&output.stdout)
 		.unwrap_or_else(|error| panic!("IDL stdout was not valid JSON: {error}"));
+}
+
+#[test]
+fn explicit_idl_generate_matches_bare_idl() {
+	let bare = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.current_dir(workspace_root())
+		.args(["idl", "--path", "examples/anchor_declare_id", "--compact"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run bare pina idl: {error}"));
+	let explicit = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.current_dir(workspace_root())
+		.args([
+			"idl",
+			"generate",
+			"--path",
+			"examples/anchor_declare_id",
+			"--compact",
+		])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina idl generate: {error}"));
+
+	assert!(bare.status.success());
+	assert!(explicit.status.success());
+	assert_eq!(bare.stdout, explicit.stdout);
 }
 
 #[test]
