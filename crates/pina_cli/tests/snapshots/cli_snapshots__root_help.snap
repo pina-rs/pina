@@ -10,11 +10,15 @@ exit_code: 0
 ----- stdout -----
 Build, inspect, and generate artifacts for Pina Solana programs.
 
-Use 'pina init' to start a program, 'pina idl' to inspect its public interface, 'pina codama generate' to render clients, and 'pina profile' to inspect a compiled SBF binary.
+Use 'pina init' to start a program, 'pina build' for its SBF binary and IDL, and 'pina generate' for selected client ecosystems. Low-level IDL, profiling, terminal documentation, and the legacy repository-wide Codama workflow remain available.
 
 Usage: pina <COMMAND>
 
 Commands:
+  build
+          Build the current Pina program for SBF and generate its IDL
+  generate
+          Generate configured clients for the current Pina program
   idl
           Generate a Codama IDL from a Pina program crate
   docs
@@ -37,8 +41,9 @@ Options:
 
 Examples:
   pina init counter_program
+  cd counter_program && pina build
+  pina generate --client rust --client typescript
   pina idl --path ./programs/counter_program --output ./idls/counter_program.json
-  pina codama generate --example counter_program
   pina profile ./target/deploy/counter_program.so --json
 
 Agent discovery:

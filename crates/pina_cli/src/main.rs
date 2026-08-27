@@ -9,6 +9,7 @@ use comfy_table::Table;
 use owo_colors::OwoColorize;
 
 use crate::cli::Cli;
+use crate::cli::ClientArg;
 use crate::cli::CodamaCommands;
 use crate::cli::Commands;
 
@@ -16,6 +17,17 @@ fn main() {
 	let cli = Cli::parse();
 
 	match cli.command {
+		Commands::Build {
+			project,
+			features,
+			no_default_features,
+		} => run_build(project, features, no_default_features),
+		Commands::Generate {
+			project,
+			clients,
+			output,
+			npx,
+		} => run_generate(project, clients, output, npx),
 		Commands::Idl {
 			path,
 			output,
@@ -50,6 +62,67 @@ fn main() {
 			}
 		}
 	}
+}
+
+fn run_build(project: PathBuf, features: Vec<String>, no_default_features: bool) {
+	let options = pina_cli::build::BuildOptions {
+		project_dir: project,
+		features,
+		no_default_features,
+	};
+	let output = match pina_cli::build::build_project_with_options(&options) {
+		Ok(output) => output,
+		Err(error) => {
+			eprintln!("{} {}", "Error".red().bold(), error);
+			std::process::exit(1);
+		}
+	};
+
+	println!("{} Built {}", "✔".green(), output.package_name);
+	println!("  SBF  {}", output.sbf_artifact.display());
+	println!("  IDL  {}", output.idl.display());
+}
+
+fn run_generate(project: PathBuf, clients: Vec<ClientArg>, output: Option<PathBuf>, npx: String) {
+	let clients = clients
+		.into_iter()
+		.map(|client| {
+			match client {
+				ClientArg::Rust => pina_cli::project::ClientLanguage::Rust,
+				ClientArg::Typescript => pina_cli::project::ClientLanguage::Typescript,
+				ClientArg::Dart => pina_cli::project::ClientLanguage::Dart,
+			}
+		})
+		.collect();
+	let options = pina_cli::ProjectGenerateOptions {
+		project_dir: project,
+		clients,
+		output,
+		npx,
+	};
+	let generated = match pina_cli::generate_project_clients(&options) {
+		Ok(generated) => generated,
+		Err(error) => {
+			eprintln!("{} {}", "Error".red().bold(), error);
+			std::process::exit(1);
+		}
+	};
+	let clients = generated
+		.clients
+		.iter()
+		.map(|client| client.as_str())
+		.collect::<Vec<_>>()
+		.join(", ");
+
+	println!(
+		"{} Generated {} client(s) for {}: {}",
+		"✔".green(),
+		generated.clients.len(),
+		generated.package_name,
+		clients
+	);
+	println!("  IDL     {}", generated.idl.display());
+	println!("  Clients {}", generated.clients_dir.display());
 }
 
 fn run_idl(path: &Path, output: Option<&Path>, name: Option<&str>, pretty: bool) {

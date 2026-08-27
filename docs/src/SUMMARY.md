@@ -5,6 +5,8 @@
 - [Getting Started](./getting-started.md)
 - [Pina CLI](./cli/index.md)
   - [Initialize a Program](./cli/init.md)
+  - [Build a Program](./cli/build.md)
+  - [Generate Clients](./cli/generate.md)
   - [Generate an IDL](./cli/idl.md)
   - [Read Terminal Docs](./cli/docs.md)
   - [Profile an SBF Program](./cli/profile.md)

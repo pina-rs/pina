@@ -34,6 +34,7 @@ counter_program/
 │   └── integration.rs
 ├── .gitignore
 ├── Cargo.toml
+├── Pina.toml
 └── README.md
 ```
 
@@ -44,7 +45,8 @@ The scaffold includes:
 - an `Accounts` struct with signer validation;
 - an SBF Cargo target and `cargo build-program` alias;
 - host-side discriminator and program-ID smoke tests;
-- Pina and Mollusk dependencies.
+- Pina and Mollusk dependencies;
+- project-local discovery and client-generation settings in `Pina.toml`.
 
 Replace the placeholder system-program address in `src/lib.rs` with the deployed program address before deployment.
 
@@ -60,9 +62,9 @@ The command prints the exact build, SBF build, test, and IDL commands for the ge
 
 ```bash
 cd ./counter_program
-cargo build
+pina build
 cargo test
-pina idl --path .
+pina generate
 ```
 
 Use `pina init --help` for the authoritative command-line surface.

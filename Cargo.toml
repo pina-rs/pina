@@ -89,6 +89,8 @@ repository = "https://github.com/pina-rs/pina"
 rust-version = "1.89.0"
 
 [workspace.dependencies]
+atomic-write-file = { default-features = false, version = "^0.3" }
+cargo_metadata = { default-features = false, version = "^0.23" }
 clap = { default-features = false, version = "^4", features = ["derive", "std"] }
 codama-nodes = { default-features = false, version = "0.11.0" }
 darling = { default-features = false, version = "0.24.0" }
@@ -126,6 +128,7 @@ syn = { default-features = false, version = "^3", features = ["full"] }
 tempfile = { default-features = false, version = "^3" }
 thiserror = { default-features = false, version = "^2" }
 tokio = { default-features = false, version = "^1" }
+toml = { default-features = false, version = "^1", features = ["parse", "serde"] }
 trybuild = { default-features = false, version = "^1" }
 walkdir = { default-features = false, version = "^2" }
 zeropod = { default-features = false, version = "0.3.5", features = ["solana-address", "solana-program-error"] }

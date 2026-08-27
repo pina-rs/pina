@@ -1,9 +1,11 @@
+pub mod build;
 pub mod codama;
 pub mod codegen;
 pub mod error;
 pub mod init;
 pub mod ir;
 pub mod parse;
+pub mod project;
 
 mod dart_client;
 mod js_client;
@@ -13,7 +15,10 @@ use std::path::Path;
 use codama_nodes::RootNode;
 
 pub use crate::codama::CodamaGenerateOptions;
+pub use crate::codama::ProjectGenerateOptions;
+pub use crate::codama::ProjectGenerateOutput;
 pub use crate::codama::generate_codama;
+pub use crate::codama::generate_project_clients;
 use crate::codegen::try_ir_to_root_node;
 use crate::error::IdlError;
 pub use crate::init::init_project;

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use clap::Subcommand;
+use clap::ValueEnum;
 
 /// Build, inspect, and generate artifacts for Pina Solana programs.
 #[derive(Parser, Debug)]
@@ -12,14 +13,14 @@ use clap::Subcommand;
 	version,
 	about = "Build, inspect, and generate artifacts for Pina Solana programs",
 	long_about = "Build, inspect, and generate artifacts for Pina Solana programs.\n\nUse 'pina \
-	              init' to start a program, 'pina idl' to inspect its public interface, 'pina \
-	              codama generate' to render clients, and 'pina profile' to inspect a compiled \
-	              SBF binary.",
+	              init' to start a program, 'pina build' for its SBF binary and IDL, and 'pina \
+	              generate' for selected client ecosystems. Low-level IDL, profiling, terminal \
+	              documentation, and the legacy repository-wide Codama workflow remain available.",
 	next_line_help = true,
 	arg_required_else_help = true,
-	after_help = "Examples:\n  pina init counter_program\n  pina idl --path \
-	              ./programs/counter_program --output ./idls/counter_program.json\n  pina codama \
-	              generate --example counter_program\n  pina profile \
+	after_help = "Examples:\n  pina init counter_program\n  cd counter_program && pina build\n  \
+	              pina generate --client rust --client typescript\n  pina idl --path \
+	              ./programs/counter_program --output ./idls/counter_program.json\n  pina profile \
 	              ./target/deploy/counter_program.so --json\n\nAgent discovery:\n  Run 'pina \
 	              <command> --help' for command-specific inputs, outputs, and examples.\n  Run \
 	              'pina docs' to list the bundled architecture and IDL reference topics."
@@ -32,6 +33,76 @@ pub(crate) struct Cli {
 /// Operations supported by the Pina toolchain.
 #[derive(Subcommand, Debug)]
 pub(crate) enum Commands {
+	/// Build the current Pina program for SBF and generate its IDL.
+	///
+	/// Discovers the nearest Pina.toml or Cargo package, runs the release SBF
+	/// build, publishes the program at target/deploy/<program>.so, and writes the
+	/// Codama IDL to target/idl/<program>.json. Cargo output is streamed directly.
+	#[command(after_help = "Examples:\n  pina build\n  pina build --project \
+	                        ./programs/counter\n\nProject discovery:\n  Pina searches from \
+	                        --project (or the current directory) toward the filesystem root for \
+	                        Pina.toml. Existing Cargo projects without Pina.toml are discovered \
+	                        with cargo metadata. CARGO_TARGET_DIR is respected.")]
+	Build {
+		/// Directory inside the project to discover. Defaults to the current directory.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Program features to enable in addition to bpf-entrypoint. Repeat or use commas.
+		#[arg(long, value_delimiter = ',', value_name = "FEATURE")]
+		features: Vec<String>,
+
+		/// Disable the program crate's default features for the SBF build.
+		#[arg(long)]
+		no_default_features: bool,
+	},
+
+	/// Generate configured clients for the current Pina program.
+	///
+	/// Discovers the project, refreshes its IDL, and generates only the selected
+	/// client ecosystems. Repeat --client to override Pina.toml. Rust-only
+	/// generation does not invoke Node.js.
+	#[command(
+		after_help = "Examples:\n  pina generate\n  pina generate --client rust\n  pina generate \
+		              --client typescript --client dart\n  pina generate --project \
+		              ./programs/counter --output ./generated\n\nConfiguration:\n  [clients]\n  \
+		              output = \"clients\"\n  languages = [\"rust\", \"typescript\"]"
+	)]
+	Generate {
+		/// Directory inside the project to discover. Defaults to the current directory.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Client ecosystem to generate. Repeat to override Pina.toml.
+		#[arg(long = "client", value_enum, value_name = "LANGUAGE")]
+		clients: Vec<ClientArg>,
+
+		/// Override the configured client output directory.
+		#[arg(short, long, value_name = "DIR")]
+		output: Option<PathBuf>,
+
+		/// Executable used to invoke JavaScript or Dart renderers. Defaults to npx.
+		#[arg(
+			long,
+			default_value = "npx",
+			hide_default_value = true,
+			value_name = "COMMAND"
+		)]
+		npx: String,
+	},
+
 	/// Generate a Codama IDL from a Pina program crate.
 	///
 	/// Parses the crate rooted at PATH, follows Rust modules from src/lib.rs,
@@ -140,6 +211,14 @@ pub(crate) enum Commands {
 		#[command(subcommand)]
 		command: CodamaCommands,
 	},
+}
+
+/// Client ecosystems supported by project-aware generation.
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub(crate) enum ClientArg {
+	Rust,
+	Typescript,
+	Dart,
 }
 
 /// Codama-related generation workflows.

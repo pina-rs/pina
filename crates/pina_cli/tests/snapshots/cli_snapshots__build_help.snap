@@ -1,0 +1,38 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - build
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Build the current Pina program for SBF and generate its IDL.
+
+Discovers the nearest Pina.toml or Cargo package, runs the release SBF build, publishes the program at target/deploy/<program>.so, and writes the Codama IDL to target/idl/<program>.json. Cargo output is streamed directly.
+
+Usage: pina build [OPTIONS]
+
+Options:
+  -p, --project <DIR>
+          Directory inside the project to discover. Defaults to the current directory
+
+      --features <FEATURE>
+          Program features to enable in addition to bpf-entrypoint. Repeat or use commas
+
+      --no-default-features
+          Disable the program crate's default features for the SBF build
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina build
+  pina build --project ./programs/counter
+
+Project discovery:
+  Pina searches from --project (or the current directory) toward the filesystem root for Pina.toml. Existing Cargo projects without Pina.toml are discovered with cargo metadata. CARGO_TARGET_DIR is respected.
+
+----- stderr -----
