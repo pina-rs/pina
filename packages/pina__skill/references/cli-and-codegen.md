@@ -41,6 +41,20 @@ The library target name determines the canonical outputs:
 
 `pina generate` refreshes that IDL and renders the client languages selected in `Pina.toml`. Override the selection for one run with repeatable `--client rust`, `--client typescript`, or `--client dart` flags. Generated ecosystem roots may be replaced, so keep hand-written code outside them.
 
+## Deterministic build artifacts
+
+Use the verified-build backend when you need a deterministic SBF artifact:
+
+```sh
+pina build --verify
+```
+
+This requires an exact `solana-verify 0.5.1` installation, a working Docker-compatible daemon, a root `Cargo.lock`, the generated Solana CLI workspace metadata, and a completely clean Git worktree. Pina does not install or update these prerequisites.
+
+The successful command prints the canonical `target/deploy` artifact, the generated IDL, a content-addressed SBF artifact, and its Pina-local build-record path. Keep the printed record and adjacent SBF together; consumers recompute the executable hash before trusting the record.
+
+`pina build --verify` creates deterministic build inputs and outputs. It does not compare the artifact with an on-chain program or record an on-chain verification result.
+
 ## IDL extraction
 
 Generate a Codama root-node document from a program crate:

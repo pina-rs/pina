@@ -1,5 +1,6 @@
 //! Command-line interface definition and user-facing help.
 
+use std::ffi::OsString;
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -38,12 +39,19 @@ pub(crate) enum Commands {
 	///
 	/// Discovers the nearest Pina.toml or Cargo package, runs the release SBF
 	/// build, publishes the program at target/deploy/<program>.so, and writes the
-	/// Codama IDL to target/idl/<program>.json. Cargo output is streamed directly.
-	#[command(after_help = "Examples:\n  pina build\n  pina build --project \
-	                        ./programs/counter\n\nProject discovery:\n  Pina searches from \
-	                        --project (or the current directory) toward the filesystem root for \
-	                        Pina.toml. Existing Cargo projects without Pina.toml are discovered \
-	                        with cargo metadata. CARGO_TARGET_DIR is respected.")]
+	/// Codama IDL to target/idl/<program>.json. With --verify, solana-verify
+	/// performs a deterministic Docker build and Pina records its inputs and hash.
+	#[command(
+		after_help = "Examples:\n  pina build\n  pina build --verify\n  pina build --verify \
+		              --features logs --no-default-features\n  pina build --project \
+		              ./programs/counter\n\nVerified builds:\n  --verify switches the compiler \
+		              backend to solana-verify 0.5.1. Install that exact version and start Docker \
+		              first. Pina never installs tools. This creates a deterministic build; it \
+		              does not compare with an on-chain program.\n\nProject discovery:\n  Pina \
+		              searches from --project (or the current directory) toward the filesystem \
+		              root for Pina.toml. Existing Cargo projects without Pina.toml are \
+		              discovered with cargo metadata. CARGO_TARGET_DIR is respected."
+	)]
 	Build {
 		/// Directory inside the project to discover. Defaults to the current directory.
 		#[arg(
@@ -62,6 +70,20 @@ pub(crate) enum Commands {
 		/// Disable the program crate's default features for the SBF build.
 		#[arg(long)]
 		no_default_features: bool,
+
+		/// Build deterministically with solana-verify and Docker instead of Cargo directly.
+		#[arg(long)]
+		verify: bool,
+
+		/// solana-verify 0.5.1 executable. Pina does not install it automatically.
+		#[arg(
+			long,
+			default_value = "solana-verify",
+			hide_default_value = true,
+			requires = "verify",
+			value_name = "COMMAND"
+		)]
+		solana_verify: OsString,
 	},
 
 	/// Generate configured clients for the current Pina program.

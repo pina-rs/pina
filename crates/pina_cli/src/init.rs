@@ -151,6 +151,9 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
+[workspace.metadata.cli]
+solana = "3.0.0"
+
 [lib]
 crate-type = ["cdylib", "lib"]
 
@@ -187,6 +190,7 @@ TypeScript client generation requires Node.js with npm and `npx`.
 ## Development
 
 - Build SBF and IDL: `pina build`
+- Build a deterministic deployable with Solana Verify: `pina build --verify`
 - Generate configured clients: `pina generate`
 - Build (all features): `cargo build --all-features`
 - Test: `cargo test`
@@ -527,6 +531,8 @@ mod tests {
 		assert!(cargo.contains("default = []"));
 		assert!(cargo.contains("bpf-entrypoint = []"));
 		assert!(cargo.contains("cpi = []"));
+		assert!(cargo.contains("[workspace.metadata.cli]"));
+		assert!(cargo.contains("solana = \"3.0.0\""));
 		assert!(cargo.contains("mollusk-svm = \"0.15.0\""));
 
 		let config = fs::read_to_string(dir.path.join("Pina.toml"))

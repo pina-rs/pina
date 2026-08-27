@@ -9,6 +9,7 @@ pub mod project;
 
 mod dart_client;
 mod js_client;
+mod verifiable;
 
 use std::path::Path;
 

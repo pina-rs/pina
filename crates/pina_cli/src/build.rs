@@ -15,6 +15,9 @@ use crate::error::IdlError;
 use crate::generate_idl;
 use crate::project::Project;
 use crate::project::ProjectError;
+pub use crate::verifiable::VerifiedBuildRecord;
+use crate::verifiable::VerifyBuildError;
+pub use crate::verifiable::VerifyBuildOptions;
 
 /// Outputs produced by [`build_project`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,11 +35,22 @@ pub struct BuildOptions {
 	pub no_default_features: bool,
 }
 
+/// Outputs produced by a deterministic Solana Verify build.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedBuildOutput {
+	pub build: BuildOutput,
+	pub verifiable_artifact: PathBuf,
+	pub verification_manifest: PathBuf,
+}
+
 /// Errors produced by the project build workflow.
 #[derive(Debug, thiserror::Error)]
 pub enum BuildError {
 	#[error(transparent)]
 	Project(#[from] ProjectError),
+
+	#[error(transparent)]
+	Verify(#[from] VerifyBuildError),
 
 	#[error("Failed to run `{command}`: {source}")]
 	RunCargo {
@@ -219,6 +233,96 @@ pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput,
 		package_name: project.package_name,
 		sbf_artifact,
 		idl: idl_path,
+	})
+}
+
+/// Build a project deterministically through Solana Verify 0.5.1.
+///
+/// The ordinary build API remains unchanged. This function switches only the
+/// SBF compiler backend, publishes a content-addressed Pina build record, and
+/// then publishes the canonical deploy artifact and IDL.
+///
+/// # Errors
+///
+/// Returns an error when project discovery, source staging, Solana Verify,
+/// IDL generation, hashing, or atomic file publication fails.
+pub fn build_project_verified_with_options(
+	options: &BuildOptions,
+	verify: &VerifyBuildOptions,
+) -> Result<VerifiedBuildOutput, BuildError> {
+	let project = Project::discover(&options.project_dir)?;
+	let features = options
+		.features
+		.iter()
+		.map(String::as_str)
+		.chain(std::iter::once("bpf-entrypoint"))
+		.collect::<BTreeSet<_>>()
+		.into_iter()
+		.map(str::to_owned)
+		.collect::<Vec<_>>();
+	let verified =
+		crate::verifiable::build(&project, &features, options.no_default_features, verify)?;
+	publish_verified_build(&project, &verified)
+}
+
+/// Read a Pina-local deterministic build record and verify its adjacent
+/// content-addressed artifact before returning any provenance.
+///
+/// # Errors
+///
+/// Returns an error for aliases, malformed records, missing artifacts, or hash
+/// mismatches.
+pub fn read_verified_build_record(path: &Path) -> Result<VerifiedBuildRecord, VerifyBuildError> {
+	crate::verifiable::read_record(path)
+}
+
+fn publish_verified_build(
+	project: &Project,
+	verified: &crate::verifiable::VerifiedBuild,
+) -> Result<VerifiedBuildOutput, BuildError> {
+	let manifest_path = crate::verifiable::publish_record(verified, &project.target_dir)?;
+	let deploy_dir = project.target_dir.join("deploy");
+	std::fs::create_dir_all(&project.idl_dir).map_err(|source| {
+		BuildError::CreateIdlDir {
+			path: project.idl_dir.clone(),
+			source,
+		}
+	})?;
+	std::fs::create_dir_all(&deploy_dir).map_err(|source| {
+		BuildError::CreateArtifactDir {
+			path: deploy_dir.clone(),
+			source,
+		}
+	})?;
+	let idl =
+		generate_idl(&verified.program_dir, Some(&project.library_name)).map_err(|source| {
+			BuildError::GenerateIdl {
+				package: project.package_name.clone(),
+				source,
+			}
+		})?;
+	let json = serde_json::to_string_pretty(&idl)
+		.map_err(|source| serialize_idl_error(&project.package_name, source))?;
+	let idl_path = project
+		.idl_dir
+		.join(format!("{}.json", project.library_name));
+	let canonical_artifact = deploy_dir.join(format!("{}.so", project.library_name));
+	publish_outputs(
+		&project.target_dir.join(".pina-build.lock"),
+		&idl_path,
+		json.as_bytes(),
+		&verified.artifact,
+		&canonical_artifact,
+	)?;
+
+	Ok(VerifiedBuildOutput {
+		build: BuildOutput {
+			package_name: project.package_name.clone(),
+			sbf_artifact: canonical_artifact,
+			idl: idl_path,
+		},
+		verifiable_artifact: manifest_path.with_extension("so"),
+		verification_manifest: manifest_path,
 	})
 }
 

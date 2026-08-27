@@ -192,6 +192,152 @@ exit 2
 	path
 }
 
+fn fake_solana_verify(root: &Path) -> PathBuf {
+	fs::create_dir_all(root)
+		.unwrap_or_else(|error| panic!("failed to create fake verifier directory: {error}"));
+	let path = root.join("fake-solana-verify.sh");
+	fs::write(
+		&path,
+		r#"#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${1:-}" == "--version" ]]; then
+	printf 'solana-verify %s\n' "${FAKE_VERIFY_VERSION:-0.5.1}"
+	exit 0
+fi
+
+if [[ "${FAKE_VERIFY_FAIL:-0}" == "1" ]]; then
+	exit 31
+fi
+
+if [[ "${FAKE_VERIFY_SIGNAL:-0}" == "1" ]]; then
+	kill -TERM "$$"
+fi
+
+if [[ -n "${FAKE_VERIFY_ARGS:-}" ]]; then
+	printf '%s\n' "$@" > "$FAKE_VERIFY_ARGS"
+fi
+
+workspace=""
+library=""
+previous=""
+for argument in "$@"; do
+	if [[ "$previous" == "--workspace-path" ]]; then
+		workspace="$argument"
+	elif [[ "$previous" == "--library-name" ]]; then
+		library="$argument"
+	fi
+	previous="$argument"
+done
+
+mkdir -p "$workspace/target/deploy"
+printf 'verified-sbf\0\0' > "$workspace/target/deploy/$library.so"
+
+if [[ "${FAKE_VERIFY_REMOVE_SOURCE:-0}" == "1" ]]; then
+	rm "$workspace/src/lib.rs"
+fi
+"#,
+	)
+	.unwrap_or_else(|error| panic!("failed to write fake verifier: {error}"));
+	let mut permissions = fs::metadata(&path)
+		.unwrap_or_else(|error| panic!("failed to inspect fake verifier: {error}"))
+		.permissions();
+	permissions.set_mode(0o755);
+	fs::set_permissions(&path, permissions)
+		.unwrap_or_else(|error| panic!("failed to make fake verifier executable: {error}"));
+	path
+}
+
+fn commit_project(root: &Path) {
+	let commands: &[&[&str]] = &[
+		&["init", "-q"],
+		&["config", "user.email", "pina-tests@example.com"],
+		&["config", "user.name", "Pina Tests"],
+		&[
+			"remote",
+			"add",
+			"origin",
+			"https://github.com/pina-rs/fixture",
+		],
+		&["add", "."],
+		&["commit", "-qm", "fixture"],
+	];
+	for arguments in commands {
+		let mut command = Command::new("git");
+		sanitize_git_environment(&mut command);
+		let status = command
+			.current_dir(root)
+			.args(*arguments)
+			.status()
+			.unwrap_or_else(|error| panic!("failed to run git {arguments:?}: {error}"));
+		assert!(status.success(), "git {arguments:?} failed");
+	}
+}
+
+fn sanitize_git_environment(command: &mut Command) {
+	for variable in [
+		"GIT_ALTERNATE_OBJECT_DIRECTORIES",
+		"GIT_COMMON_DIR",
+		"GIT_CONFIG",
+		"GIT_CONFIG_COUNT",
+		"GIT_CONFIG_PARAMETERS",
+		"GIT_DIR",
+		"GIT_GRAFT_FILE",
+		"GIT_IMPLICIT_WORK_TREE",
+		"GIT_INDEX_FILE",
+		"GIT_INTERNAL_SUPER_PREFIX",
+		"GIT_NO_REPLACE_OBJECTS",
+		"GIT_OBJECT_DIRECTORY",
+		"GIT_PREFIX",
+		"GIT_REPLACE_REF_BASE",
+		"GIT_SHALLOW_FILE",
+		"GIT_WORK_TREE",
+	] {
+		command.env_remove(variable);
+	}
+	for (variable, _) in std::env::vars_os() {
+		if variable.to_str().is_some_and(|variable| {
+			variable.starts_with("GIT_CONFIG_KEY_") || variable.starts_with("GIT_CONFIG_VALUE_")
+		}) {
+			command.env_remove(variable);
+		}
+	}
+}
+
+#[test]
+fn git_environment_isolation_preserves_external_config() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let sentinel = temp.path().join("sentinel.gitconfig");
+	let contents = b"[user]\n\tname = Sentinel\n";
+	fs::write(&sentinel, contents)
+		.unwrap_or_else(|error| panic!("failed to write sentinel config: {error}"));
+	let current_exe = std::env::current_exe()
+		.unwrap_or_else(|error| panic!("failed to locate integration test binary: {error}"));
+	let output = Command::new(current_exe)
+		.args(["verified_build_", "--test-threads=1"])
+		.env("GIT_CONFIG", &sentinel)
+		.env("GIT_CONFIG_PARAMETERS", "malformed-injected-parameters")
+		.env("GIT_CONFIG_COUNT", "1")
+		.env("GIT_CONFIG_KEY_0", "user.name")
+		.env("GIT_CONFIG_VALUE_0", "Injected")
+		.env("GIT_DIR", "/untrusted/repository.git")
+		.env("GIT_WORK_TREE", "/untrusted/worktree")
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run isolated verified-build cases: {error}"));
+
+	assert!(
+		output.status.success(),
+		"isolated verified-build cases failed:\n{}\n{}",
+		String::from_utf8_lossy(&output.stdout),
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert_eq!(
+		fs::read(&sentinel)
+			.unwrap_or_else(|error| panic!("failed to read sentinel config: {error}")),
+		contents
+	);
+}
+
 fn generated_idl_name(path: &Path) -> String {
 	let json = fs::read(path)
 		.unwrap_or_else(|error| panic!("failed to read generated IDL {}: {error}", path.display()));
@@ -206,6 +352,7 @@ fn generated_idl_name(path: &Path) -> String {
 
 fn project_command(project: &Path, fake_cargo: &Path, target: &Path) -> Command {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	sanitize_git_environment(&mut command);
 	command
 		.current_dir(project)
 		.env("CARGO", fake_cargo)
@@ -296,6 +443,340 @@ fn build_publishes_custom_library_artifact_and_idl() {
 			.unwrap_or_else(|error| panic!("failed to read repeated artifact: {error}")),
 		b"compiled-sbf"
 	);
+}
+
+#[test]
+fn verified_build_uses_solana_verify_and_publishes_hash_bound_outputs() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project with spaces");
+	let target = temp.path().join("target with spaces");
+	write_project(&project);
+	fs::write(project.join("Cargo.lock"), "version = 4\n")
+		.unwrap_or_else(|error| panic!("failed to write lockfile: {error}"));
+	commit_project(&project);
+	let cargo = fake_cargo(temp.path());
+	let verifier = fake_solana_verify(temp.path());
+	let args_path = temp.path().join("verify-args");
+
+	let output = project_command(&project, &cargo, &target)
+		.env("FAKE_VERIFY_ARGS", &args_path)
+		.args([
+			"build",
+			"--verify",
+			"--solana-verify",
+			&verifier.to_string_lossy(),
+			"--features",
+			"logs,bpf-entrypoint",
+			"--no-default-features",
+		])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run verified build: {error}"));
+
+	assert!(
+		output.status.success(),
+		"verified build failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert_eq!(
+		fs::read(target.join("deploy/custom_program.so"))
+			.unwrap_or_else(|error| panic!("failed to read canonical artifact: {error}")),
+		b"verified-sbf\0\0"
+	);
+	let verifiable_dir = target.join("pina/verifiable");
+	let files = fs::read_dir(&verifiable_dir)
+		.unwrap_or_else(|error| panic!("failed to read verifiable outputs: {error}"))
+		.map(|entry| {
+			entry
+				.unwrap_or_else(|error| panic!("failed to read output entry: {error}"))
+				.path()
+		})
+		.collect::<Vec<_>>();
+	assert_eq!(files.len(), 2);
+	let manifest_path = files
+		.iter()
+		.find(|path| {
+			path.extension()
+				.is_some_and(|extension| extension == "json")
+		})
+		.unwrap_or_else(|| panic!("verification manifest missing"));
+	let manifest: serde_json::Value = serde_json::from_slice(
+		&fs::read(manifest_path).unwrap_or_else(|error| panic!("failed to read manifest: {error}")),
+	)
+	.unwrap_or_else(|error| panic!("failed to parse manifest: {error}"));
+	assert_eq!(manifest["schemaVersion"], 1);
+	assert_eq!(manifest["libraryName"], "custom_program");
+	assert_eq!(manifest["solanaVerifyVersion"], "0.5.1");
+	assert_eq!(
+		manifest["build"]["features"],
+		serde_json::json!(["bpf-entrypoint", "logs"])
+	);
+	assert_eq!(manifest["build"]["defaultFeatures"], false);
+	assert_eq!(manifest["source"]["dirty"], false);
+	assert!(
+		manifest["executableHash"]
+			.as_str()
+			.is_some_and(|hash| hash.len() == 64)
+	);
+	let record = pina_cli::build::read_verified_build_record(manifest_path)
+		.unwrap_or_else(|error| panic!("failed to validate build record: {error}"));
+	assert_eq!(record.library_name(), "custom_program");
+	assert_eq!(
+		record.repository(),
+		Some("https://github.com/pina-rs/fixture")
+	);
+	assert_eq!(record.revision().map(str::len), Some(40));
+	assert_eq!(record.mount_path(), ".");
+	assert_eq!(record.workspace_path(), ".");
+	assert_eq!(record.program_path(), ".");
+	assert_eq!(
+		record
+			.artifact()
+			.extension()
+			.and_then(|value| value.to_str()),
+		Some("so")
+	);
+	assert_eq!(record.executable_hash(), manifest["executableHash"]);
+	let args = fs::read_to_string(args_path)
+		.unwrap_or_else(|error| panic!("failed to read verifier args: {error}"));
+	assert!(args.lines().any(|argument| argument == "--workspace-path"));
+	assert!(args.lines().any(|argument| argument == "custom_program"));
+	assert!(
+		args.lines()
+			.any(|argument| argument == "bpf-entrypoint,logs")
+	);
+	assert!(String::from_utf8_lossy(&output.stdout).contains("Build record"));
+}
+
+#[test]
+fn build_record_reader_rejects_malformed_and_mismatched_records() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let malformed = temp.path().join("program.json");
+	let hash = "0".repeat(64);
+	let manifest = temp.path().join(format!("program-{hash}.json"));
+	let artifact = manifest.with_extension("so");
+	fs::write(&malformed, b"not json")
+		.unwrap_or_else(|error| panic!("failed to write malformed record: {error}"));
+	assert!(
+		pina_cli::build::read_verified_build_record(&malformed)
+			.unwrap_err()
+			.to_string()
+			.contains("Failed to parse")
+	);
+	fs::write(&artifact, b"artifact")
+		.unwrap_or_else(|error| panic!("failed to write record artifact: {error}"));
+
+	let source_manifest = serde_json::json!({
+		"schemaVersion": 1,
+		"packageName": "program",
+		"libraryName": "program",
+		"executableHash": hash,
+		"solanaVerifyVersion": "0.5.1",
+		"build": {
+			"mountPath": ".",
+			"workspacePath": ".",
+			"programPath": ".",
+			"libraryName": "program",
+			"features": ["bpf-entrypoint"],
+			"defaultFeatures": true,
+			"cargoLockSha256": "0".repeat(64)
+		},
+		"source": {
+			"repository": "https://github.com/pina-rs/program",
+			"revision": "0000000000000000000000000000000000000000",
+			"dirty": false
+		},
+		"diagnostics": []
+	});
+	fs::write(
+		&manifest,
+		serde_json::to_vec(&source_manifest)
+			.unwrap_or_else(|error| panic!("failed to serialize fixture: {error}")),
+	)
+	.unwrap_or_else(|error| panic!("failed to write record: {error}"));
+	assert!(
+		pina_cli::build::read_verified_build_record(&manifest)
+			.unwrap_err()
+			.to_string()
+			.contains("hash does not match")
+	);
+}
+
+#[test]
+fn verified_build_fails_closed_without_replacing_existing_outputs() {
+	let cases = ["version", "failure", "signal", "dirty", "missing"];
+
+	for case in cases {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let project = temp.path().join("project");
+		let target = temp.path().join("target");
+		write_project(&project);
+		fs::write(project.join("Cargo.lock"), "version = 4\n")
+			.unwrap_or_else(|error| panic!("failed to write lockfile: {error}"));
+		commit_project(&project);
+		let cargo = fake_cargo(temp.path());
+		let verifier = fake_solana_verify(temp.path());
+		fs::create_dir_all(target.join("deploy"))
+			.unwrap_or_else(|error| panic!("failed to create deploy dir: {error}"));
+		fs::write(target.join("deploy/custom_program.so"), b"existing")
+			.unwrap_or_else(|error| panic!("failed to write existing artifact: {error}"));
+		let mut command = project_command(&project, &cargo, &target);
+		command.args(["build", "--verify", "--solana-verify"]);
+		if case == "missing" {
+			command.arg(temp.path().join("missing-verifier"));
+		} else {
+			command.arg(&verifier);
+		}
+		match case {
+			"version" => {
+				command.env("FAKE_VERIFY_VERSION", "0.5.0");
+			}
+			"failure" => {
+				command.env("FAKE_VERIFY_FAIL", "1");
+			}
+			"signal" => {
+				command.env("FAKE_VERIFY_SIGNAL", "1");
+			}
+			"dirty" => {
+				fs::write(project.join("untracked-secret"), b"never stage this")
+					.unwrap_or_else(|error| panic!("failed to dirty fixture: {error}"));
+			}
+			"missing" => {}
+			other => panic!("unknown case: {other}"),
+		}
+
+		let output = command
+			.output()
+			.unwrap_or_else(|error| panic!("failed to run {case} case: {error}"));
+		assert!(!output.status.success(), "{case} unexpectedly succeeded");
+		assert_eq!(
+			fs::read(target.join("deploy/custom_program.so"))
+				.unwrap_or_else(|error| panic!("failed to read existing artifact: {error}")),
+			b"existing",
+			"{case} replaced the existing artifact"
+		);
+		assert!(
+			!target.join("pina/verifiable").exists(),
+			"{case} published verifiable outputs"
+		);
+		let stderr = String::from_utf8_lossy(&output.stderr);
+		match case {
+			"version" => assert!(stderr.contains("requires exactly 0.5.1")),
+			"failure" => assert!(stderr.contains("failed (exit status: 31)")),
+			"signal" => assert!(stderr.contains("signal")),
+			"dirty" => assert!(stderr.contains("completely clean Git")),
+			"missing" => assert!(stderr.contains("Failed to run")),
+			other => panic!("unknown case: {other}"),
+		}
+	}
+}
+
+#[test]
+fn verified_build_keeps_canonical_outputs_when_snapshot_idl_fails() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("target");
+	write_project(&project);
+	fs::write(project.join("Cargo.lock"), "version = 4\n")
+		.unwrap_or_else(|error| panic!("failed to write lockfile: {error}"));
+	commit_project(&project);
+	let cargo = fake_cargo(temp.path());
+	let verifier = fake_solana_verify(temp.path());
+	fs::create_dir_all(target.join("deploy"))
+		.unwrap_or_else(|error| panic!("failed to create deploy dir: {error}"));
+	fs::write(target.join("deploy/custom_program.so"), b"existing")
+		.unwrap_or_else(|error| panic!("failed to write existing artifact: {error}"));
+
+	let output = project_command(&project, &cargo, &target)
+		.env("FAKE_VERIFY_REMOVE_SOURCE", "1")
+		.args([
+			"build",
+			"--verify",
+			"--solana-verify",
+			&verifier.to_string_lossy(),
+		])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run verified build: {error}"));
+
+	assert!(!output.status.success());
+	assert_eq!(
+		fs::read(target.join("deploy/custom_program.so"))
+			.unwrap_or_else(|error| panic!("failed to read existing artifact: {error}")),
+		b"existing"
+	);
+	assert_eq!(
+		fs::read_dir(target.join("pina/verifiable"))
+			.unwrap_or_else(|error| panic!("failed to read build records: {error}"))
+			.count(),
+		2,
+		"the immutable hash-bound build outputs remain accurate"
+	);
+}
+
+#[test]
+fn verified_build_reports_canonical_publication_failures() {
+	#[derive(Clone, Copy)]
+	enum Case {
+		IdlDirectory,
+		DeployDirectory,
+		PublicationLock,
+	}
+
+	for case in [
+		Case::IdlDirectory,
+		Case::DeployDirectory,
+		Case::PublicationLock,
+	] {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let project = temp.path().join("project");
+		let target = temp.path().join("target");
+		write_project(&project);
+		fs::write(project.join("Cargo.lock"), "version = 4\n")
+			.unwrap_or_else(|error| panic!("failed to write lockfile: {error}"));
+		commit_project(&project);
+		let cargo = fake_cargo(temp.path());
+		let verifier = fake_solana_verify(temp.path());
+		fs::create_dir_all(&target)
+			.unwrap_or_else(|error| panic!("failed to create target: {error}"));
+		let case_name = match case {
+			Case::IdlDirectory => {
+				fs::write(target.join("idl"), b"file")
+					.unwrap_or_else(|error| panic!("failed to block IDL directory: {error}"));
+				"idl-directory"
+			}
+			Case::DeployDirectory => {
+				fs::write(target.join("deploy"), b"file")
+					.unwrap_or_else(|error| panic!("failed to block deploy directory: {error}"));
+				"deploy-directory"
+			}
+			Case::PublicationLock => {
+				fs::create_dir(target.join(".pina-build.lock"))
+					.unwrap_or_else(|error| panic!("failed to block publication lock: {error}"));
+				"publication-lock"
+			}
+		};
+
+		let output = project_command(&project, &cargo, &target)
+			.args([
+				"build",
+				"--verify",
+				"--solana-verify",
+				&verifier.to_string_lossy(),
+			])
+			.output()
+			.unwrap_or_else(|error| panic!("failed to run {case_name}: {error}"));
+
+		assert!(
+			!output.status.success(),
+			"{case_name} unexpectedly succeeded"
+		);
+		assert_eq!(
+			fs::read_dir(target.join("pina/verifiable"))
+				.unwrap_or_else(|error| panic!("failed to read build records: {error}"))
+				.count(),
+			2,
+			"{case_name} should leave only accurate immutable outputs"
+		);
+	}
 }
 
 #[test]

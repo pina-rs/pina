@@ -29,15 +29,15 @@ The shortcut runs `cargo run -p pina_cli -- ...` against the checked-out source.
 
 ## Command map
 
-| Command                                        | Purpose                                              | Primary output        |
-| ---------------------------------------------- | ---------------------------------------------------- | --------------------- |
-| [`pina init`](./init.md)                       | Create a project-aware program scaffold              | Files plus next steps |
-| [`pina build`](./build.md)                     | Build SBF and refresh the program IDL                | SBF and IDL files     |
-| [`pina generate`](./generate.md)               | Generate configured client ecosystems                | Generated clients     |
-| [`pina idl`](./idl.md)                         | Extract a Codama root-node IDL                       | JSON                  |
-| [`pina docs`](./docs.md)                       | List or render bundled terminal docs                 | Terminal text         |
-| [`pina profile`](./profile.md)                 | Estimate per-function SBF compute cost               | Text or JSON          |
-| [`pina codama generate`](./codama-generate.md) | Generate IDLs and Rust, JavaScript, and Dart clients | Generated directories |
+| Command                                        | Purpose                                                      | Primary output                            |
+| ---------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------- |
+| [`pina init`](./init.md)                       | Create a project-aware program scaffold                      | Files plus next steps                     |
+| [`pina build`](./build.md)                     | Build SBF, optionally with deterministic verification inputs | SBF, IDL, and optional build-record files |
+| [`pina generate`](./generate.md)               | Generate configured client ecosystems                        | Generated clients                         |
+| [`pina idl`](./idl.md)                         | Extract a Codama root-node IDL                               | JSON                                      |
+| [`pina docs`](./docs.md)                       | List or render bundled terminal docs                         | Terminal text                             |
+| [`pina profile`](./profile.md)                 | Estimate per-function SBF compute cost                       | Text or JSON                              |
+| [`pina codama generate`](./codama-generate.md) | Generate IDLs and Rust, JavaScript, and Dart clients         | Generated directories                     |
 
 ## Discover the interface
 
