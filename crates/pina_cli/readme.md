@@ -120,6 +120,17 @@ pina init my_program
 pina init my_program --path ./programs/my_program --force
 ```
 
+Generated manifests register the release-matched official Pina lint set and its pinned Dylint tool versions.
+
+### `pina lint`
+
+Discover the current program and run Pina's official security lints. The first invocation prepares project-local pinned Dylint tools; fix mode applies only machine-applicable suggestions.
+
+```bash
+pina lint
+pina lint --fix
+```
+
 ### `pina test`
 
 Run native/Mollusk tests quickly, or build SBF and run the generated isolated Surfpool test:

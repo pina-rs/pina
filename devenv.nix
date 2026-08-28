@@ -1021,7 +1021,7 @@ in
           exit 1
         fi
 
-        cargo_dylint_version="5.0.0"
+        cargo_dylint_version="6.0.4"
         cargo_dylint_root="$bin_root/manual/cargo-dylint/$cargo_dylint_version"
         cargo_dylint_bin="$cargo_dylint_root/bin/cargo-dylint"
 

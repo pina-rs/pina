@@ -4,6 +4,9 @@ use std::path::PathBuf;
 
 use heck::ToUpperCamelCase;
 
+use crate::lint::CARGO_DYLINT_VERSION;
+use crate::lint::DYLINT_LINK_VERSION;
+
 // A non-system placeholder keeps the generated Surfpool deployment executable.
 // Users must still replace it before sharing or deploying the project.
 const PLACEHOLDER_PROGRAM_ID: &str = "Fg6PaFpoGXkYsidMpWxTWqkZkkM8NufCHCX9ddLKBqd7";
@@ -105,6 +108,7 @@ pub fn print_next_steps(project_dir: &Path, _package_name: &str) {
 	println!("  Next steps:");
 	println!();
 	println!("    cd {}", project_dir.display());
+	println!("    pina lint                      # run Pina's security lints");
 	println!("    pina build                     # build SBF and generate the IDL");
 	println!("    pina test --unit               # fast native and Mollusk tests");
 	println!("    pina test                      # build SBF and test with Surfpool");
@@ -165,6 +169,15 @@ publish = false
 [workspace.metadata.cli]
 solana = "3.0.0"
 
+[workspace.metadata.bin]
+cargo-dylint = {{ version = "{CARGO_DYLINT_VERSION}", bins = ["cargo-dylint"] }}
+dylint-link = {{ version = "{DYLINT_LINK_VERSION}", bins = ["dylint-link"] }}
+
+[workspace.metadata.dylint]
+libraries = [
+	{{ git = "https://github.com/pina-rs/pina", tag = "v{pina_version}", pattern = "lints/*" }},
+]
+
 [lib]
 crate-type = ["cdylib", "lib"]
 
@@ -182,7 +195,10 @@ mollusk-svm = "0.15.0"
 
 [lints.rust.unexpected_cfgs]
 level = "warn"
-check-cfg = ['cfg(target_os, values("solana"))']
+check-cfg = [
+	'cfg(dylint_lib, values(any()))',
+	'cfg(target_os, values("solana"))',
+]
 "#
 	)
 }
@@ -208,6 +224,9 @@ TypeScript client generation requires Node.js with npm and `npx`.
 - Build SBF and IDL: `pina build`
 - Build a deterministic deployable with Solana Verify: `pina build --verify`
 - Generate configured clients: `pina generate`
+- Run Pina's pinned security lint set: `pina lint`
+- Apply machine-applicable security lint suggestions: `pina lint --fix`, then
+  review the resulting diff
 - Build (all features): `cargo build --all-features`
 - Fast native/Mollusk tests: `pina test --unit`
 - SBF integration tests on an isolated Surfpool instance: `pina test`
@@ -629,6 +648,14 @@ mod tests {
 		assert!(cargo.contains("cpi = []"));
 		assert!(cargo.contains("[workspace.metadata.cli]"));
 		assert!(cargo.contains("solana = \"3.0.0\""));
+		assert!(cargo.contains("[workspace.metadata.bin]"));
+		assert!(cargo.contains("cargo-dylint = { version = \"6.0.4\""));
+		assert!(cargo.contains("dylint-link = { version = \"6.0.4\""));
+		assert!(cargo.contains("[workspace.metadata.dylint]"));
+		assert!(cargo.contains("git = \"https://github.com/pina-rs/pina\""));
+		assert!(cargo.contains(&format!("tag = \"v{}\"", env!("CARGO_PKG_VERSION"))));
+		assert!(cargo.contains("pattern = \"lints/*\""));
+		assert!(cargo.contains("cfg(dylint_lib, values(any()))"));
 		assert!(cargo.contains("mollusk-svm = \"0.15.0\""));
 
 		let config = fs::read_to_string(dir.path.join("Pina.toml"))
@@ -708,6 +735,8 @@ mod tests {
 			.unwrap_or_else(|err| panic!("expected README.md to be readable: {err}"));
 		assert!(readme.contains("sbpf-linker --version 0.1.8 --locked"));
 		assert!(readme.contains("Node.js with npm and `npx`"));
+		assert!(readme.contains("pina lint"));
+		assert!(readme.contains("pina lint --fix"));
 	}
 
 	#[test]

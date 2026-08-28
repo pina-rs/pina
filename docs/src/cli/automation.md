@@ -30,6 +30,7 @@ pina verify record --help
 For project testing and a persistent local network:
 
 ```bash
+pina lint --help
 pina test --help
 pina dev --help
 ```
@@ -105,6 +106,7 @@ jq -e '.program_id and .commands' /tmp/deploy-plan.json
 ## Automation rules
 
 - Check the exit status before consuming output.
+- Run `pina lint` before review; use `--fix` only when working-tree edits are authorized and always inspect the diff.
 - Treat stderr as diagnostics and progress, not as part of IDL JSON.
 - Use explicit paths; relative paths depend on the process working directory.
 - Create the parent of an `idl --output` file before invoking the command.

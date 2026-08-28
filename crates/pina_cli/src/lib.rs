@@ -8,6 +8,7 @@ pub mod idl_metadata;
 pub mod init;
 pub mod ir;
 pub mod keys;
+pub mod lint;
 pub mod parse;
 mod path_security;
 pub mod profile;
