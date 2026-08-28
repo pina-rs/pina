@@ -13,13 +13,16 @@ Profile compute-unit costs in a compiled SBF program.
 
 Performs static analysis of an SBF shared object. Text is written to stdout by default. Use --json for machine-readable output and --output to write either format to a file.
 
-Usage: pina profile [OPTIONS] <PROGRAM.SO>
+Usage: pina profile [OPTIONS] [PROGRAM.SO]
 
 Arguments:
-  <PROGRAM.SO>
-          Compiled SBF shared object to analyze
+  [PROGRAM.SO]
+          Compiled SBF shared object. Omit to discover the current project's artifact
 
 Options:
+      --project <DIR>
+          Project used for artifact discovery when PROGRAM.SO is omitted
+
       --json
           Emit machine-readable JSON instead of the text report
 
@@ -30,7 +33,9 @@ Options:
           Print help (see a summary with '-h')
 
 Examples:
-  pina profile ./target/deploy/counter_program.so
+  pina profile
+  pina profile --json
+  pina profile --project ./programs/counter_program
   pina profile ./target/deploy/counter_program.so --json
   pina profile ./target/deploy/counter_program.so --json -o ./profile.json
 

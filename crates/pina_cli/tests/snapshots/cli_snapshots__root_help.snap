@@ -10,7 +10,7 @@ exit_code: 0
 ----- stdout -----
 Build, test, inspect, and generate artifacts for Pina Solana programs.
 
-Use 'pina init' to start a program, 'pina build' for its SBF binary and IDL, 'pina test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent Surfpool network, 'pina generate' for selected client ecosystems, 'pina deploy' for explicit cluster deployment, and 'pina verify' for deployed-program verification. Low-level IDL, profiling, terminal documentation, and the legacy repository-wide Codama workflow remain available.
+Use 'pina init' to start a program, 'pina build' for its SBF binary and IDL, 'pina test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent Surfpool network, 'pina generate' for selected client ecosystems, 'pina deploy' for explicit cluster deployment, and 'pina verify' for deployed-program verification. Use 'pina doctor' for agent-readable diagnostics, 'pina keys' for program identity, and 'pina completions' for shell integration. Low-level IDL, profiling, terminal documentation, and the legacy repository-wide Codama workflow remain available.
 
 Usage: pina <COMMAND>
 
@@ -25,6 +25,12 @@ Commands:
           Read bundled Pina reference documentation in the terminal
   init
           Initialize a new Pina program project
+  keys
+          Inspect or synchronize the current program's identity
+  doctor
+          Diagnose the current project and development toolchain
+  completions
+          Generate shell completion scripts
   test
           Test a Pina program with fast native tests or an isolated Surfpool instance
   dev
@@ -54,6 +60,8 @@ Examples:
   pina test --unit
   pina dev --yes
   pina generate --client rust --client typescript
+  pina doctor --json
+  pina keys
   pina idl --path ./programs/counter_program --output ./idls/counter_program.json
   pina profile ./target/deploy/counter_program.so --json
   pina deploy --cluster localnet --payer ~/.config/solana/id.json --upgrade-authority ~/.config/solana/id.json --dry-run

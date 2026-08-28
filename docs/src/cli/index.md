@@ -39,6 +39,9 @@ The shortcut runs `cargo run -p pina_cli -- ...` against the checked-out source.
 | [`pina dev`](./dev.md)                         | Start an offline Surfpool watch/redeploy loop                | Surfpool UI and logs                      |
 | [`pina idl`](./idl.md)                         | Extract a Codama root-node IDL                               | JSON                                      |
 | [`pina docs`](./docs.md)                       | List or render bundled terminal docs                         | Terminal text                             |
+| [`pina keys`](./keys.md)                       | Inspect or explicitly change program identity                | Text or JSON                              |
+| [`pina doctor`](./doctor.md)                   | Diagnose project and toolchain readiness                     | Text or JSON                              |
+| [`pina completions`](./completions.md)         | Generate a shell completion script                           | Shell script                              |
 | [`pina profile`](./profile.md)                 | Estimate per-function SBF compute cost                       | Text or JSON                              |
 | [`pina deploy`](./deploy.md)                   | Plan and execute an explicit cluster deployment              | Plan or JSON                              |
 | [`pina codama generate`](./codama-generate.md) | Generate IDLs and Rust, JavaScript, and Dart clients         | Generated directories                     |
@@ -59,6 +62,9 @@ pina generate --help
 pina idl --help
 pina docs --help
 pina init --help
+pina keys --help
+pina doctor --help
+pina completions --help
 pina profile --help
 pina deploy --help
 pina codama --help
@@ -80,6 +86,9 @@ Long help includes the input contract, output behavior, defaults, and copyable e
 | `generate`        | IDL and client summary            | Renderer output and errors          |
 | `test`            | Child test-runner output          | Build output and errors             |
 | `dev`             | Surfpool UI and logs              | Build output and errors             |
+| `keys`            | Identity report or change summary | Errors                              |
+| `doctor`          | Diagnostic report                 | Errors                              |
+| `completions`     | Completion script                 | Errors                              |
 | `profile`         | Report when `--output` is omitted | Errors                              |
 | `deploy`          | Inspectable plan and completion   | Confirmation, progress, errors      |
 | `codama generate` | Completion summary                | Errors and renderer failures        |
@@ -90,7 +99,7 @@ For reliable automation, capture stdout only when the command documents it as ma
 
 ## Path behavior
 
-Relative paths are resolved from the process working directory. Output commands create their documented output directories where applicable, but `pina idl --output` expects the parent directory to exist. Existing files at explicit output paths are overwritten after the command validates its inputs.
+Relative paths are resolved from the process working directory. Project-aware commands discover the nearest `Pina.toml` or unambiguous Cargo package and use Cargo metadata for the library source and target directory. Output commands create their documented output directories where applicable, but `pina idl --output` expects the parent directory to exist. Identity replacement requires `pina keys new --force`; profile reports are published atomically and cannot alias the input binary.
 
 ## Environment
 

@@ -1,6 +1,6 @@
 ---
 name: pina
-description: Create, audit, and maintain no_std Solana programs built with Pina and pinocchio. Use for Pina project setup, account and instruction authoring, PDA validation, IDL or client generation, SBF profiling, tests, and project upgrades.
+description: Create, audit, and maintain no_std Solana programs built with Pina and pinocchio. Use for Pina project setup, program identity, account and instruction authoring, PDA validation, diagnostics, IDL or client generation, SBF profiling, tests, and project upgrades.
 ---
 
 # Pina
@@ -42,7 +42,7 @@ Read [references/program-authoring.md](references/program-authoring.md) before c
 
 - Project creation, dependency features, entrypoint wiring, or workspace layout: read [references/project-setup.md](references/project-setup.md).
 - Accounts, instructions, discriminators, PDAs, validation, CPI, resize, or close behavior: read [references/program-authoring.md](references/program-authoring.md).
-- CLI discovery, IDL extraction, Codama client generation, terminal docs, or profiling: read [references/cli-and-codegen.md](references/cli-and-codegen.md).
+- CLI discovery, project diagnostics, program keys, IDL extraction, Codama client generation, terminal docs, completions, or profiling: read [references/cli-and-codegen.md](references/cli-and-codegen.md).
 - Unit, Mollusk, SBF, generated-artifact, or release checks: read [references/testing.md](references/testing.md).
 
 Do not load every reference for routine edits.

@@ -1,0 +1,32 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - keys
+    - sync
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Update the source `declare_id!` from a validated local keypair.
+
+It fails before writing when the keypair is missing or malformed, the address is invalid, or source contains zero or multiple declarations.
+
+Usage: pina keys sync [OPTIONS]
+
+Options:
+  -p, --path <DIR>
+          Inspect or synchronize a specific program crate. Defaults to the nearest project
+
+      --keypair <KEYPAIR>
+          Use KEYPAIR instead of `target/deploy/<program>-keypair.json`
+
+      --json
+          Emit a stable machine-readable JSON document
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+----- stderr -----

@@ -1304,6 +1304,7 @@ mod tests {
 			program_dir: root.to_path_buf(),
 			package_name: "program".to_owned(),
 			library_name: "program".to_owned(),
+			library_source: root.join("src/lib.rs"),
 			target_dir: root.join("target"),
 			idl_dir: root.join("target/idl"),
 			clients_dir: root.join("clients"),
