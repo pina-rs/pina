@@ -33,6 +33,7 @@ libraries = [
 	{ path = "lints/require_sysvar_assert_before_sysvar_use" },
 	{ path = "lints/require_type_assert_before_zero_copy_cast" },
 	{ path = "lints/require_associated_token_address_before_ata_cast" },
+	{ path = "lints/require_reason_for_duplicate_remaining_accounts" },
 	{ path = "lints/require_idl_root_to_define_one_program_id" },
 	{ path = "lints/require_canonical_instruction_dispatch_for_idl" },
 	{ path = "lints/require_explicit_discriminators_and_seed_namespaces" },
@@ -62,6 +63,7 @@ Inside the repository, the `security:dylint` devenv task is the authoritative wa
 - `require_sysvar_assert_before_sysvar_use` — require `assert_sysvar()` before sysvar reads.
 - `require_type_assert_before_zero_copy_cast` — require type validation before raw zero-copy casts.
 - `require_associated_token_address_before_ata_cast` — require ATA derivation checks before ATA casts.
+- `require_reason_for_duplicate_remaining_accounts` — require a meaningful field doc comment whenever `distinct = false` permits duplicate mutable remaining accounts.
 
 ### Performance
 

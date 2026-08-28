@@ -7,7 +7,7 @@ impl<'a> ::pina::ParseAccounts<'a> for TransferAccounts<'a> {
         cursor: &mut ::pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, ::pina::ProgramError> {
         let authority = cursor.next()?;
-        let extra = cursor.remaining_mut_distinct()?;
+        let extra = cursor.remaining_mut()?;
         Ok(Self { authority, extra })
     }
 }

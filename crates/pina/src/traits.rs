@@ -668,10 +668,11 @@ pub trait CloseAccountWithRecipient {
 /// `AccountsCursor` is the runtime layer used by `#[derive(Accounts)]`. It
 /// advances through the account slice from left to right, supports explicit
 /// trailing-account capture, and rejects writable aliases for mutable accounts
-/// parsed individually through [`Self::next_mut`]. Trailing accounts returned
-/// by [`Self::remaining_mut`] preserve their original order and aliasing. Use
-/// [`Self::remaining_mut_distinct`] when every mutable trailing account must
-/// have a unique address.
+/// parsed individually through [`Self::next_mut`]. The `#[derive(Accounts)]`
+/// macro parses mutable `#[pina(remaining)]` fields with
+/// [`Self::remaining_mut_distinct`] by default. Its explicit
+/// `distinct = false` escape hatch uses [`Self::remaining_mut`] to preserve
+/// aliases for instruction contracts that intentionally allow them.
 ///
 /// Optional account slots ([`Self::next_opt`] and [`Self::next_mut_opt`]) keep
 /// the account count fixed: a slot holding the executing program's own address
@@ -800,8 +801,10 @@ impl<'a> AccountsCursor<'a> {
 	/// for writable account slices — no separate `assert_writable()` call is
 	/// required.
 	///
-	/// Duplicate addresses are preserved in this pass-through slice. Callers that
-	/// require logically distinct trailing accounts must validate their addresses.
+	/// Duplicate addresses are preserved in this pass-through slice. The
+	/// `#[derive(Accounts)]` macro only uses this path when a mutable remaining
+	/// field explicitly sets `distinct = false`; direct callers must document and
+	/// enforce any invariant that makes aliases safe.
 	pub fn remaining_mut(&mut self) -> Result<&'a mut [AccountView], ProgramError> {
 		let remaining = core::mem::take(&mut self.remaining);
 		for account in &*remaining {
@@ -813,9 +816,9 @@ impl<'a> AccountsCursor<'a> {
 
 	/// Consume and return distinct writable trailing accounts.
 	///
-	/// This is the strict counterpart to [`Self::remaining_mut`]. Every account
-	/// must be writable and every address must occur exactly once. The check is
-	/// allocation-free and preserves the original account order.
+	/// This is the default path generated for mutable `#[pina(remaining)]` fields.
+	/// Every account must be writable and every address must occur exactly once.
+	/// The check is allocation-free and preserves the original account order.
 	pub fn remaining_mut_distinct(&mut self) -> Result<&'a mut [AccountView], ProgramError> {
 		let remaining = core::mem::take(&mut self.remaining);
 		for (index, account) in remaining.iter().enumerate() {

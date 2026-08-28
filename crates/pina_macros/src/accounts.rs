@@ -56,7 +56,7 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 	let mut seen_remaining = false;
 
 	for field in fields.iter() {
-		if field.distinct.is_present() && !field.remaining.is_present() {
+		if field.distinct.is_some() && !field.remaining.is_present() {
 			return syn::Error::new_spanned(
 				&field.ident,
 				"`distinct` is only valid with `#[pina(remaining)]`",
@@ -95,10 +95,10 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 			}
 
 			let is_mut = is_mut_reference(&field.ty);
-			if field.distinct.is_present() && !is_mut {
+			if field.distinct.is_some() && !is_mut {
 				return syn::Error::new_spanned(
 					&field.ident,
-					"`#[pina(remaining, distinct)]` requires a mutable account slice",
+					"`distinct` is only valid for mutable remaining account slices",
 				)
 				.to_compile_error();
 			}
@@ -106,7 +106,7 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 			remaining_field = field
 				.ident
 				.as_ref()
-				.map(|ident| (ident, is_mut, field.distinct.is_present()));
+				.map(|ident| (ident, is_mut, is_mut && field.distinct.unwrap_or(true)));
 			continue;
 		}
 
@@ -135,7 +135,7 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 		}
 	});
 	let remaining_binding = remaining_field.map(|(field, is_mut, is_distinct)| {
-		if is_distinct {
+		if is_mut && is_distinct {
 			quote! { let #field = cursor.remaining_mut_distinct()?; }
 		} else if is_mut {
 			quote! { let #field = cursor.remaining_mut()?; }

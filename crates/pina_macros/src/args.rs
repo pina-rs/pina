@@ -462,5 +462,5 @@ pub(crate) struct AccountsField {
 	#[darling(default)]
 	pub(crate) remaining: Flag,
 	#[darling(default)]
-	pub(crate) distinct: Flag,
+	pub(crate) distinct: Option<bool>,
 }

@@ -1,4 +1,4 @@
-error: `#[pina(remaining, distinct)]` requires a mutable account slice
+error: `distinct` is only valid for mutable remaining account slices
  --> tests/ui/fail/accounts_distinct_immutable_remaining.rs:6:6
   |
 6 |     pub remaining: &'a [AccountView],
