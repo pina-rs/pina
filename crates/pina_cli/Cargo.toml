@@ -24,6 +24,7 @@ clap = { workspace = true, default-features = true }
 codama-nodes = { workspace = true, default-features = true }
 comfy-table = "8.0.0"
 ed25519-dalek = { workspace = true }
+flate2 = { workspace = true }
 fs2 = { workspace = true, default-features = true }
 heck = { workspace = true, default-features = true }
 owo-colors = "4.0"
@@ -49,7 +50,6 @@ insta = { workspace = true, features = ["json"], default-features = true }
 insta-cmd = { workspace = true, default-features = true }
 object = { features = ["write", "elf", "std"], workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }
-tempfile = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

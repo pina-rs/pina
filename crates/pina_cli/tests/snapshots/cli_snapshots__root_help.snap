@@ -20,7 +20,7 @@ Commands:
   generate
           Generate configured clients for the current Pina program
   idl
-          Generate a Codama IDL from a Pina program crate
+          Generate, inspect, and publish canonical Codama IDLs
   docs
           Read bundled Pina reference documentation in the terminal
   init

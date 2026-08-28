@@ -1,0 +1,55 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - idl
+    - publish
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Create or update the canonical on-chain IDL metadata account
+
+Usage: pina idl publish [OPTIONS] --cluster <CLUSTER>
+
+Options:
+      --cluster <CLUSTER>
+          Solana cluster moniker or HTTP(S) RPC URL. This is always explicit
+      --program-id <ADDRESS>
+          Deployed program address. Inferred from the local IDL when omitted
+  -p, --project <DIR>
+          Directory inside the local project used for IDL generation and discovery
+      --file <FILE>
+          Publish FILE instead of generating the local project IDL
+      --authority <KEYPAIR>
+          Upgrade-authority keypair for direct publication
+      --payer <KEYPAIR>
+          Fee and rent payer keypair. Defaults to --authority
+      --export [<ADDRESS>]
+          Export every planned transaction instead of submitting. Optionally use ADDRESS as a noop multisig authority
+  -o, --output <FILE>
+          Write every exported transaction to FILE instead of stdout
+      --export-encoding <EXPORT_ENCODING>
+          Encoding for an exported multisig transaction [default: base64] [possible values: base58, base64]
+      --yes
+          Skip the interactive publication confirmation
+      --json
+          Emit a machine-readable result envelope
+      --priority-fee <MICROLAMPORTS>
+          Priority fee in micro-lamports per compute unit [default: 100000]
+      --npx <COMMAND>
+          npx-compatible runner for the pinned official package. May download version 0.9.0
+  -h, --help
+          Print help
+
+Examples:
+  pina idl publish --cluster devnet --authority ~/.config/solana/id.json --yes
+  pina idl publish --cluster mainnet-beta --program-id <ADDRESS> --file ./idl.json --authority ./upgrade-authority.json --export --output ./idl-plan.txt
+  pina idl publish --cluster mainnet-beta --program-id <ADDRESS> --file ./idl.json --export <MULTISIG> --output ./idl-update.txt
+
+Safety:
+  Publication is canonical, uses compressed inline JSON under the fixed 'idl' seed, and requires explicit confirmation. --export plans every required transaction without submitting any. An optional --export authority supports multisigs.
+
+----- stderr -----

@@ -240,6 +240,41 @@ That last count-parity check is important because it catches silent extraction r
 
 <!-- {/pinaIdlVerificationContract} -->
 
+<!-- {=pinaIdlProgramMetadata} -->
+
+## Canonical on-chain IDLs
+
+The existing `pina idl` generation command also provides explicit lifecycle subcommands:
+
+```text
+pina idl generate
+pina idl fetch --cluster <CLUSTER> [--program-id <ADDRESS>]
+pina idl diff --cluster <CLUSTER> [--program-id <ADDRESS>]
+pina idl publish --cluster <CLUSTER> --authority <KEYPAIR>
+```
+
+Bare `pina idl [OPTIONS]` is unchanged and remains equivalent to `pina idl generate [OPTIONS]`.
+
+Publication uses the canonical `idl` seed with direct zlib-compressed UTF-8 JSON. Pina validates the complete Codama document and requires its `program.publicKey` to match the target. Network commands always require an explicit cluster.
+
+The transaction planner is the pinned official package `@solana-program/program-metadata@0.9.0`, invoked through an npx-compatible runner without a shell. `npx` may download that exact version when it is not cached. The adapter was cross-checked against upstream commit `33eb527e124cc4a09d8aae448cd306a9bd87db14`.
+
+Use export mode to inspect or multisig-sign every planned transaction without submitting:
+
+```text
+pina idl publish --cluster mainnet-beta --authority ./authority.json --export
+pina idl publish --cluster mainnet-beta --file ./idl.json \
+  --export <MULTISIG_AUTHORITY> --export-encoding base58 --output ./idl-plan.txt
+```
+
+The output preserves every `[Transaction #N]` block from the official planner. An export authority is a noop signer; it does not require or accept a local authority/payer secret.
+
+Fetch uses raw mode and locally performs bounded zlib, UTF-8, JSON, Codama-schema, and program-address validation. URL/external-account metadata and alternate encodings fail closed rather than causing an unexpected outbound request.
+
+See the mdBook chapter **Pina CLI → Generate and publish IDLs** for authority, rent, buffer, RPC, multisig, exit-status, and failure-recovery details.
+
+<!-- {/pinaIdlProgramMetadata} -->
+
 For best IDL extraction fidelity, follow the rules documented in [`crates/pina_cli/rules.md`](./rules.md).
 
 [crate-image]: https://img.shields.io/crates/v/pina_cli.svg?style=flat-square
