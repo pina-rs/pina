@@ -1746,45 +1746,42 @@ mod tests {
 
 	#[cfg(unix)]
 	fn fake_runner(directory: &Path, capture: &Path, stdout: &str) -> PathBuf {
-		use std::os::unix::fs::PermissionsExt;
-
 		let fixture_name = capture
 			.file_stem()
 			.and_then(|name| name.to_str())
 			.unwrap_or("runner");
 		let runner = directory.join(format!("fake-npx-{fixture_name}.sh"));
-		let script = format!(
-			"#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\nprintf '{}'\n",
+		let body = format!(
+			"printf '%s\\n' \"$@\" > '{}'\nprintf '{}'\n",
 			capture.display(),
 			stdout.replace('\\', "\\\\").replace('\'', "'\\''")
 		);
-		std::fs::write(&runner, script)
-			.unwrap_or_else(|error| panic!("runner write failed: {error}"));
-		let mut permissions = std::fs::metadata(&runner)
-			.unwrap_or_else(|error| panic!("runner metadata failed: {error}"))
-			.permissions();
-		permissions.set_mode(0o755);
-		std::fs::set_permissions(&runner, permissions)
-			.unwrap_or_else(|error| panic!("runner permissions failed: {error}"));
 
-		runner
+		fake_runner_with_body(&runner, &body)
 	}
 
 	#[cfg(unix)]
 	fn fake_runner_script(directory: &Path, body: &str) -> PathBuf {
-		use std::os::unix::fs::PermissionsExt;
-
 		let runner = directory.join("fake-script.sh");
-		std::fs::write(&runner, format!("#!/bin/sh\n{body}\n"))
-			.unwrap_or_else(|error| panic!("runner write failed: {error}"));
-		let mut permissions = std::fs::metadata(&runner)
-			.unwrap_or_else(|error| panic!("runner metadata failed: {error}"))
-			.permissions();
-		permissions.set_mode(0o755);
-		std::fs::set_permissions(&runner, permissions)
-			.unwrap_or_else(|error| panic!("runner permissions failed: {error}"));
+		fake_runner_with_body(&runner, body)
+	}
 
-		runner
+	#[cfg(unix)]
+	fn fake_runner_with_body(runner: &Path, body: &str) -> PathBuf {
+		use std::os::unix::fs::symlink;
+
+		let mut body_path = runner.as_os_str().to_owned();
+		body_path.push(".body");
+		std::fs::write(PathBuf::from(body_path), format!("{body}\n"))
+			.unwrap_or_else(|error| panic!("runner body write failed: {error}"));
+		if !runner.exists() {
+			let driver =
+				Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/shell-driver.sh");
+			symlink(driver, runner)
+				.unwrap_or_else(|error| panic!("runner driver link failed: {error}"));
+		}
+
+		runner.to_path_buf()
 	}
 
 	#[test]
