@@ -70,8 +70,13 @@ impl<'a> ProcessAccountInfos<'a> for CreateConfigAccounts<'a> {
 		self.config.assert_empty()?.assert_writable()?;
 
 		let seeds = &[SEED, self.authority.address().as_ref()];
-		let (_address, bump) =
-			create_program_account::<UserConfig>(self.config, self.authority, &ID, seeds)?;
+		let (_address, bump) = CreateProgramAccount {
+			account: self.config,
+			payer: self.authority,
+			owner: &ID,
+			seeds,
+		}
+		.invoke::<UserConfig>()?;
 
 		let mut config = self.config.as_account_mut::<UserConfig>(&ID)?;
 		config.authority = *self.authority.address();

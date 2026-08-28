@@ -56,9 +56,14 @@ impl<'a> ProcessAccountInfos<'a> for CreateAccounts<'a> {
 		let seeds = &[SEED, self.authority.address().as_ref()];
 		self.data.assert_seeds(seeds, &ID)?;
 
-		// create_program_account also finds the canonical bump internally.
-		let (_address, bump) =
-			create_program_account::<Data>(self.data, self.authority, &ID, seeds)?;
+		// CreateProgramAccount also finds the canonical bump internally.
+		let (_address, bump) = CreateProgramAccount {
+			account: self.data,
+			payer: self.authority,
+			owner: &ID,
+			seeds,
+		}
+		.invoke::<Data>()?;
 
 		let mut data_account = self.data.as_account_mut::<Data>(&ID)?;
 

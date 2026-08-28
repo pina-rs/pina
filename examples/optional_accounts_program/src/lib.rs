@@ -162,13 +162,14 @@ impl<'a> ProcessAccountInfos<'a> for InitAccounts<'a> {
 			.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
 		self.system_program.assert_address(&system::ID)?;
 
-		create_program_account_with_bump::<StoreState>(
-			self.store,
-			self.authority,
-			&ID,
-			&seeds.as_slices(),
-			args.bump,
-		)?;
+		CreateProgramAccountWithBump {
+			account: self.store,
+			payer: self.authority,
+			owner: &ID,
+			seeds: &seeds.as_slices(),
+			bump: args.bump,
+		}
+		.invoke::<StoreState>()?;
 
 		let mut store = self.store.as_account_mut::<StoreState>(&ID)?;
 		store.bump = args.bump;

@@ -1,0 +1,37 @@
+error: `CreateProgramAccount` invoked without a preceding `assert_empty()` on the target account
+  --> $DIR/account_creation.rs:26:2
+   |
+LL |     create.invoke::<State>()?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: add `target_account.assert_empty()?` before calling account creation to prevent reinitialization
+   = note: `#[deny(req$DIRre_empty_before_init)]` on by default
+
+error: `CreateProgramAccount` invoked without a preceding `assert_empty()` on the target account
+  --> $DIR/account_creation.rs:41:2
+   |
+LL |     create.invoke::<State>()?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: add `target_account.assert_empty()?` before calling account creation to prevent reinitialization
+
+error: `CreateProgramAccount` invoked without a preceding `assert_empty()` on the target account
+  --> $DIR/account_creation.rs:52:2
+   |
+LL | /     CreateProgramAccount {
+LL | |         account: second.account,
+LL | |     }
+LL | |     .invoke::<State>()?;
+   | |______________________^
+   |
+   = help: add `target_account.assert_empty()?` before calling account creation to prevent reinitialization
+
+error: `CreateProgramAccount` invoked without a preceding `assert_empty()` on the target account
+  --> $DIR/account_creation.rs:64:2
+   |
+LL |     create.invoke::<State>()?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: add `target_account.assert_empty()?` before calling account creation to prevent reinitialization
+
+error: aborting due to 4 previous errors

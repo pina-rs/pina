@@ -51,7 +51,7 @@ Feature flags:
 - `logs` is useful during **initial development and debugging**, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
 - `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
 - `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.
-- `account-resize` only enables realloc helpers such as `realloc_account()` and `realloc_account_zero()`. Close helpers still do not implicitly resize or zero account data.
+- `account-resize` only enables the `ReallocAccount` and `ReallocAccountZeroed` builders. Close helpers still do not implicitly resize or zero account data.
 
 <!-- {/pinaFeatureSelectionTips} -->
 

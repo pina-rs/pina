@@ -48,6 +48,33 @@ struct CallInfo {
 	span: rustc_span::Span,
 	method: String,
 	receiver: Option<String>,
+	trusted_builder: bool,
+}
+
+const TRUSTED_PINA_BUILDERS: &[&str] = &[
+	"AllocateAccount",
+	"AllocateAccountWithBump",
+	"CloseAccount",
+	"CloseAccountZeroed",
+	"CreateAccount",
+	"CreateProgramAccount",
+	"CreateProgramAccountWithBump",
+	"ReallocAccount",
+	"ReallocAccountZeroed",
+];
+
+fn is_trusted_pina_builder(cx: &LateContext<'_>, receiver: &Expr<'_>) -> bool {
+	let receiver_type = cx.typeck_results().expr_ty(receiver).peel_refs();
+	let Some(definition) = receiver_type.ty_adt_def() else {
+		return false;
+	};
+	let path = cx.tcx.def_path_str(definition.did());
+	is_trusted_pina_builder_path(&path)
+}
+
+fn is_trusted_pina_builder_path(path: &str) -> bool {
+	path.strip_prefix("pina::cpi::")
+		.is_some_and(|name| TRUSTED_PINA_BUILDERS.contains(&name))
 }
 
 fn receiver_ident(expr: &Expr<'_>) -> Option<String> {
@@ -63,29 +90,30 @@ fn receiver_ident(expr: &Expr<'_>) -> Option<String> {
 	}
 }
 
-fn collect_calls(body: &rustc_hir::Body<'_>) -> Vec<CallInfo> {
+fn collect_calls<'tcx>(cx: &LateContext<'tcx>, body: &'tcx rustc_hir::Body<'tcx>) -> Vec<CallInfo> {
 	let mut calls = Vec::new();
-	visit_expr(body.value, &mut calls);
+	visit_expr(cx, body.value, &mut calls);
 	calls
 }
 
-fn visit_expr(expr: &Expr<'_>, calls: &mut Vec<CallInfo>) {
+fn visit_expr<'tcx>(cx: &LateContext<'tcx>, expr: &'tcx Expr<'tcx>, calls: &mut Vec<CallInfo>) {
 	match &expr.kind {
 		ExprKind::MethodCall(seg, receiver, args, _) => {
-			visit_expr(receiver, calls);
+			visit_expr(cx, receiver, calls);
 			for arg in *args {
-				visit_expr(arg, calls);
+				visit_expr(cx, arg, calls);
 			}
 			calls.push(CallInfo {
 				span: expr.span,
 				method: seg.ident.name.as_str().to_string(),
 				receiver: receiver_ident(receiver),
+				trusted_builder: is_trusted_pina_builder(cx, receiver),
 			});
 		}
 		ExprKind::Call(callee, args) => {
-			visit_expr(callee, calls);
+			visit_expr(cx, callee, calls);
 			for arg in *args {
-				visit_expr(arg, calls);
+				visit_expr(cx, arg, calls);
 			}
 		}
 		ExprKind::Block(block, _) => {
@@ -93,30 +121,30 @@ fn visit_expr(expr: &Expr<'_>, calls: &mut Vec<CallInfo>) {
 				match &stmt.kind {
 					rustc_hir::StmtKind::Let(local) => {
 						if let Some(init) = local.init {
-							visit_expr(init, calls);
+							visit_expr(cx, init, calls);
 						}
 					}
 					rustc_hir::StmtKind::Expr(e) | rustc_hir::StmtKind::Semi(e) => {
-						visit_expr(e, calls);
+						visit_expr(cx, e, calls);
 					}
 					_ => {}
 				}
 			}
 			if let Some(e) = block.expr {
-				visit_expr(e, calls);
+				visit_expr(cx, e, calls);
 			}
 		}
 		ExprKind::Match(scrutinee, arms, _) => {
-			visit_expr(scrutinee, calls);
+			visit_expr(cx, scrutinee, calls);
 			for arm in *arms {
-				visit_expr(arm.body, calls);
+				visit_expr(cx, arm.body, calls);
 			}
 		}
 		ExprKind::If(cond, then, else_opt) => {
-			visit_expr(cond, calls);
-			visit_expr(then, calls);
+			visit_expr(cx, cond, calls);
+			visit_expr(cx, then, calls);
 			if let Some(el) = else_opt {
-				visit_expr(el, calls);
+				visit_expr(cx, el, calls);
 			}
 		}
 		ExprKind::Unary(_, e)
@@ -124,15 +152,15 @@ fn visit_expr(expr: &Expr<'_>, calls: &mut Vec<CallInfo>) {
 		| ExprKind::DropTemps(e)
 		| ExprKind::AddrOf(_, _, e)
 		| ExprKind::Field(e, _) => {
-			visit_expr(e, calls);
+			visit_expr(cx, e, calls);
 		}
 		ExprKind::Binary(_, lhs, rhs) | ExprKind::Assign(lhs, rhs, _) => {
-			visit_expr(lhs, calls);
-			visit_expr(rhs, calls);
+			visit_expr(cx, lhs, calls);
+			visit_expr(cx, rhs, calls);
 		}
 		ExprKind::Tup(exprs) | ExprKind::Array(exprs) => {
 			for e in *exprs {
-				visit_expr(e, calls);
+				visit_expr(cx, e, calls);
 			}
 		}
 		_ => {}
@@ -149,10 +177,10 @@ impl<'tcx> LateLintPass<'tcx> for RequireProgramCheckBeforeCpi {
 		_: rustc_span::Span,
 		_: rustc_hir::def_id::LocalDefId,
 	) {
-		let calls = collect_calls(body);
+		let calls = collect_calls(cx, body);
 
 		for (i, info) in calls.iter().enumerate() {
-			if !CPI_METHODS.contains(&info.method.as_str()) {
+			if !CPI_METHODS.contains(&info.method.as_str()) || info.trusted_builder {
 				continue;
 			}
 
@@ -177,5 +205,21 @@ impl<'tcx> LateLintPass<'tcx> for RequireProgramCheckBeforeCpi {
 				});
 			}
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	#[test]
+	fn trusted_pina_builder_path_is_exact() {
+		assert!(super::is_trusted_pina_builder_path(
+			"pina::cpi::CreateAccount"
+		));
+		assert!(!super::is_trusted_pina_builder_path(
+			"pina::cpi::custom::CreateAccount"
+		));
+		assert!(!super::is_trusted_pina_builder_path(
+			"another_crate::pina::cpi::CreateAccount"
+		));
 	}
 }

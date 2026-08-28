@@ -375,12 +375,13 @@ fn realloc_rejects_an_active_alias_borrow_under_miri() {
 		.unwrap_or_else(|error| panic!("borrow source alias: {error:?}"));
 	let (source, payer) = account_views.split_at_mut(1);
 
-	let result = realloc_account(
-		&mut source[0],
-		source_data_len + 1,
-		&mut payer[0],
-		&TEST_PROGRAM_ID,
-	);
+	let result = ReallocAccount {
+		account: &mut source[0],
+		payer: &mut payer[0],
+		new_size: source_data_len + 1,
+		program_id: &TEST_PROGRAM_ID,
+	}
+	.invoke();
 
 	assert_eq!(result, Err(ProgramError::AccountBorrowFailed));
 	assert_eq!(source[0].lamports(), source_lamports);

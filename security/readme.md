@@ -20,7 +20,7 @@ Based on the [sealevel-attacks](https://github.com/coral-xyz/sealevel-attacks) t
 | [01](01-account-data-matching/)      | Account Data Matching      | `assert_address()` on deserialized fields                         |
 | [02](02-owner-checks/)               | Owner Checks               | `assert_owner()` / `assert_owners()`                              |
 | [03](03-type-cosplay/)               | Type Cosplay               | `assert_type::<T>()` (discriminator + owner + size)               |
-| [04](04-initialization/)             | Initialization             | `assert_empty()` before `create_program_account`                  |
+| [04](04-initialization/)             | Initialization             | `assert_empty()` before `CreateProgramAccount`                    |
 | [05](05-arbitrary-cpi/)              | Arbitrary CPI              | `assert_address()` / `assert_program()`                           |
 | [06](06-duplicate-mutable-accounts/) | Duplicate Mutable Accounts | Address inequality check                                          |
 | [07](07-bump-seed-canonicalization/) | Bump Seed Canonicalization | `assert_seeds()` / `assert_canonical_bump()`                      |

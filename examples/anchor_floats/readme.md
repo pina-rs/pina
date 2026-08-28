@@ -18,7 +18,7 @@ Pina parity port of Anchor's float account-data patterns.
 
 - Float values are explicitly converted with `to_bits`/`from_bits` for `Pod` safety.
 - Authority checks and update rules are explicit in `apply_update`.
-- Account creation is performed with explicit `create_account` + type validation calls.
+- Account creation uses the explicit `CreateAccount` CPI builder plus type validation calls.
 
 ## Run
 

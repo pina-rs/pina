@@ -220,13 +220,14 @@ impl<'a> ProcessAccountInfos<'a> for CreatePdaAccounts<'a> {
 			self.payer.assert_signer()?.assert_writable()?;
 			self.state.assert_empty()?;
 			self.system_program.assert_address(&system::ID)?;
-			create_program_account_with_bump::<State>(
-				self.state,
-				self.payer,
-				&ID,
-				&[STATE_SEED_PREFIX],
-				args.bump,
-			)?;
+			CreateProgramAccountWithBump {
+				account: self.state,
+				payer: self.payer,
+				owner: &ID,
+				seeds: &[STATE_SEED_PREFIX],
+				bump: args.bump,
+			}
+			.invoke::<State>()?;
 
 			let mut state = self.state.as_account_mut::<State>(&ID)?;
 			state.bump = args.bump;

@@ -67,7 +67,14 @@ impl<'a> ProcessAccountInfos<'a> for CreateAccounts<'a> {
 		self.data.assert_seeds_with_bump(seeds_with_bump, &ID)?;
 
 		let seeds = &[SEED, self.authority.address().as_ref()];
-		create_program_account_with_bump::<Data>(self.data, self.authority, &ID, seeds, args.bump)?;
+		CreateProgramAccountWithBump {
+			account: self.data,
+			payer: self.authority,
+			owner: &ID,
+			seeds,
+			bump: args.bump,
+		}
+		.invoke::<Data>()?;
 
 		let mut data_account = self.data.as_account_mut::<Data>(&ID)?;
 		data_account.authority = *self.authority.address();

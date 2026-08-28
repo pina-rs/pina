@@ -12,7 +12,7 @@
 //!   `parse_instruction` for type-safe routing.
 //! - **Account validation chains** — `.assert_signer()?.assert_writable()?` for
 //!   concise, composable checks.
-//! - **`create_program_account`** — pina's CPI helper for PDA account creation.
+//! - **`CreateProgramAccount`** — pina's CPI builder for PDA account creation.
 //!
 //! ## Instructions
 //!
@@ -172,13 +172,14 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.system_program.assert_address(&system::ID)?;
 
 		// Create the PDA account
-		create_program_account_with_bump::<CounterState>(
-			self.counter,
-			self.authority,
-			&ID,
-			&seeds.as_slices(),
-			args.bump,
-		)?;
+		CreateProgramAccountWithBump {
+			account: self.counter,
+			payer: self.authority,
+			owner: &ID,
+			seeds: &seeds.as_slices(),
+			bump: args.bump,
+		}
+		.invoke::<CounterState>()?;
 
 		// Initialize account data
 		let mut counter = self.counter.as_account_mut::<CounterState>(&ID)?;

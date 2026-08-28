@@ -153,13 +153,14 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			)?;
 
 		// Create the escrow account
-		create_program_account_with_bump::<EscrowState>(
-			self.escrow,
-			self.maker,
-			&ID,
-			&escrow_seeds.as_slices(),
-			args.bump,
-		)?;
+		CreateProgramAccountWithBump {
+			account: self.escrow,
+			payer: self.maker,
+			owner: &ID,
+			seeds: &escrow_seeds.as_slices(),
+			bump: args.bump,
+		}
+		.invoke::<EscrowState>()?;
 
 		// Initialize escrow state
 		let mut escrow = self.escrow.as_account_mut::<EscrowState>(&ID)?;

@@ -126,7 +126,13 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.oracle.assert_signer()?.assert_empty()?;
 		self.system_program.assert_address(&system::ID)?;
 
-		create_account(self.payer, self.oracle, oracle_size(), &ID)?;
+		CreateAccount {
+			from: self.payer,
+			to: self.oracle,
+			space: oracle_size() as u64,
+			owner: &ID,
+		}
+		.invoke()?;
 
 		let mut oracle = self.oracle.as_account_mut::<OracleState>(&ID)?;
 		oracle.authority = *self.payer.address();

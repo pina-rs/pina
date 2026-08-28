@@ -196,13 +196,14 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
 		self.system_program.assert_address(&system::ID)?;
 
-		create_program_account_with_bump::<Sample>(
-			self.sample,
-			self.authority,
-			&ID,
-			&seeds.as_slices(),
-			args.bump,
-		)?;
+		CreateProgramAccountWithBump {
+			account: self.sample,
+			payer: self.authority,
+			owner: &ID,
+			seeds: &seeds.as_slices(),
+			bump: args.bump,
+		}
+		.invoke::<Sample>()?;
 
 		let mut sample = self.sample.as_account_mut::<Sample>(&ID)?;
 		sample.bump = args.bump;
@@ -224,7 +225,13 @@ impl<'a> ProcessAccountInfos<'a> for ReallocAccounts<'a> {
 		validate_target_len(target_len)?;
 		validate_realloc_delta(self.sample.data_len(), target_len)?;
 
-		realloc_account(self.sample, target_len, self.authority, &ID)
+		ReallocAccount {
+			account: self.sample,
+			payer: self.authority,
+			new_size: target_len,
+			program_id: &ID,
+		}
+		.invoke()
 	}
 }
 

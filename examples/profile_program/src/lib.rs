@@ -505,13 +505,14 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		let _ = args.bio_text()?;
 
 		// Create the PDA account
-		create_program_account_with_bump::<ProfileState>(
-			self.profile,
-			self.authority,
-			&ID,
-			&seeds.as_slices(),
-			args.bump,
-		)?;
+		CreateProgramAccountWithBump {
+			account: self.profile,
+			payer: self.authority,
+			owner: &ID,
+			seeds: &seeds.as_slices(),
+			bump: args.bump,
+		}
+		.invoke::<ProfileState>()?;
 
 		// Initialize account data
 		let mut profile = self.profile.as_account_mut::<ProfileState>(&ID)?;

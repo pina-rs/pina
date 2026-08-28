@@ -365,7 +365,7 @@ nostd_entrypoint!(process_instruction, 3);
 
 fn cpi_template(program_title: &str) -> String {
 	format!(
-		r"//! Typed CPI builders for this Pina program.
+		r#"//! Typed CPI builders for this Pina program.
 //!
 //! This module is compiled only when the `cpi` feature is enabled. Keep that
 //! feature disabled for deployment builds unless another on-chain program needs
@@ -390,14 +390,21 @@ pub type ProgramAccount<'a> = Program<'a, {program_title}Program>;
 pub mod accounts {{
 	use super::*;
 
+	/// Accounts required to initialize the program state.
 	#[derive(Clone, Copy, Debug)]
 	pub struct Initialize<'a> {{
+		/// Writable signer that funds initialization.
 		pub payer: CpiHandle<'a>,
+
+		/// Writable account that stores the program state.
 		pub state: CpiHandle<'a>,
+
+		/// System program used during initialization.
 		pub system_program: CpiHandle<'a>,
 	}}
 
 	impl<'a> Initialize<'a> {{
+		/// Validates writable privileges and builds the CPI account set.
 		pub fn new(
 			payer: &'a AccountView,
 			state: &'a AccountView,
@@ -421,24 +428,31 @@ pub mod accounts {{
 pub mod instructions {{
 	use super::*;
 
+	/// Initializes program state through a typed CPI.
 	#[derive(Clone, Copy, Debug)]
-	#[must_use]
+	#[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
 	pub struct Initialize<'a> {{
-		accounts: accounts::Initialize<'a>,
-		value: u8,
+		/// Validated accounts required by the initialize instruction.
+		pub accounts: accounts::Initialize<'a>,
+
+		/// Initial value to store in program state.
+		pub value: u8,
 	}}
 
 	impl<'a> Initialize<'a> {{
+		/// Builds an initialize CPI instruction.
 		#[inline(always)]
 		pub const fn new(accounts: accounts::Initialize<'a>, value: u8) -> Self {{
 			Self {{ accounts, value }}
 		}}
 
+		/// Invokes the program using transaction-level signatures.
 		#[inline(always)]
 		pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {{
 			self.invoke_signed(program, &[])
 		}}
 
+		/// Invokes the program with additional PDA signer seeds.
 		#[inline(always)]
 		pub fn invoke_signed(
 			&self,
@@ -454,14 +468,7 @@ pub mod instructions {{
 	}}
 }}
 
-#[inline(always)]
-pub const fn initialize(
-	accounts: accounts::Initialize<'_>,
-	value: u8,
-) -> instructions::Initialize<'_> {{
-	instructions::Initialize::new(accounts, value)
-}}
-"
+"#
 	)
 }
 
@@ -673,6 +680,10 @@ mod tests {
 		assert!(cpi.contains("state: CpiHandle::writable(state)?"));
 		assert!(!cpi.contains("state: CpiHandle::writable_signer(state)?"));
 		assert!(cpi.contains("InitializeInstruction::initialize"));
+		assert!(cpi.contains("pub accounts: accounts::Initialize<'a>"));
+		assert!(cpi.contains("pub value: u8"));
+		assert!(cpi.contains("pub fn invoke_signed"));
+		assert!(!cpi.contains("pub const fn initialize("));
 	}
 
 	#[test]

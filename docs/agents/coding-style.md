@@ -315,9 +315,9 @@ Every module should start with a module-level doc comment explaining its purpose
 Use doc comments (`///`) for all public APIs:
 
 ````rust
-/// Creates a new PDA-backed program account and returns `(address, bump)`.
+/// Creates and initializes a PDA-backed program account.
 ///
-/// This helper derives the canonical PDA for `seeds` + `owner`, allocates
+/// This builder derives the canonical PDA for `seeds` + `owner`, allocates
 /// account storage for `T`, and assigns account ownership to `owner`.
 ///
 /// # Errors
@@ -329,12 +329,19 @@ Use doc comments (`///`) for all public APIs:
 ///
 /// ```ignore
 /// let seeds: &[&[u8]] = &[b"escrow", authority.address().as_ref()];
-/// let (address, bump) =
-///     create_program_account::<EscrowState>(escrow_account, payer, &program_id, seeds)?;
+/// let (address, bump) = CreateProgramAccount {
+///     account: escrow_account,
+///     payer,
+///     owner: &program_id,
+///     seeds,
+/// }
+/// .invoke::<EscrowState>()?;
 /// ```
-pub fn create_program_account<'a, T: HasDiscriminator + Pod>(// ...)
- -> Result<(Address, u8), ProgramError> {
-	// ...
+#[must_use = "account creation has no effect until invoke is called"]
+pub struct CreateProgramAccount<'account, 'address, 'seeds, 'seed> {
+	/// PDA account to allocate and initialize.
+	pub account: &'account mut AccountView,
+	// Additional documented fields...
 }
 ````
 

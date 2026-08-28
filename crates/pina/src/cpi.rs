@@ -1,6 +1,6 @@
 //! CPI and account-allocation helpers used by on-chain instruction handlers.
 //!
-//! These utilities wrap common system-program patterns (create, allocate,
+//! These builders wrap common system-program patterns (create, allocate,
 //! assign, close) with consistent `ProgramError` behavior and PDA signing.
 //! All APIs in this module are designed for on-chain determinism and return
 //! `ProgramError` values for caller-side propagation with `?` instead of
@@ -20,10 +20,10 @@ use pinocchio::instruction::InstructionAccount;
 use pinocchio::instruction::InstructionView;
 use pinocchio::sysvars::Sysvar;
 use pinocchio::sysvars::rent::Rent;
-use pinocchio_system::instructions::Allocate;
-use pinocchio_system::instructions::Assign;
-use pinocchio_system::instructions::CreateAccount;
-use pinocchio_system::instructions::Transfer;
+use pinocchio_system::instructions::Allocate as SystemAllocate;
+use pinocchio_system::instructions::Assign as SystemAssign;
+use pinocchio_system::instructions::CreateAccount as SystemCreateAccount;
+use pinocchio_system::instructions::Transfer as SystemTransfer;
 
 use crate::AccountInfoValidation;
 use crate::CloseAccountWithRecipient;
@@ -33,46 +33,101 @@ use crate::MAX_SEEDS;
 use crate::PinaAccount;
 use crate::ProgramResult;
 
-/// Creates a new system account owned by `owner`.
+/// Creates a rent-exempt system account owned by another program.
 ///
-/// Calculates the rent-exempt balance for `space`, then issues a single
-/// `CreateAccount` CPI from `from` to `to`.
+/// Use this builder when both the funding account and new account are regular
+/// transaction signers. Use [`CreateProgramAccount`] or
+/// [`CreateProgramAccountWithBump`] when the new account is a PDA controlled by
+/// the executing program. Rent is loaded through the runtime syscall, so no
+/// rent-sysvar account belongs in this builder.
 ///
 /// # Errors
 ///
-/// Returns errors from rent sysvar access, rent minimum-balance computation,
-/// or the underlying system-program CPI.
+/// `invoke` returns errors from rent sysvar access, minimum-balance
+/// computation, or the system-program CPI. `invoke_signed` can additionally
+/// authorize a PDA funding account or PDA destination with signer seeds.
 ///
 /// # Examples
 ///
 /// ```ignore
-/// use pina::cpi::create_account;
+/// use pina::CreateAccount;
 ///
 /// // Create a new account with 128 bytes of space owned by `program_id`:
-/// create_account(payer, new_account, 128, &program_id)?;
+/// CreateAccount {
+/// 	from: payer,
+/// 	to: new_account,
+/// 	space: 128,
+/// 	owner: &program_id,
+/// }
+/// .invoke()?;
 /// ```
-#[inline(always)]
-pub fn create_account<'a>(
-	from: &'a AccountView,
-	to: &'a AccountView,
-	space: usize,
-	owner: &Address,
-) -> ProgramResult {
-	let lamports = Rent::get()?.try_minimum_balance(space)?;
+#[derive(Clone, Copy, Debug)]
+#[must_use = "account creation has no effect until invoke or invoke_signed is called"]
+pub struct CreateAccount<'account, 'address> {
+	/// Funding account that pays the new account's rent-exempt balance.
+	pub from: &'account AccountView,
 
-	CreateAccount {
-		from,
-		to,
-		lamports,
-		space: space as u64,
-		owner,
-	}
-	.invoke()
+	/// New account to fund, allocate, and assign.
+	pub to: &'account AccountView,
+
+	/// Number of account-data bytes to allocate.
+	pub space: u64,
+
+	/// Program that will own the new account.
+	pub owner: &'address Address,
 }
 
-/// Creates a new PDA-backed program account and returns `(address, bump)`.
+impl CreateAccount<'_, '_> {
+	/// Creates the account using transaction-level signatures.
+	#[inline(always)]
+	pub fn invoke(&self) -> ProgramResult {
+		self.invoke_signed(&[])
+	}
+
+	/// Creates the account with additional PDA signer seeds.
+	///
+	/// Use this variant when `from`, `to`, or both are PDAs controlled by the
+	/// executing program.
+	#[inline(always)]
+	pub fn invoke_signed(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
+		let space = usize::try_from(self.space).map_err(|_| ProgramError::InvalidArgument)?;
+		self.invoke_signed_inner(signers, None, space)
+	}
+
+	#[cfg(test)]
+	#[inline(always)]
+	fn invoke_signed_with_rent(
+		&self,
+		signers: &[Signer<'_, '_>],
+		rent: Rent,
+		space: usize,
+	) -> ProgramResult {
+		self.invoke_signed_inner(signers, Some(rent), space)
+	}
+
+	#[inline(always)]
+	fn invoke_signed_inner(
+		&self,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+		space: usize,
+	) -> ProgramResult {
+		let rent = rent.map_or_else(Rent::get, Ok)?;
+
+		SystemCreateAccount {
+			from: self.from,
+			to: self.to,
+			lamports: rent.try_minimum_balance(space)?,
+			space: self.space,
+			owner: self.owner,
+		}
+		.invoke_signed(signers)
+	}
+}
+
+/// Creates and initializes a PDA-backed account for a [`PinaAccount`] type.
 ///
-/// This helper derives the canonical PDA for `seeds` + `owner`, allocates
+/// This builder derives the canonical PDA for `seeds` + `owner`, allocates
 /// account storage for `T`, initializes its discriminator, and assigns account
 /// ownership to `owner`.
 ///
@@ -95,30 +150,86 @@ pub fn create_account<'a>(
 /// ```ignore
 /// // Create a PDA-backed escrow account:
 /// let seeds: &[&[u8]] = &[b"escrow", authority.address().as_ref()];
-/// let (address, bump) =
-/// 	create_program_account::<EscrowState>(escrow_account, payer, &program_id, seeds)?;
+/// let (address, bump) = CreateProgramAccount {
+/// 	account: escrow_account,
+/// 	payer,
+/// 	owner: &program_id,
+/// 	seeds,
+/// }
+/// .invoke::<EscrowState>()?;
 /// ```
-#[inline(always)]
-pub fn create_program_account<'a, T: PinaAccount>(
-	target_account: &'a mut AccountView,
-	payer: &'a AccountView,
-	owner: &Address,
-	seeds: &[&[u8]],
-) -> Result<(Address, u8), ProgramError> {
-	let Some((address, bump)) = crate::try_find_program_address(seeds, owner) else {
-		return Err(ProgramError::InvalidSeeds);
-	};
+#[must_use = "account creation has no effect until invoke or invoke_signed is called"]
+pub struct CreateProgramAccount<'account, 'address, 'seeds, 'seed> {
+	/// PDA account to allocate and initialize.
+	pub account: &'account mut AccountView,
 
-	create_program_account_with_bump::<T>(target_account, payer, owner, seeds, bump)?;
+	/// Funding account that pays any required rent-exempt balance.
+	pub payer: &'account AccountView,
 
-	Ok((address, bump))
+	/// Program that owns the PDA and derives it from `seeds`.
+	pub owner: &'address Address,
+
+	/// PDA seeds without the canonical bump.
+	pub seeds: &'seeds [&'seed [u8]],
 }
 
-/// Creates a new PDA-backed program account using a caller-provided `bump` and
+impl CreateProgramAccount<'_, '_, '_, '_> {
+	/// Creates the account using the canonical PDA bump.
+	#[inline(always)]
+	pub fn invoke<T: PinaAccount>(&mut self) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed::<T>(&[])
+	}
+
+	/// Creates the account using the canonical PDA bump and additional signers.
+	///
+	/// Additional signers are useful when `payer` is another PDA. The target
+	/// account's signer is derived and supplied automatically.
+	#[inline(always)]
+	pub fn invoke_signed<T: PinaAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+	) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed_inner::<T>(signers, None)
+	}
+
+	#[cfg(test)]
+	#[inline(always)]
+	fn invoke_signed_with_rent<T: PinaAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Rent,
+	) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed_inner::<T>(signers, Some(rent))
+	}
+
+	#[inline(always)]
+	fn invoke_signed_inner<T: PinaAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+	) -> Result<(Address, u8), ProgramError> {
+		let Some((address, bump)) = crate::try_find_program_address(self.seeds, self.owner) else {
+			return Err(ProgramError::InvalidSeeds);
+		};
+
+		CreateProgramAccountWithBump {
+			account: self.account,
+			payer: self.payer,
+			owner: self.owner,
+			seeds: self.seeds,
+			bump,
+		}
+		.invoke_signed_inner::<T>(signers, rent)?;
+
+		Ok((address, bump))
+	}
+}
+
+/// Creates a PDA-backed program account using a caller-provided `bump` and
 /// initializes `T`'s discriminator.
 ///
-/// Prefer [`create_program_account`] when you want canonical bump derivation.
-/// Use this function when the bump is instruction data and must be validated.
+/// Prefer [`CreateProgramAccount`] when you want canonical bump derivation.
+/// Use this builder when the bump is instruction data and must be validated.
 ///
 /// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->
 /// Seed-based APIs require deterministic seed ordering.
@@ -131,7 +242,7 @@ pub fn create_program_account<'a, T: PinaAccount>(
 ///
 /// # Errors
 ///
-/// Returns any error produced by [`allocate_account_with_bump`], including
+/// Returns any error produced by [`AllocateAccountWithBump`], including
 /// invalid seed layouts and system-program CPI failures.
 ///
 /// # Examples
@@ -139,34 +250,86 @@ pub fn create_program_account<'a, T: PinaAccount>(
 /// ```ignore
 /// // Create a PDA-backed account when you already know the bump:
 /// let seeds: &[&[u8]] = &[b"escrow", authority.address().as_ref()];
-/// create_program_account_with_bump::<EscrowState>(
-/// 	escrow_account, payer, &program_id, seeds, bump,
-/// )?;
+/// CreateProgramAccountWithBump {
+/// 	account: escrow_account,
+/// 	payer,
+/// 	owner: &program_id,
+/// 	seeds,
+/// 	bump,
+/// }
+/// .invoke::<EscrowState>()?;
 /// ```
-#[inline(always)]
-pub fn create_program_account_with_bump<'a, T: PinaAccount>(
-	target_account: &'a mut AccountView,
-	payer: &'a AccountView,
-	owner: &Address,
-	seeds: &[&[u8]],
-	bump: u8,
-) -> ProgramResult {
-	// Allocate space, then initialize the discriminator. Callers can obtain a
-	// typed view immediately when the schema's remaining zeroed fields form a
-	// valid zeropod representation.
-	allocate_account_with_bump(target_account, payer, T::SIZE, owner, seeds, bump)?;
-	{
-		let mut data = target_account.try_borrow_mut()?;
-		T::write_discriminator(&mut data);
+#[must_use = "account creation has no effect until invoke or invoke_signed is called"]
+pub struct CreateProgramAccountWithBump<'account, 'address, 'seeds, 'seed> {
+	/// PDA account to allocate and initialize.
+	pub account: &'account mut AccountView,
+
+	/// Funding account that pays any required rent-exempt balance.
+	pub payer: &'account AccountView,
+
+	/// Program that owns the PDA and derives it from `seeds` and `bump`.
+	pub owner: &'address Address,
+
+	/// PDA seeds without the bump.
+	pub seeds: &'seeds [&'seed [u8]],
+
+	/// PDA bump to validate and append to `seeds`.
+	pub bump: u8,
+}
+
+impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
+	/// Creates the account and writes `T`'s discriminator.
+	#[inline(always)]
+	pub fn invoke<T: PinaAccount>(&mut self) -> ProgramResult {
+		self.invoke_signed::<T>(&[])
 	}
 
-	Ok(())
+	/// Creates the account with additional PDA signers and writes `T`'s
+	/// discriminator.
+	///
+	/// The target account signer is derived and supplied automatically.
+	#[inline(always)]
+	pub fn invoke_signed<T: PinaAccount>(&mut self, signers: &[Signer<'_, '_>]) -> ProgramResult {
+		self.invoke_signed_inner::<T>(signers, None)
+	}
+
+	#[cfg(test)]
+	#[inline(always)]
+	fn invoke_signed_with_rent<T: PinaAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Rent,
+	) -> ProgramResult {
+		self.invoke_signed_inner::<T>(signers, Some(rent))
+	}
+
+	#[inline(always)]
+	fn invoke_signed_inner<T: PinaAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+	) -> ProgramResult {
+		AllocateAccountWithBump {
+			account: self.account,
+			payer: self.payer,
+			space: T::SIZE as u64,
+			owner: self.owner,
+			seeds: self.seeds,
+			bump: self.bump,
+		}
+		.invoke_signed_inner(signers, rent)?;
+
+		let mut data = self.account.try_borrow_mut()?;
+		T::write_discriminator(&mut data);
+
+		Ok(())
+	}
 }
 
 /// Allocates space for a new program account, returning the derived `address`
 /// and the canonical `bump`.
 ///
-/// This is the lower-level allocator used by [`create_program_account`] for
+/// This is the lower-level allocator used by [`CreateProgramAccount`] for
 /// cases where caller code wants manual discriminator/data initialization.
 ///
 /// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->
@@ -181,31 +344,90 @@ pub fn create_program_account_with_bump<'a, T: PinaAccount>(
 /// # Errors
 ///
 /// Returns `InvalidSeeds` when no canonical PDA can be derived, plus any
-/// allocation errors surfaced by [`allocate_account_with_bump`].
+/// allocation errors surfaced by [`AllocateAccountWithBump`].
 ///
 /// # Examples
 ///
 /// ```ignore
 /// // Allocate raw space for manual initialization:
 /// let seeds: &[&[u8]] = &[b"vault"];
-/// let (address, bump) =
-/// 	allocate_account(vault_account, payer, 64, &program_id, seeds)?;
+/// let (address, bump) = AllocateAccount {
+/// 	account: vault_account,
+/// 	payer,
+/// 	space: 64,
+/// 	owner: &program_id,
+/// 	seeds,
+/// }
+/// .invoke()?;
 /// ```
-#[inline(always)]
-pub fn allocate_account<'a>(
-	target_account: &'a AccountView,
-	payer: &'a AccountView,
-	space: usize,
-	owner: &Address,
-	seeds: &[&[u8]],
-) -> Result<(Address, u8), ProgramError> {
-	let Some((address, bump)) = crate::try_find_program_address(seeds, owner) else {
-		return Err(ProgramError::InvalidSeeds);
-	};
+#[derive(Clone, Copy, Debug)]
+#[must_use = "account allocation has no effect until invoke or invoke_signed is called"]
+pub struct AllocateAccount<'account, 'address, 'seeds, 'seed> {
+	/// PDA account to allocate and assign.
+	pub account: &'account AccountView,
 
-	allocate_account_with_bump(target_account, payer, space, owner, seeds, bump)?;
+	/// Funding account that pays any required rent-exempt balance.
+	pub payer: &'account AccountView,
 
-	Ok((address, bump))
+	/// Number of account-data bytes to allocate.
+	pub space: u64,
+
+	/// Program that owns the PDA and derives it from `seeds`.
+	pub owner: &'address Address,
+
+	/// PDA seeds without the canonical bump.
+	pub seeds: &'seeds [&'seed [u8]],
+}
+
+impl AllocateAccount<'_, '_, '_, '_> {
+	/// Allocates the account using the canonical PDA bump.
+	#[inline(always)]
+	pub fn invoke(&self) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed(&[])
+	}
+
+	/// Allocates the account using the canonical PDA bump and additional
+	/// signers.
+	///
+	/// Additional signers are useful when `payer` is another PDA. The target
+	/// account's signer is derived and supplied automatically.
+	#[inline(always)]
+	pub fn invoke_signed(&self, signers: &[Signer<'_, '_>]) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed_inner(signers, None)
+	}
+
+	#[cfg(test)]
+	#[inline(always)]
+	fn invoke_signed_with_rent(
+		&self,
+		signers: &[Signer<'_, '_>],
+		rent: Rent,
+	) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed_inner(signers, Some(rent))
+	}
+
+	#[inline(always)]
+	fn invoke_signed_inner(
+		&self,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+	) -> Result<(Address, u8), ProgramError> {
+		let Some((address, bump)) = crate::try_find_program_address(self.seeds, self.owner) else {
+			return Err(ProgramError::InvalidSeeds);
+		};
+
+		AllocateAccountWithBump {
+			account: self.account,
+			payer: self.payer,
+			space: self.space,
+			owner: self.owner,
+			seeds: self.seeds,
+			bump,
+		}
+		.invoke_signed_inner(signers, rent)?;
+
+		Ok((address, bump))
+	}
 }
 
 /// Appends a single-byte bump seed to the provided seeds array, returning
@@ -317,7 +539,7 @@ impl<'a, const SEEDS: usize> From<[&'a [u8]; SEEDS]> for PdaSigner<'a, SEEDS> {
 	}
 }
 
-/// Allocates space for a new program account with user-provided bump.
+/// Allocates a PDA account with a caller-provided bump.
 ///
 /// Two paths are taken depending on whether the target account already has
 /// lamports:
@@ -340,86 +562,142 @@ impl<'a, const SEEDS: usize> From<[&'a [u8]; SEEDS]> for PdaSigner<'a, SEEDS> {
 ///
 /// Returns seed-validation errors, rent sysvar access errors, and any
 /// system-program CPI failure from `CreateAccount`, `Transfer`, `Allocate`, or
-/// `Assign`.
+/// `Assign`. `invoke_signed` returns `InvalidArgument` when 16 additional
+/// signers would exceed the runtime's 16-signer limit after adding the target
+/// PDA signer.
 ///
 /// # Examples
 ///
 /// ```ignore
 /// let seeds: &[&[u8]] = &[b"vault"];
-/// allocate_account_with_bump(vault_account, payer, 64, &program_id, seeds, bump)?;
+/// AllocateAccountWithBump {
+/// 	account: vault_account,
+/// 	payer,
+/// 	space: 64,
+/// 	owner: &program_id,
+/// 	seeds,
+/// 	bump,
+/// }
+/// .invoke()?;
 /// ```
-#[inline(always)]
-pub fn allocate_account_with_bump<'a>(
-	target_account: &'a AccountView,
-	payer: &'a AccountView,
-	space: usize,
-	owner: &Address,
-	seeds: &[&[u8]],
-	bump: u8,
-) -> ProgramResult {
-	// Combine seeds
-	let bump_array = [bump];
-	let combined_seeds = combine_seeds_with_bump(seeds, &bump_array)?;
-	let mut derivation_seeds: [&[u8]; MAX_SEEDS] = [&[]; MAX_SEEDS];
-	derivation_seeds[..seeds.len()].copy_from_slice(seeds);
-	derivation_seeds[seeds.len()] = bump_array.as_slice();
-	let expected_address = crate::create_program_address(&derivation_seeds[..=seeds.len()], owner)?;
-	if target_account.address() != &expected_address {
-		return Err(ProgramError::InvalidSeeds);
+#[derive(Clone, Copy, Debug)]
+#[must_use = "account allocation has no effect until invoke or invoke_signed is called"]
+pub struct AllocateAccountWithBump<'account, 'address, 'seeds, 'seed> {
+	/// PDA account to allocate and assign.
+	pub account: &'account AccountView,
+
+	/// Funding account that pays any required rent-exempt balance.
+	pub payer: &'account AccountView,
+
+	/// Number of account-data bytes to allocate.
+	pub space: u64,
+
+	/// Program that owns the PDA and derives it from `seeds` and `bump`.
+	pub owner: &'address Address,
+
+	/// PDA seeds without the bump.
+	pub seeds: &'seeds [&'seed [u8]],
+
+	/// PDA bump to validate and append to `seeds`.
+	pub bump: u8,
+}
+
+impl AllocateAccountWithBump<'_, '_, '_, '_> {
+	/// Allocates the account with its derived PDA signer.
+	#[inline(always)]
+	pub fn invoke(&self) -> ProgramResult {
+		self.invoke_signed(&[])
 	}
-	let seeds_slice = &combined_seeds[..=seeds.len()];
-	let signer = Signer::from(seeds_slice);
-	let signers = &[signer];
 
-	// Allocate space for account
-	let rent = Rent::get()?;
+	/// Allocates the account with its derived PDA signer and additional signers.
+	///
+	/// The target account's signer is always included automatically. Pass only
+	/// other signers required by the CPI, such as seeds for a PDA payer.
+	#[inline(always)]
+	pub fn invoke_signed(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
+		self.invoke_signed_inner(signers, None)
+	}
 
-	if target_account.lamports().eq(&0) {
-		let lamports = rent.try_minimum_balance(space)?;
+	#[cfg(test)]
+	#[inline(always)]
+	fn invoke_signed_with_rent(&self, signers: &[Signer<'_, '_>], rent: Rent) -> ProgramResult {
+		self.invoke_signed_inner(signers, Some(rent))
+	}
 
-		CreateAccount {
-			from: payer,
-			to: target_account,
-			lamports,
-			space: space as u64,
-			owner,
+	#[inline(always)]
+	fn invoke_signed_inner(&self, signers: &[Signer<'_, '_>], rent: Option<Rent>) -> ProgramResult {
+		const MAX_CPI_SIGNERS: usize = 16;
+
+		if signers.len() >= MAX_CPI_SIGNERS {
+			return Err(ProgramError::InvalidArgument);
 		}
-		.invoke_signed(signers)?;
 
-		return Ok(());
-	}
-
-	// Otherwise, if balance is nonzero:
-
-	// 1) transfer sufficient lamports for rent exemption
-	let rent_exempt_balance = rent
-		.try_minimum_balance(space)?
-		.saturating_sub(target_account.lamports());
-
-	if rent_exempt_balance > 0 {
-		Transfer {
-			from: payer,
-			to: target_account,
-			lamports: rent_exempt_balance,
+		let bump_array = [self.bump];
+		let combined_seeds = combine_seeds_with_bump(self.seeds, &bump_array)?;
+		let mut derivation_seeds: [&[u8]; MAX_SEEDS] = [&[]; MAX_SEEDS];
+		derivation_seeds[..self.seeds.len()].copy_from_slice(self.seeds);
+		derivation_seeds[self.seeds.len()] = bump_array.as_slice();
+		let expected_address =
+			crate::create_program_address(&derivation_seeds[..=self.seeds.len()], self.owner)?;
+		if self.account.address() != &expected_address {
+			return Err(ProgramError::InvalidSeeds);
 		}
-		.invoke_signed(signers)?;
-	}
 
-	// 2) allocate space for the account
-	Allocate {
-		account: target_account,
-		space: space as u64,
-	}
-	.invoke_signed(signers)?;
+		let target_signer = Signer::from(&combined_seeds[..=self.seeds.len()]);
+		let empty_seeds: [Seed<'_>; 0] = [];
+		let empty_signer = Signer::from(&empty_seeds);
+		let mut all_signers: [Signer<'_, '_>; MAX_CPI_SIGNERS] =
+			core::array::from_fn(|_| empty_signer.clone());
+		all_signers[0] = target_signer;
+		for (destination, signer) in all_signers[1..].iter_mut().zip(signers) {
+			*destination = signer.clone();
+		}
+		let all_signers = &all_signers[..=signers.len()];
 
-	// 3) assign our program as the owner
-	Assign {
-		account: target_account,
-		owner,
-	}
-	.invoke_signed(signers)?;
+		let space = usize::try_from(self.space).map_err(|_| ProgramError::InvalidArgument)?;
+		let rent = if let Some(rent) = rent {
+			rent
+		} else {
+			Rent::get()?
+		};
+		if self.account.lamports() == 0 {
+			SystemCreateAccount {
+				from: self.payer,
+				to: self.account,
+				lamports: rent.try_minimum_balance(space)?,
+				space: self.space,
+				owner: self.owner,
+			}
+			.invoke_signed(all_signers)?;
 
-	Ok(())
+			return Ok(());
+		}
+
+		let rent_exempt_balance = rent
+			.try_minimum_balance(space)?
+			.saturating_sub(self.account.lamports());
+
+		if rent_exempt_balance > 0 {
+			SystemTransfer {
+				from: self.payer,
+				to: self.account,
+				lamports: rent_exempt_balance,
+			}
+			.invoke_signed(all_signers)?;
+		}
+
+		SystemAllocate {
+			account: self.account,
+			space: self.space,
+		}
+		.invoke_signed(all_signers)?;
+
+		SystemAssign {
+			account: self.account,
+			owner: self.owner,
+		}
+		.invoke_signed(all_signers)
+	}
 }
 
 /// Maximum number of bytes an account may grow by in a single instruction.
@@ -429,7 +707,7 @@ pub fn allocate_account_with_bump<'a>(
 #[cfg(feature = "account-resize")]
 pub const MAX_PERMITTED_DATA_INCREASE: usize = pinocchio::account::MAX_PERMITTED_DATA_INCREASE;
 
-/// Reallocates an account to `new_size` bytes, adjusting rent automatically.
+/// Reallocates an account and adjusts its rent-exempt balance.
 ///
 /// When **growing**, transfers the additional rent-exempt lamports required from
 /// `payer` to `account` via a system-program CPI. When **shrinking**, returns
@@ -445,7 +723,7 @@ pub const MAX_PERMITTED_DATA_INCREASE: usize = pinocchio::account::MAX_PERMITTED
 /// (10 KiB) per top-level instruction. Exceeding this limit returns
 /// `ProgramError::InvalidRealloc`.
 ///
-/// This helper rejects a single growth request larger than that limit before
+/// This builder rejects a single growth request larger than that limit before
 /// moving rent lamports. Pinocchio does not expose the account's original
 /// serialized length, so a later growth after an earlier reallocation in the
 /// same instruction can still fail during `resize` after rent lamports have
@@ -459,22 +737,51 @@ pub const MAX_PERMITTED_DATA_INCREASE: usize = pinocchio::account::MAX_PERMITTED
 /// `program_id`, and propagates any errors from rent sysvar access, lamport
 /// transfer, or the runtime `resize` call.
 #[cfg(feature = "account-resize")]
-#[inline(always)]
-pub fn realloc_account(
-	account: &mut AccountView,
-	new_size: usize,
-	payer: &mut AccountView,
-	program_id: &Address,
-) -> ProgramResult {
-	realloc_account_inner(account, new_size, payer, program_id)
+#[must_use = "account reallocation has no effect until invoke or invoke_signed is called"]
+pub struct ReallocAccount<'account, 'payer, 'address> {
+	/// Program-owned account whose data length and rent balance will change.
+	pub account: &'account mut AccountView,
+
+	/// Account that funds growth or receives excess rent after shrinking.
+	pub payer: &'payer mut AccountView,
+
+	/// Required account-data length after reallocation.
+	pub new_size: usize,
+
+	/// Executing program ID used to validate account ownership.
+	pub program_id: &'address Address,
+}
+
+#[cfg(feature = "account-resize")]
+impl ReallocAccount<'_, '_, '_> {
+	/// Reallocates the account using transaction-level signatures.
+	#[inline(always)]
+	pub fn invoke(&mut self) -> ProgramResult {
+		self.invoke_signed(&[])
+	}
+
+	/// Reallocates the account with PDA signer seeds for the payer.
+	///
+	/// Signers are used only when growth requires a system transfer. Shrinking
+	/// moves lamports directly from the program-owned account.
+	#[inline(always)]
+	pub fn invoke_signed(&mut self, signers: &[Signer<'_, '_>]) -> ProgramResult {
+		realloc_account_inner(
+			self.account,
+			self.new_size,
+			self.payer,
+			self.program_id,
+			signers,
+		)
+	}
 }
 
 /// Reallocates an account to `new_size` bytes with explicit zero-initialization,
 /// adjusting rent automatically.
 ///
-/// This function behaves identically to [`realloc_account`]. In the current
+/// This builder behaves identically to [`ReallocAccount`]. In the current
 /// Solana runtime, new bytes are always zero-initialized regardless of which
-/// variant is called. This function exists for API symmetry with the runtime's
+/// variant is called. This builder exists for API symmetry with the runtime's
 /// `realloc(new_len, zero_init)` parameter and to make zero-initialization
 /// intent explicit at the call site.
 ///
@@ -490,7 +797,7 @@ pub fn realloc_account(
 /// (10 KiB) per top-level instruction. Exceeding this limit returns
 /// `ProgramError::InvalidRealloc`.
 ///
-/// This helper rejects a single growth request larger than that limit before
+/// This builder rejects a single growth request larger than that limit before
 /// moving rent lamports. Pinocchio does not expose the account's original
 /// serialized length, so a later growth after an earlier reallocation in the
 /// same instruction can still fail during `resize` after rent lamports have
@@ -504,17 +811,46 @@ pub fn realloc_account(
 /// `program_id`, and propagates any errors from rent sysvar access, lamport
 /// transfer, or the runtime `resize` call.
 #[cfg(feature = "account-resize")]
-#[inline(always)]
-pub fn realloc_account_zero(
-	account: &mut AccountView,
-	new_size: usize,
-	payer: &mut AccountView,
-	program_id: &Address,
-) -> ProgramResult {
-	realloc_account_inner(account, new_size, payer, program_id)
+#[must_use = "account reallocation has no effect until invoke or invoke_signed is called"]
+pub struct ReallocAccountZeroed<'account, 'payer, 'address> {
+	/// Program-owned account whose data length and rent balance will change.
+	pub account: &'account mut AccountView,
+
+	/// Account that funds growth or receives excess rent after shrinking.
+	pub payer: &'payer mut AccountView,
+
+	/// Required account-data length after reallocation.
+	pub new_size: usize,
+
+	/// Executing program ID used to validate account ownership.
+	pub program_id: &'address Address,
 }
 
-/// Shared implementation for [`realloc_account`] and [`realloc_account_zero`].
+#[cfg(feature = "account-resize")]
+impl ReallocAccountZeroed<'_, '_, '_> {
+	/// Reallocates the account using transaction-level signatures.
+	#[inline(always)]
+	pub fn invoke(&mut self) -> ProgramResult {
+		self.invoke_signed(&[])
+	}
+
+	/// Reallocates the account with PDA signer seeds for the payer.
+	///
+	/// Signers are used only when growth requires a system transfer. The Solana
+	/// runtime zero-initializes every newly allocated byte.
+	#[inline(always)]
+	pub fn invoke_signed(&mut self, signers: &[Signer<'_, '_>]) -> ProgramResult {
+		realloc_account_inner(
+			self.account,
+			self.new_size,
+			self.payer,
+			self.program_id,
+			signers,
+		)
+	}
+}
+
+/// Shared implementation for [`ReallocAccount`] and [`ReallocAccountZeroed`].
 ///
 /// Validates the account, computes the rent delta, performs the lamport
 /// transfer, and resizes the account data.
@@ -525,6 +861,20 @@ fn realloc_account_inner(
 	new_size: usize,
 	payer: &mut AccountView,
 	program_id: &Address,
+	signers: &[Signer<'_, '_>],
+) -> ProgramResult {
+	realloc_account_inner_with_rent(account, new_size, payer, program_id, signers, None)
+}
+
+#[cfg(feature = "account-resize")]
+#[inline(always)]
+fn realloc_account_inner_with_rent(
+	account: &mut AccountView,
+	new_size: usize,
+	payer: &mut AccountView,
+	program_id: &Address,
+	signers: &[Signer<'_, '_>],
+	rent: Option<Rent>,
 ) -> ProgramResult {
 	use crate::AccountInfoValidation;
 
@@ -546,7 +896,11 @@ fn realloc_account_inner(
 		return Err(ProgramError::InvalidRealloc);
 	}
 
-	let rent = Rent::get()?;
+	let rent = if let Some(rent) = rent {
+		rent
+	} else {
+		Rent::get()?
+	};
 	let new_minimum_balance = rent.try_minimum_balance(new_size)?;
 	let current_lamports = account.lamports();
 
@@ -554,12 +908,12 @@ fn realloc_account_inner(
 		// Growing: transfer additional rent from payer to account.
 		let required_lamports = new_minimum_balance.saturating_sub(current_lamports);
 		if required_lamports > 0 {
-			Transfer {
+			SystemTransfer {
 				from: payer,
 				to: account,
 				lamports: required_lamports,
 			}
-			.invoke()?;
+			.invoke_signed(signers)?;
 		}
 	} else {
 		// Shrinking: return excess rent from account to payer.
@@ -573,11 +927,13 @@ fn realloc_account_inner(
 	account.resize(new_size)
 }
 
-/// Closes an account and returns the remaining rent lamports to the provided
-/// recipient.
+/// Closes an account and returns its remaining lamports to a recipient.
 ///
-/// Callers should clear any program-owned account state before closing when
-/// stale data reuse matters for their threat model.
+/// Use this builder when stale data reuse is not part of the account's threat
+/// model. Use [`CloseAccountZeroed`] to clear the account bytes first.
+///
+/// Closing is a direct mutation of program-owned accounts, not a CPI, so this
+/// builder intentionally has no `invoke_signed` variant.
 ///
 /// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
 /// All APIs in this section are designed for on-chain determinism.
@@ -594,16 +950,32 @@ fn realloc_account_inner(
 ///
 /// ```ignore
 /// // Close the escrow account and return rent to the authority:
-/// close_account(escrow_account, authority)?;
+/// CloseAccount {
+/// 	account: escrow_account,
+/// 	recipient: authority,
+/// }
+/// .invoke()?;
 /// ```
-#[inline(always)]
-pub fn close_account(account_info: &mut AccountView, recipient: &mut AccountView) -> ProgramResult {
-	account_info.close_with_recipient(recipient)
+#[must_use = "account closure has no effect until invoke is called"]
+pub struct CloseAccount<'account, 'recipient> {
+	/// Program-owned account to close.
+	pub account: &'account mut AccountView,
+
+	/// Writable account that receives the closed account's lamports.
+	pub recipient: &'recipient mut AccountView,
+}
+
+impl CloseAccount<'_, '_> {
+	/// Transfers the account's lamports to the recipient and closes it.
+	#[inline(always)]
+	pub fn invoke(&mut self) -> ProgramResult {
+		self.account.close_with_recipient(self.recipient)
+	}
 }
 
 /// Closes an account after zeroing its current data bytes in-place.
 ///
-/// This helper clears the raw account data before transferring the remaining
+/// This builder clears the raw account data before transferring the remaining
 /// lamports and closing the account. It does not implicitly reallocate the
 /// account, even when the `account-resize` feature is enabled.
 ///
@@ -623,14 +995,27 @@ pub fn close_account(account_info: &mut AccountView, recipient: &mut AccountView
 ///
 /// ```ignore
 /// // Zero the raw account bytes, then close the account and return rent:
-/// close_account_zeroed(escrow_account, authority)?;
+/// CloseAccountZeroed {
+/// 	account: escrow_account,
+/// 	recipient: authority,
+/// }
+/// .invoke()?;
 /// ```
-#[inline(always)]
-pub fn close_account_zeroed(
-	account_info: &mut AccountView,
-	recipient: &mut AccountView,
-) -> ProgramResult {
-	account_info.close_account_zeroed(recipient)
+#[must_use = "account closure has no effect until invoke is called"]
+pub struct CloseAccountZeroed<'account, 'recipient> {
+	/// Program-owned account whose bytes will be cleared before closing.
+	pub account: &'account mut AccountView,
+
+	/// Writable account that receives the closed account's lamports.
+	pub recipient: &'recipient mut AccountView,
+}
+
+impl CloseAccountZeroed<'_, '_> {
+	/// Clears the account data, transfers its lamports, and closes it.
+	#[inline(always)]
+	pub fn invoke(&mut self) -> ProgramResult {
+		self.account.close_account_zeroed(self.recipient)
+	}
 }
 
 /// Typed handle for passing validated accounts into CPI builders.
@@ -831,7 +1216,10 @@ where
 	P: CpiProgramId,
 	T: ToCpiAccounts<'a, ACCOUNTS>,
 {
+	/// Typed account set in the exact order expected by the target program.
 	pub accounts: T,
+
+	/// Validated executable account for the target program.
 	pub program: Program<'a, P>,
 }
 
@@ -840,6 +1228,7 @@ where
 	P: CpiProgramId,
 	T: ToCpiAccounts<'a, ACCOUNTS>,
 {
+	/// Builds a typed CPI context from a validated program and account set.
 	#[inline(always)]
 	pub const fn new(program: Program<'a, P>, accounts: T) -> Self {
 		Self { accounts, program }
@@ -862,5 +1251,254 @@ where
 		};
 
 		pinocchio::cpi::invoke_signed::<ACCOUNTS, _>(&instruction, &account_views, signers)
+	}
+}
+
+#[cfg(test)]
+#[allow(unsafe_code)]
+mod tests {
+	use pinocchio::account::NOT_BORROWED;
+	use pinocchio::account::RuntimeAccount;
+
+	use super::*;
+	use crate::HasDiscriminator;
+	use crate::LayoutKind;
+	use crate::ZeroPodError;
+	use crate::ZeroPodFixed;
+	use crate::ZeroPodSchema;
+
+	struct TestState;
+
+	impl ZeroPodSchema for TestState {
+		const LAYOUT: LayoutKind = LayoutKind::Fixed;
+	}
+
+	impl ZeroPodFixed for TestState {
+		type Zc = [u8; 1];
+
+		const SIZE: usize = 1;
+
+		fn from_bytes(data: &[u8]) -> Result<&Self::Zc, ZeroPodError> {
+			data.first_chunk().ok_or(ZeroPodError::BufferTooSmall)
+		}
+
+		fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, ZeroPodError> {
+			data.first_chunk_mut().ok_or(ZeroPodError::BufferTooSmall)
+		}
+
+		fn validate(data: &[u8]) -> Result<(), ZeroPodError> {
+			Self::from_bytes(data).map(|_| ())
+		}
+	}
+
+	impl PinaAccount for TestState {}
+
+	impl HasDiscriminator for TestState {
+		type Type = u8;
+
+		const VALUE: u8 = 7;
+	}
+
+	#[repr(C)]
+	struct TestAccount<const N: usize> {
+		header: RuntimeAccount,
+		data: [u8; N],
+	}
+
+	impl<const N: usize> TestAccount<N> {
+		fn new(address: Address, owner: Address, lamports: u64, data_len: usize) -> Self {
+			assert!(data_len <= N);
+
+			Self {
+				header: RuntimeAccount {
+					borrow_state: NOT_BORROWED,
+					is_signer: 1,
+					is_writable: 1,
+					executable: 0,
+					padding: (data_len as u32).to_le_bytes(),
+					address,
+					owner,
+					lamports,
+					data_len: data_len as u64,
+				},
+				data: [0; N],
+			}
+		}
+
+		fn view(&mut self) -> AccountView {
+			unsafe { AccountView::new_unchecked(core::ptr::addr_of_mut!(self.header)) }
+		}
+	}
+
+	fn test_rent() -> Rent {
+		Rent::from_bytes(&1u64.to_le_bytes()).unwrap_or_else(|error| panic!("test rent: {error:?}"))
+	}
+
+	#[test]
+	fn create_account_executes_with_calculated_rent() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored_from = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let mut stored_to = TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 0, 0);
+		let from = stored_from.view();
+		let to = stored_to.view();
+
+		CreateAccount {
+			from: &from,
+			to: &to,
+			space: 8,
+			owner: &owner,
+		}
+		.invoke_signed_with_rent(&[], test_rent(), 8)
+		.unwrap_or_else(|error| panic!("create account: {error:?}"));
+	}
+
+	#[test]
+	fn typed_and_raw_pda_builders_execute_with_calculated_rent() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"state"];
+		let (address, bump) = crate::try_find_program_address(seeds, &owner)
+			.unwrap_or_else(|| panic!("derive test address"));
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let rent = test_rent();
+
+		let mut stored_typed = TestAccount::<32>::new(address, owner, 0, TestState::SIZE);
+		let mut typed = stored_typed.view();
+		let result = CreateProgramAccount {
+			account: &mut typed,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+		}
+		.invoke_signed_with_rent::<TestState>(&[], rent)
+		.unwrap_or_else(|error| panic!("create typed PDA: {error:?}"));
+		assert_eq!(result, (address, bump));
+		assert_eq!(stored_typed.data[0], TestState::VALUE);
+		<TestState as ZeroPodFixed>::validate(&stored_typed.data[..TestState::SIZE])
+			.unwrap_or_else(|error| panic!("validate initialized state: {error:?}"));
+		let state = TestState::from_bytes(&stored_typed.data[..TestState::SIZE])
+			.unwrap_or_else(|error| panic!("read initialized state: {error:?}"));
+		assert_eq!(state[0], TestState::VALUE);
+		let mut copied_state = [0; TestState::SIZE];
+		copied_state.copy_from_slice(&stored_typed.data[..TestState::SIZE]);
+		let _state = TestState::from_bytes_mut(&mut copied_state)
+			.unwrap_or_else(|error| panic!("mutably read initialized state: {error:?}"));
+
+		let mut stored_explicit = TestAccount::<32>::new(address, owner, 0, TestState::SIZE);
+		let mut explicit = stored_explicit.view();
+		CreateProgramAccountWithBump {
+			account: &mut explicit,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			bump,
+		}
+		.invoke_signed_with_rent::<TestState>(&[], rent)
+		.unwrap_or_else(|error| panic!("create typed PDA with explicit bump: {error:?}"));
+		assert_eq!(stored_explicit.data[0], TestState::VALUE);
+
+		let mut stored_raw = TestAccount::<32>::new(address, owner, 0, 8);
+		let raw = stored_raw.view();
+		let result = AllocateAccount {
+			account: &raw,
+			payer: &payer,
+			space: 8,
+			owner: &owner,
+			seeds,
+		}
+		.invoke_signed_with_rent(&[], rent)
+		.unwrap_or_else(|error| panic!("allocate raw PDA: {error:?}"));
+		assert_eq!(result, (address, bump));
+	}
+
+	#[test]
+	fn prefunded_pda_allocation_runs_transfer_allocate_and_assign() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"prefunded"];
+		let (address, bump) = crate::try_find_program_address(seeds, &owner)
+			.unwrap_or_else(|| panic!("derive prefunded address"));
+		let mut stored_target = TestAccount::<32>::new(address, owner, 1, 8);
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let target = stored_target.view();
+		let payer = stored_payer.view();
+		let empty_seeds: [Seed<'_>; 0] = [];
+		let extra_signer = Signer::from(&empty_seeds);
+
+		AllocateAccountWithBump {
+			account: &target,
+			payer: &payer,
+			space: 8,
+			owner: &owner,
+			seeds,
+			bump,
+		}
+		.invoke_signed_with_rent(&[extra_signer], test_rent())
+		.unwrap_or_else(|error| panic!("allocate prefunded PDA: {error:?}"));
+
+		let rent = test_rent();
+		let fully_funded = rent
+			.try_minimum_balance(8)
+			.unwrap_or_else(|error| panic!("calculate full funding: {error:?}"));
+		let mut stored_funded = TestAccount::<32>::new(address, owner, fully_funded, 8);
+		let funded = stored_funded.view();
+		AllocateAccountWithBump {
+			account: &funded,
+			payer: &payer,
+			space: 8,
+			owner: &owner,
+			seeds,
+			bump,
+		}
+		.invoke_signed_with_rent(&[], rent)
+		.unwrap_or_else(|error| panic!("allocate fully funded PDA: {error:?}"));
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn realloc_growth_executes_rent_transfer_and_resize() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored_account =
+			TestAccount::<32>::new(Address::new_from_array([1; 32]), owner, 1, 8);
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1, 0);
+		let mut account = stored_account.view();
+		let mut payer = stored_payer.view();
+
+		realloc_account_inner_with_rent(
+			&mut account,
+			16,
+			&mut payer,
+			&owner,
+			&[],
+			Some(test_rent()),
+		)
+		.unwrap_or_else(|error| panic!("grow account: {error:?}"));
+
+		assert_eq!(account.data_len(), 16);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn realloc_shrink_returns_excess_rent_and_resizes() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored_account =
+			TestAccount::<32>::new(Address::new_from_array([1; 32]), owner, 1_000, 16);
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1, 0);
+		let mut account = stored_account.view();
+		let mut payer = stored_payer.view();
+		let initial_total = account.lamports() + payer.lamports();
+
+		realloc_account_inner_with_rent(
+			&mut account,
+			8,
+			&mut payer,
+			&owner,
+			&[],
+			Some(test_rent()),
+		)
+		.unwrap_or_else(|error| panic!("shrink account: {error:?}"));
+
+		assert_eq!(account.data_len(), 8);
+		assert_eq!(account.lamports() + payer.lamports(), initial_total);
+		assert!(payer.lamports() > 1);
 	}
 }
