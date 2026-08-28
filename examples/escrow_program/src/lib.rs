@@ -130,12 +130,16 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.maker.assert_signer()?;
-		let mint_a = self.mint_a.as_token_mint_for_program(&token_program)?;
-		mint_a.assert_no_extensions()?;
+		let mint_a = self
+			.mint_a
+			.as_token_mint_for_program(&token_program)?
+			.assert_no_extensions()?;
 		let decimals = mint_a.decimals();
 		drop(mint_a);
-		let mint_b = self.mint_b.as_token_mint_for_program(&token_program)?;
-		mint_b.assert_no_extensions()?;
+		let mint_b = self
+			.mint_b
+			.as_token_mint_for_program(&token_program)?
+			.assert_no_extensions()?;
 		drop(mint_b);
 		drop(self.maker_ata_a.as_associated_token_account_checked(
 			self.maker.address(),
@@ -300,13 +304,17 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		// Validate maker and mint accounts
 		self.maker.assert_address(&maker)?;
 		self.mint_a.assert_address(&mint_a)?;
-		let mint_a = self.mint_a.as_token_mint_for_program(&token_program)?;
-		mint_a.assert_no_extensions()?;
+		let mint_a = self
+			.mint_a
+			.as_token_mint_for_program(&token_program)?
+			.assert_no_extensions()?;
 		let decimals_a = mint_a.decimals();
 		drop(mint_a);
 		self.mint_b.assert_address(&mint_b)?;
-		let mint_b = self.mint_b.as_token_mint_for_program(&token_program)?;
-		mint_b.assert_no_extensions()?;
+		let mint_b = self
+			.mint_b
+			.as_token_mint_for_program(&token_program)?
+			.assert_no_extensions()?;
 		let decimals_b = mint_b.decimals();
 		drop(mint_b);
 

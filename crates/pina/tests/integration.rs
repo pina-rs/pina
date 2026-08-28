@@ -1765,12 +1765,13 @@ fn as_token_account_for_program_preserves_token_2022_state() {
 	let mut shadow = account_views[0];
 	let token_account = account
 		.as_token_account_for_program(&token_2022::ID)
-		.unwrap_or_else(|e| panic!("token-program account load failed: {e:?}"));
+		.unwrap_or_else(|e| panic!("token-program account load failed: {e:?}"))
+		.assert_no_extensions()
+		.unwrap_or_else(|e| panic!("token-account extension policy failed: {e:?}"));
 	assert_eq!(token_account.amount(), 88);
 	assert_eq!(token_account.program_id(), &token_2022::ID);
 	assert!(token_account.legacy().is_none());
 	assert!(token_account.token_2022().is_some());
-	assert_eq!(token_account.assert_no_extensions(), Ok(()));
 
 	assert!(matches!(
 		shadow.try_borrow_mut(),
@@ -1803,12 +1804,13 @@ fn as_token_mint_for_program_preserves_token_2022_extensions() {
 
 	let mint = account_views[0]
 		.as_token_mint_for_program(&token_2022::ID)
-		.unwrap_or_else(|error| panic!("token-program mint load failed: {error:?}"));
+		.unwrap_or_else(|error| panic!("token-program mint load failed: {error:?}"))
+		.assert_no_extensions()
+		.unwrap_or_else(|error| panic!("mint extension policy failed: {error:?}"));
 	assert_eq!(mint.decimals(), 9);
 	assert_eq!(mint.program_id(), &token_2022::ID);
 	assert!(mint.legacy().is_none());
 	assert!(mint.token_2022().is_some());
-	assert_eq!(mint.assert_no_extensions(), Ok(()));
 }
 
 #[cfg(feature = "token")]
@@ -1832,22 +1834,25 @@ fn token_mint_extension_policy_requires_an_explicit_allow_list() {
 	let mut input = unsafe { create_test_input(&accounts, &[0u8]) };
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
-	let mint = account_views[0]
-		.as_token_mint_for_program(&token_2022::ID)
-		.unwrap_or_else(|error| panic!("token-program mint load failed: {error:?}"));
+	let load_mint = || {
+		account_views[0]
+			.as_token_mint_for_program(&token_2022::ID)
+			.unwrap_or_else(|error| panic!("token-program mint load failed: {error:?}"))
+	};
 
-	assert_eq!(
-		mint.assert_no_extensions(),
+	assert!(matches!(
+		load_mint().assert_no_extensions(),
 		Err(ProgramError::InvalidAccountData)
-	);
-	assert_eq!(
-		mint.assert_extensions_allowed(&[token_2022::state::ExtensionType::PermanentDelegate]),
+	));
+	assert!(matches!(
+		load_mint()
+			.assert_extensions_allowed(&[token_2022::state::ExtensionType::PermanentDelegate,]),
 		Err(ProgramError::InvalidAccountData)
-	);
-	assert_eq!(
-		mint.assert_extensions_allowed(&[token_2022::state::ExtensionType::NonTransferable]),
-		Ok(())
-	);
+	));
+	let mint = load_mint()
+		.assert_extensions_allowed(&[token_2022::state::ExtensionType::NonTransferable])
+		.unwrap_or_else(|error| panic!("allowed mint extension was rejected: {error:?}"));
+	assert_eq!(mint.decimals(), 9);
 }
 
 #[cfg(feature = "token")]
@@ -1876,24 +1881,25 @@ fn token_account_extension_policy_requires_an_explicit_allow_list() {
 	let mut input = unsafe { create_test_input(&accounts, &[0u8]) };
 	let mut accts = [UNINIT; 10];
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
-	let token_account = account_views[0]
-		.as_token_account_for_program(&token_2022::ID)
-		.unwrap_or_else(|error| panic!("token-program account load failed: {error:?}"));
+	let load_token_account = || {
+		account_views[0]
+			.as_token_account_for_program(&token_2022::ID)
+			.unwrap_or_else(|error| panic!("token-program account load failed: {error:?}"))
+	};
 
-	assert_eq!(
-		token_account.assert_no_extensions(),
+	assert!(matches!(
+		load_token_account().assert_no_extensions(),
 		Err(ProgramError::InvalidAccountData)
-	);
-	assert_eq!(
-		token_account
+	));
+	assert!(matches!(
+		load_token_account()
 			.assert_extensions_allowed(&[token_2022::state::ExtensionType::TransferHookAccount,]),
 		Err(ProgramError::InvalidAccountData)
-	);
-	assert_eq!(
-		token_account
-			.assert_extensions_allowed(&[token_2022::state::ExtensionType::ImmutableOwner]),
-		Ok(())
-	);
+	));
+	let token_account = load_token_account()
+		.assert_extensions_allowed(&[token_2022::state::ExtensionType::ImmutableOwner])
+		.unwrap_or_else(|error| panic!("allowed account extension was rejected: {error:?}"));
+	assert_eq!(token_account.amount(), 88);
 }
 
 #[cfg(feature = "token")]

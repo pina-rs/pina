@@ -216,13 +216,18 @@ The lint compares exact identifier paths, including module-qualified constants, 
 Detects Token-2022-capable mint loads without an explicit call to `assert_no_extensions()` or `assert_extensions_allowed()` in the instruction function.
 
 ```rust
-let mint = mint_account.as_token_mint_for_program(&program_id)?;
-mint.assert_extensions_allowed(&[
-	token_2022::state::ExtensionType::ImmutableOwner,
-])?;
+let mint = mint_account
+	.as_token_mint_for_program(&program_id)?
+	.assert_extensions_allowed(&[
+		token_2022::state::ExtensionType::ImmutableOwner,
+	])?;
 ```
 
 Extensions can alter transfer, fee, hook, freeze, and authority semantics. Pina therefore requires an allow-list instead of treating the legacy base layout as a complete policy. The current analysis is function-scoped and requires a policy call after each load and before the next mint load. Keep each policy adjacent to its mint load so the lexical pairing also remains obvious to reviewers.
+
+Both policies are inherent, chainable methods on `TokenMintRef` and `TokenAccountRef`; they return the validated view rather than wrapping it in a separate free-function API.
+
+`as_token_mint_for_program()` and `as_token_account_for_program()` only accept the canonical SPL Token and Token-2022 program IDs, require the account owner to match the selected ID, and parse the corresponding concrete layout. The caller therefore cannot make a legacy account appear to be Token-2022 (or vice versa) by supplying an arbitrary address. Extension assertions are a no-op on the validated legacy variant and inspect the actual TLV extension data on the validated Token-2022 variant.
 
 ### `require_post_cpi_balance_reload`
 

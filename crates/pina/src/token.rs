@@ -8,7 +8,7 @@ use crate::Address;
 use crate::ProgramError;
 use crate::Ref;
 
-fn assert_extensions_allowed<B>(
+fn validate_extensions_allowed<B>(
 	state: &crate::token_2022::state::StateWithExtensions<B>,
 	allowed: &[crate::token_2022::state::ExtensionType],
 ) -> Result<(), ProgramError>
@@ -53,6 +53,11 @@ pub enum TokenMintRef<'a> {
 impl<'a> TokenMintRef<'a> {
 	/// Validate `account` using the selected token program.
 	///
+	/// `token_program` must equal the canonical SPL Token or Token-2022 program
+	/// ID, and `account` must be owned by that same program. The resulting enum
+	/// variant therefore reflects validated program ownership rather than an
+	/// untrusted caller selection.
+	///
 	/// # Errors
 	///
 	/// Returns `IncorrectProgramId` for unsupported programs, or the validation
@@ -90,19 +95,22 @@ impl<'a> TokenMintRef<'a> {
 	/// Legacy SPL Token mints have no extensions and always satisfy the policy.
 	/// This check makes protocol support explicit instead of silently relying on
 	/// legacy base fields when Token-2022 changes transfer or authority semantics.
+	/// Returns the validated mint view so this assertion can be chained directly
+	/// after [`crate::AsTokenAccount::as_token_mint_for_program`].
 	///
 	/// # Errors
 	///
 	/// Returns [`ProgramError::InvalidAccountData`] when a Token-2022 extension is
 	/// not allow-listed, or propagates malformed extension-data errors.
 	pub fn assert_extensions_allowed(
-		&self,
+		self,
 		allowed: &[crate::token_2022::state::ExtensionType],
-	) -> Result<(), ProgramError> {
-		match self {
-			Self::Legacy(_) => Ok(()),
-			Self::Token2022(mint) => assert_extensions_allowed(mint, allowed),
+	) -> Result<Self, ProgramError> {
+		if let Self::Token2022(mint) = &self {
+			validate_extensions_allowed(mint, allowed)?;
 		}
+
+		Ok(self)
 	}
 
 	/// Reject every Token-2022 mint extension.
@@ -111,7 +119,7 @@ impl<'a> TokenMintRef<'a> {
 	///
 	/// Returns [`ProgramError::InvalidAccountData`] when any extension is present,
 	/// or propagates malformed extension-data errors.
-	pub fn assert_no_extensions(&self) -> Result<(), ProgramError> {
+	pub fn assert_no_extensions(self) -> Result<Self, ProgramError> {
 		self.assert_extensions_allowed(&[])
 	}
 
@@ -193,6 +201,11 @@ pub enum TokenAccountRef<'a> {
 impl<'a> TokenAccountRef<'a> {
 	/// Validate `account` using the selected token program.
 	///
+	/// `token_program` must equal the canonical SPL Token or Token-2022 program
+	/// ID, and `account` must be owned by that same program. The resulting enum
+	/// variant therefore reflects validated program ownership rather than an
+	/// untrusted caller selection.
+	///
 	/// # Errors
 	///
 	/// Returns `IncorrectProgramId` for unsupported programs, or the validation
@@ -231,19 +244,22 @@ impl<'a> TokenAccountRef<'a> {
 	/// Legacy SPL Token accounts have no extensions and always satisfy the
 	/// policy. Account policies should be paired with a mint policy because the
 	/// mint controls transfer-wide behavior such as fees and hooks.
+	/// Returns the validated token-account view so this assertion can be chained
+	/// directly after [`crate::AsTokenAccount::as_token_account_for_program`].
 	///
 	/// # Errors
 	///
 	/// Returns [`ProgramError::InvalidAccountData`] when a Token-2022 extension is
 	/// not allow-listed, or propagates malformed extension-data errors.
 	pub fn assert_extensions_allowed(
-		&self,
+		self,
 		allowed: &[crate::token_2022::state::ExtensionType],
-	) -> Result<(), ProgramError> {
-		match self {
-			Self::Legacy(_) => Ok(()),
-			Self::Token2022(account) => assert_extensions_allowed(account, allowed),
+	) -> Result<Self, ProgramError> {
+		if let Self::Token2022(account) = &self {
+			validate_extensions_allowed(account, allowed)?;
 		}
+
+		Ok(self)
 	}
 
 	/// Reject every Token-2022 token-account extension.
@@ -252,7 +268,7 @@ impl<'a> TokenAccountRef<'a> {
 	///
 	/// Returns [`ProgramError::InvalidAccountData`] when any extension is present,
 	/// or propagates malformed extension-data errors.
-	pub fn assert_no_extensions(&self) -> Result<(), ProgramError> {
+	pub fn assert_no_extensions(self) -> Result<Self, ProgramError> {
 		self.assert_extensions_allowed(&[])
 	}
 
