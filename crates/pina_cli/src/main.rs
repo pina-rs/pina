@@ -63,6 +63,33 @@ fn main() {
 			command,
 			solana_verify,
 		} => run_verify(command, solana_verify),
+		Commands::Deploy {
+			project,
+			program,
+			build,
+			program_keypair,
+			upgrade_authority,
+			payer,
+			cluster,
+			dry_run,
+			json,
+			yes,
+			allow_mainnet,
+		} => {
+			run_deploy(
+				project,
+				program,
+				build,
+				program_keypair,
+				upgrade_authority,
+				payer,
+				&cluster,
+				dry_run,
+				json,
+				yes,
+				allow_mainnet,
+			);
+		}
 		Commands::Codama { command } => {
 			match command {
 				CodamaCommands::Generate {
@@ -372,7 +399,6 @@ fn run_build(
 			std::process::exit(1);
 		}
 	};
-
 	println!("{} Built {}", "✔".green(), output.package_name);
 	println!("  SBF  {}", output.sbf_artifact.display());
 	println!("  IDL  {}", output.idl.display());
@@ -459,6 +485,88 @@ fn run_dev(
 	if let Err(error) = pina_cli::workflow::dev_project(&options) {
 		eprintln!("{} {}", "Error".red().bold(), error);
 		std::process::exit(error.exit_code());
+	}
+}
+
+#[allow(clippy::fn_params_excessive_bools, clippy::too_many_arguments)]
+fn run_deploy(
+	project: PathBuf,
+	program: Option<PathBuf>,
+	build: bool,
+	program_keypair: Option<PathBuf>,
+	upgrade_authority: PathBuf,
+	payer: PathBuf,
+	cluster: &str,
+	dry_run: bool,
+	json: bool,
+	yes: bool,
+	allow_mainnet: bool,
+) {
+	let target = pina_cli::deploy::DeploymentTarget::from_cluster_arg(cluster);
+	let request = pina_cli::deploy::DeploymentRequest {
+		project,
+		program,
+		program_keypair,
+		upgrade_authority,
+		payer,
+		target,
+	};
+	let mut runner = pina_cli::deploy::SystemCommandRunner;
+	if let Err(error) = pina_cli::deploy::validate_deployment_target(&request.target) {
+		eprintln!("{} {}", "Error".red().bold(), error);
+		std::process::exit(1);
+	}
+
+	if build && let Err(error) = pina_cli::deploy::build_deployment_program(&request.project) {
+		eprintln!("{} {}", "Error".red().bold(), error);
+		std::process::exit(1);
+	}
+
+	let plan = match pina_cli::deploy::prepare_deployment(&request) {
+		Ok(plan) => plan,
+		Err(error) => {
+			eprintln!("{} {}", "Error".red().bold(), error);
+			std::process::exit(1);
+		}
+	};
+
+	if json {
+		#[rustfmt::skip]
+		let output = serde_json::to_string_pretty(&plan).unwrap_or_else(|error| panic!("deployment plans contain only JSON-compatible values: {error}"));
+		println!("{output}");
+	} else {
+		print!("{}", plan.render_text());
+	}
+
+	if dry_run {
+		return;
+	}
+
+	let mut confirmer = StdinDeploymentConfirmer;
+
+	if let Err(error) =
+		pina_cli::deploy::execute_deployment(&plan, yes, allow_mainnet, &mut runner, &mut confirmer)
+	{
+		eprintln!("{} {}", "Error".red().bold(), error);
+		std::process::exit(1);
+	}
+
+	println!("{} Deployment complete", "✔".green());
+}
+
+struct StdinDeploymentConfirmer;
+
+impl pina_cli::deploy::DeploymentConfirmer for StdinDeploymentConfirmer {
+	fn confirm(&mut self, prompt: &str) -> std::io::Result<bool> {
+		let stdin = std::io::stdin();
+		let stderr = std::io::stderr();
+		let is_terminal = stdin.is_terminal();
+		pina_cli::deploy::read_deployment_confirmation(
+			prompt,
+			is_terminal,
+			&mut stdin.lock(),
+			&mut stderr.lock(),
+		)
 	}
 }
 

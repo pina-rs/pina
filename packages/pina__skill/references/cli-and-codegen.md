@@ -18,6 +18,7 @@ pina init --help
 pina test --help
 pina dev --help
 pina profile --help
+pina deploy --help
 pina codama generate --help
 ```
 
@@ -156,3 +157,18 @@ pina verify record \
 Use `pina verify record --export [AUTHORITY] --output verification.tx` when another signer or multisig must submit the transaction. Export performs Pina's deployed-hash preflight but never submits or rebuilds the repository, does not require `--yes` or `--acknowledge-mainnet`, and writes only the validated base58 or base64 transaction payload. Remote verification begins only after the exported transaction is submitted.
 
 `pina verify submit --program-id <ADDRESS> --uploader <ADDRESS>` submits an existing record to the official mainnet remote verifier. `pina verify status --program-id <ADDRESS>` is the corresponding read-only mainnet status query. Never place credentials in an RPC URL; the URL is necessarily visible in child-process arguments.
+
+## Safe deployment
+
+Plan deployments before permitting a write:
+
+```sh
+pina deploy --cluster devnet \
+  --upgrade-authority ./keys/devnet-authority.json \
+  --payer ./keys/devnet-payer.json \
+  --dry-run --json
+```
+
+The cluster is always explicit. Pina never inherits a Solana CLI target or wallet, and deploy never creates a program identity. Conventional artifacts are `<cargo-target>/deploy/<library-name>.so` and `<cargo-target>/deploy/<library-name>-keypair.json`; override either path only when the plan requires it. Review the program ID and complete argument vector in the plan. Keep keypairs below 4 KiB and owner-private; on Unix use mode `0600`, while Windows ACLs must be restricted with operating-system tooling.
+
+Remote execution requires an interactive `deploy` confirmation or `--yes`. Named mainnet and custom remote endpoints also require `--allow-mainnet`. Custom URL user information, queries, and fragments are rejected, but accepted hosts and paths remain visible in plan output and process listings. Never put a secret anywhere in the URL; prefer a named cluster. Use `--build` when the canonical artifact must be refreshed before the final plan. Deployment requires the external Agave `solana` executable on `PATH`.

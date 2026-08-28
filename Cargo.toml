@@ -124,6 +124,7 @@ quote = { default-features = false, version = "^1" }
 semver = { default-features = false, version = "^1" }
 serde = { default-features = false, version = "^1" }
 serde_json = { default-features = false, version = "^1", features = ["std"] }
+sha2 = { default-features = false, version = "^0.10", features = ["std"] }
 solana-account = { version = "^4", default-features = false }
 solana-account-info = { version = "^3", default-features = false }
 solana-address = { default-features = false, version = "^2.0", features = ["bytemuck", "curve25519", "decode"] }

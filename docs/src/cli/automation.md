@@ -69,6 +69,18 @@ pina profile ./target/deploy/counter_program.so --json > /tmp/profile.json
 jq -e '.functions | type == "array"' /tmp/profile.json
 ```
 
+Inspect a deployment without executing a child process:
+
+```bash
+pina deploy \
+  --project ./programs/counter_program \
+  --cluster devnet \
+  --upgrade-authority ./keys/devnet-authority.json \
+  --payer ./keys/devnet-payer.json \
+  --dry-run --json > /tmp/deploy-plan.json
+jq -e '.program_id and .commands' /tmp/deploy-plan.json
+```
+
 ## Automation rules
 
 - Check the exit status before consuming output.
@@ -87,6 +99,9 @@ jq -e '.functions | type == "array"' /tmp/profile.json
 - Use `pina test --unit` when only native Rust or Mollusk tests are required.
 - Treat a missing `tests/surfpool` package or built `.so` as a failed integration setup, not a skip.
 - `pina dev` is offline unless `--network` or a credential-free HTTP(S) `--rpc-url` is explicitly supplied. The URL is visible in Surfpool's process arguments, so never place a secret anywhere in it.
+- Always inspect `deploy --dry-run --json` before remote automation.
+- Never pass `deploy --yes` until the exact target, program ID, authority, payer, and command plan have been reviewed.
+- Never put a secret anywhere in a custom deploy RPC URL. Pina rejects user information, queries, and fragments, but accepted hosts and paths remain visible in plan output and process listings because Solana receives the endpoint through `--url`. Prefer named clusters.
 
 ## Stable verification
 

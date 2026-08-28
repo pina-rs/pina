@@ -1,0 +1,77 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - deploy
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Deploy a compiled Pina program through the Solana CLI.
+
+Resolves the program artifact from a Cargo program crate or an explicit --program path, validates every keypair, prints the complete plan, and invokes `solana program deploy`. A cluster or RPC URL is always required. Remote writes require confirmation or --yes; mainnet also requires --allow-mainnet. Custom remote URLs require the same acknowledgement because their cluster identity cannot be proven.
+
+Usage: pina deploy [OPTIONS] --upgrade-authority <KEYPAIR> --payer <KEYPAIR> --cluster <CLUSTER|URL>
+
+Options:
+  -p, --project <DIR>
+          Directory used for Pina.toml or Cargo metadata project discovery
+
+      --program <PROGRAM.SO>
+          Existing SBF shared object. Conflicts with --build
+
+      --build
+          Run Pina's project-aware SBF build before final deployment planning
+
+      --program-keypair <KEYPAIR>
+          Keypair whose public key is the deployed program address
+
+      --upgrade-authority <KEYPAIR>
+          Keypair authorized to upgrade the deployed program
+
+      --payer <KEYPAIR>
+          Keypair that pays the deployment transaction fees
+
+      --cluster <CLUSTER|URL>
+          Named cluster or explicit HTTP(S) RPC URL. No target is selected by default
+
+      --dry-run
+          Print the resolved deployment plan without building or deploying
+
+      --json
+          Emit the dry-run plan as JSON. Requires --dry-run
+
+      --yes
+          Skip the remote deployment confirmation prompt
+
+      --allow-mainnet
+          Acknowledge that mainnet-beta or a custom remote endpoint can affect real assets
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina deploy --cluster localnet \
+    --payer ~/.config/solana/id.json \
+    --upgrade-authority ~/.config/solana/id.json
+  pina deploy --build --cluster devnet \
+    --payer ./keys/devnet-payer.json \
+    --upgrade-authority ./keys/devnet-authority.json
+  pina deploy --program ./artifacts/my_program.so \
+    --program-keypair ./keys/my_program.json \
+    --cluster http://127.0.0.1:8899 \
+    --payer ./keys/local-payer.json \
+    --upgrade-authority ./keys/local-authority.json --dry-run --json
+
+Safety:
+  No cluster is selected by default. --cluster accepts a named cluster or explicit RPC URL.
+  Custom URL user information, queries, and fragments are rejected. Accepted hosts and paths
+  remain visible in plans and process listings, so never put a secret anywhere in the URL.
+  Prefer a named cluster when possible.
+  Remote deployment prompts for the word deploy; use --yes only in reviewed automation.
+  Mainnet and custom remote deployment additionally require --allow-mainnet.
+  --dry-run never builds or deploys and --json is available only with --dry-run.
+
+----- stderr -----
