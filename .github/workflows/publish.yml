@@ -231,16 +231,16 @@ jobs:
       - name: setup node for publish
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          # Use the Node/npm pair from devenv. npm discovers the GitHub OIDC
+          # credentials itself; replacing it with a prefixed npm can bypass
+          # trusted publishing and fail with ENEEDAUTH.
+          node-version: 24
           package-manager-cache: false
       - name: prepare npm packages
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          npm install --global --prefix "$RUNNER_TEMP/npm-cli" npm@11.5.1
-          export PATH="$RUNNER_TEMP/npm-cli/bin:$PATH"
-          test "$(npm --version)" = "11.5.1"
 
           pnpm install --frozen-lockfile
           pnpm run build:codama-nodes
@@ -308,7 +308,6 @@ jobs:
           NPM_CONFIG_PROVENANCE: "true"
         run: |
           set -euo pipefail
-          export PATH="$RUNNER_TEMP/npm-cli/bin:$PATH"
           monochange step publish-readiness \
             --from HEAD \
             --output "$RUNNER_TEMP/publish-readiness.json" \
@@ -323,7 +322,6 @@ jobs:
           NPM_CONFIG_PROVENANCE: "true"
         run: |
           set -euo pipefail
-          export PATH="$RUNNER_TEMP/npm-cli/bin:$PATH"
           packages=(
             pina_codama_nodes
             pina_cli_darwin_arm64
@@ -365,7 +363,6 @@ jobs:
           PUBLISH_STREAM_OUTPUT: "true"
         run: |
           set -euo pipefail
-          export PATH="$RUNNER_TEMP/npm-cli/bin:$PATH"
           monochange step publish-packages \
             --log-level info \
             --all \
