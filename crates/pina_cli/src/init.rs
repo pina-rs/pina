@@ -463,7 +463,7 @@ pub mod instructions {{
 			InitializeInstruction::initialize(&mut data)?.value = self.value;
 			let ctx = CpiContext::new(*program, self.accounts);
 
-			ctx.invoke(&data, signers)
+			ctx.invoke_signed(&data, signers)
 		}}
 	}}
 }}
@@ -683,6 +683,8 @@ mod tests {
 		assert!(cpi.contains("pub accounts: accounts::Initialize<'a>"));
 		assert!(cpi.contains("pub value: u8"));
 		assert!(cpi.contains("pub fn invoke_signed"));
+		assert!(cpi.contains("ctx.invoke_signed(&data, signers)"));
+		assert!(!cpi.contains("ctx.invoke(&data, signers)"));
 		assert!(!cpi.contains("pub const fn initialize("));
 	}
 

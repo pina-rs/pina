@@ -13,9 +13,10 @@ use rustc_lint::LintContext;
 dylint_linting::declare_late_lint! {
 	/// ### What it does
 	///
-	/// Warns when `.invoke()` or `.invoke_signed()` is called without a
-	/// preceding `assert_address()`, `assert_addresses()`, or
-	/// `assert_program()` call on a program account within the same function.
+	/// Warns when `.invoke()`, `.invoke_signed()`, `.invoke_with_program()`, or
+	/// `.invoke_signed_with_program()` is called without a preceding
+	/// `assert_address()`, `assert_addresses()`, or `assert_program()` call on a
+	/// program account within the same function.
 	///
 	/// ### Why is this bad?
 	///
@@ -40,7 +41,12 @@ dylint_linting::declare_late_lint! {
 	"CPI invocations should be preceded by program address verification"
 }
 
-const CPI_METHODS: &[&str] = &["invoke", "invoke_signed"];
+const CPI_METHODS: &[&str] = &[
+	"invoke",
+	"invoke_signed",
+	"invoke_with_program",
+	"invoke_signed_with_program",
+];
 
 const PROGRAM_CHECK_METHODS: &[&str] = &["assert_address", "assert_addresses", "assert_program"];
 
@@ -48,14 +54,16 @@ struct CallInfo {
 	span: rustc_span::Span,
 	method: String,
 	receiver: Option<String>,
-	trusted_builder: bool,
+	program_argument: Option<String>,
+	trusted_cpi_type: bool,
 }
 
-const TRUSTED_PINA_BUILDERS: &[&str] = &[
+const TRUSTED_PINA_CPI_TYPES: &[&str] = &[
 	"AllocateAccount",
 	"AllocateAccountWithBump",
 	"CloseAccount",
 	"CloseAccountZeroed",
+	"CpiContext",
 	"CreateAccount",
 	"CreateProgramAccount",
 	"CreateProgramAccountWithBump",
@@ -63,18 +71,18 @@ const TRUSTED_PINA_BUILDERS: &[&str] = &[
 	"ReallocAccountZeroed",
 ];
 
-fn is_trusted_pina_builder(cx: &LateContext<'_>, receiver: &Expr<'_>) -> bool {
+fn is_trusted_pina_cpi_type(cx: &LateContext<'_>, receiver: &Expr<'_>) -> bool {
 	let receiver_type = cx.typeck_results().expr_ty(receiver).peel_refs();
 	let Some(definition) = receiver_type.ty_adt_def() else {
 		return false;
 	};
 	let path = cx.tcx.def_path_str(definition.did());
-	is_trusted_pina_builder_path(&path)
+	is_trusted_pina_cpi_type_path(&path)
 }
 
-fn is_trusted_pina_builder_path(path: &str) -> bool {
+fn is_trusted_pina_cpi_type_path(path: &str) -> bool {
 	path.strip_prefix("pina::cpi::")
-		.is_some_and(|name| TRUSTED_PINA_BUILDERS.contains(&name))
+		.is_some_and(|name| TRUSTED_PINA_CPI_TYPES.contains(&name))
 }
 
 fn receiver_ident(expr: &Expr<'_>) -> Option<String> {
@@ -86,8 +94,19 @@ fn receiver_ident(expr: &Expr<'_>) -> Option<String> {
 				.map(|s| s.ident.name.as_str().to_string())
 		}
 		ExprKind::MethodCall(_, receiver, ..) => receiver_ident(receiver),
+		ExprKind::DropTemps(inner) | ExprKind::AddrOf(_, _, inner) => receiver_ident(inner),
 		_ => None,
 	}
+}
+
+fn program_argument(method: &str, args: &[Expr<'_>]) -> Option<String> {
+	let index = match method {
+		"invoke_with_program" => 0,
+		"invoke_signed_with_program" => 1,
+		_ => return None,
+	};
+
+	args.get(index).and_then(receiver_ident)
 }
 
 fn collect_calls<'tcx>(cx: &LateContext<'tcx>, body: &'tcx rustc_hir::Body<'tcx>) -> Vec<CallInfo> {
@@ -103,11 +122,13 @@ fn visit_expr<'tcx>(cx: &LateContext<'tcx>, expr: &'tcx Expr<'tcx>, calls: &mut 
 			for arg in *args {
 				visit_expr(cx, arg, calls);
 			}
+			let method = seg.ident.name.as_str();
 			calls.push(CallInfo {
 				span: expr.span,
-				method: seg.ident.name.as_str().to_string(),
+				method: method.to_string(),
 				receiver: receiver_ident(receiver),
-				trusted_builder: is_trusted_pina_builder(cx, receiver),
+				program_argument: program_argument(method, args),
+				trusted_cpi_type: is_trusted_pina_cpi_type(cx, receiver),
 			});
 		}
 		ExprKind::Call(callee, args) => {
@@ -180,15 +201,24 @@ impl<'tcx> LateLintPass<'tcx> for RequireProgramCheckBeforeCpi {
 		let calls = collect_calls(cx, body);
 
 		for (i, info) in calls.iter().enumerate() {
-			if !CPI_METHODS.contains(&info.method.as_str()) || info.trusted_builder {
+			if !CPI_METHODS.contains(&info.method.as_str()) || info.trusted_cpi_type {
 				continue;
 			}
 
 			let has_program_check = calls[..i].iter().any(|prev| {
-				PROGRAM_CHECK_METHODS.contains(&prev.method.as_str())
-					&& prev.receiver.as_ref().is_some_and(|r| {
-						r.contains("program") || r.contains("system") || r.contains("token")
-					})
+				if !PROGRAM_CHECK_METHODS.contains(&prev.method.as_str()) {
+					return false;
+				}
+
+				if let Some(program_argument) = info.program_argument.as_ref() {
+					return prev.receiver.as_ref() == Some(program_argument);
+				}
+
+				prev.receiver.as_ref().is_some_and(|receiver| {
+					receiver.contains("program")
+						|| receiver.contains("system")
+						|| receiver.contains("token")
+				})
 			});
 
 			if !has_program_check {
@@ -211,14 +241,22 @@ impl<'tcx> LateLintPass<'tcx> for RequireProgramCheckBeforeCpi {
 #[cfg(test)]
 mod tests {
 	#[test]
-	fn trusted_pina_builder_path_is_exact() {
-		assert!(super::is_trusted_pina_builder_path(
+	fn ui() {
+		dylint_testing::ui_test(env!("CARGO_PKG_NAME"), "ui");
+	}
+
+	#[test]
+	fn trusted_pina_cpi_type_path_is_exact() {
+		assert!(super::is_trusted_pina_cpi_type_path(
 			"pina::cpi::CreateAccount"
 		));
-		assert!(!super::is_trusted_pina_builder_path(
+		assert!(super::is_trusted_pina_cpi_type_path(
+			"pina::cpi::CpiContext"
+		));
+		assert!(!super::is_trusted_pina_cpi_type_path(
 			"pina::cpi::custom::CreateAccount"
 		));
-		assert!(!super::is_trusted_pina_builder_path(
+		assert!(!super::is_trusted_pina_cpi_type_path(
 			"another_crate::pina::cpi::CreateAccount"
 		));
 	}
