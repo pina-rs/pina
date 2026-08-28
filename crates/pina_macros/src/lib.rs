@@ -39,7 +39,10 @@ use pda::expand as pda_impl;
 ///
 /// Fields can be shared or mutable `AccountView` references. A final slice
 /// field annotated with `#[pina(remaining)]` captures all trailing accounts.
-/// Add `distinct` to reject duplicate mutable trailing-account addresses.
+/// Mutable trailing-account addresses are distinct by default. Use
+/// `#[pina(remaining, distinct = false)]` only when duplicate addresses are an
+/// intentional part of the instruction contract, and document the safety
+/// invariant on the field.
 ///
 /// # Example
 ///
@@ -55,7 +58,14 @@ use pda::expand as pda_impl;
 /// #[derive(Accounts)]
 /// struct SettleAccounts<'a> {
 ///     authority: &'a AccountView,
-///     #[pina(remaining, distinct)]
+///     #[pina(remaining)]
+///     positions: &'a mut [AccountView],
+/// }
+///
+/// #[derive(Accounts)]
+/// struct WeightedAccounts<'a> {
+///     /// Duplicate entries intentionally apply the same account's weight more than once.
+///     #[pina(remaining, distinct = false)]
 ///     positions: &'a mut [AccountView],
 /// }
 /// ```

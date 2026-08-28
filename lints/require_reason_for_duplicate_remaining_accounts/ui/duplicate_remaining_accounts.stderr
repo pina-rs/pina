@@ -1,0 +1,18 @@
+error: `distinct = false` permits duplicate writable accounts without explaining why
+  --> $DIR/duplicate_remaining_accounts.rs:25:2
+   |
+LL |     #[pina(remaining, distinct = false)]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: add a field doc comment explaining the invariant that makes duplicate addresses safe
+   = note: `#[deny(req$DIRre_reason_for_duplicate_remaining_accounts)]` on by default
+
+error: `distinct = false` permits duplicate writable accounts without explaining why
+  --> $DIR/duplicate_remaining_accounts.rs:33:2
+   |
+LL |     #[pina(remaining, distinct = false)]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: add a field doc comment explaining the invariant that makes duplicate addresses safe
+
+error: aborting due to 2 previous errors

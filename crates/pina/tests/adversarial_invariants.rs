@@ -39,18 +39,19 @@ struct DuplicateMutablePair<'a> {
 
 #[derive(Accounts, Debug)]
 #[pina(crate = pina)]
-struct RemainingPassthrough<'a> {
+struct DuplicateRemainingPassthrough<'a> {
 	pub first: &'a AccountView,
-	#[pina(remaining)]
+	/// Duplicate entries intentionally preserve repeated weights supplied by the caller.
+	#[pina(remaining, distinct = false)]
 	pub rest: &'a mut [AccountView],
 }
 
 #[derive(Accounts, Debug)]
 #[pina(crate = pina)]
 #[allow(dead_code)]
-struct DistinctRemaining<'a> {
+struct DefaultDistinctRemaining<'a> {
 	pub first: &'a AccountView,
-	#[pina(remaining, distinct)]
+	#[pina(remaining)]
 	pub rest: &'a mut [AccountView],
 }
 
@@ -358,7 +359,7 @@ fn duplicate_mutable_accounts_are_rejected_by_cursor_runtime() {
 }
 
 #[test]
-fn remaining_accounts_preserve_duplicate_order_and_aliasing() {
+fn duplicate_remaining_opt_out_preserves_order_and_aliasing() {
 	let first_key = fake_address(12);
 	let duplicated_key = fake_address(13);
 	let unique_accounts = [
@@ -377,7 +378,7 @@ fn remaining_accounts_preserve_duplicate_order_and_aliasing() {
 
 	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 2, 6);
 	let account_views = initialized_account_views(&mut accounts, count);
-	let parsed = RemainingPassthrough::try_from((&TEST_PROGRAM_ID, account_views))
+	let parsed = DuplicateRemainingPassthrough::try_from((&TEST_PROGRAM_ID, account_views))
 		.unwrap_or_else(|error| panic!("failed to derive remaining accounts: {error:?}"));
 
 	assert_eq!(parsed.first.address(), &first_key);
@@ -405,7 +406,7 @@ fn remaining_accounts_preserve_duplicate_order_and_aliasing() {
 }
 
 #[test]
-fn distinct_remaining_accounts_reject_duplicate_mutable_addresses() {
+fn mutable_remaining_accounts_reject_duplicate_addresses_by_default() {
 	let unique_accounts = [
 		AccountBuilder::new()
 			.address(fake_address(41))
@@ -419,7 +420,7 @@ fn distinct_remaining_accounts_reject_duplicate_mutable_addresses() {
 
 	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 1, 4);
 	let account_views = initialized_account_views(&mut accounts, count);
-	let result = DistinctRemaining::try_from((&TEST_PROGRAM_ID, account_views));
+	let result = DefaultDistinctRemaining::try_from((&TEST_PROGRAM_ID, account_views));
 
 	assert!(matches!(
 		result,

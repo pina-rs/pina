@@ -569,7 +569,7 @@ pub struct MyAccounts<'a> {
 }
 ```
 
-Remaining-account fields preserve the original account order and aliases. If a handler requires distinct trailing accounts, it must validate their addresses explicitly.
+Remaining-account fields preserve account order. Mutable `#[pina(remaining)]` fields reject duplicate addresses by default; use `#[pina(remaining, distinct = false)]` only when aliases are intentional, and add a field doc comment explaining the invariant that makes them safe.
 
 ### Instruction authoring tips
 

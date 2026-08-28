@@ -58,7 +58,7 @@ struct TestAccountsRemainingMut<'a> {
 
 #[derive(Accounts)]
 #[pina(crate = pina)]
-struct TestAccountsRemainingMutDistinct<'a> {
+struct TestAccountsRemainingMutExplicitDistinct<'a> {
 	pub one: &'a AccountView,
 	#[pina(remaining, distinct)]
 	pub remaining: &'a mut [AccountView],
@@ -222,7 +222,7 @@ fn test_accounts_derive_mutable_remaining_rejects_readonly_accounts() {
 }
 
 #[test]
-fn test_accounts_derive_distinct_mutable_remaining_accepts_unique_accounts() {
+fn test_accounts_derive_explicit_distinct_accepts_unique_accounts() {
 	let ix_data = [3u8; 100];
 	let mut input = create_input(4, &ix_data);
 	let mut accounts = [UNINIT; 4];
@@ -231,15 +231,17 @@ fn test_accounts_derive_distinct_mutable_remaining_accepts_unique_accounts() {
 	let accounts: &mut [AccountView] =
 		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
 
-	let parsed =
-		TestAccountsRemainingMutDistinct::try_from_account_infos(&MOCK_PROGRAM_ID, accounts)
-			.unwrap();
+	let parsed = TestAccountsRemainingMutExplicitDistinct::try_from_account_infos(
+		&MOCK_PROGRAM_ID,
+		accounts,
+	)
+	.unwrap();
 	assert_ne!(parsed.one.address(), parsed.remaining[0].address());
 	assert_eq!(parsed.remaining.len(), 3);
 }
 
 #[test]
-fn test_accounts_derive_distinct_mutable_remaining_rejects_readonly_accounts() {
+fn test_accounts_derive_explicit_distinct_rejects_readonly_accounts() {
 	let ix_data = [3u8; 100];
 	let mut input = create_input_with_writability(3, &ix_data, |index| index != 2);
 	let mut accounts = [UNINIT; 3];
@@ -248,8 +250,10 @@ fn test_accounts_derive_distinct_mutable_remaining_rejects_readonly_accounts() {
 	let accounts: &mut [AccountView] =
 		unsafe { core::slice::from_raw_parts_mut(accounts.as_mut_ptr().cast(), count) };
 
-	let result =
-		TestAccountsRemainingMutDistinct::try_from_account_infos(&MOCK_PROGRAM_ID, accounts);
+	let result = TestAccountsRemainingMutExplicitDistinct::try_from_account_infos(
+		&MOCK_PROGRAM_ID,
+		accounts,
+	);
 	assert!(matches!(result, Err(ProgramError::InvalidAccountData)));
 }
 

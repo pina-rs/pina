@@ -491,17 +491,18 @@ fn accounts_derive_with_mutable_remaining() {
 }
 
 #[test]
-fn accounts_derive_with_distinct_mutable_remaining() {
+fn accounts_derive_with_duplicate_mutable_remaining() {
 	let input = quote! {
 		#[pina(crate = ::pina)]
 		pub struct TransferAccounts<'a> {
 			pub authority: &'a AccountView,
-			#[pina(remaining, distinct)]
+			/// Duplicate accounts represent repeated weights in this instruction.
+			#[pina(remaining, distinct = false)]
 			pub extra: &'a mut [AccountView],
 		}
 	};
 	let output = pretty(accounts_derive_impl(input));
-	insta::assert_snapshot!("accounts_derive_with_distinct_mutable_remaining", output);
+	insta::assert_snapshot!("accounts_derive_with_duplicate_mutable_remaining", output);
 }
 
 #[test]

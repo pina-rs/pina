@@ -100,7 +100,7 @@ pub enum ExampleError {
 
 - Supports one lifetime parameter.
 - Supports `&'a AccountView`, `&'a mut AccountView`, `&'a [AccountView]`, and `&'a mut [AccountView]` fields.
-- Supports `#[pina(remaining)]` on a single trailing field to capture remaining accounts, with opt-in `#[pina(remaining, distinct)]` validation for unique mutable addresses.
+- Supports `#[pina(remaining)]` on a single trailing field to capture remaining accounts. Mutable trailing addresses are distinct by default; `#[pina(remaining, distinct = false)]` permits duplicates only for intentionally documented instruction contracts.
 - Supports `#[pina(crate = ::pina)]` on the struct to override the crate path.
 
 ## Notes
