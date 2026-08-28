@@ -29,7 +29,7 @@ dylint_linting::declare_late_lint! {
 }
 
 const ASSET_TERMS: &[&str] = &[
-	"amount", "balance", "lamport", "price", "reward", "stake", "supply", "value",
+	"amount", "balance", "lamport", "price", "reward", "stake", "supply",
 ];
 const UNCHECKED_METHODS: &[&str] = &[
 	"saturating_add",

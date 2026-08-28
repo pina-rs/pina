@@ -244,7 +244,7 @@ Token-2022 transfer fees can make `received` differ from the requested amount; S
 
 ### `require_checked_asset_arithmetic`
 
-Detects raw `+`, `-`, `*`, and `/`, plus saturating or wrapping arithmetic, when an operand name contains an economic term such as `amount`, `balance`, `lamport`, `price`, `reward`, `stake`, `supply`, or `value`.
+Detects raw `+`, `-`, `*`, and `/`, plus saturating or wrapping arithmetic, when an operand name contains an economic term such as `amount`, `balance`, `lamport`, `price`, `reward`, `stake`, or `supply`.
 
 ```rust
 let next_balance = balance
