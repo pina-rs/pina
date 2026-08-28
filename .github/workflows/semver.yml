@@ -46,9 +46,10 @@ jobs:
           fi
 
           # Check if any changeset file contains a major change type
+          # ('major' and 'breaking' both bump major per monochange.toml)
           changeset_acknowledged=false
           if ls .changeset/*.md 1>/dev/null 2>&1; then
-            if grep -lE '^[a-zA-Z_]+: major$' .changeset/*.md 1>/dev/null 2>&1; then
+            if grep -lE '^[a-zA-Z_]+: (major|breaking)$' .changeset/*.md 1>/dev/null 2>&1; then
               changeset_acknowledged=true
               echo "Found major changeset — breaking change acknowledged via changeset"
             fi
@@ -65,7 +66,7 @@ jobs:
           echo ""
           echo "  1. Add '!' to your PR title (e.g. 'feat!: my breaking change' or 'fix(pina)!: remove deprecated api')"
           echo ""
-          echo "  2. Add a changeset file with a 'major' change type:"
+          echo "  2. Add a changeset file with a 'major' or 'breaking' change type:"
           echo "     Run 'monochange run change' or create a file in .changeset/ with:"
           echo "     ---"
           echo "     package_name: major"
