@@ -177,6 +177,12 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 
 		self.admin.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
+		let canonical_bump = self
+			.registry_config
+			.assert_canonical_bump(&registry_seeds.as_slices(), &ID)?;
+		if canonical_bump != args.bump {
+			return Err(ProgramError::InvalidSeeds);
+		}
 		self.registry_config
 			.assert_empty()?
 			.assert_seeds_with_bump(&registry_seeds_with_bump.as_slices(), &ID)?;
@@ -211,6 +217,12 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 		self.registry_config
 			.assert_not_empty()?
 			.assert_type::<RegistryConfig>(&ID)?;
+		let canonical_bump = self
+			.role_entry
+			.assert_canonical_bump(&role_entry_seeds.as_slices(), &ID)?;
+		if canonical_bump != args.bump {
+			return Err(ProgramError::InvalidSeeds);
+		}
 		self.role_entry
 			.assert_empty()?
 			.assert_seeds_with_bump(&role_entry_seeds_with_bump.as_slices(), &ID)?;

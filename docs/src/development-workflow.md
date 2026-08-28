@@ -20,6 +20,8 @@ test:idl
 
 - Rust and markdown formatting are enforced through `dprint`.
 - Clippy runs with strict workspace lint settings, and `lint:clippy` also checks the custom Dylint crates under `lints/`.
+- `security:dylint` runs every registered Pina lint over all example programs and secure security fixtures.
+- The [Security Lints](./security-lints.md) reference documents each rule, compliant patterns, and heuristic limitations.
 
 ## Reusable documentation blocks
 

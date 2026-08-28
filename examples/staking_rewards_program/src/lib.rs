@@ -240,6 +240,12 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
+		let canonical_bump = self
+			.pool_state
+			.assert_canonical_bump(&pool_seeds.as_slices(), &ID)?;
+		if canonical_bump != args.bump {
+			return Err(ProgramError::InvalidSeeds);
+		}
 		self.pool_state
 			.assert_empty()?
 			.assert_seeds_with_bump(&pool_seeds_with_bump.as_slices(), &ID)?;
@@ -322,6 +328,12 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 		self.pool_state
 			.assert_not_empty()?
 			.assert_type::<PoolState>(&ID)?;
+		let canonical_bump = self
+			.position_state
+			.assert_canonical_bump(&position_seeds.as_slices(), &ID)?;
+		if canonical_bump != args.bump {
+			return Err(ProgramError::InvalidSeeds);
+		}
 		self.position_state
 			.assert_empty()?
 			.assert_seeds_with_bump(&position_seeds_with_bump.as_slices(), &ID)?;
@@ -421,10 +433,12 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 				.checked_add(amount)
 				.ok_or(ProgramError::ArithmeticOverflow)?,
 		);
+		drop(position_state);
 
 		// Update pool state
 		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
 		pool_state.total_staked.set(total_staked);
+		drop(pool_state);
 
 		// Ensure user's stake ATA exists
 		associated_token_account::instructions::CreateIdempotent {
@@ -494,11 +508,19 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 
 		// Update position state
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
-		position_state.staked_amount.set(staked_amount - amount);
+		position_state.staked_amount.set(
+			staked_amount
+				.checked_sub(amount)
+				.ok_or(ProgramError::ArithmeticOverflow)?,
+		);
 
 		// Update pool state
 		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
-		pool_state.total_staked.set(total_staked - amount);
+		pool_state.total_staked.set(
+			total_staked
+				.checked_sub(amount)
+				.ok_or(ProgramError::ArithmeticOverflow)?,
+		);
 
 		Ok(())
 	}
@@ -552,6 +574,7 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
 		position_state.pending_rewards.set(next_pending);
+		drop(position_state);
 
 		// Ensure user's reward ATA exists
 		associated_token_account::instructions::CreateIdempotent {

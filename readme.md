@@ -897,9 +897,12 @@ See the [security guide](security/) for detailed examples of all 11 common Solan
 
 Enable pina's custom dylint lints to catch common security mistakes at compile time:
 
-- `require_owner_before_token_cast` — warns when `as_token_*()` is called without a preceding `assert_owner()`
-- `require_empty_before_init` — warns when a program-account creation builder is invoked without a preceding `assert_empty()`
-- `require_program_check_before_cpi` — warns when `.invoke()` / `.invoke_signed()` is called without program address verification
+- account ownership, initialization, PDA, sysvar, ATA, resize, close, and CPI validation
+- mutable-borrow lifetime, checked arithmetic, remaining-account bounds, and custody balance accounting
+- consistent token-program provenance and explicit Token-2022 extension policies
+- allocation and IDL/example-structure guidance
+
+See the [complete lint reference](lints/readme.md) for every lint's severity, detected patterns, compliant examples, and analysis limitations. This repository runs the entire catalog over every program under `examples/` and every secure security fixture with `devenv shell -- security:dylint`.
 
 ## Contributing
 

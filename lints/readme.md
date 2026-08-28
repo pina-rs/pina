@@ -1,91 +1,321 @@
 # Custom Dylint Lints
 
-<br>
+Pina ships custom [Dylint](https://github.com/trailofbits/dylint) libraries for Solana program development. They turn repository security conventions into compiler diagnostics and are intended to run during normal development and CI.
 
-Pina ships custom [dylint](https://github.com/trailofbits/dylint) libraries for Solana development. These lints are meant to be consumed by end users and example authors as part of the normal build and review loop.
+The lints complement tests and audits; they do not prove that a program's economic design is safe. Every path-sensitive lint documents the approximation it uses so findings can be reviewed with the right expectations.
 
-They focus on the safety properties that matter most in this codebase:
+## Installation and execution
 
-- account ownership and signer validation
-- CPI target verification
-- writable / resize / close preconditions
-- sysvar and ATA safety
-- zero-copy and type-cosplay protection
-- IDL-friendly example structure
-- performance-sensitive on-chain code
-
-## How to use the lints
-
-<br>
-
-The workspace registers all Pina lint libraries in `Cargo.toml`:
+Register the libraries in the consuming workspace:
 
 ```toml
 [workspace.metadata.dylint]
 libraries = [
-	{ path = "lints/require_owner_before_token_cast" },
-	{ path = "lints/require_empty_before_init" },
-	{ path = "lints/require_program_check_before_cpi" },
-	{ path = "lints/deny_heap_allocations_in_onchain_instruction_handlers" },
-	{ path = "lints/require_program_owned_before_lamport_mutation" },
-	{ path = "lints/require_writable_before_account_resize" },
-	{ path = "lints/require_zeroed_before_close" },
-	{ path = "lints/require_sysvar_assert_before_sysvar_use" },
-	{ path = "lints/require_type_assert_before_zero_copy_cast" },
-	{ path = "lints/require_associated_token_address_before_ata_cast" },
-	{ path = "lints/require_reason_for_duplicate_remaining_accounts" },
-	{ path = "lints/require_idl_root_to_define_one_program_id" },
-	{ path = "lints/require_canonical_instruction_dispatch_for_idl" },
-	{ path = "lints/require_explicit_discriminators_and_seed_namespaces" },
+	{ git = "https://github.com/pina-rs/pina", tag = "v0.11.0", pattern = "lints/*" },
 ]
 ```
 
-Run the full lint set with:
+Run every registered lint against all targets:
 
 ```sh
 cargo dylint --all -- --all-targets
 ```
 
-Inside the repository, the `security:dylint` devenv task is the authoritative way to run these lints over the examples and security fixtures. The quick command above works for an ad-hoc check of workspace crates, tests, examples, and security fixtures, but it also visits dependency crates, so its results can differ from the CI task.
+Inside this repository, use:
 
-## Lints shipped by Pina
+```sh
+devenv shell -- security:dylint
+```
 
-<br>
+`security:dylint` is the authoritative gate. It discovers every package under `examples/` and every `security/*/secure` fixture, then invokes all libraries registered in the root `Cargo.toml` with `--no-deps` and `--locked`. Insecure fixtures are intentionally excluded because they demonstrate rejected patterns.
 
-### Security and correctness
+## Complete lint catalog
 
-- `require_owner_before_token_cast` — require `assert_owner()` / `assert_owners()` before token casts.
-- `require_empty_before_init` — require `assert_empty()` before creating program accounts.
-- `require_program_check_before_cpi` — require a program-address check before CPI.
-- `require_program_owned_before_lamport_mutation` — require program ownership before direct lamport mutation.
-- `require_writable_before_account_resize` — require `assert_writable()` before `resize()`.
-- `require_zeroed_before_close` — require `zeroed()` before closing accounts.
-- `require_sysvar_assert_before_sysvar_use` — require `assert_sysvar()` before sysvar reads.
-- `require_type_assert_before_zero_copy_cast` — require type validation before raw zero-copy casts.
-- `require_associated_token_address_before_ata_cast` — require ATA derivation checks before ATA casts.
-- `require_reason_for_duplicate_remaining_accounts` — require a meaningful field doc comment whenever `distinct = false` permits duplicate mutable remaining accounts.
+| Lint                                                    | Level | Primary invariant                                   |
+| ------------------------------------------------------- | ----- | --------------------------------------------------- |
+| `require_owner_before_token_cast`                       | deny  | Token data is parsed only after owner validation    |
+| `require_empty_before_init`                             | deny  | Program accounts cannot be reinitialized            |
+| `require_program_check_before_cpi`                      | deny  | CPI targets are authenticated                       |
+| `deny_heap_allocations_in_onchain_instruction_handlers` | warn  | On-chain handlers avoid unbounded allocation cost   |
+| `require_program_owned_before_lamport_mutation`         | deny  | Direct lamport debits affect program-owned accounts |
+| `require_writable_before_account_resize`                | deny  | Resize targets are writable                         |
+| `require_zeroed_before_close`                           | deny  | Closed account data is invalidated                  |
+| `require_sysvar_assert_before_sysvar_use`               | deny  | Sysvar accounts cannot be substituted               |
+| `require_type_assert_before_zero_copy_cast`             | deny  | Raw zero-copy casts follow type validation          |
+| `require_associated_token_address_before_ata_cast`      | deny  | ATA identity is derived and checked                 |
+| `require_reason_for_duplicate_remaining_accounts`       | deny  | Duplicate mutable remaining accounts are justified  |
+| `require_canonical_bump_before_pda_write`               | deny  | PDA namespaces use canonical bumps                  |
+| `deny_account_borrows_across_cpi`                       | deny  | Mutable data guards end before CPI                  |
+| `require_consistent_token_program`                      | deny  | Token validation and CPI share one program identity |
+| `require_explicit_token_2022_extension_policy`          | deny  | Token-2022 extensions are explicitly allow-listed   |
+| `require_post_cpi_balance_reload`                       | deny  | Custody deposits use an observed balance delta      |
+| `require_checked_asset_arithmetic`                      | deny  | Economic arithmetic fails on overflow/underflow     |
+| `require_bounded_remaining_accounts`                    | deny  | Caller-controlled account work has a visible bound  |
+| `require_idl_root_to_define_one_program_id`             | warn  | IDL roots expose exactly one program ID             |
+| `require_canonical_instruction_dispatch_for_idl`        | warn  | Entrypoints use discoverable instruction dispatch   |
+| `require_explicit_discriminators_and_seed_namespaces`   | warn  | Examples expose type and PDA namespaces             |
 
-### Performance
+## Security and correctness reference
 
-- `deny_heap_allocations_in_onchain_instruction_handlers` — discourage `Vec`, `String`, `format!`, and similar heap-heavy patterns in on-chain handlers.
+### `require_owner_before_token_cast`
 
-### IDL generation and example structure
+Detects calls to the unchecked `as_token_mint()`, `as_token_account()`, `as_token_2022_mint()`, and `as_token_2022_account()` loaders without an earlier `assert_owner()` or `assert_owners()` on the same account.
 
-- `require_idl_root_to_define_one_program_id` — keep one clear `declare_id!` at the crate root of IDL examples.
-- `require_canonical_instruction_dispatch_for_idl` — keep instruction routing as a direct `match` in example entrypoints.
-- `require_explicit_discriminators_and_seed_namespaces` — keep explicit discriminators and visible byte-string seed namespaces in example code.
+An account can contain bytes shaped like token state while being owned by an attacker-controlled program. Parsing those bytes before checking ownership lets spoofed balances or authorities enter trusted logic.
 
-## Suggested workflow
+```rust
+mint.assert_owners(&[token::ID, token_2022::ID])?;
+let mint = mint.as_token_mint()?;
+```
 
-<br>
+The lint tracks the root receiver identifier and lexical call order within one function. Prefer the checked loaders or `*_for_program()` APIs when possible.
 
-1. Add or edit an example / security crate.
-2. Run `cargo dylint --all -- --all-targets`.
-3. Fix any lint failures before merging.
-4. Keep the code shaped the way `pina idl` expects so the examples remain easy to introspect.
+### `require_empty_before_init`
 
-## Notes
+Detects `CreateProgramAccount`, `CreateProgramAccountWithBump`, and the matching creation functions when the target account has not first passed `assert_empty()`. It recognizes inline builders and builders stored in local variables.
 
-- The current lints are intentionally conservative and tuned to the shapes Pina already uses.
-- Some of the newer lints are heuristic-based; they are designed to catch likely mistakes early without making the codebase noisy.
-- If a lint warning seems wrong, prefer adjusting the code shape to something more explicit and IDL-friendly.
+```rust
+state.assert_empty()?;
+CreateProgramAccount { account: state, payer, owner: &ID, seeds }.invoke::<State>()?;
+```
+
+The analysis tracks concrete local/field places and builder bindings within one function. Validation hidden behind a helper is not treated as proof at the call site.
+
+### `require_program_check_before_cpi`
+
+Detects unchecked `invoke*()` calls. Dynamic CPI program arguments must be dominated by `assert_address()`, `assert_addresses()`, or `assert_program()`. Pina CPI builders whose program identity is fixed by their concrete type are recognized as trusted.
+
+```rust
+token_program.assert_address(&token::ID)?;
+transfer.invoke_with_program(token_program.address())?;
+```
+
+The analyzer intersects validation state across `if` and `match` branches and invalidates proof after assignment or mutable aliasing. A check performed on only one branch is therefore insufficient.
+
+### `require_program_owned_before_lamport_mutation`
+
+Detects direct `send()` calls without an earlier ownership or typed-account check on the debited account.
+
+```rust
+vault.assert_owner(&ID)?;
+vault.send(amount, recipient)?;
+```
+
+Direct lamport mutation is not a system-program transfer: the executing program must own the debited account. The lint uses lexical receiver matching, so keep the validation close to the mutation.
+
+### `require_writable_before_account_resize`
+
+Detects `resize()` without a preceding `assert_writable()` on the same account.
+
+```rust
+state.assert_writable()?;
+state.resize(new_len)?;
+```
+
+The lint tracks lexical call order and receiver identity. It does not infer writability from comments, IDL metadata, or helper functions.
+
+### `require_zeroed_before_close`
+
+Detects `close()` or `close_with_recipient()` without an earlier `zeroed()` on the same account. Prefer `close_account_zeroed()` when the combined helper fits.
+
+```rust
+state.zeroed()?;
+state.close_with_recipient(recipient)?;
+```
+
+This protects against stale bytes remaining observable during the transaction. The lint intentionally does not flag the combined zeroing close helper.
+
+### `require_sysvar_assert_before_sysvar_use`
+
+Detects reads from accounts whose names identify known sysvars without a matching `assert_sysvar()` and expected sysvar ID.
+
+```rust
+clock.assert_sysvar(&sysvar::clock::ID)?;
+let data = clock.try_borrow()?;
+```
+
+The lint recognizes standard Solana sysvar names and instruction-sysvar loader functions. Unusually named sysvar wrappers may require an explicit, local code shape for the heuristic to recognize them.
+
+### `require_type_assert_before_zero_copy_cast`
+
+Detects raw zero-copy cast methods and known `bytemuck` cast functions when no prior `assert_type::<T>()`, `as_account::<T>()`, or `as_account_mut::<T>()` establishes the account layout.
+
+```rust
+account.assert_type::<Vault>(&ID)?;
+let vault = account.as_account::<Vault>(&ID)?;
+```
+
+Pina instruction and account `try_from_bytes()` associated functions are safe framework conversions and are not treated as raw casts. The analysis correlates the nearest account borrow and validation within one function.
+
+### `require_associated_token_address_before_ata_cast`
+
+Detects `as_associated_token_account()` without a prior `assert_associated_token_address()` on the same account.
+
+```rust
+vault.assert_associated_token_address(wallet, mint, token_program)?;
+let vault = vault.as_associated_token_account(wallet, mint, token_program)?;
+```
+
+Prefer `as_associated_token_account_checked()`, which performs owner and ATA derivation validation in one operation. The lint uses lexical receiver matching.
+
+### `require_reason_for_duplicate_remaining_accounts`
+
+Detects `#[pina(remaining, distinct = false)]` on mutable remaining accounts unless the field has a doc-comment explanation of at least five words.
+
+```rust
+/// Duplicate entries represent votes and are deduplicated before mutation.
+#[pina(remaining, distinct = false)]
+pub votes: &'a mut [AccountView],
+```
+
+`#[pina(remaining)]` is distinct by default. The word threshold only rejects missing or placeholder explanations; reviewers must still verify the stated invariant.
+
+### `require_canonical_bump_before_pda_write`
+
+Detects `assert_seeds_with_bump()` in instruction paths unless the same account has already passed `assert_canonical_bump()` or `assert_seeds()`.
+
+```rust
+let canonical = state.assert_canonical_bump(&seeds, &ID)?;
+if canonical != supplied_bump {
+	return Err(ProgramError::InvalidSeeds);
+}
+state.assert_seeds_with_bump(&seeds_with_bump, &ID)?;
+```
+
+Multiple valid bump values can otherwise create multiple addresses for one logical namespace. See Solana's [PDA documentation](https://solana.com/docs/core/pda). The lint tracks lexical receiver identity; it cannot inspect opaque validation helpers.
+
+### `deny_account_borrows_across_cpi`
+
+Detects CPI while a local returned by `try_borrow_mut()` or `as_account_mut()` is still alive.
+
+```rust
+let amount = {
+	let state = account.as_account_mut::<State>(&ID)?;
+	state.amount.get()
+};
+transfer.invoke()?;
+```
+
+An explicit `drop(guard)` or the end of a nested block releases the guard. The analysis follows block scope and explicit drops; borrows hidden inside custom wrapper constructors are outside its current model.
+
+### `require_consistent_token_program`
+
+Detects token parsing, ATA derivation, and dynamic token CPI calls that use different program identities within one instruction function.
+
+```rust
+token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
+let program_id = *token_program.address();
+let mint = mint.as_token_mint_for_program(&program_id)?;
+transfer.invoke_with_program(&program_id)?;
+```
+
+The lint compares exact identifier paths, including module-qualified constants, so `token::ID` and `token_2022::ID` cannot collapse to the same terminal name. It also rejects reassignment of a program binding between token operations, because the same lexical name would otherwise hide a changed value. Copy and reuse a single immutable, validated address instead of independently deriving, mutating, or hard-coding program IDs.
+
+### `require_explicit_token_2022_extension_policy`
+
+Detects Token-2022-capable mint loads without an explicit call to `assert_no_extensions()` or `assert_extensions_allowed()` in the instruction function.
+
+```rust
+let mint = mint_account
+	.as_token_mint_for_program(&program_id)?
+	.assert_extensions_allowed(&[
+		token_2022::state::ExtensionType::ImmutableOwner,
+	])?;
+```
+
+Extensions can alter transfer, fee, hook, freeze, and authority semantics. Pina therefore requires an allow-list instead of treating the legacy base layout as a complete policy. The analysis pairs a policy with the concrete mint-view binding or with the same direct method chain; a policy asserted on a different mint does not satisfy the rule. Keep each policy adjacent to its mint load so the pairing also remains obvious to reviewers.
+
+Both policies are inherent, chainable methods on `TokenMintRef` and `TokenAccountRef`; they return the validated view rather than wrapping it in a separate free-function API.
+
+`as_token_mint_for_program()` and `as_token_account_for_program()` only accept the canonical SPL Token and Token-2022 program IDs, require the account owner to match the selected ID, and parse the corresponding concrete layout. The caller therefore cannot make a legacy account appear to be Token-2022 (or vice versa) by supplying an arbitrary address. Extension assertions are a no-op on the validated legacy variant and inspect the actual TLV extension data on the validated Token-2022 variant.
+
+### `require_post_cpi_balance_reload`
+
+Detects token transfers into accounts whose names indicate protocol custody (`vault`, `custody`, `reserve`, or `pool`) unless the destination amount is read before and after CPI.
+
+```rust
+let before = vault.as_token_account_for_program(&program_id)?.amount();
+transfer.invoke_with_program(&program_id)?;
+let after = vault.as_token_account_for_program(&program_id)?.amount();
+let received = after.checked_sub(before).ok_or(ProgramError::ArithmeticOverflow)?;
+```
+
+Token-2022 transfer fees can make `received` differ from the requested amount; Solana's [on-chain Token-2022 guide](https://www.solana-program.com/docs/token-2022/onchain) describes this accounting requirement. The lint pairs each source-visible `Transfer::new` or `TransferChecked::new` constructor with the invocation of that exact builder. It requires the closest destination reads on each side of the transfer to have no intervening CPI, then applies a custody-name heuristic and tracks direct receiver expressions. Opaque builder wrappers are rejected because they prevent exact CPI association. Custody accounts should therefore use explicit names and direct reloads.
+
+### `require_checked_asset_arithmetic`
+
+Detects raw `+`, `-`, `*`, and `/`, plus saturating or wrapping arithmetic, when an operand name contains an economic term such as `amount`, `balance`, `lamport`, `price`, `reward`, `stake`, or `supply`.
+
+```rust
+let next_balance = balance
+	.checked_sub(amount)
+	.ok_or(ProgramError::ArithmeticOverflow)?;
+```
+
+Saturating arithmetic is rejected because silently clamping economic state can violate conservation just as surely as wrapping. The naming heuristic favors clear domain names and may not recognize opaque abbreviations.
+
+### `require_bounded_remaining_accounts`
+
+Detects loops whose source mentions `remaining` unless the iterator visibly uses `.take(MAX)`.
+
+```rust
+const MAX_REMAINING_ACCOUNTS: usize = 16;
+for account in remaining.iter().take(MAX_REMAINING_ACCOUNTS) {
+	process(account)?;
+}
+```
+
+Remaining accounts are caller-controlled; an explicit bound keeps worst-case compute auditable. The lint checks source-level loop syntax. A helper iterator with an internal bound should expose the bound at the instruction call site if it is expected to satisfy this rule.
+
+## Performance reference
+
+### `deny_heap_allocations_in_onchain_instruction_handlers`
+
+Warns on `collect`, `to_vec`, `to_string`, `clone`, `format!`, `Vec` creation, and `String` creation in functions whose names identify instruction handlers.
+
+```rust
+let mut bytes = [0u8; MAX_MESSAGE_BYTES];
+bytes[..input.len()].copy_from_slice(input);
+```
+
+The lint is a performance warning rather than a correctness denial because some off-chain or bounded on-chain designs may intentionally allocate. It uses method and function-name heuristics and does not estimate actual heap size.
+
+## IDL and example-structure reference
+
+### `require_idl_root_to_define_one_program_id`
+
+Warns when an IDL-oriented example or security crate does not expose exactly one crate-root `declare_id!` expansion.
+
+```rust
+declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+```
+
+The check is repository-scoped to definition paths under `examples` and `security`. Library crates that intentionally define no program are ignored.
+
+### `require_canonical_instruction_dispatch_for_idl`
+
+Warns when `process_instruction` or an entrypoint does not directly contain a `match` over parsed instruction data.
+
+```rust
+match instruction {
+	Instruction::Initialize => InitializeAccounts::try_from((program_id, accounts))?.process(data),
+	Instruction::Update => UpdateAccounts::try_from((program_id, accounts))?.process(data),
+}
+```
+
+The check keeps dispatch visible to `pina idl` and reviewers. It verifies the presence of direct match-shaped routing, not semantic exhaustiveness.
+
+### `require_explicit_discriminators_and_seed_namespaces`
+
+Warns when seed assertions in example instruction paths do not visibly use a byte-string namespace, a named `SEED`/`*_SEED` constant, or a generated Pina seed helper.
+
+```rust
+const VAULT_SEED: &[u8] = b"vault";
+vault.assert_seeds(&[VAULT_SEED, authority.address().as_ref()], &ID)?;
+```
+
+Associated seed helpers generated from `#[pda(...)]` are accepted because the macro declaration exposes the namespace at the account type. Receiver-less local functions named like assertion methods are not treated as framework proof. The rule is a reviewability warning and does not replace canonical bump validation.
+
+## Suppression policy
+
+Prefer making validation and bounds explicit instead of suppressing a finding. When a false positive cannot be expressed more clearly, scope `#[allow(...)]` to the smallest item and add a doc comment explaining the invariant. Deny-level security lints should not be disabled at crate or workspace scope.

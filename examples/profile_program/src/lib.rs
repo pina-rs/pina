@@ -493,6 +493,12 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 
 		// Validate accounts
 		self.authority.assert_signer()?;
+		let canonical_bump = self
+			.profile
+			.assert_canonical_bump(&seeds.as_slices(), &ID)?;
+		if canonical_bump != args.bump {
+			return Err(ProgramError::InvalidSeeds);
+		}
 		self.profile
 			.assert_empty()?
 			.assert_writable()?

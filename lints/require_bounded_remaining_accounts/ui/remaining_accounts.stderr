@@ -1,0 +1,48 @@
+error: remaining accounts are processed without an explicit bound
+  --> $DIR/remaining_accounts.rs:10:2
+   |
+LL | /     for account in remaining {
+LL | |         //~^ ERROR: remaining accounts are processed without an explicit bound
+LL | |         let _ = account;
+LL | |     }
+   | |_____^
+   |
+   = help: define a protocol maximum and iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
+   = note: `#[deny(req$DIRre_bounded_remaining_accounts)]` on by default
+
+error: remaining accounts are processed without an explicit bound
+  --> $DIR/remaining_accounts.rs:19:4
+   |
+LL | /             for account in remaining {
+LL | |                 //~^ ERROR: remaining accounts are processed without an explicit bound
+LL | |                 let _ = account;
+LL | |             }
+   | |_____________^
+   |
+   = help: define a protocol maximum and iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
+
+error: remaining accounts are processed without an explicit bound
+  --> $DIR/remaining_accounts.rs:29:9
+   |
+LL |       return for account in remaining {
+   |  ____________^
+LL | |         //~^ ERROR: remaining accounts are processed without an explicit bound
+LL | |         let _ = account;
+LL | |     };
+   | |_____^
+   |
+   = help: define a protocol maximum and iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
+
+error: remaining accounts are processed without an explicit bound
+  --> $DIR/remaining_accounts.rs:37:9
+   |
+LL |           break for account in remaining {
+   |  _______________^
+LL | |             //~^ ERROR: remaining accounts are processed without an explicit bound
+LL | |             let _ = account;
+LL | |         };
+   | |_________^
+   |
+   = help: define a protocol maximum and iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
+
+error: aborting due to 4 previous errors

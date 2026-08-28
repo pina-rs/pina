@@ -157,6 +157,10 @@ impl<'a> ProcessAccountInfos<'a> for InitAccounts<'a> {
 		let seeds_with_bump = seeds.with_bump(args.bump);
 
 		self.authority.assert_signer()?;
+		let canonical_bump = self.store.assert_canonical_bump(&seeds.as_slices(), &ID)?;
+		if canonical_bump != args.bump {
+			return Err(ProgramError::InvalidSeeds);
+		}
 		self.store
 			.assert_empty()?
 			.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;

@@ -180,6 +180,12 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
+		let canonical_bump = self
+			.vesting_state
+			.assert_canonical_bump(&vesting_seeds.as_slices(), &ID)?;
+		if canonical_bump != args.bump {
+			return Err(ProgramError::InvalidSeeds);
+		}
 		self.vesting_state
 			.assert_empty()?
 			.assert_seeds_with_bump(&vesting_seeds_with_bump.as_slices(), &ID)?;
@@ -291,6 +297,7 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 
 		let mut vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
 		vesting_state.claimed_amount.set(next_claimed);
+		drop(vesting_state);
 
 		associated_token_account::instructions::CreateIdempotent {
 			funding_account: self.beneficiary,
