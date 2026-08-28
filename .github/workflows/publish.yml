@@ -293,7 +293,7 @@ jobs:
               *-win32-*) binary_name=pina.exe ;;
             esac
             platform_report="$RUNNER_TEMP/$(basename "$package_dir")-pack.json"
-            npm pack "$package_dir" --dry-run --json > "$platform_report"
+            npm pack "./$package_dir" --dry-run --json > "$platform_report"
             jq -e --arg path "bin/$binary_name" \
               'any(.[0].files[]; .path == $path)' \
               "$platform_report" >/dev/null || {
