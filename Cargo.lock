@@ -897,9 +897,9 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "codama-errors"
-version = "0.11.0"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c4e65ee3ef3464d660567139bc313368c3d13c1f4a84f455f4b20ba90ba0320"
+checksum = "95bea6c7b0724cfabade2ec9aab60687f7bf2b8b039233054d70fc68d4fa3c7c"
 dependencies = [
  "cargo_toml",
  "proc-macro2",
@@ -910,9 +910,9 @@ dependencies = [
 
 [[package]]
 name = "codama-nodes"
-version = "0.11.0"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c233b476fe665182fde18ca7afc43b5385622367ac6d98661c0c6748f93a9b0"
+checksum = "23b0d12fde4b749f4e28ef83a9b83e4aa00697a7847dfb0aa6d6e633a3f6421e"
 dependencies = [
  "codama-errors",
  "codama-nodes-derive",
@@ -923,9 +923,9 @@ dependencies = [
 
 [[package]]
 name = "codama-nodes-derive"
-version = "0.11.0"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86315bc36007da03157be9657e24f3235e5cf53b384f15a4b03c484a2b087487"
+checksum = "0bc8c5044a8de1157b61996276736ea1f6eabd83d55ceb5f6b810e4e3ac873c1"
 dependencies = [
  "codama-errors",
  "codama-syn-helpers",
@@ -937,9 +937,9 @@ dependencies = [
 
 [[package]]
 name = "codama-syn-helpers"
-version = "0.11.0"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c32b8d72d636d82ffe8cb2e614fbc5c84d897b5969eb27dfac226d944efe361"
+checksum = "7689cf3c3a1cc524f5216cd3afa5c6d5bb9cf8d3b3d9e3900c3040b36eee13c1"
 dependencies = [
  "codama-errors",
  "derive_more 1.0.0",
