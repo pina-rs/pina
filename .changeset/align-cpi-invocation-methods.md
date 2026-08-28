@@ -20,4 +20,4 @@ context.invoke(data)?;
 context.invoke_signed(data, signers)?;
 ```
 
-Generated CPI modules created by `pina init` now use the signed method internally. The security lint also recognizes the dual-program token helpers, requiring the exact program argument passed to `invoke_with_program` or `invoke_signed_with_program` to have a preceding address validation rather than accepting a check on an unrelated program account.
+Generated CPI modules created by `pina init` now use the signed method internally. The security lint also recognizes the dual-program token helpers, requiring the exact program argument passed to `invoke_with_program` or `invoke_signed_with_program` to have a preceding address validation rather than accepting a check on an unrelated program account. Validation is tracked by HIR identity across every control-flow path and invalidated by reassignment, so shadowed bindings and non-dominating checks cannot authorize a CPI.
