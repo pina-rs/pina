@@ -72,6 +72,19 @@ fn invocation_matches(constructor: &shared::CallInfo, invocation: &shared::CallI
 		.is_some_and(|receiver| receiver.contains(constructor.span))
 }
 
+fn lint_balance_reload(cx: &LateContext<'_>, span: rustc_span::Span, destination: &str) {
+	cx.lint(REQUIRE_POST_CPI_BALANCE_RELOAD, |diag| {
+		diag.span(span);
+		diag.primary_message(format!(
+			"transfer into `{destination}` is not accounted from its observed balance delta"
+		));
+		diag.help(
+			"read the destination amount before CPI, drop the borrow, invoke the transfer, reload \
+			 the amount, and use `checked_sub` for the received value",
+		);
+	});
+}
+
 impl<'tcx> LateLintPass<'tcx> for RequirePostCpiBalanceReload {
 	fn check_fn(
 		&mut self,
@@ -105,6 +118,7 @@ impl<'tcx> LateLintPass<'tcx> for RequirePostCpiBalanceReload {
 				.iter()
 				.position(|next| invocation_matches(call, next));
 			let Some(invocation) = invocation.map(|offset| index + 1 + offset) else {
+				lint_balance_reload(cx, call.span, destination);
 				continue;
 			};
 
@@ -130,17 +144,7 @@ impl<'tcx> LateLintPass<'tcx> for RequirePostCpiBalanceReload {
 				continue;
 			}
 
-			cx.lint(REQUIRE_POST_CPI_BALANCE_RELOAD, |diag| {
-				diag.span(facts.calls[invocation].span);
-				diag.primary_message(format!(
-					"transfer into `{destination}` is not accounted from its observed balance \
-					 delta"
-				));
-				diag.help(
-					"read the destination amount before CPI, drop the borrow, invoke the \
-					 transfer, reload the amount, and use `checked_sub` for the received value",
-				);
-			});
+			lint_balance_reload(cx, facts.calls[invocation].span, destination);
 		}
 	}
 }

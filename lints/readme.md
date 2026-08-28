@@ -240,7 +240,7 @@ let after = vault.as_token_account_for_program(&program_id)?.amount();
 let received = after.checked_sub(before).ok_or(ProgramError::ArithmeticOverflow)?;
 ```
 
-Token-2022 transfer fees can make `received` differ from the requested amount; Solana's [on-chain Token-2022 guide](https://www.solana-program.com/docs/token-2022/onchain) describes this accounting requirement. The lint pairs each source-visible `Transfer::new` or `TransferChecked::new` constructor with the invocation of that exact builder. It requires the closest destination reads on each side of the transfer to have no intervening CPI, then applies a custody-name heuristic and tracks direct receiver expressions. Custody accounts should therefore use explicit names and direct reloads.
+Token-2022 transfer fees can make `received` differ from the requested amount; Solana's [on-chain Token-2022 guide](https://www.solana-program.com/docs/token-2022/onchain) describes this accounting requirement. The lint pairs each source-visible `Transfer::new` or `TransferChecked::new` constructor with the invocation of that exact builder. It requires the closest destination reads on each side of the transfer to have no intervening CPI, then applies a custody-name heuristic and tracks direct receiver expressions. Opaque builder wrappers are rejected because they prevent exact CPI association. Custody accounts should therefore use explicit names and direct reloads.
 
 ### `require_checked_asset_arithmetic`
 

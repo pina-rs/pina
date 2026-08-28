@@ -30,6 +30,10 @@ impl CreateAccount {
 	}
 }
 
+fn choose_transfer(_transfer: TransferChecked) -> TransferChecked {
+	TransferChecked
+}
+
 fn process_non_transfer_constructor(
 	first: &Account,
 	second: &Account,
@@ -80,6 +84,20 @@ fn process_unrelated_cpi_before_reload(
 	transfer.invoke()?;
 	//~^ ERROR: transfer into `vault` is not accounted from its observed balance delta
 	CreateAccount::new(source, mint, vault, owner, 10).invoke()?;
+	let _after = vault.amount();
+	Ok(())
+}
+
+fn process_wrapped_transfer(
+	source: &Account,
+	mint: &Account,
+	vault: &Account,
+	owner: &Account,
+) -> Result<(), ()> {
+	let _before = vault.amount();
+	let selected = choose_transfer(TransferChecked::new(source, mint, vault, owner, 10, 0));
+	//~^ ERROR: transfer into `vault` is not accounted from its observed balance delta
+	selected.invoke()?;
 	let _after = vault.amount();
 	Ok(())
 }

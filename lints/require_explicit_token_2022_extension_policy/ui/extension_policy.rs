@@ -3,6 +3,10 @@
 struct Account;
 struct Mint;
 
+fn choose_mint(_loaded: Mint) -> Mint {
+	Mint
+}
+
 impl Account {
 	fn as_token_mint_for_program(&self, _program: &[u8]) -> Result<Mint, ()> {
 		Ok(Mint)
@@ -44,6 +48,12 @@ fn process_unrelated_policy(
 	other_mint.assert_no_extensions()?;
 	account.as_token_mint_for_program(program).map(|_| ())
 	//~^ ERROR: Token-2022-capable mint loaded without an explicit extension policy
+}
+
+fn process_wrapped_load(account: &Account, program: &[u8]) -> Result<(), ()> {
+	let selected = choose_mint(account.as_token_mint_for_program(program)?);
+	//~^ ERROR: Token-2022-capable mint loaded without an explicit extension policy
+	selected.assert_no_extensions()
 }
 
 fn main() {}

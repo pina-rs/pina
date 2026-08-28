@@ -136,11 +136,20 @@ fn collect_from_block(
 }
 
 fn collect_from_expr(expr: &Expr<'_>, facts: &mut FunctionFacts, result_binding: Option<&str>) {
+	collect_from_expr_inner(expr, facts, result_binding, false);
+}
+
+fn collect_from_expr_inner(
+	expr: &Expr<'_>,
+	facts: &mut FunctionFacts,
+	result_binding: Option<&str>,
+	forward_call_argument_binding: bool,
+) {
 	match &expr.kind {
 		ExprKind::MethodCall(path_segment, receiver, args, _) => {
 			collect_from_expr(receiver, facts, result_binding);
 			for arg in *args {
-				collect_from_expr(arg, facts, result_binding);
+				collect_from_expr(arg, facts, None);
 			}
 			facts.calls.push(CallInfo {
 				span: expr.span,
@@ -156,7 +165,10 @@ fn collect_from_expr(expr: &Expr<'_>, facts: &mut FunctionFacts, result_binding:
 		ExprKind::Call(callee, args) => {
 			collect_from_expr(callee, facts, None);
 			for arg in *args {
-				collect_from_expr(arg, facts, result_binding);
+				let binding = forward_call_argument_binding
+					.then_some(result_binding)
+					.flatten();
+				collect_from_expr(arg, facts, binding);
 			}
 			if let rustc_hir::ExprKind::Path(path) = &callee.kind {
 				let (path_name, is_type_relative) = match path {
@@ -193,9 +205,14 @@ fn collect_from_expr(expr: &Expr<'_>, facts: &mut FunctionFacts, result_binding:
 		ExprKind::Block(block, _) | ExprKind::Loop(block, ..) => {
 			collect_from_block(block, facts, result_binding);
 		}
-		ExprKind::Match(scrutinee, arms, _) => {
+		ExprKind::Match(scrutinee, arms, source) => {
 			facts.has_match = true;
-			collect_from_expr(scrutinee, facts, result_binding);
+			collect_from_expr_inner(
+				scrutinee,
+				facts,
+				result_binding,
+				matches!(source, rustc_hir::MatchSource::TryDesugar(_)),
+			);
 			for arm in *arms {
 				collect_from_expr(arm.body, facts, result_binding);
 			}
