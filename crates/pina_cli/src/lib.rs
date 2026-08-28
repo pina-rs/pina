@@ -8,6 +8,7 @@ pub mod ir;
 pub mod parse;
 pub mod project;
 pub mod verification;
+pub mod workflow;
 
 mod dart_client;
 mod js_client;

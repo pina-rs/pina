@@ -8,9 +8,9 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-Build, inspect, and generate artifacts for Pina Solana programs.
+Build, test, inspect, and generate artifacts for Pina Solana programs.
 
-Use 'pina init' to start a program, 'pina build' for its SBF binary and IDL, and 'pina generate' for selected client ecosystems. Use 'pina build --verify' and 'pina verify' for reproducible deployed-program verification. Low-level IDL, profiling, terminal documentation, and the legacy repository-wide Codama workflow remain available.
+Use 'pina init' to start a program, 'pina build' for its SBF binary and IDL, 'pina test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent Surfpool network, 'pina generate' for selected client ecosystems, and 'pina verify' for deployed-program verification. Low-level IDL, profiling, terminal documentation, and the legacy repository-wide Codama workflow remain available.
 
 Usage: pina <COMMAND>
 
@@ -25,6 +25,10 @@ Commands:
           Read bundled Pina reference documentation in the terminal
   init
           Initialize a new Pina program project
+  test
+          Test a Pina program with fast native tests or an isolated Surfpool instance
+  dev
+          Start a persistent Surfpool development network with SBF watch and redeploy
   profile
           Profile compute-unit costs in a compiled SBF program
   verify
@@ -44,6 +48,9 @@ Options:
 Examples:
   pina init counter_program
   cd counter_program && pina build
+  pina test
+  pina test --unit
+  pina dev --yes
   pina generate --client rust --client typescript
   pina idl --path ./programs/counter_program --output ./idls/counter_program.json
   pina profile ./target/deploy/counter_program.so --json

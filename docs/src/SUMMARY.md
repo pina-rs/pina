@@ -9,6 +9,8 @@
   - [Verify a Deployed Program](./cli/verify.md)
   - [Generate Clients](./cli/generate.md)
   - [Project Configuration](./cli/configuration.md)
+  - [Test a Program](./cli/test.md)
+  - [Run a Development Surfnet](./cli/dev.md)
   - [Generate an IDL](./cli/idl.md)
   - [Read Terminal Docs](./cli/docs.md)
   - [Profile an SBF Program](./cli/profile.md)

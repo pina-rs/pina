@@ -1,0 +1,53 @@
+[package]
+name = "pina_test"
+version = "0.9.0"
+edition = "2024"
+homepage = "https://pina.rs"
+keywords = ["solana", "pinocchio", "surfpool", "testing"]
+license = "Apache-2.0"
+publish = true
+readme = "readme.md"
+repository = "https://github.com/pina-rs/pina"
+rust-version = "1.89.0"
+description = "Host-side Surfpool integration test support for Pina programs"
+
+[dependencies]
+# Surfpool 1.5 publishes broad Solana ranges that can otherwise resolve to an
+# incompatible mix. This host-only crate owns the exact compatibility set so
+# generated program manifests stay small.
+solana-address = "=2.6.1"
+solana-client = "=4.1.1"
+solana-clock = "=3.1.1"
+solana-epoch-rewards = "=3.1.0"
+solana-epoch-schedule = "=3.2.0"
+solana-fee-calculator = "=3.2.2"
+solana-hash = "=4.4.0"
+solana-instruction = "=3.4.0"
+solana-last-restart-slot = "=3.1.0"
+solana-message = "=4.4.0"
+solana-pubkey = "=4.2.0"
+solana-rent = "=4.3.0"
+solana-reward-info = "=6.2.0"
+solana-rpc-client = "=4.1.1"
+solana-runtime = "=4.1.1"
+solana-short-vec = "=3.2.2"
+solana-signature = "=3.4.1"
+solana-slot-history = "=3.1.0"
+solana-stake-history = "=1.0.0"
+solana-transaction = "=4.1.5"
+surfpool-sdk = "=1.5.0"
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+wincode = "=0.5.5"
+
+[workspace]
+resolver = "2"
+
+[lints.rust]
+unsafe_code = "deny"
+unstable_features = "deny"
+
+[lints.clippy]
+correctness = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+wildcard_dependencies = "deny"

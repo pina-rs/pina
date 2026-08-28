@@ -1,0 +1,44 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - test
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Test a Pina program with fast native tests or an isolated Surfpool instance.
+
+The default workflow builds the actual SBF shared object, verifies that it exists, and runs the project's isolated `tests/surfpool` test package. That package owns an embedded Surfpool instance, so parallel runs use separate ports and teardown remains deterministic. Use --unit for native Rust and Mollusk tests only.
+
+Usage: pina test [OPTIONS]
+
+Options:
+  -p, --project <DIR>
+          Project directory or a directory below it. Defaults to the current directory
+
+      --unit
+          Run native Rust and Mollusk tests without building SBF or starting Surfpool
+
+  -f, --filter <FILTER>
+          Run only tests whose names contain FILTER
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina test
+  pina test --filter initialize
+  pina test --unit
+  pina test --unit --filter rejects_wrong_owner
+
+Test layers:
+  --unit keeps the fast native/Mollusk loop and does not build SBF.
+  The default builds SBF and runs the ignored test in the isolated `tests/surfpool` package.
+
+Safety:
+  Embedded Surfpool tests allocate isolated ports and must stop their instance before returning. Missing SBF artifacts and incomplete Surfpool test packages are hard failures.
+
+----- stderr -----

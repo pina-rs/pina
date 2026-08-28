@@ -31,7 +31,11 @@ counter_program/
 │   ├── entrypoint.rs
 │   └── lib.rs
 ├── tests/
-│   └── integration.rs
+│   ├── integration.rs
+│   └── surfpool/
+│       ├── src/
+│       │   └── lib.rs
+│       └── Cargo.toml
 ├── .gitignore
 ├── Cargo.toml
 ├── Pina.toml
@@ -47,9 +51,10 @@ The scaffold includes:
 - a pinned nightly Rust toolchain with the `rust-src` component;
 - host-side discriminator and program-ID smoke tests;
 - Pina and Mollusk dependencies;
+- a dedicated host-only test package with one `pina_test` dependency for the isolated Surfpool test;
 - project-local discovery and client-generation settings in `Pina.toml`.
 
-Replace the placeholder system-program address in `src/lib.rs` with the deployed program address before deployment.
+Replace the non-system placeholder address in `src/lib.rs` with the deployed program address before deployment.
 
 Install `sbpf-linker` once before the first SBF build:
 
@@ -70,7 +75,9 @@ The command prints the exact build, SBF build, test, and IDL commands for the ge
 ```bash
 cd ./counter_program
 pina build
-cargo test
+pina test --unit
+pina test
+pina dev --yes
 pina generate
 ```
 

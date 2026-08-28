@@ -72,6 +72,61 @@ fn create_fake_npx(temp_dir: &Path) -> String {
 	}
 }
 
+#[cfg(unix)]
+fn create_executable(path: &Path, contents: &str) {
+	use std::os::unix::fs::PermissionsExt;
+
+	fs::write(path, contents)
+		.unwrap_or_else(|error| panic!("failed to write {}: {error}", path.display()));
+	let mut permissions = fs::metadata(path)
+		.unwrap_or_else(|error| panic!("failed to stat {}: {error}", path.display()))
+		.permissions();
+	permissions.set_mode(0o755);
+	fs::set_permissions(path, permissions)
+		.unwrap_or_else(|error| panic!("failed to make {} executable: {error}", path.display()));
+}
+
+#[cfg(unix)]
+fn create_fake_workflow_project(name: &str) -> (PathBuf, PathBuf, PathBuf, PathBuf) {
+	let project = reset_snapshot_dir(name);
+	let manifest = project.join("Cargo.toml");
+	let target = project.join("target");
+	let cargo = project.join("fake-cargo.sh");
+	let log = project.join("commands.log");
+	pina_cli::init_project(&project, "test_program", false)
+		.unwrap_or_else(|error| panic!("failed to create fake Pina project: {error}"));
+	let cargo_toml = fs::read_to_string(&manifest)
+		.unwrap_or_else(|error| panic!("failed to read {}: {error}", manifest.display()));
+	fs::write(&manifest, format!("{cargo_toml}\n[workspace]\n"))
+		.unwrap_or_else(|error| panic!("failed to isolate {}: {error}", manifest.display()));
+	create_executable(
+		&cargo,
+		r#"#!/usr/bin/env bash
+set -euo pipefail
+printf 'cargo' >> "$PINA_FAKE_LOG"
+printf ' %q' "$@" >> "$PINA_FAKE_LOG"
+printf '\n' >> "$PINA_FAKE_LOG"
+case "${1:-}" in
+	metadata)
+		exec cargo "$@"
+		;;
+	build)
+		mkdir -p "$PINA_FAKE_TARGET/bpfel-unknown-none/release"
+		: > "$PINA_FAKE_TARGET/bpfel-unknown-none/release/libtest_program.so"
+		;;
+	test)
+		if [[ " $* " == *" --lib "* ]]; then
+			test -f "${PINA_SBF_ARTIFACT:?}"
+			printf 'artifact %s\n' "$PINA_SBF_ARTIFACT" >> "$PINA_FAKE_LOG"
+		fi
+		;;
+	*) exit 91 ;;
+esac
+"#,
+	);
+	(project, manifest, target, log)
+}
+
 #[test]
 fn root_help_snapshot() {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
@@ -154,6 +209,20 @@ fn init_help_snapshot() {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command.args(["init", "--help"]);
 	assert_cmd_snapshot!("init_help", command);
+}
+
+#[test]
+fn test_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["test", "--help"]);
+	assert_cmd_snapshot!("test_help", command);
+}
+
+#[test]
+fn dev_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["dev", "--help"]);
+	assert_cmd_snapshot!("dev_help", command);
 }
 
 #[test]
@@ -436,6 +505,242 @@ fn codama_generate_missing_examples_path_error_snapshot() {
 	assert!(!output.status.success());
 	assert!(stderr.contains("Failed to read examples directory"));
 	assert!(stderr.contains("missing_examples"));
+}
+
+#[cfg(unix)]
+#[test]
+fn unit_test_mode_never_builds_or_starts_surfpool() {
+	let (project, manifest, target, log) = create_fake_workflow_project("unit workflow");
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["test", "--project"])
+		.arg(&project)
+		.arg("--unit")
+		.arg("--filter")
+		.arg("authority")
+		.env("CARGO", project.join("fake-cargo.sh"))
+		.env("CARGO_TARGET_DIR", &target)
+		.env("PINA_SURFPOOL", project.join("missing-surfpool"))
+		.env("PINA_FAKE_LOG", &log)
+		.env("PINA_FAKE_MANIFEST", &manifest)
+		.env("PINA_FAKE_TARGET", &target)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina test --unit: {error}"));
+
+	assert!(output.status.success());
+	let commands = fs::read_to_string(&log)
+		.unwrap_or_else(|error| panic!("failed to read {}: {error}", log.display()));
+	assert!(commands.contains("cargo metadata"));
+	assert!(commands.contains("cargo test"));
+	assert!(commands.contains("authority"));
+	assert!(!commands.contains("cargo build"));
+}
+
+#[cfg(unix)]
+#[test]
+fn surfpool_test_mode_builds_and_requires_the_real_artifact() {
+	let (project, manifest, target, log) = create_fake_workflow_project("test workflow");
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["test", "--project"])
+		.arg(&project)
+		.arg("--filter")
+		.arg("deploys")
+		.env("CARGO", project.join("fake-cargo.sh"))
+		.env("CARGO_TARGET_DIR", &target)
+		.env("PINA_FAKE_LOG", &log)
+		.env("PINA_FAKE_MANIFEST", &manifest)
+		.env("PINA_FAKE_TARGET", &target)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina test: {error}"));
+
+	assert!(output.status.success());
+	let artifact = target.join("deploy/test_program.so");
+	assert!(artifact.is_file());
+	let commands = fs::read_to_string(&log)
+		.unwrap_or_else(|error| panic!("failed to read {}: {error}", log.display()));
+	let build_position = commands
+		.find("cargo build")
+		.unwrap_or_else(|| panic!("missing build command in {commands}"));
+	let test_position = commands
+		.find("cargo test")
+		.unwrap_or_else(|| panic!("missing test command in {commands}"));
+	assert!(build_position < test_position);
+	assert!(commands.contains("tests/surfpool/Cargo.toml --lib deploys -- --ignored --nocapture"));
+	assert!(commands.contains(&format!("artifact {}", artifact.display())));
+}
+
+#[cfg(unix)]
+#[test]
+fn dev_delegates_offline_watch_to_surfpool() {
+	let (project, manifest, target, log) = create_fake_workflow_project("dev workflow");
+	let surfpool = project.join("fake-surfpool.sh");
+	create_executable(
+		&surfpool,
+		r#"#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == "--version" ]]; then
+	echo "surfpool 1.5.0"
+	exit 0
+fi
+printf 'surfpool' >> "$PINA_FAKE_LOG"
+printf ' %q' "$@" >> "$PINA_FAKE_LOG"
+printf '\n' >> "$PINA_FAKE_LOG"
+"#,
+	);
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["dev", "--yes", "--project"])
+		.arg(&project)
+		.env("CARGO", project.join("fake-cargo.sh"))
+		.env("CARGO_TARGET_DIR", &target)
+		.env("PINA_SURFPOOL", &surfpool)
+		.env("PINA_FAKE_LOG", &log)
+		.env("PINA_FAKE_MANIFEST", &manifest)
+		.env("PINA_FAKE_TARGET", &target)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina dev: {error}"));
+
+	assert!(
+		output.status.success(),
+		"pina dev failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert!(target.join("deploy/test_program.so").is_file());
+	let commands = fs::read_to_string(&log)
+		.unwrap_or_else(|error| panic!("failed to read {}: {error}", log.display()));
+	assert!(commands.contains("cargo build"));
+	assert!(commands.contains("surfpool start --watch --artifacts-path"));
+	assert!(commands.contains("--offline"));
+}
+
+#[cfg(unix)]
+#[test]
+fn dev_forwards_explicit_upstream_selection() {
+	let (project, manifest, target, log) = create_fake_workflow_project("dev upstream workflow");
+	let surfpool = project.join("fake-surfpool.sh");
+	create_executable(
+		&surfpool,
+		r#"#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == "--version" ]]; then
+	echo "surfpool 1.5.0"
+	exit 0
+fi
+printf 'surfpool' >> "$PINA_FAKE_LOG"
+printf ' %q' "$@" >> "$PINA_FAKE_LOG"
+printf '\n' >> "$PINA_FAKE_LOG"
+"#,
+	);
+
+	for cluster in ["mainnet", "devnet", "testnet"] {
+		let status = Command::new(env!("CARGO_BIN_EXE_pina"))
+			.args(["dev", "--yes", "--project"])
+			.arg(&project)
+			.args(["--network", cluster])
+			.env("CARGO", project.join("fake-cargo.sh"))
+			.env("PINA_SURFPOOL", &surfpool)
+			.env("PINA_FAKE_LOG", &log)
+			.env("PINA_FAKE_MANIFEST", &manifest)
+			.env("PINA_FAKE_TARGET", &target)
+			.status()
+			.unwrap_or_else(|error| panic!("failed to run pina dev for {cluster}: {error}"));
+		assert!(status.success());
+	}
+
+	let status = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["dev", "--yes", "--project"])
+		.arg(&project)
+		.args(["--rpc-url", "http://127.0.0.1:8899"])
+		.env("CARGO", project.join("fake-cargo.sh"))
+		.env("PINA_SURFPOOL", &surfpool)
+		.env("PINA_FAKE_LOG", &log)
+		.env("PINA_FAKE_MANIFEST", &manifest)
+		.env("PINA_FAKE_TARGET", &target)
+		.status()
+		.unwrap_or_else(|error| panic!("failed to run pina dev with RPC URL: {error}"));
+	assert!(status.success());
+
+	let commands = fs::read_to_string(&log)
+		.unwrap_or_else(|error| panic!("failed to read {}: {error}", log.display()));
+	for cluster in ["mainnet", "devnet", "testnet"] {
+		assert!(commands.contains(&format!("--network {cluster}")));
+	}
+	assert!(commands.contains("--rpc-url http://127.0.0.1:8899"));
+	assert!(!commands.contains("--daemon"));
+}
+
+#[cfg(unix)]
+#[test]
+fn dev_rejects_unsafe_rpc_urls_before_running_project_commands() {
+	let (project, manifest, target, log) = create_fake_workflow_project("unsafe RPC workflow");
+	let secret = "private-rpc-credential";
+	let endpoint = format!("https://agent:{secret}@rpc.example/?token={secret}#fragment");
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["dev", "--yes", "--project"])
+		.arg(&project)
+		.args(["--rpc-url", &endpoint])
+		.env("CARGO", project.join("fake-cargo.sh"))
+		.env("PINA_SURFPOOL", project.join("surfpool-that-must-not-run"))
+		.env("PINA_FAKE_LOG", &log)
+		.env("PINA_FAKE_MANIFEST", &manifest)
+		.env("PINA_FAKE_TARGET", &target)
+		.output()
+		.expect("run pina dev with an unsafe RPC URL");
+	let stderr = String::from_utf8_lossy(&output.stderr);
+
+	assert_eq!(output.status.code(), Some(1));
+	assert!(stderr.contains("unsafe Surfpool RPC URL"));
+	assert!(!stderr.contains(secret));
+	assert!(!log.exists(), "project and Surfpool commands must not run");
+	assert!(
+		!target.exists(),
+		"an invalid endpoint must not trigger a build"
+	);
+}
+
+#[cfg(unix)]
+#[test]
+fn workflow_errors_are_actionable_and_preserve_exit_status() {
+	let empty = tempfile::tempdir().expect("create empty temporary directory");
+	let missing = empty.path().join("absent");
+	let test_output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["test", "--project"])
+		.arg(&missing)
+		.output()
+		.expect("run failing test workflow");
+	assert_eq!(test_output.status.code(), Some(1));
+	assert!(String::from_utf8_lossy(&test_output.stderr).contains("Could not inspect"));
+
+	let (project, manifest, target, log) = create_fake_workflow_project("failed dev workflow");
+	let missing_runbook = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["dev", "--project"])
+		.arg(&project)
+		.env("CARGO", project.join("fake-cargo.sh"))
+		.env("PINA_FAKE_LOG", &log)
+		.env("PINA_FAKE_MANIFEST", &manifest)
+		.env("PINA_FAKE_TARGET", &target)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run missing-runbook workflow: {error}"));
+	assert_eq!(missing_runbook.status.code(), Some(1));
+	assert!(String::from_utf8_lossy(&missing_runbook.stderr).contains("run `pina dev --yes` once"));
+
+	let surfpool = executable_script_with_exit(&project, 37);
+	let dev_output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["dev", "--yes", "--project"])
+		.arg(&project)
+		.env("CARGO", project.join("fake-cargo.sh"))
+		.env("PINA_SURFPOOL", surfpool)
+		.env("PINA_FAKE_LOG", &log)
+		.env("PINA_FAKE_MANIFEST", &manifest)
+		.env("PINA_FAKE_TARGET", &target)
+		.output()
+		.expect("run failing development workflow");
+	assert_eq!(dev_output.status.code(), Some(37));
+}
+
+#[cfg(unix)]
+fn executable_script_with_exit(project: &Path, exit_code: u8) -> PathBuf {
+	let path = project.join("failed-surfpool.sh");
+	create_executable(&path, &format!("#!/bin/sh\nexit {exit_code}\n"));
+	path
 }
 
 #[test]

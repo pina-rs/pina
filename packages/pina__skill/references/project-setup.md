@@ -7,8 +7,9 @@ Start a program with the installed CLI so the generated Pina version, feature na
 ```sh
 pina init counter_program
 cd counter_program
-cargo test
 pina build
+pina test --unit
+pina test
 pina generate
 ```
 
@@ -23,6 +24,7 @@ A Pina program should keep these concerns separate:
 - on-chain instruction processing and account types in a `no_std`-compatible library;
 - the SBF entrypoint behind the project's `bpf-entrypoint` feature;
 - host tests and VM fixtures in test-only modules or integration tests;
+- embedded Surfpool RPC tests in the isolated `tests/surfpool` Cargo package, separate from the fast native loop and SBF dependency graph;
 - IDL and generated clients outside hand-written program source.
 
 Do not add a general application framework, async runtime, serializer, or allocator to the on-chain path unless the program's requirements justify it.

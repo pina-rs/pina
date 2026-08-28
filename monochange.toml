@@ -95,6 +95,10 @@ type = "cargo"
 path = "crates/pina_sdk_ids"
 type = "cargo"
 
+[package.pina_test]
+path = "crates/pina_test"
+type = "cargo"
+
 [package.pina_codama_nodes]
 path = "packages/nodes-from-pina"
 type = "npm"
@@ -151,6 +155,7 @@ packages = [
 	"pina_codama_renderer",
 	"pina_profile",
 	"pina_sdk_ids",
+	"pina_test",
 	"pina_codama_nodes",
 	"pina_cli_npm",
 	"pina_cli_darwin_arm64",
@@ -178,12 +183,14 @@ versioned_files = ["Cargo.toml"]
 # Refresh Cargo.lock after a release bumps the workspace version. All pina
 # crates inherit `version = { workspace = true }`, so `cargo update --workspace`
 # syncs exactly those lockfile entries without touching dependencies. The
-# standalone fuzz workspaces keep their own lockfiles, so they must be refreshed
-# separately or `cargo check --locked` fails on the release PR.
+# standalone fuzz and Surfpool-test workspaces keep their own lockfiles, so they
+# must be refreshed separately or `cargo check --locked` fails on the release
+# PR.
 lockfile_commands = [
 	{ command = "cargo update --workspace", cwd = ".", shell = "bash" },
 	{ command = "cargo update --workspace --manifest-path crates/pina_fuzz/Cargo.toml", cwd = ".", shell = "bash" },
 	{ command = "cargo update --workspace --manifest-path crates/pina_fuzz/fuzz/Cargo.toml", cwd = ".", shell = "bash" },
+	{ command = "cargo update --workspace --manifest-path crates/pina_test/Cargo.toml", cwd = ".", shell = "bash" },
 ]
 
 [ecosystems.cargo.publish]

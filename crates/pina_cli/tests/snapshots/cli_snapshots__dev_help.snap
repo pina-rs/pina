@@ -1,0 +1,51 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - dev
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Start a persistent Surfpool development network with SBF watch and redeploy.
+
+Builds the current SBF artifact once, then delegates the persistent process, file watching, and redeployment to `surfpool start --watch`. The network is offline by default; opt into an upstream cluster or RPC URL explicitly.
+
+Usage: pina dev [OPTIONS]
+
+Options:
+  -p, --project <DIR>
+          Project directory or a directory below it. Defaults to the current directory
+
+      --network <CLUSTER>
+          Fork from mainnet, devnet, or testnet instead of using the offline default
+
+      --rpc-url <URL>
+          Fork from a credential-free HTTP(S) RPC URL with a host.
+          
+          User information, query parameters, fragments, and control characters are rejected. Surfpool receives the URL in its child-process arguments, so never put a secret anywhere in the URL, including its host or path. Prefer `--network` when possible.
+
+      --yes
+          Allow Surfpool to create or update txtx.yml without prompting
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina dev --yes  # first run: allow txtx.yml creation
+  pina dev
+  pina dev --network devnet
+  pina dev --rpc-url https://api.mainnet-beta.solana.com
+
+Behavior:
+  Pina builds the SBF artifact, then runs Surfpool in the foreground with --watch. Build again in another terminal to trigger redeployment. Surfpool inherits terminal input, output, and errors; Ctrl-C is handled by that foreground process.
+
+Runbook safety:
+  Surfpool can create or update txtx.yml. Pina refuses a missing runbook unless --yes explicitly authorizes first-run changes. Commit and review txtx.yml before subsequent runs.
+
+Network safety:
+  The default is --offline. Pina never opts into Surfpool's upstream mainnet datasource implicitly.
+
+----- stderr -----

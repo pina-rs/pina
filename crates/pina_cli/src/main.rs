@@ -16,6 +16,7 @@ use crate::cli::ClientArg;
 use crate::cli::CodamaCommands;
 use crate::cli::Commands;
 use crate::cli::ExportEncodingArg;
+use crate::cli::SurfpoolCluster;
 use crate::cli::VerifyCommands;
 
 fn main() {
@@ -46,6 +47,17 @@ fn main() {
 		Commands::Idl { command, generate } => idl_command::run_idl_command(command, &generate),
 		Commands::Docs { topic } => run_docs(topic.as_deref()),
 		Commands::Init { name, path, force } => run_init(name.as_str(), path.as_deref(), force),
+		Commands::Test {
+			project,
+			unit,
+			filter,
+		} => run_test(project, unit, filter),
+		Commands::Dev {
+			project,
+			network,
+			rpc_url,
+			yes,
+		} => run_dev(project, network, rpc_url, yes),
 		Commands::Profile { path, json, output } => run_profile(&path, json, output.as_deref()),
 		Commands::Verify {
 			command,
@@ -410,6 +422,44 @@ fn run_generate(project: PathBuf, clients: Vec<ClientArg>, output: Option<PathBu
 	);
 	println!("  IDL     {}", generated.idl.display());
 	println!("  Clients {}", generated.clients_dir.display());
+}
+
+fn run_test(project: PathBuf, unit: bool, filter: Option<String>) {
+	let options = pina_cli::workflow::TestOptions {
+		project,
+		unit,
+		filter,
+	};
+
+	if let Err(error) = pina_cli::workflow::test_project(&options) {
+		eprintln!("{} {}", "Error".red().bold(), error);
+		std::process::exit(error.exit_code());
+	}
+}
+
+fn run_dev(
+	project: PathBuf,
+	network: Option<SurfpoolCluster>,
+	rpc_url: Option<String>,
+	accept_runbook_changes: bool,
+) {
+	let network = match (network, rpc_url) {
+		(_, Some(rpc_url)) => pina_cli::workflow::SurfpoolNetwork::RpcUrl(rpc_url),
+		(Some(network), None) => {
+			pina_cli::workflow::SurfpoolNetwork::Cluster(network.as_str().to_owned())
+		}
+		(None, None) => pina_cli::workflow::SurfpoolNetwork::Offline,
+	};
+	let options = pina_cli::workflow::DevOptions {
+		project,
+		network,
+		accept_runbook_changes,
+	};
+
+	if let Err(error) = pina_cli::workflow::dev_project(&options) {
+		eprintln!("{} {}", "Error".red().bold(), error);
+		std::process::exit(error.exit_code());
+	}
 }
 
 fn run_idl(path: &Path, output: Option<&Path>, name: Option<&str>, pretty: bool) {

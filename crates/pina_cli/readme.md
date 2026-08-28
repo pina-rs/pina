@@ -120,6 +120,26 @@ pina init my_program
 pina init my_program --path ./programs/my_program --force
 ```
 
+### `pina test`
+
+Run native/Mollusk tests quickly, or build SBF and run the generated isolated Surfpool test:
+
+```bash
+pina test --unit
+pina test
+pina test --filter initialize
+```
+
+### `pina dev`
+
+Build once, then let Surfpool watch and redeploy the canonical SBF artifact. Development is offline unless an upstream network or credential-free HTTP(S) RPC URL is selected explicitly. Explicit URLs are visible in Surfpool's process arguments, so they must never contain secrets. The first run requires explicit permission to create Surfpool's deployment runbook.
+
+```bash
+pina dev --yes # first run; review and commit the generated txtx.yml
+pina dev
+pina dev --network devnet
+```
+
 ### `pina profile`
 
 <br>

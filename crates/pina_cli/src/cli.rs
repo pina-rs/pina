@@ -13,23 +13,24 @@ use clap::ValueEnum;
 	name = "pina",
 	bin_name = "pina",
 	version,
-	about = "Build, inspect, and generate artifacts for Pina Solana programs",
-	long_about = "Build, inspect, and generate artifacts for Pina Solana programs.\n\nUse 'pina \
-	              init' to start a program, 'pina build' for its SBF binary and IDL, and 'pina \
-	              generate' for selected client ecosystems. Use 'pina build --verify' and 'pina \
-	              verify' for reproducible deployed-program verification. Low-level IDL, \
-	              profiling, terminal documentation, and the legacy repository-wide Codama \
-	              workflow remain available.",
+	about = "Build, test, inspect, and generate artifacts for Pina Solana programs",
+	long_about = "Build, test, inspect, and generate artifacts for Pina Solana programs.\n\nUse \
+	              'pina init' to start a program, 'pina build' for its SBF binary and IDL, 'pina \
+	              test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, \
+	              'pina dev' for a persistent Surfpool network, 'pina generate' for selected \
+	              client ecosystems, and 'pina verify' for deployed-program verification. \
+	              Low-level IDL, profiling, terminal documentation, and the legacy \
+	              repository-wide Codama workflow remain available.",
 	next_line_help = true,
 	arg_required_else_help = true,
 	after_help = "Examples:\n  pina init counter_program\n  cd counter_program && pina build\n  \
-	              pina generate --client rust --client typescript\n  pina idl --path \
-	              ./programs/counter_program --output ./idls/counter_program.json\n  pina profile \
-	              ./target/deploy/counter_program.so --json\n\nAgent discovery:\n  Run 'pina \
-	              <command> --help' for command-specific inputs, outputs, and examples.\n  Run \
-	              'pina docs' to list the bundled architecture and IDL reference topics.\n  For \
-	              deployment verification, run 'pina verify --help' and then inspect the selected \
-	              leaf command."
+	              pina test\n  pina test --unit\n  pina dev --yes\n  pina generate --client rust \
+	              --client typescript\n  pina idl --path ./programs/counter_program --output \
+	              ./idls/counter_program.json\n  pina profile ./target/deploy/counter_program.so \
+	              --json\n\nAgent discovery:\n  Run 'pina <command> --help' for command-specific \
+	              inputs, outputs, and examples.\n  Run 'pina docs' to list the bundled \
+	              architecture and IDL reference topics.\n  For deployment verification, run \
+	              'pina verify --help' and then inspect the selected leaf command."
 )]
 pub(crate) struct Cli {
 	#[command(subcommand)]
@@ -186,6 +187,93 @@ pub(crate) enum Commands {
 		/// Overwrite scaffold files that already exist.
 		#[arg(long)]
 		force: bool,
+	},
+
+	/// Test a Pina program with fast native tests or an isolated Surfpool instance.
+	///
+	/// The default workflow builds the actual SBF shared object, verifies that it
+	/// exists, and runs the project's isolated `tests/surfpool` test package. That
+	/// package owns an embedded Surfpool instance, so parallel runs use separate
+	/// ports and teardown remains deterministic. Use --unit for native Rust and
+	/// Mollusk tests only.
+	#[command(
+		after_help = "Examples:\n  pina test\n  pina test --filter initialize\n  pina test \
+		              --unit\n  pina test --unit --filter rejects_wrong_owner\n\nTest layers:\n  \
+		              --unit keeps the fast native/Mollusk loop and does not build SBF.\n  The \
+		              default builds SBF and runs the ignored test in the isolated \
+		              `tests/surfpool` package.\n\nSafety:\n  Embedded Surfpool tests allocate \
+		              isolated ports and must stop their instance before returning. Missing SBF \
+		              artifacts and incomplete Surfpool test packages are hard failures."
+	)]
+	Test {
+		/// Project directory or a directory below it. Defaults to the current directory.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Run native Rust and Mollusk tests without building SBF or starting Surfpool.
+		#[arg(long)]
+		unit: bool,
+
+		/// Run only tests whose names contain FILTER.
+		#[arg(short, long, value_name = "FILTER")]
+		filter: Option<String>,
+	},
+
+	/// Start a persistent Surfpool development network with SBF watch and redeploy.
+	///
+	/// Builds the current SBF artifact once, then delegates the persistent process,
+	/// file watching, and redeployment to `surfpool start --watch`. The network is
+	/// offline by default; opt into an upstream cluster or RPC URL explicitly.
+	#[command(
+		after_help = "Examples:\n  pina dev --yes  # first run: allow txtx.yml creation\n  pina \
+		              dev\n  pina dev --network devnet\n  pina dev \
+		              --rpc-url https://api.mainnet-beta.solana.com\n\nBehavior:\n  Pina builds \
+		              the SBF artifact, then runs Surfpool in the foreground with --watch. Build \
+		              again in another terminal to trigger redeployment. Surfpool inherits terminal \
+		              input, output, and errors; Ctrl-C is handled by that foreground process.\n\nRunbook safety:\n  Surfpool can create or \
+		              update txtx.yml. Pina refuses a missing runbook unless --yes explicitly \
+		              authorizes first-run changes. Commit and review txtx.yml before subsequent \
+		              runs.\n\nNetwork safety:\n  The default is --offline. Pina never opts into \
+		              Surfpool's upstream mainnet datasource implicitly."
+	)]
+	Dev {
+		/// Project directory or a directory below it. Defaults to the current directory.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Fork from mainnet, devnet, or testnet instead of using the offline default.
+		#[arg(
+			long,
+			value_enum,
+			conflicts_with = "rpc_url",
+			hide_possible_values = true,
+			value_name = "CLUSTER"
+		)]
+		network: Option<SurfpoolCluster>,
+
+		/// Fork from a credential-free HTTP(S) RPC URL with a host.
+		///
+		/// User information, query parameters, fragments, and control characters are rejected.
+		/// Surfpool receives the URL in its child-process arguments, so never put a secret anywhere
+		/// in the URL, including its host or path. Prefer `--network` when possible.
+		#[arg(long, conflicts_with = "network", value_name = "URL")]
+		rpc_url: Option<String>,
+
+		/// Allow Surfpool to create or update txtx.yml without prompting.
+		#[arg(long)]
+		yes: bool,
 	},
 
 	/// Profile compute-unit costs in a compiled SBF program.
@@ -659,6 +747,24 @@ Safety:
 pub(crate) enum ExportEncodingArg {
 	Base64,
 	Base58,
+}
+
+/// Named upstream clusters supported by Surfpool.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub(crate) enum SurfpoolCluster {
+	Mainnet,
+	Devnet,
+	Testnet,
+}
+
+impl SurfpoolCluster {
+	pub(crate) const fn as_str(self) -> &'static str {
+		match self {
+			Self::Mainnet => "mainnet",
+			Self::Devnet => "devnet",
+			Self::Testnet => "testnet",
+		}
+	}
 }
 
 /// Codama-related generation workflows.
