@@ -156,7 +156,7 @@ pub mod instructions {
 			let data = [0u8; InitializeInstruction::SIZE];
 			let ctx = CpiContext::new(*program, self.accounts);
 
-			ctx.invoke(&data, signers)
+			ctx.invoke_signed(&data, signers)
 		}
 	}
 
@@ -198,7 +198,7 @@ pub mod instructions {
 			UpdateInstruction::initialize(&mut data)?.new_price = self.new_price;
 			let ctx = CpiContext::new(*program, self.accounts);
 
-			ctx.invoke(&data, signers)
+			ctx.invoke_signed(&data, signers)
 		}
 	}
 
@@ -240,7 +240,7 @@ pub mod instructions {
 			RotateAuthorityInstruction::initialize(&mut data)?.new_authority = self.new_authority;
 			let ctx = CpiContext::new(*program, self.accounts);
 
-			ctx.invoke(&data, signers)
+			ctx.invoke_signed(&data, signers)
 		}
 	}
 }

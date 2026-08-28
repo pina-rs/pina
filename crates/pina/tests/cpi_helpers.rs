@@ -622,7 +622,8 @@ fn cpi_context_accepts_typed_account_structs() {
 	assert!(ordered[0].is_writable());
 	assert_eq!(ordered[1].address(), second_view.address());
 	assert!(!ordered[1].is_writable());
-	assert_eq!(context.invoke(&[], &[]), Ok(()));
+	assert_eq!(context.invoke(&[]), Ok(()));
+	assert_eq!(context.invoke_signed(&[], &[]), Ok(()));
 }
 
 #[test]

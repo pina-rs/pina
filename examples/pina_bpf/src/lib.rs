@@ -151,7 +151,7 @@ mod prop_amm_cpi {
 			data[1..].copy_from_slice(self.new_authority.as_ref());
 			let context = CpiContext::new(*program, self.accounts);
 
-			context.invoke(&data, signers)
+			context.invoke_signed(&data, signers)
 		}
 	}
 }

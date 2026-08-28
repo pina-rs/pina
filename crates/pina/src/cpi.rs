@@ -1054,7 +1054,7 @@ impl<'a> CpiHandle<'a> {
 	///
 	/// The signer bit describes the target instruction schema, not the outer
 	/// instruction's current privileges. This permits [`Signer`] seeds passed to
-	/// [`CpiContext::invoke`] to satisfy PDA signer requirements.
+	/// [`CpiContext::invoke_signed`] to satisfy PDA signer requirements.
 	#[inline(always)]
 	pub const fn readonly_signer(view: &'a AccountView) -> Self {
 		Self {
@@ -1234,13 +1234,19 @@ where
 		Self { accounts, program }
 	}
 
-	/// Invoke the CPI using pinocchio's checked static-array path.
-	///
-	/// This keeps the prototype allocator-free and avoids introducing unsafe
-	/// unchecked invocation until Pina has a stronger typed account runtime for
-	/// duplicate-account and alias analysis.
+	/// Invokes the CPI using transaction-level signatures.
 	#[inline(always)]
-	pub fn invoke(&self, data: &[u8], signers: &[Signer<'_, '_>]) -> ProgramResult {
+	pub fn invoke(&self, data: &[u8]) -> ProgramResult {
+		self.invoke_signed(data, &[])
+	}
+
+	/// Invokes the CPI with additional PDA signer seeds.
+	///
+	/// Both invocation paths use Pinocchio's checked static-array implementation.
+	/// This keeps the context allocator-free and avoids unchecked invocation until
+	/// Pina can prove stronger duplicate-account and aliasing invariants.
+	#[inline(always)]
+	pub fn invoke_signed(&self, data: &[u8], signers: &[Signer<'_, '_>]) -> ProgramResult {
 		let handles = self.accounts.to_cpi_handles();
 		let instruction_accounts = handles.map(CpiHandle::instruction_account);
 		let account_views = handles.map(CpiHandle::account_view);
