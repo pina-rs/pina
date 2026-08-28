@@ -24,6 +24,7 @@ When no project exists, read [references/project-setup.md](references/project-se
 - Do not introduce `unsafe` code or unstable features.
 - Validate account identity, signer status, writability, ownership, and data shape before casts, mutation, lamport transfers, resize operations, or CPI.
 - Use explicit discriminator values and type-specific PDA seed namespaces. Prefer canonical bump validation.
+- Construct account-management operations and generated CPIs as documented instruction structs, then call `.invoke()` or `.invoke_signed(signers)`. Do not recreate the removed free-function helper API.
 - Keep instruction dispatch deterministic: parse once, match explicitly, then construct and validate the accounts type for that instruction.
 - Maintain discriminator-first, fixed-layout storage types expected by Pina and zeropod. Do not place ordinary Rust `bool`, `String`, or variable-length collections in zero-copy account layouts.
 - Preserve error values and wire formats unless the user explicitly accepts a compatibility change.

@@ -16,7 +16,7 @@
 - `logs` is useful during **initial development and debugging**, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
 - `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
 - `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.
-- `account-resize` only enables realloc helpers such as `realloc_account()` and `realloc_account_zero()`. Close helpers still do not implicitly resize or zero account data.
+- `account-resize` only enables the `ReallocAccount` and `ReallocAccountZeroed` builders. Close helpers still do not implicitly resize or zero account data.
 
 <!-- {/pinaFeatureSelectionTips} -->
 
@@ -212,7 +212,7 @@ The profiler decodes each SBF instruction opcode and assigns costs: regular inst
 - **Always call `assert_empty()`** before account initialization to prevent reinitialization attacks
 - **Always verify program accounts** with `assert_address()` / `assert_program()` before CPI invocations
 - **Use `assert_type::<T>()`** to prevent type cosplay — it checks discriminator, owner, and data size
-- **Use `close_account_zeroed()` or `zeroed()` + `close_with_recipient()`** when stale account bytes must be invalidated before close
+- **Use `CloseAccountZeroed { account, recipient }.invoke()` or `zeroed()` + `close_with_recipient()`** when stale account bytes must be invalidated before close
 - **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
 - **Namespace PDA seeds** with type-specific prefixes to prevent PDA sharing across account types
 
@@ -223,7 +223,7 @@ The profiler decodes each SBF instruction opcode and assigns costs: regular inst
 Closing guidance under Pinocchio 0.11:
 
 - `close_with_recipient()` transfers lamports and closes the account handle, but it does not zero or resize account data for you.
-- When stale bytes must be invalidated, use `close_account_zeroed()` or manually call `zeroed()` before `close_with_recipient()`.
+- When stale bytes must be invalidated, use `CloseAccountZeroed { account, recipient }.invoke()` or manually call `zeroed()` before `close_with_recipient()`.
 - The `account-resize` feature only affects realloc helpers; it does not change close semantics.
 
 <!-- {/pinaCloseAccountGuidance} -->

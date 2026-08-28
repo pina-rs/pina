@@ -24,6 +24,7 @@ The skill is intentionally specific to Pina. Its entrypoint establishes the prog
 
 - preserve `no_std` compatibility and the project's feature boundary;
 - validate accounts before casts, mutation, resize, close, or CPI;
+- construct account-management and generated CPI operations as documented structs, then call `invoke` or `invoke_signed`;
 - keep discriminators and PDA seed namespaces explicit and stable;
 - treat generated IDLs and clients as reviewed public contracts;
 - verify changes at the smallest meaningful layer before running the full project suite.

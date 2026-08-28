@@ -83,16 +83,16 @@ Key differences:
 
 Anchor expresses constraints as attributes on account fields. Pina uses explicit method calls on `AccountView` references.
 
-| Anchor attribute                  | Pina equivalent                                                        |
-| --------------------------------- | ---------------------------------------------------------------------- |
-| `Signer<'info>`                   | `account.assert_signer()?`                                             |
-| `#[account(mut)]`                 | `account.assert_writable()?`                                           |
-| `#[account(owner = program)]`     | `account.assert_owner(&program_id)?`                                   |
-| `#[account(address = KEY)]`       | `account.assert_address(&KEY)?`                                        |
-| `#[account(seeds = [...], bump)]` | `account.assert_seeds_with_bump(seeds, &ID)?`                          |
-| `#[account(init, ...)]`           | `account.assert_empty()?` then `create_program_account_with_bump(...)` |
-| `#[account(constraint = expr)]`   | Write the check directly in `process` and return an error              |
-| `Account<'info, T>` (type check)  | `account.assert_type::<T>(&owner)?`                                    |
+| Anchor attribute                  | Pina equivalent                                                                          |
+| --------------------------------- | ---------------------------------------------------------------------------------------- |
+| `Signer<'info>`                   | `account.assert_signer()?`                                                               |
+| `#[account(mut)]`                 | `account.assert_writable()?`                                                             |
+| `#[account(owner = program)]`     | `account.assert_owner(&program_id)?`                                                     |
+| `#[account(address = KEY)]`       | `account.assert_address(&KEY)?`                                                          |
+| `#[account(seeds = [...], bump)]` | `account.assert_seeds_with_bump(seeds, &ID)?`                                            |
+| `#[account(init, ...)]`           | `account.assert_empty()?` then `CreateProgramAccountWithBump { ... }.invoke::<MyData>()` |
+| `#[account(constraint = expr)]`   | Write the check directly in `process` and return an error                                |
+| `Account<'info, T>` (type check)  | `account.assert_type::<T>(&owner)?`                                                      |
 
 Pina's assertion methods return the same reference type they receive, so shared chains stay shared and mutable chains stay mutable:
 
@@ -423,24 +423,26 @@ pub my_account: Account<'info, MyData>,
 
 ```rust
 // For PDA accounts:
-create_program_account_with_bump::<MyData>(
-	self.my_account,
-	self.payer,
-	&ID,
+CreateProgramAccountWithBump {
+	account: self.my_account,
+	payer: self.payer,
+	owner: &ID,
 	seeds,
 	bump,
-)?;
+}
+.invoke::<MyData>()?;
 
 // For regular accounts:
-create_account(
-	self.payer,
-	self.my_account,
-	size_of::<MyData>(),
-	&ID,
-)?;
+CreateAccount {
+	from: self.payer,
+	to: self.my_account,
+	space: MyData::SIZE as u64,
+	owner: &ID,
+}
+.invoke()?;
 ```
 
-Space is automatically computed from `size_of::<MyData>()` for the PDA helper. For `create_account` you pass the size explicitly. In both cases, rent-exemption lamports are calculated and transferred automatically.
+Space is automatically computed from `MyData::SIZE` for the PDA builder. For `CreateAccount` you pass the size explicitly. In both cases, rent-exemption lamports are calculated and transferred automatically.
 
 ## no_std and the entrypoint
 

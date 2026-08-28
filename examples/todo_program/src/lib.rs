@@ -87,13 +87,14 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.system_program.assert_address(&system::ID)?;
 
 		// Create the PDA account
-		create_program_account_with_bump::<TodoState>(
-			self.todo,
-			self.owner,
-			&ID,
-			&seeds.as_slices(),
-			args.bump,
-		)?;
+		CreateProgramAccountWithBump {
+			account: self.todo,
+			payer: self.owner,
+			owner: &ID,
+			seeds: &seeds.as_slices(),
+			bump: args.bump,
+		}
+		.invoke::<TodoState>()?;
 
 		// Initialize account data
 		let mut todo = self.todo.as_account_mut::<TodoState>(&ID)?;

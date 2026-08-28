@@ -45,11 +45,67 @@ Use a stable, type-specific byte-string namespace as the first seed. Prefer cano
 
 Seed changes alter addresses. Treat them as migrations, not refactors.
 
+## Account-management instruction builders
+
+Pina models account creation, PDA allocation, reallocation, and close operations as values. Construct the documented struct with every input visible, then call `.invoke()` for transaction-level signers or `.invoke_signed(signers)` when another CPI account must sign through program-derived seeds.
+
+```rust
+CreateAccount {
+	from: payer,
+	to: new_account,
+	space: 128,
+	owner: program_id,
+}
+.invoke()?;
+```
+
+Do not introduce wrapper functions around removed helpers such as `create_account(...)`, `create_program_account::<T>(...)`, or `realloc_account(...)`. Use the matching builder:
+
+| Operation                                             | Builder                        |
+| ----------------------------------------------------- | ------------------------------ |
+| Create a regular account                              | `CreateAccount`                |
+| Derive and create a typed canonical PDA               | `CreateProgramAccount`         |
+| Validate an explicit bump and create a typed PDA      | `CreateProgramAccountWithBump` |
+| Derive and allocate an untyped canonical PDA          | `AllocateAccount`              |
+| Validate an explicit bump and allocate an untyped PDA | `AllocateAccountWithBump`      |
+| Reallocate while balancing rent                       | `ReallocAccount`               |
+| Reallocate with explicit zero-initialization intent   | `ReallocAccountZeroed`         |
+| Close and return lamports                             | `CloseAccount`                 |
+| Zero bytes, close, and return lamports                | `CloseAccountZeroed`           |
+
+Typed PDA creation places the account type on the invocation method:
+
+```rust
+let (address, bump) = CreateProgramAccount {
+	account: state_account,
+	payer,
+	owner: program_id,
+	seeds,
+}
+.invoke::<State>()?;
+```
+
+Canonical PDA builders derive and validate the target address and return `(Address, u8)`. Explicit-bump builders verify the supplied bump before moving lamports. Both forms automatically append the target PDA signer to additional signers supplied by the caller. Use `u64` for create/allocation `space`; reallocation `new_size` remains `usize`.
+
+Close builders intentionally expose only `.invoke()`. They perform checked direct account mutation rather than a CPI, so signer seeds would have no effect.
+
+Generated CPI modules follow the same shape. Construct the generated instruction struct using its documented public account and data fields, then invoke it with the validated program account:
+
+```rust
+instructions::Update {
+	accounts,
+	new_price,
+}
+.invoke_signed(&program, signers)?;
+```
+
+Do not add free convenience constructors to generated CPI modules. Keeping accounts and instruction data visible at construction makes privilege and wire-data review possible at the call site.
+
 ## Initialization, resize, and close
 
-Initialization must prove that the target is empty and that its derived address is correct before allocating or writing state. Resize operations must validate authority, owner, address, writability, and the requested bounds before changing data length.
+Initialization must prove that the target is empty and that its derived address is correct before invoking a create or allocation builder. Resize operations must validate authority, owner, address, writability, and the requested bounds before invoking a reallocation builder.
 
-When closing an account, use the Pina close helper that matches the data-erasure requirement. Zero account data before transferring lamports when stale bytes must not remain observable.
+When closing an account, choose `CloseAccount` or `CloseAccountZeroed` according to the data-erasure requirement. Zero account data before transferring lamports when stale bytes must not remain observable.
 
 ## Compatibility review
 

@@ -181,13 +181,14 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			.assert_empty()?
 			.assert_seeds_with_bump(&registry_seeds_with_bump.as_slices(), &ID)?;
 
-		create_program_account_with_bump::<RegistryConfig>(
-			self.registry_config,
-			self.admin,
-			&ID,
-			&registry_seeds.as_slices(),
-			args.bump,
-		)?;
+		CreateProgramAccountWithBump {
+			account: self.registry_config,
+			payer: self.admin,
+			owner: &ID,
+			seeds: &registry_seeds.as_slices(),
+			bump: args.bump,
+		}
+		.invoke::<RegistryConfig>()?;
 
 		let mut registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
 		registry_config.admin = admin_address;
@@ -225,13 +226,14 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 				.ok_or(ProgramError::ArithmeticOverflow)?
 		};
 
-		create_program_account_with_bump::<RoleEntry>(
-			self.role_entry,
-			self.admin,
-			&ID,
-			&role_entry_seeds.as_slices(),
-			args.bump,
-		)?;
+		CreateProgramAccountWithBump {
+			account: self.role_entry,
+			payer: self.admin,
+			owner: &ID,
+			seeds: &role_entry_seeds.as_slices(),
+			bump: args.bump,
+		}
+		.invoke::<RoleEntry>()?;
 
 		let mut role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
 		role_entry.registry = *self.registry_config.address();

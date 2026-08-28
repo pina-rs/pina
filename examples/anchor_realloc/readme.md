@@ -9,7 +9,7 @@ Secure adaptation of Anchor's account reallocation safety checks.
 <br>
 
 - An explicit initialize → grow → shrink lifecycle for an authority-bound sample PDA.
-- Reallocation growth-limit and rent-exemption enforcement through `realloc_account`.
+- Reallocation growth-limit and rent-exemption enforcement through `ReallocAccount`.
 - Type, owner, stored-authority, and canonical-PDA validation before every resize.
 - Duplicate realloc target detection, before any mutation.
 

@@ -261,13 +261,14 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 			)?;
 
 		// Create the pool state account
-		create_program_account_with_bump::<PoolState>(
-			self.pool_state,
-			self.admin,
-			&ID,
-			&pool_seeds.as_slices(),
-			args.bump,
-		)?;
+		CreateProgramAccountWithBump {
+			account: self.pool_state,
+			payer: self.admin,
+			owner: &ID,
+			seeds: &pool_seeds.as_slices(),
+			bump: args.bump,
+		}
+		.invoke::<PoolState>()?;
 
 		// Initialize pool state
 		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
@@ -332,13 +333,14 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 		}
 
 		// Create the position account
-		create_program_account_with_bump::<PositionState>(
-			self.position_state,
-			self.user,
-			&ID,
-			&position_seeds.as_slices(),
-			args.bump,
-		)?;
+		CreateProgramAccountWithBump {
+			account: self.position_state,
+			payer: self.user,
+			owner: &ID,
+			seeds: &position_seeds.as_slices(),
+			bump: args.bump,
+		}
+		.invoke::<PositionState>()?;
 
 		// Initialize position state
 		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;

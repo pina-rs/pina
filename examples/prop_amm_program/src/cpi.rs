@@ -29,14 +29,21 @@ pub type ProgramAccount<'a> = Program<'a, PropAmmProgram>;
 pub mod accounts {
 	use super::*;
 
+	/// Accounts required to create and initialize the oracle account.
 	#[derive(Clone, Copy, Debug)]
 	pub struct Initialize<'a> {
+		/// Writable signer that funds the oracle account.
 		pub payer: CpiHandle<'a>,
+
+		/// Writable signer account that will store the oracle state.
 		pub oracle: CpiHandle<'a>,
+
+		/// System program used to create the oracle account.
 		pub system_program: CpiHandle<'a>,
 	}
 
 	impl<'a> Initialize<'a> {
+		/// Validates writable privileges and builds the CPI account set.
 		pub fn new(
 			payer: &'a AccountView,
 			oracle: &'a AccountView,
@@ -56,13 +63,18 @@ pub mod accounts {
 		}
 	}
 
+	/// Accounts required to update the oracle price.
 	#[derive(Clone, Copy, Debug)]
 	pub struct Update<'a> {
+		/// Writable oracle account whose price will change.
 		pub oracle: CpiHandle<'a>,
+
+		/// Current oracle authority, required to sign.
 		pub authority: CpiHandle<'a>,
 	}
 
 	impl<'a> Update<'a> {
+		/// Validates writable privileges and builds the CPI account set.
 		pub fn new(
 			oracle: &'a AccountView,
 			authority: &'a AccountView,
@@ -80,13 +92,18 @@ pub mod accounts {
 		}
 	}
 
+	/// Accounts required to rotate the oracle authority.
 	#[derive(Clone, Copy, Debug)]
 	pub struct RotateAuthority<'a> {
+		/// Writable oracle account whose authority will change.
 		pub oracle: CpiHandle<'a>,
+
+		/// Current oracle authority, required to sign.
 		pub authority: CpiHandle<'a>,
 	}
 
 	impl<'a> RotateAuthority<'a> {
+		/// Validates writable privileges and builds the CPI account set.
 		pub fn new(
 			oracle: &'a AccountView,
 			authority: &'a AccountView,
@@ -108,23 +125,28 @@ pub mod accounts {
 pub mod instructions {
 	use super::*;
 
+	/// Creates and initializes an oracle account through a Prop AMM CPI.
 	#[derive(Clone, Copy, Debug)]
-	#[must_use]
+	#[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
 	pub struct Initialize<'a> {
-		accounts: accounts::Initialize<'a>,
+		/// Validated accounts required by the initialize instruction.
+		pub accounts: accounts::Initialize<'a>,
 	}
 
 	impl<'a> Initialize<'a> {
+		/// Builds an initialize CPI instruction.
 		#[inline(always)]
 		pub const fn new(accounts: accounts::Initialize<'a>) -> Self {
 			Self { accounts }
 		}
 
+		/// Invokes the Prop AMM program using transaction-level signatures.
 		#[inline(always)]
 		pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
 			self.invoke_signed(program, &[])
 		}
 
+		/// Invokes the Prop AMM program with additional PDA signer seeds.
 		#[inline(always)]
 		pub fn invoke_signed(
 			&self,
@@ -138,14 +160,19 @@ pub mod instructions {
 		}
 	}
 
+	/// Updates an oracle price through a Prop AMM CPI.
 	#[derive(Clone, Copy, Debug)]
-	#[must_use]
+	#[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
 	pub struct Update<'a> {
-		accounts: accounts::Update<'a>,
-		new_price: PodU64,
+		/// Validated accounts required by the update instruction.
+		pub accounts: accounts::Update<'a>,
+
+		/// New integer price to store in the oracle.
+		pub new_price: PodU64,
 	}
 
 	impl<'a> Update<'a> {
+		/// Builds an update CPI instruction.
 		#[inline(always)]
 		pub const fn new(accounts: accounts::Update<'a>, new_price: PodU64) -> Self {
 			Self {
@@ -154,11 +181,13 @@ pub mod instructions {
 			}
 		}
 
+		/// Invokes the Prop AMM program using transaction-level signatures.
 		#[inline(always)]
 		pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
 			self.invoke_signed(program, &[])
 		}
 
+		/// Invokes the Prop AMM program with additional PDA signer seeds.
 		#[inline(always)]
 		pub fn invoke_signed(
 			&self,
@@ -173,14 +202,19 @@ pub mod instructions {
 		}
 	}
 
+	/// Changes an oracle's authority through a Prop AMM CPI.
 	#[derive(Clone, Copy, Debug)]
-	#[must_use]
+	#[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
 	pub struct RotateAuthority<'a> {
-		accounts: accounts::RotateAuthority<'a>,
-		new_authority: Address,
+		/// Validated accounts required by the authority-rotation instruction.
+		pub accounts: accounts::RotateAuthority<'a>,
+
+		/// Address that becomes the new oracle authority.
+		pub new_authority: Address,
 	}
 
 	impl<'a> RotateAuthority<'a> {
+		/// Builds an authority-rotation CPI instruction.
 		#[inline(always)]
 		pub const fn new(accounts: accounts::RotateAuthority<'a>, new_authority: Address) -> Self {
 			Self {
@@ -189,11 +223,13 @@ pub mod instructions {
 			}
 		}
 
+		/// Invokes the Prop AMM program using transaction-level signatures.
 		#[inline(always)]
 		pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
 			self.invoke_signed(program, &[])
 		}
 
+		/// Invokes the Prop AMM program with additional PDA signer seeds.
 		#[inline(always)]
 		pub fn invoke_signed(
 			&self,
@@ -207,24 +243,6 @@ pub mod instructions {
 			ctx.invoke(&data, signers)
 		}
 	}
-}
-
-#[inline(always)]
-pub const fn initialize(accounts: accounts::Initialize<'_>) -> instructions::Initialize<'_> {
-	instructions::Initialize::new(accounts)
-}
-
-#[inline(always)]
-pub const fn update(accounts: accounts::Update<'_>, new_price: PodU64) -> instructions::Update<'_> {
-	instructions::Update::new(accounts, new_price)
-}
-
-#[inline(always)]
-pub const fn rotate_authority(
-	accounts: accounts::RotateAuthority<'_>,
-	new_authority: Address,
-) -> instructions::RotateAuthority<'_> {
-	instructions::RotateAuthority::new(accounts, new_authority)
 }
 
 #[cfg(test)]

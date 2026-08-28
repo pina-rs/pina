@@ -9,7 +9,7 @@ A Pina-native port of Anchor `anchor-next` benchmark example `bench/programs/pro
 <br>
 
 - A minimal oracle account with explicit discriminator-first Pod layout.
-- Non-PDA account initialization via `create_account(...)`.
+- Non-PDA account initialization via `CreateAccount { ... }.invoke()`.
 - Global update-authority checks modeled after Anchor `prop-amm` v2.
 - Authority rotation validated against stored account state.
 - Native unit tests plus Mollusk e2e coverage.

@@ -102,7 +102,13 @@ impl<'a> ProcessAccountInfos<'a> for CreateAccounts<'a> {
 		self.account.assert_empty()?;
 		self.system_program.assert_address(&system::ID)?;
 
-		create_account(self.authority, self.account, FloatDataAccount::SIZE, &ID)?;
+		CreateAccount {
+			from: self.authority,
+			to: self.account,
+			space: FloatDataAccount::SIZE as u64,
+			owner: &ID,
+		}
+		.invoke()?;
 
 		let mut account = self.account.as_account_mut::<FloatDataAccount>(&ID)?;
 		apply_create(&mut account, self.authority.address(), data_f32, data_f64);

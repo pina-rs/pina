@@ -1,19 +1,30 @@
 #![allow(unsafe_code)]
 
+use core::mem::size_of;
+
 use pina::Address;
+use pina::AllocateAccount;
+use pina::AllocateAccountWithBump;
+use pina::CloseAccount;
+use pina::CloseAccountZeroed;
 use pina::CpiContext;
 use pina::CpiHandle;
 use pina::CpiProgramId;
+use pina::CreateAccount;
+use pina::CreateProgramAccount;
+use pina::CreateProgramAccountWithBump;
+use pina::IntoDiscriminator;
 use pina::PdaSigner;
 use pina::Program;
 use pina::ProgramError;
+#[cfg(feature = "account-resize")]
+use pina::ReallocAccount;
+#[cfg(feature = "account-resize")]
+use pina::ReallocAccountZeroed;
+use pina::Seed;
+use pina::Signer;
 use pina::ToCpiAccounts;
-use pina::allocate_account_with_bump;
 use pina::combine_seeds_with_bump;
-#[cfg(feature = "account-resize")]
-use pina::realloc_account;
-#[cfg(feature = "account-resize")]
-use pina::realloc_account_zero;
 use pina::try_find_program_address;
 use pinocchio::AccountView;
 #[cfg(feature = "account-resize")]
@@ -21,6 +32,17 @@ use pinocchio::account::MAX_PERMITTED_DATA_INCREASE;
 use pinocchio::account::NOT_BORROWED;
 use pinocchio::account::RuntimeAccount;
 use pinocchio::address::MAX_SEEDS;
+
+#[pina::discriminator(crate = ::pina)]
+enum BuilderAccountType {
+	BuilderState = 1,
+}
+
+#[pina::account(crate = ::pina, discriminator = BuilderAccountType)]
+#[allow(dead_code)]
+struct BuilderState {
+	value: u8,
+}
 
 #[test]
 fn combine_seeds_with_bump_basic() {
@@ -115,7 +137,7 @@ fn pda_signer_from_slice_array_matches_constructor() {
 fn pda_signer_from_seed_array_matches_constructor() {
 	let seed_a: &[u8] = b"escrow";
 	let bump: &[u8] = &[42];
-	let seed_array = [pina::Seed::from(seed_a), pina::Seed::from(bump)];
+	let seed_array = [Seed::from(seed_a), Seed::from(bump)];
 	let signer = PdaSigner::from(seed_array);
 
 	assert_eq!(&*signer.as_seeds()[0], b"escrow");
@@ -128,17 +150,117 @@ fn max_permitted_data_increase_is_10_kib() {
 	assert_eq!(MAX_PERMITTED_DATA_INCREASE, 10_240);
 }
 
+#[test]
+fn create_account_builder_reaches_rent_lookup() {
+	let owner = Address::new_from_array([9u8; 32]);
+	let mut stored_from = TestAccount::<0>::new(Address::new_from_array([1u8; 32]), true, true);
+	let mut stored_to = TestAccount::<0>::new(Address::new_from_array([2u8; 32]), true, true);
+	let from = stored_from.view();
+	let to = stored_to.view();
+
+	let result = CreateAccount {
+		from: &from,
+		to: &to,
+		space: 8,
+		owner: &owner,
+	}
+	.invoke();
+
+	assert_eq!(result, Err(ProgramError::UnsupportedSysvar));
+}
+
+#[test]
+fn program_account_builders_validate_the_target_before_rent_lookup() {
+	let owner = Address::new_from_array([5u8; 32]);
+	let seeds: &[&[u8]] = &[b"builder"];
+	let (address, bump) =
+		try_find_program_address(seeds, &owner).unwrap_or_else(|| panic!("expected builder PDA"));
+	let mut stored_target = TestAccount::<0>::new(address, false, true);
+	stored_target.header.lamports = 0;
+	let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([6u8; 32]), true, true);
+	let mut target = stored_target.view();
+	let payer = stored_payer.view();
+
+	let canonical_result = CreateProgramAccount {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+	}
+	.invoke::<BuilderState>();
+	assert_eq!(canonical_result, Err(ProgramError::UnsupportedSysvar));
+
+	let explicit_result = CreateProgramAccountWithBump {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+		bump,
+	}
+	.invoke::<BuilderState>();
+	assert_eq!(explicit_result, Err(ProgramError::UnsupportedSysvar));
+}
+
+#[test]
+fn close_account_builders_transfer_lamports_and_optionally_clear_data() {
+	let mut stored_plain = TestAccount::<8>::new(Address::new_from_array([1u8; 32]), false, true);
+	let mut stored_zeroed = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), false, true);
+	let mut stored_recipient =
+		TestAccount::<0>::new(Address::new_from_array([3u8; 32]), false, true);
+	stored_plain.header.lamports = 10;
+	stored_zeroed.header.lamports = 20;
+	stored_recipient.header.lamports = 5;
+	stored_plain.data.fill(7);
+	stored_zeroed.data.fill(9);
+	let mut plain = stored_plain.view();
+	let mut zeroed = stored_zeroed.view();
+	let mut recipient = stored_recipient.view();
+
+	CloseAccount {
+		account: &mut plain,
+		recipient: &mut recipient,
+	}
+	.invoke()
+	.unwrap_or_else(|error| panic!("close plain account: {error:?}"));
+	CloseAccountZeroed {
+		account: &mut zeroed,
+		recipient: &mut recipient,
+	}
+	.invoke()
+	.unwrap_or_else(|error| panic!("close zeroed account: {error:?}"));
+
+	assert_eq!(plain.lamports(), 0);
+	assert_eq!(zeroed.lamports(), 0);
+	assert_eq!(recipient.lamports(), 35);
+	assert_eq!(stored_plain.data, [7; 8]);
+	assert_eq!(stored_zeroed.data, [0; 8]);
+}
+
 #[cfg(feature = "account-resize")]
 #[test]
-fn realloc_functions_are_exported() {
-	let _grow: fn(&mut AccountView, usize, &mut AccountView, &Address) -> pinocchio::ProgramResult =
-		realloc_account;
-	let _grow_zero: fn(
-		&mut AccountView,
-		usize,
-		&mut AccountView,
-		&Address,
-	) -> pinocchio::ProgramResult = realloc_account_zero;
+fn realloc_builders_are_exported() {
+	assert!(size_of::<ReallocAccount<'static, 'static, 'static>>() > 0);
+	assert!(size_of::<ReallocAccountZeroed<'static, 'static, 'static>>() > 0);
+}
+
+#[cfg(feature = "account-resize")]
+#[test]
+fn realloc_zeroed_builder_accepts_an_unchanged_size() {
+	let owner = Address::new_from_array([9u8; 32]);
+	let mut stored_account = TestAccount::<8>::new(Address::new_from_array([1u8; 32]), false, true);
+	let mut stored_payer = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
+	let mut account = stored_account.view();
+	let mut payer = stored_payer.view();
+
+	let result = ReallocAccountZeroed {
+		account: &mut account,
+		payer: &mut payer,
+		new_size: 8,
+		program_id: &owner,
+	}
+	.invoke();
+
+	assert_eq!(result, Ok(()));
 }
 
 #[cfg(feature = "account-resize")]
@@ -156,7 +278,13 @@ fn realloc_rejects_an_active_borrow_before_moving_rent() {
 		.try_borrow()
 		.unwrap_or_else(|error| panic!("borrow account data: {error:?}"));
 
-	let result = realloc_account(&mut account, 16, &mut payer, &owner);
+	let result = ReallocAccount {
+		account: &mut account,
+		payer: &mut payer,
+		new_size: 16,
+		program_id: &owner,
+	}
+	.invoke();
 
 	assert_eq!(result, Err(ProgramError::AccountBorrowFailed));
 	assert_eq!(account.lamports(), account_lamports);
@@ -177,7 +305,13 @@ fn realloc_rejects_oversized_single_growth_before_moving_rent() {
 	let payer_lamports = payer.lamports();
 	let new_size = account.data_len() + MAX_PERMITTED_DATA_INCREASE + 1;
 
-	let result = realloc_account(&mut account, new_size, &mut payer, &owner);
+	let result = ReallocAccount {
+		account: &mut account,
+		payer: &mut payer,
+		new_size,
+		program_id: &owner,
+	}
+	.invoke();
 
 	assert_eq!(result, Err(ProgramError::InvalidRealloc));
 	assert_eq!(account.lamports(), account_lamports);
@@ -197,7 +331,13 @@ fn realloc_allows_the_maximum_single_growth_through_preflight() {
 	let payer_lamports = payer.lamports();
 	let new_size = account.data_len() + MAX_PERMITTED_DATA_INCREASE;
 
-	let result = realloc_account(&mut account, new_size, &mut payer, &owner);
+	let result = ReallocAccount {
+		account: &mut account,
+		payer: &mut payer,
+		new_size,
+		program_id: &owner,
+	}
+	.invoke();
 
 	// Host tests cannot load the on-chain Rent sysvar. Reaching that error proves
 	// the exact runtime growth limit passed the preflight `>` check.
@@ -335,7 +475,15 @@ fn assert_noncanonical_allocation_rejected(lamports: u64) {
 	let target_view = target.view();
 	let payer_view = payer.view();
 
-	let result = allocate_account_with_bump(&target_view, &payer_view, 8, &owner, seeds, bump);
+	let result = AllocateAccountWithBump {
+		account: &target_view,
+		payer: &payer_view,
+		space: 8,
+		owner: &owner,
+		seeds,
+		bump,
+	}
+	.invoke();
 	assert!(matches!(result, Err(ProgramError::InvalidSeeds)));
 }
 
@@ -361,8 +509,95 @@ fn allocation_accepts_canonical_target_before_rent_lookup() {
 	let target_view = target.view();
 	let payer_view = payer.view();
 
-	let result = allocate_account_with_bump(&target_view, &payer_view, 8, &owner, seeds, bump);
+	let result = AllocateAccountWithBump {
+		account: &target_view,
+		payer: &payer_view,
+		space: 8,
+		owner: &owner,
+		seeds,
+		bump,
+	}
+	.invoke();
 	assert_eq!(result, Err(ProgramError::UnsupportedSysvar));
+}
+
+#[test]
+fn canonical_allocation_builder_reaches_rent_lookup() {
+	let owner = Address::new_from_array([5u8; 32]);
+	let seeds: &[&[u8]] = &[b"state"];
+	let (address, _) =
+		try_find_program_address(seeds, &owner).unwrap_or_else(|| panic!("expected state PDA"));
+	let mut target = TestAccount::<0>::new(address, false, true);
+	target.header.lamports = 0;
+	let mut payer = TestAccount::<0>::new(Address::new_from_array([6u8; 32]), true, true);
+	let target_view = target.view();
+	let payer_view = payer.view();
+
+	let result = AllocateAccount {
+		account: &target_view,
+		payer: &payer_view,
+		space: 8,
+		owner: &owner,
+		seeds,
+	}
+	.invoke();
+
+	assert_eq!(result, Err(ProgramError::UnsupportedSysvar));
+}
+
+#[test]
+fn canonical_builders_reject_seed_lists_that_cannot_form_a_pda() {
+	let owner = Address::new_from_array([5u8; 32]);
+	let seed = [1u8];
+	let seeds = [&seed[..]; MAX_SEEDS];
+	let mut stored_target = TestAccount::<0>::new(Address::new_from_array([7u8; 32]), false, true);
+	let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([6u8; 32]), true, true);
+	let mut target = stored_target.view();
+	let payer = stored_payer.view();
+
+	let create_result = CreateProgramAccount {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds: &seeds,
+	}
+	.invoke::<BuilderState>();
+	assert_eq!(create_result, Err(ProgramError::InvalidSeeds));
+
+	let allocate_result = AllocateAccount {
+		account: &target,
+		payer: &payer,
+		space: 8,
+		owner: &owner,
+		seeds: &seeds,
+	}
+	.invoke();
+	assert_eq!(allocate_result, Err(ProgramError::InvalidSeeds));
+}
+
+#[test]
+fn allocation_rejects_more_signers_than_the_runtime_accepts() {
+	let owner = Address::new_from_array([5u8; 32]);
+	let seeds: &[&[u8]] = &[b"state"];
+	let mut target = TestAccount::<0>::new(Address::new_from_array([7u8; 32]), false, true);
+	let mut payer = TestAccount::<0>::new(Address::new_from_array([6u8; 32]), true, true);
+	let target_view = target.view();
+	let payer_view = payer.view();
+	let empty_seeds: [Seed<'_>; 0] = [];
+	let signer = Signer::from(&empty_seeds);
+	let signers: [Signer<'_, '_>; 16] = core::array::from_fn(|_| signer.clone());
+
+	let result = AllocateAccountWithBump {
+		account: &target_view,
+		payer: &payer_view,
+		space: 8,
+		owner: &owner,
+		seeds,
+		bump: 0,
+	}
+	.invoke_signed(&signers);
+
+	assert_eq!(result, Err(ProgramError::InvalidArgument));
 }
 
 #[test]

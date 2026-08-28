@@ -192,13 +192,14 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 				self.token_program.address(),
 			)?;
 
-		create_program_account_with_bump::<VestingState>(
-			self.vesting_state,
-			self.admin,
-			&ID,
-			&vesting_seeds.as_slices(),
-			args.bump,
-		)?;
+		CreateProgramAccountWithBump {
+			account: self.vesting_state,
+			payer: self.admin,
+			owner: &ID,
+			seeds: &vesting_seeds.as_slices(),
+			bump: args.bump,
+		}
+		.invoke::<VestingState>()?;
 
 		let mut vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
 		vesting_state.admin = admin_address;
