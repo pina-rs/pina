@@ -60,6 +60,25 @@ fn lint(cx: &LateContext<'_>, span: rustc_span::Span) {
 	});
 }
 
+fn visit_block(cx: &LateContext<'_>, block: &rustc_hir::Block<'_>) {
+	for statement in block.stmts {
+		match &statement.kind {
+			rustc_hir::StmtKind::Let(local) => {
+				if let Some(initializer) = local.init {
+					visit_expr(cx, initializer);
+				}
+			}
+			rustc_hir::StmtKind::Expr(expr) | rustc_hir::StmtKind::Semi(expr) => {
+				visit_expr(cx, expr);
+			}
+			_ => {}
+		}
+	}
+	if let Some(expr) = block.expr {
+		visit_expr(cx, expr);
+	}
+}
+
 fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 	match &expr.kind {
 		ExprKind::MethodCall(segment, receiver, args, _) => {
@@ -93,24 +112,7 @@ fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 				visit_expr(cx, argument);
 			}
 		}
-		ExprKind::Block(block, _) => {
-			for statement in block.stmts {
-				match &statement.kind {
-					rustc_hir::StmtKind::Let(local) => {
-						if let Some(initializer) = local.init {
-							visit_expr(cx, initializer);
-						}
-					}
-					rustc_hir::StmtKind::Expr(expr) | rustc_hir::StmtKind::Semi(expr) => {
-						visit_expr(cx, expr);
-					}
-					_ => {}
-				}
-			}
-			if let Some(expr) = block.expr {
-				visit_expr(cx, expr);
-			}
-		}
+		ExprKind::Block(block, _) | ExprKind::Loop(block, ..) => visit_block(cx, block),
 		ExprKind::Match(scrutinee, arms, _) => {
 			visit_expr(cx, scrutinee);
 			for arm in *arms {
@@ -122,15 +124,6 @@ fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 			visit_expr(cx, then);
 			if let Some(otherwise) = otherwise {
 				visit_expr(cx, otherwise);
-			}
-		}
-		ExprKind::Loop(block, ..) => {
-			for statement in block.stmts {
-				if let rustc_hir::StmtKind::Expr(expr) | rustc_hir::StmtKind::Semi(expr) =
-					statement.kind
-				{
-					visit_expr(cx, expr);
-				}
 			}
 		}
 		ExprKind::Unary(_, inner)
@@ -166,6 +159,7 @@ fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 				visit_expr(cx, base);
 			}
 		}
+		ExprKind::Ret(Some(inner)) | ExprKind::Break(_, Some(inner)) => visit_expr(cx, inner),
 		_ => {}
 	}
 }

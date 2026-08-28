@@ -25,6 +25,25 @@ dylint_linting::declare_late_lint! {
 	"remaining-account loops require an explicit maximum"
 }
 
+fn visit_block(cx: &LateContext<'_>, block: &rustc_hir::Block<'_>) {
+	for statement in block.stmts {
+		match &statement.kind {
+			rustc_hir::StmtKind::Let(local) => {
+				if let Some(initializer) = local.init {
+					visit_expr(cx, initializer);
+				}
+			}
+			rustc_hir::StmtKind::Expr(expr) | rustc_hir::StmtKind::Semi(expr) => {
+				visit_expr(cx, expr);
+			}
+			_ => {}
+		}
+	}
+	if let Some(expr) = block.expr {
+		visit_expr(cx, expr);
+	}
+}
+
 fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 	match &expr.kind {
 		ExprKind::Loop(block, ..) => {
@@ -33,7 +52,12 @@ fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 				.source_map()
 				.span_to_snippet(expr.span)
 				.unwrap_or_default();
-			if snippet.to_ascii_lowercase().contains("remaining") && !snippet.contains(".take(") {
+			let loop_header = snippet
+				.split_once('{')
+				.map_or(snippet.as_str(), |(header, _)| header);
+			if loop_header.to_ascii_lowercase().contains("remaining")
+				&& !loop_header.contains(".take(")
+			{
 				cx.lint(REQUIRE_BOUNDED_REMAINING_ACCOUNTS, |diag| {
 					diag.span(expr.span);
 					diag.primary_message(
@@ -46,13 +70,7 @@ fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 				});
 			}
 
-			for statement in block.stmts {
-				if let rustc_hir::StmtKind::Expr(expr) | rustc_hir::StmtKind::Semi(expr) =
-					statement.kind
-				{
-					visit_expr(cx, expr);
-				}
-			}
+			visit_block(cx, block);
 		}
 		ExprKind::MethodCall(_, receiver, args, _) => {
 			visit_expr(cx, receiver);
@@ -66,24 +84,7 @@ fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 				visit_expr(cx, argument);
 			}
 		}
-		ExprKind::Block(block, _) => {
-			for statement in block.stmts {
-				match &statement.kind {
-					rustc_hir::StmtKind::Let(local) => {
-						if let Some(initializer) = local.init {
-							visit_expr(cx, initializer);
-						}
-					}
-					rustc_hir::StmtKind::Expr(expr) | rustc_hir::StmtKind::Semi(expr) => {
-						visit_expr(cx, expr);
-					}
-					_ => {}
-				}
-			}
-			if let Some(expr) = block.expr {
-				visit_expr(cx, expr);
-			}
-		}
+		ExprKind::Block(block, _) => visit_block(cx, block),
 		ExprKind::Match(scrutinee, arms, _) => {
 			visit_expr(cx, scrutinee);
 			for arm in *arms {
@@ -132,6 +133,7 @@ fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 				visit_expr(cx, base);
 			}
 		}
+		ExprKind::Ret(Some(inner)) | ExprKind::Break(_, Some(inner)) => visit_expr(cx, inner),
 		_ => {}
 	}
 }

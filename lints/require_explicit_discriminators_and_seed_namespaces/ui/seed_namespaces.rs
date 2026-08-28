@@ -17,6 +17,8 @@ impl State {
 const CONFIG_SEED: &[u8] = b"config";
 const SEED: &[u8] = b"generic";
 
+fn assert_seeds(_seeds: &[&[u8]]) {}
+
 fn process_named_constant(account: &AccountView, authority: &[u8]) {
 	let seeds = &[CONFIG_SEED, authority];
 	account.assert_seeds(seeds);
@@ -40,6 +42,12 @@ fn process_inline_namespace(account: &AccountView, authority: &[u8]) {
 fn process_missing_namespace(account: &AccountView, authority: &[u8]) {
 	let seeds = &[authority];
 	account.assert_seeds(seeds);
+	//~^ WARN: seed-based example code should use explicit byte-string namespaces and visible discriminator markers
+}
+
+fn process_local_helper(authority: &[u8]) {
+	let seeds = &[authority];
+	assert_seeds(seeds);
 	//~^ WARN: seed-based example code should use explicit byte-string namespaces and visible discriminator markers
 }
 

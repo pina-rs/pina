@@ -13,4 +13,32 @@ fn process_unbounded(remaining: &[u8]) {
 	}
 }
 
+fn process_loop_initializer(remaining: &[u8]) {
+	loop {
+		let _value = {
+			for account in remaining {
+				//~^ ERROR: remaining accounts are processed without an explicit bound
+				let _ = account;
+			}
+		};
+		break;
+	}
+}
+
+fn process_return_payload(remaining: &[u8]) {
+	return for account in remaining {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	};
+}
+
+fn process_break_payload(remaining: &[u8]) {
+	loop {
+		break for account in remaining {
+			//~^ ERROR: remaining accounts are processed without an explicit bound
+			let _ = account;
+		};
+	}
+}
+
 fn main() {}

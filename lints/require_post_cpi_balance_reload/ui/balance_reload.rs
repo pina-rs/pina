@@ -56,4 +56,32 @@ fn process_without_reload(
 	//~^ ERROR: transfer into `vault` is not accounted from its observed balance delta
 }
 
+fn process_unrelated_cpi_before_transfer(
+	source: &Account,
+	mint: &Account,
+	vault: &Account,
+	owner: &Account,
+) -> Result<(), ()> {
+	let transfer = TransferChecked::new(source, mint, vault, owner, 10, 0);
+	let _before = vault.amount();
+	CreateAccount::new(source, mint, vault, owner, 10).invoke()?;
+	transfer.invoke()
+	//~^ ERROR: transfer into `vault` is not accounted from its observed balance delta
+}
+
+fn process_unrelated_cpi_before_reload(
+	source: &Account,
+	mint: &Account,
+	vault: &Account,
+	owner: &Account,
+) -> Result<(), ()> {
+	let transfer = TransferChecked::new(source, mint, vault, owner, 10, 0);
+	let _before = vault.amount();
+	transfer.invoke()?;
+	//~^ ERROR: transfer into `vault` is not accounted from its observed balance delta
+	CreateAccount::new(source, mint, vault, owner, 10).invoke()?;
+	let _after = vault.amount();
+	Ok(())
+}
+
 fn main() {}

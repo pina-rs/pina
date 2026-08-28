@@ -33,6 +33,23 @@ const TARGET_METHODS: &[&str] = &[
 ];
 const POLICY_METHODS: &[&str] = &["assert_extensions_allowed", "assert_no_extensions"];
 
+fn policy_matches(load: &shared::CallInfo, policy: &shared::CallInfo) -> bool {
+	if !POLICY_METHODS.contains(&policy.method.as_str()) {
+		return false;
+	}
+
+	if let Some(binding) = load.result_binding.as_deref()
+		&& (policy.receiver.as_deref() == Some(binding)
+			|| policy.result_binding.as_deref() == Some(binding))
+	{
+		return true;
+	}
+
+	policy
+		.receiver_span
+		.is_some_and(|receiver| receiver.contains(load.span))
+}
+
 impl<'tcx> LateLintPass<'tcx> for RequireExplicitToken2022ExtensionPolicy {
 	fn check_fn(
 		&mut self,
@@ -61,7 +78,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireExplicitToken2022ExtensionPolicy {
 				.map_or(facts.calls.len(), |offset| index + 1 + offset);
 			let has_policy = facts.calls[index + 1..next_load]
 				.iter()
-				.any(|next| POLICY_METHODS.contains(&next.method.as_str()));
+				.any(|next| policy_matches(call, next));
 			if has_policy {
 				continue;
 			}

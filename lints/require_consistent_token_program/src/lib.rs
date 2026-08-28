@@ -6,6 +6,8 @@ mod shared;
 extern crate rustc_hir;
 extern crate rustc_span;
 
+use std::collections::HashSet;
+
 use rustc_hir::intravisit::FnKind;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
@@ -59,6 +61,8 @@ impl<'tcx> LateLintPass<'tcx> for RequireConsistentTokenProgram {
 
 		let facts = shared::collect_function_facts(body);
 		let mut expected = None;
+		let mut previous_usage = None;
+		let mut reported_reassignments = HashSet::new();
 		for call in &facts.calls {
 			let Some(argument) = program_argument(call) else {
 				continue;
@@ -66,10 +70,32 @@ impl<'tcx> LateLintPass<'tcx> for RequireConsistentTokenProgram {
 			let identity = argument;
 			let Some(first) = expected else {
 				expected = Some(identity);
+				previous_usage = Some(call);
 				continue;
 			};
 
 			if identity == first {
+				let was_reassigned = previous_usage.is_some_and(|previous: &shared::CallInfo| {
+					facts.assignments.iter().any(|assignment| {
+						assignment.identity == identity
+							&& previous.span.hi() <= assignment.span.lo()
+							&& assignment.span.hi() <= call.span.lo()
+					})
+				});
+				if was_reassigned && reported_reassignments.insert(identity.to_string()) {
+					cx.lint(REQUIRE_CONSISTENT_TOKEN_PROGRAM, |diag| {
+						diag.span(call.span);
+						diag.primary_message(format!(
+							"token-program value `{identity}` was reassigned between token \
+							 operations"
+						));
+						diag.help(
+							"validate the token-program account once, copy its address into an \
+							 immutable binding, and reuse that binding for every token operation",
+						);
+					});
+				}
+				previous_usage = Some(call);
 				continue;
 			}
 
@@ -83,6 +109,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireConsistentTokenProgram {
 					 same value to token parsing, ATA checks, and CPI",
 				);
 			});
+			previous_usage = Some(call);
 		}
 	}
 }

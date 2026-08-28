@@ -43,4 +43,16 @@ fn process_mixed_constants(mint: &Account, vault: &Account, owner: &[u8]) -> Res
 	//~^ ERROR: token operation uses `token_2022::ID` after the instruction established `token::ID`
 }
 
+fn process_reassigned(
+	mint: &Account,
+	vault: &Account,
+	owner: &[u8],
+	mut program: &[u8],
+) -> Result<(), ()> {
+	mint.as_token_mint_for_program(program)?;
+	program = &token_2022::ID;
+	vault.assert_associated_token_address(owner, owner, program)
+	//~^ ERROR: token-program value `program` was reassigned between token operations
+}
+
 fn main() {}

@@ -28,4 +28,18 @@ fn process_borrowed(account: &mut Account, cpi: &Cpi) -> Result<(), ()> {
 	//~^ ERROR: CPI invoked while a mutable account-data borrow is still alive
 }
 
+fn process_return_payload(account: &mut Account, cpi: &Cpi) -> Result<(), ()> {
+	let _guard = account.try_borrow_mut()?;
+	return cpi.invoke();
+	//~^ ERROR: CPI invoked while a mutable account-data borrow is still alive
+}
+
+fn process_break_payload(account: &mut Account, cpi: &Cpi) -> Result<(), ()> {
+	let _guard = account.try_borrow_mut()?;
+	loop {
+		break cpi.invoke();
+		//~^ ERROR: CPI invoked while a mutable account-data borrow is still alive
+	}
+}
+
 fn main() {}

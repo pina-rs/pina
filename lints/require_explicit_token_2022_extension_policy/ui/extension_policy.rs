@@ -36,4 +36,14 @@ fn process_two_mints_with_one_policy(
 	//~^ ERROR: Token-2022-capable mint loaded without an explicit extension policy
 }
 
+fn process_unrelated_policy(
+	account: &Account,
+	other_mint: &Mint,
+	program: &[u8],
+) -> Result<(), ()> {
+	other_mint.assert_no_extensions()?;
+	account.as_token_mint_for_program(program).map(|_| ())
+	//~^ ERROR: Token-2022-capable mint loaded without an explicit extension policy
+}
+
 fn main() {}

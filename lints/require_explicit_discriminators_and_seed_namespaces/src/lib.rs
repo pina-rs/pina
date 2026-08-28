@@ -62,14 +62,13 @@ impl<'tcx> LateLintPass<'tcx> for RequireExplicitDiscriminatorsAndSeedNamespaces
 				.next()
 				.is_some_and(|name| name == "SEED" || name.ends_with("_SEED"))
 		});
-		let uses_generated_seed_builder = facts.paths.iter().any(|path| path == "seeds")
-			|| facts.calls.iter().any(|call| {
-				call.receiver.is_none()
-					&& matches!(
-						call.method.as_str(),
-						"assert_seeds" | "assert_canonical_bump" | "assert_seeds_with_bump"
-					)
-			});
+		let uses_generated_seed_builder = facts.calls.iter().any(|call| {
+			call.is_type_relative
+				&& matches!(
+					call.method.as_str(),
+					"seeds" | "assert_seeds" | "assert_canonical_bump" | "assert_seeds_with_bump"
+				)
+		});
 		let seed_assertion = facts.calls.iter().find(|call| {
 			call.method == "assert_seeds"
 				|| call.method == "assert_canonical_bump"

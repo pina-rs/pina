@@ -15,4 +15,28 @@ LL |     balance.saturating_sub(amount)
    |
    = help: use `checked_add`, `checked_sub`, `checked_mul`, or `checked_div` and return an explicit program error on failure
 
-error: aborting due to 2 previous errors
+error: asset arithmetic can overflow, underflow, or silently saturate
+  --> $DIR/asset_arithmetic.rs:18:9
+   |
+LL |     return balance - amount;
+   |            ^^^^^^^^^^^^^^^^
+   |
+   = help: use `checked_add`, `checked_sub`, `checked_mul`, or `checked_div` and return an explicit program error on failure
+
+error: asset arithmetic can overflow, underflow, or silently saturate
+  --> $DIR/asset_arithmetic.rs:24:23
+   |
+LL |         let _next_balance = balance - amount;
+   |                             ^^^^^^^^^^^^^^^^
+   |
+   = help: use `checked_add`, `checked_sub`, `checked_mul`, or `checked_div` and return an explicit program error on failure
+
+error: asset arithmetic can overflow, underflow, or silently saturate
+  --> $DIR/asset_arithmetic.rs:32:9
+   |
+LL |         break balance - amount;
+   |               ^^^^^^^^^^^^^^^^
+   |
+   = help: use `checked_add`, `checked_sub`, `checked_mul`, or `checked_div` and return an explicit program error on failure
+
+error: aborting due to 5 previous errors

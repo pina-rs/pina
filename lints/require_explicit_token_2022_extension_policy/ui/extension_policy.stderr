@@ -15,4 +15,12 @@ LL |     second.as_token_mint_for_program(program).map(|_| ())
    |
    = help: bind the mint view and call `assert_no_extensions()` or `assert_extensions_allowed(&[...])` before using its base fields
 
-error: aborting due to 2 previous errors
+error: Token-2022-capable mint loaded without an explicit extension policy
+  --> $DIR/extension_policy.rs:45:2
+   |
+LL |     account.as_token_mint_for_program(program).map(|_| ())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: bind the mint view and call `assert_no_extensions()` or `assert_extensions_allowed(&[...])` before using its base fields
+
+error: aborting due to 3 previous errors

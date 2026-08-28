@@ -11,7 +11,7 @@ Register the libraries in the consuming workspace:
 ```toml
 [workspace.metadata.dylint]
 libraries = [
-	{ git = "https://github.com/pina-rs/pina", pattern = "lints/*" },
+	{ git = "https://github.com/pina-rs/pina", tag = "v0.11.0", pattern = "lints/*" },
 ]
 ```
 
@@ -209,7 +209,7 @@ let mint = mint.as_token_mint_for_program(&program_id)?;
 transfer.invoke_with_program(&program_id)?;
 ```
 
-The lint compares exact identifier paths, including module-qualified constants, so `token::ID` and `token_2022::ID` cannot collapse to the same terminal name. Copy and reuse a single validated address instead of independently deriving or hard-coding program IDs.
+The lint compares exact identifier paths, including module-qualified constants, so `token::ID` and `token_2022::ID` cannot collapse to the same terminal name. It also rejects reassignment of a program binding between token operations, because the same lexical name would otherwise hide a changed value. Copy and reuse a single immutable, validated address instead of independently deriving, mutating, or hard-coding program IDs.
 
 ### `require_explicit_token_2022_extension_policy`
 
@@ -223,7 +223,7 @@ let mint = mint_account
 	])?;
 ```
 
-Extensions can alter transfer, fee, hook, freeze, and authority semantics. Pina therefore requires an allow-list instead of treating the legacy base layout as a complete policy. The current analysis is function-scoped and requires a policy call after each load and before the next mint load. Keep each policy adjacent to its mint load so the lexical pairing also remains obvious to reviewers.
+Extensions can alter transfer, fee, hook, freeze, and authority semantics. Pina therefore requires an allow-list instead of treating the legacy base layout as a complete policy. The analysis pairs a policy with the concrete mint-view binding or with the same direct method chain; a policy asserted on a different mint does not satisfy the rule. Keep each policy adjacent to its mint load so the pairing also remains obvious to reviewers.
 
 Both policies are inherent, chainable methods on `TokenMintRef` and `TokenAccountRef`; they return the validated view rather than wrapping it in a separate free-function API.
 
@@ -240,7 +240,7 @@ let after = vault.as_token_account_for_program(&program_id)?.amount();
 let received = after.checked_sub(before).ok_or(ProgramError::ArithmeticOverflow)?;
 ```
 
-Token-2022 transfer fees can make `received` differ from the requested amount; Solana's [on-chain Token-2022 guide](https://www.solana-program.com/docs/token-2022/onchain) describes this accounting requirement. The lint recognizes source-visible `Transfer::new` and `TransferChecked::new` constructors, then applies a custody-name heuristic and tracks direct receiver expressions. Custody accounts should therefore use explicit names and direct reloads.
+Token-2022 transfer fees can make `received` differ from the requested amount; Solana's [on-chain Token-2022 guide](https://www.solana-program.com/docs/token-2022/onchain) describes this accounting requirement. The lint pairs each source-visible `Transfer::new` or `TransferChecked::new` constructor with the invocation of that exact builder. It requires the closest destination reads on each side of the transfer to have no intervening CPI, then applies a custody-name heuristic and tracks direct receiver expressions. Custody accounts should therefore use explicit names and direct reloads.
 
 ### `require_checked_asset_arithmetic`
 
@@ -314,7 +314,7 @@ const VAULT_SEED: &[u8] = b"vault";
 vault.assert_seeds(&[VAULT_SEED, authority.address().as_ref()], &ID)?;
 ```
 
-Associated seed helpers generated from `#[pda(...)]` are accepted because the macro declaration exposes the namespace at the account type. The rule is a reviewability warning and does not replace canonical bump validation.
+Associated seed helpers generated from `#[pda(...)]` are accepted because the macro declaration exposes the namespace at the account type. Receiver-less local functions named like assertion methods are not treated as framework proof. The rule is a reviewability warning and does not replace canonical bump validation.
 
 ## Suppression policy
 

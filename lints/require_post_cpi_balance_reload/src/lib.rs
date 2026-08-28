@@ -49,6 +49,29 @@ fn is_transfer_constructor(cx: &LateContext<'_>, call: &shared::CallInfo) -> boo
 	snippet.contains("Transfer::new(") || snippet.contains("TransferChecked::new(")
 }
 
+fn is_cpi_invocation(call: &shared::CallInfo) -> bool {
+	matches!(
+		call.method.as_str(),
+		"invoke" | "invoke_signed" | "invoke_with_program" | "invoke_signed_with_program"
+	)
+}
+
+fn invocation_matches(constructor: &shared::CallInfo, invocation: &shared::CallInfo) -> bool {
+	if !is_cpi_invocation(invocation) {
+		return false;
+	}
+
+	if let Some(binding) = constructor.result_binding.as_deref()
+		&& invocation.receiver.as_deref() == Some(binding)
+	{
+		return true;
+	}
+
+	invocation
+		.receiver_span
+		.is_some_and(|receiver| receiver.contains(constructor.span))
+}
+
 impl<'tcx> LateLintPass<'tcx> for RequirePostCpiBalanceReload {
 	fn check_fn(
 		&mut self,
@@ -78,14 +101,9 @@ impl<'tcx> LateLintPass<'tcx> for RequirePostCpiBalanceReload {
 				continue;
 			}
 
-			let invocation = facts.calls[index + 1..].iter().position(|next| {
-				matches!(
-					next.method.as_str(),
-					"invoke"
-						| "invoke_signed" | "invoke_with_program"
-						| "invoke_signed_with_program"
-				)
-			});
+			let invocation = facts.calls[index + 1..]
+				.iter()
+				.position(|next| invocation_matches(call, next));
 			let Some(invocation) = invocation.map(|offset| index + 1 + offset) else {
 				continue;
 			};
@@ -93,8 +111,21 @@ impl<'tcx> LateLintPass<'tcx> for RequirePostCpiBalanceReload {
 			let reads_amount = |candidate: &shared::CallInfo| {
 				candidate.method == "amount" && candidate.receiver.as_deref() == Some(destination)
 			};
-			let has_before = facts.calls[..index].iter().any(reads_amount);
-			let has_after = facts.calls[invocation + 1..].iter().any(reads_amount);
+			let before = facts.calls[..invocation].iter().rposition(reads_amount);
+			let has_before = before.is_some_and(|before| {
+				!facts.calls[before + 1..invocation]
+					.iter()
+					.any(is_cpi_invocation)
+			});
+			let after = facts.calls[invocation + 1..]
+				.iter()
+				.position(reads_amount)
+				.map(|offset| invocation + 1 + offset);
+			let has_after = after.is_some_and(|after| {
+				!facts.calls[invocation + 1..after]
+					.iter()
+					.any(is_cpi_invocation)
+			});
 			if has_before && has_after {
 				continue;
 			}

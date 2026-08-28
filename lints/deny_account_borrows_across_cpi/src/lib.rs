@@ -203,6 +203,9 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					self.visit_expr(base, active);
 				}
 			}
+			ExprKind::Ret(Some(inner)) | ExprKind::Break(_, Some(inner)) => {
+				self.visit_expr(inner, active);
+			}
 			_ => {}
 		}
 	}
