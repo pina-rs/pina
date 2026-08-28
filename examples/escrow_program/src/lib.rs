@@ -130,16 +130,24 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.maker.assert_signer()?;
-		let decimals = self
-			.mint_a
-			.as_token_mint_for_program(&token_program)?
-			.decimals();
-		drop(self.mint_b.as_token_mint_for_program(&token_program)?);
+		let mint_a = self.mint_a.as_token_mint_for_program(&token_program)?;
+		mint_a.assert_no_extensions()?;
+		let decimals = mint_a.decimals();
+		drop(mint_a);
+		let mint_b = self.mint_b.as_token_mint_for_program(&token_program)?;
+		mint_b.assert_no_extensions()?;
+		drop(mint_b);
 		drop(self.maker_ata_a.as_associated_token_account_checked(
 			self.maker.address(),
 			self.mint_a.address(),
 			&token_program,
 		)?);
+		let canonical_bump = self
+			.escrow
+			.assert_canonical_bump(&escrow_seeds.as_slices(), &ID)?;
+		if canonical_bump != args.bump {
+			return Err(ProgramError::InvalidSeeds);
+		}
 		self.escrow
 			.assert_empty()?
 			.assert_seeds_with_bump(&escrow_seeds_with_bump.as_slices(), &ID)?;
@@ -149,7 +157,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			.assert_associated_token_address(
 				self.escrow.address(),
 				self.mint_a.address(),
-				self.token_program.address(),
+				&token_program,
 			)?;
 
 		// Create the escrow account
@@ -167,7 +175,10 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		escrow.maker = *self.maker.address();
 		escrow.mint_a = *self.mint_a.address();
 		escrow.mint_b = *self.mint_b.address();
-		escrow.amount_a = args.amount_a;
+		// Record the observed vault delta after the transfer. The temporary zero
+		// prevents the requested amount from becoming protocol accounting before
+		// the CPI has actually delivered tokens.
+		escrow.amount_a.set(0);
 		escrow.amount_b = args.amount_b;
 		escrow.seed = args.seed;
 		escrow.bump = args.bump;
@@ -183,6 +194,14 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			token_program: self.token_program,
 		}
 		.invoke()?;
+		let vault_before = self
+			.vault
+			.as_associated_token_account_checked(
+				self.escrow.address(),
+				self.mint_a.address(),
+				&token_program,
+			)?
+			.amount();
 
 		// Transfer tokens to vault
 		token::instructions::TransferChecked::new(
@@ -194,6 +213,21 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			decimals,
 		)
 		.invoke_with_program(&token_program)?;
+
+		let vault_after = self
+			.vault
+			.as_associated_token_account_checked(
+				self.escrow.address(),
+				self.mint_a.address(),
+				&token_program,
+			)?
+			.amount();
+		let received = vault_after
+			.checked_sub(vault_before)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+
+		let mut escrow = self.escrow.as_account_mut::<EscrowState>(&ID)?;
+		escrow.amount_a.set(received);
 
 		Ok(())
 	}
@@ -266,15 +300,15 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		// Validate maker and mint accounts
 		self.maker.assert_address(&maker)?;
 		self.mint_a.assert_address(&mint_a)?;
-		let decimals_a = self
-			.mint_a
-			.as_token_mint_for_program(&token_program)?
-			.decimals();
+		let mint_a = self.mint_a.as_token_mint_for_program(&token_program)?;
+		mint_a.assert_no_extensions()?;
+		let decimals_a = mint_a.decimals();
+		drop(mint_a);
 		self.mint_b.assert_address(&mint_b)?;
-		let decimals_b = self
-			.mint_b
-			.as_token_mint_for_program(&token_program)?
-			.decimals();
+		let mint_b = self.mint_b.as_token_mint_for_program(&token_program)?;
+		mint_b.assert_no_extensions()?;
+		let decimals_b = mint_b.decimals();
+		drop(mint_b);
 
 		// Validate vault and maker ATA
 		self.vault.assert_not_empty()?.assert_writable()?;
@@ -291,7 +325,7 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			.assert_associated_token_address(
 				self.maker.address(),
 				self.mint_b.address(),
-				self.token_program.address(),
+				&token_program,
 			)?;
 
 		// Create maker's token B account if needed

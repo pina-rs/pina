@@ -190,12 +190,19 @@ impl<'a> ProcessAccountInfos<'a> for ForwardRotateWithPdaAccounts<'a> {
 		#[cfg(feature = "cpi-runtime-tests")]
 		{
 			let args = ForwardRotateWithPdaInstruction::try_from_bytes(data)?;
-			let seeds = AuthorityState::seeds().with_bump(args.bump);
-			let signer = seeds.to_signer();
+			let seeds = AuthorityState::seeds();
+			let canonical_bump = self
+				.authority
+				.assert_canonical_bump(&seeds.as_slices(), &ID)?;
+			if canonical_bump != args.bump {
+				return Err(ProgramError::InvalidSeeds);
+			}
+			let seeds_with_bump = seeds.with_bump(args.bump);
+			let signer = seeds_with_bump.to_signer();
 			let signers = [signer.as_signer()];
 
 			self.authority
-				.assert_seeds_with_bump(&seeds.as_slices(), &ID)?;
+				.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
 			let program = prop_amm_cpi::ProgramAccount::new(self.prop_amm_program)?;
 			let accounts = prop_amm_cpi::RotateAuthorityAccounts::new(self.oracle, self.authority)?;
 

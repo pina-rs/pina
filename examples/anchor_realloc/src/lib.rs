@@ -170,8 +170,13 @@ fn validate_sample(sample: AccountView, authority: &Address) -> ProgramResult {
 	let stored_authority = state.authority;
 	drop(data);
 
-	let seeds = Sample::seeds(authority).with_bump(bump);
-	sample.assert_seeds_with_bump(&seeds.as_slices(), &ID)?;
+	let seeds = Sample::seeds(authority);
+	let canonical_bump = sample.assert_canonical_bump(&seeds.as_slices(), &ID)?;
+	if canonical_bump != bump {
+		return Err(ProgramError::InvalidSeeds);
+	}
+	let seeds_with_bump = seeds.with_bump(bump);
+	sample.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
 
 	// The PDA check is the primary authority control. Retain the stored value as
 	// defense in depth against accidental writes from future program instructions.
@@ -190,6 +195,10 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		let seeds_with_bump = seeds.with_bump(args.bump);
 
 		self.authority.assert_signer()?.assert_writable()?;
+		let canonical_bump = self.sample.assert_canonical_bump(&seeds.as_slices(), &ID)?;
+		if canonical_bump != args.bump {
+			return Err(ProgramError::InvalidSeeds);
+		}
 		self.sample
 			.assert_empty()?
 			.assert_writable()?

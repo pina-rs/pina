@@ -1,0 +1,11 @@
+error: explicit PDA bump used without first proving the canonical address
+  --> $DIR/canonical_bump.rs:21:2
+   |
+LL |     account.assert_seeds_with_bump(seeds, program)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: call `account.assert_canonical_bump(seeds, program_id)?` before using an explicit bump, or use `assert_seeds()`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = note: `#[deny(req$DIRre_canonical_bump_before_pda_write)]` on by default
+
+error: aborting due to 1 previous error

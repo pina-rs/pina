@@ -522,6 +522,19 @@ fn add_token_2022_account_type(data: &mut Vec<u8>, account_type: token_2022::sta
 	data[ACCOUNT_TYPE_INDEX] = account_type as u8;
 }
 
+#[cfg(feature = "token")]
+fn add_token_2022_extension(
+	data: &mut Vec<u8>,
+	extension: token_2022::state::ExtensionType,
+	value: &[u8],
+) {
+	let value_len = u16::try_from(value.len())
+		.unwrap_or_else(|error| panic!("extension value is too large: {error}"));
+	data.extend_from_slice(&(extension as u16).to_le_bytes());
+	data.extend_from_slice(&value_len.to_le_bytes());
+	data.extend_from_slice(value);
+}
+
 // ---------------------------------------------------------------------------
 // Test: Full account lifecycle
 // ---------------------------------------------------------------------------
@@ -1757,6 +1770,7 @@ fn as_token_account_for_program_preserves_token_2022_state() {
 	assert_eq!(token_account.program_id(), &token_2022::ID);
 	assert!(token_account.legacy().is_none());
 	assert!(token_account.token_2022().is_some());
+	assert_eq!(token_account.assert_no_extensions(), Ok(()));
 
 	assert!(matches!(
 		shadow.try_borrow_mut(),
@@ -1794,6 +1808,92 @@ fn as_token_mint_for_program_preserves_token_2022_extensions() {
 	assert_eq!(mint.program_id(), &token_2022::ID);
 	assert!(mint.legacy().is_none());
 	assert!(mint.token_2022().is_some());
+	assert_eq!(mint.assert_no_extensions(), Ok(()));
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn token_mint_extension_policy_requires_an_explicit_allow_list() {
+	let mint_key: Address = address!("8qbHbw2BbbTHBW1sK7d7Yx4Z4DccnE9vrFica8FWHQrP");
+	let mut mint_data = build_token_mint_bytes(9, 42);
+	add_token_2022_account_type(&mut mint_data, token_2022::state::AccountType::Mint);
+	add_token_2022_extension(
+		&mut mint_data,
+		token_2022::state::ExtensionType::NonTransferable,
+		&[],
+	);
+
+	let accounts = [AccountBuilder::new()
+		.address(mint_key)
+		.owner(token_2022::ID)
+		.lamports(1_000_000)
+		.data(&mint_data)];
+
+	let mut input = unsafe { create_test_input(&accounts, &[0u8]) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+	let mint = account_views[0]
+		.as_token_mint_for_program(&token_2022::ID)
+		.unwrap_or_else(|error| panic!("token-program mint load failed: {error:?}"));
+
+	assert_eq!(
+		mint.assert_no_extensions(),
+		Err(ProgramError::InvalidAccountData)
+	);
+	assert_eq!(
+		mint.assert_extensions_allowed(&[token_2022::state::ExtensionType::PermanentDelegate]),
+		Err(ProgramError::InvalidAccountData)
+	);
+	assert_eq!(
+		mint.assert_extensions_allowed(&[token_2022::state::ExtensionType::NonTransferable]),
+		Ok(())
+	);
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn token_account_extension_policy_requires_an_explicit_allow_list() {
+	let token_account_key: Address = address!("6QWeT6FpJrm8AF1btu6WH2k2Xhq6t5vbheKVfQavmeoZ");
+	let mint: Address = address!("4hT5gDpr9HMmXzttW2Kz7LxyzKDn5XxhxL7sRKqGZo4x");
+	let owner: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let mut token_account_data = build_token_account_bytes(&mint, &owner, 88);
+	add_token_2022_account_type(
+		&mut token_account_data,
+		token_2022::state::AccountType::Account,
+	);
+	add_token_2022_extension(
+		&mut token_account_data,
+		token_2022::state::ExtensionType::ImmutableOwner,
+		&[],
+	);
+
+	let accounts = [AccountBuilder::new()
+		.address(token_account_key)
+		.owner(token_2022::ID)
+		.lamports(1_000_000)
+		.data(&token_account_data)];
+
+	let mut input = unsafe { create_test_input(&accounts, &[0u8]) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+	let token_account = account_views[0]
+		.as_token_account_for_program(&token_2022::ID)
+		.unwrap_or_else(|error| panic!("token-program account load failed: {error:?}"));
+
+	assert_eq!(
+		token_account.assert_no_extensions(),
+		Err(ProgramError::InvalidAccountData)
+	);
+	assert_eq!(
+		token_account
+			.assert_extensions_allowed(&[token_2022::state::ExtensionType::TransferHookAccount,]),
+		Err(ProgramError::InvalidAccountData)
+	);
+	assert_eq!(
+		token_account
+			.assert_extensions_allowed(&[token_2022::state::ExtensionType::ImmutableOwner]),
+		Ok(())
+	);
 }
 
 #[cfg(feature = "token")]

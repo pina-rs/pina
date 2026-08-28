@@ -1,0 +1,13 @@
+error: remaining accounts are processed without an explicit bound
+  --> $DIR/remaining_accounts.rs:10:2
+   |
+LL | /     for account in remaining {
+LL | |         //~^ ERROR: remaining accounts are processed without an explicit bound
+LL | |         let _ = account;
+LL | |     }
+   | |_____^
+   |
+   = help: define a protocol maximum and iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
+   = note: `#[deny(req$DIRre_bounded_remaining_accounts)]` on by default
+
+error: aborting due to 1 previous error

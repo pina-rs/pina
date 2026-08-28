@@ -116,18 +116,24 @@ fn collect_from_expr(expr: &Expr<'_>, facts: &mut FunctionFacts) {
 			for arg in *args {
 				collect_from_expr(arg, facts);
 			}
-			if let rustc_hir::ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) = &callee.kind {
-				let path_name = path
-					.segments
-					.iter()
-					.map(|segment| segment.ident.name.as_str())
-					.collect::<Vec<_>>()
-					.join("::");
-				let method = path
-					.segments
-					.last()
-					.map(|segment| segment.ident.name.as_str().to_string())
-					.unwrap_or_else(|| path_name.clone());
+			if let rustc_hir::ExprKind::Path(path) = &callee.kind {
+				let path_name = match path {
+					rustc_hir::QPath::Resolved(_, path) => {
+						path.segments
+							.iter()
+							.map(|segment| segment.ident.name.as_str())
+							.collect::<Vec<_>>()
+							.join("::")
+					}
+					rustc_hir::QPath::TypeRelative(_, segment) => {
+						segment.ident.name.as_str().to_string()
+					}
+				};
+				let method = path_name
+					.rsplit("::")
+					.next()
+					.unwrap_or(&path_name)
+					.to_string();
 				facts.calls.push(CallInfo {
 					span: expr.span,
 					method,

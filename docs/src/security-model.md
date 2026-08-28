@@ -2,6 +2,8 @@
 
 Pina's safety posture is built around explicit validation and predictable state transitions.
 
+The [Security Lints](./security-lints.md) page maps these invariants to the compile-time checks applied to every repository example and secure security fixture.
+
 ## Core invariants
 
 - Type correctness: account bytes must match expected discriminator and layout.

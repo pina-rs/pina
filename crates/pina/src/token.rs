@@ -8,6 +8,27 @@ use crate::Address;
 use crate::ProgramError;
 use crate::Ref;
 
+fn assert_extensions_allowed<B>(
+	state: &crate::token_2022::state::StateWithExtensions<B>,
+	allowed: &[crate::token_2022::state::ExtensionType],
+) -> Result<(), ProgramError>
+where
+	B: crate::token_2022::state::ExtensionBaseState,
+{
+	let mut extensions = [crate::token_2022::state::ExtensionType::Uninitialized;
+		crate::token_2022::state::MAX_EXTENSIONS];
+	let count = state.write_extension_types(&mut extensions)?;
+
+	if extensions[..count]
+		.iter()
+		.all(|extension| allowed.contains(extension))
+	{
+		return Ok(());
+	}
+
+	Err(ProgramError::InvalidAccountData)
+}
+
 pub mod state {
 	pub use pinocchio_token::state::*;
 
@@ -62,6 +83,36 @@ impl<'a> TokenMintRef<'a> {
 			Self::Legacy(_) => &ID,
 			Self::Token2022(_) => &crate::token_2022::ID,
 		}
+	}
+
+	/// Require every Token-2022 extension on this mint to appear in `allowed`.
+	///
+	/// Legacy SPL Token mints have no extensions and always satisfy the policy.
+	/// This check makes protocol support explicit instead of silently relying on
+	/// legacy base fields when Token-2022 changes transfer or authority semantics.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidAccountData`] when a Token-2022 extension is
+	/// not allow-listed, or propagates malformed extension-data errors.
+	pub fn assert_extensions_allowed(
+		&self,
+		allowed: &[crate::token_2022::state::ExtensionType],
+	) -> Result<(), ProgramError> {
+		match self {
+			Self::Legacy(_) => Ok(()),
+			Self::Token2022(mint) => assert_extensions_allowed(mint, allowed),
+		}
+	}
+
+	/// Reject every Token-2022 mint extension.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidAccountData`] when any extension is present,
+	/// or propagates malformed extension-data errors.
+	pub fn assert_no_extensions(&self) -> Result<(), ProgramError> {
+		self.assert_extensions_allowed(&[])
 	}
 
 	/// Borrow the legacy mint when this view belongs to SPL Token.
@@ -172,6 +223,37 @@ impl<'a> TokenAccountRef<'a> {
 			Self::Legacy(_) => &ID,
 			Self::Token2022(_) => &crate::token_2022::ID,
 		}
+	}
+
+	/// Require every Token-2022 extension on this token account to appear in
+	/// `allowed`.
+	///
+	/// Legacy SPL Token accounts have no extensions and always satisfy the
+	/// policy. Account policies should be paired with a mint policy because the
+	/// mint controls transfer-wide behavior such as fees and hooks.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidAccountData`] when a Token-2022 extension is
+	/// not allow-listed, or propagates malformed extension-data errors.
+	pub fn assert_extensions_allowed(
+		&self,
+		allowed: &[crate::token_2022::state::ExtensionType],
+	) -> Result<(), ProgramError> {
+		match self {
+			Self::Legacy(_) => Ok(()),
+			Self::Token2022(account) => assert_extensions_allowed(account, allowed),
+		}
+	}
+
+	/// Reject every Token-2022 token-account extension.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidAccountData`] when any extension is present,
+	/// or propagates malformed extension-data errors.
+	pub fn assert_no_extensions(&self) -> Result<(), ProgramError> {
+		self.assert_extensions_allowed(&[])
 	}
 
 	/// Borrow the legacy token account when this view belongs to SPL Token.
