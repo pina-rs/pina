@@ -9,7 +9,7 @@
 		"check:npm-packages": "node scripts/npm/check-packages.mjs",
 		"test:codama-nodes": "pnpm --filter @pina-rs/codama-nodes test",
 		"test:idls": "pnpm --filter pina-codama-idl-tests test",
-		"test:npm-packages": "node --test scripts/npm/tests/*.test.mjs",
+		"test:npm-packages": "node --test scripts/npm/tests/*.test.mjs scripts/lints/*.test.mjs",
 		"test:quasar-svm": "pnpm --filter pina-quasar-svm-e2e test",
 		"test": "pnpm run generate && pnpm run check:js"
 	},

@@ -8,6 +8,7 @@ import { libraryFilename } from "./build-bundle.mjs";
 import {
 	dylintBuildToolchain,
 	executableFilename,
+	tarCreateArguments,
 } from "./build-dylint-tools.mjs";
 
 const repositoryRoot = resolve(
@@ -51,6 +52,44 @@ test("Dylint tool filenames match Unix and Windows conventions", () => {
 	assert.equal(
 		executableFilename("cargo-dylint", "x86_64-pc-windows-msvc"),
 		"cargo-dylint.exe",
+	);
+});
+
+test("Windows Dylint archives force tar to treat drive paths as local", () => {
+	assert.deepEqual(
+		tarCreateArguments(
+			"C:\\assets\\dylint-tools.tar.gz",
+			"C:\\bundle",
+			["cargo-dylint.exe", "dylint-link.exe"],
+			"win32",
+		),
+		[
+			"--force-local",
+			"-czf",
+			"C:\\assets\\dylint-tools.tar.gz",
+			"-C",
+			"C:\\bundle",
+			"manifest.json",
+			"cargo-dylint.exe",
+			"dylint-link.exe",
+		],
+	);
+	assert.deepEqual(
+		tarCreateArguments(
+			"/tmp/assets/dylint-tools.tar.gz",
+			"/tmp/bundle",
+			["cargo-dylint", "dylint-link"],
+			"linux",
+		),
+		[
+			"-czf",
+			"/tmp/assets/dylint-tools.tar.gz",
+			"-C",
+			"/tmp/bundle",
+			"manifest.json",
+			"cargo-dylint",
+			"dylint-link",
+		],
 	);
 });
 
