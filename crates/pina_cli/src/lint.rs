@@ -21,7 +21,7 @@ pub const DYLINT_LINK_VERSION: &str = "6.0.4";
 ///
 /// Update this only after reviewing changes below `lints/`. Unlike a release
 /// tag, a full commit ID cannot be redirected to different native lint code.
-pub const PINA_LINT_REVISION: &str = "7aff2afb89cd34a13e1e9d6ff854bc16d12263cc";
+pub const PINA_LINT_REVISION: &str = "f6f206e0a4e71ab70c3eeaded52d07cd66a270d8";
 
 const PINA_REPOSITORY: &str = "https://github.com/pina-rs/pina";
 const PINA_LINT_PATTERN: &str = "lints/*";
