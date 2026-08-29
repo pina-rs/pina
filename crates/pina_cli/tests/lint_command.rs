@@ -46,6 +46,7 @@ fn executable(path: &Path, contents: &str) {
 struct Fixture {
 	_temp: TempDir,
 	project: PathBuf,
+	cargo_home: PathBuf,
 	cargo: PathBuf,
 	cargo_dylint: PathBuf,
 	dylint_link: PathBuf,
@@ -63,6 +64,7 @@ impl Fixture {
 			.unwrap_or_else(|error| panic!("failed to create project: {error}"));
 		write_project(&project);
 
+		let cargo_home = temp.path().join("cargo-home");
 		let cargo = temp.path().join("cargo");
 		let cargo_dylint = temp.path().join("cargo-dylint");
 		let dylint_link = temp.path().join("dylint-link");
@@ -131,6 +133,7 @@ fi
 		Self {
 			_temp: temp,
 			project,
+			cargo_home,
 			cargo,
 			cargo_dylint,
 			dylint_link,
@@ -145,6 +148,7 @@ fi
 			.args(["lint", "--project"])
 			.arg(&self.project)
 			.env("CARGO", &self.cargo)
+			.env("CARGO_HOME", &self.cargo_home)
 			.env("REAL_CARGO", real_cargo)
 			.env("PINA_LINT_LOG", &self.log)
 			.env("FAKE_CARGO_DYLINT_SOURCE", &self.cargo_dylint)
@@ -158,7 +162,7 @@ fi
 	}
 
 	fn managed_tool_root(&self) -> PathBuf {
-		self.project.join("target/pina/tools/dylint-6.0.4-6.0.4")
+		self.cargo_home.join("pina/tools/dylint-6.0.4-6.0.4")
 	}
 }
 
@@ -185,11 +189,11 @@ fn lint_installs_pinned_tools_once_and_runs_release_lints() {
 	assert!(first_log.contains("--version 6.0.4 dylint-link"));
 	assert!(first_log.contains("dylint dylint --no-deps"));
 	assert!(first_log.contains("--git https://github.com/pina-rs/pina"));
-	assert!(first_log.contains(&format!("--tag v{}", env!("CARGO_PKG_VERSION"))));
+	assert!(first_log.contains("--rev 7aff2afb89cd34a13e1e9d6ff854bc16d12263cc"));
 	assert!(first_log.contains("--pattern lints/\\*"));
 	assert!(first_log.contains("--package lint-fixture"));
 	assert!(first_log.contains("link="));
-	assert!(first_log.contains("/target/pina/tools/dylint-6.0.4-6.0.4/bin/dylint-link"));
+	assert!(first_log.contains("/cargo-home/pina/tools/dylint-6.0.4-6.0.4/bin/dylint-link"));
 
 	let second = fixture
 		.command()
@@ -224,6 +228,53 @@ fn lint_discovers_cargo_from_path_when_the_cargo_variable_is_absent() {
 		String::from_utf8_lossy(&output.stderr)
 	);
 	assert!(fixture.log().contains("cargo install --locked --root"));
+}
+
+#[test]
+fn lint_resolves_relative_cargo_home_from_the_invocation_directory() {
+	let fixture = Fixture::new("pina-lint-relative-cargo-home");
+	let invocation_directory = fixture._temp.path().join("invocation");
+	fs::create_dir_all(&invocation_directory)
+		.unwrap_or_else(|error| panic!("failed to create invocation directory: {error}"));
+	let output = fixture
+		.command()
+		.current_dir(&invocation_directory)
+		.env("CARGO_HOME", "relative-cargo-home")
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
+	assert!(
+		output.status.success(),
+		"pina lint failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert!(
+		invocation_directory
+			.join("relative-cargo-home/pina/tools/dylint-6.0.4-6.0.4/bin/cargo-dylint")
+			.is_file()
+	);
+}
+
+#[test]
+fn lint_defaults_managed_tools_to_the_platform_cargo_home() {
+	let fixture = Fixture::new("pina-lint-default-cargo-home");
+	let home = fixture._temp.path().join("home");
+	fs::create_dir_all(&home)
+		.unwrap_or_else(|error| panic!("failed to create platform home: {error}"));
+	let output = fixture
+		.command()
+		.env_remove("CARGO_HOME")
+		.env("HOME", &home)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
+	assert!(
+		output.status.success(),
+		"pina lint failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert!(
+		home.join(".cargo/pina/tools/dylint-6.0.4-6.0.4/bin/cargo-dylint")
+			.is_file()
+	);
 }
 
 #[test]
@@ -358,12 +409,12 @@ fn lint_reports_an_invalid_managed_tool_path() {
 #[test]
 fn lint_reports_when_the_managed_tool_directory_cannot_be_created() {
 	let fixture = Fixture::new("pina-lint-tool-directory");
-	let target = fixture.project.join("blocked-target");
-	fs::write(&target, "not a directory")
-		.unwrap_or_else(|error| panic!("failed to create blocked target: {error}"));
+	let cargo_home = fixture.project.join("blocked-cargo-home");
+	fs::write(&cargo_home, "not a directory")
+		.unwrap_or_else(|error| panic!("failed to block Cargo home: {error}"));
 	let output = fixture
 		.command()
-		.env("CARGO_TARGET_DIR", &target)
+		.env("CARGO_HOME", &cargo_home)
 		.output()
 		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
 	assert!(!output.status.success());

@@ -11,4 +11,4 @@ The repository's Dylint runner, linker, lint authoring API, and lint test harnes
 
 The seed-namespace lint now distinguishes generated associated `seeds` builders from unrelated local bindings, closing a false-negative path while preserving the ergonomic generated-builder exemption.
 
-New `pina init` projects now register the same release-matched lint set and Dylint binary versions in Cargo workspace metadata. Generated next steps, project documentation, and the Pina agent skill include the security lint workflow.
+New `pina init` projects now register the same immutable-revision lint set and Dylint binary versions in Cargo workspace metadata. Generated next steps, project documentation, and the Pina agent skill include the security lint workflow.

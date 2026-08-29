@@ -32,7 +32,7 @@ The shortcut runs `cargo run -p pina_cli -- ...` against the checked-out source.
 | Command                                        | Purpose                                                      | Primary output                            |
 | ---------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------- |
 | [`pina init`](./init.md)                       | Create a project-aware program scaffold                      | Files plus next steps                     |
-| [`pina lint`](./lint.md)                       | Run the release-matched Pina security lint set               | Dylint diagnostics and optional fixes     |
+| [`pina lint`](./lint.md)                       | Run the revision-pinned Pina security lint set               | Dylint diagnostics and optional fixes     |
 | [`pina build`](./build.md)                     | Build SBF, optionally with deterministic verification inputs | SBF, IDL, and optional build-record files |
 | [`pina verify`](./verify.md)                   | Compare deployments and record verified source               | Status or transaction                     |
 | [`pina generate`](./generate.md)               | Generate configured client ecosystems                        | Generated clients                         |

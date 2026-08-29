@@ -120,7 +120,7 @@ pina init my_program
 pina init my_program --path ./programs/my_program --force
 ```
 
-Generated manifests register the release-matched official Pina lint set and its pinned Dylint tool versions.
+Generated manifests register the immutable-revision official Pina lint set and its pinned Dylint tool versions.
 
 ### `pina lint`
 

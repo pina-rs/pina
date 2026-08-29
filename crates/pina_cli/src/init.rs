@@ -6,6 +6,7 @@ use heck::ToUpperCamelCase;
 
 use crate::lint::CARGO_DYLINT_VERSION;
 use crate::lint::DYLINT_LINK_VERSION;
+use crate::lint::PINA_LINT_REVISION;
 
 // A non-system placeholder keeps the generated Surfpool deployment executable.
 // Users must still replace it before sharing or deploying the project.
@@ -175,7 +176,7 @@ dylint-link = {{ version = "{DYLINT_LINK_VERSION}", bins = ["dylint-link"] }}
 
 [workspace.metadata.dylint]
 libraries = [
-	{{ git = "https://github.com/pina-rs/pina", tag = "v{pina_version}", pattern = "lints/*" }},
+	{{ git = "https://github.com/pina-rs/pina", rev = "{PINA_LINT_REVISION}", pattern = "lints/*" }},
 ]
 
 [lib]
@@ -653,7 +654,7 @@ mod tests {
 		assert!(cargo.contains("dylint-link = { version = \"6.0.4\""));
 		assert!(cargo.contains("[workspace.metadata.dylint]"));
 		assert!(cargo.contains("git = \"https://github.com/pina-rs/pina\""));
-		assert!(cargo.contains(&format!("tag = \"v{}\"", env!("CARGO_PKG_VERSION"))));
+		assert!(cargo.contains(&format!("rev = \"{PINA_LINT_REVISION}\"")));
 		assert!(cargo.contains("pattern = \"lints/*\""));
 		assert!(cargo.contains("cfg(dylint_lib, values(any()))"));
 		assert!(cargo.contains("mollusk-svm = \"0.15.0\""));

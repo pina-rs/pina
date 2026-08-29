@@ -903,7 +903,7 @@ pina lint
 pina lint --fix
 ```
 
-`pina init` registers the release-matched official lint set automatically. `pina lint` prepares pinned Dylint tools below Cargo's target directory and does not load extra project-defined lint libraries.
+`pina init` registers the revision-pinned official lint set automatically. `pina lint` prepares pinned Dylint tools below Cargo home and does not load extra project-defined lint libraries.
 
 - account ownership, initialization, PDA, sysvar, ATA, resize, close, and CPI validation
 - mutable-borrow lifetime, checked arithmetic, remaining-account bounds, and custody balance accounting

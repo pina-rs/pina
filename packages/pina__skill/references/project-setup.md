@@ -16,7 +16,7 @@ pina test
 pina generate
 ```
 
-The scaffold pins the nightly toolchain and `rust-src` needed by `pina build`; install its compatible linker with `cargo install sbpf-linker --version 0.1.8 --locked` before the first SBF build. It also records release-matched official Pina lint metadata and pinned Dylint binary versions. `pina lint` prepares those tools below Cargo's target directory on first use. TypeScript client generation also requires Node.js with npm and `npx`. Keep the generated `Pina.toml` as the project-local discovery and client-selection contract.
+The scaffold pins the nightly toolchain and `rust-src` needed by `pina build`; install its compatible linker with `cargo install sbpf-linker --version 0.1.8 --locked` before the first SBF build. It also records immutable-revision official Pina lint metadata and pinned Dylint binary versions. `pina lint` prepares those tools below Cargo home on first use. TypeScript client generation also requires Node.js with npm and `npx`. Keep the generated `Pina.toml` as the project-local discovery and client-selection contract.
 
 Before deployment, establish the program identity explicitly. Use `pina keys new` for a fresh local identity or validate a keypair produced by trusted platform tooling with `pina keys sync --keypair <path>`. Never use `--force` unless the intended operation is an identity rotation.
 

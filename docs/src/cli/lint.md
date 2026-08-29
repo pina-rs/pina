@@ -27,14 +27,14 @@ pina lint --project ./programs/counter
 
 The command owns the complete official-lint selection:
 
-- `cargo-dylint` 6.0.4 and `dylint-link` 6.0.4 are installed below the project's Cargo target directory on first use;
-- later runs reuse that versioned installation;
-- the lint libraries come from `lints/*` at the `v<CLI version>` tag in `pina-rs/pina`;
+- `cargo-dylint` 6.0.4 and `dylint-link` 6.0.4 are installed below Cargo home on first use;
+- later runs and projects reuse that versioned, user-owned installation;
+- the lint libraries come from `lints/*` at the full immutable Git revision reviewed for this CLI;
 - project-provided Dylint metadata is ignored by this command, so adding an unrelated library cannot silently extend the trusted code loaded by `pina lint`.
 
-The generated `Cargo.toml` records the same binary versions under `[workspace.metadata.bin]` and the same release-tagged lint source under `[workspace.metadata.dylint]`. This lets Dylint-aware editors and direct `cargo dylint --all` workflows discover the official set. `pina lint` still supplies its own release-matched selection so older projects receive the set associated with their installed CLI.
+The generated `Cargo.toml` records the same binary versions under `[workspace.metadata.bin]` and the same revision-pinned lint source under `[workspace.metadata.dylint]`. This lets Dylint-aware editors and direct `cargo dylint --all` workflows discover the official set. `pina lint` still supplies its own reviewed selection so older projects receive the set associated with their installed CLI.
 
-The first run requires network access to install the pinned tools and fetch the tagged lint libraries. Set `CARGO_TARGET_DIR` to move both Cargo's normal artifacts and Pina's managed Dylint installation.
+The first run requires network access to install the pinned tools and fetch the lint libraries. Set `CARGO_HOME` to move Pina's managed Dylint installation; `CARGO_TARGET_DIR` continues to control normal project build artifacts.
 
 ## Fix mode
 
@@ -47,7 +47,7 @@ Dylint delegates fix mode to `cargo fix`. Pina supplies `--allow-dirty`, `--allo
 
 ## Security boundary
 
-Dylint libraries are native compiler plugins, not passive rule files. Running a lint grants the selected library code the same local permissions as the invoking user. Pina therefore selects only its official, versioned release tag and disables project metadata for `pina lint`. Protect release tags, obtain the CLI from a trusted channel, and review CLI upgrades as executable tooling changes.
+Dylint libraries are native compiler plugins, not passive rule files. Running a lint grants the selected library code the same local permissions as the invoking user. Pina therefore selects only its official, immutable reviewed revision, keeps reusable Dylint executables outside project-controlled target trees, and disables project metadata for `pina lint`. Obtain the CLI from a trusted channel and review CLI upgrades as executable tooling changes.
 
 Use direct `cargo dylint` only when you intentionally want to run additional project-defined lint libraries. Review and pin every such source before loading it.
 

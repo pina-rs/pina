@@ -17,6 +17,12 @@ pub const CARGO_DYLINT_VERSION: &str = "6.0.4";
 /// The `dylint-link` release used to build Pina's lint libraries.
 pub const DYLINT_LINK_VERSION: &str = "6.0.4";
 
+/// Immutable Git revision containing Pina's reviewed official lint set.
+///
+/// Update this only after reviewing changes below `lints/`. Unlike a release
+/// tag, a full commit ID cannot be redirected to different native lint code.
+pub const PINA_LINT_REVISION: &str = "7aff2afb89cd34a13e1e9d6ff854bc16d12263cc";
+
 const PINA_REPOSITORY: &str = "https://github.com/pina-rs/pina";
 const PINA_LINT_PATTERN: &str = "lints/*";
 
@@ -51,6 +57,12 @@ pub enum LintError {
 		path: PathBuf,
 		source: std::io::Error,
 	},
+
+	#[error("Could not resolve Cargo home for Pina's managed Dylint tools")]
+	MissingCargoHome,
+
+	#[error("Could not resolve relative CARGO_HOME from the current directory: {source}")]
+	CurrentDirectory { source: std::io::Error },
 
 	#[error("Could not open the managed Dylint installation lock at {path}: {source}")]
 	OpenInstallLock {
@@ -92,13 +104,13 @@ pub enum LintError {
 	LintFailed { status: String },
 }
 
-/// Discover a Pina project and run the release-matched official lint set.
+/// Discover a Pina project and run Pina's revision-pinned official lint set.
 ///
 /// The first invocation installs pinned `cargo-dylint` and `dylint-link`
-/// binaries below Cargo's target directory. Later invocations reuse that
-/// project-local tool installation. Lint libraries are loaded from the Pina
-/// release tag matching this CLI, not from a mutable branch or project-provided
-/// Dylint metadata.
+/// binaries below Cargo home. Later invocations and projects reuse that managed
+/// installation. Lint libraries are loaded from the immutable revision reviewed
+/// for this CLI, not from a mutable branch, tag, or project-provided Dylint
+/// metadata.
 ///
 /// # Errors
 ///
@@ -108,14 +120,13 @@ pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 	let project = Project::discover(&options.project)?;
 	let tools = prepare_tools(&project)?;
 	let manifest = project.program_dir.join("Cargo.toml");
-	let tag = format!("v{}", env!("CARGO_PKG_VERSION"));
 	let mut args = vec![
 		OsString::from("dylint"),
 		OsString::from("--no-deps"),
 		OsString::from("--git"),
 		OsString::from(PINA_REPOSITORY),
-		OsString::from("--tag"),
-		OsString::from(tag),
+		OsString::from("--rev"),
+		OsString::from(PINA_LINT_REVISION),
 		OsString::from("--pattern"),
 		OsString::from(PINA_LINT_PATTERN),
 		OsString::from("--manifest-path"),
@@ -153,14 +164,16 @@ pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 	})
 }
 
+/// Executables installed and selected by Pina rather than project metadata.
 #[derive(Debug)]
 struct Tools {
 	bin_dir: PathBuf,
 	cargo_dylint: PathBuf,
 }
 
+/// Prepare the versioned Dylint tools in a user-owned Cargo-home cache.
 fn prepare_tools(project: &Project) -> Result<Tools, LintError> {
-	let root = project.target_dir.join("pina/tools").join(format!(
+	let root = cargo_home()?.join("pina/tools").join(format!(
 		"dylint-{CARGO_DYLINT_VERSION}-{DYLINT_LINK_VERSION}"
 	));
 	std::fs::create_dir_all(&root).map_err(|source| {
@@ -218,6 +231,56 @@ fn prepare_tools(project: &Project) -> Result<Tools, LintError> {
 	})
 }
 
+/// Resolve Cargo home using Cargo's environment and platform conventions.
+fn cargo_home() -> Result<PathBuf, LintError> {
+	resolve_cargo_home(
+		std::env::var_os("CARGO_HOME"),
+		std::env::current_dir(),
+		platform_home(),
+	)
+}
+
+/// Resolve an explicit or platform Cargo home without reading process state.
+fn resolve_cargo_home(
+	cargo_home: Option<OsString>,
+	current_dir: Result<PathBuf, std::io::Error>,
+	platform_home: Option<PathBuf>,
+) -> Result<PathBuf, LintError> {
+	if let Some(home) = cargo_home {
+		let home = PathBuf::from(home);
+		if home.is_absolute() {
+			return Ok(home);
+		}
+
+		return current_dir
+			.map(|current_dir| current_dir.join(home))
+			.map_err(|source| LintError::CurrentDirectory { source });
+	}
+
+	platform_home
+		.map(|home| home.join(".cargo"))
+		.ok_or(LintError::MissingCargoHome)
+}
+
+#[cfg(not(windows))]
+/// Return the platform home used by Cargo on Unix-like systems.
+fn platform_home() -> Option<PathBuf> {
+	std::env::var_os("HOME").map(PathBuf::from)
+}
+
+#[cfg(windows)]
+/// Return the platform home used by Cargo on Windows.
+fn platform_home() -> Option<PathBuf> {
+	std::env::var_os("USERPROFILE")
+		.map(PathBuf::from)
+		.or_else(|| {
+			let drive = std::env::var_os("HOMEDRIVE")?;
+			let path = std::env::var_os("HOMEPATH")?;
+			Some(PathBuf::from(drive).join(path))
+		})
+}
+
+/// Install one exact crates.io tool release unless its managed binary exists.
 fn install_tool(
 	cargo: &OsString,
 	project_root: &Path,
@@ -263,6 +326,7 @@ fn install_tool(
 	Ok(())
 }
 
+/// Prepend Pina's managed tool directory without discarding the caller's PATH.
 fn tool_path(bin_dir: &Path) -> Result<OsString, LintError> {
 	let current_path = std::env::var_os("PATH").unwrap_or_default();
 	let paths = std::iter::once(bin_dir.to_path_buf()).chain(std::env::split_paths(&current_path));
@@ -270,11 +334,66 @@ fn tool_path(bin_dir: &Path) -> Result<OsString, LintError> {
 }
 
 #[cfg(windows)]
+/// Return a platform executable filename on Windows.
 fn executable_name(name: &str) -> OsString {
 	OsString::from(format!("{name}.exe"))
 }
 
 #[cfg(not(windows))]
+/// Return a platform executable filename on Unix-like systems.
 fn executable_name(name: &str) -> OsString {
 	OsString::from(name)
+}
+
+#[cfg(test)]
+mod tests {
+	use std::io;
+
+	use super::*;
+
+	#[test]
+	fn resolves_absolute_relative_and_default_cargo_homes() {
+		let absolute = std::env::temp_dir().join("managed-cargo");
+		assert_eq!(
+			resolve_cargo_home(
+				Some(absolute.clone().into_os_string()),
+				Err(io::Error::other("unused")),
+				None,
+			)
+			.expect("absolute Cargo home should resolve"),
+			absolute
+		);
+
+		let working = std::env::temp_dir().join("working");
+		assert_eq!(
+			resolve_cargo_home(Some(OsString::from("relative")), Ok(working.clone()), None,)
+				.expect("relative Cargo home should resolve"),
+			working.join("relative")
+		);
+
+		let home = std::env::temp_dir().join("home-developer");
+		assert_eq!(
+			resolve_cargo_home(None, Err(io::Error::other("unused")), Some(home.clone()),)
+				.expect("default Cargo home should resolve"),
+			home.join(".cargo")
+		);
+	}
+
+	#[test]
+	fn reports_unavailable_working_and_home_directories() {
+		let current_directory = resolve_cargo_home(
+			Some(OsString::from("relative")),
+			Err(io::Error::other("missing working directory")),
+			None,
+		)
+		.expect_err("relative Cargo home should require a working directory");
+		assert!(matches!(
+			current_directory,
+			LintError::CurrentDirectory { .. }
+		));
+
+		let home = resolve_cargo_home(None, Ok(PathBuf::from("/working")), None)
+			.expect_err("a platform home should be required");
+		assert!(matches!(home, LintError::MissingCargoHome));
+	}
 }
