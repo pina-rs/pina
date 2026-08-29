@@ -93,7 +93,7 @@ rust-version = "1.89.0"
 
 [workspace.dependencies]
 atomic-write-file = { default-features = false, version = "^0.3" }
-base64 = { default-features = false, version = "^0.23.1" }
+base64 = { default-features = false, version = "^0.22.1" }
 bs58 = { default-features = false, version = "^0.5.1" }
 cargo_metadata = { default-features = false, version = "^0.23" }
 clap = { default-features = false, version = "^4", features = ["derive", "std"] }
@@ -101,7 +101,7 @@ clap_complete = { default-features = false, version = "^4" }
 codama-nodes = { default-features = false, version = "0.13.1" }
 comfy-table = { default-features = false, version = "^8.0.0" }
 darling = { default-features = false, version = "0.24.0" }
-ed25519-dalek = { version = "3.0.0", default-features = false }
+ed25519-dalek = { version = "2.2.0", default-features = false }
 flate2 = { default-features = true, version = "1.1.2" }
 fs2 = { default-features = false, version = "^0.4" }
 getrandom = { default-features = false, version = "0.4.2" }
@@ -130,7 +130,7 @@ same-file = { default-features = false, version = "^1" }
 semver = { default-features = false, version = "^1" }
 serde = { default-features = false, version = "^1" }
 serde_json = { default-features = false, version = "^1", features = ["std"] }
-sha2 = { default-features = false, version = "^0.11" }
+sha2 = { default-features = false, version = "^0.10", features = ["std"] }
 solana-account = { version = "^4", default-features = false }
 solana-account-info = { version = "^3", default-features = false }
 solana-address = { default-features = false, version = "^2.0", features = ["bytemuck", "curve25519", "decode"] }
