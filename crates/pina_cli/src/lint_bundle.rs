@@ -27,7 +27,7 @@ const PINA_RELEASE_DOWNLOADS: &str = "https://github.com/pina-rs/pina/releases/d
 const TOOL_NAMES: [&str; 2] = ["cargo-dylint", "dylint-link"];
 
 /// Metadata compiled into the CLI and consumed by the release builder.
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct LintCatalog {
 	pub(crate) schema_version: u32,
@@ -220,6 +220,14 @@ pub(crate) fn lint_catalog() -> Result<LintCatalog, BundleError> {
 
 /// Download once, then validate and reuse the current CLI's native bundle.
 pub(crate) fn prepare_bundle(cargo_home: &Path) -> Result<PreparedBundle, BundleError> {
+	prepare_bundle_from(cargo_home, PINA_RELEASES_API, PINA_RELEASE_DOWNLOADS)
+}
+
+fn prepare_bundle_from(
+	cargo_home: &Path,
+	releases_api: &str,
+	release_downloads: &str,
+) -> Result<PreparedBundle, BundleError> {
 	let catalog = lint_catalog()?;
 	let version = env!("CARGO_PKG_VERSION");
 	let target = env!("PINA_BUILD_TARGET");
@@ -234,25 +242,7 @@ pub(crate) fn prepare_bundle(cargo_home: &Path) -> Result<PreparedBundle, Bundle
 		}
 	})?;
 
-	let lock_path = root.join("bundle.lock");
-	let lock = OpenOptions::new()
-		.read(true)
-		.write(true)
-		.create(true)
-		.truncate(false)
-		.open(&lock_path)
-		.map_err(|source| {
-			BundleError::OpenLock {
-				path: lock_path.clone(),
-				source,
-			}
-		})?;
-	lock.lock_exclusive().map_err(|source| {
-		BundleError::Lock {
-			path: lock_path,
-			source,
-		}
-	})?;
+	let _lock = lock_cache(&root)?;
 
 	let bundle_path = root.join("bundle");
 	if let Ok(metadata) = fs::symlink_metadata(&bundle_path)
@@ -265,8 +255,8 @@ pub(crate) fn prepare_bundle(cargo_home: &Path) -> Result<PreparedBundle, Bundle
 
 	let tag = format!("v{version}");
 	let asset_name = format!("pina-lints-{target}-{tag}.tar.gz");
-	let release = fetch_release(&tag)?;
-	let asset = select_asset(&release, &tag, &asset_name)?;
+	let release = fetch_release(releases_api, &tag)?;
+	let asset = select_asset(&release, release_downloads, &tag, &asset_name)?;
 	let archive = fetch_archive(asset)?;
 	verify_archive(asset, &archive)?;
 
@@ -280,41 +270,10 @@ pub(crate) fn prepare_bundle(cargo_home: &Path) -> Result<PreparedBundle, Bundle
 			}
 		})?;
 	let extracted = temporary.path().join("bundle");
-	fs::create_dir(&extracted).map_err(|source| {
-		BundleError::CreateDirectory {
-			path: extracted.clone(),
-			source,
-		}
-	})?;
+	create_directory(&extracted)?;
 	unpack_archive(&archive, &extracted, &asset.name, ArchiveContents::Lints)?;
 	let bundle = validate_bundle(&extracted, &catalog, version, target)?;
-
-	if fs::symlink_metadata(&bundle_path).is_ok() {
-		let metadata = fs::symlink_metadata(&bundle_path).map_err(|source| {
-			BundleError::ReplaceCachedBundle {
-				path: bundle_path.clone(),
-				source,
-			}
-		})?;
-		if metadata.file_type().is_symlink() || !metadata.is_dir() {
-			return Err(BundleError::InvalidBundle {
-				path: bundle_path,
-				reason: "the cache entry is not a regular directory".to_owned(),
-			});
-		}
-		fs::remove_dir_all(&bundle_path).map_err(|source| {
-			BundleError::ReplaceCachedBundle {
-				path: bundle_path.clone(),
-				source,
-			}
-		})?;
-	}
-	fs::rename(&extracted, &bundle_path).map_err(|source| {
-		BundleError::CacheBundle {
-			path: bundle_path.clone(),
-			source,
-		}
-	})?;
+	replace_cached_directory(&extracted, &bundle_path)?;
 
 	Ok(PreparedBundle {
 		library_paths: bundle
@@ -327,6 +286,14 @@ pub(crate) fn prepare_bundle(cargo_home: &Path) -> Result<PreparedBundle, Bundle
 
 /// Download once, then validate and reuse the pinned native Dylint tools.
 pub(crate) fn prepare_dylint_tools(cargo_home: &Path) -> Result<PreparedTools, BundleError> {
+	prepare_dylint_tools_from(cargo_home, PINA_RELEASES_API, PINA_RELEASE_DOWNLOADS)
+}
+
+fn prepare_dylint_tools_from(
+	cargo_home: &Path,
+	releases_api: &str,
+	release_downloads: &str,
+) -> Result<PreparedTools, BundleError> {
 	let version = lint_catalog()?.dylint_version;
 	let target = env!("PINA_BUILD_TARGET");
 	let root = cargo_home
@@ -340,6 +307,42 @@ pub(crate) fn prepare_dylint_tools(cargo_home: &Path) -> Result<PreparedTools, B
 		}
 	})?;
 
+	let _lock = lock_cache(&root)?;
+
+	let bundle_path = root.join("bundle");
+	if let Ok(metadata) = fs::symlink_metadata(&bundle_path)
+		&& metadata.is_dir()
+		&& !metadata.file_type().is_symlink()
+		&& let Ok(tools) = validate_tool_bundle(&bundle_path, &version, target)
+	{
+		return Ok(tools);
+	}
+
+	let tag = format!("dylint-v{version}");
+	let asset_name = format!("pina-dylint-tools-{target}-v{version}.tar.gz");
+	let release = fetch_release(releases_api, &tag)?;
+	let asset = select_asset(&release, release_downloads, &tag, &asset_name)?;
+	let archive = fetch_archive(asset)?;
+	verify_archive(asset, &archive)?;
+
+	let temporary = tempfile::Builder::new()
+		.prefix("download-")
+		.tempdir_in(&root)
+		.map_err(|source| {
+			BundleError::CreateTemporaryBundle {
+				path: root.clone(),
+				source,
+			}
+		})?;
+	let extracted = temporary.path().join("bundle");
+	create_directory(&extracted)?;
+	unpack_archive(&archive, &extracted, &asset.name, ArchiveContents::Tools)?;
+	validate_tool_bundle(&extracted, &version, target)?;
+	replace_cached_directory(&extracted, &bundle_path)?;
+	validate_tool_bundle(&bundle_path, &version, target)
+}
+
+fn lock_cache(root: &Path) -> Result<File, BundleError> {
 	let lock_path = root.join("bundle.lock");
 	let lock = OpenOptions::new()
 		.read(true)
@@ -359,69 +362,45 @@ pub(crate) fn prepare_dylint_tools(cargo_home: &Path) -> Result<PreparedTools, B
 			source,
 		}
 	})?;
+	Ok(lock)
+}
 
-	let bundle_path = root.join("bundle");
-	if let Ok(metadata) = fs::symlink_metadata(&bundle_path)
-		&& metadata.is_dir()
-		&& !metadata.file_type().is_symlink()
-		&& let Ok(tools) = validate_tool_bundle(&bundle_path, &version, target)
-	{
-		return Ok(tools);
-	}
-
-	let tag = format!("dylint-v{version}");
-	let asset_name = format!("pina-dylint-tools-{target}-v{version}.tar.gz");
-	let release = fetch_release(&tag)?;
-	let asset = select_asset(&release, &tag, &asset_name)?;
-	let archive = fetch_archive(asset)?;
-	verify_archive(asset, &archive)?;
-
-	let temporary = tempfile::Builder::new()
-		.prefix("download-")
-		.tempdir_in(&root)
-		.map_err(|source| {
-			BundleError::CreateTemporaryBundle {
-				path: root.clone(),
-				source,
-			}
-		})?;
-	let extracted = temporary.path().join("bundle");
-	fs::create_dir(&extracted).map_err(|source| {
+fn create_directory(path: &Path) -> Result<(), BundleError> {
+	fs::create_dir(path).map_err(|source| {
 		BundleError::CreateDirectory {
-			path: extracted.clone(),
+			path: path.to_path_buf(),
 			source,
 		}
-	})?;
-	unpack_archive(&archive, &extracted, &asset.name, ArchiveContents::Tools)?;
-	validate_tool_bundle(&extracted, &version, target)?;
+	})
+}
 
-	if fs::symlink_metadata(&bundle_path).is_ok() {
-		let metadata = fs::symlink_metadata(&bundle_path).map_err(|source| {
+fn replace_cached_directory(source: &Path, destination: &Path) -> Result<(), BundleError> {
+	if fs::symlink_metadata(destination).is_ok() {
+		let metadata = fs::symlink_metadata(destination).map_err(|source| {
 			BundleError::ReplaceCachedBundle {
-				path: bundle_path.clone(),
+				path: destination.to_path_buf(),
 				source,
 			}
 		})?;
 		if metadata.file_type().is_symlink() || !metadata.is_dir() {
 			return Err(BundleError::InvalidBundle {
-				path: bundle_path,
+				path: destination.to_path_buf(),
 				reason: "the cache entry is not a regular directory".to_owned(),
 			});
 		}
-		fs::remove_dir_all(&bundle_path).map_err(|source| {
+		fs::remove_dir_all(destination).map_err(|source| {
 			BundleError::ReplaceCachedBundle {
-				path: bundle_path.clone(),
+				path: destination.to_path_buf(),
 				source,
 			}
 		})?;
 	}
-	fs::rename(&extracted, &bundle_path).map_err(|source| {
+	fs::rename(source, destination).map_err(|source| {
 		BundleError::CacheBundle {
-			path: bundle_path.clone(),
+			path: destination.to_path_buf(),
 			source,
 		}
-	})?;
-	validate_tool_bundle(&bundle_path, &version, target)
+	})
 }
 
 fn validate_catalog(catalog: &LintCatalog) -> Result<(), BundleError> {
@@ -469,8 +448,8 @@ fn validate_catalog(catalog: &LintCatalog) -> Result<(), BundleError> {
 	Ok(())
 }
 
-fn fetch_release(tag: &str) -> Result<GithubRelease, BundleError> {
-	let url = format!("{PINA_RELEASES_API}/{tag}");
+fn fetch_release(releases_api: &str, tag: &str) -> Result<GithubRelease, BundleError> {
+	let url = format!("{releases_api}/{tag}");
 	let mut response = ureq::get(&url)
 		.header("Accept", "application/vnd.github+json")
 		.header(
@@ -495,6 +474,7 @@ fn fetch_release(tag: &str) -> Result<GithubRelease, BundleError> {
 
 fn select_asset<'a>(
 	release: &'a GithubRelease,
+	release_downloads: &str,
 	tag: &str,
 	asset_name: &str,
 ) -> Result<&'a GithubAsset, BundleError> {
@@ -514,7 +494,7 @@ fn select_asset<'a>(
 				asset: asset_name.to_owned(),
 			}
 		})?;
-	let expected_url = format!("{PINA_RELEASE_DOWNLOADS}/{tag}/{}", asset.name);
+	let expected_url = format!("{release_downloads}/{tag}/{}", asset.name);
 	if asset.browser_download_url != expected_url {
 		return Err(BundleError::UnexpectedDownloadUrl {
 			asset: asset.name.clone(),
@@ -724,12 +704,7 @@ fn validate_tool_bundle(
 				&format!("unexpected Dylint tool filename {}", executable.file),
 			);
 		}
-		if !expected_files.insert(executable.file.clone()) {
-			return invalid_bundle(
-				path,
-				&format!("duplicate Dylint tool file {}", executable.file),
-			);
-		}
+		expected_files.insert(executable.file.clone());
 		let executable_path = path.join(&executable.file);
 		let metadata = fs::symlink_metadata(&executable_path).map_err(|source| {
 			BundleError::InvalidBundle {
@@ -845,9 +820,7 @@ fn validate_bundle(
 				&format!("unexpected library filename {}", library.file),
 			);
 		}
-		if !expected_files.insert(library.file.clone()) {
-			return invalid_bundle(path, &format!("duplicate library file {}", library.file));
-		}
+		expected_files.insert(library.file.clone());
 		let library_path = path.join(&library.file);
 		let metadata = fs::symlink_metadata(&library_path).map_err(|source| {
 			BundleError::InvalidBundle {
@@ -1018,6 +991,9 @@ fn hex_digest(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+	use std::net::TcpListener;
+	use std::thread;
+
 	use flate2::Compression;
 	use flate2::write::GzEncoder;
 	use serde_json::json;
@@ -1025,12 +1001,276 @@ mod tests {
 	use super::*;
 	const TEST_DYLINT_VERSION: &str = "6.0.4";
 
+	fn test_catalog() -> LintCatalog {
+		LintCatalog {
+			schema_version: 1,
+			dylint_version: TEST_DYLINT_VERSION.to_owned(),
+			toolchain: "nightly-test".to_owned(),
+			targets: vec![env!("PINA_BUILD_TARGET").to_owned()],
+			libraries: vec!["secure_lint".to_owned()],
+		}
+	}
+
+	fn archive(files: impl IntoIterator<Item = (String, Vec<u8>)>) -> Vec<u8> {
+		let encoder = GzEncoder::new(Vec::new(), Compression::default());
+		let mut archive = tar::Builder::new(encoder);
+		for (name, contents) in files {
+			let mut header = tar::Header::new_gnu();
+			header.set_size(contents.len() as u64);
+			header.set_mode(0o644);
+			header.set_cksum();
+			archive
+				.append_data(&mut header, name, contents.as_slice())
+				.expect("test archive entry should be created");
+		}
+		let encoder = archive.into_inner().expect("tar stream should finish");
+		encoder.finish().expect("gzip stream should finish")
+	}
+
+	fn lint_archive(catalog: &LintCatalog, version: &str, target: &str) -> Vec<u8> {
+		let toolchain = format!("{}-{target}", catalog.toolchain);
+		let mut files = Vec::new();
+		let libraries = catalog
+			.libraries
+			.iter()
+			.map(|name| {
+				let file = library_filename(name, &toolchain);
+				let contents = format!("trusted native library {name}").into_bytes();
+				files.push((file.clone(), contents.clone()));
+				json!({
+					"name": name,
+					"file": file,
+					"sha256": sha256(&contents),
+					"size": contents.len(),
+				})
+			})
+			.collect::<Vec<_>>();
+		let manifest = json!({
+			"schema_version": 1,
+			"version": version,
+			"target": target,
+			"toolchain": toolchain,
+			"dylint_version": catalog.dylint_version,
+			"libraries": libraries,
+		});
+		files.push((
+			"manifest.json".to_owned(),
+			serde_json::to_vec(&manifest).expect("manifest should encode"),
+		));
+		archive(files)
+	}
+
+	fn tool_archive(version: &str, target: &str) -> Vec<u8> {
+		let mut files = Vec::new();
+		let executables = TOOL_NAMES
+			.into_iter()
+			.map(|name| {
+				let file = tool_filename(name, target);
+				let contents = format!("trusted executable {name}").into_bytes();
+				files.push((file.clone(), contents.clone()));
+				json!({
+					"name": name,
+					"file": file,
+					"sha256": sha256(&contents),
+					"size": contents.len(),
+				})
+			})
+			.collect::<Vec<_>>();
+		let manifest = json!({
+			"schema_version": 1,
+			"dylint_version": version,
+			"target": target,
+			"executables": executables,
+		});
+		files.push((
+			"manifest.json".to_owned(),
+			serde_json::to_vec(&manifest).expect("manifest should encode"),
+		));
+		archive(files)
+	}
+
+	fn serve_release(
+		tag: &str,
+		asset_name: &str,
+		asset_bytes: Vec<u8>,
+	) -> (String, String, thread::JoinHandle<()>) {
+		let listener = TcpListener::bind("127.0.0.1:0").expect("test server should bind");
+		let base = format!(
+			"http://{}",
+			listener
+				.local_addr()
+				.expect("server address should resolve")
+		);
+		let releases_api = format!("{base}/releases/tags");
+		let release_downloads = format!("{base}/releases/download");
+		let metadata = serde_json::to_vec(&json!({
+			"tag_name": tag,
+			"assets": [{
+				"name": asset_name,
+				"browser_download_url": format!("{release_downloads}/{tag}/{asset_name}"),
+				"size": asset_bytes.len(),
+				"digest": format!("sha256:{}", sha256(&asset_bytes)),
+			}],
+		}))
+		.expect("release metadata should encode");
+		let expected_paths = [
+			format!("/releases/tags/{tag}"),
+			format!("/releases/download/{tag}/{asset_name}"),
+		];
+		let handle = thread::spawn(move || {
+			for (index, body) in [metadata, asset_bytes].into_iter().enumerate() {
+				let (mut stream, _) = listener.accept().expect("request should arrive");
+				let mut request = Vec::new();
+				let mut buffer = [0_u8; 1024];
+				while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+					let count = stream
+						.read(&mut buffer)
+						.expect("request should be readable");
+					assert!(count > 0, "request ended before its headers");
+					request.extend_from_slice(&buffer[..count]);
+					assert!(request.len() <= 16 * 1024, "request headers were too large");
+				}
+				let first_line = String::from_utf8_lossy(&request)
+					.lines()
+					.next()
+					.expect("request should have a first line")
+					.to_owned();
+				assert_eq!(
+					first_line,
+					format!("GET {} HTTP/1.1", expected_paths[index])
+				);
+				write!(
+					stream,
+					"HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+					body.len()
+				)
+				.expect("response headers should be written");
+				stream
+					.write_all(&body)
+					.expect("response body should be written");
+			}
+		});
+		(releases_api, release_downloads, handle)
+	}
+
+	fn serve_once(body: Vec<u8>, declared_length: usize) -> (String, thread::JoinHandle<()>) {
+		let listener = TcpListener::bind("127.0.0.1:0").expect("test server should bind");
+		let url = format!(
+			"http://{}",
+			listener
+				.local_addr()
+				.expect("server address should resolve")
+		);
+		let handle = thread::spawn(move || {
+			let (mut stream, _) = listener.accept().expect("request should arrive");
+			let mut request = [0_u8; 16 * 1024];
+			assert!(stream.read(&mut request).expect("request should be read") > 0);
+			write!(
+				stream,
+				"HTTP/1.1 200 OK\r\nContent-Length: {declared_length}\r\nConnection: close\r\n\r\n"
+			)
+			.expect("response headers should be written");
+			stream
+				.write_all(&body)
+				.expect("response body should be written");
+		});
+		(url, handle)
+	}
+
+	fn extract_fixture(bytes: &[u8], contents: ArchiveContents) -> tempfile::TempDir {
+		let directory = tempfile::tempdir().expect("temporary bundle should exist");
+		unpack_archive(bytes, directory.path(), "fixture.tar.gz", contents)
+			.expect("fixture should extract");
+		directory
+	}
+
+	fn rewrite_manifest(path: &Path, mutate: impl FnOnce(&mut serde_json::Value)) {
+		let manifest_path = path.join("manifest.json");
+		let mut manifest: serde_json::Value = serde_json::from_slice(
+			&fs::read(&manifest_path).expect("fixture manifest should be readable"),
+		)
+		.expect("fixture manifest should parse");
+		mutate(&mut manifest);
+		fs::write(
+			manifest_path,
+			serde_json::to_vec(&manifest).expect("fixture manifest should encode"),
+		)
+		.expect("fixture manifest should be replaced");
+	}
+
+	fn lint_fixture() -> (tempfile::TempDir, LintCatalog) {
+		let catalog = test_catalog();
+		let directory = extract_fixture(
+			&lint_archive(&catalog, "1.2.3", env!("PINA_BUILD_TARGET")),
+			ArchiveContents::Lints,
+		);
+		(directory, catalog)
+	}
+
+	fn tool_fixture() -> tempfile::TempDir {
+		extract_fixture(
+			&tool_archive(TEST_DYLINT_VERSION, env!("PINA_BUILD_TARGET")),
+			ArchiveContents::Tools,
+		)
+	}
+
 	#[test]
 	fn embedded_catalog_is_valid_and_sorted() {
 		let catalog = lint_catalog().expect("embedded catalog should be valid");
 		let mut sorted = catalog.libraries.clone();
 		sorted.sort();
 		assert_eq!(catalog.libraries, sorted);
+	}
+
+	#[test]
+	fn catalog_validation_rejects_every_unsafe_contract_shape() {
+		let invalid_catalogs = [
+			LintCatalog {
+				schema_version: 2,
+				..test_catalog()
+			},
+			LintCatalog {
+				dylint_version: "not-semver".to_owned(),
+				..test_catalog()
+			},
+			LintCatalog {
+				toolchain: String::new(),
+				..test_catalog()
+			},
+			LintCatalog {
+				targets: vec!["duplicate".to_owned(), "duplicate".to_owned()],
+				..test_catalog()
+			},
+			LintCatalog {
+				targets: vec!["../unsafe".to_owned(), env!("PINA_BUILD_TARGET").to_owned()],
+				..test_catalog()
+			},
+			LintCatalog {
+				targets: vec!["safe-but-not-this-host".to_owned()],
+				..test_catalog()
+			},
+			LintCatalog {
+				libraries: vec!["duplicate".to_owned(), "duplicate".to_owned()],
+				..test_catalog()
+			},
+			LintCatalog {
+				libraries: vec!["../unsafe".to_owned()],
+				..test_catalog()
+			},
+		];
+		for catalog in invalid_catalogs {
+			assert!(matches!(
+				validate_catalog(&catalog),
+				Err(BundleError::InvalidCatalog { .. })
+			));
+		}
+		assert!(!is_safe_component(""));
+		assert!(!is_safe_release_component(""));
+		assert!(is_safe_release_component("aarch64-unknown-linux-gnu"));
+		assert_eq!(
+			tool_filename("cargo-dylint", "x86_64-pc-windows-msvc"),
+			"cargo-dylint.exe"
+		);
 	}
 
 	#[test]
@@ -1045,9 +1285,243 @@ mod tests {
 			}],
 		};
 		assert!(matches!(
-			select_asset(&release, "v1.2.3", "pina-lints-test-v1.2.3.tar.gz"),
+			select_asset(
+				&release,
+				PINA_RELEASE_DOWNLOADS,
+				"v1.2.3",
+				"pina-lints-test-v1.2.3.tar.gz",
+			),
 			Err(BundleError::UnexpectedDownloadUrl { .. })
 		));
+		assert!(matches!(
+			select_asset(
+				&release,
+				PINA_RELEASE_DOWNLOADS,
+				"v9.9.9",
+				"pina-lints-test-v1.2.3.tar.gz",
+			),
+			Err(BundleError::UnexpectedReleaseTag { .. })
+		));
+		assert!(matches!(
+			select_asset(
+				&GithubRelease {
+					tag_name: "v1.2.3".to_owned(),
+					assets: Vec::new(),
+				},
+				PINA_RELEASE_DOWNLOADS,
+				"v1.2.3",
+				"missing.tar.gz",
+			),
+			Err(BundleError::MissingAsset { .. })
+		));
+	}
+
+	#[test]
+	fn downloads_verifies_caches_and_reuses_native_release_assets() {
+		let cargo_home = tempfile::tempdir().expect("temporary Cargo home should exist");
+		let catalog = lint_catalog().expect("embedded catalog should be valid");
+		let target = env!("PINA_BUILD_TARGET");
+		let version = env!("CARGO_PKG_VERSION");
+
+		let lint_root = cargo_home
+			.path()
+			.join("pina/lints")
+			.join(format!("v{version}"))
+			.join(target);
+		fs::create_dir_all(lint_root.join("bundle")).expect("stale lint bundle should be created");
+		fs::write(lint_root.join("bundle/stale"), b"stale")
+			.expect("stale lint entry should be written");
+		let lint_tag = format!("v{version}");
+		let lint_asset = format!("pina-lints-{target}-{lint_tag}.tar.gz");
+		let (api, downloads, server) = serve_release(
+			&lint_tag,
+			&lint_asset,
+			lint_archive(&catalog, version, target),
+		);
+		let bundle = prepare_bundle_from(cargo_home.path(), &api, &downloads)
+			.expect("lint bundle should download");
+		server.join().expect("lint release server should finish");
+		assert_eq!(bundle.library_paths.len(), catalog.libraries.len());
+		assert!(bundle.library_paths.iter().all(|path| path.is_file()));
+		assert!(!lint_root.join("bundle/stale").exists());
+		prepare_bundle(cargo_home.path()).expect("cached lint bundle should be reused");
+
+		let tool_root = cargo_home
+			.path()
+			.join(format!("pina/tools/dylint-v{}", catalog.dylint_version))
+			.join(target);
+		fs::create_dir_all(tool_root.join("bundle")).expect("stale tool bundle should be created");
+		fs::write(tool_root.join("bundle/stale"), b"stale")
+			.expect("stale tool entry should be written");
+		let tool_tag = format!("dylint-v{}", catalog.dylint_version);
+		let tool_asset = format!(
+			"pina-dylint-tools-{target}-v{}.tar.gz",
+			catalog.dylint_version
+		);
+		let (api, downloads, server) = serve_release(
+			&tool_tag,
+			&tool_asset,
+			tool_archive(&catalog.dylint_version, target),
+		);
+		let tools = prepare_dylint_tools_from(cargo_home.path(), &api, &downloads)
+			.expect("Dylint tools should download");
+		server.join().expect("tool release server should finish");
+		assert!(tools.bin_dir.is_dir());
+		assert!(tools.cargo_dylint.is_file());
+		assert!(!tool_root.join("bundle/stale").exists());
+		prepare_dylint_tools(cargo_home.path()).expect("cached Dylint tools should be reused");
+	}
+
+	#[test]
+	fn managed_cache_setup_reports_directory_and_lock_failures() {
+		let temporary = tempfile::tempdir().expect("temporary root should exist");
+		let blocked_home = temporary.path().join("blocked-home");
+		fs::write(&blocked_home, b"not a directory").expect("blocked home should be written");
+		assert!(matches!(
+			prepare_bundle_from(&blocked_home, "unused", "unused"),
+			Err(BundleError::CreateDirectory { .. })
+		));
+		assert!(matches!(
+			prepare_dylint_tools_from(&blocked_home, "unused", "unused"),
+			Err(BundleError::CreateDirectory { .. })
+		));
+
+		let cargo_home = tempfile::tempdir().expect("temporary Cargo home should exist");
+		let lint_lock = cargo_home
+			.path()
+			.join("pina/lints")
+			.join(format!("v{}", env!("CARGO_PKG_VERSION")))
+			.join(env!("PINA_BUILD_TARGET"))
+			.join("bundle.lock");
+		fs::create_dir_all(&lint_lock).expect("directory lock should be created");
+		assert!(matches!(
+			prepare_bundle_from(cargo_home.path(), "unused", "unused"),
+			Err(BundleError::OpenLock { .. })
+		));
+
+		let tool_lock = cargo_home
+			.path()
+			.join(format!("pina/tools/dylint-v{TEST_DYLINT_VERSION}"))
+			.join(env!("PINA_BUILD_TARGET"))
+			.join("bundle.lock");
+		fs::create_dir_all(&tool_lock).expect("directory lock should be created");
+		assert!(matches!(
+			prepare_dylint_tools_from(cargo_home.path(), "unused", "unused"),
+			Err(BundleError::OpenLock { .. })
+		));
+
+		let existing = tempfile::tempdir().expect("temporary directory should exist");
+		assert!(matches!(
+			create_directory(existing.path()),
+			Err(BundleError::CreateDirectory { .. })
+		));
+
+		let replacement = tempfile::tempdir().expect("temporary directory should exist");
+		assert!(matches!(
+			replace_cached_directory(
+				&replacement.path().join("missing-source"),
+				&replacement.path().join("destination"),
+			),
+			Err(BundleError::CacheBundle { .. })
+		));
+	}
+
+	#[test]
+	fn managed_downloads_reject_non_directory_cache_entries() {
+		let cargo_home = tempfile::tempdir().expect("temporary Cargo home should exist");
+		let catalog = lint_catalog().expect("embedded catalog should be valid");
+		let target = env!("PINA_BUILD_TARGET");
+		let version = env!("CARGO_PKG_VERSION");
+		let lint_root = cargo_home
+			.path()
+			.join("pina/lints")
+			.join(format!("v{version}"))
+			.join(target);
+		fs::create_dir_all(&lint_root).expect("lint cache root should be created");
+		fs::write(lint_root.join("bundle"), b"not a directory")
+			.expect("invalid lint cache should be written");
+		let tag = format!("v{version}");
+		let asset = format!("pina-lints-{target}-{tag}.tar.gz");
+		let (api, downloads, server) =
+			serve_release(&tag, &asset, lint_archive(&catalog, version, target));
+		assert!(matches!(
+			prepare_bundle_from(cargo_home.path(), &api, &downloads),
+			Err(BundleError::InvalidBundle { .. })
+		));
+		server.join().expect("lint release server should finish");
+
+		let tool_root = cargo_home
+			.path()
+			.join(format!("pina/tools/dylint-v{}", catalog.dylint_version))
+			.join(target);
+		fs::create_dir_all(&tool_root).expect("tool cache root should be created");
+		fs::write(tool_root.join("bundle"), b"not a directory")
+			.expect("invalid tool cache should be written");
+		let tag = format!("dylint-v{}", catalog.dylint_version);
+		let asset = format!(
+			"pina-dylint-tools-{target}-v{}.tar.gz",
+			catalog.dylint_version
+		);
+		let (api, downloads, server) =
+			serve_release(&tag, &asset, tool_archive(&catalog.dylint_version, target));
+		assert!(matches!(
+			prepare_dylint_tools_from(cargo_home.path(), &api, &downloads),
+			Err(BundleError::InvalidBundle { .. })
+		));
+		server.join().expect("tool release server should finish");
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn managed_downloads_report_temporary_directory_failures() {
+		let catalog = lint_catalog().expect("embedded catalog should be valid");
+		let target = env!("PINA_BUILD_TARGET");
+		let version = env!("CARGO_PKG_VERSION");
+		let cargo_home = tempfile::tempdir().expect("temporary Cargo home should exist");
+		let lint_root = cargo_home
+			.path()
+			.join("pina/lints")
+			.join(format!("v{version}"))
+			.join(target);
+		fs::create_dir_all(&lint_root).expect("lint root should be created");
+		fs::write(lint_root.join("bundle.lock"), b"").expect("lint lock should be written");
+		fs::set_permissions(&lint_root, fs::Permissions::from_mode(0o555))
+			.expect("lint root should become read-only");
+		let tag = format!("v{version}");
+		let asset = format!("pina-lints-{target}-{tag}.tar.gz");
+		let (api, downloads, server) =
+			serve_release(&tag, &asset, lint_archive(&catalog, version, target));
+		assert!(matches!(
+			prepare_bundle_from(cargo_home.path(), &api, &downloads),
+			Err(BundleError::CreateTemporaryBundle { .. })
+		));
+		fs::set_permissions(&lint_root, fs::Permissions::from_mode(0o755))
+			.expect("lint root permissions should be restored");
+		server.join().expect("lint release server should finish");
+
+		let cargo_home = tempfile::tempdir().expect("temporary Cargo home should exist");
+		let tool_root = cargo_home
+			.path()
+			.join(format!("pina/tools/dylint-v{}", catalog.dylint_version))
+			.join(target);
+		fs::create_dir_all(&tool_root).expect("tool root should be created");
+		fs::write(tool_root.join("bundle.lock"), b"").expect("tool lock should be written");
+		fs::set_permissions(&tool_root, fs::Permissions::from_mode(0o555))
+			.expect("tool root should become read-only");
+		let tag = format!("dylint-v{}", catalog.dylint_version);
+		let asset = format!(
+			"pina-dylint-tools-{target}-v{}.tar.gz",
+			catalog.dylint_version
+		);
+		let (api, downloads, server) =
+			serve_release(&tag, &asset, tool_archive(&catalog.dylint_version, target));
+		assert!(matches!(
+			prepare_dylint_tools_from(cargo_home.path(), &api, &downloads),
+			Err(BundleError::CreateTemporaryBundle { .. })
+		));
+		fs::set_permissions(&tool_root, fs::Permissions::from_mode(0o755))
+			.expect("tool root permissions should be restored");
+		server.join().expect("tool release server should finish");
 	}
 
 	#[test]
@@ -1066,6 +1540,75 @@ mod tests {
 			verify_archive(&wrong_size, bytes),
 			Err(BundleError::UnexpectedAssetSize { .. })
 		));
+
+		let missing_digest = GithubAsset {
+			digest: None,
+			..wrong_size
+		};
+		let missing_digest = GithubAsset {
+			size: bytes.len() as u64,
+			..missing_digest
+		};
+		assert!(matches!(
+			verify_archive(&missing_digest, bytes),
+			Err(BundleError::MissingAssetDigest { .. })
+		));
+		let unsupported = GithubAsset {
+			digest: Some("sha512:00".to_owned()),
+			..missing_digest
+		};
+		assert!(matches!(
+			verify_archive(&unsupported, bytes),
+			Err(BundleError::UnsupportedAssetDigest { .. })
+		));
+		let mismatched = GithubAsset {
+			digest: Some("sha256:00".to_owned()),
+			..unsupported
+		};
+		assert!(matches!(
+			verify_archive(&mismatched, bytes),
+			Err(BundleError::AssetDigestMismatch { .. })
+		));
+	}
+
+	#[test]
+	fn http_failures_preserve_release_and_asset_context() {
+		assert!(matches!(
+			fetch_release("http://127.0.0.1:1/releases/tags", "v1.2.3"),
+			Err(BundleError::Http { resource, .. }) if resource.contains("v1.2.3")
+		));
+		let asset = GithubAsset {
+			name: "native.tar.gz".to_owned(),
+			browser_download_url: "http://127.0.0.1:1/native.tar.gz".to_owned(),
+			size: 0,
+			digest: None,
+		};
+		assert!(matches!(
+			fetch_archive(&asset),
+			Err(BundleError::Http { resource, .. }) if resource == "native.tar.gz"
+		));
+
+		let (url, server) = serve_once(b"{".to_vec(), 1);
+		assert!(matches!(
+			fetch_release(&url, "malformed"),
+			Err(BundleError::Http { resource, .. }) if resource.contains("malformed")
+		));
+		server
+			.join()
+			.expect("malformed release server should finish");
+
+		let (url, server) = serve_once(b"short".to_vec(), 100);
+		let truncated = GithubAsset {
+			name: "truncated.tar.gz".to_owned(),
+			browser_download_url: url,
+			size: 100,
+			digest: None,
+		};
+		assert!(matches!(
+			fetch_archive(&truncated),
+			Err(BundleError::Http { resource, .. }) if resource == "truncated.tar.gz"
+		));
+		server.join().expect("truncated asset server should finish");
 	}
 
 	#[test]
@@ -1095,14 +1638,100 @@ mod tests {
 	}
 
 	#[test]
+	fn extraction_rejects_malformed_disallowed_duplicate_and_oversized_entries() {
+		let destination = tempfile::tempdir().expect("temporary directory should exist");
+		assert!(matches!(
+			unpack_archive(
+				b"not a gzip stream",
+				destination.path(),
+				"malformed.tar.gz",
+				ArchiveContents::Lints,
+			),
+			Err(BundleError::Unpack { .. })
+		));
+
+		let disallowed = archive([("source.rs".to_owned(), b"unsafe".to_vec())]);
+		assert!(matches!(
+			unpack_archive(
+				&disallowed,
+				destination.path(),
+				"disallowed.tar.gz",
+				ArchiveContents::Lints,
+			),
+			Err(BundleError::UnsafeArchiveEntry { .. })
+		));
+
+		let mut absolute_header = tar::Header::new_gnu();
+		absolute_header.set_size(0);
+		absolute_header.set_mode(0o644);
+		absolute_header.as_mut_bytes()[..15].copy_from_slice(b"/manifest.json\0");
+		absolute_header.set_cksum();
+		let mut absolute_encoder = GzEncoder::new(Vec::new(), Compression::default());
+		absolute_encoder
+			.write_all(absolute_header.as_bytes())
+			.expect("absolute header should be written");
+		absolute_encoder
+			.write_all(&[0_u8; 1024])
+			.expect("tar trailer should be written");
+		let absolute = absolute_encoder
+			.finish()
+			.expect("gzip stream should finish");
+		let absolute_destination = tempfile::tempdir().expect("temporary directory should exist");
+		assert!(matches!(
+			unpack_archive(
+				&absolute,
+				absolute_destination.path(),
+				"absolute.tar.gz",
+				ArchiveContents::Lints,
+			),
+			Err(BundleError::UnsafeArchiveEntry { .. })
+		));
+
+		let duplicate = archive([
+			("manifest.json".to_owned(), b"{}".to_vec()),
+			("manifest.json".to_owned(), b"{}".to_vec()),
+		]);
+		let duplicate_destination = tempfile::tempdir().expect("temporary directory should exist");
+		assert!(matches!(
+			unpack_archive(
+				&duplicate,
+				duplicate_destination.path(),
+				"duplicate.tar.gz",
+				ArchiveContents::Lints,
+			),
+			Err(BundleError::Unpack { .. })
+		));
+
+		let mut header = tar::Header::new_gnu();
+		header
+			.set_path("manifest.json")
+			.expect("safe path should be accepted");
+		header.set_size(MAX_EXTRACTED_BYTES + 1);
+		header.set_mode(0o644);
+		header.set_cksum();
+		let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+		encoder
+			.write_all(header.as_bytes())
+			.expect("oversized header should be written");
+		encoder
+			.write_all(&[0_u8; 1024])
+			.expect("tar trailer should be written");
+		let oversized = encoder.finish().expect("gzip stream should finish");
+		let oversized_destination = tempfile::tempdir().expect("temporary directory should exist");
+		assert!(matches!(
+			unpack_archive(
+				&oversized,
+				oversized_destination.path(),
+				"oversized.tar.gz",
+				ArchiveContents::Lints,
+			),
+			Err(BundleError::UnsafeArchiveEntry { entry, .. }) if entry.contains("size limit")
+		));
+	}
+
+	#[test]
 	fn bundle_validation_detects_tampered_library_bytes() {
-		let catalog = LintCatalog {
-			schema_version: 1,
-			dylint_version: TEST_DYLINT_VERSION.to_owned(),
-			toolchain: "nightly-test".to_owned(),
-			targets: vec![env!("PINA_BUILD_TARGET").to_owned()],
-			libraries: vec!["secure_lint".to_owned()],
-		};
+		let catalog = test_catalog();
 		let target = env!("PINA_BUILD_TARGET");
 		let toolchain = format!("{}-{target}", catalog.toolchain);
 		let file = library_filename("secure_lint", &toolchain);
@@ -1130,10 +1759,113 @@ mod tests {
 		validate_bundle(directory.path(), &catalog, "1.2.3", target)
 			.expect("untampered bundle should validate");
 
-		fs::write(directory.path().join(&file), b"tampered native library")
+		fs::write(directory.path().join(&file), b"altered native library")
 			.expect("library should be replaced");
 		assert!(matches!(
 			validate_bundle(directory.path(), &catalog, "1.2.3", target),
+			Err(BundleError::InvalidBundle { .. })
+		));
+	}
+
+	#[test]
+	fn bundle_validation_rejects_malformed_metadata_files_and_layouts() {
+		let missing = tempfile::tempdir().expect("temporary directory should exist");
+		assert!(matches!(
+			validate_bundle(
+				missing.path(),
+				&test_catalog(),
+				"1.2.3",
+				env!("PINA_BUILD_TARGET"),
+			),
+			Err(BundleError::ReadManifest { .. })
+		));
+
+		let malformed = tempfile::tempdir().expect("temporary directory should exist");
+		fs::write(malformed.path().join("manifest.json"), b"{")
+			.expect("malformed manifest should be written");
+		assert!(matches!(
+			validate_bundle(
+				malformed.path(),
+				&test_catalog(),
+				"1.2.3",
+				env!("PINA_BUILD_TARGET"),
+			),
+			Err(BundleError::ParseManifest { .. })
+		));
+
+		let (metadata, catalog) = lint_fixture();
+		rewrite_manifest(metadata.path(), |manifest| {
+			manifest["schema_version"] = json!(2);
+		});
+		assert!(matches!(
+			validate_bundle(
+				metadata.path(),
+				&catalog,
+				"1.2.3",
+				env!("PINA_BUILD_TARGET"),
+			),
+			Err(BundleError::InvalidBundle { .. })
+		));
+
+		let (names, catalog) = lint_fixture();
+		rewrite_manifest(names.path(), |manifest| {
+			manifest["libraries"] = json!([]);
+		});
+		assert!(matches!(
+			validate_bundle(names.path(), &catalog, "1.2.3", env!("PINA_BUILD_TARGET"),),
+			Err(BundleError::InvalidBundle { .. })
+		));
+
+		let (filename, catalog) = lint_fixture();
+		rewrite_manifest(filename.path(), |manifest| {
+			manifest["libraries"][0]["file"] = json!("unexpected.so");
+		});
+		assert!(matches!(
+			validate_bundle(
+				filename.path(),
+				&catalog,
+				"1.2.3",
+				env!("PINA_BUILD_TARGET"),
+			),
+			Err(BundleError::InvalidBundle { .. })
+		));
+
+		let (missing_file, catalog) = lint_fixture();
+		let expected_file = library_filename(
+			"secure_lint",
+			&format!("{}-{}", catalog.toolchain, env!("PINA_BUILD_TARGET")),
+		);
+		fs::remove_file(missing_file.path().join(&expected_file))
+			.expect("fixture library should be removed");
+		assert!(matches!(
+			validate_bundle(
+				missing_file.path(),
+				&catalog,
+				"1.2.3",
+				env!("PINA_BUILD_TARGET"),
+			),
+			Err(BundleError::InvalidBundle { .. })
+		));
+
+		let (wrong_size, catalog) = lint_fixture();
+		rewrite_manifest(wrong_size.path(), |manifest| {
+			manifest["libraries"][0]["size"] = json!(1);
+		});
+		assert!(matches!(
+			validate_bundle(
+				wrong_size.path(),
+				&catalog,
+				"1.2.3",
+				env!("PINA_BUILD_TARGET"),
+			),
+			Err(BundleError::InvalidBundle { .. })
+		));
+
+		let (extra, catalog) = lint_fixture();
+		fs::write(extra.path().join("unexpected"), b"unexpected")
+			.expect("unexpected file should be written");
+		assert!(matches!(
+			validate_bundle(extra.path(), &catalog, "1.2.3", env!("PINA_BUILD_TARGET"),),
 			Err(BundleError::InvalidBundle { .. })
 		));
 	}
@@ -1175,10 +1907,126 @@ mod tests {
 			directory.path().join(tool_filename("cargo-dylint", target))
 		);
 
-		fs::write(&tools.cargo_dylint, b"tampered executable").expect("tool should be replaced");
+		fs::write(&tools.cargo_dylint, b"altered executable cargo-dylint")
+			.expect("tool should be replaced");
 		assert!(matches!(
 			validate_tool_bundle(directory.path(), TEST_DYLINT_VERSION, target),
 			Err(BundleError::InvalidBundle { .. })
 		));
+	}
+
+	#[test]
+	fn tool_validation_rejects_malformed_metadata_files_and_layouts() {
+		let target = env!("PINA_BUILD_TARGET");
+		let missing = tempfile::tempdir().expect("temporary directory should exist");
+		assert!(matches!(
+			validate_tool_bundle(missing.path(), TEST_DYLINT_VERSION, target),
+			Err(BundleError::ReadManifest { .. })
+		));
+
+		let malformed = tempfile::tempdir().expect("temporary directory should exist");
+		fs::write(malformed.path().join("manifest.json"), b"{")
+			.expect("malformed manifest should be written");
+		assert!(matches!(
+			validate_tool_bundle(malformed.path(), TEST_DYLINT_VERSION, target),
+			Err(BundleError::ParseManifest { .. })
+		));
+
+		let metadata = tool_fixture();
+		rewrite_manifest(metadata.path(), |manifest| {
+			manifest["target"] = json!("wrong-target");
+		});
+		assert!(matches!(
+			validate_tool_bundle(metadata.path(), TEST_DYLINT_VERSION, target),
+			Err(BundleError::InvalidBundle { .. })
+		));
+
+		let names = tool_fixture();
+		rewrite_manifest(names.path(), |manifest| {
+			manifest["executables"] = json!([]);
+		});
+		assert!(matches!(
+			validate_tool_bundle(names.path(), TEST_DYLINT_VERSION, target),
+			Err(BundleError::InvalidBundle { .. })
+		));
+
+		let filename = tool_fixture();
+		rewrite_manifest(filename.path(), |manifest| {
+			manifest["executables"][0]["file"] = json!("unexpected");
+		});
+		assert!(matches!(
+			validate_tool_bundle(filename.path(), TEST_DYLINT_VERSION, target),
+			Err(BundleError::InvalidBundle { .. })
+		));
+
+		let missing_file = tool_fixture();
+		fs::remove_file(
+			missing_file
+				.path()
+				.join(tool_filename("cargo-dylint", target)),
+		)
+		.expect("fixture tool should be removed");
+		assert!(matches!(
+			validate_tool_bundle(missing_file.path(), TEST_DYLINT_VERSION, target),
+			Err(BundleError::InvalidBundle { .. })
+		));
+
+		let wrong_size = tool_fixture();
+		rewrite_manifest(wrong_size.path(), |manifest| {
+			manifest["executables"][0]["size"] = json!(1);
+		});
+		assert!(matches!(
+			validate_tool_bundle(wrong_size.path(), TEST_DYLINT_VERSION, target),
+			Err(BundleError::InvalidBundle { .. })
+		));
+
+		let extra = tool_fixture();
+		fs::write(extra.path().join("unexpected"), b"unexpected")
+			.expect("unexpected file should be written");
+		assert!(matches!(
+			validate_tool_bundle(extra.path(), TEST_DYLINT_VERSION, target),
+			Err(BundleError::InvalidBundle { .. })
+		));
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn validation_propagates_file_and_permission_failures() {
+		let target = env!("PINA_BUILD_TARGET");
+		let (lint_hash, catalog) = lint_fixture();
+		let lint_file = lint_hash.path().join(library_filename(
+			"secure_lint",
+			&format!("{}-{target}", catalog.toolchain),
+		));
+		fs::set_permissions(&lint_file, fs::Permissions::from_mode(0o000))
+			.expect("lint file should become unreadable");
+		assert!(matches!(
+			validate_bundle(lint_hash.path(), &catalog, "1.2.3", target),
+			Err(BundleError::InvalidBundle { .. })
+		));
+		fs::set_permissions(&lint_file, fs::Permissions::from_mode(0o644))
+			.expect("lint file permissions should be restored");
+
+		let tool_hash = tool_fixture();
+		let tool_file = tool_hash.path().join(tool_filename("cargo-dylint", target));
+		fs::set_permissions(&tool_file, fs::Permissions::from_mode(0o000))
+			.expect("tool file should become unreadable");
+		assert!(matches!(
+			validate_tool_bundle(tool_hash.path(), TEST_DYLINT_VERSION, target),
+			Err(BundleError::InvalidBundle { .. })
+		));
+		fs::set_permissions(&tool_file, fs::Permissions::from_mode(0o644))
+			.expect("tool file permissions should be restored");
+
+		let missing_tools = tempfile::tempdir().expect("temporary directory should exist");
+		assert!(matches!(
+			set_executable_permissions(missing_tools.path(), target),
+			Err(BundleError::InvalidBundle { .. })
+		));
+		assert!(is_safe_component("manifest.json"));
+		assert!(is_dynamic_library("lint.so"));
+		assert!(is_dynamic_library("lint.dylib"));
+		assert!(is_dynamic_library("lint.dll"));
+		assert!(!is_dynamic_library("lint.rs"));
 	}
 }
