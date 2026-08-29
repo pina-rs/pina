@@ -59,6 +59,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          # lints.json is the single release contract shared by this workflow
+          # and the CLI downloader. A Dylint version gets one durable tool
+          # release that later Pina versions can reuse without rebuilding it.
           version="$(jq -er .dylintVersion crates/pina_cli/lints.json)"
           toolchain="$(jq -er .toolchain crates/pina_cli/lints.json)"
           tag="dylint-v${version}"
@@ -69,16 +73,30 @@ jobs:
             echo "tag=$tag"
           } >> "$GITHUB_OUTPUT"
 
-          if ! release="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" 2>/dev/null)"; then
+          # Only a genuine 404 means the cache is absent. Treat authentication,
+          # rate-limit, and network errors as failures rather than attempting a
+          # conflicting rebuild of a release that may already exist.
+          release_error="$(mktemp)"
+          if release="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" 2>"$release_error")"; then
+            :
+          elif grep -q '(HTTP 404)' "$release_error"; then
             echo "No $tag release exists; native Dylint tools will be built."
             echo "required=true" >> "$GITHUB_OUTPUT"
             exit 0
+          else
+            echo "::error::Could not inspect the $tag Dylint tool release." >&2
+            cat "$release_error" >&2
+            exit 1
           fi
 
+          # A published version-keyed release is immutable. If it is draft or
+          # incomplete, fail closed instead of silently mixing old and new
+          # native executables under the same Dylint version.
           if [ "$(jq -r .draft <<< "$release")" != false ]; then
             echo "::error::The existing $tag release is still a draft." >&2
             exit 1
           fi
+
           while IFS= read -r target; do
             asset="pina-dylint-tools-${target}-v${version}.tar.gz"
             jq -e --arg asset "$asset" \
@@ -136,6 +154,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          # The script uses `cargo +stable` explicitly because the checked-in
+          # rust-toolchain.toml intentionally selects nightly for lint cdylibs.
           node scripts/lints/build-dylint-tools.mjs \
             --target "$DYLINT_TARGET" \
             --output-dir "$RUNNER_TEMP/dylint-assets"
@@ -178,6 +199,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/dylint-assets"
+
+          # GNU-hosted runners cannot produce native musl executables. Build in
+          # a digest-pinned Alpine container whose architecture matches the
+          # runner, verify rustup before executing it, and mount only the source
+          # tree plus the directory that receives the final archive.
           docker run --rm \
             --env DYLINT_TARGET \
             --env RUSTUP_SHA256 \
@@ -193,6 +219,9 @@ jobs:
               chmod +x /tmp/rustup-init
               /tmp/rustup-init -y --profile minimal --default-toolchain stable
               . "$HOME/.cargo/env"
+
+              # build-dylint-tools uses +stable explicitly, preventing the
+              # repository nightly override from downloading another toolchain.
               node scripts/lints/build-dylint-tools.mjs \
                 --target "$DYLINT_TARGET" \
                 --output-dir /dylint-assets
@@ -226,6 +255,10 @@ jobs:
           prepare: pkg install -y cmake curl node24 pkgconf
           run: |
             set -euo pipefail
+
+            # FreeBSD must also be built natively. Pin and verify rustup before
+            # installing stable, then let the shared script validate that the
+            # resulting rustc host matches the archive target.
             rustup_url='https://static.rust-lang.org/rustup/archive/1.28.2/x86_64-unknown-freebsd/rustup-init'
             curl --proto '=https' --tlsv1.2 -sSf "$rustup_url" -o /tmp/rustup-init
             test "$(sha256 -q /tmp/rustup-init)" = '4d9fef2e40731489f3186c61a0f178d54d79864fe3d34791edf5b17f70074956'
@@ -244,6 +277,10 @@ jobs:
 
   publish_dylint_tools:
     name: publish or reuse Dylint tools
+    # The three build jobs are expected to be skipped when the versioned tool
+    # release already exists. `always()` lets this join job handle both the
+    # reuse path and the successful all-platform build path, while the rest of
+    # the expression prevents it from running after any real build failure.
     needs:
       - prepare_dylint_tools
       - build_dylint_tools
@@ -297,6 +334,10 @@ jobs:
         run: |
           set -euo pipefail
           asset_dir="$RUNNER_TEMP/dylint-assets"
+
+          # Require exactly one archive for every catalog target. This catches
+          # a missing matrix runner and also rejects unexpected extra archives
+          # before anything is attested or published.
           while IFS= read -r target; do
             test -f "$asset_dir/pina-dylint-tools-${target}-v${DYLINT_VERSION}.tar.gz"
           done < <(jq -r '.targets[]' crates/pina_cli/lints.json)
@@ -319,6 +360,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          # Attestation happens before upload, and GitHub binds provenance to
+          # each archive digest. Creating a separate non-latest release keeps
+          # these reusable tools independent of any one Pina version.
           gh release create "$DYLINT_TAG" "$RUNNER_TEMP/dylint-assets"/*.tar.gz \
             --repo "$GITHUB_REPOSITORY" \
             --target "$DYLINT_COMMIT" \
@@ -331,6 +376,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          # GitHub's attestation index is eventually consistent. Retry lookup
+          # briefly, but never let lint compilation consume an unverified tool.
           for archive in "$RUNNER_TEMP/dylint-assets"/*.tar.gz; do
             verified=false
             for attempt in 1 2 3 4 5; do
@@ -513,6 +561,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          # Lint libraries must be linked by the target-native dylint-link from
+          # the reusable tool release. Verify provenance before extracting it
+          # or adding its directory to PATH.
           asset="pina-dylint-tools-${DYLINT_TARGET}-v${DYLINT_VERSION}.tar.gz"
           tools_dir="$RUNNER_TEMP/dylint-tools"
           mkdir -p "$tools_dir"
@@ -529,6 +581,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          # Unlike the stable CLI tools, Dylint libraries are rustc-private and
+          # therefore compile with the exact catalog nightly installed above.
           node scripts/lints/build-bundle.mjs \
             --target "$LINT_TARGET" \
             --release-tag "$RELEASE_TAG" \
@@ -620,6 +675,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/lint-assets"
+
+          # Build the rustc-private libraries inside the same native musl
+          # boundary used for the tools. The tool archive was verified before
+          # entering the container, and only the completed bundle is uploaded.
           docker run --rm \
             --env DYLINT_VERSION \
             --env LINT_TOOLCHAIN \
@@ -726,6 +785,10 @@ jobs:
           prepare: pkg install -y cmake curl node24 pkgconf
           run: |
             set -euo pipefail
+
+            # The VM provides a real FreeBSD ABI. Install the exact lint
+            # nightly, unpack the already verified linker, then run the shared
+            # bundle builder against every catalog lint crate.
             rustup_url='https://static.rust-lang.org/rustup/archive/1.28.2/x86_64-unknown-freebsd/rustup-init'
             curl --proto '=https' --tlsv1.2 -sSf "$rustup_url" -o /tmp/rustup-init
             test "$(sha256 -q /tmp/rustup-init)" = '4d9fef2e40731489f3186c61a0f178d54d79864fe3d34791edf5b17f70074956'
@@ -784,6 +847,10 @@ jobs:
           set -euo pipefail
           asset_dir="$RUNNER_TEMP/release-asset-attestations"
           mkdir -p "$asset_dir"
+
+          # This gate runs only after every CLI and lint matrix job succeeds.
+          # Download the draft release as the source of truth so attestation
+          # covers exactly the artifacts users will receive, not job-local files.
           gh release download "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --pattern 'pina-*' \

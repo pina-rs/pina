@@ -5,7 +5,10 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { libraryFilename } from "./build-bundle.mjs";
-import { executableFilename } from "./build-dylint-tools.mjs";
+import {
+	dylintBuildToolchain,
+	executableFilename,
+} from "./build-dylint-tools.mjs";
 
 const repositoryRoot = resolve(
 	dirname(fileURLToPath(import.meta.url)),
@@ -40,6 +43,7 @@ test("Dylint bundle filenames match each native loader convention", () => {
 });
 
 test("Dylint tool filenames match Unix and Windows conventions", () => {
+	assert.equal(dylintBuildToolchain, "+stable");
 	assert.equal(
 		executableFilename("cargo-dylint", "aarch64-apple-darwin"),
 		"cargo-dylint",

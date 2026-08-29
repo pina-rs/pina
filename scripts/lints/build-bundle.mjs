@@ -70,6 +70,8 @@ export function libraryFilename(name, toolchain, target) {
 }
 
 function validateRelease(releaseTag) {
+	// Bind every archive to the checked-out CLI version. This prevents a manual
+	// workflow dispatch from publishing lint libraries under the wrong Pina tag.
 	if (!/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(releaseTag)) {
 		fail(`Invalid release tag: ${releaseTag}`);
 	}
@@ -91,6 +93,9 @@ function validateRelease(releaseTag) {
 }
 
 function validateHost(target, catalog) {
+	// rustc-private libraries are ABI-coupled to both the nightly and host
+	// target. Cross-compiling or using a merely compatible nightly would produce
+	// an archive that Dylint cannot safely load.
 	const rustc = run("rustc", ["-vV"], { capture: true });
 	const host = /^host: (.+)$/m.exec(rustc)?.[1];
 	if (host !== target) {
@@ -129,6 +134,9 @@ export function buildBundle(arguments_) {
 	const temporaryDirectory = mkdtempSync(join(tmpdir(), "pina-lint-bundle-"));
 	const targetDirectory = join(temporaryDirectory, "target");
 	const stagingDirectory = join(temporaryDirectory, "bundle");
+	// Every lint crate already selects dylint-link in its Cargo config. Keep the
+	// target-specific environment override as a fail-safe for native builders
+	// whose Cargo configuration discovery differs inside a VM or container.
 	const linkerVariable = `CARGO_TARGET_${
 		target.replaceAll("-", "_").toUpperCase()
 	}_LINKER`;
@@ -137,6 +145,9 @@ export function buildBundle(arguments_) {
 
 	try {
 		const libraries = [];
+		// Build each cdylib independently into the same target directory. The
+		// linker embeds the exact toolchain in its filename, which the CLI later
+		// checks before loading any native code.
 		for (const name of catalog.libraries) {
 			const manifestPath = join(repositoryRoot, "lints", name, "Cargo.toml");
 			run("cargo", ["build", "--release", "--manifest-path", manifestPath], {
@@ -159,6 +170,8 @@ export function buildBundle(arguments_) {
 			});
 		}
 
+		// The manifest binds names, sizes, and digests to the release, target, and
+		// rustc toolchain. Runtime validation rejects any extra or changed file.
 		writeFileSync(
 			join(stagingDirectory, "manifest.json"),
 			`${
