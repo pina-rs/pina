@@ -43,6 +43,20 @@ Generated JavaScript codecs reject over-capacity values rather than truncating t
 - Document the explicit `zeroed()` then `close_with_recipient()` close flow.
 - Regenerate Codama IDLs and committed Rust/JS clients for the updated writable-account inference.
 
+## [0.11.1](https://github.com/pina-rs/pina/releases/tag/v0.11.1) (2026-08-29)
+
+Grouped release for `core`.
+
+### Fixes
+
+#### Recover Native Lint Bundle Publication
+
+_Packages:_ _pina_cli_
+
+Select lint libraries by the active Rust compiler host, omit impossible musl `cdylib` builds, and keep Windows archive paths local so automated releases can publish every supported lint bundle.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #262](https://github.com/pina-rs/pina/pull/262)
+
 ## [0.11.0](https://github.com/pina-rs/pina/releases/tag/v0.11.0) (2026-08-29)
 
 Grouped release for `core`.
