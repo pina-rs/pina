@@ -26,6 +26,8 @@ allow = [
 	"Apache-2.0 WITH LLVM-exception",
 	"BSD-2-Clause",
 	"BSD-3-Clause",
+	# webpki-roots distributes Mozilla's public certificate trust-store data.
+	"CDLA-Permissive-2.0",
 	"ISC",
 	"MIT",
 	"MPL-2.0",
