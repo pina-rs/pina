@@ -14,7 +14,7 @@ import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { libraryFilename } from "./build-bundle.mjs";
+import { libraryFilename, lintTarCreateArguments } from "./build-bundle.mjs";
 import {
 	dylintBuildToolchain,
 	executableFilename,
@@ -118,6 +118,54 @@ test("Dylint tar arguments create an archive at an absolute host path", () => {
 	}
 });
 
+test("lint archives use a relative output name on every host", () => {
+	assert.deepEqual(
+		lintTarCreateArguments(
+			"pina-lints-v0.11.0.tar.gz",
+			"C:\\bundle",
+			["secure_lint.dll"],
+		),
+		[
+			"-czf",
+			"pina-lints-v0.11.0.tar.gz",
+			"-C",
+			"C:\\bundle",
+			"manifest.json",
+			"secure_lint.dll",
+		],
+	);
+});
+
+test("lint tar arguments create an archive at an absolute host path", () => {
+	const temporaryDirectory = mkdtempSync(
+		join(tmpdir(), "pina-lint-archive-test-"),
+	);
+	const stagingDirectory = join(temporaryDirectory, "bundle");
+	const outputDirectory = join(temporaryDirectory, "assets");
+	mkdirSync(stagingDirectory);
+	mkdirSync(outputDirectory);
+
+	try {
+		writeFileSync(join(stagingDirectory, "manifest.json"), "{}\n");
+		writeFileSync(join(stagingDirectory, "secure_lint.dll"), "lint");
+		const archiveName = "pina-lints-v0.11.0.tar.gz";
+		const archivePath = join(outputDirectory, archiveName);
+
+		execFileSync(
+			"tar",
+			lintTarCreateArguments(
+				archiveName,
+				stagingDirectory,
+				["secure_lint.dll"],
+			),
+			{ cwd: outputDirectory },
+		);
+		assert.ok(statSync(archivePath).size > 0);
+	} finally {
+		rmSync(temporaryDirectory, { force: true, recursive: true });
+	}
+});
+
 test("the release catalog covers every lint crate and matches the pinned toolchain", () => {
 	const catalog = JSON.parse(
 		readFileSync(join(repositoryRoot, "crates/pina_cli/lints.json"), "utf8"),
@@ -137,13 +185,22 @@ test("the release catalog covers every lint crate and matches the pinned toolcha
 		.map((entry) => entry.name)
 		.sort();
 	assert.deepEqual(catalog.libraries, lintCrates);
-	assert.deepEqual(catalog.targets, [
+	assert.deepEqual(catalog.toolTargets, [
 		"aarch64-unknown-linux-gnu",
 		"aarch64-unknown-linux-musl",
 		"aarch64-apple-darwin",
 		"aarch64-pc-windows-msvc",
 		"x86_64-unknown-linux-gnu",
 		"x86_64-unknown-linux-musl",
+		"x86_64-apple-darwin",
+		"x86_64-pc-windows-msvc",
+		"x86_64-unknown-freebsd",
+	]);
+	assert.deepEqual(catalog.lintTargets, [
+		"aarch64-unknown-linux-gnu",
+		"aarch64-apple-darwin",
+		"aarch64-pc-windows-msvc",
+		"x86_64-unknown-linux-gnu",
 		"x86_64-apple-darwin",
 		"x86_64-pc-windows-msvc",
 		"x86_64-unknown-freebsd",
@@ -166,9 +223,14 @@ test("the release catalog covers every lint crate and matches the pinned toolcha
 		join(repositoryRoot, ".github/workflows/publish.yml"),
 		"utf8",
 	);
-	for (const target of catalog.targets) {
+	for (const target of catalog.toolTargets) {
 		assert.match(publishWorkflow, new RegExp(`target: ${target}`, "u"));
 	}
+	assert.doesNotMatch(publishWorkflow, /upload_musl_lint_bundles/u);
+	assert.match(
+		publishWorkflow,
+		/cd "\$tools_dir"\s+tar -xzf "\$asset" -C \./u,
+	);
 	assert.match(
 		publishWorkflow,
 		/toolchain: \$\{\{ needs\.prepare_dylint_tools\.outputs\.toolchain \}\}/u,

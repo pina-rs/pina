@@ -101,15 +101,15 @@ function validateHost(target) {
 export function buildDylintTools(arguments_) {
 	const { outputDirectory, target } = parseArguments(arguments_);
 	const catalog = JSON.parse(readFileSync(catalogPath, "utf8"));
-	if (catalog.schemaVersion !== 1 || !Array.isArray(catalog.targets)) {
+	if (catalog.schemaVersion !== 2 || !Array.isArray(catalog.toolTargets)) {
 		fail("The lint catalog is empty or uses an unsupported schema.");
 	}
 	const version = catalog.dylintVersion;
 	if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
 		fail(`Invalid Dylint version in lint catalog: ${version}`);
 	}
-	if (!catalog.targets.includes(target)) {
-		fail(`Target ${target} is not in the lint release catalog.`);
+	if (!catalog.toolTargets.includes(target)) {
+		fail(`Target ${target} is not in the Dylint tool release catalog.`);
 	}
 	validateHost(target);
 

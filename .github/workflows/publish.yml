@@ -502,6 +502,10 @@ jobs:
       contents: write # Upload the native lint bundle to the draft release.
     strategy:
       fail-fast: false
+      # Rust's musl hosts cannot produce the cdylib crate type required by
+      # rustc-private plugins. Musl-distributed Pina executables remain
+      # supported: at runtime they select the bundle for the active rustc host,
+      # which is normally the matching GNU target on glibc Linux systems.
       matrix:
         include:
           - target: aarch64-unknown-linux-gnu
@@ -573,7 +577,13 @@ jobs:
             --pattern "$asset" \
             --dir "$tools_dir"
           gh attestation verify "$tools_dir/$asset" --repo "$GITHUB_REPOSITORY"
-          tar -xzf "$tools_dir/$asset" -C "$tools_dir"
+          # GNU tar interprets `C:` and `D:` in absolute Windows paths as
+          # remote hosts. Extract from the containing directory so both archive
+          # and destination arguments remain relative on every runner.
+          (
+            cd "$tools_dir"
+            tar -xzf "$asset" -C .
+          )
           echo "$tools_dir" >> "$GITHUB_PATH"
       - name: build native lint bundle
         env:
@@ -589,125 +599,6 @@ jobs:
             --release-tag "$RELEASE_TAG" \
             --output-dir "$RUNNER_TEMP/lint-assets"
       - name: upload native lint bundle
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LINT_TARGET: ${{ matrix.target }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          asset="$RUNNER_TEMP/lint-assets/pina-lints-${LINT_TARGET}-${RELEASE_TAG}.tar.gz"
-          test -f "$asset"
-          gh release upload "$RELEASE_TAG" "$asset" \
-            --clobber \
-            --repo "$GITHUB_REPOSITORY"
-
-  upload_musl_lint_bundles:
-    name: build lints ${{ matrix.target }}
-    needs:
-      - prepare_dylint_tools
-      - publish_dylint_tools
-    if: >-
-      github.repository_owner == 'pina-rs' &&
-      startsWith(inputs.tag || github.ref_name, 'v')
-    # Upload the completed native bundle to the draft release.
-    permissions:
-      attestations: read # Verify the downloaded Dylint tool provenance.
-      contents: write # Upload the native musl lint bundle to the draft release.
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: aarch64-unknown-linux-musl
-            os: ubuntu-24.04-arm
-            rustup-sha256: a97c8f56d7462908695348dd8c71ea6740c138ce303715793a690503a94fc9a9
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-24.04
-            rustup-sha256: e6599a1c7be58a2d8eaca66a80e0dc006d87bbcf780a58b7343d6e14c1605cb2
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
-    steps:
-      - name: wait for draft release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Waiting for the draft release $RELEASE_TAG to be created by the release-pr tag job..."
-          for attempt in $(seq 1 30); do
-            if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-              echo "Draft release $RELEASE_TAG exists after $attempt attempt(s)."
-              exit 0
-            fi
-            echo "  attempt $attempt/30: release not found yet; sleeping 10s"
-            sleep 10
-          done
-          echo "::error::Release $RELEASE_TAG was not created within the wait window. Check the release-pr tag job." >&2
-          exit 1
-      - name: checkout release tag
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ env.RELEASE_TAG }}
-          fetch-depth: 0
-          persist-credentials: false
-      - name: download verified musl Dylint tools
-        env:
-          DYLINT_TAG: ${{ needs.prepare_dylint_tools.outputs.tag }}
-          DYLINT_TARGET: ${{ matrix.target }}
-          DYLINT_VERSION: ${{ needs.prepare_dylint_tools.outputs.version }}
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          asset="pina-dylint-tools-${DYLINT_TARGET}-v${DYLINT_VERSION}.tar.gz"
-          mkdir -p "$RUNNER_TEMP/lint-assets"
-          gh release download "$DYLINT_TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern "$asset" \
-            --dir "$RUNNER_TEMP/lint-assets"
-          gh attestation verify "$RUNNER_TEMP/lint-assets/$asset" --repo "$GITHUB_REPOSITORY"
-      - name: build native musl lint bundle
-        env:
-          DYLINT_VERSION: ${{ needs.prepare_dylint_tools.outputs.version }}
-          LINT_TOOLCHAIN: ${{ needs.prepare_dylint_tools.outputs.toolchain }}
-          LINT_TARGET: ${{ matrix.target }}
-          RUSTUP_SHA256: ${{ matrix.rustup-sha256 }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/lint-assets"
-
-          # Build the rustc-private libraries inside the same native musl
-          # boundary used for the tools. The tool archive was verified before
-          # entering the container, and only the completed bundle is uploaded.
-          docker run --rm \
-            --env DYLINT_VERSION \
-            --env LINT_TOOLCHAIN \
-            --env LINT_TARGET \
-            --env RELEASE_TAG \
-            --env RUSTUP_SHA256 \
-            --volume "$GITHUB_WORKSPACE:/workspace" \
-            --volume "$RUNNER_TEMP/lint-assets:/lint-assets" \
-            --workdir /workspace \
-            alpine@sha256:4bcff63911fcb4448bd4fdacec207030997caf25e9bea4045fa6c8c44de311d1 \
-            sh -euc '
-              apk add --no-cache bash build-base ca-certificates cmake curl nodejs openssl-dev perl pkgconf
-              rustup_url="https://static.rust-lang.org/rustup/archive/1.28.2/$LINT_TARGET/rustup-init"
-              curl --proto "=https" --tlsv1.2 -sSf "$rustup_url" -o /tmp/rustup-init
-              echo "$RUSTUP_SHA256  /tmp/rustup-init" | sha256sum -c -
-              chmod +x /tmp/rustup-init
-              /tmp/rustup-init -y --profile minimal --default-toolchain "$LINT_TOOLCHAIN"
-              . "$HOME/.cargo/env"
-              rustup component add rustc-dev
-              asset="/lint-assets/pina-dylint-tools-${LINT_TARGET}-v${DYLINT_VERSION}.tar.gz"
-              mkdir -p /tmp/dylint-tools
-              tar -xzf "$asset" -C /tmp/dylint-tools
-              export PATH="/tmp/dylint-tools:$PATH"
-              node scripts/lints/build-bundle.mjs \
-                --target "$LINT_TARGET" \
-                --release-tag "$RELEASE_TAG" \
-                --output-dir /lint-assets
-            '
-      - name: upload native musl lint bundle
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LINT_TARGET: ${{ matrix.target }}
@@ -824,7 +715,6 @@ jobs:
     needs:
       - upload_assets
       - upload_lint_bundles
-      - upload_musl_lint_bundles
       - upload_freebsd_lint_bundle
     # Read release archives, then attach OIDC-backed provenance attestations.
     permissions:

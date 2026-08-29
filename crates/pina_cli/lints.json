@@ -1,14 +1,23 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"dylintVersion": "6.0.4",
 	"toolchain": "nightly-2026-02-20",
-	"targets": [
+	"toolTargets": [
 		"aarch64-unknown-linux-gnu",
 		"aarch64-unknown-linux-musl",
 		"aarch64-apple-darwin",
 		"aarch64-pc-windows-msvc",
 		"x86_64-unknown-linux-gnu",
 		"x86_64-unknown-linux-musl",
+		"x86_64-apple-darwin",
+		"x86_64-pc-windows-msvc",
+		"x86_64-unknown-freebsd"
+	],
+	"lintTargets": [
+		"aarch64-unknown-linux-gnu",
+		"aarch64-apple-darwin",
+		"aarch64-pc-windows-msvc",
+		"x86_64-unknown-linux-gnu",
 		"x86_64-apple-darwin",
 		"x86_64-pc-windows-msvc",
 		"x86_64-unknown-freebsd"

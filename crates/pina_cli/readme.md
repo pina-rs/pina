@@ -124,7 +124,7 @@ Generated manifests do not install Dylint or register a source repository for na
 
 ### `pina lint`
 
-Discover the current program and run Pina's official security lints. The first invocation downloads the pinned, precompiled Dylint tools and verified native bundle; fix mode applies only machine-applicable suggestions.
+Discover the current program and run Pina's official security lints. The first invocation downloads pinned, precompiled Dylint tools for the CLI platform and a verified native bundle for the active Rust compiler host; fix mode applies only machine-applicable suggestions. Musl CLI builds use GNU lint libraries when the active compiler is GNU because Rust's musl hosts cannot load `cdylib` compiler plugins.
 
 ```bash
 pina lint

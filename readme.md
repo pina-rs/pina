@@ -903,7 +903,7 @@ pina lint
 pina lint --fix
 ```
 
-`pina lint` downloads pinned, precompiled `cargo-dylint` and Pina lint libraries instead of installing or compiling them from source, and it does not load extra project-defined lint libraries. Dylint may still build its internal compiler driver for the project's exact Rust toolchain on first use. `pina init` does not add source-based lint metadata or a self-referential commit pin.
+`pina lint` downloads pinned, precompiled `cargo-dylint` for the CLI platform and Pina lint libraries for the active Rust compiler host instead of installing or compiling them from source, and it does not load extra project-defined lint libraries. This distinction lets musl-distributed CLI binaries use GNU lint libraries on glibc Linux; Rust's genuinely musl-hosted compilers cannot load the required dynamic plugins and receive a clear unsupported-host error. Dylint may still build its internal compiler driver for the project's exact Rust toolchain on first use. `pina init` does not add source-based lint metadata or a self-referential commit pin.
 
 - account ownership, initialization, PDA, sysvar, ATA, resize, close, and CPI validation
 - mutable-borrow lifetime, checked arithmetic, remaining-account bounds, and custody balance accounting
