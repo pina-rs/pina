@@ -242,6 +242,14 @@ test("the release catalog covers every lint crate and matches the pinned toolcha
 	);
 	assert.match(
 		publishWorkflow,
+		/attest_assets:[\s\S]*?if: >-\s+always\(\) &&\s+needs\.upload_assets\.result == 'success' &&\s+needs\.upload_lint_bundles\.result == 'success' &&\s+needs\.upload_freebsd_lint_bundle\.result == 'success'/u,
+	);
+	assert.match(
+		publishWorkflow,
+		/publish:\s+name: publish packages and release\s+needs: attest_assets[\s\S]*?if: >-\s+always\(\) &&\s+needs\.attest_assets\.result == 'success'/u,
+	);
+	assert.match(
+		publishWorkflow,
 		/cd "\$tools_dir"\s+tar -xzf "\$asset" -C \./u,
 	);
 	assert.match(
