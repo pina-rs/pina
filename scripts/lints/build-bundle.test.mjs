@@ -227,6 +227,7 @@ test("the release catalog covers every lint crate and matches the pinned toolcha
 		assert.match(publishWorkflow, new RegExp(`target: ${target}`, "u"));
 	}
 	assert.doesNotMatch(publishWorkflow, /upload_musl_lint_bundles/u);
+	assert.doesNotMatch(publishWorkflow, /\.targets\b/u);
 	assert.match(
 		publishWorkflow,
 		/cd "\$tools_dir"\s+tar -xzf "\$asset" -C \./u,
