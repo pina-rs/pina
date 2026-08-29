@@ -4,10 +4,6 @@ use std::path::PathBuf;
 
 use heck::ToUpperCamelCase;
 
-use crate::lint::CARGO_DYLINT_VERSION;
-use crate::lint::DYLINT_LINK_VERSION;
-use crate::lint::PINA_LINT_REVISION;
-
 // A non-system placeholder keeps the generated Surfpool deployment executable.
 // Users must still replace it before sharing or deploying the project.
 const PLACEHOLDER_PROGRAM_ID: &str = "Fg6PaFpoGXkYsidMpWxTWqkZkkM8NufCHCX9ddLKBqd7";
@@ -169,15 +165,6 @@ publish = false
 
 [workspace.metadata.cli]
 solana = "3.0.0"
-
-[workspace.metadata.bin]
-cargo-dylint = {{ version = "{CARGO_DYLINT_VERSION}", bins = ["cargo-dylint"] }}
-dylint-link = {{ version = "{DYLINT_LINK_VERSION}", bins = ["dylint-link"] }}
-
-[workspace.metadata.dylint]
-libraries = [
-	{{ git = "https://github.com/pina-rs/pina", rev = "{PINA_LINT_REVISION}", pattern = "lints/*" }},
-]
 
 [lib]
 crate-type = ["cdylib", "lib"]
@@ -649,13 +636,10 @@ mod tests {
 		assert!(cargo.contains("cpi = []"));
 		assert!(cargo.contains("[workspace.metadata.cli]"));
 		assert!(cargo.contains("solana = \"3.0.0\""));
-		assert!(cargo.contains("[workspace.metadata.bin]"));
-		assert!(cargo.contains("cargo-dylint = { version = \"6.0.4\""));
-		assert!(cargo.contains("dylint-link = { version = \"6.0.4\""));
-		assert!(cargo.contains("[workspace.metadata.dylint]"));
-		assert!(cargo.contains("git = \"https://github.com/pina-rs/pina\""));
-		assert!(cargo.contains(&format!("rev = \"{PINA_LINT_REVISION}\"")));
-		assert!(cargo.contains("pattern = \"lints/*\""));
+		assert!(!cargo.contains("[workspace.metadata.bin]"));
+		assert!(!cargo.contains("cargo-dylint"));
+		assert!(!cargo.contains("dylint-link"));
+		assert!(!cargo.contains("[workspace.metadata.dylint]"));
 		assert!(cargo.contains("cfg(dylint_lib, values(any()))"));
 		assert!(cargo.contains("mollusk-svm = \"0.15.0\""));
 

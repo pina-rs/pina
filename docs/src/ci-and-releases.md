@@ -113,6 +113,12 @@ The `publish` workflow builds and uploads the `pina` CLI binary for all supporte
 - Build scope: `crates/pina_cli` only (`bin = "pina"`)
 - Artifacts: `pina-<target>-<tag>` archives with `sha256`/`sha512` checksums, attested with build provenance
 
+The same workflow resolves a reusable `dylint-v<version>` tool release before building `pina-lints-<target>-<tag>.tar.gz`. A complete existing tool release is verified and reused. If the exact version has no release, the workflow builds `cargo-dylint` and `dylint-link` for the full target matrix, attests the archives, and publishes them once under that versioned tag. This makes the lint runner independent of both a Pina commit revision and the Linux-only upstream Dylint binary matrix.
+
+Lint libraries are then built natively because Dylint compiler plugins are tied to the host, pinned nightly toolchain, and dynamic loader. Linux musl builds run inside a digest-pinned Alpine image; FreeBSD runs in a pinned VM action. The workflow waits for all CLI and lint assets, attests and verifies every `pina-*` asset, and only then publishes packages and makes the GitHub release public.
+
+`crates/pina_cli/lints.json` is the single release contract shared by the CLI and bundle builders. Its `dylintVersion` field is the pointer to the reusable tool release; changing it causes the next publish run to create that release if it does not already exist. Tests require the catalog to match every crate under `lints/`, the repository Rust toolchain, and the workspace's Dylint dependency version. The installed CLI selects releases by semantic version rather than embedding a commit revision, so automated releases remain a single merge-and-publish flow.
+
 After attestation, the publish job downloads those same archives and fills the platform-specific npm packages. `@pina-rs/cli` uses optional dependencies to install the matching native package without compiling Rust. The release target and npm package matrices are checked one-to-one for:
 
 - macOS arm64 and x64

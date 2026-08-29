@@ -1513,7 +1513,10 @@ mod tests {
 	}
 
 	fn record_hash() -> String {
-		Sha256::digest([7_u8; 128]).iter().map(|byte| format!("{byte:02x}")).collect::<String>()
+		Sha256::digest([7_u8; 128])
+			.iter()
+			.map(|byte| format!("{byte:02x}"))
+			.collect::<String>()
 	}
 
 	fn record_program_for_test(
@@ -1875,7 +1878,10 @@ mod tests {
 		default_features: bool,
 	) -> PathBuf {
 		let bytes = vec![7_u8; 128];
-		let hash = Sha256::digest(&bytes).iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+		let hash = Sha256::digest(&bytes)
+			.iter()
+			.map(|byte| format!("{byte:02x}"))
+			.collect::<String>();
 		let record = temp.path().join(format!("verify_fixture-{hash}.json"));
 		let artifact = record.with_extension("so");
 		let json = serde_json::json!({

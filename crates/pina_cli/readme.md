@@ -120,11 +120,11 @@ pina init my_program
 pina init my_program --path ./programs/my_program --force
 ```
 
-Generated manifests register the immutable-revision official Pina lint set and its pinned Dylint tool versions.
+Generated manifests do not install Dylint or register a source repository for native lint code. `pina lint` owns the pinned tool and library downloads.
 
 ### `pina lint`
 
-Discover the current program and run Pina's official security lints. The first invocation prepares project-local pinned Dylint tools; fix mode applies only machine-applicable suggestions.
+Discover the current program and run Pina's official security lints. The first invocation downloads the pinned, precompiled Dylint tools and verified native bundle; fix mode applies only machine-applicable suggestions.
 
 ```bash
 pina lint

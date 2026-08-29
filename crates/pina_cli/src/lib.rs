@@ -9,6 +9,7 @@ pub mod init;
 pub mod ir;
 pub mod keys;
 pub mod lint;
+mod lint_bundle;
 pub mod parse;
 mod path_security;
 pub mod profile;

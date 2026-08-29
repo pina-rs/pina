@@ -101,14 +101,13 @@ pub(crate) enum Commands {
 	/// Run Pina's official security lints against the current program.
 	///
 	/// Discovers the nearest Pina.toml or Cargo package, prepares pinned Dylint
-	/// tools under Cargo home, and runs the lint set from the immutable revision
-	/// reviewed for this CLI. Use --fix to apply machine-applicable suggestions;
+	/// tooling under Cargo home, and runs the precompiled lint bundle published
+	/// with this CLI release. Use --fix to apply machine-applicable suggestions;
 	/// review every resulting source change.
 	#[command(
 		after_help = "Examples:\n  pina lint\n  pina lint --fix\n  pina lint --project \
-		              ./programs/counter\n\nTooling:\n  The first run installs pinned \
-		              cargo-dylint and dylint-link binaries below Cargo home. Lint libraries are \
-		              loaded from the immutable Pina revision reviewed for this CLI. --fix \
+		              ./programs/counter\n\nTooling:\n  The first run downloads verified, \
+		              precompiled cargo-dylint and native lint bundles below Cargo home. --fix \
 		              applies only machine-applicable suggestions and allows Cargo to edit dirty, \
 		              staged, or not-yet-versioned working trees; inspect the diff before \
 		              committing."

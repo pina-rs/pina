@@ -5,8 +5,15 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+use std::process::Stdio;
+use std::thread;
+use std::time::Duration;
 
 use fs2::FileExt;
+use serde_json::Value;
+use serde_json::json;
+use sha2::Digest;
+use sha2::Sha256;
 use tempfile::TempDir;
 
 fn write_project(root: &Path) {
@@ -43,13 +50,126 @@ fn executable(path: &Path, contents: &str) {
 		.unwrap_or_else(|error| panic!("failed to make {} executable: {error}", path.display()));
 }
 
+fn hex_digest(bytes: &[u8]) -> String {
+	const HEX: &[u8; 16] = b"0123456789abcdef";
+	let mut encoded = String::with_capacity(bytes.len() * 2);
+	for byte in bytes {
+		encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+		encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+	}
+	encoded
+}
+
+fn dylint_library_filename(name: &str, toolchain: &str) -> String {
+	if cfg!(target_os = "macos") {
+		format!("lib{name}@{toolchain}.dylib")
+	} else {
+		format!("lib{name}@{toolchain}.so")
+	}
+}
+
+fn write_cached_bundle(cargo_home: &Path) {
+	let catalog: Value = serde_json::from_str(include_str!("../lints.json"))
+		.unwrap_or_else(|error| panic!("failed to parse lint catalog: {error}"));
+	let target = env!("PINA_BUILD_TARGET");
+	let toolchain = format!(
+		"{}-{target}",
+		catalog["toolchain"]
+			.as_str()
+			.unwrap_or_else(|| panic!("catalog toolchain should be a string"))
+	);
+	let bundle = cargo_home
+		.join("pina/lints")
+		.join(format!("v{}", env!("CARGO_PKG_VERSION")))
+		.join(target)
+		.join("bundle");
+	fs::create_dir_all(&bundle)
+		.unwrap_or_else(|error| panic!("failed to create cached bundle: {error}"));
+	let libraries = catalog["libraries"]
+		.as_array()
+		.unwrap_or_else(|| panic!("catalog libraries should be an array"))
+		.iter()
+		.map(|name| {
+			let name = name
+				.as_str()
+				.unwrap_or_else(|| panic!("catalog library should be a string"));
+			let file = dylint_library_filename(name, &toolchain);
+			let contents = format!("test dylint library: {name}");
+			fs::write(bundle.join(&file), contents.as_bytes())
+				.unwrap_or_else(|error| panic!("failed to write cached lint: {error}"));
+			json!({
+				"name": name,
+				"file": file,
+				"sha256": hex_digest(Sha256::digest(contents.as_bytes()).as_ref()),
+				"size": contents.len(),
+			})
+		})
+		.collect::<Vec<_>>();
+	let manifest = json!({
+		"schema_version": 1,
+		"version": env!("CARGO_PKG_VERSION"),
+		"target": target,
+		"toolchain": toolchain,
+		"dylint_version": "6.0.4",
+		"libraries": libraries,
+	});
+	fs::write(
+		bundle.join("manifest.json"),
+		serde_json::to_vec_pretty(&manifest)
+			.unwrap_or_else(|error| panic!("failed to encode manifest: {error}")),
+	)
+	.unwrap_or_else(|error| panic!("failed to write manifest: {error}"));
+}
+
+fn write_cached_tools(cargo_home: &Path, cargo_dylint: &Path) {
+	let target = env!("PINA_BUILD_TARGET");
+	let bundle = cargo_home
+		.join("pina/tools/dylint-v6.0.4")
+		.join(target)
+		.join("bundle");
+	fs::create_dir_all(&bundle)
+		.unwrap_or_else(|error| panic!("failed to create cached Dylint tools: {error}"));
+	let executables = [
+		("cargo-dylint", cargo_dylint.to_path_buf()),
+		("dylint-link", bundle.join("dylint-link")),
+	]
+	.into_iter()
+	.map(|(name, source)| {
+		let file = name.to_owned();
+		if name == "cargo-dylint" {
+			fs::copy(&source, bundle.join(&file))
+				.unwrap_or_else(|error| panic!("failed to cache cargo-dylint: {error}"));
+		} else {
+			executable(&source, "#!/usr/bin/env bash\nexit 0\n");
+		}
+		let bytes = fs::read(bundle.join(&file))
+			.unwrap_or_else(|error| panic!("failed to read cached Dylint tool: {error}"));
+		json!({
+			"name": name,
+			"file": file,
+			"sha256": hex_digest(Sha256::digest(&bytes).as_ref()),
+			"size": bytes.len(),
+		})
+	})
+	.collect::<Vec<_>>();
+	let manifest = json!({
+		"schema_version": 1,
+		"dylint_version": "6.0.4",
+		"target": target,
+		"executables": executables,
+	});
+	fs::write(
+		bundle.join("manifest.json"),
+		serde_json::to_vec_pretty(&manifest)
+			.unwrap_or_else(|error| panic!("failed to encode Dylint tool manifest: {error}")),
+	)
+	.unwrap_or_else(|error| panic!("failed to write Dylint tool manifest: {error}"));
+}
+
 struct Fixture {
 	_temp: TempDir,
 	project: PathBuf,
 	cargo_home: PathBuf,
-	cargo: PathBuf,
-	cargo_dylint: PathBuf,
-	dylint_link: PathBuf,
 	log: PathBuf,
 }
 
@@ -65,56 +185,9 @@ impl Fixture {
 		write_project(&project);
 
 		let cargo_home = temp.path().join("cargo-home");
-		let cargo = temp.path().join("cargo");
+		write_cached_bundle(&cargo_home);
 		let cargo_dylint = temp.path().join("cargo-dylint");
-		let dylint_link = temp.path().join("dylint-link");
 		let log = temp.path().join("commands.log");
-		executable(
-			&cargo,
-			r#"#!/usr/bin/env bash
-set -euo pipefail
-
-if [[ "${1:-}" == "metadata" ]]; then
-	"$REAL_CARGO" "$@"
-	status="$?"
-	if [[ "${FAKE_CARGO_DISAPPEAR:-0}" == "1" ]]; then
-		rm "$0"
-	fi
-	exit "$status"
-fi
-
-printf 'cargo' >> "$PINA_LINT_LOG"
-printf ' %q' "$@" >> "$PINA_LINT_LOG"
-printf '\n' >> "$PINA_LINT_LOG"
-
-package="${!#}"
-if [[ "${FAKE_INSTALL_FAIL:-}" == "$package" ]]; then
-	exit 41
-fi
-
-root=""
-previous=""
-for argument in "$@"; do
-	if [[ "$previous" == "--root" ]]; then
-		root="$argument"
-		break
-	fi
-	previous="$argument"
-done
-test -n "$root"
-mkdir -p "$root/bin"
-
-if [[ "${FAKE_INSTALL_OMIT:-}" == "$package" ]]; then
-	exit 0
-fi
-
-case "$package" in
-	cargo-dylint) cp "$FAKE_CARGO_DYLINT_SOURCE" "$root/bin/cargo-dylint" ;;
-	dylint-link) cp "$FAKE_DYLINT_LINK_SOURCE" "$root/bin/dylint-link" ;;
-	*) exit 42 ;;
-esac
-"#,
-		);
 		executable(
 			&cargo_dylint,
 			r#"#!/usr/bin/env bash
@@ -122,21 +195,17 @@ set -euo pipefail
 printf 'dylint' >> "$PINA_LINT_LOG"
 printf ' %q' "$@" >> "$PINA_LINT_LOG"
 printf '\n' >> "$PINA_LINT_LOG"
-printf 'link=%s\n' "$(command -v dylint-link)" >> "$PINA_LINT_LOG"
 if [[ "${FAKE_LINT_FAIL:-0}" == "1" ]]; then
 	exit 43
 fi
 "#,
 		);
-		executable(&dylint_link, "#!/usr/bin/env bash\nexit 0\n");
+		write_cached_tools(&cargo_home, &cargo_dylint);
 
 		Self {
 			_temp: temp,
 			project,
 			cargo_home,
-			cargo,
-			cargo_dylint,
-			dylint_link,
 			log,
 		}
 	}
@@ -147,12 +216,9 @@ fi
 		command
 			.args(["lint", "--project"])
 			.arg(&self.project)
-			.env("CARGO", &self.cargo)
 			.env("CARGO_HOME", &self.cargo_home)
-			.env("REAL_CARGO", real_cargo)
-			.env("PINA_LINT_LOG", &self.log)
-			.env("FAKE_CARGO_DYLINT_SOURCE", &self.cargo_dylint)
-			.env("FAKE_DYLINT_LINK_SOURCE", &self.dylint_link);
+			.env("CARGO", real_cargo)
+			.env("PINA_LINT_LOG", &self.log);
 		command
 	}
 
@@ -162,12 +228,14 @@ fi
 	}
 
 	fn managed_tool_root(&self) -> PathBuf {
-		self.cargo_home.join("pina/tools/dylint-6.0.4-6.0.4")
+		self.cargo_home
+			.join("pina/tools/dylint-v6.0.4")
+			.join(env!("PINA_BUILD_TARGET"))
 	}
 }
 
 #[test]
-fn lint_installs_pinned_tools_once_and_runs_release_lints() {
+fn lint_reuses_precompiled_runner_and_release_lints() {
 	let fixture = Fixture::new("pina-lint-success");
 	let first = fixture
 		.command()
@@ -184,16 +252,13 @@ fn lint_installs_pinned_tools_once_and_runs_release_lints() {
 	);
 
 	let first_log = fixture.log();
-	assert!(first_log.contains("install --locked --root"));
-	assert!(first_log.contains("--version 6.0.4 cargo-dylint"));
-	assert!(first_log.contains("--version 6.0.4 dylint-link"));
-	assert!(first_log.contains("dylint dylint --no-deps"));
-	assert!(first_log.contains("--git https://github.com/pina-rs/pina"));
-	assert!(first_log.contains("--rev f6f206e0a4e71ab70c3eeaded52d07cd66a270d8"));
-	assert!(first_log.contains("--pattern lints/\\*"));
+	assert!(first_log.contains("dylint dylint --no-deps --no-metadata"));
+	assert!(first_log.contains("--lib-path"));
+	assert!(first_log.contains("require_owner_before_token_cast"));
 	assert!(first_log.contains("--package lint-fixture"));
-	assert!(first_log.contains("link="));
-	assert!(first_log.contains("/cargo-home/pina/tools/dylint-6.0.4-6.0.4/bin/dylint-link"));
+	assert!(!first_log.contains("--git"));
+	assert!(!first_log.contains("--rev"));
+	assert!(!first_log.contains("install"));
 
 	let second = fixture
 		.command()
@@ -201,146 +266,22 @@ fn lint_installs_pinned_tools_once_and_runs_release_lints() {
 		.unwrap_or_else(|error| panic!("failed to rerun pina lint: {error}"));
 	assert!(second.status.success());
 	let second_log = fixture.log();
-	assert_eq!(second_log.matches("cargo install").count(), 2);
 	assert_eq!(second_log.matches("dylint dylint").count(), 2);
 }
 
 #[test]
-fn lint_discovers_cargo_from_path_when_the_cargo_variable_is_absent() {
-	let fixture = Fixture::new("pina-lint-cargo-path");
-	let fake_bin = fixture
-		.cargo
-		.parent()
-		.unwrap_or_else(|| panic!("fake Cargo should have a parent directory"));
-	let current_path = std::env::var_os("PATH").unwrap_or_default();
-	let path = std::iter::once(fake_bin.to_path_buf()).chain(std::env::split_paths(&current_path));
-	let path = std::env::join_paths(path)
-		.unwrap_or_else(|error| panic!("failed to construct test PATH: {error}"));
-	let output = fixture
-		.command()
-		.env_remove("CARGO")
-		.env("PATH", path)
-		.output()
-		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
-	assert!(
-		output.status.success(),
-		"pina lint failed: {}",
-		String::from_utf8_lossy(&output.stderr)
-	);
-	assert!(fixture.log().contains("cargo install --locked --root"));
-}
-
-#[test]
-fn lint_resolves_relative_cargo_home_from_the_invocation_directory() {
-	let fixture = Fixture::new("pina-lint-relative-cargo-home");
-	let invocation_directory = fixture._temp.path().join("invocation");
-	fs::create_dir_all(&invocation_directory)
-		.unwrap_or_else(|error| panic!("failed to create invocation directory: {error}"));
-	let output = fixture
-		.command()
-		.current_dir(&invocation_directory)
-		.env("CARGO_HOME", "relative-cargo-home")
-		.output()
-		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
-	assert!(
-		output.status.success(),
-		"pina lint failed: {}",
-		String::from_utf8_lossy(&output.stderr)
-	);
-	assert!(
-		invocation_directory
-			.join("relative-cargo-home/pina/tools/dylint-6.0.4-6.0.4/bin/cargo-dylint")
-			.is_file()
-	);
-}
-
-#[test]
-fn lint_defaults_managed_tools_to_the_platform_cargo_home() {
-	let fixture = Fixture::new("pina-lint-default-cargo-home");
-	let home = fixture._temp.path().join("home");
-	fs::create_dir_all(&home)
-		.unwrap_or_else(|error| panic!("failed to create platform home: {error}"));
-	let output = fixture
-		.command()
-		.env_remove("CARGO_HOME")
-		.env("HOME", &home)
-		.output()
-		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
-	assert!(
-		output.status.success(),
-		"pina lint failed: {}",
-		String::from_utf8_lossy(&output.stderr)
-	);
-	assert!(
-		home.join(".cargo/pina/tools/dylint-6.0.4-6.0.4/bin/cargo-dylint")
-			.is_file()
-	);
-}
-
-#[test]
-fn lint_reports_project_discovery_failures() {
-	let fixture = Fixture::new("pina-lint-discovery-failure");
-	let missing = fixture.project.join("missing");
-	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
-		.args(["lint", "--project"])
-		.arg(&missing)
-		.output()
-		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
-	assert!(!output.status.success());
-	assert!(String::from_utf8_lossy(&output.stderr).contains("Could not inspect"));
-}
-
-#[test]
-fn lint_fix_allows_cargo_to_edit_dirty_and_staged_sources() {
+fn lint_fix_forwards_machine_applicable_fix_permissions() {
 	let fixture = Fixture::new("pina-lint-fix");
 	let output = fixture
 		.command()
 		.arg("--fix")
 		.output()
 		.unwrap_or_else(|error| panic!("failed to run pina lint --fix: {error}"));
+	assert!(output.status.success());
 	assert!(
-		output.status.success(),
-		"pina lint --fix failed: {}",
-		String::from_utf8_lossy(&output.stderr)
-	);
-	assert!(
-		String::from_utf8_lossy(&output.stdout)
-			.contains("Applied available Pina security lint fixes for lint-fixture")
-	);
-	assert!(
-		fixture.log().contains(
-			"--package lint-fixture --fix -- --allow-dirty --allow-staged --allow-no-vcs"
-		)
-	);
-}
-
-#[test]
-fn lint_reports_pinned_tool_install_failure() {
-	let fixture = Fixture::new("pina-lint-install-failure");
-	let output = fixture
-		.command()
-		.env("FAKE_INSTALL_FAIL", "cargo-dylint")
-		.output()
-		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
-	assert!(!output.status.success());
-	assert!(
-		String::from_utf8_lossy(&output.stderr)
-			.contains("Installing pinned tool `cargo-dylint` failed with status")
-	);
-}
-
-#[test]
-fn lint_rejects_a_successful_install_without_the_expected_binary() {
-	let fixture = Fixture::new("pina-lint-missing-tool");
-	let output = fixture
-		.command()
-		.env("FAKE_INSTALL_OMIT", "dylint-link")
-		.output()
-		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
-	assert!(!output.status.success());
-	assert!(
-		String::from_utf8_lossy(&output.stderr)
-			.contains("Cargo reported success but did not install `dylint-link`")
+		fixture
+			.log()
+			.contains("--fix -- --allow-dirty --allow-staged --allow-no-vcs")
 	);
 }
 
@@ -357,56 +298,6 @@ fn lint_propagates_lint_failures() {
 }
 
 #[test]
-fn lint_reports_when_cargo_disappears_after_discovery() {
-	let fixture = Fixture::new("pina-lint-cargo-disappears");
-	let output = fixture
-		.command()
-		.env("FAKE_CARGO_DISAPPEAR", "1")
-		.output()
-		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
-	assert!(!output.status.success());
-	assert!(
-		String::from_utf8_lossy(&output.stderr)
-			.contains("Could not install pinned tool `cargo-dylint` with Cargo")
-	);
-}
-
-#[test]
-fn lint_reports_when_the_cached_runner_is_not_executable() {
-	let fixture = Fixture::new("pina-lint-runner-permissions");
-	let mut permissions = fs::metadata(&fixture.cargo_dylint)
-		.unwrap_or_else(|error| panic!("failed to inspect fake cargo-dylint: {error}"))
-		.permissions();
-	permissions.set_mode(0o644);
-	fs::set_permissions(&fixture.cargo_dylint, permissions)
-		.unwrap_or_else(|error| panic!("failed to remove execute permission: {error}"));
-	let output = fixture
-		.command()
-		.output()
-		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
-	assert!(!output.status.success());
-	assert!(
-		String::from_utf8_lossy(&output.stderr).contains("Could not run Pina"),
-		"unexpected stderr: {}",
-		String::from_utf8_lossy(&output.stderr)
-	);
-}
-
-#[test]
-fn lint_reports_an_invalid_managed_tool_path() {
-	let fixture = Fixture::new("pina:lint-invalid-path");
-	let output = fixture
-		.command()
-		.output()
-		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
-	assert!(!output.status.success());
-	assert!(
-		String::from_utf8_lossy(&output.stderr)
-			.contains("Could not construct PATH for the pinned Dylint tools")
-	);
-}
-
-#[test]
 fn lint_reports_when_the_managed_tool_directory_cannot_be_created() {
 	let fixture = Fixture::new("pina-lint-tool-directory");
 	let cargo_home = fixture.project.join("blocked-cargo-home");
@@ -420,31 +311,14 @@ fn lint_reports_when_the_managed_tool_directory_cannot_be_created() {
 	assert!(!output.status.success());
 	assert!(
 		String::from_utf8_lossy(&output.stderr)
-			.contains("Could not create the managed Dylint directory")
+			.contains("Could not create the managed lint bundle directory")
 	);
 }
 
 #[test]
-fn lint_reports_when_the_install_lock_cannot_be_opened() {
-	let fixture = Fixture::new("pina-lint-open-lock");
-	let lock = fixture.managed_tool_root().join("install.lock");
-	fs::create_dir_all(&lock)
-		.unwrap_or_else(|error| panic!("failed to create blocking lock directory: {error}"));
-	let output = fixture
-		.command()
-		.output()
-		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
-	assert!(!output.status.success());
-	assert!(
-		String::from_utf8_lossy(&output.stderr)
-			.contains("Could not open the managed Dylint installation lock")
-	);
-}
-
-#[test]
-fn lint_reports_a_concurrent_managed_tool_installation() {
+fn lint_waits_for_a_concurrent_managed_runner_download() {
 	let fixture = Fixture::new("pina-lint-lock-contention");
-	let lock_path = fixture.managed_tool_root().join("install.lock");
+	let lock_path = fixture.managed_tool_root().join("bundle.lock");
 	fs::create_dir_all(
 		lock_path
 			.parent()
@@ -456,13 +330,29 @@ fn lint_reports_a_concurrent_managed_tool_installation() {
 	lock.lock_exclusive()
 		.unwrap_or_else(|error| panic!("failed to acquire install lock: {error}"));
 
-	let output = fixture
+	let mut child = fixture
 		.command()
-		.output()
+		.stdout(Stdio::piped())
+		.stderr(Stdio::piped())
+		.spawn()
 		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
-	assert!(!output.status.success());
+	thread::sleep(Duration::from_millis(250));
+	let exited_while_locked = child
+		.try_wait()
+		.unwrap_or_else(|error| panic!("failed to inspect pina lint: {error}"));
+	FileExt::unlock(&lock)
+		.unwrap_or_else(|error| panic!("failed to release install lock: {error}"));
+	let output = child
+		.wait_with_output()
+		.unwrap_or_else(|error| panic!("failed to wait for pina lint: {error}"));
 	assert!(
+		exited_while_locked.is_none(),
+		"pina lint exited instead of waiting for the managed bundle lock: {}",
 		String::from_utf8_lossy(&output.stderr)
-			.contains("Could not lock the managed Dylint installation")
+	);
+	assert!(
+		output.status.success(),
+		"pina lint failed after the managed bundle lock was released: {}",
+		String::from_utf8_lossy(&output.stderr)
 	);
 }

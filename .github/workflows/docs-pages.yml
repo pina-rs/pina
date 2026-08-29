@@ -17,8 +17,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: "pages"
@@ -26,11 +24,19 @@ concurrency:
 
 jobs:
   build:
-    if: github.repository_owner == 'pina-rs'
+    name: build documentation
+    if: >-
+      github.repository_owner == 'pina-rs' &&
+      (github.event_name != 'release' || startsWith(github.event.release.tag_name, 'v'))
+    permissions:
+      contents: read # Read documentation and source files from the repository.
+      pages: read # Read the GitHub Pages site configuration.
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: setup
         uses: ./.github/actions/devenv
@@ -54,8 +60,12 @@ jobs:
           path: docs/book
 
   deploy:
+    name: deploy documentation
     if: github.repository_owner == 'pina-rs'
     needs: build
+    permissions:
+      id-token: write # Authenticate the Pages deployment with GitHub OIDC.
+      pages: write # Publish the built documentation artifact to GitHub Pages.
     runs-on: ubuntu-latest
     environment:
       name: github-pages
