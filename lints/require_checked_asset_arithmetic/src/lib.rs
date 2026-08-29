@@ -29,7 +29,8 @@ dylint_linting::declare_late_lint! {
 }
 
 const ASSET_TERMS: &[&str] = &[
-	"amount", "balance", "lamport", "price", "reward", "stake", "supply",
+	"amount", "amounts", "balance", "balances", "lamport", "lamports", "price", "prices", "reward",
+	"rewards", "stake", "staked", "supply",
 ];
 const UNCHECKED_METHODS: &[&str] = &[
 	"saturating_add",
@@ -44,8 +45,10 @@ const UNCHECKED_METHODS: &[&str] = &[
 
 fn looks_like_asset(expr: &Expr<'_>) -> bool {
 	shared::expression_identity(expr).is_some_and(|identity| {
-		let identity = identity.to_ascii_lowercase();
-		ASSET_TERMS.iter().any(|term| identity.contains(term))
+		identity
+			.to_ascii_lowercase()
+			.split(|character: char| !character.is_ascii_alphanumeric())
+			.any(|component| ASSET_TERMS.contains(&component))
 	})
 }
 

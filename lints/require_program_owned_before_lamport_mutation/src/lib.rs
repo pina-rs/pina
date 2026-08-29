@@ -51,7 +51,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireProgramOwnedBeforeLamportMutation {
 			return;
 		}
 
-		let facts = shared::collect_function_facts(body);
+		let facts = shared::collect_function_facts(cx, body);
 		for (index, call) in facts.calls.iter().enumerate() {
 			if !TARGET_METHODS.contains(&call.method.as_str()) {
 				continue;

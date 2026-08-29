@@ -1,14 +1,14 @@
 error: asset arithmetic can overflow, underflow, or silently saturate
- --> $DIR/asset_arithmetic.rs:12:2
-  |
+  --> $DIR/asset_arithmetic.rs:18:2
+   |
 LL |     balance - amount
-  |     ^^^^^^^^^^^^^^^^
-  |
-  = help: use `checked_add`, `checked_sub`, `checked_mul`, or `checked_div` and return an explicit program error on failure
-  = note: `#[deny(req$DIRre_checked_asset_arithmetic)]` on by default
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = help: use `checked_add`, `checked_sub`, `checked_mul`, or `checked_div` and return an explicit program error on failure
+   = note: `#[deny(req$DIRre_checked_asset_arithmetic)]` on by default
 
 error: asset arithmetic can overflow, underflow, or silently saturate
-  --> $DIR/asset_arithmetic.rs:17:2
+  --> $DIR/asset_arithmetic.rs:23:2
    |
 LL |     balance.saturating_sub(amount)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -16,7 +16,7 @@ LL |     balance.saturating_sub(amount)
    = help: use `checked_add`, `checked_sub`, `checked_mul`, or `checked_div` and return an explicit program error on failure
 
 error: asset arithmetic can overflow, underflow, or silently saturate
-  --> $DIR/asset_arithmetic.rs:22:9
+  --> $DIR/asset_arithmetic.rs:28:9
    |
 LL |     return balance - amount;
    |            ^^^^^^^^^^^^^^^^
@@ -24,7 +24,7 @@ LL |     return balance - amount;
    = help: use `checked_add`, `checked_sub`, `checked_mul`, or `checked_div` and return an explicit program error on failure
 
 error: asset arithmetic can overflow, underflow, or silently saturate
-  --> $DIR/asset_arithmetic.rs:28:23
+  --> $DIR/asset_arithmetic.rs:34:23
    |
 LL |         let _next_balance = balance - amount;
    |                             ^^^^^^^^^^^^^^^^
@@ -32,7 +32,7 @@ LL |         let _next_balance = balance - amount;
    = help: use `checked_add`, `checked_sub`, `checked_mul`, or `checked_div` and return an explicit program error on failure
 
 error: asset arithmetic can overflow, underflow, or silently saturate
-  --> $DIR/asset_arithmetic.rs:36:9
+  --> $DIR/asset_arithmetic.rs:42:9
    |
 LL |         break balance - amount;
    |               ^^^^^^^^^^^^^^^^

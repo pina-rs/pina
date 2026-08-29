@@ -56,7 +56,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireExplicitDiscriminatorsAndSeedNamespaces
 			return;
 		}
 
-		let facts = shared::collect_function_facts(body);
+		let facts = shared::collect_function_facts(cx, body);
 		let has_named_seed_constant = facts.paths.iter().any(|path| {
 			path.rsplit("::")
 				.next()

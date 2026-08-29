@@ -33,6 +33,22 @@ const TARGET_METHODS: &[&str] = &[
 ];
 const POLICY_METHODS: &[&str] = &["assert_extensions_allowed", "assert_no_extensions"];
 
+fn is_explicit_legacy_load(call: &shared::CallInfo) -> bool {
+	if call.method != "as_token_mint_for_program" {
+		return false;
+	}
+
+	call.arg_def_crates
+		.first()
+		.and_then(Option::as_deref)
+		.is_some_and(|crate_name| crate_name == "pinocchio_token")
+		&& call
+			.arg_def_paths
+			.first()
+			.and_then(Option::as_deref)
+			.is_some_and(|path| path.ends_with("::ID"))
+}
+
 fn policy_matches(load: &shared::CallInfo, policy: &shared::CallInfo) -> bool {
 	if !POLICY_METHODS.contains(&policy.method.as_str()) {
 		return false;
@@ -67,9 +83,9 @@ impl<'tcx> LateLintPass<'tcx> for RequireExplicitToken2022ExtensionPolicy {
 			return;
 		}
 
-		let facts = shared::collect_function_facts(body);
+		let facts = shared::collect_function_facts(cx, body);
 		for (index, call) in facts.calls.iter().enumerate() {
-			if !TARGET_METHODS.contains(&call.method.as_str()) {
+			if !TARGET_METHODS.contains(&call.method.as_str()) || is_explicit_legacy_load(call) {
 				continue;
 			}
 			let next_load = facts.calls[index + 1..]

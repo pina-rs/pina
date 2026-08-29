@@ -1,4 +1,9 @@
+// aux-build: pinocchio_token.rs
+// normalize-stderr-test: "\n$" -> ""
+
 #![allow(dead_code)]
+
+extern crate pinocchio_token;
 
 struct Account;
 struct Mint;
@@ -22,6 +27,12 @@ impl Mint {
 fn process(account: &Account, program: &[u8]) -> Result<(), ()> {
 	let mint = account.as_token_mint_for_program(program)?;
 	mint.assert_no_extensions()
+}
+
+fn process_explicit_legacy(account: &Account) -> Result<(), ()> {
+	account
+		.as_token_mint_for_program(&pinocchio_token::ID)
+		.map(|_| ())
 }
 
 fn process_without_policy(account: &Account, program: &[u8]) -> Result<(), ()> {

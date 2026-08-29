@@ -1,33 +1,33 @@
 error: transfer into `vault` is not accounted from its observed balance delta
-  --> $DIR/balance_reload.rs:59:2
+  --> $DIR/balance_reload.rs:83:2
    |
-LL |     TransferChecked::new(source, mint, vault, owner, 10, 0).invoke()
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     token_2022::instructions::TransferChecked::new(source, mint, vault, owner, 10, 0).invoke()
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: read the destination amount before CPI, drop the borrow, invoke the transfer, reload the amount, and use `checked_sub` for the received value
    = note: `#[deny(req$DIRre_post_cpi_balance_reload)]` on by default
 
 error: transfer into `vault` is not accounted from its observed balance delta
-  --> $DIR/balance_reload.rs:72:2
+  --> $DIR/balance_reload.rs:93:2
    |
-LL |     transfer.invoke()
-   |     ^^^^^^^^^^^^^^^^^
-   |
-   = help: read the destination amount before CPI, drop the borrow, invoke the transfer, reload the amount, and use `checked_sub` for the received value
-
-error: transfer into `vault` is not accounted from its observed balance delta
-  --> $DIR/balance_reload.rs:84:2
-   |
-LL |     transfer.invoke()?;
-   |     ^^^^^^^^^^^^^^^^^
+LL |     TransferChecked::new(source, mint, vault, owner, 10, 0).invoke_with_program(owner)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: read the destination amount before CPI, drop the borrow, invoke the transfer, reload the amount, and use `checked_sub` for the received value
 
 error: transfer into `vault` is not accounted from its observed balance delta
-  --> $DIR/balance_reload.rs:98:33
+  --> $DIR/balance_reload.rs:106:2
    |
-LL |     let selected = choose_transfer(TransferChecked::new(source, mint, vault, owner, 10, 0));
-   |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     transfer.invoke_with_program(owner)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: read the destination amount before CPI, drop the borrow, invoke the transfer, reload the amount, and use `checked_sub` for the received value
+
+error: transfer into `vault` is not accounted from its observed balance delta
+  --> $DIR/balance_reload.rs:118:2
+   |
+LL |     transfer.invoke_with_program(owner)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: read the destination amount before CPI, drop the borrow, invoke the transfer, reload the amount, and use `checked_sub` for the received value
 

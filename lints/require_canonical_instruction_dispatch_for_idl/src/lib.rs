@@ -58,7 +58,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalInstructionDispatchForIdl {
 			return;
 		}
 
-		let facts = shared::collect_function_facts(body);
+		let facts = shared::collect_function_facts(cx, body);
 		if !facts.has_match {
 			cx.lint(REQUIRE_CANONICAL_INSTRUCTION_DISPATCH_FOR_IDL, |diag| {
 				diag.primary_message(

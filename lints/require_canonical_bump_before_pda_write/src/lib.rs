@@ -43,7 +43,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalBumpBeforePdaWrite {
 			return;
 		}
 
-		let facts = shared::collect_function_facts(body);
+		let facts = shared::collect_function_facts(cx, body);
 		for (index, call) in facts.calls.iter().enumerate() {
 			if call.method != "assert_seeds_with_bump" {
 				continue;

@@ -1,5 +1,5 @@
 error: token operation uses `other_program` after the instruction established `program`
-  --> $DIR/token_program.rs:36:2
+  --> $DIR/token_program.rs:38:2
    |
 LL |     vault.assert_associated_token_address(owner, owner, other_program)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -8,19 +8,27 @@ LL |     vault.assert_associated_token_address(owner, owner, other_program)
    = note: `#[deny(req$DIRre_consistent_token_program)]` on by default
 
 error: token operation uses `token_2022::ID` after the instruction established `token::ID`
-  --> $DIR/token_program.rs:42:2
+  --> $DIR/token_program.rs:44:2
    |
 LL |     vault.assert_associated_token_address(owner, owner, &token_2022::ID)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: validate the token-program account once, copy its address, and pass that same value to token parsing, ATA checks, and CPI
 
+error: token operation uses `token_2022::ID` after the instruction established `program`
+  --> $DIR/token_program.rs:68:2
+   |
+LL |     vault.assert_associated_token_address(owner, owner, program)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: validate the token-program account once, copy its address, and pass that same value to token parsing, ATA checks, and CPI
+
 error: token-program value `program` was reassigned between token operations
-  --> $DIR/token_program.rs:54:2
+  --> $DIR/token_program.rs:80:2
    |
 LL |     vault.assert_associated_token_address(owner, owner, program)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: validate the token-program account once, copy its address into an immutable binding, and reuse that binding for every token operation
 
-error: aborting due to 3 previous errors
+error: aborting due to 4 previous errors

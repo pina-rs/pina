@@ -28,7 +28,7 @@ dylint_linting::declare_late_lint! {
 	"token operations in one instruction must share one program identity"
 }
 
-fn program_argument(call: &shared::CallInfo) -> Option<&str> {
+fn program_argument(call: &shared::CallInfo) -> Option<(usize, &str)> {
 	let index = match call.method.as_str() {
 		"as_token_mint_for_program" | "as_token_account_for_program" => 0,
 		"as_associated_token_account"
@@ -39,7 +39,38 @@ fn program_argument(call: &shared::CallInfo) -> Option<&str> {
 		_ => return None,
 	};
 
-	call.args.get(index).and_then(Option::as_deref)
+	call.args
+		.get(index)
+		.and_then(Option::as_deref)
+		.map(|argument| (index, argument))
+}
+
+fn canonical_identity<'a>(
+	call: &'a shared::CallInfo,
+	argument_index: usize,
+	mut identity: &'a str,
+	facts: &'a shared::FunctionFacts,
+) -> &'a str {
+	let mut visited = HashSet::new();
+	let mut binding = call.arg_bindings.get(argument_index).copied().flatten();
+	while let Some(current) = binding
+		&& visited.insert(current)
+	{
+		if facts
+			.assignments
+			.iter()
+			.any(|assignment| assignment.identity == identity)
+		{
+			break;
+		}
+		let Some(alias) = facts.aliases.get(&current) else {
+			break;
+		};
+		identity = &alias.identity;
+		binding = alias.binding;
+	}
+
+	identity
 }
 
 impl<'tcx> LateLintPass<'tcx> for RequireConsistentTokenProgram {
@@ -59,15 +90,15 @@ impl<'tcx> LateLintPass<'tcx> for RequireConsistentTokenProgram {
 			return;
 		}
 
-		let facts = shared::collect_function_facts(body);
+		let facts = shared::collect_function_facts(cx, body);
 		let mut expected = None;
 		let mut previous_usage = None;
 		let mut reported_reassignments = HashSet::new();
 		for call in &facts.calls {
-			let Some(argument) = program_argument(call) else {
+			let Some((argument_index, argument)) = program_argument(call) else {
 				continue;
 			};
-			let identity = argument;
+			let identity = canonical_identity(call, argument_index, argument, &facts);
 			let Some(first) = expected else {
 				expected = Some(identity);
 				previous_usage = Some(call);

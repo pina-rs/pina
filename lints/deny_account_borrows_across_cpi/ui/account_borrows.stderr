@@ -1,26 +1,26 @@
 error: CPI invoked while a mutable account-data borrow is still alive
-  --> $DIR/account_borrows.rs:27:2
+  --> $DIR/account_borrows.rs:43:2
    |
 LL |     cpi.invoke()
    |     ^^^^^^^^^^^^
    |
-   = help: copy the required values, then call `drop(guard)` or end the borrow's scope before invoking another program
+   = help: copy the req$DIRred values, then call `drop(guard)` or end the borrow's scope before invoking another program
    = note: `#[deny(deny_account_borrows_across_cpi)]` on by default
 
 error: CPI invoked while a mutable account-data borrow is still alive
-  --> $DIR/account_borrows.rs:33:9
+  --> $DIR/account_borrows.rs:49:9
    |
 LL |     return cpi.invoke();
    |            ^^^^^^^^^^^^
    |
-   = help: copy the required values, then call `drop(guard)` or end the borrow's scope before invoking another program
+   = help: copy the req$DIRred values, then call `drop(guard)` or end the borrow's scope before invoking another program
 
 error: CPI invoked while a mutable account-data borrow is still alive
-  --> $DIR/account_borrows.rs:40:9
+  --> $DIR/account_borrows.rs:56:9
    |
 LL |         break cpi.invoke();
    |               ^^^^^^^^^^^^
    |
-   = help: copy the required values, then call `drop(guard)` or end the borrow's scope before invoking another program
+   = help: copy the req$DIRred values, then call `drop(guard)` or end the borrow's scope before invoking another program
 
 error: aborting due to 3 previous errors

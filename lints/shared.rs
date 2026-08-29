@@ -4,10 +4,14 @@ extern crate rustc_ast;
 extern crate rustc_hir;
 extern crate rustc_span;
 
+use std::collections::HashMap;
+
 use rustc_ast::LitKind;
 use rustc_hir::Body;
 use rustc_hir::Expr;
 use rustc_hir::ExprKind;
+use rustc_hir::HirId;
+use rustc_lint::LateContext;
 use rustc_span::Span;
 
 #[derive(Debug, Clone)]
@@ -17,9 +21,20 @@ pub struct CallInfo {
 	pub receiver: Option<String>,
 	pub receiver_span: Option<Span>,
 	pub path: Option<String>,
+	pub def_path: Option<String>,
+	pub def_crate: Option<String>,
 	pub is_type_relative: bool,
 	pub args: Vec<Option<String>>,
+	pub arg_def_paths: Vec<Option<String>>,
+	pub arg_def_crates: Vec<Option<String>>,
+	pub arg_bindings: Vec<Option<HirId>>,
 	pub result_binding: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AliasInfo {
+	pub identity: String,
+	pub binding: Option<HirId>,
 }
 
 #[derive(Debug, Clone)]
@@ -35,12 +50,36 @@ pub struct FunctionFacts {
 	pub has_byte_string: bool,
 	pub paths: Vec<String>,
 	pub assignments: Vec<AssignmentInfo>,
+	pub aliases: HashMap<HirId, AliasInfo>,
 }
 
-pub fn collect_function_facts(body: &Body<'_>) -> FunctionFacts {
+pub fn collect_function_facts(cx: &LateContext<'_>, body: &Body<'_>) -> FunctionFacts {
 	let mut facts = FunctionFacts::default();
-	collect_from_expr(body.value, &mut facts, None);
+	collect_from_expr(cx, body.value, &mut facts, None);
 	facts
+}
+
+fn definition_identity(cx: &LateContext<'_>, def_id: rustc_hir::def_id::DefId) -> (String, String) {
+	(
+		cx.tcx.def_path_str(def_id),
+		cx.tcx.crate_name(def_id.krate).as_str().to_string(),
+	)
+}
+
+fn expression_definition(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<(String, String)> {
+	match &expr.kind {
+		ExprKind::Path(path) => {
+			match cx.qpath_res(path, expr.hir_id) {
+				rustc_hir::def::Res::Def(_, def_id) => Some(definition_identity(cx, def_id)),
+				_ => None,
+			}
+		}
+		ExprKind::Unary(_, inner)
+		| ExprKind::Cast(inner, _)
+		| ExprKind::DropTemps(inner)
+		| ExprKind::AddrOf(_, _, inner) => expression_definition(cx, inner),
+		_ => None,
+	}
 }
 
 pub fn receiver_name(expr: &Expr<'_>) -> Option<String> {
@@ -78,6 +117,32 @@ pub fn expression_identity(expr: &Expr<'_>) -> Option<String> {
 	}
 }
 
+pub fn expression_local_binding(expr: &Expr<'_>) -> Option<HirId> {
+	match &expr.kind {
+		ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) => {
+			match path.res {
+				rustc_hir::def::Res::Local(binding) => Some(binding),
+				_ => None,
+			}
+		}
+		ExprKind::MethodCall(_, receiver, ..) | ExprKind::Match(receiver, ..) => {
+			expression_local_binding(receiver)
+		}
+		ExprKind::Unary(_, inner)
+		| ExprKind::Cast(inner, _)
+		| ExprKind::DropTemps(inner)
+		| ExprKind::AddrOf(_, _, inner)
+		| ExprKind::Index(inner, ..) => expression_local_binding(inner),
+		ExprKind::Block(block, _) => block.expr.and_then(expression_local_binding),
+		ExprKind::Call(callee, args) => {
+			args.first()
+				.and_then(|argument| expression_local_binding(argument))
+				.or_else(|| expression_local_binding(callee))
+		}
+		_ => None,
+	}
+}
+
 pub fn has_prior_method_with_receiver_match(
 	calls: &[CallInfo],
 	index: usize,
@@ -107,6 +172,7 @@ pub fn def_path_matches(def_path: &str, needles: &[&str]) -> bool {
 }
 
 fn collect_from_block(
+	cx: &LateContext<'_>,
 	block: &rustc_hir::Block<'_>,
 	facts: &mut FunctionFacts,
 	result_binding: Option<&str>,
@@ -116,30 +182,52 @@ fn collect_from_block(
 			rustc_hir::StmtKind::Let(local) => {
 				if let Some(init) = local.init {
 					let binding = match local.pat.kind {
-						rustc_hir::PatKind::Binding(_, _, ident, _) => {
-							Some(ident.name.as_str().to_string())
+						rustc_hir::PatKind::Binding(_, binding, ident, _) => {
+							Some((binding, ident.name.as_str().to_string()))
 						}
 						_ => None,
 					};
-					collect_from_expr(init, facts, binding.as_deref());
+					if let (Some((binding, _)), Some(identity)) =
+						(binding.as_ref(), expression_identity(init))
+					{
+						facts.aliases.insert(
+							*binding,
+							AliasInfo {
+								identity,
+								binding: expression_local_binding(init),
+							},
+						);
+					}
+					collect_from_expr(
+						cx,
+						init,
+						facts,
+						binding.as_ref().map(|(_, name)| name.as_str()),
+					);
 				}
 			}
 			rustc_hir::StmtKind::Expr(expr) | rustc_hir::StmtKind::Semi(expr) => {
-				collect_from_expr(expr, facts, None);
+				collect_from_expr(cx, expr, facts, None);
 			}
 			_ => {}
 		}
 	}
 	if let Some(expr) = block.expr {
-		collect_from_expr(expr, facts, result_binding);
+		collect_from_expr(cx, expr, facts, result_binding);
 	}
 }
 
-fn collect_from_expr(expr: &Expr<'_>, facts: &mut FunctionFacts, result_binding: Option<&str>) {
-	collect_from_expr_inner(expr, facts, result_binding, false);
+fn collect_from_expr(
+	cx: &LateContext<'_>,
+	expr: &Expr<'_>,
+	facts: &mut FunctionFacts,
+	result_binding: Option<&str>,
+) {
+	collect_from_expr_inner(cx, expr, facts, result_binding, false);
 }
 
 fn collect_from_expr_inner(
+	cx: &LateContext<'_>,
 	expr: &Expr<'_>,
 	facts: &mut FunctionFacts,
 	result_binding: Option<&str>,
@@ -147,28 +235,45 @@ fn collect_from_expr_inner(
 ) {
 	match &expr.kind {
 		ExprKind::MethodCall(path_segment, receiver, args, _) => {
-			collect_from_expr(receiver, facts, result_binding);
+			collect_from_expr(cx, receiver, facts, result_binding);
 			for arg in *args {
-				collect_from_expr(arg, facts, None);
+				collect_from_expr(cx, arg, facts, None);
 			}
+			let definition = cx
+				.typeck_results()
+				.type_dependent_def_id(expr.hir_id)
+				.map(|def_id| definition_identity(cx, def_id));
 			facts.calls.push(CallInfo {
 				span: expr.span,
 				method: path_segment.ident.name.as_str().to_string(),
 				receiver: expression_identity(receiver),
 				receiver_span: Some(receiver.span),
 				path: None,
+				def_path: definition.as_ref().map(|(path, _)| path.clone()),
+				def_crate: definition.map(|(_, crate_name)| crate_name),
 				is_type_relative: false,
 				args: args.iter().map(expression_identity).collect(),
+				arg_def_paths: args
+					.iter()
+					.map(|argument| expression_definition(cx, argument).map(|(path, _)| path))
+					.collect(),
+				arg_def_crates: args
+					.iter()
+					.map(|argument| {
+						expression_definition(cx, argument).map(|(_, crate_name)| crate_name)
+					})
+					.collect(),
+				arg_bindings: args.iter().map(expression_local_binding).collect(),
 				result_binding: result_binding.map(str::to_string),
 			});
 		}
 		ExprKind::Call(callee, args) => {
-			collect_from_expr(callee, facts, None);
+			collect_from_expr(cx, callee, facts, None);
 			for arg in *args {
 				let binding = forward_call_argument_binding
 					.then_some(result_binding)
 					.flatten();
-				collect_from_expr(arg, facts, binding);
+				collect_from_expr(cx, arg, facts, binding);
 			}
 			if let rustc_hir::ExprKind::Path(path) = &callee.kind {
 				let (path_name, is_type_relative) = match path {
@@ -190,38 +295,56 @@ fn collect_from_expr_inner(
 					.next()
 					.unwrap_or(&path_name)
 					.to_string();
+				let definition = match cx.qpath_res(path, callee.hir_id) {
+					rustc_hir::def::Res::Def(_, def_id) => Some(definition_identity(cx, def_id)),
+					_ => None,
+				};
 				facts.calls.push(CallInfo {
 					span: expr.span,
 					method,
 					receiver: None,
 					receiver_span: None,
 					path: Some(path_name),
+					def_path: definition.as_ref().map(|(path, _)| path.clone()),
+					def_crate: definition.map(|(_, crate_name)| crate_name),
 					is_type_relative,
 					args: args.iter().map(expression_identity).collect(),
+					arg_def_paths: args
+						.iter()
+						.map(|argument| expression_definition(cx, argument).map(|(path, _)| path))
+						.collect(),
+					arg_def_crates: args
+						.iter()
+						.map(|argument| {
+							expression_definition(cx, argument).map(|(_, crate_name)| crate_name)
+						})
+						.collect(),
+					arg_bindings: args.iter().map(expression_local_binding).collect(),
 					result_binding: result_binding.map(str::to_string),
 				});
 			}
 		}
 		ExprKind::Block(block, _) | ExprKind::Loop(block, ..) => {
-			collect_from_block(block, facts, result_binding);
+			collect_from_block(cx, block, facts, result_binding);
 		}
 		ExprKind::Match(scrutinee, arms, source) => {
 			facts.has_match = true;
 			collect_from_expr_inner(
+				cx,
 				scrutinee,
 				facts,
 				result_binding,
 				matches!(source, rustc_hir::MatchSource::TryDesugar(_)),
 			);
 			for arm in *arms {
-				collect_from_expr(arm.body, facts, result_binding);
+				collect_from_expr(cx, arm.body, facts, result_binding);
 			}
 		}
 		ExprKind::If(cond, then, else_opt) => {
-			collect_from_expr(cond, facts, None);
-			collect_from_expr(then, facts, result_binding);
+			collect_from_expr(cx, cond, facts, None);
+			collect_from_expr(cx, then, facts, result_binding);
 			if let Some(el) = else_opt {
-				collect_from_expr(el, facts, result_binding);
+				collect_from_expr(cx, el, facts, result_binding);
 			}
 		}
 		ExprKind::Unary(_, expr)
@@ -235,11 +358,11 @@ fn collect_from_expr_inner(
 		| ExprKind::Yield(expr, _)
 		| ExprKind::Become(expr)
 		| ExprKind::UnsafeBinderCast(_, expr, _) => {
-			collect_from_expr(expr, facts, result_binding);
+			collect_from_expr(cx, expr, facts, result_binding);
 		}
 		ExprKind::Binary(_, lhs, rhs) => {
-			collect_from_expr(lhs, facts, result_binding);
-			collect_from_expr(rhs, facts, result_binding);
+			collect_from_expr(cx, lhs, facts, result_binding);
+			collect_from_expr(cx, rhs, facts, result_binding);
 		}
 		ExprKind::Assign(lhs, rhs, _) | ExprKind::AssignOp(_, lhs, rhs) => {
 			if let Some(identity) = expression_identity(lhs) {
@@ -248,31 +371,31 @@ fn collect_from_expr_inner(
 					identity,
 				});
 			}
-			collect_from_expr(lhs, facts, None);
-			collect_from_expr(rhs, facts, None);
+			collect_from_expr(cx, lhs, facts, None);
+			collect_from_expr(cx, rhs, facts, None);
 		}
 		ExprKind::Index(base, index, _) => {
-			collect_from_expr(base, facts, result_binding);
-			collect_from_expr(index, facts, None);
+			collect_from_expr(cx, base, facts, result_binding);
+			collect_from_expr(cx, index, facts, None);
 		}
 		ExprKind::Let(let_expr) => {
-			collect_from_expr(let_expr.init, facts, result_binding);
+			collect_from_expr(cx, let_expr.init, facts, result_binding);
 		}
 		ExprKind::Tup(exprs) | ExprKind::Array(exprs) => {
 			for e in *exprs {
-				collect_from_expr(e, facts, result_binding);
+				collect_from_expr(cx, e, facts, result_binding);
 			}
 		}
 		ExprKind::Struct(_, fields, tail) => {
 			for field in *fields {
-				collect_from_expr(field.expr, facts, result_binding);
+				collect_from_expr(cx, field.expr, facts, result_binding);
 			}
 			if let rustc_hir::StructTailExpr::Base(base) = tail {
-				collect_from_expr(base, facts, result_binding);
+				collect_from_expr(cx, base, facts, result_binding);
 			}
 		}
 		ExprKind::Ret(Some(inner)) | ExprKind::Break(_, Some(inner)) => {
-			collect_from_expr(inner, facts, result_binding);
+			collect_from_expr(cx, inner, facts, result_binding);
 		}
 		ExprKind::Lit(lit) => {
 			if matches!(lit.node, LitKind::ByteStr(..)) {

@@ -49,10 +49,25 @@ fn is_transfer_constructor(cx: &LateContext<'_>, call: &shared::CallInfo) -> boo
 	snippet.contains("Transfer::new(") || snippet.contains("TransferChecked::new(")
 }
 
+fn is_explicit_legacy_constructor(call: &shared::CallInfo) -> bool {
+	call.def_crate.as_deref() == Some("pinocchio_token")
+		&& call.def_path.as_deref().is_some_and(|path| {
+			path.contains("instructions::Transfer::new")
+				|| path.contains("instructions::TransferChecked::new")
+		})
+}
+
 fn is_cpi_invocation(call: &shared::CallInfo) -> bool {
 	matches!(
 		call.method.as_str(),
 		"invoke" | "invoke_signed" | "invoke_with_program" | "invoke_signed_with_program"
+	)
+}
+
+fn is_dynamic_token_invocation(call: &shared::CallInfo) -> bool {
+	matches!(
+		call.method.as_str(),
+		"invoke_with_program" | "invoke_signed_with_program"
 	)
 }
 
@@ -102,7 +117,7 @@ impl<'tcx> LateLintPass<'tcx> for RequirePostCpiBalanceReload {
 			return;
 		}
 
-		let facts = shared::collect_function_facts(body);
+		let facts = shared::collect_function_facts(cx, body);
 		for (index, call) in facts.calls.iter().enumerate() {
 			if !is_transfer_constructor(cx, call) {
 				continue;
@@ -118,9 +133,15 @@ impl<'tcx> LateLintPass<'tcx> for RequirePostCpiBalanceReload {
 				.iter()
 				.position(|next| invocation_matches(call, next));
 			let Some(invocation) = invocation.map(|offset| index + 1 + offset) else {
-				lint_balance_reload(cx, call.span, destination);
+				// The transfer builder was passed through an opaque wrapper. Avoid a
+				// deny-level guess when the actual invocation cannot be associated.
 				continue;
 			};
+			if !is_dynamic_token_invocation(&facts.calls[invocation])
+				&& is_explicit_legacy_constructor(call)
+			{
+				continue;
+			}
 
 			let reads_amount = |candidate: &shared::CallInfo| {
 				candidate.method == "amount" && candidate.receiver.as_deref() == Some(destination)

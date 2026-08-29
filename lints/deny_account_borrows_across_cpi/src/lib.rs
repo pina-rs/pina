@@ -36,25 +36,65 @@ const CPI_METHODS: &[&str] = &[
 	"invoke_signed_with_program",
 ];
 
-fn contains_mutable_borrow(expr: &Expr<'_>) -> bool {
+fn method_def_path(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<String> {
+	cx.typeck_results()
+		.type_dependent_def_id(expr.hir_id)
+		.map(|def_id| cx.tcx.def_path_str(def_id))
+}
+
+fn is_account_borrow(cx: &LateContext<'_>, expr: &Expr<'_>, method: &str) -> bool {
+	if !BORROW_METHODS.contains(&method) {
+		return false;
+	}
+
+	method_def_path(cx, expr).is_some_and(|path| {
+		let path = path.to_ascii_lowercase();
+		match method {
+			"try_borrow_mut" => path.contains("accountview::try_borrow_mut"),
+			"as_account_mut" => path.contains("asaccount::as_account_mut"),
+			_ => false,
+		}
+	})
+}
+
+fn is_cpi_invocation(cx: &LateContext<'_>, expr: &Expr<'_>, method: &str) -> bool {
+	if !CPI_METHODS.contains(&method) {
+		return false;
+	}
+
+	method_def_path(cx, expr).is_some_and(|path| {
+		let path = path.to_ascii_lowercase();
+		path.starts_with("pina::")
+			|| path.starts_with("pinocchio::")
+			|| path.starts_with("pinocchio_")
+			|| path.split("::").any(|segment| {
+				segment == "cpi"
+					|| segment == "instructions"
+					|| segment.ends_with("instruction")
+					|| segment.starts_with("cpi")
+			})
+	})
+}
+
+fn contains_mutable_borrow(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
 	match &expr.kind {
 		ExprKind::MethodCall(segment, receiver, args, _) => {
-			BORROW_METHODS.contains(&segment.ident.name.as_str())
-				|| contains_mutable_borrow(receiver)
+			is_account_borrow(cx, expr, segment.ident.name.as_str())
+				|| contains_mutable_borrow(cx, receiver)
 				|| args
 					.iter()
-					.any(|argument| contains_mutable_borrow(argument))
+					.any(|argument| contains_mutable_borrow(cx, argument))
 		}
 		ExprKind::Match(scrutinee, ..)
 		| ExprKind::DropTemps(scrutinee)
 		| ExprKind::Use(scrutinee, _)
 		| ExprKind::Type(scrutinee, _)
-		| ExprKind::UnsafeBinderCast(_, scrutinee, _) => contains_mutable_borrow(scrutinee),
+		| ExprKind::UnsafeBinderCast(_, scrutinee, _) => contains_mutable_borrow(cx, scrutinee),
 		ExprKind::Call(callee, args) => {
-			contains_mutable_borrow(callee)
+			contains_mutable_borrow(cx, callee)
 				|| args
 					.iter()
-					.any(|argument| contains_mutable_borrow(argument))
+					.any(|argument| contains_mutable_borrow(cx, argument))
 		}
 		_ => false,
 	}
@@ -88,7 +128,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				rustc_hir::StmtKind::Let(local) => {
 					if let Some(initializer) = local.init {
 						self.visit_expr(initializer, active);
-						if contains_mutable_borrow(initializer)
+						if contains_mutable_borrow(self.cx, initializer)
 							&& let rustc_hir::PatKind::Binding(_, binding, ..) = local.pat.kind
 						{
 							active.insert(binding, initializer.span);
@@ -121,7 +161,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				}
 
 				let method = segment.ident.name.as_str();
-				if CPI_METHODS.contains(&method) && !active.is_empty() {
+				if is_cpi_invocation(self.cx, expr, method) && !active.is_empty() {
 					self.cx.lint(DENY_ACCOUNT_BORROWS_ACROSS_CPI, |diag| {
 						diag.span(expr.span);
 						diag.primary_message(
