@@ -16,26 +16,26 @@ path = "src/main.rs"
 doc = false
 
 [dependencies]
-atomic-write-file = { workspace = true }
-base64 = { workspace = true }
-bs58 = { workspace = true }
+atomic-write-file = { workspace = true, default-features = true }
+base64 = { workspace = true, default-features = true }
+bs58 = { workspace = true, default-features = true }
 cargo_metadata = { workspace = true, default-features = true }
 clap = { workspace = true, default-features = true }
 clap_complete = { workspace = true, default-features = true }
 codama-nodes = { workspace = true, default-features = true }
-comfy-table = "8.0.0"
+comfy-table = { workspace = true, default-features = true }
 ed25519-dalek = { workspace = true, default-features = true }
-flate2 = { workspace = true }
+flate2 = { workspace = true, default-features = true }
 fs2 = { workspace = true, default-features = true }
 getrandom = { workspace = true, default-features = true }
 heck = { workspace = true, default-features = true }
 http = { workspace = true, default-features = true }
-owo-colors = "4.0"
+owo-colors = { workspace = true, default-features = true }
 pina_codama_renderer = { workspace = true }
 pina_profile = { workspace = true }
 proc-macro2 = { workspace = true, features = ["span-locations"], default-features = true }
 quote = { workspace = true, default-features = true }
-rayon = "1.10"
+rayon = { workspace = true, default-features = true }
 same-file = { workspace = true, default-features = true }
 semver = { workspace = true, default-features = true }
 serde = { workspace = true, features = ["derive"], default-features = true }
@@ -44,10 +44,10 @@ sha2 = { workspace = true, default-features = true }
 solana-address = { workspace = true, default-features = true }
 syn = { workspace = true, default-features = true, features = ["full", "extra-traits", "visit", "printing"] }
 tempfile = { workspace = true, default-features = true }
-termimad = "0.35.1"
+termimad = { workspace = true, default-features = true }
 thiserror = { workspace = true, default-features = true }
 toml = { workspace = true, default-features = true }
-url = { workspace = true }
+url = { workspace = true, default-features = true }
 walkdir = { workspace = true, default-features = true }
 
 [dev-dependencies]
