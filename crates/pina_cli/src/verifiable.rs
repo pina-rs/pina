@@ -1143,7 +1143,11 @@ fn sha256_file(path: &Path) -> Result<String, VerifyBuildError> {
 		hasher.update(&buffer[..read]);
 	}
 
-	Ok(format!("{:x}", hasher.finalize()))
+	Ok(hasher
+		.finalize()
+		.iter()
+		.map(|byte| format!("{byte:02x}"))
+		.collect::<String>())
 }
 
 fn executable_hash(path: &Path) -> Result<String, VerifyBuildError> {
@@ -1181,7 +1185,11 @@ fn executable_hash(path: &Path) -> Result<String, VerifyBuildError> {
 		}
 	}
 
-	Ok(format!("{:x}", hasher.finalize()))
+	Ok(hasher
+		.finalize()
+		.iter()
+		.map(|byte| format!("{byte:02x}"))
+		.collect::<String>())
 }
 
 fn portable_path(path: &Path) -> String {
