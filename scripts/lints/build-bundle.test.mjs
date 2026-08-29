@@ -250,6 +250,14 @@ test("the release catalog covers every lint crate and matches the pinned toolcha
 	);
 	assert.match(
 		publishWorkflow,
+		/name: publish standalone pina_test workspace[\s\S]*?--package pina_test[\s\S]*?\.package_publish\.packages\[0\]\.package == "pina_test"/u,
+	);
+	assert.match(
+		publishWorkflow,
+		/name: dry-run independently publishable packages[\s\S]*?packages=\([\s\S]*?pina_test[\s\S]*?\)\s+for package/u,
+	);
+	assert.match(
+		publishWorkflow,
 		/cd "\$tools_dir"\s+tar -xzf "\$asset" -C \./u,
 	);
 	assert.match(
