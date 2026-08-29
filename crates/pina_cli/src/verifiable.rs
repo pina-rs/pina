@@ -1504,14 +1504,14 @@ mod tests {
 		let path = temp.path().join("program.so");
 		fs::write(&path, b"program\0\0")
 			.unwrap_or_else(|error| panic!("fixture write failed: {error}"));
-		let expected = format!("{:x}", Sha256::digest(b"program"));
+		let expected = Sha256::digest(b"program").iter().map(|byte| format!("{byte:02x}")).collect::<String>();
 		assert_eq!(
 			executable_hash(&path).unwrap_or_else(|error| panic!("hash failed: {error}")),
 			expected
 		);
 		assert_eq!(
 			sha256_file(&path).unwrap_or_else(|error| panic!("raw hash failed: {error}")),
-			format!("{:x}", Sha256::digest(b"program\0\0"))
+			Sha256::digest(b"program\0\0").iter().map(|byte| format!("{byte:02x}")).collect::<String>()
 		);
 
 		let mut large = vec![0_u8; 2 * 1024 * 1024];
@@ -1521,7 +1521,7 @@ mod tests {
 			.unwrap_or_else(|error| panic!("large fixture write failed: {error}"));
 		assert_eq!(
 			executable_hash(&path).unwrap_or_else(|error| panic!("streaming hash failed: {error}")),
-			format!("{:x}", Sha256::digest(&large[..64 * 1024 + 8]))
+			Sha256::digest(&large[..64 * 1024 + 8]).iter().map(|byte| format!("{byte:02x}")).collect::<String>()
 		);
 	}
 
@@ -1717,7 +1717,7 @@ mod tests {
 	fn record_reader_validates_size_shape_hash_and_accessors() {
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 		let artifact_contents = b"program\0\0";
-		let hash = format!("{:x}", Sha256::digest(b"program"));
+		let hash = Sha256::digest(b"program").iter().map(|byte| format!("{byte:02x}")).collect::<String>();
 		let record_path = temp.path().join(format!("program-{hash}.json"));
 		let artifact_path = record_path.with_extension("so");
 		let manifest = valid_manifest(&hash);
@@ -1973,7 +1973,7 @@ mod tests {
 		let artifact = snapshot.path().join("program.so");
 		fs::write(&artifact, b"program")
 			.unwrap_or_else(|error| panic!("artifact write failed: {error}"));
-		let hash = format!("{:x}", Sha256::digest(b"program"));
+		let hash = Sha256::digest(b"program").iter().map(|byte| format!("{byte:02x}")).collect::<String>();
 		let verified = VerifiedBuild {
 			_snapshot: snapshot,
 			artifact,

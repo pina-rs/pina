@@ -1,5 +1,5 @@
 ---
-pina_cli: patch
+pina_cli: fix
 ---
 
 Update crypto dependencies.
