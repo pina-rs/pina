@@ -5,7 +5,7 @@ LL |     vault.assert_associated_token_address(owner, owner, other_program)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: validate the token-program account once, copy its address, and pass that same value to token parsing, ATA checks, and CPI
-   = note: `#[deny(req$DIRre_consistent_token_program)]` on by default
+   = note: `#[deny(require_consistent_token_program)]` on by default
 
 error: token operation uses `token_2022::ID` after the instruction established `token::ID`
   --> $DIR/token_program.rs:44:2

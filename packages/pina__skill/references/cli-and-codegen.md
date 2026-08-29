@@ -15,6 +15,7 @@ pina idl diff --help
 pina idl publish --help
 pina docs --help
 pina init --help
+pina lint --help
 pina test --help
 pina dev --help
 pina keys --help
@@ -32,6 +33,7 @@ Use `pina docs` to list bundled terminal topics. Custom topics can be supplied t
 Run project-aware commands from the program directory or any descendant. Pina uses the nearest ancestor `Pina.toml`; an existing unambiguous Cargo package also works without configuration.
 
 ```sh
+pina lint
 pina build
 pina test --unit
 pina test
@@ -43,6 +45,8 @@ pina generate
 ```sh
 pina build --features logs,cpi --no-default-features
 ```
+
+Run `pina lint` before review to execute the official Pina security lint set associated with the installed CLI release. Use `pina lint --fix` only when source edits are authorized, then inspect and test every change. The command intentionally ignores additional project Dylint metadata; use direct `cargo dylint` only after reviewing and pinning any extra native lint libraries.
 
 The library target name determines the canonical outputs:
 

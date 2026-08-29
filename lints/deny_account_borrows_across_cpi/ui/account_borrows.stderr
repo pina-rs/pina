@@ -24,3 +24,4 @@ LL |         break cpi.invoke();
    = help: copy the req$DIRred values, then call `drop(guard)` or end the borrow's scope before invoking another program
 
 error: aborting due to 3 previous errors
+

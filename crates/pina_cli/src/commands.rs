@@ -36,6 +36,7 @@ pub(crate) fn run(cli: Cli) {
 				solana_verify,
 			);
 		}
+		Commands::Lint { project, fix } => run_lint(project, fix),
 		Commands::Generate {
 			project,
 			clients,
@@ -126,6 +127,27 @@ pub(crate) fn run(cli: Cli) {
 				}
 			}
 		}
+	}
+}
+
+fn run_lint(project: PathBuf, fix: bool) {
+	let output = unwrap_or_exit(pina_cli::lint::lint_project(&pina_cli::lint::LintOptions {
+		project,
+		fix,
+	}));
+
+	if output.fix {
+		println!(
+			"{} Applied available Pina security lint fixes for {}",
+			"✔".green(),
+			escaped_text(&output.package_name)
+		);
+	} else {
+		println!(
+			"{} Pina security lints passed for {}",
+			"✔".green(),
+			escaped_text(&output.package_name)
+		);
 	}
 }
 

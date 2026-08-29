@@ -897,6 +897,14 @@ See the [security guide](security/) for detailed examples of all 11 common Solan
 
 Enable pina's custom dylint lints to catch common security mistakes at compile time:
 
+```bash
+pina lint
+# Apply machine-applicable suggestions, then inspect the diff.
+pina lint --fix
+```
+
+`pina init` registers the revision-pinned official lint set automatically. `pina lint` prepares pinned Dylint tools below Cargo home and does not load extra project-defined lint libraries.
+
 - account ownership, initialization, PDA, sysvar, ATA, resize, close, and CPI validation
 - mutable-borrow lifetime, checked arithmetic, remaining-account bounds, and custody balance accounting
 - consistent token-program provenance and explicit Token-2022 extension policies

@@ -8,7 +8,7 @@ LL | |     }
    | |_____^
    |
    = help: reject `remaining.len() > MAX_REMAINING_ACCOUNTS` before the loop, or iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
-   = note: `#[deny(req$DIRre_bounded_remaining_accounts)]` on by default
+   = note: `#[deny(require_bounded_remaining_accounts)]` on by default
 
 error: remaining accounts are processed without an explicit bound
   --> $DIR/remaining_accounts.rs:47:4

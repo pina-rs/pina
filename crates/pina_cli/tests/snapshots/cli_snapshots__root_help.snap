@@ -10,13 +10,15 @@ exit_code: 0
 ----- stdout -----
 Build, test, inspect, and generate artifacts for Pina Solana programs.
 
-Use 'pina init' to start a program, 'pina build' for its SBF binary and IDL, 'pina test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent Surfpool network, 'pina generate' for selected client ecosystems, 'pina deploy' for explicit cluster deployment, and 'pina verify' for deployed-program verification. Use 'pina doctor' for agent-readable diagnostics, 'pina keys' for program identity, and 'pina completions' for shell integration. Low-level IDL, profiling, terminal documentation, and the legacy repository-wide Codama workflow remain available.
+Use 'pina init' to start a program, 'pina lint' for the official security lint set, 'pina build' for its SBF binary and IDL, 'pina test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent Surfpool network, 'pina generate' for selected client ecosystems, 'pina deploy' for explicit cluster deployment, and 'pina verify' for deployed-program verification. Use 'pina doctor' for agent-readable diagnostics, 'pina keys' for program identity, and 'pina completions' for shell integration. Low-level IDL, profiling, terminal documentation, and the legacy repository-wide Codama workflow remain available.
 
 Usage: pina <COMMAND>
 
 Commands:
   build
           Build the current Pina program for SBF and generate its IDL
+  lint
+          Run Pina's official security lints against the current program
   generate
           Generate configured clients for the current Pina program
   idl
@@ -56,6 +58,7 @@ Options:
 Examples:
   pina init counter_program
   cd counter_program && pina build
+  pina lint
   pina test
   pina test --unit
   pina dev --yes

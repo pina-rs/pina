@@ -78,6 +78,9 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalBumpBeforePdaWrite {
 mod tests {
 	#[test]
 	fn ui() {
-		dylint_testing::ui_test(env!("CARGO_PKG_NAME"), "ui");
+		dylint_testing::ui_test(
+			env!("CARGO_PKG_NAME"),
+			concat!(env!("CARGO_MANIFEST_DIR"), "/ui"),
+		);
 	}
 }

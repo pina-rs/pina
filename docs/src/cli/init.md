@@ -49,6 +49,7 @@ The scaffold includes:
 - an `Accounts` struct with signer validation;
 - an SBF Cargo target and `cargo build-program` alias;
 - a pinned nightly Rust toolchain with the `rust-src` component;
+- immutable-revision Pina security lint metadata and pinned Dylint tool versions;
 - host-side discriminator and program-ID smoke tests;
 - Pina and Mollusk dependencies;
 - a dedicated host-only test package with one `pina_test` dependency for the isolated Surfpool test;
@@ -74,6 +75,7 @@ The command prints the exact build, SBF build, test, and IDL commands for the ge
 
 ```bash
 cd ./counter_program
+pina lint
 pina build
 pina test --unit
 pina test
