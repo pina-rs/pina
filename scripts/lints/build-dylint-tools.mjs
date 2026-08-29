@@ -69,17 +69,13 @@ export function executableFilename(name, target) {
 }
 
 export function tarCreateArguments(
-	archivePath,
+	archiveName,
 	stagingDirectory,
 	files,
-	platform = process.platform,
 ) {
 	return [
-		// GNU tar interprets the colon in an absolute Windows path as remote
-		// archive syntax unless local-file handling is made explicit.
-		...(platform === "win32" ? ["--force-local"] : []),
 		"-czf",
-		archivePath,
+		archiveName,
 		"-C",
 		stagingDirectory,
 		"manifest.json",
@@ -178,13 +174,16 @@ export function buildDylintTools(arguments_) {
 
 		const archiveName = `pina-dylint-tools-${target}-v${version}.tar.gz`;
 		const archivePath = join(outputDirectory, archiveName);
+		// Pass a relative output name because Windows tar implementations can
+		// interpret the colon in an absolute drive path as remote archive syntax.
 		run(
 			"tar",
 			tarCreateArguments(
-				archivePath,
+				archiveName,
 				stagingDirectory,
 				executables.map((executable) => executable.file),
 			),
+			{ cwd: outputDirectory },
 		);
 		console.log(
 			JSON.stringify({

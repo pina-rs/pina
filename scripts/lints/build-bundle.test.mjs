@@ -65,40 +65,21 @@ test("Dylint tool filenames match Unix and Windows conventions", () => {
 	);
 });
 
-test("Windows Dylint archives force tar to treat drive paths as local", () => {
+test("Dylint archives use a relative output name on every host", () => {
 	assert.deepEqual(
 		tarCreateArguments(
-			"C:\\assets\\dylint-tools.tar.gz",
+			"dylint-tools.tar.gz",
 			"C:\\bundle",
 			["cargo-dylint.exe", "dylint-link.exe"],
-			"win32",
 		),
 		[
-			"--force-local",
 			"-czf",
-			"C:\\assets\\dylint-tools.tar.gz",
+			"dylint-tools.tar.gz",
 			"-C",
 			"C:\\bundle",
 			"manifest.json",
 			"cargo-dylint.exe",
 			"dylint-link.exe",
-		],
-	);
-	assert.deepEqual(
-		tarCreateArguments(
-			"/tmp/assets/dylint-tools.tar.gz",
-			"/tmp/bundle",
-			["cargo-dylint", "dylint-link"],
-			"linux",
-		),
-		[
-			"-czf",
-			"/tmp/assets/dylint-tools.tar.gz",
-			"-C",
-			"/tmp/bundle",
-			"manifest.json",
-			"cargo-dylint",
-			"dylint-link",
 		],
 	);
 });
@@ -125,10 +106,11 @@ test("Dylint tar arguments create an archive at an absolute host path", () => {
 		execFileSync(
 			"tar",
 			tarCreateArguments(
-				archivePath,
+				"dylint-tools.tar.gz",
 				stagingDirectory,
 				executableNames,
 			),
+			{ cwd: outputDirectory },
 		);
 		assert.ok(statSync(archivePath).size > 0);
 	} finally {
