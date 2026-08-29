@@ -238,6 +238,10 @@ test("the release catalog covers every lint crate and matches the pinned toolcha
 	);
 	assert.match(
 		publishWorkflow,
+		/verify_publication:\s+name: require successful publication\s+needs: publish[\s\S]*?if: always\(\)[\s\S]*?PUBLISH_RESULT: \$\{\{ needs\.publish\.result \}\}/u,
+	);
+	assert.match(
+		publishWorkflow,
 		/cd "\$tools_dir"\s+tar -xzf "\$asset" -C \./u,
 	);
 	assert.match(
