@@ -1,5 +1,15 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -91,6 +101,39 @@ test("Windows Dylint archives force tar to treat drive paths as local", () => {
 			"dylint-link",
 		],
 	);
+});
+
+test("Dylint tar arguments create an archive at an absolute host path", () => {
+	const temporaryDirectory = mkdtempSync(
+		join(tmpdir(), "pina-dylint-archive-test-"),
+	);
+	const stagingDirectory = join(temporaryDirectory, "bundle");
+	const outputDirectory = join(temporaryDirectory, "assets");
+	const executableNames = process.platform === "win32"
+		? ["cargo-dylint.exe", "dylint-link.exe"]
+		: ["cargo-dylint", "dylint-link"];
+	mkdirSync(stagingDirectory);
+	mkdirSync(outputDirectory);
+
+	try {
+		writeFileSync(join(stagingDirectory, "manifest.json"), "{}\n");
+		for (const name of executableNames) {
+			writeFileSync(join(stagingDirectory, name), name);
+		}
+
+		const archivePath = join(outputDirectory, "dylint-tools.tar.gz");
+		execFileSync(
+			"tar",
+			tarCreateArguments(
+				archivePath,
+				stagingDirectory,
+				executableNames,
+			),
+		);
+		assert.ok(statSync(archivePath).size > 0);
+	} finally {
+		rmSync(temporaryDirectory, { force: true, recursive: true });
+	}
 });
 
 test("the release catalog covers every lint crate and matches the pinned toolchain", () => {
