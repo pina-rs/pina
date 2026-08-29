@@ -189,7 +189,7 @@ fn lint_installs_pinned_tools_once_and_runs_release_lints() {
 	assert!(first_log.contains("--version 6.0.4 dylint-link"));
 	assert!(first_log.contains("dylint dylint --no-deps"));
 	assert!(first_log.contains("--git https://github.com/pina-rs/pina"));
-	assert!(first_log.contains("--rev 7aff2afb89cd34a13e1e9d6ff854bc16d12263cc"));
+	assert!(first_log.contains("--rev f6f206e0a4e71ab70c3eeaded52d07cd66a270d8"));
 	assert!(first_log.contains("--pattern lints/\\*"));
 	assert!(first_log.contains("--package lint-fixture"));
 	assert!(first_log.contains("link="));
