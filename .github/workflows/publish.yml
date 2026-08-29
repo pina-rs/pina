@@ -493,7 +493,14 @@ jobs:
     needs:
       - prepare_dylint_tools
       - publish_dylint_tools
+    # The reuse job deliberately skips its native build dependencies when the
+    # versioned tool release already exists. `always()` prevents those
+    # transitive skips from suppressing this job, while the explicit result
+    # checks still fail closed if either direct dependency actually fails.
     if: >-
+      always() &&
+      needs.prepare_dylint_tools.result == 'success' &&
+      needs.publish_dylint_tools.result == 'success' &&
       github.repository_owner == 'pina-rs' &&
       startsWith(inputs.tag || github.ref_name, 'v')
     # Upload the completed native bundle to the draft release.
@@ -616,7 +623,12 @@ jobs:
     needs:
       - prepare_dylint_tools
       - publish_dylint_tools
+    # Match the matrix job's explicit join semantics so a reused Dylint tool
+    # release starts FreeBSD compilation despite skipped tool-build ancestors.
     if: >-
+      always() &&
+      needs.prepare_dylint_tools.result == 'success' &&
+      needs.publish_dylint_tools.result == 'success' &&
       github.repository_owner == 'pina-rs' &&
       startsWith(inputs.tag || github.ref_name, 'v')
     # Upload the completed native bundle to the draft release.

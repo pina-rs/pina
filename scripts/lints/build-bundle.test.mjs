@@ -228,6 +228,14 @@ test("the release catalog covers every lint crate and matches the pinned toolcha
 	}
 	assert.doesNotMatch(publishWorkflow, /upload_musl_lint_bundles/u);
 	assert.doesNotMatch(publishWorkflow, /\.targets\b/u);
+	assert.equal(
+		[
+			...publishWorkflow.matchAll(
+				/always\(\) &&\s+needs\.prepare_dylint_tools\.result == 'success' &&\s+needs\.publish_dylint_tools\.result == 'success'/gu,
+			),
+		].length,
+		2,
+	);
 	assert.match(
 		publishWorkflow,
 		/cd "\$tools_dir"\s+tar -xzf "\$asset" -C \./u,
