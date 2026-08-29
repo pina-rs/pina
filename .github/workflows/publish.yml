@@ -493,7 +493,14 @@ jobs:
     needs:
       - prepare_dylint_tools
       - publish_dylint_tools
+    # The reuse job deliberately skips its native build dependencies when the
+    # versioned tool release already exists. `always()` prevents those
+    # transitive skips from suppressing this job, while the explicit result
+    # checks still fail closed if either direct dependency actually fails.
     if: >-
+      always() &&
+      needs.prepare_dylint_tools.result == 'success' &&
+      needs.publish_dylint_tools.result == 'success' &&
       github.repository_owner == 'pina-rs' &&
       startsWith(inputs.tag || github.ref_name, 'v')
     # Upload the completed native bundle to the draft release.
@@ -616,7 +623,12 @@ jobs:
     needs:
       - prepare_dylint_tools
       - publish_dylint_tools
+    # Match the matrix job's explicit join semantics so a reused Dylint tool
+    # release starts FreeBSD compilation despite skipped tool-build ancestors.
     if: >-
+      always() &&
+      needs.prepare_dylint_tools.result == 'success' &&
+      needs.publish_dylint_tools.result == 'success' &&
       github.repository_owner == 'pina-rs' &&
       startsWith(inputs.tag || github.ref_name, 'v')
     # Upload the completed native bundle to the draft release.
@@ -962,3 +974,25 @@ jobs:
         run: gh release edit "$RELEASE_TAG" --draft=false --latest --repo "$GITHUB_REPOSITORY"
         env:
           GH_TOKEN: ${{ github.token }}
+
+  verify_publication:
+    name: require successful publication
+    needs: publish
+    # A skipped job normally counts as a successful workflow conclusion. Run
+    # unconditionally so a broken dependency or condition cannot silently turn
+    # a skipped package publication into a green release workflow.
+    if: always()
+    permissions: {}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: require the publication job to succeed
+        env:
+          PUBLISH_RESULT: ${{ needs.publish.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$PUBLISH_RESULT" != 'success' ]; then
+            echo "::error::The publication job concluded '$PUBLISH_RESULT'." >&2
+            exit 1
+          fi
