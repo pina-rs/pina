@@ -62,7 +62,7 @@ impl<'tcx> LateLintPass<'tcx> for DenyHeapAllocationsInOnchainInstructionHandler
 			return;
 		}
 
-		let facts = shared::collect_function_facts(body);
+		let facts = shared::collect_function_facts(cx, body);
 		for call in &facts.calls {
 			let matches_heap_pattern = TARGET_METHODS.contains(&call.method.as_str())
 				|| call

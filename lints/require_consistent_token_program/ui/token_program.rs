@@ -1,3 +1,5 @@
+// normalize-stderr-test: "\n$" -> ""
+
 #![allow(dead_code)]
 
 struct Account;
@@ -41,6 +43,30 @@ fn process_mixed_constants(mint: &Account, vault: &Account, owner: &[u8]) -> Res
 	mint.as_token_mint_for_program(&token::ID)?;
 	vault.assert_associated_token_address(owner, owner, &token_2022::ID)
 	//~^ ERROR: token operation uses `token_2022::ID` after the instruction established `token::ID`
+}
+
+fn process_equivalent_aliases(
+	mint: &Account,
+	vault: &Account,
+	owner: &[u8],
+	program: &[u8],
+) -> Result<(), ()> {
+	let parsing_program = program;
+	let cpi_program = parsing_program;
+	mint.as_token_mint_for_program(parsing_program)?;
+	vault.assert_associated_token_address(owner, owner, cpi_program)
+}
+
+fn process_shadowed_program(
+	mint: &Account,
+	vault: &Account,
+	owner: &[u8],
+	program: &[u8],
+) -> Result<(), ()> {
+	mint.as_token_mint_for_program(program)?;
+	let program = &token_2022::ID;
+	vault.assert_associated_token_address(owner, owner, program)
+	//~^ ERROR: token operation uses `token_2022::ID` after the instruction established `program`
 }
 
 fn process_reassigned(

@@ -1,3 +1,5 @@
+// normalize-stderr-test: "\n$" -> ""
+
 #![allow(dead_code)]
 
 fn process(balance: u64, amount: u64) -> Result<u64, ()> {
@@ -6,6 +8,10 @@ fn process(balance: u64, amount: u64) -> Result<u64, ()> {
 
 fn process_non_asset(raw_value: u64) -> u64 {
 	raw_value + 1
+}
+
+fn process_name_contains_asset_fragment(rebalance_attempts: u64, unstaked_epochs: u64) -> u64 {
+	rebalance_attempts + unstaked_epochs
 }
 
 fn process_unchecked(balance: u64, amount: u64) -> u64 {

@@ -71,7 +71,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireTypeAssertBeforeZeroCopyCast {
 			return;
 		}
 
-		let facts = shared::collect_function_facts(body);
+		let facts = shared::collect_function_facts(cx, body);
 		for (index, call) in facts.calls.iter().enumerate() {
 			let is_cast_method =
 				call.receiver.is_some() && TARGET_METHODS.contains(&call.method.as_str());

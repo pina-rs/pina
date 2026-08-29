@@ -95,7 +95,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireSysvarAssertBeforeSysvarUse {
 			return;
 		}
 
-		let facts = shared::collect_function_facts(body);
+		let facts = shared::collect_function_facts(cx, body);
 		for (index, call) in facts.calls.iter().enumerate() {
 			if call.method == "assert_sysvar" {
 				continue;

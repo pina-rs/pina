@@ -196,7 +196,7 @@ let amount = {
 transfer.invoke()?;
 ```
 
-An explicit `drop(guard)` or the end of a nested block releases the guard. The analysis follows block scope and explicit drops; borrows hidden inside custom wrapper constructors are outside its current model.
+An explicit `drop(guard)` or the end of a nested block releases the guard. The analysis follows block scope and explicit drops. It resolves method definitions before classifying a borrow or CPI, so an unrelated type that happens to define `try_borrow_mut()` or `invoke()` does not trigger the lint. Account borrows hidden inside custom wrapper constructors and CPIs hidden behind opaque helpers are outside its current model.
 
 ### `require_consistent_token_program`
 
@@ -209,7 +209,7 @@ let mint = mint.as_token_mint_for_program(&program_id)?;
 transfer.invoke_with_program(&program_id)?;
 ```
 
-The lint compares exact identifier paths, including module-qualified constants, so `token::ID` and `token_2022::ID` cannot collapse to the same terminal name. It also rejects reassignment of a program binding between token operations, because the same lexical name would otherwise hide a changed value. Copy and reuse a single immutable, validated address instead of independently deriving, mutating, or hard-coding program IDs.
+The lint compares resolved identifier paths, including module-qualified constants, so `token::ID` and `token_2022::ID` cannot collapse to the same terminal name. Immutable local aliases are traced back to their original identity, allowing clear names for parsing and CPI without reporting a mismatch. It still rejects reassignment of a program binding between token operations, because the same lexical name would otherwise hide a changed value. Copy and reuse a single immutable, validated address instead of independently deriving, mutating, or hard-coding program IDs.
 
 ### `require_explicit_token_2022_extension_policy`
 
@@ -224,6 +224,8 @@ let mint = mint_account
 ```
 
 Extensions can alter transfer, fee, hook, freeze, and authority semantics. Pina therefore requires an allow-list instead of treating the legacy base layout as a complete policy. The analysis pairs a policy with the concrete mint-view binding or with the same direct method chain; a policy asserted on a different mint does not satisfy the rule. Keep each policy adjacent to its mint load so the pairing also remains obvious to reviewers.
+
+An `as_token_mint_for_program(&token::ID)` call with the canonical legacy SPL Token ID is exempt because Token-2022 extensions cannot be present. Dynamic program identities and the explicit Token-2022 loaders still require a policy.
 
 Both policies are inherent, chainable methods on `TokenMintRef` and `TokenAccountRef`; they return the validated view rather than wrapping it in a separate free-function API.
 
@@ -240,11 +242,11 @@ let after = vault.as_token_account_for_program(&program_id)?.amount();
 let received = after.checked_sub(before).ok_or(ProgramError::ArithmeticOverflow)?;
 ```
 
-Token-2022 transfer fees can make `received` differ from the requested amount; Solana's [on-chain Token-2022 guide](https://www.solana-program.com/docs/token-2022/onchain) describes this accounting requirement. The lint pairs each source-visible `Transfer::new` or `TransferChecked::new` constructor with the invocation of that exact builder. It requires the closest destination reads on each side of the transfer to have no intervening CPI, then applies a custody-name heuristic and tracks direct receiver expressions. Opaque builder wrappers are rejected because they prevent exact CPI association. Custody accounts should therefore use explicit names and direct reloads.
+Token-2022 transfer fees can make `received` differ from the requested amount; Solana's [on-chain Token-2022 guide](https://www.solana-program.com/docs/token-2022/onchain) describes this accounting requirement. The lint pairs each source-visible `Transfer::new` or `TransferChecked::new` constructor with the direct invocation of that exact builder. It requires the closest destination reads on each side of the transfer to have no intervening CPI, then applies a custody-name heuristic and tracks direct receiver expressions. A static `invoke()` is exempt only when the resolved constructor belongs to the canonical `pinocchio_token` crate, including Pina's `token` re-export; local look-alikes and Token-2022 builders remain covered. Opaque builder wrappers are not diagnosed because the analysis cannot associate them with a particular invocation; audit such wrappers manually or keep the transfer direct in the instruction handler.
 
 ### `require_checked_asset_arithmetic`
 
-Detects raw `+`, `-`, `*`, and `/`, plus saturating or wrapping arithmetic, when an operand name contains an economic term such as `amount`, `balance`, `lamport`, `price`, `reward`, `stake`, or `supply`.
+Detects raw `+`, `-`, `*`, and `/`, plus saturating or wrapping arithmetic, when an operand has an economic identifier component such as `amount`, `balance`, `lamport`, `price`, `reward`, `stake`, or `supply`.
 
 ```rust
 let next_balance = balance
@@ -252,20 +254,23 @@ let next_balance = balance
 	.ok_or(ProgramError::ArithmeticOverflow)?;
 ```
 
-Saturating arithmetic is rejected because silently clamping economic state can violate conservation just as surely as wrapping. The naming heuristic favors clear domain names and may not recognize opaque abbreviations.
+Saturating arithmetic is rejected because silently clamping economic state can violate conservation just as surely as wrapping. Components are split at Rust identifier separators, so `vault_balance` is covered while an unrelated name such as `rebalance_attempts` is not. The naming heuristic favors clear domain names and may not recognize opaque abbreviations.
 
 ### `require_bounded_remaining_accounts`
 
-Detects loops whose source mentions `remaining` unless the iterator visibly uses `.take(MAX)`.
+Detects loops whose source mentions `remaining` unless the iterator visibly uses `.take(MAX)` or a dominating constant-bound length guard rejects oversized input first.
 
 ```rust
 const MAX_REMAINING_ACCOUNTS: usize = 16;
-for account in remaining.iter().take(MAX_REMAINING_ACCOUNTS) {
+if remaining.len() > MAX_REMAINING_ACCOUNTS {
+	return Err(ProgramError::InvalidArgument);
+}
+for account in remaining {
 	process(account)?;
 }
 ```
 
-Remaining accounts are caller-controlled; an explicit bound keeps worst-case compute auditable. The lint checks source-level loop syntax. A helper iterator with an internal bound should expose the bound at the instruction call site if it is expected to satisfy this rule.
+Remaining accounts are caller-controlled; an explicit bound keeps worst-case compute auditable. Rejecting an oversized list is preferred when every supplied account must be processed, while `.take(MAX)` is suitable only when ignoring surplus accounts is intentional. The guard must compare `remaining.len()` against an integer literal or resolved constant, return early on the oversized path, and dominate the loop. A runtime limit, branch-local check, late check, or opaque helper does not satisfy the rule because it does not establish a source-visible protocol maximum on every path.
 
 ## Performance reference
 
