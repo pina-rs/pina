@@ -721,7 +721,14 @@ jobs:
 
   attest_assets:
     name: attest release assets
+    # Intentional tool-build skips remain in this job's transitive dependency
+    # graph even after every CLI and lint job succeeds. Ignore that ancestry,
+    # then require each direct asset-producing dependency to succeed.
     if: >-
+      always() &&
+      needs.upload_assets.result == 'success' &&
+      needs.upload_lint_bundles.result == 'success' &&
+      needs.upload_freebsd_lint_bundle.result == 'success' &&
       github.repository_owner == 'pina-rs' &&
       startsWith(inputs.tag || github.ref_name, 'v')
     needs:
@@ -798,7 +805,11 @@ jobs:
     permissions:
       contents: write # Publish the draft GitHub release after registry publication.
       id-token: write # Authenticate to crates.io and npm trusted publishing.
+    # Keep the intentional Dylint tool-build skips from propagating past the
+    # successful attestation join, but never publish unless attestation passed.
     if: >-
+      always() &&
+      needs.attest_assets.result == 'success' &&
       github.repository_owner == 'pina-rs' &&
       startsWith(inputs.tag || github.ref_name, 'v')
     runs-on: ubuntu-latest
