@@ -41,6 +41,7 @@ jobs:
       commit: ${{ steps.release.outputs.commit }}
       required: ${{ steps.release.outputs.required }}
       tag: ${{ steps.release.outputs.tag }}
+      toolchain: ${{ steps.release.outputs.toolchain }}
       version: ${{ steps.release.outputs.version }}
     permissions:
       contents: read # Inspect the versioned Dylint tool release.
@@ -59,9 +60,11 @@ jobs:
         run: |
           set -euo pipefail
           version="$(jq -er .dylintVersion crates/pina_cli/lints.json)"
+          toolchain="$(jq -er .toolchain crates/pina_cli/lints.json)"
           tag="dylint-v${version}"
           {
             echo "commit=$(git rev-parse HEAD)"
+            echo "toolchain=$toolchain"
             echo "version=$version"
             echo "tag=$tag"
           } >> "$GITHUB_OUTPUT"
@@ -447,6 +450,7 @@ jobs:
       startsWith(inputs.tag || github.ref_name, 'v')
     # Upload the completed native bundle to the draft release.
     permissions:
+      attestations: read # Verify the downloaded Dylint tool provenance.
       contents: write # Upload the native lint bundle to the draft release.
     strategy:
       fail-fast: false
@@ -493,7 +497,7 @@ jobs:
       - name: install lint toolchain
         uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
         with:
-          toolchain: nightly-2026-02-20
+          toolchain: ${{ needs.prepare_dylint_tools.outputs.toolchain }}
           components: rustc-dev
       - name: setup node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -552,6 +556,7 @@ jobs:
       startsWith(inputs.tag || github.ref_name, 'v')
     # Upload the completed native bundle to the draft release.
     permissions:
+      attestations: read # Verify the downloaded Dylint tool provenance.
       contents: write # Upload the native musl lint bundle to the draft release.
     strategy:
       fail-fast: false
@@ -608,6 +613,7 @@ jobs:
       - name: build native musl lint bundle
         env:
           DYLINT_VERSION: ${{ needs.prepare_dylint_tools.outputs.version }}
+          LINT_TOOLCHAIN: ${{ needs.prepare_dylint_tools.outputs.toolchain }}
           LINT_TARGET: ${{ matrix.target }}
           RUSTUP_SHA256: ${{ matrix.rustup-sha256 }}
         shell: bash
@@ -616,6 +622,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/lint-assets"
           docker run --rm \
             --env DYLINT_VERSION \
+            --env LINT_TOOLCHAIN \
             --env LINT_TARGET \
             --env RELEASE_TAG \
             --env RUSTUP_SHA256 \
@@ -629,7 +636,7 @@ jobs:
               curl --proto "=https" --tlsv1.2 -sSf "$rustup_url" -o /tmp/rustup-init
               echo "$RUSTUP_SHA256  /tmp/rustup-init" | sha256sum -c -
               chmod +x /tmp/rustup-init
-              /tmp/rustup-init -y --profile minimal --default-toolchain nightly-2026-02-20
+              /tmp/rustup-init -y --profile minimal --default-toolchain "$LINT_TOOLCHAIN"
               . "$HOME/.cargo/env"
               rustup component add rustc-dev
               asset="/lint-assets/pina-dylint-tools-${LINT_TARGET}-v${DYLINT_VERSION}.tar.gz"
@@ -664,6 +671,7 @@ jobs:
       startsWith(inputs.tag || github.ref_name, 'v')
     # Upload the completed native bundle to the draft release.
     permissions:
+      attestations: read # Verify the downloaded Dylint tool provenance.
       contents: write # Upload the native FreeBSD lint bundle to the draft release.
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -709,11 +717,12 @@ jobs:
       - name: build native FreeBSD lint bundle
         env:
           DYLINT_VERSION: ${{ needs.prepare_dylint_tools.outputs.version }}
+          LINT_TOOLCHAIN: ${{ needs.prepare_dylint_tools.outputs.toolchain }}
         uses: vmactions/freebsd-vm@f0552d3b69211736abd97f02ff3d4674c56b73b1 # v1.5.5
         with:
           release: "15.1"
           usesh: true
-          envs: RELEASE_TAG DYLINT_VERSION
+          envs: RELEASE_TAG DYLINT_VERSION LINT_TOOLCHAIN
           prepare: pkg install -y cmake curl node24 pkgconf
           run: |
             set -euo pipefail
@@ -721,7 +730,7 @@ jobs:
             curl --proto '=https' --tlsv1.2 -sSf "$rustup_url" -o /tmp/rustup-init
             test "$(sha256 -q /tmp/rustup-init)" = '4d9fef2e40731489f3186c61a0f178d54d79864fe3d34791edf5b17f70074956'
             chmod +x /tmp/rustup-init
-            /tmp/rustup-init -y --profile minimal --default-toolchain nightly-2026-02-20
+            /tmp/rustup-init -y --profile minimal --default-toolchain "$LINT_TOOLCHAIN"
             . "$HOME/.cargo/env"
             rustup component add rustc-dev
             asset="lint-assets/pina-dylint-tools-x86_64-unknown-freebsd-v${DYLINT_VERSION}.tar.gz"

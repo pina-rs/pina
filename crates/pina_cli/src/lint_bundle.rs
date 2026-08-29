@@ -247,7 +247,7 @@ pub(crate) fn prepare_bundle(cargo_home: &Path) -> Result<PreparedBundle, Bundle
 				source,
 			}
 		})?;
-	lock.try_lock_exclusive().map_err(|source| {
+	lock.lock_exclusive().map_err(|source| {
 		BundleError::Lock {
 			path: lock_path,
 			source,
@@ -353,7 +353,7 @@ pub(crate) fn prepare_dylint_tools(cargo_home: &Path) -> Result<PreparedTools, B
 				source,
 			}
 		})?;
-	lock.try_lock_exclusive().map_err(|source| {
+	lock.lock_exclusive().map_err(|source| {
 		BundleError::Lock {
 			path: lock_path,
 			source,

@@ -101,4 +101,9 @@ test("the release catalog covers every lint crate and matches the pinned toolcha
 	for (const target of catalog.targets) {
 		assert.match(publishWorkflow, new RegExp(`target: ${target}`, "u"));
 	}
+	assert.match(
+		publishWorkflow,
+		/toolchain: \$\{\{ needs\.prepare_dylint_tools\.outputs\.toolchain \}\}/u,
+	);
+	assert.doesNotMatch(publishWorkflow, /toolchain: nightly-/u);
 });

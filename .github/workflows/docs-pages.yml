@@ -30,6 +30,7 @@ jobs:
       (github.event_name != 'release' || startsWith(github.event.release.tag_name, 'v'))
     permissions:
       contents: read # Read documentation and source files from the repository.
+      pages: read # Read the GitHub Pages site configuration.
     runs-on: ubuntu-latest
     steps:
       - name: checkout repository

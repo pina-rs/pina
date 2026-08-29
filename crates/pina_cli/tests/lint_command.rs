@@ -5,6 +5,9 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+use std::process::Stdio;
+use std::thread;
+use std::time::Duration;
 
 use fs2::FileExt;
 use serde_json::Value;
@@ -313,7 +316,7 @@ fn lint_reports_when_the_managed_tool_directory_cannot_be_created() {
 }
 
 #[test]
-fn lint_reports_a_concurrent_managed_runner_download() {
+fn lint_waits_for_a_concurrent_managed_runner_download() {
 	let fixture = Fixture::new("pina-lint-lock-contention");
 	let lock_path = fixture.managed_tool_root().join("bundle.lock");
 	fs::create_dir_all(
@@ -327,12 +330,29 @@ fn lint_reports_a_concurrent_managed_runner_download() {
 	lock.lock_exclusive()
 		.unwrap_or_else(|error| panic!("failed to acquire install lock: {error}"));
 
-	let output = fixture
+	let mut child = fixture
 		.command()
-		.output()
+		.stdout(Stdio::piped())
+		.stderr(Stdio::piped())
+		.spawn()
 		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
-	assert!(!output.status.success());
+	thread::sleep(Duration::from_millis(250));
+	let exited_while_locked = child
+		.try_wait()
+		.unwrap_or_else(|error| panic!("failed to inspect pina lint: {error}"));
+	FileExt::unlock(&lock)
+		.unwrap_or_else(|error| panic!("failed to release install lock: {error}"));
+	let output = child
+		.wait_with_output()
+		.unwrap_or_else(|error| panic!("failed to wait for pina lint: {error}"));
 	assert!(
-		String::from_utf8_lossy(&output.stderr).contains("Could not lock the managed lint bundle")
+		exited_while_locked.is_none(),
+		"pina lint exited instead of waiting for the managed bundle lock: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert!(
+		output.status.success(),
+		"pina lint failed after the managed bundle lock was released: {}",
+		String::from_utf8_lossy(&output.stderr)
 	);
 }
