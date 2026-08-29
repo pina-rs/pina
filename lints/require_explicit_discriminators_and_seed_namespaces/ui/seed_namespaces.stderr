@@ -16,3 +16,4 @@ LL |     assert_seeds(seeds);
    = help: use byte-string seed prefixes such as `b"config"` and keep `#[discriminator]` / `#[instruction(...)]` annotations explicit
 
 warning: 2 warnings emitted
+

@@ -16,26 +16,28 @@ use clap_complete::Shell;
 	version,
 	about = "Build, test, inspect, and generate artifacts for Pina Solana programs",
 	long_about = "Build, test, inspect, and generate artifacts for Pina Solana programs.\n\nUse \
-	              'pina init' to start a program, 'pina build' for its SBF binary and IDL, 'pina \
-	              test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, \
-	              'pina dev' for a persistent Surfpool network, 'pina generate' for selected \
-	              client ecosystems, 'pina deploy' for explicit cluster deployment, and 'pina \
-	              verify' for deployed-program verification. Use 'pina doctor' for agent-readable \
-	              diagnostics, 'pina keys' for program identity, and 'pina completions' for shell \
-	              integration. Low-level IDL, profiling, terminal documentation, and the legacy \
-	              repository-wide Codama workflow remain available.",
+	              'pina init' to start a program, 'pina lint' for the official security lint set, \
+	              'pina build' for its SBF binary and IDL, 'pina test' for SBF integration, 'pina \
+	              test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent \
+	              Surfpool network, 'pina generate' for selected client ecosystems, 'pina deploy' \
+	              for explicit cluster deployment, and 'pina verify' for deployed-program \
+	              verification. Use 'pina doctor' for agent-readable diagnostics, 'pina keys' for \
+	              program identity, and 'pina completions' for shell integration. Low-level IDL, \
+	              profiling, terminal documentation, and the legacy repository-wide Codama \
+	              workflow remain available.",
 	next_line_help = true,
 	arg_required_else_help = true,
 	after_help = "Examples:\n  pina init counter_program\n  cd counter_program && pina build\n  \
-	              pina test\n  pina test --unit\n  pina dev --yes\n  pina generate --client rust \
-	              --client typescript\n  pina doctor --json\n  pina keys\n  pina idl --path \
-	              ./programs/counter_program --output ./idls/counter_program.json\n  pina profile \
-	              ./target/deploy/counter_program.so --json\n  pina deploy --cluster localnet \
-	              --payer ~/.config/solana/id.json --upgrade-authority ~/.config/solana/id.json \
-	              --dry-run\n\nAgent discovery:\n  Run 'pina <command> --help' for \
-	              command-specific inputs, outputs, and examples.\n  Run 'pina docs' to list the \
-	              bundled architecture and IDL reference topics.\n  For deployment verification, \
-	              run 'pina verify --help' and then inspect the selected leaf command."
+	              pina lint\n  pina test\n  pina test --unit\n  pina dev --yes\n  pina generate \
+	              --client rust --client typescript\n  pina doctor --json\n  pina keys\n  pina \
+	              idl --path ./programs/counter_program --output ./idls/counter_program.json\n  \
+	              pina profile ./target/deploy/counter_program.so --json\n  pina deploy --cluster \
+	              localnet --payer ~/.config/solana/id.json --upgrade-authority \
+	              ~/.config/solana/id.json --dry-run\n\nAgent discovery:\n  Run 'pina <command> \
+	              --help' for command-specific inputs, outputs, and examples.\n  Run 'pina docs' \
+	              to list the bundled architecture and IDL reference topics.\n  For deployment \
+	              verification, run 'pina verify --help' and then inspect the selected leaf \
+	              command."
 )]
 pub(crate) struct Cli {
 	#[command(subcommand)]
@@ -94,6 +96,37 @@ pub(crate) enum Commands {
 			value_name = "COMMAND"
 		)]
 		solana_verify: OsString,
+	},
+
+	/// Run Pina's official security lints against the current program.
+	///
+	/// Discovers the nearest Pina.toml or Cargo package, prepares pinned Dylint
+	/// tools under Cargo home, and runs the lint set from the immutable revision
+	/// reviewed for this CLI. Use --fix to apply machine-applicable suggestions;
+	/// review every resulting source change.
+	#[command(
+		after_help = "Examples:\n  pina lint\n  pina lint --fix\n  pina lint --project \
+		              ./programs/counter\n\nTooling:\n  The first run installs pinned \
+		              cargo-dylint and dylint-link binaries below Cargo home. Lint libraries are \
+		              loaded from the immutable Pina revision reviewed for this CLI. --fix \
+		              applies only machine-applicable suggestions and allows Cargo to edit dirty, \
+		              staged, or not-yet-versioned working trees; inspect the diff before \
+		              committing."
+	)]
+	Lint {
+		/// Directory inside the project to discover. Defaults to the current directory.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Apply machine-applicable lint suggestions to the working tree.
+		#[arg(long)]
+		fix: bool,
 	},
 
 	/// Generate configured clients for the current Pina program.

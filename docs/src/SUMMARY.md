@@ -5,6 +5,7 @@
 - [Getting Started](./getting-started.md)
 - [Pina CLI](./cli/index.md)
   - [Initialize a Program](./cli/init.md)
+  - [Run Security Lints](./cli/lint.md)
   - [Build a Program](./cli/build.md)
   - [Verify a Deployed Program](./cli/verify.md)
   - [Generate Clients](./cli/generate.md)

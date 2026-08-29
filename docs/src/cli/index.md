@@ -32,6 +32,7 @@ The shortcut runs `cargo run -p pina_cli -- ...` against the checked-out source.
 | Command                                        | Purpose                                                      | Primary output                            |
 | ---------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------- |
 | [`pina init`](./init.md)                       | Create a project-aware program scaffold                      | Files plus next steps                     |
+| [`pina lint`](./lint.md)                       | Run the revision-pinned Pina security lint set               | Dylint diagnostics and optional fixes     |
 | [`pina build`](./build.md)                     | Build SBF, optionally with deterministic verification inputs | SBF, IDL, and optional build-record files |
 | [`pina verify`](./verify.md)                   | Compare deployments and record verified source               | Status or transaction                     |
 | [`pina generate`](./generate.md)               | Generate configured client ecosystems                        | Generated clients                         |
@@ -62,6 +63,7 @@ pina generate --help
 pina idl --help
 pina docs --help
 pina init --help
+pina lint --help
 pina keys --help
 pina doctor --help
 pina completions --help
@@ -80,6 +82,7 @@ Long help includes the input contract, output behavior, defaults, and copyable e
 | `idl`             | JSON when `--output` is omitted   | Progress, extraction counts, errors |
 | `docs`            | Topic index or rendered Markdown  | Errors                              |
 | `init`            | Created path and next steps       | Errors                              |
+| `lint`            | Completion summary                | Cargo/Dylint progress and errors    |
 | `build`           | Published artifact summary        | Cargo output and errors             |
 | `verify check`    | Matching hash                     | Mismatch hashes and errors          |
 | `verify record`   | Upstream streamed progress        | Upstream diagnostics and errors     |

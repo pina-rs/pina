@@ -1,11 +1,11 @@
 error: asset arithmetic can overflow, underflow, or silently saturate
- --> $DIR/asset_arithmetic.rs:12:2
-  |
+  --> $DIR/asset_arithmetic.rs:12:2
+   |
 LL |     balance - amount
-  |     ^^^^^^^^^^^^^^^^
-  |
-  = help: use `checked_add`, `checked_sub`, `checked_mul`, or `checked_div` and return an explicit program error on failure
-  = note: `#[deny(req$DIRre_checked_asset_arithmetic)]` on by default
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = help: use `checked_add`, `checked_sub`, `checked_mul`, or `checked_div` and return an explicit program error on failure
+   = note: `#[deny(require_checked_asset_arithmetic)]` on by default
 
 error: asset arithmetic can overflow, underflow, or silently saturate
   --> $DIR/asset_arithmetic.rs:17:2
@@ -40,3 +40,4 @@ LL |         break balance - amount;
    = help: use `checked_add`, `checked_sub`, `checked_mul`, or `checked_div` and return an explicit program error on failure
 
 error: aborting due to 5 previous errors
+
