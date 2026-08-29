@@ -903,7 +903,7 @@ pina lint
 pina lint --fix
 ```
 
-`pina init` registers the revision-pinned official lint set automatically. `pina lint` prepares pinned Dylint tools below Cargo home and does not load extra project-defined lint libraries.
+`pina lint` downloads pinned, precompiled `cargo-dylint` and Pina lint libraries instead of installing or compiling them from source, and it does not load extra project-defined lint libraries. Dylint may still build its internal compiler driver for the project's exact Rust toolchain on first use. `pina init` does not add source-based lint metadata or a self-referential commit pin.
 
 - account ownership, initialization, PDA, sysvar, ATA, resize, close, and CPI validation
 - mutable-borrow lifetime, checked arithmetic, remaining-account bounds, and custody balance accounting

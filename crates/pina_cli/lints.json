@@ -1,0 +1,39 @@
+{
+	"schemaVersion": 1,
+	"dylintVersion": "6.0.4",
+	"toolchain": "nightly-2026-02-20",
+	"targets": [
+		"aarch64-unknown-linux-gnu",
+		"aarch64-unknown-linux-musl",
+		"aarch64-apple-darwin",
+		"aarch64-pc-windows-msvc",
+		"x86_64-unknown-linux-gnu",
+		"x86_64-unknown-linux-musl",
+		"x86_64-apple-darwin",
+		"x86_64-pc-windows-msvc",
+		"x86_64-unknown-freebsd"
+	],
+	"libraries": [
+		"deny_account_borrows_across_cpi",
+		"deny_heap_allocations_in_onchain_instruction_handlers",
+		"require_associated_token_address_before_ata_cast",
+		"require_bounded_remaining_accounts",
+		"require_canonical_bump_before_pda_write",
+		"require_canonical_instruction_dispatch_for_idl",
+		"require_checked_asset_arithmetic",
+		"require_consistent_token_program",
+		"require_empty_before_init",
+		"require_explicit_discriminators_and_seed_namespaces",
+		"require_explicit_token_2022_extension_policy",
+		"require_idl_root_to_define_one_program_id",
+		"require_owner_before_token_cast",
+		"require_post_cpi_balance_reload",
+		"require_program_check_before_cpi",
+		"require_program_owned_before_lamport_mutation",
+		"require_reason_for_duplicate_remaining_accounts",
+		"require_sysvar_assert_before_sysvar_use",
+		"require_type_assert_before_zero_copy_cast",
+		"require_writable_before_account_resize",
+		"require_zeroed_before_close"
+	]
+}

@@ -1,5 +1,6 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
+assertion_line: 148
 info:
   program: pina
   args:
@@ -11,7 +12,7 @@ exit_code: 0
 ----- stdout -----
 Run Pina's official security lints against the current program.
 
-Discovers the nearest Pina.toml or Cargo package, prepares pinned Dylint tools under Cargo home, and runs the lint set from the immutable revision reviewed for this CLI. Use --fix to apply machine-applicable suggestions; review every resulting source change.
+Discovers the nearest Pina.toml or Cargo package, prepares pinned Dylint tooling under Cargo home, and runs the precompiled lint bundle published with this CLI release. Use --fix to apply machine-applicable suggestions; review every resulting source change.
 
 Usage: pina lint [OPTIONS]
 
@@ -31,6 +32,6 @@ Examples:
   pina lint --project ./programs/counter
 
 Tooling:
-  The first run installs pinned cargo-dylint and dylint-link binaries below Cargo home. Lint libraries are loaded from the immutable Pina revision reviewed for this CLI. --fix applies only machine-applicable suggestions and allows Cargo to edit dirty, staged, or not-yet-versioned working trees; inspect the diff before committing.
+  The first run downloads verified, precompiled cargo-dylint and native lint bundles below Cargo home. --fix applies only machine-applicable suggestions and allows Cargo to edit dirty, staged, or not-yet-versioned working trees; inspect the diff before committing.
 
 ----- stderr -----

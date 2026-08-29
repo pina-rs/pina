@@ -64,7 +64,10 @@ esac
 
 fn create_record_and_keypair(temp: &TempDir) -> (std::path::PathBuf, std::path::PathBuf, String) {
 	let bytes = vec![7_u8; 128];
-	let hash = Sha256::digest(&bytes).iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+	let hash = Sha256::digest(&bytes)
+		.iter()
+		.map(|byte| format!("{byte:02x}"))
+		.collect::<String>();
 	let record = temp.path().join(format!("fixture-{hash}.json"));
 	let artifact = record.with_extension("so");
 	let json = serde_json::json!({

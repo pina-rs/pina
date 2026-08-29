@@ -966,7 +966,10 @@ mod tests {
 
 	fn record_options(temp: &TempDir, confirmed: bool) -> pina_cli::verification::RecordOptions {
 		let artifact_bytes = vec![7_u8; 128];
-		let hash = Sha256::digest(&artifact_bytes).iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+		let hash = Sha256::digest(&artifact_bytes)
+			.iter()
+			.map(|byte| format!("{byte:02x}"))
+			.collect::<String>();
 		let record_dir = temp.path().join("record with spaces");
 		fs::create_dir_all(&record_dir).unwrap();
 		let record = record_dir.join(format!("fixture-{hash}.json"));

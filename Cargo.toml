@@ -142,12 +142,14 @@ solana-pubkey = { version = "^4", features = ["bytemuck"], default-features = fa
 solana-sdk-ids = { version = "^3", default-features = false }
 solana-system-interface = { version = "^3", default-features = false }
 syn = { default-features = false, version = "^3", features = ["full"] }
+tar = { default-features = false, version = "^0.4" }
 tempfile = { default-features = false, version = "^3" }
 termimad = { default-features = false, version = "^0.35.1" }
 thiserror = { default-features = false, version = "^2" }
 tokio = { default-features = false, version = "^1" }
 toml = { default-features = false, version = "^1", features = ["parse", "serde"] }
 trybuild = { default-features = false, version = "^1" }
+ureq = { default-features = false, version = "^3", features = ["json", "rustls"] }
 url = { default-features = false, version = "^2.5.4" }
 walkdir = { default-features = false, version = "^2" }
 zeropod = { default-features = false, version = "0.3.5", features = ["solana-address", "solana-program-error"] }

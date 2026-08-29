@@ -49,7 +49,7 @@ The scaffold includes:
 - an `Accounts` struct with signer validation;
 - an SBF Cargo target and `cargo build-program` alias;
 - a pinned nightly Rust toolchain with the `rust-src` component;
-- immutable-revision Pina security lint metadata and pinned Dylint tool versions;
+- no source-installed Dylint metadata; `pina lint` downloads the pinned runner and official native lint bundles from Pina releases;
 - host-side discriminator and program-ID smoke tests;
 - Pina and Mollusk dependencies;
 - a dedicated host-only test package with one `pina_test` dependency for the isolated Surfpool test;

@@ -6,22 +6,17 @@ The lints complement tests and audits; they do not prove that a program's econom
 
 ## Installation and execution
 
-Register the libraries in the consuming workspace:
+Run the catalog published with your installed Pina CLI:
 
-```toml
-[workspace.metadata.dylint]
-libraries = [
-	{ git = "https://github.com/pina-rs/pina", tag = "v0.11.0", pattern = "lints/*" },
-]
+```bash
+pina lint
+# Apply machine-applicable suggestions, then inspect the diff.
+pina lint --fix
 ```
 
-Run every registered lint against all targets:
+`pina lint` downloads precompiled Dylint executables from Pina's reusable release for the pinned Dylint version, then downloads native libraries from the matching Pina release. It verifies each release digest, bundle manifest, host/toolchain identity, and file digest. Consuming projects do not register or build Pina's lint source; Dylint may still build its location-specific compiler driver for the active nightly toolchain.
 
-```sh
-cargo dylint --all -- --all-targets
-```
-
-Inside this repository, use:
+Pina contributors still build the local source catalog when changing a lint:
 
 ```sh
 devenv shell -- security:dylint

@@ -1,30 +1,15 @@
 //! Project-aware execution of Pina's official security lints.
 
 use std::ffi::OsString;
-use std::fs::OpenOptions;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
-use fs2::FileExt;
-
+use crate::lint_bundle::BundleError;
+use crate::lint_bundle::prepare_bundle;
+use crate::lint_bundle::prepare_dylint_tools;
 use crate::project::Project;
 use crate::project::ProjectError;
-
-/// The `cargo-dylint` release used by `pina lint`.
-pub const CARGO_DYLINT_VERSION: &str = "6.0.4";
-
-/// The `dylint-link` release used to build Pina's lint libraries.
-pub const DYLINT_LINK_VERSION: &str = "6.0.4";
-
-/// Immutable Git revision containing Pina's reviewed official lint set.
-///
-/// Update this only after reviewing changes below `lints/`. Unlike a release
-/// tag, a full commit ID cannot be redirected to different native lint code.
-pub const PINA_LINT_REVISION: &str = "f6f206e0a4e71ab70c3eeaded52d07cd66a270d8";
-
-const PINA_REPOSITORY: &str = "https://github.com/pina-rs/pina";
-const PINA_LINT_PATTERN: &str = "lints/*";
 
 /// Options for running Pina's official security lints.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,47 +37,14 @@ pub enum LintError {
 	#[error(transparent)]
 	Project(#[from] ProjectError),
 
-	#[error("Could not create the managed Dylint directory at {path}: {source}")]
-	CreateToolDirectory {
-		path: PathBuf,
-		source: std::io::Error,
-	},
+	#[error(transparent)]
+	Bundle(#[from] BundleError),
 
 	#[error("Could not resolve Cargo home for Pina's managed Dylint tools")]
 	MissingCargoHome,
 
 	#[error("Could not resolve relative CARGO_HOME from the current directory: {source}")]
 	CurrentDirectory { source: std::io::Error },
-
-	#[error("Could not open the managed Dylint installation lock at {path}: {source}")]
-	OpenInstallLock {
-		path: PathBuf,
-		source: std::io::Error,
-	},
-
-	#[error("Could not lock the managed Dylint installation at {path}: {source}")]
-	LockInstall {
-		path: PathBuf,
-		source: std::io::Error,
-	},
-
-	#[error("Could not install pinned tool `{package}` with Cargo: {source}")]
-	RunInstall {
-		package: &'static str,
-		source: std::io::Error,
-	},
-
-	#[error("Installing pinned tool `{package}` failed with status {status}")]
-	InstallFailed {
-		package: &'static str,
-		status: String,
-	},
-
-	#[error("Cargo reported success but did not install `{package}` at {path}")]
-	MissingInstalledTool {
-		package: &'static str,
-		path: PathBuf,
-	},
 
 	#[error("Could not construct PATH for the pinned Dylint tools: {source}")]
 	ToolPath { source: std::env::JoinPathsError },
@@ -104,13 +56,12 @@ pub enum LintError {
 	LintFailed { status: String },
 }
 
-/// Discover a Pina project and run Pina's revision-pinned official lint set.
+/// Discover a Pina project and run this CLI release's official lint set.
 ///
-/// The first invocation installs pinned `cargo-dylint` and `dylint-link`
-/// binaries below Cargo home. Later invocations and projects reuse that managed
-/// installation. Lint libraries are loaded from the immutable revision reviewed
-/// for this CLI, not from a mutable branch, tag, or project-provided Dylint
-/// metadata.
+/// The first invocation downloads pinned `cargo-dylint` and the precompiled
+/// libraries below Cargo home. Later invocations and projects reuse the
+/// verified caches. Exact library paths are passed to Dylint, so
+/// project-provided Dylint metadata is ignored.
 ///
 /// # Errors
 ///
@@ -118,22 +69,23 @@ pub enum LintError {
 /// prepared, or Dylint reports a lint or compilation failure.
 pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 	let project = Project::discover(&options.project)?;
-	let tools = prepare_tools(&project)?;
+	let cargo_home = cargo_home()?;
+	let tools = prepare_dylint_tools(&cargo_home)?;
+	let bundle = prepare_bundle(&cargo_home)?;
 	let manifest = project.program_dir.join("Cargo.toml");
 	let mut args = vec![
 		OsString::from("dylint"),
 		OsString::from("--no-deps"),
-		OsString::from("--git"),
-		OsString::from(PINA_REPOSITORY),
-		OsString::from("--rev"),
-		OsString::from(PINA_LINT_REVISION),
-		OsString::from("--pattern"),
-		OsString::from(PINA_LINT_PATTERN),
+		OsString::from("--no-metadata"),
 		OsString::from("--manifest-path"),
 		manifest.into_os_string(),
 		OsString::from("--package"),
 		OsString::from(&project.package_name),
 	];
+	for library_path in bundle.library_paths {
+		args.push(OsString::from("--lib-path"));
+		args.push(library_path.into_os_string());
+	}
 
 	if options.fix {
 		args.push(OsString::from("--fix"));
@@ -161,73 +113,6 @@ pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 	Ok(LintOutput {
 		package_name: project.package_name,
 		fix: options.fix,
-	})
-}
-
-/// Executables installed and selected by Pina rather than project metadata.
-#[derive(Debug)]
-struct Tools {
-	bin_dir: PathBuf,
-	cargo_dylint: PathBuf,
-}
-
-/// Prepare the versioned Dylint tools in a user-owned Cargo-home cache.
-fn prepare_tools(project: &Project) -> Result<Tools, LintError> {
-	let root = cargo_home()?.join("pina/tools").join(format!(
-		"dylint-{CARGO_DYLINT_VERSION}-{DYLINT_LINK_VERSION}"
-	));
-	std::fs::create_dir_all(&root).map_err(|source| {
-		LintError::CreateToolDirectory {
-			path: root.clone(),
-			source,
-		}
-	})?;
-
-	let lock_path = root.join("install.lock");
-	let lock = OpenOptions::new()
-		.read(true)
-		.write(true)
-		.create(true)
-		.truncate(false)
-		.open(&lock_path)
-		.map_err(|source| {
-			LintError::OpenInstallLock {
-				path: lock_path.clone(),
-				source,
-			}
-		})?;
-	lock.try_lock_exclusive().map_err(|source| {
-		LintError::LockInstall {
-			path: lock_path,
-			source,
-		}
-	})?;
-
-	let bin_dir = root.join("bin");
-	let cargo_dylint = bin_dir.join(executable_name("cargo-dylint"));
-	let dylint_link = bin_dir.join(executable_name("dylint-link"));
-	let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
-
-	install_tool(
-		&cargo,
-		&project.root,
-		&root,
-		"cargo-dylint",
-		CARGO_DYLINT_VERSION,
-		&cargo_dylint,
-	)?;
-	install_tool(
-		&cargo,
-		&project.root,
-		&root,
-		"dylint-link",
-		DYLINT_LINK_VERSION,
-		&dylint_link,
-	)?;
-
-	Ok(Tools {
-		bin_dir,
-		cargo_dylint,
 	})
 }
 
@@ -280,69 +165,11 @@ fn platform_home() -> Option<PathBuf> {
 		})
 }
 
-/// Install one exact crates.io tool release unless its managed binary exists.
-fn install_tool(
-	cargo: &OsString,
-	project_root: &Path,
-	tool_root: &Path,
-	package: &'static str,
-	version: &'static str,
-	executable: &Path,
-) -> Result<(), LintError> {
-	if executable.is_file() {
-		return Ok(());
-	}
-
-	let build_target = tool_root.join("build").join(package);
-	let status = Command::new(cargo)
-		.args([
-			OsString::from("install"),
-			OsString::from("--locked"),
-			OsString::from("--root"),
-			tool_root.as_os_str().to_owned(),
-			OsString::from("--version"),
-			OsString::from(version),
-			OsString::from(package),
-		])
-		.current_dir(project_root)
-		.env("CARGO_TARGET_DIR", build_target)
-		.status()
-		.map_err(|source| LintError::RunInstall { package, source })?;
-
-	if !status.success() {
-		return Err(LintError::InstallFailed {
-			package,
-			status: status.to_string(),
-		});
-	}
-
-	if !executable.is_file() {
-		return Err(LintError::MissingInstalledTool {
-			package,
-			path: executable.to_path_buf(),
-		});
-	}
-
-	Ok(())
-}
-
 /// Prepend Pina's managed tool directory without discarding the caller's PATH.
 fn tool_path(bin_dir: &Path) -> Result<OsString, LintError> {
 	let current_path = std::env::var_os("PATH").unwrap_or_default();
 	let paths = std::iter::once(bin_dir.to_path_buf()).chain(std::env::split_paths(&current_path));
 	std::env::join_paths(paths).map_err(|source| LintError::ToolPath { source })
-}
-
-#[cfg(windows)]
-/// Return a platform executable filename on Windows.
-fn executable_name(name: &str) -> OsString {
-	OsString::from(format!("{name}.exe"))
-}
-
-#[cfg(not(windows))]
-/// Return a platform executable filename on Unix-like systems.
-fn executable_name(name: &str) -> OsString {
-	OsString::from(name)
 }
 
 #[cfg(test)]
