@@ -21,6 +21,11 @@ const repositoryRoot = resolve(
 	"../..",
 );
 const catalogPath = join(repositoryRoot, "crates/pina_cli/lints.json");
+// The repository pins a nightly toolchain for compiling lint libraries. These
+// two reusable CLI executables do not need that nightly, so `+stable` must be
+// explicit; otherwise Rustup's directory override silently wins over the
+// workflow step that installs stable Rust.
+export const dylintBuildToolchain = "+stable";
 const toolNames = ["cargo-dylint", "dylint-link"];
 
 function fail(message) {
@@ -64,7 +69,12 @@ export function executableFilename(name, target) {
 }
 
 function validateHost(target) {
-	const rustc = run("rustc", ["-vV"], { capture: true });
+	// Dylint tools are downloaded and executed directly on the destination host.
+	// Refuse cross-compilation so the archive can never contain binaries for a
+	// different architecture than its filename claims.
+	const rustc = run("rustc", [dylintBuildToolchain, "-vV"], {
+		capture: true,
+	});
 	const host = /^host: (.+)$/m.exec(rustc)?.[1];
 	if (host !== target) {
 		fail(
@@ -97,6 +107,7 @@ export function buildDylintTools(arguments_) {
 	try {
 		for (const name of toolNames) {
 			run("cargo", [
+				dylintBuildToolchain,
 				"install",
 				"--locked",
 				"--force",
