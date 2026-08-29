@@ -379,7 +379,10 @@ impl<'tcx> LateLintPass<'tcx> for RequireProgramCheckBeforeCpi {
 mod tests {
 	#[test]
 	fn ui() {
-		dylint_testing::ui_test(env!("CARGO_PKG_NAME"), "ui");
+		dylint_testing::ui_test(
+			env!("CARGO_PKG_NAME"),
+			concat!(env!("CARGO_MANIFEST_DIR"), "/ui"),
+		);
 	}
 
 	#[test]

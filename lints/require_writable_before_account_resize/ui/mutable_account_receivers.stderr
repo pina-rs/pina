@@ -6,7 +6,7 @@ LL |     account.resize(1)?;
    |
    = help: call `account.assert_writable()?` before `resize()`
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
-   = note: `#[deny(req$DIRre_writable_before_account_resize)]` on by default
+   = note: `#[deny(require_writable_before_account_resize)]` on by default
 
 error: aborting due to 1 previous error
 

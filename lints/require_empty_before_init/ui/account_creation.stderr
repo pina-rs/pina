@@ -5,7 +5,7 @@ LL |     create.invoke::<State>()?;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: add `target_account.assert_empty()?` before calling account creation to prevent reinitialization
-   = note: `#[deny(req$DIRre_empty_before_init)]` on by default
+   = note: `#[deny(require_empty_before_init)]` on by default
 
 error: `CreateProgramAccount` invoked without a preceding `assert_empty()` on the target account
   --> $DIR/account_creation.rs:41:2

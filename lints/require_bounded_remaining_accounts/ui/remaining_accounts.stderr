@@ -8,7 +8,7 @@ LL | |     }
    | |_____^
    |
    = help: define a protocol maximum and iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
-   = note: `#[deny(req$DIRre_bounded_remaining_accounts)]` on by default
+   = note: `#[deny(require_bounded_remaining_accounts)]` on by default
 
 error: remaining accounts are processed without an explicit bound
   --> $DIR/remaining_accounts.rs:19:4
@@ -46,3 +46,4 @@ LL | |         };
    = help: define a protocol maximum and iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
 
 error: aborting due to 4 previous errors
+
