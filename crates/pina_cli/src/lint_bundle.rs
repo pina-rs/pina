@@ -20,6 +20,7 @@ use sha2::Digest;
 use sha2::Sha256;
 
 const BUNDLE_SCHEMA_VERSION: u32 = 1;
+const CATALOG_SCHEMA_VERSION: u32 = 2;
 const MAX_ARCHIVE_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_EXTRACTED_BYTES: u64 = 1024 * 1024 * 1024;
 const PINA_RELEASES_API: &str = "https://api.github.com/repos/pina-rs/pina/releases/tags";
@@ -33,7 +34,8 @@ pub(crate) struct LintCatalog {
 	pub(crate) schema_version: u32,
 	pub(crate) dylint_version: String,
 	pub(crate) toolchain: String,
-	pub(crate) targets: Vec<String>,
+	pub(crate) tool_targets: Vec<String>,
+	pub(crate) lint_targets: Vec<String>,
 	pub(crate) libraries: Vec<String>,
 }
 
@@ -167,6 +169,9 @@ pub enum BundleError {
 	#[error("The embedded lint catalog is invalid: {reason}")]
 	InvalidCatalog { reason: String },
 
+	#[error("Rust compiler host {host} cannot load Pina's precompiled lint libraries")]
+	UnsupportedLintHost { host: String },
+
 	#[error("Could not read lint bundle manifest at {path}: {source}")]
 	ReadManifest {
 		path: PathBuf,
@@ -218,19 +223,38 @@ pub(crate) fn lint_catalog() -> Result<LintCatalog, BundleError> {
 	Ok(catalog)
 }
 
-/// Download once, then validate and reuse the current CLI's native bundle.
-pub(crate) fn prepare_bundle(cargo_home: &Path) -> Result<PreparedBundle, BundleError> {
-	prepare_bundle_from(cargo_home, PINA_RELEASES_API, PINA_RELEASE_DOWNLOADS)
+/// Download once, then validate and reuse the Rust compiler host's native bundle.
+pub(crate) fn prepare_bundle(
+	cargo_home: &Path,
+	target: &str,
+) -> Result<PreparedBundle, BundleError> {
+	prepare_bundle_from(
+		cargo_home,
+		target,
+		PINA_RELEASES_API,
+		PINA_RELEASE_DOWNLOADS,
+	)
 }
 
 fn prepare_bundle_from(
 	cargo_home: &Path,
+	target: &str,
 	releases_api: &str,
 	release_downloads: &str,
 ) -> Result<PreparedBundle, BundleError> {
 	let catalog = lint_catalog()?;
 	let version = env!("CARGO_PKG_VERSION");
-	let target = env!("PINA_BUILD_TARGET");
+
+	if !catalog
+		.lint_targets
+		.iter()
+		.any(|candidate| candidate == target)
+	{
+		return Err(BundleError::UnsupportedLintHost {
+			host: target.to_owned(),
+		});
+	}
+
 	let root = cargo_home
 		.join("pina/lints")
 		.join(format!("v{version}"))
@@ -404,7 +428,7 @@ fn replace_cached_directory(source: &Path, destination: &Path) -> Result<(), Bun
 }
 
 fn validate_catalog(catalog: &LintCatalog) -> Result<(), BundleError> {
-	if catalog.schema_version != BUNDLE_SCHEMA_VERSION {
+	if catalog.schema_version != CATALOG_SCHEMA_VERSION {
 		return Err(BundleError::InvalidCatalog {
 			reason: format!("schema version {} is not supported", catalog.schema_version),
 		});
@@ -414,24 +438,46 @@ fn validate_catalog(catalog: &LintCatalog) -> Result<(), BundleError> {
 			reason: "Dylint version must use semantic versioning".to_owned(),
 		});
 	}
-	if catalog.toolchain.is_empty() || catalog.targets.is_empty() || catalog.libraries.is_empty() {
+	if catalog.toolchain.is_empty()
+		|| catalog.tool_targets.is_empty()
+		|| catalog.lint_targets.is_empty()
+		|| catalog.libraries.is_empty()
+	{
 		return Err(BundleError::InvalidCatalog {
-			reason: "toolchain, targets, and libraries must not be empty".to_owned(),
+			reason: "toolchain, tool targets, lint targets, and libraries must not be empty"
+				.to_owned(),
 		});
 	}
-	let unique_targets = catalog.targets.iter().collect::<BTreeSet<_>>();
-	if unique_targets.len() != catalog.targets.len()
+	let unique_tool_targets = catalog.tool_targets.iter().collect::<BTreeSet<_>>();
+	if unique_tool_targets.len() != catalog.tool_targets.len()
 		|| catalog
-			.targets
+			.tool_targets
 			.iter()
 			.any(|target| !is_safe_release_component(target))
 		|| !catalog
-			.targets
+			.tool_targets
 			.iter()
 			.any(|target| target == env!("PINA_BUILD_TARGET"))
 	{
 		return Err(BundleError::InvalidCatalog {
-			reason: "targets must be unique safe components and include this CLI host".to_owned(),
+			reason: "tool targets must be unique safe components and include this CLI host"
+				.to_owned(),
+		});
+	}
+	let unique_lint_targets = catalog.lint_targets.iter().collect::<BTreeSet<_>>();
+	if unique_lint_targets.len() != catalog.lint_targets.len()
+		|| catalog
+			.lint_targets
+			.iter()
+			.any(|target| !is_safe_release_component(target))
+		|| !catalog
+			.lint_targets
+			.iter()
+			.all(|target| unique_tool_targets.contains(target))
+	{
+		return Err(BundleError::InvalidCatalog {
+			reason: "lint targets must be unique safe components and have matching Dylint tools"
+				.to_owned(),
 		});
 	}
 	let unique = catalog.libraries.iter().collect::<BTreeSet<_>>();
@@ -1003,10 +1049,11 @@ mod tests {
 
 	fn test_catalog() -> LintCatalog {
 		LintCatalog {
-			schema_version: 1,
+			schema_version: CATALOG_SCHEMA_VERSION,
 			dylint_version: TEST_DYLINT_VERSION.to_owned(),
 			toolchain: "nightly-test".to_owned(),
-			targets: vec![env!("PINA_BUILD_TARGET").to_owned()],
+			tool_targets: vec![env!("PINA_BUILD_TARGET").to_owned()],
+			lint_targets: vec![env!("PINA_BUILD_TARGET").to_owned()],
 			libraries: vec!["secure_lint".to_owned()],
 		}
 	}
@@ -1223,10 +1270,26 @@ mod tests {
 	}
 
 	#[test]
+	fn managed_bundle_rejects_a_rust_host_without_dynamic_libraries() {
+		let cargo_home = tempfile::tempdir().expect("temporary Cargo home should exist");
+
+		assert!(matches!(
+			prepare_bundle_from(
+				cargo_home.path(),
+				"x86_64-unknown-linux-musl",
+				"unused",
+				"unused",
+			),
+			Err(BundleError::UnsupportedLintHost { host })
+				if host == "x86_64-unknown-linux-musl"
+		));
+	}
+
+	#[test]
 	fn catalog_validation_rejects_every_unsafe_contract_shape() {
 		let invalid_catalogs = [
 			LintCatalog {
-				schema_version: 2,
+				schema_version: 1,
 				..test_catalog()
 			},
 			LintCatalog {
@@ -1238,15 +1301,28 @@ mod tests {
 				..test_catalog()
 			},
 			LintCatalog {
-				targets: vec!["duplicate".to_owned(), "duplicate".to_owned()],
+				tool_targets: vec!["duplicate".to_owned(), "duplicate".to_owned()],
 				..test_catalog()
 			},
 			LintCatalog {
-				targets: vec!["../unsafe".to_owned(), env!("PINA_BUILD_TARGET").to_owned()],
+				tool_targets: vec!["../unsafe".to_owned(), env!("PINA_BUILD_TARGET").to_owned()],
 				..test_catalog()
 			},
 			LintCatalog {
-				targets: vec!["safe-but-not-this-host".to_owned()],
+				tool_targets: vec!["safe-but-not-this-host".to_owned()],
+				lint_targets: vec!["safe-but-not-this-host".to_owned()],
+				..test_catalog()
+			},
+			LintCatalog {
+				lint_targets: vec!["duplicate".to_owned(), "duplicate".to_owned()],
+				..test_catalog()
+			},
+			LintCatalog {
+				lint_targets: vec!["../unsafe".to_owned()],
+				..test_catalog()
+			},
+			LintCatalog {
+				lint_targets: vec!["safe-but-missing-tools".to_owned()],
 				..test_catalog()
 			},
 			LintCatalog {
@@ -1338,13 +1414,13 @@ mod tests {
 			&lint_asset,
 			lint_archive(&catalog, version, target),
 		);
-		let bundle = prepare_bundle_from(cargo_home.path(), &api, &downloads)
+		let bundle = prepare_bundle_from(cargo_home.path(), target, &api, &downloads)
 			.expect("lint bundle should download");
 		server.join().expect("lint release server should finish");
 		assert_eq!(bundle.library_paths.len(), catalog.libraries.len());
 		assert!(bundle.library_paths.iter().all(|path| path.is_file()));
 		assert!(!lint_root.join("bundle/stale").exists());
-		prepare_bundle(cargo_home.path()).expect("cached lint bundle should be reused");
+		prepare_bundle(cargo_home.path(), target).expect("cached lint bundle should be reused");
 
 		let tool_root = cargo_home
 			.path()
@@ -1378,7 +1454,7 @@ mod tests {
 		let blocked_home = temporary.path().join("blocked-home");
 		fs::write(&blocked_home, b"not a directory").expect("blocked home should be written");
 		assert!(matches!(
-			prepare_bundle_from(&blocked_home, "unused", "unused"),
+			prepare_bundle_from(&blocked_home, env!("PINA_BUILD_TARGET"), "unused", "unused",),
 			Err(BundleError::CreateDirectory { .. })
 		));
 		assert!(matches!(
@@ -1395,7 +1471,12 @@ mod tests {
 			.join("bundle.lock");
 		fs::create_dir_all(&lint_lock).expect("directory lock should be created");
 		assert!(matches!(
-			prepare_bundle_from(cargo_home.path(), "unused", "unused"),
+			prepare_bundle_from(
+				cargo_home.path(),
+				env!("PINA_BUILD_TARGET"),
+				"unused",
+				"unused",
+			),
 			Err(BundleError::OpenLock { .. })
 		));
 
@@ -1445,7 +1526,7 @@ mod tests {
 		let (api, downloads, server) =
 			serve_release(&tag, &asset, lint_archive(&catalog, version, target));
 		assert!(matches!(
-			prepare_bundle_from(cargo_home.path(), &api, &downloads),
+			prepare_bundle_from(cargo_home.path(), target, &api, &downloads),
 			Err(BundleError::InvalidBundle { .. })
 		));
 		server.join().expect("lint release server should finish");
@@ -1492,7 +1573,7 @@ mod tests {
 		let (api, downloads, server) =
 			serve_release(&tag, &asset, lint_archive(&catalog, version, target));
 		assert!(matches!(
-			prepare_bundle_from(cargo_home.path(), &api, &downloads),
+			prepare_bundle_from(cargo_home.path(), target, &api, &downloads),
 			Err(BundleError::CreateTemporaryBundle { .. })
 		));
 		fs::set_permissions(&lint_root, fs::Permissions::from_mode(0o755))

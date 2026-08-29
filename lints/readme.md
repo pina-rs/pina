@@ -14,7 +14,7 @@ pina lint
 pina lint --fix
 ```
 
-`pina lint` downloads precompiled Dylint executables from Pina's reusable release for the pinned Dylint version, then downloads native libraries from the matching Pina release. It verifies each release digest, bundle manifest, host/toolchain identity, and file digest. Consuming projects do not register or build Pina's lint source; Dylint may still build its location-specific compiler driver for the active nightly toolchain.
+`pina lint` downloads precompiled Dylint executables from Pina's reusable release for the pinned Dylint version, then downloads native libraries from the matching Pina release. Executables match the CLI platform; libraries match the host reported by the active Rust compiler. This lets a musl-distributed CLI use GNU libraries on glibc Linux without pretending Rust's musl hosts support dynamic compiler plugins. Pina verifies each release digest, bundle manifest, host/toolchain identity, and file digest. Consuming projects do not register or build Pina's lint source; Dylint may still build its location-specific compiler driver for the active nightly toolchain.
 
 Pina contributors still build the local source catalog when changing a lint:
 

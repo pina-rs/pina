@@ -69,6 +69,17 @@ export function libraryFilename(name, toolchain, target) {
 	return `lib${name}@${toolchain}.so`;
 }
 
+export function lintTarCreateArguments(archiveName, stagingDirectory, files) {
+	return [
+		"-czf",
+		archiveName,
+		"-C",
+		stagingDirectory,
+		"manifest.json",
+		...files,
+	];
+}
+
 function validateRelease(releaseTag) {
 	// Bind every archive to the checked-out CLI version. This prevents a manual
 	// workflow dispatch from publishing lint libraries under the wrong Pina tag.
@@ -120,14 +131,18 @@ function validateHost(target, catalog) {
 export function buildBundle(arguments_) {
 	const { outputDirectory, releaseTag, target } = parseArguments(arguments_);
 	const catalog = JSON.parse(readFileSync(catalogPath, "utf8"));
-	if (catalog.schemaVersion !== 1 || catalog.libraries.length === 0) {
+	if (
+		catalog.schemaVersion !== 2 ||
+		!Array.isArray(catalog.lintTargets) ||
+		catalog.libraries.length === 0
+	) {
 		fail("The lint catalog is empty or uses an unsupported schema.");
 	}
 	if (new Set(catalog.libraries).size !== catalog.libraries.length) {
 		fail("The lint catalog contains duplicate library names.");
 	}
-	if (!catalog.targets.includes(target)) {
-		fail(`Target ${target} is not in the lint release catalog.`);
+	if (!catalog.lintTargets.includes(target)) {
+		fail(`Target ${target} is not in the lint-library release catalog.`);
 	}
 	const version = validateRelease(releaseTag);
 	const toolchain = validateHost(target, catalog);
@@ -192,14 +207,17 @@ export function buildBundle(arguments_) {
 
 		const archiveName = `pina-lints-${target}-${releaseTag}.tar.gz`;
 		const archivePath = join(outputDirectory, archiveName);
-		run("tar", [
-			"-czf",
-			archivePath,
-			"-C",
-			stagingDirectory,
-			"manifest.json",
-			...libraries.map((library) => library.file),
-		]);
+		// Windows tar treats the colon in an absolute drive path as remote syntax.
+		// Create the archive from its output directory so the name stays relative.
+		run(
+			"tar",
+			lintTarCreateArguments(
+				archiveName,
+				stagingDirectory,
+				libraries.map((library) => library.file),
+			),
+			{ cwd: outputDirectory },
+		);
 		console.log(
 			JSON.stringify({
 				archive: archivePath,

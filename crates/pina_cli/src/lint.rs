@@ -49,6 +49,15 @@ pub enum LintError {
 	#[error("Could not construct PATH for the pinned Dylint tools: {source}")]
 	ToolPath { source: std::env::JoinPathsError },
 
+	#[error("Could not query the Rust compiler host: {source}")]
+	QueryRustcHost { source: std::io::Error },
+
+	#[error("Could not query the Rust compiler host because rustc exited with status {status}")]
+	RustcHostFailed { status: String },
+
+	#[error("Could not read a host target from rustc -vV")]
+	MissingRustcHost,
+
 	#[error("Could not run Pina's security lints: {source}")]
 	RunDylint { source: std::io::Error },
 
@@ -70,8 +79,9 @@ pub enum LintError {
 pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 	let project = Project::discover(&options.project)?;
 	let cargo_home = cargo_home()?;
+	let lint_target = rustc_host(&project.root)?;
 	let tools = prepare_dylint_tools(&cargo_home)?;
-	let bundle = prepare_bundle(&cargo_home)?;
+	let bundle = prepare_bundle(&cargo_home, &lint_target)?;
 	let manifest = project.program_dir.join("Cargo.toml");
 	let mut args = vec![
 		OsString::from("dylint"),
@@ -114,6 +124,32 @@ pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 		package_name: project.package_name,
 		fix: options.fix,
 	})
+}
+
+/// Resolve the host target of the Rust compiler that Dylint will invoke.
+fn rustc_host(project_root: &Path) -> Result<String, LintError> {
+	let output = Command::new("rustc")
+		.arg("-vV")
+		.current_dir(project_root)
+		.output()
+		.map_err(|source| LintError::QueryRustcHost { source })?;
+
+	if !output.status.success() {
+		return Err(LintError::RustcHostFailed {
+			status: output.status.to_string(),
+		});
+	}
+
+	parse_rustc_host(&output.stdout).ok_or(LintError::MissingRustcHost)
+}
+
+/// Parse the host target from verbose rustc version output.
+fn parse_rustc_host(output: &[u8]) -> Option<String> {
+	String::from_utf8_lossy(output)
+		.lines()
+		.find_map(|line| line.strip_prefix("host: "))
+		.filter(|host| !host.is_empty())
+		.map(str::to_owned)
 }
 
 /// Resolve Cargo home using Cargo's environment and platform conventions.
@@ -222,5 +258,17 @@ mod tests {
 		let home = resolve_cargo_home(None, Ok(PathBuf::from("/working")), None)
 			.expect_err("a platform home should be required");
 		assert!(matches!(home, LintError::MissingCargoHome));
+	}
+
+	#[test]
+	fn parses_rustc_host_from_verbose_version_output() {
+		let output = b"rustc 1.95.0-nightly\nbinary: rustc\nhost: x86_64-unknown-linux-gnu\n";
+
+		assert_eq!(
+			parse_rustc_host(output).as_deref(),
+			Some("x86_64-unknown-linux-gnu")
+		);
+		assert_eq!(parse_rustc_host(b"rustc without a host line\n"), None);
+		assert_eq!(parse_rustc_host(b"host: \n"), None);
 	}
 }
