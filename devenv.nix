@@ -432,7 +432,7 @@ in
         pnpm --dir "$DEVENV_ROOT" run check:npm-packages
         pnpm --dir "$DEVENV_ROOT" run test:npm-packages
       '';
-      description = "Verify npm package metadata, platform coverage, launchers, and the skill installer.";
+      description = "Verify npm metadata, platform launchers, the skill installer, and release packaging scripts.";
       binary = "bash";
     };
     "test:fuzz:smoke" = {

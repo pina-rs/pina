@@ -68,6 +68,21 @@ export function executableFilename(name, target) {
 	return target.includes("windows") ? `${name}.exe` : name;
 }
 
+export function tarCreateArguments(
+	archiveName,
+	stagingDirectory,
+	files,
+) {
+	return [
+		"-czf",
+		archiveName,
+		"-C",
+		stagingDirectory,
+		"manifest.json",
+		...files,
+	];
+}
+
 function validateHost(target) {
 	// Dylint tools are downloaded and executed directly on the destination host.
 	// Refuse cross-compilation so the archive can never contain binaries for a
@@ -159,14 +174,17 @@ export function buildDylintTools(arguments_) {
 
 		const archiveName = `pina-dylint-tools-${target}-v${version}.tar.gz`;
 		const archivePath = join(outputDirectory, archiveName);
-		run("tar", [
-			"-czf",
-			archivePath,
-			"-C",
-			stagingDirectory,
-			"manifest.json",
-			...executables.map((executable) => executable.file),
-		]);
+		// Pass a relative output name because Windows tar implementations can
+		// interpret the colon in an absolute drive path as remote archive syntax.
+		run(
+			"tar",
+			tarCreateArguments(
+				archiveName,
+				stagingDirectory,
+				executables.map((executable) => executable.file),
+			),
+			{ cwd: outputDirectory },
+		);
 		console.log(
 			JSON.stringify({
 				archive: archivePath,
