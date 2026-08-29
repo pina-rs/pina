@@ -105,7 +105,7 @@ jobs:
                 echo "::error::The existing $tag release is missing verified asset $asset." >&2
                 exit 1
               }
-          done < <(jq -r '.targets[]' crates/pina_cli/lints.json)
+          done < <(jq -r '.toolTargets[]' crates/pina_cli/lints.json)
           echo "The complete $tag release already exists; no Dylint tools will be rebuilt."
           echo "required=false" >> "$GITHUB_OUTPUT"
 
@@ -340,8 +340,8 @@ jobs:
           # before anything is attested or published.
           while IFS= read -r target; do
             test -f "$asset_dir/pina-dylint-tools-${target}-v${DYLINT_VERSION}.tar.gz"
-          done < <(jq -r '.targets[]' crates/pina_cli/lints.json)
-          expected_count="$(jq '.targets | length' crates/pina_cli/lints.json)"
+          done < <(jq -r '.toolTargets[]' crates/pina_cli/lints.json)
+          expected_count="$(jq '.toolTargets | length' crates/pina_cli/lints.json)"
           actual_count="$(find "$asset_dir" -maxdepth 1 -type f -name '*.tar.gz' | wc -l | tr -d ' ')"
           test "$actual_count" = "$expected_count"
           sha256sum "$asset_dir"/*.tar.gz
