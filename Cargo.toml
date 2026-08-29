@@ -93,12 +93,13 @@ rust-version = "1.89.0"
 
 [workspace.dependencies]
 atomic-write-file = { default-features = false, version = "^0.3" }
-base64 = "0.22.1"
-bs58 = "0.5.1"
+base64 = { default-features = false, version = "^0.22.1" }
+bs58 = { default-features = false, version = "^0.5.1" }
 cargo_metadata = { default-features = false, version = "^0.23" }
 clap = { default-features = false, version = "^4", features = ["derive", "std"] }
 clap_complete = { default-features = false, version = "^4" }
 codama-nodes = { default-features = false, version = "0.13.1" }
+comfy-table = { default-features = false, version = "^8.0.0" }
 darling = { default-features = false, version = "0.24.0" }
 ed25519-dalek = { version = "2.2.0", default-features = false }
 flate2 = { default-features = true, version = "1.1.2" }
@@ -112,6 +113,7 @@ mollusk-svm = { default-features = false, version = "0.15.0" }
 num-derive = { version = "^0.5", default-features = false }
 num-traits = { version = "^0.2", default-features = false }
 object = { default-features = false, version = "^0.40.0" }
+owo-colors = { default-features = false, version = "^4.0" }
 pastey = { default-features = false, version = "^0.2" }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }
@@ -123,6 +125,7 @@ prettyplease = { default-features = false, version = "^0.3" }
 proc-macro2 = { default-features = false, version = "^1" }
 proptest = { default-features = false, version = "^1", features = ["std"] }
 quote = { default-features = false, version = "^1" }
+rayon = { default-features = false, version = "^1.10" }
 same-file = { default-features = false, version = "^1" }
 semver = { default-features = false, version = "^1" }
 serde = { default-features = false, version = "^1" }
@@ -140,11 +143,12 @@ solana-sdk-ids = { version = "^3", default-features = false }
 solana-system-interface = { version = "^3", default-features = false }
 syn = { default-features = false, version = "^3", features = ["full"] }
 tempfile = { default-features = false, version = "^3" }
+termimad = { default-features = false, version = "^0.35.1" }
 thiserror = { default-features = false, version = "^2" }
 tokio = { default-features = false, version = "^1" }
 toml = { default-features = false, version = "^1", features = ["parse", "serde"] }
 trybuild = { default-features = false, version = "^1" }
-url = "2.5.4"
+url = { default-features = false, version = "^2.5.4" }
 walkdir = { default-features = false, version = "^2" }
 zeropod = { default-features = false, version = "0.3.5", features = ["solana-address", "solana-program-error"] }
 
