@@ -223,6 +223,10 @@ test("the release catalog covers every lint crate and matches the pinned toolcha
 		join(repositoryRoot, ".github/workflows/publish.yml"),
 		"utf8",
 	);
+	const ciWorkflow = readFileSync(
+		join(repositoryRoot, ".github/workflows/ci.yml"),
+		"utf8",
+	);
 	for (const target of catalog.toolTargets) {
 		assert.match(publishWorkflow, new RegExp(`target: ${target}`, "u"));
 	}
@@ -252,9 +256,13 @@ test("the release catalog covers every lint crate and matches the pinned toolcha
 		publishWorkflow,
 		/name: publish standalone pina_test workspace[\s\S]*?--package pina_test[\s\S]*?\.package_publish\.packages\[0\]\.package == "pina_test"/u,
 	);
-	assert.match(
+	assert.doesNotMatch(
 		publishWorkflow,
-		/name: dry-run independently publishable packages[\s\S]*?packages=\([\s\S]*?pina_test[\s\S]*?\)\s+for package/u,
+		/name: dry-run independently publishable packages/u,
+	);
+	assert.match(
+		ciWorkflow,
+		/release-publish:\s+name: release-publish[\s\S]*?monochange run release --create-pr=false[\s\S]*?monochange step publish-readiness[\s\S]*?\.status == "ready"[\s\S]*?monochange step publish-packages[\s\S]*?--dry-run[\s\S]*?--all[\s\S]*?publish-readiness\.json/u,
 	);
 	assert.match(
 		publishWorkflow,

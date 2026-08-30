@@ -26,6 +26,8 @@ Separate PR workflows also verify:
 - `surfpool` builds each example SBF program and exercises its runtime guards through the Surfpool SDK
 - `compute-units` for tracked static CU regression reporting vs the PR base revision
 
+The main CI workflow also runs `release-publish` on every pull request. When a PR contains releaseable changesets, the job creates the same release commit as the production release workflow and keeps that commit local to the runner. Registry readiness and a publish dry-run both select every package from its embedded release record, and CI requires their package sets to match so a newly added package cannot be omitted by a maintained allowlist. Cargo cannot completely verify dependent crates until their same-release dependencies exist in crates.io; Monochange plans those packages and publishes them in dependency order during the real release. Prepared release PRs are checked directly. Pull requests without a publishable release keep the job visible but skip the preflight explicitly.
+
 This keeps code quality, behavior, documentation build health, feature-flag compatibility, and performance visibility aligned.
 
 ## Surfpool example security checks
@@ -143,3 +145,8 @@ monochange step publish-packages
 <!-- {/releaseWorkflowCommands} -->
 
 Keep changeset descriptions explicit and user-impact focused.
+
+### First-time packages
+
+A new crates.io crate or npm package must exist before registry-side trusted publishing can be configured. Before its first real release, a registry owner should run `monochange step placeholder-publish --dry-run --package
+<package-id>`, publish the `0.0.0` placeholder with the same command without `--dry-run`, then configure repository `pina-rs/pina`, workflow `publish.yml`, and environment `publisher` as its trusted publisher. The placeholder both prevents name squatting and lets PR publication preflight validate later versions before the release workflow obtains an OIDC token.
