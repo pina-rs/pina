@@ -349,24 +349,67 @@ jobs:
           echo "created=true" >> "$GITHUB_OUTPUT"
         shell: devenv shell -- bash -e {0}
 
+      - name: check registry publication readiness
+        if: steps.release_state.outputs.current_release == 'true' || steps.release_commit.outputs.created == 'true'
+        run: |
+          set -euo pipefail
+
+          # Readiness covers the complete release record and identifies packages
+          # that still need a first-time placeholder before OIDC can be configured.
+          result="$RUNNER_TEMP/publish-readiness.json"
+          monochange step publish-readiness \
+            --from HEAD \
+            --output "$result" \
+            --format json
+          jq -e '
+            .status == "ready" and
+              (.packages | length > 0) and
+              all(.packages[]; .status == "ready")
+          ' "$result" >/dev/null
+        shell: devenv shell -- bash -e {0}
+
       - name: dry-run release publication
         if: steps.release_state.outputs.current_release == 'true' || steps.release_commit.outputs.created == 'true'
         run: |
           set -euo pipefail
 
-          # Run from the prepared release commit so package versions, lockfiles,
-          # generated manifests, and the embedded release record match the state
-          # that the real publish workflow will receive after the release PR merges.
-          result="$RUNNER_TEMP/publish-dry-run.json"
-          monochange step publish-packages \
-            --dry-run \
-            --all \
-            --output "$result" \
-            --format json
-          jq -e '
-            .package_publish.summary.expected > 0 and
-              .package_publish.summary.failed == 0
-          ' "$result" >/dev/null
+          # Cargo cannot verify a dependent crate until its same-release
+          # dependencies exist in crates.io. Strictly dry-run every package
+          # without that registry dependency; the real publish job orders the
+          # remaining crates after these packages have been uploaded.
+          packages=(
+            pina_codama_nodes
+            pina_cli_darwin_arm64
+            pina_cli_darwin_x64
+            pina_cli_freebsd_x64
+            pina_cli_linux_arm64_gnu
+            pina_cli_linux_arm64_musl
+            pina_cli_linux_x64_gnu
+            pina_cli_linux_x64_musl
+            pina_cli_win32_arm64_msvc
+            pina_cli_win32_x64_msvc
+            pina_skill
+            pina_codama_renderer
+            pina_macros
+            pina_profile
+            pina_sdk_ids
+            pina_test
+          )
+          for package in "${packages[@]}"; do
+            report="$RUNNER_TEMP/publish-dry-run-${package}.json"
+            monochange step publish-packages \
+              --dry-run \
+              --package "$package" \
+              --format json | tee "$report"
+            jq -e '
+              (.package_publish.packages | length == 1) and
+                .package_publish.summary.failed == 0 and
+                all(
+                  .package_publish.packages[];
+                  ((.stderr // "") | test("(^|\\n)error:") | not)
+                )
+            ' "$report" >/dev/null
+          done
         shell: devenv shell -- bash -e {0}
 
       - name: skip publish dry-run without a release
