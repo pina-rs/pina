@@ -46,7 +46,7 @@ pina generate
 pina build --features logs,cpi --no-default-features
 ```
 
-Run `pina lint` before review to execute the official Pina security lint set associated with the installed CLI release. Use `pina lint --fix` only when source edits are authorized, then inspect and test every change. The command intentionally ignores additional project Dylint metadata; use direct `cargo dylint` only after reviewing and pinning any extra native lint libraries.
+Run `pina lint` before review to execute the official Pina security lint set associated with the installed CLI release. Use `pina lint --fix` only when source edits are authorized, then inspect and test every change. The bundled driver statically links the whole lint catalog, so additional project-defined lint libraries are never loaded.
 
 The library target name determines the canonical outputs:
 
