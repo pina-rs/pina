@@ -1,0 +1,29 @@
+error: lamport mutation should be preceded by a program-owner check on the same account
+  --> $DIR/lamport_mutation.rs:34:2
+   |
+LL |     vault.send(10, recipient)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: add `account.assert_owner(&program_id)?` or `account.assert_owners(&[...])?` before mutating lamports
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = note: `#[deny(require_program_owned_before_lamport_mutation)]` on by default
+
+error: lamport mutation should be preceded by a program-owner check on the same account
+  --> $DIR/lamport_mutation.rs:45:2
+   |
+LL |     vault.send(15, recipient)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: add `account.assert_owner(&program_id)?` or `account.assert_owners(&[...])?` before mutating lamports
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: lamport mutation should be preceded by a program-owner check on the same account
+  --> $DIR/lamport_mutation.rs:51:2
+   |
+LL |     vault.send(20, recipient)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: add `account.assert_owner(&program_id)?` or `account.assert_owners(&[...])?` before mutating lamports
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: aborting due to 3 previous errors

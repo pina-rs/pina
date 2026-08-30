@@ -30,7 +30,7 @@ Use `pina docs` to list bundled terminal topics. Custom topics can be supplied t
 
 ## Daily project workflow
 
-Run project-aware commands from the program directory or any descendant. Pina uses the nearest ancestor `Pina.toml`; an existing unambiguous Cargo package also works without configuration.
+Run project-aware commands from the program directory or any descendant. Pina uses the nearest ancestor `pina.toml`; an existing unambiguous Cargo package also works without configuration.
 
 ```sh
 pina lint
@@ -55,7 +55,7 @@ The library target name determines the canonical outputs:
 <cargo-target>/idl/<library-name>.json
 ```
 
-`pina generate` refreshes that IDL and renders the client languages selected in `Pina.toml`. Override the selection for one run with repeatable `--client rust`, `--client typescript`, or `--client dart` flags. Generated ecosystem roots may be replaced, so keep hand-written code outside them.
+`pina generate` refreshes that IDL and renders the client languages selected in `pina.toml`. Override the selection for one run with repeatable `--client rust`, `--client typescript`, or `--client dart` flags. Generated ecosystem roots may be replaced, so keep hand-written code outside them.
 
 ## Project diagnostics and identity
 
@@ -66,7 +66,7 @@ pina doctor --json
 pina keys show --json
 ```
 
-`doctor --json` keeps stdout valid JSON and returns a failing exit status when required project or SBF prerequisites are unavailable. Its tool requirements follow the clients selected in `Pina.toml`.
+`doctor --json` keeps stdout valid JSON and returns a failing exit status when required project or SBF prerequisites are unavailable. Its tool requirements follow the clients selected in `pina.toml`.
 
 Treat program identity changes as security-sensitive. `pina keys sync` validates an existing Ed25519 keypair and updates exactly one parsed `declare_id!`. `pina keys new` creates a local identity; only `pina keys new --force` may rotate an existing one. Never copy or print keypair bytes. On platforms where Pina cannot guarantee private permissions, generate the keypair with trusted platform tooling and then run `pina keys sync --keypair <path>`.
 

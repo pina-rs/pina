@@ -158,52 +158,6 @@ in
   dotenv.disableHint = true;
 
   scripts = {
-    "dylint-link" = {
-      exec = ''
-        set -euo pipefail
-
-        repo_root="''${DEVENV_ROOT:-}"
-        if [ -z "$repo_root" ]; then
-          repo_root="$(${pkgs.git}/bin/git rev-parse --show-toplevel 2>/dev/null || true)"
-        fi
-        if [ -z "$repo_root" ]; then
-          for arg in "$@"; do
-            case "$arg" in
-              -*) ;;
-              */target/dylint/libraries/*)
-                repo_root="$(printf '%s\n' "$arg" | sed 's#/target/dylint/libraries/.*##')"
-                break
-                ;;
-            esac
-          done
-        fi
-        if [ -z "$repo_root" ]; then
-          repo_root="$(pwd)"
-        fi
-
-        if [ -z "''${RUSTUP_TOOLCHAIN:-}" ] && [ -f "$repo_root/rust-toolchain.toml" ]; then
-          RUSTUP_TOOLCHAIN="$(sed -n 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p' "$repo_root/rust-toolchain.toml" | head -n 1)"
-          export RUSTUP_TOOLCHAIN
-        fi
-
-        if [ -d "$repo_root/.bin" ]; then
-          dylint_link_bin="$(find "$repo_root/.bin" -path '*/dylint-link/*/bin/dylint-link' | sort | tail -n 1)"
-          if [ -n "$dylint_link_bin" ] && [ -x "$dylint_link_bin" ]; then
-            if "$dylint_link_bin" --version >/dev/null 2>&1; then
-              exec "$dylint_link_bin" "$@"
-            fi
-
-            echo "Ignoring broken cached dylint-link at $dylint_link_bin" >&2
-            rm -f "$dylint_link_bin"
-          fi
-        fi
-
-        cd "$repo_root"
-        exec cargo bin dylint-link "$@"
-      '';
-      description = "The `dylint-link` executable";
-      binary = "bash";
-    };
     "pina" = {
       exec = ''
         set -euo pipefail
@@ -960,91 +914,17 @@ in
       description = "Fix clippy lints for rust.";
       binary = "bash";
     };
-    "security:dylint" = {
+    "security:pina-lint" = {
       exec = ''
         set -euo pipefail
 
         repo_root=${lib.escapeShellArg currentDir}
 
-        # cargo-dylint and its dependencies need openssl at build time; expose
-        # the nix openssl through pkg-config so installs work outside the
-        # devenv shell too.
-        export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-        export PATH="${pkgs.pkg-config}/bin:$PATH"
-
-        # The dylint library links pass -nodefaultlibs, so -lz/-lc++/-liconv
-        # must resolve through the nix cc/ld wrappers with explicit -L paths.
-        # Reconstruct that environment so the check works outside the devenv
-        # shell too.
-        case "$(uname -s)" in
-          Darwin)
-            host_triple="$(uname -m | tr -d '\n')_apple_darwin"
-            ;;
-          Linux)
-            host_triple="$(uname -m | tr -d '\n')_unknown_linux_gnu"
-            ;;
-          *)
-            host_triple=""
-            ;;
-        esac
-        if [ -n "$host_triple" ]; then
-          export "NIX_CC_WRAPPER_TARGET_HOST_''${host_triple}=1"
-          export "NIX_BINTOOLS_WRAPPER_TARGET_HOST_''${host_triple}=1"
-          export NIX_LDFLAGS="-L${pkgs.zlib}/lib -L${pkgs.libcxx}/lib -L${pkgs.libiconv}/lib''${NIX_LDFLAGS:+ $NIX_LDFLAGS}"
-          export PATH="${pkgs.gcc}/bin:${pkgs.stdenv.cc.bintools}/bin:$PATH"
-        fi
-
-        resolve_bin_root() {
-          if [ -d "$repo_root/.bin" ]; then
-            echo "$repo_root/.bin"
-            return 0
-          fi
-
-          while IFS= read -r -d "" worktree_field; do
-            case "$worktree_field" in
-              "worktree "*)
-                worktree_path="''${worktree_field#worktree }"
-
-                if [ -d "$worktree_path/.bin" ]; then
-                  echo "$worktree_path/.bin"
-                  return 0
-                fi
-                ;;
-            esac
-          done < <(${pkgs.git}/bin/git -C "$repo_root" worktree list --porcelain -z)
-
-          return 1
-        }
-
-        if ! bin_root="$(resolve_bin_root)"; then
-          echo "Missing .bin directory for this repository. Run 'install:cargo:bin'." >&2
-          exit 1
-        fi
-
-        cargo_dylint_version="6.0.4"
-        cargo_dylint_root="$bin_root/manual/cargo-dylint/$cargo_dylint_version"
-        cargo_dylint_bin="$cargo_dylint_root/bin/cargo-dylint"
-
-        if [ ! -x "$cargo_dylint_bin" ]; then
-          mkdir -p "$cargo_dylint_root"
-          CARGO_TARGET_DIR="$repo_root/target/cargo-install/cargo-dylint" \
-            cargo install \
-              --locked \
-              --root "$cargo_dylint_root" \
-              cargo-dylint \
-              --version "$cargo_dylint_version"
-        fi
-
-        if [ ! -x "$cargo_dylint_bin" ]; then
-          echo "Unable to install cargo-dylint into $cargo_dylint_root." >&2
-          exit 1
-        fi
-
-        dylint_link_wrapper="$repo_root/.devenv/profile/bin/dylint-link"
-        if [ ! -x "$dylint_link_wrapper" ]; then
-          echo "Missing dylint-link command. Run 'install:cargo:bin'." >&2
-          exit 1
-        fi
+        # Build the workspace driver once; every fixture check reuses it. The
+        # driver statically links the lints, so it only needs the pinned
+        # nightly toolchain and its rustc-dev component.
+        driver="$repo_root/target/debug/pina_lint_driver"
+        cargo build -p pina_lints --bin pina_lint_driver
 
         mapfile -t target_manifests < <(
           find "$repo_root/examples" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort
@@ -1064,11 +944,16 @@ in
           exit 1
         fi
 
-        CARGO_INCREMENTAL=0 \
-          PATH="$(dirname "$dylint_link_wrapper"):$PATH" \
-          "$cargo_dylint_bin" dylint --all --no-deps "''${package_args[@]}" -- --locked
+        # Run every library fixture through the driver exactly the way
+        # `pina lint` does: cargo check with the driver as RUSTC_WRAPPER and
+        # linting restricted to the primary package. Insecure fixtures are
+        # intentionally excluded because they demonstrate rejected patterns.
+        export PINA_LINT_NO_DEPS=1
+        export RUSTC_WRAPPER="$driver"
+
+        CARGO_INCREMENTAL=0 cargo check --locked "''${package_args[@]}"
       '';
-      description = "Run custom security dylint checks against the example and security program crates.";
+      description = "Run Pina's security lints (pina_lint_driver) against the example and security program crates.";
       binary = "bash";
     };
     "security:deny" = {
@@ -1137,7 +1022,7 @@ in
     "verify:security" = {
       exec = ''
         set -euo pipefail
-        security:dylint
+        security:pina-lint
         security:deny
         security:audit
         security:pina-test:deny
@@ -1154,9 +1039,8 @@ in
         profile_bin=${lib.escapeShellArg "${currentDir}/.devenv/profile/bin"}
         export PATH="$profile_bin''${PATH:+:$PATH}"
 
-        # Git invokes hooks outside `devenv shell`, while clippy and the custom
-        # dylints compile native OpenSSL/libgit2 dependencies. Re-enter the
-        # pinned shell once so the compiler, SDK, and library paths are complete.
+        # Git invokes hooks outside `devenv shell`. Re-enter the pinned shell
+        # once so the compiler, SDK, and library paths are complete.
         if [ -z "''${DEVENV_ROOT:-}" ]; then
           exec ${pkgs.devenv}/bin/devenv shell -- "$profile_bin/lint:push"
         fi
@@ -1181,7 +1065,7 @@ in
         run_step "lint:clippy" "$profile_bin/lint:clippy"
         run_step "lint:format" "$profile_bin/lint:format"
         run_step "verify:docs" "$profile_bin/verify:docs"
-        run_step "security:dylint" "$profile_bin/security:dylint"
+        run_step "security:pina-lint" "$profile_bin/security:pina-lint"
         run_step "lint:monochange" "$profile_bin/lint:monochange"
         run_step "test:all" "$profile_bin/test:all"
         run_step "test:idl" "$profile_bin/test:idl"
@@ -1195,10 +1079,10 @@ in
         lint:clippy
         lint:format
         verify:docs
-        security:dylint
+        security:pina-lint
         lint:monochange
       '';
-      description = "Run all checks, including all custom dylint rules.";
+      description = "Run all checks, including all Pina lint rules.";
       binary = "bash";
     };
     "lint:monochange" = {
@@ -1281,12 +1165,6 @@ in
       exec = ''
         set -euo pipefail
 
-        # The dylint lint crates pull in openssl-sys (via dylint_linting); expose
-        # the nix openssl through pkg-config so the build works outside the
-        # devenv shell too.
-        export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-        export PATH="${pkgs.pkg-config}/bin:$PATH"
-
         mapfile -t generated_client_manifests < <(find ${lib.escapeShellArg "${currentDir}/codama/clients/rust"} -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
         exclude_args=()
         for manifest in "''${generated_client_manifests[@]}"; do
@@ -1297,11 +1175,6 @@ in
         done
 
         cargo clippy --workspace --all-features --locked ''${exclude_args[@]}
-
-        mapfile -t lint_manifests < <(find ${lib.escapeShellArg "${currentDir}/lints"} -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
-        for manifest in "''${lint_manifests[@]}"; do
-          cargo clippy --manifest-path "$manifest" --all-features --all-targets --locked
-        done
       '';
       description = "Check that all rust lints are passing.";
       binary = "bash";

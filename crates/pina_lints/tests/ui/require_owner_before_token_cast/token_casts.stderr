@@ -1,0 +1,18 @@
+error: `as_token_account()` called without a preceding `assert_owner()` or `assert_owners()` on the same account
+  --> $DIR/token_casts.rs:46:2
+   |
+LL |     account.as_token_account()?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: add `account.assert_owner(&expected_owner)?` or `account.assert_owners(&PROGRAM_IDS)?` before calling `as_token_account()`
+   = note: `#[deny(require_owner_before_token_cast)]` on by default
+
+error: `as_token_account()` called without a preceding `assert_owner()` or `assert_owners()` on the same account
+  --> $DIR/token_casts.rs:52:13
+   |
+LL |     let cast = account.as_token_account()?;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: add `account.assert_owner(&expected_owner)?` or `account.assert_owners(&PROGRAM_IDS)?` before calling `as_token_account()`
+
+error: aborting due to 2 previous errors

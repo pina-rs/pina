@@ -25,6 +25,7 @@ members = [
 	"crates/pina",
 	"crates/pina_cli",
 	"crates/pina_codama_renderer",
+	"crates/pina_lints",
 	"crates/pina_macros",
 	"crates/pina_profile",
 	"crates/pina_sdk_ids",
@@ -76,9 +77,6 @@ exclude = [
 	"security/08-pda-sharing/insecure",
 	"security/09-closing-accounts/insecure",
 	"security/10-sysvar-address-checking/insecure",
-	"lints/require_owner_before_token_cast",
-	"lints/require_empty_before_init",
-	"lints/require_program_check_before_cpi",
 ]
 
 [workspace.package]
@@ -114,6 +112,7 @@ num-derive = { version = "^0.5", default-features = false }
 num-traits = { version = "^0.2", default-features = false }
 object = { default-features = false, version = "^0.40.0" }
 owo-colors = { default-features = false, version = "^4.0" }
+paste = { default-features = false, version = "^1" }
 pastey = { default-features = false, version = "^0.2" }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }
@@ -161,6 +160,7 @@ zeropod = { default-features = false, version = "0.3.5", features = ["solana-add
 pina = { default-features = false, path = "crates/pina", version = "0.11.1" }
 pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.11.1" }
 pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.11.1" }
+pina_lints = { default-features = false, path = "crates/pina_lints", version = "0.11.1" }
 pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.11.1" }
 pina_profile = { default-features = false, path = "crates/pina_profile", version = "0.11.1" }
 pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.11.1" }
@@ -169,32 +169,6 @@ pina_test = { default-features = false, path = "crates/pina_test", version = "0.
 [workspace.metadata.bin]
 cargo-semver-checks = { version = "0.50.0" }
 cargo-workspaces = { version = "0.4.2" }
-dylint-link = { version = "6.0.4", bins = ["dylint-link"] }
-
-[workspace.metadata.dylint]
-libraries = [
-	{ path = "lints/require_owner_before_token_cast" },
-	{ path = "lints/require_empty_before_init" },
-	{ path = "lints/require_program_check_before_cpi" },
-	{ path = "lints/deny_heap_allocations_in_onchain_instruction_handlers" },
-	{ path = "lints/require_program_owned_before_lamport_mutation" },
-	{ path = "lints/require_writable_before_account_resize" },
-	{ path = "lints/require_zeroed_before_close" },
-	{ path = "lints/require_sysvar_assert_before_sysvar_use" },
-	{ path = "lints/require_type_assert_before_zero_copy_cast" },
-	{ path = "lints/require_associated_token_address_before_ata_cast" },
-	{ path = "lints/require_reason_for_duplicate_remaining_accounts" },
-	{ path = "lints/require_canonical_bump_before_pda_write" },
-	{ path = "lints/deny_account_borrows_across_cpi" },
-	{ path = "lints/require_consistent_token_program" },
-	{ path = "lints/require_explicit_token_2022_extension_policy" },
-	{ path = "lints/require_post_cpi_balance_reload" },
-	{ path = "lints/require_checked_asset_arithmetic" },
-	{ path = "lints/require_bounded_remaining_accounts" },
-	{ path = "lints/require_idl_root_to_define_one_program_id" },
-	{ path = "lints/require_canonical_instruction_dispatch_for_idl" },
-	{ path = "lints/require_explicit_discriminators_and_seed_namespaces" },
-]
 
 [workspace.lints.rust]
 # Group lints

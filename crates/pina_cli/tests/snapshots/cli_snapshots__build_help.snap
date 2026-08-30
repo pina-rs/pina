@@ -11,7 +11,7 @@ exit_code: 0
 ----- stdout -----
 Build the current Pina program for SBF and generate its IDL.
 
-Discovers the nearest Pina.toml or Cargo package, runs the release SBF build, publishes the program at target/deploy/<program>.so, and writes the Codama IDL to target/idl/<program>.json. With --verify, solana-verify performs a deterministic Docker build and Pina records its inputs and hash.
+Discovers the nearest pina.toml or Cargo package, runs the release SBF build, publishes the program at target/deploy/<program>.so, and writes the Codama IDL to target/idl/<program>.json. With --verify, solana-verify performs a deterministic Docker build and Pina records its inputs and hash.
 
 Usage: pina build [OPTIONS]
 
@@ -44,6 +44,6 @@ Verified builds:
   --verify switches the compiler backend to solana-verify 0.5.1. Install that exact version and start Docker first. Pina never installs tools. This creates a deterministic build; it does not compare with an on-chain program.
 
 Project discovery:
-  Pina searches from --project (or the current directory) toward the filesystem root for Pina.toml. Existing Cargo projects without Pina.toml are discovered with cargo metadata. CARGO_TARGET_DIR is respected.
+  Pina searches from --project (or the current directory) toward the filesystem root for pina.toml. Existing Cargo projects without pina.toml are discovered with cargo metadata. CARGO_TARGET_DIR is respected.
 
 ----- stderr -----

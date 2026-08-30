@@ -11,7 +11,7 @@ pina generate [OPTIONS]
 | Input                 | Default           | Meaning                                      |
 | --------------------- | ----------------- | -------------------------------------------- |
 | `-p, --project <DIR>` | current directory | Start directory for project discovery.       |
-| `--client <LANGUAGE>` | `Pina.toml`       | `rust`, `typescript`, or `dart`; repeatable. |
+| `--client <LANGUAGE>` | `pina.toml`       | `rust`, `typescript`, or `dart`; repeatable. |
 | `-o, --output <DIR>`  | configured output | Override the client output root.             |
 | `--npx <COMMAND>`     | `npx`             | Codama runner for TypeScript or Dart.        |
 

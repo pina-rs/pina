@@ -92,6 +92,6 @@ Pina forwards only its validated feature selection to Solana Verify. It intentio
 
 Solana Verify 0.5.1 is supported on Linux and macOS when a compatible executable and Docker runtime are available. Native Windows and FreeBSD execution fail before source staging; use a supported Linux environment instead.
 
-Project discovery uses the nearest ancestor `Pina.toml`. Existing projects without that file fall back to Cargo metadata; an ambiguous workspace root fails with the candidate package names instead of guessing.
+Project discovery uses the nearest ancestor `pina.toml`. Existing projects without that file fall back to Cargo metadata; an ambiguous workspace root fails with the candidate package names instead of guessing.
 
-See [Project Configuration](./configuration.md) for the complete `Pina.toml` schema and path rules.
+See [Project Configuration](./configuration.md) for the complete `pina.toml` schema and path rules.

@@ -1,5 +1,6 @@
 //! Project-local configuration and Cargo workspace discovery.
 
+use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::path::Component;
 use std::path::Path;
@@ -12,8 +13,16 @@ use cargo_metadata::TargetKind;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::lint_catalog::LintCatalog;
+use crate::lint_catalog::LintLevel;
+
 /// Name of the project-local Pina configuration file.
-pub const CONFIG_FILE_NAME: &str = "Pina.toml";
+pub const CONFIG_FILE_NAME: &str = "pina.toml";
+
+/// Deprecated uppercase spelling of the project configuration file, still
+/// supported for discovery (`pina.toml` wins in the same directory) but emits
+/// a deprecation warning when selected.
+pub const LEGACY_CONFIG_FILE_NAME: &str = "Pina.toml";
 
 /// A generated client ecosystem.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
@@ -49,6 +58,8 @@ pub struct Project {
 	pub idl_dir: PathBuf,
 	pub clients_dir: PathBuf,
 	pub clients: Vec<ClientLanguage>,
+	#[serde(skip)]
+	pub lint_levels: BTreeMap<String, LintLevel>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -58,7 +69,16 @@ struct ProjectConfig {
 	project: ProgramConfig,
 	#[serde(default)]
 	clients: ClientsConfig,
+	#[serde(default)]
+	lints: LintsConfig,
 }
+
+/// Lint level overrides configured through the `[lints]` table.
+///
+/// Keys are Pina lint names; values are `allow`, `warn`, or `deny`. Lints
+/// that are not listed keep their built-in default level.
+#[derive(Debug, Default, Deserialize)]
+struct LintsConfig(BTreeMap<String, String>);
 
 #[derive(Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -116,7 +136,7 @@ pub enum ProjectError {
 	#[error("Configured program directory does not contain Cargo.toml: {path}")]
 	MissingManifest { path: PathBuf },
 
-	#[error("Invalid `{field}` path `{path}` in Pina.toml: {reason}")]
+	#[error("Invalid `{field}` path `{path}` in pina.toml: {reason}")]
 	InvalidConfigPath {
 		field: &'static str,
 		path: PathBuf,
@@ -128,12 +148,20 @@ pub enum ProjectError {
 
 	#[error(
 		"Could not choose a program from the Cargo workspace at {path}. Run from a package \
-		 directory or add Pina.toml. Candidates: {candidates}"
+		 directory or add pina.toml. Candidates: {candidates}"
 	)]
 	AmbiguousWorkspace { path: PathBuf, candidates: String },
 
 	#[error("Cargo package {package} does not define a Rust library target")]
 	MissingLibraryTarget { package: String },
+
+	#[error("Unknown pina lint `{name}` in [lints]; known lints: {known}")]
+	UnknownLint { name: String, known: String },
+
+	#[error(
+		"Invalid level `{level}` for lint `{name}` in [lints]; expected `allow`, `warn`, or `deny`"
+	)]
+	InvalidLintLevel { name: String, level: String },
 }
 
 impl Project {
@@ -153,7 +181,7 @@ impl Project {
 			.join(format!("{}-keypair.json", self.library_name))
 	}
 
-	/// Discover a project from `start`, preferring the nearest `Pina.toml` and
+	/// Discover a project from `start`, preferring the nearest `pina.toml` and
 	/// falling back to Cargo metadata for existing projects.
 	///
 	/// # Errors
@@ -163,7 +191,7 @@ impl Project {
 	pub fn discover(start: &Path) -> Result<Self, ProjectError> {
 		let start = normalize_start(start)?;
 
-		if let Some(config_path) = find_ancestor_file(&start, CONFIG_FILE_NAME) {
+		if let Some(config_path) = find_ancestor_config(&start) {
 			return Self::from_config(&config_path);
 		}
 
@@ -223,6 +251,7 @@ impl Project {
 			.unwrap_or_else(|| target_dir.join("idl"));
 		let clients_dir =
 			resolve_output_config_path(&root, "clients.output", &config.clients.output)?;
+		let lint_levels = resolve_lint_levels(config.lints.0)?;
 
 		Ok(Self {
 			program_dir,
@@ -233,6 +262,7 @@ impl Project {
 			target_dir,
 			clients_dir,
 			clients: config.clients.languages,
+			lint_levels,
 			root,
 		})
 	}
@@ -292,6 +322,7 @@ impl Project {
 			target_dir,
 			clients_dir: root.join("clients"),
 			clients: ClientsConfig::default().languages,
+			lint_levels: BTreeMap::new(),
 			root,
 		})
 	}
@@ -326,6 +357,32 @@ fn resolve_config_path(
 	}
 
 	Ok(root.join(path))
+}
+
+/// Validate the `[lints]` table and return the resolved level overrides.
+fn resolve_lint_levels(
+	entries: BTreeMap<String, String>,
+) -> Result<BTreeMap<String, LintLevel>, ProjectError> {
+	let catalog = LintCatalog::global();
+	let mut levels = BTreeMap::new();
+
+	for (name, level) in entries {
+		if !catalog.contains(&name) {
+			return Err(ProjectError::UnknownLint {
+				known: catalog.known_lints(),
+				name,
+			});
+		}
+
+		let level = match level.as_str() {
+			"allow" => LintLevel::Allow,
+			"warn" => LintLevel::Warn,
+			"deny" => LintLevel::Deny,
+			_ => return Err(ProjectError::InvalidLintLevel { level, name }),
+		};
+		levels.insert(name, level);
+	}
+	Ok(levels)
 }
 
 fn resolve_output_config_path(
@@ -455,11 +512,31 @@ fn normalize_start(start: &Path) -> Result<PathBuf, ProjectError> {
 		.map_or_else(|| PathBuf::from("."), Path::to_path_buf))
 }
 
-fn find_ancestor_file(start: &Path, name: &str) -> Option<PathBuf> {
-	start
-		.ancestors()
-		.map(|ancestor| ancestor.join(name))
-		.find(|candidate| candidate.is_file())
+fn find_ancestor_config(start: &Path) -> Option<PathBuf> {
+	start.ancestors().find_map(find_config_in_directory)
+}
+
+fn find_config_in_directory(directory: &Path) -> Option<PathBuf> {
+	let mut legacy = None;
+
+	for entry in std::fs::read_dir(directory).ok()?.flatten() {
+		let name = entry.file_name();
+
+		if name == CONFIG_FILE_NAME && entry.path().is_file() {
+			return Some(entry.path());
+		}
+
+		if name == LEGACY_CONFIG_FILE_NAME && entry.path().is_file() {
+			legacy = Some(entry.path());
+		}
+	}
+
+	if let Some(config) = legacy {
+		eprintln!("warning: Pina.toml is deprecated; rename it to pina.toml");
+		return Some(config);
+	}
+
+	None
 }
 
 #[cfg(test)]

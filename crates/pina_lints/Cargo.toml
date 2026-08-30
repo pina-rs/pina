@@ -1,0 +1,29 @@
+[package]
+name = "pina_lints"
+version = { workspace = true }
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme = "readme.md"
+repository.workspace = true
+rust-version.workspace = true
+description = "Pina's official security lints: a self-contained, Dylint-compatible lint catalog with a built-in rustc driver"
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+# The lint passes and driver link against the Rust compiler's unstable
+# `rustc_private` crates, so this package is nightly-only and must not inherit
+# the workspace lint table (which denies `unstable_features`).
+
+[dependencies]
+paste = { workspace = true }
+
+[dev-dependencies]
+regex = { default-features = false, version = "^1", features = ["std", "perf"] }
+serde = { workspace = true, default-features = true, features = ["derive"] }
+serde_json = { workspace = true, default-features = true }
+
+[package.metadata.rust-analyzer]
+rustc_private = true

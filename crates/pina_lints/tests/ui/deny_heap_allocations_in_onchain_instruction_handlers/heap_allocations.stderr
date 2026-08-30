@@ -1,0 +1,58 @@
+warning: heap allocation patterns should be avoided in on-chain instruction handlers
+  --> $DIR/heap_allocations.rs:9:14
+   |
+LL |     let owned = accounts.to_vec();
+   |                 ^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer borrowed slices, stack-backed buffers, and fixed-size POD types in instruction paths
+   = note: `#[warn(deny_heap_allocations_in_onchain_instruction_handlers)]` on by default
+
+warning: heap allocation patterns should be avoided in on-chain instruction handlers
+  --> $DIR/heap_allocations.rs:11:15
+   |
+LL |     let copies = accounts.iter().collect::<Vec<_>>();
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer borrowed slices, stack-backed buffers, and fixed-size POD types in instruction paths
+
+warning: heap allocation patterns should be avoided in on-chain instruction handlers
+  --> $DIR/heap_allocations.rs:14:14
+   |
+LL |     let label = format!("{} accounts", owned.len());
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer borrowed slices, stack-backed buffers, and fixed-size POD types in instruction paths
+
+warning: heap allocation patterns should be avoided in on-chain instruction handlers
+  --> $DIR/heap_allocations.rs:16:16
+   |
+LL |     let account = owned[0].clone();
+   |                   ^^^^^^^^^^^^^^^^
+   |
+   = help: prefer borrowed slices, stack-backed buffers, and fixed-size POD types in instruction paths
+
+warning: heap allocation patterns should be avoided in on-chain instruction handlers
+  --> $DIR/heap_allocations.rs:25:15
+   |
+LL |     entries.push(accounts[0].clone());
+   |                  ^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer borrowed slices, stack-backed buffers, and fixed-size POD types in instruction paths
+
+warning: heap allocation patterns should be avoided in on-chain instruction handlers
+  --> $DIR/heap_allocations.rs:29:17
+   |
+LL |     let rendered = name.to_string();
+   |                    ^^^^^^^^^^^^^^^^
+   |
+   = help: prefer borrowed slices, stack-backed buffers, and fixed-size POD types in instruction paths
+
+warning: heap allocation patterns should be avoided in on-chain instruction handlers
+  --> $DIR/heap_allocations.rs:37:14
+   |
+LL |     let owned = accounts.to_vec();
+   |                 ^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer borrowed slices, stack-backed buffers, and fixed-size POD types in instruction paths
+
+warning: 7 warnings emitted

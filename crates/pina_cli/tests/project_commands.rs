@@ -6,6 +6,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
+use pina_cli::project::Project;
 use tempfile::TempDir;
 
 fn write_project(root: &Path) {
@@ -29,7 +30,7 @@ bpf-entrypoint = []
 	)
 	.unwrap_or_else(|error| panic!("failed to write Cargo.toml: {error}"));
 	fs::write(
-		root.join("Pina.toml"),
+		root.join("pina.toml"),
 		r#"[project]
 program = "."
 
@@ -38,7 +39,7 @@ output = "clients"
 languages = ["rust", "typescript"]
 "#,
 	)
-	.unwrap_or_else(|error| panic!("failed to write Pina.toml: {error}"));
+	.unwrap_or_else(|error| panic!("failed to write pina.toml: {error}"));
 	fs::write(
 		root.join("src/lib.rs"),
 		r#"use pina::*;
@@ -786,10 +787,10 @@ fn build_resolves_relative_target_from_config_root_for_subdirectory_program() {
 	let program = root.join("programs/custom");
 	let target = root.join("relative-target");
 	write_project(&program);
-	fs::remove_file(program.join("Pina.toml"))
+	fs::remove_file(program.join("pina.toml"))
 		.unwrap_or_else(|error| panic!("failed to remove nested config: {error}"));
 	fs::write(
-		root.join("Pina.toml"),
+		root.join("pina.toml"),
 		r#"[project]
 program = "programs/custom"
 
@@ -825,7 +826,7 @@ fn build_uses_metadata_target_from_configless_nested_start() {
 	let project = temp.path().join("project");
 	let nested = project.join("src/instructions");
 	write_project(&project);
-	fs::remove_file(project.join("Pina.toml"))
+	fs::remove_file(project.join("pina.toml"))
 		.unwrap_or_else(|error| panic!("failed to remove config: {error}"));
 	fs::create_dir_all(&nested)
 		.unwrap_or_else(|error| panic!("failed to create nested directory: {error}"));
@@ -848,6 +849,23 @@ fn build_uses_metadata_target_from_configless_nested_start() {
 		generated_idl_name(&target.join("idl/custom_program.json")),
 		"customProgram"
 	);
+}
+
+#[test]
+fn discover_falls_back_to_legacy_uppercase_config_spelling() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	write_project(&project);
+	fs::rename(project.join("pina.toml"), project.join("Pina.toml"))
+		.unwrap_or_else(|error| panic!("failed to rename config: {error}"));
+	let nested = project.join("src");
+	let root = fs::canonicalize(&project)
+		.unwrap_or_else(|error| panic!("failed to canonicalize root: {error}"));
+
+	let discovered =
+		Project::discover(&nested).unwrap_or_else(|error| panic!("discovery failed: {error}"));
+
+	assert_eq!(discovered.root, root);
 }
 
 #[test]
@@ -921,7 +939,7 @@ fn build_reports_idl_and_output_directory_failures() {
 
 	write_project(&project);
 	fs::write(
-		project.join("Pina.toml"),
+		project.join("pina.toml"),
 		"[project]\nprogram = \".\"\nidl_dir = \"blocked-idl\"\n",
 	)
 	.unwrap_or_else(|error| panic!("failed to update config: {error}"));
@@ -936,7 +954,7 @@ fn build_reports_idl_and_output_directory_failures() {
 
 	fs::remove_file(project.join("blocked-idl"))
 		.unwrap_or_else(|error| panic!("failed to unblock IDL directory: {error}"));
-	fs::write(project.join("Pina.toml"), "")
+	fs::write(project.join("pina.toml"), "")
 		.unwrap_or_else(|error| panic!("failed to reset config: {error}"));
 	fs::write(target.join("deploy"), b"file")
 		.unwrap_or_else(|error| panic!("failed to block deploy directory: {error}"));
@@ -1032,7 +1050,7 @@ fn generate_uses_configured_clients_and_supports_dart() {
 	let target = temp.path().join("custom-target");
 	write_project(&project);
 	fs::write(
-		project.join("Pina.toml"),
+		project.join("pina.toml"),
 		"[clients]\noutput = \"clients\"\nlanguages = [\"typescript\", \"dart\"]\n",
 	)
 	.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));

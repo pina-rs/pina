@@ -18,6 +18,14 @@ use pina::*;
 
 declare_id!("Dec1areProgram11111111111111111111111111111");
 
+/// The example deliberately declares a second program id: the parity
+/// demonstration validates an *external* program account against its own
+/// id, so the external id lives next to the parity code that uses it.
+// rustdoc does not load the pina lint catalog, so the tool-lint name is
+// unknown to it; `unknown_lints` keeps `-D warnings` documentation builds
+// green while the pina driver continues to honor the scoped suppression.
+#[allow(unknown_lints)]
+#[allow(require_idl_root_to_define_one_program_id)]
 pub mod external {
 	use pina::*;
 

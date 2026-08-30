@@ -11,7 +11,7 @@ exit_code: 0
 ----- stdout -----
 Generate configured clients for the current Pina program.
 
-Discovers the project, refreshes its IDL, and generates only the selected client ecosystems. Repeat --client to override Pina.toml. Rust-only generation does not invoke Node.js.
+Discovers the project, refreshes its IDL, and generates only the selected client ecosystems. Repeat --client to override pina.toml. Rust-only generation does not invoke Node.js.
 
 Usage: pina generate [OPTIONS]
 
@@ -20,7 +20,7 @@ Options:
           Directory inside the project to discover. Defaults to the current directory
 
       --client <LANGUAGE>
-          Client ecosystem to generate. Repeat to override Pina.toml
+          Client ecosystem to generate. Repeat to override pina.toml
           
           [possible values: rust, typescript, dart]
 

@@ -17,7 +17,7 @@ Usage: pina deploy [OPTIONS] --upgrade-authority <KEYPAIR> --payer <KEYPAIR> --c
 
 Options:
   -p, --project <DIR>
-          Directory used for Pina.toml or Cargo metadata project discovery
+          Directory used for pina.toml or Cargo metadata project discovery
 
       --program <PROGRAM.SO>
           Existing SBF shared object. Conflicts with --build

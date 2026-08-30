@@ -52,7 +52,7 @@ Outputs use Cargo's target directory: `deploy/<library>.so` and `idl/<library>.j
 
 ### `pina generate`
 
-Generate the clients selected in `Pina.toml`, or override them for one invocation.
+Generate the clients selected in `pina.toml`, or override them for one invocation.
 
 ```bash
 pina generate
@@ -113,18 +113,18 @@ pina docs pina-idl
 
 <br>
 
-Scaffold a new project-aware Pina program with `Pina.toml`.
+Scaffold a new project-aware Pina program with `pina.toml`.
 
 ```bash
 pina init my_program
 pina init my_program --path ./programs/my_program --force
 ```
 
-Generated manifests do not install Dylint or register a source repository for native lint code. `pina lint` owns the pinned tool and library downloads.
+Generated manifests do not install lint tooling. `pina lint` builds and manages the `pina_lint_driver` binary itself.
 
 ### `pina lint`
 
-Discover the current program and run Pina's official security lints. The first invocation downloads pinned, precompiled Dylint tools for the CLI platform and a verified native bundle for the active Rust compiler host; fix mode applies only machine-applicable suggestions. Musl CLI builds use GNU lint libraries when the active compiler is GNU because Rust's musl hosts cannot load `cdylib` compiler plugins.
+Discover the current program and run Pina's official security lints. The first invocation installs the `pina_lint_driver` binary built from the `pina_lints` release matching this CLI below Cargo home; the driver statically links every lint and is used as `cargo check`'s `RUSTC_WRAPPER`. Fix mode applies only machine-applicable suggestions. Lint levels honor the `[lints]` table of the project's `pina.toml`.
 
 ```bash
 pina lint

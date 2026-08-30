@@ -28,14 +28,14 @@ Dry runs perform no build or deployment. Consequently, `--dry-run` conflicts wit
 
 ## Input resolution
 
-`--project` accepts a project directory or any directory below it. Pina uses the same project discovery as `pina build`: the nearest ancestor `Pina.toml`, then unambiguous Cargo metadata as a fallback. The library target name and Cargo metadata target directory resolve:
+`--project` accepts a project directory or any directory below it. Pina uses the same project discovery as `pina build`: the nearest ancestor `pina.toml`, then unambiguous Cargo metadata as a fallback. The library target name and Cargo metadata target directory resolve:
 
 - `<cargo-target>/deploy/<lib-name>.so`
 - `<cargo-target>/deploy/<lib-name>-keypair.json`
 
 Use `--program` or `--program-keypair` to override either conventional path. `--program` conflicts with `--build`. Every resolved file is canonicalized and must be a regular file. Keypair files cannot exceed 4 KiB and must contain a valid 64-byte Solana JSON keypair. On Unix, Pina rejects keypairs with any group or world permission bits; `chmod 600 <keypair>` is the recommended mode. Pina cannot inspect equivalent Windows ACL policy, so Windows operators must restrict keypair access with the operating system's ACL tooling. The program keypair address must match the program's `declare_id!`; deploy never generates or silently replaces an identity.
 
-`--upgrade-authority` and `--payer` are always explicit. Pina does not inherit wallet paths from Solana configuration and does not store deployment credentials in `Pina.toml`.
+`--upgrade-authority` and `--payer` are always explicit. Pina does not inherit wallet paths from Solana configuration and does not store deployment credentials in `pina.toml`.
 
 ## Targets and confirmation
 

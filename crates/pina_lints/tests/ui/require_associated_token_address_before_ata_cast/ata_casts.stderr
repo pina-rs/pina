@@ -1,0 +1,29 @@
+error: ATA casts should be preceded by `assert_associated_token_address()`
+  --> $DIR/ata_casts.rs:51:13
+   |
+LL |     let view = vault.as_associated_token_account(wallet, mint, token_program)?;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: call `account.assert_associated_token_address(owner, mint, token_program)?` before `as_associated_token_account()`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = note: `#[deny(require_associated_token_address_before_ata_cast)]` on by default
+
+error: ATA casts should be preceded by `assert_associated_token_address()`
+  --> $DIR/ata_casts.rs:65:13
+   |
+LL |     let view = vault.as_associated_token_account(wallet, mint, token_program)?;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: call `account.assert_associated_token_address(owner, mint, token_program)?` before `as_associated_token_account()`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: ATA casts should be preceded by `assert_associated_token_address()`
+  --> $DIR/ata_casts.rs:72:13
+   |
+LL |     let view = vault.as_associated_token_account(wallet, mint, token_program)?;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: call `account.assert_associated_token_address(owner, mint, token_program)?` before `as_associated_token_account()`
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: aborting due to 3 previous errors

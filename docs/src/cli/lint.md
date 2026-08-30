@@ -2,6 +2,8 @@
 
 Run Pina's official security lint set against the discovered program.
 
+The lints live in the `pina_lints` crate, which is published to crates.io and statically compiled into the `pina_lint_driver` binary, a `rustc` wrapper. No external lint tooling is downloaded, no precompiled lint bundles exist, and the project itself never supplies or configures lint libraries.
+
 ## Synopsis
 
 ```text
@@ -21,40 +23,49 @@ pina lint --fix
 pina lint --project ./programs/counter
 ```
 
-`pina lint` discovers the nearest `Pina.toml` or unambiguous Cargo package. It checks only that program package and does not lint workspace dependencies.
+`pina lint` discovers the nearest `pina.toml` or unambiguous Cargo package. It checks only that program package and does not lint workspace dependencies.
 
-## Reproducible tool and lint selection
+## Managed lint driver
 
-The command owns the complete official-lint selection:
+`pina lint` runs `cargo check` — or `cargo fix` with `--fix` — with the driver as `RUSTC_WRAPPER`. Cargo calls the driver with the arguments it would have passed to `rustc`; the driver registers every lint statically linked into it, and compilation continues normally with the lints emitted as ordinary compiler diagnostics.
 
-- precompiled `cargo-dylint` 6.0.4 and `dylint-link` are downloaded from Pina's reusable `dylint-v6.0.4` tool release on first use;
-- later Pina releases, runs, and projects reuse that versioned, user-owned tool cache instead of compiling Dylint;
-- native lint libraries are downloaded from the GitHub release for the installed `pina` version, never compiled from repository source on the user's machine;
-- the Dylint executable archive matches the installed CLI binary, while the lint-library archive matches the active Rust compiler host and CLI version, for example `pina-lints-aarch64-apple-darwin-v0.11.0.tar.gz`;
-- project-provided Dylint metadata is ignored by this command, so adding an unrelated library cannot silently extend the trusted code loaded by `pina lint`.
+The CLI prepares the driver below Cargo home:
 
-There is deliberately no `PINA_LINT_REVISION`. The CLI version is the lint-library release identity, while `dylintVersion` in the embedded lint catalog selects the reusable Dylint tool release. The workflow builds either versioned release before package publication can continue. A release therefore cannot require a follow-up commit merely to point back at itself.
+```text
+$CARGO_HOME/pina/lint-driver/<pina-version>/<rustc-release>-<host>/bin/pina_lint_driver
+```
 
-Generated projects do not install Dylint or register a Git source under `[workspace.metadata.dylint]`. Use `pina lint` for the official catalog. Direct `cargo dylint` remains available when a project intentionally manages additional libraries itself.
+- The first use installs it from crates.io with `cargo install --locked --root <that directory> --bin pina_lint_driver --version =<CLI version> pina_lints`. This step requires network access once; later runs reuse the cached binary.
+- The driver release identity is the `pina_lints` version, which matches the installed CLI version. There is no separate tool release or revision selector to pick.
+- The driver is built with the project's pinned nightly toolchain, the same compiler that builds the project, because `pina_lints` is nightly-only: its lint passes and the driver link against the compiler's unstable `rustc_private` crates. The toolchain must have the `rustc-dev` component installed (`rustup component add rustc-dev` if it is missing).
+- Set `CARGO_HOME` to move the driver cache. `CARGO_TARGET_DIR` continues to control normal project build artifacts.
 
-The first run requires network access to download the pinned runner and lint bundle. Set `CARGO_HOME` to move both caches. Managed runners use `$CARGO_HOME/pina/tools/dylint-v<version>/<cli-target>/`; bundles use `$CARGO_HOME/pina/lints/v<version>/<rustc-host>/`. `CARGO_TARGET_DIR` continues to control normal project build artifacts.
+To run a driver you built yourself — typically the workspace driver while developing a lint — set `PINA_LINT_DRIVER_PATH` to an executable binary path and `pina lint` uses it instead of the managed cache. The repository's own `security:pina-lint` task uses this variable to run the workspace-built driver.
 
-Linux musl CLI packages still download and run their native, statically linked Dylint executables. Rust compiler plugins are different: Rust's musl hosts do not support the `cdylib` crate type that Dylint libraries require. `pina lint` therefore queries `rustc -vV` and selects libraries for that compiler host. A musl Pina executable running with a GNU-hosted Rust toolchain uses the matching GNU lint bundle. A genuinely musl-hosted Rust compiler exits with an explicit unsupported-host error instead of requesting an asset that cannot exist.
+## Driver environment variables
 
-`cargo-dylint`, `dylint-link`, and Pina's lint libraries are precompiled. Dylint itself may still compile and cache its small `dylint-driver` executable for the project's exact nightly toolchain on first use. That driver links against the local `rustc-dev` installation and is not portable between Rust toolchain locations, so it is deliberately not shipped as a release asset. This step does not fetch or compile Pina lint source.
+The driver reads a few environment variables:
 
-## Download and verification
+| Variable            | Meaning                                                        |
+| ------------------- | -------------------------------------------------------------- |
+| `PINA_LINT_NO_DEPS` | Set to `1` to lint only the primary package, not dependencies. |
+| `PINA_LINT_LEVELS`  | Comma-separated `lint=level` (allow/warn/deny) overrides.      |
+| `PINA_LINT_ONLY`    | Restrict linting to a single named lint.                       |
+| `PINA_LINT_LIST`    | Print the lint catalog instead of compiling.                   |
 
-Pina treats lint libraries as native executable code:
+`pina lint` sets `PINA_LINT_NO_DEPS` and forwards `PINA_LINT_LEVELS` from the project's `[lints]` table. `PINA_LINT_NO_DEPS`, `PINA_LINT_LEVELS`, and `PINA_LINT_ONLY` are recorded in dep-info, so changing them invalidates cargo's cached check results.
 
-1. It queries `dylint-v<version>` for the pinned Dylint executables and the GitHub release whose tag exactly matches the installed CLI for the lint libraries.
-2. It accepts only the target-specific asset names and canonical `github.com/pina-rs/pina/releases/download/<tag>/` URLs.
-3. It checks the downloaded byte count and GitHub-provided SHA-256 asset digest before extraction.
-4. It rejects nested paths, links, special files, unknown extensions, duplicate files, and oversized archives.
-5. It validates the bundle manifest against the CLI's embedded catalog, Dylint version, Rust toolchain, detected compiler host, exact filenames, file sizes, and per-library SHA-256 digests.
-6. It passes every verified absolute path with `--lib-path` and `--no-metadata`; Dylint neither discovers nor builds project-provided library sources.
+## Configuring lint levels
 
-Every published Dylint tool bundle, lint bundle, and CLI archive receives GitHub's OIDC-backed build-provenance attestation. The release job first checks whether the exact `dylint-v<version>` release already has the complete executable target matrix. When it does, every Pina release reuses it. When it does not exist, the workflow builds and publishes `cargo-dylint` and `dylint-link` natively for macOS, Linux glibc, Linux musl, and Windows on arm64 and x64, plus FreeBSD x64. It builds lint libraries for the seven Rust hosts that support dynamic compiler plugins: macOS, Linux glibc, and Windows on arm64 and x64, plus FreeBSD x64.
+Lint levels are configured in the project's `pina.toml` under the `[lints]` table. Each entry maps a lint name to `allow`, `warn`, or `deny`; lints that are not listed keep their built-in default level.
+
+```toml
+[lints]
+deny_heap_allocations_in_onchain_instruction_handlers = "deny"
+require_explicit_discriminators_and_seed_namespaces = "allow"
+```
+
+Unknown lint names are rejected with the list of known lints. Deny-level security lints should not be disabled at crate scope; when a finding is a false positive, scope an `#[allow(...)]` to the smallest item and document the invariant.
 
 ## Fix mode
 
@@ -63,14 +74,14 @@ pina lint --fix
 git diff
 ```
 
-Dylint delegates fix mode to `cargo fix`. Pina supplies `--allow-dirty`, `--allow-staged`, and `--allow-no-vcs` because requesting `--fix` is explicit permission to edit the current working tree, including a newly initialized project that has not entered version control yet. Only diagnostics carrying machine-applicable suggestions can be changed automatically; findings without a safe rewrite remain diagnostics. Always inspect and test the resulting diff.
+With `--fix`, `pina lint` runs `cargo fix` instead of `cargo check`. Pina supplies `--allow-dirty`, `--allow-staged`, and `--allow-no-vcs` because requesting `--fix` is explicit permission to edit the current working tree, including a newly initialized project that has not entered version control yet. Only diagnostics carrying machine-applicable suggestions can be changed automatically; findings without a safe rewrite remain diagnostics. Always inspect and test the resulting diff.
 
 ## Security boundary
 
-Dylint libraries are native compiler plugins, not passive rule files. Running a lint grants the selected library code the same local permissions as the invoking user. Pina therefore couples each bundle to an exact CLI release and host, verifies it before every use, keeps reusable Dylint executables outside project-controlled target trees, and disables project metadata for `pina lint`. Obtain the CLI from a trusted channel and review CLI upgrades as executable tooling changes.
+The lint driver is native executable code, not a passive rule file: it links against the compiler's unstable internals and runs with the same local permissions as the invoking user. Pina therefore pins the driver to the crates.io release of `pina_lints` matching the exact CLI version, installs it with `--locked` into a user-owned cache outside project-controlled target trees, and never loads lint libraries from project metadata. Obtain the CLI from a trusted channel and review CLI upgrades as executable tooling changes.
 
-Use direct `cargo dylint` only when you intentionally want to run additional project-defined lint libraries. Review and pin every such source before loading it.
+`PINA_LINT_DRIVER_PATH` executes whatever binary it names, so point it only at a driver you built yourself.
 
 ## Exit behavior
 
-The command exits successfully only when tool preparation, compilation, and all enabled security lints succeed. A diagnostic at an error level, a compilation failure, an unavailable network dependency on first use, or an invalid download produces a non-zero exit. Child Cargo and Dylint output stays attached to the terminal; Pina prints a short completion summary only after success.
+The command exits successfully only when driver preparation, compilation, and all enabled security lints succeed. A diagnostic at an error level, a compilation failure, a missing network connection on first install, or an invalid `PINA_LINT_DRIVER_PATH` produces a non-zero exit. Child Cargo output stays attached to the terminal; Pina prints a short completion summary only after success.

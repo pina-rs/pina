@@ -79,7 +79,6 @@ cargo semver-checks
 
 Defined in `.cargo/config.toml`:
 
-- `cargo dylint`
 - `cargo insta`
 - `cargo llvm-cov`
 - `cargo nextest`
