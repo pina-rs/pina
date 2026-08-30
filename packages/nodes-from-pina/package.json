@@ -41,7 +41,7 @@
 		"codama": "^1.10.2"
 	},
 	"devDependencies": {
-		"@types/node": "^26.2.0",
+		"@types/node": "^26.4.0",
 		"rimraf": "^6.1.3",
 		"tsup": "^8.5.1",
 		"typescript": "^7.0.2",
