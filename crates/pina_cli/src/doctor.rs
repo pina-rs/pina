@@ -258,40 +258,8 @@ pub fn diagnose(start: &Path) -> DoctorReport {
 		});
 	}
 
-	let nightly_available = command_status(Command::new("cargo").args(["-Z", "help"]))
-		.is_ok_and(|status| status.success());
-	checks.push(DoctorCheck {
-		id: "rust.unstable-flags".to_owned(),
-		status: if nightly_available {
-			CheckStatus::Pass
-		} else {
-			CheckStatus::Fail
-		},
-		message: if nightly_available {
-			"cargo accepts -Z build-std workflows".to_owned()
-		} else {
-			"cargo does not accept the nightly -Z flags required for SBF builds".to_owned()
-		},
-	});
-	let rust_src_available = rust_src_available();
-	checks.push(DoctorCheck {
-		id: "rust.rust-src".to_owned(),
-		status: if rust_src_available {
-			CheckStatus::Pass
-		} else {
-			CheckStatus::Fail
-		},
-		message: if rust_src_available {
-			"the active Rust toolchain includes rust-src for -Z build-std".to_owned()
-		} else {
-			"the active Rust toolchain is missing the rust-src component".to_owned()
-		},
-	});
-
 	let has_failures = checks.iter().any(|check| check.status == CheckStatus::Fail);
-	let missing_required_tools = tools.iter().any(|tool| tool.required && !tool.available)
-		|| !nightly_available
-		|| !rust_src_available;
+	let missing_required_tools = tools.iter().any(|tool| tool.required && !tool.available);
 	let missing_optional_tools = tools
 		.iter()
 		.any(|tool| !tool.required && !matches!(tool.name, "npx" | "pnpm") && !tool.available);
@@ -397,31 +365,6 @@ fn tool_specs(needs_node: bool) -> Vec<ToolSpec> {
 		specs.extend_from_slice(CLIENT_TOOL_SPECS);
 	}
 	specs
-}
-
-fn rust_src_available() -> bool {
-	rust_src_available_from(Command::new("rustc").args(["--print", "sysroot"]))
-}
-
-fn rust_src_available_from(command: &mut Command) -> bool {
-	let Ok(output) = capture_command(command) else {
-		return false;
-	};
-	if !output.status.success() {
-		return false;
-	}
-
-	let Ok(sysroot) = std::str::from_utf8(&output.stdout) else {
-		return false;
-	};
-	let sysroot = sysroot.trim();
-	if sysroot.is_empty() || sysroot.chars().any(char::is_control) {
-		return false;
-	}
-
-	Path::new(sysroot)
-		.join("lib/rustlib/src/rust/library/core/src/lib.rs")
-		.is_file()
 }
 
 fn diagnose_project(
@@ -715,15 +658,6 @@ fn capture_command_with_timeout(
 		stdout,
 		stderr,
 	})
-}
-
-fn command_status(command: &mut Command) -> std::io::Result<ExitStatus> {
-	let mut child = command
-		.stdin(Stdio::null())
-		.stdout(Stdio::null())
-		.stderr(Stdio::null())
-		.spawn()?;
-	wait_with_timeout(&mut child, TOOL_TIMEOUT)
 }
 
 trait ManagedChild {
@@ -1433,22 +1367,5 @@ mod tests {
 			keypair_check(path, &Ok(None), true, true).status,
 			CheckStatus::Pass
 		);
-	}
-
-	#[cfg(unix)]
-	#[test]
-	fn rust_source_probe_rejects_launch_nonzero_non_utf8_and_control_failures() {
-		assert!(!rust_src_available_from(&mut Command::new(
-			"pina-definitely-missing-rustc"
-		)));
-		assert!(!rust_src_available_from(
-			Command::new("sh").args(["-c", "exit 1"])
-		));
-		assert!(!rust_src_available_from(
-			Command::new("sh").args(["-c", "printf '\\377'",])
-		));
-		assert!(!rust_src_available_from(
-			Command::new("sh").args(["-c", "printf '/tmp/invalid\\tpath'",])
-		));
 	}
 }

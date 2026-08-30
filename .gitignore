@@ -87,3 +87,6 @@ crates/pina_fuzz/target/
 .mdt/
 **/.cache/
 .pi/
+
+# Compiler probe artifacts dropped by rustc-driver runs
+*.rmeta

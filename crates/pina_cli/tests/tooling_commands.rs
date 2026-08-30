@@ -491,9 +491,4 @@ fn doctor_json_reports_missing_required_tools_as_failures() {
 			.iter()
 			.any(|check| { check["id"] == "tool.cargo" && check["status"] == "fail" })
 	);
-	assert!(
-		checks
-			.iter()
-			.any(|check| { check["id"] == "rust.unstable-flags" && check["status"] == "fail" })
-	);
 }

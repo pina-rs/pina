@@ -238,7 +238,8 @@ fn gitignore_template() -> String {
 }
 
 fn cargo_config_template() -> String {
-	"[alias]\nbuild-program = \"build-sbf --sbf-out-dir target/deploy -F bpf-entrypoint\"\n".to_owned()
+	"[alias]\nbuild-program = \"build-sbf --sbf-out-dir target/deploy -F bpf-entrypoint\"\n"
+		.to_owned()
 }
 
 fn lib_template(package_name: &str, program_title: &str) -> String {
