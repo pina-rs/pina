@@ -373,43 +373,23 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Cargo cannot verify a dependent crate until its same-release
-          # dependencies exist in crates.io. Strictly dry-run every package
-          # without that registry dependency; the real publish job orders the
-          # remaining crates after these packages have been uploaded.
-          packages=(
-            pina_codama_nodes
-            pina_cli_darwin_arm64
-            pina_cli_darwin_x64
-            pina_cli_freebsd_x64
-            pina_cli_linux_arm64_gnu
-            pina_cli_linux_arm64_musl
-            pina_cli_linux_x64_gnu
-            pina_cli_linux_x64_musl
-            pina_cli_win32_arm64_msvc
-            pina_cli_win32_x64_msvc
-            pina_skill
-            pina_codama_renderer
-            pina_macros
-            pina_profile
-            pina_sdk_ids
-            pina_test
-          )
-          for package in "${packages[@]}"; do
-            report="$RUNNER_TEMP/publish-dry-run-${package}.json"
-            monochange step publish-packages \
-              --dry-run \
-              --package "$package" \
-              --format json | tee "$report"
-            jq -e '
-              (.package_publish.packages | length == 1) and
-                .package_publish.summary.failed == 0 and
-                all(
-                  .package_publish.packages[];
-                  ((.stderr // "") | test("(^|\\n)error:") | not)
-                )
-            ' "$report" >/dev/null
-          done
+          # Select from the generated release record instead of maintaining a
+          # package allowlist that could silently omit a newly added package.
+          report="$RUNNER_TEMP/publish-dry-run.json"
+          monochange step publish-packages \
+            --dry-run \
+            --all \
+            --format json | tee "$report"
+
+          # Readiness and the publish dry-run must cover the same package set.
+          # Monochange handles same-release dependency ordering during the real
+          # publish after Cargo dry-run reports unavailable future versions.
+          jq -s -e '
+            (.[0].packages | map(.package) | sort) ==
+              (.[1].package_publish.packages | map(.package) | sort) and
+              .[1].package_publish.summary.expected > 0 and
+              .[1].package_publish.summary.failed == 0
+          ' "$RUNNER_TEMP/publish-readiness.json" "$report" >/dev/null
         shell: devenv shell -- bash -e {0}
 
       - name: skip publish dry-run without a release

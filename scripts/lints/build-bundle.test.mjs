@@ -262,7 +262,7 @@ test("the release catalog covers every lint crate and matches the pinned toolcha
 	);
 	assert.match(
 		ciWorkflow,
-		/release-publish:\s+name: release-publish[\s\S]*?monochange run release --create-pr=false[\s\S]*?monochange step publish-readiness[\s\S]*?\.status == "ready"[\s\S]*?packages=\([\s\S]*?pina_test[\s\S]*?monochange step publish-packages[\s\S]*?--dry-run/u,
+		/release-publish:\s+name: release-publish[\s\S]*?monochange run release --create-pr=false[\s\S]*?monochange step publish-readiness[\s\S]*?\.status == "ready"[\s\S]*?monochange step publish-packages[\s\S]*?--dry-run[\s\S]*?--all[\s\S]*?publish-readiness\.json/u,
 	);
 	assert.match(
 		publishWorkflow,

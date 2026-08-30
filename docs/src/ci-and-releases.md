@@ -26,7 +26,7 @@ Separate PR workflows also verify:
 - `surfpool` builds each example SBF program and exercises its runtime guards through the Surfpool SDK
 - `compute-units` for tracked static CU regression reporting vs the PR base revision
 
-The main CI workflow also runs `release-publish` on every pull request. When a PR contains releaseable changesets, the job creates the same release commit as the production release workflow and keeps that commit local to the runner. Registry readiness covers every package in its embedded release record, then every independently publishable package receives a strict publish dry-run. Dependent Cargo crates cannot be verified until their same-release dependencies exist in crates.io. Prepared release PRs are checked directly. Pull requests without a publishable release keep the job visible but skip the preflight explicitly.
+The main CI workflow also runs `release-publish` on every pull request. When a PR contains releaseable changesets, the job creates the same release commit as the production release workflow and keeps that commit local to the runner. Registry readiness and a publish dry-run both select every package from its embedded release record, and CI requires their package sets to match so a newly added package cannot be omitted by a maintained allowlist. Cargo cannot completely verify dependent crates until their same-release dependencies exist in crates.io; Monochange plans those packages and publishes them in dependency order during the real release. Prepared release PRs are checked directly. Pull requests without a publishable release keep the job visible but skip the preflight explicitly.
 
 This keeps code quality, behavior, documentation build health, feature-flag compatibility, and performance visibility aligned.
 
