@@ -23,18 +23,28 @@ use surfpool_sdk::cheatcodes::builders::DeployProgram;
 
 /// Run an async integration-test body on a dedicated Tokio runtime.
 ///
+/// Test bodies panic through this helper, so panics are intercepted while the
+/// Surfpool runtime drains and then re-raised after shutdown completes. This
+/// keeps failing tests from aborting the process while their instance tears
+/// down in the background.
+///
 /// # Panics
 ///
-/// Panics if Tokio cannot construct the test runtime.
+/// Panics if Tokio cannot construct the test runtime, and re-panics with the
+/// original payload when the test body panics.
 pub fn run<F>(future: F) -> F::Output
 where
 	F: Future,
 {
-	tokio::runtime::Builder::new_multi_thread()
+	let runtime = tokio::runtime::Builder::new_multi_thread()
 		.enable_all()
 		.build()
-		.unwrap_or_else(|error| panic!("build Pina integration-test runtime: {error}"))
-		.block_on(future)
+		.unwrap_or_else(|error| panic!("build Pina integration-test runtime: {error}"));
+
+	match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| runtime.block_on(future))) {
+		Ok(output) => output,
+		Err(payload) => std::panic::resume_unwind(payload),
+	}
 }
 
 /// An error from an isolated Pina integration-test operation.
@@ -213,7 +223,33 @@ pub struct OfflineSurfnet {
 	inner: Surfnet,
 }
 
+impl Drop for OfflineSurfnet {
+	fn drop(&mut self) {
+		// Dropping `Surfnet` hands a Terminate command to a runtime that may
+		// already be gone, which aborts the whole test process when a test
+		// panics. Drain synchronously here before the unwinder continues.
+		let _ = self.inner.stop();
+	}
+}
+
 impl OfflineSurfnet {
+	/// Build a system-program transfer instruction from the payer.
+	fn transfer_instruction(&self, to: &Pubkey, lamports: u64) -> Instruction {
+		let mut data = Vec::with_capacity(12);
+		// System program `Transfer` enum tag = 2.
+		data.extend_from_slice(&2u32.to_le_bytes());
+		data.extend_from_slice(&lamports.to_le_bytes());
+
+		Instruction::new_with_bytes(
+			system_program_id(),
+			&data,
+			vec![
+				AccountMeta::new(self.payer(), true),
+				AccountMeta::new(*to, false),
+			],
+		)
+	}
+
 	/// Start an isolated Surfpool instance without contacting an upstream RPC.
 	///
 	/// # Errors
@@ -301,28 +337,21 @@ impl OfflineSurfnet {
 			.map_err(|error| test_error("execute program instruction", error))
 	}
 
-	/// Fund an address inside the isolated Surfnet.
+	/// Fund an address inside the isolated Surfnet by transferring lamports
+	/// from the pre-funded payer.
+	///
+	/// The transfer doubles as creation: the receiver starts as a system
+	/// account holding the transferred balance, exactly like production
+	/// funding flows.
 	///
 	/// # Errors
 	///
-	/// Returns an error when the local RPC rejects or cannot confirm the airdrop.
+	/// Returns an error when the transfer transaction cannot be signed,
+	/// submitted, or confirmed.
 	pub fn fund(&self, address: &Pubkey, lamports: u64) -> Result<Signature, TestError> {
-		let rpc = self.inner.rpc_client();
-		let signature = rpc
-			.request_airdrop(address, lamports)
-			.map_err(|error| test_error("request test account funding", error))?;
-		let confirmed = rpc
-			.confirm_transaction(&signature)
-			.map_err(|error| test_error("confirm test account funding", error))?;
+		let instruction = self.transfer_instruction(address, lamports);
 
-		if !confirmed {
-			return Err(test_error(
-				"confirm test account funding",
-				"transaction was not confirmed",
-			));
-		}
-
-		Ok(signature)
+		self.send_instruction(instruction)
 	}
 
 	/// Fetch an account from the local RPC.
@@ -366,6 +395,11 @@ fn test_error(operation: &'static str, error: impl std::fmt::Display) -> TestErr
 		operation,
 		message: error.to_string(),
 	}
+}
+
+/// The system program, which owns lamports and account creation.
+fn system_program_id() -> Pubkey {
+	Pubkey::default()
 }
 
 fn artifact_from_env() -> Result<PathBuf, TestError> {

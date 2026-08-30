@@ -2422,6 +2422,7 @@ version = "0.0.0"
 dependencies = [
  "escrow_program",
  "pina_test",
+ "solana-rent 4.3.0",
 ]
 
 [[package]]
@@ -10256,6 +10257,7 @@ name = "staking-rewards-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
  "pina_test",
+ "solana-rent 4.3.0",
  "staking_rewards_program",
 ]
 
@@ -11310,6 +11312,7 @@ name = "vesting-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
  "pina_test",
+ "solana-rent 4.3.0",
  "vesting_program",
 ]
 

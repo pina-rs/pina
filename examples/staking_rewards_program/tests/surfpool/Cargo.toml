@@ -8,3 +8,4 @@ workspace = "../../../../crates/pina_test"
 [dependencies]
 pina_test = { workspace = true }
 program_under_test = { package = "staking_rewards_program", path = "../.." }
+solana-rent = "=4.3.0"

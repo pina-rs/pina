@@ -134,6 +134,13 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		}
 		.invoke()?;
 
+		// A freshly created account holds zeroed storage; write the typed
+		// discriminator before taking the validated view.
+		{
+			let mut storage = self.oracle.try_borrow_mut()?;
+			OracleState::write_discriminator(&mut storage);
+		}
+
 		let mut oracle = self.oracle.as_account_mut::<OracleState>(&ID)?;
 		oracle.authority = *self.payer.address();
 		oracle.price.set(0);
