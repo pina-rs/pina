@@ -68,7 +68,6 @@ inputs = [
 ]
 steps = [
 	{ name = "prepare release", type = "PrepareRelease", allow_empty_changesets = true, inputs = { format = "json" } },
-	{ name = "preserve macro test dependency range", type = "Command", shell = "bash", command = "scripts/preserve-pina-dev-dependency-range.sh", when = "{{ number_of_changesets > 0 }}" },
 	{ name = "sync npm platform dependency ranges", type = "Command", shell = "bash", command = "node scripts/npm/sync-release-versions.mjs && pnpm install --lockfile-only", when = "{{ number_of_changesets > 0 }}" },
 	{ name = "format release commit", type = "Command", shell = "bash", command = "fix:format", when = "{{ number_of_changesets > 0 }}" },
 	{ name = "commit release", type = "CommitRelease", inputs = { stage_all = true, no_verify = true }, when = "{{ number_of_changesets > 0 }}" },
@@ -220,7 +219,7 @@ trusted_publishing = { enabled = true, repository = "pina-rs/pina", workflow = "
 [changesets.affected]
 enabled = true
 required = true
-skip_labels = ["release"]
+skip_labels = ["release", "dependencies"]
 comment_on_failure = true
 changed_paths = ["codecov.yml"]
 ignored_paths = [

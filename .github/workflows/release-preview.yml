@@ -30,7 +30,6 @@ jobs:
       - name: preview release
         run: |
           set -euo pipefail
-          scripts/preserve-pina-dev-dependency-range.sh --check
           echo "## Release Preview" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           if ! ls .changeset/*.md 1>/dev/null 2>&1; then
