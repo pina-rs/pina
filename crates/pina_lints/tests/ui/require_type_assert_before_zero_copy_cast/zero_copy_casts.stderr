@@ -1,0 +1,38 @@
+error: raw zero-copy casts should be preceded by `assert_type::<T>()` or a safe Pina account conversion
+  --> $DIR/zero_copy_casts.rs:52:13
+   |
+LL |     let view = data.cast_ref()?;
+   |                ^^^^^^^^^^^^^^^
+   |
+   = help: prefer `assert_type::<T>()` or `as_account::<T>()` over raw `bytemuck::try_from_bytes` casts
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+   = note: `#[deny(require_type_assert_before_zero_copy_cast)]` on by default
+
+error: raw zero-copy casts should be preceded by `assert_type::<T>()` or a safe Pina account conversion
+  --> $DIR/zero_copy_casts.rs:54:24
+   |
+LL |     let parsed = unsafe { bytemuck::try_from_bytes::<VaultData>(bytes) }?;
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer `assert_type::<T>()` or `as_account::<T>()` over raw `bytemuck::try_from_bytes` casts
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: raw zero-copy casts should be preceded by `assert_type::<T>()` or a safe Pina account conversion
+  --> $DIR/zero_copy_casts.rs:62:13
+   |
+LL |     let view = guard.cast_ref()?;
+   |                ^^^^^^^^^^^^^^^^
+   |
+   = help: prefer `assert_type::<T>()` or `as_account::<T>()` over raw `bytemuck::try_from_bytes` casts
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: raw zero-copy casts should be preceded by `assert_type::<T>()` or a safe Pina account conversion
+  --> $DIR/zero_copy_casts.rs:64:24
+   |
+LL |     let parsed = unsafe { bytemuck::try_from_bytes::<VaultData>(bytes) }?;
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer `assert_type::<T>()` or `as_account::<T>()` over raw `bytemuck::try_from_bytes` casts
+   = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
+
+error: aborting due to 4 previous errors

@@ -34,6 +34,51 @@ struct Directives {
 }
 
 #[test]
+fn ui_deny_heap_allocations_in_onchain_instruction_handlers() {
+	run_ui_tests("deny_heap_allocations_in_onchain_instruction_handlers");
+}
+
+#[test]
+fn ui_require_associated_token_address_before_ata_cast() {
+	run_ui_tests("require_associated_token_address_before_ata_cast");
+}
+
+#[test]
+fn ui_require_canonical_instruction_dispatch_for_idl() {
+	run_ui_tests("require_canonical_instruction_dispatch_for_idl");
+}
+
+#[test]
+fn ui_require_idl_root_to_define_one_program_id() {
+	run_ui_tests("require_idl_root_to_define_one_program_id");
+}
+
+#[test]
+fn ui_require_owner_before_token_cast() {
+	run_ui_tests("require_owner_before_token_cast");
+}
+
+#[test]
+fn ui_require_program_owned_before_lamport_mutation() {
+	run_ui_tests("require_program_owned_before_lamport_mutation");
+}
+
+#[test]
+fn ui_require_sysvar_assert_before_sysvar_use() {
+	run_ui_tests("require_sysvar_assert_before_sysvar_use");
+}
+
+#[test]
+fn ui_require_type_assert_before_zero_copy_cast() {
+	run_ui_tests("require_type_assert_before_zero_copy_cast");
+}
+
+#[test]
+fn ui_require_zeroed_before_close() {
+	run_ui_tests("require_zeroed_before_close");
+}
+
+#[test]
 fn ui_deny_account_borrows_across_cpi() {
 	run_ui_tests("deny_account_borrows_across_cpi");
 }
@@ -276,11 +321,12 @@ fn build_auxiliaries(driver: &Path, src_base: &Path, directives: &Directives) ->
 ///
 /// The driver is invoked through plain `rustc` arguments, so artifacts keep
 /// their unhashed names: `lib{crate_name}.rlib` for libraries and
-/// `lib{crate_name}.dylib` for proc-macro crates.
+/// `lib{crate_name}.{dylib,so}` for proc-macro crates.
 fn find_artifact(output_dir: &Path, crate_name: &str) -> PathBuf {
 	for file_name in [
 		format!("lib{crate_name}.rlib"),
 		format!("lib{crate_name}.dylib"),
+		format!("lib{crate_name}.so"),
 	] {
 		let candidate = output_dir.join(&file_name);
 		if candidate.is_file() {

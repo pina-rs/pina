@@ -1,0 +1,10 @@
+warning: IDL-oriented example crates should define exactly one `declare_id!` in the crate root
+  --> $DIR/security_program_ids_multiple.rs:14:2
+   |
+LL |     declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: keep the program id declaration in `src/lib.rs` and avoid duplicating it across modules
+   = note: `#[warn(require_idl_root_to_define_one_program_id)]` on by default
+
+warning: 1 warning emitted

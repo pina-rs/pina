@@ -157,7 +157,7 @@ zeropod = { default-features = false, version = "0.3.5", features = ["solana-add
 # `pina` is a dev-dependency of `pina_macros`. This range lets Cargo verify
 # the packaged macros crate against the previously published 0.x release while
 # workspace tests continue to use the local path.
-pina = { default-features = false, path = "crates/pina", version = "0.11.1" }
+pina = { default-features = false, path = "crates/pina", version = ">=0.8.0, <1.0.0" }
 pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.11.1" }
 pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.11.1" }
 pina_lints = { default-features = false, path = "crates/pina_lints", version = "0.11.1" }

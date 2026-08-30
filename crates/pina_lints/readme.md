@@ -317,7 +317,7 @@ Warns when an IDL-oriented example or security crate does not expose exactly one
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 ```
 
-The check is repository-scoped to definition paths under `examples` and `security`. Library crates that intentionally define no program are ignored.
+The check is repository-scoped by source file: `declare_id!` expansions are inspected in crates whose sources live under an `examples` or `security` directory. The crate-root program id is the contract, and every additional declaration is reported at its own call site, so module-scoped `#[allow(...)]` suppresses only the extra declarations (as `examples/anchor_declare_program` demonstrates). Library crates that intentionally define no program are ignored.
 
 ### `require_canonical_instruction_dispatch_for_idl`
 

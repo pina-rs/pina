@@ -1,0 +1,6 @@
+warning: IDL-friendly instruction dispatch should be a direct `match` over the parsed instruction enum
+   |
+   = help: keep the dispatch in the entrypoint itself so `pina idl` can follow the instruction routing
+   = note: `#[warn(require_canonical_instruction_dispatch_for_idl)]` on by default
+
+warning: 1 warning emitted

@@ -1,0 +1,26 @@
+error: sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:55:13
+   |
+LL |     let view = clock.try_borrow()?;
+   |                ^^^^^^^^^^^^^^^^^^
+   |
+   = help: call `sysvar_account.assert_sysvar(&sysvar::ID)?` before reading time or rent information
+   = note: `#[deny(require_sysvar_assert_before_sysvar_use)]` on by default
+
+error: sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:71:13
+   |
+LL |     let view = clock.try_borrow()?;
+   |                ^^^^^^^^^^^^^^^^^^
+   |
+   = help: call `sysvar_account.assert_sysvar(&sysvar::ID)?` before reading time or rent information
+
+error: sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:78:13
+   |
+LL |     let view = rent.try_borrow()?;
+   |                ^^^^^^^^^^^^^^^^^
+   |
+   = help: call `sysvar_account.assert_sysvar(&sysvar::ID)?` before reading time or rent information
+
+error: aborting due to 3 previous errors
