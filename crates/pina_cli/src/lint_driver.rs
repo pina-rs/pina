@@ -122,12 +122,15 @@ fn install_driver(root: &Path) -> Result<(), DriverError> {
 }
 
 /// Return the platform file name of the driver binary.
+#[cfg(windows)]
 fn driver_binary_name() -> &'static str {
-	if cfg!(windows) {
-		"pina_lint_driver.exe"
-	} else {
-		"pina_lint_driver"
-	}
+	"pina_lint_driver.exe"
+}
+
+/// Return the platform file name of the driver binary.
+#[cfg(not(windows))]
+fn driver_binary_name() -> &'static str {
+	"pina_lint_driver"
 }
 
 /// Return whether `path` is an executable file.
@@ -180,18 +183,21 @@ fn parse_rustc_fingerprint(output: &[u8]) -> Option<String> {
 		.next()?
 		.to_owned();
 
-	let fingerprint = format!("{release}-{host}");
-	let safe = fingerprint
-		.chars()
-		.map(|character| {
-			if character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-') {
-				character
-			} else {
-				'-'
-			}
-		})
-		.collect::<String>();
-	(!safe.is_empty()).then_some(safe)
+	let fingerprint = format!("{released}-{host}", released = release, host = host);
+	// The release and host prefixes were parsed above, so the leftover
+	// replacements cannot blank the name out.
+	Some(
+		fingerprint
+			.chars()
+			.map(|character| {
+				if character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-') {
+					character
+				} else {
+					'-'
+				}
+			})
+			.collect::<String>(),
+	)
 }
 
 /// Resolve the directory Cargo uses for its managed state.
@@ -316,6 +322,18 @@ mod tests {
 			Some("1.95.0-nightly-x86_64-unknown-linux-gnu")
 		);
 		assert!(parse_rustc_fingerprint(b"rustc without fingerprint lines\n").is_none());
+	}
+
+	#[test]
+	fn sanitizes_unexpected_characters_out_of_the_toolchain_fingerprint() {
+		let output = b"rustc 1.95.0 nightly\nbinary: rustc\nrelease: \
+		               1.95.0~rolling\nhost: aarch64 unknown linux\n";
+
+		// The tilde is not allowed in a cargo target fingerprint, so the
+		// sanitizer must replace it with the safe placeholder. The host token
+		// is the first whitespace-separated word of the host line.
+		let parsed = parse_rustc_fingerprint(output).expect("the crafted output should parse");
+		assert_eq!(parsed, "1.95.0-rolling-aarch64");
 	}
 
 	#[test]
