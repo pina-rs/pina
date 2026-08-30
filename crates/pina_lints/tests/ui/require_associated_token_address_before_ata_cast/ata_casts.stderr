@@ -1,5 +1,5 @@
 error: ATA casts should be preceded by `assert_associated_token_address()`
-  --> $DIR/ata_casts.rs:41:13
+  --> $DIR/ata_casts.rs:51:13
    |
 LL |     let view = vault.as_associated_token_account(wallet, mint, token_program)?;
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -9,7 +9,7 @@ LL |     let view = vault.as_associated_token_account(wallet, mint, token_progra
    = note: `#[deny(require_associated_token_address_before_ata_cast)]` on by default
 
 error: ATA casts should be preceded by `assert_associated_token_address()`
-  --> $DIR/ata_casts.rs:55:13
+  --> $DIR/ata_casts.rs:65:13
    |
 LL |     let view = vault.as_associated_token_account(wallet, mint, token_program)?;
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -18,7 +18,7 @@ LL |     let view = vault.as_associated_token_account(wallet, mint, token_progra
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually
 
 error: ATA casts should be preceded by `assert_associated_token_address()`
-  --> $DIR/ata_casts.rs:67:13
+  --> $DIR/ata_casts.rs:72:13
    |
 LL |     let view = vault.as_associated_token_account(wallet, mint, token_program)?;
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
