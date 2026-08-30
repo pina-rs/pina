@@ -32,7 +32,7 @@ The shortcut runs `cargo run -p pina_cli -- ...` against the checked-out source.
 | Command                                        | Purpose                                                      | Primary output                            |
 | ---------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------- |
 | [`pina init`](./init.md)                       | Create a project-aware program scaffold                      | Files plus next steps                     |
-| [`pina lint`](./lint.md)                       | Run the release-matched Pina security lint bundle            | Dylint diagnostics and optional fixes     |
+| [`pina lint`](./lint.md)                       | Run the official security lints via the lint driver          | Compiler diagnostics and optional fixes   |
 | [`pina build`](./build.md)                     | Build SBF, optionally with deterministic verification inputs | SBF, IDL, and optional build-record files |
 | [`pina verify`](./verify.md)                   | Compare deployments and record verified source               | Status or transaction                     |
 | [`pina generate`](./generate.md)               | Generate configured client ecosystems                        | Generated clients                         |
@@ -82,7 +82,7 @@ Long help includes the input contract, output behavior, defaults, and copyable e
 | `idl`             | JSON when `--output` is omitted   | Progress, extraction counts, errors |
 | `docs`            | Topic index or rendered Markdown  | Errors                              |
 | `init`            | Created path and next steps       | Errors                              |
-| `lint`            | Completion summary                | Cargo/Dylint progress and errors    |
+| `lint`            | Completion summary                | Cargo progress and lint diagnostics |
 | `build`           | Published artifact summary        | Cargo output and errors             |
 | `verify check`    | Matching hash                     | Mismatch hashes and errors          |
 | `verify record`   | Upstream streamed progress        | Upstream diagnostics and errors     |
@@ -102,16 +102,16 @@ For reliable automation, capture stdout only when the command documents it as ma
 
 ## Path behavior
 
-Relative paths are resolved from the process working directory. Project-aware commands discover the nearest `Pina.toml` or unambiguous Cargo package and use Cargo metadata for the library source and target directory. Output commands create their documented output directories where applicable, but `pina idl --output` expects the parent directory to exist. Identity replacement requires `pina keys new --force`; profile reports are published atomically and cannot alias the input binary.
+Relative paths are resolved from the process working directory. Project-aware commands discover the nearest `pina.toml` or unambiguous Cargo package and use Cargo metadata for the library source and target directory. Output commands create their documented output directories where applicable, but `pina idl --output` expects the parent directory to exist. Identity replacement requires `pina keys new --force`; profile reports are published atomically and cannot alias the input binary.
 
 ## Environment
 
-Project-aware commands read `Pina.toml` and respect standard Cargo variables such as `CARGO_TARGET_DIR` and `CARGO`. The CLI also reads one Pina-specific optional environment variable:
+Project-aware commands read `pina.toml` and respect standard Cargo variables such as `CARGO_TARGET_DIR` and `CARGO`. The CLI also reads one Pina-specific optional environment variable:
 
 | Variable             | Used by     | Meaning                                          |
 | -------------------- | ----------- | ------------------------------------------------ |
 | `PINA_TEMPLATES_DIR` | `pina docs` | Directory containing custom `<topic>.t.md` files |
 
-No configuration file is required for an unambiguous Cargo package. `pina init` creates a small `Pina.toml` so every tool and agent discovers the same program and client choices.
+No configuration file is required for an unambiguous Cargo package. `pina init` creates a small `pina.toml` so every tool and agent discovers the same program and client choices.
 
 Agents that maintain Pina projects can install the companion [`@pina-rs/skill`](../agent-skill.md) package.

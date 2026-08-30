@@ -895,22 +895,15 @@ See the [security guide](security/) for detailed examples of all 11 common Solan
 
 <br>
 
-Enable pina's custom dylint lints to catch common security mistakes at compile time:
+Enable Pina's official security lints to catch common mistakes at compile time:
 
-```bash
+```sh
 pina lint
-# Apply machine-applicable suggestions, then inspect the diff.
-pina lint --fix
 ```
 
-`pina lint` downloads pinned, precompiled `cargo-dylint` for the CLI platform and Pina lint libraries for the active Rust compiler host instead of installing or compiling them from source, and it does not load extra project-defined lint libraries. This distinction lets musl-distributed CLI binaries use GNU lint libraries on glibc Linux; Rust's genuinely musl-hosted compilers cannot load the required dynamic plugins and receive a clear unsupported-host error. Dylint may still build its internal compiler driver for the project's exact Rust toolchain on first use. `pina init` does not add source-based lint metadata or a self-referential commit pin.
+Every lint lives in the [`pina_lints`](crates/pina_lints) crate and is statically compiled into the `pina_lint_driver` binary. `pina lint` installs that driver for the active toolchain below Cargo home on first use and runs `cargo check` with the driver as `RUSTC_WRAPPER`, so no external lint tooling or precompiled lint bundles are downloaded. Lint levels are configured through the `[lints]` table of the project's `pina.toml`.
 
-- account ownership, initialization, PDA, sysvar, ATA, resize, close, and CPI validation
-- mutable-borrow lifetime, checked arithmetic, remaining-account bounds, and custody balance accounting
-- consistent token-program provenance and explicit Token-2022 extension policies
-- allocation and IDL/example-structure guidance
-
-See the [complete lint reference](lints/readme.md) for every lint's severity, detected patterns, compliant examples, and analysis limitations. This repository runs the entire catalog over every program under `examples/` and every secure security fixture with `devenv shell -- security:dylint`.
+See the [complete lint reference](crates/pina_lints/readme.md) for every lint's severity, detected patterns, compliant examples, and analysis limitations. This repository runs the entire catalog over every program under `examples/` and every secure security fixture with `devenv shell -- security:pina-lint`.
 
 ## Contributing
 

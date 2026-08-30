@@ -1,13 +1,13 @@
 //! Project-aware execution of Pina's official security lints.
 
 use std::ffi::OsString;
-use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
-use crate::lint_bundle::BundleError;
-use crate::lint_bundle::prepare_bundle;
-use crate::lint_bundle::prepare_dylint_tools;
+use crate::lint_driver::DriverError;
+use crate::lint_driver::cargo_home;
+use crate::lint_driver::format_lint_levels;
+use crate::lint_driver::prepare_driver;
 use crate::project::Project;
 use crate::project::ProjectError;
 
@@ -24,7 +24,7 @@ pub struct LintOptions {
 /// The project linted by [`lint_project`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LintOutput {
-	/// Cargo package checked by Dylint.
+	/// Cargo package checked by the lint driver.
 	pub package_name: String,
 
 	/// Whether automatic fixes were requested.
@@ -38,28 +38,10 @@ pub enum LintError {
 	Project(#[from] ProjectError),
 
 	#[error(transparent)]
-	Bundle(#[from] BundleError),
-
-	#[error("Could not resolve Cargo home for Pina's managed Dylint tools")]
-	MissingCargoHome,
-
-	#[error("Could not resolve relative CARGO_HOME from the current directory: {source}")]
-	CurrentDirectory { source: std::io::Error },
-
-	#[error("Could not construct PATH for the pinned Dylint tools: {source}")]
-	ToolPath { source: std::env::JoinPathsError },
-
-	#[error("Could not query the Rust compiler host: {source}")]
-	QueryRustcHost { source: std::io::Error },
-
-	#[error("Could not query the Rust compiler host because rustc exited with status {status}")]
-	RustcHostFailed { status: String },
-
-	#[error("Could not read a host target from rustc -vV")]
-	MissingRustcHost,
+	Driver(#[from] DriverError),
 
 	#[error("Could not run Pina's security lints: {source}")]
-	RunDylint { source: std::io::Error },
+	RunCargo { source: std::io::Error },
 
 	#[error("Pina's security lints failed with status {status}")]
 	LintFailed { status: String },
@@ -67,52 +49,58 @@ pub enum LintError {
 
 /// Discover a Pina project and run this CLI release's official lint set.
 ///
-/// The first invocation downloads pinned `cargo-dylint` and the precompiled
-/// libraries below Cargo home. Later invocations and projects reuse the
-/// verified caches. Exact library paths are passed to Dylint, so
-/// project-provided Dylint metadata is ignored.
+/// The lints are compiled into the `pina_lints` crate and statically linked
+/// into the `pina_lint_driver` binary. This command prepares the driver for
+/// the active toolchain (see [`crate::lint_driver`]), then runs
+/// `cargo check` — or `cargo fix` with `--fix` — with the driver as
+/// `RUSTC_WRAPPER`. Level overrides from the project's `pina.toml` `[lints]`
+/// table are forwarded through `PINA_LINT_LEVELS`.
 ///
 /// # Errors
 ///
-/// Returns an error when project discovery fails, the pinned tools cannot be
-/// prepared, or Dylint reports a lint or compilation failure.
+/// Returns an error when project discovery fails, the lint driver cannot be
+/// prepared, or cargo reports a lint or compilation failure.
 pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 	let project = Project::discover(&options.project)?;
 	let cargo_home = cargo_home()?;
-	let lint_target = rustc_host(&project.root)?;
-	let tools = prepare_dylint_tools(&cargo_home)?;
-	let bundle = prepare_bundle(&cargo_home, &lint_target)?;
+	let driver = prepare_driver(&cargo_home, &project.root)?;
 	let manifest = project.program_dir.join("Cargo.toml");
-	let mut args = vec![
-		OsString::from("dylint"),
-		OsString::from("--no-deps"),
-		OsString::from("--no-metadata"),
-		OsString::from("--manifest-path"),
-		manifest.into_os_string(),
-		OsString::from("--package"),
-		OsString::from(&project.package_name),
-	];
-	for library_path in bundle.library_paths {
-		args.push(OsString::from("--lib-path"));
-		args.push(library_path.into_os_string());
-	}
 
-	if options.fix {
-		args.push(OsString::from("--fix"));
-		args.push(OsString::from("--"));
-		args.push(OsString::from("--allow-dirty"));
-		args.push(OsString::from("--allow-staged"));
-		args.push(OsString::from("--allow-no-vcs"));
-	}
+	let levels = project
+		.lint_levels
+		.iter()
+		.map(|(name, level)| (name.as_str(), level.as_str()))
+		.collect::<Vec<_>>();
 
-	let path = tool_path(&tools.bin_dir)?;
-	let status = Command::new(&tools.cargo_dylint)
-		.args(&args)
+	let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
+	let mut command = Command::new(&cargo);
+	command
 		.current_dir(&project.root)
 		.env("CARGO_INCREMENTAL", "0")
-		.env("PATH", path)
+		.env("RUSTC_WRAPPER", &driver.path)
+		.env("PINA_LINT_NO_DEPS", "1");
+	if !levels.is_empty() {
+		command.env("PINA_LINT_LEVELS", format_lint_levels(levels));
+	}
+	if options.fix {
+		command
+			.arg("fix")
+			.arg("--allow-dirty")
+			.arg("--allow-staged")
+			.arg("--allow-no-vcs");
+	} else {
+		command.arg("check");
+	}
+	command
+		.arg("--locked")
+		.arg("--manifest-path")
+		.arg(manifest)
+		.arg("--package")
+		.arg(&project.package_name);
+
+	let status = command
 		.status()
-		.map_err(|source| LintError::RunDylint { source })?;
+		.map_err(|source| LintError::RunCargo { source })?;
 
 	if !status.success() {
 		return Err(LintError::LintFailed {
@@ -124,151 +112,4 @@ pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 		package_name: project.package_name,
 		fix: options.fix,
 	})
-}
-
-/// Resolve the host target of the Rust compiler that Dylint will invoke.
-fn rustc_host(project_root: &Path) -> Result<String, LintError> {
-	let output = Command::new("rustc")
-		.arg("-vV")
-		.current_dir(project_root)
-		.output()
-		.map_err(|source| LintError::QueryRustcHost { source })?;
-
-	if !output.status.success() {
-		return Err(LintError::RustcHostFailed {
-			status: output.status.to_string(),
-		});
-	}
-
-	parse_rustc_host(&output.stdout).ok_or(LintError::MissingRustcHost)
-}
-
-/// Parse the host target from verbose rustc version output.
-fn parse_rustc_host(output: &[u8]) -> Option<String> {
-	String::from_utf8_lossy(output)
-		.lines()
-		.find_map(|line| line.strip_prefix("host: "))
-		.filter(|host| !host.is_empty())
-		.map(str::to_owned)
-}
-
-/// Resolve Cargo home using Cargo's environment and platform conventions.
-fn cargo_home() -> Result<PathBuf, LintError> {
-	resolve_cargo_home(
-		std::env::var_os("CARGO_HOME"),
-		std::env::current_dir(),
-		platform_home(),
-	)
-}
-
-/// Resolve an explicit or platform Cargo home without reading process state.
-fn resolve_cargo_home(
-	cargo_home: Option<OsString>,
-	current_dir: Result<PathBuf, std::io::Error>,
-	platform_home: Option<PathBuf>,
-) -> Result<PathBuf, LintError> {
-	if let Some(home) = cargo_home {
-		let home = PathBuf::from(home);
-		if home.is_absolute() {
-			return Ok(home);
-		}
-
-		return current_dir
-			.map(|current_dir| current_dir.join(home))
-			.map_err(|source| LintError::CurrentDirectory { source });
-	}
-
-	platform_home
-		.map(|home| home.join(".cargo"))
-		.ok_or(LintError::MissingCargoHome)
-}
-
-#[cfg(not(windows))]
-/// Return the platform home used by Cargo on Unix-like systems.
-fn platform_home() -> Option<PathBuf> {
-	std::env::var_os("HOME").map(PathBuf::from)
-}
-
-#[cfg(windows)]
-/// Return the platform home used by Cargo on Windows.
-fn platform_home() -> Option<PathBuf> {
-	std::env::var_os("USERPROFILE")
-		.map(PathBuf::from)
-		.or_else(|| {
-			let drive = std::env::var_os("HOMEDRIVE")?;
-			let path = std::env::var_os("HOMEPATH")?;
-			Some(PathBuf::from(drive).join(path))
-		})
-}
-
-/// Prepend Pina's managed tool directory without discarding the caller's PATH.
-fn tool_path(bin_dir: &Path) -> Result<OsString, LintError> {
-	let current_path = std::env::var_os("PATH").unwrap_or_default();
-	let paths = std::iter::once(bin_dir.to_path_buf()).chain(std::env::split_paths(&current_path));
-	std::env::join_paths(paths).map_err(|source| LintError::ToolPath { source })
-}
-
-#[cfg(test)]
-mod tests {
-	use std::io;
-
-	use super::*;
-
-	#[test]
-	fn resolves_absolute_relative_and_default_cargo_homes() {
-		let absolute = std::env::temp_dir().join("managed-cargo");
-		assert_eq!(
-			resolve_cargo_home(
-				Some(absolute.clone().into_os_string()),
-				Err(io::Error::other("unused")),
-				None,
-			)
-			.expect("absolute Cargo home should resolve"),
-			absolute
-		);
-
-		let working = std::env::temp_dir().join("working");
-		assert_eq!(
-			resolve_cargo_home(Some(OsString::from("relative")), Ok(working.clone()), None,)
-				.expect("relative Cargo home should resolve"),
-			working.join("relative")
-		);
-
-		let home = std::env::temp_dir().join("home-developer");
-		assert_eq!(
-			resolve_cargo_home(None, Err(io::Error::other("unused")), Some(home.clone()),)
-				.expect("default Cargo home should resolve"),
-			home.join(".cargo")
-		);
-	}
-
-	#[test]
-	fn reports_unavailable_working_and_home_directories() {
-		let current_directory = resolve_cargo_home(
-			Some(OsString::from("relative")),
-			Err(io::Error::other("missing working directory")),
-			None,
-		)
-		.expect_err("relative Cargo home should require a working directory");
-		assert!(matches!(
-			current_directory,
-			LintError::CurrentDirectory { .. }
-		));
-
-		let home = resolve_cargo_home(None, Ok(PathBuf::from("/working")), None)
-			.expect_err("a platform home should be required");
-		assert!(matches!(home, LintError::MissingCargoHome));
-	}
-
-	#[test]
-	fn parses_rustc_host_from_verbose_version_output() {
-		let output = b"rustc 1.95.0-nightly\nbinary: rustc\nhost: x86_64-unknown-linux-gnu\n";
-
-		assert_eq!(
-			parse_rustc_host(output).as_deref(),
-			Some("x86_64-unknown-linux-gnu")
-		);
-		assert_eq!(parse_rustc_host(b"rustc without a host line\n"), None);
-		assert_eq!(parse_rustc_host(b"host: \n"), None);
-	}
 }

@@ -511,6 +511,7 @@ fn parse_version(value: &str) -> Option<semver::Version> {
 
 #[cfg(test)]
 mod tests {
+	use std::collections::BTreeMap;
 	use std::fs;
 	#[cfg(unix)]
 	use std::process::ExitStatus;
@@ -957,6 +958,7 @@ mod tests {
 			idl_dir: root.join("target/idl"),
 			clients_dir: root.join("clients"),
 			clients: Vec::new(),
+			lint_levels: BTreeMap::new(),
 		};
 		assert!(matches!(
 			require_surfpool_test(&project),

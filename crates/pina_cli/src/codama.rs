@@ -133,7 +133,7 @@ pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, C
 
 /// Generate selected clients for the project discovered from `project_dir`.
 ///
-/// An empty `clients` override uses the languages configured in `Pina.toml`.
+/// An empty `clients` override uses the languages configured in `pina.toml`.
 /// The output override is resolved from the process working directory, matching
 /// normal command-line path behavior.
 ///

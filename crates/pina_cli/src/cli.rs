@@ -49,7 +49,7 @@ pub(crate) struct Cli {
 pub(crate) enum Commands {
 	/// Build the current Pina program for SBF and generate its IDL.
 	///
-	/// Discovers the nearest Pina.toml or Cargo package, runs the release SBF
+	/// Discovers the nearest pina.toml or Cargo package, runs the release SBF
 	/// build, publishes the program at target/deploy/<program>.so, and writes the
 	/// Codama IDL to target/idl/<program>.json. With --verify, solana-verify
 	/// performs a deterministic Docker build and Pina records its inputs and hash.
@@ -61,7 +61,7 @@ pub(crate) enum Commands {
 		              first. Pina never installs tools. This creates a deterministic build; it \
 		              does not compare with an on-chain program.\n\nProject discovery:\n  Pina \
 		              searches from --project (or the current directory) toward the filesystem \
-		              root for Pina.toml. Existing Cargo projects without Pina.toml are \
+		              root for pina.toml. Existing Cargo projects without pina.toml are \
 		              discovered with cargo metadata. CARGO_TARGET_DIR is respected."
 	)]
 	Build {
@@ -100,17 +100,18 @@ pub(crate) enum Commands {
 
 	/// Run Pina's official security lints against the current program.
 	///
-	/// Discovers the nearest Pina.toml or Cargo package, prepares pinned Dylint
-	/// tooling under Cargo home, and runs the precompiled lint bundle published
-	/// with this CLI release. Use --fix to apply machine-applicable suggestions;
-	/// review every resulting source change.
+	/// Discovers the nearest pina.toml or Cargo package, prepares the
+	/// pina_lint_driver binary for the active toolchain under Cargo home, and
+	/// runs cargo check with the driver as RUSTC_WRAPPER. Lint levels configured
+	/// in the [lints] table of pina.toml are honored. Use --fix to apply
+	/// machine-applicable suggestions; review every resulting source change.
 	#[command(
 		after_help = "Examples:\n  pina lint\n  pina lint --fix\n  pina lint --project \
-		              ./programs/counter\n\nTooling:\n  The first run downloads verified, \
-		              precompiled cargo-dylint and native lint bundles below Cargo home. --fix \
-		              applies only machine-applicable suggestions and allows Cargo to edit dirty, \
-		              staged, or not-yet-versioned working trees; inspect the diff before \
-		              committing."
+		              ./programs/counter\n\nTooling:\n  The first run installs the lint driver \
+		              built from the pina_lints release matching this CLI below Cargo home; later \
+		              runs reuse it. --fix applies only machine-applicable suggestions and allows \
+		              Cargo to edit dirty, staged, or not-yet-versioned working trees; inspect \
+		              the diff before committing."
 	)]
 	Lint {
 		/// Directory inside the project to discover. Defaults to the current directory.
@@ -131,7 +132,7 @@ pub(crate) enum Commands {
 	/// Generate configured clients for the current Pina program.
 	///
 	/// Discovers the project, refreshes its IDL, and generates only the selected
-	/// client ecosystems. Repeat --client to override Pina.toml. Rust-only
+	/// client ecosystems. Repeat --client to override pina.toml. Rust-only
 	/// generation does not invoke Node.js.
 	#[command(
 		after_help = "Examples:\n  pina generate\n  pina generate --client rust\n  pina generate \
@@ -150,7 +151,7 @@ pub(crate) enum Commands {
 		)]
 		project: PathBuf,
 
-		/// Client ecosystem to generate. Repeat to override Pina.toml.
+		/// Client ecosystem to generate. Repeat to override pina.toml.
 		#[arg(long = "client", value_enum, value_name = "LANGUAGE")]
 		clients: Vec<ClientArg>,
 
@@ -478,7 +479,7 @@ Safety:
   Mainnet and custom remote deployment additionally require --allow-mainnet.
   --dry-run never builds or deploys and --json is available only with --dry-run.")]
 	Deploy {
-		/// Directory used for Pina.toml or Cargo metadata project discovery.
+		/// Directory used for pina.toml or Cargo metadata project discovery.
 		#[arg(
 			short,
 			long,

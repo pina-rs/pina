@@ -1,0 +1,56 @@
+error: `distinct = false` permits duplicate writable accounts without explaining why
+  --> $DIR/duplicate_remaining_accounts.rs:25:2
+   |
+LL |     #[pina(remaining, distinct = false)]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: add a field doc comment explaining the invariant that makes duplicate addresses safe
+   = note: `#[deny(require_reason_for_duplicate_remaining_accounts)]` on by default
+
+error: `distinct = false` permits duplicate writable accounts without explaining why
+  --> $DIR/duplicate_remaining_accounts.rs:33:2
+   |
+LL |     #[pina(remaining, distinct = false)]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: add a field doc comment explaining the invariant that makes duplicate addresses safe
+
+warning: struct `AccountView` is never constructed
+  --> $DIR/duplicate_remaining_accounts.rs:8:8
+   |
+LL | struct AccountView;
+   |        ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `DefaultDistinct` is never constructed
+  --> $DIR/duplicate_remaining_accounts.rs:11:8
+   |
+LL | struct DefaultDistinct<'a> {
+   |        ^^^^^^^^^^^^^^^
+
+warning: struct `ExplainedDuplicates` is never constructed
+  --> $DIR/duplicate_remaining_accounts.rs:17:8
+   |
+LL | struct ExplainedDuplicates<'a> {
+   |        ^^^^^^^^^^^^^^^^^^^
+
+warning: struct `UnexplainedDuplicates` is never constructed
+  --> $DIR/duplicate_remaining_accounts.rs:24:8
+   |
+LL | struct UnexplainedDuplicates<'a> {
+   |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `EmptyExplanation` is never constructed
+  --> $DIR/duplicate_remaining_accounts.rs:31:8
+   |
+LL | struct EmptyExplanation<'a> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: function `main` is never used
+  --> $DIR/duplicate_remaining_accounts.rs:38:4
+   |
+LL | fn main() {}
+   |    ^^^^
+
+error: aborting due to 2 previous errors; 6 warnings emitted

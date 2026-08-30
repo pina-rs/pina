@@ -1203,6 +1203,7 @@ fn portable_path(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
 	use std::cell::RefCell;
+	use std::collections::BTreeMap;
 	use std::collections::VecDeque;
 	use std::fs;
 
@@ -1317,6 +1318,7 @@ mod tests {
 			idl_dir: root.join("target/idl"),
 			clients_dir: root.join("clients"),
 			clients: Vec::new(),
+			lint_levels: BTreeMap::new(),
 		}
 	}
 

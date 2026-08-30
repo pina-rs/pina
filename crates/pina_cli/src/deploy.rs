@@ -1353,7 +1353,7 @@ mod tests {
 		fs::rename(fixture.root.join("src"), program_dir.join("src"))
 			.unwrap_or_else(|error| panic!("move source: {error}"));
 		fs::write(
-			fixture.root.join("Pina.toml"),
+			fixture.root.join("pina.toml"),
 			"[project]\nprogram = \"programs/example\"\n",
 		)
 		.unwrap_or_else(|error| panic!("write Pina config: {error}"));

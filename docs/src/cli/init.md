@@ -38,7 +38,7 @@ counter_program/
 │       └── Cargo.toml
 ├── .gitignore
 ├── Cargo.toml
-├── Pina.toml
+├── pina.toml
 └── README.md
 ```
 
@@ -49,11 +49,11 @@ The scaffold includes:
 - an `Accounts` struct with signer validation;
 - an SBF Cargo target and `cargo build-program` alias;
 - a pinned nightly Rust toolchain with the `rust-src` component;
-- no source-installed Dylint metadata; `pina lint` downloads the pinned runner and official native lint bundles from Pina releases;
+- no source-installed lint tooling; `pina lint` installs the `pina_lint_driver` binary under Cargo home on first use;
 - host-side discriminator and program-ID smoke tests;
 - Pina and Mollusk dependencies;
 - a dedicated host-only test package with one `pina_test` dependency for the isolated Surfpool test;
-- project-local discovery and client-generation settings in `Pina.toml`.
+- project-local discovery and client-generation settings in `pina.toml`.
 
 Replace the non-system placeholder address in `src/lib.rs` with the deployed program address before deployment.
 
@@ -85,4 +85,4 @@ pina generate
 
 Use `pina init --help` for the authoritative command-line surface.
 
-See [Project Configuration](./configuration.md) for every generated `Pina.toml` field.
+See [Project Configuration](./configuration.md) for every generated `pina.toml` field.
