@@ -116,7 +116,12 @@ fn every_example_is_a_complete_pina_project() {
 
 		assert_eq!(project.root, root);
 		assert_eq!(project.package_name, *example);
-		assert!(root.join("tests/surfpool/Cargo.toml").is_file());
+
+		let surfpool_manifest = root.join("tests/surfpool/Cargo.toml");
+		let surfpool_cargo = fs::read_to_string(&surfpool_manifest)
+			.unwrap_or_else(|error| panic!("read {}: {error}", surfpool_manifest.display()));
+		assert!(surfpool_cargo.contains("pina_test = { workspace = true }"));
+		assert!(!surfpool_cargo.contains("pina_test = { path ="));
 		assert!(root.join("tests/surfpool/src/lib.rs").is_file());
 	}
 }

@@ -3,10 +3,8 @@ name = "anchor-declare-program-surfpool-tests"
 version = "0.0.0"
 edition = "2024"
 publish = false
-
-# Keep Surfpool's host runtime isolated from native Mollusk tests and SBF builds.
-[workspace]
+workspace = "../../../../crates/pina_test"
 
 [dependencies]
-pina_test = { path = "../../../../crates/pina_test" }
+pina_test = { workspace = true }
 program_under_test = { package = "anchor_declare_program", path = "../.." }
