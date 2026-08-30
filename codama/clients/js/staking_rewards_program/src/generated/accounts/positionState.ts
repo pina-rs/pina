@@ -34,7 +34,7 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { findPositionPda, PositionSeeds } from "../pdas";
+import { findPositionPda, type PositionSeeds } from "../pdas";
 import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const POSITION_STATE_DISCRIMINATOR = 2;

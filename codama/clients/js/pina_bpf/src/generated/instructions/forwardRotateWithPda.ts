@@ -165,7 +165,7 @@ export async function getForwardRotateWithPdaInstructionAsync<
 
 	// Resolve default values.
 	if (!accounts.authority.value) {
-		accounts.authority.value = await findAuthorityPda();
+		accounts.authority.value = await findAuthorityPda({ programAddress });
 	}
 
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

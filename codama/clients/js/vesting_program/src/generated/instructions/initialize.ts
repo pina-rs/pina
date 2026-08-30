@@ -251,7 +251,7 @@ export async function getInitializeInstructionAsync<
 				"mint",
 				accounts.mint.value,
 			),
-		});
+		}, { programAddress });
 	}
 	if (!accounts.associatedTokenProgram.value) {
 		accounts.associatedTokenProgram.value =

@@ -32,7 +32,7 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { findSamplePda, SampleSeeds } from "../pdas";
+import { findSamplePda, type SampleSeeds } from "../pdas";
 import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const SAMPLE_DISCRIMINATOR = 1;

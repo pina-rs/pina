@@ -137,7 +137,7 @@ export async function getToggleCompletedInstructionAsync<
 				"owner",
 				accounts.owner.value,
 			),
-		});
+		}, { programAddress });
 	}
 
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

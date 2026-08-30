@@ -32,7 +32,7 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { CounterSeeds, findCounterPda } from "../pdas";
+import { type CounterSeeds, findCounterPda } from "../pdas";
 import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const COUNTER_STATE_DISCRIMINATOR = 1;

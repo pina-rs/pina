@@ -36,7 +36,7 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { findVestingPda, VestingSeeds } from "../pdas";
+import { findVestingPda, type VestingSeeds } from "../pdas";
 import {
 	getZeroPodBooleanDecoder,
 	getZeroPodDiscriminatorDecoder,

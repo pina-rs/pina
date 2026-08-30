@@ -32,7 +32,7 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { findStorePda, StoreSeeds } from "../pdas";
+import { findStorePda, type StoreSeeds } from "../pdas";
 import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const STORE_STATE_DISCRIMINATOR = 1;

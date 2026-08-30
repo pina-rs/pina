@@ -232,7 +232,7 @@ export async function getInitializePoolInstructionAsync<
 				"rewardMint",
 				accounts.rewardMint.value,
 			),
-		});
+		}, { programAddress });
 	}
 	if (!accounts.associatedTokenProgram.value) {
 		accounts.associatedTokenProgram.value =

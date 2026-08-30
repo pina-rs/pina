@@ -38,7 +38,7 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { findTodoPda, TodoSeeds } from "../pdas";
+import { findTodoPda, type TodoSeeds } from "../pdas";
 import {
 	fixZeroPodEncoderSize,
 	getZeroPodBooleanDecoder,

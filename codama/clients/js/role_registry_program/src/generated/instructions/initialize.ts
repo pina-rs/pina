@@ -163,7 +163,7 @@ export async function getInitializeInstructionAsync<
 				"admin",
 				accounts.admin.value,
 			),
-		});
+		}, { programAddress });
 	}
 	if (!accounts.systemProgram.value) {
 		accounts.systemProgram.value =
