@@ -166,7 +166,7 @@ export async function getUpdateProfileInstructionAsync<
 				"authority",
 				accounts.authority.value,
 			),
-		});
+		}, { programAddress });
 	}
 
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

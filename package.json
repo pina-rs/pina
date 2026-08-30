@@ -14,15 +14,15 @@
 		"test": "pnpm run generate && pnpm run check:js"
 	},
 	"dependencies": {
-		"@codama/renderers-js": "^2.3.1",
+		"@codama/renderers-js": "^2.4.0",
 		"codama": "^1.10.2",
 		"codama-renderers-dart": "0.5.1"
 	},
 	"devDependencies": {
 		"@solana/surfpool": "^1.5.0",
-		"@solana/kit": "^7.1.1",
-		"@solana/program-client-core": "^7.1.1",
-		"@types/node": "^26.2.0",
+		"@solana/kit": "^8.1.0",
+		"@solana/program-client-core": "^8.1.0",
+		"@types/node": "^26.4.0",
 		"typescript": "^7.0.2"
 	}
 }

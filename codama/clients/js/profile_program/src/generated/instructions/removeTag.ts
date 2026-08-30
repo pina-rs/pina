@@ -146,7 +146,7 @@ export async function getRemoveTagInstructionAsync<
 				"authority",
 				accounts.authority.value,
 			),
-		});
+		}, { programAddress });
 	}
 
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

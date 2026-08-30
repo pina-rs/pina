@@ -179,7 +179,7 @@ export async function getInitializeInstructionAsync<
 				"owner",
 				accounts.owner.value,
 			),
-		});
+		}, { programAddress });
 	}
 	if (!accounts.systemProgram.value) {
 		accounts.systemProgram.value =

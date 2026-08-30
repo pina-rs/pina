@@ -36,7 +36,7 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { findRoleEntryPda, RoleEntrySeeds } from "../pdas";
+import { findRoleEntryPda, type RoleEntrySeeds } from "../pdas";
 import {
 	getZeroPodBooleanDecoder,
 	getZeroPodDiscriminatorDecoder,

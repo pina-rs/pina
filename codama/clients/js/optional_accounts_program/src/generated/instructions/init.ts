@@ -165,7 +165,7 @@ export async function getInitInstructionAsync<
 				"authority",
 				accounts.authority.value,
 			),
-		});
+		}, { programAddress });
 	}
 	if (!accounts.systemProgram.value) {
 		accounts.systemProgram.value =

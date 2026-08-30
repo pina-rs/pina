@@ -34,7 +34,7 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { EscrowSeeds, findEscrowPda } from "../pdas";
+import { type EscrowSeeds, findEscrowPda } from "../pdas";
 import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const ESCROW_STATE_DISCRIMINATOR = 1;

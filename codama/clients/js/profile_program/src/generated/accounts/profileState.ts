@@ -42,7 +42,7 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { findProfilePda, ProfileSeeds } from "../pdas";
+import { findProfilePda, type ProfileSeeds } from "../pdas";
 import {
 	fixZeroPodEncoderSize,
 	getZeroPodBooleanDecoder,

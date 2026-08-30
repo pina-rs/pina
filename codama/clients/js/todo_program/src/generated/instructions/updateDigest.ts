@@ -151,7 +151,7 @@ export async function getUpdateDigestInstructionAsync<
 				"owner",
 				accounts.owner.value,
 			),
-		});
+		}, { programAddress });
 	}
 
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

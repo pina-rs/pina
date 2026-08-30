@@ -34,7 +34,7 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { findRegistryConfigPda, RegistryConfigSeeds } from "../pdas";
+import { findRegistryConfigPda, type RegistryConfigSeeds } from "../pdas";
 import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const REGISTRY_CONFIG_DISCRIMINATOR = 1;

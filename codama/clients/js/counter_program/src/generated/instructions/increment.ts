@@ -137,7 +137,7 @@ export async function getIncrementInstructionAsync<
 				"authority",
 				accounts.authority.value,
 			),
-		});
+		}, { programAddress });
 	}
 
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
