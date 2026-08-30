@@ -17,8 +17,10 @@ Two SOL transfer patterns: CPI and direct lamport mutation.
 <br>
 
 ```bash
-cargo test -p transfer_sol
-pina idl --path examples/transfer_sol --output codama/idls/transfer_sol.json
+cd examples/transfer_sol
+pina test --unit
+pina test
+pina generate
 ```
 
 ## Optional SBF build

@@ -25,6 +25,8 @@ Pina parity port of Anchor's float account-data patterns.
 <br>
 
 ```bash
-cargo test -p anchor_floats
-pina idl --path examples/anchor_floats --output codama/idls/anchor_floats.json
+cd examples/anchor_floats
+pina test --unit
+pina test
+pina generate
 ```

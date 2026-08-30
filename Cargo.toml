@@ -114,6 +114,7 @@ object = { default-features = false, version = "^0.40.0" }
 owo-colors = { default-features = false, version = "^4.0" }
 paste = { default-features = false, version = "^1" }
 pastey = { default-features = false, version = "^0.2" }
+pina_test = { default-features = false, path = "crates/pina_test", version = "0.11.1" }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }
 pinocchio-memo = { default-features = false, version = "^0.4" }
@@ -164,7 +165,6 @@ pina_lints = { default-features = false, path = "crates/pina_lints", version = "
 pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.11.1" }
 pina_profile = { default-features = false, path = "crates/pina_profile", version = "0.11.1" }
 pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.11.1" }
-pina_test = { default-features = false, path = "crates/pina_test", version = "0.11.1" }
 
 [workspace.metadata.bin]
 cargo-semver-checks = { version = "0.50.0" }

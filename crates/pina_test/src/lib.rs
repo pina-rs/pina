@@ -4,32 +4,47 @@
 //! dynamically allocated ports, and requests synchronous shutdown. Its inner
 //! Surfnet also requests shutdown from `Drop`, including during a panic.
 
+use std::ffi::OsString;
 use std::future::Future;
 use std::path::Path;
+use std::path::PathBuf;
 
+pub use solana_account::Account;
 pub use solana_instruction::AccountMeta;
 pub use solana_instruction::Instruction;
+pub use solana_keypair::Keypair;
 use solana_message::Message;
 pub use solana_pubkey::Pubkey;
+pub use solana_signature::Signature;
+pub use solana_signer::Signer;
 use solana_transaction::Transaction;
-use surfpool_sdk::Signer;
 use surfpool_sdk::Surfnet;
 use surfpool_sdk::cheatcodes::builders::DeployProgram;
 
 /// Run an async integration-test body on a dedicated Tokio runtime.
 ///
+/// Test bodies panic through this helper, so panics are intercepted while the
+/// Surfpool runtime drains and then re-raised after shutdown completes. This
+/// keeps failing tests from aborting the process while their instance tears
+/// down in the background.
+///
 /// # Panics
 ///
-/// Panics if Tokio cannot construct the test runtime.
+/// Panics if Tokio cannot construct the test runtime, and re-panics with the
+/// original payload when the test body panics.
 pub fn run<F>(future: F) -> F::Output
 where
 	F: Future,
 {
-	tokio::runtime::Builder::new_multi_thread()
+	let runtime = tokio::runtime::Builder::new_multi_thread()
 		.enable_all()
 		.build()
-		.unwrap_or_else(|error| panic!("build Pina integration-test runtime: {error}"))
-		.block_on(future)
+		.unwrap_or_else(|error| panic!("build Pina integration-test runtime: {error}"));
+
+	match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| runtime.block_on(future))) {
+		Ok(output) => output,
+		Err(payload) => std::panic::resume_unwind(payload),
+	}
 }
 
 /// An error from an isolated Pina integration-test operation.
@@ -40,12 +55,201 @@ pub struct TestError {
 	message: String,
 }
 
+impl TestError {
+	/// Short name of the operation that failed.
+	#[must_use]
+	pub const fn operation(&self) -> &'static str {
+		self.operation
+	}
+
+	/// Error text returned by the underlying runtime or RPC client.
+	#[must_use]
+	pub fn message(&self) -> &str {
+		&self.message
+	}
+}
+
+/// A deployed Pina program running in its own isolated Surfpool instance.
+///
+/// `pina test` sets `PINA_SBF_ARTIFACT` before it runs the dedicated Surfpool
+/// test package. [`ProgramTest::start`] consumes that artifact path, deploys the
+/// program, and leaves tests to focus on instructions and state assertions.
+pub struct ProgramTest {
+	program_id: Pubkey,
+	surfnet: OfflineSurfnet,
+}
+
+impl ProgramTest {
+	/// Start an offline Surfnet and deploy the artifact supplied by `pina test`.
+	///
+	/// # Errors
+	///
+	/// Returns an error when `PINA_SBF_ARTIFACT` is missing, does not name a file,
+	/// or the Surfnet cannot start and deploy the program.
+	pub async fn start(program_id: Pubkey) -> Result<Self, TestError> {
+		let artifact = artifact_from_env()?;
+
+		Self::start_with_artifact(program_id, &artifact).await
+	}
+
+	/// Start an offline Surfnet and deploy an explicit SBF artifact.
+	///
+	/// # Errors
+	///
+	/// Returns an error when `artifact` does not name a file or the Surfnet cannot
+	/// start and deploy the program.
+	pub async fn start_with_artifact(
+		program_id: Pubkey,
+		artifact: &Path,
+	) -> Result<Self, TestError> {
+		if !artifact.is_file() {
+			return Err(test_error(
+				"locate SBF program artifact",
+				format_args!("missing file: {}", artifact.display()),
+			));
+		}
+
+		let surfnet = OfflineSurfnet::start().await?;
+		surfnet.deploy_program(program_id, artifact)?;
+
+		Ok(Self {
+			program_id,
+			surfnet,
+		})
+	}
+
+	/// Address where the program is deployed.
+	#[must_use]
+	pub const fn program_id(&self) -> Pubkey {
+		self.program_id
+	}
+
+	/// Address of the pre-funded transaction payer.
+	#[must_use]
+	pub fn payer(&self) -> Pubkey {
+		self.surfnet.payer()
+	}
+
+	/// Build an instruction addressed to the deployed program.
+	#[must_use]
+	pub fn instruction(&self, data: &[u8], accounts: Vec<AccountMeta>) -> Instruction {
+		Instruction::new_with_bytes(self.program_id, data, accounts)
+	}
+
+	/// Build, sign with the pre-funded payer, submit, and confirm one program instruction.
+	///
+	/// # Errors
+	///
+	/// Returns an error when blockhash retrieval, submission, or confirmation fails.
+	pub fn send(&self, data: &[u8], accounts: Vec<AccountMeta>) -> Result<Signature, TestError> {
+		self.send_instruction(self.instruction(data, accounts))
+	}
+
+	/// Sign with the pre-funded payer, submit, and confirm one instruction.
+	///
+	/// # Errors
+	///
+	/// Returns an error when blockhash retrieval, submission, or confirmation fails.
+	pub fn send_instruction(&self, instruction: Instruction) -> Result<Signature, TestError> {
+		self.surfnet.send_instruction(instruction)
+	}
+
+	/// Submit and confirm one instruction with the payer and additional signers.
+	///
+	/// The payer is always the transaction fee payer and first signer. Callers
+	/// only provide program-specific signers.
+	///
+	/// # Errors
+	///
+	/// Returns an error when blockhash retrieval, signing, submission, or
+	/// confirmation fails.
+	pub fn send_with_signers(
+		&self,
+		instruction: Instruction,
+		signers: &[&dyn Signer],
+	) -> Result<Signature, TestError> {
+		self.surfnet
+			.send_instruction_with_signers(instruction, signers)
+	}
+
+	/// Fund an address inside the isolated Surfnet.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the local RPC rejects or cannot confirm the airdrop.
+	pub fn fund(&self, address: &Pubkey, lamports: u64) -> Result<Signature, TestError> {
+		self.surfnet.fund(address, lamports)
+	}
+
+	/// Fetch an account from the isolated Surfnet.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the account does not exist or the local RPC fails.
+	pub fn account(&self, address: &Pubkey) -> Result<Account, TestError> {
+		self.surfnet.account(address)
+	}
+
+	/// Fetch an address balance from the isolated Surfnet.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the local RPC fails.
+	pub fn balance(&self, address: &Pubkey) -> Result<u64, TestError> {
+		self.surfnet.balance(address)
+	}
+
+	/// Return whether the deployed program account exists and is executable.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the program account cannot be fetched.
+	pub fn is_executable(&self) -> Result<bool, TestError> {
+		self.surfnet.program_is_executable(&self.program_id)
+	}
+
+	/// Stop the owned Surfpool RPC servers and release their ports.
+	///
+	/// # Errors
+	///
+	/// Returns an error when both RPC servers do not confirm shutdown in time.
+	pub fn stop(&mut self) -> Result<(), TestError> {
+		self.surfnet.stop()
+	}
+}
+
 /// A dynamically ported Surfpool instance with upstream network access off.
 pub struct OfflineSurfnet {
 	inner: Surfnet,
 }
 
+impl Drop for OfflineSurfnet {
+	fn drop(&mut self) {
+		// Dropping `Surfnet` hands a Terminate command to a runtime that may
+		// already be gone, which aborts the whole test process when a test
+		// panics. Drain synchronously here before the unwinder continues.
+		let _ = self.inner.stop();
+	}
+}
+
 impl OfflineSurfnet {
+	/// Build a system-program transfer instruction from the payer.
+	fn transfer_instruction(&self, to: &Pubkey, lamports: u64) -> Instruction {
+		let mut data = Vec::with_capacity(12);
+		// System program `Transfer` enum tag = 2.
+		data.extend_from_slice(&2u32.to_le_bytes());
+		data.extend_from_slice(&lamports.to_le_bytes());
+
+		Instruction::new_with_bytes(
+			system_program_id(),
+			&data,
+			vec![
+				AccountMeta::new(self.payer(), true),
+				AccountMeta::new(*to, false),
+			],
+		)
+	}
+
 	/// Start an isolated Surfpool instance without contacting an upstream RPC.
 	///
 	/// # Errors
@@ -98,18 +302,80 @@ impl OfflineSurfnet {
 	/// # Errors
 	///
 	/// Returns an error when blockhash retrieval, submission, or confirmation fails.
-	pub fn send_instruction(&self, instruction: Instruction) -> Result<(), TestError> {
+	pub fn send_instruction(&self, instruction: Instruction) -> Result<Signature, TestError> {
+		self.send_instruction_with_signers(instruction, &[])
+	}
+
+	/// Sign, submit, and confirm one instruction with additional signers.
+	///
+	/// The pre-funded payer remains the fee payer and is added automatically.
+	///
+	/// # Errors
+	///
+	/// Returns an error when blockhash retrieval, signing, submission, or
+	/// confirmation fails.
+	pub fn send_instruction_with_signers(
+		&self,
+		instruction: Instruction,
+		signers: &[&dyn Signer],
+	) -> Result<Signature, TestError> {
 		let rpc = self.inner.rpc_client();
 		let payer = self.inner.payer();
+		let mut transaction_signers: Vec<&dyn Signer> = Vec::with_capacity(signers.len() + 1);
+		transaction_signers.push(payer);
+		transaction_signers.extend_from_slice(signers);
 		let blockhash = rpc
 			.get_latest_blockhash()
 			.map_err(|error| test_error("fetch latest blockhash", error))?;
 		let message = Message::new(&[instruction], Some(&payer.pubkey()));
-		let transaction = Transaction::new(&[payer], message, blockhash);
+		let mut transaction = Transaction::new_unsigned(message);
+		transaction
+			.try_sign(&transaction_signers, blockhash)
+			.map_err(|error| test_error("sign program transaction", error))?;
 
 		rpc.send_and_confirm_transaction(&transaction)
-			.map(|_| ())
 			.map_err(|error| test_error("execute program instruction", error))
+	}
+
+	/// Fund an address inside the isolated Surfnet by transferring lamports
+	/// from the pre-funded payer.
+	///
+	/// The transfer doubles as creation: the receiver starts as a system
+	/// account holding the transferred balance, exactly like production
+	/// funding flows.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the transfer transaction cannot be signed,
+	/// submitted, or confirmed.
+	pub fn fund(&self, address: &Pubkey, lamports: u64) -> Result<Signature, TestError> {
+		let instruction = self.transfer_instruction(address, lamports);
+
+		self.send_instruction(instruction)
+	}
+
+	/// Fetch an account from the local RPC.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the account does not exist or the local RPC fails.
+	pub fn account(&self, address: &Pubkey) -> Result<Account, TestError> {
+		self.inner
+			.rpc_client()
+			.get_account(address)
+			.map_err(|error| test_error("fetch test account", error))
+	}
+
+	/// Fetch an address balance from the local RPC.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the local RPC fails.
+	pub fn balance(&self, address: &Pubkey) -> Result<u64, TestError> {
+		self.inner
+			.rpc_client()
+			.get_balance(address)
+			.map_err(|error| test_error("fetch test account balance", error))
 	}
 
 	/// Synchronously stop the owned Surfpool RPC servers and release their ports.
@@ -131,6 +397,35 @@ fn test_error(operation: &'static str, error: impl std::fmt::Display) -> TestErr
 	}
 }
 
+/// The system program, which owns lamports and account creation.
+fn system_program_id() -> Pubkey {
+	Pubkey::default()
+}
+
+fn artifact_from_env() -> Result<PathBuf, TestError> {
+	let artifact = std::env::var_os("PINA_SBF_ARTIFACT").ok_or_else(|| {
+		test_error(
+			"locate SBF program artifact",
+			"PINA_SBF_ARTIFACT is not set; run this test with `pina test`",
+		)
+	})?;
+
+	artifact_path(artifact)
+}
+
+fn artifact_path(artifact: OsString) -> Result<PathBuf, TestError> {
+	let path = PathBuf::from(artifact);
+
+	if !path.is_file() {
+		return Err(test_error(
+			"locate SBF program artifact",
+			format_args!("missing file: {}", path.display()),
+		));
+	}
+
+	Ok(path)
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -139,6 +434,8 @@ mod tests {
 	fn preserves_error_operation_and_source() {
 		let error = test_error("deploy", "missing artifact");
 
+		assert_eq!(error.operation(), "deploy");
+		assert_eq!(error.message(), "missing artifact");
 		assert_eq!(error.to_string(), "deploy: missing artifact");
 	}
 

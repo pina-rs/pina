@@ -25,6 +25,8 @@ Pina parity port of Anchor's custom error handling patterns.
 <br>
 
 ```bash
-cargo test -p anchor_errors
-pina idl --path examples/anchor_errors --output codama/idls/anchor_errors.json
+cd examples/anchor_errors
+pina test --unit
+pina test
+pina generate
 ```

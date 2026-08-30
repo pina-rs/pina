@@ -17,8 +17,10 @@ Minimal Pina program.
 <br>
 
 ```bash
-cargo test -p hello_solana
-pina idl --path examples/hello_solana --output codama/idls/hello_solana.json
+cd examples/hello_solana
+pina test --unit
+pina test
+pina generate
 ```
 
 ## Optional SBF build

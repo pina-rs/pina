@@ -18,8 +18,10 @@ User profile registry demonstrating fully initialized bounded text and list fiel
 <br>
 
 ```bash
-cargo test -p profile_program
-pina idl --path examples/profile_program --output codama/idls/profile_program.json
+cd examples/profile_program
+pina test --unit
+pina test
+pina generate
 ```
 
 ## Optional SBF build

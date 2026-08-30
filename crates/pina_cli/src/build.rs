@@ -163,10 +163,13 @@ pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput,
 		.into_iter()
 		.collect::<Vec<_>>()
 		.join(",");
-	let args = cargo_build_args(&project, &manifest_path, &features, options);
+	let args = build_sbf_args(&project, &manifest_path, &features, options);
 	let command_label = command_label(&cargo, &args);
 	let mut command = Command::new(&cargo);
-	command.current_dir(&project.root).args(&args);
+	command
+		.current_dir(&project.root)
+		.env("CARGO_TARGET_DIR", &project.target_dir)
+		.args(&args);
 
 	let status = command.status().map_err(|source| {
 		BuildError::RunCargo {
@@ -184,8 +187,8 @@ pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput,
 
 	let compiler_artifact = project
 		.target_dir
-		.join("bpfel-unknown-none/release")
-		.join(format!("lib{}.so", project.library_name));
+		.join("sbf-build")
+		.join(format!("{}.so", project.library_name));
 
 	if !compiler_artifact.is_file() {
 		return Err(BuildError::MissingArtifact {
@@ -326,25 +329,24 @@ fn publish_verified_build(
 	})
 }
 
-fn cargo_build_args(
+/// Arguments that delegate SBF compilation to the Agave `cargo-build-sbf`
+/// driver.
+///
+/// The driver owns the SBF toolchain (platform-tools rustc and sbf-linker),
+/// produces artifacts whose relocations are applied correctly by the real
+/// runtimes, and honors `CARGO_TARGET_DIR` for its intermediate output.
+fn build_sbf_args(
 	project: &Project,
 	manifest_path: &Path,
 	features: &str,
 	options: &BuildOptions,
 ) -> Vec<OsString> {
 	let mut args = vec![
-		OsString::from("build"),
-		OsString::from("--release"),
-		OsString::from("--target"),
-		OsString::from("bpfel-unknown-none"),
-		OsString::from("--target-dir"),
-		project.target_dir.as_os_str().to_owned(),
+		OsString::from("build-sbf"),
 		OsString::from("--manifest-path"),
 		manifest_path.as_os_str().to_owned(),
-		OsString::from("-p"),
-		OsString::from(&project.package_name),
-		OsString::from("-Z"),
-		OsString::from("build-std=core,alloc"),
+		OsString::from("--sbf-out-dir"),
+		project.target_dir.join("sbf-build").into_os_string(),
 		OsString::from("--features"),
 		OsString::from(features),
 	];

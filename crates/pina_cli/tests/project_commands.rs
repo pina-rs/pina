@@ -132,8 +132,8 @@ if [[ -z "$target_dir" ]]; then
 	target_dir="$CARGO_TARGET_DIR"
 fi
 
-mkdir -p "$target_dir/bpfel-unknown-none/release"
-printf 'compiled-sbf' > "$target_dir/bpfel-unknown-none/release/libcustom_program.so"
+mkdir -p "$target_dir/sbf-build"
+printf 'compiled-sbf' > "$target_dir/sbf-build/custom_program.so"
 "#,
 	)
 	.unwrap_or_else(|error| panic!("failed to write fake cargo: {error}"));
@@ -409,21 +409,14 @@ fn build_publishes_custom_library_artifact_and_idl() {
 	assert_eq!(
 		args,
 		vec![
-			"build".to_owned(),
-			"--release".to_owned(),
-			"--target".to_owned(),
-			"bpfel-unknown-none".to_owned(),
-			"--target-dir".to_owned(),
-			target.to_string_lossy().into_owned(),
+			"build-sbf".to_owned(),
 			"--manifest-path".to_owned(),
 			fs::canonicalize(project.join("Cargo.toml"))
 				.unwrap_or_else(|error| panic!("failed to canonicalize manifest: {error}"))
 				.to_string_lossy()
 				.into_owned(),
-			"-p".to_owned(),
-			"hyphen-package".to_owned(),
-			"-Z".to_owned(),
-			"build-std=core,alloc".to_owned(),
+			"--sbf-out-dir".to_owned(),
+			target.join("sbf-build").to_string_lossy().into_owned(),
 			"--features".to_owned(),
 			"bpf-entrypoint,cpi,logs".to_owned(),
 			"--no-default-features".to_owned(),
@@ -887,8 +880,8 @@ fn failed_build_does_not_publish_an_artifact() {
 	assert!(!target.join("idl/custom_program.json").exists());
 	let stderr = String::from_utf8_lossy(&output.stderr);
 	assert!(stderr.contains("exit status: 23"));
-	assert!(stderr.contains("build-std=core,alloc"));
-	assert!(stderr.contains("--target-dir"));
+	assert!(stderr.contains("build-sbf"));
+	assert!(stderr.contains("--sbf-out-dir"));
 	assert!(stderr.contains("--manifest-path"));
 	assert!(stderr.contains("--features"));
 	assert!(stderr.contains("bpf-entrypoint,logs"));

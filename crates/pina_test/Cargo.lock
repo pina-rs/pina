@@ -314,6 +314,54 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "anchor-declare-id-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "anchor_declare_id",
+ "pina_test",
+]
+
+[[package]]
+name = "anchor-declare-program-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "anchor_declare_program",
+ "pina_test",
+]
+
+[[package]]
+name = "anchor-duplicate-mutable-accounts-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "anchor_duplicate_mutable_accounts",
+ "pina_test",
+]
+
+[[package]]
+name = "anchor-errors-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "anchor_errors",
+ "pina_test",
+]
+
+[[package]]
+name = "anchor-events-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "anchor_events",
+ "pina_test",
+]
+
+[[package]]
+name = "anchor-floats-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "anchor_floats",
+ "pina_test",
+]
+
+[[package]]
 name = "anchor-lang-idl"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -335,6 +383,93 @@ checksum = "2bdf143115440fe621bdac3a29a1f7472e09f6cd82b2aa569429a0c13f103838"
 dependencies = [
  "anyhow",
  "serde",
+]
+
+[[package]]
+name = "anchor-realloc-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "anchor_realloc",
+ "pina_test",
+]
+
+[[package]]
+name = "anchor-system-accounts-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "anchor_system_accounts",
+ "pina_test",
+]
+
+[[package]]
+name = "anchor-sysvars-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "anchor_sysvars",
+ "pina_test",
+]
+
+[[package]]
+name = "anchor_declare_id"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "anchor_declare_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "anchor_duplicate_mutable_accounts"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "anchor_errors"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "anchor_events"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "anchor_floats"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "anchor_realloc"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "anchor_system_accounts"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "anchor_sysvars"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -1499,6 +1634,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "counter-program-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "counter_program",
+ "pina_test",
+]
+
+[[package]]
+name = "counter_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "cpufeatures"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1710,6 +1860,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed17f5901b6630b993ca003def43f2f8ef4014fc13b047b57aad617ff32bc2ec"
+dependencies = [
+ "darling_core 0.24.1",
+ "darling_macro 0.24.1",
+]
+
+[[package]]
 name = "darling_core"
 version = "0.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1737,6 +1897,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling_core"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6837e2cf7485aaae18f86181d2f0e9a7ed297a025e220aeabf63fdebd3a2ddff"
+dependencies = [
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "strsim",
+ "syn 3.0.4",
+]
+
+[[package]]
 name = "darling_macro"
 version = "0.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1756,6 +1929,17 @@ dependencies = [
  "darling_core 0.23.0",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ac7135c3ef02b2f7833bbeb1be5ba7f966dcde8a87c6b87f65a778d71a02785"
+dependencies = [
+ "darling_core 0.24.1",
+ "quote",
+ "syn 3.0.4",
 ]
 
 [[package]]
@@ -2229,7 +2413,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "escrow-program-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "escrow_program",
+ "pina_test",
+ "solana-rent 4.3.0",
+]
+
+[[package]]
+name = "escrow_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -2774,6 +2974,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
+name = "hello-solana-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "hello_solana",
+ "pina_test",
+]
+
+[[package]]
+name = "hello_solana"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "hermit-abi"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3022,7 +3237,7 @@ dependencies = [
  "libc",
  "percent-encoding 2.3.2",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.5",
  "tokio",
  "tower-service",
  "tracing",
@@ -4435,6 +4650,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
+name = "optional-accounts-program-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "optional_accounts_program",
+ "pina_test",
+]
+
+[[package]]
+name = "optional_accounts_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "pairing"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4647,9 +4877,52 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
+name = "pina"
+version = "0.11.1"
+dependencies = [
+ "pastey",
+ "pina_macros",
+ "pinocchio",
+ "pinocchio-associated-token-account",
+ "pinocchio-system",
+ "pinocchio-token",
+ "pinocchio-token-2022",
+ "solana-address 2.6.1",
+ "solana-program-log",
+ "zeropod",
+]
+
+[[package]]
+name = "pina-bpf-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "pina_bpf",
+ "pina_test",
+]
+
+[[package]]
+name = "pina_bpf"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "pina_macros"
+version = "0.11.1"
+dependencies = [
+ "darling 0.24.1",
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 3.0.4",
+]
+
+[[package]]
 name = "pina_test"
 version = "0.11.1"
 dependencies = [
+ "solana-account 4.3.1",
  "solana-address 2.6.1",
  "solana-client",
  "solana-clock 3.1.1",
@@ -4658,6 +4931,7 @@ dependencies = [
  "solana-fee-calculator 3.2.2",
  "solana-hash 4.4.0",
  "solana-instruction 3.4.0",
+ "solana-keypair",
  "solana-last-restart-slot 3.1.0",
  "solana-message 4.4.0",
  "solana-pubkey 4.2.0",
@@ -4667,6 +4941,7 @@ dependencies = [
  "solana-runtime",
  "solana-short-vec 3.2.2",
  "solana-signature",
+ "solana-signer",
  "solana-slot-history 3.1.0",
  "solana-stake-history",
  "solana-transaction 4.1.5",
@@ -4674,6 +4949,68 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "wincode",
+]
+
+[[package]]
+name = "pinocchio"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6cababcb62a2e739c7078ae16eda02789a6e3edd21bbdded864e85c38a7914d"
+dependencies = [
+ "solana-account-view",
+ "solana-address 2.6.1",
+ "solana-define-syscall 5.2.0",
+ "solana-instruction-view",
+ "solana-program-error 3.0.1",
+]
+
+[[package]]
+name = "pinocchio-associated-token-account"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c552da2a965b33511ac54494e434e69be0ae12da1619a72594b76703c3dca211"
+dependencies = [
+ "solana-account-view",
+ "solana-address 2.6.1",
+ "solana-instruction-view",
+ "solana-program-error 3.0.1",
+]
+
+[[package]]
+name = "pinocchio-system"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3ae2ee67b42e2ac797dd88312da473c895660e270d8093e0ba2749b885b5778"
+dependencies = [
+ "pinocchio",
+ "solana-address 2.6.1",
+]
+
+[[package]]
+name = "pinocchio-token"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "217e3259f93a1520e4692b18653dad4d29af54ffc8b3a09819808be85dada074"
+dependencies = [
+ "solana-account-view",
+ "solana-address 2.6.1",
+ "solana-instruction-view",
+ "solana-program-error 3.0.1",
+]
+
+[[package]]
+name = "pinocchio-token-2022"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a3c164973916f044bebff3c8cb4467088bafb13cbdb818522b9ca8782940d06"
+dependencies = [
+ "pinocchio-token",
+ "solana-account-view",
+ "solana-address 2.6.1",
+ "solana-instruction-view",
+ "solana-nullable",
+ "solana-program-error 3.0.1",
+ "solana-zero-copy",
 ]
 
 [[package]]
@@ -4840,6 +5177,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "profile-program-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "pina_test",
+ "profile_program",
+]
+
+[[package]]
+name = "profile_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "prop-amm-program-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "pina_test",
+ "prop_amm_program",
+]
+
+[[package]]
+name = "prop_amm_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "qstring"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4872,7 +5239,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash 2.1.3",
  "rustls 0.23.43",
- "socket2 0.5.10",
+ "socket2 0.6.5",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
@@ -4912,9 +5279,9 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.10",
+ "socket2 0.6.5",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5327,6 +5694,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "role-registry-program-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "pina_test",
+ "role_registry_program",
+]
+
+[[package]]
+name = "role_registry_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5372,7 +5754,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5450,7 +5832,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6057,6 +6439,16 @@ dependencies = [
  "solana-address 2.6.1",
  "solana-program-error 3.0.1",
  "solana-program-memory 3.1.0",
+]
+
+[[package]]
+name = "solana-account-view"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc141b940560430425ebaadb7645496c45f6a10fad9911d719bd03eab7f4d422"
+dependencies = [
+ "solana-address 2.6.1",
+ "solana-program-error 3.0.1",
 ]
 
 [[package]]
@@ -7145,6 +7537,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-instruction-view"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ab7a27d0c4214b9f7389c3dd00b68c93093a67f1dcc5b7893aebe299bbcbb47"
+dependencies = [
+ "solana-account-view",
+ "solana-address 2.6.1",
+ "solana-define-syscall 5.2.0",
+ "solana-program-error 3.0.1",
+]
+
+[[package]]
 name = "solana-instructions-sysvar"
 version = "2.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7813,6 +8217,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f04fa578707b3612b095f0c8e19b66a1233f7c42ca8082fcb3b745afcc0add6"
 dependencies = [
  "borsh 1.8.1",
+]
+
+[[package]]
+name = "solana-program-log"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ffd48ddef444e6db138fb11bdb9ab8117bb830a78cef051a453454de5613039b"
+dependencies = [
+ "solana-define-syscall 5.2.0",
+ "solana-program-log-macro",
+]
+
+[[package]]
+name = "solana-program-log-macro"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73b234f83b71ba6b5d3236b69ba42ccb639907cb724bf58e94ce8398b51ac87c"
+dependencies = [
+ "quote",
+ "regex",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -9828,6 +10253,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
+name = "staking-rewards-program-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "pina_test",
+ "solana-rent 4.3.0",
+ "staking_rewards_program",
+]
+
+[[package]]
+name = "staking_rewards_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10176,7 +10617,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -10316,6 +10757,21 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
+
+[[package]]
+name = "todo-program-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "pina_test",
+ "todo_program",
+]
+
+[[package]]
+name = "todo_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
 
 [[package]]
 name = "tokio"
@@ -10528,6 +10984,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
 dependencies = [
  "once_cell",
+]
+
+[[package]]
+name = "transfer-sol-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "pina_test",
+ "transfer_sol",
+]
+
+[[package]]
+name = "transfer_sol"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -10837,6 +11308,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
+name = "vesting-program-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "pina_test",
+ "solana-rent 4.3.0",
+ "vesting_program",
+]
+
+[[package]]
+name = "vesting_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "void"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11034,7 +11521,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -11504,6 +11991,28 @@ name = "zeroize_derive"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c50655cbb0fe3fc43170059e702f1ce5e19b84cec58dc87b037a09935c2f328"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "zeropod"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af6c4fe8dc57179de72db5185c9c618a3350a9122a76ec3e13ccd493bca38931"
+dependencies = [
+ "solana-address 2.6.1",
+ "solana-program-error 3.0.1",
+ "zeropod-derive",
+]
+
+[[package]]
+name = "zeropod-derive"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "babb94e405e4914176ad9fd74e34c640ea0fcd314bfcb2bb6690a5300e724257"
 dependencies = [
  "proc-macro2",
  "quote",

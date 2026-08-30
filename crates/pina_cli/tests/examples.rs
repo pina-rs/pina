@@ -3,7 +3,32 @@ use std::path::Path;
 
 use codama_nodes::RootNode;
 use pina_cli::generate_idl;
+use pina_cli::project::Project;
 use serde_json::Value;
+
+const EXAMPLES: &[&str] = &[
+	"anchor_declare_id",
+	"anchor_declare_program",
+	"anchor_duplicate_mutable_accounts",
+	"anchor_errors",
+	"anchor_events",
+	"anchor_floats",
+	"anchor_realloc",
+	"anchor_system_accounts",
+	"anchor_sysvars",
+	"counter_program",
+	"escrow_program",
+	"hello_solana",
+	"optional_accounts_program",
+	"pina_bpf",
+	"profile_program",
+	"prop_amm_program",
+	"role_registry_program",
+	"staking_rewards_program",
+	"todo_program",
+	"transfer_sol",
+	"vesting_program",
+];
 
 fn workspace_root() -> &'static Path {
 	// The test binary runs from the workspace root.
@@ -77,5 +102,30 @@ fn committed_example_idls_match_generated_output() {
 		"transfer_sol",
 	] {
 		assert_matches_committed_idl(example);
+	}
+}
+
+#[test]
+fn every_example_is_a_complete_pina_project() {
+	let examples_dir = workspace_root().join("examples");
+
+	for example in EXAMPLES {
+		let root = examples_dir.join(example);
+		let project = Project::discover(&root)
+			.unwrap_or_else(|error| panic!("discover {example} through Pina.toml: {error}"));
+
+		assert_eq!(
+			project.root,
+			root.canonicalize()
+				.unwrap_or_else(|error| panic!("canonicalize {example} root: {error}"))
+		);
+		assert_eq!(project.package_name, *example);
+
+		let surfpool_manifest = root.join("tests/surfpool/Cargo.toml");
+		let surfpool_cargo = fs::read_to_string(&surfpool_manifest)
+			.unwrap_or_else(|error| panic!("read {}: {error}", surfpool_manifest.display()));
+		assert!(surfpool_cargo.contains("pina_test = { workspace = true }"));
+		assert!(!surfpool_cargo.contains("pina_test = { path ="));
+		assert!(root.join("tests/surfpool/src/lib.rs").is_file());
 	}
 }

@@ -25,6 +25,8 @@ Pina parity port of Anchor's `declare-id` example.
 <br>
 
 ```bash
-cargo test -p anchor_declare_id
-pina idl --path examples/anchor_declare_id --output codama/idls/anchor_declare_id.json
+cd examples/anchor_declare_id
+pina test --unit
+pina test
+pina generate
 ```

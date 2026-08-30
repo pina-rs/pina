@@ -25,6 +25,8 @@ Pina parity port of Anchor's `declare-program` behavior.
 <br>
 
 ```bash
-cargo test -p anchor_declare_program
-pina idl --path examples/anchor_declare_program --output codama/idls/anchor_declare_program.json
+cd examples/anchor_declare_program
+pina test --unit
+pina test
+pina generate
 ```

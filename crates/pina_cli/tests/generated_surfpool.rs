@@ -65,9 +65,23 @@ fn initialized_project_executes_its_starter_instruction_on_surfpool() {
 		panic!("failed to update {}: {error}", surfpool_manifest.display())
 	});
 
+	let target_dir = workspace_root().join("target/generated-surfpool");
+	let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+	let check = Command::new(cargo)
+		.args(["check", "--all-features", "--manifest-path"])
+		.arg(&manifest)
+		.env("CARGO_TARGET_DIR", &target_dir)
+		.status()
+		.unwrap_or_else(|error| panic!("failed to check generated project: {error}"));
+	assert!(
+		check.success(),
+		"generated all-features check failed with {check}"
+	);
+
 	let test = Command::new(pina)
 		.args(["test", "--project"])
 		.arg(&project)
+		.env("CARGO_TARGET_DIR", target_dir)
 		.status()
 		.unwrap_or_else(|error| panic!("failed to run generated Surfpool test: {error}"));
 	assert!(

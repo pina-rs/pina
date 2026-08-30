@@ -25,6 +25,8 @@ Pina parity port of Anchor's event definitions and serialization semantics.
 <br>
 
 ```bash
-cargo test -p anchor_events
-pina idl --path examples/anchor_events --output codama/idls/anchor_events.json
+cd examples/anchor_events
+pina test --unit
+pina test
+pina generate
 ```

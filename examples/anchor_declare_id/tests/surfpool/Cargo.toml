@@ -1,0 +1,10 @@
+[package]
+name = "anchor-declare-id-surfpool-tests"
+version = "0.0.0"
+edition = "2024"
+publish = false
+workspace = "../../../../crates/pina_test"
+
+[dependencies]
+pina_test = { workspace = true }
+program_under_test = { package = "anchor_declare_id", path = "../.." }

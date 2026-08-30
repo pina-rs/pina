@@ -32,8 +32,10 @@ Pina keeps the implementation fully Rust-based and aligned with the workspace's 
 <br>
 
 ```bash
-cargo test -p prop_amm_program -- --nocapture
-pina idl --path examples/prop_amm_program --output codama/idls/prop_amm_program.json
+cd examples/prop_amm_program
+pina test --unit
+pina test
+pina generate
 ```
 
 ## Optional SBF build

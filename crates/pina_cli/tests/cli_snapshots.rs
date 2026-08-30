@@ -110,9 +110,9 @@ case "${1:-}" in
 	metadata)
 		exec cargo "$@"
 		;;
-	build)
-		mkdir -p "$PINA_FAKE_TARGET/bpfel-unknown-none/release"
-		: > "$PINA_FAKE_TARGET/bpfel-unknown-none/release/libtest_program.so"
+	build-sbf)
+		mkdir -p "$PINA_FAKE_TARGET/sbf-build"
+		: > "$PINA_FAKE_TARGET/sbf-build/test_program.so"
 		;;
 	test)
 		if [[ " $* " == *" --lib "* ]]; then

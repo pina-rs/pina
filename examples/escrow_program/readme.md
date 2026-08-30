@@ -17,8 +17,10 @@ Token escrow program.
 <br>
 
 ```bash
-cargo test -p escrow_program
-pina idl --path examples/escrow_program --output codama/idls/escrow_program.json
+cd examples/escrow_program
+pina test --unit
+pina test
+pina generate
 ```
 
 ## Optional SBF build

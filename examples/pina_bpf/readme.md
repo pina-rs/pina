@@ -17,39 +17,15 @@ Compared to the original pinocchio starter style:
   - the BPF artifact exists after build
   - the generated artifact is a valid ELF binary
 
-## Build Requirements
+## Project workflow
 
 <br>
 
-This example must be built with nightly Rust and `build-std` for `core,alloc`.
+Run the same commands available in a project created by `pina init`:
 
 ```bash
-rustup component add rust-src --toolchain nightly
-cargo +nightly build --release \
-  --target bpfel-unknown-none \
-  -p pina_bpf \
-  -F bpf-entrypoint \
-  -Z build-std=core,alloc
-```
-
-The workspace provides an alias for the same command:
-
-```bash
-cargo +nightly build-bpf
-```
-
-## Tests
-
-<br>
-
-Run normal unit tests:
-
-```bash
-cargo test -p pina_bpf
-```
-
-Run BPF artifact verification tests after building:
-
-```bash
-cargo test -p pina_bpf bpf_build_ -- --ignored
+cd examples/pina_bpf
+pina test --unit
+pina test
+pina generate
 ```
