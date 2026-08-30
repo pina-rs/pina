@@ -351,7 +351,7 @@ const BASE_TOOL_SPECS: &[ToolSpec] = &[
 		accept_nonzero: false,
 	},
 	ToolSpec {
-		name: "sbpf-linker",
+		name: "cargo-build-sbf",
 		required: true,
 		version_args: &["--version"],
 		accept_nonzero: true,
@@ -1392,7 +1392,7 @@ mod tests {
 
 		assert_eq!(
 			tool_message(&ToolDiagnostic {
-				name: "sbpf-linker",
+				name: "cargo-build-sbf",
 				required: true,
 				available: true,
 				version: None,

@@ -25,3 +25,7 @@ This crate is for host tests only. Do not enable it in an SBF build.
 The crate is intentionally isolated from Pina's main Cargo workspace: Surfpool 1.5 uses Agave 4.1, while the workspace's current Mollusk release uses Agave 4.2. The separation keeps both test layers reproducible without forcing either runtime into the other's dependency graph.
 
 See [security.md](security.md) for the offline-only trust boundary, dependency audit exceptions, and package-specific license policy.
+
+## Known runtime limitations
+
+Surfpool 1.5 cannot derive CPI signers for PDAs with four or more seed arguments (five including the bump); derivations that work on the host and on mainnet fail there with `Provided seeds do not result in a valid address`. Programs seeding PDAs with four arguments cannot run their Surfpool suites end to end until the runtime is fixed; pin or skip those flows loudly.

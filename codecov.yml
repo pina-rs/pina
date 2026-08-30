@@ -1,0 +1,6 @@
+# Coverage accounting scope: the Surfpool harness and the example
+# integration packages are exercised by real-runtime suites that cannot run
+# inside the CI coverage job, so they are excluded from patch targets.
+ignore:
+  - "crates/pina_test"
+  - "examples"

@@ -18,7 +18,7 @@ pina build [OPTIONS]
 
 `bpf-entrypoint` is always enabled and deduplicated from explicit features.
 
-SBF compilation uses Cargo's unstable `-Z build-std=core,alloc` support. The `cargo` executable selected by `CARGO`, or `cargo` from `PATH`, must therefore be a nightly toolchain with the `rust-src` component installed.
+SBF compilation delegates to the Agave CLI's `cargo-build-sbf` driver, which owns the SBF toolchain (its own rustc and sbf-linker from platform-tools). The Agave CLI must therefore be installed and on `PATH`; a nightly toolchain with `rust-src` is no longer required.
 
 ## Outputs
 
