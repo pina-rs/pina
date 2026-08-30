@@ -25,6 +25,8 @@ Pina parity port of Anchor's duplicate mutable account checks.
 <br>
 
 ```bash
-cargo test -p anchor_duplicate_mutable_accounts
-pina idl --path examples/anchor_duplicate_mutable_accounts --output codama/idls/anchor_duplicate_mutable_accounts.json
+cd examples/anchor_duplicate_mutable_accounts
+pina test --unit
+pina test
+pina generate
 ```

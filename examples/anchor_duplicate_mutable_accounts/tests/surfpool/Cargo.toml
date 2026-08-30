@@ -1,0 +1,12 @@
+[package]
+name = "anchor-duplicate-mutable-accounts-surfpool-tests"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Keep Surfpool's host runtime isolated from native Mollusk tests and SBF builds.
+[workspace]
+
+[dependencies]
+pina_test = { path = "../../../../crates/pina_test" }
+program_under_test = { package = "anchor_duplicate_mutable_accounts", path = "../.." }

@@ -20,8 +20,10 @@ The `tests/e2e.rs` file exercises the full role lifecycle through Mollusk.
 <br>
 
 ```bash
-cargo test -p role_registry_program
-pina idl --path examples/role_registry_program --output codama/idls/role_registry_program.json
+cd examples/role_registry_program
+pina test --unit
+pina test
+pina generate
 ```
 
 ## Optional SBF build

@@ -25,6 +25,8 @@ Pina parity port of Anchor's sysvar-address validation checks.
 <br>
 
 ```bash
-cargo test -p anchor_sysvars
-pina idl --path examples/anchor_sysvars --output codama/idls/anchor_sysvars.json
+cd examples/anchor_sysvars
+pina test --unit
+pina test
+pina generate
 ```

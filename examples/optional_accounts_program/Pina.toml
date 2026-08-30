@@ -1,0 +1,6 @@
+[project]
+program = "."
+
+[clients]
+output = "clients"
+languages = ["rust", "typescript"]

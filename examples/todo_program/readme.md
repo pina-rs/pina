@@ -17,8 +17,10 @@ PDA-backed todo state program.
 <br>
 
 ```bash
-cargo test -p todo_program
-pina idl --path examples/todo_program --output codama/idls/todo_program.json
+cd examples/todo_program
+pina test --unit
+pina test
+pina generate
 ```
 
 ## Optional SBF build

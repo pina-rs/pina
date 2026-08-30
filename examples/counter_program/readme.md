@@ -17,8 +17,10 @@ PDA-backed counter program.
 <br>
 
 ```bash
-cargo test -p counter_program
-pina idl --path examples/counter_program --output codama/idls/counter_program.json
+cd examples/counter_program
+pina test --unit
+pina test
+pina generate
 ```
 
 ## Optional SBF build

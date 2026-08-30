@@ -31,8 +31,10 @@ See the book's [Production Readiness](../../docs/src/production-readiness.md) ch
 <br>
 
 ```bash
-cargo test -p vesting_program
-pina idl --path examples/vesting_program --output codama/idls/vesting_program.json
+cd examples/vesting_program
+pina test --unit
+pina test
+pina generate
 ```
 
 The first command still runs useful native tests when the SBF artifact is absent; read its output and do not mistake a skipped E2E path for an executed program test.

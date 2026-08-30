@@ -42,6 +42,8 @@ The SBF regressions cover the normal lifecycle, a signer attempting to resize an
 <br>
 
 ```sh
-cargo test -p anchor_realloc
-pina idl --path examples/anchor_realloc --output codama/idls/anchor_realloc.json
+cd examples/anchor_realloc
+pina test --unit
+pina test
+pina generate
 ```

@@ -94,7 +94,7 @@ pub fn init_project(project_dir: &Path, package_name: &str, force: bool) -> Resu
 	)?;
 	write_file(&paths[9], &rust_toolchain_template())?;
 	write_file(&paths[10], &surfpool_cargo_toml_template(package_name))?;
-	write_file(&paths[11], &surfpool_test_template(&program_title))?;
+	write_file(&paths[11], &surfpool_test_template())?;
 
 	Ok(())
 }
@@ -107,7 +107,7 @@ pub fn print_next_steps(project_dir: &Path, _package_name: &str) {
 	println!("    cd {}", project_dir.display());
 	println!("    pina lint                      # run Pina's security lints");
 	println!("    pina build                     # build SBF and generate the IDL");
-	println!("    pina test --unit               # fast native and Mollusk tests");
+	println!("    pina test --unit               # fast native tests");
 	println!("    pina test                      # build SBF and test with Surfpool");
 	println!("    pina dev --yes                 # create and review the Surfpool runbook");
 	println!("    pina generate                  # generate configured clients");
@@ -177,10 +177,6 @@ cpi = []
 [dependencies]
 pina = {{ version = "{pina_version}", features = ["logs", "derive"] }}
 
-[dev-dependencies]
-# Keep fast native instruction tests on the workspace-supported Mollusk release.
-mollusk-svm = "0.15.0"
-
 [lints.rust.unexpected_cfgs]
 level = "warn"
 check-cfg = [
@@ -215,7 +211,7 @@ TypeScript client generation requires Node.js with npm and `npx`.
 - Apply machine-applicable security lint suggestions: `pina lint --fix`, then
   review the resulting diff
 - Build (all features): `cargo build --all-features`
-- Fast native/Mollusk tests: `pina test --unit`
+- Fast native tests: `pina test --unit`
 - SBF integration tests on an isolated Surfpool instance: `pina test`
 - Persistent development Surfnet: `pina dev --yes` on the first run, then
   review and commit the generated `txtx.yml`
@@ -305,17 +301,18 @@ pub struct InitializeInstruction {{
 
 #[derive(Accounts, Debug)]
 pub struct InitializeAccounts<'a> {{
-	pub payer: &'a AccountView,
-	pub state: &'a AccountView,
-	pub system_program: &'a AccountView,
+	pub authority: &'a AccountView,
 }}
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {{
 	fn process(self, data: &[u8]) -> ProgramResult {{
-		let _args = InitializeInstruction::try_from_bytes(data)?;
-		self.payer.assert_signer()?;
+		let args = InitializeInstruction::try_from_bytes(data)?;
+		self.authority.assert_signer()?;
+		if args.value == 0 {{
+			return Err(ProgramError::InvalidArgument);
+		}}
+
 		log!("Initialized {package_name}");
-		// Your logic here
 		Ok(())
 	}}
 }}
@@ -362,9 +359,7 @@ fn entrypoint_template() -> String {
 
 use crate::*;
 
-// Size entrypoint storage for this scaffold's largest account list. Keeping
-// the default transaction-wide maximum would waste compute during decoding.
-nostd_entrypoint!(process_instruction, 3);
+nostd_entrypoint!(process_instruction);
 "
 	.to_owned()
 }
@@ -396,37 +391,25 @@ pub type ProgramAccount<'a> = Program<'a, {program_title}Program>;
 pub mod accounts {{
 	use super::*;
 
-	/// Accounts required to initialize the program state.
+	/// Accounts required to initialize the program.
 	#[derive(Clone, Copy, Debug)]
 	pub struct Initialize<'a> {{
-		/// Writable signer that funds initialization.
-		pub payer: CpiHandle<'a>,
-
-		/// Writable account that stores the program state.
-		pub state: CpiHandle<'a>,
-
-		/// System program used during initialization.
-		pub system_program: CpiHandle<'a>,
+		/// Signer authorizing initialization.
+		pub authority: CpiHandle<'a>,
 	}}
 
 	impl<'a> Initialize<'a> {{
-		/// Validates writable privileges and builds the CPI account set.
-		pub fn new(
-			payer: &'a AccountView,
-			state: &'a AccountView,
-			system_program: &'a AccountView,
-		) -> Result<Self, ProgramError> {{
-			Ok(Self {{
-				payer: CpiHandle::writable_signer(payer)?,
-				state: CpiHandle::writable(state)?,
-				system_program: CpiHandle::readonly(system_program),
-			}})
+		/// Validates signer privileges and builds the CPI account set.
+		pub const fn new(authority: &'a AccountView) -> Self {{
+			Self {{
+				authority: CpiHandle::readonly_signer(authority),
+			}}
 		}}
 	}}
 
-	impl<'a> ToCpiAccounts<'a, 3> for Initialize<'a> {{
-		fn to_cpi_handles(&self) -> [CpiHandle<'a>; 3] {{
-			[self.payer, self.state, self.system_program]
+	impl<'a> ToCpiAccounts<'a, 1> for Initialize<'a> {{
+		fn to_cpi_handles(&self) -> [CpiHandle<'a>; 1] {{
+			[self.authority]
 		}}
 	}}
 }}
@@ -434,14 +417,14 @@ pub mod accounts {{
 pub mod instructions {{
 	use super::*;
 
-	/// Initializes program state through a typed CPI.
+	/// Initializes the program through a typed CPI.
 	#[derive(Clone, Copy, Debug)]
 	#[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
 	pub struct Initialize<'a> {{
 		/// Validated accounts required by the initialize instruction.
 		pub accounts: accounts::Initialize<'a>,
 
-		/// Initial value to store in program state.
+		/// Non-zero value accepted by the starter handler.
 		pub value: u8,
 	}}
 
@@ -466,7 +449,8 @@ pub mod instructions {{
 			signers: &[Signer<'_, '_>],
 		) -> ProgramResult {{
 			let mut data = [0u8; InitializeInstruction::SIZE];
-			InitializeInstruction::initialize(&mut data)?.value = self.value;
+			let args = InitializeInstruction::initialize(&mut data)?;
+			args.value = self.value;
 			let ctx = CpiContext::new(*program, self.accounts);
 
 			ctx.invoke_signed(&data, signers)
@@ -499,38 +483,31 @@ fn parse_instruction_rejects_wrong_program_id() {{
 	assert!(matches!(result, Err(pina::ProgramError::IncorrectProgramId)));
 }}
 
-// Uncomment and adapt once mollusk-svm is set up in your environment:
-//
-// #[test]
-// fn initialize_succeeds() {{
-//     use mollusk_svm::Mollusk;
-//
-//     let mollusk = Mollusk::new(&ID, "{package_ident}");
-//
-//     // Build instruction data (discriminator + payload).
-//     let data = [
-//         {program_title}Instruction::Initialize as u8,
-//         42u8, // value
-//     ];
-//
-//     // Set up account fixtures and invoke via mollusk.process_instruction.
-//     // See the mollusk-svm documentation for details.
-// }}
+/// Fast native test for the client-facing instruction encoder.
+#[test]
+fn initialize_instruction_encodes_fields() {{
+	let mut data = [0u8; InitializeInstruction::SIZE];
+	let args = InitializeInstruction::initialize(&mut data)
+		.expect("initialize instruction storage");
+	args.value = 42;
+
+	let decoded = InitializeInstruction::try_from_bytes(&data)
+		.expect("decode initialized instruction");
+	assert_eq!(decoded.value, 42);
+}}
 "#
 	)
 }
 
-fn surfpool_test_template(program_title: &str) -> String {
-	format!(
-		r#"use std::path::PathBuf;
+fn surfpool_test_template() -> String {
+	r#"#![cfg(test)]
 
 use pina_test::AccountMeta;
-use pina_test::Instruction;
-use pina_test::OfflineSurfnet;
+use pina_test::ProgramTest;
 use pina_test::Pubkey;
 
-use program_under_test::{program_title}Instruction;
 use program_under_test::ID;
+use program_under_test::InitializeInstruction;
 
 /// Deploy the real SBF artifact to an isolated, offline Surfnet.
 ///
@@ -541,45 +518,28 @@ use program_under_test::ID;
 #[ignore = "run with `pina test`"]
 fn initialize_runs_on_surfpool() {{
 	pina_test::run(async {{
-		let artifact = std::env::var_os("PINA_SBF_ARTIFACT")
-			.map(PathBuf::from)
-			.expect("PINA_SBF_ARTIFACT is set by `pina test`");
-		assert!(artifact.is_file(), "missing SBF artifact: {{}}", artifact.display());
-
-		let mut surfnet = OfflineSurfnet::start()
-			.await
-			.expect("start isolated Surfpool instance");
 		let program_id = Pubkey::new_from_array(ID.to_bytes());
-
-		surfnet
-			.deploy_program(program_id, &artifact)
-			.expect("deploy SBF program");
-		assert!(
-			surfnet
-				.program_is_executable(&program_id)
-				.expect("fetch deployed program account"),
-			"deployed program account is not executable"
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+		let authority = program.payer();
+		let mut data = [0u8; InitializeInstruction::SIZE];
+		let args = InitializeInstruction::initialize(&mut data)
+			.expect("initialize instruction storage");
+		args.value = 42;
+		let instruction = program.instruction(
+			&data,
+			vec![AccountMeta::new_readonly(authority, true)],
 		);
-
-		let state = Pubkey::new_unique();
-		let instruction = Instruction::new_with_bytes(
-			program_id,
-			&[{program_title}Instruction::Initialize as u8, 42],
-			vec![
-				AccountMeta::new(surfnet.payer(), true),
-				AccountMeta::new(state, false),
-				AccountMeta::new_readonly(Pubkey::default(), false),
-			],
-		);
-		surfnet
+		program
 			.send_instruction(instruction)
 			.expect("execute Initialize instruction");
 
-		surfnet.stop().expect("stop isolated Surfpool instance");
+		program.stop().expect("stop isolated program test");
 	}});
 }}
 "#
-	)
+	.to_owned()
 }
 
 #[cfg(test)]
@@ -639,7 +599,7 @@ mod tests {
 		assert!(!cargo.contains("dylint"));
 		assert!(!cargo.contains("[workspace.metadata.dylint]"));
 		assert!(!cargo.contains("dylint_lib"));
-		assert!(cargo.contains("mollusk-svm = \"0.15.0\""));
+		assert!(!cargo.contains("mollusk-svm"));
 
 		let config = fs::read_to_string(dir.path.join("pina.toml"))
 			.unwrap_or_else(|err| panic!("expected pina.toml to be readable: {err}"));
@@ -687,8 +647,7 @@ mod tests {
 		assert!(cpi.contains("pub type ProgramAccount<'a>"));
 		assert!(cpi.contains("pub mod accounts"));
 		assert!(cpi.contains("pub mod instructions"));
-		assert!(cpi.contains("state: CpiHandle::writable(state)?"));
-		assert!(!cpi.contains("state: CpiHandle::writable_signer(state)?"));
+		assert!(cpi.contains("authority: CpiHandle::readonly_signer(authority)"));
 		assert!(cpi.contains("InitializeInstruction::initialize"));
 		assert!(cpi.contains("pub accounts: accounts::Initialize<'a>"));
 		assert!(cpi.contains("pub value: u8"));
@@ -732,7 +691,7 @@ mod tests {
 			.unwrap_or_else(|err| panic!("expected integration.rs to be readable: {err}"));
 		assert!(test.contains("use my_program::*;"));
 		assert!(test.contains("instruction_discriminators_are_stable"));
-		assert!(test.contains("mollusk"));
+		assert!(test.contains("initialize_instruction_encodes_fields"));
 	}
 
 	#[test]
@@ -743,13 +702,11 @@ mod tests {
 
 		let test = fs::read_to_string(dir.path.join("tests/surfpool/src/lib.rs"))
 			.unwrap_or_else(|err| panic!("expected Surfpool lib.rs to be readable: {err}"));
-		assert!(test.contains("OfflineSurfnet::start()"));
-		assert!(test.contains("PINA_SBF_ARTIFACT"));
-		assert!(test.contains("deploy_program"));
+		assert!(test.contains("ProgramTest::start(program_id)"));
 		assert!(test.contains("send_instruction"));
 		assert!(test.contains("execute Initialize instruction"));
-		assert!(test.contains("let mut surfnet"));
-		assert!(test.contains("surfnet.stop()"));
+		assert!(test.contains("let mut program"));
+		assert!(test.contains("program.stop()"));
 		assert!(!test.contains("Uncomment"));
 	}
 
@@ -765,6 +722,8 @@ mod tests {
 		assert!(lib.contains("#[cfg(feature = \"cpi\")]"));
 		assert!(lib.contains("pub mod cpi;"));
 		assert!(lib.contains("process_instruction"));
+		assert!(lib.contains("pub struct InitializeInstruction"));
+		assert!(lib.contains("self.authority.assert_signer()?"));
 		assert!(!lib.contains("surfpool-tests"));
 	}
 
