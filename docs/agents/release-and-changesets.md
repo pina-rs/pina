@@ -10,6 +10,22 @@ monochange run release
 monochange step publish-packages
 ```
 
+## First-time package publication
+
+Trusted publishing cannot publish a new crates.io crate or npm package until the package exists and its registry-side trusted publisher has been configured. Before merging a release that introduces a public package:
+
+1. Ask a registry owner to preview and create its `0.0.0` placeholder:
+
+   ```sh
+   monochange step placeholder-publish --dry-run --package <package-id>
+   monochange step placeholder-publish --package <package-id>
+   ```
+
+2. Ask the owner to configure the package's trusted publisher for repository `pina-rs/pina`, workflow `publish.yml`, and environment `publisher`.
+3. Confirm the PR's `release-publish` job passes before merging.
+
+The placeholder reserves the package name and gives the registry an existing package on which to configure OIDC trust. Agents must not attempt the real release and wait for it to fail as a way to discover missing setup, and must not use a maintainer's local registry credentials themselves.
+
 ## Required changesets
 
 Any pull request that modifies code in:
@@ -61,6 +77,7 @@ dprint fmt .changeset/* --allow-no-files
 - `pina_cli`
 - `pina_codama_renderer`
 - `pina_profile`
+- `pina_test`
 - `pina_codama_nodes`
 - `pina_cli_npm`
 - `pina_cli_darwin_arm64`

@@ -254,3 +254,121 @@ jobs:
       - name: build workspace all features
         run: build:all
         shell: devenv shell -c -- bash -e {0}
+
+  release-publish:
+    name: release-publish
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: configure local release identity
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        shell: bash
+
+      - name: inspect release state
+        id: release_state
+        run: |
+          set -euo pipefail
+
+          current_release=false
+          release_record="$RUNNER_TEMP/release-record.json"
+          if monochange step release-record \
+            --from HEAD \
+            --format json \
+            > "$release_record" 2>/dev/null; then
+            resolved_commit="$(jq -r '.resolved_commit // ""' "$release_record")"
+            record_commit="$(jq -r '.record_commit // ""' "$release_record")"
+            release_target_count="$(jq '.record.release_targets | length' "$release_record")"
+
+            if [[ "$resolved_commit" == "$record_commit" ]] &&
+              ((release_target_count > 0)); then
+              current_release=true
+            fi
+          fi
+
+          has_changesets=false
+          if [ -d .changeset ] && find .changeset -type f -name '*.md' -print -quit | grep -q .; then
+            has_changesets=true
+          fi
+
+          echo "current_release=${current_release}" >> "$GITHUB_OUTPUT"
+          echo "has_changesets=${has_changesets}" >> "$GITHUB_OUTPUT"
+        shell: devenv shell -- bash -e {0}
+
+      - name: create local release commit
+        id: release_commit
+        if: steps.release_state.outputs.current_release != 'true' && steps.release_state.outputs.has_changesets == 'true'
+        run: |
+          set -euo pipefail
+
+          before="$(git rev-parse HEAD)"
+          output="$RUNNER_TEMP/release-output.txt"
+
+          # This runs the production release preparation and commit steps but
+          # disables the final source-provider write. The generated commit and
+          # embedded release record remain local to this disposable runner.
+          if ! monochange run release --create-pr=false > "$output" 2>&1; then
+            if grep -q 'no releaseable packages were found in discovered changesets' "$output"; then
+              echo "No releaseable packages were found; skipping the publish dry-run."
+              echo "created=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            cat "$output" >&2
+            exit 1
+          fi
+          cat "$output"
+
+          after="$(git rev-parse HEAD)"
+          if [[ "$before" == "$after" ]]; then
+            echo "No release commit was created; skipping the publish dry-run."
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          monochange step release-record \
+            --from HEAD \
+            --format json \
+            --jq '.resolved_commit == .record_commit' | grep -qx true
+          echo "created=true" >> "$GITHUB_OUTPUT"
+        shell: devenv shell -- bash -e {0}
+
+      - name: dry-run release publication
+        if: steps.release_state.outputs.current_release == 'true' || steps.release_commit.outputs.created == 'true'
+        run: |
+          set -euo pipefail
+
+          # Run from the prepared release commit so package versions, lockfiles,
+          # generated manifests, and the embedded release record match the state
+          # that the real publish workflow will receive after the release PR merges.
+          result="$RUNNER_TEMP/publish-dry-run.json"
+          monochange step publish-packages \
+            --dry-run \
+            --all \
+            --output "$result" \
+            --format json
+          jq -e '
+            .package_publish.summary.expected > 0 and
+              .package_publish.summary.failed == 0
+          ' "$result" >/dev/null
+        shell: devenv shell -- bash -e {0}
+
+      - name: skip publish dry-run without a release
+        if: steps.release_state.outputs.current_release != 'true' && steps.release_commit.outputs.created != 'true'
+        run: echo "This pull request does not produce a publishable release."
