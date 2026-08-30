@@ -131,31 +131,31 @@ importers:
   packages/pina__cli:
     optionalDependencies:
       '@pina-rs/cli-darwin-arm64':
-        specifier: ^0.11.1
+        specifier: ^0.12.0
         version: link:../pina__cli-darwin-arm64
       '@pina-rs/cli-darwin-x64':
-        specifier: ^0.11.1
+        specifier: ^0.12.0
         version: link:../pina__cli-darwin-x64
       '@pina-rs/cli-freebsd-x64':
-        specifier: ^0.11.1
+        specifier: ^0.12.0
         version: link:../pina__cli-freebsd-x64
       '@pina-rs/cli-linux-arm64-gnu':
-        specifier: ^0.11.1
+        specifier: ^0.12.0
         version: link:../pina__cli-linux-arm64-gnu
       '@pina-rs/cli-linux-arm64-musl':
-        specifier: ^0.11.1
+        specifier: ^0.12.0
         version: link:../pina__cli-linux-arm64-musl
       '@pina-rs/cli-linux-x64-gnu':
-        specifier: ^0.11.1
+        specifier: ^0.12.0
         version: link:../pina__cli-linux-x64-gnu
       '@pina-rs/cli-linux-x64-musl':
-        specifier: ^0.11.1
+        specifier: ^0.12.0
         version: link:../pina__cli-linux-x64-musl
       '@pina-rs/cli-win32-arm64-msvc':
-        specifier: ^0.11.1
+        specifier: ^0.12.0
         version: link:../pina__cli-win32-arm64-msvc
       '@pina-rs/cli-win32-x64-msvc':
-        specifier: ^0.11.1
+        specifier: ^0.12.0
         version: link:../pina__cli-win32-x64-msvc
 
   packages/pina__cli-darwin-arm64: {}

@@ -1,6 +1,6 @@
 [package]
 name = "pina_test"
-version = "0.11.1"
+version = "0.12.0"
 edition = "2024"
 homepage = "https://pina.rs"
 keywords = ["solana", "pinocchio", "surfpool", "testing"]
@@ -48,7 +48,7 @@ resolver = "2"
 members = ["../../examples/*/tests/surfpool"]
 
 [workspace.dependencies]
-pina_test = { default-features = false, path = ".", version = "0.11.1" }
+pina_test = { default-features = false, path = ".", version = "0.12.0" }
 
 [lints.rust]
 unsafe_code = "deny"
