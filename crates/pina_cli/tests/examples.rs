@@ -114,7 +114,11 @@ fn every_example_is_a_complete_pina_project() {
 		let project = Project::discover(&root)
 			.unwrap_or_else(|error| panic!("discover {example} through Pina.toml: {error}"));
 
-		assert_eq!(project.root, root);
+		assert_eq!(
+			project.root,
+			root.canonicalize()
+				.unwrap_or_else(|error| panic!("canonicalize {example} root: {error}"))
+		);
 		assert_eq!(project.package_name, *example);
 
 		let surfpool_manifest = root.join("tests/surfpool/Cargo.toml");
