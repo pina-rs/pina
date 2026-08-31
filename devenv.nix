@@ -1202,7 +1202,7 @@ in
           fi
         done
 
-        cargo clippy --workspace --all-features --locked ''${exclude_args[@]}
+        cargo clippy --workspace --all-features --locked ''${exclude_args[@]} -- -D warnings
       '';
       description = "Check that all rust lints are passing.";
       binary = "bash";
