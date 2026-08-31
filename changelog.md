@@ -43,6 +43,102 @@ Generated JavaScript codecs reject over-capacity values rather than truncating t
 - Document the explicit `zeroed()` then `close_with_recipient()` close flow.
 - Regenerate Codama IDLs and committed Rust/JS clients for the updated writable-account inference.
 
+## [0.12.0](https://github.com/pina-rs/pina/releases/tag/v0.12.0) (2026-08-31)
+
+Grouped release for `core`.
+
+### Breaking Changes
+
+#### Ship the pina_lints crate and drop the Dylint pipeline
+
+_Packages:_ _pina_cli_
+
+Introduce the `pina_lints` crate: every Pina security, performance, and IDL lint now lives in one self-contained, importable crate that mirrors the Dylint authoring API (`declare_late_lint!`, `declare_pre_expansion_lint!`) and registers through a single `register_all_lints` entry point. The crate builds as a library and a Dylint-compatible cdylib, and it ships the `pina_lint_driver` binary that statically links the whole catalog.
+
+`pina lint` now runs `cargo check` (or `cargo fix` with `--fix`) with the bundled driver as `RUSTC_WRAPPER`. This is a breaking change for `pina_cli` library consumers: `LintError::Bundle` is gone (the download pipeline it represented is removed), `Project` exposes a new `lint_levels` field, and the lint catalog file `lints.json` moved to a simplified schema. The driver is installed below Cargo home from the `pina_lints` release matching the CLI version on first use; no precompiled Dylint tools or lint bundles are downloaded. Lint levels are configurable through the new `[lints]` table of `pina.toml` (lint name = `allow`, `warn`, or `deny`), and unknown names are rejected with the full catalog list.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #270](https://github.com/pina-rs/pina/pull/270)
+
+### Features
+
+#### Exercise every example on real runtimes
+
+_Packages:_ _pina_cli_, _pina_test_
+
+Replace the deploy-only filler suites with behavior tests that run each compiled SBF artifact through an isolated Surfpool instance: on-chain state transitions, runtime error codes, signature and ownership guards, PDA math, SPL token provisioning, and an escrow Make/Take round trip. The support surface moves into the `pina_test` crate, and generated test manifests inherit the pinned Surfpool compatibility graph from it instead of pinning Mollusk in every program manifest.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #269](https://github.com/pina-rs/pina/pull/269)
+
+#### Prefer the lowercase `pina.toml` config file
+
+_Packages:_ _pina_cli_
+
+The canonical project configuration file name is now `pina.toml`. `pina init` writes `pina.toml`, and project discovery prefers it. The legacy uppercase `Pina.toml` spelling is still discovered, but selecting it prints a deprecation warning asking for the rename, and `pina.toml` always wins within the same directory.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #270](https://github.com/pina-rs/pina/pull/270)
+
+#### Ship the pina_lints crate and drop the Dylint pipeline
+
+_Packages:_ _pina_lints_
+
+Introduce the `pina_lints` crate: every Pina security, performance, and IDL lint now lives in one self-contained, importable crate that mirrors the Dylint authoring API (`declare_late_lint!`, `declare_pre_expansion_lint!`) and registers through a single `register_all_lints` entry point. The crate builds as a library and a Dylint-compatible cdylib, and it ships the `pina_lint_driver` binary that statically links the whole catalog.
+
+`pina lint` now runs `cargo check` (or `cargo fix` with `--fix`) with the bundled driver as `RUSTC_WRAPPER`. This is a breaking change for `pina_cli` library consumers: `LintError::Bundle` is gone (the download pipeline it represented is removed), `Project` exposes a new `lint_levels` field, and the lint catalog file `lints.json` moved to a simplified schema. The driver is installed below Cargo home from the `pina_lints` release matching the CLI version on first use; no precompiled Dylint tools or lint bundles are downloaded. Lint levels are configurable through the new `[lints]` table of `pina.toml` (lint name = `allow`, `warn`, or `deny`), and unknown names are rejected with the full catalog list.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #270](https://github.com/pina-rs/pina/pull/270)
+
+### Documentation
+
+#### Improve readme quality with managed badge rows
+
+_Packages:_ _pina_, _pina_cli_, _pina_lints_, _pina_macros_, _pina_codama_renderer_, _pina_profile_, _pina_sdk_ids_, _pina_test_, _pina_codama_nodes_, _pina_cli_npm_, _pina_skill_
+
+Replace the per-crate inline reference-link badges with an mdt-managed `crateReadmeBadgeRow` template and a new `npmReadmeBadgeRow` for the npm packages, so badges stay synchronized from `templates/readme-badges.t.md`. Each readme now carries concrete usage examples: a full counter program flow for `pina`, typed ID checks for `pina_sdk_ids`, a complete `ProgramTest` fixture for `pina_test`, CLI loops for `@pina-rs/cli`, and fresh usage claims in `pina_codama_renderer` (now published).
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #283](https://github.com/pina-rs/pina/pull/283)
+
+#### Configure codecov from the repository root
+
+_Packages:_ _pina_skill_
+
+The new root-level `codecov.yml` scopes coverage accounting to the unit-testable crates. It is a repository configuration file, so every package is affected without requiring a version bump. The agent-skill testing and project-setup references gain the Surfpool runtime limitations and the delegated SBF build toolchain.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #269](https://github.com/pina-rs/pina/pull/269)
+
+#### Document the bundled lint driver in the agent skill
+
+_Packages:_ _pina_skill_
+
+Update the skill references to describe the `pina_lint_driver` flow (`pina lint` installs the driver under Cargo home on first use) instead of pinned Dylint tooling, and use the lowercase `pina.toml` spelling.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #270](https://github.com/pina-rs/pina/pull/270)
+
+#### Refresh the lint skill reference for the driver
+
+_Packages:_ _pina_skill_
+
+Update the agent-skill CLI reference to describe the bundled `pina_lint_driver` flow (the driver statically links the whole lint catalog; additional project-defined lint libraries are never loaded), replacing the stale guidance about project Dylint metadata and direct `cargo dylint` usage.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #273](https://github.com/pina-rs/pina/pull/273) · _Related issues:_ [#270](https://github.com/pina-rs/pina/issues/270)
+
+### Notes
+
+#### Configure codecov from the repository root
+
+_Packages:_ _pina_, _pina_lints_, _pina_macros_, _pina_codama_renderer_, _pina_profile_, _pina_sdk_ids_, _pina_codama_nodes_, _pina_cli_npm_, _pina_cli_darwin_arm64_, _pina_cli_darwin_x64_, _pina_cli_freebsd_x64_, _pina_cli_linux_arm64_gnu_, _pina_cli_linux_arm64_musl_, _pina_cli_linux_x64_gnu_, _pina_cli_linux_x64_musl_, _pina_cli_win32_arm64_msvc_, _pina_cli_win32_x64_msvc_
+
+The new root-level `codecov.yml` scopes coverage accounting to the unit-testable crates. It is a repository configuration file, so every package is affected without requiring a version bump. The agent-skill testing and project-setup references gain the Surfpool runtime limitations and the delegated SBF build toolchain.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #269](https://github.com/pina-rs/pina/pull/269)
+
+#### Gate zizmor workflow auditing into the security check
+
+_Packages:_ _pina_, _pina_lints_, _pina_macros_, _pina_codama_renderer_, _pina_profile_, _pina_sdk_ids_, _pina_codama_nodes_, _pina_cli_npm_, _pina_cli_darwin_arm64_, _pina_cli_darwin_x64_, _pina_cli_freebsd_x64_, _pina_cli_linux_arm64_gnu_, _pina_cli_linux_arm64_musl_, _pina_cli_linux_x64_gnu_, _pina_cli_linux_x64_musl_, _pina_cli_win32_arm64_msvc_, _pina_cli_win32_x64_msvc_, _pina_skill_
+
+Zizmor now audits every workflow and composite action as part of `verify:security`, with a zero-findings policy recorded in `.github/zizmor.yml`. Checkouts persist credentials only where authentication is required, the compute-unit report status is passed through `env:` instead of template expansion, and Dependabot updates gain a seven-day cooldown. The `taiki-e/install-action` pin is refreshed to its latest release hash.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #280](https://github.com/pina-rs/pina/pull/280)
+
 ## [0.11.1](https://github.com/pina-rs/pina/releases/tag/v0.11.1) (2026-08-29)
 
 Grouped release for `core`.

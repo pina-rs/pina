@@ -1,0 +1,1642 @@
+{
+	"schema_version": "0.4",
+	"kind": "monochange.releaseRecord",
+	"created_at": "2026-08-31T08:00:52Z",
+	"command": "release",
+	"version": "0.12.0",
+	"versions": {
+		"core": "0.12.0"
+	},
+	"release_targets": [
+		{
+			"id": "core",
+			"kind": "group",
+			"version": "0.12.0",
+			"version_format": "primary",
+			"tag": true,
+			"release": true,
+			"tag_name": "v0.12.0",
+			"members": [
+				"pina",
+				"pina_cli",
+				"pina_lints",
+				"pina_macros",
+				"pina_codama_renderer",
+				"pina_profile",
+				"pina_sdk_ids",
+				"pina_test",
+				"pina_codama_nodes",
+				"pina_cli_npm",
+				"pina_cli_darwin_arm64",
+				"pina_cli_darwin_x64",
+				"pina_cli_freebsd_x64",
+				"pina_cli_linux_arm64_gnu",
+				"pina_cli_linux_arm64_musl",
+				"pina_cli_linux_x64_gnu",
+				"pina_cli_linux_x64_musl",
+				"pina_cli_win32_arm64_msvc",
+				"pina_cli_win32_x64_msvc",
+				"pina_skill"
+			]
+		}
+	],
+	"released_packages": [
+		"@pina-rs/cli",
+		"@pina-rs/cli-darwin-arm64",
+		"@pina-rs/cli-darwin-x64",
+		"@pina-rs/cli-freebsd-x64",
+		"@pina-rs/cli-linux-arm64-gnu",
+		"@pina-rs/cli-linux-arm64-musl",
+		"@pina-rs/cli-linux-x64-gnu",
+		"@pina-rs/cli-linux-x64-musl",
+		"@pina-rs/cli-win32-arm64-msvc",
+		"@pina-rs/cli-win32-x64-msvc",
+		"@pina-rs/codama-nodes",
+		"@pina-rs/skill",
+		"pina",
+		"pina_cli",
+		"pina_codama_renderer",
+		"pina_lints",
+		"pina_macros",
+		"pina_profile",
+		"pina_sdk_ids",
+		"pina_test"
+	],
+	"changed_files": [
+		"Cargo.lock",
+		"Cargo.toml",
+		"changelog.md",
+		"crates/pina/Cargo.toml",
+		"crates/pina_cli/Cargo.toml",
+		"crates/pina_codama_renderer/Cargo.toml",
+		"crates/pina_lints/Cargo.toml",
+		"crates/pina_macros/Cargo.toml",
+		"crates/pina_profile/Cargo.toml",
+		"crates/pina_sdk_ids/Cargo.toml",
+		"crates/pina_test/Cargo.toml",
+		"packages/nodes-from-pina/package.json",
+		"packages/pina__cli/package.json",
+		"packages/pina__cli-darwin-arm64/package.json",
+		"packages/pina__cli-darwin-x64/package.json",
+		"packages/pina__cli-freebsd-x64/package.json",
+		"packages/pina__cli-linux-arm64-gnu/package.json",
+		"packages/pina__cli-linux-arm64-musl/package.json",
+		"packages/pina__cli-linux-x64-gnu/package.json",
+		"packages/pina__cli-linux-x64-musl/package.json",
+		"packages/pina__cli-win32-arm64-msvc/package.json",
+		"packages/pina__cli-win32-x64-msvc/package.json",
+		"packages/pina__skill/package.json",
+		"pnpm-lock.yaml"
+	],
+	"package_publications": [
+		{
+			"package": "pina",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_arm64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_freebsd_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_npm",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_arm64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_x64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_nodes",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_lints",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_macros",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_profile",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_sdk_ids",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_skill",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_test",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.12.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		}
+	],
+	"updated_changelogs": [
+		"changelog.md"
+	],
+	"deleted_changesets": [
+		".changeset/pina-codecov-config.md",
+		".changeset/pina-example-surfpool-tests.md",
+		".changeset/pina-lints-crate.md",
+		".changeset/pina-readme-quality.md",
+		".changeset/pina-skill-lint-docs.md",
+		".changeset/pina-skill-lint-reference.md",
+		".changeset/pina-toml-lowercase.md",
+		".changeset/pina-zizmor-security-gate.md"
+	],
+	"changesets": [
+		{
+			"path": ".changeset/pina-codecov-config.md",
+			"summary": "Configure codecov from the repository root",
+			"details": "The new root-level `codecov.yml` scopes coverage accounting to the unit-testable crates. It is a repository configuration file, so every package is affected without requiring a version bump. The agent-skill testing and project-setup references gain the Surfpool runtime limitations and the delegated SBF build toolchain.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_lints",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_codama_nodes",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_codama_renderer",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_profile",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_sdk_ids",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_skill",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_cli_npm",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_darwin_arm64",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_darwin_x64",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_freebsd_x64",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_linux_arm64_gnu",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_linux_arm64_musl",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_linux_x64_gnu",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_linux_x64_musl",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_win32_arm64_msvc",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_win32_x64_msvc",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "a893fc008abc2ebf196deecba29479f189ee326a",
+						"short_sha": "a893fc0",
+						"url": "https://github.com/pina-rs/pina/commit/a893fc008abc2ebf196deecba29479f189ee326a",
+						"authored_at": "2026-08-30T21:27:15+01:00",
+						"committed_at": "2026-08-30T21:27:15+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#269",
+						"title": "feat(examples): adopt pina test workflow",
+						"url": "https://github.com/pina-rs/pina/pull/269",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "37fce5dda139dd5fd7c893270e2c75b692ace786",
+						"short_sha": "37fce5d",
+						"url": "https://github.com/pina-rs/pina/commit/37fce5dda139dd5fd7c893270e2c75b692ace786",
+						"authored_at": "2026-08-31T06:15:19+01:00",
+						"committed_at": "2026-08-31T06:15:19+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#281",
+						"title": "revert(release): undo failed v0.12.0 release and remove standalone pina_test publish step",
+						"url": "https://github.com/pina-rs/pina/pull/281",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/pina-example-surfpool-tests.md",
+			"summary": "Exercise every example on real runtimes",
+			"details": "Replace the deploy-only filler suites with behavior tests that run each compiled SBF artifact through an isolated Surfpool instance: on-chain state transitions, runtime error codes, signature and ownership guards, PDA math, SPL token provisioning, and an escrow Make/Take round trip. The support surface moves into the `pina_test` crate, and generated test manifests inherit the pinned Surfpool compatibility graph from it instead of pinning Mollusk in every program manifest.",
+			"targets": [
+				{
+					"id": "pina_test",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "a893fc008abc2ebf196deecba29479f189ee326a",
+						"short_sha": "a893fc0",
+						"url": "https://github.com/pina-rs/pina/commit/a893fc008abc2ebf196deecba29479f189ee326a",
+						"authored_at": "2026-08-30T21:27:15+01:00",
+						"committed_at": "2026-08-30T21:27:15+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#269",
+						"title": "feat(examples): adopt pina test workflow",
+						"url": "https://github.com/pina-rs/pina/pull/269",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "37fce5dda139dd5fd7c893270e2c75b692ace786",
+						"short_sha": "37fce5d",
+						"url": "https://github.com/pina-rs/pina/commit/37fce5dda139dd5fd7c893270e2c75b692ace786",
+						"authored_at": "2026-08-31T06:15:19+01:00",
+						"committed_at": "2026-08-31T06:15:19+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#281",
+						"title": "revert(release): undo failed v0.12.0 release and remove standalone pina_test publish step",
+						"url": "https://github.com/pina-rs/pina/pull/281",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/pina-lints-crate.md",
+			"summary": "Ship the pina_lints crate and drop the Dylint pipeline",
+			"details": "Introduce the `pina_lints` crate: every Pina security, performance, and IDL lint now lives in one self-contained, importable crate that mirrors the Dylint authoring API (`declare_late_lint!`, `declare_pre_expansion_lint!`) and registers through a single `register_all_lints` entry point. The crate builds as a library and a Dylint-compatible cdylib, and it ships the `pina_lint_driver` binary that statically links the whole catalog.\n\n`pina lint` now runs `cargo check` (or `cargo fix` with `--fix`) with the bundled driver as `RUSTC_WRAPPER`. This is a breaking change for `pina_cli` library consumers: `LintError::Bundle` is gone (the download pipeline it represented is removed), `Project` exposes a new `lint_levels` field, and the lint catalog file `lints.json` moved to a simplified schema. The driver is installed below Cargo home from the `pina_lints` release matching the CLI version on first use; no precompiled Dylint tools or lint bundles are downloaded. Lint levels are configurable through the new `[lints]` table of `pina.toml` (lint name = `allow`, `warn`, or `deny`), and unknown names are rejected with the full catalog list.",
+			"targets": [
+				{
+					"id": "pina_lints",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "0b5de73f2a2e8b8bf77e1445d6f338692d7b7449",
+						"short_sha": "0b5de73",
+						"url": "https://github.com/pina-rs/pina/commit/0b5de73f2a2e8b8bf77e1445d6f338692d7b7449",
+						"authored_at": "2026-08-30T16:57:09+01:00",
+						"committed_at": "2026-08-30T16:57:09+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#270",
+						"title": "feat(lints): replace Dylint with the self-contained pina_lints crate",
+						"url": "https://github.com/pina-rs/pina/pull/270",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "37fce5dda139dd5fd7c893270e2c75b692ace786",
+						"short_sha": "37fce5d",
+						"url": "https://github.com/pina-rs/pina/commit/37fce5dda139dd5fd7c893270e2c75b692ace786",
+						"authored_at": "2026-08-31T06:15:19+01:00",
+						"committed_at": "2026-08-31T06:15:19+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#281",
+						"title": "revert(release): undo failed v0.12.0 release and remove standalone pina_test publish step",
+						"url": "https://github.com/pina-rs/pina/pull/281",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/pina-readme-quality.md",
+			"summary": "Improve readme quality with managed badge rows",
+			"details": "Replace the per-crate inline reference-link badges with an mdt-managed `crateReadmeBadgeRow` template and a new `npmReadmeBadgeRow` for the npm packages, so badges stay synchronized from `templates/readme-badges.t.md`. Each readme now carries concrete usage examples: a full counter program flow for `pina`, typed ID checks for `pina_sdk_ids`, a complete `ProgramTest` fixture for `pina_test`, CLI loops for `@pina-rs/cli`, and fresh usage claims in `pina_codama_renderer` (now published).",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_codama_renderer",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_lints",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_profile",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_sdk_ids",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_test",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_codama_nodes",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_cli_npm",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_skill",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "6be911efccd192597424325a1e1e84ffb95017e1",
+						"short_sha": "6be911e",
+						"url": "https://github.com/pina-rs/pina/commit/6be911efccd192597424325a1e1e84ffb95017e1",
+						"authored_at": "2026-08-31T08:50:26+01:00",
+						"committed_at": "2026-08-31T08:50:26+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#283",
+						"title": "docs(readme): raise readme quality with managed badge rows",
+						"url": "https://github.com/pina-rs/pina/pull/283",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "6be911efccd192597424325a1e1e84ffb95017e1",
+						"short_sha": "6be911e",
+						"url": "https://github.com/pina-rs/pina/commit/6be911efccd192597424325a1e1e84ffb95017e1",
+						"authored_at": "2026-08-31T08:50:26+01:00",
+						"committed_at": "2026-08-31T08:50:26+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#283",
+						"title": "docs(readme): raise readme quality with managed badge rows",
+						"url": "https://github.com/pina-rs/pina/pull/283",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/pina-skill-lint-docs.md",
+			"summary": "Document the bundled lint driver in the agent skill",
+			"details": "Update the skill references to describe the `pina_lint_driver` flow (`pina lint` installs the driver under Cargo home on first use) instead of pinned Dylint tooling, and use the lowercase `pina.toml` spelling.",
+			"targets": [
+				{
+					"id": "pina_skill",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "0b5de73f2a2e8b8bf77e1445d6f338692d7b7449",
+						"short_sha": "0b5de73",
+						"url": "https://github.com/pina-rs/pina/commit/0b5de73f2a2e8b8bf77e1445d6f338692d7b7449",
+						"authored_at": "2026-08-30T16:57:09+01:00",
+						"committed_at": "2026-08-30T16:57:09+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#270",
+						"title": "feat(lints): replace Dylint with the self-contained pina_lints crate",
+						"url": "https://github.com/pina-rs/pina/pull/270",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "37fce5dda139dd5fd7c893270e2c75b692ace786",
+						"short_sha": "37fce5d",
+						"url": "https://github.com/pina-rs/pina/commit/37fce5dda139dd5fd7c893270e2c75b692ace786",
+						"authored_at": "2026-08-31T06:15:19+01:00",
+						"committed_at": "2026-08-31T06:15:19+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#281",
+						"title": "revert(release): undo failed v0.12.0 release and remove standalone pina_test publish step",
+						"url": "https://github.com/pina-rs/pina/pull/281",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/pina-skill-lint-reference.md",
+			"summary": "Refresh the lint skill reference for the driver",
+			"details": "Update the agent-skill CLI reference to describe the bundled `pina_lint_driver` flow (the driver statically links the whole lint catalog; additional project-defined lint libraries are never loaded), replacing the stale guidance about project Dylint metadata and direct `cargo dylint` usage.",
+			"targets": [
+				{
+					"id": "pina_skill",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "113db8da2c03be40f49ef0da162cde5cd451dcfe",
+						"short_sha": "113db8d",
+						"url": "https://github.com/pina-rs/pina/commit/113db8da2c03be40f49ef0da162cde5cd451dcfe",
+						"authored_at": "2026-08-30T18:20:16+01:00",
+						"committed_at": "2026-08-30T18:20:16+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#273",
+						"title": "ci: remove the last Dylint packaging leftovers",
+						"url": "https://github.com/pina-rs/pina/pull/273",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "37fce5dda139dd5fd7c893270e2c75b692ace786",
+						"short_sha": "37fce5d",
+						"url": "https://github.com/pina-rs/pina/commit/37fce5dda139dd5fd7c893270e2c75b692ace786",
+						"authored_at": "2026-08-31T06:15:19+01:00",
+						"committed_at": "2026-08-31T06:15:19+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#281",
+						"title": "revert(release): undo failed v0.12.0 release and remove standalone pina_test publish step",
+						"url": "https://github.com/pina-rs/pina/pull/281",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#270",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/270",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/pina-toml-lowercase.md",
+			"summary": "Prefer the lowercase `pina.toml` config file",
+			"details": "The canonical project configuration file name is now `pina.toml`. `pina init` writes `pina.toml`, and project discovery prefers it. The legacy uppercase `Pina.toml` spelling is still discovered, but selecting it prints a deprecation warning asking for the rename, and `pina.toml` always wins within the same directory.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "0b5de73f2a2e8b8bf77e1445d6f338692d7b7449",
+						"short_sha": "0b5de73",
+						"url": "https://github.com/pina-rs/pina/commit/0b5de73f2a2e8b8bf77e1445d6f338692d7b7449",
+						"authored_at": "2026-08-30T16:57:09+01:00",
+						"committed_at": "2026-08-30T16:57:09+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#270",
+						"title": "feat(lints): replace Dylint with the self-contained pina_lints crate",
+						"url": "https://github.com/pina-rs/pina/pull/270",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "37fce5dda139dd5fd7c893270e2c75b692ace786",
+						"short_sha": "37fce5d",
+						"url": "https://github.com/pina-rs/pina/commit/37fce5dda139dd5fd7c893270e2c75b692ace786",
+						"authored_at": "2026-08-31T06:15:19+01:00",
+						"committed_at": "2026-08-31T06:15:19+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#281",
+						"title": "revert(release): undo failed v0.12.0 release and remove standalone pina_test publish step",
+						"url": "https://github.com/pina-rs/pina/pull/281",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/pina-zizmor-security-gate.md",
+			"summary": "Gate zizmor workflow auditing into the security check",
+			"details": "Zizmor now audits every workflow and composite action as part of `verify:security`, with a zero-findings policy recorded in `.github/zizmor.yml`. Checkouts persist credentials only where authentication is required, the compute-unit report status is passed through `env:` instead of template expansion, and Dependabot updates gain a seven-day cooldown. The `taiki-e/install-action` pin is refreshed to its latest release hash.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_lints",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_codama_nodes",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_codama_renderer",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_profile",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_sdk_ids",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_skill",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_npm",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_darwin_arm64",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_darwin_x64",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_freebsd_x64",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_linux_arm64_gnu",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_linux_arm64_musl",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_linux_x64_gnu",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_linux_x64_musl",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_win32_arm64_msvc",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_win32_x64_msvc",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "6a6e7b9ea893f84c64127a77b2b1639c2a619b6d",
+						"short_sha": "6a6e7b9",
+						"url": "https://github.com/pina-rs/pina/commit/6a6e7b9ea893f84c64127a77b2b1639c2a619b6d",
+						"authored_at": "2026-08-31T04:25:03+01:00",
+						"committed_at": "2026-08-31T04:25:03+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#280",
+						"title": "ci(security): gate zizmor workflow audits into the security check",
+						"url": "https://github.com/pina-rs/pina/pull/280",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "6a6e7b9ea893f84c64127a77b2b1639c2a619b6d",
+						"short_sha": "6a6e7b9",
+						"url": "https://github.com/pina-rs/pina/commit/6a6e7b9ea893f84c64127a77b2b1639c2a619b6d",
+						"authored_at": "2026-08-31T04:25:03+01:00",
+						"committed_at": "2026-08-31T04:25:03+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#280",
+						"title": "ci(security): gate zizmor workflow audits into the security check",
+						"url": "https://github.com/pina-rs/pina/pull/280",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		}
+	],
+	"changelogs": [
+		{
+			"owner_id": "core",
+			"owner_kind": "group",
+			"path": "changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.12.0](https://github.com/pina-rs/pina/releases/tag/v0.12.0) (2026-08-31)",
+				"summary": [
+					"Grouped release for `core`."
+				],
+				"sections": [
+					{
+						"title": "Breaking Changes",
+						"collapsed": false,
+						"entries": [
+							"#### Ship the pina_lints crate and drop the Dylint pipeline\n_Packages:_ _pina_cli_\n\nIntroduce the `pina_lints` crate: every Pina security, performance, and IDL lint now lives in one self-contained, importable crate that mirrors the Dylint authoring API (`declare_late_lint!`, `declare_pre_expansion_lint!`) and registers through a single `register_all_lints` entry point. The crate builds as a library and a Dylint-compatible cdylib, and it ships the `pina_lint_driver` binary that statically links the whole catalog.\n\n`pina lint` now runs `cargo check` (or `cargo fix` with `--fix`) with the bundled driver as `RUSTC_WRAPPER`. This is a breaking change for `pina_cli` library consumers: `LintError::Bundle` is gone (the download pipeline it represented is removed), `Project` exposes a new `lint_levels` field, and the lint catalog file `lints.json` moved to a simplified schema. The driver is installed below Cargo home from the `pina_lints` release matching the CLI version on first use; no precompiled Dylint tools or lint bundles are downloaded. Lint levels are configurable through the new `[lints]` table of `pina.toml` (lint name = `allow`, `warn`, or `deny`), and unknown names are rejected with the full catalog list.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #270](https://github.com/pina-rs/pina/pull/270)"
+						]
+					},
+					{
+						"title": "Features",
+						"collapsed": false,
+						"entries": [
+							"#### Exercise every example on real runtimes\n_Packages:_ _pina_cli_, _pina_test_\n\nReplace the deploy-only filler suites with behavior tests that run each compiled SBF artifact through an isolated Surfpool instance: on-chain state transitions, runtime error codes, signature and ownership guards, PDA math, SPL token provisioning, and an escrow Make/Take round trip. The support surface moves into the `pina_test` crate, and generated test manifests inherit the pinned Surfpool compatibility graph from it instead of pinning Mollusk in every program manifest.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #269](https://github.com/pina-rs/pina/pull/269)",
+							"#### Prefer the lowercase `pina.toml` config file\n_Packages:_ _pina_cli_\n\nThe canonical project configuration file name is now `pina.toml`. `pina init` writes `pina.toml`, and project discovery prefers it. The legacy uppercase `Pina.toml` spelling is still discovered, but selecting it prints a deprecation warning asking for the rename, and `pina.toml` always wins within the same directory.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #270](https://github.com/pina-rs/pina/pull/270)",
+							"#### Ship the pina_lints crate and drop the Dylint pipeline\n_Packages:_ _pina_lints_\n\nIntroduce the `pina_lints` crate: every Pina security, performance, and IDL lint now lives in one self-contained, importable crate that mirrors the Dylint authoring API (`declare_late_lint!`, `declare_pre_expansion_lint!`) and registers through a single `register_all_lints` entry point. The crate builds as a library and a Dylint-compatible cdylib, and it ships the `pina_lint_driver` binary that statically links the whole catalog.\n\n`pina lint` now runs `cargo check` (or `cargo fix` with `--fix`) with the bundled driver as `RUSTC_WRAPPER`. This is a breaking change for `pina_cli` library consumers: `LintError::Bundle` is gone (the download pipeline it represented is removed), `Project` exposes a new `lint_levels` field, and the lint catalog file `lints.json` moved to a simplified schema. The driver is installed below Cargo home from the `pina_lints` release matching the CLI version on first use; no precompiled Dylint tools or lint bundles are downloaded. Lint levels are configurable through the new `[lints]` table of `pina.toml` (lint name = `allow`, `warn`, or `deny`), and unknown names are rejected with the full catalog list.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #270](https://github.com/pina-rs/pina/pull/270)"
+						]
+					},
+					{
+						"title": "Documentation",
+						"collapsed": false,
+						"entries": [
+							"#### Improve readme quality with managed badge rows\n_Packages:_ _pina_, _pina_cli_, _pina_lints_, _pina_macros_, _pina_codama_renderer_, _pina_profile_, _pina_sdk_ids_, _pina_test_, _pina_codama_nodes_, _pina_cli_npm_, _pina_skill_\n\nReplace the per-crate inline reference-link badges with an mdt-managed `crateReadmeBadgeRow` template and a new `npmReadmeBadgeRow` for the npm packages, so badges stay synchronized from `templates/readme-badges.t.md`. Each readme now carries concrete usage examples: a full counter program flow for `pina`, typed ID checks for `pina_sdk_ids`, a complete `ProgramTest` fixture for `pina_test`, CLI loops for `@pina-rs/cli`, and fresh usage claims in `pina_codama_renderer` (now published).\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #283](https://github.com/pina-rs/pina/pull/283)",
+							"#### Configure codecov from the repository root\n_Packages:_ _pina_skill_\n\nThe new root-level `codecov.yml` scopes coverage accounting to the unit-testable crates. It is a repository configuration file, so every package is affected without requiring a version bump. The agent-skill testing and project-setup references gain the Surfpool runtime limitations and the delegated SBF build toolchain.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #269](https://github.com/pina-rs/pina/pull/269)",
+							"#### Document the bundled lint driver in the agent skill\n_Packages:_ _pina_skill_\n\nUpdate the skill references to describe the `pina_lint_driver` flow (`pina lint` installs the driver under Cargo home on first use) instead of pinned Dylint tooling, and use the lowercase `pina.toml` spelling.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #270](https://github.com/pina-rs/pina/pull/270)",
+							"#### Refresh the lint skill reference for the driver\n_Packages:_ _pina_skill_\n\nUpdate the agent-skill CLI reference to describe the bundled `pina_lint_driver` flow (the driver statically links the whole lint catalog; additional project-defined lint libraries are never loaded), replacing the stale guidance about project Dylint metadata and direct `cargo dylint` usage.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #273](https://github.com/pina-rs/pina/pull/273) · _Related issues:_ [#270](https://github.com/pina-rs/pina/issues/270)"
+						]
+					},
+					{
+						"title": "Notes",
+						"collapsed": false,
+						"entries": [
+							"#### Configure codecov from the repository root\n_Packages:_ _pina_, _pina_lints_, _pina_macros_, _pina_codama_renderer_, _pina_profile_, _pina_sdk_ids_, _pina_codama_nodes_, _pina_cli_npm_, _pina_cli_darwin_arm64_, _pina_cli_darwin_x64_, _pina_cli_freebsd_x64_, _pina_cli_linux_arm64_gnu_, _pina_cli_linux_arm64_musl_, _pina_cli_linux_x64_gnu_, _pina_cli_linux_x64_musl_, _pina_cli_win32_arm64_msvc_, _pina_cli_win32_x64_msvc_\n\nThe new root-level `codecov.yml` scopes coverage accounting to the unit-testable crates. It is a repository configuration file, so every package is affected without requiring a version bump. The agent-skill testing and project-setup references gain the Surfpool runtime limitations and the delegated SBF build toolchain.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #269](https://github.com/pina-rs/pina/pull/269)",
+							"#### Gate zizmor workflow auditing into the security check\n_Packages:_ _pina_, _pina_lints_, _pina_macros_, _pina_codama_renderer_, _pina_profile_, _pina_sdk_ids_, _pina_codama_nodes_, _pina_cli_npm_, _pina_cli_darwin_arm64_, _pina_cli_darwin_x64_, _pina_cli_freebsd_x64_, _pina_cli_linux_arm64_gnu_, _pina_cli_linux_arm64_musl_, _pina_cli_linux_x64_gnu_, _pina_cli_linux_x64_musl_, _pina_cli_win32_arm64_msvc_, _pina_cli_win32_x64_msvc_, _pina_skill_\n\nZizmor now audits every workflow and composite action as part of `verify:security`, with a zero-findings policy recorded in `.github/zizmor.yml`. Checkouts persist credentials only where authentication is required, the compute-unit report status is passed through `env:` instead of template expansion, and Dependabot updates gain a seven-day cooldown. The `taiki-e/install-action` pin is refreshed to its latest release hash.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #280](https://github.com/pina-rs/pina/pull/280)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.12.0](https://github.com/pina-rs/pina/releases/tag/v0.12.0) (2026-08-31)\n\nGrouped release for `core`.\n### Breaking Changes\n\n#### Ship the pina_lints crate and drop the Dylint pipeline\n_Packages:_ _pina_cli_\n\nIntroduce the `pina_lints` crate: every Pina security, performance, and IDL lint now lives in one self-contained, importable crate that mirrors the Dylint authoring API (`declare_late_lint!`, `declare_pre_expansion_lint!`) and registers through a single `register_all_lints` entry point. The crate builds as a library and a Dylint-compatible cdylib, and it ships the `pina_lint_driver` binary that statically links the whole catalog.\n\n`pina lint` now runs `cargo check` (or `cargo fix` with `--fix`) with the bundled driver as `RUSTC_WRAPPER`. This is a breaking change for `pina_cli` library consumers: `LintError::Bundle` is gone (the download pipeline it represented is removed), `Project` exposes a new `lint_levels` field, and the lint catalog file `lints.json` moved to a simplified schema. The driver is installed below Cargo home from the `pina_lints` release matching the CLI version on first use; no precompiled Dylint tools or lint bundles are downloaded. Lint levels are configurable through the new `[lints]` table of `pina.toml` (lint name = `allow`, `warn`, or `deny`), and unknown names are rejected with the full catalog list.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #270](https://github.com/pina-rs/pina/pull/270)\n\n### Features\n\n#### Exercise every example on real runtimes\n_Packages:_ _pina_cli_, _pina_test_\n\nReplace the deploy-only filler suites with behavior tests that run each compiled SBF artifact through an isolated Surfpool instance: on-chain state transitions, runtime error codes, signature and ownership guards, PDA math, SPL token provisioning, and an escrow Make/Take round trip. The support surface moves into the `pina_test` crate, and generated test manifests inherit the pinned Surfpool compatibility graph from it instead of pinning Mollusk in every program manifest.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #269](https://github.com/pina-rs/pina/pull/269)\n\n#### Prefer the lowercase `pina.toml` config file\n_Packages:_ _pina_cli_\n\nThe canonical project configuration file name is now `pina.toml`. `pina init` writes `pina.toml`, and project discovery prefers it. The legacy uppercase `Pina.toml` spelling is still discovered, but selecting it prints a deprecation warning asking for the rename, and `pina.toml` always wins within the same directory.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #270](https://github.com/pina-rs/pina/pull/270)\n\n#### Ship the pina_lints crate and drop the Dylint pipeline\n_Packages:_ _pina_lints_\n\nIntroduce the `pina_lints` crate: every Pina security, performance, and IDL lint now lives in one self-contained, importable crate that mirrors the Dylint authoring API (`declare_late_lint!`, `declare_pre_expansion_lint!`) and registers through a single `register_all_lints` entry point. The crate builds as a library and a Dylint-compatible cdylib, and it ships the `pina_lint_driver` binary that statically links the whole catalog.\n\n`pina lint` now runs `cargo check` (or `cargo fix` with `--fix`) with the bundled driver as `RUSTC_WRAPPER`. This is a breaking change for `pina_cli` library consumers: `LintError::Bundle` is gone (the download pipeline it represented is removed), `Project` exposes a new `lint_levels` field, and the lint catalog file `lints.json` moved to a simplified schema. The driver is installed below Cargo home from the `pina_lints` release matching the CLI version on first use; no precompiled Dylint tools or lint bundles are downloaded. Lint levels are configurable through the new `[lints]` table of `pina.toml` (lint name = `allow`, `warn`, or `deny`), and unknown names are rejected with the full catalog list.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #270](https://github.com/pina-rs/pina/pull/270)\n\n### Documentation\n\n#### Improve readme quality with managed badge rows\n_Packages:_ _pina_, _pina_cli_, _pina_lints_, _pina_macros_, _pina_codama_renderer_, _pina_profile_, _pina_sdk_ids_, _pina_test_, _pina_codama_nodes_, _pina_cli_npm_, _pina_skill_\n\nReplace the per-crate inline reference-link badges with an mdt-managed `crateReadmeBadgeRow` template and a new `npmReadmeBadgeRow` for the npm packages, so badges stay synchronized from `templates/readme-badges.t.md`. Each readme now carries concrete usage examples: a full counter program flow for `pina`, typed ID checks for `pina_sdk_ids`, a complete `ProgramTest` fixture for `pina_test`, CLI loops for `@pina-rs/cli`, and fresh usage claims in `pina_codama_renderer` (now published).\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #283](https://github.com/pina-rs/pina/pull/283)\n\n#### Configure codecov from the repository root\n_Packages:_ _pina_skill_\n\nThe new root-level `codecov.yml` scopes coverage accounting to the unit-testable crates. It is a repository configuration file, so every package is affected without requiring a version bump. The agent-skill testing and project-setup references gain the Surfpool runtime limitations and the delegated SBF build toolchain.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #269](https://github.com/pina-rs/pina/pull/269)\n\n#### Document the bundled lint driver in the agent skill\n_Packages:_ _pina_skill_\n\nUpdate the skill references to describe the `pina_lint_driver` flow (`pina lint` installs the driver under Cargo home on first use) instead of pinned Dylint tooling, and use the lowercase `pina.toml` spelling.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #270](https://github.com/pina-rs/pina/pull/270)\n\n#### Refresh the lint skill reference for the driver\n_Packages:_ _pina_skill_\n\nUpdate the agent-skill CLI reference to describe the bundled `pina_lint_driver` flow (the driver statically links the whole lint catalog; additional project-defined lint libraries are never loaded), replacing the stale guidance about project Dylint metadata and direct `cargo dylint` usage.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #273](https://github.com/pina-rs/pina/pull/273) · _Related issues:_ [#270](https://github.com/pina-rs/pina/issues/270)\n\n### Notes\n\n#### Configure codecov from the repository root\n_Packages:_ _pina_, _pina_lints_, _pina_macros_, _pina_codama_renderer_, _pina_profile_, _pina_sdk_ids_, _pina_codama_nodes_, _pina_cli_npm_, _pina_cli_darwin_arm64_, _pina_cli_darwin_x64_, _pina_cli_freebsd_x64_, _pina_cli_linux_arm64_gnu_, _pina_cli_linux_arm64_musl_, _pina_cli_linux_x64_gnu_, _pina_cli_linux_x64_musl_, _pina_cli_win32_arm64_msvc_, _pina_cli_win32_x64_msvc_\n\nThe new root-level `codecov.yml` scopes coverage accounting to the unit-testable crates. It is a repository configuration file, so every package is affected without requiring a version bump. The agent-skill testing and project-setup references gain the Surfpool runtime limitations and the delegated SBF build toolchain.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #269](https://github.com/pina-rs/pina/pull/269)\n\n#### Gate zizmor workflow auditing into the security check\n_Packages:_ _pina_, _pina_lints_, _pina_macros_, _pina_codama_renderer_, _pina_profile_, _pina_sdk_ids_, _pina_codama_nodes_, _pina_cli_npm_, _pina_cli_darwin_arm64_, _pina_cli_darwin_x64_, _pina_cli_freebsd_x64_, _pina_cli_linux_arm64_gnu_, _pina_cli_linux_arm64_musl_, _pina_cli_linux_x64_gnu_, _pina_cli_linux_x64_musl_, _pina_cli_win32_arm64_msvc_, _pina_cli_win32_x64_msvc_, _pina_skill_\n\nZizmor now audits every workflow and composite action as part of `verify:security`, with a zero-findings policy recorded in `.github/zizmor.yml`. Checkouts persist credentials only where authentication is required, the compute-unit report status is passed through `env:` instead of template expansion, and Dependabot updates gain a seven-day cooldown. The `taiki-e/install-action` pin is refreshed to its latest release hash.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #280](https://github.com/pina-rs/pina/pull/280)"
+		}
+	],
+	"provider": {
+		"kind": "github",
+		"owner": "pina-rs",
+		"repo": "pina",
+		"host": null
+	}
+}
