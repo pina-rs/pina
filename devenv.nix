@@ -95,6 +95,21 @@ in
     # Shared by the program-e2e and Surfpool builders so every SBF artifact is
     # produced with the same pinned platform tools.
     SBF_TOOLS_VERSION = "v1.54";
+  }
+  # cc-rs compiles vendored C/C++ (e.g. libfuzzer-sys) by passing
+  # `--target=arm64-apple-macosx` to `clang++`. The nix cc-wrapper explicitly
+  # does not support that override ("multi-target compilers" warning) and its
+  # mishandled include paths then fail to resolve libc++ headers against the
+  # Xcode sysroot (`unknown type name 'uint8_t'`). Hand cc-rs Apple's toolchain
+  # on macOS instead; it pairs with the global Xcode SDK, matching
+  # `apple.sdk = null` above.
+  #
+  # HOST_* is required because the nix stdenv setup hooks re-export
+  # CC=clang/CXX=clang++ after `env`, silently overriding shell-level CC/CXX
+  # values; cc-rs prefers HOST_* over CC/CXX, and nothing overwrites those.
+  // lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
+    HOST_CC = "/usr/bin/clang";
+    HOST_CXX = "/usr/bin/clang++";
   };
 
   # Rely on the global sdk for now as the nix apple sdk is not working for me.
