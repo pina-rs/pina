@@ -12,7 +12,11 @@ The binary name is `pina`.
 
 The complete command reference is published in the [Pina CLI book](https://pina-rs.github.io/pina/cli/index.html).
 
-[![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][license-image]][license-link] [![codecov][codecov-image]][codecov-link]
+<!-- {=crateReadmeBadgeRow:"pina_cli"} -->
+
+[![Crates.io](https://img.shields.io/badge/crates.io-pina**cli-orange?logo=rust)](https://crates.io/crates/pina_cli) [![Docs.rs](https://img.shields.io/badge/docs.rs-pina**cli-1f425f?logo=docs.rs)](https://docs.rs/pina_cli/) [![CI](https://github.com/pina-rs/pina/actions/workflows/ci.yml/badge.svg)](https://github.com/pina-rs/pina/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/pina-rs/pina/branch/main/graph/badge.svg)](https://codecov.io/gh/pina-rs/pina) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/license/apache-2.0)
+
+<!-- {/crateReadmeBadgeRow} -->
 
 ## Installation
 
@@ -322,14 +326,3 @@ See the mdBook chapter **Pina CLI → Generate and publish IDLs** for authority,
 <!-- {/pinaIdlProgramMetadata} -->
 
 For best IDL extraction fidelity, follow the rules documented in [`crates/pina_cli/rules.md`](./rules.md).
-
-[crate-image]: https://img.shields.io/crates/v/pina_cli.svg?style=flat-square
-[crate-link]: https://crates.io/crates/pina_cli
-[docs-image]: https://docs.rs/pina_cli/badge.svg
-[docs-link]: https://docs.rs/pina_cli/
-[ci-status-image]: https://github.com/pina-rs/pina/workflows/ci/badge.svg
-[ci-status-link]: https://github.com/pina-rs/pina/actions?query=workflow:ci
-[license-image]: https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=flat-square
-[license-link]: https://www.apache.org/licenses/LICENSE-2.0
-[codecov-image]: https://codecov.io/github/pina-rs/pina/graph/badge.svg?token=87K799Q78I
-[codecov-link]: https://codecov.io/github/pina-rs/pina

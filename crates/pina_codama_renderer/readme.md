@@ -6,9 +6,13 @@
 
 <br>
 
-Codama Rust renderer that generates Pina-style validated zeropod models and discriminator-first layouts from Codama JSON IDLs. It is not published to crates.io and is used internally by the `pina codama generate` workflow.
+Codama Rust renderer that generates Pina-style validated zeropod models and discriminator-first layouts from Codama JSON IDLs. The `pina codama generate` command drives it for every program you generate; it is also published to crates.io for custom render pipelines.
 
-[![CI][ci-status-image]][ci-status-link] [![License][license-image]][license-link]
+<!-- {=crateReadmeBadgeRow:"pina_codama_renderer"} -->
+
+[![Crates.io](https://img.shields.io/badge/crates.io-pina**codama**renderer-orange?logo=rust)](https://crates.io/crates/pina_codama_renderer) [![Docs.rs](https://img.shields.io/badge/docs.rs-pina**codama**renderer-1f425f?logo=docs.rs)](https://docs.rs/pina_codama_renderer/) [![CI](https://github.com/pina-rs/pina/actions/workflows/ci.yml/badge.svg)](https://github.com/pina-rs/pina/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/pina-rs/pina/branch/main/graph/badge.svg)](https://codecov.io/gh/pina-rs/pina) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/license/apache-2.0)
+
+<!-- {/crateReadmeBadgeRow} -->
 
 ## Usage
 
@@ -40,8 +44,3 @@ The renderer only supports fixed-size layouts. The following Codama patterns wil
 - Floats
 - Non-UTF8 constant byte seeds
 - Non-fixed arrays
-
-[ci-status-image]: https://github.com/pina-rs/pina/workflows/ci/badge.svg
-[ci-status-link]: https://github.com/pina-rs/pina/actions?query=workflow:ci
-[license-image]: https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=flat-square
-[license-link]: https://www.apache.org/licenses/LICENSE-2.0

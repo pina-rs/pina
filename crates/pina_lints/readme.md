@@ -1,10 +1,20 @@
-# Pina Lints
+# `pina_lints`
+
+<p align="center">
+	<img src="https://raw.githubusercontent.com/pina-rs/pina/main/.github/assets/logo.png" alt="The Pina logo: a low-poly origami pineapple" width="140">
+</p>
 
 `pina_lints` is Pina's self-contained replacement for the previous [Dylint](https://github.com/trailofbits/dylint) setup: every security, performance, and IDL lint that Pina ships lives in this one importable crate, so the lints are built into Pina instead of being distributed as separate Dylint libraries. They turn repository security conventions into compiler diagnostics and are intended to run during normal development and CI.
 
 The crate keeps the Dylint authoring shape — each lint lives in its own module under `lints` and declares itself with `declare_late_lint!` or `declare_pre_expansion_lint!` — but no lint registers itself; registration is centralized in `register_all_lints`. The crate builds as both a library and a cdylib that exports the Dylint-compatible `register_lints` symbol, so a Dylint driver can still load it as a single library. It also ships the bundled `pina_lint_driver` binary, a `rustc` wrapper with every lint statically linked; `pina lint` runs it as `RUSTC_WRAPPER`, so it needs no external lint tooling.
 
 The lints complement tests and audits; they do not prove that a program's economic design is safe. Every path-sensitive lint documents the approximation it uses so findings can be reviewed with the right expectations.
+
+<!-- {=crateReadmeBadgeRow:"pina_lints"} -->
+
+[![Crates.io](https://img.shields.io/badge/crates.io-pina**lints-orange?logo=rust)](https://crates.io/crates/pina_lints) [![Docs.rs](https://img.shields.io/badge/docs.rs-pina**lints-1f425f?logo=docs.rs)](https://docs.rs/pina_lints/) [![CI](https://github.com/pina-rs/pina/actions/workflows/ci.yml/badge.svg)](https://github.com/pina-rs/pina/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/pina-rs/pina/branch/main/graph/badge.svg)](https://codecov.io/gh/pina-rs/pina) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/license/apache-2.0)
+
+<!-- {/crateReadmeBadgeRow} -->
 
 ## Installation and execution
 

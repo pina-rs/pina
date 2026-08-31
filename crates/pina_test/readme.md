@@ -1,6 +1,16 @@
 # `pina_test`
 
+<p align="center">
+	<img src="https://raw.githubusercontent.com/pina-rs/pina/main/.github/assets/logo.png" alt="The Pina logo: a low-poly origami pineapple" width="140">
+</p>
+
 Host-side Surfpool integration test support for Pina programs.
+
+<!-- {=crateReadmeBadgeRow:"pina_test"} -->
+
+[![Crates.io](https://img.shields.io/badge/crates.io-pina**test-orange?logo=rust)](https://crates.io/crates/pina_test) [![Docs.rs](https://img.shields.io/badge/docs.rs-pina**test-1f425f?logo=docs.rs)](https://docs.rs/pina_test/) [![CI](https://github.com/pina-rs/pina/actions/workflows/ci.yml/badge.svg)](https://github.com/pina-rs/pina/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/pina-rs/pina/branch/main/graph/badge.svg)](https://codecov.io/gh/pina-rs/pina) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/license/apache-2.0)
+
+<!-- {/crateReadmeBadgeRow} -->
 
 `ProgramTest` is the high-level fixture used by projects created with `pina init`. It reads the SBF artifact supplied by `pina test`, starts an embedded Surfpool instance on dynamic ports with upstream RPC access disabled, deploys the program at its declared address, and owns deterministic shutdown.
 
@@ -10,13 +20,23 @@ Tests can then focus on program behavior:
 let program_id = Pubkey::new_from_array(ID.to_bytes());
 let mut program = ProgramTest::start(program_id).await?;
 
-program.send(&instruction_data, account_metas)?;
-let state = program.account(&state_address)?;
+// Fund a counter PDA authority before the first transaction.
+program.fund(&user_pubkey, 1_000_000_000)?;
+
+// Send instruction data and accounts; the payer signs and confirms.
+program
+	.send(&[INCREMENT_DISCRIMINATOR], vec![
+		AccountMeta::new(authority.pubkey(), true),
+		AccountMeta::new(counter_pda, false),
+	])?;
+
+let state = program.account(&counter_pda)?;
+assert_eq!(state.lamports, LAMPORTS_PER_SOL);
 
 program.stop()?;
 ```
 
-The fixture also supports funding arbitrary addresses, additional transaction signers, balance reads, and prebuilt instructions. `TestError::operation` and `TestError::message` make failure assertions readable without parsing display text. `OfflineSurfnet` remains available when a test needs to control deployment itself.
+The payer signs and submits by default; `send_with_signers` adds program-specific signers, and `TestError::operation` plus `TestError::message` make failure assertions readable without parsing display text. `OfflineSurfnet` remains available when a test needs to control deployment itself.
 
 Generated programs keep `pina_test` in a dedicated `tests/surfpool` Cargo package with its own workspace boundary. Native tests therefore do not resolve, compile, or link Surfpool, and SBF builds cannot enable the host dependency.
 

@@ -12,7 +12,11 @@ A performant Solana smart contract framework built on top of [pinocchio](https:/
 
 <!-- {/pinaProjectDescription} -->
 
-[![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][license-image]][license-link] [![codecov][codecov-image]][codecov-link]
+<!-- {=crateReadmeBadgeRow:"pina"} -->
+
+[![Crates.io](https://img.shields.io/badge/crates.io-pina-orange?logo=rust)](https://crates.io/crates/pina) [![Docs.rs](https://img.shields.io/badge/docs.rs-pina-1f425f?logo=docs.rs)](https://docs.rs/pina/) [![CI](https://github.com/pina-rs/pina/actions/workflows/ci.yml/badge.svg)](https://github.com/pina-rs/pina/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/pina-rs/pina/branch/main/graph/badge.svg)](https://codecov.io/gh/pina-rs/pina) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/license/apache-2.0)
+
+<!-- {/crateReadmeBadgeRow} -->
 
 > Pina is currently unaudited and still hardening. See [SECURITY.md](./SECURITY.md) for the current readiness statement, supported versions, and private vulnerability reporting instructions.
 
@@ -916,18 +920,3 @@ Contributions are welcome! Please open an issue or pull request on [GitHub](http
 <br>
 
 Licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
-
-<!-- {=pinaBadgeLinks} -->
-
-[crate-image]: https://img.shields.io/crates/v/pina.svg?style=flat-square
-[crate-link]: https://crates.io/crates/pina
-[docs-image]: https://docs.rs/pina/badge.svg
-[docs-link]: https://docs.rs/pina/
-[ci-status-image]: https://github.com/pina-rs/pina/workflows/ci/badge.svg
-[ci-status-link]: https://github.com/pina-rs/pina/actions?query=workflow:ci
-[license-image]: https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=flat-square
-[license-link]: https://www.apache.org/licenses/LICENSE-2.0
-[codecov-image]: https://codecov.io/github/pina-rs/pina/graph/badge.svg?token=87K799Q78I
-[codecov-link]: https://codecov.io/github/pina-rs/pina
-
-<!-- {/pinaBadgeLinks} -->

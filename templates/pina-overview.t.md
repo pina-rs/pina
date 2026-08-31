@@ -147,21 +147,6 @@ cargo nextest run  # Faster parallel test execution
 
 <!-- {/pinaTestingInstructions} -->
 
-<!-- {@pinaBadgeLinks} -->
-
-[crate-image]: https://img.shields.io/crates/v/pina.svg?style=flat-square
-[crate-link]: https://crates.io/crates/pina
-[docs-image]: https://docs.rs/pina/badge.svg
-[docs-link]: https://docs.rs/pina/
-[ci-status-image]: https://github.com/pina-rs/pina/workflows/ci/badge.svg
-[ci-status-link]: https://github.com/pina-rs/pina/actions?query=workflow:ci
-[license-image]: https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=flat-square
-[license-link]: https://www.apache.org/licenses/LICENSE-2.0
-[codecov-image]: https://codecov.io/github/pina-rs/pina/graph/badge.svg?token=87K799Q78I
-[codecov-link]: https://codecov.io/github/pina-rs/pina
-
-<!-- {/pinaBadgeLinks} -->
-
 <!-- {@pinaCliCommands} -->
 
 - `pina init <name>` — scaffold a project-aware Pina program
