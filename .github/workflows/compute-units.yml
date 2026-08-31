@@ -21,6 +21,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: setup
         uses: ./.github/actions/devenv
@@ -89,8 +90,10 @@ jobs:
 
       - name: enforce regression threshold
         if: always()
+        env:
+          COMPARE_STATUS: ${{ steps.compare.outputs.status }}
         run: |
-          status='${{ steps.compare.outputs.status }}'
+          status="$COMPARE_STATUS"
 
           if [ -z "$status" ]; then
             echo "compute-unit comparison did not run because an earlier step failed" >&2

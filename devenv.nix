@@ -69,6 +69,7 @@ in
         '';
       }))
       shfmt
+      zizmor
       zlib
       zstd
     ]
@@ -1019,6 +1020,17 @@ in
       description = "Fail on moderate-or-higher advisories in the pnpm lockfile.";
       binary = "bash";
     };
+    "security:zizmor" = {
+      exec = ''
+        set -euo pipefail
+        # --no-online-audits keeps the gate reproducible and sandbox-friendly;
+        # offline audits still cover workflow injection, credential persistence,
+        # dependency pinning, and permissions hardening.
+        zizmor --no-online-audits --no-progress ${lib.escapeShellArg "${currentDir}/.github"}
+      '';
+      description = "Audit GitHub Actions workflows and composite actions with zizmor.";
+      binary = "bash";
+    };
     "verify:security" = {
       exec = ''
         set -euo pipefail
@@ -1028,6 +1040,7 @@ in
         security:pina-test:deny
         security:pina-test:audit
         security:npm-audit
+        security:zizmor
       '';
       description = "Run all custom and dependency security checks.";
       binary = "bash";
