@@ -139,9 +139,7 @@ fn is_executable(path: &Path) -> bool {
 	use std::os::unix::fs::PermissionsExt;
 
 	path.is_file()
-		&& std::fs::metadata(path)
-			.map(|metadata| metadata.permissions().mode() & 0o111 != 0)
-			.unwrap_or(false)
+		&& std::fs::metadata(path).is_ok_and(|metadata| metadata.permissions().mode() & 0o111 != 0)
 }
 
 /// Return whether `path` is an executable file.
@@ -183,7 +181,7 @@ fn parse_rustc_fingerprint(output: &[u8]) -> Option<String> {
 		.next()?
 		.to_owned();
 
-	let fingerprint = format!("{released}-{host}", released = release, host = host);
+	let fingerprint = format!("{release}-{host}");
 	// The release and host prefixes were parsed above, so the leftover
 	// replacements cannot blank the name out.
 	Some(

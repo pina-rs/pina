@@ -85,7 +85,7 @@ impl rustc_driver::Callbacks for Callbacks {
 				));
 			}
 
-			if no_deps_enabled() && !env::var_os("CARGO_PRIMARY_PACKAGE").is_some() {
+			if no_deps_enabled() && env::var_os("CARGO_PRIMARY_PACKAGE").is_none() {
 				return;
 			}
 
@@ -140,10 +140,10 @@ fn run(args: &[OsString]) -> Result<(), String> {
 	rustc_args.push("rustc".to_owned());
 
 	let mut args = args.iter();
-	if let Some(first) = args.next() {
-		if !is_rustc(first) {
-			rustc_args.push(first.to_string_lossy().to_string());
-		}
+	if let Some(first) = args.next()
+		&& !is_rustc(first)
+	{
+		rustc_args.push(first.to_string_lossy().to_string());
 	}
 	rustc_args.extend(args.map(|arg| arg.to_string_lossy().to_string()));
 

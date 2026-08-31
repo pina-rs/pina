@@ -71,7 +71,7 @@ pub const PINA_LINTS_VERSION: &str = "1";
 pub const DYLINT_VERSION: &str = "0.1.0";
 
 /// Every lint in this crate, in catalog (alphabetical) order.
-pub static LINTS: &[&'static rustc_lint::Lint] = &[
+pub static LINTS: &[&rustc_lint::Lint] = &[
 	lints::deny_account_borrows_across_cpi::DENY_ACCOUNT_BORROWS_ACROSS_CPI,
 	lints::deny_heap_allocations_in_onchain_instruction_handlers::DENY_HEAP_ALLOCATIONS_IN_ONCHAIN_INSTRUCTION_HANDLERS,
 	lints::require_associated_token_address_before_ata_cast::REQUIRE_ASSOCIATED_TOKEN_ADDRESS_BEFORE_ATA_CAST,

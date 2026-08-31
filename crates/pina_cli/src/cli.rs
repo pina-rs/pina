@@ -101,8 +101,8 @@ pub(crate) enum Commands {
 	/// Run Pina's official security lints against the current program.
 	///
 	/// Discovers the nearest pina.toml or Cargo package, prepares the
-	/// pina_lint_driver binary for the active toolchain under Cargo home, and
-	/// runs cargo check with the driver as RUSTC_WRAPPER. Lint levels configured
+	/// `pina_lint_driver` binary for the active toolchain under Cargo home, and
+	/// runs cargo check with the driver as `RUSTC_WRAPPER`. Lint levels configured
 	/// in the [lints] table of pina.toml are honored. Use --fix to apply
 	/// machine-applicable suggestions; review every resulting source change.
 	#[command(
