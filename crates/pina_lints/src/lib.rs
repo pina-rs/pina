@@ -134,7 +134,7 @@ pub struct LintInfo {
 }
 
 /// Iterate the lint catalog with plain Rust types, in catalog order.
-#[must_use]
+#[must_use = "iterate the catalog to inspect the registered lints"]
 pub fn catalog() -> impl Iterator<Item = LintInfo> {
 	LINT_NAMES.iter().zip(LINTS).map(|(name, lint)| {
 		LintInfo {
@@ -381,7 +381,7 @@ pub fn register_lints(sess: &rustc_session::Session, lint_store: &mut rustc_lint
 #[unsafe(no_mangle)]
 pub extern "C" fn pina_lints_version() -> *mut std::os::raw::c_char {
 	std::ffi::CString::new(PINA_LINTS_VERSION)
-		.expect("protocol version contains no interior NUL bytes")
+		.unwrap_or_else(|error| panic!("protocol version contains no interior NUL bytes: {error}"))
 		.into_raw()
 }
 
@@ -389,6 +389,6 @@ pub extern "C" fn pina_lints_version() -> *mut std::os::raw::c_char {
 #[unsafe(no_mangle)]
 pub extern "C" fn dylint_version() -> *mut std::os::raw::c_char {
 	std::ffi::CString::new(DYLINT_VERSION)
-		.expect("protocol version contains no interior NUL bytes")
+		.unwrap_or_else(|error| panic!("protocol version contains no interior NUL bytes: {error}"))
 		.into_raw()
 }
