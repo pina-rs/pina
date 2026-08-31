@@ -323,6 +323,27 @@ jobs:
             --output "$RUNNER_TEMP/publish-readiness.json" \
             --format json
         shell: devenv shell -- bash -e {0}
+      - name: publish standalone pina_test workspace
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
+          PUBLISH_STREAM_OUTPUT: "true"
+        run: |
+          set -euo pipefail
+
+          # `pina_test` is an intentionally isolated Cargo workspace because
+          # its Agave dependency set conflicts with the root workspace. The
+          # bulk `--all` discovery does not cross that workspace boundary, so
+          # publish it explicitly from the release record with the same OIDC
+          # token. This is idempotent: monochange skips the command when this
+          # version already exists on crates_io.
+          result="$RUNNER_TEMP/pina-test-publish-result.json"
+          monochange step publish-packages \
+            --log-level info \
+            --package pina_test \
+            --output "$result" \
+            --format json
+          jq -e '.package_publish.summary.failed == 0' "$result" >/dev/null
+        shell: devenv shell -- bash -e {0}
       - name: publish packages with monochange
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
