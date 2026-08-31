@@ -10,7 +10,11 @@ Core runtime crate for building Solana programs on top of [`pinocchio`](https://
 
 It provides zero-copy account loaders, discriminator-aware account/instruction/event modeling, account validation traits, and `no_std` entrypoint helpers.
 
-[![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][license-image]][license-link] [![codecov][codecov-image]][codecov-link]
+<!-- {=crateReadmeBadgeRow:"pina"} -->
+
+[![Crates.io](https://img.shields.io/badge/crates.io-pina-orange?logo=rust)](https://crates.io/crates/pina) [![Docs.rs](https://img.shields.io/badge/docs.rs-pina-1f425f?logo=docs.rs)](https://docs.rs/pina/) [![CI](https://github.com/pina-rs/pina/actions/workflows/ci.yml/badge.svg)](https://github.com/pina-rs/pina/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/pina-rs/pina/branch/main/graph/badge.svg)](https://codecov.io/gh/pina-rs/pina) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/license/apache-2.0)
+
+<!-- {/crateReadmeBadgeRow} -->
 
 ## Installation
 
@@ -103,6 +107,53 @@ fn process_instruction(
 }
 ```
 
+## PDAs, accounts, and validation in practice
+
+`examples/counter_program` wires the full loop: discriminator-first instructions, a PDA-seeded account, and a validation chain that ends in a checked zero-copy mutation.
+
+```rust
+#[account(discriminator = CounterAccountType)]
+#[pda(seeds = [COUNTER_SEED, authority: Address], bump = bump)]
+pub struct CounterState {
+	pub bump: u8,
+	pub count: u64,
+}
+
+#[derive(Accounts, Debug)]
+pub struct IncrementAccounts<'a> {
+	pub authority: &'a AccountView,
+	pub counter: &'a mut AccountView,
+}
+
+impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
+	fn process(self, data: &[u8]) -> ProgramResult {
+		let _ = IncrementInstruction::try_from_bytes(data)?;
+
+		self.authority.assert_signer()?;
+		self.counter
+			.assert_not_empty()?
+			.assert_type::<CounterState>(&ID)?;
+
+		// Verify the account is the PDA for the authority, using the stored
+		// bump field (avoids re-deriving the canonical bump on-chain).
+		CounterState::assert_seeds(self.counter, self.authority.address(), &ID)?;
+
+		// Mutate state
+		let mut counter = self.counter.as_account_mut::<CounterState>(&ID)?;
+		let next = counter
+			.count
+			.get()
+			.checked_add(1)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+		counter.count.set(next);
+
+		Ok(())
+	}
+}
+```
+
+For the complete program — `CreateProgramAccountWithBump`, `log!`, and the isolated Surfpool tests — see [`examples/counter_program`](https://github.com/pina-rs/pina/tree/main/examples/counter_program).
+
 ## Instruction authoring tips
 
 <br>
@@ -136,18 +187,3 @@ pina idl --path ./my_program --output ./idls/my_program.json
 ```
 
 From there you can generate JS clients with Codama renderers, or Pina-style Rust clients using this repository's `pina_codama_renderer` tool.
-
-<!-- {=pinaBadgeLinks} -->
-
-[crate-image]: https://img.shields.io/crates/v/pina.svg?style=flat-square
-[crate-link]: https://crates.io/crates/pina
-[docs-image]: https://docs.rs/pina/badge.svg
-[docs-link]: https://docs.rs/pina/
-[ci-status-image]: https://github.com/pina-rs/pina/workflows/ci/badge.svg
-[ci-status-link]: https://github.com/pina-rs/pina/actions?query=workflow:ci
-[license-image]: https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=flat-square
-[license-link]: https://www.apache.org/licenses/LICENSE-2.0
-[codecov-image]: https://codecov.io/github/pina-rs/pina/graph/badge.svg?token=87K799Q78I
-[codecov-link]: https://codecov.io/github/pina-rs/pina
-
-<!-- {/pinaBadgeLinks} -->

@@ -10,7 +10,11 @@ Typed constants for well-known Solana program IDs and sysvar IDs.
 
 Each module exposes an `ID` constant declared via `solana_address::declare_id!`.
 
-[![Crates.io][crate-image]][crate-link] [![Docs.rs][docs-image]][docs-link] [![CI][ci-status-image]][ci-status-link] [![License][license-image]][license-link] [![codecov][codecov-image]][codecov-link]
+<!-- {=crateReadmeBadgeRow:"pina_sdk_ids"} -->
+
+[![Crates.io](https://img.shields.io/badge/crates.io-pina**sdk**ids-orange?logo=rust)](https://crates.io/crates/pina_sdk_ids) [![Docs.rs](https://img.shields.io/badge/docs.rs-pina**sdk**ids-1f425f?logo=docs.rs)](https://docs.rs/pina_sdk_ids/) [![CI](https://github.com/pina-rs/pina/actions/workflows/ci.yml/badge.svg)](https://github.com/pina-rs/pina/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/pina-rs/pina/branch/main/graph/badge.svg)](https://codecov.io/gh/pina-rs/pina) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/license/apache-2.0)
+
+<!-- {/crateReadmeBadgeRow} -->
 
 ## Installation
 
@@ -28,8 +32,11 @@ cargo add pina_sdk_ids
 use pina_sdk_ids::system_program;
 use pina_sdk_ids::sysvar;
 
-let system_program_id = system_program::ID;
-let clock_sysvar_id = sysvar::clock::ID;
+// Validation chains read best with named IDs:
+self.system_program.assert_address(&system_program::ID)?;
+self.clock.assert_sysvar(&sysvar::clock::ID)?;
+// Signature-verification programs stay typed during CPI checks:
+self.ed25519_program.assert_address(&pina_sdk_ids::ed25519_program::ID)?;
 ```
 
 ## Included IDs
@@ -54,14 +61,3 @@ let clock_sysvar_id = sysvar::clock::ID;
 <br>
 
 `pina_sdk_ids` is `#![no_std]` and safe for on-chain program crates.
-
-[crate-image]: https://img.shields.io/crates/v/pina_sdk_ids.svg?style=flat-square
-[crate-link]: https://crates.io/crates/pina_sdk_ids
-[docs-image]: https://docs.rs/pina_sdk_ids/badge.svg
-[docs-link]: https://docs.rs/pina_sdk_ids/
-[ci-status-image]: https://github.com/pina-rs/pina/workflows/ci/badge.svg
-[ci-status-link]: https://github.com/pina-rs/pina/actions?query=workflow:ci
-[license-image]: https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=flat-square
-[license-link]: https://www.apache.org/licenses/LICENSE-2.0
-[codecov-image]: https://codecov.io/github/pina-rs/pina/graph/badge.svg?token=87K799Q78I
-[codecov-link]: https://codecov.io/github/pina-rs/pina

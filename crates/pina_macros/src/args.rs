@@ -1,9 +1,5 @@
 // Darling's derive expansions emit `continue` in generated code.
 #![allow(clippy::needless_continue)]
-#![expect(
-	unused_qualifications,
-	reason = "darling emits qualified paths whose spans point to its input fields"
-)]
 
 use darling::FromDeriveInput;
 use darling::FromField;

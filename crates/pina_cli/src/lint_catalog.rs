@@ -67,8 +67,9 @@ impl LintCatalog {
 	pub fn global() -> &'static Self {
 		static CATALOG: OnceLock<LintCatalog> = OnceLock::new();
 		CATALOG.get_or_init(|| {
-			let file: CatalogFile = serde_json::from_str(CATALOG_JSON)
-				.expect("embedded lint catalog must be valid JSON");
+			let file: CatalogFile = serde_json::from_str(CATALOG_JSON).unwrap_or_else(|error| {
+				panic!("embedded lint catalog must be valid JSON: {error}")
+			});
 			let catalog = LintCatalog {
 				entries: file.lints,
 			};

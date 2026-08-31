@@ -71,7 +71,7 @@ pub const PINA_LINTS_VERSION: &str = "1";
 pub const DYLINT_VERSION: &str = "0.1.0";
 
 /// Every lint in this crate, in catalog (alphabetical) order.
-pub static LINTS: &[&'static rustc_lint::Lint] = &[
+pub static LINTS: &[&rustc_lint::Lint] = &[
 	lints::deny_account_borrows_across_cpi::DENY_ACCOUNT_BORROWS_ACROSS_CPI,
 	lints::deny_heap_allocations_in_onchain_instruction_handlers::DENY_HEAP_ALLOCATIONS_IN_ONCHAIN_INSTRUCTION_HANDLERS,
 	lints::require_associated_token_address_before_ata_cast::REQUIRE_ASSOCIATED_TOKEN_ADDRESS_BEFORE_ATA_CAST,
@@ -134,7 +134,7 @@ pub struct LintInfo {
 }
 
 /// Iterate the lint catalog with plain Rust types, in catalog order.
-#[must_use]
+#[must_use = "iterate the catalog to inspect the registered lints"]
 pub fn catalog() -> impl Iterator<Item = LintInfo> {
 	LINT_NAMES.iter().zip(LINTS).map(|(name, lint)| {
 		LintInfo {
@@ -381,7 +381,7 @@ pub fn register_lints(sess: &rustc_session::Session, lint_store: &mut rustc_lint
 #[unsafe(no_mangle)]
 pub extern "C" fn pina_lints_version() -> *mut std::os::raw::c_char {
 	std::ffi::CString::new(PINA_LINTS_VERSION)
-		.expect("protocol version contains no interior NUL bytes")
+		.unwrap_or_else(|error| panic!("protocol version contains no interior NUL bytes: {error}"))
 		.into_raw()
 }
 
@@ -389,6 +389,6 @@ pub extern "C" fn pina_lints_version() -> *mut std::os::raw::c_char {
 #[unsafe(no_mangle)]
 pub extern "C" fn dylint_version() -> *mut std::os::raw::c_char {
 	std::ffi::CString::new(DYLINT_VERSION)
-		.expect("protocol version contains no interior NUL bytes")
+		.unwrap_or_else(|error| panic!("protocol version contains no interior NUL bytes: {error}"))
 		.into_raw()
 }
