@@ -1,6 +1,6 @@
 {
 	"name": "@pina-rs/cli-freebsd-x64",
-	"version": "0.12.0",
+	"version": "0.11.1",
 	"description": "Prebuilt Pina CLI binary for FreeBSD x64",
 	"homepage": "https://pina.rs",
 	"bugs": { "url": "https://github.com/pina-rs/pina/issues" },
