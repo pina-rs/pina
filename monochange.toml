@@ -80,6 +80,8 @@ steps = [
 path = "."
 type = "cargo"
 publish = { enabled = false }
+
+[package.pina]
 path = "crates/pina"
 type = "cargo"
 
