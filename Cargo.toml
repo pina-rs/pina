@@ -103,7 +103,7 @@ exclude = [
 
 [package]
 name = "pina_root"
-version = "0.0.0"
+version = "0.0.1"
 edition = "2024"
 publish = false
 description = "Internal cross-crate test harness for the Pina workspace; never published."
@@ -121,7 +121,7 @@ syn = { workspace = true, features = ["full"] }
 trybuild = { workspace = true }
 
 [workspace.package]
-version = "0.12.0"
+version = "0.12.1"
 edition = "2024"
 homepage = "https://pina.rs"
 keywords = ["solana", "pinocchio"]
@@ -156,7 +156,7 @@ object = { default-features = false, version = "^0.40.0" }
 owo-colors = { default-features = false, version = "^4.0" }
 paste = { default-features = false, version = "^1" }
 pastey = { default-features = false, version = "^0.2" }
-pina_test = { path = "crates/pina_test", version = "0.12.0" }
+pina_test = { path = "crates/pina_test", version = "0.12.1" }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }
 pinocchio-memo = { default-features = false, version = "^0.4" }
@@ -197,13 +197,13 @@ walkdir = { default-features = false, version = "^2" }
 zeropod = { default-features = false, version = "0.3.5", features = ["solana-address", "solana-program-error"] }
 
 # publishable crates
-pina = { default-features = false, path = "crates/pina", version = "0.12.0" }
-pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.12.0" }
-pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.12.0" }
-pina_lints = { default-features = false, path = "crates/pina_lints", version = "0.12.0" }
-pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.12.0" }
-pina_profile = { default-features = false, path = "crates/pina_profile", version = "0.12.0" }
-pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.12.0" }
+pina = { default-features = false, path = "crates/pina", version = "0.12.1" }
+pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.12.1" }
+pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.12.1" }
+pina_lints = { default-features = false, path = "crates/pina_lints", version = "0.12.1" }
+pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.12.1" }
+pina_profile = { default-features = false, path = "crates/pina_profile", version = "0.12.1" }
+pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.12.1" }
 
 [workspace.metadata.bin]
 cargo-expand = { version = "1.0.111" }
