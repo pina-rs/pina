@@ -43,6 +43,20 @@ Generated JavaScript codecs reject over-capacity values rather than truncating t
 - Document the explicit `zeroed()` then `close_with_recipient()` close flow.
 - Regenerate Codama IDLs and committed Rust/JS clients for the updated writable-account inference.
 
+## [0.12.2](https://github.com/pina-rs/pina/releases/tag/v0.12.2) (2026-09-01)
+
+Grouped release for `core`.
+
+### Fixes
+
+#### Drop pina_macros' dead dev-dependencies
+
+_Packages:_ _pina_macros_
+
+The pina_root migration moved every pina_macros test out of the crate but left four dev-dependencies behind: `insta`, `pina`, `prettyplease`, and `trybuild`. The remaining `pina` requirement deadlocked crates.io publication: monochange publishes `pina_macros` before `pina`, while `cargo publish --locked` must resolve the rewritten dev-dependency `pina ^0.12.1`, which does not exist until `pina` publishes later in the same run. The one remaining unit test only references `pina::AccountView` inside `syn::parse_quote!` token streams and never links against the crate, so the whole section goes away.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #292](https://github.com/pina-rs/pina/pull/292) · _Related issues:_ [#284](https://github.com/pina-rs/pina/issues/284), [#288](https://github.com/pina-rs/pina/issues/288), [#290](https://github.com/pina-rs/pina/issues/290), [#291](https://github.com/pina-rs/pina/issues/291)
+
 ## [0.12.1](https://github.com/pina-rs/pina/releases/tag/v0.12.1) (2026-09-01)
 
 Grouped release for `core`.

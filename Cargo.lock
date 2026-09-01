@@ -5731,7 +5731,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "pina"
-version = "0.12.1"
+version = "0.12.2"
 dependencies = [
  "pastey",
  "pina_macros",
@@ -5780,7 +5780,7 @@ dependencies = [
 
 [[package]]
 name = "pina_cli"
-version = "0.12.1"
+version = "0.12.2"
 dependencies = [
  "atomic-write-file",
  "base64 0.23.1",
@@ -5824,7 +5824,7 @@ dependencies = [
 
 [[package]]
 name = "pina_codama_renderer"
-version = "0.12.1"
+version = "0.12.2"
 dependencies = [
  "clap",
  "codama-nodes",
@@ -5838,7 +5838,7 @@ dependencies = [
 
 [[package]]
 name = "pina_lints"
-version = "0.12.1"
+version = "0.12.2"
 dependencies = [
  "paste",
  "regex",
@@ -5848,7 +5848,7 @@ dependencies = [
 
 [[package]]
 name = "pina_macros"
-version = "0.12.1"
+version = "0.12.2"
 dependencies = [
  "darling 0.24.1",
  "heck 0.5.0",
@@ -5859,7 +5859,7 @@ dependencies = [
 
 [[package]]
 name = "pina_profile"
-version = "0.12.1"
+version = "0.12.2"
 dependencies = [
  "object 0.40.0",
  "serde",
@@ -5870,7 +5870,7 @@ dependencies = [
 
 [[package]]
 name = "pina_root"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "insta",
  "macrotest",
@@ -5884,7 +5884,7 @@ dependencies = [
 
 [[package]]
 name = "pina_sdk_ids"
-version = "0.12.1"
+version = "0.12.2"
 dependencies = [
  "proptest",
  "solana-address 2.6.1",
@@ -5892,7 +5892,7 @@ dependencies = [
 
 [[package]]
 name = "pina_test"
-version = "0.12.1"
+version = "0.12.2"
 dependencies = [
  "solana-account 4.3.2",
  "solana-address 2.6.1",

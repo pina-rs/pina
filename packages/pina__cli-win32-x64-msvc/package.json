@@ -1,6 +1,6 @@
 {
 	"name": "@pina-rs/cli-win32-x64-msvc",
-	"version": "0.12.1",
+	"version": "0.12.2",
 	"description": "Prebuilt Pina CLI binary for Windows x64",
 	"homepage": "https://pina.rs",
 	"bugs": { "url": "https://github.com/pina-rs/pina/issues" },

@@ -1,0 +1,546 @@
+{
+	"schema_version": "0.4",
+	"kind": "monochange.releaseRecord",
+	"created_at": "2026-09-01T16:06:20Z",
+	"command": "release",
+	"version": null,
+	"versions": {
+		"core": "0.12.2",
+		"pina_root": "0.0.2"
+	},
+	"release_targets": [
+		{
+			"id": "core",
+			"kind": "group",
+			"version": "0.12.2",
+			"version_format": "primary",
+			"tag": true,
+			"release": true,
+			"tag_name": "v0.12.2",
+			"members": [
+				"pina",
+				"pina_cli",
+				"pina_lints",
+				"pina_macros",
+				"pina_codama_renderer",
+				"pina_profile",
+				"pina_sdk_ids",
+				"pina_test",
+				"pina_codama_nodes",
+				"pina_cli_npm",
+				"pina_cli_darwin_arm64",
+				"pina_cli_darwin_x64",
+				"pina_cli_freebsd_x64",
+				"pina_cli_linux_arm64_gnu",
+				"pina_cli_linux_arm64_musl",
+				"pina_cli_linux_x64_gnu",
+				"pina_cli_linux_x64_musl",
+				"pina_cli_win32_arm64_msvc",
+				"pina_cli_win32_x64_msvc",
+				"pina_skill"
+			]
+		},
+		{
+			"id": "pina_root",
+			"kind": "package",
+			"version": "0.0.2",
+			"version_format": "namespaced",
+			"tag": false,
+			"release": false,
+			"tag_name": "pina_root/v0.0.2",
+			"members": [
+				"pina_root"
+			]
+		}
+	],
+	"released_packages": [
+		"@pina-rs/cli",
+		"@pina-rs/cli-darwin-arm64",
+		"@pina-rs/cli-darwin-x64",
+		"@pina-rs/cli-freebsd-x64",
+		"@pina-rs/cli-linux-arm64-gnu",
+		"@pina-rs/cli-linux-arm64-musl",
+		"@pina-rs/cli-linux-x64-gnu",
+		"@pina-rs/cli-linux-x64-musl",
+		"@pina-rs/cli-win32-arm64-msvc",
+		"@pina-rs/cli-win32-x64-msvc",
+		"@pina-rs/codama-nodes",
+		"@pina-rs/skill",
+		"pina",
+		"pina_cli",
+		"pina_codama_renderer",
+		"pina_lints",
+		"pina_macros",
+		"pina_profile",
+		"pina_root",
+		"pina_sdk_ids",
+		"pina_test"
+	],
+	"changed_files": [
+		"Cargo.lock",
+		"Cargo.toml",
+		"changelog.md",
+		"crates/pina/Cargo.toml",
+		"crates/pina_cli/Cargo.toml",
+		"crates/pina_codama_renderer/Cargo.toml",
+		"crates/pina_lints/Cargo.toml",
+		"crates/pina_macros/Cargo.toml",
+		"crates/pina_profile/Cargo.toml",
+		"crates/pina_sdk_ids/Cargo.toml",
+		"crates/pina_test/Cargo.toml",
+		"packages/nodes-from-pina/package.json",
+		"packages/pina__cli/package.json",
+		"packages/pina__cli-darwin-arm64/package.json",
+		"packages/pina__cli-darwin-x64/package.json",
+		"packages/pina__cli-freebsd-x64/package.json",
+		"packages/pina__cli-linux-arm64-gnu/package.json",
+		"packages/pina__cli-linux-arm64-musl/package.json",
+		"packages/pina__cli-linux-x64-gnu/package.json",
+		"packages/pina__cli-linux-x64-musl/package.json",
+		"packages/pina__cli-win32-arm64-msvc/package.json",
+		"packages/pina__cli-win32-x64-msvc/package.json",
+		"packages/pina__skill/package.json"
+	],
+	"package_publications": [
+		{
+			"package": "pina",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_arm64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_freebsd_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_npm",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_arm64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_x64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_nodes",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_lints",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_macros",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_profile",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_sdk_ids",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_skill",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_test",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.12.2",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			},
+			"timeout": {
+				"timeout_seconds": 900,
+				"retries": 2
+			}
+		}
+	],
+	"updated_changelogs": [
+		"changelog.md"
+	],
+	"deleted_changesets": [
+		".changeset/pina-macros-drop-dev-deps.md"
+	],
+	"changesets": [
+		{
+			"path": ".changeset/pina-macros-drop-dev-deps.md",
+			"summary": "Drop pina_macros' dead dev-dependencies",
+			"details": "The pina_root migration moved every pina_macros test out of the crate but left four dev-dependencies behind: `insta`, `pina`, `prettyplease`, and `trybuild`. The remaining `pina` requirement deadlocked crates.io publication: monochange publishes `pina_macros` before `pina`, while `cargo publish --locked` must resolve the rewritten dev-dependency `pina ^0.12.1`, which does not exist until `pina` publishes later in the same run. The one remaining unit test only references `pina::AccountView` inside `syn::parse_quote!` token streams and never links against the crate, so the whole section goes away.",
+			"targets": [
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "9f5a5ba24dc7a496e079f24c53c9b9e50fbd0aa1",
+						"short_sha": "9f5a5ba",
+						"url": "https://github.com/pina-rs/pina/commit/9f5a5ba24dc7a496e079f24c53c9b9e50fbd0aa1",
+						"authored_at": "2026-09-01T16:55:12+01:00",
+						"committed_at": "2026-09-01T16:55:12+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#292",
+						"title": "fix(release): drop pina_macros dev-dependencies left by the pina_root migration",
+						"url": "https://github.com/pina-rs/pina/pull/292",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "9f5a5ba24dc7a496e079f24c53c9b9e50fbd0aa1",
+						"short_sha": "9f5a5ba",
+						"url": "https://github.com/pina-rs/pina/commit/9f5a5ba24dc7a496e079f24c53c9b9e50fbd0aa1",
+						"authored_at": "2026-09-01T16:55:12+01:00",
+						"committed_at": "2026-09-01T16:55:12+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#292",
+						"title": "fix(release): drop pina_macros dev-dependencies left by the pina_root migration",
+						"url": "https://github.com/pina-rs/pina/pull/292",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#284",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/284",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#288",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/288",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#290",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/290",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#291",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/291",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		}
+	],
+	"changelogs": [
+		{
+			"owner_id": "core",
+			"owner_kind": "group",
+			"path": "changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.12.2](https://github.com/pina-rs/pina/releases/tag/v0.12.2) (2026-09-01)",
+				"summary": [
+					"Grouped release for `core`."
+				],
+				"sections": [
+					{
+						"title": "Fixes",
+						"collapsed": false,
+						"entries": [
+							"#### Drop pina_macros' dead dev-dependencies\n_Packages:_ _pina_macros_\n\nThe pina_root migration moved every pina_macros test out of the crate but left four dev-dependencies behind: `insta`, `pina`, `prettyplease`, and `trybuild`. The remaining `pina` requirement deadlocked crates.io publication: monochange publishes `pina_macros` before `pina`, while `cargo publish --locked` must resolve the rewritten dev-dependency `pina ^0.12.1`, which does not exist until `pina` publishes later in the same run. The one remaining unit test only references `pina::AccountView` inside `syn::parse_quote!` token streams and never links against the crate, so the whole section goes away.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #292](https://github.com/pina-rs/pina/pull/292) · _Related issues:_ [#284](https://github.com/pina-rs/pina/issues/284), [#288](https://github.com/pina-rs/pina/issues/288), [#290](https://github.com/pina-rs/pina/issues/290), [#291](https://github.com/pina-rs/pina/issues/291)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.12.2](https://github.com/pina-rs/pina/releases/tag/v0.12.2) (2026-09-01)\n\nGrouped release for `core`.\n### Fixes\n\n#### Drop pina_macros' dead dev-dependencies\n_Packages:_ _pina_macros_\n\nThe pina_root migration moved every pina_macros test out of the crate but left four dev-dependencies behind: `insta`, `pina`, `prettyplease`, and `trybuild`. The remaining `pina` requirement deadlocked crates.io publication: monochange publishes `pina_macros` before `pina`, while `cargo publish --locked` must resolve the rewritten dev-dependency `pina ^0.12.1`, which does not exist until `pina` publishes later in the same run. The one remaining unit test only references `pina::AccountView` inside `syn::parse_quote!` token streams and never links against the crate, so the whole section goes away.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #292](https://github.com/pina-rs/pina/pull/292) · _Related issues:_ [#284](https://github.com/pina-rs/pina/issues/284), [#288](https://github.com/pina-rs/pina/issues/288), [#290](https://github.com/pina-rs/pina/issues/290), [#291](https://github.com/pina-rs/pina/issues/291)"
+		}
+	],
+	"provider": {
+		"kind": "github",
+		"owner": "pina-rs",
+		"repo": "pina",
+		"host": null
+	}
+}

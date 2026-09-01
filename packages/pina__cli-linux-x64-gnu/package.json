@@ -1,6 +1,6 @@
 {
 	"name": "@pina-rs/cli-linux-x64-gnu",
-	"version": "0.12.1",
+	"version": "0.12.2",
 	"description": "Prebuilt Pina CLI binary for Linux x64 (glibc)",
 	"homepage": "https://pina.rs",
 	"bugs": { "url": "https://github.com/pina-rs/pina/issues" },
