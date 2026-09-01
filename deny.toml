@@ -22,12 +22,18 @@ ignore = [
 
 [licenses]
 allow = [
+	# enum-iterator and enum-iterator-derive (solana-svm feature enumeration).
+	"0BSD",
 	"Apache-2.0",
 	"Apache-2.0 WITH LLVM-exception",
 	"BSD-2-Clause",
 	"BSD-3-Clause",
 	# webpki-roots distributes Mozilla's public certificate trust-store data.
 	"CDLA-Permissive-2.0",
+	# tiny-keccak (surfpool's keccak256 precompile stack).
+	"CC0-1.0",
+	# libbz2-rs-sys (surfpool's snapshot archives).
+	"bzip2-1.0.6",
 	"ISC",
 	"MIT",
 	"MPL-2.0",

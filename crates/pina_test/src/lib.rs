@@ -15,6 +15,7 @@ pub use solana_instruction::Instruction;
 pub use solana_keypair::Keypair;
 use solana_message::Message;
 pub use solana_pubkey::Pubkey;
+pub use solana_rent::Rent;
 pub use solana_signature::Signature;
 pub use solana_signer::Signer;
 use solana_transaction::Transaction;

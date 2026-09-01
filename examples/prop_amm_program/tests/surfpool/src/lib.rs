@@ -155,7 +155,6 @@ fn rotate_hands_over_the_oracle_authority() {
 			.expect("execute Initialize");
 
 		let new_authority = Keypair::new();
-		let new_authority = Keypair::new();
 
 		program
 			.send_instruction(rotate_instruction(

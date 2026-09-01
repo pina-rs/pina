@@ -3,7 +3,6 @@ name = "profile-program-surfpool-tests"
 version = "0.0.0"
 edition = "2024"
 publish = false
-workspace = "../../../../crates/pina_test"
 
 [dependencies]
 pina_test = { workspace = true }

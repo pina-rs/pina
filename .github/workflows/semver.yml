@@ -29,7 +29,12 @@ jobs:
       - name: run semver-checks
         id: semver
         continue-on-error: true
-        run: cargo semver-checks check-release --workspace
+        # pina_test's published 0.12.0 baseline carries the legacy exact-pin
+        # dependency island, which no longer resolves against the current
+        # registry (Surfpool's broad ranges now pick Agave 4.2 interface
+        # crates into a 4.1-train graph). Exclude it until the rebalanced
+        # 0.12.1 becomes the published baseline.
+        run: cargo semver-checks check-release --workspace --exclude pina_test
         shell: devenv shell -c -- bash -e {0}
 
       - name: evaluate semver results

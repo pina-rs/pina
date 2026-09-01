@@ -111,6 +111,11 @@ type = "cargo"
 path = "crates/pina_test"
 type = "cargo"
 
+[package.pina_test.publish.timeout]
+# The publish dry-run compiles the whole Surfpool host stack, which takes
+# minutes cold; the 60-second default is a cold-runner timeout, not a hang.
+timeout_seconds = 900
+
 [package.pina_codama_nodes]
 path = "packages/nodes-from-pina"
 type = "npm"
@@ -203,7 +208,6 @@ lockfile_commands = [
 	{ command = "cargo update --workspace", cwd = ".", shell = "bash" },
 	{ command = "cargo update --workspace --manifest-path crates/pina_fuzz/Cargo.toml", cwd = ".", shell = "bash" },
 	{ command = "cargo update --workspace --manifest-path crates/pina_fuzz/fuzz/Cargo.toml", cwd = ".", shell = "bash" },
-	{ command = "cargo update --workspace --manifest-path crates/pina_test/Cargo.toml", cwd = ".", shell = "bash" },
 ]
 
 [ecosystems.cargo.publish]

@@ -30,27 +30,49 @@ members = [
 	"crates/pina_macros",
 	"crates/pina_profile",
 	"crates/pina_sdk_ids",
+	"crates/pina_test",
 	"examples/anchor_declare_id",
+	"examples/anchor_declare_id/tests/surfpool",
 	"examples/anchor_declare_program",
+	"examples/anchor_declare_program/tests/surfpool",
 	"examples/anchor_duplicate_mutable_accounts",
+	"examples/anchor_duplicate_mutable_accounts/tests/surfpool",
 	"examples/anchor_errors",
+	"examples/anchor_errors/tests/surfpool",
 	"examples/anchor_events",
+	"examples/anchor_events/tests/surfpool",
 	"examples/anchor_floats",
+	"examples/anchor_floats/tests/surfpool",
 	"examples/anchor_realloc",
+	"examples/anchor_realloc/tests/surfpool",
 	"examples/anchor_system_accounts",
+	"examples/anchor_system_accounts/tests/surfpool",
 	"examples/anchor_sysvars",
+	"examples/anchor_sysvars/tests/surfpool",
 	"examples/counter_program",
+	"examples/counter_program/tests/surfpool",
 	"examples/escrow_program",
+	"examples/escrow_program/tests/surfpool",
 	"examples/hello_solana",
+	"examples/hello_solana/tests/surfpool",
 	"examples/optional_accounts_program",
+	"examples/optional_accounts_program/tests/surfpool",
 	"examples/pina_bpf",
+	"examples/pina_bpf/tests/surfpool",
 	"examples/profile_program",
+	"examples/profile_program/tests/surfpool",
 	"examples/prop_amm_program",
+	"examples/prop_amm_program/tests/surfpool",
 	"examples/role_registry_program",
+	"examples/role_registry_program/tests/surfpool",
 	"examples/staking_rewards_program",
+	"examples/staking_rewards_program/tests/surfpool",
 	"examples/todo_program",
+	"examples/todo_program/tests/surfpool",
 	"examples/transfer_sol",
+	"examples/transfer_sol/tests/surfpool",
 	"examples/vesting_program",
+	"examples/vesting_program/tests/surfpool",
 	"security/00-signer-authorization/secure",
 	"security/01-account-data-matching/secure",
 	"security/02-owner-checks/secure",
@@ -65,9 +87,7 @@ members = [
 ]
 
 exclude = [
-	# Surfpool 1.5 requires Agave 4.1 while the workspace's Mollusk 0.15 uses
-	# Agave 4.2. Keep host-side Surfpool support in its own dependency island.
-	"crates/pina_test",
+	# Intentionally insecure programs; they must never ship or lint clean.
 	"security/00-signer-authorization/insecure",
 	"security/01-account-data-matching/insecure",
 	"security/02-owner-checks/insecure",
@@ -129,14 +149,14 @@ http = { default-features = false, version = "^1" }
 insta = { default-features = false, version = "^1" }
 insta-cmd = { default-features = false, version = "^0.7.0" }
 macrotest = { default-features = false, version = "^1.2" }
-mollusk-svm = { default-features = false, version = "0.15.0" }
+mollusk-svm = { default-features = false, version = "0.14.0" }
 num-derive = { version = "^0.5", default-features = false }
 num-traits = { version = "^0.2", default-features = false }
 object = { default-features = false, version = "^0.40.0" }
 owo-colors = { default-features = false, version = "^4.0" }
 paste = { default-features = false, version = "^1" }
 pastey = { default-features = false, version = "^0.2" }
-pina_test = { default-features = false, path = "crates/pina_test", version = "0.12.0" }
+pina_test = { path = "crates/pina_test", version = "0.12.0" }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }
 pinocchio-memo = { default-features = false, version = "^0.4" }
