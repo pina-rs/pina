@@ -1,7 +1,7 @@
 #[test]
 fn macro_ui() {
 	// Refresh the checked-in `.stderr` files with:
-	// `TRYBUILD=overwrite cargo test -p pina_macros --test ui -- --nocapture`
+	// `TRYBUILD=overwrite cargo test -p pina_root --test ui -- --nocapture`
 	let t = trybuild::TestCases::new();
 
 	t.compile_fail("tests/ui/fail/*.rs");

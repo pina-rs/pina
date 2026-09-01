@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+	".",
 	"codama/clients/rust/anchor_declare_id",
 	"codama/clients/rust/anchor_declare_program",
 	"codama/clients/rust/anchor_duplicate_mutable_accounts",
@@ -62,6 +63,7 @@ members = [
 	"security/09-closing-accounts/secure",
 	"security/10-sysvar-address-checking/secure",
 ]
+
 exclude = [
 	# Surfpool 1.5 requires Agave 4.1 while the workspace's Mollusk 0.15 uses
 	# Agave 4.2. Keep host-side Surfpool support in its own dependency island.
@@ -78,6 +80,24 @@ exclude = [
 	"security/09-closing-accounts/insecure",
 	"security/10-sysvar-address-checking/insecure",
 ]
+
+[package]
+name = "pina_root"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Internal cross-crate test harness for the Pina workspace; never published."
+
+[dependencies]
+pina = { workspace = true, features = ["derive"] }
+pina_macros = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+prettyplease = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true, features = ["full"] }
+trybuild = { workspace = true }
 
 [workspace.package]
 version = "0.12.0"
@@ -155,10 +175,7 @@ walkdir = { default-features = false, version = "^2" }
 zeropod = { default-features = false, version = "0.3.5", features = ["solana-address", "solana-program-error"] }
 
 # publishable crates
-# `pina` is a dev-dependency of `pina_macros`. This range lets Cargo verify
-# the packaged macros crate against the previously published 0.x release while
-# workspace tests continue to use the local path.
-pina = { default-features = false, path = "crates/pina", version = ">=0.8.0, <1.0.0" }
+pina = { default-features = false, path = "crates/pina", version = "0.12.0" }
 pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.12.0" }
 pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.12.0" }
 pina_lints = { default-features = false, path = "crates/pina_lints", version = "0.12.0" }

@@ -97,7 +97,17 @@ jobs:
           echo "### Dry-run output:" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           preview_status=0
-          monochange preview --format md 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || preview_status=$?
+          preview_output="$(monochange preview --format md 2>&1)" || {
+            if printf '%s\n' "$preview_output" | grep -q "no releaseable packages"; then
+              echo "### No releaseable packages in current changesets" >> "$GITHUB_STEP_SUMMARY"
+              echo "All bumps are \`none\`; nothing to release." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            printf '%s\n' "$preview_output" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          }
+          printf '%s\n' "$preview_output" | tee -a "$GITHUB_STEP_SUMMARY"
+          preview_status=0
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           exit "$preview_status"
         shell: devenv shell -- bash -e {0}

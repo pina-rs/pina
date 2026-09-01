@@ -2889,6 +2889,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "pina_root"
+version = "0.0.0"
+dependencies = [
+ "insta",
+ "pina",
+ "pina_macros",
+ "prettyplease",
+ "quote",
+ "syn 3.0.4",
+ "trybuild",
+]
+
+[[package]]
 name = "pina_sdk_ids"
 version = "0.12.0"
 dependencies = [

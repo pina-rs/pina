@@ -74,6 +74,11 @@ steps = [
 	{ name = "open release request", type = "OpenReleaseRequest", inputs = { stage_all = true, no_verify = true }, when = "{{ number_of_changesets > 0 && inputs.create_pr }}" },
 ]
 
+[package.pina_root]
+path = "."
+type = "cargo"
+publish = { enabled = false }
+
 [package.pina]
 path = "crates/pina"
 type = "cargo"
