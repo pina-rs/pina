@@ -94,6 +94,7 @@ pina_macros = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
+macrotest = { workspace = true }
 prettyplease = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true, features = ["full"] }
@@ -127,6 +128,7 @@ heck = { default-features = false, version = "^0.5" }
 http = { default-features = false, version = "^1" }
 insta = { default-features = false, version = "^1" }
 insta-cmd = { default-features = false, version = "^0.7.0" }
+macrotest = { default-features = false, version = "^1.2" }
 mollusk-svm = { default-features = false, version = "0.15.0" }
 num-derive = { version = "^0.5", default-features = false }
 num-traits = { version = "^0.2", default-features = false }
@@ -184,6 +186,7 @@ pina_profile = { default-features = false, path = "crates/pina_profile", version
 pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.12.0" }
 
 [workspace.metadata.bin]
+cargo-expand = { version = "1.0.111" }
 cargo-semver-checks = { version = "0.50.0" }
 cargo-workspaces = { version = "0.4.2" }
 
