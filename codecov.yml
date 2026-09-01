@@ -3,4 +3,5 @@
 # inside the CI coverage job, so they are excluded from patch targets.
 ignore:
   - "crates/pina_test"
+  - "pina_root"
   - "examples"

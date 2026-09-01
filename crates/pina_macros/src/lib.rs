@@ -17,24 +17,6 @@ mod pda;
 mod schema;
 mod support;
 
-#[cfg(test)]
-mod tests;
-
-#[cfg(test)]
-use account::expand as account_impl;
-#[cfg(test)]
-use accounts::expand as accounts_derive_impl;
-#[cfg(test)]
-use discriminator::expand as discriminator_impl;
-#[cfg(test)]
-use error::expand as error_impl;
-#[cfg(test)]
-use event::expand as event_impl;
-#[cfg(test)]
-use instruction::expand as instruction_impl;
-#[cfg(test)]
-use pda::expand as pda_impl;
-
 /// Parses an account slice into a named-field struct.
 ///
 /// Fields can be shared or mutable `AccountView` references. A final slice

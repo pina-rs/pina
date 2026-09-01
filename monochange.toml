@@ -75,6 +75,11 @@ steps = [
 ]
 
 [package.pina]
+
+[package.pina_root]
+path = "."
+type = "cargo"
+publish = { enabled = false }
 path = "crates/pina"
 type = "cargo"
 
