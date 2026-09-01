@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+	".",
 	"codama/clients/rust/anchor_declare_id",
 	"codama/clients/rust/anchor_declare_program",
 	"codama/clients/rust/anchor_duplicate_mutable_accounts",
@@ -62,6 +63,7 @@ members = [
 	"security/09-closing-accounts/secure",
 	"security/10-sysvar-address-checking/secure",
 ]
+
 exclude = [
 	# Surfpool 1.5 requires Agave 4.1 while the workspace's Mollusk 0.15 uses
 	# Agave 4.2. Keep host-side Surfpool support in its own dependency island.
@@ -78,6 +80,24 @@ exclude = [
 	"security/09-closing-accounts/insecure",
 	"security/10-sysvar-address-checking/insecure",
 ]
+
+[package]
+name = "pina_root"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Internal cross-crate test harness for the Pina workspace; never published."
+
+[dependencies]
+pina = { workspace = true, features = ["derive"] }
+pina_macros = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+prettyplease = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true, features = ["full"] }
+trybuild = { workspace = true }
 
 [workspace.package]
 version = "0.12.0"
