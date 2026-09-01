@@ -19,6 +19,7 @@ pub enum AccountDisc {
 }
 
 #[account(crate = pina, discriminator = AccountDisc)]
+#[allow(clippy::same_name_method)]
 pub struct ConfigState {
 	pub version: u8,
 	pub bump: u8,

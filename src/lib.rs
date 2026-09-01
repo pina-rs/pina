@@ -10,4 +10,9 @@
 //! - [`pina_macros`] — proc-macro contract tests: real macro invocations,
 //!   compile-pass fixtures, and compile-failure UI tests.
 
+// The generated code from the proc-macros triggers these clippy lints.
+// This is a test-only crate, so suppressing them is appropriate.
+#![allow(clippy::self_named_constructors)]
+#![allow(clippy::too_many_arguments)]
+
 pub mod pina_macros;

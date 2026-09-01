@@ -5,8 +5,6 @@
 //! impl linking back to the discriminator enum.
 
 /// Local alias to disambiguate from any pina Vec type.
-use std::vec;
-
 use pina::*;
 
 #[discriminator]
@@ -43,7 +41,7 @@ pub struct AuditEvent {
 /// A basic event round-trips through initialize and try_from_bytes.
 #[test]
 fn basic_roundtrip() {
-	let mut bytes: std::vec::Vec<u8> = std::vec![0; TransferEvent::SIZE];
+	let mut bytes = [0_u8; TransferEvent::SIZE];
 	{
 		let view = TransferEvent::initialize(&mut bytes).unwrap();
 		view.amount.set(500);

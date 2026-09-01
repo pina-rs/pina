@@ -83,6 +83,7 @@ pub struct MakeAccounts<'a> {
 #[test]
 fn basic() {
 	// Compile-time proof: the type exists and has the expected size bound.
+	#[allow(dead_code)]
 	fn assert_parses<'a, T: ParseAccounts<'a>>() {}
 	assert_parses::<InitAccounts>();
 }
@@ -131,4 +132,5 @@ fn with_optional_accounts() {
 }
 
 /// Helper to prove the derive generated a usable `ParseAccounts` impl.
+#[allow(dead_code)]
 fn assert_parses<'a, T: ParseAccounts<'a>>() {}

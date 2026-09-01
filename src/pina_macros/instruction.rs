@@ -16,9 +16,11 @@ pub enum InstructionDisc {
 	ComplexInstruction = 4,
 }
 
+#[allow(clippy::self_named_constructors)]
 #[instruction(crate = pina, discriminator = InstructionDisc)]
 pub struct Initialize {}
 
+#[allow(clippy::self_named_constructors)]
 #[instruction(crate = pina, discriminator = InstructionDisc)]
 pub struct FlipBit {
 	pub section_index: u8,
@@ -27,17 +29,20 @@ pub struct FlipBit {
 	pub value: u8,
 }
 
+#[allow(clippy::self_named_constructors)]
 #[instruction(crate = pina, discriminator = InstructionDisc)]
 pub struct Transfer {
 	pub amount: PodU64,
 }
 
+#[allow(clippy::self_named_constructors)]
 #[instruction(crate = pina, discriminator = InstructionDisc, variant = TransferData)]
 pub struct CustomTransferData {
 	pub amount: PodU64,
 	pub destination: [u8; 32],
 }
 
+#[allow(clippy::self_named_constructors)]
 #[instruction(crate = pina, discriminator = InstructionDisc)]
 pub struct ComplexInstruction {
 	pub seed: [u8; 32],

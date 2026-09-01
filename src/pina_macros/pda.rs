@@ -26,6 +26,7 @@ pub enum PdaDisc {
 }
 
 #[account(crate = pina, discriminator = PdaDisc, variant = AllSeedState)]
+#[allow(clippy::too_many_arguments)]
 #[pda(
 	crate = ::pina,
 	seeds = [
@@ -82,6 +83,7 @@ fn basic_address_seed_with_bump() {
 
 /// All seed types contribute their correct wire widths.
 #[test]
+#[allow(clippy::too_many_arguments)]
 fn all_seed_types() {
 	let _ = AllSeedState::SIZE;
 }
