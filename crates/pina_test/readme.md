@@ -42,7 +42,7 @@ Generated programs keep `pina_test` in a dedicated `tests/surfpool` Cargo packag
 
 This crate is for host tests only. Do not enable it in an SBF build.
 
-The crate is intentionally isolated from Pina's main Cargo workspace: Surfpool 1.5 uses Agave 4.1, while the workspace's current Mollusk release uses Agave 4.2. The separation keeps both test layers reproducible without forcing either runtime into the other's dependency graph.
+`pina_test` lives in Pina's main Cargo workspace. Its dependencies are declared as ranges, so the resolver unifies Surfpool's host runtime with the workspace's Mollusk-based tests on a single Agave train — no exact version pins, no separate workspace.
 
 See [security.md](security.md) for the offline-only trust boundary, dependency audit exceptions, and package-specific license policy.
 

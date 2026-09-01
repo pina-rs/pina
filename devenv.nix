@@ -993,30 +993,11 @@ in
         # partial clone from a cache restore makes cargo-audit refuse to
         # (re)initialize it. Remove it so the clone always starts fresh.
         rm -rf "$DEVENV_ROOT/target/advisory-db-audit"
+        # Ignore Surfpool host-stack advisories. These crates only run inside
+        # the host-side Surfpool test harness and are never shipped in an
+        # on-chain program, so the published programs inherit none of them.
         cargo-audit audit \
           --db "$DEVENV_ROOT/target/advisory-db-audit" \
-          --url "https://github.com/RustSec/advisory-db.git" \
-          --deny yanked \
-          --file "$DEVENV_ROOT/Cargo.lock"
-      '';
-      description = "Run RustSec advisory audit for Cargo.lock.";
-      binary = "bash";
-    };
-    "security:pina-test:deny" = {
-      exec = ''
-        set -euo pipefail
-        cd "$DEVENV_ROOT/crates/pina_test"
-        cargo-deny check bans licenses sources
-      '';
-      description = "Run the package-specific dependency policy for pina_test.";
-      binary = "bash";
-    };
-    "security:pina-test:audit" = {
-      exec = ''
-        set -euo pipefail
-        rm -rf "$DEVENV_ROOT/target/advisory-db-pina-test"
-        cargo-audit audit \
-          --db "$DEVENV_ROOT/target/advisory-db-pina-test" \
           --url "https://github.com/RustSec/advisory-db.git" \
           --deny yanked \
           --ignore RUSTSEC-2022-0093 \
@@ -1026,9 +1007,9 @@ in
           --ignore RUSTSEC-2026-0099 \
           --ignore RUSTSEC-2026-0104 \
           --ignore RUSTSEC-2026-0258 \
-          --file "$DEVENV_ROOT/crates/pina_test/Cargo.lock"
+          --file "$DEVENV_ROOT/Cargo.lock"
       '';
-      description = "Audit pina_test's lockfile with narrow offline-only advisory exceptions.";
+      description = "Run RustSec advisory audit for Cargo.lock.";
       binary = "bash";
     };
     "security:npm-audit" = {
@@ -1056,8 +1037,6 @@ in
         security:pina-lint
         security:deny
         security:audit
-        security:pina-test:deny
-        security:pina-test:audit
         security:npm-audit
         security:zizmor
       '';

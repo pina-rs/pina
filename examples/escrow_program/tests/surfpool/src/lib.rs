@@ -52,7 +52,7 @@ fn escrow_pda(program_id: &Pubkey, maker: &Pubkey, seed: u64) -> (Pubkey, u8) {
 }
 
 fn create_account_instruction(
-	program: &ProgramTest,
+	_program: &ProgramTest,
 	payer: &Pubkey,
 	new_account: &Pubkey,
 	lamports: u64,
@@ -77,7 +77,7 @@ fn create_account_instruction(
 }
 
 fn rent_minimum(space: u64) -> u64 {
-	solana_rent::Rent::default().minimum_balance(usize::try_from(space).expect("space"))
+	pina_test::Rent::default().minimum_balance(usize::try_from(space).expect("space"))
 }
 
 fn provision_mint(

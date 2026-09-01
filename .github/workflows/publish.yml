@@ -323,25 +323,6 @@ jobs:
             --output "$RUNNER_TEMP/publish-readiness.json" \
             --format json
         shell: devenv shell -- bash -e {0}
-      - name: publish standalone pina_test workspace
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
-        run: |
-          set -euo pipefail
-
-          # `pina_test` is an intentionally isolated Cargo workspace because
-          # its Agave dependency set conflicts with the root workspace.
-          # monochange's discovery cannot reconcile the member, so publish it
-          # directly with the same crates_io OIDC token. Skip when the exact
-          # version already exists on crates_io so reruns stay idempotent.
-          if curl -fsSL -A "pina-release-publish" \
-            "https://index.crates.io/p/in/a/pina_test" \
-            | grep -q '"vers":"0.12.0"'; then
-            echo "pina_test 0.12.0 already published; skipping"
-            exit 0
-          fi
-          cargo publish --locked --manifest-path crates/pina_test/Cargo.toml
-        shell: devenv shell -- bash -e {0}
       - name: publish packages with monochange
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}

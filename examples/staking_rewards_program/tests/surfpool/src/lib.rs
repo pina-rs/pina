@@ -55,11 +55,11 @@ fn position_pda(program_id: &Pubkey, pool: &Pubkey, owner: &Pubkey) -> (Pubkey, 
 }
 
 fn rent_minimum(space: u64) -> u64 {
-	solana_rent::Rent::default().minimum_balance(usize::try_from(space).expect("space"))
+	pina_test::Rent::default().minimum_balance(usize::try_from(space).expect("space"))
 }
 
 fn create_account_instruction(
-	program: &ProgramTest,
+	_program: &ProgramTest,
 	payer: &Pubkey,
 	new_account: &Pubkey,
 	lamports: u64,

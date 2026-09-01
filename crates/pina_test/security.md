@@ -8,6 +8,6 @@ Surfpool 1.5.0 currently brings seven advisories through code outside this offli
 - RUSTSEC-2024-0421 is in the URL 1.x IDNA implementation. The supported path uses an SDK-provided numeric loopback URL and never decodes an international domain name.
 - RUSTSEC-2026-0258, RUSTSEC-2026-0098, RUSTSEC-2026-0099, and RUSTSEC-2026-0104 are in the legacy HTTP/TLS client graph. Offline Surfnet does not make an upstream HTTP or TLS connection.
 
-The dedicated audit task ignores only these exact advisory IDs. Every other advisory remains a hard failure. Remove each exception when Surfpool publishes a compatible dependency graph containing the fix.
+The workspace audit ignores only these exact advisory IDs. Every other advisory remains a hard failure. Remove each exception when Surfpool publishes a compatible dependency graph containing the fix.
 
-The package-specific license policy additionally permits 0BSD, bzip2-1.0.6, CC0-1.0, and CDLA-Permissive-2.0. These are permissive licenses used by Surfpool or Agave transitive dependencies; they are not broad unknown license exceptions.
+The workspace license policy additionally permits 0BSD, bzip2-1.0.6, CC0-1.0, and CDLA-Permissive-2.0. These are permissive licenses used by Surfpool or Agave transitive dependencies; they are not broad unknown license exceptions.
