@@ -328,6 +328,10 @@ in
     "test:all" = {
       exec = ''
         set -euo pipefail
+        # Ensure cargo-expand is available for macrotest expansion snapshots.
+        if ! command -v cargo-expand &>/dev/null; then
+          cargo install --locked --version 1.0.111 cargo-expand
+        fi
         cargo test --all-features --locked
         cargo check \
           --manifest-path ${lib.escapeShellArg "${currentDir}/crates/pina_fuzz/fuzz/Cargo.toml"} \
