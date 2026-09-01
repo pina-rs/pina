@@ -1,6 +1,6 @@
 [package]
 name = "pina_test"
-version = "0.12.0"
+version = "0.12.1"
 edition = "2024"
 homepage = "https://pina.rs"
 keywords = ["solana", "pinocchio", "surfpool", "testing"]

@@ -1,6 +1,6 @@
 {
 	"name": "@pina-rs/cli",
-	"version": "0.12.0",
+	"version": "0.12.1",
 	"description": "Prebuilt Pina CLI for scaffolding Solana programs, generating IDLs and clients, and profiling SBF binaries",
 	"keywords": [
 		"cli",
@@ -31,15 +31,15 @@
 		"provenance": true
 	},
 	"optionalDependencies": {
-		"@pina-rs/cli-darwin-arm64": "^0.12.0",
-		"@pina-rs/cli-darwin-x64": "^0.12.0",
-		"@pina-rs/cli-freebsd-x64": "^0.12.0",
-		"@pina-rs/cli-linux-arm64-gnu": "^0.12.0",
-		"@pina-rs/cli-linux-arm64-musl": "^0.12.0",
-		"@pina-rs/cli-linux-x64-gnu": "^0.12.0",
-		"@pina-rs/cli-linux-x64-musl": "^0.12.0",
-		"@pina-rs/cli-win32-arm64-msvc": "^0.12.0",
-		"@pina-rs/cli-win32-x64-msvc": "^0.12.0"
+		"@pina-rs/cli-darwin-arm64": "^0.12.1",
+		"@pina-rs/cli-darwin-x64": "^0.12.1",
+		"@pina-rs/cli-freebsd-x64": "^0.12.1",
+		"@pina-rs/cli-linux-arm64-gnu": "^0.12.1",
+		"@pina-rs/cli-linux-arm64-musl": "^0.12.1",
+		"@pina-rs/cli-linux-x64-gnu": "^0.12.1",
+		"@pina-rs/cli-linux-x64-musl": "^0.12.1",
+		"@pina-rs/cli-win32-arm64-msvc": "^0.12.1",
+		"@pina-rs/cli-win32-x64-msvc": "^0.12.1"
 	},
 	"engines": {
 		"node": ">=18"

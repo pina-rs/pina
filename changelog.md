@@ -43,6 +43,32 @@ Generated JavaScript codecs reject over-capacity values rather than truncating t
 - Document the explicit `zeroed()` then `close_with_recipient()` close flow.
 - Regenerate Codama IDLs and committed Rust/JS clients for the updated writable-account inference.
 
+## [0.12.1](https://github.com/pina-rs/pina/releases/tag/v0.12.1) (2026-09-01)
+
+Grouped release for `core`.
+
+### Features
+
+#### Rejoin pina_test with train-anchored ranges
+
+_Packages:_ _pina_test_
+
+Drop every exact (`=`) version requirement declared by this repository. `pina_test` rejoins the main workspace together with the 21 `examples/*/tests/surfpool` packages, and its dependency set becomes tilde train-anchors on the Agave 4.1 stack that Surfpool 1.5 ships on. Tildes are required because `pina init` generates downstream Surfpool test packages without a lockfile, and Agave keeps republishing interface crates onto newer serialization stacks mid-train — an unanchored resolve mixes `wincode` 0.5 and 0.6 into a graph that cannot compile. The workspace aligns its host test stack by moving `mollusk-svm` from 0.15 (Agave 4.2) to 0.14 (Agave 4.1), and `pina_test` now re-exports `Rent` so generated tests do not declare `solana-rent` themselves.
+
+Also: the standalone pina_test publish step is gone from `publish.yml` (monochange publishes it like every other crate, with a longer publish dry-run timeout), cargo-deny gains the Surfpool stack's licenses, `program_under_test` path dependencies gain explicit versions, the Surfpool advisory exceptions move into the workspace audit, and `semver-checks` skips `pina_test` until its rebalanced release becomes the published baseline.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #289](https://github.com/pina-rs/pina/pull/289)
+
+### Notes
+
+#### Establish pina_root internal test crate
+
+_Packages:_ _pina_, _pina_cli_, _pina_lints_, _pina_macros_, _pina_codama_renderer_, _pina_profile_, _pina_sdk_ids_, _pina_test_, _pina_codama_nodes_, _pina_cli_npm_, _pina_cli_darwin_arm64_, _pina_cli_darwin_x64_, _pina_cli_freebsd_x64_, _pina_cli_linux_arm64_gnu_, _pina_cli_linux_arm64_musl_, _pina_cli_linux_x64_gnu_, _pina_cli_linux_x64_musl_, _pina_cli_win32_arm64_msvc_, _pina_cli_win32_x64_msvc_, _pina_skill_
+
+The workspace root becomes an internal, never-published `pina_root` crate hosting cross-crate tests through the public macro API. All 47 `pina_macros` tests migrate from internal `expand()` calls to behavioral tests through public macro invocations. The `pina_macros` dev-dependency on `pina` is removed, dissolving the publish-order cycle. The workspace range hack is deleted.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #288](https://github.com/pina-rs/pina/pull/288)
+
 ## [0.12.0](https://github.com/pina-rs/pina/releases/tag/v0.12.0) (2026-08-31)
 
 Grouped release for `core`.
