@@ -5,10 +5,10 @@ use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use program_under_test::ID;
 use program_under_test::PinaBpfInstruction;
-use program_under_test::STATE_SEED_PREFIX;
+use program_under_test::SEED_STATE_PREFIX;
 
 fn state_pda(program_id: &Pubkey) -> (Pubkey, u8) {
-	Pubkey::find_program_address(&[STATE_SEED_PREFIX], program_id)
+	Pubkey::find_program_address(&[SEED_STATE_PREFIX], program_id)
 }
 
 fn hello(program: &ProgramTest) -> pina_test::Instruction {

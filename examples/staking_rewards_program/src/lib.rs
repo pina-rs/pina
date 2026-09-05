@@ -88,7 +88,7 @@ pub enum StakingAccountType {
 }
 
 #[account(discriminator = StakingAccountType)]
-#[pda(seeds = [POOL_SEED_PREFIX, stake_mint: Address, reward_mint: Address], bump = bump)]
+#[pda(seeds = [SEED_POOL_PREFIX, stake_mint: Address, reward_mint: Address], bump = bump)]
 pub struct PoolState {
 	pub admin: Address,
 	pub stake_mint: Address,
@@ -100,7 +100,7 @@ pub struct PoolState {
 }
 
 #[account(discriminator = StakingAccountType)]
-#[pda(seeds = [POSITION_SEED_PREFIX, pool: Address, owner: Address], bump = bump)]
+#[pda(seeds = [SEED_POSITION_PREFIX, pool: Address, owner: Address], bump = bump)]
 pub struct PositionState {
 	pub pool: Address,
 	pub owner: Address,
@@ -190,10 +190,10 @@ pub struct ClaimAccounts<'a> {
 }
 
 /// Seed prefix for pool PDAs.
-const POOL_SEED_PREFIX: &[u8] = b"pool";
+const SEED_POOL_PREFIX: &[u8] = b"pool";
 
 /// Seed prefix for position PDAs.
-const POSITION_SEED_PREFIX: &[u8] = b"position";
+const SEED_POSITION_PREFIX: &[u8] = b"position";
 
 const SPL_PROGRAM_IDS: [Address; 2] = [token::ID, token_2022::ID];
 

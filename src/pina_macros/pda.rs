@@ -8,10 +8,10 @@
 
 use pina::*;
 
-const COUNTER_SEED: &[u8] = b"counter";
+const SEED_COUNTER: &[u8] = b"counter";
 
 #[account(crate = pina, discriminator = PdaDisc, variant = CounterState)]
-#[pda(crate = pina, seeds = [COUNTER_SEED, authority: Address], bump = bump)]
+#[pda(crate = pina, seeds = [SEED_COUNTER, authority: Address], bump = bump)]
 pub struct CounterState {
 	pub authority: Address,
 	pub bump: u8,
@@ -104,7 +104,7 @@ fn default_crate_path() {
 /// A constant-reference seed uses the named constant.
 #[test]
 fn constant_ref_seed() {
-	assert_eq!(COUNTER_SEED, b"counter");
+	assert_eq!(SEED_COUNTER, b"counter");
 }
 
 /// A constant-only seed produces a single-element seed list.

@@ -4,14 +4,14 @@
 //!
 //! ```ignore
 //! #[account(discriminator = CounterAccount)]
-//! #[pda(seeds = [COUNTER_SEED, authority: Address], bump = bump)]
+//! #[pda(seeds = [SEED_COUNTER, authority: Address], bump = bump)]
 //! pub struct CounterState { ... }
 //! ```
 //!
 //! Unlike the `macro_rules!` heuristic in [`super::seeds`], this extraction
 //! reads the seed types directly from the attribute, so the generated IDL
 //! always matches the on-chain derivation. Constant seed references (e.g.
-//! `COUNTER_SEED`) are resolved through the file's `const &[u8]`
+//! `SEED_COUNTER`) are resolved through the file's `const &[u8]`
 //! declarations.
 
 use heck::ToSnakeCase;
@@ -25,7 +25,7 @@ use crate::ir::PdaIr;
 use crate::ir::PdaSeedIr;
 /// Extract PDA declarations from `#[pda(...)]` attributes on account structs.
 ///
-/// Constant seed references (e.g. `COUNTER_SEED`) are resolved through the
+/// Constant seed references (e.g. `SEED_COUNTER`) are resolved through the
 /// file's `const &[u8]` declarations.
 ///
 /// # Errors
@@ -200,7 +200,7 @@ fn parse_seed_list(input: syn::parse::ParseStream) -> syn::Result<Vec<PdaAttrSee
 				rust_type,
 			});
 		} else {
-			// A path to a `const &[u8]` seed (e.g. `COUNTER_SEED`).
+			// A path to a `const &[u8]` seed (e.g. `SEED_COUNTER`).
 			let path: syn::Path = content.parse()?;
 			seeds.push(PdaAttrSeed::ConstantRef(path));
 		}
@@ -268,10 +268,10 @@ mod tests {
 	#[test]
 	fn extracts_pda_with_address_seed() {
 		let source = r#"
-			const COUNTER_SEED: &[u8] = b"counter";
+			const SEED_COUNTER: &[u8] = b"counter";
 
 			#[account(discriminator = CounterAccount)]
-			#[pda(seeds = [COUNTER_SEED, authority: Address], bump = bump)]
+			#[pda(seeds = [SEED_COUNTER, authority: Address], bump = bump)]
 			pub struct CounterState {
 				pub authority: Address,
 				pub bump: u8,

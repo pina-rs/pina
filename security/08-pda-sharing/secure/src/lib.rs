@@ -48,8 +48,8 @@ pub struct CreateConfigInstruction {
 pub struct CreateVaultInstruction {}
 
 // SECURE: Each account type has its own seed prefix.
-const CONFIG_SEED: &[u8] = b"config";
-const VAULT_SEED: &[u8] = b"vault";
+const SEED_CONFIG: &[u8] = b"config";
+const SEED_VAULT: &[u8] = b"vault";
 
 #[derive(Accounts, Debug)]
 pub struct CreateConfigAccounts<'a> {
@@ -67,7 +67,7 @@ impl<'a> ProcessAccountInfos<'a> for CreateConfigAccounts<'a> {
 		self.config.assert_empty()?.assert_writable()?;
 
 		// SECURE: Uses type-specific seed prefix "config".
-		let seeds = &[CONFIG_SEED, self.authority.address().as_ref()];
+		let seeds = &[SEED_CONFIG, self.authority.address().as_ref()];
 		self.config.assert_seeds(seeds, &ID)?;
 
 		let (_address, bump) = CreateProgramAccount {

@@ -8,15 +8,15 @@ use pina_test::Signer;
 use program_under_test::ID;
 use program_under_test::TodoInstruction;
 
-/// Seed prefix for todo PDAs, mirroring `TODO_SEED` in the program.
-const TODO_SEED: &[u8] = b"todo";
+/// Seed prefix for todo PDAs, mirroring `SEED_TODO` in the program.
+const SEED_TODO: &[u8] = b"todo";
 
 fn pda_address(program_id: &Pubkey, owner: &Pubkey) -> Pubkey {
-	Pubkey::find_program_address(&[TODO_SEED, owner.as_ref()], program_id).0
+	Pubkey::find_program_address(&[SEED_TODO, owner.as_ref()], program_id).0
 }
 
 fn bump_for(program_id: &Pubkey, owner: &Pubkey) -> u8 {
-	Pubkey::try_find_program_address(&[TODO_SEED, owner.as_ref()], program_id)
+	Pubkey::try_find_program_address(&[SEED_TODO, owner.as_ref()], program_id)
 		.expect("canonical bump for the todo PDA")
 		.1
 }

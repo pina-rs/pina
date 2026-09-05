@@ -40,7 +40,7 @@ pub struct SeedConstant {
 /// ```ignore
 /// macro_rules! counter_seeds {
 ///     ($authority:expr) => {
-///         &[COUNTER_SEED, $authority]
+///         &[SEED_COUNTER, $authority]
 ///     };
 /// }
 /// ```
@@ -198,27 +198,27 @@ mod tests {
 	#[test]
 	fn extracts_seed_constants() {
 		let source = r#"
-			const COUNTER_SEED: &[u8] = b"counter";
+			const SEED_COUNTER: &[u8] = b"counter";
 			const OTHER: u8 = 42;
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
 		let constants = extract_seed_constants(&file);
 		assert_eq!(constants.len(), 1);
-		assert_eq!(constants[0].name, "COUNTER_SEED");
+		assert_eq!(constants[0].name, "SEED_COUNTER");
 		assert_eq!(constants[0].value, b"counter");
 	}
 
 	#[test]
 	fn extracts_pda_from_macro() {
 		let source = r#"
-			const COUNTER_SEED: &[u8] = b"counter";
+			const SEED_COUNTER: &[u8] = b"counter";
 
 			macro_rules! counter_seeds {
 				($authority:expr) => {
-					&[COUNTER_SEED, $authority]
+					&[SEED_COUNTER, $authority]
 				};
 				($authority:expr, $bump:expr) => {
-					&[COUNTER_SEED, $authority, &[$bump]]
+					&[SEED_COUNTER, $authority, &[$bump]]
 				};
 			}
 		"#;

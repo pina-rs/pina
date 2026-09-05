@@ -81,7 +81,7 @@ pub enum VestingAccountType {
 }
 
 #[account(discriminator = VestingAccountType)]
-#[pda(seeds = [VESTING_SEED_PREFIX, admin: Address, beneficiary: Address, mint: Address], bump = bump)]
+#[pda(seeds = [SEED_VESTING_PREFIX, admin: Address, beneficiary: Address, mint: Address], bump = bump)]
 pub struct VestingState {
 	pub admin: Address,
 	pub beneficiary: Address,
@@ -146,7 +146,7 @@ pub struct CancelAccounts<'a> {
 }
 
 /// Seed prefix for vesting PDAs.
-const VESTING_SEED_PREFIX: &[u8] = b"vesting";
+const SEED_VESTING_PREFIX: &[u8] = b"vesting";
 
 const SPL_PROGRAM_IDS: [Address; 2] = [token::ID, token_2022::ID];
 

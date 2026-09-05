@@ -16,15 +16,15 @@ pub struct InitializeAccounts<'a> {
 	pub counter: &'a AccountView,
 }
 
-const COUNTER_SEED: &[u8] = b"counter";
+const SEED_COUNTER: &[u8] = b"counter";
 
 #[macro_export]
 macro_rules! counter_seeds {
 	($authority:expr) => {
-		&[COUNTER_SEED, $authority]
+		&[SEED_COUNTER, $authority]
 	};
 	($authority:expr, $bump:expr) => {
-		&[COUNTER_SEED, $authority, &[$bump]]
+		&[SEED_COUNTER, $authority, &[$bump]]
 	};
 }
 

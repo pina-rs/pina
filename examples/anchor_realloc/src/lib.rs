@@ -24,7 +24,7 @@ use pina::*;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
-const SAMPLE_SEED: &[u8] = b"sample";
+const SEED_SAMPLE: &[u8] = b"sample";
 
 #[error]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,7 +53,7 @@ pub enum ReallocAccountType {
 /// collection. The example tests allocation and rent behaviour, not a data
 /// serialization format; only the header participates in program logic.
 #[account(discriminator = ReallocAccountType)]
-#[pda(seeds = [SAMPLE_SEED, authority: Address], bump = bump)]
+#[pda(seeds = [SEED_SAMPLE, authority: Address], bump = bump)]
 pub struct Sample {
 	/// Canonical PDA bump, persisted for inexpensive validation on resize.
 	pub bump: u8,

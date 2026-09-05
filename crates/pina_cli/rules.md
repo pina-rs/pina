@@ -80,7 +80,7 @@ For reliable PDA extraction:
 - Use byte-string constants:
 
 ```rust
-const COUNTER_SEED: &[u8] = b"counter";
+const SEED_COUNTER: &[u8] = b"counter";
 ```
 
 - Use `macro_rules!` names that contain `seeds`. Good examples:
@@ -277,15 +277,15 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 ### PDA seed helpers
 
 ```rust
-const MY_SEED: &[u8] = b"my";
+const SEED_MY: &[u8] = b"my";
 
 #[macro_export]
 macro_rules! my_seeds {
 	($authority:expr) => {
-		&[MY_SEED, $authority]
+		&[SEED_MY, $authority]
 	};
 	($authority:expr, $bump:expr) => {
-		&[MY_SEED, $authority, &[$bump]]
+		&[SEED_MY, $authority, &[$bump]]
 	};
 }
 ```

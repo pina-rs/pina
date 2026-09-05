@@ -8,17 +8,17 @@ use pina_test::Signer;
 use program_under_test::CounterInstruction;
 use program_under_test::ID;
 
-/// Seed prefix for counter PDAs, mirroring `COUNTER_SEED` in the program.
-const COUNTER_SEED: &[u8] = b"counter";
+/// Seed prefix for counter PDAs, mirroring `SEED_COUNTER` in the program.
+const SEED_COUNTER: &[u8] = b"counter";
 
 /// The counter PDA is seeded by the authority's address.
 fn pda_address(program_id: &Pubkey, authority: &Pubkey) -> Pubkey {
-	Pubkey::find_program_address(&[COUNTER_SEED, authority.as_ref()], program_id).0
+	Pubkey::find_program_address(&[SEED_COUNTER, authority.as_ref()], program_id).0
 }
 
 fn counter_bump(program_id: &Pubkey, authority: &Pubkey) -> u8 {
 	let (address, bump) =
-		Pubkey::try_find_program_address(&[COUNTER_SEED, authority.as_ref()], program_id)
+		Pubkey::try_find_program_address(&[SEED_COUNTER, authority.as_ref()], program_id)
 			.expect("canonical bump for the counter PDA");
 	assert_eq!(
 		address.as_ref(),

@@ -19,10 +19,10 @@ declare_id!("2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe");
 const PROP_AMM_PROGRAM_ID: Address = address!("55555555555555555555555555555555555555555555");
 
 /// Seed namespace for the PDA used to authorize the generated CPI regression.
-pub const CPI_AUTHORITY_SEED_PREFIX: &[u8] = b"cpi-authority";
+pub const SEED_CPI_AUTHORITY_PREFIX: &[u8] = b"cpi-authority";
 
 /// Seed namespace for the account-creation regression.
-pub const STATE_SEED_PREFIX: &[u8] = b"state";
+pub const SEED_STATE_PREFIX: &[u8] = b"state";
 
 #[discriminator]
 pub enum PinaBpfInstruction {
@@ -38,13 +38,13 @@ pub enum PinaBpfAccountType {
 }
 
 #[account(discriminator = PinaBpfAccountType)]
-#[pda(seeds = [STATE_SEED_PREFIX], bump = bump)]
+#[pda(seeds = [SEED_STATE_PREFIX], bump = bump)]
 pub struct State {
 	pub bump: u8,
 }
 
 /// Typed schema for the data-free PDA that signs the CPI regression.
-#[pda(seeds = [CPI_AUTHORITY_SEED_PREFIX])]
+#[pda(seeds = [SEED_CPI_AUTHORITY_PREFIX])]
 pub struct AuthorityState {}
 
 #[instruction(discriminator = PinaBpfInstruction::Hello)]
@@ -231,7 +231,7 @@ impl<'a> ProcessAccountInfos<'a> for CreatePdaAccounts<'a> {
 				account: self.state,
 				payer: self.payer,
 				owner: &ID,
-				seeds: &[STATE_SEED_PREFIX],
+				seeds: &[SEED_STATE_PREFIX],
 				bump: args.bump,
 			}
 			.invoke::<State>()?;

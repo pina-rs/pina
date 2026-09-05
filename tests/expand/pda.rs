@@ -1,6 +1,6 @@
 use pina::*;
 
-const COUNTER_SEED: &[u8] = b"counter";
+const SEED_COUNTER: &[u8] = b"counter";
 
 #[discriminator]
 #[derive(Debug)]
@@ -11,7 +11,7 @@ pub enum PdaDisc {
 }
 
 #[account(crate = pina, discriminator = PdaDisc, variant = CounterState)]
-#[pda(crate = pina, seeds = [COUNTER_SEED, authority: Address], bump = bump)]
+#[pda(crate = pina, seeds = [SEED_COUNTER, authority: Address], bump = bump)]
 pub struct CounterState {
 	pub authority: Address,
 	pub bump: u8,

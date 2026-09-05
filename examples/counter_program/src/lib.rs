@@ -89,7 +89,7 @@ pub enum CounterAccountType {
 /// | 2      | 8    | count (little-endian u64) |
 /// ```
 #[account(discriminator = CounterAccountType)]
-#[pda(seeds = [COUNTER_SEED, authority: Address], bump = bump)]
+#[pda(seeds = [SEED_COUNTER, authority: Address], bump = bump)]
 pub struct CounterState {
 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
 	pub bump: u8,
@@ -122,7 +122,7 @@ pub struct IncrementInstruction {}
 // ---------------------------------------------------------------------------
 
 /// Seed prefix for counter PDAs.
-const COUNTER_SEED: &[u8] = b"counter";
+const SEED_COUNTER: &[u8] = b"counter";
 
 // ---------------------------------------------------------------------------
 // Accounts structs

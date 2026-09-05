@@ -78,7 +78,7 @@ pub(crate) struct PdaArgs {
 pub(crate) enum PdaSeedArg {
 	/// A byte-string literal seed (e.g. `b"counter"`).
 	Constant(Vec<u8>),
-	/// A reference to a `const &[u8]` seed (e.g. `COUNTER_SEED`).
+	/// A reference to a `const &[u8]` seed (e.g. `SEED_COUNTER`).
 	ConstantRef(Path),
 	/// A typed dynamic seed (e.g. `authority: Address`).
 	Variable { name: Ident, ty: SeedType },
@@ -256,7 +256,7 @@ fn parse_seed_list(input: syn::parse::ParseStream) -> syn::Result<Vec<PdaSeedArg
 			let ty = parse_seed_type(&ty)?;
 			seeds.push(PdaSeedArg::Variable { name, ty });
 		} else {
-			// A path to a `const &[u8]` seed (e.g. `COUNTER_SEED`).
+			// A path to a `const &[u8]` seed (e.g. `SEED_COUNTER`).
 			let path: Path = content.parse()?;
 			seeds.push(PdaSeedArg::ConstantRef(path));
 		}

@@ -14,13 +14,19 @@ impl State {
 	}
 }
 
-const CONFIG_SEED: &[u8] = b"config";
+const SEED_CONFIG: &[u8] = b"config";
+const VAULT_SEED: &[u8] = b"vault";
 const SEED: &[u8] = b"generic";
 
 fn assert_seeds(_seeds: &[&[u8]]) {}
 
 fn process_named_constant(account: &AccountView, authority: &[u8]) {
-	let seeds = &[CONFIG_SEED, authority];
+	let seeds = &[SEED_CONFIG, authority];
+	account.assert_seeds(seeds);
+}
+
+fn process_suffix_constant(account: &AccountView, authority: &[u8]) {
+	let seeds = &[VAULT_SEED, authority];
 	account.assert_seeds(seeds);
 }
 

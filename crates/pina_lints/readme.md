@@ -344,11 +344,11 @@ The check keeps dispatch visible to `pina idl` and reviewers. It verifies the pr
 
 ### `require_explicit_discriminators_and_seed_namespaces`
 
-Warns when seed assertions in example instruction paths do not visibly use a byte-string namespace, a named `SEED`/`*_SEED` constant, or a generated Pina seed helper.
+Warns when seed assertions in example instruction paths do not visibly use a byte-string namespace, a named `SEED`/`SEED_*`/`*_SEED` constant, or a generated Pina seed helper.
 
 ```rust
-const VAULT_SEED: &[u8] = b"vault";
-vault.assert_seeds(&[VAULT_SEED, authority.address().as_ref()], &ID)?;
+const SEED_VAULT: &[u8] = b"vault";
+vault.assert_seeds(&[SEED_VAULT, authority.address().as_ref()], &ID)?;
 ```
 
 Associated seed helpers generated from `#[pda(...)]` are accepted because the macro declaration exposes the namespace at the account type. Receiver-less local functions named like assertion methods are not treated as framework proof. The rule is a reviewability warning and does not replace canonical bump validation.
