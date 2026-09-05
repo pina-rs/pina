@@ -2,6 +2,8 @@
 source: crates/pina_cpi_renderer/src/__tests.rs
 expression: "render_fixture_instruction(\"vesting_program\", \"claim\")"
 ---
+#![allow(rustdoc::broken_intra_doc_links)]
+
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;

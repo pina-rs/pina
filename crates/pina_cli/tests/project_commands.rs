@@ -1039,6 +1039,16 @@ fn generate_uses_pina_toml_to_create_a_standalone_cpi_crate() {
 	assert!(instruction.contains("pub fn invoke_signed("));
 	assert!(!project.join("clients/rust").exists());
 	assert!(!project.join("clients/typescript").exists());
+
+	let explicit = project_command(&project, &cargo, &target)
+		.args(["generate", "--client", "cpi"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run explicit CPI generation: {error}"));
+	assert!(
+		explicit.status.success(),
+		"explicit CPI generation failed: {}",
+		String::from_utf8_lossy(&explicit.stderr)
+	);
 }
 
 #[test]
