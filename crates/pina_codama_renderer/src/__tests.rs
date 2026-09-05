@@ -102,11 +102,11 @@ fn renders_counter_account_with_pod_types() {
 
 #[test]
 fn renders_compact_account_fixture_with_dynamic_helpers() {
-	let crate_dir = render_fixture_program("anchor_realloc", "pina-codama-render-compact");
-	let content = read_generated_file(&crate_dir, "accounts/sample.rs");
+	let crate_dir = render_fixture_program("compact_accounts", "pina-codama-render-compact");
+	let content = read_generated_file(&crate_dir, "accounts/journal.rs");
 
 	assert!(content.contains("#[zeropod(compact)]"));
-	assert!(content.contains("pub values: pina::Vec<u64, { u16::MAX as usize }>"));
+	assert!(content.contains("pub entries: pina::Vec<u64, { u16::MAX as usize }>"));
 	assert!(content.contains("pub const HEADER_SIZE: usize"));
 	assert!(content.contains("pub fn initialize(data: &mut [u8])"));
 	assert!(content.contains("pub fn from_bytes(data: &[u8])"));

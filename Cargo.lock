@@ -1957,6 +1957,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "compact-accounts-client"
+version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "compact-accounts-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "compact_accounts",
+ "pina_test",
+]
+
+[[package]]
+name = "compact_accounts"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "compression-codecs"
 version = "0.4.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"

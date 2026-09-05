@@ -4,6 +4,8 @@ import 'dart:typed_data';
 
 import 'package:pina_codama_clients/anchor_realloc.dart'
     show Sample, getSampleDecoder, getSampleEncoder;
+import 'package:pina_codama_clients/compact_accounts.dart'
+    show Journal, getJournalDecoder, getJournalEncoder;
 import 'package:pina_codama_clients/profile_program.dart';
 import 'package:solana_kit_accounts/solana_kit_accounts.dart';
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -196,6 +198,26 @@ void main() {
       expect(decoded.authority, systemAddress);
       expect(decoded.values, values);
     });
+
+    test('round trips compact headers and dynamic tails', () {
+      final entries = [BigInt.from(5), BigInt.from(8), BigInt.from(13)];
+      final encoded = getJournalEncoder().encode(
+        Journal(
+          bump: 7,
+          authority: systemAddress,
+          revision: 4,
+          entries: entries,
+        ),
+      );
+      final decoded = getJournalDecoder().decode(encoded);
+
+      expect(encoded, hasLength(40 + entries.length * 8));
+      expect(decoded.discriminator, 1);
+      expect(decoded.bump, 7);
+      expect(decoded.authority, systemAddress);
+      expect(decoded.revision, 4);
+      expect(decoded.entries, entries);
+    });
   });
 
   group('Profile instruction codecs', () {
@@ -352,6 +374,7 @@ const expectedPrograms = <String>[
   'anchor_realloc',
   'anchor_system_accounts',
   'anchor_sysvars',
+  'compact_accounts',
   'counter_program',
   'escrow_program',
   'hello_solana',

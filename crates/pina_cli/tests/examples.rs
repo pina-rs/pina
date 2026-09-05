@@ -16,6 +16,7 @@ const EXAMPLES: &[&str] = &[
 	"anchor_realloc",
 	"anchor_system_accounts",
 	"anchor_sysvars",
+	"compact_accounts",
 	"counter_program",
 	"escrow_program",
 	"hello_solana",
@@ -93,8 +94,30 @@ fn hello_solana_idl() {
 }
 
 #[test]
+fn compact_accounts_idl_preserves_the_dynamic_tail() {
+	let idl = serde_json::to_value(example_program_idl("compact_accounts"))
+		.unwrap_or_else(|error| panic!("serialize compact_accounts IDL: {error}"));
+	assert_eq!(
+		idl.pointer("/program/accounts/0/data/fields/4/type/count/kind")
+			.and_then(Value::as_str),
+		Some("prefixedCountNode"),
+	);
+	assert_eq!(
+		idl.pointer("/program/accounts/0/data/fields/4/type/count/prefix/format")
+			.and_then(Value::as_str),
+		Some("u16"),
+	);
+	assert_eq!(
+		idl.pointer("/program/accounts/0/data/fields/4/type/item/format")
+			.and_then(Value::as_str),
+		Some("u64"),
+	);
+}
+
+#[test]
 fn committed_example_idls_match_generated_output() {
 	for example in [
+		"compact_accounts",
 		"counter_program",
 		"escrow_program",
 		"hello_solana",

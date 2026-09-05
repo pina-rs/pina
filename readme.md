@@ -200,13 +200,13 @@ That last count-parity check is important because it catches silent extraction r
 
 <!-- {=pinaFeatureFlags} -->
 
-| Feature          | Default | Description                                                     |
-| ---------------- | ------- | --------------------------------------------------------------- |
-| `derive`         | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.)      |
-| `logs`           | Yes     | Enables on-chain logging via `solana-program-log`               |
-| `token`          | No      | Enables SPL token / token-2022 helpers and ATA utilities        |
-| `memo`           | No      | Enables memo program helpers via `pina::memo`                   |
-| `account-resize` | No      | Enables account realloc helpers that call Pinocchio resize APIs |
+| Feature          | Default | Description                                                |
+| ---------------- | ------- | ---------------------------------------------------------- |
+| `derive`         | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.) |
+| `logs`           | Yes     | Enables on-chain logging via `solana-program-log`          |
+| `token`          | No      | Enables SPL token / token-2022 helpers and ATA utilities   |
+| `memo`           | No      | Enables memo program helpers via `pina::memo`              |
+| `account-resize` | No      | Enables raw and typed compact-account realloc helpers      |
 
 <!-- {/pinaFeatureFlags} -->
 
@@ -220,7 +220,7 @@ That last count-parity check is important because it catches silent extraction r
 - `logs` is useful during **initial development and debugging**, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
 - `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
 - `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.
-- `account-resize` only enables the `ReallocAccount` and `ReallocAccountZeroed` builders. Close helpers still do not implicitly resize or zero account data.
+- `account-resize` enables `ReallocAccount`, `ReallocAccountZeroed`, and `ReallocCompactAccount`. Compact creation builders also require it. Close helpers still do not implicitly resize or zero account data.
 
 <!-- {/pinaFeatureSelectionTips} -->
 
@@ -436,18 +436,76 @@ pub struct Config {
 
 The generated struct has an auto-injected `discriminator` field as the first field.
 
-Compact accounts opt into a single trailing dynamic vector. Only active values occupy account data, while the literal capacity remains an enforced upper bound:
+<!-- {=compactAccountQuickstart} -->
+
+Add `compact` to an account with exactly one trailing, bounded `Vec`. The capacity must be a literal so the macro can audit and generate the maximum layout:
 
 ```rust
-#[account(discriminator = MyAccount::Config, compact)]
-pub struct Config {
-	pub authority: Address,
+#[account(discriminator = AccountType, compact)]
+pub struct Journal {
 	pub bump: u8,
-	pub values: Vec<u64, 64>,
+	pub authority: Address,
+	pub revision: u32,
+	pub entries: Vec<u64, 8>,
+}
+
+fn account_size(entry_count: usize) -> Result<usize, ProgramError> {
+	if entry_count > 8 {
+		return Err(ProgramError::InvalidArgument);
+	}
+
+	Ok(Journal::HEADER_SIZE + entry_count * core::mem::size_of::<PodU64>())
 }
 ```
 
-The macro generates `ConfigHeader`, `ConfigRef`, and `ConfigMut` views together with `HEADER_SIZE`, `MAX_SIZE`, checked loaders, and initialization helpers. `CreateCompactProgramAccount*` creates a PDA at any valid element boundary; `ReallocCompactAccount` validates the current type and target size before rent-adjusting the account. Use `with_compact_account` and `with_compact_account_mut` to scope runtime borrow guards.
+The macro generates `JournalHeader`, `JournalRef`, and `JournalMut`, plus `HEADER_SIZE`, `MAX_SIZE`, checked load/initialize methods, and the compact-account traits used by Pina's typed CPI builders. Only the active tail is allocated; the declared capacity is a validation bound, not reserved space.
+
+<!-- {/compactAccountQuickstart} -->
+
+<!-- {=compactAccountResizeOrdering} -->
+
+Compact mutation has one important ordering rule:
+
+- **Grow:** calculate and validate the target size, call `ReallocCompactAccount` first, then write and `commit` the longer tail.
+- **Same size:** write and `commit`; skip the realloc CPI.
+- **Shrink or clear:** write and `commit` the shorter tail first, then call `ReallocCompactAccount` with the returned encoded size.
+
+```rust
+if target_size > account.data_len() {
+	ReallocCompactAccount {
+		account,
+		payer,
+		new_size: target_size,
+		program_id,
+	}
+	.invoke::<Journal>()?;
+}
+
+let encoded_size = {
+	let mut data = account.try_borrow_mut()?;
+	let mut journal = Journal::try_from_bytes_mut(&mut data)?;
+	journal
+		.set_entries(entries)
+		.map_err(|_| ProgramError::InvalidAccountData)?;
+	journal
+		.commit()
+		.map_err(|_| ProgramError::InvalidAccountData)?
+};
+
+if encoded_size < account.data_len() {
+	ReallocCompactAccount {
+		account,
+		payer,
+		new_size: encoded_size,
+		program_id,
+	}
+	.invoke::<Journal>()?;
+}
+```
+
+`ReallocCompactAccount` checks the current compact type, validates the destination size, preserves rent exemption on growth, and refunds excess lamports to `payer` on shrink. Scope immutable runtime borrows with `with_compact_account`; use a direct `try_borrow_mut` guard when a tail setter must borrow instruction-local values through `commit`.
+
+<!-- {/compactAccountResizeOrdering} -->
 
 ### Instructions
 
@@ -886,6 +944,7 @@ The `pina docs` subcommand renders built-in reference topics. Set the `PINA_TEMP
 | [`anchor_system_accounts`](examples/anchor_system_accounts)                       | Anchor system-owned account constraint parity                               |
 | [`anchor_sysvars`](examples/anchor_sysvars)                                       | Anchor sysvar account validation parity                                     |
 | [`anchor_realloc`](examples/anchor_realloc)                                       | Dynamic compact account lifecycle with typed, rent-adjusted reallocations   |
+| [`compact_accounts`](examples/compact_accounts)                                   | Focused compact account sizing, mutation order, rent, and generated clients |
 
 ## Security
 

@@ -507,6 +507,7 @@ in
           -p anchor_events \
           -p anchor_floats \
           -p anchor_realloc \
+          -p compact_accounts \
           -p anchor_system_accounts \
           -p anchor_sysvars \
           -p escrow_program \

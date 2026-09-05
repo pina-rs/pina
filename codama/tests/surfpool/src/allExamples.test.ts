@@ -42,6 +42,7 @@ const EXAMPLE_PROGRAMS = [
 	"anchor_realloc",
 	"anchor_system_accounts",
 	"anchor_sysvars",
+	"compact_accounts",
 	"counter_program",
 	"escrow_program",
 	"hello_solana",
@@ -455,6 +456,11 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
 	},
+	compact_accounts: {
+		instruction: "initialize",
+		accounts: "none",
+		programError: "NotEnoughAccountKeys",
+	},
 	anchor_system_accounts: {
 		instruction: "initialize",
 		accounts: "none",
@@ -525,6 +531,7 @@ const ACCESS_GUARD_PROGRAMS: Partial<
 	anchor_declare_program: "MissingRequiredSignature",
 	anchor_floats: "InvalidAccountData",
 	anchor_realloc: "InvalidAccountData",
+	compact_accounts: "MissingRequiredSignature",
 	anchor_system_accounts: "MissingRequiredSignature",
 	counter_program: "InvalidAccountData",
 	escrow_program: "InvalidAccountData",
