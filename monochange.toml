@@ -99,6 +99,10 @@ type = "cargo"
 path = "crates/pina_codama_renderer"
 type = "cargo"
 
+[package.pina_cpi_renderer]
+path = "crates/pina_cpi_renderer"
+type = "cargo"
+
 [package.pina_profile]
 path = "crates/pina_profile"
 type = "cargo"
@@ -171,6 +175,7 @@ packages = [
 	"pina_lints",
 	"pina_macros",
 	"pina_codama_renderer",
+	"pina_cpi_renderer",
 	"pina_profile",
 	"pina_sdk_ids",
 	"pina_test",

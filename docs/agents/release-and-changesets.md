@@ -76,6 +76,7 @@ dprint fmt .changeset/* --allow-no-files
 - `pina_sdk_ids`
 - `pina_cli`
 - `pina_codama_renderer`
+- `pina_cpi_renderer`
 - `pina_profile`
 - `pina_test`
 - `pina_codama_nodes`

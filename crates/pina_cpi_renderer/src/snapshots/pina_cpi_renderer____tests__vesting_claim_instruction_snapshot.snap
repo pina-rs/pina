@@ -1,0 +1,87 @@
+---
+source: crates/pina_cpi_renderer/src/__tests.rs
+expression: "render_fixture_instruction(\"vesting_program\", \"claim\")"
+---
+use pinocchio::cpi::Signer;
+use pinocchio::cpi::invoke_signed;
+use pinocchio::error::ProgramResult;
+use pinocchio::instruction::InstructionView;
+use pinocchio::Address;
+use pinocchio::instruction::InstructionAccount;
+use pinocchio::AccountView;
+
+/// CPI arguments for the `claim` instruction.
+#[derive(Clone, Copy, Debug)]
+#[must_use = "the CPI has no effect until invoke_signed is called"]
+pub struct Claim<'a> {
+	/// Switchboard program the instruction is invoked on.
+	pub program_id: &'a Address,
+
+	/// writable, must sign.
+	pub beneficiary: &'a AccountView,
+
+	pub mint: &'a AccountView,
+
+	/// writable.
+	pub vesting_state: &'a AccountView,
+
+	/// writable.
+	pub beneficiary_ata: &'a AccountView,
+
+	/// writable.
+	pub vault: &'a AccountView,
+
+	pub associated_token_program: &'a AccountView,
+
+	pub system_program: &'a AccountView,
+
+	pub token_program: &'a AccountView,
+
+	pub amount: u64,
+}
+
+impl Claim<'_> {
+	/// Invokes the instruction with no PDA seeds.
+	///
+	/// Signer accounts must still be covered by the enclosing transaction or
+	/// by seeds passed to [`Self::invoke_signed`].
+	#[inline]
+	pub fn invoke(&self) -> ProgramResult {
+		self.invoke_signed(&[])
+	}
+
+	/// Invokes the instruction, signing with the provided PDA seeds.
+	pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+		let mut data = [0u8; 9];
+		data[..1].copy_from_slice(&CLAIM_DISCRIMINATOR);
+		data[1..9].copy_from_slice(&self.amount.to_le_bytes());
+		let accounts = [
+			InstructionAccount::new(self.beneficiary.address(), true, true),
+			InstructionAccount::new(self.mint.address(), false, false),
+			InstructionAccount::new(self.vesting_state.address(), true, false),
+			InstructionAccount::new(self.beneficiary_ata.address(), true, false),
+			InstructionAccount::new(self.vault.address(), true, false),
+			InstructionAccount::new(self.associated_token_program.address(), false, false),
+			InstructionAccount::new(self.system_program.address(), false, false),
+			InstructionAccount::new(self.token_program.address(), false, false),
+		];
+		let views: [&AccountView; 8] = [
+			self.beneficiary,
+			self.mint,
+			self.vesting_state,
+			self.beneficiary_ata,
+			self.vault,
+			self.associated_token_program,
+			self.system_program,
+			self.token_program,
+		];
+		let instruction = InstructionView {
+			program_id: self.program_id,
+			accounts: &accounts,
+			data: &data,
+		};
+		invoke_signed(&instruction, &views, signers)
+	}
+}
+
+const CLAIM_DISCRIMINATOR: [u8; 1] = [1];

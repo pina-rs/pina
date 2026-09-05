@@ -26,6 +26,7 @@ members = [
 	"crates/pina",
 	"crates/pina_cli",
 	"crates/pina_codama_renderer",
+	"crates/pina_cpi_renderer",
 	"crates/pina_lints",
 	"crates/pina_macros",
 	"crates/pina_profile",
@@ -200,6 +201,7 @@ zeropod = { default-features = false, version = "0.3.5", features = ["solana-add
 pina = { default-features = false, path = "crates/pina", version = "0.12.2" }
 pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.12.2" }
 pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.12.2" }
+pina_cpi_renderer = { default-features = false, path = "crates/pina_cpi_renderer", version = "0.12.2" }
 pina_lints = { default-features = false, path = "crates/pina_lints", version = "0.12.2" }
 pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.12.2" }
 pina_profile = { default-features = false, path = "crates/pina_profile", version = "0.12.2" }

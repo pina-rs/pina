@@ -1,0 +1,98 @@
+---
+source: crates/pina_cpi_renderer/src/__tests.rs
+expression: "render_fixture_instruction(\"vesting_program\", \"initialize\")"
+---
+use pinocchio::cpi::Signer;
+use pinocchio::cpi::invoke_signed;
+use pinocchio::error::ProgramResult;
+use pinocchio::instruction::InstructionView;
+use pinocchio::Address;
+use pinocchio::instruction::InstructionAccount;
+use pinocchio::AccountView;
+
+/// CPI arguments for the `initialize` instruction.
+#[derive(Clone, Copy, Debug)]
+#[must_use = "the CPI has no effect until invoke_signed is called"]
+pub struct Initialize<'a> {
+	/// Switchboard program the instruction is invoked on.
+	pub program_id: &'a Address,
+
+	/// writable, must sign.
+	pub admin: &'a AccountView,
+
+	pub beneficiary: &'a AccountView,
+
+	pub mint: &'a AccountView,
+
+	/// writable.
+	pub vesting_state: &'a AccountView,
+
+	/// writable.
+	pub vault: &'a AccountView,
+
+	pub associated_token_program: &'a AccountView,
+
+	pub system_program: &'a AccountView,
+
+	pub token_program: &'a AccountView,
+
+	/// `totalAmount` argument.
+	pub total_amount: u64,
+	/// `startTs` argument.
+	pub start_ts: u64,
+	/// `cliffTs` argument.
+	pub cliff_ts: u64,
+	/// `endTs` argument.
+	pub end_ts: u64,
+	pub bump: u8,
+}
+
+impl Initialize<'_> {
+	/// Invokes the instruction with no PDA seeds.
+	///
+	/// Signer accounts must still be covered by the enclosing transaction or
+	/// by seeds passed to [`Self::invoke_signed`].
+	#[inline]
+	pub fn invoke(&self) -> ProgramResult {
+		self.invoke_signed(&[])
+	}
+
+	/// Invokes the instruction, signing with the provided PDA seeds.
+	pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+		let mut data = [0u8; 34];
+		data[..1].copy_from_slice(&INITIALIZE_DISCRIMINATOR);
+		data[1..9].copy_from_slice(&self.total_amount.to_le_bytes());
+		data[9..17].copy_from_slice(&self.start_ts.to_le_bytes());
+		data[17..25].copy_from_slice(&self.cliff_ts.to_le_bytes());
+		data[25..33].copy_from_slice(&self.end_ts.to_le_bytes());
+		data[33..34].copy_from_slice(&self.bump.to_le_bytes());
+		let accounts = [
+			InstructionAccount::new(self.admin.address(), true, true),
+			InstructionAccount::new(self.beneficiary.address(), false, false),
+			InstructionAccount::new(self.mint.address(), false, false),
+			InstructionAccount::new(self.vesting_state.address(), true, false),
+			InstructionAccount::new(self.vault.address(), true, false),
+			InstructionAccount::new(self.associated_token_program.address(), false, false),
+			InstructionAccount::new(self.system_program.address(), false, false),
+			InstructionAccount::new(self.token_program.address(), false, false),
+		];
+		let views: [&AccountView; 8] = [
+			self.admin,
+			self.beneficiary,
+			self.mint,
+			self.vesting_state,
+			self.vault,
+			self.associated_token_program,
+			self.system_program,
+			self.token_program,
+		];
+		let instruction = InstructionView {
+			program_id: self.program_id,
+			accounts: &accounts,
+			data: &data,
+		};
+		invoke_signed(&instruction, &views, signers)
+	}
+}
+
+const INITIALIZE_DISCRIMINATOR: [u8; 1] = [0];
