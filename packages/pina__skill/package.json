@@ -1,6 +1,6 @@
 {
 	"name": "@pina-rs/skill",
-	"version": "0.12.2",
+	"version": "0.12.3",
 	"description": "Agent skill for creating and maintaining secure Pina Solana programs",
 	"keywords": [
 		"agent",
