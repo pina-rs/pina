@@ -531,7 +531,7 @@ const ACCESS_GUARD_PROGRAMS: Partial<
 	anchor_declare_program: "MissingRequiredSignature",
 	anchor_floats: "InvalidAccountData",
 	anchor_realloc: "InvalidAccountData",
-	compact_accounts: "MissingRequiredSignature",
+	compact_accounts: "InvalidAccountData",
 	anchor_system_accounts: "MissingRequiredSignature",
 	counter_program: "InvalidAccountData",
 	escrow_program: "InvalidAccountData",
