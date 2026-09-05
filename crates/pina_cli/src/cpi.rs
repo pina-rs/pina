@@ -354,7 +354,10 @@ mod tests {
 					.unwrap_or_else(|error| panic!("failed to read generated source: {error}"));
 			assert!(source.contains("pub fn invoke(&self, program: &ProgramAccount<'_>)"));
 			assert!(source.contains("pub fn invoke_signed("));
-			assert!(source.contains("CpiContext::new(*program, self.accounts)"));
+			assert!(source.contains("pub struct Initialize<'account>"));
+			assert!(source.contains("pub instruction: InitializeInstruction"));
+			assert!(source.contains("let data = self.instruction.to_bytes();"));
+			assert!(source.contains("CpiContext::new(*program, accounts)"));
 		}
 	}
 
