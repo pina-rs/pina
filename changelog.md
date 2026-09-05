@@ -43,6 +43,30 @@ Generated JavaScript codecs reject over-capacity values rather than truncating t
 - Document the explicit `zeroed()` then `close_with_recipient()` close flow.
 - Regenerate Codama IDLs and committed Rust/JS clients for the updated writable-account inference.
 
+## [0.12.3](https://github.com/pina-rs/pina/releases/tag/v0.12.3) (2026-09-05)
+
+Grouped release for `core`.
+
+### Fixes
+
+#### Prefix seed constants with SEED_
+
+_Packages:_ _pina_lints_
+
+Every example seed constant now leads with SEED_: PROFILE_SEED becomes SEED_PROFILE, STATE_SEED_PREFIX becomes SEED_STATE_PREFIX, and the same rule covers all remaining program, security-example, and surfpool-test seed constants. The illustrative COUNTER_SEED, CONFIG_SEED, STATE_SEED, MY_SEED, and VAULT_SEED constants used across crates documentation, doc comments, templates, test fixtures, and the pina_root macro contract tests rename to the SEED_ prefix form for consistency. The require_explicit_discriminators_and_seed_namespaces lint now also recognizes SEED_-prefixed seed constants so assertions using the preferred naming stay clean; names only reorder and seed bytes, PDA addresses, and program behavior are unchanged.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #295](https://github.com/pina-rs/pina/pull/295)
+
+### Notes
+
+#### Prefix seed constants with SEED_
+
+_Packages:_ _pina_, _pina_cli_, _pina_macros_
+
+Every example seed constant now leads with SEED_: PROFILE_SEED becomes SEED_PROFILE, STATE_SEED_PREFIX becomes SEED_STATE_PREFIX, and the same rule covers all remaining program, security-example, and surfpool-test seed constants. The illustrative COUNTER_SEED, CONFIG_SEED, STATE_SEED, MY_SEED, and VAULT_SEED constants used across crates documentation, doc comments, templates, test fixtures, and the pina_root macro contract tests rename to the SEED_ prefix form for consistency. The require_explicit_discriminators_and_seed_namespaces lint now also recognizes SEED_-prefixed seed constants so assertions using the preferred naming stay clean; names only reorder and seed bytes, PDA addresses, and program behavior are unchanged.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #295](https://github.com/pina-rs/pina/pull/295)
+
 ## [0.12.2](https://github.com/pina-rs/pina/releases/tag/v0.12.2) (2026-09-01)
 
 Grouped release for `core`.
