@@ -3,8 +3,8 @@
 //! Point the renderer at a Codama root node — the output of `@codama/nodes-from-anchor`
 //! for Anchor IDLs, or `pina generate` for Pina programs — and it renders a
 //! standalone, `no_std` CPI crate: one builder per instruction, each owning its
-//! discriminator bytes, argument encoding, and account metadata, ready to be
-//! consumed from another program via `pinocchio::cpi::invoke_signed`.
+//! discriminator bytes, argument encoding, and account metadata. Generated
+//! builders expose Pina-native `invoke` and `invoke_signed` methods.
 //!
 //! The renderer refuses rather than guess: optional accounts, optional
 //! signers, optional arguments, non-little-endian numbers, and unsupported
@@ -76,18 +76,8 @@ impl Default for RenderConfig {
 }
 
 pub fn read_root_node(path: &Path) -> Result<RootNode> {
-	let idl = fs::read_to_string(path).map_err(|source| {
-		RenderError::ReadFile {
-			path: path.to_path_buf(),
-			source,
-		}
-	})?;
-	serde_json::from_str(&idl).map_err(|source| {
-		RenderError::ParseIdl {
-			path: path.to_path_buf(),
-			source,
-		}
-	})
+	let idl = fs::read_to_string(path).map_err(|source| read_file_error(path, source))?;
+	serde_json::from_str(&idl).map_err(|source| parse_idl_error(path, source))
 }
 
 pub fn render_idl_file(path: &Path, crate_dir: &Path, config: &RenderConfig) -> Result<()> {
@@ -103,12 +93,8 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 	ensure_crate_scaffold(crate_dir, root.program.name.as_ref())?;
 
 	if config.delete_folder_before_rendering && generated_dir.exists() {
-		fs::remove_dir_all(&generated_dir).map_err(|source| {
-			RenderError::WriteFile {
-				path: generated_dir.clone(),
-				source,
-			}
-		})?;
+		fs::remove_dir_all(&generated_dir)
+			.map_err(|source| write_file_error(&generated_dir, source))?;
 	}
 
 	write_files(&generated_dir, &files)
@@ -123,14 +109,10 @@ pub fn render_program(
 	render_root_node(&root, crate_dir, config)
 }
 
-/// Renders the program into an in-memory file map without touching disk.
-///
-/// Useful for inspecting or post-processing the generated sources; use
-/// [`render_root_node`] to write them to a crate directory.
+/// Renders a program into an in-memory file map without touching disk.
 pub fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>> {
 	let program = &root.program;
 	let mut files = BTreeMap::new();
-
 	let mut program_constants = Vec::new();
 	for program in std::iter::once(program).chain(root.additional_programs.iter()) {
 		let docs = program.docs.iter().cloned().collect::<Vec<_>>().join("\n");
@@ -145,7 +127,7 @@ pub fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, Stri
 	files.insert(PathBuf::from("mod.rs"), page(&render_root_mod(program)));
 	files.insert(
 		PathBuf::from("programs.rs"),
-		page(&render_programs_mod(&program_constants)),
+		page(&render_programs_mod(program, &program_constants)),
 	);
 
 	if !program.instructions.is_empty() {
@@ -188,19 +170,11 @@ fn validate_generated_dir(crate_dir: &Path, generated_folder: &Path) -> Result<P
 	let generated_dir = crate_dir.join(generated_folder);
 	let mut current = crate_dir.to_path_buf();
 	for component in generated_folder.components() {
-		let Component::Normal(component) = component else {
-			unreachable!("components were validated above");
-		};
-		current.push(component);
+		current.push(component.as_os_str());
 		let metadata = match fs::symlink_metadata(&current) {
 			Ok(metadata) => metadata,
 			Err(source) if source.kind() == std::io::ErrorKind::NotFound => continue,
-			Err(source) => {
-				return Err(RenderError::ReadFile {
-					path: current.clone(),
-					source,
-				});
-			}
+			Err(source) => return Err(read_file_error(&current, source)),
 		};
 		if metadata.is_symlink() {
 			return Err(RenderError::UnsafeOutputPath {
@@ -215,28 +189,18 @@ fn validate_generated_dir(crate_dir: &Path, generated_folder: &Path) -> Result<P
 
 fn validate_generated_sources(files: &BTreeMap<PathBuf, String>) -> Result<()> {
 	for (path, source) in files {
-		syn::parse_file(source).map_err(|error| {
-			RenderError::InvalidGeneratedSource {
-				path: path.clone(),
-				reason: error.to_string(),
-			}
-		})?;
+		syn::parse_file(source).map_err(|error| invalid_source_error(path, &error))?;
 	}
 
 	Ok(())
 }
 
 fn validate_existing_generated_dir(path: &Path, require_managed: bool) -> Result<()> {
-	if !path.exists() {
-		return Ok(());
-	}
-
-	let metadata = fs::symlink_metadata(path).map_err(|source| {
-		RenderError::ReadFile {
-			path: path.to_path_buf(),
-			source,
-		}
-	})?;
+	let metadata = match fs::symlink_metadata(path) {
+		Ok(metadata) => metadata,
+		Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+		Err(source) => return Err(read_file_error(path, source)),
+	};
 	if !metadata.is_dir() {
 		return Err(RenderError::UnsafeOutputPath {
 			path: path.to_path_buf(),
@@ -247,21 +211,11 @@ fn validate_existing_generated_dir(path: &Path, require_managed: bool) -> Result
 	validate_tree_has_no_symlinks(path)?;
 
 	if require_managed {
-		let mut entries = fs::read_dir(path).map_err(|source| {
-			RenderError::ReadFile {
-				path: path.to_path_buf(),
-				source,
-			}
-		})?;
+		let mut entries = fs::read_dir(path).map_err(|source| read_file_error(path, source))?;
 		if entries
 			.next()
 			.transpose()
-			.map_err(|source| {
-				RenderError::ReadFile {
-					path: path.to_path_buf(),
-					source,
-				}
-			})?
+			.map_err(|source| read_file_error(path, source))?
 			.is_some()
 		{
 			let marker_path = path.join("mod.rs");
@@ -272,12 +226,8 @@ fn validate_existing_generated_dir(path: &Path, require_managed: bool) -> Result
 						.to_string(),
 				});
 			}
-			let marker = fs::read_to_string(&marker_path).map_err(|source| {
-				RenderError::ReadFile {
-					path: marker_path.clone(),
-					source,
-				}
-			})?;
+			let marker = fs::read_to_string(&marker_path)
+				.map_err(|source| read_file_error(&marker_path, source))?;
 			if !marker.starts_with(GENERATED_HEADER) {
 				return Err(RenderError::UnsafeOutputPath {
 					path: path.to_path_buf(),
@@ -292,25 +242,11 @@ fn validate_existing_generated_dir(path: &Path, require_managed: bool) -> Result
 }
 
 fn validate_tree_has_no_symlinks(path: &Path) -> Result<()> {
-	for entry in fs::read_dir(path).map_err(|source| {
-		RenderError::ReadFile {
-			path: path.to_path_buf(),
-			source,
-		}
-	})? {
-		let entry = entry.map_err(|source| {
-			RenderError::ReadFile {
-				path: path.to_path_buf(),
-				source,
-			}
-		})?;
+	for entry in fs::read_dir(path).map_err(|source| read_file_error(path, source))? {
+		let entry = entry.map_err(|source| read_file_error(path, source))?;
 		let entry_path = entry.path();
-		let metadata = fs::symlink_metadata(&entry_path).map_err(|source| {
-			RenderError::ReadFile {
-				path: entry_path.clone(),
-				source,
-			}
-		})?;
+		let metadata = fs::symlink_metadata(&entry_path)
+			.map_err(|source| read_file_error(&entry_path, source))?;
 		if metadata.is_symlink() {
 			return Err(RenderError::UnsafeOutputPath {
 				path: entry_path,
@@ -323,4 +259,32 @@ fn validate_tree_has_no_symlinks(path: &Path) -> Result<()> {
 	}
 
 	Ok(())
+}
+
+fn read_file_error(path: &Path, source: std::io::Error) -> RenderError {
+	RenderError::ReadFile {
+		path: path.to_path_buf(),
+		source,
+	}
+}
+
+fn write_file_error(path: &Path, source: std::io::Error) -> RenderError {
+	RenderError::WriteFile {
+		path: path.to_path_buf(),
+		source,
+	}
+}
+
+fn parse_idl_error(path: &Path, source: serde_json::Error) -> RenderError {
+	RenderError::ParseIdl {
+		path: path.to_path_buf(),
+		source,
+	}
+}
+
+fn invalid_source_error(path: &Path, source: &syn::Error) -> RenderError {
+	RenderError::InvalidGeneratedSource {
+		path: path.to_path_buf(),
+		reason: source.to_string(),
+	}
 }

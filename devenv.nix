@@ -405,8 +405,9 @@ in
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
         pnpm --dir "$DEVENV_ROOT" run check:npm-packages
         pnpm --dir "$DEVENV_ROOT" run test:npm-packages
+        pnpm --dir "$DEVENV_ROOT" run test:codama-renderer-cpi
       '';
-      description = "Verify npm metadata, platform launchers, the skill installer, and release packaging scripts.";
+      description = "Verify npm metadata, platform launchers, the CPI visitor, the skill installer, and release packaging scripts.";
       binary = "bash";
     };
     "test:fuzz:smoke" = {
@@ -763,6 +764,7 @@ in
           -p pina \
           -p pina_cli \
           -p pina_codama_renderer \
+          -p pina_cpi_renderer \
           -p prop_amm_program \
           -p profile_program \
           -p profile-program-client \

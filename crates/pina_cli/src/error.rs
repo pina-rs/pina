@@ -135,6 +135,12 @@ pub enum CodamaError {
 		source: pina_codama_renderer::RenderError,
 	},
 
+	#[error("CPI client rendering failed for {path}: {source}")]
+	RenderCpi {
+		path: PathBuf,
+		source: pina_cpi_renderer::RenderError,
+	},
+
 	#[error("Failed to harden generated JavaScript client at {path}: {source}")]
 	HardenJavaScript {
 		path: PathBuf,

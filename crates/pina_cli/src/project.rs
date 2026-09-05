@@ -28,6 +28,7 @@ pub const LEGACY_CONFIG_FILE_NAME: &str = "Pina.toml";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ClientLanguage {
+	Cpi,
 	Rust,
 	Typescript,
 	Dart,
@@ -38,6 +39,7 @@ impl ClientLanguage {
 	#[must_use]
 	pub const fn as_str(self) -> &'static str {
 		match self {
+			Self::Cpi => "cpi",
 			Self::Rust => "rust",
 			Self::Typescript => "typescript",
 			Self::Dart => "dart",

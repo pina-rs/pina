@@ -21,23 +21,23 @@ use clap_complete::Shell;
 	              test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent \
 	              Surfpool network, 'pina generate' for selected client ecosystems, 'pina deploy' \
 	              for explicit cluster deployment, and 'pina verify' for deployed-program \
-	              verification. Use 'pina doctor' for agent-readable diagnostics, 'pina keys' for \
-	              program identity, and 'pina completions' for shell integration. Low-level IDL, \
-	              profiling, terminal documentation, and the legacy repository-wide Codama \
-	              workflow remain available.",
+	              verification. Use 'pina cpi' for standalone CPI crates, 'pina doctor' for \
+	              agent-readable diagnostics, 'pina keys' for program identity, and 'pina \
+	              completions' for shell integration. Low-level IDL, profiling, terminal \
+	              documentation, and the legacy repository-wide Codama workflow remain available.",
 	next_line_help = true,
 	arg_required_else_help = true,
 	after_help = "Examples:\n  pina init counter_program\n  cd counter_program && pina build\n  \
 	              pina lint\n  pina test\n  pina test --unit\n  pina dev --yes\n  pina generate \
 	              --client rust --client typescript\n  pina doctor --json\n  pina keys\n  pina \
-	              idl --path ./programs/counter_program --output ./idls/counter_program.json\n  \
-	              pina profile ./target/deploy/counter_program.so --json\n  pina deploy --cluster \
-	              localnet --payer ~/.config/solana/id.json --upgrade-authority \
-	              ~/.config/solana/id.json --dry-run\n\nAgent discovery:\n  Run 'pina <command> \
-	              --help' for command-specific inputs, outputs, and examples.\n  Run 'pina docs' \
-	              to list the bundled architecture and IDL reference topics.\n  For deployment \
-	              verification, run 'pina verify --help' and then inspect the selected leaf \
-	              command."
+	              cpi --idl ./idl.json --output ./clients/program-cpi\n  pina idl --path \
+	              ./programs/counter_program --output ./idls/counter_program.json\n  pina profile \
+	              ./target/deploy/counter_program.so --json\n  pina deploy --cluster localnet \
+	              --payer ~/.config/solana/id.json --upgrade-authority ~/.config/solana/id.json \
+	              --dry-run\n\nAgent discovery:\n  Run 'pina <command> --help' for \
+	              command-specific inputs, outputs, and examples.\n  Run 'pina docs' to list the \
+	              bundled architecture and IDL reference topics.\n  For deployment verification, \
+	              run 'pina verify --help' and then inspect the selected leaf command."
 )]
 pub(crate) struct Cli {
 	#[command(subcommand)]
@@ -160,6 +160,42 @@ pub(crate) enum Commands {
 		output: Option<PathBuf>,
 
 		/// Executable used to invoke JavaScript or Dart renderers. Defaults to npx.
+		#[arg(
+			long,
+			default_value = "npx",
+			hide_default_value = true,
+			value_name = "COMMAND"
+		)]
+		npx: String,
+	},
+
+	/// Generate a standalone Pina CPI crate from a Codama or Anchor IDL.
+	///
+	/// Codama IDLs are rendered natively. Anchor IDLs are normalized through
+	/// Codama before the same Pina renderer runs. Use --stdin when a Codama
+	/// visitor needs to pass its current, potentially transformed root node.
+	#[command(
+		after_help = "Examples:\n  pina cpi --idl ./target/idl/counter.json --output \
+		              ./clients/counter-cpi\n  pina cpi --idl ./target/idl/anchor.json --output \
+		              ./clients/anchor-cpi\n  cat ./idl.json | pina cpi --stdin --output \
+		              ./clients/program-cpi\n\nAnchor IDLs:\n  Raw Anchor IDLs require Node.js. \
+		              Pina invokes @codama/nodes-from-anchor through npx. Codama root-node IDLs \
+		              do not invoke Node.js."
+	)]
+	Cpi {
+		/// Codama or Anchor IDL file to render.
+		#[arg(long, value_name = "FILE", required_unless_present = "stdin")]
+		idl: Option<PathBuf>,
+
+		/// Read a normalized Codama root-node IDL from standard input.
+		#[arg(long, conflicts_with = "idl")]
+		stdin: bool,
+
+		/// Directory to create as the standalone CPI crate.
+		#[arg(short, long, value_name = "DIR")]
+		output: PathBuf,
+
+		/// Executable used to normalize Anchor IDLs. Defaults to npx.
 		#[arg(
 			long,
 			default_value = "npx",
@@ -793,6 +829,7 @@ impl ExportArg {
 /// Client ecosystems supported by project-aware generation.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub(crate) enum ClientArg {
+	Cpi,
 	Rust,
 	Typescript,
 	Dart,

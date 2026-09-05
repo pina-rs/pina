@@ -1,9 +1,11 @@
 ---
 pina_cpi_renderer: feat
+pina_cli: feat
+pina_codama_renderer_cpi: feat
 ---
 
-# Add the pina_cpi_renderer crate
+# Add IDL-driven Pina CPI generation
 
-New Codama Rust renderer that generates standalone Pinocchio CPI clients from Anchor and Codama IDLs. Point it at a Codama root node — the output of `@codama/nodes-from-anchor` for Anchor IDLs, or `pina generate` for Pina programs — and it renders one builder per instruction, each owning its discriminator bytes, argument encoding, and account metadata, ready to be consumed from another program via `pinocchio::cpi::invoke_signed`.
+Adds a Codama Rust renderer and `@pina-rs/codama-renderer-cpi` visitor that generate standalone, `no_std` Pina CPI crates. Point the Codama pipeline or `pina cpi` at a Pina or Anchor IDL, or run `pina generate --client cpi` in a Pina program. Every instruction becomes a typed builder with `.invoke()` and `.invoke_signed()` methods backed by Pina's validated `ProgramAccount`, `CpiHandle`, `ToCpiAccounts`, and `CpiContext` APIs.
 
 The renderer refuses rather than guess: optional accounts, optional signers, optional arguments, big-endian numbers, and unsupported argument or discriminator types are rejected with errors naming the exact node instead of generating instruction data that would never dispatch. Accounts the IDL derives from PDA seeds stay ordinary builder fields, because the runtime resolves CPI accounts against the executing program's own account list.

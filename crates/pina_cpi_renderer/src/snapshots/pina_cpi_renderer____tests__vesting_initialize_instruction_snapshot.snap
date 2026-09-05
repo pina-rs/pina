@@ -2,39 +2,69 @@
 source: crates/pina_cpi_renderer/src/__tests.rs
 expression: "render_fixture_instruction(\"vesting_program\", \"initialize\")"
 ---
-use pinocchio::cpi::Signer;
-use pinocchio::cpi::invoke_signed;
-use pinocchio::error::ProgramResult;
-use pinocchio::instruction::InstructionView;
-use pinocchio::Address;
-use pinocchio::instruction::InstructionAccount;
-use pinocchio::AccountView;
+use pina::AccountView;
+use pina::CpiContext;
+use pina::CpiHandle;
+use pina::ProgramError;
+use pina::ProgramResult;
+use pina::Signer;
+use pina::ToCpiAccounts;
 
-/// CPI arguments for the `initialize` instruction.
+use crate::ProgramAccount;
+
+/// Accounts required by the `initialize` instruction.
 #[derive(Clone, Copy, Debug)]
-#[must_use = "the CPI has no effect until invoke_signed is called"]
-pub struct Initialize<'a> {
-	/// Switchboard program the instruction is invoked on.
-	pub program_id: &'a Address,
-
+pub struct InitializeAccounts<'a> {
 	/// writable, must sign.
-	pub admin: &'a AccountView,
-
-	pub beneficiary: &'a AccountView,
-
-	pub mint: &'a AccountView,
-
+	pub admin: CpiHandle<'a>,
+	pub beneficiary: CpiHandle<'a>,
+	pub mint: CpiHandle<'a>,
 	/// writable.
-	pub vesting_state: &'a AccountView,
-
+	pub vesting_state: CpiHandle<'a>,
 	/// writable.
-	pub vault: &'a AccountView,
+	pub vault: CpiHandle<'a>,
+	pub associated_token_program: CpiHandle<'a>,
+	pub system_program: CpiHandle<'a>,
+	pub token_program: CpiHandle<'a>,
+}
 
-	pub associated_token_program: &'a AccountView,
+impl<'a> InitializeAccounts<'a> {
+	/// Validates writable privileges and builds the CPI account set.
+	pub fn new(
+		admin: &'a AccountView,
+		beneficiary: &'a AccountView,
+		mint: &'a AccountView,
+		vesting_state: &'a AccountView,
+		vault: &'a AccountView,
+		associated_token_program: &'a AccountView,
+		system_program: &'a AccountView,
+		token_program: &'a AccountView,
+	) -> Result<Self, ProgramError> {
+		Ok(Self {
+			admin: CpiHandle::writable_signer(admin)?,
+			beneficiary: CpiHandle::readonly(beneficiary),
+			mint: CpiHandle::readonly(mint),
+			vesting_state: CpiHandle::writable(vesting_state)?,
+			vault: CpiHandle::writable(vault)?,
+			associated_token_program: CpiHandle::readonly(associated_token_program),
+			system_program: CpiHandle::readonly(system_program),
+			token_program: CpiHandle::readonly(token_program),
+		})
+	}
+}
 
-	pub system_program: &'a AccountView,
+impl<'a> ToCpiAccounts<'a, 8> for InitializeAccounts<'a> {
+	fn to_cpi_handles(&self) -> [CpiHandle<'a>; 8] {
+		[self.admin, self.beneficiary, self.mint, self.vesting_state, self.vault, self.associated_token_program, self.system_program, self.token_program]
+	}
+}
 
-	pub token_program: &'a AccountView,
+/// CPI builder for the `initialize` instruction.
+#[derive(Clone, Copy, Debug)]
+#[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
+pub struct Initialize<'a> {
+	/// Validated accounts required by the instruction.
+	pub accounts: InitializeAccounts<'a>,
 
 	/// `totalAmount` argument.
 	pub total_amount: u64,
@@ -47,18 +77,26 @@ pub struct Initialize<'a> {
 	pub bump: u8,
 }
 
-impl Initialize<'_> {
+impl<'a> Initialize<'a> {
+	/// Builds a `Initialize` CPI instruction.
+	#[inline(always)]
+	pub const fn new(accounts: InitializeAccounts<'a>, total_amount: u64, start_ts: u64, cliff_ts: u64, end_ts: u64, bump: u8) -> Self {
+		Self { accounts, total_amount, start_ts, cliff_ts, end_ts, bump }
+	}
+
 	/// Invokes the instruction with no PDA seeds.
-	///
-	/// Signer accounts must still be covered by the enclosing transaction or
-	/// by seeds passed to [`Self::invoke_signed`].
-	#[inline]
-	pub fn invoke(&self) -> ProgramResult {
-		self.invoke_signed(&[])
+	#[inline(always)]
+	pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
+		self.invoke_signed(program, &[])
 	}
 
 	/// Invokes the instruction, signing with the provided PDA seeds.
-	pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+	#[inline(always)]
+	pub fn invoke_signed(
+		&self,
+		program: &ProgramAccount<'_>,
+		signers: &[Signer<'_, '_>],
+	) -> ProgramResult {
 		let mut data = [0u8; 34];
 		data[..1].copy_from_slice(&INITIALIZE_DISCRIMINATOR);
 		data[1..9].copy_from_slice(&self.total_amount.to_le_bytes());
@@ -66,32 +104,9 @@ impl Initialize<'_> {
 		data[17..25].copy_from_slice(&self.cliff_ts.to_le_bytes());
 		data[25..33].copy_from_slice(&self.end_ts.to_le_bytes());
 		data[33..34].copy_from_slice(&self.bump.to_le_bytes());
-		let accounts = [
-			InstructionAccount::new(self.admin.address(), true, true),
-			InstructionAccount::new(self.beneficiary.address(), false, false),
-			InstructionAccount::new(self.mint.address(), false, false),
-			InstructionAccount::new(self.vesting_state.address(), true, false),
-			InstructionAccount::new(self.vault.address(), true, false),
-			InstructionAccount::new(self.associated_token_program.address(), false, false),
-			InstructionAccount::new(self.system_program.address(), false, false),
-			InstructionAccount::new(self.token_program.address(), false, false),
-		];
-		let views: [&AccountView; 8] = [
-			self.admin,
-			self.beneficiary,
-			self.mint,
-			self.vesting_state,
-			self.vault,
-			self.associated_token_program,
-			self.system_program,
-			self.token_program,
-		];
-		let instruction = InstructionView {
-			program_id: self.program_id,
-			accounts: &accounts,
-			data: &data,
-		};
-		invoke_signed(&instruction, &views, signers)
+		let context = CpiContext::new(*program, self.accounts);
+
+		context.invoke_signed(&data, signers)
 	}
 }
 

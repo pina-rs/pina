@@ -2,70 +2,87 @@
 source: crates/pina_cpi_renderer/src/__tests.rs
 expression: "render_fixture_instruction(\"vesting_program\", \"cancel\")"
 ---
-use pinocchio::cpi::Signer;
-use pinocchio::cpi::invoke_signed;
-use pinocchio::error::ProgramResult;
-use pinocchio::instruction::InstructionView;
-use pinocchio::Address;
-use pinocchio::instruction::InstructionAccount;
-use pinocchio::AccountView;
+use pina::AccountView;
+use pina::CpiContext;
+use pina::CpiHandle;
+use pina::ProgramError;
+use pina::ProgramResult;
+use pina::Signer;
+use pina::ToCpiAccounts;
 
-/// CPI arguments for the `cancel` instruction.
+use crate::ProgramAccount;
+
+/// Accounts required by the `cancel` instruction.
 #[derive(Clone, Copy, Debug)]
-#[must_use = "the CPI has no effect until invoke_signed is called"]
-pub struct Cancel<'a> {
-	/// Switchboard program the instruction is invoked on.
-	pub program_id: &'a Address,
-
+pub struct CancelAccounts<'a> {
 	/// must sign.
-	pub admin: &'a AccountView,
-
-	pub mint: &'a AccountView,
-
+	pub admin: CpiHandle<'a>,
+	pub mint: CpiHandle<'a>,
 	/// writable.
-	pub vesting_state: &'a AccountView,
-
+	pub vesting_state: CpiHandle<'a>,
 	/// writable.
-	pub vault: &'a AccountView,
-
-	pub token_program: &'a AccountView,
-
+	pub vault: CpiHandle<'a>,
+	pub token_program: CpiHandle<'a>,
 }
 
-impl Cancel<'_> {
+impl<'a> CancelAccounts<'a> {
+	/// Validates writable privileges and builds the CPI account set.
+	pub fn new(
+		admin: &'a AccountView,
+		mint: &'a AccountView,
+		vesting_state: &'a AccountView,
+		vault: &'a AccountView,
+		token_program: &'a AccountView,
+	) -> Result<Self, ProgramError> {
+		Ok(Self {
+			admin: CpiHandle::readonly_signer(admin),
+			mint: CpiHandle::readonly(mint),
+			vesting_state: CpiHandle::writable(vesting_state)?,
+			vault: CpiHandle::writable(vault)?,
+			token_program: CpiHandle::readonly(token_program),
+		})
+	}
+}
+
+impl<'a> ToCpiAccounts<'a, 5> for CancelAccounts<'a> {
+	fn to_cpi_handles(&self) -> [CpiHandle<'a>; 5] {
+		[self.admin, self.mint, self.vesting_state, self.vault, self.token_program]
+	}
+}
+
+/// CPI builder for the `cancel` instruction.
+#[derive(Clone, Copy, Debug)]
+#[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
+pub struct Cancel<'a> {
+	/// Validated accounts required by the instruction.
+	pub accounts: CancelAccounts<'a>,
+}
+
+impl<'a> Cancel<'a> {
+	/// Builds a `Cancel` CPI instruction.
+	#[inline(always)]
+	pub const fn new(accounts: CancelAccounts<'a>) -> Self {
+		Self { accounts }
+	}
+
 	/// Invokes the instruction with no PDA seeds.
-	///
-	/// Signer accounts must still be covered by the enclosing transaction or
-	/// by seeds passed to [`Self::invoke_signed`].
-	#[inline]
-	pub fn invoke(&self) -> ProgramResult {
-		self.invoke_signed(&[])
+	#[inline(always)]
+	pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
+		self.invoke_signed(program, &[])
 	}
 
 	/// Invokes the instruction, signing with the provided PDA seeds.
-	pub fn invoke_signed(&self, signers: &[Signer]) -> ProgramResult {
+	#[inline(always)]
+	pub fn invoke_signed(
+		&self,
+		program: &ProgramAccount<'_>,
+		signers: &[Signer<'_, '_>],
+	) -> ProgramResult {
 		let mut data = [0u8; 1];
 		data[..1].copy_from_slice(&CANCEL_DISCRIMINATOR);
-		let accounts = [
-			InstructionAccount::new(self.admin.address(), false, true),
-			InstructionAccount::new(self.mint.address(), false, false),
-			InstructionAccount::new(self.vesting_state.address(), true, false),
-			InstructionAccount::new(self.vault.address(), true, false),
-			InstructionAccount::new(self.token_program.address(), false, false),
-		];
-		let views: [&AccountView; 5] = [
-			self.admin,
-			self.mint,
-			self.vesting_state,
-			self.vault,
-			self.token_program,
-		];
-		let instruction = InstructionView {
-			program_id: self.program_id,
-			accounts: &accounts,
-			data: &data,
-		};
-		invoke_signed(&instruction, &views, signers)
+		let context = CpiContext::new(*program, self.accounts);
+
+		context.invoke_signed(&data, signers)
 	}
 }
 

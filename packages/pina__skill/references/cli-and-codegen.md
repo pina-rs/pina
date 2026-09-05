@@ -55,7 +55,9 @@ The library target name determines the canonical outputs:
 <cargo-target>/idl/<library-name>.json
 ```
 
-`pina generate` refreshes that IDL and renders the client languages selected in `pina.toml`. Override the selection for one run with repeatable `--client rust`, `--client typescript`, or `--client dart` flags. Generated ecosystem roots may be replaced, so keep hand-written code outside them.
+`pina generate` refreshes that IDL and renders the client languages selected in `pina.toml`. Override the selection for one run with repeatable `--client cpi`, `--client rust`, `--client typescript`, or `--client dart` flags. CPI output is a separate `no_std` crate with `.invoke()` and `.invoke_signed()` builders. Generated ecosystem roots may be replaced, so keep hand-written code outside them.
+
+Generate the same crate from an external Codama or Anchor IDL with `pina cpi --idl <FILE> --output <DIR>`. Codama IDLs stay native; raw Anchor IDLs are normalized through `@codama/nodes-from-anchor` first.
 
 ## Project diagnostics and identity
 

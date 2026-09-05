@@ -22,7 +22,7 @@ Options:
       --client <LANGUAGE>
           Client ecosystem to generate. Repeat to override pina.toml
           
-          [possible values: rust, typescript, dart]
+          [possible values: cpi, rust, typescript, dart]
 
   -o, --output <DIR>
           Override the configured client output directory

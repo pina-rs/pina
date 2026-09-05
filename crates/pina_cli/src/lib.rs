@@ -1,6 +1,7 @@
 pub mod build;
 pub mod codama;
 pub mod codegen;
+pub mod cpi;
 pub mod deploy;
 pub mod doctor;
 pub mod error;
@@ -32,6 +33,9 @@ pub use crate::codama::ProjectGenerateOutput;
 pub use crate::codama::generate_codama;
 pub use crate::codama::generate_project_clients;
 use crate::codegen::try_ir_to_root_node;
+pub use crate::cpi::CpiGenerateOptions;
+pub use crate::cpi::generate_cpi_crate;
+pub use crate::cpi::generate_cpi_crate_from_reader;
 use crate::error::IdlError;
 pub use crate::init::init_project;
 pub use crate::init::print_next_steps;

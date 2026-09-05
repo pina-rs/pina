@@ -254,6 +254,7 @@ jobs:
 
           pnpm install --frozen-lockfile
           pnpm run build:codama-nodes
+          pnpm run build:codama-renderer-cpi
           pnpm run check:npm-packages
           pnpm run test:npm-packages
 
@@ -278,6 +279,17 @@ jobs:
               'any(.[0].files[]; .path == $path)' \
               "$pack_report" >/dev/null || {
                 echo "::error::npm package is missing $required_file" >&2
+                exit 1
+              }
+          done
+
+          cpi_pack_report="$RUNNER_TEMP/pina-codama-renderer-cpi-pack.json"
+          npm pack ./packages/codama-renderer-cpi --dry-run --json > "$cpi_pack_report"
+          for required_file in dist/index.js dist/types/index.d.ts README.md; do
+            jq -e --arg path "$required_file" \
+              'any(.[0].files[]; .path == $path)' \
+              "$cpi_pack_report" >/dev/null || {
+                echo "::error::@pina-rs/codama-renderer-cpi is missing $required_file" >&2
                 exit 1
               }
           done

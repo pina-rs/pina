@@ -169,13 +169,7 @@ fn render_array_argument(
 		});
 	}
 
-	let count = usize::try_from(count.value).map_err(|_| {
-		RenderError::UnsupportedType {
-			context: context.to_string(),
-			kind: "fixedCountNode",
-			reason: "array length does not fit in a usize".to_string(),
-		}
-	})?;
+	let count = count.value as usize;
 
 	let write = format!("data[{{offset}}..{{offset_end}}].copy_from_slice(&self.{field});");
 
@@ -186,4 +180,65 @@ fn render_array_argument(
 		write,
 		docs: Vec::new(),
 	})
+}
+
+#[cfg(test)]
+mod tests {
+	use codama_nodes::BooleanTypeNode;
+	use codama_nodes::BytesTypeNode;
+	use codama_nodes::F32;
+	use codama_nodes::F64;
+	use codama_nodes::I8;
+	use codama_nodes::I16;
+	use codama_nodes::I32;
+	use codama_nodes::I64;
+	use codama_nodes::I128;
+	use codama_nodes::ShortU16;
+	use codama_nodes::StringTypeNode;
+	use codama_nodes::U8;
+	use codama_nodes::U16;
+	use codama_nodes::U32;
+	use codama_nodes::U64;
+	use codama_nodes::U128;
+
+	use super::*;
+
+	#[test]
+	fn rejects_unsupported_argument_shapes() {
+		assert!(render_argument("name", &StringTypeNode::utf8().into(), "test").is_err());
+		assert!(render_argument("name", &NumberTypeNode::be(U16).into(), "test").is_err());
+
+		for format in [I8, I16, I32, I64, I128, F32, F64, ShortU16] {
+			assert!(render_argument("name", &NumberTypeNode::le(format).into(), "test").is_err());
+		}
+
+		let fixed_boolean = codama_nodes::FixedSizeTypeNode::new(BooleanTypeNode::default(), 4);
+		assert!(render_argument("name", &fixed_boolean.into(), "test").is_err());
+		let remainder = ArrayTypeNode::remainder(NumberTypeNode::le(U8));
+		assert!(render_argument("name", &remainder.into(), "test").is_err());
+		let wrong_item = ArrayTypeNode::fixed(NumberTypeNode::le(U16), 4);
+		assert!(render_argument("name", &wrong_item.into(), "test").is_err());
+	}
+
+	#[test]
+	fn renders_every_supported_argument_shape() {
+		for (format, rust_type, wire_size) in [
+			(U8, "u8", 1),
+			(U16, "u16", 2),
+			(U32, "u32", 4),
+			(U64, "u64", 8),
+			(U128, "u128", 16),
+		] {
+			let rendered = render_argument("someValue", &NumberTypeNode::le(format).into(), "test")
+				.unwrap_or_else(|error| panic!("number should render: {error}"));
+			assert_eq!(rendered.field, "some_value");
+			assert_eq!(rendered.rust_type, rust_type);
+			assert_eq!(rendered.wire_size, wire_size);
+		}
+
+		let fixed = codama_nodes::FixedSizeTypeNode::new(BytesTypeNode {}, 12);
+		let rendered = render_argument("bytes", &fixed.into(), "test")
+			.unwrap_or_else(|error| panic!("fixed bytes should render: {error}"));
+		assert_eq!(rendered.rust_type, "[u8; 12]");
+	}
 }

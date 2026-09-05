@@ -43,6 +43,12 @@ pub(crate) fn run(cli: Cli) {
 			output,
 			npx,
 		} => run_generate(project, clients, output, npx),
+		Commands::Cpi {
+			idl,
+			stdin,
+			output,
+			npx,
+		} => run_cpi(idl.as_deref(), stdin, &output, &npx),
 		Commands::Idl { command, generate } => idl_command::run_idl_command(command, &generate),
 		Commands::Docs { topic } => run_docs(topic.as_deref()),
 		Commands::Init { name, path, force } => run_init(name.as_str(), path.as_deref(), force),
@@ -549,6 +555,7 @@ fn run_generate(project: PathBuf, clients: Vec<ClientArg>, output: Option<PathBu
 		.into_iter()
 		.map(|client| {
 			match client {
+				ClientArg::Cpi => pina_cli::project::ClientLanguage::Cpi,
 				ClientArg::Rust => pina_cli::project::ClientLanguage::Rust,
 				ClientArg::Typescript => pina_cli::project::ClientLanguage::Typescript,
 				ClientArg::Dart => pina_cli::project::ClientLanguage::Dart,
@@ -584,6 +591,26 @@ fn run_generate(project: PathBuf, clients: Vec<ClientArg>, output: Option<PathBu
 	);
 	println!("  IDL     {}", generated.idl.display());
 	println!("  Clients {}", generated.clients_dir.display());
+}
+
+fn run_cpi(idl: Option<&Path>, stdin: bool, output: &Path, npx: &str) {
+	let result = if stdin {
+		pina_cli::generate_cpi_crate_from_reader(std::io::stdin().lock(), output)
+	} else {
+		let idl = idl.unwrap_or_else(|| unreachable!("clap requires --idl or --stdin"));
+		pina_cli::generate_cpi_crate(&pina_cli::CpiGenerateOptions {
+			idl: idl.to_path_buf(),
+			output: output.to_path_buf(),
+			npx: npx.to_string(),
+		})
+	};
+
+	unwrap_or_exit(result);
+	println!(
+		"{} Generated CPI crate at {}",
+		"✔".green(),
+		output.display()
+	);
 }
 
 fn run_test(project: PathBuf, unit: bool, filter: Option<String>) {

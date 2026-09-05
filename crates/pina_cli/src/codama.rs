@@ -9,6 +9,8 @@ use std::process::Stdio;
 use atomic_write_file::AtomicWriteFile;
 use pina_codama_renderer::RenderConfig;
 use pina_codama_renderer::render_idl_file;
+use pina_cpi_renderer::RenderConfig as CpiRenderConfig;
+use pina_cpi_renderer::render_idl_file as render_cpi_idl_file;
 
 use crate::dart_client::validate_dart_client_idls;
 use crate::dart_client::write_dart_package_barrels;
@@ -91,6 +93,7 @@ struct GenerationPlan {
 	override_idl_names: bool,
 	idls_dir: PathBuf,
 	rust_out: PathBuf,
+	cpi_out: PathBuf,
 	typescript_out: PathBuf,
 	dart_out: PathBuf,
 	clients: BTreeSet<ClientLanguage>,
@@ -114,6 +117,7 @@ pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, C
 		override_idl_names: false,
 		idls_dir: options.idls_dir.clone(),
 		rust_out: options.rust_out.clone(),
+		cpi_out: PathBuf::new(),
 		typescript_out: options.js_out.clone(),
 		dart_out: options.dart_out.clone(),
 		clients: [
@@ -161,6 +165,7 @@ pub fn generate_project_clients(
 		override_idl_names: true,
 		idls_dir: project.idl_dir.clone(),
 		rust_out: clients_dir.join("rust"),
+		cpi_out: clients_dir.join("cpi"),
 		typescript_out: clients_dir.join("typescript"),
 		dart_out: clients_dir.join("dart"),
 		clients: clients.clone(),
@@ -237,6 +242,16 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 		}
 	}
 
+	if plan.clients.contains(&ClientLanguage::Cpi) {
+		let render_config = CpiRenderConfig::default();
+
+		for (example, idl_path) in examples.iter().zip(idl_paths.iter()) {
+			let crate_dir = plan.cpi_out.join(example);
+			validate_render_target(&crate_dir)?;
+			render_cpi_client(idl_path, &crate_dir, &render_config)?;
+		}
+	}
+
 	if plan.clients.contains(&ClientLanguage::Typescript) {
 		for example in &examples {
 			validate_render_target(&plan.typescript_out.join(example))?;
@@ -281,7 +296,23 @@ fn render_rust_client(
 	})
 }
 
-fn validate_render_target(path: &Path) -> Result<(), CodamaError> {
+fn render_cpi_client(
+	idl_path: &Path,
+	crate_dir: &Path,
+	config: &CpiRenderConfig,
+) -> Result<(), CodamaError> {
+	render_cpi_idl_file(idl_path, crate_dir, config)
+		.map_err(|source| cpi_render_error(crate_dir, source))
+}
+
+fn cpi_render_error(path: &Path, source: pina_cpi_renderer::RenderError) -> CodamaError {
+	CodamaError::RenderCpi {
+		path: path.to_path_buf(),
+		source,
+	}
+}
+
+pub(crate) fn validate_render_target(path: &Path) -> Result<(), CodamaError> {
 	let absolute = std::path::absolute(path).map_err(|source| create_dir_error(path, source))?;
 
 	if absolute.parent().is_none() {
@@ -378,6 +409,10 @@ fn selected_output_dirs(plan: &GenerationPlan) -> Vec<&Path> {
 
 	if plan.clients.contains(&ClientLanguage::Rust) {
 		paths.push(plan.rust_out.as_path());
+	}
+
+	if plan.clients.contains(&ClientLanguage::Cpi) {
+		paths.push(plan.cpi_out.as_path());
 	}
 
 	if plan.clients.contains(&ClientLanguage::Typescript) {
@@ -689,6 +724,7 @@ fn join_reader(
 
 fn renderer_output(plan: &GenerationPlan, renderer: ClientLanguage) -> &Path {
 	match renderer {
+		ClientLanguage::Cpi => &plan.cpi_out,
 		ClientLanguage::Typescript => &plan.typescript_out,
 		ClientLanguage::Dart => &plan.dart_out,
 		ClientLanguage::Rust => &plan.rust_out,
@@ -699,9 +735,9 @@ fn add_npx_renderer_package(command: &mut Command, renderer: ClientLanguage) {
 	command.arg("-p");
 
 	match renderer {
+		ClientLanguage::Cpi | ClientLanguage::Rust => command.arg("codama@1.10.1"),
 		ClientLanguage::Typescript => command.arg("@codama/renderers-js@2.3.1"),
 		ClientLanguage::Dart => command.arg("codama-renderers-dart@0.5.1"),
-		ClientLanguage::Rust => command.arg("codama@1.10.1"),
 	};
 }
 
@@ -709,9 +745,9 @@ fn add_pnpm_renderer_package(command: &mut Command, renderer: ClientLanguage) {
 	command.arg("--package");
 
 	match renderer {
+		ClientLanguage::Cpi | ClientLanguage::Rust => command.arg("codama@1.10.1"),
 		ClientLanguage::Typescript => command.arg("@codama/renderers-js@2.3.1"),
 		ClientLanguage::Dart => command.arg("codama-renderers-dart@0.5.1"),
-		ClientLanguage::Rust => command.arg("codama@1.10.1"),
 	};
 }
 
@@ -737,6 +773,7 @@ mod tests {
 			override_idl_names: false,
 			idls_dir: PathBuf::from("idl"),
 			rust_out: PathBuf::from("rust"),
+			cpi_out: PathBuf::from("cpi"),
 			typescript_out: PathBuf::from("typescript"),
 			dart_out: PathBuf::from("dart"),
 			clients: BTreeSet::new(),
@@ -857,9 +894,11 @@ mod tests {
 			override_idl_names: false,
 			idls_dir: PathBuf::from("idl"),
 			rust_out: PathBuf::from("rust"),
+			cpi_out: PathBuf::from("cpi"),
 			typescript_out: PathBuf::from("typescript"),
 			dart_out: PathBuf::from("dart"),
 			clients: [
+				ClientLanguage::Cpi,
 				ClientLanguage::Rust,
 				ClientLanguage::Typescript,
 				ClientLanguage::Dart,
@@ -873,9 +912,14 @@ mod tests {
 			selected_output_dirs(&plan),
 			vec![
 				Path::new("rust"),
+				Path::new("cpi"),
 				Path::new("typescript"),
 				Path::new("dart")
 			]
+		);
+		assert_eq!(
+			renderer_output(&plan, ClientLanguage::Cpi),
+			Path::new("cpi")
 		);
 		assert_eq!(
 			renderer_output(&plan, ClientLanguage::Rust),
@@ -929,6 +973,7 @@ mod tests {
 	#[test]
 	fn renderer_command_helpers_cover_each_language() {
 		for language in [
+			ClientLanguage::Cpi,
 			ClientLanguage::Rust,
 			ClientLanguage::Typescript,
 			ClientLanguage::Dart,
@@ -953,6 +998,19 @@ mod tests {
 			),
 			Err(CodamaError::NoPrograms)
 		));
+	}
+
+	#[test]
+	fn cpi_renderer_failures_preserve_the_output_path() {
+		let output = Path::new("clients/cpi");
+		let error = render_cpi_client(
+			Path::new("missing-cpi-idl.json"),
+			output,
+			&CpiRenderConfig::default(),
+		)
+		.expect_err("missing IDL should fail");
+
+		assert!(matches!(error, CodamaError::RenderCpi { path, .. } if path == output));
 	}
 
 	#[test]

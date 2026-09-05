@@ -36,6 +36,7 @@ The shortcut runs `cargo run -p pina_cli -- ...` against the checked-out source.
 | [`pina build`](./build.md)                     | Build SBF, optionally with deterministic verification inputs | SBF, IDL, and optional build-record files |
 | [`pina verify`](./verify.md)                   | Compare deployments and record verified source               | Status or transaction                     |
 | [`pina generate`](./generate.md)               | Generate configured client ecosystems                        | Generated clients                         |
+| [`pina cpi`](./cpi.md)                         | Generate a standalone Pina CPI crate from an IDL             | Rust crate                                |
 | [`pina test`](./test.md)                       | Run native/Mollusk or SBF/Surfpool tests                     | Test runner output                        |
 | [`pina dev`](./dev.md)                         | Start an offline Surfpool watch/redeploy loop                | Surfpool UI and logs                      |
 | [`pina idl`](./idl.md)                         | Extract a Codama root-node IDL                               | JSON                                      |
@@ -60,6 +61,7 @@ pina verify record --help
 pina verify submit --help
 pina verify status --help
 pina generate --help
+pina cpi --help
 pina idl --help
 pina docs --help
 pina init --help
@@ -87,6 +89,7 @@ Long help includes the input contract, output behavior, defaults, and copyable e
 | `verify check`    | Matching hash                     | Mismatch hashes and errors          |
 | `verify record`   | Upstream streamed progress        | Upstream diagnostics and errors     |
 | `generate`        | IDL and client summary            | Renderer output and errors          |
+| `cpi`             | Generated crate summary           | Conversion and renderer errors      |
 | `test`            | Child test-runner output          | Build output and errors             |
 | `dev`             | Surfpool UI and logs              | Build output and errors             |
 | `keys`            | Identity report or change summary | Errors                              |

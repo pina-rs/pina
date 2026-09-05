@@ -5801,6 +5801,7 @@ dependencies = [
  "object 0.40.0",
  "owo-colors",
  "pina_codama_renderer",
+ "pina_cpi_renderer",
  "pina_profile",
  "proc-macro2",
  "quote",

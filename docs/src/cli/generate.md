@@ -8,25 +8,27 @@ Refresh the current program's IDL and generate selected client ecosystems.
 pina generate [OPTIONS]
 ```
 
-| Input                 | Default           | Meaning                                      |
-| --------------------- | ----------------- | -------------------------------------------- |
-| `-p, --project <DIR>` | current directory | Start directory for project discovery.       |
-| `--client <LANGUAGE>` | `pina.toml`       | `rust`, `typescript`, or `dart`; repeatable. |
-| `-o, --output <DIR>`  | configured output | Override the client output root.             |
-| `--npx <COMMAND>`     | `npx`             | Codama runner for TypeScript or Dart.        |
+| Input                 | Default           | Meaning                                             |
+| --------------------- | ----------------- | --------------------------------------------------- |
+| `-p, --project <DIR>` | current directory | Start directory for project discovery.              |
+| `--client <LANGUAGE>` | `pina.toml`       | `cpi`, `rust`, `typescript`, or `dart`; repeatable. |
+| `-o, --output <DIR>`  | configured output | Override the client output root.                    |
+| `--npx <COMMAND>`     | `npx`             | Codama runner for TypeScript or Dart.               |
 
 ```bash
 pina generate
 pina generate --client rust
+pina generate --client cpi
 pina generate --client typescript --client dart
 ```
 
-Repeating a language is harmless. Explicit `--client` values replace the configured list for that invocation. Rust-only generation does not invoke Node.js.
+Repeating a language is harmless. Explicit `--client` values replace the configured list for that invocation. CPI-only and Rust-only generation do not invoke Node.js.
 
 Outputs are grouped by ecosystem:
 
 ```text
 clients/
+├── cpi/<library-name>/
 ├── rust/<library-name>/
 ├── typescript/<library-name>/
 └── dart/

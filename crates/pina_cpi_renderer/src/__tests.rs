@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -139,7 +140,10 @@ fn renders_vesting_fixture_to_disk() {
 
 	let lib_rs = fs::read_to_string(crate_dir.join("src/lib.rs"))
 		.unwrap_or_else(|error| panic!("reads: {error}"));
-	assert_eq!(lib_rs, "pub mod generated;\npub use generated::*;\n");
+	assert_eq!(
+		lib_rs,
+		"#![no_std]\n\npub mod generated;\npub use generated::*;\n"
+	);
 
 	// Re-rendering must succeed against the managed generated directory.
 	render_root_node(&root, &crate_dir, &RenderConfig::default())
@@ -180,6 +184,14 @@ fn refuses_a_directory_not_created_by_this_renderer() {
 	let crate_dir = unique_temp_dir("pina-cpi-renderer-foreign");
 	let generated = crate_dir.join("src/generated");
 	fs::create_dir_all(&generated).unwrap_or_else(|error| panic!("creates: {error}"));
+	fs::write(generated.join("foreign.rs"), "// not ours\n")
+		.unwrap_or_else(|error| panic!("writes: {error}"));
+
+	let error = render_root_node(&root, &crate_dir, &RenderConfig::default()).expect_err("refuses");
+	assert!(error.to_string().contains("not created by this renderer"));
+
+	fs::remove_dir_all(&generated).unwrap_or_else(|error| panic!("resets: {error}"));
+	fs::create_dir_all(&generated).unwrap_or_else(|error| panic!("recreates: {error}"));
 	fs::write(generated.join("mod.rs"), "// not ours\n")
 		.unwrap_or_else(|error| panic!("writes: {error}"));
 
@@ -248,7 +260,7 @@ fn renders_non_omitted_arguments_only() {
 }
 
 #[test]
-fn refuses_non_constant_discriminators() {
+fn refuses_field_discriminators_without_a_matching_argument() {
 	let program = program_node(
 		"broken",
 		"11111111111111111111111111111111",
@@ -260,7 +272,39 @@ fn refuses_non_constant_discriminators() {
 		)],
 	);
 	let error = render_program_to_files(&RootNode::new(program)).expect_err("refuses");
-	assert!(error.to_string().contains("missing required discriminator"));
+	assert!(error.to_string().contains("has no matching argument"));
+}
+
+#[test]
+fn renders_anchor_field_discriminators() {
+	let mut discriminator = InstructionArgumentNode::new(
+		"discriminator",
+		codama_nodes::FixedSizeTypeNode::new(codama_nodes::BytesTypeNode {}, 8),
+	);
+	discriminator.default_value_strategy = Some(codama_nodes::DefaultValueStrategy::Omitted);
+	discriminator.default_value = Box::new(Some(
+		BytesValueNode::new(BytesEncoding::Base16, "afaf6d1f0d989bed").into(),
+	));
+	let program = program_node(
+		"anchorCounter",
+		"11111111111111111111111111111111",
+		vec![instruction_node(
+			"initialize",
+			DiscriminatorNode::Field(codama_nodes::FieldDiscriminatorNode::new(
+				"discriminator",
+				0,
+			)),
+			vec![],
+			vec![discriminator],
+		)],
+	);
+	let page = render_instruction_page(&program.instructions[0])
+		.unwrap_or_else(|error| panic!("renders: {error}"));
+
+	assert!(page.contains(
+		"const INITIALIZE_DISCRIMINATOR: [u8; 8] = [175, 175, 109, 31, 13, 152, 155, 237];"
+	));
+	assert!(!page.contains("pub discriminator:"));
 }
 
 #[test]
@@ -283,7 +327,7 @@ fn renders_byte_array_arguments() {
 
 	assert!(page.contains("pub digest: [u8; 32]"));
 	assert!(page.contains("const SEAL_DISCRIMINATOR: [u8; 1] = [3];"));
-	assert!(page.contains("pub struct Seal<'a>"));
+	assert!(page.contains("pub struct Seal {"));
 }
 
 #[test]
@@ -309,7 +353,7 @@ fn renders_base16_discriminators() {
 
 	assert!(page.contains("const OPEN_DISCRIMINATOR: [u8; 4] = [222, 173, 190, 239];"));
 	assert!(page.contains("[0u8; 4]"));
-	assert!(page.contains("pub struct Open<'a>"));
+	assert!(page.contains("pub struct Open {"));
 }
 
 #[test]
@@ -320,7 +364,10 @@ fn renders_public_key_bool_and_number_arguments() {
 		vec![instruction_node(
 			"enroll",
 			numeric_discriminator(7),
-			vec![InstructionAccountNode::new("member", true, true)],
+			vec![
+				InstructionAccountNode::new("member", true, true),
+				InstructionAccountNode::new("authority", false, true),
+			],
 			vec![
 				InstructionArgumentNode::new("sponsor", PublicKeyTypeNode {}),
 				InstructionArgumentNode::new("active", BooleanTypeNode::default()),
@@ -334,8 +381,12 @@ fn renders_public_key_bool_and_number_arguments() {
 	assert!(page.contains("pub sponsor: Address,"));
 	assert!(page.contains("pub active: bool,"));
 	assert!(page.contains("pub stake: u64,"));
-	assert!(page.contains("pub member: &'a AccountView,"));
-	assert!(page.contains("InstructionAccount::new(self.member.address(), true, true)"));
+	assert!(page.contains("pub member: CpiHandle<'a>,"));
+	assert!(page.contains("member: CpiHandle::writable_signer(member)?"));
+	assert!(page.contains("authority: CpiHandle::readonly_signer(authority)"));
+	assert!(page.contains("pub fn invoke(&self, program: &ProgramAccount<'_>)"));
+	assert!(page.contains("pub fn invoke_signed("));
+	assert!(page.contains("context.invoke_signed(&data, signers)"));
 	assert!(page.contains("[0u8; 42]"));
 }
 
@@ -364,7 +415,7 @@ fn renders_fixed_size_byte_arguments() {
 
 #[test]
 fn renders_program_id_constants() {
-	let root = RootNode::new(program_node(
+	let mut root = RootNode::new(program_node(
 		"registry",
 		"Bp6AJD3QQ64kZVfc1YnhP7GN5UBYEHsDXpGUc1xzg4op",
 		vec![instruction_node(
@@ -374,9 +425,173 @@ fn renders_program_id_constants() {
 			vec![],
 		)],
 	));
+	root.program.docs = vec!["Primary registry".to_string()].into();
+	root.additional_programs.push(program_node(
+		"helper",
+		"11111111111111111111111111111111",
+		vec![],
+	));
 	let files = render_program_to_files(&root).unwrap_or_else(|error| panic!("renders: {error}"));
 	let programs_rs = &files[&PathBuf::from("programs.rs")];
 
 	assert!(programs_rs.contains("pub const REGISTRY_ID: Address ="));
 	assert!(programs_rs.contains("Bp6AJD3QQ64kZVfc1YnhP7GN5UBYEHsDXpGUc1xzg4op"));
+	assert!(programs_rs.contains("/// Primary registry"));
+	assert!(programs_rs.contains("pub const HELPER_ID: Address ="));
+}
+
+#[test]
+fn public_entrypoints_cover_files_programs_and_parse_errors() {
+	let root = load_fixture_root("vesting_program");
+	let crate_dir = unique_temp_dir("pina-cpi-renderer-entrypoints");
+	render_idl_file(
+		&repo_root().join("codama/idls/vesting_program.json"),
+		&crate_dir,
+		&RenderConfig::default(),
+	)
+	.unwrap_or_else(|error| panic!("IDL should render: {error}"));
+
+	let program_dir = unique_temp_dir("pina-cpi-renderer-program");
+	render_program(&root.program, &program_dir, &RenderConfig::default())
+		.unwrap_or_else(|error| panic!("program should render: {error}"));
+
+	let empty = RootNode::new(program_node(
+		"empty",
+		"11111111111111111111111111111111",
+		vec![],
+	));
+	let files = render_program_to_files(&empty)
+		.unwrap_or_else(|error| panic!("empty program should render: {error}"));
+	assert!(!files.contains_key(Path::new("instructions/mod.rs")));
+
+	let missing = unique_temp_dir("pina-cpi-renderer-missing");
+	assert!(matches!(
+		read_root_node(&missing),
+		Err(RenderError::ReadFile { .. })
+	));
+	let malformed = unique_temp_dir("pina-cpi-renderer-malformed");
+	fs::write(&malformed, "{").unwrap_or_else(|error| panic!("writes malformed IDL: {error}"));
+	assert!(matches!(
+		read_root_node(&malformed),
+		Err(RenderError::ParseIdl { .. })
+	));
+
+	for path in [crate_dir, program_dir] {
+		fs::remove_dir_all(path).unwrap_or_else(|error| panic!("cleans output: {error}"));
+	}
+	fs::remove_file(malformed).unwrap_or_else(|error| panic!("cleans malformed IDL: {error}"));
+}
+
+#[cfg(unix)]
+#[test]
+fn output_validation_rejects_unsafe_and_unreadable_paths() {
+	use std::os::unix::fs::symlink;
+
+	let crate_dir = unique_temp_dir("pina-cpi-renderer-paths");
+	fs::create_dir_all(&crate_dir).unwrap_or_else(|error| panic!("creates temp dir: {error}"));
+
+	for generated in [
+		Path::new(""),
+		Path::new("../generated"),
+		Path::new("/generated"),
+	] {
+		assert!(matches!(
+			validate_generated_dir(&crate_dir, generated),
+			Err(RenderError::UnsafeOutputPath { .. })
+		));
+	}
+	assert!(matches!(
+		validate_generated_dir(&crate_dir, Path::new(&"x".repeat(300))),
+		Err(RenderError::ReadFile { .. })
+	));
+
+	let linked = crate_dir.join("linked");
+	symlink(crate_dir.join("missing-target"), &linked)
+		.unwrap_or_else(|error| panic!("creates symlink: {error}"));
+	assert!(matches!(
+		validate_generated_dir(&crate_dir, Path::new("linked/generated")),
+		Err(RenderError::UnsafeOutputPath { .. })
+	));
+
+	let file = crate_dir.join("file");
+	fs::write(&file, "not a directory").unwrap_or_else(|error| panic!("writes file: {error}"));
+	assert!(matches!(
+		validate_existing_generated_dir(&file, false),
+		Err(RenderError::UnsafeOutputPath { .. })
+	));
+	assert!(matches!(
+		validate_existing_generated_dir(&crate_dir.join("x".repeat(300)), false),
+		Err(RenderError::ReadFile { .. })
+	));
+	assert!(matches!(
+		validate_tree_has_no_symlinks(&file),
+		Err(RenderError::ReadFile { .. })
+	));
+	let tree = crate_dir.join("tree");
+	fs::create_dir_all(&tree).unwrap_or_else(|error| panic!("creates tree: {error}"));
+	let regular_tree = crate_dir.join("regular-tree/nested");
+	fs::create_dir_all(&regular_tree)
+		.unwrap_or_else(|error| panic!("creates regular tree: {error}"));
+	fs::write(regular_tree.join("file.rs"), "source")
+		.unwrap_or_else(|error| panic!("writes regular tree: {error}"));
+	validate_tree_has_no_symlinks(&crate_dir.join("regular-tree"))
+		.unwrap_or_else(|error| panic!("regular tree should validate: {error}"));
+	symlink(crate_dir.join("missing-target"), tree.join("link"))
+		.unwrap_or_else(|error| panic!("creates tree symlink: {error}"));
+	assert!(matches!(
+		validate_tree_has_no_symlinks(&tree),
+		Err(RenderError::UnsafeOutputPath { .. })
+	));
+
+	fs::remove_dir_all(crate_dir).unwrap_or_else(|error| panic!("cleans paths: {error}"));
+}
+
+#[test]
+fn generated_source_and_io_error_helpers_preserve_context() {
+	let mut files = BTreeMap::new();
+	files.insert(PathBuf::from("invalid.rs"), "pub fn".to_string());
+	assert!(matches!(
+		validate_generated_sources(&files),
+		Err(RenderError::InvalidGeneratedSource { .. })
+	));
+	assert!(matches!(
+		read_file_error(Path::new("read"), std::io::Error::other("failure")),
+		RenderError::ReadFile { .. }
+	));
+	assert!(matches!(
+		write_file_error(Path::new("write"), std::io::Error::other("failure")),
+		RenderError::WriteFile { .. }
+	));
+}
+
+#[test]
+fn scaffold_reports_each_filesystem_failure() {
+	let temp = unique_temp_dir("pina-cpi-renderer-scaffold-errors");
+	fs::create_dir_all(&temp).unwrap_or_else(|error| panic!("creates temp dir: {error}"));
+
+	let blocked_crate = temp.join("blocked-crate");
+	fs::write(&blocked_crate, "file").unwrap_or_else(|error| panic!("writes blocker: {error}"));
+	assert!(matches!(
+		ensure_crate_scaffold(&blocked_crate, "blocked"),
+		Err(RenderError::WriteFile { .. })
+	));
+
+	let mut files = BTreeMap::new();
+	files.insert(PathBuf::from("nested/file.rs"), "source".to_string());
+	let blocked_base = temp.join("blocked-base");
+	fs::write(&blocked_base, "file").unwrap_or_else(|error| panic!("writes base blocker: {error}"));
+	assert!(matches!(
+		write_files(&blocked_base, &files),
+		Err(RenderError::WriteFile { .. })
+	));
+
+	let blocked_write = temp.join("blocked-write");
+	fs::create_dir_all(blocked_write.join("nested/file.rs"))
+		.unwrap_or_else(|error| panic!("creates write blocker: {error}"));
+	assert!(matches!(
+		write_files(&blocked_write, &files),
+		Err(RenderError::WriteFile { .. })
+	));
+
+	fs::remove_dir_all(temp).unwrap_or_else(|error| panic!("cleans scaffold errors: {error}"));
 }

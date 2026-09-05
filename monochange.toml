@@ -124,6 +124,10 @@ timeout_seconds = 900
 path = "packages/nodes-from-pina"
 type = "npm"
 
+[package.pina_codama_renderer_cpi]
+path = "packages/codama-renderer-cpi"
+type = "npm"
+
 [package.pina_cli_npm]
 path = "packages/pina__cli"
 type = "npm"
@@ -180,6 +184,7 @@ packages = [
 	"pina_sdk_ids",
 	"pina_test",
 	"pina_codama_nodes",
+	"pina_codama_renderer_cpi",
 	"pina_cli_npm",
 	"pina_cli_darwin_arm64",
 	"pina_cli_darwin_x64",

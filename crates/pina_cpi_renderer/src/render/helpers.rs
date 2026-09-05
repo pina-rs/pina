@@ -131,3 +131,45 @@ pub(crate) fn decode_base16(data: &str, context: &str) -> Result<Vec<u8>> {
 
 	Ok(bytes)
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn renders_multiline_documentation() {
+		assert_eq!(
+			render_docs(&["first\r\nsecond".to_string()], 1),
+			["\t/// first", "\t/// second"]
+		);
+	}
+
+	#[test]
+	fn validates_public_keys_and_unsigned_numbers() {
+		assert_eq!(
+			canonical_pubkey("11111111111111111111111111111111", "test")
+				.unwrap_or_else(|error| panic!("key should be valid: {error}")),
+			"11111111111111111111111111111111"
+		);
+		assert!(canonical_pubkey("invalid", "test").is_err());
+		assert_eq!(
+			cast_unsigned(&Number::SignedInteger(7), 7, "test")
+				.unwrap_or_else(|error| panic!("positive integer should cast: {error}")),
+			7
+		);
+		assert!(cast_unsigned(&Number::SignedInteger(-1), u128::MAX, "test").is_err());
+		assert!(cast_unsigned(&Number::Float(1.0), u128::MAX, "test").is_err());
+		assert!(cast_unsigned(&Number::UnsignedInteger(2), 1, "test").is_err());
+	}
+
+	#[test]
+	fn decodes_and_rejects_base16_values() {
+		assert_eq!(
+			decode_base16("0x00ff", "test")
+				.unwrap_or_else(|error| panic!("hex should decode: {error}")),
+			[0, 255]
+		);
+		assert!(decode_base16("abc", "test").is_err());
+		assert!(decode_base16("zz", "test").is_err());
+	}
+}

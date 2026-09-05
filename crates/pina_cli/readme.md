@@ -61,9 +61,16 @@ Generate the clients selected in `pina.toml`, or override them for one invocatio
 ```bash
 pina generate
 pina generate --client rust --client typescript
+pina generate --client cpi
 ```
 
-Rust-only generation does not require Node.js.
+CPI-only and Rust-only generation do not require Node.js.
+
+Generate a standalone Pina CPI crate from any Codama or Anchor IDL:
+
+```bash
+pina cpi --idl ./idl.json --output ./clients/program-cpi
+```
 
 ### `pina verify`
 

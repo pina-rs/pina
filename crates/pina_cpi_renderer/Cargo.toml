@@ -7,7 +7,7 @@ keywords.workspace = true
 license.workspace = true
 publish = true
 repository.workspace = true
-description = "Codama Rust renderer that generates Pinocchio CPI clients from Anchor and Codama IDLs"
+description = "Codama Rust renderer that generates standalone Pina CPI clients"
 
 [dependencies]
 codama-nodes = { workspace = true, default-features = true }
