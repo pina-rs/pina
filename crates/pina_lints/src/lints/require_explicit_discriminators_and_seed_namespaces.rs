@@ -21,7 +21,7 @@ crate::declare_late_lint! {
 	/// ### Example
 	///
 	/// ```ignore
-	/// const CONFIG_SEED: &[u8] = b"config";
+	/// const SEED_CONFIG: &[u8] = b"config";
 	/// ```
 	pub REQUIRE_EXPLICIT_DISCRIMINATORS_AND_SEED_NAMESPACES,
 	Warn,
@@ -55,9 +55,9 @@ impl<'tcx> LateLintPass<'tcx> for RequireExplicitDiscriminatorsAndSeedNamespaces
 
 		let facts = shared::collect_function_facts(cx, body);
 		let has_named_seed_constant = facts.paths.iter().any(|path| {
-			path.rsplit("::")
-				.next()
-				.is_some_and(|name| name == "SEED" || name.ends_with("_SEED"))
+			path.rsplit("::").next().is_some_and(|name| {
+				name == "SEED" || name.starts_with("SEED_") || name.ends_with("_SEED")
+			})
 		});
 		let uses_generated_seed_builder = facts.calls.iter().any(|call| {
 			call.is_type_relative

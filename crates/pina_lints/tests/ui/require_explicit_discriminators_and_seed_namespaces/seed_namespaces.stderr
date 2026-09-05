@@ -1,5 +1,5 @@
 warning: seed-based example code should use explicit byte-string namespaces and visible discriminator markers
-  --> $DIR/seed_namespaces.rs:44:2
+  --> $DIR/seed_namespaces.rs:50:2
    |
 LL |     account.assert_seeds(seeds);
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -8,7 +8,7 @@ LL |     account.assert_seeds(seeds);
    = note: `#[warn(require_explicit_discriminators_and_seed_namespaces)]` on by default
 
 warning: seed-based example code should use explicit byte-string namespaces and visible discriminator markers
-  --> $DIR/seed_namespaces.rs:50:2
+  --> $DIR/seed_namespaces.rs:56:2
    |
 LL |     assert_seeds(seeds);
    |     ^^^^^^^^^^^^^^^^^^^
