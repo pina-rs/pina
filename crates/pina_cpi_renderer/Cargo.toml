@@ -1,0 +1,24 @@
+[package]
+name = "pina_cpi_renderer"
+version = { workspace = true }
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+publish = true
+repository.workspace = true
+description = "Codama Rust renderer that generates Pinocchio CPI clients from Anchor and Codama IDLs"
+
+[dependencies]
+codama-nodes = { workspace = true, default-features = true }
+heck = { workspace = true, default-features = true }
+serde_json = { workspace = true, default-features = true }
+solana-pubkey = { workspace = true, default-features = true }
+syn = { workspace = true, default-features = true }
+thiserror = { workspace = true, default-features = true }
+
+[dev-dependencies]
+insta = { workspace = true, default-features = true }
+
+[lints]
+workspace = true
