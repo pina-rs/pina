@@ -28,10 +28,10 @@ pub const LEGACY_CONFIG_FILE_NAME: &str = "Pina.toml";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ClientLanguage {
-	Cpi,
 	Rust,
 	Typescript,
 	Dart,
+	Cpi,
 }
 
 impl ClientLanguage {
