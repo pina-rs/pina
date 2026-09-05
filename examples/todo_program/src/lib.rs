@@ -33,7 +33,7 @@ pub enum TodoAccount {
 }
 
 #[account(discriminator = TodoAccount)]
-#[pda(seeds = [TODO_SEED, owner: Address], bump = bump)]
+#[pda(seeds = [SEED_TODO, owner: Address], bump = bump)]
 pub struct TodoState {
 	pub owner: Address,
 	pub bump: u8,
@@ -56,7 +56,7 @@ pub struct UpdateDigestInstruction {
 }
 
 /// Seed prefix for todo PDAs.
-const TODO_SEED: &[u8] = b"todo";
+const SEED_TODO: &[u8] = b"todo";
 
 #[derive(Accounts, Debug)]
 pub struct InitializeAccounts<'a> {

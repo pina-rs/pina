@@ -113,7 +113,7 @@ pub enum ProfileError {
 /// | 239    | 1    | active (PodBool) |
 /// ```
 #[account(discriminator = ProfileAccountType)]
-#[pda(seeds = [PROFILE_SEED, authority: Address], bump = bump)]
+#[pda(seeds = [SEED_PROFILE, authority: Address], bump = bump)]
 pub struct ProfileState {
 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
 	pub bump: u8,
@@ -452,7 +452,7 @@ pub struct RemoveTagInstruction {
 // ---------------------------------------------------------------------------
 
 /// Seed prefix for profile PDAs.
-const PROFILE_SEED: &[u8] = b"profile";
+const SEED_PROFILE: &[u8] = b"profile";
 
 // ---------------------------------------------------------------------------
 // Accounts structs

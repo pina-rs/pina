@@ -6,8 +6,8 @@ use pina_test::Pubkey;
 use program_under_test::ID;
 use program_under_test::ReallocInstruction;
 
-/// Seed prefix for sample PDAs, mirroring `SAMPLE_SEED` in the program.
-const SAMPLE_SEED: &[u8] = b"sample";
+/// Seed prefix for sample PDAs, mirroring `SEED_SAMPLE` in the program.
+const SEED_SAMPLE: &[u8] = b"sample";
 
 /// The Sample header is 1 discriminator + 1 bump + 32 authority bytes.
 const SAMPLE_HEADER_LEN: usize = 34;
@@ -16,11 +16,11 @@ const SAMPLE_HEADER_LEN: usize = 34;
 const MAX_PERMITTED_DATA_INCREASE: u16 = 1024;
 
 fn pda_address(program_id: &Pubkey, authority: &Pubkey) -> Pubkey {
-	Pubkey::find_program_address(&[SAMPLE_SEED, authority.as_ref()], program_id).0
+	Pubkey::find_program_address(&[SEED_SAMPLE, authority.as_ref()], program_id).0
 }
 
 fn bump_for(program_id: &Pubkey, authority: &Pubkey) -> u8 {
-	Pubkey::try_find_program_address(&[SAMPLE_SEED, authority.as_ref()], program_id)
+	Pubkey::try_find_program_address(&[SEED_SAMPLE, authority.as_ref()], program_id)
 		.expect("canonical bump for the sample PDA")
 		.1
 }

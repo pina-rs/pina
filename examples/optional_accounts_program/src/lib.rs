@@ -61,7 +61,7 @@ pub enum OptionalAccountKind {
 ///
 /// Layout (10 bytes): 1 discriminator + 1 bump + 8 count.
 #[account(discriminator = OptionalAccountKind)]
-#[pda(seeds = [STORE_SEED, authority: Address], bump = bump)]
+#[pda(seeds = [SEED_STORE, authority: Address], bump = bump)]
 pub struct StoreState {
 	pub bump: u8,
 	pub count: u64,
@@ -90,7 +90,7 @@ pub struct NoteInstruction {}
 // Seeds
 // ---------------------------------------------------------------------------
 
-const STORE_SEED: &[u8] = b"store";
+const SEED_STORE: &[u8] = b"store";
 
 // ---------------------------------------------------------------------------
 // Accounts structs
@@ -341,7 +341,7 @@ mod tests {
 		let derived = StoreState::seeds(&authority);
 		let seeds = derived.as_slices();
 		assert_eq!(seeds.len(), 2);
-		assert_eq!(seeds[0], STORE_SEED);
+		assert_eq!(seeds[0], SEED_STORE);
 		assert_eq!(seeds[1], authority.as_ref());
 	}
 

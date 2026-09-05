@@ -22,8 +22,8 @@ const ATA_PROGRAM: &str = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
 const MINT_SPACE: u64 = 82;
 const DECIMALS: u8 = 6;
 const FUND: u64 = 1_000_000_000;
-const POOL_SEED: &[u8] = b"pool";
-const POSITION_SEED: &[u8] = b"position";
+const SEED_POOL: &[u8] = b"pool";
+const SEED_POSITION: &[u8] = b"position";
 const DEPOSIT: u64 = 1_500;
 const WITHDRAW: u64 = 500;
 
@@ -45,13 +45,13 @@ fn ata_of(wallet: &Pubkey, mint: &Pubkey) -> Pubkey {
 
 fn pool_pda(program_id: &Pubkey, stake_mint: &Pubkey, reward_mint: &Pubkey) -> (Pubkey, u8) {
 	Pubkey::find_program_address(
-		&[POOL_SEED, stake_mint.as_ref(), reward_mint.as_ref()],
+		&[SEED_POOL, stake_mint.as_ref(), reward_mint.as_ref()],
 		program_id,
 	)
 }
 
 fn position_pda(program_id: &Pubkey, pool: &Pubkey, owner: &Pubkey) -> (Pubkey, u8) {
-	Pubkey::find_program_address(&[POSITION_SEED, pool.as_ref(), owner.as_ref()], program_id)
+	Pubkey::find_program_address(&[SEED_POSITION, pool.as_ref(), owner.as_ref()], program_id)
 }
 
 fn rent_minimum(space: u64) -> u64 {

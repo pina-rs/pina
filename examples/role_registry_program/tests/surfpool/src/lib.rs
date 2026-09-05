@@ -7,16 +7,16 @@ use program_under_test::ID;
 use program_under_test::RegistryInstruction;
 
 /// Seed prefixes, mirroring the program's constants.
-const REGISTRY_SEED: &[u8] = b"registry";
-const ROLE_ENTRY_SEED: &[u8] = b"role-entry";
+const SEED_REGISTRY: &[u8] = b"registry";
+const SEED_ROLE_ENTRY: &[u8] = b"role-entry";
 
 fn registry_pda(program_id: &Pubkey, admin: &Pubkey) -> (Pubkey, u8) {
-	Pubkey::find_program_address(&[REGISTRY_SEED, admin.as_ref()], program_id)
+	Pubkey::find_program_address(&[SEED_REGISTRY, admin.as_ref()], program_id)
 }
 
 fn role_entry_pda(program_id: &Pubkey, registry: &Pubkey, role_id: u64) -> (Pubkey, u8) {
 	Pubkey::find_program_address(
-		&[ROLE_ENTRY_SEED, registry.as_ref(), &role_id.to_le_bytes()],
+		&[SEED_ROLE_ENTRY, registry.as_ref(), &role_id.to_le_bytes()],
 		program_id,
 	)
 }

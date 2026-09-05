@@ -22,7 +22,7 @@ const ATA_PROGRAM: &str = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
 const MINT_SPACE: u64 = 82;
 const DECIMALS: u8 = 6;
 const FUND: u64 = 1_000_000_000;
-const VESTING_SEED: &[u8] = b"vesting";
+const SEED_VESTING: &[u8] = b"vesting";
 const TOTAL: u64 = 1_000_000_000;
 const CLAIM_AMOUNT: u64 = 400_000_000;
 
@@ -50,7 +50,7 @@ fn vesting_pda(
 ) -> (Pubkey, u8) {
 	Pubkey::find_program_address(
 		&[
-			VESTING_SEED,
+			SEED_VESTING,
 			admin.as_ref(),
 			beneficiary.as_ref(),
 			mint.as_ref(),

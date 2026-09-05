@@ -84,7 +84,7 @@ pub enum RegistryAccountType {
 }
 
 #[account(discriminator = RegistryAccountType)]
-#[pda(seeds = [REGISTRY_SEED_PREFIX, admin: Address], bump = bump)]
+#[pda(seeds = [SEED_REGISTRY_PREFIX, admin: Address], bump = bump)]
 pub struct RegistryConfig {
 	pub admin: Address,
 	pub role_count: u64,
@@ -92,7 +92,7 @@ pub struct RegistryConfig {
 }
 
 #[account(discriminator = RegistryAccountType)]
-#[pda(seeds = [ROLE_ENTRY_SEED_PREFIX, registry: Address, role_id: u64], bump = bump)]
+#[pda(seeds = [SEED_ROLE_ENTRY_PREFIX, registry: Address, role_id: u64], bump = bump)]
 pub struct RoleEntry {
 	pub registry: Address,
 	pub role_id: u64,
@@ -163,10 +163,10 @@ pub struct RotateAdminAccounts<'a> {
 }
 
 /// Seed prefix for registry config PDAs.
-const REGISTRY_SEED_PREFIX: &[u8] = b"registry";
+const SEED_REGISTRY_PREFIX: &[u8] = b"registry";
 
 /// Seed prefix for role entry PDAs.
-const ROLE_ENTRY_SEED_PREFIX: &[u8] = b"role-entry";
+const SEED_ROLE_ENTRY_PREFIX: &[u8] = b"role-entry";
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {

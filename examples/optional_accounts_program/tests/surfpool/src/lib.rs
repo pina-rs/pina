@@ -6,15 +6,15 @@ use pina_test::Pubkey;
 use program_under_test::ID;
 use program_under_test::OptionalInstruction;
 
-/// Seed prefix for store PDAs, mirroring `STORE_SEED` in the program.
-const STORE_SEED: &[u8] = b"store";
+/// Seed prefix for store PDAs, mirroring `SEED_STORE` in the program.
+const SEED_STORE: &[u8] = b"store";
 
 fn pda_address(program_id: &Pubkey, authority: &Pubkey) -> Pubkey {
-	Pubkey::find_program_address(&[STORE_SEED, authority.as_ref()], program_id).0
+	Pubkey::find_program_address(&[SEED_STORE, authority.as_ref()], program_id).0
 }
 
 fn bump_for(program_id: &Pubkey, authority: &Pubkey) -> u8 {
-	Pubkey::try_find_program_address(&[STORE_SEED, authority.as_ref()], program_id)
+	Pubkey::try_find_program_address(&[SEED_STORE, authority.as_ref()], program_id)
 		.expect("canonical bump for the store PDA")
 		.1
 }

@@ -17,10 +17,10 @@ const TAGS_AT: usize = BIO_AT + 129;
 const ACTIVE_AT: usize = TAGS_AT + 66 + 9;
 
 /// Seed prefix for profile PDAs.
-const PROFILE_SEED: &[u8] = b"profile";
+const SEED_PROFILE: &[u8] = b"profile";
 
 fn pda_address(program_id: &Pubkey, authority: &Pubkey) -> (Pubkey, u8) {
-	Pubkey::find_program_address(&[PROFILE_SEED, authority.as_ref()], program_id)
+	Pubkey::find_program_address(&[SEED_PROFILE, authority.as_ref()], program_id)
 }
 
 /// Bounded text: 1 length byte + UTF-8 payload.
