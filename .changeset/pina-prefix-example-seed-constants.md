@@ -1,6 +1,8 @@
 ---
 pina: none
+pina_cli: none
 pina_lints: fix
+pina_macros: none
 ---
 
 # Prefix seed constants with SEED_
