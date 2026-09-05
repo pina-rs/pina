@@ -25,37 +25,35 @@ pub(crate) fn ensure_crate_scaffold(crate_dir: &Path, program_name: &str) -> Res
 	}
 
 	let cargo_toml_path = crate_dir.join("Cargo.toml");
-	if !cargo_toml_path.exists() {
-		let package_name = format!("{}-cpi", snake(program_name).replace('_', "-"));
-		let cargo_toml = [
-			"[package]".to_string(),
-			format!("name = \"{package_name}\""),
-			"version = \"0.0.0\"".to_string(),
-			"edition = \"2021\"".to_string(),
-			"publish = false".to_string(),
-			String::new(),
-			"[dependencies]".to_string(),
-			"pina = { version = \"0.12\", default-features = false }".to_string(),
-			String::new(),
-		]
-		.join("\n");
-		fs::write(&cargo_toml_path, cargo_toml)
-			.map_err(|source| write_file_error(&cargo_toml_path, source))?;
+	if cargo_toml_path.exists() {
+		return Ok(());
 	}
 
-	Ok(())
+	let package_name = format!("{}-cpi", snake(program_name).replace('_', "-"));
+	let cargo_toml = [
+		"[package]".to_string(),
+		format!("name = \"{package_name}\""),
+		"version = \"0.0.0\"".to_string(),
+		"edition = \"2021\"".to_string(),
+		"publish = false".to_string(),
+		String::new(),
+		"[dependencies]".to_string(),
+		"pina = { version = \"0.12\", default-features = false }".to_string(),
+		String::new(),
+	]
+	.join("\n");
+	fs::write(&cargo_toml_path, cargo_toml)
+		.map_err(|source| write_file_error(&cargo_toml_path, source))
 }
 
 /// Writes the generated file map, deleting a previous generated directory first.
 pub(crate) fn write_files(base: &Path, files: &BTreeMap<PathBuf, String>) -> Result<()> {
-	for (path, content) in files {
+	files.iter().try_for_each(|(path, content)| {
 		let full_path = base.join(path);
 		let parent = full_path.parent().unwrap_or(base);
 		fs::create_dir_all(parent).map_err(|source| write_file_error(parent, source))?;
-		fs::write(&full_path, content).map_err(|source| write_file_error(&full_path, source))?;
-	}
-
-	Ok(())
+		fs::write(&full_path, content).map_err(|source| write_file_error(&full_path, source))
+	})
 }
 
 fn write_file_error(path: &Path, source: std::io::Error) -> RenderError {

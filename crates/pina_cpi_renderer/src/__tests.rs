@@ -184,6 +184,10 @@ fn refuses_a_directory_not_created_by_this_renderer() {
 	let crate_dir = unique_temp_dir("pina-cpi-renderer-foreign");
 	let generated = crate_dir.join("src/generated");
 	fs::create_dir_all(&generated).unwrap_or_else(|error| panic!("creates: {error}"));
+	validate_existing_generated_dir(&generated, true)
+		.unwrap_or_else(|error| panic!("accepts an empty managed directory: {error}"));
+	validate_existing_generated_dir(&generated, false)
+		.unwrap_or_else(|error| panic!("accepts an ordinary empty directory: {error}"));
 	fs::write(generated.join("foreign.rs"), "// not ours\n")
 		.unwrap_or_else(|error| panic!("writes: {error}"));
 

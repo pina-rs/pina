@@ -189,7 +189,12 @@ fn validate_generated_dir(crate_dir: &Path, generated_folder: &Path) -> Result<P
 
 fn validate_generated_sources(files: &BTreeMap<PathBuf, String>) -> Result<()> {
 	for (path, source) in files {
-		syn::parse_file(source).map_err(|error| invalid_source_error(path, &error))?;
+		syn::parse_file(source).map_err(|error| {
+			RenderError::InvalidGeneratedSource {
+				path: path.clone(),
+				reason: error.to_string(),
+			}
+		})?;
 	}
 
 	Ok(())
@@ -279,12 +284,5 @@ fn parse_idl_error(path: &Path, source: serde_json::Error) -> RenderError {
 	RenderError::ParseIdl {
 		path: path.to_path_buf(),
 		source,
-	}
-}
-
-fn invalid_source_error(path: &Path, source: &syn::Error) -> RenderError {
-	RenderError::InvalidGeneratedSource {
-		path: path.to_path_buf(),
-		reason: source.to_string(),
 	}
 }
