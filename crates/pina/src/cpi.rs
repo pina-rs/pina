@@ -1451,12 +1451,14 @@ mod tests {
 	use crate::ZeroPodFixed;
 	use crate::ZeroPodSchema;
 
+	#[cfg(all(feature = "account-resize", feature = "derive"))]
 	mod compact_cpi_state {
 		include!(concat!(
 			env!("CARGO_MANIFEST_DIR"),
 			"/tests/support/compact_cpi_state.rs"
 		));
 	}
+	#[cfg(all(feature = "account-resize", feature = "derive"))]
 	use compact_cpi_state::TestCompactState;
 
 	struct TestState;
@@ -1616,7 +1618,7 @@ mod tests {
 		assert_eq!(result, (address, bump));
 	}
 
-	#[cfg(feature = "account-resize")]
+	#[cfg(all(feature = "account-resize", feature = "derive"))]
 	#[test]
 	fn compact_pda_builder_executes_with_calculated_rent() {
 		let owner = Address::new_from_array([9; 32]);
