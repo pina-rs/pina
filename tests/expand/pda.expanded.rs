@@ -1,5 +1,5 @@
 use pina::*;
-const COUNTER_SEED: &[u8] = b"counter";
+const SEED_COUNTER: &[u8] = b"counter";
 #[repr(u8)]
 #[non_exhaustive]
 pub enum PdaDisc {
@@ -299,7 +299,7 @@ impl CounterState {
 impl<'a> CounterStateSeeds<'a> {
     /// The seeds as byte slices, without the bump seed.
     pub fn as_slices(&self) -> [&[u8]; 2usize] {
-        [COUNTER_SEED, self.authority.as_ref()]
+        [SEED_COUNTER, self.authority.as_ref()]
     }
     /// Append the bump seed to the seeds.
     pub fn with_bump(&self, bump: u8) -> CounterStateSeedsWithBump<'a> {
@@ -312,7 +312,7 @@ impl<'a> CounterStateSeeds<'a> {
 impl<'a> CounterStateSeedsWithBump<'a> {
     /// The seeds as byte slices, including the bump seed.
     pub fn as_slices(&self) -> [&[u8]; 3usize] {
-        [COUNTER_SEED, self.inner.authority.as_ref(), &self._bump]
+        [SEED_COUNTER, self.inner.authority.as_ref(), &self._bump]
     }
     /// The seeds as Pinocchio CPI seed values, including the bump seed.
     pub fn as_seed_array(&self) -> [pina::Seed<'_>; 3usize] {

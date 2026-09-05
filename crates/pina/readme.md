@@ -113,7 +113,7 @@ fn process_instruction(
 
 ```rust
 #[account(discriminator = CounterAccountType)]
-#[pda(seeds = [COUNTER_SEED, authority: Address], bump = bump)]
+#[pda(seeds = [SEED_COUNTER, authority: Address], bump = bump)]
 pub struct CounterState {
 	pub bump: u8,
 	pub count: u64,

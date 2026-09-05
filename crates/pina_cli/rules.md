@@ -80,7 +80,7 @@ For reliable PDA extraction:
 - Use byte-string constants:
 
 ```rust
-const COUNTER_SEED: &[u8] = b"counter";
+const SEED_COUNTER: &[u8] = b"counter";
 ```
 
 - Use `macro_rules!` names that contain `seeds`. Good examples:
