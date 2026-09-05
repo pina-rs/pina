@@ -199,13 +199,14 @@ in
           --examples-dir "$DEVENV_ROOT/examples" \
           --idls-dir "$DEVENV_ROOT/codama/idls" \
           --rust-out "$DEVENV_ROOT/codama/clients/rust" \
+          --cpi-out "$DEVENV_ROOT/codama/clients/cpi" \
           --js-out "$DEVENV_ROOT/codama/clients/js" \
           --dart-out "$DEVENV_ROOT/codama/clients/dart" \
           --npx node
         dprint fmt "codama/**"
         dart format "$DEVENV_ROOT/codama/clients/dart"
       '';
-      description = "Generate Codama IDLs and Rust/JS/Dart clients for all examples.";
+      description = "Generate Codama IDLs and Rust/CPI/JS/Dart clients for all examples.";
       binary = "bash";
     };
     "codama:test" = {

@@ -116,20 +116,22 @@ pub(crate) fn run(cli: Cli) {
 					examples_dir,
 					idls_dir,
 					rust_out,
+					cpi_out,
 					js_out,
 					dart_out,
 					examples,
 					npx,
 				} => {
-					run_codama_generate(
+					run_codama_generate(&pina_cli::CodamaGenerateOptions {
 						examples_dir,
 						idls_dir,
 						rust_out,
+						cpi_out,
 						js_out,
 						dart_out,
 						examples,
 						npx,
-					);
+					});
 				}
 			}
 		}
@@ -923,26 +925,8 @@ fn run_profile(explicit_path: Option<&Path>, project: &Path, json: bool, output:
 	));
 }
 
-fn run_codama_generate(
-	examples_dir: PathBuf,
-	idls_dir: PathBuf,
-	rust_out: PathBuf,
-	js_out: PathBuf,
-	dart_out: PathBuf,
-	examples: Vec<String>,
-	npx: String,
-) {
-	let options = pina_cli::CodamaGenerateOptions {
-		examples_dir,
-		idls_dir,
-		rust_out,
-		js_out,
-		dart_out,
-		examples,
-		npx,
-	};
-
-	let generated_examples = match pina_cli::generate_codama(&options) {
+fn run_codama_generate(options: &pina_cli::CodamaGenerateOptions) {
+	let generated_examples = match pina_cli::generate_codama(options) {
 		Ok(examples) => examples,
 		Err(err) => {
 			eprintln!("{} {}", "Error".red().bold(), err);
@@ -951,7 +935,7 @@ fn run_codama_generate(
 	};
 
 	println!(
-		"{} Generated Codama IDLs and Rust/JavaScript/Dart clients for {} example(s): {}",
+		"{} Generated Codama IDLs and Rust/CPI/JavaScript/Dart clients for {} example(s): {}",
 		"✔".green(),
 		generated_examples.len(),
 		generated_examples.join(", "),

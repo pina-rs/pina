@@ -1002,15 +1002,20 @@ fn generate_rust_override_skips_node_and_deduplicates_clients() {
 }
 
 #[test]
-fn generate_cpi_override_creates_a_standalone_pina_crate() {
+fn generate_uses_pina_toml_to_create_a_standalone_cpi_crate() {
 	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 	let project = temp.path().join("project");
 	let target = temp.path().join("custom-target");
 	write_project(&project);
+	fs::write(
+		project.join("pina.toml"),
+		"[project]\nprogram = \".\"\n\n[clients]\noutput = \"clients\"\nlanguages = [\"cpi\"]\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to select CPI in pina.toml: {error}"));
 	let cargo = fake_cargo(temp.path());
 
 	let output = project_command(&project, &cargo, &target)
-		.args(["generate", "--client", "cpi"])
+		.arg("generate")
 		.output()
 		.unwrap_or_else(|error| panic!("failed to run CPI generation: {error}"));
 
@@ -1027,6 +1032,9 @@ fn generate_cpi_override_creates_a_standalone_pina_crate() {
 			.unwrap_or_else(|error| panic!("failed to read CPI instruction: {error}"));
 	assert!(manifest.contains("name = \"custom-program-cpi\""));
 	assert!(manifest.contains("pina ="));
+	assert!(instruction.contains("pub struct Initialize<'account>"));
+	assert!(instruction.contains("pub instruction: InitializeInstruction"));
+	assert!(instruction.contains("pub struct InitializeInstruction"));
 	assert!(instruction.contains("pub fn invoke(&self, program: &ProgramAccount<'_>)"));
 	assert!(instruction.contains("pub fn invoke_signed("));
 	assert!(!project.join("clients/rust").exists());

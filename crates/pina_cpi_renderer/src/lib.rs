@@ -2,14 +2,15 @@
 //!
 //! Point the renderer at a Codama root node — the output of `@codama/nodes-from-anchor`
 //! for Anchor IDLs, or `pina generate` for Pina programs — and it renders a
-//! standalone, `no_std` CPI crate: one builder per instruction, each owning its
-//! discriminator bytes, argument encoding, and account metadata. Generated
-//! builders expose Pina-native `invoke` and `invoke_signed` methods.
+//! standalone, `no_std` CPI crate: one call struct per instruction with direct
+//! account references and a typed instruction-data struct. Generated builders
+//! expose Pina-native `invoke` and `invoke_signed` methods.
 //!
-//! The renderer refuses rather than guess: optional accounts, optional
-//! signers, optional arguments, non-little-endian numbers, and unsupported
-//! argument or discriminator types are rejected with errors naming the exact
-//! node, instead of generating instruction data that would never dispatch.
+//! Program-ID placeholder optional accounts and runtime-selected signers are
+//! represented directly in the generated API. The renderer refuses rather
+//! than guess for omitted optional accounts, optional arguments,
+//! non-little-endian numbers, and unsupported argument or discriminator types,
+//! with errors naming the exact node.
 //! Accounts the IDL derives from PDA seeds stay ordinary builder fields — at
 //! CPI time the caller passes the derived account explicitly anyway, because
 //! the runtime resolves CPI accounts against the executing program's own

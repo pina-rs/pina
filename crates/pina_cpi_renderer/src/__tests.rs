@@ -206,26 +206,53 @@ fn refuses_a_directory_not_created_by_this_renderer() {
 }
 
 #[test]
-fn refuses_optional_accounts() {
+fn renders_program_id_optional_accounts() {
 	let mut root = load_fixture_root("vesting_program");
 	root.program.instructions[0].accounts[0].is_optional = Some(true);
-	let error = render_program_to_files(&root).expect_err("refuses");
-	assert!(
-		error
-			.to_string()
-			.contains("optional accounts are not supported")
-	);
+	root.program.instructions[0].optional_account_strategy =
+		Some(codama_nodes::OptionalAccountStrategy::ProgramId);
+	let page = render_instruction_page(&root.program.instructions[0])
+		.unwrap_or_else(|error| panic!("renders optional account: {error}"));
+
+	assert!(page.contains("pub admin: Option<&'account AccountView>,"));
+	assert!(page.contains("Some(account) => CpiHandle::writable_signer(account)?"));
+	assert!(page.contains("None => CpiHandle::readonly(program.account())"));
 }
 
 #[test]
-fn refuses_optional_signers() {
+fn renders_runtime_signer_selection() {
 	let mut root = load_fixture_root("vesting_program");
 	root.program.instructions[0].accounts[0].is_signer = IsSigner::Either;
-	let error = render_program_to_files(&root).expect_err("refuses");
+	let mut witness = InstructionAccountNode::new("witness", false, IsSigner::Either);
+	witness.is_optional = Some(true);
+	witness.docs = vec!["Optional witness account.".to_string()].into();
+	root.program.instructions[0].accounts.push(witness);
+	root.program.instructions[0].optional_account_strategy =
+		Some(codama_nodes::OptionalAccountStrategy::ProgramId);
+	let page = render_instruction_page(&root.program.instructions[0])
+		.unwrap_or_else(|error| panic!("renders runtime signer: {error}"));
+
+	assert!(page.contains("pub admin: (&'account AccountView, bool),"));
+	assert!(page.contains("(account, true) => CpiHandle::writable_signer(account)?"));
+	assert!(page.contains("(account, false) => CpiHandle::writable(account)?"));
+	assert!(page.contains("pub witness: Option<(&'account AccountView, bool)>,"));
+	assert!(page.contains("/// Optional witness account."));
+	assert!(page.contains("Some((account, true)) => CpiHandle::readonly_signer(account)"));
+	assert!(page.contains("Some((account, false)) => CpiHandle::readonly(account)"));
+}
+
+#[test]
+fn refuses_omitted_optional_accounts() {
+	let mut root = load_fixture_root("vesting_program");
+	root.program.instructions[0].accounts[0].is_optional = Some(true);
+	root.program.instructions[0].optional_account_strategy =
+		Some(codama_nodes::OptionalAccountStrategy::Omitted);
+	let error = render_program_to_files(&root).expect_err("refuses omitted optional accounts");
+
 	assert!(
 		error
 			.to_string()
-			.contains("optional signers are not supported")
+			.contains("omitted optional-account strategy")
 	);
 }
 
@@ -362,6 +389,8 @@ fn renders_base16_discriminators() {
 
 #[test]
 fn renders_public_key_bool_and_number_arguments() {
+	let mut sponsor = InstructionArgumentNode::new("sponsor", PublicKeyTypeNode {});
+	sponsor.docs = vec!["Address credited as the sponsor.".to_string()].into();
 	let program = program_node(
 		"registry",
 		"11111111111111111111111111111111",
@@ -373,7 +402,7 @@ fn renders_public_key_bool_and_number_arguments() {
 				InstructionAccountNode::new("authority", false, true),
 			],
 			vec![
-				InstructionArgumentNode::new("sponsor", PublicKeyTypeNode {}),
+				sponsor,
 				InstructionArgumentNode::new("active", BooleanTypeNode::default()),
 				InstructionArgumentNode::new("stake", NumberTypeNode::le(U64)),
 			],
@@ -382,16 +411,40 @@ fn renders_public_key_bool_and_number_arguments() {
 	let page = render_instruction_page(&program.instructions[0])
 		.unwrap_or_else(|error| panic!("renders: {error}"));
 
-	assert!(page.contains("pub sponsor: Address,"));
+	assert!(page.contains("pub sponsor: &'address Address,"));
+	assert!(page.contains("/// Instruction argument `sponsor`."));
+	assert!(page.contains("/// Address credited as the sponsor."));
 	assert!(page.contains("pub active: bool,"));
 	assert!(page.contains("pub stake: u64,"));
-	assert!(page.contains("pub member: CpiHandle<'a>,"));
-	assert!(page.contains("member: CpiHandle::writable_signer(member)?"));
-	assert!(page.contains("authority: CpiHandle::readonly_signer(authority)"));
+	assert!(page.contains("pub member: &'account AccountView,"));
+	assert!(page.contains("CpiHandle::writable_signer(self.member)?"));
+	assert!(page.contains("CpiHandle::readonly_signer(self.authority)"));
+	assert!(page.contains("pub instruction: EnrollInstruction<'address>,"));
 	assert!(page.contains("pub fn invoke(&self, program: &ProgramAccount<'_>)"));
 	assert!(page.contains("pub fn invoke_signed("));
 	assert!(page.contains("context.invoke_signed(&data, signers)"));
 	assert!(page.contains("[0u8; 42]"));
+}
+
+#[test]
+fn renders_address_only_instruction_lifetimes() {
+	let program = program_node(
+		"registry",
+		"11111111111111111111111111111111",
+		vec![instruction_node(
+			"setOwner",
+			numeric_discriminator(9),
+			vec![],
+			vec![InstructionArgumentNode::new("owner", PublicKeyTypeNode {})],
+		)],
+	);
+	let page = render_instruction_page(&program.instructions[0])
+		.unwrap_or_else(|error| panic!("renders address-only instruction: {error}"));
+
+	assert!(page.contains("pub struct SetOwner<'address> {"));
+	assert!(page.contains("pub instruction: SetOwnerInstruction<'address>,"));
+	assert!(page.contains("impl<'address> SetOwnerInstruction<'address>"));
+	assert!(page.contains("impl<'address> SetOwner<'address>"));
 }
 
 #[test]

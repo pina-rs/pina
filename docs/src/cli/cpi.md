@@ -20,6 +20,6 @@ pina cpi --idl ./target/idl/counter.json --output ./clients/counter-cpi
 pina cpi --idl ./anchor-idl.json --output ./clients/anchor-cpi
 ```
 
-Codama roots are rendered natively. Raw Anchor IDLs are normalized with `@codama/nodes-from-anchor`, then passed to the same renderer. The output crate contains a validated `ProgramAccount`, typed CPI account sets, and instruction builders exposing `.invoke()` and `.invoke_signed()`.
+Codama roots are rendered natively. Raw Anchor IDLs are normalized with `@codama/nodes-from-anchor`, then passed to the same renderer. The output crate contains a validated `ProgramAccount` and direct struct-based calls exposing `.invoke()` and `.invoke_signed()`. Each call contains its account references and a typed `*Instruction` field whose `to_bytes()` output is passed as CPI data. Account and argument fields preserve their IDL documentation and are labelled with their role.
 
 Use `pina generate --client cpi` when the source is the current Pina program. For a reusable Codama script, install `@pina-rs/codama-renderer-cpi`; Codama normalizes either source format before passing its current transformed root to the visitor.

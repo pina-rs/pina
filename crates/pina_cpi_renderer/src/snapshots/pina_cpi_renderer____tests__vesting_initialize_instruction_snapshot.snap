@@ -5,85 +5,90 @@ expression: "render_fixture_instruction(\"vesting_program\", \"initialize\")"
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
-use pina::ProgramError;
 use pina::ProgramResult;
 use pina::Signer;
-use pina::ToCpiAccounts;
 
 use crate::ProgramAccount;
 
-/// Accounts required by the `initialize` instruction.
-#[derive(Clone, Copy, Debug)]
-pub struct InitializeAccounts<'a> {
-	/// writable, must sign.
-	pub admin: CpiHandle<'a>,
-	pub beneficiary: CpiHandle<'a>,
-	pub mint: CpiHandle<'a>,
-	/// writable.
-	pub vesting_state: CpiHandle<'a>,
-	/// writable.
-	pub vault: CpiHandle<'a>,
-	pub associated_token_program: CpiHandle<'a>,
-	pub system_program: CpiHandle<'a>,
-	pub token_program: CpiHandle<'a>,
-}
-
-impl<'a> InitializeAccounts<'a> {
-	/// Validates writable privileges and builds the CPI account set.
-	pub fn new(
-		admin: &'a AccountView,
-		beneficiary: &'a AccountView,
-		mint: &'a AccountView,
-		vesting_state: &'a AccountView,
-		vault: &'a AccountView,
-		associated_token_program: &'a AccountView,
-		system_program: &'a AccountView,
-		token_program: &'a AccountView,
-	) -> Result<Self, ProgramError> {
-		Ok(Self {
-			admin: CpiHandle::writable_signer(admin)?,
-			beneficiary: CpiHandle::readonly(beneficiary),
-			mint: CpiHandle::readonly(mint),
-			vesting_state: CpiHandle::writable(vesting_state)?,
-			vault: CpiHandle::writable(vault)?,
-			associated_token_program: CpiHandle::readonly(associated_token_program),
-			system_program: CpiHandle::readonly(system_program),
-			token_program: CpiHandle::readonly(token_program),
-		})
-	}
-}
-
-impl<'a> ToCpiAccounts<'a, 8> for InitializeAccounts<'a> {
-	fn to_cpi_handles(&self) -> [CpiHandle<'a>; 8] {
-		[self.admin, self.beneficiary, self.mint, self.vesting_state, self.vault, self.associated_token_program, self.system_program, self.token_program]
-	}
-}
-
-/// CPI builder for the `initialize` instruction.
+/// CPI call for the `initialize` instruction.
 #[derive(Clone, Copy, Debug)]
 #[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
-pub struct Initialize<'a> {
-	/// Validated accounts required by the instruction.
-	pub accounts: InitializeAccounts<'a>,
+pub struct Initialize<'account> {
+	/// CPI account `admin`.
+	/// Required privileges: writable and signer.
+	pub admin: &'account AccountView,
 
-	/// `totalAmount` argument.
+	/// CPI account `beneficiary`.
+	/// Required privileges: read-only.
+	pub beneficiary: &'account AccountView,
+
+	/// CPI account `mint`.
+	/// Required privileges: read-only.
+	pub mint: &'account AccountView,
+
+	/// CPI account `vestingState`.
+	/// Required privileges: writable.
+	pub vesting_state: &'account AccountView,
+
+	/// CPI account `vault`.
+	/// Required privileges: writable.
+	pub vault: &'account AccountView,
+
+	/// CPI account `associatedTokenProgram`.
+	/// Required privileges: read-only.
+	pub associated_token_program: &'account AccountView,
+
+	/// CPI account `systemProgram`.
+	/// Required privileges: read-only.
+	pub system_program: &'account AccountView,
+
+	/// CPI account `tokenProgram`.
+	/// Required privileges: read-only.
+	pub token_program: &'account AccountView,
+
+	/// Instruction arguments encoded and sent as CPI data for `initialize`.
+	pub instruction: InitializeInstruction,
+}
+
+/// Instruction arguments for the `initialize` CPI call.
+#[derive(Clone, Copy, Debug)]
+pub struct InitializeInstruction {
+	/// Instruction argument `totalAmount`.
 	pub total_amount: u64,
-	/// `startTs` argument.
+
+	/// Instruction argument `startTs`.
 	pub start_ts: u64,
-	/// `cliffTs` argument.
+
+	/// Instruction argument `cliffTs`.
 	pub cliff_ts: u64,
-	/// `endTs` argument.
+
+	/// Instruction argument `endTs`.
 	pub end_ts: u64,
+
+	/// Instruction argument `bump`.
 	pub bump: u8,
 }
 
-impl<'a> Initialize<'a> {
-	/// Builds a `Initialize` CPI instruction.
-	#[inline(always)]
-	pub const fn new(accounts: InitializeAccounts<'a>, total_amount: u64, start_ts: u64, cliff_ts: u64, end_ts: u64, bump: u8) -> Self {
-		Self { accounts, total_amount, start_ts, cliff_ts, end_ts, bump }
-	}
+impl InitializeInstruction {
+	/// Number of bytes in the encoded instruction, including its discriminator.
+	pub const LEN: usize = 34;
 
+	/// Encodes the discriminator and instruction arguments for CPI.
+	#[inline(always)]
+	pub fn to_bytes(&self) -> [u8; 34] {
+		let mut data = [0u8; 34];
+		data[..1].copy_from_slice(&INITIALIZE_DISCRIMINATOR);
+		data[1..9].copy_from_slice(&self.total_amount.to_le_bytes());
+		data[9..17].copy_from_slice(&self.start_ts.to_le_bytes());
+		data[17..25].copy_from_slice(&self.cliff_ts.to_le_bytes());
+		data[25..33].copy_from_slice(&self.end_ts.to_le_bytes());
+		data[33..34].copy_from_slice(&self.bump.to_le_bytes());
+
+		data
+	}
+}
+
+impl<'account> Initialize<'account> {
 	/// Invokes the instruction with no PDA seeds.
 	#[inline(always)]
 	pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
@@ -97,14 +102,18 @@ impl<'a> Initialize<'a> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let mut data = [0u8; 34];
-		data[..1].copy_from_slice(&INITIALIZE_DISCRIMINATOR);
-		data[1..9].copy_from_slice(&self.total_amount.to_le_bytes());
-		data[9..17].copy_from_slice(&self.start_ts.to_le_bytes());
-		data[17..25].copy_from_slice(&self.cliff_ts.to_le_bytes());
-		data[25..33].copy_from_slice(&self.end_ts.to_le_bytes());
-		data[33..34].copy_from_slice(&self.bump.to_le_bytes());
-		let context = CpiContext::new(*program, self.accounts);
+		let accounts: [CpiHandle<'_>; 8] = [
+			CpiHandle::writable_signer(self.admin)?,
+			CpiHandle::readonly(self.beneficiary),
+			CpiHandle::readonly(self.mint),
+			CpiHandle::writable(self.vesting_state)?,
+			CpiHandle::writable(self.vault)?,
+			CpiHandle::readonly(self.associated_token_program),
+			CpiHandle::readonly(self.system_program),
+			CpiHandle::readonly(self.token_program),
+		];
+		let data = self.instruction.to_bytes();
+		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)
 	}

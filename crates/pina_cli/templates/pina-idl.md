@@ -162,7 +162,7 @@ Keep in mind:
 
 `test:idl` treats the generated IDL as an API contract. It checks that:
 
-- every example regenerates deterministically into `codama/idls`, `codama/clients/js`, `codama/clients/rust`, and `codama/clients/dart`
+- every example regenerates deterministically into `codama/idls`, `codama/clients/js`, `codama/clients/rust`, `codama/clients/cpi`, and `codama/clients/dart`
 - generated JSON passes Codama's JS validator
 - generated JS clients typecheck
 - generated Rust clients compile

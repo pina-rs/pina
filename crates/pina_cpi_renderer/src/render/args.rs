@@ -51,7 +51,7 @@ pub(crate) fn render_argument(
 					"data[{{offset}}..{{offset_end}}].copy_from_slice(self.{field}.as_ref());"
 				),
 				field,
-				rust_type: "Address".to_string(),
+				rust_type: "&'address Address".to_string(),
 				wire_size: 32,
 				docs: Vec::new(),
 			})

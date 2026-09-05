@@ -46,7 +46,7 @@ The shortcut runs `cargo run -p pina_cli -- ...` against the checked-out source.
 | [`pina completions`](./completions.md)         | Generate a shell completion script                           | Shell script                              |
 | [`pina profile`](./profile.md)                 | Estimate per-function SBF compute cost                       | Text or JSON                              |
 | [`pina deploy`](./deploy.md)                   | Plan and execute an explicit cluster deployment              | Plan or JSON                              |
-| [`pina codama generate`](./codama-generate.md) | Generate IDLs and Rust, JavaScript, and Dart clients         | Generated directories                     |
+| [`pina codama generate`](./codama-generate.md) | Generate IDLs and Rust, CPI, JavaScript, and Dart clients    | Generated directories                     |
 
 ## Discover the interface
 

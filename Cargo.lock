@@ -329,6 +329,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anchor-declare-id-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "anchor-declare-id-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -349,6 +356,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "anchor-declare-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -375,6 +389,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anchor-duplicate-mutable-accounts-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "anchor-duplicate-mutable-accounts-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -395,6 +416,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "anchor-errors-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -421,6 +449,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anchor-events-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "anchor-events-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -441,6 +476,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "anchor-floats-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -491,6 +533,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anchor-realloc-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "anchor-realloc-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -514,6 +563,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anchor-system-accounts-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "anchor-system-accounts-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -534,6 +590,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "anchor-sysvars-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -2046,6 +2109,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "counter-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "counter-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -3022,6 +3092,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "escrow-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "escrow-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -3612,6 +3689,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "hello-solana-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -5490,6 +5574,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "optional-accounts-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "optional-accounts-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -5761,6 +5852,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "pina-bpf-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -6209,6 +6307,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "profile-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "profile-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -6241,6 +6346,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "prop-amm-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -6797,6 +6909,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "role-registry-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -11555,6 +11674,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "staking-rewards-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "staking-rewards-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -12117,6 +12243,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "todo-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "todo-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -12419,6 +12552,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "transfer-sol-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -12832,6 +12972,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "vesting-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]

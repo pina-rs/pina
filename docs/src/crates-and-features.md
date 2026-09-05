@@ -80,7 +80,7 @@ Commands:
 
 - `pina init <name>` — scaffold a project-aware Pina program
 - `pina build` — build SBF and publish the program IDL
-- `pina generate` — generate configured Rust, TypeScript, or Dart clients
+- `pina generate` — generate configured CPI, Rust, TypeScript, or Dart clients
 - `pina test [--unit]` — run native/Mollusk or SBF/Surfpool tests
 - `pina dev [--yes]` — run Surfpool's persistent watch/redeploy loop
 - `pina verify` — compare deployments and record verified source

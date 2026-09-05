@@ -1203,6 +1203,13 @@ pub trait ToCpiAccounts<'a, const ACCOUNTS: usize> {
 	fn to_cpi_handles(&self) -> [CpiHandle<'a>; ACCOUNTS];
 }
 
+impl<'a, const ACCOUNTS: usize> ToCpiAccounts<'a, ACCOUNTS> for [CpiHandle<'a>; ACCOUNTS] {
+	#[inline(always)]
+	fn to_cpi_handles(&self) -> [CpiHandle<'a>; ACCOUNTS] {
+		*self
+	}
+}
+
 /// Minimal typed CPI context built around [`CpiHandle`] and const generics.
 ///
 /// This prototype intentionally omits heap-backed remaining-account lists.
@@ -1338,6 +1345,19 @@ mod tests {
 
 	fn test_rent() -> Rent {
 		Rent::from_bytes(&1u64.to_le_bytes()).unwrap_or_else(|error| panic!("test rent: {error:?}"))
+	}
+
+	#[test]
+	fn cpi_handle_arrays_are_typed_account_sets() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let view = stored.view();
+		let accounts = [CpiHandle::readonly_signer(&view)];
+		let handles = accounts.to_cpi_handles();
+
+		assert_eq!(handles[0].address(), view.address());
+		assert!(!handles[0].is_writable());
+		assert!(handles[0].is_signer());
 	}
 
 	#[test]

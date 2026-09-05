@@ -1,6 +1,6 @@
 # `pina codama generate`
 
-Generate Codama IDLs and Rust, JavaScript, and Dart clients for a directory of Pina programs.
+Generate Codama IDLs and Rust, CPI, JavaScript, and Dart clients for a directory of Pina programs.
 
 ## Synopsis
 
@@ -13,6 +13,7 @@ pina codama generate [OPTIONS]
 | `--examples-dir <DIR>` | `examples`            | Directory whose child directories are program crates. |
 | `--idls-dir <DIR>`     | `codama/idls`         | Generated IDL JSON directory.                         |
 | `--rust-out <DIR>`     | `codama/clients/rust` | Generated Rust client root.                           |
+| `--cpi-out <DIR>`      | `codama/clients/cpi`  | Generated standalone CPI crate root.                  |
 | `--js-out <DIR>`       | `codama/clients/js`   | Generated JavaScript client root.                     |
 | `--dart-out <DIR>`     | `codama/clients/dart` | Generated Dart package root.                          |
 | `--example <NAME>`     | all programs          | Select a program. Repeat for multiple programs.       |
@@ -42,10 +43,11 @@ For every selected program, the command:
 
 1. extracts and writes a pretty Codama IDL;
 2. renders a Pina-style Rust client;
-3. validates Dart semantic compatibility;
-4. invokes pinned Codama JavaScript and Dart renderers;
-5. adds Pina wire-boundary validation to generated JavaScript;
-6. writes Dart package barrel exports.
+3. renders a standalone Pina CPI crate;
+4. validates Dart semantic compatibility;
+5. invokes pinned Codama JavaScript and Dart renderers;
+6. adds Pina wire-boundary validation to generated JavaScript;
+7. writes Dart package barrel exports.
 
 The output roots are created automatically. Program-specific generated output may be replaced by the renderers, so treat these directories as generated artifacts rather than hand-edited source.
 
@@ -64,6 +66,7 @@ pina codama generate \
   --examples-dir ./programs \
   --idls-dir ./generated/idls \
   --rust-out ./generated/rust \
+  --cpi-out ./generated/cpi \
   --js-out ./generated/js \
   --dart-out ./generated/dart
 ```

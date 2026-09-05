@@ -132,13 +132,13 @@ pub(crate) enum Commands {
 	/// Generate configured clients for the current Pina program.
 	///
 	/// Discovers the project, refreshes its IDL, and generates only the selected
-	/// client ecosystems. Repeat --client to override pina.toml. Rust-only
-	/// generation does not invoke Node.js.
+	/// client ecosystems. Repeat --client to override pina.toml. CPI-only and
+	/// Rust-only generation do not invoke Node.js.
 	#[command(
 		after_help = "Examples:\n  pina generate\n  pina generate --client rust\n  pina generate \
 		              --client typescript --client dart\n  pina generate --project \
 		              ./programs/counter --output ./generated\n\nConfiguration:\n  [clients]\n  \
-		              output = \"clients\"\n  languages = [\"rust\", \"typescript\"]"
+		              output = \"clients\"\n  languages = [\"cpi\", \"rust\", \"typescript\"]"
 	)]
 	Generate {
 		/// Directory inside the project to discover. Defaults to the current directory.
@@ -1038,14 +1038,14 @@ pub(crate) enum CodamaCommands {
 	/// Generate IDLs and Rust, JavaScript, and Dart clients.
 	///
 	/// Discovers Pina programs below `EXAMPLES_DIR`, optionally filters them with
-	/// repeatable --example arguments, writes IDLs, and renders all three client
+	/// repeatable --example arguments, writes IDLs, and renders all four client
 	/// targets. The command fails when a requested example does not exist or a
 	/// renderer exits unsuccessfully.
 	#[command(
 		after_help = "Examples:\n  pina codama generate\n  pina codama generate --example \
 		              counter_program --example todo_program\n  pina codama generate \
 		              --examples-dir ./programs --idls-dir ./idls \\\n                --rust-out \
-		              ./clients/rust --js-out ./clients/js --dart-out \
+		              ./clients/rust --cpi-out ./clients/cpi --js-out ./clients/js --dart-out \
 		              ./clients/dart\n\nRequirements:\n  The selected --npx executable, or the \
 		              default pnpm fallback, must be available when JavaScript and Dart client \
 		              rendering runs."
@@ -1077,6 +1077,15 @@ pub(crate) enum CodamaCommands {
 			value_name = "DIR"
 		)]
 		rust_out: PathBuf,
+
+		/// Directory for generated CPI crates. Defaults to `codama/clients/cpi`.
+		#[arg(
+			long,
+			default_value = "codama/clients/cpi",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		cpi_out: PathBuf,
 
 		/// Directory for generated JavaScript client packages. Defaults to `codama/clients/js`.
 		#[arg(

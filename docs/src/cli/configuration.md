@@ -11,7 +11,7 @@ program = "."
 
 [clients]
 output = "clients"
-languages = ["rust", "typescript"]
+languages = ["cpi", "rust", "typescript"]
 ```
 
 | Field               | Required | Default                    | Meaning                                         |
@@ -19,7 +19,7 @@ languages = ["rust", "typescript"]
 | `project.program`   | no       | `.`                        | Directory containing the program `Cargo.toml`.  |
 | `project.idl_dir`   | no       | Cargo target directory/idl | Override for generated IDL files.               |
 | `clients.output`    | no       | `clients`                  | Root directory for generated client ecosystems. |
-| `clients.languages` | no       | `rust`, `typescript`       | Any of `rust`, `typescript`, and `dart`.        |
+| `clients.languages` | no       | `rust`, `typescript`       | Any of `cpi`, `rust`, `typescript`, and `dart`. |
 
 An empty `pina.toml` uses every default. Configuration paths are resolved relative to the directory containing `pina.toml`; absolute paths, `..` traversal, and symbolic-link escapes are rejected. Unknown sections and fields are rejected so misspellings cannot silently change a build.
 

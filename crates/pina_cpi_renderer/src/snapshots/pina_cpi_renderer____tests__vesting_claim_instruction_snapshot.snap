@@ -5,78 +5,74 @@ expression: "render_fixture_instruction(\"vesting_program\", \"claim\")"
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
-use pina::ProgramError;
 use pina::ProgramResult;
 use pina::Signer;
-use pina::ToCpiAccounts;
 
 use crate::ProgramAccount;
 
-/// Accounts required by the `claim` instruction.
-#[derive(Clone, Copy, Debug)]
-pub struct ClaimAccounts<'a> {
-	/// writable, must sign.
-	pub beneficiary: CpiHandle<'a>,
-	pub mint: CpiHandle<'a>,
-	/// writable.
-	pub vesting_state: CpiHandle<'a>,
-	/// writable.
-	pub beneficiary_ata: CpiHandle<'a>,
-	/// writable.
-	pub vault: CpiHandle<'a>,
-	pub associated_token_program: CpiHandle<'a>,
-	pub system_program: CpiHandle<'a>,
-	pub token_program: CpiHandle<'a>,
-}
-
-impl<'a> ClaimAccounts<'a> {
-	/// Validates writable privileges and builds the CPI account set.
-	pub fn new(
-		beneficiary: &'a AccountView,
-		mint: &'a AccountView,
-		vesting_state: &'a AccountView,
-		beneficiary_ata: &'a AccountView,
-		vault: &'a AccountView,
-		associated_token_program: &'a AccountView,
-		system_program: &'a AccountView,
-		token_program: &'a AccountView,
-	) -> Result<Self, ProgramError> {
-		Ok(Self {
-			beneficiary: CpiHandle::writable_signer(beneficiary)?,
-			mint: CpiHandle::readonly(mint),
-			vesting_state: CpiHandle::writable(vesting_state)?,
-			beneficiary_ata: CpiHandle::writable(beneficiary_ata)?,
-			vault: CpiHandle::writable(vault)?,
-			associated_token_program: CpiHandle::readonly(associated_token_program),
-			system_program: CpiHandle::readonly(system_program),
-			token_program: CpiHandle::readonly(token_program),
-		})
-	}
-}
-
-impl<'a> ToCpiAccounts<'a, 8> for ClaimAccounts<'a> {
-	fn to_cpi_handles(&self) -> [CpiHandle<'a>; 8] {
-		[self.beneficiary, self.mint, self.vesting_state, self.beneficiary_ata, self.vault, self.associated_token_program, self.system_program, self.token_program]
-	}
-}
-
-/// CPI builder for the `claim` instruction.
+/// CPI call for the `claim` instruction.
 #[derive(Clone, Copy, Debug)]
 #[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
-pub struct Claim<'a> {
-	/// Validated accounts required by the instruction.
-	pub accounts: ClaimAccounts<'a>,
+pub struct Claim<'account> {
+	/// CPI account `beneficiary`.
+	/// Required privileges: writable and signer.
+	pub beneficiary: &'account AccountView,
 
+	/// CPI account `mint`.
+	/// Required privileges: read-only.
+	pub mint: &'account AccountView,
+
+	/// CPI account `vestingState`.
+	/// Required privileges: writable.
+	pub vesting_state: &'account AccountView,
+
+	/// CPI account `beneficiaryAta`.
+	/// Required privileges: writable.
+	pub beneficiary_ata: &'account AccountView,
+
+	/// CPI account `vault`.
+	/// Required privileges: writable.
+	pub vault: &'account AccountView,
+
+	/// CPI account `associatedTokenProgram`.
+	/// Required privileges: read-only.
+	pub associated_token_program: &'account AccountView,
+
+	/// CPI account `systemProgram`.
+	/// Required privileges: read-only.
+	pub system_program: &'account AccountView,
+
+	/// CPI account `tokenProgram`.
+	/// Required privileges: read-only.
+	pub token_program: &'account AccountView,
+
+	/// Instruction arguments encoded and sent as CPI data for `claim`.
+	pub instruction: ClaimInstruction,
+}
+
+/// Instruction arguments for the `claim` CPI call.
+#[derive(Clone, Copy, Debug)]
+pub struct ClaimInstruction {
+	/// Instruction argument `amount`.
 	pub amount: u64,
 }
 
-impl<'a> Claim<'a> {
-	/// Builds a `Claim` CPI instruction.
-	#[inline(always)]
-	pub const fn new(accounts: ClaimAccounts<'a>, amount: u64) -> Self {
-		Self { accounts, amount }
-	}
+impl ClaimInstruction {
+	/// Number of bytes in the encoded instruction, including its discriminator.
+	pub const LEN: usize = 9;
 
+	/// Encodes the discriminator and instruction arguments for CPI.
+	#[inline(always)]
+	pub fn to_bytes(&self) -> [u8; 9] {
+		let mut data = [0u8; 9];
+		data[..1].copy_from_slice(&CLAIM_DISCRIMINATOR);
+		data[1..9].copy_from_slice(&self.amount.to_le_bytes());
+
+		data
+	}
+}
+
+impl<'account> Claim<'account> {
 	/// Invokes the instruction with no PDA seeds.
 	#[inline(always)]
 	pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
@@ -90,10 +86,18 @@ impl<'a> Claim<'a> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let mut data = [0u8; 9];
-		data[..1].copy_from_slice(&CLAIM_DISCRIMINATOR);
-		data[1..9].copy_from_slice(&self.amount.to_le_bytes());
-		let context = CpiContext::new(*program, self.accounts);
+		let accounts: [CpiHandle<'_>; 8] = [
+			CpiHandle::writable_signer(self.beneficiary)?,
+			CpiHandle::readonly(self.mint),
+			CpiHandle::writable(self.vesting_state)?,
+			CpiHandle::writable(self.beneficiary_ata)?,
+			CpiHandle::writable(self.vault)?,
+			CpiHandle::readonly(self.associated_token_program),
+			CpiHandle::readonly(self.system_program),
+			CpiHandle::readonly(self.token_program),
+		];
+		let data = self.instruction.to_bytes();
+		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)
 	}
