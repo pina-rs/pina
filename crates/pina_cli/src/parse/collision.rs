@@ -167,7 +167,6 @@ mod tests {
 
 	fn make_account_with_repr(name: &str, disc_value: u64, repr_size: usize) -> AccountIr {
 		AccountIr {
-			is_compact: false,
 			name: name.to_owned(),
 			fields: vec![],
 			discriminator: DiscriminatorIr {

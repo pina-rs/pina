@@ -11,6 +11,7 @@ use crate::AsCompactAccount;
 #[cfg(feature = "token")]
 use crate::AsTokenAccount;
 use crate::CloseAccountWithRecipient;
+use crate::CompactAccountInfoValidation;
 use crate::LamportTransfer;
 use crate::PinaAccount;
 use crate::PinaCompactAccount;
@@ -413,16 +414,6 @@ macro_rules! impl_account_info_validation {
 			}
 
 			#[track_caller]
-			fn assert_compact_type<T: PinaCompactAccount>(
-				self,
-				program_id: &Address,
-			) -> Result<Self, ProgramError> {
-				validate_compact_type::<T>(*self, program_id)?;
-
-				Ok(self)
-			}
-
-			#[track_caller]
 			fn assert_program(self, program_id: &Address) -> Result<Self, ProgramError> {
 				validate_program(*self, program_id)?;
 
@@ -505,6 +496,18 @@ macro_rules! impl_account_info_validation {
 				token_program: &Address,
 			) -> Result<Self, ProgramError> {
 				validate_associated_token_address(*self, wallet, mint, token_program)?;
+
+				Ok(self)
+			}
+		}
+
+		impl<'a> CompactAccountInfoValidation for $type {
+			#[track_caller]
+			fn assert_compact_type<T: PinaCompactAccount>(
+				self,
+				program_id: &Address,
+			) -> Result<Self, ProgramError> {
+				validate_compact_type::<T>(*self, program_id)?;
 
 				Ok(self)
 			}

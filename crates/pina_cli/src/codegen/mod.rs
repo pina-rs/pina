@@ -127,7 +127,7 @@ fn build_account_node(
 	let mut fields = vec![build_account_discriminator_field(&account.discriminator)];
 	for (index, field) in account.fields.iter().enumerate() {
 		let context = format!("account `{}.{}`", account.name, field.name);
-		let mut node = if account.is_compact && index + 1 == account.fields.len() {
+		let mut node = if account.is_compact() && index + 1 == account.fields.len() {
 			StructFieldTypeNode::new(
 				field.name.as_str(),
 				try_rust_type_to_codama_compact_tail(&field.rust_type, &context, zeropod_enums)?,
@@ -149,8 +149,9 @@ fn build_account_node(
 		.as_ref()
 		.map(|name| PdaLinkNode::new(name.as_str()));
 
-	if !account.docs.is_empty() {
-		node.docs = account.docs.clone().into();
+	let docs = account.visible_docs();
+	if !docs.is_empty() {
+		node.docs = docs.into();
 	}
 
 	Ok(node)
@@ -425,6 +426,34 @@ mod tests {
 	}
 
 	#[test]
+	fn compact_account_metadata_does_not_leak_into_idl_docs() {
+		let account = AccountIr {
+			name: "DynamicState".to_owned(),
+			fields: vec![FieldIr {
+				name: "values".to_owned(),
+				rust_type: "Vec<u64, 8>".to_owned(),
+				docs: vec![],
+			}],
+			discriminator: DiscriminatorIr {
+				value: 1,
+				repr_size: 1,
+			},
+			docs: vec![
+				"Dynamic values.".to_owned(),
+				crate::ir::COMPACT_ACCOUNT_DOC_MARKER.to_owned(),
+			],
+			pda_name: None,
+		};
+
+		let node = build_account_node(&account, &[])
+			.unwrap_or_else(|error| panic!("IDL codegen failed: {error}"));
+		let docs = node.docs.iter().map(String::as_str).collect::<Vec<_>>();
+
+		assert_eq!(docs, vec!["Dynamic values."]);
+		assert!(account.is_compact());
+	}
+
+	#[test]
 	fn preserves_source_discriminator_widths_in_codegen() {
 		for (primitive, repr_size, format) in [
 			("u16", 2, NumberFormat::U16),
@@ -487,7 +516,6 @@ mod tests {
 			public_key: "11111111111111111111111111111111".to_string(),
 			zeropod_enums: vec![],
 			accounts: vec![AccountIr {
-				is_compact: false,
 				name: "State".to_string(),
 				pda_name: None,
 				fields: vec![],
@@ -675,7 +703,6 @@ mod tests {
 			public_key: "11111111111111111111111111111111".to_string(),
 			zeropod_enums: vec![],
 			accounts: vec![AccountIr {
-				is_compact: false,
 				name: "State".to_string(),
 				pda_name: None,
 				fields: vec![FieldIr {
@@ -722,7 +749,6 @@ mod tests {
 				docs: vec![],
 			}],
 			accounts: vec![AccountIr {
-				is_compact: false,
 				name: "Palette".to_string(),
 				pda_name: None,
 				fields: vec![

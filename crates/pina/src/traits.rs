@@ -215,13 +215,6 @@ pub trait AccountInfoValidation {
 	fn assert_type<T: PinaAccount>(self, program_id: &Address) -> Result<Self, ProgramError>
 	where
 		Self: Sized;
-	/// Assert that the account contains the specified compact account type.
-	fn assert_compact_type<T: PinaCompactAccount>(
-		self,
-		program_id: &Address,
-	) -> Result<Self, ProgramError>
-	where
-		Self: Sized;
 	/// Assert that the account is a program.
 	fn assert_program(self, program_id: &Address) -> Result<Self, ProgramError>
 	where
@@ -278,6 +271,20 @@ pub trait AccountInfoValidation {
 		wallet: &Address,
 		mint: &Address,
 		token_program: &Address,
+	) -> Result<Self, ProgramError>
+	where
+		Self: Sized;
+}
+
+/// Validation extension for compact account layouts.
+///
+/// This is separate from [`AccountInfoValidation`] so adding compact-account
+/// support does not add a required method to implementations of that trait.
+pub trait CompactAccountInfoValidation {
+	/// Assert that the account contains the specified compact account type.
+	fn assert_compact_type<T: PinaCompactAccount>(
+		self,
+		program_id: &Address,
 	) -> Result<Self, ProgramError>
 	where
 		Self: Sized;

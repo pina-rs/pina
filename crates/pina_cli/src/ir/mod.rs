@@ -35,12 +35,31 @@ pub struct ZeroPodEnumVariantIr {
 #[derive(Debug, Clone)]
 pub struct AccountIr {
 	pub name: String,
-	pub is_compact: bool,
 	pub fields: Vec<FieldIr>,
 	pub discriminator: DiscriminatorIr,
 	pub docs: Vec<String>,
 	/// The name of the PDA declared for this account via `#[pda(...)]`.
 	pub pda_name: Option<String>,
+}
+
+// Keep compactness in the pre-existing docs field so this minor release does
+// not add a field to the public IR structs. Codegen always strips the sentinel.
+pub(crate) const COMPACT_ACCOUNT_DOC_MARKER: &str = "\0pina:compact";
+
+impl AccountIr {
+	pub(crate) fn is_compact(&self) -> bool {
+		self.docs
+			.iter()
+			.any(|doc| doc == COMPACT_ACCOUNT_DOC_MARKER)
+	}
+
+	pub(crate) fn visible_docs(&self) -> Vec<String> {
+		self.docs
+			.iter()
+			.filter(|doc| doc.as_str() != COMPACT_ACCOUNT_DOC_MARKER)
+			.cloned()
+			.collect()
+	}
 }
 
 /// An instruction assembled from `#[instruction]`, `#[derive(Accounts)]`, the

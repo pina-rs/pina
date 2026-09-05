@@ -177,9 +177,14 @@ fn assemble_from_extracted(
 				"account",
 			)
 			.map(|disc_value| {
+				debug_assert_eq!(
+					acct.is_compact(),
+					acct.docs
+						.iter()
+						.any(|doc| doc == crate::ir::COMPACT_ACCOUNT_DOC_MARKER)
+				);
 				AccountIr {
 					name: acct.name.clone(),
-					is_compact: acct.is_compact,
 					fields: acct.fields.clone(),
 					discriminator: disc_value,
 					docs: acct.docs.clone(),
@@ -848,7 +853,6 @@ mod tests {
 			repr_size: 1,
 		};
 		let account = account_state::AccountStruct {
-			is_compact: false,
 			name: "VaultState".to_owned(),
 			discriminator_enum: "ExampleAccount".to_owned(),
 			variant: "Vault".to_owned(),

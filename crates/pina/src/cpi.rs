@@ -28,6 +28,8 @@ use pinocchio_system::instructions::Transfer as SystemTransfer;
 use crate::AccountInfoValidation;
 use crate::CloseAccountWithRecipient;
 #[cfg(feature = "account-resize")]
+use crate::CompactAccountInfoValidation;
+#[cfg(feature = "account-resize")]
 use crate::LamportTransfer;
 use crate::MAX_SEEDS;
 use crate::PinaAccount;
@@ -977,8 +979,6 @@ impl ReallocCompactAccount<'_, '_, '_> {
 		&mut self,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		use crate::AccountInfoValidation;
-
 		self.account.assert_compact_type::<T>(self.program_id)?;
 		T::validate_size(self.new_size)?;
 
