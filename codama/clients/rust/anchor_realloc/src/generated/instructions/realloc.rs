@@ -12,8 +12,7 @@ use pina::zeropod;
 
 /// Resizes the complete account-data buffer to `len` bytes.
 ///
-/// `len` includes the fixed [`Sample`] header and therefore cannot be smaller
-/// than [`Sample::SIZE`].
+/// `len` includes [`Sample::HEADER_SIZE`] and must end on a value boundary.
 pub const REALLOC_DISCRIMINATOR: u8 = 0u8;
 
 /// Accounts.

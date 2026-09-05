@@ -13,12 +13,16 @@ import 'package:solana_kit_errors/solana_kit_errors.dart';
 
 @immutable
 class Sample {
-  const Sample({required this.bump, required this.authority})
-    : discriminator = 1;
+  const Sample({
+    required this.bump,
+    required this.authority,
+    required this.values,
+  }) : discriminator = 1;
 
   final int discriminator;
   final int bump;
   final Address authority;
+  final List<BigInt> values;
 
   @override
   bool operator ==(Object other) =>
@@ -27,14 +31,15 @@ class Sample {
           runtimeType == other.runtimeType &&
           discriminator == other.discriminator &&
           bump == other.bump &&
-          authority == other.authority;
+          authority == other.authority &&
+          values == other.values;
 
   @override
-  int get hashCode => Object.hash(discriminator, bump, authority);
+  int get hashCode => Object.hash(discriminator, bump, authority, values);
 
   @override
   String toString() =>
-      'Sample(discriminator: $discriminator, bump: $bump, authority: $authority)';
+      'Sample(discriminator: $discriminator, bump: $bump, authority: $authority, values: $values)';
 }
 
 Encoder<Sample> getSampleEncoder() {
@@ -42,6 +47,13 @@ Encoder<Sample> getSampleEncoder() {
     ('discriminator', getU8Encoder()),
     ('bump', getU8Encoder()),
     ('authority', getAddressEncoder()),
+    (
+      'values',
+      getArrayEncoder<BigInt>(
+        transformEncoder(getU64Encoder(), (BigInt value) => value),
+        size: PrefixedArraySize(getU16Encoder()),
+      ),
+    ),
   ]);
 
   return transformEncoder(
@@ -50,6 +62,7 @@ Encoder<Sample> getSampleEncoder() {
       'discriminator': 1,
       'bump': value.bump,
       'authority': value.authority,
+      'values': value.values,
     },
   );
 }
@@ -59,6 +72,13 @@ Decoder<Sample> getSampleDecoder() {
     ('discriminator', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('authority', getAddressDecoder()),
+    (
+      'values',
+      getArrayDecoder(
+        getU64Decoder(),
+        size: PrefixedArraySize(getU16Decoder()),
+      ),
+    ),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
@@ -77,6 +97,7 @@ Decoder<Sample> getSampleDecoder() {
       Sample(
         bump: map['bump']! as int,
         authority: map['authority']! as Address,
+        values: map['values']! as List<BigInt>,
       ),
       newOffset,
     );

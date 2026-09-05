@@ -46,6 +46,7 @@ use crate::ir::PdaIr;
 use crate::ir::PdaSeedIr;
 use crate::ir::ProgramIr;
 use crate::ir::ZeroPodEnumIr;
+use crate::parse::types::try_rust_type_to_codama_compact_tail;
 use crate::parse::types::try_rust_type_to_codama_with_zeropod_enums;
 
 /// Validate every IR type mapping and convert a `ProgramIr` into a Codama
@@ -124,12 +125,20 @@ fn build_account_node(
 	zeropod_enums: &[ZeroPodEnumIr],
 ) -> Result<AccountNode, IdlError> {
 	let mut fields = vec![build_account_discriminator_field(&account.discriminator)];
-	for field in &account.fields {
-		fields.push(build_struct_field(
-			field,
-			format!("account `{}.{}`", account.name, field.name),
-			zeropod_enums,
-		)?);
+	for (index, field) in account.fields.iter().enumerate() {
+		let context = format!("account `{}.{}`", account.name, field.name);
+		let mut node = if account.is_compact && index + 1 == account.fields.len() {
+			StructFieldTypeNode::new(
+				field.name.as_str(),
+				try_rust_type_to_codama_compact_tail(&field.rust_type, &context, zeropod_enums)?,
+			)
+		} else {
+			build_struct_field(field, context, zeropod_enums)?
+		};
+		if !field.docs.is_empty() {
+			node.docs = field.docs.clone().into();
+		}
+		fields.push(node);
 	}
 
 	let data = StructTypeNode::new(fields);
@@ -478,6 +487,7 @@ mod tests {
 			public_key: "11111111111111111111111111111111".to_string(),
 			zeropod_enums: vec![],
 			accounts: vec![AccountIr {
+				is_compact: false,
 				name: "State".to_string(),
 				pda_name: None,
 				fields: vec![],
@@ -665,6 +675,7 @@ mod tests {
 			public_key: "11111111111111111111111111111111".to_string(),
 			zeropod_enums: vec![],
 			accounts: vec![AccountIr {
+				is_compact: false,
 				name: "State".to_string(),
 				pda_name: None,
 				fields: vec![FieldIr {
@@ -711,6 +722,7 @@ mod tests {
 				docs: vec![],
 			}],
 			accounts: vec![AccountIr {
+				is_compact: false,
 				name: "Palette".to_string(),
 				pda_name: None,
 				fields: vec![

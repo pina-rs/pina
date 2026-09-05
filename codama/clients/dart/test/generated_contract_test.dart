@@ -183,20 +183,18 @@ void main() {
   });
 
   group('resizable account codec', () {
-    test('decodes a fixed header with trailing resized capacity', () {
-      final canonical = getSampleEncoder().encode(
-        const Sample(bump: 254, authority: systemAddress),
+    test('round trips active compact values without capacity padding', () {
+      final values = [BigInt.zero, BigInt.one, BigInt.two];
+      final encoded = getSampleEncoder().encode(
+        Sample(bump: 254, authority: systemAddress, values: values),
       );
-      final resized = Uint8List.fromList([
-        ...canonical,
-        ...List<int>.filled(128, 0xa5),
-      ]);
+      final decoded = getSampleDecoder().decode(encoded);
 
-      final decoded = getSampleDecoder().decode(resized);
-
+      expect(encoded, hasLength(36 + values.length * 8));
       expect(decoded.discriminator, 1);
       expect(decoded.bump, 254);
       expect(decoded.authority, systemAddress);
+      expect(decoded.values, values);
     });
   });
 

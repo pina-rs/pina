@@ -47,6 +47,7 @@ use codama_nodes::U8;
 use codama_nodes::VariablePdaSeedNode;
 
 use super::render::seeds::render_variable_seed_parameter;
+use super::render::types::render_type_for_compact_tail;
 use super::render::types::render_type_for_pod;
 use super::*;
 
@@ -97,6 +98,65 @@ fn renders_counter_account_with_pod_types() {
 	let content = read_generated_file(&crate_dir, "accounts/counter_state.rs");
 
 	insta::assert_snapshot!("counter_state_account_rs", content);
+}
+
+#[test]
+fn renders_compact_account_fixture_with_dynamic_helpers() {
+	let crate_dir = render_fixture_program("anchor_realloc", "pina-codama-render-compact");
+	let content = read_generated_file(&crate_dir, "accounts/sample.rs");
+
+	assert!(content.contains("#[zeropod(compact)]"));
+	assert!(content.contains("pub values: pina::Vec<u64, { u16::MAX as usize }>"));
+	assert!(content.contains("pub const HEADER_SIZE: usize"));
+	assert!(content.contains("pub fn initialize(data: &mut [u8])"));
+	assert!(content.contains("pub fn from_bytes(data: &[u8])"));
+	assert!(content.contains("pub fn from_bytes_mut(data: &mut [u8])"));
+	syn::parse_file(&content)
+		.unwrap_or_else(|error| panic!("generated compact account is invalid Rust: {error}"));
+}
+
+#[test]
+fn renders_every_compact_collection_prefix() {
+	for (format, expected) in [
+		(
+			U8,
+			"pina::PodVec<<u64 as pina::ZcField>::Pod, { u8::MAX as usize }, 1>",
+		),
+		(NumberFormat::U16, "pina::Vec<u64, { u16::MAX as usize }>"),
+		(
+			NumberFormat::U32,
+			"pina::PodVec<<u64 as pina::ZcField>::Pod, { u32::MAX as usize }, 4>",
+		),
+		(
+			NumberFormat::U64,
+			"pina::PodVec<<u64 as pina::ZcField>::Pod, usize::MAX, 8>",
+		),
+	] {
+		let tail = TypeNode::from(ArrayTypeNode::prefixed(
+			NumberTypeNode::le(NumberFormat::U64),
+			NumberTypeNode::le(format),
+		));
+		assert_eq!(
+			render_type_for_compact_tail(&tail, "State.values")
+				.unwrap_or_else(|error| panic!("render failed: {error}")),
+			expected
+		);
+	}
+}
+
+#[test]
+fn rejects_non_compact_tail_nodes() {
+	let number = TypeNode::from(NumberTypeNode::le(NumberFormat::U64));
+	let fixed = TypeNode::from(ArrayTypeNode::fixed(
+		NumberTypeNode::le(NumberFormat::U64),
+		4,
+	));
+
+	for node in [number, fixed] {
+		let error = render_type_for_compact_tail(&node, "State.values")
+			.expect_err("non-prefixed tail must be rejected");
+		assert!(error.to_string().contains("trailing prefixed array"));
+	}
 }
 
 #[test]

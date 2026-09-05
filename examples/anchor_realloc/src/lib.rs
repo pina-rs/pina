@@ -20,6 +20,8 @@
 ))]
 extern crate std;
 
+use core::mem::size_of;
+
 use pina::*;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
@@ -47,18 +49,16 @@ pub enum ReallocAccountType {
 	Sample = 1,
 }
 
-/// The authenticated header at the start of every resizable sample account.
-///
-/// Bytes after this fixed header are deliberately not exposed as a typed
-/// collection. The example tests allocation and rent behaviour, not a data
-/// serialization format; only the header participates in program logic.
-#[account(discriminator = ReallocAccountType)]
+/// A compact account whose active values occupy only the bytes they need.
+#[account(discriminator = ReallocAccountType, compact)]
 #[pda(seeds = [SEED_SAMPLE, authority: Address], bump = bump)]
 pub struct Sample {
 	/// Canonical PDA bump, persisted for inexpensive validation on resize.
 	pub bump: u8,
 	/// The only signer permitted to resize this sample.
 	pub authority: Address,
+	/// Dynamically encoded values; unused capacity occupies no account bytes.
+	pub values: Vec<u64, 64>,
 }
 
 /// Creates the per-authority sample PDA.
@@ -70,8 +70,7 @@ pub struct InitializeIx {
 
 /// Resizes the complete account-data buffer to `len` bytes.
 ///
-/// `len` includes the fixed [`Sample`] header and therefore cannot be smaller
-/// than [`Sample::SIZE`].
+/// `len` includes [`Sample::HEADER_SIZE`] and must end on a value boundary.
 #[instruction(discriminator = ReallocInstruction::Realloc)]
 pub struct ReallocIx {
 	pub len: u16,
@@ -130,7 +129,10 @@ fn validate_realloc_delta(current_len: usize, new_len: usize) -> ProgramResult {
 }
 
 fn validate_target_len(target_len: usize) -> ProgramResult {
-	if target_len < Sample::SIZE {
+	let tail_len = target_len
+		.checked_sub(Sample::HEADER_SIZE)
+		.ok_or(ReallocError::AccountDataTooSmall)?;
+	if !tail_len.is_multiple_of(size_of::<PodU64>()) || target_len > Sample::MAX_SIZE {
 		return Err(ReallocError::AccountDataTooSmall.into());
 	}
 
@@ -151,32 +153,15 @@ fn validate_sample(sample: AccountView, authority: &Address) -> ProgramResult {
 		.assert_writable()?
 		.assert_owner(&ID)?;
 
-	// `Sample` is a fixed header followed by untyped realloc capacity. Pina's
-	// `assert_type` deliberately requires an exact account length, which is the
-	// right default for fixed accounts but would reject every successful resize.
-	// Validate only the fixed prefix here; slicing it to `Sample::SIZE` keeps
-	// zeropod's checked view bounded to the declared header.
-	let data = sample.try_borrow()?;
-	let header = data
-		.get(..Sample::SIZE)
-		.ok_or(ProgramError::AccountDataTooSmall)?;
-	if !Sample::matches_discriminator(header) {
-		return Err(ProgramError::InvalidAccountData);
-	}
-	<Sample as ZeroPodFixed>::validate(header).map_err(|_| ProgramError::InvalidAccountData)?;
-	let state = <Sample as ZeroPodFixed>::from_bytes(header)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	let bump = state.bump;
-	let stored_authority = state.authority;
-	drop(data);
+	let (bump, stored_authority) =
+		sample.with_compact_account::<Sample, _>(&ID, |state| Ok((state.bump, state.authority)))?;
 
 	let seeds = Sample::seeds(authority);
 	let canonical_bump = sample.assert_canonical_bump(&seeds.as_slices(), &ID)?;
 	if canonical_bump != bump {
 		return Err(ProgramError::InvalidSeeds);
 	}
-	let seeds_with_bump = seeds.with_bump(bump);
-	sample.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
+	Sample::assert_seeds(&sample, authority, &ID)?;
 
 	// The PDA check is the primary authority control. Retain the stored value as
 	// defense in depth against accidental writes from future program instructions.
@@ -205,18 +190,22 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
 		self.system_program.assert_address(&system::ID)?;
 
-		CreateProgramAccountWithBump {
+		CreateCompactProgramAccountWithBump {
 			account: self.sample,
 			payer: self.authority,
 			owner: &ID,
 			seeds: &seeds.as_slices(),
 			bump: args.bump,
+			space: Sample::HEADER_SIZE,
 		}
 		.invoke::<Sample>()?;
 
-		let mut sample = self.sample.as_account_mut::<Sample>(&ID)?;
-		sample.bump = args.bump;
-		sample.authority = authority_key;
+		self.sample
+			.with_compact_account_mut::<Sample, _>(&ID, |sample| {
+				sample.bump = args.bump;
+				sample.authority = authority_key;
+				Ok(())
+			})?;
 
 		Ok(())
 	}
@@ -234,13 +223,46 @@ impl<'a> ProcessAccountInfos<'a> for ReallocAccounts<'a> {
 		validate_target_len(target_len)?;
 		validate_realloc_delta(self.sample.data_len(), target_len)?;
 
-		ReallocAccount {
-			account: self.sample,
-			payer: self.authority,
-			new_size: target_len,
-			program_id: &ID,
+		if target_len > self.sample.data_len() {
+			ReallocCompactAccount {
+				account: self.sample,
+				payer: self.authority,
+				new_size: target_len,
+				program_id: &ID,
+			}
+			.invoke::<Sample>()?;
 		}
-		.invoke()
+
+		let count = (target_len - Sample::HEADER_SIZE) / size_of::<PodU64>();
+		let mut values = [PodU64::from(0); 64];
+		for (index, value) in values.iter_mut().take(count).enumerate() {
+			value.set(u64::try_from(index).map_err(|_| ProgramError::InvalidArgument)?);
+		}
+		let encoded_size = {
+			let mut data = self.sample.try_borrow_mut()?;
+			let mut sample = Sample::try_from_bytes_mut(&mut data)?;
+			sample
+				.set_values(&values[..count])
+				.map_err(|_| ProgramError::InvalidAccountData)?;
+			sample
+				.commit()
+				.map_err(|_| ProgramError::InvalidAccountData)?
+		};
+		if encoded_size != target_len {
+			return Err(ProgramError::InvalidAccountData);
+		}
+
+		if target_len < self.sample.data_len() {
+			ReallocCompactAccount {
+				account: self.sample,
+				payer: self.authority,
+				new_size: target_len,
+				program_id: &ID,
+			}
+			.invoke::<Sample>()?;
+		}
+
+		Ok(())
 	}
 }
 
@@ -308,9 +330,9 @@ mod tests {
 	fn realloc_instruction_roundtrip() {
 		let mut bytes = [0u8; ReallocIx::SIZE];
 		let ix = ReallocIx::initialize(&mut bytes).unwrap_or_else(|e| panic!("encode: {e:?}"));
-		ix.len.set(Sample::SIZE as u16);
+		ix.len.set(Sample::HEADER_SIZE as u16);
 		let parsed = ReallocIx::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
-		assert_eq!(usize::from(parsed.len.get()), Sample::SIZE);
+		assert_eq!(usize::from(parsed.len.get()), Sample::HEADER_SIZE);
 	}
 
 	#[test]
@@ -326,6 +348,7 @@ mod tests {
 	#[test]
 	fn validate_realloc_delta_allows_small_growth() {
 		assert!(validate_realloc_delta(100, 200).is_ok());
+		assert!(validate_realloc_delta(200, 100).is_ok());
 	}
 
 	#[test]
@@ -339,11 +362,50 @@ mod tests {
 
 	#[test]
 	fn validate_target_len_rejects_truncating_the_sample_header() {
-		let result = validate_target_len(Sample::SIZE - 1);
+		let result = validate_target_len(Sample::HEADER_SIZE - 1);
 		assert!(matches!(
 			result,
 			Err(ProgramError::Custom(code)) if code == ReallocError::AccountDataTooSmall as u32
 		));
+	}
+
+	#[test]
+	fn validate_target_len_enforces_element_boundaries_and_capacity() {
+		assert!(validate_target_len(Sample::HEADER_SIZE).is_ok());
+
+		for target in [Sample::HEADER_SIZE + 1, Sample::MAX_SIZE + 8] {
+			let result = validate_target_len(target);
+			assert!(matches!(
+				result,
+				Err(ProgramError::Custom(code))
+					if code == ReallocError::AccountDataTooSmall as u32
+			));
+		}
+	}
+
+	#[test]
+	fn sample_compact_codec_roundtrips_active_values() {
+		let mut data = [0u8; Sample::HEADER_SIZE + 24];
+		let values = [PodU64::from(3), PodU64::from(5), PodU64::from(8)];
+		let encoded_size = {
+			let mut sample = Sample::initialize(&mut data)
+				.unwrap_or_else(|error| panic!("initialize: {error:?}"));
+			sample.bump = 7;
+			sample.authority = Address::new_from_array([9; 32]);
+			sample
+				.set_values(&values)
+				.unwrap_or_else(|error| panic!("set values: {error:?}"));
+			sample
+				.commit()
+				.unwrap_or_else(|error| panic!("commit: {error:?}"))
+		};
+
+		assert_eq!(encoded_size, data.len());
+		let sample =
+			Sample::try_from_bytes(&data).unwrap_or_else(|error| panic!("decode: {error:?}"));
+		assert_eq!(sample.bump, 7);
+		assert_eq!(sample.authority, Address::new_from_array([9; 32]));
+		assert_eq!(sample.values(), values);
 	}
 
 	#[test]
@@ -354,5 +416,12 @@ mod tests {
 			result,
 			Err(ProgramError::Custom(code)) if code == ReallocError::AccountDuplicateReallocs as u32
 		));
+	}
+
+	#[test]
+	fn validate_distinct_realloc_targets_accepts_distinct_accounts() {
+		let first: Address = [2u8; 32].into();
+		let second: Address = [3u8; 32].into();
+		assert!(validate_distinct_realloc_targets(&first, &second).is_ok());
 	}
 }

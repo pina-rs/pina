@@ -436,6 +436,19 @@ pub struct Config {
 
 The generated struct has an auto-injected `discriminator` field as the first field.
 
+Compact accounts opt into a single trailing dynamic vector. Only active values occupy account data, while the literal capacity remains an enforced upper bound:
+
+```rust
+#[account(discriminator = MyAccount::Config, compact)]
+pub struct Config {
+	pub authority: Address,
+	pub bump: u8,
+	pub values: Vec<u64, 64>,
+}
+```
+
+The macro generates `ConfigHeader`, `ConfigRef`, and `ConfigMut` views together with `HEADER_SIZE`, `MAX_SIZE`, checked loaders, and initialization helpers. `CreateCompactProgramAccount*` creates a PDA at any valid element boundary; `ReallocCompactAccount` validates the current type and target size before rent-adjusting the account. Use `with_compact_account` and `with_compact_account_mut` to scope runtime borrow guards.
+
 ### Instructions
 
 <br>
@@ -872,7 +885,7 @@ The `pina docs` subcommand renders built-in reference topics. Set the `PINA_TEMP
 | [`anchor_floats`](examples/anchor_floats)                                         | Anchor float account/update behavior with authority checks                  |
 | [`anchor_system_accounts`](examples/anchor_system_accounts)                       | Anchor system-owned account constraint parity                               |
 | [`anchor_sysvars`](examples/anchor_sysvars)                                       | Anchor sysvar account validation parity                                     |
-| [`anchor_realloc`](examples/anchor_realloc)                                       | Secure realloc lifecycle with authority-bound PDA and duplicate checks      |
+| [`anchor_realloc`](examples/anchor_realloc)                                       | Dynamic compact account lifecycle with typed, rent-adjusted reallocations   |
 
 ## Security
 

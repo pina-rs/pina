@@ -60,6 +60,46 @@ pub fn try_rust_type_to_codama_with_zeropod_enums(
 	}
 }
 
+/// Map the single trailing collection in a compact account without fixed-size
+/// padding. The declared capacity remains an on-chain validation bound; the
+/// Codama node describes the active prefixed elements present on the wire.
+pub fn try_rust_type_to_codama_compact_tail(
+	ty: &str,
+	context: &str,
+	zeropod_enums: &[ZeroPodEnumIr],
+) -> Result<TypeNode, crate::error::IdlError> {
+	let error = |reason| {
+		crate::error::IdlError::UnsupportedType {
+			ty: ty.to_owned(),
+			context: context.to_owned(),
+			reason,
+		}
+	};
+	let Some((name, args)) = parse_generic_args(ty) else {
+		return Err(error("compact tails must be `Vec<T, N>`".to_string()));
+	};
+	if !matches!(name.as_str(), "Vec" | "PodVec") || !(2..=3).contains(&args.len()) {
+		return Err(error("compact tails must be `Vec<T, N>`".to_string()));
+	}
+	let item_ty = &args[0];
+	if !is_known_fixed_size_type(item_ty, zeropod_enums) {
+		return Err(error(format!(
+			"cannot determine compact `Vec` element size for `{item_ty}`"
+		)));
+	}
+	let capacity = parse_collection_size(args.get(1), ty, "capacity").map_err(error)?;
+	let prefix_size = match args.get(2) {
+		Some(value) => parse_collection_size(Some(value), ty, "prefix size").map_err(error)?,
+		None => 2,
+	};
+	validate_prefix_size(prefix_size, ty).map_err(&error)?;
+	validate_collection_capacity(capacity, prefix_size, ty).map_err(&error)?;
+	let item = try_rust_type_to_codama_with_zeropod_enums(item_ty, zeropod_enums).map_err(error)?;
+	let prefix = prefix_number_type(prefix_size, ty).map_err(error)?;
+
+	Ok(ArrayTypeNode::prefixed(item, prefix).into())
+}
+
 /// Parse a zeropod collection schema or explicit storage type into a semantic,
 /// fixed-size Codama node.
 ///
@@ -564,6 +604,48 @@ mod tests {
 		);
 		let expected: TypeNode = FixedSizeTypeNode::<TypeNode>::new(array, 9).into();
 		assert_eq!(ty, expected);
+	}
+
+	#[test]
+	fn maps_compact_vec_tails_without_fixed_capacity_padding() {
+		for (ty, item, prefix) in [
+			("Vec<u64, 64>", NumberFormat::U64, NumberFormat::U16),
+			("PodVec<PodU16, 8, 1>", NumberFormat::U16, NumberFormat::U8),
+			("Vec<u32, 8, 4>", NumberFormat::U32, NumberFormat::U32),
+			("Vec<u8, 8, 8>", NumberFormat::U8, NumberFormat::U64),
+		] {
+			let mapped = try_rust_type_to_codama_compact_tail(ty, "test account", &[])
+				.unwrap_or_else(|error| panic!("failed to map `{ty}`: {error}"));
+			assert_eq!(
+				mapped,
+				ArrayTypeNode::prefixed(NumberTypeNode::le(item), NumberTypeNode::le(prefix),)
+					.into(),
+				"wrong compact node for `{ty}`"
+			);
+		}
+	}
+
+	#[test]
+	fn rejects_invalid_compact_vec_tails() {
+		for (ty, expected) in [
+			("u64", "compact tails must be"),
+			("String<u64, 8>", "compact tails must be"),
+			("Vec<u64>", "compact tails must be"),
+			("Vec<MyPod, 8>", "cannot determine compact"),
+			("Vec<u64, CAPACITY>", "literal usize capacity"),
+			("Vec<u64, 8, PREFIX>", "literal usize prefix size"),
+			("Vec<u64, 8, 3>", "unsupported prefix size"),
+			("Vec<u64, 256, 1>", "cannot be represented"),
+		] {
+			let error = try_rust_type_to_codama_compact_tail(ty, "account `State.values`", &[])
+				.expect_err("invalid compact tail must be rejected")
+				.to_string();
+			assert!(
+				error.contains(expected),
+				"unexpected error for `{ty}`: {error}"
+			);
+			assert!(error.contains("State.values"), "missing context: {error}");
+		}
 	}
 
 	#[test]

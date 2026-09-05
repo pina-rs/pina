@@ -35,6 +35,7 @@ pub struct ZeroPodEnumVariantIr {
 #[derive(Debug, Clone)]
 pub struct AccountIr {
 	pub name: String,
+	pub is_compact: bool,
 	pub fields: Vec<FieldIr>,
 	pub discriminator: DiscriminatorIr,
 	pub docs: Vec<String>,

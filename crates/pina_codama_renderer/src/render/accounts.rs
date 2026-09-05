@@ -9,6 +9,8 @@ use super::helpers::render_docs;
 use super::helpers::snake;
 use super::seeds::render_constant_seed_expression;
 use super::seeds::render_variable_seed_parameter;
+use super::types::is_compact_tail;
+use super::types::render_type_for_compact_tail;
 use super::types::render_type_for_pod;
 use crate::error::Result;
 
@@ -46,6 +48,10 @@ pub(crate) fn render_account_page(
 		render_constant_discriminator(account.name.as_ref(), &account.discriminators, &context)?;
 
 	let data_type = account.data.get_nested_type_node();
+	let compact_tail = data_type
+		.fields
+		.last()
+		.is_some_and(|field| is_compact_tail(&field.r#type));
 	let mut field_lines = Vec::new();
 	for doc_line in render_docs(&account.docs, 0) {
 		field_lines.push(doc_line);
@@ -53,13 +59,17 @@ pub(crate) fn render_account_page(
 	if let Some(discriminator) = &discriminator {
 		field_lines.push(format!("\tpub discriminator: {},", discriminator.ty));
 	}
-	for field in &data_type.fields {
+	for (index, field) in data_type.fields.iter().enumerate() {
 		if discriminator.is_some() && field.name.as_ref() == "discriminator" {
 			continue;
 		}
 		let field_name = snake(field.name.as_ref());
 		let field_context = format!("{account_name}.{field_name}");
-		let field_type = render_type_for_pod(&field.r#type, &field_context)?;
+		let field_type = if compact_tail && index + 1 == data_type.fields.len() {
+			render_type_for_compact_tail(&field.r#type, &field_context)?
+		} else {
+			render_type_for_pod(&field.r#type, &field_context)?
+		};
 		for doc_line in render_docs(&field.docs, 1) {
 			field_lines.push(doc_line);
 		}
@@ -70,6 +80,9 @@ pub(crate) fn render_account_page(
 	lines.push("use pina::zeropod;".to_string());
 	lines.push(String::new());
 	lines.push("#[derive(pina::ZeroPod)]".to_string());
+	if compact_tail {
+		lines.push("#[zeropod(compact)]".to_string());
+	}
 	lines.push(format!("pub struct {account_name} {{"));
 	lines.extend(field_lines);
 	lines.push("}".to_string());
@@ -84,6 +97,34 @@ pub(crate) fn render_account_page(
 	}
 
 	lines.push(format!("impl {account_name} {{"));
+	if compact_tail {
+		lines.extend(render_compact_account_helpers(
+			&account_name,
+			discriminator.as_ref(),
+		));
+	} else {
+		lines.extend(render_fixed_account_helpers(
+			&zc_name,
+			discriminator.as_ref(),
+		));
+	}
+	lines.push("}".to_string());
+
+	if let Some(pda) = pda {
+		lines.push(String::new());
+		let helpers =
+			render_account_pda_helpers(account_name.as_str(), pda, primary_program_const)?;
+		lines.extend(helpers);
+	}
+
+	Ok(lines.join("\n"))
+}
+
+fn render_fixed_account_helpers(
+	zc_name: &str,
+	discriminator: Option<&super::discriminator::DiscriminatorInfo>,
+) -> Vec<String> {
+	let mut lines = Vec::new();
 	lines.push("\tpub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;".to_string());
 	lines.push(String::new());
 	lines.push("\t/// Initialize zero-valid account storage.".to_string());
@@ -106,7 +147,7 @@ pub(crate) fn render_account_page(
 	lines.push(
 		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
 	);
-	if let Some(discriminator) = &discriminator {
+	if let Some(discriminator) = discriminator {
 		lines.push(format!(
 			"\t\taccount.discriminator = {};",
 			discriminator.name
@@ -129,7 +170,7 @@ pub(crate) fn render_account_page(
 	lines.push(
 		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
 	);
-	if let Some(discriminator) = &discriminator {
+	if let Some(discriminator) = discriminator {
 		lines.push(format!(
 			"\t\tif account.discriminator != {} {{",
 			discriminator.name
@@ -156,7 +197,7 @@ pub(crate) fn render_account_page(
 	lines.push(
 		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
 	);
-	if let Some(discriminator) = &discriminator {
+	if let Some(discriminator) = discriminator {
 		lines.push(format!(
 			"\t\tif account.discriminator != {} {{",
 			discriminator.name
@@ -168,18 +209,78 @@ pub(crate) fn render_account_page(
 	}
 	lines.push("\t\tOk(account)".to_string());
 	lines.push("\t}".to_string());
-	lines.push("}".to_string());
+	lines
+}
 
-	if let Some(pda) = pda {
-		lines.push(String::new());
-		lines.extend(render_account_pda_helpers(
-			account_name.as_str(),
-			pda,
-			primary_program_const,
-		)?);
+fn render_compact_account_helpers(
+	account_name: &str,
+	discriminator: Option<&super::discriminator::DiscriminatorInfo>,
+) -> Vec<String> {
+	let ref_name = format!("{account_name}Ref");
+	let mut_name = format!("{account_name}Mut");
+	let mut lines = vec![
+		"\tpub const HEADER_SIZE: usize = <Self as pina::ZeroPodCompact>::HEADER_SIZE;".to_string(),
+		String::new(),
+		"\tpub fn initialize(data: &mut [u8]) -> Result<".to_string()
+			+ &mut_name
+			+ "<'_>, solana_program_error::ProgramError> {",
+		"\t\tif data.len() < Self::HEADER_SIZE {".to_string(),
+		"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+		"\t\t}".to_string(),
+		"\t\tdata.fill(0);".to_string(),
+		format!("\t\tlet mut account = {mut_name}::new(data)"),
+		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
+	];
+	if let Some(discriminator) = discriminator {
+		lines.push(format!(
+			"\t\taccount.discriminator = {};",
+			discriminator.name
+		));
 	}
-
-	Ok(lines.join("\n"))
+	lines.extend([
+		"\t\tOk(account)".to_string(),
+		"\t}".to_string(),
+		String::new(),
+		format!(
+			"\tpub fn from_bytes(data: &[u8]) -> Result<{ref_name}<'_>, \
+			 solana_program_error::ProgramError> {{"
+		),
+		format!("\t\tlet account = {ref_name}::new(data)"),
+		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
+	]);
+	if let Some(discriminator) = discriminator {
+		lines.push(format!(
+			"\t\tif account.discriminator != {} {{",
+			discriminator.name
+		));
+		lines.push(
+			"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+		);
+		lines.push("\t\t}".to_string());
+	}
+	lines.extend([
+		"\t\tOk(account)".to_string(),
+		"\t}".to_string(),
+		String::new(),
+		format!(
+			"\tpub fn from_bytes_mut(data: &mut [u8]) -> Result<{mut_name}<'_>, \
+			 solana_program_error::ProgramError> {{"
+		),
+		format!("\t\tlet account = {mut_name}::new(data)"),
+		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
+	]);
+	if let Some(discriminator) = discriminator {
+		lines.push(format!(
+			"\t\tif account.discriminator != {} {{",
+			discriminator.name
+		));
+		lines.push(
+			"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+		);
+		lines.push("\t\t}".to_string());
+	}
+	lines.extend(["\t\tOk(account)".to_string(), "\t}".to_string()]);
+	lines
 }
 
 fn render_account_pda_helpers(

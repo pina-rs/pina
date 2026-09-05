@@ -88,6 +88,49 @@ pub(crate) fn render_type_for_pod(r#type: &TypeNode, context: &str) -> Result<St
 	}
 }
 
+pub(crate) fn is_compact_tail(r#type: &TypeNode) -> bool {
+	matches!(
+		r#type,
+		TypeNode::Array(array) if matches!(array.count.as_ref(), CountNode::Prefixed(_))
+	)
+}
+
+pub(crate) fn render_type_for_compact_tail(r#type: &TypeNode, context: &str) -> Result<String> {
+	let TypeNode::Array(array) = r#type else {
+		return Err(RenderError::UnsupportedType {
+			context: context.to_string(),
+			kind: r#type.kind(),
+			reason: "compact accounts require one trailing prefixed array".to_string(),
+		});
+	};
+	let CountNode::Prefixed(count) = array.count.as_ref() else {
+		return Err(RenderError::UnsupportedType {
+			context: context.to_string(),
+			kind: r#type.kind(),
+			reason: "compact accounts require one trailing prefixed array".to_string(),
+		});
+	};
+	let item_type = render_type_for_pod(&array.item, context)?;
+	let prefix_size = render_prefix_size(count.prefix.get_nested_type_node(), context)?;
+	let capacity = if prefix_size == 1 {
+		"{ u8::MAX as usize }"
+	} else if prefix_size == 2 {
+		"{ u16::MAX as usize }"
+	} else if prefix_size == 4 {
+		"{ u32::MAX as usize }"
+	} else {
+		"usize::MAX"
+	};
+
+	if prefix_size == 2 {
+		Ok(format!("pina::Vec<{item_type}, {capacity}>"))
+	} else {
+		Ok(format!(
+			"pina::PodVec<<{item_type} as pina::ZcField>::Pod, {capacity}, {prefix_size}>"
+		))
+	}
+}
+
 fn render_pod_option_type(option: &OptionTypeNode, context: &str) -> Result<String> {
 	if option.fixed != Some(true) {
 		return Err(RenderError::UnsupportedType {

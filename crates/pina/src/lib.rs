@@ -7,6 +7,8 @@
 //! ## Features
 //!
 //! - **Zero-copy account deserialization** via `zeropod` — no heap allocation.
+//! - **Compact dynamic accounts** with checked trailing vectors and typed,
+//!   rent-adjusting creation/reallocation helpers.
 //! - **`no_std` compatible** — designed for on-chain deployment to the SBF
 //!   target.
 //! - **Discriminator system** — every account, instruction, and event type
@@ -26,8 +28,8 @@
 //! - `token` — enables SPL token / token-2022 helpers and associated token
 //!   account utilities.
 //! - `memo` — enables memo program helpers.
-//! - `account-resize` — enables account realloc helpers on top of Pinocchio's
-//!   safe account resize support.
+//! - `account-resize` — enables raw realloc helpers plus typed compact-account
+//!   creation and reallocation on top of Pinocchio's safe resize support.
 
 #![no_std]
 // CU optimization for on-chain programs; inline_always ensures discriminator

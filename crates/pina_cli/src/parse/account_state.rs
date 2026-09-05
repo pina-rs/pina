@@ -11,6 +11,7 @@ use crate::ir::FieldIr;
 #[derive(Debug, Clone)]
 pub struct AccountStruct {
 	pub name: String,
+	pub is_compact: bool,
 	pub discriminator_enum: String,
 	pub variant: String,
 	pub fields: Vec<FieldIr>,
@@ -45,6 +46,7 @@ pub fn extract_account_structs(file: &File) -> Result<Vec<AccountStruct>, IdlErr
 
 		result.push(AccountStruct {
 			name: item_struct.ident.to_string(),
+			is_compact: has_compact_flag(&item_struct.attrs),
 			discriminator_enum,
 			variant,
 			fields,
@@ -54,6 +56,18 @@ pub fn extract_account_structs(file: &File) -> Result<Vec<AccountStruct>, IdlErr
 	}
 
 	Ok(result)
+}
+
+fn has_compact_flag(attrs: &[syn::Attribute]) -> bool {
+	attrs.iter().any(|attr| {
+		if !attr.path().is_ident("account") {
+			return false;
+		}
+		attr.parse_args_with(
+			syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
+		)
+		.is_ok_and(|items| items.iter().any(|item| item.path().is_ident("compact")))
+	})
 }
 
 /// Derive the IDL PDA name for a struct with a `#[pda(...)]` attribute.
@@ -112,6 +126,7 @@ mod tests {
 			extract_account_structs(&file).unwrap_or_else(|e| panic!("extract failed: {e}"));
 		assert_eq!(accounts.len(), 1);
 		assert_eq!(accounts[0].name, "CounterState");
+		assert!(!accounts[0].is_compact);
 		assert_eq!(accounts[0].discriminator_enum, "CounterAccountType");
 		assert_eq!(accounts[0].variant, "CounterState");
 		assert_eq!(accounts[0].fields.len(), 2);
@@ -119,6 +134,19 @@ mod tests {
 		assert_eq!(accounts[0].fields[0].rust_type, "u8");
 		assert_eq!(accounts[0].fields[1].name, "count");
 		assert_eq!(accounts[0].fields[1].rust_type, "PodU64");
+	}
+
+	#[test]
+	fn extracts_compact_account_flag() {
+		let source = r#"
+			#[account(discriminator = AccountType, compact)]
+			pub struct DynamicState { pub values: Vec<u64, 8> }
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let accounts =
+			extract_account_structs(&file).unwrap_or_else(|e| panic!("extract failed: {e}"));
+
+		assert!(accounts[0].is_compact);
 	}
 
 	#[test]

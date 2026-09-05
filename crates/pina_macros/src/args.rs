@@ -25,6 +25,9 @@ pub(crate) struct AccountArgs {
 	pub(crate) discriminator: Path,
 	/// Set the variant of the discriminator enum.
 	pub(crate) variant: Option<Ident>,
+	/// Use zeropod's compact, variable-length account layout.
+	#[darling(default)]
+	pub(crate) compact: Flag,
 }
 
 /// Arguments for the `#[instruction(...)]` attribute macro.

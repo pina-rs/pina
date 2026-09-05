@@ -33,7 +33,7 @@ cargo add pina_macros
 <br>
 
 - `#[discriminator]`: defines a typed discriminator enum (`u8`, `u16`, `u32`, `u64`).
-- `#[account]`: defines discriminator-first account POD structs and generated builders.
+- `#[account]`: defines discriminator-first fixed or compact account POD structs and generated builders.
 - `#[instruction]`: defines discriminator-first instruction data POD structs.
 - `#[event]`: defines discriminator-first event POD structs.
 - `#[pda]`: defines typed PDA seed, derivation, and validation helpers.
@@ -111,6 +111,6 @@ pub enum ExampleError {
 
 <br>
 
-- Generated account/instruction/event structs require fixed-size, alignment-1 `ZcElem` layouts with load-bearing `ZcValidate` implementations.
+- Generated instruction/event structs and ordinary accounts require fixed-size, alignment-1 `ZcElem` layouts with load-bearing `ZcValidate` implementations. `#[account(compact)]` additionally supports one audited trailing `Vec<T, N>` dynamic tail.
 - The macros are designed for `no_std` Solana program crates.
 - If you use `pina`, these macros are available directly without importing `pina_macros`.

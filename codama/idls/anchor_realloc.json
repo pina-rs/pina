@@ -12,11 +12,7 @@
 				"kind": "accountNode",
 				"name": "sample",
 				"docs": [
-					"The authenticated header at the start of every resizable sample account.",
-					"",
-					"Bytes after this fixed header are deliberately not exposed as a typed",
-					"collection. The example tests allocation and rent behaviour, not a data",
-					"serialization format; only the header participates in program logic."
+					"A compact account whose active values occupy only the bytes they need."
 				],
 				"data": {
 					"kind": "structTypeNode",
@@ -55,6 +51,29 @@
 							],
 							"type": {
 								"kind": "publicKeyTypeNode"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "values",
+							"docs": [
+								"Dynamically encoded values; unused capacity occupies no account bytes."
+							],
+							"type": {
+								"kind": "arrayTypeNode",
+								"item": {
+									"kind": "numberTypeNode",
+									"format": "u64",
+									"endian": "le"
+								},
+								"count": {
+									"kind": "prefixedCountNode",
+									"prefix": {
+										"kind": "numberTypeNode",
+										"format": "u16",
+										"endian": "le"
+									}
+								}
 							}
 						}
 					]
@@ -190,8 +209,7 @@
 				"docs": [
 					"Resizes the complete account-data buffer to `len` bytes.",
 					"",
-					"`len` includes the fixed [`Sample`] header and therefore cannot be smaller",
-					"than [`Sample::SIZE`]."
+					"`len` includes [`Sample::HEADER_SIZE`] and must end on a value boundary."
 				],
 				"accounts": [
 					{

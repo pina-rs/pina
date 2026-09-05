@@ -31,6 +31,8 @@ use crate::CloseAccountWithRecipient;
 use crate::LamportTransfer;
 use crate::MAX_SEEDS;
 use crate::PinaAccount;
+#[cfg(feature = "account-resize")]
+use crate::PinaCompactAccount;
 use crate::ProgramResult;
 
 /// Creates a rent-exempt system account owned by another program.
@@ -321,6 +323,125 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 
 		let mut data = self.account.try_borrow_mut()?;
 		T::write_discriminator(&mut data);
+
+		Ok(())
+	}
+}
+
+/// Creates and initializes a variable-length PDA-backed account.
+#[cfg(feature = "account-resize")]
+#[must_use = "account creation has no effect until invoke or invoke_signed is called"]
+pub struct CreateCompactProgramAccount<'account, 'address, 'seeds, 'seed> {
+	/// PDA account to allocate and initialize.
+	pub account: &'account mut AccountView,
+	/// Funding account that pays the rent-exempt balance.
+	pub payer: &'account AccountView,
+	/// Program that owns and derives the PDA.
+	pub owner: &'address Address,
+	/// PDA seeds without the canonical bump.
+	pub seeds: &'seeds [&'seed [u8]],
+	/// Initial byte length, bounded by the compact schema.
+	pub space: usize,
+}
+
+#[cfg(feature = "account-resize")]
+impl CreateCompactProgramAccount<'_, '_, '_, '_> {
+	/// Creates the compact account using its canonical PDA bump.
+	pub fn invoke<T: PinaCompactAccount>(&mut self) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed::<T>(&[])
+	}
+
+	/// Creates the compact account with additional payer signer seeds.
+	pub fn invoke_signed<T: PinaCompactAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+	) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed_inner::<T>(signers, None)
+	}
+
+	#[cfg(test)]
+	fn invoke_signed_with_rent<T: PinaCompactAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Rent,
+	) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed_inner::<T>(signers, Some(rent))
+	}
+
+	fn invoke_signed_inner<T: PinaCompactAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+	) -> Result<(Address, u8), ProgramError> {
+		let Some((address, bump)) = crate::try_find_program_address(self.seeds, self.owner) else {
+			return Err(ProgramError::InvalidSeeds);
+		};
+
+		CreateCompactProgramAccountWithBump {
+			account: self.account,
+			payer: self.payer,
+			owner: self.owner,
+			seeds: self.seeds,
+			bump,
+			space: self.space,
+		}
+		.invoke_signed_inner::<T>(signers, rent)?;
+
+		Ok((address, bump))
+	}
+}
+
+/// Creates a variable-length PDA-backed account using an explicit bump.
+#[cfg(feature = "account-resize")]
+#[must_use = "account creation has no effect until invoke or invoke_signed is called"]
+pub struct CreateCompactProgramAccountWithBump<'account, 'address, 'seeds, 'seed> {
+	/// PDA account to allocate and initialize.
+	pub account: &'account mut AccountView,
+	/// Funding account that pays the rent-exempt balance.
+	pub payer: &'account AccountView,
+	/// Program that owns and derives the PDA.
+	pub owner: &'address Address,
+	/// PDA seeds without the bump.
+	pub seeds: &'seeds [&'seed [u8]],
+	/// PDA bump to validate and append to `seeds`.
+	pub bump: u8,
+	/// Initial byte length, bounded by the compact schema.
+	pub space: usize,
+}
+
+#[cfg(feature = "account-resize")]
+impl CreateCompactProgramAccountWithBump<'_, '_, '_, '_> {
+	/// Creates and initializes the compact account.
+	pub fn invoke<T: PinaCompactAccount>(&mut self) -> ProgramResult {
+		self.invoke_signed::<T>(&[])
+	}
+
+	/// Creates and initializes the compact account with extra payer signers.
+	pub fn invoke_signed<T: PinaCompactAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+	) -> ProgramResult {
+		self.invoke_signed_inner::<T>(signers, None)
+	}
+
+	fn invoke_signed_inner<T: PinaCompactAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+	) -> ProgramResult {
+		T::validate_size(self.space)?;
+		AllocateAccountWithBump {
+			account: self.account,
+			payer: self.payer,
+			space: self.space as u64,
+			owner: self.owner,
+			seeds: self.seeds,
+			bump: self.bump,
+		}
+		.invoke_signed_inner(signers, rent)?;
+
+		let mut data = self.account.try_borrow_mut()?;
+		T::initialize(&mut data)?;
 
 		Ok(())
 	}
@@ -826,6 +947,51 @@ pub struct ReallocAccountZeroed<'account, 'payer, 'address> {
 	pub program_id: &'address Address,
 }
 
+/// Rent-adjusts and resizes a validated compact account.
+///
+/// Unlike the raw reallocation builders, this API verifies the account's
+/// current compact layout and constrains the target length to its declared
+/// header and capacity bounds.
+#[cfg(feature = "account-resize")]
+#[must_use = "account reallocation has no effect until invoke or invoke_signed is called"]
+pub struct ReallocCompactAccount<'account, 'payer, 'address> {
+	/// Program-owned compact account to resize.
+	pub account: &'account mut AccountView,
+	/// Account that funds growth or receives excess rent after shrinkage.
+	pub payer: &'payer mut AccountView,
+	/// Required account-data length after reallocation.
+	pub new_size: usize,
+	/// Executing program ID used to validate ownership.
+	pub program_id: &'address Address,
+}
+
+#[cfg(feature = "account-resize")]
+impl ReallocCompactAccount<'_, '_, '_> {
+	/// Validates and resizes the compact account.
+	pub fn invoke<T: PinaCompactAccount>(&mut self) -> ProgramResult {
+		self.invoke_signed::<T>(&[])
+	}
+
+	/// Validates and resizes the compact account with payer signer seeds.
+	pub fn invoke_signed<T: PinaCompactAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+	) -> ProgramResult {
+		use crate::AccountInfoValidation;
+
+		self.account.assert_compact_type::<T>(self.program_id)?;
+		T::validate_size(self.new_size)?;
+
+		realloc_account_inner(
+			self.account,
+			self.new_size,
+			self.payer,
+			self.program_id,
+			signers,
+		)
+	}
+}
+
 #[cfg(feature = "account-resize")]
 impl ReallocAccountZeroed<'_, '_, '_> {
 	/// Reallocates the account using transaction-level signatures.
@@ -1285,6 +1451,14 @@ mod tests {
 	use crate::ZeroPodFixed;
 	use crate::ZeroPodSchema;
 
+	mod compact_cpi_state {
+		include!(concat!(
+			env!("CARGO_MANIFEST_DIR"),
+			"/tests/support/compact_cpi_state.rs"
+		));
+	}
+	use compact_cpi_state::TestCompactState;
+
 	struct TestState;
 
 	impl ZeroPodSchema for TestState {
@@ -1440,6 +1614,60 @@ mod tests {
 		.invoke_signed_with_rent(&[], rent)
 		.unwrap_or_else(|error| panic!("allocate raw PDA: {error:?}"));
 		assert_eq!(result, (address, bump));
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn compact_pda_builder_executes_with_calculated_rent() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"compact-state"];
+		let (address, bump) = crate::try_find_program_address(seeds, &owner)
+			.unwrap_or_else(|| panic!("derive compact test address"));
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let initial_size = TestCompactState::HEADER_SIZE + 2 * size_of::<u64>();
+		let mut stored_state = TestAccount::<64>::new(address, owner, 0, initial_size);
+		let mut state = stored_state.view();
+
+		let result = CreateCompactProgramAccount {
+			account: &mut state,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			space: initial_size,
+		}
+		.invoke_signed_with_rent::<TestCompactState>(&[], test_rent())
+		.unwrap_or_else(|error| panic!("create compact PDA: {error:?}"));
+
+		assert_eq!(result, (address, bump));
+		assert_eq!(state.data_len(), initial_size);
+		let data = state
+			.try_borrow()
+			.unwrap_or_else(|error| panic!("borrow compact state: {error:?}"));
+		let compact = TestCompactState::try_from_bytes(&data)
+			.unwrap_or_else(|error| panic!("validate compact state: {error:?}"));
+		assert!(TestCompactState::matches_discriminator(&data));
+		assert_eq!(compact.value, 0);
+		assert!(compact.items().is_empty());
+		drop(compact);
+		drop(data);
+
+		let mut data = state
+			.try_borrow_mut()
+			.unwrap_or_else(|error| panic!("mutably borrow compact state: {error:?}"));
+		let mut compact = TestCompactState::try_from_bytes_mut(&mut data)
+			.unwrap_or_else(|error| panic!("mutably validate compact state: {error:?}"));
+		compact.value = 4;
+		let values = [crate::PodU64::from(8), crate::PodU64::from(13)];
+		compact
+			.set_items(&values)
+			.unwrap_or_else(|error| panic!("set compact items: {error:?}"));
+		assert_eq!(
+			compact
+				.commit()
+				.unwrap_or_else(|error| panic!("commit compact state: {error:?}")),
+			initial_size
+		);
 	}
 
 	#[test]

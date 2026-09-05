@@ -75,11 +75,12 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 	discriminator::expand(args.into(), input.into()).into()
 }
 
-/// Defines discriminator-first, fixed-size account data.
+/// Defines discriminator-first fixed or compact account data.
 ///
 /// The macro validates Pina's closed schema grammar, derives the zeropod
 /// companion, and generates checked `initialize` and `try_from_bytes`
-/// helpers.
+/// helpers. Add `compact` to permit exactly one trailing `Vec<T, N>` whose
+/// active elements, rather than its full capacity, occupy account data.
 ///
 /// # Example
 ///
@@ -88,6 +89,12 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 /// struct Counter {
 ///     authority: Address,
 ///     value: PodU64,
+/// }
+///
+/// #[account(discriminator = AccountType::History, compact)]
+/// struct History {
+///     authority: Address,
+///     values: Vec<u64, 64>,
 /// }
 /// ```
 #[proc_macro_attribute]

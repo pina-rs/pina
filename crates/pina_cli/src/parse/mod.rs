@@ -179,6 +179,7 @@ fn assemble_from_extracted(
 			.map(|disc_value| {
 				AccountIr {
 					name: acct.name.clone(),
+					is_compact: acct.is_compact,
 					fields: acct.fields.clone(),
 					discriminator: disc_value,
 					docs: acct.docs.clone(),
@@ -847,6 +848,7 @@ mod tests {
 			repr_size: 1,
 		};
 		let account = account_state::AccountStruct {
+			is_compact: false,
 			name: "VaultState".to_owned(),
 			discriminator_enum: "ExampleAccount".to_owned(),
 			variant: "Vault".to_owned(),
