@@ -17,9 +17,9 @@ import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart';
 import 'package:test/test.dart';
 
 const systemAddress = Address('11111111111111111111111111111111');
-final contractFixture =
-    jsonDecode(File('../../contracts/profile_program.json').readAsStringSync())
-        as Map<String, Object?>;
+final contractFixture = jsonDecode(
+  File('../../contracts/profile_program.json').readAsStringSync(),
+) as Map<String, Object?>;
 
 void main() {
   group('generated client inventory', () {

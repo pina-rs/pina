@@ -44,8 +44,8 @@ pub enum CompactAccountType {
 /// A compact account with two independently encoded dynamic fields.
 ///
 /// The one-byte discriminator, bump, authority, revision, and two vector
-/// prefixes always occupy [`Self::HEADER_SIZE`] bytes. Each active row adds an
-/// eight-byte entry and a one-byte marker, up to [`Self::MAX_SIZE`].
+/// prefixes always occupy `Self::HEADER_SIZE` bytes. Each active row adds an
+/// eight-byte entry and a one-byte marker, up to `Self::MAX_SIZE`.
 #[account(discriminator = CompactAccountType, compact)]
 #[pda(seeds = [SEED_JOURNAL, authority: Address], bump = bump)]
 pub struct Journal {

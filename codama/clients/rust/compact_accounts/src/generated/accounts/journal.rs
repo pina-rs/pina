@@ -16,8 +16,8 @@ pub struct Journal {
 	/// A compact account with two independently encoded dynamic fields.
 	///
 	/// The one-byte discriminator, bump, authority, revision, and two vector
-	/// prefixes always occupy [`Self::HEADER_SIZE`] bytes. Each active row adds an
-	/// eight-byte entry and a one-byte marker, up to [`Self::MAX_SIZE`].
+	/// prefixes always occupy `Self::HEADER_SIZE` bytes. Each active row adds an
+	/// eight-byte entry and a one-byte marker, up to `Self::MAX_SIZE`.
 	pub discriminator: u8,
 	/// Canonical PDA bump.
 	pub bump: u8,

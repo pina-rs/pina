@@ -70,7 +70,7 @@ pub struct InitializeIx {
 
 /// Resizes the complete account-data buffer to `len` bytes.
 ///
-/// `len` must equal [`Sample::projected_bytes`] for an active value count.
+/// `len` must equal `Sample::projected_bytes` for an active value count.
 #[instruction(discriminator = ReallocInstruction::Realloc)]
 pub struct ReallocIx {
 	pub len: u16,
