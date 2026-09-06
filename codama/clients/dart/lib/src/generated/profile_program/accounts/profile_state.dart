@@ -61,7 +61,7 @@ Encoder<ProfileState> getProfileStateEncoder() {
     (
       'favoriteTag',
       getNullableEncoder<BigInt>(
-        getU64Encoder(),
+        transformEncoder(getU64Encoder(), (BigInt value) => value),
         noneValue: const ZeroesNoneValue(),
       ),
     ),
