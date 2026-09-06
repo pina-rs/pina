@@ -9,6 +9,15 @@ let
   currentDir = builtins.dirOf __curPos.file;
   llvm = pkgs.llvmPackages_21;
   custom = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.hostPlatform.system};
+  kaniToolchain = pkgs.rust-bin.nightly."2025-11-21".minimal;
+  kani = custom.kani.overrideAttrs (old: {
+    buildInputs = (old.buildInputs or [ ]) ++ lib.optionals pkgs.stdenv.isLinux [ kaniToolchain ];
+    postInstall = (old.postInstall or "") + ''
+      if [ ! -e "$out/toolchain" ]; then
+        ln -s ${kaniToolchain} "$out/toolchain"
+      fi
+    '';
+  });
 in
 
 {
@@ -115,6 +124,8 @@ in
   # Rely on the global sdk for now as the nix apple sdk is not working for me.
   # apple.sdk = if pkgs.stdenv.isDarwin then pkgs.apple-sdk_15 else null;
   apple.sdk = null;
+
+  profiles.kani.module.packages = [ kani ];
 
   git-hooks = {
     package = pkgs.prek;
@@ -460,6 +471,43 @@ in
           cargo +"$TOOLCHAIN" miri test --locked -p pina --test schema_boundary --all-features
       '';
       description = "Run Miri regressions for loader guards and macro-generated schema storage.";
+      binary = "bash";
+    };
+    "test:kani:quick" = {
+      exec = ''
+        set -euo pipefail
+        cargo-kani \
+          -p pina \
+          --lib \
+          --no-default-features \
+          --features account-resize,compact \
+          --output-format terse \
+          --harness quick_
+      '';
+      description = "Run fast Kani proofs for arithmetic, parsers, compact sizing, CPI metadata, and fixed layouts.";
+      binary = "bash";
+    };
+    "test:kani:compact" = {
+      exec = ''
+        set -euo pipefail
+        cargo-kani \
+          -p pina \
+          --lib \
+          --no-default-features \
+          --features compact \
+          --output-format terse \
+          --harness compact_
+      '';
+      description = "Run bounded Kani state-machine proofs for compact account layouts.";
+      binary = "bash";
+    };
+    "test:kani" = {
+      exec = ''
+        set -euo pipefail
+        test:kani:quick
+        test:kani:compact
+      '';
+      description = "Run every Kani proof harness.";
       binary = "bash";
     };
     "test:pina:default" = {

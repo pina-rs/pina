@@ -194,6 +194,44 @@ jobs:
         run: test:miri
         shell: devenv shell -c -- bash -e {0}
 
+  kani-quick:
+    name: kani (quick)
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: run fast kani proofs
+        run: test:kani:quick
+        shell: devenv --profile kani shell -c -- bash -e {0}
+
+  kani-compact:
+    name: kani (compact layouts)
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: run compact-layout kani proofs
+        run: test:kani:compact
+        shell: devenv --profile kani shell -c -- bash -e {0}
+
   feature-matrix:
     timeout-minutes: 60
     runs-on: ubuntu-24.04

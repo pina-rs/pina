@@ -786,7 +786,7 @@ impl AsTokenAccount for AccountView {
 	}
 }
 
-fn checked_send_balances(
+pub(crate) fn checked_send_balances(
 	current: u64,
 	recipient_balance: u64,
 	lamports: u64,
@@ -801,7 +801,10 @@ fn checked_send_balances(
 	Ok((new_balance, new_recipient_balance))
 }
 
-fn checked_close_balance(sender_balance: u64, recipient_balance: u64) -> Result<u64, ProgramError> {
+pub(crate) fn checked_close_balance(
+	sender_balance: u64,
+	recipient_balance: u64,
+) -> Result<u64, ProgramError> {
 	recipient_balance
 		.checked_add(sender_balance)
 		.ok_or(ProgramError::ArithmeticOverflow)

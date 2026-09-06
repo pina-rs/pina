@@ -259,6 +259,7 @@ edition_2024_expr_fragment_specifier = "allow"
 level = "warn"
 check-cfg = [
 	'cfg(coverage)',
+	'cfg(kani)',
 	'cfg(target_os, values("solana"))',
 	'cfg(target_feature, values("static-syscalls"))',
 ]
