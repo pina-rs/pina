@@ -4,19 +4,21 @@ _Updated after the native-schema redesign in the PR #192 follow-up to PR #195._
 
 ## Architecture
 
-Pina uses zeropod's normal derive model rather than implementing a parallel zero-copy system:
+Pina uses Pinapod's normal derive model rather than implementing a parallel zero-copy system:
 
 ```rust
 #[account(discriminator = ProfileAccountType)]
 pub struct ProfileState {
 	pub bump: u8,
-	pub name: pina::String<32>,
-	pub tags: pina::Vec<u64, 8>,
+	pub name: [u8; 33],  // fully initialized bounded UTF-8 name
+	pub tags: [u8; 129], // fully initialized tag bytes
 	pub active: bool,
 }
 ```
 
-The source struct is a native schema. `zeropod::ZeroPod` generates `ProfileStateZc`, whose fields have alignment-one storage representations. Pina's account loaders validate the runtime byte slice and return a borrow of that generated view. Native integers and booleans remain native in the schema; callers use `.get()` / `.set()` on their generated storage fields.
+Fixed-layout schemas require fully initialized bounded arrays like these (this mirrors the real `ProfileState` in `examples/profile_program`). Compact schemas may instead end in exactly one bounded `Vec`/`PodVec` tail under `#[account(compact)]`; `String`/`PodString` remain rejected in both modes.
+
+The source struct is a native schema. `pinapod::ZeroPod` generates `ProfileStateZc`, whose fields have alignment-one storage representations. Pina's account loaders validate the runtime byte slice and return a borrow of that generated view. Native integers and booleans remain native in the schema; callers use `.get()` / `.set()` on their generated storage fields.
 
 ## Why there is no `to_bytes()`
 

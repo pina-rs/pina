@@ -6,7 +6,7 @@ The flow has three stages:
 
 1. Generate Codama JSON from Rust programs (`pina idl`).
 2. Validate generated JSON against committed fixtures/tests.
-3. Render clients (JS and Dart with Codama renderers, Rust with `pina_codama_renderer`).
+3. Render clients (JS and Dart with Codama renderers, Rust with `pina_codama_renderer`, and standalone CPI crates with `pina_cpi_renderer`).
 
 ## In This Repository
 
@@ -41,7 +41,7 @@ Supporting scripts:
 - `scripts/generate-codama-idls.sh`: regenerates `codama/idls/*.json` fixtures for all examples.
 - `scripts/verify-codama-idls.sh`: regenerates IDLs/clients, verifies fixtures and generated clients with Rust, JS, and Dart tests, and enforces deterministic no-diff output (including untracked files).
 
-The generated Dart package lives in `codama/clients/dart`. It exposes one package-root library per example, pins dependency resolution in `pubspec.lock`, and checks all 20 example IDLs as a single inventory. CI runs `dart format`, `dart analyze --fatal-infos`, and `dart test` over the checked-in output.
+The generated Dart package lives in `codama/clients/dart`. It exposes one package-root library per example, pins dependency resolution in `pubspec.lock`, and checks all 22 example IDLs as a single inventory. CI runs `dart format`, `dart analyze --fatal-infos`, and `dart test` over the checked-in output.
 
 For project-aware generation, `[clients]` in `pina.toml` controls `mode` (`auto`, `create`, `update`, or `overwrite`) and `scaffold`, with optional overrides under `[clients.cpi]`, `[clients.rust]`, `[clients.typescript]`, and `[clients.dart]`. Dart is also the Flutter target. Update mode replaces only generated sources, so user-owned manifests and entrypoints can be customized without being rewritten. See [Project Configuration](./cli/configuration.md) for the complete schema.
 
@@ -269,7 +269,7 @@ pub struct MyState {
 
 <!-- {/pinaIdlCanonicalExamples} -->
 
-For the full checklist and rationale, see [`crates/pina_cli/rules.md`](../../crates/pina_cli/rules.md).
+For the full checklist and rationale, see [`crates/pina_cli/rules.md`](https://github.com/pina-rs/pina/blob/main/crates/pina_cli/rules.md).
 
 ## CI Coverage
 

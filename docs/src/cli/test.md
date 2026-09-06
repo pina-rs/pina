@@ -36,10 +36,10 @@ Pina's prebuilt CLI supports more operating systems and CPU targets than Surfpoo
 
 ## Options
 
-| Option              | Meaning                                   |
-| ------------------- | ----------------------------------------- |
-| `--project <DIR>`   | Project directory or a directory below it |
-| `--unit`            | Run only native Rust and Mollusk tests    |
-| `--filter <FILTER>` | Pass a test-name filter to Cargo          |
+| Option                  | Meaning                                   |
+| ----------------------- | ----------------------------------------- |
+| `--project <DIR>`       | Project directory or a directory below it |
+| `--unit`                | Run only native Rust and Mollusk tests    |
+| `-f, --filter <FILTER>` | Pass a test-name filter to Cargo          |
 
 Run `pina test --help` for the authoritative command contract.

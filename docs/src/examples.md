@@ -23,10 +23,11 @@ The `examples/` workspace members demonstrate focused usage patterns. They are n
 - `anchor_sysvars`: clock/rent/stake-history sysvar validation parity.
 - `anchor_realloc`: authority-bound PDA realloc lifecycle, growth limits, and duplicate-target safety checks.
 - `compact_accounts`: focused compact-account size management across create, grow, same-size update, shrink, clear, rent adjustment, and rejected boundary cases.
+- `optional_accounts_program`: optional-account slots with explicit presence handling and count tracking.
 
 Use examples as references for the specific framework behavior each one demonstrates. Do not infer unimplemented economic behavior from an instruction name. Read [Production Readiness](./production-readiness.md) before adapting an example for an asset-bearing program.
 
-Anchor test-suite parity progress is tracked in [Anchor Test Porting](./anchor-test-porting.md).
+Anchor test-suite parity progress is tracked in [Anchor Test Porting](../anchor-test-porting.md).
 
 Every example directory includes a local `readme.md` with purpose, coverage, limitations, and run commands. Some E2E suites skip when their SBF binary is missing; production CI should build the artifact first and treat a missing artifact as a failure.
 

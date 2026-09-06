@@ -15,6 +15,10 @@ languages = ["cpi", "rust", "typescript"]
 mode = "auto"
 scaffold = true
 
+# Optional per-lint level overrides.
+[lints]
+require_canonical_instruction_dispatch = "deny"
+
 # Optional target-specific overrides.
 [clients.cpi]
 output = "onchain/cpi"
@@ -35,8 +39,11 @@ mode = "update"
 | `clients.<target>.output`   | no       | target name                | Target directory beneath `clients.output`.                 |
 | `clients.<target>.mode`     | no       | `clients.mode`             | Destination policy for one target.                         |
 | `clients.<target>.scaffold` | no       | `clients.scaffold`         | Scaffold policy for one target.                            |
+| `lints.<lint-name>`         | no       | built-in level             | Per-lint override: `allow`, `warn`, or `deny`.             |
 
 `<target>` is `cpi`, `rust`, `typescript`, or `dart`. Dart is the Dart and Flutter target; there is no separate Flutter generator.
+
+Lint levels are validated against the bundled lint catalog; see [Run Security Lints](./lint.md) for the full lint-level workflow.
 
 Generation modes make the destination lifecycle explicit:
 

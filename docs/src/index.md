@@ -20,4 +20,3 @@ This book is the single place for project documentation. It complements API refe
 - Guidance for examples and security-focused development.
 - A production-readiness gate for asset-bearing programs.
 - CI/release pipeline expectations.
-- A practical recommendations roadmap for improving goal alignment.

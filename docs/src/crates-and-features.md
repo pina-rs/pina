@@ -29,7 +29,7 @@ Includes:
 - Typed account loaders and discriminator checks.
 - CPI/system/token helper utilities.
 - `nostd_entrypoint!` and instruction parsing helpers.
-- Instruction introspection (flash loan guards, sandwich detection).
+- Instruction introspection (program-ID checks, sandwich detection).
 - Pod types with full arithmetic operator support.
 
 Feature flags:
@@ -127,7 +127,7 @@ The consuming program depends on the generated crate directly. This avoids coupl
 
 ## Pod types
 
-The `pina::pod` module re-exports zeropod's alignment-safe POD primitive wrappers (`PodBool`, `PodU*`, `PodI*`) and fixed-capacity collection types (`PodOption`, `PodString`, `PodVec`), shared by `pina` and generated clients.
+The `pina::pod` module re-exports Pinapod's alignment-safe POD primitive wrappers (`PodBool`, `PodU*`, `PodI*`) and fixed-capacity collection types (`PodOption`, `PodString`, `PodVec`), shared by `pina` and generated clients.
 
 <!-- {=podArithmeticDescription} -->
 
@@ -184,7 +184,7 @@ Repository-local renderer that generates Pina-style Rust client code from Codama
 - `discriminator.rs` — discriminator rendering
 - `seeds.rs` — seed parameter/constant rendering
 
-Use this when you want generated Rust models to match Pina's fixed-size, discriminator-first, zeropod-validated conventions.
+Use this when you want generated Rust models to match Pina's fixed-size, discriminator-first, Pinapod-validated conventions.
 
 ## `crates/pina_sdk_ids`
 
