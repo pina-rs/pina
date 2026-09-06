@@ -13,6 +13,7 @@ const OWNER: Address = Address::new_from_array([9; 32]);
 enum CompactKind {
 	DynamicState = 7,
 	ThreeTailState = 8,
+	PrefixState = 9,
 }
 
 #[account(crate = ::pina, discriminator = CompactKind, compact)]
@@ -34,6 +35,14 @@ struct ThreeTailState {
 	pub bytes: Vec<u8, 2>,
 	pub words: Vec<u16, 2>,
 	pub triples: Vec<[u8; 3], 2>,
+}
+
+#[account(crate = ::pina, discriminator = CompactKind, compact)]
+struct PrefixState {
+	pub one: PodVec<u8, 2, 1>,
+	pub two: PodVec<PodU16, 2, 2>,
+	pub four: PodVec<PodU32, 2, 4>,
+	pub eight: PodVec<PodU64, 2, 8>,
 }
 
 #[test]
@@ -79,8 +88,15 @@ fn compact_account_preserves_full_tails_across_two_full_replacements() {
 #[test]
 fn compact_account_roundtrips_active_tail_without_fixed_capacity_padding() {
 	assert_eq!(DynamicState::HEADER_SIZE, 38);
+	assert_eq!(DynamicState::MIN_SIZE, DynamicState::HEADER_SIZE);
 	assert_eq!(DynamicState::MAX_SIZE, 76);
 	assert_eq!(DynamicState::TAIL_ALIGNMENT, 2);
+	assert_eq!(DynamicState::VALUES_CAPACITY, 4);
+	assert_eq!(DynamicState::CODES_CAPACITY, 3);
+	assert_eq!(
+		DynamicState::projected_bytes(2, 2),
+		Ok(DynamicState::HEADER_SIZE + 16 + 4)
+	);
 
 	let mut data = [0u8; DynamicState::MAX_SIZE];
 	let values = [PodU64::from(11), PodU64::from(22)];
@@ -96,6 +112,12 @@ fn compact_account_roundtrips_active_tail_without_fixed_capacity_padding() {
 		state
 			.set_codes(&codes)
 			.unwrap_or_else(|error| panic!("set compact codes: {error:?}"));
+		assert_eq!(state.encoded_size(), DynamicState::MIN_SIZE);
+		assert_eq!(
+			state.projected_size(),
+			DynamicState::projected_bytes(values.len(), codes.len())
+				.unwrap_or_else(|error| panic!("project compact size: {error:?}"))
+		);
 		state
 			.commit()
 			.unwrap_or_else(|error| panic!("commit compact state: {error:?}"))
@@ -111,6 +133,70 @@ fn compact_account_roundtrips_active_tail_without_fixed_capacity_padding() {
 	assert_eq!(state.values()[0].get(), 11);
 	assert_eq!(state.values()[1].get(), 22);
 	assert_eq!(state.codes(), &codes);
+	assert_eq!(state.encoded_size(), encoded_size);
+}
+
+#[test]
+fn projected_bytes_rejects_each_tail_past_its_own_capacity() {
+	assert_eq!(
+		DynamicState::projected_bytes(DynamicState::VALUES_CAPACITY + 1, 0),
+		Err(ProgramError::InvalidAccountData)
+	);
+	assert_eq!(
+		DynamicState::projected_bytes(0, DynamicState::CODES_CAPACITY + 1),
+		Err(ProgramError::InvalidAccountData)
+	);
+}
+
+#[test]
+fn compact_size_helpers_cover_every_prefix_width_and_staged_edit() {
+	assert_eq!(PrefixState::MIN_SIZE, PrefixState::HEADER_SIZE);
+	assert_eq!(PrefixState::HEADER_SIZE, 16);
+	assert_eq!(PrefixState::ONE_CAPACITY, 2);
+	assert_eq!(PrefixState::TWO_CAPACITY, 2);
+	assert_eq!(PrefixState::FOUR_CAPACITY, 2);
+	assert_eq!(PrefixState::EIGHT_CAPACITY, 2);
+
+	let one = [1u8, 2];
+	let two = [PodU16::from(3)];
+	let four = [PodU32::from(5), PodU32::from(8)];
+	let eight = [PodU64::from(13)];
+	let expected = PrefixState::projected_bytes(one.len(), two.len(), four.len(), eight.len())
+		.unwrap_or_else(|error| panic!("project prefix state size: {error:?}"));
+	let mut data = [0u8; PrefixState::MAX_SIZE];
+	let committed = {
+		let mut state = PrefixState::initialize(&mut data)
+			.unwrap_or_else(|error| panic!("initialize prefix state: {error:?}"));
+		assert_eq!(state.encoded_size(), PrefixState::MIN_SIZE);
+		state.set_one(&one).unwrap();
+		state.set_two(&two).unwrap();
+		state.set_four(&four).unwrap();
+		state.set_eight(&eight).unwrap();
+		assert_eq!(state.encoded_size(), PrefixState::MIN_SIZE);
+		assert_eq!(state.projected_size(), expected);
+
+		state.commit().unwrap()
+	};
+	assert_eq!(committed, expected);
+
+	let state = PrefixState::try_from_bytes(&data)
+		.unwrap_or_else(|error| panic!("read prefix state: {error:?}"));
+	assert_eq!(state.encoded_size(), committed);
+	assert!(state.encoded_size() < data.len());
+
+	for counts in [[3, 0, 0, 0], [0, 3, 0, 0], [0, 0, 3, 0], [0, 0, 0, 3]] {
+		assert_eq!(
+			PrefixState::projected_bytes(counts[0], counts[1], counts[2], counts[3]),
+			Err(ProgramError::InvalidAccountData)
+		);
+	}
+
+	let mut state = PrefixState::try_from_bytes_mut(&mut data)
+		.unwrap_or_else(|error| panic!("mutably read prefix state: {error:?}"));
+	assert_eq!(state.encoded_size(), committed);
+	state.set_one(&one[..1]).unwrap();
+	assert_eq!(state.encoded_size(), committed);
+	assert_eq!(state.projected_size(), committed - 1);
 }
 
 #[test]

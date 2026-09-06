@@ -65,17 +65,10 @@ pub struct Journal {
 	pub markers: PodVec<u8, 8, 8>,
 }
 
-fn account_size(entry_count: usize) -> Result<usize, ProgramError> {
-	if entry_count > 8 {
-		return Err(ProgramError::InvalidArgument);
-	}
-
-	Ok(Journal::HEADER_SIZE
-		+ entry_count * (core::mem::size_of::<PodU64>() + core::mem::size_of::<u8>()))
-}
+let account_bytes = Journal::projected_bytes(active_entry_count, active_marker_count)?;
 ```
 
-The macro generates `JournalHeader`, `JournalRef`, and `JournalMut`, plus `HEADER_SIZE`, `MAX_SIZE`, checked load/initialize methods, and the compact-account traits used by Pina's typed CPI builders. Every tail length is stored in the fixed header. Active payloads are concatenated after that header in declaration order; declared capacity is a validation bound, not reserved space.
+The macro generates `JournalHeader`, `JournalRef`, and `JournalMut`, plus `HEADER_SIZE`, `MIN_SIZE`, `MAX_SIZE`, one `*_CAPACITY` constant per tail, checked size/load/initialize methods, and the compact-account traits used by Pina's typed CPI builders. For this schema, `ENTRIES_CAPACITY` and `MARKERS_CAPACITY` are both eight. Every tail length is stored in the fixed header. Active payloads are concatenated after that header in declaration order; declared capacity is a validation bound, not reserved space.
 
 Pina uses Pinapod, its maintained and wire-compatible ZeroPod fork. Each immutable and mutable accessor reads its own length prefix, so compact tails may have independent active lengths.
 
@@ -103,15 +96,21 @@ if target_size > account.data_len() {
 let encoded_size = {
 	let mut data = account.try_borrow_mut()?;
 	let mut journal = Journal::try_from_bytes_mut(&mut data)?;
+	let committed_size = journal.encoded_size();
 	journal
 		.set_entries(entries)
 		.map_err(|_| ProgramError::InvalidAccountData)?;
 	journal
 		.set_markers(markers)
 		.map_err(|_| ProgramError::InvalidAccountData)?;
-	journal
+	let projected_size = journal.projected_size();
+	let encoded_size = journal
 		.commit()
-		.map_err(|_| ProgramError::InvalidAccountData)?
+		.map_err(|_| ProgramError::InvalidAccountData)?;
+	debug_assert_eq!(encoded_size, projected_size);
+	debug_assert!(committed_size <= account.data_len());
+
+	encoded_size
 };
 
 if encoded_size < account.data_len() {
