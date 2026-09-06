@@ -179,6 +179,166 @@ fn scaffold_never_overwrites_consumer_files() {
 }
 
 #[test]
+fn generation_modes_create_update_and_overwrite_destinations() {
+	let root = load_fixture_root("vesting_program");
+	let crate_dir = unique_temp_dir("pina-cpi-renderer-modes");
+	let create = RenderConfig {
+		mode: RenderMode::Create,
+		..RenderConfig::default()
+	};
+	render_root_node(&root, &crate_dir, &create)
+		.unwrap_or_else(|error| panic!("create failed: {error}"));
+	let error = render_root_node(&root, &crate_dir, &create)
+		.expect_err("create must reject a nonempty destination");
+	assert!(matches!(error, RenderError::InvalidGenerationState { .. }));
+
+	fs::write(crate_dir.join("Cargo.toml"), "# consumer manifest\n")
+		.unwrap_or_else(|error| panic!("manifest edit failed: {error}"));
+	let update = RenderConfig {
+		mode: RenderMode::Update,
+		..RenderConfig::default()
+	};
+	render_root_node(&root, &crate_dir, &update)
+		.unwrap_or_else(|error| panic!("update failed: {error}"));
+	assert_eq!(
+		fs::read_to_string(crate_dir.join("Cargo.toml"))
+			.unwrap_or_else(|error| panic!("manifest read failed: {error}")),
+		"# consumer manifest\n"
+	);
+
+	fs::write(crate_dir.join("sentinel.txt"), "remove")
+		.unwrap_or_else(|error| panic!("sentinel write failed: {error}"));
+	let overwrite = RenderConfig {
+		mode: RenderMode::Overwrite,
+		..RenderConfig::default()
+	};
+	render_root_node(&root, &crate_dir, &overwrite)
+		.unwrap_or_else(|error| panic!("overwrite failed: {error}"));
+	assert!(!crate_dir.join("sentinel.txt").exists());
+	assert!(crate_dir.join("Cargo.toml").is_file());
+
+	fs::remove_dir_all(crate_dir)
+		.unwrap_or_else(|error| panic!("mode fixture cleanup failed: {error}"));
+}
+
+#[test]
+fn source_only_generation_does_not_create_a_crate_scaffold() {
+	let root = load_fixture_root("vesting_program");
+	let crate_dir = unique_temp_dir("pina-cpi-renderer-source-only");
+	let update = RenderConfig {
+		mode: RenderMode::Update,
+		..RenderConfig::default()
+	};
+	let error = render_root_node(&root, &crate_dir, &update)
+		.expect_err("update must reject a missing destination");
+	assert!(matches!(error, RenderError::InvalidGenerationState { .. }));
+
+	let source_only = RenderConfig {
+		scaffold: false,
+		..RenderConfig::default()
+	};
+	render_root_node(&root, &crate_dir, &source_only)
+		.unwrap_or_else(|error| panic!("source-only render failed: {error}"));
+	assert!(crate_dir.join("src/generated/mod.rs").is_file());
+	assert!(!crate_dir.join("Cargo.toml").exists());
+	assert!(!crate_dir.join("src/lib.rs").exists());
+
+	fs::remove_dir_all(crate_dir)
+		.unwrap_or_else(|error| panic!("source-only fixture cleanup failed: {error}"));
+}
+
+#[test]
+fn generation_mode_labels_cover_the_public_policy() {
+	assert_eq!(RenderMode::Auto.as_str(), "automatically generate");
+	assert_eq!(RenderMode::Create.as_str(), "create");
+	assert_eq!(RenderMode::Update.as_str(), "update");
+	assert_eq!(RenderMode::Overwrite.as_str(), "overwrite");
+}
+
+#[cfg(unix)]
+#[test]
+fn generation_modes_reject_unsafe_destination_trees_and_unreadable_paths() {
+	use std::os::unix::fs::PermissionsExt;
+	use std::os::unix::fs::symlink;
+
+	let root = load_fixture_root("vesting_program");
+	let output = unique_temp_dir("pina-cpi-render-mode-safety");
+	fs::create_dir_all(&output)
+		.unwrap_or_else(|error| panic!("failed to create safety fixture: {error}"));
+
+	let file = output.join("file");
+	fs::write(&file, "blocked")
+		.unwrap_or_else(|error| panic!("failed to create file target: {error}"));
+	assert!(matches!(
+		render_root_node(&root, &file, &RenderConfig::default()),
+		Err(RenderError::UnsafeOutputPath { .. })
+	));
+
+	let real = output.join("real");
+	let linked = output.join("linked");
+	fs::create_dir_all(&real)
+		.unwrap_or_else(|error| panic!("failed to create symlink target: {error}"));
+	symlink(&real, &linked)
+		.unwrap_or_else(|error| panic!("failed to create destination symlink: {error}"));
+	assert!(matches!(
+		render_root_node(&root, &linked, &RenderConfig::default()),
+		Err(RenderError::UnsafeOutputPath { .. })
+	));
+
+	let git_tree = output.join("git-tree");
+	fs::create_dir_all(git_tree.join(".git"))
+		.unwrap_or_else(|error| panic!("failed to create Git marker: {error}"));
+	assert!(matches!(
+		remove_crate_dir(&git_tree),
+		Err(RenderError::UnsafeOutputPath { .. })
+	));
+
+	let linked_tree = output.join("linked-tree");
+	fs::create_dir_all(&linked_tree)
+		.unwrap_or_else(|error| panic!("failed to create linked tree: {error}"));
+	symlink(&real, linked_tree.join("child"))
+		.unwrap_or_else(|error| panic!("failed to create nested symlink: {error}"));
+	assert!(matches!(
+		remove_crate_dir(&linked_tree),
+		Err(RenderError::UnsafeOutputPath { .. })
+	));
+	assert!(remove_crate_dir(&output.join("missing")).is_ok());
+
+	let blocked_parent = output.join("blocked-parent");
+	fs::create_dir_all(&blocked_parent)
+		.unwrap_or_else(|error| panic!("failed to create blocked parent: {error}"));
+	fs::set_permissions(&blocked_parent, fs::Permissions::from_mode(0o000))
+		.unwrap_or_else(|error| panic!("failed to block parent: {error}"));
+	let unreadable_metadata = render_root_node(
+		&root,
+		&blocked_parent.join("child"),
+		&RenderConfig::default(),
+	);
+	fs::set_permissions(&blocked_parent, fs::Permissions::from_mode(0o700))
+		.unwrap_or_else(|error| panic!("failed to restore parent: {error}"));
+	assert!(matches!(
+		unreadable_metadata,
+		Err(RenderError::ReadFile { .. })
+	));
+
+	let blocked_dir = output.join("blocked-dir");
+	fs::create_dir_all(&blocked_dir)
+		.unwrap_or_else(|error| panic!("failed to create blocked directory: {error}"));
+	fs::set_permissions(&blocked_dir, fs::Permissions::from_mode(0o000))
+		.unwrap_or_else(|error| panic!("failed to block directory: {error}"));
+	let unreadable_entries = render_root_node(&root, &blocked_dir, &RenderConfig::default());
+	fs::set_permissions(&blocked_dir, fs::Permissions::from_mode(0o700))
+		.unwrap_or_else(|error| panic!("failed to restore directory: {error}"));
+	assert!(matches!(
+		unreadable_entries,
+		Err(RenderError::ReadFile { .. })
+	));
+
+	fs::remove_dir_all(output)
+		.unwrap_or_else(|error| panic!("failed to clean safety fixture: {error}"));
+}
+
+#[test]
 fn scaffold_imports_a_custom_generated_folder() {
 	let root = load_fixture_root("vesting_program");
 	let crate_dir = unique_temp_dir("pina-cpi-renderer-custom-folder");

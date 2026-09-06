@@ -25,6 +25,20 @@ Options:
   -o, --output <DIR>
           Directory to create as the standalone CPI crate
 
+      --mode <MODE>
+          How to handle an existing output directory
+
+          Possible values:
+          - auto:      Create clients in empty destinations and update clients in existing ones
+          - create:    Require an empty or nonexistent destination
+          - update:    Require an existing, nonempty destination and preserve its scaffold
+          - overwrite: Remove the complete destination before generating it again
+          
+          [default: auto]
+
+      --no-scaffold
+          Generate source files without Cargo.toml or src/lib.rs
+
       --npx <COMMAND>
           Executable used to normalize Anchor IDLs. Defaults to npx
 

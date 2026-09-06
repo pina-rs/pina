@@ -36,10 +36,12 @@ use crate::codegen::try_ir_to_root_node;
 pub use crate::cpi::CpiGenerateOptions;
 pub use crate::cpi::generate_cpi_crate;
 pub use crate::cpi::generate_cpi_crate_from_reader;
+pub use crate::cpi::generate_cpi_crate_from_reader_with_config;
 use crate::error::IdlError;
 pub use crate::init::init_project;
 pub use crate::init::print_next_steps;
 use crate::parse::parse_program;
+pub use crate::project::GenerationMode;
 
 /// Generate a Codama IDL `RootNode` from a Pina program crate.
 ///

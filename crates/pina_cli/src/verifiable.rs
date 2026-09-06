@@ -1320,6 +1320,7 @@ mod tests {
 			idl_dir: root.join("target/idl"),
 			clients_dir: root.join("clients"),
 			clients: Vec::new(),
+			client_generation: BTreeMap::new(),
 			lint_levels: BTreeMap::new(),
 		}
 	}

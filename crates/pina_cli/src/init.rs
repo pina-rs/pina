@@ -120,6 +120,8 @@ program = "."
 [clients]
 output = "clients"
 languages = ["cpi", "rust", "typescript"]
+mode = "auto"
+scaffold = true
 "#
 	.to_owned()
 }

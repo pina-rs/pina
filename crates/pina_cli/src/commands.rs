@@ -41,14 +41,18 @@ pub(crate) fn run(cli: Cli) {
 			project,
 			clients,
 			output,
+			mode,
+			no_scaffold,
 			npx,
-		} => run_generate(project, clients, output, npx),
+		} => run_generate(project, clients, output, mode, no_scaffold, npx),
 		Commands::Cpi {
 			idl,
 			stdin,
 			output,
+			mode,
+			no_scaffold,
 			npx,
-		} => run_cpi(idl.as_deref(), stdin, &output, &npx),
+		} => run_cpi(idl.as_deref(), stdin, &output, mode, no_scaffold, &npx),
 		Commands::Idl { command, generate } => idl_command::run_idl_command(command, &generate),
 		Commands::Docs { topic } => run_docs(topic.as_deref()),
 		Commands::Init { name, path, force } => run_init(name.as_str(), path.as_deref(), force),
@@ -552,7 +556,14 @@ fn run_build(
 	}
 }
 
-fn run_generate(project: PathBuf, clients: Vec<ClientArg>, output: Option<PathBuf>, npx: String) {
+fn run_generate(
+	project: PathBuf,
+	clients: Vec<ClientArg>,
+	output: Option<PathBuf>,
+	mode: Option<pina_cli::GenerationMode>,
+	no_scaffold: bool,
+	npx: String,
+) {
 	let clients = clients
 		.into_iter()
 		.map(|client| {
@@ -568,6 +579,8 @@ fn run_generate(project: PathBuf, clients: Vec<ClientArg>, output: Option<PathBu
 		project_dir: project,
 		clients,
 		output,
+		mode,
+		scaffold: no_scaffold.then_some(false),
 		npx,
 	};
 	let generated = match pina_cli::generate_project_clients(&options) {
@@ -595,14 +608,28 @@ fn run_generate(project: PathBuf, clients: Vec<ClientArg>, output: Option<PathBu
 	println!("  Clients {}", generated.clients_dir.display());
 }
 
-fn run_cpi(idl: Option<&Path>, stdin: bool, output: &Path, npx: &str) {
+fn run_cpi(
+	idl: Option<&Path>,
+	stdin: bool,
+	output: &Path,
+	mode: pina_cli::GenerationMode,
+	no_scaffold: bool,
+	npx: &str,
+) {
 	let result = if stdin {
-		pina_cli::generate_cpi_crate_from_reader(std::io::stdin().lock(), output)
+		pina_cli::generate_cpi_crate_from_reader_with_config(
+			std::io::stdin().lock(),
+			output,
+			mode,
+			!no_scaffold,
+		)
 	} else {
 		let idl = idl.unwrap_or_else(|| unreachable!("clap requires --idl or --stdin"));
 		pina_cli::generate_cpi_crate(&pina_cli::CpiGenerateOptions {
 			idl: idl.to_path_buf(),
 			output: output.to_path_buf(),
+			mode,
+			scaffold: !no_scaffold,
 			npx: npx.to_string(),
 		})
 	};
