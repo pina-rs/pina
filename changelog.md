@@ -43,6 +43,222 @@ Generated JavaScript codecs reject over-capacity values rather than truncating t
 - Document the explicit `zeroed()` then `close_with_recipient()` close flow.
 - Regenerate Codama IDLs and committed Rust/JS clients for the updated writable-account inference.
 
+## [0.13.0](https://github.com/pina-rs/pina/releases/tag/v0.13.0) (2026-09-06)
+
+Grouped release for `core`.
+
+### Breaking Changes
+
+#### Add First-Class Compact Accounts
+
+_Packages:_ _pina_
+
+Adds checked dynamic account loaders and typed rent-adjusting builders, updates the realloc example, and covers the lifecycle in unit, SBF, generated-client, and Surfpool tests. This is a major release for `pina` so downstream programs can adopt the expanded account-layout contract explicitly.
+
+Compact mode is disabled by default. Enable `compact` for compact schemas and loaders, and combine it with `account-resize` for the typed creation and rent-adjusting reallocation builders:
+
+```toml
+[dependencies]
+pina = { version = "0.13", features = ["compact", "account-resize"] }
+```
+
+Compact mode uses a fixed header and a suffix of bounded vectors. Each vector length lives in the header and only active elements occupy account bytes:
+
+```rust
+#[account(discriminator = AccountType, compact)]
+pub struct Journal {
+	pub bump: u8,
+	pub authority: Address,
+	pub revision: u32,
+	pub entries: Vec<u64, 8>,
+	pub markers: Vec<u8, 16>,
+}
+
+let account_bytes = Journal::HEADER_SIZE
+	+ active_entry_count * core::mem::size_of::<PodU64>()
+	+ active_marker_count * core::mem::size_of::<u8>();
+Journal::validate_size(account_bytes)?;
+```
+
+`PinaCompactAccount::TAIL_ELEMENT_SIZE` is replaced by `TAIL_ALIGNMENT`, the greatest common byte alignment across all dynamic element types.
+
+Pina now uses Pinapod 0.1.0, its maintained and wire-compatible ZeroPod fork, so immutable and mutable accessors both use each compact vector's own active length.
+
+When resizing, allocate before writing a longer tail and commit a shorter tail before refunding its excess rent:
+
+```rust
+if target_size > account.data_len() {
+	ReallocCompactAccount {
+		account,
+		payer,
+		new_size: target_size,
+		program_id: &ID,
+	}
+	.invoke::<Journal>()?;
+}
+
+let encoded_size = {
+	let mut data = account.try_borrow_mut()?;
+	let mut journal = Journal::try_from_bytes_mut(&mut data)?;
+	journal.set_entries(entries).map_err(|_| ProgramError::InvalidAccountData)?;
+	journal.set_markers(markers).map_err(|_| ProgramError::InvalidAccountData)?;
+	journal.commit().map_err(|_| ProgramError::InvalidAccountData)?
+};
+
+if encoded_size < account.data_len() {
+	ReallocCompactAccount {
+		account,
+		payer,
+		new_size: encoded_size,
+		program_id: &ID,
+	}
+	.invoke::<Journal>()?;
+}
+```
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #298](https://github.com/pina-rs/pina/pull/298)
+
+#### Make generated clients safe to customize and regenerate
+
+_Packages:_ _core_
+
+Adds explicit `auto`, `create`, `update`, and `overwrite` destination modes plus scaffold controls to project-aware CPI, Rust, TypeScript, and Dart/Flutter generation. Global `[clients]` defaults can be overridden for each target, including its output directory, while CLI flags support one-off lifecycle and source-only generation.
+
+Update mode replaces only renderer-owned generated sources and preserves user-edited manifests and entrypoints. Overwrite mode is an explicit clean sweep with working-tree and symbolic-link safety checks. The native Rust and CPI renderers and the Codama CPI visitor expose the same controls.
+
+This is a breaking `core` API change because the public Rust renderer and CLI option structs gain required generation-policy fields.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #300](https://github.com/pina-rs/pina/pull/300)
+
+#### Add IDL-driven Pina CPI generation
+
+_Packages:_ _core_
+
+Adds a Codama Rust renderer and `@pina-rs/codama-renderer-cpi` visitor that generate standalone, `no_std` Pina CPI crates. Point the Codama pipeline or `pina cpi` at a Pina or Anchor IDL, select `cpi` in `pina.toml`, or run `pina generate --client cpi` in a Pina program. Every instruction becomes a direct call struct with typed account fields, a separately encoded instruction-data struct, and `.invoke()` and `.invoke_signed()` methods backed by Pina's validated `ProgramAccount`, `CpiHandle`, `ToCpiAccounts`, and `CpiContext` APIs.
+
+Generated fields preserve IDL documentation and identify account privileges or instruction-argument roles. Program-ID fallback optional accounts and runtime signer choices retain their Codama semantics; omitted optional-account layouts, optional arguments, big-endian numbers, and unsupported argument or discriminator types are rejected with errors naming the exact node instead of generating instruction data that would never dispatch. Accounts the IDL derives from PDA seeds stay ordinary call fields, because the runtime resolves CPI accounts against the executing program's own account list.
+
+New `pina init` projects select the standalone CPI client in `pina.toml` instead of creating a program-local `cpi` feature and handwritten `src/cpi.rs`. The `pina_bpf` CPI regression consumes the generated Prop AMM crate for both `.invoke()` and PDA-backed `.invoke_signed()`. A committed raw Anchor fixture is passed through the pinned converter and its generated crate is compile-checked end to end.
+
+This is a breaking `core` API change: `Program::new` has been removed. Callers must migrate to `Program::try_new` and handle its `Result<Self, ProgramError>`.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #296](https://github.com/pina-rs/pina/pull/296)
+
+### Features
+
+#### Add Bit-Precise Kani Verification
+
+_Packages:_ _pina_
+
+Adds a pure account-reallocation plan API and proves discriminator parsing, zero-copy validation, lamport conservation, rent adjustment, CPI metadata, compact schema sizing, aligned initialization, shrink-prefix validation, and bounded multi-tail layout invariants with Kani. Fast and compact proof suites run independently in CI and through dedicated devenv tasks.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #301](https://github.com/pina-rs/pina/pull/301) · _Related issues:_ [#298](https://github.com/pina-rs/pina/issues/298)
+
+#### Add First-Class Compact Accounts
+
+_Packages:_ _pina_cli_, _pina_macros_, _pina_codama_renderer_
+
+Adds checked dynamic account loaders and typed rent-adjusting builders, updates the realloc example, and covers the lifecycle in unit, SBF, generated-client, and Surfpool tests. This is a major release for `pina` so downstream programs can adopt the expanded account-layout contract explicitly.
+
+Compact mode is disabled by default. Enable `compact` for compact schemas and loaders, and combine it with `account-resize` for the typed creation and rent-adjusting reallocation builders:
+
+```toml
+[dependencies]
+pina = { version = "0.13", features = ["compact", "account-resize"] }
+```
+
+Compact mode uses a fixed header and a suffix of bounded vectors. Each vector length lives in the header and only active elements occupy account bytes:
+
+```rust
+#[account(discriminator = AccountType, compact)]
+pub struct Journal {
+	pub bump: u8,
+	pub authority: Address,
+	pub revision: u32,
+	pub entries: Vec<u64, 8>,
+	pub markers: Vec<u8, 16>,
+}
+
+let account_bytes = Journal::HEADER_SIZE
+	+ active_entry_count * core::mem::size_of::<PodU64>()
+	+ active_marker_count * core::mem::size_of::<u8>();
+Journal::validate_size(account_bytes)?;
+```
+
+`PinaCompactAccount::TAIL_ELEMENT_SIZE` is replaced by `TAIL_ALIGNMENT`, the greatest common byte alignment across all dynamic element types.
+
+Pina now uses Pinapod 0.1.0, its maintained and wire-compatible ZeroPod fork, so immutable and mutable accessors both use each compact vector's own active length.
+
+When resizing, allocate before writing a longer tail and commit a shorter tail before refunding its excess rent:
+
+```rust
+if target_size > account.data_len() {
+	ReallocCompactAccount {
+		account,
+		payer,
+		new_size: target_size,
+		program_id: &ID,
+	}
+	.invoke::<Journal>()?;
+}
+
+let encoded_size = {
+	let mut data = account.try_borrow_mut()?;
+	let mut journal = Journal::try_from_bytes_mut(&mut data)?;
+	journal.set_entries(entries).map_err(|_| ProgramError::InvalidAccountData)?;
+	journal.set_markers(markers).map_err(|_| ProgramError::InvalidAccountData)?;
+	journal.commit().map_err(|_| ProgramError::InvalidAccountData)?
+};
+
+if encoded_size < account.data_len() {
+	ReallocCompactAccount {
+		account,
+		payer,
+		new_size: encoded_size,
+		program_id: &ID,
+	}
+	.invoke::<Journal>()?;
+}
+```
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #298](https://github.com/pina-rs/pina/pull/298)
+
+### Fixes
+
+#### Use released Dart offset codecs
+
+_Packages:_ _pina_cli_
+
+Upgrade the pinned Dart renderer to 0.5.5, which contains the upstream pre/post-offset collection-length fix. Remove the local renderer patch and renderer-specific dependency overrides so generated clients use the published package directly.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #302](https://github.com/pina-rs/pina/pull/302)
+
+#### Prefix seed constants with SEED_
+
+_Packages:_ _pina_lints_
+
+Every example seed constant now leads with SEED_: PROFILE_SEED becomes SEED_PROFILE, STATE_SEED_PREFIX becomes SEED_STATE_PREFIX, and the same rule covers all remaining program, security-example, and surfpool-test seed constants. The illustrative COUNTER_SEED, CONFIG_SEED, STATE_SEED, MY_SEED, and VAULT_SEED constants used across crates documentation, doc comments, templates, test fixtures, and the pina_root macro contract tests rename to the SEED_ prefix form for consistency. The require_explicit_discriminators_and_seed_namespaces lint now also recognizes SEED_-prefixed seed constants so assertions using the preferred naming stay clean; names only reorder and seed bytes, PDA addresses, and program behavior are unchanged.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #295](https://github.com/pina-rs/pina/pull/295)
+
+### Notes
+
+#### Prefix seed constants with SEED_
+
+_Packages:_ _pina_, _pina_cli_, _pina_macros_
+
+Every example seed constant now leads with SEED_: PROFILE_SEED becomes SEED_PROFILE, STATE_SEED_PREFIX becomes SEED_STATE_PREFIX, and the same rule covers all remaining program, security-example, and surfpool-test seed constants. The illustrative COUNTER_SEED, CONFIG_SEED, STATE_SEED, MY_SEED, and VAULT_SEED constants used across crates documentation, doc comments, templates, test fixtures, and the pina_root macro contract tests rename to the SEED_ prefix form for consistency. The require_explicit_discriminators_and_seed_namespaces lint now also recognizes SEED_-prefixed seed constants so assertions using the preferred naming stay clean; names only reorder and seed bytes, PDA addresses, and program behavior are unchanged.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #295](https://github.com/pina-rs/pina/pull/295)
+
+#### Rename every example manifest to pina.toml
+
+_Packages:_ _pina_, _pina_cli_
+
+The lowercase `pina.toml` name is the canonical project configuration file, and the examples were the last remaining place still carrying the legacy uppercase `Pina.toml` spelling. Every example manifest is renamed with git so history follows the file, and the pina_cli example-discovery test message says pina.toml. Project discovery already prefers `pina.toml`, so nothing else changes; the legacy `Pina.toml` spelling remains discovered with a deprecation warning for existing projects.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #299](https://github.com/pina-rs/pina/pull/299)
+
 ## [0.12.2](https://github.com/pina-rs/pina/releases/tag/v0.12.2) (2026-09-01)
 
 Grouped release for `core`.

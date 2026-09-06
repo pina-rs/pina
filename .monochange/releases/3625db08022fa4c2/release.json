@@ -1,0 +1,1289 @@
+{
+	"schema_version": "0.4",
+	"kind": "monochange.releaseRecord",
+	"created_at": "2026-09-06T16:56:19Z",
+	"command": "release",
+	"version": null,
+	"versions": {
+		"core": "0.13.0",
+		"pina_root": "0.0.3"
+	},
+	"release_targets": [
+		{
+			"id": "core",
+			"kind": "group",
+			"version": "0.13.0",
+			"version_format": "primary",
+			"tag": true,
+			"release": true,
+			"tag_name": "v0.13.0",
+			"members": [
+				"pina",
+				"pina_cli",
+				"pina_lints",
+				"pina_macros",
+				"pina_codama_renderer",
+				"pina_cpi_renderer",
+				"pina_profile",
+				"pina_sdk_ids",
+				"pina_test",
+				"pina_codama_nodes",
+				"pina_codama_renderer_cpi",
+				"pina_cli_npm",
+				"pina_cli_darwin_arm64",
+				"pina_cli_darwin_x64",
+				"pina_cli_freebsd_x64",
+				"pina_cli_linux_arm64_gnu",
+				"pina_cli_linux_arm64_musl",
+				"pina_cli_linux_x64_gnu",
+				"pina_cli_linux_x64_musl",
+				"pina_cli_win32_arm64_msvc",
+				"pina_cli_win32_x64_msvc",
+				"pina_skill"
+			]
+		},
+		{
+			"id": "pina_root",
+			"kind": "package",
+			"version": "0.0.3",
+			"version_format": "namespaced",
+			"tag": false,
+			"release": false,
+			"tag_name": "pina_root/v0.0.3",
+			"members": [
+				"pina_root"
+			]
+		}
+	],
+	"released_packages": [
+		"@pina-rs/cli",
+		"@pina-rs/cli-darwin-arm64",
+		"@pina-rs/cli-darwin-x64",
+		"@pina-rs/cli-freebsd-x64",
+		"@pina-rs/cli-linux-arm64-gnu",
+		"@pina-rs/cli-linux-arm64-musl",
+		"@pina-rs/cli-linux-x64-gnu",
+		"@pina-rs/cli-linux-x64-musl",
+		"@pina-rs/cli-win32-arm64-msvc",
+		"@pina-rs/cli-win32-x64-msvc",
+		"@pina-rs/codama-nodes",
+		"@pina-rs/codama-renderer-cpi",
+		"@pina-rs/skill",
+		"pina",
+		"pina_cli",
+		"pina_codama_renderer",
+		"pina_cpi_renderer",
+		"pina_lints",
+		"pina_macros",
+		"pina_profile",
+		"pina_root",
+		"pina_sdk_ids",
+		"pina_test"
+	],
+	"changed_files": [
+		"Cargo.lock",
+		"Cargo.toml",
+		"changelog.md",
+		"crates/pina/Cargo.toml",
+		"crates/pina_cli/Cargo.toml",
+		"crates/pina_codama_renderer/Cargo.toml",
+		"crates/pina_cpi_renderer/Cargo.toml",
+		"crates/pina_lints/Cargo.toml",
+		"crates/pina_macros/Cargo.toml",
+		"crates/pina_profile/Cargo.toml",
+		"crates/pina_sdk_ids/Cargo.toml",
+		"crates/pina_test/Cargo.toml",
+		"packages/codama-renderer-cpi/package.json",
+		"packages/nodes-from-pina/package.json",
+		"packages/pina__cli/package.json",
+		"packages/pina__cli-darwin-arm64/package.json",
+		"packages/pina__cli-darwin-x64/package.json",
+		"packages/pina__cli-freebsd-x64/package.json",
+		"packages/pina__cli-linux-arm64-gnu/package.json",
+		"packages/pina__cli-linux-arm64-musl/package.json",
+		"packages/pina__cli-linux-x64-gnu/package.json",
+		"packages/pina__cli-linux-x64-musl/package.json",
+		"packages/pina__cli-win32-arm64-msvc/package.json",
+		"packages/pina__cli-win32-x64-msvc/package.json",
+		"packages/pina__skill/package.json",
+		"pnpm-lock.yaml"
+	],
+	"package_publications": [
+		{
+			"package": "pina",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_arm64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_freebsd_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_npm",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_arm64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_x64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_nodes",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cpi",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cpi_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_lints",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_macros",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_profile",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_sdk_ids",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_skill",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_test",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.13.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			},
+			"timeout": {
+				"timeout_seconds": 900,
+				"retries": 2
+			}
+		}
+	],
+	"updated_changelogs": [
+		"changelog.md"
+	],
+	"deleted_changesets": [
+		".changeset/dynamic-accounts.md",
+		".changeset/kani-verification.md",
+		".changeset/pina-configurable-client-generation.md",
+		".changeset/pina-cpi-renderer.md",
+		".changeset/pina-prefix-example-seed-constants.md",
+		".changeset/pina-rename-example-manifests-to-lowercase.md",
+		".changeset/use-released-dart-offset-codecs.md"
+	],
+	"changesets": [
+		{
+			"path": ".changeset/dynamic-accounts.md",
+			"summary": "Add First-Class Compact Accounts",
+			"details": "Adds checked dynamic account loaders and typed rent-adjusting builders, updates the realloc example, and covers the lifecycle in unit, SBF, generated-client, and Surfpool tests. This is a major release for `pina` so downstream programs can adopt the expanded account-layout contract explicitly.\n\nCompact mode is disabled by default. Enable `compact` for compact schemas and loaders, and combine it with `account-resize` for the typed creation and rent-adjusting reallocation builders:\n\n```toml\n[dependencies]\npina = { version = \"0.13\", features = [\"compact\", \"account-resize\"] }\n```\n\nCompact mode uses a fixed header and a suffix of bounded vectors. Each vector length lives in the header and only active elements occupy account bytes:\n\n```rust\n#[account(discriminator = AccountType, compact)]\npub struct Journal {\n\tpub bump: u8,\n\tpub authority: Address,\n\tpub revision: u32,\n\tpub entries: Vec<u64, 8>,\n\tpub markers: Vec<u8, 16>,\n}\n\nlet account_bytes = Journal::HEADER_SIZE\n\t+ active_entry_count * core::mem::size_of::<PodU64>()\n\t+ active_marker_count * core::mem::size_of::<u8>();\nJournal::validate_size(account_bytes)?;\n```\n\n`PinaCompactAccount::TAIL_ELEMENT_SIZE` is replaced by `TAIL_ALIGNMENT`, the greatest common byte alignment across all dynamic element types.\n\nPina now uses Pinapod 0.1.0, its maintained and wire-compatible ZeroPod fork, so immutable and mutable accessors both use each compact vector's own active length.\n\nWhen resizing, allocate before writing a longer tail and commit a shorter tail before refunding its excess rent:\n\n```rust\nif target_size > account.data_len() {\n\tReallocCompactAccount {\n\t\taccount,\n\t\tpayer,\n\t\tnew_size: target_size,\n\t\tprogram_id: &ID,\n\t}\n\t.invoke::<Journal>()?;\n}\n\nlet encoded_size = {\n\tlet mut data = account.try_borrow_mut()?;\n\tlet mut journal = Journal::try_from_bytes_mut(&mut data)?;\n\tjournal.set_entries(entries).map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal.set_markers(markers).map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal.commit().map_err(|_| ProgramError::InvalidAccountData)?\n};\n\nif encoded_size < account.data_len() {\n\tReallocCompactAccount {\n\t\taccount,\n\t\tpayer,\n\t\tnew_size: encoded_size,\n\t\tprogram_id: &ID,\n\t}\n\t.invoke::<Journal>()?;\n}\n```",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_codama_renderer",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "4221cfce4fdcf577ee0dd7da6aa73fa9e053fad8",
+						"short_sha": "4221cfc",
+						"url": "https://github.com/pina-rs/pina/commit/4221cfce4fdcf577ee0dd7da6aa73fa9e053fad8",
+						"authored_at": "2026-09-06T14:31:28+01:00",
+						"committed_at": "2026-09-06T14:31:28+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#298",
+						"title": "feat(pina)!: add multi-tail compact account reallocations",
+						"url": "https://github.com/pina-rs/pina/pull/298",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "4221cfce4fdcf577ee0dd7da6aa73fa9e053fad8",
+						"short_sha": "4221cfc",
+						"url": "https://github.com/pina-rs/pina/commit/4221cfce4fdcf577ee0dd7da6aa73fa9e053fad8",
+						"authored_at": "2026-09-06T14:31:28+01:00",
+						"committed_at": "2026-09-06T14:31:28+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#298",
+						"title": "feat(pina)!: add multi-tail compact account reallocations",
+						"url": "https://github.com/pina-rs/pina/pull/298",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/kani-verification.md",
+			"summary": "Add Bit-Precise Kani Verification",
+			"details": "Adds a pure account-reallocation plan API and proves discriminator parsing, zero-copy validation, lamport conservation, rent adjustment, CPI metadata, compact schema sizing, aligned initialization, shrink-prefix validation, and bounded multi-tail layout invariants with Kani. Fast and compact proof suites run independently in CI and through dedicated devenv tasks.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "7aa3fcb0e7cfcbd17788aeb176c3d73176a4c2ae",
+						"short_sha": "7aa3fcb",
+						"url": "https://github.com/pina-rs/pina/commit/7aa3fcb0e7cfcbd17788aeb176c3d73176a4c2ae",
+						"authored_at": "2026-09-06T17:44:53+01:00",
+						"committed_at": "2026-09-06T17:44:53+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#301",
+						"title": "feat(pina): add Kani verification",
+						"url": "https://github.com/pina-rs/pina/pull/301",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "7aa3fcb0e7cfcbd17788aeb176c3d73176a4c2ae",
+						"short_sha": "7aa3fcb",
+						"url": "https://github.com/pina-rs/pina/commit/7aa3fcb0e7cfcbd17788aeb176c3d73176a4c2ae",
+						"authored_at": "2026-09-06T17:44:53+01:00",
+						"committed_at": "2026-09-06T17:44:53+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#301",
+						"title": "feat(pina): add Kani verification",
+						"url": "https://github.com/pina-rs/pina/pull/301",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#298",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/298",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/pina-configurable-client-generation.md",
+			"summary": "Make generated clients safe to customize and regenerate",
+			"details": "Adds explicit `auto`, `create`, `update`, and `overwrite` destination modes plus scaffold controls to project-aware CPI, Rust, TypeScript, and Dart/Flutter generation. Global `[clients]` defaults can be overridden for each target, including its output directory, while CLI flags support one-off lifecycle and source-only generation.\n\nUpdate mode replaces only renderer-owned generated sources and preserves user-edited manifests and entrypoints. Overwrite mode is an explicit clean sweep with working-tree and symbolic-link safety checks. The native Rust and CPI renderers and the Codama CPI visitor expose the same controls.\n\nThis is a breaking `core` API change because the public Rust renderer and CLI option structs gain required generation-policy fields.",
+			"targets": [
+				{
+					"id": "core",
+					"kind": "group",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "major"
+				},
+				{
+					"id": "pina_root",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "10fa32181a4aae7cee8627d50528fc4ebeb8f6fd",
+						"short_sha": "10fa321",
+						"url": "https://github.com/pina-rs/pina/commit/10fa32181a4aae7cee8627d50528fc4ebeb8f6fd",
+						"authored_at": "2026-09-06T12:24:38+01:00",
+						"committed_at": "2026-09-06T12:24:38+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#300",
+						"title": "feat(cli): configure client generation lifecycle",
+						"url": "https://github.com/pina-rs/pina/pull/300",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "10fa32181a4aae7cee8627d50528fc4ebeb8f6fd",
+						"short_sha": "10fa321",
+						"url": "https://github.com/pina-rs/pina/commit/10fa32181a4aae7cee8627d50528fc4ebeb8f6fd",
+						"authored_at": "2026-09-06T12:24:38+01:00",
+						"committed_at": "2026-09-06T12:24:38+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#300",
+						"title": "feat(cli): configure client generation lifecycle",
+						"url": "https://github.com/pina-rs/pina/pull/300",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/pina-cpi-renderer.md",
+			"summary": "Add IDL-driven Pina CPI generation",
+			"details": "Adds a Codama Rust renderer and `@pina-rs/codama-renderer-cpi` visitor that generate standalone, `no_std` Pina CPI crates. Point the Codama pipeline or `pina cpi` at a Pina or Anchor IDL, select `cpi` in `pina.toml`, or run `pina generate --client cpi` in a Pina program. Every instruction becomes a direct call struct with typed account fields, a separately encoded instruction-data struct, and `.invoke()` and `.invoke_signed()` methods backed by Pina's validated `ProgramAccount`, `CpiHandle`, `ToCpiAccounts`, and `CpiContext` APIs.\n\nGenerated fields preserve IDL documentation and identify account privileges or instruction-argument roles. Program-ID fallback optional accounts and runtime signer choices retain their Codama semantics; omitted optional-account layouts, optional arguments, big-endian numbers, and unsupported argument or discriminator types are rejected with errors naming the exact node instead of generating instruction data that would never dispatch. Accounts the IDL derives from PDA seeds stay ordinary call fields, because the runtime resolves CPI accounts against the executing program's own account list.\n\nNew `pina init` projects select the standalone CPI client in `pina.toml` instead of creating a program-local `cpi` feature and handwritten `src/cpi.rs`. The `pina_bpf` CPI regression consumes the generated Prop AMM crate for both `.invoke()` and PDA-backed `.invoke_signed()`. A committed raw Anchor fixture is passed through the pinned converter and its generated crate is compile-checked end to end.\n\nThis is a breaking `core` API change: `Program::new` has been removed. Callers must migrate to `Program::try_new` and handle its `Result<Self, ProgramError>`.",
+			"targets": [
+				{
+					"id": "core",
+					"kind": "group",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "major"
+				},
+				{
+					"id": "pina_root",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "4b5eeeb17ffef2fab206f4676e57909bcd33dc58",
+						"short_sha": "4b5eeeb",
+						"url": "https://github.com/pina-rs/pina/commit/4b5eeeb17ffef2fab206f4676e57909bcd33dc58",
+						"authored_at": "2026-09-06T05:01:02+01:00",
+						"committed_at": "2026-09-06T05:01:02+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#296",
+						"title": "feat(cpi)!: add IDL-driven CPI generation pipeline",
+						"url": "https://github.com/pina-rs/pina/pull/296",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "4b5eeeb17ffef2fab206f4676e57909bcd33dc58",
+						"short_sha": "4b5eeeb",
+						"url": "https://github.com/pina-rs/pina/commit/4b5eeeb17ffef2fab206f4676e57909bcd33dc58",
+						"authored_at": "2026-09-06T05:01:02+01:00",
+						"committed_at": "2026-09-06T05:01:02+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#296",
+						"title": "feat(cpi)!: add IDL-driven CPI generation pipeline",
+						"url": "https://github.com/pina-rs/pina/pull/296",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/pina-prefix-example-seed-constants.md",
+			"summary": "Prefix seed constants with SEED_",
+			"details": "Every example seed constant now leads with SEED_: PROFILE_SEED becomes SEED_PROFILE, STATE_SEED_PREFIX becomes SEED_STATE_PREFIX, and the same rule covers all remaining program, security-example, and surfpool-test seed constants. The illustrative COUNTER_SEED, CONFIG_SEED, STATE_SEED, MY_SEED, and VAULT_SEED constants used across crates documentation, doc comments, templates, test fixtures, and the pina_root macro contract tests rename to the SEED_ prefix form for consistency. The require_explicit_discriminators_and_seed_namespaces lint now also recognizes SEED_-prefixed seed constants so assertions using the preferred naming stay clean; names only reorder and seed bytes, PDA addresses, and program behavior are unchanged.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_lints",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "66210c3dc148be48919f0e4c5ca03bdeadcfcb07",
+						"short_sha": "66210c3",
+						"url": "https://github.com/pina-rs/pina/commit/66210c3dc148be48919f0e4c5ca03bdeadcfcb07",
+						"authored_at": "2026-09-05T14:33:25+01:00",
+						"committed_at": "2026-09-05T14:33:25+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#295",
+						"title": "refactor(examples): move seed to the front of seed constant names",
+						"url": "https://github.com/pina-rs/pina/pull/295",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "66210c3dc148be48919f0e4c5ca03bdeadcfcb07",
+						"short_sha": "66210c3",
+						"url": "https://github.com/pina-rs/pina/commit/66210c3dc148be48919f0e4c5ca03bdeadcfcb07",
+						"authored_at": "2026-09-05T14:33:25+01:00",
+						"committed_at": "2026-09-05T14:33:25+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#295",
+						"title": "refactor(examples): move seed to the front of seed constant names",
+						"url": "https://github.com/pina-rs/pina/pull/295",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/pina-rename-example-manifests-to-lowercase.md",
+			"summary": "Rename every example manifest to pina.toml",
+			"details": "The lowercase `pina.toml` name is the canonical project configuration file, and the examples were the last remaining place still carrying the legacy uppercase `Pina.toml` spelling. Every example manifest is renamed with git so history follows the file, and the pina_cli example-discovery test message says pina.toml. Project discovery already prefers `pina.toml`, so nothing else changes; the legacy `Pina.toml` spelling remains discovered with a deprecation warning for existing projects.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c22a53a98b566777af180786bc9d942eb0303512",
+						"short_sha": "c22a53a",
+						"url": "https://github.com/pina-rs/pina/commit/c22a53a98b566777af180786bc9d942eb0303512",
+						"authored_at": "2026-09-06T01:57:52+01:00",
+						"committed_at": "2026-09-06T01:57:52+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#299",
+						"title": "refactor(examples): rename every Pina.toml manifest to pina.toml",
+						"url": "https://github.com/pina-rs/pina/pull/299",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c22a53a98b566777af180786bc9d942eb0303512",
+						"short_sha": "c22a53a",
+						"url": "https://github.com/pina-rs/pina/commit/c22a53a98b566777af180786bc9d942eb0303512",
+						"authored_at": "2026-09-06T01:57:52+01:00",
+						"committed_at": "2026-09-06T01:57:52+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#299",
+						"title": "refactor(examples): rename every Pina.toml manifest to pina.toml",
+						"url": "https://github.com/pina-rs/pina/pull/299",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/use-released-dart-offset-codecs.md",
+			"summary": "Use released Dart offset codecs",
+			"details": "Upgrade the pinned Dart renderer to 0.5.5, which contains the upstream pre/post-offset collection-length fix. Remove the local renderer patch and renderer-specific dependency overrides so generated clients use the published package directly.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "0db56b0f900847f4c7906c0d4c25b258b72fcfe8",
+						"short_sha": "0db56b0",
+						"url": "https://github.com/pina-rs/pina/commit/0db56b0f900847f4c7906c0d4c25b258b72fcfe8",
+						"authored_at": "2026-09-06T16:55:06+01:00",
+						"committed_at": "2026-09-06T16:55:06+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#302",
+						"title": "fix(cli): use released Dart offset codecs",
+						"url": "https://github.com/pina-rs/pina/pull/302",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "0db56b0f900847f4c7906c0d4c25b258b72fcfe8",
+						"short_sha": "0db56b0",
+						"url": "https://github.com/pina-rs/pina/commit/0db56b0f900847f4c7906c0d4c25b258b72fcfe8",
+						"authored_at": "2026-09-06T16:55:06+01:00",
+						"committed_at": "2026-09-06T16:55:06+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#302",
+						"title": "fix(cli): use released Dart offset codecs",
+						"url": "https://github.com/pina-rs/pina/pull/302",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		}
+	],
+	"changelogs": [
+		{
+			"owner_id": "core",
+			"owner_kind": "group",
+			"path": "changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.13.0](https://github.com/pina-rs/pina/releases/tag/v0.13.0) (2026-09-06)",
+				"summary": [
+					"Grouped release for `core`."
+				],
+				"sections": [
+					{
+						"title": "Breaking Changes",
+						"collapsed": false,
+						"entries": [
+							"#### Add First-Class Compact Accounts\n_Packages:_ _pina_\n\nAdds checked dynamic account loaders and typed rent-adjusting builders, updates the realloc example, and covers the lifecycle in unit, SBF, generated-client, and Surfpool tests. This is a major release for `pina` so downstream programs can adopt the expanded account-layout contract explicitly.\n\nCompact mode is disabled by default. Enable `compact` for compact schemas and loaders, and combine it with `account-resize` for the typed creation and rent-adjusting reallocation builders:\n\n```toml\n[dependencies]\npina = { version = \"0.13\", features = [\"compact\", \"account-resize\"] }\n```\n\nCompact mode uses a fixed header and a suffix of bounded vectors. Each vector length lives in the header and only active elements occupy account bytes:\n\n```rust\n#[account(discriminator = AccountType, compact)]\npub struct Journal {\n\tpub bump: u8,\n\tpub authority: Address,\n\tpub revision: u32,\n\tpub entries: Vec<u64, 8>,\n\tpub markers: Vec<u8, 16>,\n}\n\nlet account_bytes = Journal::HEADER_SIZE\n\t+ active_entry_count * core::mem::size_of::<PodU64>()\n\t+ active_marker_count * core::mem::size_of::<u8>();\nJournal::validate_size(account_bytes)?;\n```\n\n`PinaCompactAccount::TAIL_ELEMENT_SIZE` is replaced by `TAIL_ALIGNMENT`, the greatest common byte alignment across all dynamic element types.\n\nPina now uses Pinapod 0.1.0, its maintained and wire-compatible ZeroPod fork, so immutable and mutable accessors both use each compact vector's own active length.\n\nWhen resizing, allocate before writing a longer tail and commit a shorter tail before refunding its excess rent:\n\n```rust\nif target_size > account.data_len() {\n\tReallocCompactAccount {\n\t\taccount,\n\t\tpayer,\n\t\tnew_size: target_size,\n\t\tprogram_id: &ID,\n\t}\n\t.invoke::<Journal>()?;\n}\n\nlet encoded_size = {\n\tlet mut data = account.try_borrow_mut()?;\n\tlet mut journal = Journal::try_from_bytes_mut(&mut data)?;\n\tjournal.set_entries(entries).map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal.set_markers(markers).map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal.commit().map_err(|_| ProgramError::InvalidAccountData)?\n};\n\nif encoded_size < account.data_len() {\n\tReallocCompactAccount {\n\t\taccount,\n\t\tpayer,\n\t\tnew_size: encoded_size,\n\t\tprogram_id: &ID,\n\t}\n\t.invoke::<Journal>()?;\n}\n```\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #298](https://github.com/pina-rs/pina/pull/298)",
+							"#### Make generated clients safe to customize and regenerate\n_Packages:_ _core_\n\nAdds explicit `auto`, `create`, `update`, and `overwrite` destination modes plus scaffold controls to project-aware CPI, Rust, TypeScript, and Dart/Flutter generation. Global `[clients]` defaults can be overridden for each target, including its output directory, while CLI flags support one-off lifecycle and source-only generation.\n\nUpdate mode replaces only renderer-owned generated sources and preserves user-edited manifests and entrypoints. Overwrite mode is an explicit clean sweep with working-tree and symbolic-link safety checks. The native Rust and CPI renderers and the Codama CPI visitor expose the same controls.\n\nThis is a breaking `core` API change because the public Rust renderer and CLI option structs gain required generation-policy fields.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #300](https://github.com/pina-rs/pina/pull/300)",
+							"#### Add IDL-driven Pina CPI generation\n_Packages:_ _core_\n\nAdds a Codama Rust renderer and `@pina-rs/codama-renderer-cpi` visitor that generate standalone, `no_std` Pina CPI crates. Point the Codama pipeline or `pina cpi` at a Pina or Anchor IDL, select `cpi` in `pina.toml`, or run `pina generate --client cpi` in a Pina program. Every instruction becomes a direct call struct with typed account fields, a separately encoded instruction-data struct, and `.invoke()` and `.invoke_signed()` methods backed by Pina's validated `ProgramAccount`, `CpiHandle`, `ToCpiAccounts`, and `CpiContext` APIs.\n\nGenerated fields preserve IDL documentation and identify account privileges or instruction-argument roles. Program-ID fallback optional accounts and runtime signer choices retain their Codama semantics; omitted optional-account layouts, optional arguments, big-endian numbers, and unsupported argument or discriminator types are rejected with errors naming the exact node instead of generating instruction data that would never dispatch. Accounts the IDL derives from PDA seeds stay ordinary call fields, because the runtime resolves CPI accounts against the executing program's own account list.\n\nNew `pina init` projects select the standalone CPI client in `pina.toml` instead of creating a program-local `cpi` feature and handwritten `src/cpi.rs`. The `pina_bpf` CPI regression consumes the generated Prop AMM crate for both `.invoke()` and PDA-backed `.invoke_signed()`. A committed raw Anchor fixture is passed through the pinned converter and its generated crate is compile-checked end to end.\n\nThis is a breaking `core` API change: `Program::new` has been removed. Callers must migrate to `Program::try_new` and handle its `Result<Self, ProgramError>`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #296](https://github.com/pina-rs/pina/pull/296)"
+						]
+					},
+					{
+						"title": "Features",
+						"collapsed": false,
+						"entries": [
+							"#### Add Bit-Precise Kani Verification\n_Packages:_ _pina_\n\nAdds a pure account-reallocation plan API and proves discriminator parsing, zero-copy validation, lamport conservation, rent adjustment, CPI metadata, compact schema sizing, aligned initialization, shrink-prefix validation, and bounded multi-tail layout invariants with Kani. Fast and compact proof suites run independently in CI and through dedicated devenv tasks.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #301](https://github.com/pina-rs/pina/pull/301) · _Related issues:_ [#298](https://github.com/pina-rs/pina/issues/298)",
+							"#### Add First-Class Compact Accounts\n_Packages:_ _pina_cli_, _pina_macros_, _pina_codama_renderer_\n\nAdds checked dynamic account loaders and typed rent-adjusting builders, updates the realloc example, and covers the lifecycle in unit, SBF, generated-client, and Surfpool tests. This is a major release for `pina` so downstream programs can adopt the expanded account-layout contract explicitly.\n\nCompact mode is disabled by default. Enable `compact` for compact schemas and loaders, and combine it with `account-resize` for the typed creation and rent-adjusting reallocation builders:\n\n```toml\n[dependencies]\npina = { version = \"0.13\", features = [\"compact\", \"account-resize\"] }\n```\n\nCompact mode uses a fixed header and a suffix of bounded vectors. Each vector length lives in the header and only active elements occupy account bytes:\n\n```rust\n#[account(discriminator = AccountType, compact)]\npub struct Journal {\n\tpub bump: u8,\n\tpub authority: Address,\n\tpub revision: u32,\n\tpub entries: Vec<u64, 8>,\n\tpub markers: Vec<u8, 16>,\n}\n\nlet account_bytes = Journal::HEADER_SIZE\n\t+ active_entry_count * core::mem::size_of::<PodU64>()\n\t+ active_marker_count * core::mem::size_of::<u8>();\nJournal::validate_size(account_bytes)?;\n```\n\n`PinaCompactAccount::TAIL_ELEMENT_SIZE` is replaced by `TAIL_ALIGNMENT`, the greatest common byte alignment across all dynamic element types.\n\nPina now uses Pinapod 0.1.0, its maintained and wire-compatible ZeroPod fork, so immutable and mutable accessors both use each compact vector's own active length.\n\nWhen resizing, allocate before writing a longer tail and commit a shorter tail before refunding its excess rent:\n\n```rust\nif target_size > account.data_len() {\n\tReallocCompactAccount {\n\t\taccount,\n\t\tpayer,\n\t\tnew_size: target_size,\n\t\tprogram_id: &ID,\n\t}\n\t.invoke::<Journal>()?;\n}\n\nlet encoded_size = {\n\tlet mut data = account.try_borrow_mut()?;\n\tlet mut journal = Journal::try_from_bytes_mut(&mut data)?;\n\tjournal.set_entries(entries).map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal.set_markers(markers).map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal.commit().map_err(|_| ProgramError::InvalidAccountData)?\n};\n\nif encoded_size < account.data_len() {\n\tReallocCompactAccount {\n\t\taccount,\n\t\tpayer,\n\t\tnew_size: encoded_size,\n\t\tprogram_id: &ID,\n\t}\n\t.invoke::<Journal>()?;\n}\n```\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #298](https://github.com/pina-rs/pina/pull/298)"
+						]
+					},
+					{
+						"title": "Fixes",
+						"collapsed": false,
+						"entries": [
+							"#### Use released Dart offset codecs\n_Packages:_ _pina_cli_\n\nUpgrade the pinned Dart renderer to 0.5.5, which contains the upstream pre/post-offset collection-length fix. Remove the local renderer patch and renderer-specific dependency overrides so generated clients use the published package directly.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #302](https://github.com/pina-rs/pina/pull/302)",
+							"#### Prefix seed constants with SEED_\n_Packages:_ _pina_lints_\n\nEvery example seed constant now leads with SEED_: PROFILE_SEED becomes SEED_PROFILE, STATE_SEED_PREFIX becomes SEED_STATE_PREFIX, and the same rule covers all remaining program, security-example, and surfpool-test seed constants. The illustrative COUNTER_SEED, CONFIG_SEED, STATE_SEED, MY_SEED, and VAULT_SEED constants used across crates documentation, doc comments, templates, test fixtures, and the pina_root macro contract tests rename to the SEED_ prefix form for consistency. The require_explicit_discriminators_and_seed_namespaces lint now also recognizes SEED_-prefixed seed constants so assertions using the preferred naming stay clean; names only reorder and seed bytes, PDA addresses, and program behavior are unchanged.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #295](https://github.com/pina-rs/pina/pull/295)"
+						]
+					},
+					{
+						"title": "Notes",
+						"collapsed": false,
+						"entries": [
+							"#### Prefix seed constants with SEED_\n_Packages:_ _pina_, _pina_cli_, _pina_macros_\n\nEvery example seed constant now leads with SEED_: PROFILE_SEED becomes SEED_PROFILE, STATE_SEED_PREFIX becomes SEED_STATE_PREFIX, and the same rule covers all remaining program, security-example, and surfpool-test seed constants. The illustrative COUNTER_SEED, CONFIG_SEED, STATE_SEED, MY_SEED, and VAULT_SEED constants used across crates documentation, doc comments, templates, test fixtures, and the pina_root macro contract tests rename to the SEED_ prefix form for consistency. The require_explicit_discriminators_and_seed_namespaces lint now also recognizes SEED_-prefixed seed constants so assertions using the preferred naming stay clean; names only reorder and seed bytes, PDA addresses, and program behavior are unchanged.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #295](https://github.com/pina-rs/pina/pull/295)",
+							"#### Rename every example manifest to pina.toml\n_Packages:_ _pina_, _pina_cli_\n\nThe lowercase `pina.toml` name is the canonical project configuration file, and the examples were the last remaining place still carrying the legacy uppercase `Pina.toml` spelling. Every example manifest is renamed with git so history follows the file, and the pina_cli example-discovery test message says pina.toml. Project discovery already prefers `pina.toml`, so nothing else changes; the legacy `Pina.toml` spelling remains discovered with a deprecation warning for existing projects.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #299](https://github.com/pina-rs/pina/pull/299)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.13.0](https://github.com/pina-rs/pina/releases/tag/v0.13.0) (2026-09-06)\n\nGrouped release for `core`.\n### Breaking Changes\n\n#### Add First-Class Compact Accounts\n_Packages:_ _pina_\n\nAdds checked dynamic account loaders and typed rent-adjusting builders, updates the realloc example, and covers the lifecycle in unit, SBF, generated-client, and Surfpool tests. This is a major release for `pina` so downstream programs can adopt the expanded account-layout contract explicitly.\n\nCompact mode is disabled by default. Enable `compact` for compact schemas and loaders, and combine it with `account-resize` for the typed creation and rent-adjusting reallocation builders:\n\n```toml\n[dependencies]\npina = { version = \"0.13\", features = [\"compact\", \"account-resize\"] }\n```\n\nCompact mode uses a fixed header and a suffix of bounded vectors. Each vector length lives in the header and only active elements occupy account bytes:\n\n```rust\n#[account(discriminator = AccountType, compact)]\npub struct Journal {\n\tpub bump: u8,\n\tpub authority: Address,\n\tpub revision: u32,\n\tpub entries: Vec<u64, 8>,\n\tpub markers: Vec<u8, 16>,\n}\n\nlet account_bytes = Journal::HEADER_SIZE\n\t+ active_entry_count * core::mem::size_of::<PodU64>()\n\t+ active_marker_count * core::mem::size_of::<u8>();\nJournal::validate_size(account_bytes)?;\n```\n\n`PinaCompactAccount::TAIL_ELEMENT_SIZE` is replaced by `TAIL_ALIGNMENT`, the greatest common byte alignment across all dynamic element types.\n\nPina now uses Pinapod 0.1.0, its maintained and wire-compatible ZeroPod fork, so immutable and mutable accessors both use each compact vector's own active length.\n\nWhen resizing, allocate before writing a longer tail and commit a shorter tail before refunding its excess rent:\n\n```rust\nif target_size > account.data_len() {\n\tReallocCompactAccount {\n\t\taccount,\n\t\tpayer,\n\t\tnew_size: target_size,\n\t\tprogram_id: &ID,\n\t}\n\t.invoke::<Journal>()?;\n}\n\nlet encoded_size = {\n\tlet mut data = account.try_borrow_mut()?;\n\tlet mut journal = Journal::try_from_bytes_mut(&mut data)?;\n\tjournal.set_entries(entries).map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal.set_markers(markers).map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal.commit().map_err(|_| ProgramError::InvalidAccountData)?\n};\n\nif encoded_size < account.data_len() {\n\tReallocCompactAccount {\n\t\taccount,\n\t\tpayer,\n\t\tnew_size: encoded_size,\n\t\tprogram_id: &ID,\n\t}\n\t.invoke::<Journal>()?;\n}\n```\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #298](https://github.com/pina-rs/pina/pull/298)\n\n#### Make generated clients safe to customize and regenerate\n_Packages:_ _core_\n\nAdds explicit `auto`, `create`, `update`, and `overwrite` destination modes plus scaffold controls to project-aware CPI, Rust, TypeScript, and Dart/Flutter generation. Global `[clients]` defaults can be overridden for each target, including its output directory, while CLI flags support one-off lifecycle and source-only generation.\n\nUpdate mode replaces only renderer-owned generated sources and preserves user-edited manifests and entrypoints. Overwrite mode is an explicit clean sweep with working-tree and symbolic-link safety checks. The native Rust and CPI renderers and the Codama CPI visitor expose the same controls.\n\nThis is a breaking `core` API change because the public Rust renderer and CLI option structs gain required generation-policy fields.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #300](https://github.com/pina-rs/pina/pull/300)\n\n#### Add IDL-driven Pina CPI generation\n_Packages:_ _core_\n\nAdds a Codama Rust renderer and `@pina-rs/codama-renderer-cpi` visitor that generate standalone, `no_std` Pina CPI crates. Point the Codama pipeline or `pina cpi` at a Pina or Anchor IDL, select `cpi` in `pina.toml`, or run `pina generate --client cpi` in a Pina program. Every instruction becomes a direct call struct with typed account fields, a separately encoded instruction-data struct, and `.invoke()` and `.invoke_signed()` methods backed by Pina's validated `ProgramAccount`, `CpiHandle`, `ToCpiAccounts`, and `CpiContext` APIs.\n\nGenerated fields preserve IDL documentation and identify account privileges or instruction-argument roles. Program-ID fallback optional accounts and runtime signer choices retain their Codama semantics; omitted optional-account layouts, optional arguments, big-endian numbers, and unsupported argument or discriminator types are rejected with errors naming the exact node instead of generating instruction data that would never dispatch. Accounts the IDL derives from PDA seeds stay ordinary call fields, because the runtime resolves CPI accounts against the executing program's own account list.\n\nNew `pina init` projects select the standalone CPI client in `pina.toml` instead of creating a program-local `cpi` feature and handwritten `src/cpi.rs`. The `pina_bpf` CPI regression consumes the generated Prop AMM crate for both `.invoke()` and PDA-backed `.invoke_signed()`. A committed raw Anchor fixture is passed through the pinned converter and its generated crate is compile-checked end to end.\n\nThis is a breaking `core` API change: `Program::new` has been removed. Callers must migrate to `Program::try_new` and handle its `Result<Self, ProgramError>`.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #296](https://github.com/pina-rs/pina/pull/296)\n\n### Features\n\n#### Add Bit-Precise Kani Verification\n_Packages:_ _pina_\n\nAdds a pure account-reallocation plan API and proves discriminator parsing, zero-copy validation, lamport conservation, rent adjustment, CPI metadata, compact schema sizing, aligned initialization, shrink-prefix validation, and bounded multi-tail layout invariants with Kani. Fast and compact proof suites run independently in CI and through dedicated devenv tasks.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #301](https://github.com/pina-rs/pina/pull/301) · _Related issues:_ [#298](https://github.com/pina-rs/pina/issues/298)\n\n#### Add First-Class Compact Accounts\n_Packages:_ _pina_cli_, _pina_macros_, _pina_codama_renderer_\n\nAdds checked dynamic account loaders and typed rent-adjusting builders, updates the realloc example, and covers the lifecycle in unit, SBF, generated-client, and Surfpool tests. This is a major release for `pina` so downstream programs can adopt the expanded account-layout contract explicitly.\n\nCompact mode is disabled by default. Enable `compact` for compact schemas and loaders, and combine it with `account-resize` for the typed creation and rent-adjusting reallocation builders:\n\n```toml\n[dependencies]\npina = { version = \"0.13\", features = [\"compact\", \"account-resize\"] }\n```\n\nCompact mode uses a fixed header and a suffix of bounded vectors. Each vector length lives in the header and only active elements occupy account bytes:\n\n```rust\n#[account(discriminator = AccountType, compact)]\npub struct Journal {\n\tpub bump: u8,\n\tpub authority: Address,\n\tpub revision: u32,\n\tpub entries: Vec<u64, 8>,\n\tpub markers: Vec<u8, 16>,\n}\n\nlet account_bytes = Journal::HEADER_SIZE\n\t+ active_entry_count * core::mem::size_of::<PodU64>()\n\t+ active_marker_count * core::mem::size_of::<u8>();\nJournal::validate_size(account_bytes)?;\n```\n\n`PinaCompactAccount::TAIL_ELEMENT_SIZE` is replaced by `TAIL_ALIGNMENT`, the greatest common byte alignment across all dynamic element types.\n\nPina now uses Pinapod 0.1.0, its maintained and wire-compatible ZeroPod fork, so immutable and mutable accessors both use each compact vector's own active length.\n\nWhen resizing, allocate before writing a longer tail and commit a shorter tail before refunding its excess rent:\n\n```rust\nif target_size > account.data_len() {\n\tReallocCompactAccount {\n\t\taccount,\n\t\tpayer,\n\t\tnew_size: target_size,\n\t\tprogram_id: &ID,\n\t}\n\t.invoke::<Journal>()?;\n}\n\nlet encoded_size = {\n\tlet mut data = account.try_borrow_mut()?;\n\tlet mut journal = Journal::try_from_bytes_mut(&mut data)?;\n\tjournal.set_entries(entries).map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal.set_markers(markers).map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal.commit().map_err(|_| ProgramError::InvalidAccountData)?\n};\n\nif encoded_size < account.data_len() {\n\tReallocCompactAccount {\n\t\taccount,\n\t\tpayer,\n\t\tnew_size: encoded_size,\n\t\tprogram_id: &ID,\n\t}\n\t.invoke::<Journal>()?;\n}\n```\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #298](https://github.com/pina-rs/pina/pull/298)\n\n### Fixes\n\n#### Use released Dart offset codecs\n_Packages:_ _pina_cli_\n\nUpgrade the pinned Dart renderer to 0.5.5, which contains the upstream pre/post-offset collection-length fix. Remove the local renderer patch and renderer-specific dependency overrides so generated clients use the published package directly.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #302](https://github.com/pina-rs/pina/pull/302)\n\n#### Prefix seed constants with SEED_\n_Packages:_ _pina_lints_\n\nEvery example seed constant now leads with SEED_: PROFILE_SEED becomes SEED_PROFILE, STATE_SEED_PREFIX becomes SEED_STATE_PREFIX, and the same rule covers all remaining program, security-example, and surfpool-test seed constants. The illustrative COUNTER_SEED, CONFIG_SEED, STATE_SEED, MY_SEED, and VAULT_SEED constants used across crates documentation, doc comments, templates, test fixtures, and the pina_root macro contract tests rename to the SEED_ prefix form for consistency. The require_explicit_discriminators_and_seed_namespaces lint now also recognizes SEED_-prefixed seed constants so assertions using the preferred naming stay clean; names only reorder and seed bytes, PDA addresses, and program behavior are unchanged.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #295](https://github.com/pina-rs/pina/pull/295)\n\n### Notes\n\n#### Prefix seed constants with SEED_\n_Packages:_ _pina_, _pina_cli_, _pina_macros_\n\nEvery example seed constant now leads with SEED_: PROFILE_SEED becomes SEED_PROFILE, STATE_SEED_PREFIX becomes SEED_STATE_PREFIX, and the same rule covers all remaining program, security-example, and surfpool-test seed constants. The illustrative COUNTER_SEED, CONFIG_SEED, STATE_SEED, MY_SEED, and VAULT_SEED constants used across crates documentation, doc comments, templates, test fixtures, and the pina_root macro contract tests rename to the SEED_ prefix form for consistency. The require_explicit_discriminators_and_seed_namespaces lint now also recognizes SEED_-prefixed seed constants so assertions using the preferred naming stay clean; names only reorder and seed bytes, PDA addresses, and program behavior are unchanged.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #295](https://github.com/pina-rs/pina/pull/295)\n\n#### Rename every example manifest to pina.toml\n_Packages:_ _pina_, _pina_cli_\n\nThe lowercase `pina.toml` name is the canonical project configuration file, and the examples were the last remaining place still carrying the legacy uppercase `Pina.toml` spelling. Every example manifest is renamed with git so history follows the file, and the pina_cli example-discovery test message says pina.toml. Project discovery already prefers `pina.toml`, so nothing else changes; the legacy `Pina.toml` spelling remains discovered with a deprecation warning for existing projects.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #299](https://github.com/pina-rs/pina/pull/299)"
+		}
+	],
+	"provider": {
+		"kind": "github",
+		"owner": "pina-rs",
+		"repo": "pina",
+		"host": null
+	}
+}
