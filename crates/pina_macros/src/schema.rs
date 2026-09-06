@@ -158,17 +158,10 @@ pub(crate) fn validate_compact_schema(
 	for field in &fields.named {
 		if is_compact_vec(field) {
 			seen_tail = true;
-			let (element, capacity, prefix_size) = classify_compact_vec(field, crate_path)?;
+			let (source, element, capacity, prefix_size) = classify_compact_vec(field, crate_path)?;
 			let native = &element.native;
 			let pod = &element.pod;
-			field_proofs.push(quote! {
-				const _: fn(#native) -> #native = |value| value;
-
-				const _: fn() = || {
-					fn assert_element<T: #crate_path::ZcElem + #crate_path::ZcValidate>() {}
-					assert_element::<#pod>();
-				};
-			});
+			field_proofs.push(mapping_proof(&source, native, pod, crate_path));
 			header_sizes.push(quote!(#prefix_size));
 			tail_max_sizes.push(quote!(#capacity * ::core::mem::size_of::<#pod>()));
 			tail_element_sizes.push(quote!(::core::mem::size_of::<#pod>()));
@@ -301,7 +294,7 @@ fn validate_schema_container(item: &ItemStruct) -> syn::Result<()> {
 fn classify_compact_vec(
 	field: &Field,
 	crate_path: &syn::Path,
-) -> syn::Result<(AuditedField, Expr, usize)> {
+) -> syn::Result<(Type, AuditedField, Expr, usize)> {
 	if field.attrs.iter().any(is_pinapod_attribute) {
 		return Err(syn::Error::new_spanned(
 			field,
@@ -356,7 +349,7 @@ fn classify_compact_vec(
 		_ => return Err(compact_tail_error(&field.ty)),
 	};
 
-	Ok((audited, capacity, prefix_size))
+	Ok((element.clone(), audited, capacity, prefix_size))
 }
 
 fn mapping_proof(

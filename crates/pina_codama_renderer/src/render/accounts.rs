@@ -67,7 +67,7 @@ pub(crate) fn render_account_page(
 		let field_name = snake(field.name.as_ref());
 		let field_context = format!("{account_name}.{field_name}");
 		let field_type = if first_compact_tail.is_some_and(|start| index >= start) {
-			render_type_for_compact_tail(&field.r#type, &field_context)?
+			render_type_for_compact_tail(&field.r#type, &field.docs, &field_context)?
 		} else {
 			render_type_for_pod(&field.r#type, &field_context)?
 		};

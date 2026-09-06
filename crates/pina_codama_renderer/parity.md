@@ -1,6 +1,6 @@
 # Codama renderer parity
 
-The repository renderer accepts Codama layouts that can be represented as native zeropod schemas. Most schemas remain fixed-size; accounts may additionally end in one prefixed array that maps exactly to a compact zeropod tail. Unsupported or ambiguous layouts fail with a contextual error instead of silently falling back to a public key or byte array.
+The repository renderer accepts Codama layouts that can be represented as native zeropod schemas. Most schemas remain fixed-size; accounts may additionally end in a suffix of one or more prefixed arrays that map exactly to compact zeropod tails. Unsupported or ambiguous layouts fail with a contextual error instead of silently falling back to a public key or byte array.
 
 ## Generated model
 
@@ -22,7 +22,7 @@ The repository renderer accepts Codama layouts that can be represented as native
 | Fixed bytes/array               | `[T; N]`                                  | Supported fixed-size element                              |
 | Fixed-size UTF-8 string         | `pina::String<N>` or explicit prefix form | Prefix and capacity must agree                            |
 | Prefixed fixed-capacity array   | `pina::Vec<T, N>` or explicit prefix form | Fixed-size, recursively validated element                 |
-| Trailing prefixed account array | compact `pina::Vec<T, prefix maximum>`    | Variable-size active tail; account-only and final field   |
+| Trailing prefixed account array | compact `pina::Vec<T, N>`                 | `N` is declared capacity and must fit the selected prefix |
 | Struct defined type             | Native `#[derive(pina::ZeroPod)]` struct  | Every field supported                                     |
 | Scalar enum defined type        | Native `#[derive(pina::ZeroPod)]` enum    | Unit variants, unsigned repr, contiguous values from zero |
 | Defined type link               | Generated native type                     | Target must resolve                                       |
@@ -41,7 +41,7 @@ The renderer supports fixed string/byte, little-endian number, boolean, and publ
 
 ## Rejected layouts
 
-- variable-length strings, bytes, maps, or sets, and variable arrays outside the final field of an account;
+- variable-length strings, bytes, maps, or sets, and variable arrays outside the compact suffix of an account;
 - remainder or sentinel encodings;
 - big-endian and floating-point numbers;
 - sparse enums or enums with payload variants;
@@ -49,4 +49,4 @@ The renderer supports fixed string/byte, little-endian number, boolean, and publ
 - fixed-size wrappers whose semantic meaning cannot be recovered;
 - non-zero-offset or size-derived discriminators.
 
-Every accepted layout has one unambiguous validation path. Fixed accounts and all instruction/event layouts have one exact byte size; compact accounts have a fixed header and an element-aligned dynamic tail. This is intentionally narrower than the complete Codama schema language.
+Every accepted layout has one unambiguous validation path. Fixed accounts and all instruction/event layouts have one exact byte size; compact accounts have a fixed header and element-aligned dynamic tails. This is intentionally narrower than the complete Codama schema language.

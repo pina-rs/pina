@@ -447,17 +447,16 @@ pub struct Journal {
 	pub authority: Address,
 	pub revision: u32,
 	pub entries: Vec<u64, 8>,
-	pub markers: Vec<u8, 16>,
+	pub markers: PodVec<u8, 8, 8>,
 }
 
-fn account_size(entry_count: usize, marker_count: usize) -> Result<usize, ProgramError> {
-	if entry_count > 8 || marker_count > 16 {
+fn account_size(entry_count: usize) -> Result<usize, ProgramError> {
+	if entry_count > 8 {
 		return Err(ProgramError::InvalidArgument);
 	}
 
 	Ok(Journal::HEADER_SIZE
-		+ entry_count * core::mem::size_of::<PodU64>()
-		+ marker_count * core::mem::size_of::<u8>())
+		+ entry_count * (core::mem::size_of::<PodU64>() + core::mem::size_of::<u8>()))
 }
 ```
 
@@ -511,7 +510,7 @@ if encoded_size < account.data_len() {
 }
 ```
 
-`ReallocCompactAccount` checks the current compact type, validates the destination size, preserves rent exemption on growth, and refunds excess lamports to `payer` on shrink. Scope immutable runtime borrows with `with_compact_account`; use a direct `try_borrow_mut` guard when a tail setter must borrow instruction-local values through `commit`.
+`ReallocCompactAccount` checks the current compact type, validates the destination size, and verifies that a shrink retains every active tail before moving rent. It preserves rent exemption on growth and refunds excess lamports to `payer` on shrink. Scope immutable runtime borrows with `with_compact_account`; use a direct `try_borrow_mut` guard when a tail setter must borrow instruction-local values through `commit`.
 
 <!-- {/compactAccountResizeOrdering} -->
 

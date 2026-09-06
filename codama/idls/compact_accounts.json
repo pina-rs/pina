@@ -73,11 +73,12 @@
 							"kind": "structFieldTypeNode",
 							"name": "entries",
 							"docs": [
-								"Active entries. Unused capacity consumes no account bytes."
+								"Active entries. Unused capacity consumes no account bytes.",
+								"Pina compact capacity: 8."
 							],
 							"type": {
 								"kind": "preOffsetTypeNode",
-								"offset": 4,
+								"offset": 10,
 								"strategy": "relative",
 								"type": {
 									"kind": "arrayTypeNode",
@@ -111,7 +112,8 @@
 							"kind": "structFieldTypeNode",
 							"name": "markers",
 							"docs": [
-								"One marker per entry, stored as a second compact tail."
+								"One marker per entry, stored as a second compact tail.",
+								"Pina compact capacity: 8."
 							],
 							"type": {
 								"kind": "arrayTypeNode",
@@ -132,7 +134,7 @@
 											"strategy": "absolute",
 											"type": {
 												"kind": "numberTypeNode",
-												"format": "u16",
+												"format": "u64",
 												"endian": "le"
 											}
 										}

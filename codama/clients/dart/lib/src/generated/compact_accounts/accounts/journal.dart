@@ -70,7 +70,7 @@ Encoder<Journal> getJournalEncoder() {
             ),
           ),
         ),
-        OffsetConfig(preOffset: (scope) => scope.preOffset + 4),
+        OffsetConfig(preOffset: (scope) => scope.preOffset + 10),
       ),
     ),
     (
@@ -79,7 +79,7 @@ Encoder<Journal> getJournalEncoder() {
         transformEncoder(getU8Encoder(), (int value) => value),
         size: PrefixedArraySize(
           offsetEncoder(
-            offsetEncoder(getU16Encoder(), OffsetConfig(preOffset: (_) => 40)),
+            offsetEncoder(getU64Encoder(), OffsetConfig(preOffset: (_) => 40)),
             OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
         ),
@@ -121,7 +121,7 @@ Decoder<Journal> getJournalDecoder() {
             ),
           ),
         ),
-        OffsetConfig(preOffset: (scope) => scope.preOffset + 4),
+        OffsetConfig(preOffset: (scope) => scope.preOffset + 10),
       ),
     ),
     (
@@ -130,7 +130,7 @@ Decoder<Journal> getJournalDecoder() {
         getU8Decoder(),
         size: PrefixedArraySize(
           offsetDecoder(
-            offsetDecoder(getU16Decoder(), OffsetConfig(preOffset: (_) => 40)),
+            offsetDecoder(getU64Decoder(), OffsetConfig(preOffset: (_) => 40)),
             OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
         ),

@@ -54,7 +54,10 @@ export type Sample = {
 	bump: number;
 	/** The only signer permitted to resize this sample. */
 	authority: Address;
-	/** Dynamically encoded values; unused capacity occupies no account bytes. */
+	/**
+	 * Dynamically encoded values; unused capacity occupies no account bytes.
+	 * Pina compact capacity: 64.
+	 */
 	values: Array<bigint>;
 };
 
@@ -63,7 +66,10 @@ export type SampleArgs = {
 	bump: number;
 	/** The only signer permitted to resize this sample. */
 	authority: Address;
-	/** Dynamically encoded values; unused capacity occupies no account bytes. */
+	/**
+	 * Dynamically encoded values; unused capacity occupies no account bytes.
+	 * Pina compact capacity: 64.
+	 */
 	values: Array<number | bigint>;
 };
 

@@ -26,9 +26,11 @@ pub struct Journal {
 	/// Number of successful resize or write operations.
 	pub revision: u32,
 	/// Active entries. Unused capacity consumes no account bytes.
-	pub entries: pina::Vec<u64, { u16::MAX as usize }>,
+	/// Pina compact capacity: 8.
+	pub entries: pina::Vec<u64, 8>,
 	/// One marker per entry, stored as a second compact tail.
-	pub markers: pina::Vec<u8, { u16::MAX as usize }>,
+	/// Pina compact capacity: 8.
+	pub markers: pina::PodVec<<u8 as pina::ZcField>::Pod, 8, 8>,
 }
 
 pub const JOURNAL_DISCRIMINATOR: u8 = 1u8;

@@ -57,7 +57,8 @@
 							"kind": "structFieldTypeNode",
 							"name": "values",
 							"docs": [
-								"Dynamically encoded values; unused capacity occupies no account bytes."
+								"Dynamically encoded values; unused capacity occupies no account bytes.",
+								"Pina compact capacity: 64."
 							],
 							"type": {
 								"kind": "arrayTypeNode",

@@ -213,9 +213,9 @@ void main() {
       );
       final decoded = getJournalDecoder().decode(encoded);
 
-      expect(encoded, hasLength(42 + entries.length * 8 + markers.length));
+      expect(encoded, hasLength(48 + entries.length * 8 + markers.length));
       expect(encoded.sublist(38, 40), [3, 0]);
-      expect(encoded.sublist(40, 42), [2, 0]);
+      expect(encoded.sublist(40, 48), [2, 0, 0, 0, 0, 0, 0, 0]);
       expect(decoded.discriminator, 1);
       expect(decoded.bump, 7);
       expect(decoded.authority, systemAddress);

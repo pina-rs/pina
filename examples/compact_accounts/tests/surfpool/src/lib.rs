@@ -95,7 +95,7 @@ fn assert_journal(
 		expected_entries.len(),
 	);
 	assert_eq!(
-		u16::from_le_bytes(account.data[40..42].try_into().expect("marker-count bytes")) as usize,
+		u64::from_le_bytes(account.data[40..48].try_into().expect("marker-count bytes")) as usize,
 		expected_entries.len(),
 	);
 	let entries_end = Journal::HEADER_SIZE + expected_entries.len() * 8;

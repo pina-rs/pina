@@ -402,6 +402,47 @@ fn compact_realloc_validates_current_data_and_target_size() {
 
 #[cfg(feature = "account-resize")]
 #[test]
+fn compact_realloc_rejects_shrinking_below_the_active_tail() {
+	const ACTIVE_SIZE: usize = CompactBuilderState::HEADER_SIZE + size_of::<pina::PodU64>();
+
+	let owner = Address::new_from_array([9u8; 32]);
+	let mut stored_account =
+		TestAccount::<ACTIVE_SIZE>::new(Address::new_from_array([1u8; 32]), false, true);
+	let mut stored_payer = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
+	let mut account = stored_account.view();
+	let mut payer = stored_payer.view();
+	{
+		let mut data = account
+			.try_borrow_mut()
+			.unwrap_or_else(|error| panic!("borrow compact data: {error:?}"));
+		let mut state = CompactBuilderState::initialize(&mut data)
+			.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
+		let items = [pina::PodU64::from(7)];
+		state
+			.set_items(&items)
+			.unwrap_or_else(|error| panic!("set compact items: {error:?}"));
+		assert_eq!(
+			state
+				.commit()
+				.unwrap_or_else(|error| panic!("commit compact state: {error:?}")),
+			ACTIVE_SIZE
+		);
+	}
+
+	let result = ReallocCompactAccount {
+		account: &mut account,
+		payer: &mut payer,
+		new_size: CompactBuilderState::HEADER_SIZE,
+		program_id: &owner,
+	}
+	.invoke::<CompactBuilderState>();
+
+	assert_eq!(result, Err(ProgramError::InvalidAccountData));
+	assert_eq!(account.data_len(), ACTIVE_SIZE);
+}
+
+#[cfg(feature = "account-resize")]
+#[test]
 fn realloc_zeroed_builder_accepts_an_unchanged_size() {
 	let owner = Address::new_from_array([9u8; 32]);
 	let mut stored_account = TestAccount::<8>::new(Address::new_from_array([1u8; 32]), false, true);

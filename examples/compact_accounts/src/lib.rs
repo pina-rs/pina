@@ -61,7 +61,7 @@ pub struct Journal {
 	/// Active entries. Unused capacity consumes no account bytes.
 	pub entries: Vec<u64, 8>,
 	/// One marker per entry, stored as a second compact tail.
-	pub markers: Vec<u8, 8>,
+	pub markers: PodVec<u8, 8, 8>,
 }
 
 /// Returns the exact encoded account size for `entry_count` active entries.
@@ -370,8 +370,8 @@ mod tests {
 
 	#[test]
 	fn size_formula_covers_empty_partial_and_full_accounts() {
-		assert_eq!(Journal::HEADER_SIZE, 42);
-		assert_eq!(Journal::MAX_SIZE, 114);
+		assert_eq!(Journal::HEADER_SIZE, 48);
+		assert_eq!(Journal::MAX_SIZE, 120);
 		assert_eq!(Journal::TAIL_ALIGNMENT, 1);
 		assert_eq!(account_size(0), Ok(Journal::HEADER_SIZE));
 		assert_eq!(account_size(3), Ok(Journal::HEADER_SIZE + 27));

@@ -66,9 +66,15 @@ export type Journal = {
 	authority: Address;
 	/** Number of successful resize or write operations. */
 	revision: number;
-	/** Active entries. Unused capacity consumes no account bytes. */
+	/**
+	 * Active entries. Unused capacity consumes no account bytes.
+	 * Pina compact capacity: 8.
+	 */
 	entries: Array<bigint>;
-	/** One marker per entry, stored as a second compact tail. */
+	/**
+	 * One marker per entry, stored as a second compact tail.
+	 * Pina compact capacity: 8.
+	 */
 	markers: Array<number>;
 };
 
@@ -79,9 +85,15 @@ export type JournalArgs = {
 	authority: Address;
 	/** Number of successful resize or write operations. */
 	revision: number;
-	/** Active entries. Unused capacity consumes no account bytes. */
+	/**
+	 * Active entries. Unused capacity consumes no account bytes.
+	 * Pina compact capacity: 8.
+	 */
 	entries: Array<number | bigint>;
-	/** One marker per entry, stored as a second compact tail. */
+	/**
+	 * One marker per entry, stored as a second compact tail.
+	 * Pina compact capacity: 8.
+	 */
 	markers: Array<number>;
 };
 
@@ -102,14 +114,14 @@ export function getJournalEncoder(): Encoder<JournalArgs> {
 							{ postOffset: ({ preOffset }) => preOffset + 0 },
 						),
 					}),
-					{ preOffset: ({ preOffset }) => preOffset + 4 },
+					{ preOffset: ({ preOffset }) => preOffset + 10 },
 				),
 			],
 			[
 				"markers",
 				getArrayEncoder(getU8Encoder(), {
 					size: offsetEncoder(
-						offsetEncoder(getU16Encoder(), { preOffset: () => 40 }),
+						offsetEncoder(getU64Encoder(), { preOffset: () => 40 }),
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 				}),
@@ -138,14 +150,14 @@ export function getJournalDecoder(): Decoder<Journal> {
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 				}),
-				{ preOffset: ({ preOffset }) => preOffset + 4 },
+				{ preOffset: ({ preOffset }) => preOffset + 10 },
 			),
 		],
 		[
 			"markers",
 			getArrayDecoder(getU8Decoder(), {
 				size: offsetDecoder(
-					offsetDecoder(getU16Decoder(), { preOffset: () => 40 }),
+					offsetDecoder(getU64Decoder(), { preOffset: () => 40 }),
 					{ postOffset: ({ preOffset }) => preOffset + 0 },
 				),
 			}),

@@ -977,7 +977,8 @@ impl ReallocAccountZeroed<'_, '_, '_> {
 ///
 /// Unlike the raw reallocation builders, this API verifies the account's
 /// current compact layout and constrains the target length to its declared
-/// header and capacity bounds.
+/// header and capacity bounds. Shrinking also validates the retained byte
+/// slice, preventing active tail data from being truncated.
 #[cfg(feature = "account-resize")]
 #[must_use = "account reallocation has no effect until invoke or invoke_signed is called"]
 pub struct ReallocCompactAccount<'account, 'payer, 'address> {
@@ -1005,6 +1006,10 @@ impl ReallocCompactAccount<'_, '_, '_> {
 	) -> ProgramResult {
 		self.account.assert_compact_type::<T>(self.program_id)?;
 		T::validate_size(self.new_size)?;
+		if self.new_size < self.account.data_len() {
+			let data = self.account.try_borrow()?;
+			T::validate_account_data(&data[..self.new_size])?;
+		}
 
 		realloc_account_inner(
 			self.account,

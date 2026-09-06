@@ -46,6 +46,7 @@ use crate::ir::PdaIr;
 use crate::ir::PdaSeedIr;
 use crate::ir::ProgramIr;
 use crate::ir::ZeroPodEnumIr;
+use crate::parse::types::compact_vec_capacity;
 use crate::parse::types::compact_vec_prefix_size;
 use crate::parse::types::try_rust_type_to_codama_compact_tail;
 use crate::parse::types::try_rust_type_to_codama_compact_tail_at;
@@ -173,7 +174,9 @@ fn build_account_node(
 
 	for (index, field) in account.fields.iter().enumerate() {
 		let context = format!("account `{}.{}`", account.name, field.name);
+		let mut compact_capacity = None;
 		let mut node = if let Some(start) = first_tail.filter(|start| index >= *start) {
+			compact_capacity = compact_vec_capacity(&field.rust_type);
 			if index == start {
 				prefix_offset = header_offset;
 			}
@@ -217,8 +220,12 @@ fn build_account_node(
 		{
 			prefix_offset += sizes[index - start];
 		}
-		if !field.docs.is_empty() {
-			node.docs = field.docs.clone().into();
+		let mut docs = field.docs.clone();
+		if let Some(capacity) = compact_capacity {
+			docs.push(format!("Pina compact capacity: {capacity}."));
+		}
+		if !docs.is_empty() {
+			node.docs = docs.into();
 		}
 		fields.push(node);
 	}
@@ -530,8 +537,17 @@ mod tests {
 		let node = build_account_node(&account, &[])
 			.unwrap_or_else(|error| panic!("IDL codegen failed: {error}"));
 		let docs = node.docs.iter().map(String::as_str).collect::<Vec<_>>();
+		let field_docs = node
+			.data
+			.get_nested_type_node()
+			.fields
+			.iter()
+			.find(|field| field.name.as_ref() == "values")
+			.map(|field| field.docs.iter().map(String::as_str).collect::<Vec<_>>())
+			.unwrap_or_else(|| panic!("compact values field missing"));
 
 		assert_eq!(docs, vec!["Dynamic values."]);
+		assert_eq!(field_docs, vec!["Pina compact capacity: 8."]);
 		assert!(account.is_compact());
 	}
 

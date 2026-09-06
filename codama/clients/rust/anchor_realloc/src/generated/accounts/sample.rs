@@ -20,7 +20,8 @@ pub struct Sample {
 	/// The only signer permitted to resize this sample.
 	pub authority: solana_pubkey::Pubkey,
 	/// Dynamically encoded values; unused capacity occupies no account bytes.
-	pub values: pina::Vec<u64, { u16::MAX as usize }>,
+	/// Pina compact capacity: 64.
+	pub values: pina::Vec<u64, 64>,
 }
 
 pub const SAMPLE_DISCRIMINATOR: u8 = 1u8;

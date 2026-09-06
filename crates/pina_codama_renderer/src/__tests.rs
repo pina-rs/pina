@@ -107,8 +107,8 @@ fn renders_compact_account_fixture_with_dynamic_helpers() {
 	let content = read_generated_file(&crate_dir, "accounts/journal.rs");
 
 	assert!(content.contains("#[pinapod(compact)]"));
-	assert!(content.contains("pub entries: pina::Vec<u64, { u16::MAX as usize }>"));
-	assert!(content.contains("pub markers: pina::Vec<u8, { u16::MAX as usize }>"));
+	assert!(content.contains("pub entries: pina::Vec<u64, 8>"));
+	assert!(content.contains("pub markers: pina::PodVec<<u8 as pina::ZcField>::Pod, 8, 8>"));
 	assert!(content.contains("pub const HEADER_SIZE: usize"));
 	assert!(content.contains("pub fn initialize(data: &mut [u8])"));
 	assert!(content.contains("pub fn from_bytes(data: &[u8])"));
@@ -119,19 +119,17 @@ fn renders_compact_account_fixture_with_dynamic_helpers() {
 
 #[test]
 fn renders_every_compact_collection_prefix() {
+	let docs: Docs = vec!["Pina compact capacity: 64.".to_string()].into();
 	for (format, expected) in [
-		(
-			U8,
-			"pina::PodVec<<u64 as pina::ZcField>::Pod, { u8::MAX as usize }, 1>",
-		),
-		(NumberFormat::U16, "pina::Vec<u64, { u16::MAX as usize }>"),
+		(U8, "pina::PodVec<<u64 as pina::ZcField>::Pod, 64, 1>"),
+		(NumberFormat::U16, "pina::Vec<u64, 64>"),
 		(
 			NumberFormat::U32,
-			"pina::PodVec<<u64 as pina::ZcField>::Pod, { u32::MAX as usize }, 4>",
+			"pina::PodVec<<u64 as pina::ZcField>::Pod, 64, 4>",
 		),
 		(
 			NumberFormat::U64,
-			"pina::PodVec<<u64 as pina::ZcField>::Pod, usize::MAX, 8>",
+			"pina::PodVec<<u64 as pina::ZcField>::Pod, 64, 8>",
 		),
 	] {
 		let tail = TypeNode::from(ArrayTypeNode::prefixed(
@@ -139,7 +137,7 @@ fn renders_every_compact_collection_prefix() {
 			NumberTypeNode::le(format),
 		));
 		assert_eq!(
-			render_type_for_compact_tail(&tail, "State.values")
+			render_type_for_compact_tail(&tail, &docs, "State.values")
 				.unwrap_or_else(|error| panic!("render failed: {error}")),
 			expected
 		);
@@ -153,11 +151,12 @@ fn renders_compact_tail_through_a_post_offset_wrapper() {
 		NumberTypeNode::le(NumberFormat::U16),
 	);
 	let tail = PostOffsetTypeNode::<TypeNode>::relative(array, 0).into();
+	let docs: Docs = vec!["Pina compact capacity: 8.".to_string()].into();
 
 	assert_eq!(
-		render_type_for_compact_tail(&tail, "State.values")
+		render_type_for_compact_tail(&tail, &docs, "State.values")
 			.unwrap_or_else(|error| panic!("render failed: {error}")),
-		"pina::Vec<u64, { u16::MAX as usize }>"
+		"pina::Vec<u64, 8>"
 	);
 }
 
@@ -170,10 +169,30 @@ fn rejects_non_compact_tail_nodes() {
 	));
 
 	for node in [number, fixed] {
-		let error = render_type_for_compact_tail(&node, "State.values")
+		let error = render_type_for_compact_tail(&node, &Docs::new(), "State.values")
 			.expect_err("non-prefixed tail must be rejected");
 		assert!(error.to_string().contains("suffix of prefixed arrays"));
 	}
+}
+
+#[test]
+fn rejects_compact_tails_without_capacity_metadata_or_with_prefix_overflow() {
+	let tail = TypeNode::from(ArrayTypeNode::prefixed(
+		NumberTypeNode::le(NumberFormat::U64),
+		NumberTypeNode::le(U8),
+	));
+	let missing = render_type_for_compact_tail(&tail, &Docs::new(), "State.values")
+		.expect_err("missing capacity metadata must be rejected");
+	assert!(missing.to_string().contains("Pina compact capacity"));
+
+	let too_large: Docs = vec!["Pina compact capacity: 256.".to_string()].into();
+	let overflow = render_type_for_compact_tail(&tail, &too_large, "State.values")
+		.expect_err("capacity beyond prefix maximum must be rejected");
+	assert!(
+		overflow
+			.to_string()
+			.contains("exceeds the 1-byte prefix maximum")
+	);
 }
 
 #[test]

@@ -147,6 +147,15 @@ pub(crate) fn compact_vec_prefix_size(ty: &str) -> Option<usize> {
 	}
 }
 
+pub(crate) fn compact_vec_capacity(ty: &str) -> Option<usize> {
+	let (name, args) = parse_generic_args(ty)?;
+	if !matches!(name.as_str(), "Vec" | "PodVec") || !(2..=3).contains(&args.len()) {
+		return None;
+	}
+
+	args.get(1)?.parse().ok()
+}
+
 /// Parse a zeropod collection schema or explicit storage type into a semantic,
 /// fixed-size Codama node.
 ///
@@ -728,6 +737,10 @@ mod tests {
 		assert_eq!(compact_vec_prefix_size("PodVec<u8, 8, 1>"), Some(1));
 		assert_eq!(compact_vec_prefix_size("Vec<u8, 8, PREFIX>"), None);
 		assert_eq!(compact_vec_prefix_size("String<8>"), None);
+		assert_eq!(compact_vec_capacity("Vec<u64, 8>"), Some(8));
+		assert_eq!(compact_vec_capacity("PodVec<u8, 16, 1>"), Some(16));
+		assert_eq!(compact_vec_capacity("Vec<u8, CAPACITY>"), None);
+		assert_eq!(compact_vec_capacity("String<8>"), None);
 	}
 
 	#[test]
