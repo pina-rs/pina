@@ -41,12 +41,12 @@ pub struct AddRole<'account> {
 	pub system_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `add_role`.
-	pub instruction: AddRoleInstruction,
+	pub ix: AddRoleIx,
 }
 
 /// Instruction arguments for the `add_role` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct AddRoleInstruction {
+pub struct AddRoleIx {
 	/// Instruction argument `roleId`.
 	pub role_id: u64,
 
@@ -57,7 +57,7 @@ pub struct AddRoleInstruction {
 	pub bump: u8,
 }
 
-impl AddRoleInstruction {
+impl AddRoleIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 18;
 
@@ -95,7 +95,7 @@ impl<'account> AddRole<'account> {
 			CpiHandle::writable(self.role_entry)?,
 			CpiHandle::readonly(self.system_program),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

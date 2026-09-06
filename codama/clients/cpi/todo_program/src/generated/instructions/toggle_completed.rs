@@ -29,14 +29,14 @@ pub struct ToggleCompleted<'account> {
 	pub todo: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `toggle_completed`.
-	pub instruction: ToggleCompletedInstruction,
+	pub ix: ToggleCompletedIx,
 }
 
 /// Instruction arguments for the `toggle_completed` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct ToggleCompletedInstruction;
+pub struct ToggleCompletedIx;
 
-impl ToggleCompletedInstruction {
+impl ToggleCompletedIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -68,7 +68,7 @@ impl<'account> ToggleCompleted<'account> {
 			CpiHandle::readonly_signer(self.owner),
 			CpiHandle::writable(self.todo)?,
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

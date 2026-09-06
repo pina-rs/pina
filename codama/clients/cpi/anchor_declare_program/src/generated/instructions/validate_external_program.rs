@@ -29,14 +29,14 @@ pub struct ValidateExternalProgram<'account> {
 	pub external_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `validate_external_program`.
-	pub instruction: ValidateExternalProgramInstruction,
+	pub ix: ValidateExternalProgramIx,
 }
 
 /// Instruction arguments for the `validate_external_program` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct ValidateExternalProgramInstruction;
+pub struct ValidateExternalProgramIx;
 
-impl ValidateExternalProgramInstruction {
+impl ValidateExternalProgramIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -68,7 +68,7 @@ impl<'account> ValidateExternalProgram<'account> {
 			CpiHandle::readonly_signer(self.authority),
 			CpiHandle::readonly(self.external_program),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

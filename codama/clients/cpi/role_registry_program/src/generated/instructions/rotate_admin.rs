@@ -33,14 +33,14 @@ pub struct RotateAdmin<'account> {
 	pub registry_config: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `rotate_admin`.
-	pub instruction: RotateAdminInstruction,
+	pub ix: RotateAdminIx,
 }
 
 /// Instruction arguments for the `rotate_admin` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct RotateAdminInstruction;
+pub struct RotateAdminIx;
 
-impl RotateAdminInstruction {
+impl RotateAdminIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -73,7 +73,7 @@ impl<'account> RotateAdmin<'account> {
 			CpiHandle::readonly(self.new_admin),
 			CpiHandle::writable(self.registry_config)?,
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

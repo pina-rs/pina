@@ -45,17 +45,17 @@ pub struct CpiTransfer<'account> {
 	pub system_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `cpi_transfer`.
-	pub instruction: CpiTransferInstruction,
+	pub ix: CpiTransferIx,
 }
 
 /// Instruction arguments for the `cpi_transfer` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct CpiTransferInstruction {
+pub struct CpiTransferIx {
 	/// Instruction argument `amount`.
 	pub amount: u64,
 }
 
-impl CpiTransferInstruction {
+impl CpiTransferIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 9;
 
@@ -89,7 +89,7 @@ impl<'account> CpiTransfer<'account> {
 			CpiHandle::writable(self.recipient)?,
 			CpiHandle::readonly(self.system_program),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

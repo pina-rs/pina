@@ -32,17 +32,17 @@ pub struct AddTag<'account> {
 	pub profile: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `add_tag`.
-	pub instruction: AddTagInstruction,
+	pub ix: AddTagIx,
 }
 
 /// Instruction arguments for the `add_tag` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct AddTagInstruction {
+pub struct AddTagIx {
 	/// Instruction argument `tag`.
 	pub tag: u64,
 }
 
-impl AddTagInstruction {
+impl AddTagIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 9;
 
@@ -75,7 +75,7 @@ impl<'account> AddTag<'account> {
 			CpiHandle::readonly_signer(self.authority),
 			CpiHandle::writable(self.profile)?,
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

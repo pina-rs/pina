@@ -20,14 +20,14 @@ use crate::ProgramAccount;
 #[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
 pub struct RequireGte {
 	/// Instruction arguments encoded and sent as CPI data for `require_gte`.
-	pub instruction: RequireGteInstruction,
+	pub ix: RequireGteIx,
 }
 
 /// Instruction arguments for the `require_gte` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct RequireGteInstruction;
+pub struct RequireGteIx;
 
-impl RequireGteInstruction {
+impl RequireGteIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -56,7 +56,7 @@ impl RequireGte {
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
 		let accounts: [CpiHandle<'_>; 0] = [];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

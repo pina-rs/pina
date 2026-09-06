@@ -33,12 +33,12 @@ pub struct Create<'account> {
 	pub system_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `create`.
-	pub instruction: CreateInstruction,
+	pub ix: CreateIx,
 }
 
 /// Instruction arguments for the `create` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct CreateInstruction {
+pub struct CreateIx {
 	/// Instruction argument `dataF32`.
 	pub data_f32: u32,
 
@@ -46,7 +46,7 @@ pub struct CreateInstruction {
 	pub data_f64: u64,
 }
 
-impl CreateInstruction {
+impl CreateIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 13;
 
@@ -81,7 +81,7 @@ impl<'account> Create<'account> {
 			CpiHandle::readonly_signer(self.authority),
 			CpiHandle::readonly(self.system_program),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

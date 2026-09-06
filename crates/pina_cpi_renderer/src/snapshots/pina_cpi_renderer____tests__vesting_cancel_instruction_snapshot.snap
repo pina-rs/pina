@@ -37,14 +37,14 @@ pub struct Cancel<'account> {
 	pub token_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `cancel`.
-	pub instruction: CancelInstruction,
+	pub ix: CancelIx,
 }
 
 /// Instruction arguments for the `cancel` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct CancelInstruction;
+pub struct CancelIx;
 
-impl CancelInstruction {
+impl CancelIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -79,7 +79,7 @@ impl<'account> Cancel<'account> {
 			CpiHandle::writable(self.vault)?,
 			CpiHandle::readonly(self.token_program),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

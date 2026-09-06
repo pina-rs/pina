@@ -440,7 +440,7 @@ fn renders_public_key_bool_and_number_arguments() {
 	assert!(page.contains("pub member: &'account AccountView,"));
 	assert!(page.contains("CpiHandle::writable_signer(self.member)?"));
 	assert!(page.contains("CpiHandle::readonly_signer(self.authority)"));
-	assert!(page.contains("pub instruction: EnrollInstruction<'address>,"));
+	assert!(page.contains("pub ix: EnrollIx<'address>,"));
 	assert!(page.contains("pub fn invoke(&self, program: &ProgramAccount<'_>)"));
 	assert!(page.contains("pub fn invoke_signed("));
 	assert!(page.contains("context.invoke_signed(&data, signers)"));
@@ -498,8 +498,8 @@ fn renders_address_only_instruction_lifetimes() {
 		.unwrap_or_else(|error| panic!("renders address-only instruction: {error}"));
 
 	assert!(page.contains("pub struct SetOwner<'address> {"));
-	assert!(page.contains("pub instruction: SetOwnerInstruction<'address>,"));
-	assert!(page.contains("impl<'address> SetOwnerInstruction<'address>"));
+	assert!(page.contains("pub ix: SetOwnerIx<'address>,"));
+	assert!(page.contains("impl<'address> SetOwnerIx<'address>"));
 	assert!(page.contains("impl<'address> SetOwner<'address>"));
 }
 

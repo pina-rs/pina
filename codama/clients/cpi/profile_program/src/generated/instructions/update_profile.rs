@@ -32,12 +32,12 @@ pub struct UpdateProfile<'account> {
 	pub profile: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `update_profile`.
-	pub instruction: UpdateProfileInstruction,
+	pub ix: UpdateProfileIx,
 }
 
 /// Instruction arguments for the `update_profile` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct UpdateProfileInstruction {
+pub struct UpdateProfileIx {
 	/// Instruction argument `name`.
 	pub name: [u8; 33],
 
@@ -45,7 +45,7 @@ pub struct UpdateProfileInstruction {
 	pub bio: [u8; 129],
 }
 
-impl UpdateProfileInstruction {
+impl UpdateProfileIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 163;
 
@@ -79,7 +79,7 @@ impl<'account> UpdateProfile<'account> {
 			CpiHandle::readonly_signer(self.authority),
 			CpiHandle::writable(self.profile)?,
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

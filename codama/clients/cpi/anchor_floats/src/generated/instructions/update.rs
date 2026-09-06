@@ -29,12 +29,12 @@ pub struct Update<'account> {
 	pub authority: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `update`.
-	pub instruction: UpdateInstruction,
+	pub ix: UpdateIx,
 }
 
 /// Instruction arguments for the `update` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct UpdateInstruction {
+pub struct UpdateIx {
 	/// Instruction argument `dataF32`.
 	pub data_f32: u32,
 
@@ -42,7 +42,7 @@ pub struct UpdateInstruction {
 	pub data_f64: u64,
 }
 
-impl UpdateInstruction {
+impl UpdateIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 13;
 
@@ -76,7 +76,7 @@ impl<'account> Update<'account> {
 			CpiHandle::writable(self.account)?,
 			CpiHandle::readonly_signer(self.authority),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

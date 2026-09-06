@@ -37,17 +37,17 @@ pub struct OpenPosition<'account> {
 	pub system_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `open_position`.
-	pub instruction: OpenPositionInstruction,
+	pub ix: OpenPositionIx,
 }
 
 /// Instruction arguments for the `open_position` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct OpenPositionInstruction {
+pub struct OpenPositionIx {
 	/// Instruction argument `bump`.
 	pub bump: u8,
 }
 
-impl OpenPositionInstruction {
+impl OpenPositionIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 2;
 
@@ -82,7 +82,7 @@ impl<'account> OpenPosition<'account> {
 			CpiHandle::writable(self.position_state)?,
 			CpiHandle::readonly(self.system_program),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

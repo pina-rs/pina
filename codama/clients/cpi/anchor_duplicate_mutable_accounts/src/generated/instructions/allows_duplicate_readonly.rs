@@ -29,14 +29,14 @@ pub struct AllowsDuplicateReadonly<'account> {
 	pub account2: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `allows_duplicate_readonly`.
-	pub instruction: AllowsDuplicateReadonlyInstruction,
+	pub ix: AllowsDuplicateReadonlyIx,
 }
 
 /// Instruction arguments for the `allows_duplicate_readonly` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct AllowsDuplicateReadonlyInstruction;
+pub struct AllowsDuplicateReadonlyIx;
 
-impl AllowsDuplicateReadonlyInstruction {
+impl AllowsDuplicateReadonlyIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -68,7 +68,7 @@ impl<'account> AllowsDuplicateReadonly<'account> {
 			CpiHandle::readonly(self.account1),
 			CpiHandle::readonly(self.account2),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

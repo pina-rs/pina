@@ -32,14 +32,14 @@ pub struct Note<'account> {
 	pub note: Option<&'account AccountView>,
 
 	/// Instruction arguments encoded and sent as CPI data for `note`.
-	pub instruction: NoteInstruction,
+	pub ix: NoteIx,
 }
 
 /// Instruction arguments for the `note` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct NoteInstruction;
+pub struct NoteIx;
 
-impl NoteInstruction {
+impl NoteIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -74,7 +74,7 @@ impl<'account> Note<'account> {
 				None => CpiHandle::readonly(program.account()),
 			},
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

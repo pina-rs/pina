@@ -33,14 +33,14 @@ pub struct Initialize<'account> {
 	pub system_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `initialize`.
-	pub instruction: InitializeInstruction,
+	pub ix: InitializeIx,
 }
 
 /// Instruction arguments for the `initialize` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct InitializeInstruction;
+pub struct InitializeIx;
 
-impl InitializeInstruction {
+impl InitializeIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -73,7 +73,7 @@ impl<'account> Initialize<'account> {
 			CpiHandle::writable_signer(self.oracle)?,
 			CpiHandle::readonly(self.system_program),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

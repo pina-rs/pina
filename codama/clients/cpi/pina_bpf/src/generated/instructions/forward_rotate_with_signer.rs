@@ -34,17 +34,17 @@ pub struct ForwardRotateWithSigner<'account, 'address> {
 	pub prop_amm_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `forward_rotate_with_signer`.
-	pub instruction: ForwardRotateWithSignerInstruction<'address>,
+	pub ix: ForwardRotateWithSignerIx<'address>,
 }
 
 /// Instruction arguments for the `forward_rotate_with_signer` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct ForwardRotateWithSignerInstruction<'address> {
+pub struct ForwardRotateWithSignerIx<'address> {
 	/// Instruction argument `newAuthority`.
 	pub new_authority: &'address Address,
 }
 
-impl<'address> ForwardRotateWithSignerInstruction<'address> {
+impl<'address> ForwardRotateWithSignerIx<'address> {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 33;
 
@@ -78,7 +78,7 @@ impl<'account, 'address> ForwardRotateWithSigner<'account, 'address> {
 			CpiHandle::readonly_signer(self.authority),
 			CpiHandle::readonly(self.prop_amm_program),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

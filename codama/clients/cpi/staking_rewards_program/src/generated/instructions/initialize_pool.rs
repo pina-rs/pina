@@ -57,17 +57,17 @@ pub struct InitializePool<'account> {
 	pub token_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `initialize_pool`.
-	pub instruction: InitializePoolInstruction,
+	pub ix: InitializePoolIx,
 }
 
 /// Instruction arguments for the `initialize_pool` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct InitializePoolInstruction {
+pub struct InitializePoolIx {
 	/// Instruction argument `bump`.
 	pub bump: u8,
 }
 
-impl InitializePoolInstruction {
+impl InitializePoolIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 2;
 
@@ -107,7 +107,7 @@ impl<'account> InitializePool<'account> {
 			CpiHandle::readonly(self.system_program),
 			CpiHandle::readonly(self.token_program),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

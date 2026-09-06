@@ -29,14 +29,14 @@ pub struct FailsDuplicateMutable<'account> {
 	pub account2: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `fails_duplicate_mutable`.
-	pub instruction: FailsDuplicateMutableInstruction,
+	pub ix: FailsDuplicateMutableIx,
 }
 
 /// Instruction arguments for the `fails_duplicate_mutable` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct FailsDuplicateMutableInstruction;
+pub struct FailsDuplicateMutableIx;
 
-impl FailsDuplicateMutableInstruction {
+impl FailsDuplicateMutableIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -68,7 +68,7 @@ impl<'account> FailsDuplicateMutable<'account> {
 			CpiHandle::writable(self.account1)?,
 			CpiHandle::writable(self.account2)?,
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

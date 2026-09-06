@@ -35,17 +35,17 @@ pub struct DirectTransfer<'account> {
 	pub recipient: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `direct_transfer`.
-	pub instruction: DirectTransferInstruction,
+	pub ix: DirectTransferIx,
 }
 
 /// Instruction arguments for the `direct_transfer` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct DirectTransferInstruction {
+pub struct DirectTransferIx {
 	/// Instruction argument `amount`.
 	pub amount: u64,
 }
 
-impl DirectTransferInstruction {
+impl DirectTransferIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 9;
 
@@ -78,7 +78,7 @@ impl<'account> DirectTransfer<'account> {
 			CpiHandle::writable_signer(self.sender)?,
 			CpiHandle::writable(self.recipient)?,
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

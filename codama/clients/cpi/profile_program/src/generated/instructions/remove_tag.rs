@@ -32,17 +32,17 @@ pub struct RemoveTag<'account> {
 	pub profile: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `remove_tag`.
-	pub instruction: RemoveTagInstruction,
+	pub ix: RemoveTagIx,
 }
 
 /// Instruction arguments for the `remove_tag` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct RemoveTagInstruction {
+pub struct RemoveTagIx {
 	/// Instruction argument `index`.
 	pub index: u64,
 }
 
-impl RemoveTagInstruction {
+impl RemoveTagIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 9;
 
@@ -75,7 +75,7 @@ impl<'account> RemoveTag<'account> {
 			CpiHandle::readonly_signer(self.authority),
 			CpiHandle::writable(self.profile)?,
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

@@ -33,14 +33,14 @@ pub struct Sysvars<'account> {
 	pub stake_history: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `sysvars`.
-	pub instruction: SysvarsInstruction,
+	pub ix: SysvarsIx,
 }
 
 /// Instruction arguments for the `sysvars` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct SysvarsInstruction;
+pub struct SysvarsIx;
 
-impl SysvarsInstruction {
+impl SysvarsIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -73,7 +73,7 @@ impl<'account> Sysvars<'account> {
 			CpiHandle::readonly(self.rent),
 			CpiHandle::readonly(self.stake_history),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

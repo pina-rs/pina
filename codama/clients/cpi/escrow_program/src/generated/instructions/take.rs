@@ -69,14 +69,14 @@ pub struct Take<'account> {
 	pub system_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `take`.
-	pub instruction: TakeInstruction,
+	pub ix: TakeIx,
 }
 
 /// Instruction arguments for the `take` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct TakeInstruction;
+pub struct TakeIx;
 
-impl TakeInstruction {
+impl TakeIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -118,7 +118,7 @@ impl<'account> Take<'account> {
 			CpiHandle::readonly(self.associated_token_program),
 			CpiHandle::readonly(self.system_program),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

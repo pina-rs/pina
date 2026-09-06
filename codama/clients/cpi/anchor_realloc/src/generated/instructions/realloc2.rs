@@ -42,17 +42,17 @@ pub struct Realloc2<'account> {
 	pub system_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `realloc2`.
-	pub instruction: Realloc2Instruction,
+	pub ix: Realloc2Ix,
 }
 
 /// Instruction arguments for the `realloc2` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct Realloc2Instruction {
+pub struct Realloc2Ix {
 	/// Instruction argument `len`.
 	pub len: u16,
 }
 
-impl Realloc2Instruction {
+impl Realloc2Ix {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 3;
 
@@ -87,7 +87,7 @@ impl<'account> Realloc2<'account> {
 			CpiHandle::writable(self.sample2)?,
 			CpiHandle::readonly(self.system_program),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

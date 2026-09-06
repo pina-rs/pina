@@ -406,8 +406,8 @@ mod tests {
 			assert!(source.contains("pub fn invoke(&self, program: &ProgramAccount<'_>)"));
 			assert!(source.contains("pub fn invoke_signed("));
 			assert!(source.contains("pub struct Initialize<'account>"));
-			assert!(source.contains("pub instruction: InitializeInstruction"));
-			assert!(source.contains("let data = self.instruction.to_bytes();"));
+			assert!(source.contains("pub ix: InitializeIx"));
+			assert!(source.contains("let data = self.ix.to_bytes();"));
 			assert!(source.contains("CpiContext::new(*program, accounts)"));
 		}
 	}

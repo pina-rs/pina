@@ -33,14 +33,14 @@ pub struct Increment<'account> {
 	pub counter: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `increment`.
-	pub instruction: IncrementInstruction,
+	pub ix: IncrementIx,
 }
 
 /// Instruction arguments for the `increment` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct IncrementInstruction;
+pub struct IncrementIx;
 
-impl IncrementInstruction {
+impl IncrementIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -72,7 +72,7 @@ impl<'account> Increment<'account> {
 			CpiHandle::readonly_signer(self.authority),
 			CpiHandle::writable(self.counter)?,
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

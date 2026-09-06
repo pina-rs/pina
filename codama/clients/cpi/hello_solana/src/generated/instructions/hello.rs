@@ -37,14 +37,14 @@ pub struct Hello<'account> {
 	pub user: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `hello`.
-	pub instruction: HelloInstruction,
+	pub ix: HelloIx,
 }
 
 /// Instruction arguments for the `hello` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct HelloInstruction;
+pub struct HelloIx;
 
-impl HelloInstruction {
+impl HelloIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -73,7 +73,7 @@ impl<'account> Hello<'account> {
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
 		let accounts: [CpiHandle<'_>; 1] = [CpiHandle::readonly_signer(self.user)];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

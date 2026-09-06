@@ -57,12 +57,12 @@ pub struct Make<'account> {
 	pub token_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `make`.
-	pub instruction: MakeInstruction,
+	pub ix: MakeIx,
 }
 
 /// Instruction arguments for the `make` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct MakeInstruction {
+pub struct MakeIx {
 	/// Instruction argument `seed`.
 	pub seed: u64,
 
@@ -76,7 +76,7 @@ pub struct MakeInstruction {
 	pub bump: u8,
 }
 
-impl MakeInstruction {
+impl MakeIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 26;
 
@@ -119,7 +119,7 @@ impl<'account> Make<'account> {
 			CpiHandle::readonly(self.system_program),
 			CpiHandle::readonly(self.token_program),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

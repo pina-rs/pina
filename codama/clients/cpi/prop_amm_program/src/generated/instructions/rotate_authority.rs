@@ -30,17 +30,17 @@ pub struct RotateAuthority<'account, 'address> {
 	pub authority: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `rotate_authority`.
-	pub instruction: RotateAuthorityInstruction<'address>,
+	pub ix: RotateAuthorityIx<'address>,
 }
 
 /// Instruction arguments for the `rotate_authority` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct RotateAuthorityInstruction<'address> {
+pub struct RotateAuthorityIx<'address> {
 	/// Instruction argument `newAuthority`.
 	pub new_authority: &'address Address,
 }
 
-impl<'address> RotateAuthorityInstruction<'address> {
+impl<'address> RotateAuthorityIx<'address> {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 33;
 
@@ -73,7 +73,7 @@ impl<'account, 'address> RotateAuthority<'account, 'address> {
 			CpiHandle::writable(self.oracle)?,
 			CpiHandle::readonly_signer(self.authority),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

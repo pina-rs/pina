@@ -1033,8 +1033,8 @@ fn generate_uses_pina_toml_to_create_a_standalone_cpi_crate() {
 	assert!(manifest.contains("name = \"custom-program-cpi\""));
 	assert!(manifest.contains("pina ="));
 	assert!(instruction.contains("pub struct Initialize<'account>"));
-	assert!(instruction.contains("pub instruction: InitializeInstruction"));
-	assert!(instruction.contains("pub struct InitializeInstruction"));
+	assert!(instruction.contains("pub ix: InitializeIx"));
+	assert!(instruction.contains("pub struct InitializeIx"));
 	assert!(instruction.contains("pub fn invoke(&self, program: &ProgramAccount<'_>)"));
 	assert!(instruction.contains("pub fn invoke_signed("));
 	assert!(!project.join("clients/rust").exists());

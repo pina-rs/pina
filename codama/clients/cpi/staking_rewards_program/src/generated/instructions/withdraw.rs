@@ -49,17 +49,17 @@ pub struct Withdraw<'account> {
 	pub system_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `withdraw`.
-	pub instruction: WithdrawInstruction,
+	pub ix: WithdrawIx,
 }
 
 /// Instruction arguments for the `withdraw` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct WithdrawInstruction {
+pub struct WithdrawIx {
 	/// Instruction argument `amount`.
 	pub amount: u64,
 }
 
-impl WithdrawInstruction {
+impl WithdrawIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 9;
 
@@ -97,7 +97,7 @@ impl<'account> Withdraw<'account> {
 			CpiHandle::readonly(self.token_program),
 			CpiHandle::readonly(self.system_program),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

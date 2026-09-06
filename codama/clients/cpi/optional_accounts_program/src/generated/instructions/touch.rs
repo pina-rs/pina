@@ -32,14 +32,14 @@ pub struct Touch<'account> {
 	pub store: Option<&'account AccountView>,
 
 	/// Instruction arguments encoded and sent as CPI data for `touch`.
-	pub instruction: TouchInstruction,
+	pub ix: TouchIx,
 }
 
 /// Instruction arguments for the `touch` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct TouchInstruction;
+pub struct TouchIx;
 
-impl TouchInstruction {
+impl TouchIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -74,7 +74,7 @@ impl<'account> Touch<'account> {
 				None => CpiHandle::readonly(program.account()),
 			},
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

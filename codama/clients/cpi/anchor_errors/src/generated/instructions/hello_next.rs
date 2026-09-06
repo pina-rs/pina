@@ -20,14 +20,14 @@ use crate::ProgramAccount;
 #[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
 pub struct HelloNext {
 	/// Instruction arguments encoded and sent as CPI data for `hello_next`.
-	pub instruction: HelloNextInstruction,
+	pub ix: HelloNextIx,
 }
 
 /// Instruction arguments for the `hello_next` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct HelloNextInstruction;
+pub struct HelloNextIx;
 
-impl HelloNextInstruction {
+impl HelloNextIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -56,7 +56,7 @@ impl HelloNext {
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
 		let accounts: [CpiHandle<'_>; 0] = [];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

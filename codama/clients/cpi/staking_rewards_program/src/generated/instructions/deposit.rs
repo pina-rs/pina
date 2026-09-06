@@ -53,17 +53,17 @@ pub struct Deposit<'account> {
 	pub system_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `deposit`.
-	pub instruction: DepositInstruction,
+	pub ix: DepositIx,
 }
 
 /// Instruction arguments for the `deposit` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct DepositInstruction {
+pub struct DepositIx {
 	/// Instruction argument `amount`.
 	pub amount: u64,
 }
 
-impl DepositInstruction {
+impl DepositIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 9;
 
@@ -102,7 +102,7 @@ impl<'account> Deposit<'account> {
 			CpiHandle::readonly(self.token_program),
 			CpiHandle::readonly(self.system_program),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

@@ -33,14 +33,14 @@ pub struct DeactivateRole<'account> {
 	pub role_entry: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `deactivate_role`.
-	pub instruction: DeactivateRoleInstruction,
+	pub ix: DeactivateRoleIx,
 }
 
 /// Instruction arguments for the `deactivate_role` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct DeactivateRoleInstruction;
+pub struct DeactivateRoleIx;
 
-impl DeactivateRoleInstruction {
+impl DeactivateRoleIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -73,7 +73,7 @@ impl<'account> DeactivateRole<'account> {
 			CpiHandle::readonly(self.registry_config),
 			CpiHandle::writable(self.role_entry)?,
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

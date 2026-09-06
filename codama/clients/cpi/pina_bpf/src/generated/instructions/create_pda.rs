@@ -33,17 +33,17 @@ pub struct CreatePda<'account> {
 	pub system_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `create_pda`.
-	pub instruction: CreatePdaInstruction,
+	pub ix: CreatePdaIx,
 }
 
 /// Instruction arguments for the `create_pda` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct CreatePdaInstruction {
+pub struct CreatePdaIx {
 	/// Instruction argument `bump`.
 	pub bump: u8,
 }
 
-impl CreatePdaInstruction {
+impl CreatePdaIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 2;
 
@@ -77,7 +77,7 @@ impl<'account> CreatePda<'account> {
 			CpiHandle::writable(self.state)?,
 			CpiHandle::readonly(self.system_program),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

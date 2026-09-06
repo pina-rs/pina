@@ -29,17 +29,17 @@ pub struct UpdateDigest<'account> {
 	pub todo: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `update_digest`.
-	pub instruction: UpdateDigestInstruction,
+	pub ix: UpdateDigestIx,
 }
 
 /// Instruction arguments for the `update_digest` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct UpdateDigestInstruction {
+pub struct UpdateDigestIx {
 	/// Instruction argument `digest`.
 	pub digest: [u8; 32],
 }
 
-impl UpdateDigestInstruction {
+impl UpdateDigestIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 33;
 
@@ -72,7 +72,7 @@ impl<'account> UpdateDigest<'account> {
 			CpiHandle::readonly_signer(self.owner),
 			CpiHandle::writable(self.todo)?,
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

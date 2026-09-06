@@ -36,17 +36,17 @@ pub struct Init<'account> {
 	pub system_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `init`.
-	pub instruction: InitInstruction,
+	pub ix: InitIx,
 }
 
 /// Instruction arguments for the `init` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct InitInstruction {
+pub struct InitIx {
 	/// Instruction argument `bump`.
 	pub bump: u8,
 }
 
-impl InitInstruction {
+impl InitIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 2;
 
@@ -80,7 +80,7 @@ impl<'account> Init<'account> {
 			CpiHandle::writable(self.store)?,
 			CpiHandle::readonly(self.system_program),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

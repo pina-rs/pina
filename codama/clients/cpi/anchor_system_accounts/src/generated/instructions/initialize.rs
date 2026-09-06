@@ -29,14 +29,14 @@ pub struct Initialize<'account> {
 	pub wallet: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `initialize`.
-	pub instruction: InitializeInstruction,
+	pub ix: InitializeIx,
 }
 
 /// Instruction arguments for the `initialize` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct InitializeInstruction;
+pub struct InitializeIx;
 
-impl InitializeInstruction {
+impl InitializeIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -68,7 +68,7 @@ impl<'account> Initialize<'account> {
 			CpiHandle::readonly_signer(self.authority),
 			CpiHandle::readonly(self.wallet),
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

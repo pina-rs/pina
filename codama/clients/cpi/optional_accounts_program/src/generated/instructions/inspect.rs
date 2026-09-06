@@ -38,14 +38,14 @@ pub struct Inspect<'account> {
 	pub witness: Option<&'account AccountView>,
 
 	/// Instruction arguments encoded and sent as CPI data for `inspect`.
-	pub instruction: InspectInstruction,
+	pub ix: InspectIx,
 }
 
 /// Instruction arguments for the `inspect` CPI call.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct InspectInstruction;
+pub struct InspectIx;
 
-impl InspectInstruction {
+impl InspectIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 1;
 
@@ -84,7 +84,7 @@ impl<'account> Inspect<'account> {
 				None => CpiHandle::readonly(program.account()),
 			},
 		];
-		let data = self.instruction.to_bytes();
+		let data = self.ix.to_bytes();
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

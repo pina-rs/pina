@@ -107,7 +107,7 @@ impl<'a> ProcessAccountInfos<'a> for ForwardRotateAccounts<'a> {
 			prop_amm_cpi::RotateAuthority {
 				oracle: self.oracle,
 				authority: self.authority,
-				instruction: prop_amm_cpi::RotateAuthorityInstruction {
+				ix: prop_amm_cpi::RotateAuthorityIx {
 					new_authority: &args.new_authority,
 				},
 			}
@@ -145,7 +145,7 @@ impl<'a> ProcessAccountInfos<'a> for ForwardRotateWithPdaAccounts<'a> {
 			prop_amm_cpi::RotateAuthority {
 				oracle: self.oracle,
 				authority: self.authority,
-				instruction: prop_amm_cpi::RotateAuthorityInstruction {
+				ix: prop_amm_cpi::RotateAuthorityIx {
 					new_authority: &args.new_authority,
 				},
 			}

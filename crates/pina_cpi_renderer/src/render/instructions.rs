@@ -42,7 +42,7 @@ pub(crate) fn render_instructions_mod(instructions: &[InstructionNode]) -> Strin
 pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<String> {
 	let snake_name = snake(instruction.name.as_ref());
 	let struct_name = pascal(instruction.name.as_ref());
-	let instruction_name = format!("{struct_name}Instruction");
+	let ix_name = format!("{struct_name}Ix");
 	let context = format!("instruction `{struct_name}`");
 	let discriminator = render_constant_discriminator(
 		&snake_name,
@@ -62,9 +62,9 @@ pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<S
 	let has_addresses = arguments
 		.iter()
 		.any(|argument| argument.rust_type.contains("Address"));
-	let instruction_generics = lifetime_generics(false, has_addresses);
+	let ix_generics = lifetime_generics(false, has_addresses);
 	let struct_generics = lifetime_generics(has_accounts, has_addresses);
-	let instruction_type = format!("{instruction_name}{instruction_generics}");
+	let ix_type = format!("{ix_name}{ix_generics}");
 
 	let mut lines = vec![
 		"#![allow(rustdoc::broken_intra_doc_links)]".to_string(),
@@ -107,7 +107,7 @@ pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<S
 	lines.push(format!(
 		"\t/// Instruction arguments encoded and sent as CPI data for `{snake_name}`."
 	));
-	lines.push(format!("\tpub instruction: {instruction_type},"));
+	lines.push(format!("\tpub ix: {ix_type},"));
 	lines.push("}".to_string());
 	lines.push(String::new());
 
@@ -121,11 +121,9 @@ pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<S
 	};
 	lines.push(instruction_derives.to_string());
 	if arguments.is_empty() {
-		lines.push(format!("pub struct {instruction_name};"));
+		lines.push(format!("pub struct {ix_name};"));
 	} else {
-		lines.push(format!(
-			"pub struct {instruction_name}{instruction_generics} {{"
-		));
+		lines.push(format!("pub struct {ix_name}{ix_generics} {{"));
 		for (index, argument) in arguments.iter().enumerate() {
 			if index > 0 {
 				lines.push(String::new());
@@ -137,8 +135,8 @@ pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<S
 	}
 	lines.push(String::new());
 
-	let instruction_impl = impl_header(&instruction_name, false, has_addresses);
-	lines.push(format!("{instruction_impl} {{"));
+	let ix_impl = impl_header(&ix_name, false, has_addresses);
+	lines.push(format!("{ix_impl} {{"));
 	lines.push(
 		"\t/// Number of bytes in the encoded instruction, including its discriminator."
 			.to_string(),
@@ -183,7 +181,7 @@ pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<S
 	lines.push("\t\tsigners: &[Signer<'_, '_>],".to_string());
 	lines.push("\t) -> ProgramResult {".to_string());
 	lines.extend(render_account_handles(&accounts));
-	lines.push("\t\tlet data = self.instruction.to_bytes();".to_string());
+	lines.push("\t\tlet data = self.ix.to_bytes();".to_string());
 	lines.push("\t\tlet context = CpiContext::new(*program, accounts);".to_string());
 	lines.push(String::new());
 	lines.push("\t\tcontext.invoke_signed(&data, signers)".to_string());
