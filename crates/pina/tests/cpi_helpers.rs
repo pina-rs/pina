@@ -613,7 +613,7 @@ fn cpi_context_accepts_typed_account_structs() {
 	let mut stored_program =
 		TestAccount::<8>::new_with_executable(ExampleProgram::ID, false, false, true);
 	let program_view = stored_program.view();
-	let program = Program::<ExampleProgram>::new(&program_view)
+	let program = Program::<ExampleProgram>::try_new(&program_view)
 		.unwrap_or_else(|e| panic!("program validation: {e:?}"));
 	let context = CpiContext::new(program, accounts);
 	let ordered = context.accounts.to_cpi_handles();
@@ -631,7 +631,7 @@ fn program_wrapper_validates_executable_program_address() {
 	let mut stored_program =
 		TestAccount::<8>::new_with_executable(ExampleProgram::ID, false, false, true);
 	let program_view = stored_program.view();
-	let program = Program::<ExampleProgram>::new(&program_view)
+	let program = Program::<ExampleProgram>::try_new(&program_view)
 		.unwrap_or_else(|e| panic!("program validation: {e:?}"));
 	let copied_program = program;
 	let cloned_program = program.clone();
@@ -650,7 +650,7 @@ fn program_wrapper_rejects_wrong_address() {
 	let mut stored_program =
 		TestAccount::<8>::new_with_executable(wrong_address, false, false, true);
 	let program_view = stored_program.view();
-	let error = Program::<ExampleProgram>::new(&program_view)
+	let error = Program::<ExampleProgram>::try_new(&program_view)
 		.expect_err("wrong program address should fail validation");
 
 	assert_eq!(error, ProgramError::InvalidAccountData);

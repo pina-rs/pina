@@ -1169,8 +1169,13 @@ impl<T: CpiProgramId> core::fmt::Debug for Program<'_, T> {
 
 impl<'a, T: CpiProgramId> Program<'a, T> {
 	/// Validate `account` as the expected executable program.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidAccountData`] when the account is not
+	/// executable or does not have the expected program address.
 	#[inline(always)]
-	pub fn new(account: &'a AccountView) -> Result<Self, ProgramError> {
+	pub fn try_new(account: &'a AccountView) -> Result<Self, ProgramError> {
 		account.assert_program(&T::ID)?;
 
 		Ok(Self {

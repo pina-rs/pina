@@ -5874,6 +5874,7 @@ name = "pina_bpf"
 version = "0.0.0"
 dependencies = [
  "pina",
+ "prop-amm-program-cpi",
 ]
 
 [[package]]

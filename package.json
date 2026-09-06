@@ -21,9 +21,10 @@
 		"codama-renderers-dart": "0.5.1"
 	},
 	"devDependencies": {
-		"@solana/surfpool": "^1.5.0",
+		"@codama/nodes-from-anchor": "1.5.5",
 		"@solana/kit": "^8.1.0",
 		"@solana/program-client-core": "^8.1.0",
+		"@solana/surfpool": "^1.5.0",
 		"@types/node": "^26.4.0",
 		"typescript": "^7.0.2"
 	}

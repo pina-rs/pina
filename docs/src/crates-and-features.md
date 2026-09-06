@@ -104,16 +104,19 @@ Library surface:
 
 Generated program feature flags:
 
-| Feature          | Default | Description                                                                 |
-| ---------------- | ------- | --------------------------------------------------------------------------- |
-| `bpf-entrypoint` | No      | Compiles the on-chain entrypoint for SBF deployment builds.                 |
-| `cpi`            | No      | Exposes that program's typed on-chain CPI builders for downstream programs. |
+| Feature          | Default | Description                                                 |
+| ---------------- | ------- | ----------------------------------------------------------- |
+| `bpf-entrypoint` | No      | Compiles the on-chain entrypoint for SBF deployment builds. |
 
-Keep `cpi` disabled for deployed programs that do not need to export their CPI surface. Consumer programs can opt in explicitly:
+CPI clients are standalone generated crates rather than a feature of the deployed program crate. Add `cpi` to `clients.languages` in `pina.toml`, then run `pina generate`:
 
 ```toml
-other_program = { version = "...", default-features = false, features = ["cpi"] }
+[clients]
+output = "clients"
+languages = ["cpi", "rust", "typescript"]
 ```
+
+The consuming program depends on the generated crate directly. This avoids coupling a program's deployable feature graph to downstream CPI consumers.
 
 ## Pod types
 

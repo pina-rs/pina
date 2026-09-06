@@ -8,11 +8,19 @@ use std::process::Stdio;
 use tempfile::TempDir;
 
 fn fixture_path() -> PathBuf {
+	workspace_root().join("codama/idls/vesting_program.json")
+}
+
+fn workspace_root() -> PathBuf {
 	Path::new(env!("CARGO_MANIFEST_DIR"))
 		.parent()
 		.and_then(Path::parent)
 		.unwrap_or_else(|| Path::new("."))
-		.join("codama/idls/vesting_program.json")
+		.to_path_buf()
+}
+
+fn anchor_fixture_path() -> PathBuf {
+	Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/anchor_counter.json")
 }
 
 #[test]
@@ -72,6 +80,62 @@ fn cpi_command_accepts_a_codama_pipeline_on_standard_input() {
 		String::from_utf8_lossy(&output.stderr)
 	);
 	assert!(output_dir.join("src/generated/mod.rs").is_file());
+}
+
+#[cfg(unix)]
+#[test]
+fn cpi_command_converts_a_raw_anchor_idl_and_compiles_the_crate() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
+	let output_dir = temp.path().join("anchor-counter-cpi");
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["cpi", "--idl"])
+		.arg(anchor_fixture_path())
+		.args(["--npx", "node", "--output"])
+		.arg(&output_dir)
+		.current_dir(workspace_root())
+		.output()
+		.unwrap_or_else(|error| panic!("Anchor CPI command failed to launch: {error}"));
+
+	assert!(
+		output.status.success(),
+		"Anchor CPI command failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let instruction_path = output_dir.join("src/generated/instructions/set_value.rs");
+	let instruction = fs::read_to_string(&instruction_path)
+		.unwrap_or_else(|error| panic!("generated instruction read failed: {error}"));
+	assert!(instruction.contains("Set the stored counter value."));
+	assert!(instruction.contains("CPI account `counter`."));
+	assert!(instruction.contains("Counter account to update."));
+	assert!(instruction.contains("Instruction argument `value`."));
+	assert!(instruction.contains("New counter value."));
+	assert!(instruction.contains("pub value: u64"));
+	assert!(instruction.contains("pub owner: &'address Address"));
+	assert!(instruction.contains("pub fn invoke(&self, program: &ProgramAccount<'_>)"));
+	assert!(instruction.contains("pub fn invoke_signed("));
+
+	let pina_path = workspace_root().join("crates/pina");
+	let manifest = format!(
+		"[package]\nname = \"anchor-counter-cpi-proof\"\nversion = \"0.0.0\"\nedition = \
+		 \"2021\"\npublish = false\n\n[workspace]\n\n[dependencies]\npina = {{ path = {:?}, \
+		 default-features = false }}\n",
+		pina_path
+	);
+	fs::write(output_dir.join("Cargo.toml"), manifest)
+		.unwrap_or_else(|error| panic!("generated manifest rewrite failed: {error}"));
+	let check = Command::new("cargo")
+		.args(["check", "--quiet", "--manifest-path"])
+		.arg(output_dir.join("Cargo.toml"))
+		.args(["--target-dir"])
+		.arg(temp.path().join("cargo-target"))
+		.current_dir(workspace_root())
+		.output()
+		.unwrap_or_else(|error| panic!("generated crate check failed to launch: {error}"));
+	assert!(
+		check.status.success(),
+		"generated Anchor CPI crate did not compile: {}",
+		String::from_utf8_lossy(&check.stderr)
+	);
 }
 
 #[test]

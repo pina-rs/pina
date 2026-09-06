@@ -49,7 +49,7 @@ Build the discovered program for SBF and publish its IDL.
 
 ```bash
 pina build
-pina build --features logs,cpi --no-default-features
+pina build --features logs --no-default-features
 ```
 
 Outputs use Cargo's target directory: `deploy/<library>.so` and `idl/<library>.json`.

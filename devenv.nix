@@ -329,6 +329,8 @@ in
     "test:all" = {
       exec = ''
         set -euo pipefail
+        # The raw Anchor CPI integration test invokes the pinned local converter.
+        pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
         # Ensure cargo-expand is available for macrotest expansion snapshots.
         if ! command -v cargo-expand &>/dev/null; then
           cargo install --locked --version 1.0.111 cargo-expand
@@ -757,6 +759,8 @@ in
     "coverage:all" = {
       exec = ''
         set -euo pipefail
+        # The raw Anchor CPI integration test invokes the pinned local converter.
+        pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
         mkdir -p "$DEVENV_ROOT/target/coverage"
         rm -rf "$DEVENV_ROOT/target/llvm-cov-target"
         cargo llvm-cov \

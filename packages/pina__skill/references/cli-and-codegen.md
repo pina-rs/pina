@@ -43,7 +43,7 @@ pina generate
 `pina build` compiles SBF with the required `bpf-entrypoint` feature and refreshes the IDL. Pass program features explicitly when required:
 
 ```sh
-pina build --features logs,cpi --no-default-features
+pina build --features logs --no-default-features
 ```
 
 Run `pina lint` before review to execute the official Pina security lint set associated with the installed CLI release. Use `pina lint --fix` only when source edits are authorized, then inspect and test every change. The bundled driver statically links the whole lint catalog, so additional project-defined lint libraries are never loaded.

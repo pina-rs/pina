@@ -35,7 +35,7 @@ Cargo output is streamed to the terminal. Pina stages both outputs first and ato
 
 ```bash
 pina build
-pina build --features logs,cpi --no-default-features
+pina build --features logs --no-default-features
 pina build --project ./programs/counter
 ```
 
@@ -85,7 +85,7 @@ Pina atomically replaces each destination file. The content-addressed artifact a
 Feature selection is identical for both backends:
 
 ```bash
-pina build --verify --features logs,cpi --no-default-features
+pina build --verify --features logs --no-default-features
 ```
 
 Pina forwards only its validated feature selection to Solana Verify. It intentionally offers no raw Cargo, Docker, image, or shell-argument passthrough.
