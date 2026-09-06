@@ -156,6 +156,13 @@ fn generate_help_snapshot() {
 }
 
 #[test]
+fn cpi_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["cpi", "--help"]);
+	assert_cmd_snapshot!("cpi_help", command);
+}
+
+#[test]
 fn idl_help_snapshot() {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command.args(["idl", "--help"]);
@@ -516,6 +523,7 @@ fn codama_generate_success_output_snapshot() {
 	let fake_npx = create_fake_npx(&temp_dir);
 	let idls_dir = temp_dir.join("idls");
 	let rust_out = temp_dir.join("rust");
+	let cpi_out = temp_dir.join("cpi");
 	let js_out = temp_dir.join("js");
 	let dart_out = temp_dir.join("dart");
 	let js_generated = js_out.join("counter_program/src/generated");
@@ -544,6 +552,8 @@ fn codama_generate_success_output_snapshot() {
 		.arg(workspace_relative(&idls_dir))
 		.arg("--rust-out")
 		.arg(workspace_relative(&rust_out))
+		.arg("--cpi-out")
+		.arg(workspace_relative(&cpi_out))
 		.arg("--js-out")
 		.arg(workspace_relative(&js_out))
 		.arg("--dart-out")
@@ -566,6 +576,17 @@ fn codama_generate_success_output_snapshot() {
 			.is_file(),
 		"expected generated Rust client module at {}",
 		rust_out
+			.join("counter_program")
+			.join("src/generated/mod.rs")
+			.display()
+	);
+	assert!(
+		cpi_out
+			.join("counter_program")
+			.join("src/generated/mod.rs")
+			.is_file(),
+		"expected generated CPI client module at {}",
+		cpi_out
 			.join("counter_program")
 			.join("src/generated/mod.rs")
 			.display()

@@ -8,6 +8,7 @@ The installed CLI is authoritative:
 pina --help
 pina build --help
 pina generate --help
+pina cpi --help
 pina idl --help
 pina idl generate --help
 pina idl fetch --help
@@ -43,7 +44,7 @@ pina generate
 `pina build` compiles SBF with the required `bpf-entrypoint` feature and refreshes the IDL. Pass program features explicitly when required:
 
 ```sh
-pina build --features logs,cpi --no-default-features
+pina build --features logs --no-default-features
 ```
 
 Run `pina lint` before review to execute the official Pina security lint set associated with the installed CLI release. Use `pina lint --fix` only when source edits are authorized, then inspect and test every change. The bundled driver statically links the whole lint catalog, so additional project-defined lint libraries are never loaded.
@@ -55,7 +56,9 @@ The library target name determines the canonical outputs:
 <cargo-target>/idl/<library-name>.json
 ```
 
-`pina generate` refreshes that IDL and renders the client languages selected in `pina.toml`. Override the selection for one run with repeatable `--client rust`, `--client typescript`, or `--client dart` flags. Generated ecosystem roots may be replaced, so keep hand-written code outside them.
+`pina generate` refreshes that IDL and renders the client languages selected in `pina.toml`. Override the selection for one run with repeatable `--client cpi`, `--client rust`, `--client typescript`, or `--client dart` flags. CPI output is a separate `no_std` crate with `.invoke()` and `.invoke_signed()` builders. Generated ecosystem roots may be replaced, so keep hand-written code outside them.
+
+Generate the same crate from an external Codama or Anchor IDL with `pina cpi --idl <FILE> --output <DIR>`. Codama IDLs stay native; raw Anchor IDLs are normalized through `@codama/nodes-from-anchor` first.
 
 ## Project diagnostics and identity
 

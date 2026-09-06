@@ -1,0 +1,108 @@
+---
+source: crates/pina_cpi_renderer/src/__tests.rs
+expression: "render_fixture_instruction(\"vesting_program\", \"claim\")"
+---
+#![allow(rustdoc::broken_intra_doc_links)]
+
+use pina::AccountView;
+use pina::CpiContext;
+use pina::CpiHandle;
+use pina::ProgramResult;
+use pina::Signer;
+
+use crate::ProgramAccount;
+
+/// CPI call for the `claim` instruction.
+#[derive(Clone, Copy, Debug)]
+#[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
+pub struct Claim<'account> {
+	/// CPI account `beneficiary`.
+	/// Required privileges: writable and signer.
+	pub beneficiary: &'account AccountView,
+
+	/// CPI account `mint`.
+	/// Required privileges: read-only.
+	pub mint: &'account AccountView,
+
+	/// CPI account `vestingState`.
+	/// Required privileges: writable.
+	pub vesting_state: &'account AccountView,
+
+	/// CPI account `beneficiaryAta`.
+	/// Required privileges: writable.
+	pub beneficiary_ata: &'account AccountView,
+
+	/// CPI account `vault`.
+	/// Required privileges: writable.
+	pub vault: &'account AccountView,
+
+	/// CPI account `associatedTokenProgram`.
+	/// Required privileges: read-only.
+	pub associated_token_program: &'account AccountView,
+
+	/// CPI account `systemProgram`.
+	/// Required privileges: read-only.
+	pub system_program: &'account AccountView,
+
+	/// CPI account `tokenProgram`.
+	/// Required privileges: read-only.
+	pub token_program: &'account AccountView,
+
+	/// Instruction arguments encoded and sent as CPI data for `claim`.
+	pub ix: ClaimIx,
+}
+
+/// Instruction arguments for the `claim` CPI call.
+#[derive(Clone, Copy, Debug)]
+pub struct ClaimIx {
+	/// Instruction argument `amount`.
+	pub amount: u64,
+}
+
+impl ClaimIx {
+	/// Number of bytes in the encoded instruction, including its discriminator.
+	pub const LEN: usize = 9;
+
+	/// Encodes the discriminator and instruction arguments for CPI.
+	#[inline(always)]
+	pub fn to_bytes(&self) -> [u8; 9] {
+		let mut data = [0u8; 9];
+		data[..1].copy_from_slice(&CLAIM_DISCRIMINATOR);
+		data[1..9].copy_from_slice(&self.amount.to_le_bytes());
+
+		data
+	}
+}
+
+impl<'account> Claim<'account> {
+	/// Invokes the instruction with no PDA seeds.
+	#[inline(always)]
+	pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
+		self.invoke_signed(program, &[])
+	}
+
+	/// Invokes the instruction, signing with the provided PDA seeds.
+	#[inline(always)]
+	pub fn invoke_signed(
+		&self,
+		program: &ProgramAccount<'_>,
+		signers: &[Signer<'_, '_>],
+	) -> ProgramResult {
+		let accounts: [CpiHandle<'_>; 8] = [
+			CpiHandle::writable_signer(self.beneficiary)?,
+			CpiHandle::readonly(self.mint),
+			CpiHandle::writable(self.vesting_state)?,
+			CpiHandle::writable(self.beneficiary_ata)?,
+			CpiHandle::writable(self.vault)?,
+			CpiHandle::readonly(self.associated_token_program),
+			CpiHandle::readonly(self.system_program),
+			CpiHandle::readonly(self.token_program),
+		];
+		let data = self.ix.to_bytes();
+		let context = CpiContext::new(*program, accounts);
+
+		context.invoke_signed(&data, signers)
+	}
+}
+
+const CLAIM_DISCRIMINATOR: [u8; 1] = [1];

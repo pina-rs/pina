@@ -31,6 +31,7 @@ pub enum ClientLanguage {
 	Rust,
 	Typescript,
 	Dart,
+	Cpi,
 }
 
 impl ClientLanguage {
@@ -38,6 +39,7 @@ impl ClientLanguage {
 	#[must_use]
 	pub const fn as_str(self) -> &'static str {
 		match self {
+			Self::Cpi => "cpi",
 			Self::Rust => "rust",
 			Self::Typescript => "typescript",
 			Self::Dart => "dart",

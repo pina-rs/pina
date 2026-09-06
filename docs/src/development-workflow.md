@@ -44,10 +44,10 @@ update:deps
 # Generate Codama IDLs for all examples.
 codama:idl:all
 
-# Generate Rust + JS + Dart clients.
+# Generate Rust + CPI + JS + Dart clients.
 codama:clients:generate
 
-# Generate IDLs + Rust/JS/Dart clients in one command.
+# Generate IDLs + Rust/CPI/JS/Dart clients in one command.
 pina codama generate
 
 # Run the complete Codama pipeline.

@@ -1,0 +1,40 @@
+{
+	"address": "55555555555555555555555555555555555555555555",
+	"metadata": {
+		"name": "anchor_counter",
+		"version": "0.1.0",
+		"spec": "0.1.0",
+		"description": "Raw Anchor IDL fixture for end-to-end CPI generation"
+	},
+	"instructions": [
+		{
+			"name": "set_value",
+			"docs": ["Set the stored counter value."],
+			"discriminator": [1, 2, 3, 4, 5, 6, 7, 8],
+			"accounts": [
+				{
+					"name": "counter",
+					"docs": ["Counter account to update."],
+					"writable": true
+				},
+				{
+					"name": "authority",
+					"docs": ["Authority approving the update."],
+					"signer": true
+				}
+			],
+			"args": [
+				{
+					"name": "value",
+					"docs": ["New counter value."],
+					"type": "u64"
+				},
+				{
+					"name": "owner",
+					"docs": ["New owner address."],
+					"type": "pubkey"
+				}
+			]
+		}
+	]
+}

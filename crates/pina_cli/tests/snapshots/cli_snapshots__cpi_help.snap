@@ -1,0 +1,42 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - cpi
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Generate a standalone Pina CPI crate from a Codama or Anchor IDL.
+
+Codama IDLs are rendered natively. Anchor IDLs are normalized through Codama before the same Pina renderer runs. Use --stdin when a Codama visitor needs to pass its current, potentially transformed root node.
+
+Usage: pina cpi [OPTIONS] --output <DIR>
+
+Options:
+      --idl <FILE>
+          Codama or Anchor IDL file to render
+
+      --stdin
+          Read a normalized Codama root-node IDL from standard input
+
+  -o, --output <DIR>
+          Directory to create as the standalone CPI crate
+
+      --npx <COMMAND>
+          Executable used to normalize Anchor IDLs. Defaults to npx
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina cpi --idl ./target/idl/counter.json --output ./clients/counter-cpi
+  pina cpi --idl ./target/idl/anchor.json --output ./clients/anchor-cpi
+  cat ./idl.json | pina cpi --stdin --output ./clients/program-cpi
+
+Anchor IDLs:
+  Raw Anchor IDLs require Node.js. Pina invokes @codama/nodes-from-anchor through npx. Codama root-node IDLs do not invoke Node.js.
+
+----- stderr -----

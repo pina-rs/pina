@@ -5,3 +5,9 @@ ignore:
   - "crates/pina_test"
   - "pina_root"
   - "examples"
+
+coverage:
+  status:
+    patch:
+      default:
+        target: 100%

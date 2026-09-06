@@ -14,10 +14,11 @@ crate-type = ["cdylib", "lib"]
 
 [features]
 bpf-entrypoint = []
-cpi-runtime-tests = []
+cpi-runtime-tests = ["dep:prop-amm-program-cpi"]
 
 [dependencies]
 pina = { workspace = true, features = ["logs", "derive"] }
+prop-amm-program-cpi = { path = "../../codama/clients/cpi/prop_amm_program", optional = true }
 
 [lints]
 workspace = true

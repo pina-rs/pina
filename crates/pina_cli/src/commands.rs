@@ -43,6 +43,12 @@ pub(crate) fn run(cli: Cli) {
 			output,
 			npx,
 		} => run_generate(project, clients, output, npx),
+		Commands::Cpi {
+			idl,
+			stdin,
+			output,
+			npx,
+		} => run_cpi(idl.as_deref(), stdin, &output, &npx),
 		Commands::Idl { command, generate } => idl_command::run_idl_command(command, &generate),
 		Commands::Docs { topic } => run_docs(topic.as_deref()),
 		Commands::Init { name, path, force } => run_init(name.as_str(), path.as_deref(), force),
@@ -110,20 +116,22 @@ pub(crate) fn run(cli: Cli) {
 					examples_dir,
 					idls_dir,
 					rust_out,
+					cpi_out,
 					js_out,
 					dart_out,
 					examples,
 					npx,
 				} => {
-					run_codama_generate(
+					run_codama_generate(&pina_cli::CodamaGenerateOptions {
 						examples_dir,
 						idls_dir,
 						rust_out,
+						cpi_out,
 						js_out,
 						dart_out,
 						examples,
 						npx,
-					);
+					});
 				}
 			}
 		}
@@ -549,6 +557,7 @@ fn run_generate(project: PathBuf, clients: Vec<ClientArg>, output: Option<PathBu
 		.into_iter()
 		.map(|client| {
 			match client {
+				ClientArg::Cpi => pina_cli::project::ClientLanguage::Cpi,
 				ClientArg::Rust => pina_cli::project::ClientLanguage::Rust,
 				ClientArg::Typescript => pina_cli::project::ClientLanguage::Typescript,
 				ClientArg::Dart => pina_cli::project::ClientLanguage::Dart,
@@ -584,6 +593,26 @@ fn run_generate(project: PathBuf, clients: Vec<ClientArg>, output: Option<PathBu
 	);
 	println!("  IDL     {}", generated.idl.display());
 	println!("  Clients {}", generated.clients_dir.display());
+}
+
+fn run_cpi(idl: Option<&Path>, stdin: bool, output: &Path, npx: &str) {
+	let result = if stdin {
+		pina_cli::generate_cpi_crate_from_reader(std::io::stdin().lock(), output)
+	} else {
+		let idl = idl.unwrap_or_else(|| unreachable!("clap requires --idl or --stdin"));
+		pina_cli::generate_cpi_crate(&pina_cli::CpiGenerateOptions {
+			idl: idl.to_path_buf(),
+			output: output.to_path_buf(),
+			npx: npx.to_string(),
+		})
+	};
+
+	unwrap_or_exit(result);
+	println!(
+		"{} Generated CPI crate at {}",
+		"✔".green(),
+		output.display()
+	);
 }
 
 fn run_test(project: PathBuf, unit: bool, filter: Option<String>) {
@@ -896,26 +925,8 @@ fn run_profile(explicit_path: Option<&Path>, project: &Path, json: bool, output:
 	));
 }
 
-fn run_codama_generate(
-	examples_dir: PathBuf,
-	idls_dir: PathBuf,
-	rust_out: PathBuf,
-	js_out: PathBuf,
-	dart_out: PathBuf,
-	examples: Vec<String>,
-	npx: String,
-) {
-	let options = pina_cli::CodamaGenerateOptions {
-		examples_dir,
-		idls_dir,
-		rust_out,
-		js_out,
-		dart_out,
-		examples,
-		npx,
-	};
-
-	let generated_examples = match pina_cli::generate_codama(&options) {
+fn run_codama_generate(options: &pina_cli::CodamaGenerateOptions) {
+	let generated_examples = match pina_cli::generate_codama(options) {
 		Ok(examples) => examples,
 		Err(err) => {
 			eprintln!("{} {}", "Error".red().bold(), err);
@@ -924,7 +935,7 @@ fn run_codama_generate(
 	};
 
 	println!(
-		"{} Generated Codama IDLs and Rust/JavaScript/Dart clients for {} example(s): {}",
+		"{} Generated Codama IDLs and Rust/CPI/JavaScript/Dart clients for {} example(s): {}",
 		"✔".green(),
 		generated_examples.len(),
 		generated_examples.join(", "),

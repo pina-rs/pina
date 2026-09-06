@@ -15,7 +15,6 @@ crate-type = ["cdylib", "lib"]
 [features]
 default = []
 bpf-entrypoint = []
-cpi = []
 
 [dependencies]
 pina = { workspace = true, features = ["logs", "derive"] }

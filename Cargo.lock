@@ -314,6 +314,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "ambient-authority"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9d4ee0d472d1cd2e28c97dfa124b3d8d992e10eb0a035f33f5d12e3a177ba3b"
+
+[[package]]
 name = "anchor-declare-id-client"
 version = "0.0.0"
 dependencies = [
@@ -326,6 +332,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "anchor-declare-id-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -352,6 +365,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anchor-declare-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "anchor-declare-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -372,6 +392,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "anchor-duplicate-mutable-accounts-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -398,6 +425,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anchor-errors-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "anchor-errors-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -421,6 +455,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anchor-events-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "anchor-events-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -441,6 +482,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "anchor-floats-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -491,6 +539,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anchor-realloc-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "anchor-realloc-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -514,6 +569,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "anchor-system-accounts-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "anchor-system-accounts-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -534,6 +596,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "anchor-sysvars-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -1581,6 +1650,48 @@ dependencies = [
 ]
 
 [[package]]
+name = "cap-fs-ext"
+version = "4.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56ff379b70af8e08307a8f65e7040c7301cb4a572538ade16b4984f0da77847f"
+dependencies = [
+ "cap-primitives",
+ "cap-std",
+ "io-lifetimes 3.0.1",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "cap-primitives"
+version = "4.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b5f74729fd2f44701d1a8eb47e906cdb3ccd9ec0f02baad85a744b791940b18"
+dependencies = [
+ "ambient-authority",
+ "fs-set-times",
+ "io-extras",
+ "io-lifetimes 3.0.1",
+ "ipnet",
+ "maybe-owned",
+ "rustix",
+ "rustix-linux-procfs",
+ "windows-sys 0.61.2",
+ "winx",
+]
+
+[[package]]
+name = "cap-std"
+version = "4.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1ec78e242cfa2cfe276807ac2ecc00315a6c97786977414bcd1c3963b6c91b8"
+dependencies = [
+ "cap-primitives",
+ "io-extras",
+ "io-lifetimes 3.0.1",
+ "rustix",
+]
+
+[[package]]
 name = "caps"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2043,6 +2154,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "counter-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -3022,6 +3140,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "escrow-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "escrow-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -3253,6 +3378,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8878864ba14bb86e818a412bfd6f18f9eabd4ec0f008a28e8f7eb61db532fcf9"
 dependencies = [
  "futures-core",
+]
+
+[[package]]
+name = "fs-set-times"
+version = "0.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94e7099f6313ecacbe1256e8ff9d617b75d1bcb16a6fddef94866d225a01a14a"
+dependencies = [
+ "io-lifetimes 2.0.4",
+ "rustix",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3612,6 +3748,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "hello-solana-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -4156,6 +4299,28 @@ checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
 dependencies = [
  "cfg-if 1.0.4",
 ]
+
+[[package]]
+name = "io-extras"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20fd6de4ccfcc187e38bc21cfa543cb5a302cb86a8b114eb7f0bf0dc9f8ac00f"
+dependencies = [
+ "io-lifetimes 3.0.1",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "io-lifetimes"
+version = "2.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06432fb54d3be7964ecd3649233cddf80db2832f47fec34c01f65b3d9d774983"
+
+[[package]]
+name = "io-lifetimes"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f0fb0570afe1fed943c5c3d4102d5358592d8625fda6a0007fdbe65a92fba96"
 
 [[package]]
 name = "io-uring"
@@ -4933,6 +5098,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2532096657941c2fea9c289d370a250971c689d4f143798ff67113ec042024a5"
 
 [[package]]
+name = "maybe-owned"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4facc753ae494aeb6e3c22f839b158aebd4f9270f55cd3c79906c45476c47ab4"
+
+[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5490,6 +5661,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "optional-accounts-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "optional-accounts-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -5764,6 +5942,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "pina-bpf-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "pina-bpf-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -5776,6 +5961,7 @@ name = "pina_bpf"
 version = "0.0.0"
 dependencies = [
  "pina",
+ "prop-amm-program-cpi",
 ]
 
 [[package]]
@@ -5801,6 +5987,7 @@ dependencies = [
  "object 0.40.0",
  "owo-colors",
  "pina_codama_renderer",
+ "pina_cpi_renderer",
  "pina_profile",
  "proc-macro2",
  "quote",
@@ -5827,6 +6014,21 @@ name = "pina_codama_renderer"
 version = "0.12.2"
 dependencies = [
  "clap",
+ "codama-nodes",
+ "heck 0.5.0",
+ "insta",
+ "serde_json",
+ "solana-pubkey 4.2.1",
+ "syn 3.0.4",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "pina_cpi_renderer"
+version = "0.12.2"
+dependencies = [
+ "cap-fs-ext",
+ "cap-std",
  "codama-nodes",
  "heck 0.5.0",
  "insta",
@@ -6195,6 +6397,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "profile-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "profile-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -6227,6 +6436,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "prop-amm-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -6786,6 +7002,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "role-registry-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "role-registry-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -6852,6 +7075,16 @@ dependencies = [
  "libc",
  "linux-raw-sys",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "rustix-linux-procfs"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fc84bf7e9aa16c4f2c758f27412dc9841341e16aa682d9c7ac308fe3ee12056"
+dependencies = [
+ "once_cell",
+ "rustix",
 ]
 
 [[package]]
@@ -11541,6 +11774,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "staking-rewards-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "staking-rewards-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -12103,6 +12343,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "todo-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "todo-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -12405,6 +12652,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "transfer-sol-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -12818,6 +13072,13 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "vesting-program-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -13380,6 +13641,16 @@ checksum = "524e57b2c537c0f9b1e69f1965311ec12182b4122e45035b1508cd24d2adadb1"
 dependencies = [
  "cfg-if 1.0.4",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "winx"
+version = "0.36.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f3fd376f71958b862e7afb20cfe5a22830e1963462f3a17f49d82a6c1d1f42d"
+dependencies = [
+ "bitflags 2.13.1",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

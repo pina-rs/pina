@@ -101,6 +101,18 @@ assert.equal(codamaManifest.name, "@pina-rs/codama-nodes");
 assert.equal(codamaManifest.version, cliManifest.version);
 assertPublicPackage(codamaManifest);
 
+const cpiRendererManifest = readManifest("codama-renderer-cpi");
+assert.equal(
+	cpiRendererManifest.name,
+	"@pina-rs/codama-renderer-cpi",
+);
+assert.equal(cpiRendererManifest.version, cliManifest.version);
+assert.equal(
+	cpiRendererManifest.dependencies["@pina-rs/cli"],
+	`^${cliManifest.version}`,
+);
+assertPublicPackage(cpiRendererManifest);
+
 const skillManifest = readManifest("pina__skill");
 assert.equal(skillManifest.name, "@pina-rs/skill");
 assert.equal(skillManifest.version, cliManifest.version);
@@ -108,6 +120,6 @@ assertPublicPackage(skillManifest);
 
 console.log(
 	`Verified ${
-		platforms.length + 3
+		platforms.length + 4
 	} @pina-rs npm packages at ${cliManifest.version}`,
 );

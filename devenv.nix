@@ -199,13 +199,14 @@ in
           --examples-dir "$DEVENV_ROOT/examples" \
           --idls-dir "$DEVENV_ROOT/codama/idls" \
           --rust-out "$DEVENV_ROOT/codama/clients/rust" \
+          --cpi-out "$DEVENV_ROOT/codama/clients/cpi" \
           --js-out "$DEVENV_ROOT/codama/clients/js" \
           --dart-out "$DEVENV_ROOT/codama/clients/dart" \
           --npx node
         dprint fmt "codama/**"
         dart format "$DEVENV_ROOT/codama/clients/dart"
       '';
-      description = "Generate Codama IDLs and Rust/JS/Dart clients for all examples.";
+      description = "Generate Codama IDLs and Rust/CPI/JS/Dart clients for all examples.";
       binary = "bash";
     };
     "codama:test" = {
@@ -328,6 +329,12 @@ in
     "test:all" = {
       exec = ''
         set -euo pipefail
+        if [ -z "''${HOME:-}" ]; then
+          export HOME="$DEVENV_ROOT/.cache/home"
+        fi
+        mkdir -p "$HOME"
+        # The raw Anchor CPI integration test invokes the pinned local converter.
+        pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
         # Ensure cargo-expand is available for macrotest expansion snapshots.
         if ! command -v cargo-expand &>/dev/null; then
           cargo install --locked --version 1.0.111 cargo-expand
@@ -405,8 +412,9 @@ in
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
         pnpm --dir "$DEVENV_ROOT" run check:npm-packages
         pnpm --dir "$DEVENV_ROOT" run test:npm-packages
+        pnpm --dir "$DEVENV_ROOT" run test:codama-renderer-cpi
       '';
-      description = "Verify npm metadata, platform launchers, the skill installer, and release packaging scripts.";
+      description = "Verify npm metadata, platform launchers, the CPI visitor, the skill installer, and release packaging scripts.";
       binary = "bash";
     };
     "test:fuzz:smoke" = {
@@ -755,6 +763,12 @@ in
     "coverage:all" = {
       exec = ''
         set -euo pipefail
+        if [ -z "''${HOME:-}" ]; then
+          export HOME="$DEVENV_ROOT/.cache/home"
+        fi
+        mkdir -p "$HOME"
+        # The raw Anchor CPI integration test invokes the pinned local converter.
+        pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
         mkdir -p "$DEVENV_ROOT/target/coverage"
         rm -rf "$DEVENV_ROOT/target/llvm-cov-target"
         cargo llvm-cov \
@@ -763,6 +777,7 @@ in
           -p pina \
           -p pina_cli \
           -p pina_codama_renderer \
+          -p pina_cpi_renderer \
           -p prop_amm_program \
           -p profile_program \
           -p profile-program-client \

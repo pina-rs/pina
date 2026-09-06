@@ -218,7 +218,7 @@ pub fn diagnose(start: &Path) -> DoctorReport {
 		project
 			.clients
 			.iter()
-			.any(|client| *client != ClientLanguage::Rust)
+			.any(|client| matches!(client, ClientLanguage::Typescript | ClientLanguage::Dart))
 	});
 	let tools = tool_specs(needs_node)
 		.iter()

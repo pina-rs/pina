@@ -16,7 +16,7 @@ use pina::*;
 declare_id!("2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe");
 
 #[cfg(feature = "cpi-runtime-tests")]
-const PROP_AMM_PROGRAM_ID: Address = address!("55555555555555555555555555555555555555555555");
+use prop_amm_program_cpi as prop_amm_cpi;
 
 /// Seed namespace for the PDA used to authorize the generated CPI regression.
 pub const SEED_CPI_AUTHORITY_PREFIX: &[u8] = b"cpi-authority";
@@ -87,75 +87,6 @@ pub struct CreatePdaAccounts<'a> {
 	pub system_program: &'a AccountView,
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
-#[cfg(feature = "cpi-runtime-tests")]
-mod prop_amm_cpi {
-	use super::*;
-
-	pub struct PropAmmProgram;
-
-	impl CpiProgramId for PropAmmProgram {
-		const ID: Address = PROP_AMM_PROGRAM_ID;
-	}
-
-	pub type ProgramAccount<'a> = Program<'a, PropAmmProgram>;
-
-	#[derive(Clone, Copy)]
-	pub struct RotateAuthorityAccounts<'a> {
-		oracle: CpiHandle<'a>,
-		authority: CpiHandle<'a>,
-	}
-
-	impl<'a> RotateAuthorityAccounts<'a> {
-		pub fn new(
-			oracle: &'a AccountView,
-			authority: &'a AccountView,
-		) -> Result<Self, ProgramError> {
-			Ok(Self {
-				oracle: CpiHandle::writable(oracle)?,
-				authority: CpiHandle::readonly_signer(authority),
-			})
-		}
-	}
-
-	impl<'a> ToCpiAccounts<'a, 2> for RotateAuthorityAccounts<'a> {
-		fn to_cpi_handles(&self) -> [CpiHandle<'a>; 2] {
-			[self.oracle, self.authority]
-		}
-	}
-
-	pub struct RotateAuthority<'a> {
-		accounts: RotateAuthorityAccounts<'a>,
-		new_authority: Address,
-	}
-
-	impl<'a> RotateAuthority<'a> {
-		pub const fn new(accounts: RotateAuthorityAccounts<'a>, new_authority: Address) -> Self {
-			Self {
-				accounts,
-				new_authority,
-			}
-		}
-
-		pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
-			self.invoke_signed(program, &[])
-		}
-
-		pub fn invoke_signed(
-			&self,
-			program: &ProgramAccount<'_>,
-			signers: &[Signer<'_, '_>],
-		) -> ProgramResult {
-			let mut data = [0u8; 1 + ADDRESS_BYTES];
-			data[0] = 2;
-			data[1..].copy_from_slice(self.new_authority.as_ref());
-			let context = CpiContext::new(*program, self.accounts);
-
-			context.invoke_signed(&data, signers)
-		}
-	}
-}
-
 #[cfg_attr(not(any(test, feature = "bpf-entrypoint")), allow(dead_code))]
 #[inline(always)]
 fn process_hello(data: &[u8]) -> ProgramResult {
@@ -171,10 +102,16 @@ impl<'a> ProcessAccountInfos<'a> for ForwardRotateAccounts<'a> {
 			let args = ForwardRotateWithSignerInstruction::try_from_bytes(data)?;
 
 			self.authority.assert_signer()?;
-			let program = prop_amm_cpi::ProgramAccount::new(self.prop_amm_program)?;
-			let accounts = prop_amm_cpi::RotateAuthorityAccounts::new(self.oracle, self.authority)?;
+			let program = prop_amm_cpi::ProgramAccount::try_new(self.prop_amm_program)?;
 
-			prop_amm_cpi::RotateAuthority::new(accounts, args.new_authority).invoke(&program)
+			prop_amm_cpi::RotateAuthority {
+				oracle: self.oracle,
+				authority: self.authority,
+				ix: prop_amm_cpi::RotateAuthorityIx {
+					new_authority: &args.new_authority,
+				},
+			}
+			.invoke(&program)
 		}
 
 		#[cfg(not(feature = "cpi-runtime-tests"))]
@@ -203,11 +140,16 @@ impl<'a> ProcessAccountInfos<'a> for ForwardRotateWithPdaAccounts<'a> {
 
 			self.authority
 				.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
-			let program = prop_amm_cpi::ProgramAccount::new(self.prop_amm_program)?;
-			let accounts = prop_amm_cpi::RotateAuthorityAccounts::new(self.oracle, self.authority)?;
+			let program = prop_amm_cpi::ProgramAccount::try_new(self.prop_amm_program)?;
 
-			prop_amm_cpi::RotateAuthority::new(accounts, args.new_authority)
-				.invoke_signed(&program, &signers)
+			prop_amm_cpi::RotateAuthority {
+				oracle: self.oracle,
+				authority: self.authority,
+				ix: prop_amm_cpi::RotateAuthorityIx {
+					new_authority: &args.new_authority,
+				},
+			}
+			.invoke_signed(&program, &signers)
 		}
 
 		#[cfg(not(feature = "cpi-runtime-tests"))]

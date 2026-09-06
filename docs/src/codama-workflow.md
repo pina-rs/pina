@@ -18,10 +18,10 @@ Generate and validate the whole workspace flow with `devenv` scripts:
 # Generate Codama IDLs for all examples.
 codama:idl:all
 
-# Generate Rust + JS + Dart clients.
+# Generate Rust + CPI + JS + Dart clients.
 codama:clients:generate
 
-# Generate IDLs + Rust/JS/Dart clients in one command.
+# Generate IDLs + Rust/CPI/JS/Dart clients in one command.
 pina codama generate
 
 # Run the complete Codama pipeline.
@@ -274,10 +274,10 @@ For the full checklist and rationale, see [`crates/pina_cli/rules.md`](../../cra
 
 `test:idl` treats the generated IDL as an API contract. It checks that:
 
-- every example regenerates deterministically into `codama/idls`, `codama/clients/js`, `codama/clients/rust`, and `codama/clients/dart`
+- every example regenerates deterministically into `codama/idls`, `codama/clients/js`, `codama/clients/rust`, `codama/clients/cpi`, and `codama/clients/dart`
 - generated JSON passes Codama's JS validator
 - generated JS clients typecheck
-- generated Rust clients compile
+- generated Rust and CPI clients compile
 - generated Dart clients resolve with the lockfile, format cleanly, pass static analysis, and pass codec contract tests
 - for every example, generated instruction/account/error counts match the source declarations:
   - `#[instruction]`

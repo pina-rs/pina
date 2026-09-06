@@ -49,7 +49,7 @@ Build the discovered program for SBF and publish its IDL.
 
 ```bash
 pina build
-pina build --features logs,cpi --no-default-features
+pina build --features logs --no-default-features
 ```
 
 Outputs use Cargo's target directory: `deploy/<library>.so` and `idl/<library>.json`.
@@ -61,9 +61,18 @@ Generate the clients selected in `pina.toml`, or override them for one invocatio
 ```bash
 pina generate
 pina generate --client rust --client typescript
+pina generate --client cpi
 ```
 
-Rust-only generation does not require Node.js.
+CPI-only and Rust-only generation do not require Node.js.
+
+Generate a standalone Pina CPI crate from any Codama or Anchor IDL:
+
+```bash
+pina cpi --idl ./idl.json --output ./clients/program-cpi
+```
+
+Codama IDLs render without Node.js. Raw Anchor IDLs require Node.js with `npx`, or a compatible command supplied through `--npx`, to run the pinned converter.
 
 ### `pina verify`
 
@@ -186,7 +195,7 @@ Every remote write requires confirmation or `--yes`; named mainnet and custom re
 
 <br>
 
-Generate Codama IDLs and Rust/JavaScript/Dart clients from one or more example program crates.
+Generate Codama IDLs and Rust/CPI/JavaScript/Dart clients from one or more example program crates.
 
 ```bash
 pina codama generate
@@ -276,10 +285,10 @@ Keep in mind:
 
 `test:idl` treats the generated IDL as an API contract. It checks that:
 
-- every example regenerates deterministically into `codama/idls`, `codama/clients/js`, `codama/clients/rust`, and `codama/clients/dart`
+- every example regenerates deterministically into `codama/idls`, `codama/clients/js`, `codama/clients/rust`, `codama/clients/cpi`, and `codama/clients/dart`
 - generated JSON passes Codama's JS validator
 - generated JS clients typecheck
-- generated Rust clients compile
+- generated Rust and CPI clients compile
 - generated Dart clients resolve with the lockfile, format cleanly, pass static analysis, and pass codec contract tests
 - for every example, generated instruction/account/error counts match the source declarations:
   - `#[instruction]`

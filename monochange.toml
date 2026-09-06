@@ -99,6 +99,10 @@ type = "cargo"
 path = "crates/pina_codama_renderer"
 type = "cargo"
 
+[package.pina_cpi_renderer]
+path = "crates/pina_cpi_renderer"
+type = "cargo"
+
 [package.pina_profile]
 path = "crates/pina_profile"
 type = "cargo"
@@ -118,6 +122,10 @@ timeout_seconds = 900
 
 [package.pina_codama_nodes]
 path = "packages/nodes-from-pina"
+type = "npm"
+
+[package.pina_codama_renderer_cpi]
+path = "packages/codama-renderer-cpi"
 type = "npm"
 
 [package.pina_cli_npm]
@@ -171,10 +179,12 @@ packages = [
 	"pina_lints",
 	"pina_macros",
 	"pina_codama_renderer",
+	"pina_cpi_renderer",
 	"pina_profile",
 	"pina_sdk_ids",
 	"pina_test",
 	"pina_codama_nodes",
+	"pina_codama_renderer_cpi",
 	"pina_cli_npm",
 	"pina_cli_darwin_arm64",
 	"pina_cli_darwin_x64",

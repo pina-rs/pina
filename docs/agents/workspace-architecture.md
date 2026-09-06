@@ -7,6 +7,8 @@
 - `crates/pina_sdk_ids` — typed Solana program and sysvar IDs
 - `crates/pina_cli` — CLI/library for IDL generation and Codama workflows
 - `crates/pina_codama_renderer` — repository-local Codama Rust renderer
+- `crates/pina_cpi_renderer` — repository-local Codama Rust renderer for standalone Pina CPI clients
+- `packages/codama-renderer-cpi` — Codama visitor for the standalone Pina CPI renderer
 - `crates/pina_profile` — static CU profiler for compiled SBF programs
 
 There are also multiple examples and security fixtures under `examples/` and `security/`.

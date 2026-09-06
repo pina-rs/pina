@@ -6,8 +6,10 @@
 		"generate": "cargo run -p pina_cli -- codama generate --npx node",
 		"check:js": "tsc --noEmit -p codama/tsconfig.json",
 		"build:codama-nodes": "pnpm --filter @pina-rs/codama-nodes build",
+		"build:codama-renderer-cpi": "pnpm --filter @pina-rs/codama-renderer-cpi build",
 		"check:npm-packages": "node scripts/npm/check-packages.mjs",
 		"test:codama-nodes": "pnpm --filter @pina-rs/codama-nodes test",
+		"test:codama-renderer-cpi": "pnpm --filter @pina-rs/codama-renderer-cpi test",
 		"test:idls": "pnpm --filter pina-codama-idl-tests test",
 		"test:npm-packages": "node --test scripts/npm/tests/*.test.mjs",
 		"test:quasar-svm": "pnpm --filter pina-quasar-svm-e2e test",
@@ -19,9 +21,10 @@
 		"codama-renderers-dart": "0.5.1"
 	},
 	"devDependencies": {
-		"@solana/surfpool": "^1.5.0",
+		"@codama/nodes-from-anchor": "1.5.5",
 		"@solana/kit": "^8.1.0",
 		"@solana/program-client-core": "^8.1.0",
+		"@solana/surfpool": "^1.5.0",
 		"@types/node": "^26.4.0",
 		"typescript": "^7.0.2"
 	}

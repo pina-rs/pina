@@ -1169,8 +1169,13 @@ impl<T: CpiProgramId> core::fmt::Debug for Program<'_, T> {
 
 impl<'a, T: CpiProgramId> Program<'a, T> {
 	/// Validate `account` as the expected executable program.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidAccountData`] when the account is not
+	/// executable or does not have the expected program address.
 	#[inline(always)]
-	pub fn new(account: &'a AccountView) -> Result<Self, ProgramError> {
+	pub fn try_new(account: &'a AccountView) -> Result<Self, ProgramError> {
 		account.assert_program(&T::ID)?;
 
 		Ok(Self {
@@ -1201,6 +1206,13 @@ pub trait ToCpiAccounts<'a, const ACCOUNTS: usize> {
 	/// Collect the handles in the exact order expected by the callee
 	/// instruction.
 	fn to_cpi_handles(&self) -> [CpiHandle<'a>; ACCOUNTS];
+}
+
+impl<'a, const ACCOUNTS: usize> ToCpiAccounts<'a, ACCOUNTS> for [CpiHandle<'a>; ACCOUNTS] {
+	#[inline(always)]
+	fn to_cpi_handles(&self) -> [CpiHandle<'a>; ACCOUNTS] {
+		*self
+	}
 }
 
 /// Minimal typed CPI context built around [`CpiHandle`] and const generics.
@@ -1338,6 +1350,19 @@ mod tests {
 
 	fn test_rent() -> Rent {
 		Rent::from_bytes(&1u64.to_le_bytes()).unwrap_or_else(|error| panic!("test rent: {error:?}"))
+	}
+
+	#[test]
+	fn cpi_handle_arrays_are_typed_account_sets() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let view = stored.view();
+		let accounts = [CpiHandle::readonly_signer(&view)];
+		let handles = accounts.to_cpi_handles();
+
+		assert_eq!(handles[0].address(), view.address());
+		assert!(!handles[0].is_writable());
+		assert!(handles[0].is_signer());
 	}
 
 	#[test]
