@@ -46,8 +46,52 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: verify security
-        run: verify:security
+      - name: run Pina security lints
+        run: security:pina-lint
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: audit Rust dependencies
+        run: security:audit
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: audit npm dependencies
+        run: security:npm-audit
+        shell: devenv shell -c -- bash -e {0}
+
+  cargo-deny:
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: check dependency policy
+        run: security:deny
+        shell: devenv shell -c -- bash -e {0}
+
+  zizmor:
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: audit GitHub Actions
+        run: security:zizmor
         shell: devenv shell -c -- bash -e {0}
 
   test:
@@ -81,7 +125,7 @@ jobs:
           persist-credentials: false
 
       - name: install Rust toolchain
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
+        uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0 # master
         with:
           toolchain: nightly-2026-02-20
 

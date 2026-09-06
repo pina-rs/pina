@@ -7,7 +7,9 @@ The GitHub CI workflow verifies:
 - `lint:clippy`
 - `lint:format`
 - `verify:docs`
-- `verify:security`
+- `security:pina-lint`, `security:audit`, and `security:npm-audit`
+- `security:deny` in a dedicated `cargo-deny` job
+- `security:zizmor` in a dedicated `zizmor` job
 - `test:all` (workspace Rust tests, standalone fuzz-target compilation, and npm package tests)
 - `test:npm-packages` (scoped package metadata, native-target coverage, launchers, and skill installation)
 - `feature-matrix` for `pina` across explicit configurations:
