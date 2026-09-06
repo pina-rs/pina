@@ -1972,6 +1972,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "compact-accounts-cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "compact-accounts-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -5943,6 +5950,7 @@ version = "0.12.2"
 dependencies = [
  "pastey",
  "pina_macros",
+ "pinapod",
  "pinocchio",
  "pinocchio-associated-token-account",
  "pinocchio-memo",
@@ -5953,7 +5961,6 @@ dependencies = [
  "solana-address 2.6.1",
  "solana-program-log",
  "trybuild",
- "zeropod",
 ]
 
 [[package]]
@@ -6152,6 +6159,28 @@ dependencies = [
  "surfpool-sdk",
  "thiserror 2.0.20",
  "tokio",
+]
+
+[[package]]
+name = "pinapod"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72175fa13b1fceeed06738c5688f1b30f29e6409de5cf7bec708dcd6ce8c4e47"
+dependencies = [
+ "pinapod-derive",
+ "solana-address 2.6.1",
+ "solana-program-error 3.0.1",
+]
+
+[[package]]
+name = "pinapod-derive"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26158eeaa46a9b825024d64c99ab06601b1e392fdba785f26bf6bee134156c44"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -13819,28 +13848,6 @@ name = "zeroize_derive"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c50655cbb0fe3fc43170059e702f1ce5e19b84cec58dc87b037a09935c2f328"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "zeropod"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af6c4fe8dc57179de72db5185c9c618a3350a9122a76ec3e13ccd493bca38931"
-dependencies = [
- "solana-address 2.6.1",
- "solana-program-error 3.0.1",
- "zeropod-derive",
-]
-
-[[package]]
-name = "zeropod-derive"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "babb94e405e4914176ad9fd74e34c640ea0fcd314bfcb2bb6690a5300e724257"
 dependencies = [
  "proc-macro2",
  "quote",

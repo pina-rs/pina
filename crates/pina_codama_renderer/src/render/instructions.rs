@@ -66,7 +66,7 @@ pub(crate) fn render_instruction_page(
 	})?;
 
 	let mut lines = Vec::new();
-	lines.push("use pina::zeropod;".to_string());
+	lines.push("use pina::pinapod;".to_string());
 	lines.push(String::new());
 	for doc_line in render_docs(&instruction.docs, 0) {
 		lines.push(doc_line);

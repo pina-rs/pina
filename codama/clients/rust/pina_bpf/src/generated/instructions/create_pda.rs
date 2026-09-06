@@ -8,7 +8,7 @@
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 pub const CREATE_PDA_DISCRIMINATOR: u8 = 3u8;
 

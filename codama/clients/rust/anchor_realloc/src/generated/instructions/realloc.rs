@@ -8,7 +8,7 @@
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 /// Resizes the complete account-data buffer to `len` bytes.
 ///

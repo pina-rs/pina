@@ -12,7 +12,7 @@ expression: "format!(\"{initialize_content}\\n\\n{increment_content}\")"
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 /// Instruction data for `Initialize`.
 /// 
@@ -105,7 +105,7 @@ pub struct InitializeInstructionWire {
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 /// Instruction data for `Increment`. No extra payload beyond the
 /// discriminator byte.

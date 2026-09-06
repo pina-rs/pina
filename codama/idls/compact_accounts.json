@@ -12,11 +12,11 @@
 				"kind": "accountNode",
 				"name": "journal",
 				"docs": [
-					"A compact account with an eight-entry logical capacity.",
+					"A compact account with two independently encoded dynamic fields.",
 					"",
-					"The one-byte discriminator, bump, authority, revision, and two-byte vector",
-					"prefix always occupy [`Self::HEADER_SIZE`] bytes. Each active entry adds",
-					"exactly eight bytes, up to [`Self::MAX_SIZE`]."
+					"The one-byte discriminator, bump, authority, revision, and two vector",
+					"prefixes always occupy [`Self::HEADER_SIZE`] bytes. Each active row adds an",
+					"eight-byte entry and a one-byte marker, up to [`Self::MAX_SIZE`]."
 				],
 				"data": {
 					"kind": "structTypeNode",
@@ -76,18 +76,66 @@
 								"Active entries. Unused capacity consumes no account bytes."
 							],
 							"type": {
+								"kind": "preOffsetTypeNode",
+								"offset": 4,
+								"strategy": "relative",
+								"type": {
+									"kind": "arrayTypeNode",
+									"item": {
+										"kind": "numberTypeNode",
+										"format": "u64",
+										"endian": "le"
+									},
+									"count": {
+										"kind": "prefixedCountNode",
+										"prefix": {
+											"kind": "postOffsetTypeNode",
+											"offset": 0,
+											"strategy": "preOffset",
+											"type": {
+												"kind": "preOffsetTypeNode",
+												"offset": 38,
+												"strategy": "absolute",
+												"type": {
+													"kind": "numberTypeNode",
+													"format": "u16",
+													"endian": "le"
+												}
+											}
+										}
+									}
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "markers",
+							"docs": [
+								"One marker per entry, stored as a second compact tail."
+							],
+							"type": {
 								"kind": "arrayTypeNode",
 								"item": {
 									"kind": "numberTypeNode",
-									"format": "u64",
+									"format": "u8",
 									"endian": "le"
 								},
 								"count": {
 									"kind": "prefixedCountNode",
 									"prefix": {
-										"kind": "numberTypeNode",
-										"format": "u16",
-										"endian": "le"
+										"kind": "postOffsetTypeNode",
+										"offset": 0,
+										"strategy": "preOffset",
+										"type": {
+											"kind": "preOffsetTypeNode",
+											"offset": 40,
+											"strategy": "absolute",
+											"type": {
+												"kind": "numberTypeNode",
+												"format": "u16",
+												"endian": "le"
+											}
+										}
 									}
 								}
 							}

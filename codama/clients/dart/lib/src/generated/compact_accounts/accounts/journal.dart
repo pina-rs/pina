@@ -18,6 +18,7 @@ class Journal {
     required this.authority,
     required this.revision,
     required this.entries,
+    required this.markers,
   }) : discriminator = 1;
 
   final int discriminator;
@@ -25,6 +26,7 @@ class Journal {
   final Address authority;
   final int revision;
   final List<BigInt> entries;
+  final List<int> markers;
 
   @override
   bool operator ==(Object other) =>
@@ -35,15 +37,16 @@ class Journal {
           bump == other.bump &&
           authority == other.authority &&
           revision == other.revision &&
-          entries == other.entries;
+          entries == other.entries &&
+          markers == other.markers;
 
   @override
   int get hashCode =>
-      Object.hash(discriminator, bump, authority, revision, entries);
+      Object.hash(discriminator, bump, authority, revision, entries, markers);
 
   @override
   String toString() =>
-      'Journal(discriminator: $discriminator, bump: $bump, authority: $authority, revision: $revision, entries: $entries)';
+      'Journal(discriminator: $discriminator, bump: $bump, authority: $authority, revision: $revision, entries: $entries, markers: $markers)';
 }
 
 Encoder<Journal> getJournalEncoder() {
@@ -54,9 +57,32 @@ Encoder<Journal> getJournalEncoder() {
     ('revision', getU32Encoder()),
     (
       'entries',
-      getArrayEncoder<BigInt>(
-        transformEncoder(getU64Encoder(), (BigInt value) => value),
-        size: PrefixedArraySize(getU16Encoder()),
+      offsetEncoder(
+        getArrayEncoder<BigInt>(
+          transformEncoder(getU64Encoder(), (BigInt value) => value),
+          size: PrefixedArraySize(
+            offsetEncoder(
+              offsetEncoder(
+                getU16Encoder(),
+                OffsetConfig(preOffset: (_) => 38),
+              ),
+              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+            ),
+          ),
+        ),
+        OffsetConfig(preOffset: (scope) => scope.preOffset + 4),
+      ),
+    ),
+    (
+      'markers',
+      getArrayEncoder<int>(
+        transformEncoder(getU8Encoder(), (int value) => value),
+        size: PrefixedArraySize(
+          offsetEncoder(
+            offsetEncoder(getU16Encoder(), OffsetConfig(preOffset: (_) => 40)),
+            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+          ),
+        ),
       ),
     ),
   ]);
@@ -69,6 +95,7 @@ Encoder<Journal> getJournalEncoder() {
       'authority': value.authority,
       'revision': value.revision,
       'entries': value.entries,
+      'markers': value.markers,
     },
   );
 }
@@ -81,9 +108,32 @@ Decoder<Journal> getJournalDecoder() {
     ('revision', getU32Decoder()),
     (
       'entries',
+      offsetDecoder(
+        getArrayDecoder(
+          getU64Decoder(),
+          size: PrefixedArraySize(
+            offsetDecoder(
+              offsetDecoder(
+                getU16Decoder(),
+                OffsetConfig(preOffset: (_) => 38),
+              ),
+              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+            ),
+          ),
+        ),
+        OffsetConfig(preOffset: (scope) => scope.preOffset + 4),
+      ),
+    ),
+    (
+      'markers',
       getArrayDecoder(
-        getU64Decoder(),
-        size: PrefixedArraySize(getU16Decoder()),
+        getU8Decoder(),
+        size: PrefixedArraySize(
+          offsetDecoder(
+            offsetDecoder(getU16Decoder(), OffsetConfig(preOffset: (_) => 40)),
+            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+          ),
+        ),
       ),
     ),
   ]);
@@ -106,6 +156,7 @@ Decoder<Journal> getJournalDecoder() {
         authority: map['authority']! as Address,
         revision: map['revision']! as int,
         entries: map['entries']! as List<BigInt>,
+        markers: map['markers']! as List<int>,
       ),
       newOffset,
     );

@@ -3,7 +3,7 @@ use pina::*;
 #[derive(Clone, Copy)]
 pub struct Address([u8; 32]);
 
-impl ZcField for Address {
+unsafe impl ZcField for Address {
 	type Pod = [u8; 32];
 
 	const POD_SIZE: usize = 32;

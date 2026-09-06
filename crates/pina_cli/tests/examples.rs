@@ -94,23 +94,33 @@ fn hello_solana_idl() {
 }
 
 #[test]
-fn compact_accounts_idl_preserves_the_dynamic_tail() {
+fn compact_accounts_idl_preserves_multiple_dynamic_tails() {
 	let idl = serde_json::to_value(example_program_idl("compact_accounts"))
 		.unwrap_or_else(|error| panic!("serialize compact_accounts IDL: {error}"));
 	assert_eq!(
-		idl.pointer("/program/accounts/0/data/fields/4/type/count/kind")
+		idl.pointer("/program/accounts/0/data/fields/4/type/type/count/kind")
 			.and_then(Value::as_str),
 		Some("prefixedCountNode"),
 	);
 	assert_eq!(
-		idl.pointer("/program/accounts/0/data/fields/4/type/count/prefix/format")
+		idl.pointer("/program/accounts/0/data/fields/4/type/type/count/prefix/type/type/format")
 			.and_then(Value::as_str),
 		Some("u16"),
 	);
 	assert_eq!(
-		idl.pointer("/program/accounts/0/data/fields/4/type/item/format")
+		idl.pointer("/program/accounts/0/data/fields/4/type/type/item/format")
 			.and_then(Value::as_str),
 		Some("u64"),
+	);
+	assert_eq!(
+		idl.pointer("/program/accounts/0/data/fields/5/type/count/kind")
+			.and_then(Value::as_str),
+		Some("prefixedCountNode"),
+	);
+	assert_eq!(
+		idl.pointer("/program/accounts/0/data/fields/5/type/item/format")
+			.and_then(Value::as_str),
+		Some("u8"),
 	);
 }
 

@@ -1,4 +1,4 @@
-error: `#[zeropod(...)]` cannot override a Pina account, instruction, or event layout
+error: `#[pinapod(...)]` cannot override a Pina account, instruction, or event layout
   --> tests/ui/fail/account_zeropod_override.rs:9:1
    |
  9 | / #[zeropod(crate = pina::zeropod)]

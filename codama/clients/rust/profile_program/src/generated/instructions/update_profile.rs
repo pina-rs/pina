@@ -8,7 +8,7 @@
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 /// Instruction data for `UpdateProfile`. Replaces both name and bio.
 pub const UPDATE_PROFILE_DISCRIMINATOR: u8 = 1u8;

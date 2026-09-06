@@ -46,7 +46,7 @@ cargo add pina --features token
 
 <!-- {=compactAccountQuickstart} -->
 
-Add `compact` to an account with exactly one trailing, bounded `Vec`. The capacity must be a literal so the macro can audit and generate the maximum layout:
+Add `compact` to an account with a suffix of one or more bounded `Vec` fields. Fixed fields must come first, and every capacity must be a literal so the macro can audit and generate the maximum layout:
 
 ```rust
 #[account(discriminator = AccountType, compact)]
@@ -55,18 +55,23 @@ pub struct Journal {
 	pub authority: Address,
 	pub revision: u32,
 	pub entries: Vec<u64, 8>,
+	pub markers: Vec<u8, 16>,
 }
 
-fn account_size(entry_count: usize) -> Result<usize, ProgramError> {
-	if entry_count > 8 {
+fn account_size(entry_count: usize, marker_count: usize) -> Result<usize, ProgramError> {
+	if entry_count > 8 || marker_count > 16 {
 		return Err(ProgramError::InvalidArgument);
 	}
 
-	Ok(Journal::HEADER_SIZE + entry_count * core::mem::size_of::<PodU64>())
+	Ok(Journal::HEADER_SIZE
+		+ entry_count * core::mem::size_of::<PodU64>()
+		+ marker_count * core::mem::size_of::<u8>())
 }
 ```
 
-The macro generates `JournalHeader`, `JournalRef`, and `JournalMut`, plus `HEADER_SIZE`, `MAX_SIZE`, checked load/initialize methods, and the compact-account traits used by Pina's typed CPI builders. Only the active tail is allocated; the declared capacity is a validation bound, not reserved space.
+The macro generates `JournalHeader`, `JournalRef`, and `JournalMut`, plus `HEADER_SIZE`, `MAX_SIZE`, checked load/initialize methods, and the compact-account traits used by Pina's typed CPI builders. Every tail length is stored in the fixed header. Active payloads are concatenated after that header in declaration order; declared capacity is a validation bound, not reserved space.
+
+Pina uses Pinapod, its maintained and wire-compatible ZeroPod fork. Each immutable and mutable accessor reads its own length prefix, so compact tails may have independent active lengths.
 
 <!-- {/compactAccountQuickstart} -->
 
@@ -94,6 +99,9 @@ let encoded_size = {
 	let mut journal = Journal::try_from_bytes_mut(&mut data)?;
 	journal
 		.set_entries(entries)
+		.map_err(|_| ProgramError::InvalidAccountData)?;
+	journal
+		.set_markers(markers)
 		.map_err(|_| ProgramError::InvalidAccountData)?;
 	journal
 		.commit()

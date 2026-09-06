@@ -125,29 +125,29 @@ pub struct TransferEvent {
 #[repr(C)]
 pub struct TransferEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    [u8; 32]: zeropod::ZcValidate,
-    [u8; 32]: zeropod::ZcValidate,
-    <PodU64 as zeropod::ZcField>::Pod: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    [u8; 32]: pinapod::ZcValidate,
+    [u8; 32]: pinapod::ZcValidate,
+    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
 {
     discriminator: [u8; EventDisc::BYTES],
     pub from: [u8; 32],
     pub to: [u8; 32],
-    pub amount: <PodU64 as zeropod::ZcField>::Pod,
+    pub amount: <PodU64 as pinapod::ZcField>::Pod,
 }
 impl Copy for TransferEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    [u8; 32]: zeropod::ZcValidate,
-    [u8; 32]: zeropod::ZcValidate,
-    <PodU64 as zeropod::ZcField>::Pod: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    [u8; 32]: pinapod::ZcValidate,
+    [u8; 32]: pinapod::ZcValidate,
+    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
 {}
 impl Clone for TransferEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    [u8; 32]: zeropod::ZcValidate,
-    [u8; 32]: zeropod::ZcValidate,
-    <PodU64 as zeropod::ZcField>::Pod: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    [u8; 32]: pinapod::ZcValidate,
+    [u8; 32]: pinapod::ZcValidate,
+    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
 {
     fn clone(&self) -> Self {
         *self
@@ -172,80 +172,80 @@ impl TransferEventZc {
         &self.to
     }
     #[inline(always)]
-    pub fn amount(&self) -> &<PodU64 as zeropod::ZcField>::Pod {
+    pub fn amount(&self) -> &<PodU64 as pinapod::ZcField>::Pod {
         &self.amount
     }
 }
-impl zeropod::ZcValidate for TransferEventZc
+impl pinapod::ZcValidate for TransferEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    [u8; 32]: zeropod::ZcValidate,
-    [u8; 32]: zeropod::ZcValidate,
-    <PodU64 as zeropod::ZcField>::Pod: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    [u8; 32]: pinapod::ZcValidate,
+    [u8; 32]: pinapod::ZcValidate,
+    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
 {
-    fn validate_ref(value: &Self) -> Result<(), zeropod::ZeroPodError> {
-        <[u8; EventDisc::BYTES] as zeropod::ZcValidate>::validate_ref(
+    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
+        <[u8; EventDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
-        <[u8; 32] as zeropod::ZcValidate>::validate_ref(&value.from)?;
-        <[u8; 32] as zeropod::ZcValidate>::validate_ref(&value.to)?;
-        <<PodU64 as zeropod::ZcField>::Pod as zeropod::ZcValidate>::validate_ref(
+        <[u8; 32] as pinapod::ZcValidate>::validate_ref(&value.from)?;
+        <[u8; 32] as pinapod::ZcValidate>::validate_ref(&value.to)?;
+        <<PodU64 as pinapod::ZcField>::Pod as pinapod::ZcValidate>::validate_ref(
             &value.amount,
         )?;
         Ok(())
     }
 }
-impl zeropod::ZeroPodSchema for TransferEvent
+impl pinapod::ZeroPodSchema for TransferEvent
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    [u8; 32]: zeropod::ZcValidate,
-    [u8; 32]: zeropod::ZcValidate,
-    <PodU64 as zeropod::ZcField>::Pod: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    [u8; 32]: pinapod::ZcValidate,
+    [u8; 32]: pinapod::ZcValidate,
+    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
 {
-    const LAYOUT: zeropod::LayoutKind = zeropod::LayoutKind::Fixed;
+    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
 }
-impl zeropod::ZeroPodFixed for TransferEvent
+impl pinapod::ZeroPodFixed for TransferEvent
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    [u8; 32]: zeropod::ZcValidate,
-    [u8; 32]: zeropod::ZcValidate,
-    <PodU64 as zeropod::ZcField>::Pod: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    [u8; 32]: pinapod::ZcValidate,
+    [u8; 32]: pinapod::ZcValidate,
+    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
 {
     type Zc = TransferEventZc;
     const SIZE: usize = core::mem::size_of::<TransferEventZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, zeropod::ZeroPodError> {
+    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
         Self::validate(data)?;
         Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
     }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, zeropod::ZeroPodError> {
+    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
         Self::validate(data)?;
         Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
     }
-    fn validate(data: &[u8]) -> Result<(), zeropod::ZeroPodError> {
+    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
         if data.len() < core::mem::size_of::<TransferEventZc>() {
-            return Err(zeropod::ZeroPodError::BufferTooSmall);
+            return Err(pinapod::ZeroPodError::BufferTooSmall);
         }
         let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as zeropod::ZcValidate>::validate_ref(__zc)?;
+        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
         Ok(())
     }
 }
-impl zeropod::ZcField for TransferEvent
+unsafe impl pinapod::ZcField for TransferEvent
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    [u8; 32]: zeropod::ZcValidate,
-    [u8; 32]: zeropod::ZcValidate,
-    <PodU64 as zeropod::ZcField>::Pod: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    [u8; 32]: pinapod::ZcValidate,
+    [u8; 32]: pinapod::ZcValidate,
+    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
 {
     type Pod = TransferEventZc;
     const POD_SIZE: usize = core::mem::size_of::<TransferEventZc>();
 }
-unsafe impl zeropod::ZcElem for TransferEventZc
+unsafe impl pinapod::ZcElem for TransferEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    [u8; 32]: zeropod::ZcValidate,
-    [u8; 32]: zeropod::ZcValidate,
-    <PodU64 as zeropod::ZcField>::Pod: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    [u8; 32]: pinapod::ZcValidate,
+    [u8; 32]: pinapod::ZcValidate,
+    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
 {}
 const _: fn([u8; 32]) -> [::core::primitive::u8; 32] = |value| value;
 const _: fn() = || {
@@ -380,21 +380,21 @@ pub struct InitEvent {
 #[repr(C)]
 pub struct InitEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    u8: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    u8: pinapod::ZcValidate,
 {
     discriminator: [u8; EventDisc::BYTES],
     pub choice: u8,
 }
 impl Copy for InitEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    u8: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    u8: pinapod::ZcValidate,
 {}
 impl Clone for InitEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    u8: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    u8: pinapod::ZcValidate,
 {
     fn clone(&self) -> Self {
         *self
@@ -415,62 +415,62 @@ impl InitEventZc {
         self.choice
     }
 }
-impl zeropod::ZcValidate for InitEventZc
+impl pinapod::ZcValidate for InitEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    u8: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    u8: pinapod::ZcValidate,
 {
-    fn validate_ref(value: &Self) -> Result<(), zeropod::ZeroPodError> {
-        <[u8; EventDisc::BYTES] as zeropod::ZcValidate>::validate_ref(
+    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
+        <[u8; EventDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
-        <u8 as zeropod::ZcValidate>::validate_ref(&value.choice)?;
+        <u8 as pinapod::ZcValidate>::validate_ref(&value.choice)?;
         Ok(())
     }
 }
-impl zeropod::ZeroPodSchema for InitEvent
+impl pinapod::ZeroPodSchema for InitEvent
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    u8: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    u8: pinapod::ZcValidate,
 {
-    const LAYOUT: zeropod::LayoutKind = zeropod::LayoutKind::Fixed;
+    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
 }
-impl zeropod::ZeroPodFixed for InitEvent
+impl pinapod::ZeroPodFixed for InitEvent
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    u8: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    u8: pinapod::ZcValidate,
 {
     type Zc = InitEventZc;
     const SIZE: usize = core::mem::size_of::<InitEventZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, zeropod::ZeroPodError> {
+    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
         Self::validate(data)?;
         Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
     }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, zeropod::ZeroPodError> {
+    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
         Self::validate(data)?;
         Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
     }
-    fn validate(data: &[u8]) -> Result<(), zeropod::ZeroPodError> {
+    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
         if data.len() < core::mem::size_of::<InitEventZc>() {
-            return Err(zeropod::ZeroPodError::BufferTooSmall);
+            return Err(pinapod::ZeroPodError::BufferTooSmall);
         }
         let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as zeropod::ZcValidate>::validate_ref(__zc)?;
+        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
         Ok(())
     }
 }
-impl zeropod::ZcField for InitEvent
+unsafe impl pinapod::ZcField for InitEvent
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    u8: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    u8: pinapod::ZcValidate,
 {
     type Pod = InitEventZc;
     const POD_SIZE: usize = core::mem::size_of::<InitEventZc>();
 }
-unsafe impl zeropod::ZcElem for InitEventZc
+unsafe impl pinapod::ZcElem for InitEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    u8: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    u8: pinapod::ZcValidate,
 {}
 const _: fn(u8) -> ::core::primitive::u8 = |value| value;
 const _: fn() = || {
@@ -562,17 +562,17 @@ pub struct EmptyEvent {
 #[repr(C)]
 pub struct EmptyEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
 {
     discriminator: [u8; EventDisc::BYTES],
 }
 impl Copy for EmptyEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
 {}
 impl Clone for EmptyEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
 {
     fn clone(&self) -> Self {
         *self
@@ -589,56 +589,56 @@ impl EmptyEventZc {
         &self.discriminator
     }
 }
-impl zeropod::ZcValidate for EmptyEventZc
+impl pinapod::ZcValidate for EmptyEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
 {
-    fn validate_ref(value: &Self) -> Result<(), zeropod::ZeroPodError> {
-        <[u8; EventDisc::BYTES] as zeropod::ZcValidate>::validate_ref(
+    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
+        <[u8; EventDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
         Ok(())
     }
 }
-impl zeropod::ZeroPodSchema for EmptyEvent
+impl pinapod::ZeroPodSchema for EmptyEvent
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
 {
-    const LAYOUT: zeropod::LayoutKind = zeropod::LayoutKind::Fixed;
+    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
 }
-impl zeropod::ZeroPodFixed for EmptyEvent
+impl pinapod::ZeroPodFixed for EmptyEvent
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
 {
     type Zc = EmptyEventZc;
     const SIZE: usize = core::mem::size_of::<EmptyEventZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, zeropod::ZeroPodError> {
+    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
         Self::validate(data)?;
         Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
     }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, zeropod::ZeroPodError> {
+    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
         Self::validate(data)?;
         Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
     }
-    fn validate(data: &[u8]) -> Result<(), zeropod::ZeroPodError> {
+    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
         if data.len() < core::mem::size_of::<EmptyEventZc>() {
-            return Err(zeropod::ZeroPodError::BufferTooSmall);
+            return Err(pinapod::ZeroPodError::BufferTooSmall);
         }
         let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as zeropod::ZcValidate>::validate_ref(__zc)?;
+        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
         Ok(())
     }
 }
-impl zeropod::ZcField for EmptyEvent
+unsafe impl pinapod::ZcField for EmptyEvent
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
 {
     type Pod = EmptyEventZc;
     const POD_SIZE: usize = core::mem::size_of::<EmptyEventZc>();
 }
-unsafe impl zeropod::ZcElem for EmptyEventZc
+unsafe impl pinapod::ZcElem for EmptyEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
 {}
 const _: fn() = || {
     fn assert_storage<T: pina::ZcElem>() {}
@@ -725,25 +725,25 @@ impl ::core::fmt::Debug for AuditEvent {
 #[repr(C)]
 pub struct AuditEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    u8: zeropod::ZcValidate,
-    <PodU64 as zeropod::ZcField>::Pod: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    u8: pinapod::ZcValidate,
+    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
 {
     discriminator: [u8; EventDisc::BYTES],
     pub action: u8,
-    pub timestamp: <PodU64 as zeropod::ZcField>::Pod,
+    pub timestamp: <PodU64 as pinapod::ZcField>::Pod,
 }
 impl Copy for AuditEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    u8: zeropod::ZcValidate,
-    <PodU64 as zeropod::ZcField>::Pod: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    u8: pinapod::ZcValidate,
+    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
 {}
 impl Clone for AuditEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    u8: zeropod::ZcValidate,
-    <PodU64 as zeropod::ZcField>::Pod: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    u8: pinapod::ZcValidate,
+    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
 {
     fn clone(&self) -> Self {
         *self
@@ -764,74 +764,74 @@ impl AuditEventZc {
         self.action
     }
     #[inline(always)]
-    pub fn timestamp(&self) -> &<PodU64 as zeropod::ZcField>::Pod {
+    pub fn timestamp(&self) -> &<PodU64 as pinapod::ZcField>::Pod {
         &self.timestamp
     }
 }
-impl zeropod::ZcValidate for AuditEventZc
+impl pinapod::ZcValidate for AuditEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    u8: zeropod::ZcValidate,
-    <PodU64 as zeropod::ZcField>::Pod: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    u8: pinapod::ZcValidate,
+    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
 {
-    fn validate_ref(value: &Self) -> Result<(), zeropod::ZeroPodError> {
-        <[u8; EventDisc::BYTES] as zeropod::ZcValidate>::validate_ref(
+    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
+        <[u8; EventDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
-        <u8 as zeropod::ZcValidate>::validate_ref(&value.action)?;
-        <<PodU64 as zeropod::ZcField>::Pod as zeropod::ZcValidate>::validate_ref(
+        <u8 as pinapod::ZcValidate>::validate_ref(&value.action)?;
+        <<PodU64 as pinapod::ZcField>::Pod as pinapod::ZcValidate>::validate_ref(
             &value.timestamp,
         )?;
         Ok(())
     }
 }
-impl zeropod::ZeroPodSchema for AuditEvent
+impl pinapod::ZeroPodSchema for AuditEvent
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    u8: zeropod::ZcValidate,
-    <PodU64 as zeropod::ZcField>::Pod: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    u8: pinapod::ZcValidate,
+    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
 {
-    const LAYOUT: zeropod::LayoutKind = zeropod::LayoutKind::Fixed;
+    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
 }
-impl zeropod::ZeroPodFixed for AuditEvent
+impl pinapod::ZeroPodFixed for AuditEvent
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    u8: zeropod::ZcValidate,
-    <PodU64 as zeropod::ZcField>::Pod: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    u8: pinapod::ZcValidate,
+    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
 {
     type Zc = AuditEventZc;
     const SIZE: usize = core::mem::size_of::<AuditEventZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, zeropod::ZeroPodError> {
+    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
         Self::validate(data)?;
         Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
     }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, zeropod::ZeroPodError> {
+    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
         Self::validate(data)?;
         Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
     }
-    fn validate(data: &[u8]) -> Result<(), zeropod::ZeroPodError> {
+    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
         if data.len() < core::mem::size_of::<AuditEventZc>() {
-            return Err(zeropod::ZeroPodError::BufferTooSmall);
+            return Err(pinapod::ZeroPodError::BufferTooSmall);
         }
         let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as zeropod::ZcValidate>::validate_ref(__zc)?;
+        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
         Ok(())
     }
 }
-impl zeropod::ZcField for AuditEvent
+unsafe impl pinapod::ZcField for AuditEvent
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    u8: zeropod::ZcValidate,
-    <PodU64 as zeropod::ZcField>::Pod: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    u8: pinapod::ZcValidate,
+    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
 {
     type Pod = AuditEventZc;
     const POD_SIZE: usize = core::mem::size_of::<AuditEventZc>();
 }
-unsafe impl zeropod::ZcElem for AuditEventZc
+unsafe impl pinapod::ZcElem for AuditEventZc
 where
-    [u8; EventDisc::BYTES]: zeropod::ZcValidate,
-    u8: zeropod::ZcValidate,
-    <PodU64 as zeropod::ZcField>::Pod: zeropod::ZcValidate,
+    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    u8: pinapod::ZcValidate,
+    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
 {}
 const _: fn(u8) -> ::core::primitive::u8 = |value| value;
 const _: fn() = || {

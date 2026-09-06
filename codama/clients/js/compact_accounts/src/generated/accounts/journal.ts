@@ -37,6 +37,8 @@ import {
 	getU8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
+	offsetDecoder,
+	offsetEncoder,
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
@@ -50,11 +52,11 @@ export function getJournalDiscriminatorBytes(): ReadonlyUint8Array {
 }
 
 /**
- * A compact account with an eight-entry logical capacity.
+ * A compact account with two independently encoded dynamic fields.
  *
- * The one-byte discriminator, bump, authority, revision, and two-byte vector
- * prefix always occupy [`Self::HEADER_SIZE`] bytes. Each active entry adds
- * exactly eight bytes, up to [`Self::MAX_SIZE`].
+ * The one-byte discriminator, bump, authority, revision, and two vector
+ * prefixes always occupy [`Self::HEADER_SIZE`] bytes. Each active row adds an
+ * eight-byte entry and a one-byte marker, up to [`Self::MAX_SIZE`].
  */
 export type Journal = {
 	discriminator: number;
@@ -66,6 +68,8 @@ export type Journal = {
 	revision: number;
 	/** Active entries. Unused capacity consumes no account bytes. */
 	entries: Array<bigint>;
+	/** One marker per entry, stored as a second compact tail. */
+	markers: Array<number>;
 };
 
 export type JournalArgs = {
@@ -77,6 +81,8 @@ export type JournalArgs = {
 	revision: number;
 	/** Active entries. Unused capacity consumes no account bytes. */
 	entries: Array<number | bigint>;
+	/** One marker per entry, stored as a second compact tail. */
+	markers: Array<number>;
 };
 
 /** Gets the encoder for {@link JournalArgs} account data. */
@@ -87,7 +93,27 @@ export function getJournalEncoder(): Encoder<JournalArgs> {
 			["bump", getU8Encoder()],
 			["authority", getAddressEncoder()],
 			["revision", getU32Encoder()],
-			["entries", getArrayEncoder(getU64Encoder(), { size: getU16Encoder() })],
+			[
+				"entries",
+				offsetEncoder(
+					getArrayEncoder(getU64Encoder(), {
+						size: offsetEncoder(
+							offsetEncoder(getU16Encoder(), { preOffset: () => 38 }),
+							{ postOffset: ({ preOffset }) => preOffset + 0 },
+						),
+					}),
+					{ preOffset: ({ preOffset }) => preOffset + 4 },
+				),
+			],
+			[
+				"markers",
+				getArrayEncoder(getU8Encoder(), {
+					size: offsetEncoder(
+						offsetEncoder(getU16Encoder(), { preOffset: () => 40 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
+					),
+				}),
+			],
 		]),
 		(value) => ({ ...value, discriminator: 1 }),
 	);
@@ -103,7 +129,27 @@ export function getJournalDecoder(): Decoder<Journal> {
 		["bump", getU8Decoder()],
 		["authority", getAddressDecoder()],
 		["revision", getU32Decoder()],
-		["entries", getArrayDecoder(getU64Decoder(), { size: getU16Decoder() })],
+		[
+			"entries",
+			offsetDecoder(
+				getArrayDecoder(getU64Decoder(), {
+					size: offsetDecoder(
+						offsetDecoder(getU16Decoder(), { preOffset: () => 38 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
+					),
+				}),
+				{ preOffset: ({ preOffset }) => preOffset + 4 },
+			),
+		],
+		[
+			"markers",
+			getArrayDecoder(getU8Decoder(), {
+				size: offsetDecoder(
+					offsetDecoder(getU16Decoder(), { preOffset: () => 40 }),
+					{ postOffset: ({ preOffset }) => preOffset + 0 },
+				),
+			}),
+		],
 	]);
 }
 

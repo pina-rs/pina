@@ -8,16 +8,16 @@
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 #[derive(pina::ZeroPod)]
-#[zeropod(compact)]
+#[pinapod(compact)]
 pub struct Journal {
-	/// A compact account with an eight-entry logical capacity.
+	/// A compact account with two independently encoded dynamic fields.
 	///
-	/// The one-byte discriminator, bump, authority, revision, and two-byte vector
-	/// prefix always occupy [`Self::HEADER_SIZE`] bytes. Each active entry adds
-	/// exactly eight bytes, up to [`Self::MAX_SIZE`].
+	/// The one-byte discriminator, bump, authority, revision, and two vector
+	/// prefixes always occupy [`Self::HEADER_SIZE`] bytes. Each active row adds an
+	/// eight-byte entry and a one-byte marker, up to [`Self::MAX_SIZE`].
 	pub discriminator: u8,
 	/// Canonical PDA bump.
 	pub bump: u8,
@@ -27,6 +27,8 @@ pub struct Journal {
 	pub revision: u32,
 	/// Active entries. Unused capacity consumes no account bytes.
 	pub entries: pina::Vec<u64, { u16::MAX as usize }>,
+	/// One marker per entry, stored as a second compact tail.
+	pub markers: pina::Vec<u8, { u16::MAX as usize }>,
 }
 
 pub const JOURNAL_DISCRIMINATOR: u8 = 1u8;

@@ -8,7 +8,7 @@
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 /// Instruction data for `AddTag`. Appends a tag to the profile.
 pub const ADD_TAG_DISCRIMINATOR: u8 = 2u8;

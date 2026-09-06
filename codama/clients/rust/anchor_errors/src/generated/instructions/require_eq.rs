@@ -8,7 +8,7 @@
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 pub const REQUIRE_EQ_DISCRIMINATOR: u8 = 3u8;
 

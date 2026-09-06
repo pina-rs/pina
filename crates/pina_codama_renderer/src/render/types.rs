@@ -89,25 +89,23 @@ pub(crate) fn render_type_for_pod(r#type: &TypeNode, context: &str) -> Result<St
 }
 
 pub(crate) fn is_compact_tail(r#type: &TypeNode) -> bool {
-	matches!(
-		r#type,
-		TypeNode::Array(array) if matches!(array.count.as_ref(), CountNode::Prefixed(_))
-	)
+	compact_tail_array(r#type)
+		.is_some_and(|array| matches!(array.count.as_ref(), CountNode::Prefixed(_)))
 }
 
 pub(crate) fn render_type_for_compact_tail(r#type: &TypeNode, context: &str) -> Result<String> {
-	let TypeNode::Array(array) = r#type else {
+	let Some(array) = compact_tail_array(r#type) else {
 		return Err(RenderError::UnsupportedType {
 			context: context.to_string(),
 			kind: r#type.kind(),
-			reason: "compact accounts require one trailing prefixed array".to_string(),
+			reason: "compact accounts require a suffix of prefixed arrays".to_string(),
 		});
 	};
 	let CountNode::Prefixed(count) = array.count.as_ref() else {
 		return Err(RenderError::UnsupportedType {
 			context: context.to_string(),
 			kind: r#type.kind(),
-			reason: "compact accounts require one trailing prefixed array".to_string(),
+			reason: "compact accounts require a suffix of prefixed arrays".to_string(),
 		});
 	};
 	let item_type = render_type_for_pod(&array.item, context)?;
@@ -128,6 +126,15 @@ pub(crate) fn render_type_for_compact_tail(r#type: &TypeNode, context: &str) -> 
 		Ok(format!(
 			"pina::PodVec<<{item_type} as pina::ZcField>::Pod, {capacity}, {prefix_size}>"
 		))
+	}
+}
+
+fn compact_tail_array(r#type: &TypeNode) -> Option<&codama_nodes::ArrayTypeNode> {
+	match r#type {
+		TypeNode::Array(array) => Some(array),
+		TypeNode::PreOffset(offset) => compact_tail_array(&offset.r#type),
+		TypeNode::PostOffset(offset) => compact_tail_array(&offset.r#type),
+		_ => None,
 	}
 }
 
@@ -407,7 +414,7 @@ fn render_defined_zeropod_enum(
 	};
 
 	let mut lines = render_docs(docs, 0);
-	lines.insert(0, "use pina::zeropod;".to_string());
+	lines.insert(0, "use pina::pinapod;".to_string());
 	lines.insert(1, String::new());
 	lines.push("#[derive(Clone, Copy, Debug, PartialEq, Eq, pina::ZeroPod)]".to_string());
 	lines.push(format!("#[repr({repr})]"));
@@ -429,7 +436,7 @@ fn render_defined_zeropod_enum(
 }
 
 fn render_defined_struct(name: &str, struct_type: &StructTypeNode, docs: &Docs) -> Result<String> {
-	let mut lines = vec!["use pina::zeropod;".to_string(), String::new()];
+	let mut lines = vec!["use pina::pinapod;".to_string(), String::new()];
 	for doc_line in render_docs(docs, 0) {
 		lines.push(doc_line);
 	}

@@ -79,8 +79,8 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// The macro validates Pina's closed schema grammar, derives the zeropod
 /// companion, and generates checked `initialize` and `try_from_bytes`
-/// helpers. Add `compact` to permit exactly one trailing `Vec<T, N>` whose
-/// active elements, rather than its full capacity, occupy account data.
+/// helpers. Add `compact` to permit a suffix of bounded `Vec<T, N>` fields whose
+/// active elements, rather than their full capacities, occupy account data.
 ///
 /// # Example
 ///
@@ -95,6 +95,7 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 /// struct History {
 ///     authority: Address,
 ///     values: Vec<u64, 64>,
+///     tags: Vec<u8, 128>,
 /// }
 /// ```
 #[proc_macro_attribute]

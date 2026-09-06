@@ -1,5 +1,7 @@
 #![allow(unsafe_code)]
 
+use core::mem::size_of;
+
 use pina::*;
 use pinocchio::account::NOT_BORROWED;
 use pinocchio::account::RuntimeAccount;
@@ -16,16 +18,18 @@ struct DynamicState {
 	pub bump: u8,
 	pub authority: Address,
 	pub values: Vec<u64, 4>,
+	pub codes: Vec<u16, 3>,
 }
 
 #[test]
 fn compact_account_roundtrips_active_tail_without_fixed_capacity_padding() {
-	assert_eq!(DynamicState::HEADER_SIZE, 36);
-	assert_eq!(DynamicState::MAX_SIZE, 68);
-	assert_eq!(DynamicState::TAIL_ELEMENT_SIZE, 8);
+	assert_eq!(DynamicState::HEADER_SIZE, 38);
+	assert_eq!(DynamicState::MAX_SIZE, 76);
+	assert_eq!(DynamicState::TAIL_ALIGNMENT, 2);
 
 	let mut data = [0u8; DynamicState::MAX_SIZE];
 	let values = [PodU64::from(11), PodU64::from(22)];
+	let codes = [PodU16::from(3), PodU16::from(5)];
 	let encoded_size = {
 		let mut state = DynamicState::initialize(&mut data)
 			.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
@@ -35,27 +39,101 @@ fn compact_account_roundtrips_active_tail_without_fixed_capacity_padding() {
 			.set_values(&values)
 			.unwrap_or_else(|error| panic!("set compact values: {error:?}"));
 		state
+			.set_codes(&codes)
+			.unwrap_or_else(|error| panic!("set compact codes: {error:?}"));
+		state
 			.commit()
 			.unwrap_or_else(|error| panic!("commit compact state: {error:?}"))
 	};
 
-	assert_eq!(encoded_size, DynamicState::HEADER_SIZE + 16);
+	assert_eq!(encoded_size, DynamicState::HEADER_SIZE + 16 + 4);
+	assert_eq!(&data[34..36], &2u16.to_le_bytes());
+	assert_eq!(&data[36..38], &2u16.to_le_bytes());
 	let state = DynamicState::try_from_bytes(&data[..encoded_size])
 		.unwrap_or_else(|error| panic!("read compact state: {error:?}"));
 	assert_eq!(state.bump, 3);
 	assert_eq!(state.authority, Address::new_from_array([5; 32]));
 	assert_eq!(state.values()[0].get(), 11);
 	assert_eq!(state.values()[1].get(), 22);
+	assert_eq!(state.codes(), &codes);
+}
+
+#[test]
+fn compact_account_moves_later_tails_when_an_earlier_tail_changes_size() {
+	let mut data = [0u8; DynamicState::MAX_SIZE];
+	let initial_values = [PodU64::from(11)];
+	let grown_values = [PodU64::from(11), PodU64::from(22), PodU64::from(33)];
+	let codes = [PodU16::from(13)];
+
+	let initial_size = {
+		let mut state = DynamicState::initialize(&mut data)
+			.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
+		state
+			.set_values(&initial_values)
+			.unwrap_or_else(|error| panic!("set initial values: {error:?}"));
+		state
+			.set_codes(&codes)
+			.unwrap_or_else(|error| panic!("set codes: {error:?}"));
+		state
+			.commit()
+			.unwrap_or_else(|error| panic!("commit initial state: {error:?}"))
+	};
+	assert_eq!(initial_size, DynamicState::HEADER_SIZE + 8 + 2);
+
+	let grown_size = {
+		let mut state = DynamicState::try_from_bytes_mut(&mut data)
+			.unwrap_or_else(|error| panic!("load compact state: {error:?}"));
+		state
+			.set_values(&grown_values)
+			.unwrap_or_else(|error| panic!("grow values: {error:?}"));
+		state
+			.commit()
+			.unwrap_or_else(|error| panic!("commit grown state: {error:?}"))
+	};
+
+	let state = DynamicState::try_from_bytes(&data[..grown_size])
+		.unwrap_or_else(|error| panic!("read grown compact state: {error:?}"));
+	assert_eq!(state.values(), &grown_values);
+	assert_eq!(&data[36..38], &1u16.to_le_bytes());
+	let codes_offset = DynamicState::HEADER_SIZE + grown_values.len() * size_of::<PodU64>();
+	assert_eq!(&data[codes_offset..codes_offset + 2], &13u16.to_le_bytes());
+}
+
+#[test]
+fn compact_vec_accessors_use_their_own_independent_lengths() {
+	let mut data = [0u8; DynamicState::MAX_SIZE];
+	let values = [PodU64::from(11)];
+	let codes = [PodU16::from(3), PodU16::from(5), PodU16::from(8)];
+	let encoded_size = {
+		let mut state = DynamicState::initialize(&mut data)
+			.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
+		state
+			.set_values(&values)
+			.unwrap_or_else(|error| panic!("set compact values: {error:?}"));
+		state
+			.set_codes(&codes)
+			.unwrap_or_else(|error| panic!("set compact codes: {error:?}"));
+		state
+			.commit()
+			.unwrap_or_else(|error| panic!("commit compact state: {error:?}"))
+	};
+
+	let state = DynamicState::try_from_bytes(&data[..encoded_size])
+		.unwrap_or_else(|error| panic!("read compact state: {error:?}"));
+	assert_eq!(state.codes(), &codes);
 }
 
 #[test]
 fn compact_account_validation_rejects_every_invalid_boundary() {
 	let mut too_small = [0u8; DynamicState::HEADER_SIZE - 1];
 	let mut too_large = [0u8; DynamicState::MAX_SIZE + 1];
-	let mut split_element = [0u8; DynamicState::HEADER_SIZE + 1];
 	assert!(DynamicState::initialize(&mut too_small).is_err());
 	assert!(DynamicState::initialize(&mut too_large).is_err());
-	assert!(DynamicState::initialize(&mut split_element).is_err());
+
+	let mut split_alignment = [0u8; DynamicState::HEADER_SIZE + 1];
+	assert!(DynamicState::initialize(&mut split_alignment).is_err());
+	let mut spare_capacity = [0u8; DynamicState::HEADER_SIZE + 2];
+	assert!(DynamicState::initialize(&mut spare_capacity).is_ok());
 
 	let mut data = [0u8; DynamicState::HEADER_SIZE];
 	DynamicState::initialize(&mut data)
@@ -65,6 +143,10 @@ fn compact_account_validation_rejects_every_invalid_boundary() {
 
 	data[0] = CompactKind::DynamicState as u8;
 	data[34] = 5;
+	assert!(DynamicState::try_from_bytes(&data).is_err());
+
+	data[34] = 0;
+	data[36] = 4;
 	assert!(DynamicState::try_from_bytes(&data).is_err());
 }
 

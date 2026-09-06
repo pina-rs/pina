@@ -8,7 +8,7 @@
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 #[derive(pina::ZeroPod)]
 pub struct RegistryConfig {

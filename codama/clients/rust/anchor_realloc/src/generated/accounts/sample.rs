@@ -8,10 +8,10 @@
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 #[derive(pina::ZeroPod)]
-#[zeropod(compact)]
+#[pinapod(compact)]
 pub struct Sample {
 	/// A compact account whose active values occupy only the bytes they need.
 	pub discriminator: u8,

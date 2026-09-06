@@ -8,7 +8,7 @@
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 /// Creates the per-authority sample PDA.
 pub const INITIALIZE_DISCRIMINATOR: u8 = 2u8;

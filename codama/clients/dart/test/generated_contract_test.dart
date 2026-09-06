@@ -201,22 +201,27 @@ void main() {
 
     test('round trips compact headers and dynamic tails', () {
       final entries = [BigInt.from(5), BigInt.from(8), BigInt.from(13)];
+      final markers = [21, 34];
       final encoded = getJournalEncoder().encode(
         Journal(
           bump: 7,
           authority: systemAddress,
           revision: 4,
           entries: entries,
+          markers: markers,
         ),
       );
       final decoded = getJournalDecoder().decode(encoded);
 
-      expect(encoded, hasLength(40 + entries.length * 8));
+      expect(encoded, hasLength(42 + entries.length * 8 + markers.length));
+      expect(encoded.sublist(38, 40), [3, 0]);
+      expect(encoded.sublist(40, 42), [2, 0]);
       expect(decoded.discriminator, 1);
       expect(decoded.bump, 7);
       expect(decoded.authority, systemAddress);
       expect(decoded.revision, 4);
       expect(decoded.entries, entries);
+      expect(decoded.markers, markers);
     });
   });
 

@@ -62,8 +62,8 @@ pub(crate) fn expand(
 		) {
 			Ok(schema) => {
 				let max_size = schema.max_size;
-				let element_size = schema.element_size;
-				(schema.proofs, Some((max_size, element_size)))
+				let tail_alignment = schema.tail_alignment;
+				(schema.proofs, Some((max_size, tail_alignment)))
 			}
 			Err(error) => return error.to_compile_error(),
 		}
@@ -74,7 +74,7 @@ pub(crate) fn expand(
 		}
 	};
 
-	let derives = [syn::parse_quote!(#crate_path::zeropod::ZeroPod)];
+	let derives = [syn::parse_quote!(#crate_path::pinapod::ZeroPod)];
 
 	if let Err(error) = add_derives(&mut item_struct.attrs, &derives) {
 		return error.to_compile_error();
@@ -82,7 +82,7 @@ pub(crate) fn expand(
 	if compact {
 		item_struct
 			.attrs
-			.push(syn::parse_quote!(#[zeropod(compact)]));
+			.push(syn::parse_quote!(#[pinapod(compact)]));
 	}
 
 	// Add discriminator field
@@ -104,14 +104,14 @@ pub(crate) fn expand(
 	};
 	let validation_type = if compact { &header_name } else { &zc_name };
 	let validation_impl = generate_validation_impl(&crate_path, validation_type);
-	let account_impl = if let Some((max_size, element_size)) = compact_schema {
+	let account_impl = if let Some((max_size, tail_alignment)) = compact_schema {
 		quote! {
 			impl #crate_path::PinaCompactAccount for #struct_name {
 				type Ref<'data> = #ref_name<'data>;
 				type Mut<'data> = #mut_name<'data>;
 
 				const MAX_SIZE: usize = #max_size;
-				const TAIL_ELEMENT_SIZE: usize = #element_size;
+				const TAIL_ALIGNMENT: usize = #tail_alignment;
 
 				fn try_from_bytes(
 					data: &[u8],

@@ -1,5 +1,6 @@
 #![allow(unsafe_code)]
 
+#[cfg(feature = "account-resize")]
 use core::mem::size_of;
 
 use pina::Address;

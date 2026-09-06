@@ -34,6 +34,7 @@ use codama_nodes::PdaNode;
 use codama_nodes::PdaSeedNode;
 use codama_nodes::PdaSeedValueNode;
 use codama_nodes::PdaValueNode;
+use codama_nodes::PostOffsetTypeNode;
 use codama_nodes::ProgramNode;
 use codama_nodes::PublicKeyTypeNode;
 use codama_nodes::RootNode;
@@ -105,8 +106,9 @@ fn renders_compact_account_fixture_with_dynamic_helpers() {
 	let crate_dir = render_fixture_program("compact_accounts", "pina-codama-render-compact");
 	let content = read_generated_file(&crate_dir, "accounts/journal.rs");
 
-	assert!(content.contains("#[zeropod(compact)]"));
+	assert!(content.contains("#[pinapod(compact)]"));
 	assert!(content.contains("pub entries: pina::Vec<u64, { u16::MAX as usize }>"));
+	assert!(content.contains("pub markers: pina::Vec<u8, { u16::MAX as usize }>"));
 	assert!(content.contains("pub const HEADER_SIZE: usize"));
 	assert!(content.contains("pub fn initialize(data: &mut [u8])"));
 	assert!(content.contains("pub fn from_bytes(data: &[u8])"));
@@ -145,6 +147,21 @@ fn renders_every_compact_collection_prefix() {
 }
 
 #[test]
+fn renders_compact_tail_through_a_post_offset_wrapper() {
+	let array = ArrayTypeNode::prefixed(
+		NumberTypeNode::le(NumberFormat::U64),
+		NumberTypeNode::le(NumberFormat::U16),
+	);
+	let tail = PostOffsetTypeNode::<TypeNode>::relative(array, 0).into();
+
+	assert_eq!(
+		render_type_for_compact_tail(&tail, "State.values")
+			.unwrap_or_else(|error| panic!("render failed: {error}")),
+		"pina::Vec<u64, { u16::MAX as usize }>"
+	);
+}
+
+#[test]
 fn rejects_non_compact_tail_nodes() {
 	let number = TypeNode::from(NumberTypeNode::le(NumberFormat::U64));
 	let fixed = TypeNode::from(ArrayTypeNode::fixed(
@@ -155,7 +172,7 @@ fn rejects_non_compact_tail_nodes() {
 	for node in [number, fixed] {
 		let error = render_type_for_compact_tail(&node, "State.values")
 			.expect_err("non-prefixed tail must be rejected");
-		assert!(error.to_string().contains("trailing prefixed array"));
+		assert!(error.to_string().contains("suffix of prefixed arrays"));
 	}
 }
 
@@ -697,6 +714,27 @@ fn renders_defined_type_aliases_with_pod_wrappers() {
 
 	let content = read_generated_file(&crate_dir, "types/counter.rs");
 	insta::assert_snapshot!("defined_type_alias_counter_rs", content);
+}
+
+#[test]
+fn renders_defined_structs_with_the_pinapod_helper_in_scope() {
+	let defined = DefinedTypeNode {
+		name: "settings".into(),
+		docs: vec!["Shared settings.".to_string()].into(),
+		r#type: Box::new(
+			StructTypeNode::new(vec![StructFieldTypeNode::new(
+				"counter",
+				NumberTypeNode::le(NumberFormat::U64),
+			)])
+			.into(),
+		),
+	};
+
+	let content = render_defined_type_page(&defined)
+		.unwrap_or_else(|error| panic!("defined struct render failed: {error}"));
+	assert!(content.starts_with("use pina::pinapod;\n\n"));
+	assert!(content.contains("#[derive(pina::ZeroPod)]"));
+	assert!(content.contains("pub counter: u64,"));
 }
 
 #[test]

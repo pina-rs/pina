@@ -11,6 +11,7 @@ members = [
 	"codama/clients/cpi/anchor_realloc",
 	"codama/clients/cpi/anchor_system_accounts",
 	"codama/clients/cpi/anchor_sysvars",
+	"codama/clients/cpi/compact_accounts",
 	"codama/clients/cpi/counter_program",
 	"codama/clients/cpi/escrow_program",
 	"codama/clients/cpi/hello_solana",
@@ -184,6 +185,7 @@ owo-colors = { default-features = false, version = "^4.0" }
 paste = { default-features = false, version = "^1" }
 pastey = { default-features = false, version = "^0.2" }
 pina_test = { path = "crates/pina_test", version = "0.12.2" }
+pinapod = { default-features = false, version = "0.1.0", features = ["solana-address", "solana-program-error"] }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }
 pinocchio-memo = { default-features = false, version = "^0.4" }
@@ -221,7 +223,6 @@ trybuild = { default-features = false, version = "^1" }
 ureq = { default-features = false, version = "^3", features = ["json", "rustls"] }
 url = { default-features = false, version = "^2.5.4" }
 walkdir = { default-features = false, version = "^2" }
-zeropod = { default-features = false, version = "0.3.5", features = ["solana-address", "solana-program-error"] }
 
 # publishable crates
 pina = { default-features = false, path = "crates/pina", version = "0.12.2" }

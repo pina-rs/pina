@@ -76,7 +76,7 @@ fn assert_journal(
 	expected_entries: &[u64],
 ) {
 	let account = program.account(journal).expect("fetch journal account");
-	let expected_size = Journal::HEADER_SIZE + expected_entries.len() * 8;
+	let expected_size = Journal::HEADER_SIZE + expected_entries.len() * 9;
 	assert_eq!(account.owner, program.program_id());
 	assert_eq!(account.data.len(), expected_size);
 	assert_eq!(
@@ -94,11 +94,20 @@ fn assert_journal(
 		u16::from_le_bytes(account.data[38..40].try_into().expect("entry-count bytes")) as usize,
 		expected_entries.len(),
 	);
-	let entries = account.data[Journal::HEADER_SIZE..]
+	assert_eq!(
+		u16::from_le_bytes(account.data[40..42].try_into().expect("marker-count bytes")) as usize,
+		expected_entries.len(),
+	);
+	let entries_end = Journal::HEADER_SIZE + expected_entries.len() * 8;
+	let entries = account.data[Journal::HEADER_SIZE..entries_end]
 		.chunks_exact(8)
 		.map(|bytes| u64::from_le_bytes(bytes.try_into().expect("entry bytes")))
 		.collect::<Vec<_>>();
 	assert_eq!(entries, expected_entries);
+	assert_eq!(
+		&account.data[entries_end..],
+		&(0..expected_entries.len() as u8).collect::<Vec<_>>(),
+	);
 }
 
 #[test]

@@ -1,7 +1,7 @@
 //! A focused compact-account lifecycle example.
 //!
 //! [`Journal`] stores a fixed header and only the active bytes of its trailing
-//! entries. [`ResizeAccounts`] demonstrates the required operation ordering:
+//! entries and markers. [`ResizeAccounts`] demonstrates the required operation ordering:
 //! allocate before growing the tail, commit the new prefix before shrinking the
 //! account, and skip reallocation when the encoded size does not change.
 
@@ -44,11 +44,11 @@ pub enum CompactAccountType {
 	Journal = 1,
 }
 
-/// A compact account with an eight-entry logical capacity.
+/// A compact account with two independently encoded dynamic fields.
 ///
-/// The one-byte discriminator, bump, authority, revision, and two-byte vector
-/// prefix always occupy [`Self::HEADER_SIZE`] bytes. Each active entry adds
-/// exactly eight bytes, up to [`Self::MAX_SIZE`].
+/// The one-byte discriminator, bump, authority, revision, and two vector
+/// prefixes always occupy [`Self::HEADER_SIZE`] bytes. Each active row adds an
+/// eight-byte entry and a one-byte marker, up to [`Self::MAX_SIZE`].
 #[account(discriminator = CompactAccountType, compact)]
 #[pda(seeds = [SEED_JOURNAL, authority: Address], bump = bump)]
 pub struct Journal {
@@ -60,6 +60,8 @@ pub struct Journal {
 	pub revision: u32,
 	/// Active entries. Unused capacity consumes no account bytes.
 	pub entries: Vec<u64, 8>,
+	/// One marker per entry, stored as a second compact tail.
+	pub markers: Vec<u8, 8>,
 }
 
 /// Returns the exact encoded account size for `entry_count` active entries.
@@ -76,7 +78,7 @@ pub fn account_size(entry_count: usize) -> Result<usize, ProgramError> {
 		return Err(CompactAccountError::CapacityExceeded.into());
 	}
 
-	Ok(Journal::HEADER_SIZE + entry_count * size_of::<PodU64>())
+	Ok(Journal::HEADER_SIZE + entry_count * (size_of::<PodU64>() + size_of::<u8>()))
 }
 
 #[instruction(discriminator = CompactInstruction::Initialize)]
@@ -156,6 +158,14 @@ fn initialized_entries(entry_count: usize) -> [PodU64; MAX_ENTRIES] {
 	entries
 }
 
+fn initialized_markers(entry_count: usize) -> [u8; MAX_ENTRIES] {
+	let mut markers = [0; MAX_ENTRIES];
+	for (index, marker) in markers.iter_mut().take(entry_count).enumerate() {
+		*marker = index as u8;
+	}
+	markers
+}
+
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = InitializeIx::try_from_bytes(data)?;
@@ -189,6 +199,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		.invoke::<Journal>()?;
 
 		let entries = initialized_entries(entry_count);
+		let markers = initialized_markers(entry_count);
 		let encoded_size = {
 			let mut data = self.journal.try_borrow_mut()?;
 			let mut journal = Journal::try_from_bytes_mut(&mut data)?;
@@ -197,6 +208,9 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			journal.revision.set(0);
 			journal
 				.set_entries(&entries[..entry_count])
+				.map_err(|_| ProgramError::InvalidAccountData)?;
+			journal
+				.set_markers(&markers[..entry_count])
 				.map_err(|_| ProgramError::InvalidAccountData)?;
 			journal
 				.commit()
@@ -237,6 +251,7 @@ impl<'a> ProcessAccountInfos<'a> for ResizeAccounts<'a> {
 		{
 			entry.set(index as u64);
 		}
+		let markers = initialized_markers(target_count);
 
 		if target_size > self.journal.data_len() {
 			ReallocCompactAccount {
@@ -254,6 +269,9 @@ impl<'a> ProcessAccountInfos<'a> for ResizeAccounts<'a> {
 			journal.revision.set(next_revision(revision)?);
 			journal
 				.set_entries(&entries[..target_count])
+				.map_err(|_| ProgramError::InvalidAccountData)?;
+			journal
+				.set_markers(&markers[..target_count])
 				.map_err(|_| ProgramError::InvalidAccountData)?;
 			journal
 				.commit()
@@ -352,10 +370,11 @@ mod tests {
 
 	#[test]
 	fn size_formula_covers_empty_partial_and_full_accounts() {
-		assert_eq!(Journal::HEADER_SIZE, 40);
-		assert_eq!(Journal::MAX_SIZE, 104);
+		assert_eq!(Journal::HEADER_SIZE, 42);
+		assert_eq!(Journal::MAX_SIZE, 114);
+		assert_eq!(Journal::TAIL_ALIGNMENT, 1);
 		assert_eq!(account_size(0), Ok(Journal::HEADER_SIZE));
-		assert_eq!(account_size(3), Ok(Journal::HEADER_SIZE + 24));
+		assert_eq!(account_size(3), Ok(Journal::HEADER_SIZE + 27));
 		assert_eq!(account_size(MAX_ENTRIES), Ok(Journal::MAX_SIZE));
 	}
 
@@ -371,11 +390,7 @@ mod tests {
 	fn generated_size_validation_rejects_every_invalid_shape() {
 		assert!(Journal::validate_size(Journal::HEADER_SIZE).is_ok());
 		assert!(Journal::validate_size(Journal::MAX_SIZE).is_ok());
-		for invalid in [
-			Journal::HEADER_SIZE - 1,
-			Journal::HEADER_SIZE + 1,
-			Journal::MAX_SIZE + size_of::<PodU64>(),
-		] {
+		for invalid in [Journal::HEADER_SIZE - 1, Journal::MAX_SIZE + 1] {
 			assert_eq!(
 				Journal::validate_size(invalid),
 				Err(ProgramError::InvalidAccountData)
@@ -385,8 +400,9 @@ mod tests {
 
 	#[test]
 	fn compact_codec_roundtrips_header_and_active_entries() {
-		let mut data = [0u8; Journal::HEADER_SIZE + 24];
+		let mut data = [0u8; Journal::HEADER_SIZE + 27];
 		let entries = initialized_entries(3);
+		let markers = initialized_markers(3);
 		let encoded_size = {
 			let mut journal = Journal::initialize(&mut data)
 				.unwrap_or_else(|error| panic!("initialize journal: {error:?}"));
@@ -396,6 +412,9 @@ mod tests {
 			journal
 				.set_entries(&entries[..3])
 				.unwrap_or_else(|error| panic!("set entries: {error:?}"));
+			journal
+				.set_markers(&markers[..3])
+				.unwrap_or_else(|error| panic!("set markers: {error:?}"));
 			journal
 				.commit()
 				.unwrap_or_else(|error| panic!("commit journal: {error:?}"))
@@ -408,6 +427,7 @@ mod tests {
 		assert_eq!(journal.authority, Address::new_from_array([7; 32]));
 		assert_eq!(journal.revision.get(), 2);
 		assert_eq!(journal.entries(), &entries[..3]);
+		assert_eq!(journal.markers(), &markers[..3]);
 	}
 
 	#[test]
@@ -416,12 +436,16 @@ mod tests {
 			let mut data = [0u8; Journal::MAX_SIZE];
 			let size = account_size(count).unwrap_or_else(|error| panic!("size: {error:?}"));
 			let entries = initialized_entries(count);
+			let markers = initialized_markers(count);
 			let encoded = {
 				let mut journal = Journal::initialize(&mut data[..size])
 					.unwrap_or_else(|error| panic!("initialize: {error:?}"));
 				journal
 					.set_entries(&entries[..count])
 					.unwrap_or_else(|error| panic!("set entries: {error:?}"));
+				journal
+					.set_markers(&markers[..count])
+					.unwrap_or_else(|error| panic!("set markers: {error:?}"));
 				journal
 					.commit()
 					.unwrap_or_else(|error| panic!("commit: {error:?}"))
@@ -432,6 +456,12 @@ mod tests {
 					.unwrap_or_else(|error| panic!("decode: {error:?}"))
 					.entries(),
 				&entries[..count]
+			);
+			assert_eq!(
+				Journal::try_from_bytes(&data[..size])
+					.unwrap_or_else(|error| panic!("decode: {error:?}"))
+					.markers(),
+				&markers[..count]
 			);
 		}
 	}
@@ -507,6 +537,13 @@ mod tests {
 		assert_eq!(entries[1].get(), 1);
 		assert_eq!(entries[2].get(), 2);
 		assert!(entries[3..].iter().all(|entry| entry.get() == 0));
+	}
+
+	#[test]
+	fn initialized_markers_fill_only_the_active_prefix() {
+		let markers = initialized_markers(3);
+		assert_eq!(&markers[..3], &[0, 1, 2]);
+		assert!(markers[3..].iter().all(|marker| *marker == 0));
 	}
 
 	#[test]

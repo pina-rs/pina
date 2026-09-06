@@ -54,7 +54,7 @@ pub(crate) fn expand(
 			Err(error) => return error.to_compile_error(),
 		};
 
-	let derives = [syn::parse_quote!(#crate_path::zeropod::ZeroPod)];
+	let derives = [syn::parse_quote!(#crate_path::pinapod::ZeroPod)];
 
 	if let Err(error) = add_derives(&mut item_struct.attrs, &derives) {
 		return error.to_compile_error();

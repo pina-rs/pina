@@ -8,7 +8,7 @@
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 pub const TOGGLE_COMPLETED_DISCRIMINATOR: u8 = 1u8;
 

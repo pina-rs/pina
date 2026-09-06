@@ -48,10 +48,11 @@ pub(crate) fn render_account_page(
 		render_constant_discriminator(account.name.as_ref(), &account.discriminators, &context)?;
 
 	let data_type = account.data.get_nested_type_node();
-	let compact_tail = data_type
+	let first_compact_tail = data_type
 		.fields
-		.last()
-		.is_some_and(|field| is_compact_tail(&field.r#type));
+		.iter()
+		.position(|field| is_compact_tail(&field.r#type));
+	let compact_account = first_compact_tail.is_some();
 	let mut field_lines = Vec::new();
 	for doc_line in render_docs(&account.docs, 0) {
 		field_lines.push(doc_line);
@@ -65,7 +66,7 @@ pub(crate) fn render_account_page(
 		}
 		let field_name = snake(field.name.as_ref());
 		let field_context = format!("{account_name}.{field_name}");
-		let field_type = if compact_tail && index + 1 == data_type.fields.len() {
+		let field_type = if first_compact_tail.is_some_and(|start| index >= start) {
 			render_type_for_compact_tail(&field.r#type, &field_context)?
 		} else {
 			render_type_for_pod(&field.r#type, &field_context)?
@@ -77,11 +78,11 @@ pub(crate) fn render_account_page(
 	}
 
 	let mut lines = Vec::new();
-	lines.push("use pina::zeropod;".to_string());
+	lines.push("use pina::pinapod;".to_string());
 	lines.push(String::new());
 	lines.push("#[derive(pina::ZeroPod)]".to_string());
-	if compact_tail {
-		lines.push("#[zeropod(compact)]".to_string());
+	if compact_account {
+		lines.push("#[pinapod(compact)]".to_string());
 	}
 	lines.push(format!("pub struct {account_name} {{"));
 	lines.extend(field_lines);
@@ -97,7 +98,7 @@ pub(crate) fn render_account_page(
 	}
 
 	lines.push(format!("impl {account_name} {{"));
-	if compact_tail {
+	if compact_account {
 		lines.extend(render_compact_account_helpers(
 			&account_name,
 			discriminator.as_ref(),
