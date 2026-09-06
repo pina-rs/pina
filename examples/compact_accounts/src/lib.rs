@@ -385,9 +385,9 @@ mod tests {
 
 	#[test]
 	fn generated_size_validation_rejects_every_invalid_shape() {
-		assert!(Journal::validate_size(Journal::HEADER_SIZE).is_ok());
+		assert!(Journal::validate_size(Journal::MIN_SIZE).is_ok());
 		assert!(Journal::validate_size(Journal::MAX_SIZE).is_ok());
-		for invalid in [Journal::HEADER_SIZE - 1, Journal::MAX_SIZE + 1] {
+		for invalid in [Journal::MIN_SIZE - 1, Journal::MAX_SIZE + 1] {
 			assert_eq!(
 				Journal::validate_size(invalid),
 				Err(ProgramError::InvalidAccountData)
@@ -397,11 +397,14 @@ mod tests {
 
 	#[test]
 	fn compact_codec_roundtrips_header_and_active_entries() {
-		let mut data = [0u8; Journal::HEADER_SIZE + 27];
+		let target_size = Journal::projected_bytes(3, 3)
+			.unwrap_or_else(|error| panic!("project size: {error:?}"));
+		let mut backing = [0u8; Journal::MAX_SIZE];
+		let data = &mut backing[..target_size];
 		let entries = initialized_entries(3);
 		let markers = initialized_markers(3);
 		let encoded_size = {
-			let mut journal = Journal::initialize(&mut data)
+			let mut journal = Journal::initialize(&mut *data)
 				.unwrap_or_else(|error| panic!("initialize journal: {error:?}"));
 			journal.bump = 4;
 			journal.authority = Address::new_from_array([7; 32]);
@@ -423,8 +426,8 @@ mod tests {
 				.unwrap_or_else(|error| panic!("commit journal: {error:?}"))
 		};
 
-		assert_eq!(encoded_size, data.len());
-		let journal = Journal::try_from_bytes(&data)
+		assert_eq!(encoded_size, target_size);
+		let journal = Journal::try_from_bytes(&*data)
 			.unwrap_or_else(|error| panic!("decode journal: {error:?}"));
 		assert_eq!(journal.bump, 4);
 		assert_eq!(journal.authority, Address::new_from_array([7; 32]));
@@ -473,7 +476,7 @@ mod tests {
 
 	#[test]
 	fn compact_codec_rejects_corrupt_discriminators_prefixes_and_capacity() {
-		let mut data = [0u8; Journal::HEADER_SIZE];
+		let mut data = [0u8; Journal::MIN_SIZE];
 		Journal::initialize(&mut data)
 			.unwrap_or_else(|error| panic!("initialize journal: {error:?}"));
 		data[0] = 99;

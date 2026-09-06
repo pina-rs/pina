@@ -70,7 +70,7 @@ pub struct InitializeIx {
 
 /// Resizes the complete account-data buffer to `len` bytes.
 ///
-/// `len` includes [`Sample::HEADER_SIZE`] and must end on a value boundary.
+/// `len` must equal [`Sample::projected_bytes`] for an active value count.
 #[instruction(discriminator = ReallocInstruction::Realloc)]
 pub struct ReallocIx {
 	pub len: u16,
@@ -128,15 +128,24 @@ fn validate_realloc_delta(current_len: usize, new_len: usize) -> ProgramResult {
 	Ok(())
 }
 
-fn validate_target_len(target_len: usize) -> ProgramResult {
+fn target_values_count(target_len: usize) -> Result<usize, ProgramError> {
 	let tail_len = target_len
-		.checked_sub(Sample::HEADER_SIZE)
+		.checked_sub(Sample::MIN_SIZE)
 		.ok_or(ReallocError::AccountDataTooSmall)?;
-	if !tail_len.is_multiple_of(size_of::<PodU64>()) || target_len > Sample::MAX_SIZE {
+
+	if !tail_len.is_multiple_of(size_of::<PodU64>()) {
 		return Err(ReallocError::AccountDataTooSmall.into());
 	}
 
-	Ok(())
+	let values_count = tail_len / size_of::<PodU64>();
+	let projected_size = Sample::projected_bytes(values_count)
+		.map_err(|_| ProgramError::from(ReallocError::AccountDataTooSmall))?;
+
+	if projected_size != target_len {
+		return Err(ReallocError::AccountDataTooSmall.into());
+	}
+
+	Ok(values_count)
 }
 
 fn validate_distinct_realloc_targets(account1: &Address, account2: &Address) -> ProgramResult {
@@ -196,7 +205,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			owner: &ID,
 			seeds: &seeds.as_slices(),
 			bump: args.bump,
-			space: Sample::HEADER_SIZE,
+			space: Sample::MIN_SIZE,
 		}
 		.invoke::<Sample>()?;
 
@@ -220,7 +229,7 @@ impl<'a> ProcessAccountInfos<'a> for ReallocAccounts<'a> {
 		self.authority.assert_signer()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
 		validate_sample(*self.sample, &authority_key)?;
-		validate_target_len(target_len)?;
+		let count = target_values_count(target_len)?;
 		validate_realloc_delta(self.sample.data_len(), target_len)?;
 
 		if target_len > self.sample.data_len() {
@@ -233,8 +242,7 @@ impl<'a> ProcessAccountInfos<'a> for ReallocAccounts<'a> {
 			.invoke::<Sample>()?;
 		}
 
-		let count = (target_len - Sample::HEADER_SIZE) / size_of::<PodU64>();
-		let mut values = [PodU64::from(0); 64];
+		let mut values = [PodU64::from(0); Sample::VALUES_CAPACITY];
 		for (index, value) in values.iter_mut().take(count).enumerate() {
 			value.set(u64::try_from(index).map_err(|_| ProgramError::InvalidArgument)?);
 		}
@@ -244,9 +252,20 @@ impl<'a> ProcessAccountInfos<'a> for ReallocAccounts<'a> {
 			sample
 				.set_values(&values[..count])
 				.map_err(|_| ProgramError::InvalidAccountData)?;
-			sample
+
+			if sample.projected_size() != target_len {
+				return Err(ProgramError::InvalidAccountData);
+			}
+
+			let encoded_size = sample
 				.commit()
-				.map_err(|_| ProgramError::InvalidAccountData)?
+				.map_err(|_| ProgramError::InvalidAccountData)?;
+
+			if sample.encoded_size() != encoded_size {
+				return Err(ProgramError::InvalidAccountData);
+			}
+
+			encoded_size
 		};
 		if encoded_size != target_len {
 			return Err(ProgramError::InvalidAccountData);
@@ -330,9 +349,9 @@ mod tests {
 	fn realloc_instruction_roundtrip() {
 		let mut bytes = [0u8; ReallocIx::SIZE];
 		let ix = ReallocIx::initialize(&mut bytes).unwrap_or_else(|e| panic!("encode: {e:?}"));
-		ix.len.set(Sample::HEADER_SIZE as u16);
+		ix.len.set(Sample::MIN_SIZE as u16);
 		let parsed = ReallocIx::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
-		assert_eq!(usize::from(parsed.len.get()), Sample::HEADER_SIZE);
+		assert_eq!(usize::from(parsed.len.get()), Sample::MIN_SIZE);
 	}
 
 	#[test]
@@ -361,8 +380,8 @@ mod tests {
 	}
 
 	#[test]
-	fn validate_target_len_rejects_truncating_the_sample_header() {
-		let result = validate_target_len(Sample::HEADER_SIZE - 1);
+	fn target_values_count_rejects_truncating_the_sample_header() {
+		let result = target_values_count(Sample::MIN_SIZE - 1);
 		assert!(matches!(
 			result,
 			Err(ProgramError::Custom(code)) if code == ReallocError::AccountDataTooSmall as u32
@@ -370,11 +389,14 @@ mod tests {
 	}
 
 	#[test]
-	fn validate_target_len_enforces_element_boundaries_and_capacity() {
-		assert!(validate_target_len(Sample::HEADER_SIZE).is_ok());
+	fn target_values_count_uses_generated_size_boundaries_and_capacity() {
+		let three_values =
+			Sample::projected_bytes(3).unwrap_or_else(|error| panic!("project size: {error:?}"));
+		assert_eq!(target_values_count(Sample::MIN_SIZE), Ok(0));
+		assert_eq!(target_values_count(three_values), Ok(3));
 
-		for target in [Sample::HEADER_SIZE + 1, Sample::MAX_SIZE + 8] {
-			let result = validate_target_len(target);
+		for target in [Sample::MIN_SIZE + 1, Sample::MAX_SIZE + size_of::<PodU64>()] {
+			let result = target_values_count(target);
 			assert!(matches!(
 				result,
 				Err(ProgramError::Custom(code))
@@ -385,24 +407,32 @@ mod tests {
 
 	#[test]
 	fn sample_compact_codec_roundtrips_active_values() {
-		let mut data = [0u8; Sample::HEADER_SIZE + 24];
+		let target_size =
+			Sample::projected_bytes(3).unwrap_or_else(|error| panic!("project size: {error:?}"));
+		let mut backing = [0u8; Sample::MAX_SIZE];
+		let data = &mut backing[..target_size];
 		let values = [PodU64::from(3), PodU64::from(5), PodU64::from(8)];
 		let encoded_size = {
-			let mut sample = Sample::initialize(&mut data)
+			let mut sample = Sample::initialize(&mut *data)
 				.unwrap_or_else(|error| panic!("initialize: {error:?}"));
+			assert_eq!(sample.encoded_size(), Sample::MIN_SIZE);
 			sample.bump = 7;
 			sample.authority = Address::new_from_array([9; 32]);
 			sample
 				.set_values(&values)
 				.unwrap_or_else(|error| panic!("set values: {error:?}"));
-			sample
+			assert_eq!(sample.projected_size(), target_size);
+			let encoded_size = sample
 				.commit()
-				.unwrap_or_else(|error| panic!("commit: {error:?}"))
+				.unwrap_or_else(|error| panic!("commit: {error:?}"));
+			assert_eq!(sample.encoded_size(), encoded_size);
+			encoded_size
 		};
 
-		assert_eq!(encoded_size, data.len());
+		assert_eq!(encoded_size, target_size);
 		let sample =
-			Sample::try_from_bytes(&data).unwrap_or_else(|error| panic!("decode: {error:?}"));
+			Sample::try_from_bytes(&*data).unwrap_or_else(|error| panic!("decode: {error:?}"));
+		assert_eq!(sample.encoded_size(), target_size);
 		assert_eq!(sample.bump, 7);
 		assert_eq!(sample.authority, Address::new_from_array([9; 32]));
 		assert_eq!(sample.values(), values);
