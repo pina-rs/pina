@@ -10,7 +10,14 @@ A focused reference for declaring, creating, loading, resizing, and generating c
 
 <!-- {=compactAccountQuickstart} -->
 
-Add `compact` to an account with a suffix of one or more bounded `Vec` fields. Fixed fields must come first, and every capacity must be a literal so the macro can audit and generate the maximum layout:
+Compact mode is opt-in. Enable `compact` for schemas and checked loaders; add `account-resize` when using the typed creation and rent-adjusting reallocation builders:
+
+```toml
+[dependencies]
+pina = { version = "...", features = ["compact", "account-resize"] }
+```
+
+The `compact` feature also enables `derive`. Add `compact` to an account with a suffix of one or more bounded `Vec` fields. Fixed fields must come first, and every capacity must be a literal so the macro can audit and generate the maximum layout:
 
 ```rust
 #[account(discriminator = AccountType, compact)]

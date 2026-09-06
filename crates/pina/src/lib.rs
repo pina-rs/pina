@@ -7,8 +7,8 @@
 //! ## Features
 //!
 //! - **Zero-copy account deserialization** via `pinapod` — no heap allocation.
-//! - **Compact dynamic accounts** with checked trailing vectors and typed,
-//!   rent-adjusting creation/reallocation helpers.
+//! - **Compact dynamic accounts** *(optional)* with checked trailing vectors
+//!   and typed, rent-adjusting creation/reallocation helpers.
 //! - **`no_std` compatible** — designed for on-chain deployment to the SBF
 //!   target.
 //! - **Discriminator system** — every account, instruction, and event type
@@ -25,11 +25,14 @@
 //!
 //! - `logs` *(default)* — enables on-chain logging via `solana-program-log`.
 //! - `derive` *(default)* — enables the `pina_macros` proc-macro crate.
+//! - `compact` — enables compact account schemas, checked loaders, and typed
+//!   account APIs. This also enables `derive`.
 //! - `token` — enables SPL token / token-2022 helpers and associated token
 //!   account utilities.
 //! - `memo` — enables memo program helpers.
-//! - `account-resize` — enables raw realloc helpers plus typed compact-account
-//!   creation and reallocation on top of Pinocchio's safe resize support.
+//! - `account-resize` — enables raw realloc helpers on top of Pinocchio's safe
+//!   resize support. Enable it with `compact` for typed compact-account creation
+//!   and reallocation.
 
 #![no_std]
 // CU optimization for on-chain programs; inline_always ensures discriminator
@@ -67,7 +70,8 @@ pub use pinapod as zeropod;
 pub use pinapod::LayoutKind;
 /// Fixed-capacity UTF-8 string schema used by Pinapod derives.
 pub use pinapod::String;
-/// Fixed-capacity vector schema used by Pinapod derives.
+/// Bounded vector schema used by compact Pinapod derives.
+#[cfg(feature = "compact")]
 pub use pinapod::Vec;
 /// Marker trait for types that can be safely cast from any byte pattern.
 pub use pinapod::ZcElem;
@@ -78,6 +82,7 @@ pub use pinapod::ZcValidate;
 /// Derives a validated zero-copy companion for a native schema.
 pub use pinapod::ZeroPod;
 /// Zero-copy access for compact (variable-length) types.
+#[cfg(feature = "compact")]
 pub use pinapod::ZeroPodCompact;
 /// Error type for Pinapod validation failures.
 pub use pinapod::ZeroPodError;

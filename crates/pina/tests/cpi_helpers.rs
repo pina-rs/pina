@@ -12,9 +12,9 @@ use pina::CpiContext;
 use pina::CpiHandle;
 use pina::CpiProgramId;
 use pina::CreateAccount;
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 use pina::CreateCompactProgramAccount;
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 use pina::CreateCompactProgramAccountWithBump;
 use pina::CreateProgramAccount;
 use pina::CreateProgramAccountWithBump;
@@ -26,7 +26,7 @@ use pina::ProgramError;
 use pina::ReallocAccount;
 #[cfg(feature = "account-resize")]
 use pina::ReallocAccountZeroed;
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 use pina::ReallocCompactAccount;
 use pina::Seed;
 use pina::Signer;
@@ -51,7 +51,7 @@ struct BuilderState {
 	value: u8,
 }
 
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 #[pina::account(crate = ::pina, discriminator = BuilderAccountType::BuilderState, compact)]
 struct CompactBuilderState {
 	value: u8,
@@ -255,6 +255,11 @@ fn close_account_builders_transfer_lamports_and_optionally_clear_data() {
 fn realloc_builders_are_exported() {
 	assert!(size_of::<ReallocAccount<'static, 'static, 'static>>() > 0);
 	assert!(size_of::<ReallocAccountZeroed<'static, 'static, 'static>>() > 0);
+}
+
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+#[test]
+fn compact_resize_builders_are_exported() {
 	assert!(size_of::<ReallocCompactAccount<'static, 'static, 'static>>() > 0);
 	assert!(size_of::<CreateCompactProgramAccount<'static, 'static, 'static, 'static>>() > 0);
 	assert!(
@@ -262,7 +267,7 @@ fn realloc_builders_are_exported() {
 	);
 }
 
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 #[test]
 fn compact_creation_rejects_invalid_sizes_before_cpi() {
 	let owner = Address::new_from_array([5u8; 32]);
@@ -298,7 +303,7 @@ fn compact_creation_rejects_invalid_sizes_before_cpi() {
 	assert_eq!(explicit, Err(ProgramError::InvalidAccountData));
 }
 
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 #[test]
 fn canonical_compact_creation_rejects_seed_lists_that_cannot_form_a_pda() {
 	let owner = Address::new_from_array([5u8; 32]);
@@ -321,7 +326,7 @@ fn canonical_compact_creation_rejects_seed_lists_that_cannot_form_a_pda() {
 	assert_eq!(result, Err(ProgramError::InvalidSeeds));
 }
 
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 #[test]
 fn compact_creation_accepts_a_valid_header_before_rent_lookup() {
 	let owner = Address::new_from_array([5u8; 32]);
@@ -346,7 +351,7 @@ fn compact_creation_accepts_a_valid_header_before_rent_lookup() {
 	assert_eq!(result, Err(ProgramError::UnsupportedSysvar));
 }
 
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 #[test]
 fn compact_realloc_validates_current_data_and_target_size() {
 	let owner = Address::new_from_array([9u8; 32]);
@@ -400,7 +405,7 @@ fn compact_realloc_validates_current_data_and_target_size() {
 	assert_eq!(invalid_data, Err(ProgramError::InvalidAccountData));
 }
 
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 #[test]
 fn compact_realloc_rejects_shrinking_below_the_active_tail() {
 	const ACTIVE_SIZE: usize = CompactBuilderState::HEADER_SIZE + size_of::<pina::PodU64>();

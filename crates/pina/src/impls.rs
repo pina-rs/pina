@@ -7,13 +7,16 @@ use crate::AccountValidation;
 use crate::AccountView;
 use crate::Address;
 use crate::AsAccount;
+#[cfg(feature = "compact")]
 use crate::AsCompactAccount;
 #[cfg(feature = "token")]
 use crate::AsTokenAccount;
 use crate::CloseAccountWithRecipient;
+#[cfg(feature = "compact")]
 use crate::CompactAccountInfoValidation;
 use crate::LamportTransfer;
 use crate::PinaAccount;
+#[cfg(feature = "compact")]
 use crate::PinaCompactAccount;
 use crate::ProgramError;
 use crate::Ref;
@@ -152,6 +155,7 @@ fn validate_type<T: PinaAccount>(account: AccountView, program_id: &Address) -> 
 }
 
 #[track_caller]
+#[cfg(feature = "compact")]
 fn validate_compact_type<T: PinaCompactAccount>(
 	account: AccountView,
 	program_id: &Address,
@@ -501,6 +505,7 @@ macro_rules! impl_account_info_validation {
 			}
 		}
 
+		#[cfg(feature = "compact")]
 		impl<'a> CompactAccountInfoValidation for $type {
 			#[track_caller]
 			fn assert_compact_type<T: PinaCompactAccount>(
@@ -544,6 +549,7 @@ impl AsAccount for AccountView {
 	}
 }
 
+#[cfg(feature = "compact")]
 impl AsCompactAccount for AccountView {
 	#[track_caller]
 	fn with_compact_account<T, R>(

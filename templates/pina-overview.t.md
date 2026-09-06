@@ -1,22 +1,24 @@
 <!-- {@pinaFeatureFlags} -->
 
-| Feature          | Default | Description                                                |
-| ---------------- | ------- | ---------------------------------------------------------- |
-| `derive`         | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.) |
-| `logs`           | Yes     | Enables on-chain logging via `solana-program-log`          |
-| `token`          | No      | Enables SPL token / token-2022 helpers and ATA utilities   |
-| `memo`           | No      | Enables memo program helpers via `pina::memo`              |
-| `account-resize` | No      | Enables raw and typed compact-account realloc helpers      |
+| Feature          | Default | Description                                                  |
+| ---------------- | ------- | ------------------------------------------------------------ |
+| `derive`         | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.)   |
+| `logs`           | Yes     | Enables on-chain logging via `solana-program-log`            |
+| `compact`        | No      | Enables compact schemas, checked loaders, and typed APIs     |
+| `token`          | No      | Enables SPL token / token-2022 helpers and ATA utilities     |
+| `memo`           | No      | Enables memo program helpers via `pina::memo`                |
+| `account-resize` | No      | Enables raw account reallocation and safe Pinocchio resizing |
 
 <!-- {/pinaFeatureFlags} -->
 
 <!-- {@pinaFeatureSelectionTips} -->
 
 - `derive` is the normal choice for program crates; disable it only when you want the low-level runtime traits without the proc macros.
+- `compact` enables `#[account(compact)]`, `PinaCompactAccount`, compact account validation/loaders, and `pina::Vec`; it also enables `derive`.
 - `logs` is useful during **initial development and debugging**, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
 - `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
 - `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.
-- `account-resize` enables `ReallocAccount`, `ReallocAccountZeroed`, and `ReallocCompactAccount`. Compact creation builders also require it. Close helpers still do not implicitly resize or zero account data.
+- `account-resize` enables `ReallocAccount` and `ReallocAccountZeroed`. Enable it together with `compact` for `ReallocCompactAccount` and the compact creation builders. Close helpers still do not implicitly resize or zero account data.
 
 <!-- {/pinaFeatureSelectionTips} -->
 

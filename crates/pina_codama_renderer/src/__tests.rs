@@ -105,7 +105,10 @@ fn renders_counter_account_with_pod_types() {
 fn renders_compact_account_fixture_with_dynamic_helpers() {
 	let crate_dir = render_fixture_program("compact_accounts", "pina-codama-render-compact");
 	let content = read_generated_file(&crate_dir, "accounts/journal.rs");
+	let manifest = fs::read_to_string(crate_dir.join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("read compact client manifest: {error}"));
 
+	assert!(manifest.contains("pina = { workspace = true, features = [\"compact\"] }"));
 	assert!(content.contains("#[pinapod(compact)]"));
 	assert!(content.contains("pub entries: pina::Vec<u64, 8>"));
 	assert!(content.contains("pub markers: pina::PodVec<<u8 as pina::ZcField>::Pod, 8, 8>"));

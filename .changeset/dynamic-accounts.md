@@ -9,6 +9,13 @@ pina_macros: feat
 
 Adds checked dynamic account loaders and typed rent-adjusting builders, updates the realloc example, and covers the lifecycle in unit, SBF, generated-client, and Surfpool tests. This is a major release for `pina` so downstream programs can adopt the expanded account-layout contract explicitly.
 
+Compact mode is disabled by default. Enable `compact` for compact schemas and loaders, and combine it with `account-resize` for the typed creation and rent-adjusting reallocation builders:
+
+```toml
+[dependencies]
+pina = { version = "0.13", features = ["compact", "account-resize"] }
+```
+
 Compact mode uses a fixed header and a suffix of bounded vectors. Each vector length lives in the header and only active elements occupy account bytes:
 
 ```rust

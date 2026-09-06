@@ -81,6 +81,7 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 /// companion, and generates checked `initialize` and `try_from_bytes`
 /// helpers. Add `compact` to permit a suffix of bounded `Vec<T, N>` fields whose
 /// active elements, rather than their full capacities, occupy account data.
+/// Compact accounts require the `compact` crate feature.
 ///
 /// # Example
 ///

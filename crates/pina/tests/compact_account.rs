@@ -1,3 +1,4 @@
+#![cfg(feature = "compact")]
 #![allow(unsafe_code)]
 
 use core::mem::size_of;

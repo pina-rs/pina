@@ -27,13 +27,13 @@ use pinocchio_system::instructions::Transfer as SystemTransfer;
 
 use crate::AccountInfoValidation;
 use crate::CloseAccountWithRecipient;
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 use crate::CompactAccountInfoValidation;
 #[cfg(feature = "account-resize")]
 use crate::LamportTransfer;
 use crate::MAX_SEEDS;
 use crate::PinaAccount;
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 use crate::PinaCompactAccount;
 use crate::ProgramResult;
 
@@ -331,7 +331,7 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 }
 
 /// Creates and initializes a variable-length PDA-backed account.
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 #[must_use = "account creation has no effect until invoke or invoke_signed is called"]
 pub struct CreateCompactProgramAccount<'account, 'address, 'seeds, 'seed> {
 	/// PDA account to allocate and initialize.
@@ -346,7 +346,7 @@ pub struct CreateCompactProgramAccount<'account, 'address, 'seeds, 'seed> {
 	pub space: usize,
 }
 
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 impl CreateCompactProgramAccount<'_, '_, '_, '_> {
 	/// Creates the compact account using its canonical PDA bump.
 	pub fn invoke<T: PinaCompactAccount>(&mut self) -> Result<(Address, u8), ProgramError> {
@@ -394,7 +394,7 @@ impl CreateCompactProgramAccount<'_, '_, '_, '_> {
 }
 
 /// Creates a variable-length PDA-backed account using an explicit bump.
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 #[must_use = "account creation has no effect until invoke or invoke_signed is called"]
 pub struct CreateCompactProgramAccountWithBump<'account, 'address, 'seeds, 'seed> {
 	/// PDA account to allocate and initialize.
@@ -411,7 +411,7 @@ pub struct CreateCompactProgramAccountWithBump<'account, 'address, 'seeds, 'seed
 	pub space: usize,
 }
 
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 impl CreateCompactProgramAccountWithBump<'_, '_, '_, '_> {
 	/// Creates and initializes the compact account.
 	pub fn invoke<T: PinaCompactAccount>(&mut self) -> ProgramResult {
@@ -979,7 +979,7 @@ impl ReallocAccountZeroed<'_, '_, '_> {
 /// current compact layout and constrains the target length to its declared
 /// header and capacity bounds. Shrinking also validates the retained byte
 /// slice, preventing active tail data from being truncated.
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 #[must_use = "account reallocation has no effect until invoke or invoke_signed is called"]
 pub struct ReallocCompactAccount<'account, 'payer, 'address> {
 	/// Program-owned compact account to resize.
@@ -992,7 +992,7 @@ pub struct ReallocCompactAccount<'account, 'payer, 'address> {
 	pub program_id: &'address Address,
 }
 
-#[cfg(feature = "account-resize")]
+#[cfg(all(feature = "account-resize", feature = "compact"))]
 impl ReallocCompactAccount<'_, '_, '_> {
 	/// Validates and resizes the compact account.
 	pub fn invoke<T: PinaCompactAccount>(&mut self) -> ProgramResult {
@@ -1456,14 +1456,14 @@ mod tests {
 	use crate::ZeroPodFixed;
 	use crate::ZeroPodSchema;
 
-	#[cfg(all(feature = "account-resize", feature = "derive"))]
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
 	mod compact_cpi_state {
 		include!(concat!(
 			env!("CARGO_MANIFEST_DIR"),
 			"/tests/support/compact_cpi_state.rs"
 		));
 	}
-	#[cfg(all(feature = "account-resize", feature = "derive"))]
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
 	use compact_cpi_state::TestCompactState;
 
 	struct TestState;
@@ -1623,7 +1623,7 @@ mod tests {
 		assert_eq!(result, (address, bump));
 	}
 
-	#[cfg(all(feature = "account-resize", feature = "derive"))]
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
 	#[test]
 	fn compact_pda_builder_executes_with_calculated_rent() {
 		let owner = Address::new_from_array([9; 32]);

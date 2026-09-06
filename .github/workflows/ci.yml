@@ -213,6 +213,14 @@ jobs:
             build_task: build:pina:token-only
             test_task: test:pina:token-only
             doc_task: ""
+          - label: compact-only
+            build_task: build:pina:compact-only
+            test_task: test:pina:compact-only
+            doc_task: doc:pina:compact-only
+          - label: account-resize-only
+            build_task: build:pina:account-resize-only
+            test_task: test:pina:account-resize-only
+            doc_task: ""
           - label: all-features
             build_task: build:pina:all-features
             test_task: test:pina:all-features

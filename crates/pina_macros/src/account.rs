@@ -53,6 +53,14 @@ pub(crate) fn expand(
 			Err(e) => return e.to_compile_error(),
 		};
 	let compact = compact.is_present();
+	#[cfg(not(feature = "compact"))]
+	if compact {
+		return syn::Error::new_spanned(
+			&item_struct.ident,
+			"compact account support requires enabling the `compact` feature",
+		)
+		.to_compile_error();
+	}
 	let (schema_proofs, compact_schema) = if compact {
 		match schema::validate_compact_schema(
 			&item_struct,
@@ -267,5 +275,27 @@ fn generate_compact_view_helpers(
 			<Self as #crate_path::HasDiscriminator>::write_discriminator(data);
 			#mut_name::new(data).map_err(|_| #error)
 		}
+	}
+}
+
+#[cfg(all(test, not(feature = "compact")))]
+mod tests {
+	use quote::quote;
+
+	#[test]
+	fn compact_accounts_require_the_feature() {
+		let expanded = super::expand(
+			quote!(discriminator = AccountType::State, compact),
+			quote! {
+				struct State {
+					values: pina::Vec<u64, 4>,
+				}
+			},
+		)
+		.to_string();
+
+		assert!(
+			expanded.contains("compact account support requires enabling the `compact` feature")
+		);
 	}
 }

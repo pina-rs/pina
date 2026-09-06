@@ -25,7 +25,7 @@ pub(crate) struct AccountArgs {
 	pub(crate) discriminator: Path,
 	/// Set the variant of the discriminator enum.
 	pub(crate) variant: Option<Ident>,
-	/// Use zeropod's compact, variable-length account layout.
+	/// Use Pinapod's compact, variable-length layout when the feature is enabled.
 	#[darling(default)]
 	pub(crate) compact: Flag,
 }

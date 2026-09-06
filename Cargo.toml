@@ -135,8 +135,8 @@ publish = false
 description = "Internal cross-crate test harness for the Pina workspace; never published."
 
 [dependencies]
-pina = { workspace = true, features = ["derive"] }
-pina_macros = { workspace = true }
+pina = { workspace = true, features = ["compact", "derive"] }
+pina_macros = { workspace = true, features = ["compact"] }
 
 [dev-dependencies]
 insta = { workspace = true }

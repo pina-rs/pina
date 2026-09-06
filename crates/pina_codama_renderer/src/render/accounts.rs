@@ -14,6 +14,15 @@ use super::types::render_type_for_compact_tail;
 use super::types::render_type_for_pod;
 use crate::error::Result;
 
+pub(crate) fn is_compact_account(account: &AccountNode) -> bool {
+	account
+		.data
+		.get_nested_type_node()
+		.fields
+		.iter()
+		.any(|field| is_compact_tail(&field.r#type))
+}
+
 pub(crate) fn render_accounts_mod(accounts: &[AccountNode]) -> String {
 	let mut lines = Vec::new();
 
@@ -52,7 +61,7 @@ pub(crate) fn render_account_page(
 		.fields
 		.iter()
 		.position(|field| is_compact_tail(&field.r#type));
-	let compact_account = first_compact_tail.is_some();
+	let compact_account = is_compact_account(account);
 	let mut field_lines = Vec::new();
 	for doc_line in render_docs(&account.docs, 0) {
 		field_lines.push(doc_line);

@@ -296,6 +296,22 @@ in
       description = "Verify `pina` builds with only the `token` feature enabled.";
       binary = "bash";
     };
+    "build:pina:compact-only" = {
+      exec = ''
+        set -euo pipefail
+        cargo check -p pina --no-default-features --features compact --locked
+      '';
+      description = "Verify `pina` builds with only the `compact` feature enabled.";
+      binary = "bash";
+    };
+    "build:pina:account-resize-only" = {
+      exec = ''
+        set -euo pipefail
+        cargo check -p pina --no-default-features --features account-resize --locked
+      '';
+      description = "Verify raw account resizing does not enable compact mode.";
+      binary = "bash";
+    };
     "build:pina:all-features" = {
       exec = ''
         set -euo pipefail
@@ -309,6 +325,8 @@ in
         set -euo pipefail
         build:pina:no-default-only
         cargo check -p pina --no-default-features --features derive --locked
+        build:pina:compact-only
+        build:pina:account-resize-only
         build:pina:token-only
         cargo check -p pina --no-default-features --features token,derive --locked
       '';
@@ -320,6 +338,8 @@ in
         set -euo pipefail
         build:pina:default
         build:pina:no-default-only
+        build:pina:compact-only
+        build:pina:account-resize-only
         build:pina:token-only
         build:pina:all-features
       '';
@@ -466,6 +486,23 @@ in
       description = "Run `pina` library tests with only the `token` feature enabled.";
       binary = "bash";
     };
+    "test:pina:compact-only" = {
+      exec = ''
+        set -euo pipefail
+        cargo test -p pina --no-default-features --features compact --lib --test compact_account --test cpi_ui --locked
+      '';
+      description = "Run compact schema and loader tests without unrelated optional features.";
+      binary = "bash";
+    };
+    "test:pina:account-resize-only" = {
+      exec = ''
+        set -euo pipefail
+        cargo test -p pina --no-default-features --features account-resize,derive --lib --test cpi_helpers --locked
+        cargo test -p pina_macros --no-default-features --lib --locked
+      '';
+      description = "Test raw resizing with compact mode disabled, including the macro feature diagnostic.";
+      binary = "bash";
+    };
     "test:pina:all-features" = {
       exec = ''
         set -euo pipefail
@@ -482,12 +519,23 @@ in
       description = "Build `pina` docs without default features to catch hidden default-feature coupling.";
       binary = "bash";
     };
+    "doc:pina:compact-only" = {
+      exec = ''
+        set -euo pipefail
+        cargo doc -p pina --no-default-features --features compact --no-deps --locked
+      '';
+      description = "Build `pina` docs with only compact mode enabled.";
+      binary = "bash";
+    };
     "test:pina:feature-matrix" = {
       exec = ''
         set -euo pipefail
         test:pina:default
         test:pina:no-default
         doc:pina:no-default
+        test:pina:compact-only
+        doc:pina:compact-only
+        test:pina:account-resize-only
         test:pina:token-only
         test:pina:all-features
       '';
