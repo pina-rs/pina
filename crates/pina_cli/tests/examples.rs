@@ -112,7 +112,7 @@ fn every_example_is_a_complete_pina_project() {
 	for example in EXAMPLES {
 		let root = examples_dir.join(example);
 		let project = Project::discover(&root)
-			.unwrap_or_else(|error| panic!("discover {example} through Pina.toml: {error}"));
+			.unwrap_or_else(|error| panic!("discover {example} through pina.toml: {error}"));
 
 		assert_eq!(
 			project.root,
