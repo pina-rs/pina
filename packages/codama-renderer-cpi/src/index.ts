@@ -9,6 +9,10 @@ const MAX_OUTPUT_BYTES = 16 * 1024;
 export interface RenderOptions {
 	/** Override the Pina command and any arguments placed before `cpi`. */
 	pinaCommand?: readonly [string, ...string[]];
+	/** Control whether the destination is created, updated, or replaced. */
+	mode?: "auto" | "create" | "update" | "overwrite";
+	/** Create Cargo.toml and src/lib.rs when they are missing. */
+	scaffold?: boolean;
 }
 
 /** Creates a Codama visitor that renders a standalone, `no_std` Pina CPI crate. */
@@ -28,9 +32,21 @@ export function renderRoot(
 	options: RenderOptions = {},
 ): void {
 	const [command, ...prefixArgs] = options.pinaCommand ?? defaultPinaCommand();
+	const args = [
+		...prefixArgs,
+		"cpi",
+		"--stdin",
+		"--output",
+		outputDir,
+		"--mode",
+		options.mode ?? "auto",
+	];
+	if (options.scaffold === false) {
+		args.push("--no-scaffold");
+	}
 	const result = spawnSync(
 		command,
-		[...prefixArgs, "cpi", "--stdin", "--output", outputDir],
+		args,
 		{
 			encoding: "utf8",
 			input: JSON.stringify(root),

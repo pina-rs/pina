@@ -10,6 +10,7 @@ use cargo_metadata::Metadata;
 use cargo_metadata::MetadataCommand;
 use cargo_metadata::Package;
 use cargo_metadata::TargetKind;
+use clap::ValueEnum;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -47,6 +48,46 @@ impl ClientLanguage {
 	}
 }
 
+/// How Pina publishes a generated client into its destination.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum GenerationMode {
+	/// Create clients in empty destinations and update clients in existing ones.
+	#[default]
+	Auto,
+	/// Require an empty or nonexistent destination.
+	Create,
+	/// Require an existing, nonempty destination and preserve its scaffold.
+	Update,
+	/// Remove the complete destination before generating it again.
+	Overwrite,
+}
+
+impl GenerationMode {
+	/// Return the stable command-line and configuration spelling.
+	#[must_use]
+	pub const fn as_str(self) -> &'static str {
+		match self {
+			Self::Auto => "auto",
+			Self::Create => "create",
+			Self::Update => "update",
+			Self::Overwrite => "overwrite",
+		}
+	}
+}
+
+/// Resolved generation settings for one client ecosystem.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientGenerationConfig {
+	/// Output path relative to the shared `clients.output` directory.
+	pub output: PathBuf,
+	/// Destination lifecycle policy.
+	pub mode: GenerationMode,
+	/// Whether initial generation may create package scaffold files.
+	pub scaffold: bool,
+}
+
 /// Resolved paths and package metadata for one Pina program.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -60,6 +101,7 @@ pub struct Project {
 	pub idl_dir: PathBuf,
 	pub clients_dir: PathBuf,
 	pub clients: Vec<ClientLanguage>,
+	pub client_generation: BTreeMap<ClientLanguage, ClientGenerationConfig>,
 	#[serde(skip)]
 	pub lint_levels: BTreeMap<String, LintLevel>,
 }
@@ -103,6 +145,12 @@ impl Default for ProgramConfig {
 struct ClientsConfig {
 	output: PathBuf,
 	languages: Vec<ClientLanguage>,
+	mode: GenerationMode,
+	scaffold: bool,
+	cpi: ClientGenerationOverride,
+	rust: ClientGenerationOverride,
+	typescript: ClientGenerationOverride,
+	dart: ClientGenerationOverride,
 }
 
 impl Default for ClientsConfig {
@@ -110,7 +158,67 @@ impl Default for ClientsConfig {
 		Self {
 			output: PathBuf::from("clients"),
 			languages: vec![ClientLanguage::Rust, ClientLanguage::Typescript],
+			mode: GenerationMode::Auto,
+			scaffold: true,
+			cpi: ClientGenerationOverride::default(),
+			rust: ClientGenerationOverride::default(),
+			typescript: ClientGenerationOverride::default(),
+			dart: ClientGenerationOverride::default(),
 		}
+	}
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+struct ClientGenerationOverride {
+	output: Option<PathBuf>,
+	mode: Option<GenerationMode>,
+	scaffold: Option<bool>,
+}
+
+impl ClientsConfig {
+	fn generation_for(&self, language: ClientLanguage) -> ClientGenerationConfig {
+		let overrides = match language {
+			ClientLanguage::Cpi => &self.cpi,
+			ClientLanguage::Rust => &self.rust,
+			ClientLanguage::Typescript => &self.typescript,
+			ClientLanguage::Dart => &self.dart,
+		};
+
+		ClientGenerationConfig {
+			output: overrides
+				.output
+				.clone()
+				.unwrap_or_else(|| PathBuf::from(language.as_str())),
+			mode: overrides.mode.unwrap_or(self.mode),
+			scaffold: overrides.scaffold.unwrap_or(self.scaffold),
+		}
+	}
+
+	fn resolved_generation(
+		&self,
+		clients_dir: &Path,
+	) -> Result<BTreeMap<ClientLanguage, ClientGenerationConfig>, ProjectError> {
+		let mut resolved = BTreeMap::new();
+
+		for language in [
+			ClientLanguage::Cpi,
+			ClientLanguage::Rust,
+			ClientLanguage::Typescript,
+			ClientLanguage::Dart,
+		] {
+			let generation = self.generation_for(language);
+			let field = match language {
+				ClientLanguage::Cpi => "clients.cpi.output",
+				ClientLanguage::Rust => "clients.rust.output",
+				ClientLanguage::Typescript => "clients.typescript.output",
+				ClientLanguage::Dart => "clients.dart.output",
+			};
+			resolve_output_config_path(clients_dir, field, &generation.output)?;
+			resolved.insert(language, generation);
+		}
+
+		Ok(resolved)
 	}
 }
 
@@ -253,6 +361,7 @@ impl Project {
 			.unwrap_or_else(|| target_dir.join("idl"));
 		let clients_dir =
 			resolve_output_config_path(&root, "clients.output", &config.clients.output)?;
+		let client_generation = config.clients.resolved_generation(&clients_dir)?;
 		let lint_levels = resolve_lint_levels(config.lints.0)?;
 
 		Ok(Self {
@@ -264,6 +373,7 @@ impl Project {
 			target_dir,
 			clients_dir,
 			clients: config.clients.languages,
+			client_generation,
 			lint_levels,
 			root,
 		})
@@ -314,6 +424,9 @@ impl Project {
 		let (library_name, library_source) = library_details(package)?;
 		let root = program_dir.to_path_buf();
 		let target_dir = metadata.target_directory.as_std_path().to_path_buf();
+		let clients_dir = root.join("clients");
+		let clients_config = ClientsConfig::default();
+		let client_generation = clients_config.resolved_generation(&clients_dir)?;
 
 		Ok(Self {
 			program_dir: root.clone(),
@@ -322,8 +435,9 @@ impl Project {
 			library_source,
 			idl_dir: target_dir.join("idl"),
 			target_dir,
-			clients_dir: root.join("clients"),
-			clients: ClientsConfig::default().languages,
+			clients_dir,
+			clients: clients_config.languages,
+			client_generation,
 			lint_levels: BTreeMap::new(),
 			root,
 		})
@@ -595,6 +709,14 @@ crate-type = ["cdylib", "lib"]
 			project.clients,
 			vec![ClientLanguage::Rust, ClientLanguage::Typescript]
 		);
+		assert_eq!(
+			project.client_generation[&ClientLanguage::Rust],
+			ClientGenerationConfig {
+				output: PathBuf::from("rust"),
+				mode: GenerationMode::Auto,
+				scaffold: true,
+			}
+		);
 	}
 
 	#[test]
@@ -628,6 +750,15 @@ idl_dir = "artifacts/idls"
 [clients]
 output = "generated"
 languages = ["rust", "dart"]
+mode = "update"
+scaffold = false
+
+[clients.rust]
+output = "native"
+scaffold = true
+
+[clients.dart]
+mode = "overwrite"
 "#,
 		)
 		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
@@ -648,6 +779,22 @@ languages = ["rust", "dart"]
 		assert_eq!(
 			project.clients,
 			vec![ClientLanguage::Rust, ClientLanguage::Dart]
+		);
+		assert_eq!(
+			project.client_generation[&ClientLanguage::Rust],
+			ClientGenerationConfig {
+				output: PathBuf::from("native"),
+				mode: GenerationMode::Update,
+				scaffold: true,
+			}
+		);
+		assert_eq!(
+			project.client_generation[&ClientLanguage::Dart],
+			ClientGenerationConfig {
+				output: PathBuf::from("dart"),
+				mode: GenerationMode::Overwrite,
+				scaffold: false,
+			}
 		);
 	}
 
@@ -684,6 +831,14 @@ languages = ["rust", "dart"]
 			),
 			("clients.output", "[clients]\noutput = \"/outside\"\n"),
 			("clients.output", "[clients]\noutput = \"../outside\"\n"),
+			(
+				"clients.cpi.output",
+				"[clients.cpi]\noutput = \"/outside\"\n",
+			),
+			(
+				"clients.cpi.output",
+				"[clients.cpi]\noutput = \"../outside\"\n",
+			),
 		];
 
 		for (field, config) in cases {
@@ -921,5 +1076,13 @@ languages = ["rust", "dart"]
 			package_for_manifest(&metadata, &manifest_path, &root),
 			Err(ProjectError::CargoMetadata { .. })
 		));
+	}
+
+	#[test]
+	fn generation_mode_spellings_are_stable() {
+		assert_eq!(GenerationMode::Auto.as_str(), "auto");
+		assert_eq!(GenerationMode::Create.as_str(), "create");
+		assert_eq!(GenerationMode::Update.as_str(), "update");
+		assert_eq!(GenerationMode::Overwrite.as_str(), "overwrite");
 	}
 }

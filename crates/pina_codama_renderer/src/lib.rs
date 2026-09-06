@@ -17,6 +17,8 @@ use render::*;
 pub struct RenderConfig {
 	pub delete_folder_before_rendering: bool,
 	pub generated_folder: PathBuf,
+	pub mode: RenderMode,
+	pub scaffold: bool,
 }
 
 impl Default for RenderConfig {
@@ -24,6 +26,33 @@ impl Default for RenderConfig {
 		Self {
 			delete_folder_before_rendering: true,
 			generated_folder: PathBuf::from("src/generated"),
+			mode: RenderMode::Auto,
+			scaffold: true,
+		}
+	}
+}
+
+/// Controls how a renderer treats the client destination.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, clap::ValueEnum)]
+pub enum RenderMode {
+	/// Create an empty destination or update an existing client.
+	#[default]
+	Auto,
+	/// Require an empty or nonexistent destination.
+	Create,
+	/// Require an existing, nonempty destination.
+	Update,
+	/// Remove the complete destination before rendering.
+	Overwrite,
+}
+
+impl RenderMode {
+	const fn as_str(self) -> &'static str {
+		match self {
+			Self::Auto => "automatically generate",
+			Self::Create => "create",
+			Self::Update => "update",
+			Self::Overwrite => "overwrite",
 		}
 	}
 }
@@ -49,12 +78,20 @@ pub fn render_idl_file(path: &Path, crate_dir: &Path, config: &RenderConfig) -> 
 }
 
 pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig) -> Result<()> {
+	let mode = resolve_render_mode(crate_dir, config.mode)?;
+
+	if mode == RenderMode::Overwrite {
+		remove_crate_dir(crate_dir)?;
+	}
+
 	let generated_dir = validate_generated_dir(crate_dir, &config.generated_folder)?;
 	let files = render_program_to_files(root)?;
 	validate_generated_sources(&files)?;
 	validate_existing_generated_dir(&generated_dir, config.delete_folder_before_rendering)?;
 
-	ensure_crate_scaffold(crate_dir, root.program.name.as_ref())?;
+	if config.scaffold {
+		ensure_crate_scaffold(crate_dir, root.program.name.as_ref())?;
+	}
 
 	if config.delete_folder_before_rendering && generated_dir.exists() {
 		fs::remove_dir_all(&generated_dir).map_err(|source| {
@@ -66,6 +103,97 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 	}
 
 	write_files(&generated_dir, files)
+}
+
+fn resolve_render_mode(crate_dir: &Path, requested: RenderMode) -> Result<RenderMode> {
+	let metadata = match fs::symlink_metadata(crate_dir) {
+		Ok(metadata) => Some(metadata),
+		Err(source) if source.kind() == std::io::ErrorKind::NotFound => None,
+		Err(source) => return Err(read_file_error(crate_dir, source)),
+	};
+	let is_empty = match metadata {
+		None => true,
+		Some(metadata) if metadata.file_type().is_symlink() => {
+			return Err(RenderError::UnsafeOutputPath {
+				path: crate_dir.to_path_buf(),
+				reason: "client destinations cannot be symbolic links".to_string(),
+			});
+		}
+		Some(metadata) if !metadata.is_dir() => {
+			return Err(RenderError::UnsafeOutputPath {
+				path: crate_dir.to_path_buf(),
+				reason: "client destinations must be directories".to_string(),
+			});
+		}
+		Some(_) => {
+			fs::read_dir(crate_dir)
+				.map_err(|source| read_file_error(crate_dir, source))?
+				.next()
+				.transpose()
+				.map_err(|source| read_file_error(crate_dir, source))?
+				.is_none()
+		}
+	};
+
+	match (requested, is_empty) {
+		(RenderMode::Auto, true) => Ok(RenderMode::Create),
+		(RenderMode::Auto, false) => Ok(RenderMode::Update),
+		(RenderMode::Create, false) => {
+			Err(RenderError::InvalidGenerationState {
+				path: crate_dir.to_path_buf(),
+				mode: requested.as_str(),
+				reason: "the destination is not empty",
+			})
+		}
+		(RenderMode::Update, true) => {
+			Err(RenderError::InvalidGenerationState {
+				path: crate_dir.to_path_buf(),
+				mode: requested.as_str(),
+				reason: "the destination is empty or does not exist",
+			})
+		}
+		(mode, _) => Ok(mode),
+	}
+}
+
+fn remove_crate_dir(crate_dir: &Path) -> Result<()> {
+	if !crate_dir.exists() {
+		return Ok(());
+	}
+
+	let absolute =
+		fs::canonicalize(crate_dir).map_err(|source| read_file_error(crate_dir, source))?;
+	let current_dir =
+		std::env::current_dir().map_err(|source| read_file_error(Path::new("."), source))?;
+	let current =
+		fs::canonicalize(&current_dir).map_err(|source| read_file_error(&current_dir, source))?;
+
+	if absolute.parent().is_none()
+		|| current.starts_with(&absolute)
+		|| absolute.join(".git").exists()
+	{
+		return Err(RenderError::UnsafeOutputPath {
+			path: absolute,
+			reason: "refusing to overwrite a filesystem root or working tree".to_string(),
+		});
+	}
+
+	validate_tree_has_no_symlinks(crate_dir)?;
+	fs::remove_dir_all(crate_dir).map_err(|source| write_file_error(crate_dir, source))
+}
+
+fn read_file_error(path: &Path, source: std::io::Error) -> RenderError {
+	RenderError::ReadFile {
+		path: path.to_path_buf(),
+		source,
+	}
+}
+
+pub(crate) fn write_file_error(path: &Path, source: std::io::Error) -> RenderError {
+	RenderError::WriteFile {
+		path: path.to_path_buf(),
+		source,
+	}
 }
 
 pub fn render_program(

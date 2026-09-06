@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use pina_codama_renderer::RenderConfig;
 use pina_codama_renderer::RenderError;
+use pina_codama_renderer::RenderMode;
 use pina_codama_renderer::read_root_node;
 use pina_codama_renderer::render_root_node;
 
@@ -24,6 +25,24 @@ struct Args {
 	/// Root output directory where `<program>/src/generated` will be written.
 	#[arg(long)]
 	output: PathBuf,
+
+	/// How to handle existing client crate destinations.
+	#[arg(long, value_enum, default_value = "auto", value_name = "MODE")]
+	mode: RenderMode,
+
+	/// Generate only src/generated without Cargo.toml or src/lib.rs.
+	#[arg(long)]
+	no_scaffold: bool,
+}
+
+impl Args {
+	fn render_config(&self) -> RenderConfig {
+		RenderConfig {
+			mode: self.mode,
+			scaffold: !self.no_scaffold,
+			..RenderConfig::default()
+		}
+	}
 }
 
 fn main() {
@@ -35,8 +54,12 @@ fn main() {
 
 fn run() -> Result<(), RenderError> {
 	let args = Args::parse();
-	let idl_paths = collect_idl_paths(&args)?;
-	let config = RenderConfig::default();
+	run_with_args(&args)
+}
+
+fn run_with_args(args: &Args) -> Result<(), RenderError> {
+	let idl_paths = collect_idl_paths(args)?;
+	let config = args.render_config();
 
 	for idl_path in &idl_paths {
 		let root = read_root_node(idl_path)?;
@@ -113,6 +136,9 @@ fn file_stem(path: &Path) -> Result<String, RenderError> {
 mod tests {
 	use std::path::Path;
 
+	use clap::Parser;
+
+	use super::Args;
 	use super::file_stem;
 
 	#[test]
@@ -121,5 +147,24 @@ mod tests {
 			.err()
 			.unwrap_or_else(|| panic!("expected parent-directory stem to be rejected"));
 		assert!(error.to_string().contains("child output directory"));
+	}
+
+	#[test]
+	fn cli_generation_options_create_the_renderer_config() {
+		let args = Args::try_parse_from([
+			"pina_codama_renderer",
+			"--idl",
+			"program.json",
+			"--output",
+			"clients",
+			"--mode",
+			"overwrite",
+			"--no-scaffold",
+		])
+		.unwrap_or_else(|error| panic!("arguments should parse: {error}"));
+		let config = args.render_config();
+
+		assert_eq!(config.mode, pina_codama_renderer::RenderMode::Overwrite);
+		assert!(!config.scaffold);
 	}
 }

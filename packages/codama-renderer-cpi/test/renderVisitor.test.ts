@@ -42,7 +42,14 @@ describe("renderVisitor", () => {
 			let input = "";
 			for await (const chunk of process.stdin) input += chunk;
 			const args = process.argv.slice(2);
-			if (args[0] !== "cpi" || args[1] !== "--stdin" || args[2] !== "--output") process.exit(9);
+			if (
+				args[0] !== "cpi" ||
+				args[1] !== "--stdin" ||
+				args[2] !== "--output" ||
+				args[4] !== "--mode" ||
+				args[5] !== "overwrite" ||
+				args[6] !== "--no-scaffold"
+			) process.exit(9);
 			mkdirSync(args[3], { recursive: true });
 			writeFileSync(join(args[3], "root.json"), input);
 		`);
@@ -50,7 +57,9 @@ describe("renderVisitor", () => {
 		visit(
 			root,
 			renderVisitor(output, {
+				mode: "overwrite",
 				pinaCommand: [process.execPath, script],
+				scaffold: false,
 			}),
 		);
 

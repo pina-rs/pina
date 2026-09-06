@@ -21,8 +21,11 @@ Codama Rust renderer that generates Pina-style validated zeropod models and disc
 ```bash
 cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
   --idl ./idls/my_program.json \
-  --output ./clients/rust
+  --output ./clients/rust \
+  --mode auto
 ```
+
+`auto` creates an empty destination and otherwise updates only `src/generated`, preserving an existing `Cargo.toml` and `src/lib.rs`. Use `--mode create` or `--mode update` to require that lifecycle state, `--mode overwrite` for a complete clean regeneration, and `--no-scaffold` to emit generated sources without package files.
 
 ## What It Generates
 

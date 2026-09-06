@@ -7,6 +7,7 @@ use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
 use clap_complete::Shell;
+use pina_cli::GenerationMode;
 
 /// Build, inspect, and generate artifacts for Pina Solana programs.
 #[derive(Parser, Debug)]
@@ -137,8 +138,10 @@ pub(crate) enum Commands {
 	#[command(
 		after_help = "Examples:\n  pina generate\n  pina generate --client rust\n  pina generate \
 		              --client typescript --client dart\n  pina generate --project \
-		              ./programs/counter --output ./generated\n\nConfiguration:\n  [clients]\n  \
-		              output = \"clients\"\n  languages = [\"cpi\", \"rust\", \"typescript\"]"
+		              ./programs/counter --output ./generated\n  pina generate --mode update \
+		              --no-scaffold\n\nConfiguration:\n  [clients]\n  output = \"clients\"\n  \
+		              languages = [\"cpi\", \"rust\", \"typescript\"]\n  mode = \"auto\"\n  \
+		              scaffold = true\n\n  [clients.cpi]\n  output = \"onchain/cpi\""
 	)]
 	Generate {
 		/// Directory inside the project to discover. Defaults to the current directory.
@@ -158,6 +161,14 @@ pub(crate) enum Commands {
 		/// Override the configured client output directory.
 		#[arg(short, long, value_name = "DIR")]
 		output: Option<PathBuf>,
+
+		/// Override how existing client destinations are handled.
+		#[arg(long, value_enum, value_name = "MODE")]
+		mode: Option<GenerationMode>,
+
+		/// Generate source files without package manifests or crate entrypoints.
+		#[arg(long)]
+		no_scaffold: bool,
 
 		/// Executable used to invoke JavaScript or Dart renderers. Defaults to npx.
 		#[arg(
@@ -194,6 +205,14 @@ pub(crate) enum Commands {
 		/// Directory to create as the standalone CPI crate.
 		#[arg(short, long, value_name = "DIR")]
 		output: PathBuf,
+
+		/// How to handle an existing output directory.
+		#[arg(long, value_enum, default_value = "auto", value_name = "MODE")]
+		mode: GenerationMode,
+
+		/// Generate source files without Cargo.toml or src/lib.rs.
+		#[arg(long)]
+		no_scaffold: bool,
 
 		/// Executable used to normalize Anchor IDLs. Defaults to npx.
 		#[arg(

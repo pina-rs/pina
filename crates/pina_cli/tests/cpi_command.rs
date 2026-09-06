@@ -82,6 +82,53 @@ fn cpi_command_accepts_a_codama_pipeline_on_standard_input() {
 	assert!(output_dir.join("src/generated/mod.rs").is_file());
 }
 
+#[test]
+fn cpi_command_exposes_source_only_and_destination_modes() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
+	let output_dir = temp.path().join("vesting-cpi");
+	let command = |mode: &str| {
+		Command::new(env!("CARGO_BIN_EXE_pina"))
+			.args(["cpi", "--idl"])
+			.arg(fixture_path())
+			.args(["--output"])
+			.arg(&output_dir)
+			.args(["--mode", mode, "--no-scaffold"])
+			.output()
+			.unwrap_or_else(|error| panic!("CPI command failed to launch: {error}"))
+	};
+
+	let create = command("create");
+	assert!(
+		create.status.success(),
+		"create failed: {}",
+		String::from_utf8_lossy(&create.stderr)
+	);
+	assert!(output_dir.join("src/generated/mod.rs").is_file());
+	assert!(!output_dir.join("Cargo.toml").exists());
+	assert!(!output_dir.join("src/lib.rs").exists());
+
+	let duplicate = command("create");
+	assert!(!duplicate.status.success());
+	assert!(String::from_utf8_lossy(&duplicate.stderr).contains("destination is not empty"));
+
+	let update = command("update");
+	assert!(
+		update.status.success(),
+		"update failed: {}",
+		String::from_utf8_lossy(&update.stderr)
+	);
+	fs::write(output_dir.join("remove.txt"), "remove")
+		.unwrap_or_else(|error| panic!("sentinel write failed: {error}"));
+
+	let overwrite = command("overwrite");
+	assert!(
+		overwrite.status.success(),
+		"overwrite failed: {}",
+		String::from_utf8_lossy(&overwrite.stderr)
+	);
+	assert!(!output_dir.join("remove.txt").exists());
+}
+
 #[cfg(unix)]
 #[test]
 fn cpi_command_converts_a_raw_anchor_idl_and_compiles_the_crate() {

@@ -23,6 +23,12 @@ pub enum RenderError {
 	},
 	#[error("unsafe generated output path `{path}`: {reason}")]
 	UnsafeOutputPath { path: PathBuf, reason: String },
+	#[error("cannot {mode} generated client at `{path}`: {reason}")]
+	InvalidGenerationState {
+		path: PathBuf,
+		mode: &'static str,
+		reason: &'static str,
+	},
 	#[error("generated Rust source `{path}` is invalid: {reason}")]
 	InvalidGeneratedSource { path: PathBuf, reason: String },
 	#[error("unsupported type `{kind}` at `{context}`: {reason}")]

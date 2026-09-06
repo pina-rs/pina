@@ -110,6 +110,13 @@ pub enum CodamaError {
 	#[error("Refusing unsafe generated-client output path {path}: {reason}")]
 	UnsafeOutput { path: PathBuf, reason: String },
 
+	#[error("Cannot {mode} generated client at {path}: {reason}")]
+	InvalidGenerationState {
+		path: PathBuf,
+		mode: &'static str,
+		reason: &'static str,
+	},
+
 	#[error("IDL generation failed for `{example}` ({path}): {source}")]
 	GenerateIdl {
 		example: String,

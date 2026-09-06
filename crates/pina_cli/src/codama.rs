@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::path::Path;
@@ -8,8 +9,10 @@ use std::process::Stdio;
 
 use atomic_write_file::AtomicWriteFile;
 use pina_codama_renderer::RenderConfig;
+use pina_codama_renderer::RenderMode as RustRenderMode;
 use pina_codama_renderer::render_idl_file;
 use pina_cpi_renderer::RenderConfig as CpiRenderConfig;
+use pina_cpi_renderer::RenderMode as CpiRenderMode;
 use pina_cpi_renderer::render_idl_file as render_cpi_idl_file;
 
 use crate::dart_client::validate_dart_client_idls;
@@ -18,43 +21,166 @@ use crate::error::CodamaError;
 use crate::generate_idl;
 use crate::js_client::harden_generated_clients;
 use crate::project::ClientLanguage;
+use crate::project::GenerationMode;
 use crate::project::Project;
 
 const CLIENT_RENDER_SCRIPT: &str = r#"
 import { createFromJson, visit } from "codama";
-import { readFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import {
+	cpSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	renameSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, join } from "node:path";
 
-const [renderer, outputRoot, ...idlPaths] = process.argv.slice(2);
+const [renderer, outputRoot, requestedMode, scaffoldValue, ...idlPaths] = process.argv.slice(2);
 
-if (!renderer || !outputRoot) {
-	throw new Error("missing renderer or output root argument");
+if (!renderer || !outputRoot || !requestedMode || !scaffoldValue) {
+	throw new Error("missing renderer, output root, mode, or scaffold argument");
 }
 
-for (const idlPath of idlPaths.sort()) {
-	const name = basename(idlPath, ".json");
-	const json = readFileSync(idlPath, "utf8");
-	const codama = createFromJson(json);
+const scaffold = scaffoldValue === "true";
+const names = idlPaths.map((path) => basename(path, ".json")).sort();
+const stagingRoot = mkdtempSync(join(tmpdir(), "pina-clients-"));
+
+try {
+	for (const idlPath of idlPaths.sort()) {
+		const name = basename(idlPath, ".json");
+		const json = readFileSync(idlPath, "utf8");
+		const codama = createFromJson(json);
+
+		if (renderer === "typescript") {
+			const { renderVisitor } = await import("@codama/renderers-js");
+			await codama.accept(renderVisitor(join(stagingRoot, name), {
+				formatCode: false,
+				deleteFolderBeforeRendering: true,
+			}));
+			continue;
+		}
+
+		if (renderer === "dart") {
+			const { renderVisitor } = await import("codama-renderers-dart");
+			visit(codama.getRoot(), renderVisitor(join(stagingRoot, "lib", "src", "generated", name), {
+				formatCode: false,
+				deleteFolderBeforeRendering: true,
+			}));
+			continue;
+		}
+
+		throw new Error(`unknown renderer: ${renderer}`);
+	}
 
 	if (renderer === "typescript") {
-		const { renderVisitor } = await import("@codama/renderers-js");
-		await codama.accept(renderVisitor(join(outputRoot, name), {
-			formatCode: false,
-			deleteFolderBeforeRendering: true,
-		}));
-		continue;
+		for (const name of names) {
+			publishTypescript(name);
+		}
+	} else {
+		publishDart();
+	}
+} finally {
+	rmSync(stagingRoot, { force: true, recursive: true });
+}
+
+function publishTypescript(name) {
+	const destination = join(outputRoot, name);
+	const staged = join(stagingRoot, name);
+	const mode = resolveMode(destination);
+
+	if (mode === "overwrite") {
+		rmSync(destination, { force: true, recursive: true });
 	}
 
-	if (renderer === "dart") {
-		const { renderVisitor } = await import("codama-renderers-dart");
-		visit(codama.getRoot(), renderVisitor(join(outputRoot, "lib", "src", "generated", name), {
-			formatCode: false,
-			deleteFolderBeforeRendering: true,
-		}));
-		continue;
+	publishDirectory(
+		join(staged, "src", "generated"),
+		join(destination, "src", "generated"),
+	);
+
+	const manifest = join(destination, "package.json");
+	if (scaffold && !existsSync(manifest)) {
+		mkdirSync(destination, { recursive: true });
+		cpSync(join(staged, "package.json"), manifest);
+	}
+}
+
+function publishDart() {
+	const mode = resolveMode(outputRoot);
+
+	if (mode === "overwrite") {
+		rmSync(outputRoot, { force: true, recursive: true });
 	}
 
-	throw new Error(`unknown renderer: ${renderer}`);
+	for (const name of names) {
+		publishDirectory(
+			join(stagingRoot, "lib", "src", "generated", name),
+			join(outputRoot, "lib", "src", "generated", name),
+		);
+	}
+
+	const manifest = join(outputRoot, "pubspec.yaml");
+	if (scaffold && !existsSync(manifest)) {
+		mkdirSync(outputRoot, { recursive: true });
+		writeFileSync(manifest, dartManifest(), "utf8");
+	}
+}
+
+function publishDirectory(staged, destination) {
+	const parent = dirname(destination);
+	const next = `${destination}.pina-next`;
+	mkdirSync(parent, { recursive: true });
+	rmSync(next, { force: true, recursive: true });
+	cpSync(staged, next, { recursive: true });
+	rmSync(destination, { force: true, recursive: true });
+	renameSync(next, destination);
+}
+
+function resolveMode(destination) {
+	const empty = !existsSync(destination) || readdirSync(destination).length === 0;
+
+	if (requestedMode === "auto") {
+		return empty ? "create" : "update";
+	}
+
+	if (requestedMode === "create" && !empty) {
+		throw new Error(`cannot create generated client at nonempty destination: ${destination}`);
+	}
+
+	if (requestedMode === "update" && empty) {
+		throw new Error(`cannot update missing or empty generated client: ${destination}`);
+	}
+
+	return requestedMode;
+}
+
+function dartManifest() {
+	const packageName = names.length === 1
+		? `${names[0]}_client`
+		: "pina_clients";
+	return `name: ${packageName}
+description: Generated Dart and Flutter clients for Pina programs.
+publish_to: none
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+
+dependencies:
+  meta: ^1.16.0
+  solana_kit_accounts: ^0.8.0
+  solana_kit_addresses: ^0.8.0
+  solana_kit_codecs_core: ^0.8.0
+  solana_kit_codecs_data_structures: ^0.8.0
+  solana_kit_codecs_numbers: ^0.8.0
+  solana_kit_codecs_strings: ^0.8.0
+  solana_kit_errors: ^0.8.0
+  solana_kit_instructions: ^0.8.0
+  solana_kit_rpc_types: ^0.8.0
+`;
 }
 "#;
 
@@ -76,6 +202,8 @@ pub struct ProjectGenerateOptions {
 	pub project_dir: PathBuf,
 	pub clients: Vec<ClientLanguage>,
 	pub output: Option<PathBuf>,
+	pub mode: Option<GenerationMode>,
+	pub scaffold: Option<bool>,
 	pub npx: String,
 }
 
@@ -98,7 +226,14 @@ struct GenerationPlan {
 	typescript_out: PathBuf,
 	dart_out: PathBuf,
 	clients: BTreeSet<ClientLanguage>,
+	generation: BTreeMap<ClientLanguage, GenerationSettings>,
 	npx: String,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct GenerationSettings {
+	mode: GenerationMode,
+	scaffold: bool,
 }
 
 struct BoundedOutput {
@@ -129,6 +264,7 @@ pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, C
 		]
 		.into_iter()
 		.collect(),
+		generation: default_generation_settings(),
 		npx: options.npx.clone(),
 	};
 
@@ -162,15 +298,34 @@ pub fn generate_project_clients(
 		.clone()
 		.unwrap_or_else(|| project.clients_dir.clone());
 	validate_render_target(&clients_dir)?;
+	let client_target = |language: ClientLanguage| {
+		let configured = &project.client_generation[&language];
+
+		clients_dir.join(&configured.output)
+	};
+	let generation = project
+		.client_generation
+		.iter()
+		.map(|(language, configured)| {
+			(
+				*language,
+				GenerationSettings {
+					mode: options.mode.unwrap_or(configured.mode),
+					scaffold: options.scaffold.unwrap_or(configured.scaffold),
+				},
+			)
+		})
+		.collect();
 	let plan = GenerationPlan {
 		programs: vec![(project.library_name.clone(), project.program_dir.clone())],
 		override_idl_names: true,
 		idls_dir: project.idl_dir.clone(),
-		rust_out: clients_dir.join("rust"),
-		cpi_out: clients_dir.join("cpi"),
-		typescript_out: clients_dir.join("typescript"),
-		dart_out: clients_dir.join("dart"),
+		rust_out: client_target(ClientLanguage::Rust),
+		cpi_out: client_target(ClientLanguage::Cpi),
+		typescript_out: client_target(ClientLanguage::Typescript),
+		dart_out: client_target(ClientLanguage::Dart),
 		clients: clients.clone(),
+		generation,
 		npx: options.npx.clone(),
 	};
 
@@ -188,6 +343,26 @@ pub fn generate_project_clients(
 	})
 }
 
+fn default_generation_settings() -> BTreeMap<ClientLanguage, GenerationSettings> {
+	[
+		ClientLanguage::Cpi,
+		ClientLanguage::Rust,
+		ClientLanguage::Typescript,
+		ClientLanguage::Dart,
+	]
+	.into_iter()
+	.map(|language| {
+		(
+			language,
+			GenerationSettings {
+				mode: GenerationMode::Auto,
+				scaffold: true,
+			},
+		)
+	})
+	.collect()
+}
+
 fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	let examples = plan
 		.programs
@@ -195,16 +370,10 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 		.map(|(name, _)| name.clone())
 		.collect::<Vec<_>>();
 
-	std::fs::create_dir_all(&plan.idls_dir).map_err(|source| {
-		CodamaError::CreateDir {
-			path: plan.idls_dir.clone(),
-			source,
-		}
-	})?;
+	create_output_dir(&plan.idls_dir)?;
 
 	for path in selected_output_dirs(plan) {
 		validate_render_target(path)?;
-		create_output_dir(path)?;
 	}
 
 	let mut idl_paths = Vec::with_capacity(plan.programs.len());
@@ -235,7 +404,12 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	}
 
 	if plan.clients.contains(&ClientLanguage::Rust) {
-		let render_config = RenderConfig::default();
+		let settings = plan.generation[&ClientLanguage::Rust];
+		let render_config = RenderConfig {
+			mode: rust_render_mode(settings.mode),
+			scaffold: settings.scaffold,
+			..RenderConfig::default()
+		};
 
 		for (example, idl_path) in examples.iter().zip(idl_paths.iter()) {
 			let crate_dir = plan.rust_out.join(example);
@@ -245,7 +419,12 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	}
 
 	if plan.clients.contains(&ClientLanguage::Cpi) {
-		let render_config = CpiRenderConfig::default();
+		let settings = plan.generation[&ClientLanguage::Cpi];
+		let render_config = CpiRenderConfig {
+			mode: cpi_render_mode(settings.mode),
+			scaffold: settings.scaffold,
+			..CpiRenderConfig::default()
+		};
 
 		for (example, idl_path) in examples.iter().zip(idl_paths.iter()) {
 			let crate_dir = plan.cpi_out.join(example);
@@ -255,8 +434,10 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	}
 
 	if plan.clients.contains(&ClientLanguage::Typescript) {
+		let settings = plan.generation[&ClientLanguage::Typescript];
+
 		for example in &examples {
-			validate_render_target(&plan.typescript_out.join(example))?;
+			validate_generation_target(&plan.typescript_out.join(example), settings)?;
 		}
 
 		run_client_generation(plan, ClientLanguage::Typescript, &idl_paths)?;
@@ -264,6 +445,9 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	}
 
 	if plan.clients.contains(&ClientLanguage::Dart) {
+		let settings = plan.generation[&ClientLanguage::Dart];
+		validate_generation_target(&plan.dart_out, settings)?;
+
 		for example in &examples {
 			validate_render_target(&plan.dart_out.join("lib/src/generated").join(example))?;
 		}
@@ -274,6 +458,90 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	}
 
 	Ok(idl_paths)
+}
+
+fn validate_generation_target(
+	path: &Path,
+	settings: GenerationSettings,
+) -> Result<(), CodamaError> {
+	validate_render_target(path)?;
+	let empty = destination_is_empty(path)?;
+
+	if settings.mode == GenerationMode::Create && !empty {
+		return Err(CodamaError::InvalidGenerationState {
+			path: path.to_path_buf(),
+			mode: "create",
+			reason: "the destination is not empty",
+		});
+	}
+
+	if settings.mode == GenerationMode::Update && empty {
+		return Err(CodamaError::InvalidGenerationState {
+			path: path.to_path_buf(),
+			mode: "update",
+			reason: "the destination is empty or does not exist",
+		});
+	}
+
+	if settings.mode != GenerationMode::Overwrite {
+		return Ok(());
+	}
+
+	let absolute = if path.exists() {
+		std::fs::canonicalize(path).map_err(|source| create_dir_error(path, source))?
+	} else {
+		std::path::absolute(path).map_err(|source| create_dir_error(path, source))?
+	};
+	let current_dir =
+		std::env::current_dir().map_err(|source| create_dir_error(Path::new("."), source))?;
+	let current = std::fs::canonicalize(&current_dir)
+		.map_err(|source| create_dir_error(&current_dir, source))?;
+
+	if current.starts_with(&absolute) || absolute.join(".git").exists() {
+		return Err(CodamaError::UnsafeOutput {
+			path: absolute,
+			reason: "refusing to overwrite a working tree".to_owned(),
+		});
+	}
+
+	Ok(())
+}
+
+fn destination_is_empty(path: &Path) -> Result<bool, CodamaError> {
+	let metadata = match std::fs::symlink_metadata(path) {
+		Ok(metadata) => metadata,
+		Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(true),
+		Err(source) => return Err(create_dir_error(path, source)),
+	};
+
+	if !metadata.is_dir() {
+		return Ok(false);
+	}
+
+	std::fs::read_dir(path)
+		.map_err(|source| create_dir_error(path, source))?
+		.next()
+		.transpose()
+		.map(|entry| entry.is_none())
+		.map_err(|source| create_dir_error(path, source))
+}
+
+const fn rust_render_mode(mode: GenerationMode) -> RustRenderMode {
+	match mode {
+		GenerationMode::Auto => RustRenderMode::Auto,
+		GenerationMode::Create => RustRenderMode::Create,
+		GenerationMode::Update => RustRenderMode::Update,
+		GenerationMode::Overwrite => RustRenderMode::Overwrite,
+	}
+}
+
+const fn cpi_render_mode(mode: GenerationMode) -> CpiRenderMode {
+	match mode {
+		GenerationMode::Auto => CpiRenderMode::Auto,
+		GenerationMode::Create => CpiRenderMode::Create,
+		GenerationMode::Update => CpiRenderMode::Update,
+		GenerationMode::Overwrite => CpiRenderMode::Overwrite,
+	}
 }
 
 fn create_output_dir(path: &Path) -> Result<(), CodamaError> {
@@ -564,6 +832,7 @@ fn run_client_generation_with_npx(
 		.arg("-")
 		.arg(renderer.as_str())
 		.arg(renderer_output(plan, renderer));
+	add_generation_arguments(&mut command, plan.generation[&renderer]);
 
 	for idl_path in idl_paths {
 		command.arg(idl_path);
@@ -586,6 +855,7 @@ fn run_client_generation_with_pnpm(
 		.arg("-")
 		.arg(renderer.as_str())
 		.arg(renderer_output(plan, renderer));
+	add_generation_arguments(&mut command, plan.generation[&renderer]);
 
 	for idl_path in idl_paths {
 		command.arg(idl_path);
@@ -611,6 +881,7 @@ fn run_client_generation_with_node(
 		.arg("-")
 		.arg(renderer.as_str())
 		.arg(renderer_output(plan, renderer));
+	add_generation_arguments(&mut command, plan.generation[&renderer]);
 
 	for idl_path in idl_paths {
 		command.arg(idl_path);
@@ -622,6 +893,12 @@ fn run_client_generation_with_node(
 			source,
 		}
 	})
+}
+
+fn add_generation_arguments(command: &mut Command, settings: GenerationSettings) {
+	command
+		.arg(settings.mode.as_str())
+		.arg(if settings.scaffold { "true" } else { "false" });
 }
 
 fn run_bounded(command: &mut Command, input: Option<&[u8]>) -> std::io::Result<BoundedOutput> {
@@ -779,6 +1056,7 @@ mod tests {
 			typescript_out: PathBuf::from("typescript"),
 			dart_out: PathBuf::from("dart"),
 			clients: BTreeSet::new(),
+			generation: default_generation_settings(),
 			npx: npx.into(),
 		}
 	}
@@ -907,6 +1185,7 @@ mod tests {
 			]
 			.into_iter()
 			.collect(),
+			generation: default_generation_settings(),
 			npx: "npx".to_owned(),
 		};
 
@@ -1029,6 +1308,118 @@ mod tests {
 			create_output_dir(&file),
 			Err(CodamaError::CreateDir { .. })
 		));
+	}
+
+	#[test]
+	fn generation_target_modes_enforce_destination_state_and_renderer_mapping() {
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let nonempty = temp.path().join("nonempty");
+		std::fs::create_dir_all(&nonempty)
+			.unwrap_or_else(|error| panic!("failed to create destination: {error}"));
+		std::fs::write(nonempty.join("keep"), "keep")
+			.unwrap_or_else(|error| panic!("failed to populate destination: {error}"));
+		assert!(matches!(
+			validate_generation_target(
+				&nonempty,
+				GenerationSettings {
+					mode: GenerationMode::Create,
+					scaffold: true,
+				},
+			),
+			Err(CodamaError::InvalidGenerationState { .. })
+		));
+
+		let empty = temp.path().join("empty");
+		std::fs::create_dir_all(&empty)
+			.unwrap_or_else(|error| panic!("failed to create empty destination: {error}"));
+		assert!(matches!(
+			validate_generation_target(
+				&empty,
+				GenerationSettings {
+					mode: GenerationMode::Update,
+					scaffold: true,
+				},
+			),
+			Err(CodamaError::InvalidGenerationState { .. })
+		));
+
+		let missing = temp.path().join("missing");
+		validate_generation_target(
+			&missing,
+			GenerationSettings {
+				mode: GenerationMode::Overwrite,
+				scaffold: false,
+			},
+		)
+		.unwrap_or_else(|error| panic!("missing overwrite target should be safe: {error}"));
+
+		let git_tree = temp.path().join("git-tree");
+		std::fs::create_dir_all(git_tree.join(".git"))
+			.unwrap_or_else(|error| panic!("failed to create Git marker: {error}"));
+		assert!(matches!(
+			validate_generation_target(
+				&git_tree,
+				GenerationSettings {
+					mode: GenerationMode::Overwrite,
+					scaffold: true,
+				},
+			),
+			Err(CodamaError::UnsafeOutput { .. })
+		));
+
+		let file = temp.path().join("file");
+		std::fs::write(&file, "file")
+			.unwrap_or_else(|error| panic!("failed to create file fixture: {error}"));
+		assert!(
+			!destination_is_empty(&file)
+				.unwrap_or_else(|error| panic!("file state should be observable: {error}"))
+		);
+
+		for (mode, rust, cpi) in [
+			(
+				GenerationMode::Auto,
+				RustRenderMode::Auto,
+				CpiRenderMode::Auto,
+			),
+			(
+				GenerationMode::Create,
+				RustRenderMode::Create,
+				CpiRenderMode::Create,
+			),
+			(
+				GenerationMode::Update,
+				RustRenderMode::Update,
+				CpiRenderMode::Update,
+			),
+			(
+				GenerationMode::Overwrite,
+				RustRenderMode::Overwrite,
+				CpiRenderMode::Overwrite,
+			),
+		] {
+			assert_eq!(rust_render_mode(mode), rust);
+			assert_eq!(cpi_render_mode(mode), cpi);
+		}
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn destination_state_reports_unreadable_paths() {
+		use std::os::unix::fs::PermissionsExt;
+
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let blocked = temp.path().join("blocked");
+		std::fs::create_dir_all(&blocked)
+			.unwrap_or_else(|error| panic!("failed to create blocked parent: {error}"));
+		std::fs::set_permissions(&blocked, std::fs::Permissions::from_mode(0o000))
+			.unwrap_or_else(|error| panic!("failed to block parent: {error}"));
+		let result = destination_is_empty(&blocked.join("child"));
+		std::fs::set_permissions(&blocked, std::fs::Permissions::from_mode(0o700))
+			.unwrap_or_else(|error| panic!("failed to restore parent: {error}"));
+
+		assert!(matches!(result, Err(CodamaError::CreateDir { .. })));
 	}
 
 	#[test]

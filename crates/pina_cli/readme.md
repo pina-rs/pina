@@ -62,14 +62,18 @@ Generate the clients selected in `pina.toml`, or override them for one invocatio
 pina generate
 pina generate --client rust --client typescript
 pina generate --client cpi
+pina generate --mode update --no-scaffold
 ```
 
 CPI-only and Rust-only generation do not require Node.js.
+
+Generation defaults to `auto`: initialize an empty client and later update only renderer-owned source directories, preserving customized manifests and entrypoints. Configure `mode` and `scaffold` globally or per client in `pina.toml`, or use `--mode create|update|overwrite` and `--no-scaffold` for a one-off override.
 
 Generate a standalone Pina CPI crate from any Codama or Anchor IDL:
 
 ```bash
 pina cpi --idl ./idl.json --output ./clients/program-cpi
+pina cpi --idl ./idl.json --output ./clients/program-cpi --mode update
 ```
 
 Codama IDLs render without Node.js. Raw Anchor IDLs require Node.js with `npx`, or a compatible command supplied through `--npx`, to run the pinned converter.

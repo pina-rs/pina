@@ -9,6 +9,14 @@ use std::process::Command;
 use pina_cli::project::Project;
 use tempfile::TempDir;
 
+fn workspace_root() -> PathBuf {
+	PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+		.parent()
+		.and_then(Path::parent)
+		.unwrap_or_else(|| panic!("workspace root should contain pina_cli"))
+		.to_path_buf()
+}
+
 fn write_project(root: &Path) {
 	fs::create_dir_all(root.join("src"))
 		.unwrap_or_else(|error| panic!("failed to create source directory: {error}"));
@@ -168,7 +176,7 @@ for ((index = 0; index < ${#arguments[@]}; index++)); do
 
 	renderer="${arguments[$index]}"
 	output="${arguments[$((index + 1))]}"
-	idl="${arguments[$((index + 2))]}"
+	idl="${arguments[$((index + 4))]}"
 	name="$(basename "$idl" .json)"
 	if [[ "$renderer" == "typescript" ]]; then
 		mkdir -p "$output/$name/src/generated"
@@ -1049,6 +1057,197 @@ fn generate_uses_pina_toml_to_create_a_standalone_cpi_crate() {
 		"explicit CPI generation failed: {}",
 		String::from_utf8_lossy(&explicit.stderr)
 	);
+}
+
+#[test]
+fn generate_preserves_scaffolds_on_update_and_replaces_them_on_overwrite() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	fs::write(
+		project.join("pina.toml"),
+		"[clients]\nlanguages = [\"cpi\"]\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to configure CPI generation: {error}"));
+	let cargo = fake_cargo(temp.path());
+	let crate_dir = project.join("clients/cpi/custom_program");
+
+	let initial = project_command(&project, &cargo, &target)
+		.arg("generate")
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run initial generation: {error}"));
+	assert!(
+		initial.status.success(),
+		"initial generation failed: {}",
+		String::from_utf8_lossy(&initial.stderr)
+	);
+	fs::write(crate_dir.join("Cargo.toml"), "# consumer manifest\n")
+		.unwrap_or_else(|error| panic!("failed to customize manifest: {error}"));
+	fs::write(crate_dir.join("keep.txt"), "keep")
+		.unwrap_or_else(|error| panic!("failed to write consumer file: {error}"));
+
+	let update = project_command(&project, &cargo, &target)
+		.arg("generate")
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run update generation: {error}"));
+	assert!(
+		update.status.success(),
+		"update generation failed: {}",
+		String::from_utf8_lossy(&update.stderr)
+	);
+	assert_eq!(
+		fs::read_to_string(crate_dir.join("Cargo.toml"))
+			.unwrap_or_else(|error| panic!("failed to read customized manifest: {error}")),
+		"# consumer manifest\n"
+	);
+	assert!(crate_dir.join("keep.txt").is_file());
+
+	let overwrite = project_command(&project, &cargo, &target)
+		.args(["generate", "--mode", "overwrite"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run overwrite generation: {error}"));
+	assert!(
+		overwrite.status.success(),
+		"overwrite generation failed: {}",
+		String::from_utf8_lossy(&overwrite.stderr)
+	);
+	assert!(!crate_dir.join("keep.txt").exists());
+	assert!(
+		fs::read_to_string(crate_dir.join("Cargo.toml"))
+			.unwrap_or_else(|error| panic!("failed to read replaced manifest: {error}"))
+			.contains("name = \"custom-program-cpi\"")
+	);
+}
+
+#[test]
+fn generate_supports_source_only_clients_and_per_language_outputs() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	fs::write(
+		project.join("pina.toml"),
+		r#"[clients]
+languages = ["cpi"]
+mode = "create"
+
+[clients.cpi]
+output = "interop"
+scaffold = false
+"#,
+	)
+	.unwrap_or_else(|error| panic!("failed to configure source-only generation: {error}"));
+	let cargo = fake_cargo(temp.path());
+	let crate_dir = project.join("clients/interop/custom_program");
+
+	let create = project_command(&project, &cargo, &target)
+		.arg("generate")
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run create generation: {error}"));
+	assert!(
+		create.status.success(),
+		"create generation failed: {}",
+		String::from_utf8_lossy(&create.stderr)
+	);
+	assert!(crate_dir.join("src/generated/mod.rs").is_file());
+	assert!(!crate_dir.join("Cargo.toml").exists());
+	assert!(!crate_dir.join("src/lib.rs").exists());
+
+	let duplicate = project_command(&project, &cargo, &target)
+		.arg("generate")
+		.output()
+		.unwrap_or_else(|error| panic!("failed to rerun create generation: {error}"));
+	assert!(!duplicate.status.success());
+	assert!(String::from_utf8_lossy(&duplicate.stderr).contains("destination is not empty"));
+
+	let update = project_command(&project, &cargo, &target)
+		.args(["generate", "--mode", "update"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run explicit update: {error}"));
+	assert!(
+		update.status.success(),
+		"explicit update failed: {}",
+		String::from_utf8_lossy(&update.stderr)
+	);
+}
+
+#[test]
+fn generate_real_typescript_and_dart_clients_preserves_scaffold_until_overwrite() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	fs::write(
+		project.join("pina.toml"),
+		"[clients]\nlanguages = [\"typescript\", \"dart\"]\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));
+	std::os::unix::fs::symlink(
+		workspace_root().join("node_modules"),
+		project.join("node_modules"),
+	)
+	.unwrap_or_else(|error| panic!("failed to expose workspace Node dependencies: {error}"));
+	let cargo = fake_cargo(temp.path());
+	let command = |arguments: &[&str]| {
+		let mut command = project_command(&project, &cargo, &target);
+		command.args(["generate", "--npx", "node"]).args(arguments);
+		command
+			.output()
+			.unwrap_or_else(|error| panic!("failed to run generation: {error}"))
+	};
+
+	let initial = command(&[]);
+	assert!(
+		initial.status.success(),
+		"initial generation failed: {}",
+		String::from_utf8_lossy(&initial.stderr)
+	);
+	let typescript = project.join("clients/typescript/custom_program");
+	let dart = project.join("clients/dart");
+	assert!(typescript.join("src/generated/index.ts").is_file());
+	assert!(dart.join("lib/src/generated/custom_program").is_dir());
+
+	fs::write(typescript.join("package.json"), "{\"custom\":true}\n")
+		.unwrap_or_else(|error| panic!("failed to customize package.json: {error}"));
+	fs::write(typescript.join("keep.txt"), "keep")
+		.unwrap_or_else(|error| panic!("failed to write TypeScript sentinel: {error}"));
+	fs::write(dart.join("pubspec.yaml"), "name: custom_client\n")
+		.unwrap_or_else(|error| panic!("failed to customize pubspec.yaml: {error}"));
+	fs::write(dart.join("keep.txt"), "keep")
+		.unwrap_or_else(|error| panic!("failed to write Dart sentinel: {error}"));
+
+	let update = command(&[]);
+	assert!(
+		update.status.success(),
+		"update generation failed: {}",
+		String::from_utf8_lossy(&update.stderr)
+	);
+	assert_eq!(
+		fs::read_to_string(typescript.join("package.json"))
+			.unwrap_or_else(|error| panic!("failed to read package.json: {error}")),
+		"{\"custom\":true}\n"
+	);
+	assert_eq!(
+		fs::read_to_string(dart.join("pubspec.yaml"))
+			.unwrap_or_else(|error| panic!("failed to read pubspec.yaml: {error}")),
+		"name: custom_client\n"
+	);
+	assert!(typescript.join("keep.txt").is_file());
+	assert!(dart.join("keep.txt").is_file());
+
+	let overwrite = command(&["--mode", "overwrite", "--no-scaffold"]);
+	assert!(
+		overwrite.status.success(),
+		"overwrite generation failed: {}",
+		String::from_utf8_lossy(&overwrite.stderr)
+	);
+	assert!(typescript.join("src/generated/index.ts").is_file());
+	assert!(dart.join("lib/src/generated/custom_program").is_dir());
+	assert!(!typescript.join("package.json").exists());
+	assert!(!typescript.join("keep.txt").exists());
+	assert!(!dart.join("pubspec.yaml").exists());
+	assert!(!dart.join("keep.txt").exists());
 }
 
 #[test]

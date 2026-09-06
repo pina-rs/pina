@@ -56,7 +56,9 @@ The library target name determines the canonical outputs:
 <cargo-target>/idl/<library-name>.json
 ```
 
-`pina generate` refreshes that IDL and renders the client languages selected in `pina.toml`. Override the selection for one run with repeatable `--client cpi`, `--client rust`, `--client typescript`, or `--client dart` flags. CPI output is a separate `no_std` crate with `.invoke()` and `.invoke_signed()` builders. Generated ecosystem roots may be replaced, so keep hand-written code outside them.
+`pina generate` refreshes that IDL and renders the client languages selected in `pina.toml`. Override the selection for one run with repeatable `--client cpi`, `--client rust`, `--client typescript`, or `--client dart` flags. Dart is also the Flutter target. CPI output is a separate `no_std` crate with `.invoke()` and `.invoke_signed()` builders.
+
+Generation defaults to `mode = "auto"`: it initializes an empty target, then updates only renderer-owned source directories on later runs. Existing manifests and crate/package entrypoints are preserved. Use `mode = "create"` or `mode = "update"` to enforce the expected state, `mode = "overwrite"` for an explicit complete cleanup, and `scaffold = false` for source-only output. These settings may be global under `[clients]` or overridden under `[clients.cpi]`, `[clients.rust]`, `[clients.typescript]`, and `[clients.dart]`. The CLI equivalents are `--mode` and `--no-scaffold`.
 
 Generate the same crate from an external Codama or Anchor IDL with `pina cpi --idl <FILE> --output <DIR>`. Codama IDLs stay native; raw Anchor IDLs are normalized through `@codama/nodes-from-anchor` first.
 

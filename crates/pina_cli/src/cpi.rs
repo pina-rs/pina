@@ -8,10 +8,12 @@ use std::process::Command;
 
 use codama_nodes::RootNode;
 use pina_cpi_renderer::RenderConfig;
+use pina_cpi_renderer::RenderMode;
 use serde_json::Value;
 
 use crate::codama::validate_render_target;
 use crate::error::CodamaError;
+use crate::project::GenerationMode;
 
 const MAX_IDL_BYTES: u64 = 16 * 1024 * 1024;
 const NODES_FROM_ANCHOR_PACKAGE: &str = "@codama/nodes-from-anchor@1.5.5";
@@ -70,6 +72,8 @@ impl ConverterResolution {
 pub struct CpiGenerateOptions {
 	pub idl: PathBuf,
 	pub output: PathBuf,
+	pub mode: GenerationMode,
+	pub scaffold: bool,
 	pub npx: String,
 }
 
@@ -139,7 +143,7 @@ pub fn generate_cpi_crate(options: &CpiGenerateOptions) -> Result<(), CpiGenerat
 	let input = read_idl(&options.idl)?;
 	let root = normalize_idl(&input, &options.idl, &options.npx)?;
 
-	render_cpi_root(&root, &options.output)
+	render_cpi_root(&root, &options.output, options.mode, options.scaffold)
 }
 
 /// Generate a standalone Pina CPI crate from a reader.
@@ -155,6 +159,20 @@ pub fn generate_cpi_crate_from_reader(
 	reader: impl Read,
 	output: &Path,
 ) -> Result<(), CpiGenerateError> {
+	generate_cpi_crate_from_reader_with_config(reader, output, GenerationMode::Auto, true)
+}
+
+/// Generate a standalone Pina CPI crate from a reader with explicit output settings.
+///
+/// # Errors
+///
+/// Returns an error when reading, normalization, or rendering fails.
+pub fn generate_cpi_crate_from_reader_with_config(
+	reader: impl Read,
+	output: &Path,
+	mode: GenerationMode,
+	scaffold: bool,
+) -> Result<(), CpiGenerateError> {
 	let path = PathBuf::from("<stdin>");
 	let input = read_bounded(reader, &path)?;
 	let value = parse_json(&input, &path)?;
@@ -162,7 +180,7 @@ pub fn generate_cpi_crate_from_reader(
 		return Err(CpiGenerateError::ExpectedCodamaStdin);
 	};
 
-	render_cpi_root(&root, output)
+	render_cpi_root(&root, output, mode, scaffold)
 }
 
 fn read_idl(path: &Path) -> Result<Vec<u8>, CpiGenerateError> {
@@ -336,14 +354,33 @@ fn diagnostic_text(bytes: &[u8]) -> String {
 		.collect()
 }
 
-fn render_cpi_root(root: &RootNode, output: &Path) -> Result<(), CpiGenerateError> {
+fn render_cpi_root(
+	root: &RootNode,
+	output: &Path,
+	mode: GenerationMode,
+	scaffold: bool,
+) -> Result<(), CpiGenerateError> {
 	validate_render_target(output)?;
-	pina_cpi_renderer::render_root_node(root, output, &RenderConfig::default()).map_err(|source| {
+	let config = RenderConfig {
+		mode: cpi_render_mode(mode),
+		scaffold,
+		..RenderConfig::default()
+	};
+	pina_cpi_renderer::render_root_node(root, output, &config).map_err(|source| {
 		CpiGenerateError::Render {
 			path: output.to_path_buf(),
 			source,
 		}
 	})
+}
+
+const fn cpi_render_mode(mode: GenerationMode) -> RenderMode {
+	match mode {
+		GenerationMode::Auto => RenderMode::Auto,
+		GenerationMode::Create => RenderMode::Create,
+		GenerationMode::Update => RenderMode::Update,
+		GenerationMode::Overwrite => RenderMode::Overwrite,
+	}
 }
 
 #[cfg(test)]
@@ -393,6 +430,8 @@ mod tests {
 		generate_cpi_crate(&CpiGenerateOptions {
 			idl: fixture_path(),
 			output: file_output.clone(),
+			mode: GenerationMode::Auto,
+			scaffold: true,
 			npx: "must-not-run".to_string(),
 		})
 		.unwrap_or_else(|error| panic!("file generation failed: {error}"));
@@ -457,6 +496,8 @@ mod tests {
 			generate_cpi_crate(&CpiGenerateOptions {
 				idl: missing,
 				output: temp.path().join("missing-output"),
+				mode: GenerationMode::Auto,
+				scaffold: true,
 				npx: "npx".to_string(),
 			}),
 			Err(CpiGenerateError::ReadIdl { .. })
@@ -471,7 +512,12 @@ mod tests {
 			.unwrap_or_else(|error| panic!("fixture parse failed: {error}"));
 		root.program.public_key = "not a public key".to_string();
 		assert!(matches!(
-			render_cpi_root(&root, &temp.path().join("invalid-program")),
+			render_cpi_root(
+				&root,
+				&temp.path().join("invalid-program"),
+				GenerationMode::Auto,
+				true,
+			),
 			Err(CpiGenerateError::Render { .. })
 		));
 	}
@@ -497,6 +543,8 @@ mod tests {
 			generate_cpi_crate(&CpiGenerateOptions {
 				idl: anchor.clone(),
 				output: output.clone(),
+				mode: GenerationMode::Auto,
+				scaffold: true,
 				npx: command.to_string_lossy().into_owned(),
 			})
 			.unwrap_or_else(|error| panic!("{name} conversion failed: {error}"));

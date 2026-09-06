@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use super::helpers::snake;
 use crate::error::RenderError;
 use crate::error::Result;
+use crate::write_file_error;
 
 pub(crate) fn ensure_crate_scaffold(crate_dir: &Path, program_name: &str) -> Result<()> {
 	fs::create_dir_all(crate_dir.join("src")).map_err(|source| {
@@ -28,9 +29,10 @@ pub(crate) fn ensure_crate_scaffold(crate_dir: &Path, program_name: &str) -> Res
 	}
 
 	let cargo_toml_path = crate_dir.join("Cargo.toml");
-	let package_name = format!("{}-client", snake(program_name).replace('_', "-"));
-	let cargo_toml = format!(
-		r#"[package]
+	if !cargo_toml_path.exists() {
+		let package_name = format!("{}-client", snake(program_name).replace('_', "-"));
+		let cargo_toml = format!(
+			r#"[package]
 name = "{package_name}"
 version = "0.0.0"
 edition = "2021"
@@ -47,13 +49,10 @@ solana-program-error = {{ workspace = true, default-features = true }}
 solana-pubkey = {{ workspace = true, default-features = true, features = ["curve25519"] }}
 thiserror = {{ workspace = true, default-features = true }}
 "#
-	);
-	fs::write(&cargo_toml_path, cargo_toml).map_err(|source| {
-		RenderError::WriteFile {
-			path: cargo_toml_path.clone(),
-			source,
-		}
-	})?;
+		);
+		fs::write(&cargo_toml_path, cargo_toml)
+			.map_err(|source| write_file_error(&cargo_toml_path, source))?;
+	}
 
 	Ok(())
 }

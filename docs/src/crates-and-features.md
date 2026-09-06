@@ -114,9 +114,11 @@ CPI clients are standalone generated crates rather than a feature of the deploye
 [clients]
 output = "clients"
 languages = ["cpi", "rust", "typescript"]
+mode = "auto"
+scaffold = true
 ```
 
-The consuming program depends on the generated crate directly. This avoids coupling a program's deployable feature graph to downstream CPI consumers.
+The consuming program depends on the generated crate directly. This avoids coupling a program's deployable feature graph to downstream CPI consumers. Auto updates preserve customized manifests and entrypoints; set `scaffold = false` for generated sources only or `mode = "overwrite"` for an explicit clean sweep.
 
 ## Pod types
 
