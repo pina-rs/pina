@@ -8,7 +8,7 @@
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 /// Instruction data for `RemoveTag`. Removes the tag at `index`.
 pub const REMOVE_TAG_DISCRIMINATOR: u8 = 3u8;

@@ -8,49 +8,42 @@
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 #[derive(pina::ZeroPod)]
+#[pinapod(compact)]
 pub struct Sample {
-	/// The authenticated header at the start of every resizable sample account.
-	///
-	/// Bytes after this fixed header are deliberately not exposed as a typed
-	/// collection. The example tests allocation and rent behaviour, not a data
-	/// serialization format; only the header participates in program logic.
+	/// A compact account whose active values occupy only the bytes they need.
 	pub discriminator: u8,
 	/// Canonical PDA bump, persisted for inexpensive validation on resize.
 	pub bump: u8,
 	/// The only signer permitted to resize this sample.
 	pub authority: solana_pubkey::Pubkey,
+	/// Dynamically encoded values; unused capacity occupies no account bytes.
+	/// Pina compact capacity: 64.
+	pub values: pina::Vec<u64, 64>,
 }
 
 pub const SAMPLE_DISCRIMINATOR: u8 = 1u8;
 
 impl Sample {
-	pub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;
+	pub const HEADER_SIZE: usize = <Self as pina::ZeroPodCompact>::HEADER_SIZE;
 
-	/// Initialize zero-valid account storage.
-	///
-	/// Every non-discriminator field must accept an all-zero
-	/// representation. Otherwise this method returns `InvalidAccountData`.
 	pub fn initialize(
 		data: &mut [u8],
-	) -> Result<&mut SampleZc, solana_program_error::ProgramError> {
-		if data.len() != Self::LEN {
+	) -> Result<SampleMut<'_>, solana_program_error::ProgramError> {
+		if data.len() < Self::HEADER_SIZE {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		data.fill(0);
-		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+		let mut account = SampleMut::new(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		account.discriminator = SAMPLE_DISCRIMINATOR;
 		Ok(account)
 	}
 
-	pub fn from_bytes(data: &[u8]) -> Result<&SampleZc, solana_program_error::ProgramError> {
-		if data.len() != Self::LEN {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		let account = <Self as pina::ZeroPodFixed>::from_bytes(data)
+	pub fn from_bytes(data: &[u8]) -> Result<SampleRef<'_>, solana_program_error::ProgramError> {
+		let account = SampleRef::new(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != SAMPLE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
@@ -60,11 +53,8 @@ impl Sample {
 
 	pub fn from_bytes_mut(
 		data: &mut [u8],
-	) -> Result<&mut SampleZc, solana_program_error::ProgramError> {
-		if data.len() != Self::LEN {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+	) -> Result<SampleMut<'_>, solana_program_error::ProgramError> {
+		let account = SampleMut::new(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != SAMPLE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);

@@ -90,7 +90,8 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 	validate_existing_generated_dir(&generated_dir, config.delete_folder_before_rendering)?;
 
 	if config.scaffold {
-		ensure_crate_scaffold(crate_dir, root.program.name.as_ref())?;
+		let uses_compact_accounts = root.program.accounts.iter().any(is_compact_account);
+		ensure_crate_scaffold(crate_dir, root.program.name.as_ref(), uses_compact_accounts)?;
 	}
 
 	if config.delete_folder_before_rendering && generated_dir.exists() {

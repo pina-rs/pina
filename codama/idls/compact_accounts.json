@@ -1,0 +1,475 @@
+{
+	"kind": "rootNode",
+	"standard": "codama",
+	"version": "1.8.0",
+	"program": {
+		"kind": "programNode",
+		"name": "compactAccounts",
+		"publicKey": "85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn",
+		"version": "0.0.0",
+		"accounts": [
+			{
+				"kind": "accountNode",
+				"name": "journal",
+				"docs": [
+					"A compact account with two independently encoded dynamic fields.",
+					"",
+					"The one-byte discriminator, bump, authority, revision, and two vector",
+					"prefixes always occupy [`Self::HEADER_SIZE`] bytes. Each active row adds an",
+					"eight-byte entry and a one-byte marker, up to [`Self::MAX_SIZE`]."
+				],
+				"data": {
+					"kind": "structTypeNode",
+					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "discriminator",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "bump",
+							"docs": [
+								"Canonical PDA bump."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "authority",
+							"docs": [
+								"Signer permitted to mutate and fund this journal."
+							],
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "revision",
+							"docs": [
+								"Number of successful resize or write operations."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u32",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "entries",
+							"docs": [
+								"Active entries. Unused capacity consumes no account bytes.",
+								"Pina compact capacity: 8."
+							],
+							"type": {
+								"kind": "preOffsetTypeNode",
+								"offset": 10,
+								"strategy": "relative",
+								"type": {
+									"kind": "arrayTypeNode",
+									"item": {
+										"kind": "numberTypeNode",
+										"format": "u64",
+										"endian": "le"
+									},
+									"count": {
+										"kind": "prefixedCountNode",
+										"prefix": {
+											"kind": "postOffsetTypeNode",
+											"offset": 0,
+											"strategy": "preOffset",
+											"type": {
+												"kind": "preOffsetTypeNode",
+												"offset": 38,
+												"strategy": "absolute",
+												"type": {
+													"kind": "numberTypeNode",
+													"format": "u16",
+													"endian": "le"
+												}
+											}
+										}
+									}
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "markers",
+							"docs": [
+								"One marker per entry, stored as a second compact tail.",
+								"Pina compact capacity: 8."
+							],
+							"type": {
+								"kind": "arrayTypeNode",
+								"item": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								},
+								"count": {
+									"kind": "prefixedCountNode",
+									"prefix": {
+										"kind": "postOffsetTypeNode",
+										"offset": 0,
+										"strategy": "preOffset",
+										"type": {
+											"kind": "preOffsetTypeNode",
+											"offset": 40,
+											"strategy": "absolute",
+											"type": {
+												"kind": "numberTypeNode",
+												"format": "u64",
+												"endian": "le"
+											}
+										}
+									}
+								}
+							}
+						}
+					]
+				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "journal"
+				},
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			}
+		],
+		"instructions": [
+			{
+				"kind": "instructionNode",
+				"name": "initialize",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": true,
+						"isSigner": true,
+						"isOptional": false,
+						"docs": [
+							"Funds rent and becomes the journal authority."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "journal",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"Empty canonical journal PDA."
+						],
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "journal"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "bump",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "entryCount",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "resize",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": true,
+						"isSigner": true,
+						"isOptional": false,
+						"docs": [
+							"Funds growth and receives the rent refund from shrinking."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "journal",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 1
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "entryCount",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "write",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": false,
+						"isSigner": true,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "journal",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 2
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "index",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "value",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u64",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 2
+							}
+						}
+					}
+				]
+			}
+		],
+		"pdas": [
+			{
+				"kind": "pdaNode",
+				"name": "journal",
+				"seeds": [
+					{
+						"kind": "constantPdaSeedNode",
+						"type": {
+							"kind": "stringTypeNode",
+							"encoding": "utf8"
+						},
+						"value": {
+							"kind": "stringValueNode",
+							"string": "compact-journal"
+						}
+					},
+					{
+						"kind": "variablePdaSeedNode",
+						"name": "authority",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					}
+				]
+			}
+		],
+		"errors": [
+			{
+				"kind": "errorNode",
+				"name": "capacityExceeded",
+				"code": 7000,
+				"message": ""
+			},
+			{
+				"kind": "errorNode",
+				"name": "indexOutOfBounds",
+				"code": 7001,
+				"message": ""
+			},
+			{
+				"kind": "errorNode",
+				"name": "authorityMismatch",
+				"code": 7002,
+				"message": ""
+			}
+		]
+	}
+}

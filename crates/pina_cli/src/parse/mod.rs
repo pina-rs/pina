@@ -177,6 +177,12 @@ fn assemble_from_extracted(
 				"account",
 			)
 			.map(|disc_value| {
+				debug_assert_eq!(
+					acct.is_compact(),
+					acct.docs
+						.iter()
+						.any(|doc| doc == crate::ir::COMPACT_ACCOUNT_DOC_MARKER)
+				);
 				AccountIr {
 					name: acct.name.clone(),
 					fields: acct.fields.clone(),

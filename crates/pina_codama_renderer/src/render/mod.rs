@@ -9,6 +9,7 @@ pub(crate) mod seeds;
 pub(crate) mod types;
 
 // Items used directly by lib.rs production code.
+pub(crate) use accounts::is_compact_account;
 pub(crate) use accounts::render_account_page;
 pub(crate) use accounts::render_accounts_mod;
 pub(crate) use errors::render_errors_mod;

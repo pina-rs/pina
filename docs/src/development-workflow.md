@@ -64,9 +64,9 @@ pnpm run test:quasar-svm
 
 ## Dependency security
 
-- `security:deny` runs policy checks (license allow-list, source restrictions, dependency bans).
+- `security:deny` runs policy checks (license allow-list, source restrictions, dependency bans). CI exposes it as the dedicated `cargo-deny` job.
 - `security:audit` runs RustSec vulnerability checks over `Cargo.lock`.
-- `security:zizmor` audits GitHub Actions workflows and composite actions for security anti-patterns. Findings are gated in CI via the `security` workflow job.
+- `security:zizmor` audits GitHub Actions workflows and composite actions for security anti-patterns. CI exposes it as the dedicated `zizmor` job.
 - `verify:security` runs all of the checks above.
 
 ## Coverage

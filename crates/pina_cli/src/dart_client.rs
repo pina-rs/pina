@@ -7,9 +7,9 @@ use crate::error::CodamaError;
 /// Validates Dart renderer inputs before any Dart source is emitted.
 ///
 /// Codec behavior belongs to `codama-renderers-dart` and the Solana Kit Dart
-/// packages. Pina deliberately does not rewrite generated Dart source: a
-/// renderer that cannot express Pina's semantic IDL must fail before emitting
-/// a client rather than being patched with a second, divergent codec layer.
+/// packages. Pina deliberately does not rewrite generated Dart source. The
+/// workspace pins the renderer patch needed for Codama offset nodes so compact
+/// multi-tail layouts retain their shared-header prefixes.
 pub fn validate_dart_client_idls(
 	output_root: &Path,
 	programs: &[String],
@@ -92,6 +92,8 @@ fn validate_supported_types(value: &Value, path: &Path) -> Result<(), CodamaErro
 						| "enumEmptyVariantTypeNode"
 						| "enumTypeNode" | "fixedSizeTypeNode"
 						| "numberTypeNode" | "optionTypeNode"
+						| "postOffsetTypeNode"
+						| "preOffsetTypeNode"
 						| "publicKeyTypeNode"
 						| "sizePrefixTypeNode"
 						| "stringTypeNode" | "structFieldTypeNode"
@@ -222,6 +224,24 @@ mod tests {
 
 		validate_supported_types(&value, Path::new("fixture.json"))
 			.expect("supported zeropod semantics must validate");
+	}
+
+	#[test]
+	fn accepts_offset_nodes_used_by_compact_tail_headers() {
+		let value = serde_json::json!({
+			"kind": "preOffsetTypeNode",
+			"offset": 4,
+			"strategy": "relative",
+			"type": {
+				"kind": "postOffsetTypeNode",
+				"offset": 0,
+				"strategy": "preOffset",
+				"type": { "kind": "numberTypeNode", "format": "u16", "endian": "le" }
+			}
+		});
+
+		validate_supported_types(&value, Path::new("fixture.json"))
+			.expect("compact offset nodes must validate");
 	}
 
 	#[test]

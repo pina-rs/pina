@@ -22,18 +22,26 @@ This crate powers the attributes/derives re-exported by `pina`.
 
 Most projects should depend on `pina` and use the re-exported macros.
 
-If needed directly:
+Compact accounts are opt-in:
+
+```bash
+cargo add pina --features compact
+```
+
+For fixed account macros needed directly:
 
 ```bash
 cargo add pina_macros
 ```
+
+Add `--features compact` when invoking `#[account(compact)]` through a direct `pina_macros` dependency.
 
 ## Macros
 
 <br>
 
 - `#[discriminator]`: defines a typed discriminator enum (`u8`, `u16`, `u32`, `u64`).
-- `#[account]`: defines discriminator-first account POD structs and generated builders.
+- `#[account]`: defines discriminator-first fixed or compact account POD structs and generated builders.
 - `#[instruction]`: defines discriminator-first instruction data POD structs.
 - `#[event]`: defines discriminator-first event POD structs.
 - `#[pda]`: defines typed PDA seed, derivation, and validation helpers.
@@ -90,6 +98,7 @@ pub enum ExampleError {
 - `discriminator = PathToEnum`
 - `variant = EnumVariant` (optional; defaults to inferred struct name; cannot be combined with a `discriminator` path that includes a variant)
 - `crate = ::pina` (optional)
+- `compact` (requires the crate's `compact` feature; permits one or more trailing bounded `Vec<T, N>` fields)
 
 ### `#[error(...)]`
 
@@ -111,6 +120,6 @@ pub enum ExampleError {
 
 <br>
 
-- Generated account/instruction/event structs require fixed-size, alignment-1 `ZcElem` layouts with load-bearing `ZcValidate` implementations.
+- Generated instruction/event structs and ordinary accounts require fixed-size, alignment-1 `ZcElem` layouts with load-bearing `ZcValidate` implementations. With the `compact` feature, `#[account(compact)]` additionally supports an audited suffix of one or more `Vec<T, N>` dynamic fields with independent active lengths.
 - The macros are designed for `no_std` Solana program crates.
 - If you use `pina`, these macros are available directly without importing `pina_macros`.

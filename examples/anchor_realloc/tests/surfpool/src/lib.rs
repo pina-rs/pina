@@ -9,11 +9,11 @@ use program_under_test::ReallocInstruction;
 /// Seed prefix for sample PDAs, mirroring `SEED_SAMPLE` in the program.
 const SEED_SAMPLE: &[u8] = b"sample";
 
-/// The Sample header is 1 discriminator + 1 bump + 32 authority bytes.
-const SAMPLE_HEADER_LEN: usize = 34;
+/// The Sample header is discriminator + bump + authority + u16 value count.
+const SAMPLE_HEADER_LEN: usize = 36;
 
-/// Anchor's on-chain cap for a single realloc instruction.
-const MAX_PERMITTED_DATA_INCREASE: u16 = 1024;
+/// Maximum bytes occupied by the compact tail's 64 u64 values.
+const MAX_COMPACT_TAIL_LEN: u16 = 512;
 
 fn pda_address(program_id: &Pubkey, authority: &Pubkey) -> Pubkey {
 	Pubkey::find_program_address(&[SEED_SAMPLE, authority.as_ref()], program_id).0
@@ -81,7 +81,7 @@ fn realloc2_instruction(
 	)
 }
 
-/// Initialize creates the sample PDA with the fixed 34-byte header.
+/// Initialize creates the sample PDA with the fixed 36-byte compact header.
 #[test]
 #[ignore = "run with pina test"]
 fn initializes_the_sample_account() {
@@ -105,6 +105,7 @@ fn initializes_the_sample_account() {
 		assert_eq!(account.data[0], 1, "account discriminator is Sample");
 		assert_eq!(account.data[1], bump);
 		assert_eq!(&account.data[2..34], authority.to_bytes());
+		assert_eq!(&account.data[34..36], &[0, 0]);
 
 		program.stop().expect("stop isolated program test");
 	});
@@ -129,7 +130,7 @@ fn realloc_grows_within_the_increase_limit() {
 			.send_instruction(initialize_instruction(&program, &authority, &sample, bump))
 			.expect("execute Initialize");
 
-		let grown = SAMPLE_HEADER_LEN + usize::from(MAX_PERMITTED_DATA_INCREASE);
+		let grown = SAMPLE_HEADER_LEN + usize::from(MAX_COMPACT_TAIL_LEN);
 		program
 			.send_instruction(realloc_instruction(
 				&program,
@@ -145,22 +146,25 @@ fn realloc_grows_within_the_increase_limit() {
 			grown,
 			"realloc moved the account length on-chain"
 		);
+		assert_eq!(&account.data[34..36], &64u16.to_le_bytes());
+		for (index, value) in account.data[SAMPLE_HEADER_LEN..]
+			.chunks_exact(8)
+			.enumerate()
+		{
+			assert_eq!(
+				u64::from_le_bytes(value.try_into().expect("u64 value bytes")),
+				u64::try_from(index).expect("value index fits u64"),
+			);
+		}
 
 		program.stop().expect("stop isolated program test");
 	});
 }
 
-/// Anchor parity documents a 1 KiB per-instruction resize cap
-/// (`AccountReallocExceedsLimit`, custom 3016). Agave 4.x runtimes — Mollusk
-/// 0.15 and Surfpool 1.5 alike — do not enforce that cap anymore, and the
-/// program's guard reads a data length that is stale under the real reading of
-/// the input region, so a >1024 delta currently RESIZES the account.
-///
-/// This test pins the observed real-runtime behavior so an upgrade either
-/// restores the cap or changes the guard outcome loudly.
+/// The compact account refuses allocations beyond its declared 64-value cap.
 #[test]
 #[ignore = "run with pina test"]
-fn realloc_growth_beyond_the_cap_documents_current_outcome() {
+fn realloc_growth_beyond_the_compact_capacity_is_rejected() {
 	pina_test::run(async {
 		let program_id = Pubkey::new_from_array(ID.to_bytes());
 		let mut program = ProgramTest::start(program_id)
@@ -175,22 +179,19 @@ fn realloc_growth_beyond_the_cap_documents_current_outcome() {
 			.send_instruction(initialize_instruction(&program, &authority, &sample, bump))
 			.expect("execute Initialize");
 
-		let target = SAMPLE_HEADER_LEN + usize::from(MAX_PERMITTED_DATA_INCREASE) + 1;
-		program
+		let target = SAMPLE_HEADER_LEN + usize::from(MAX_COMPACT_TAIL_LEN) + 8;
+		let error = program
 			.send_instruction(realloc_instruction(
 				&program,
 				&authority,
 				&sample,
 				target.try_into().expect("target len"),
 			))
-			.expect("agave 4.x no longer caps realloc deltas at 1 KiB/tx");
+			.expect_err("compact capacity must bound account growth");
 
 		let account = program.account(&sample).expect("fetch sample account");
-		assert_eq!(
-			account.data.len(),
-			target,
-			"the >1KiB delta resized the account on-chain"
-		);
+		assert_eq!(account.data.len(), SAMPLE_HEADER_LEN);
+		assert_eq!(error.operation(), "execute program instruction");
 
 		program.stop().expect("stop isolated program test");
 	});

@@ -5,6 +5,7 @@ use super::discriminator::extract_discriminator_and_variant;
 use super::doc_comments::extract_docs;
 use super::types::type_to_string;
 use crate::error::IdlError;
+use crate::ir::COMPACT_ACCOUNT_DOC_MARKER;
 use crate::ir::FieldIr;
 
 /// A parsed `#[account(discriminator = ...)]` struct.
@@ -17,6 +18,14 @@ pub struct AccountStruct {
 	pub docs: Vec<String>,
 	/// The name of the PDA declared for this account via `#[pda(...)]`.
 	pub pda_name: Option<String>,
+}
+
+impl AccountStruct {
+	pub(crate) fn is_compact(&self) -> bool {
+		self.docs
+			.iter()
+			.any(|doc| doc == COMPACT_ACCOUNT_DOC_MARKER)
+	}
 }
 
 /// Extract all `#[account(...)]` structs from a file.
@@ -40,7 +49,10 @@ pub fn extract_account_structs(file: &File) -> Result<Vec<AccountStruct>, IdlErr
 		};
 
 		let fields = extract_named_fields(&item_struct.fields);
-		let docs = extract_docs(&item_struct.attrs);
+		let mut docs = extract_docs(&item_struct.attrs);
+		if has_compact_flag(&item_struct.attrs) {
+			docs.push(COMPACT_ACCOUNT_DOC_MARKER.to_owned());
+		}
 		let pda_name = extract_pda_name(&item_struct.attrs, &item_struct.ident.to_string());
 
 		result.push(AccountStruct {
@@ -54,6 +66,18 @@ pub fn extract_account_structs(file: &File) -> Result<Vec<AccountStruct>, IdlErr
 	}
 
 	Ok(result)
+}
+
+fn has_compact_flag(attrs: &[syn::Attribute]) -> bool {
+	attrs.iter().any(|attr| {
+		if !attr.path().is_ident("account") {
+			return false;
+		}
+		attr.parse_args_with(
+			syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
+		)
+		.is_ok_and(|items| items.iter().any(|item| item.path().is_ident("compact")))
+	})
 }
 
 /// Derive the IDL PDA name for a struct with a `#[pda(...)]` attribute.
@@ -112,6 +136,7 @@ mod tests {
 			extract_account_structs(&file).unwrap_or_else(|e| panic!("extract failed: {e}"));
 		assert_eq!(accounts.len(), 1);
 		assert_eq!(accounts[0].name, "CounterState");
+		assert!(!accounts[0].is_compact());
 		assert_eq!(accounts[0].discriminator_enum, "CounterAccountType");
 		assert_eq!(accounts[0].variant, "CounterState");
 		assert_eq!(accounts[0].fields.len(), 2);
@@ -119,6 +144,19 @@ mod tests {
 		assert_eq!(accounts[0].fields[0].rust_type, "u8");
 		assert_eq!(accounts[0].fields[1].name, "count");
 		assert_eq!(accounts[0].fields[1].rust_type, "PodU64");
+	}
+
+	#[test]
+	fn extracts_compact_account_flag() {
+		let source = r#"
+			#[account(discriminator = AccountType, compact)]
+			pub struct DynamicState { pub values: Vec<u64, 8> }
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let accounts =
+			extract_account_structs(&file).unwrap_or_else(|e| panic!("extract failed: {e}"));
+
+		assert!(accounts[0].is_compact());
 	}
 
 	#[test]

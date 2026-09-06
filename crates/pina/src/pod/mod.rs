@@ -6,4 +6,4 @@
 //! those macros. Direct derives and manual `ZeroPodFixed` implementations are
 //! advanced APIs outside Pina's audited macro-generated contract.
 
-pub use zeropod::pod::*;
+pub use pinapod::pod::*;

@@ -7,7 +7,9 @@ The GitHub CI workflow verifies:
 - `lint:clippy`
 - `lint:format`
 - `verify:docs`
-- `verify:security`
+- `security:pina-lint`, `security:audit`, and `security:npm-audit`
+- `security:deny` in a dedicated `cargo-deny` job
+- `security:zizmor` in a dedicated `zizmor` job
 - `test:all` (workspace Rust tests, standalone fuzz-target compilation, and npm package tests)
 - `test:npm-packages` (scoped package metadata, native-target coverage, launchers, and skill installation)
 - `feature-matrix` for `pina` across explicit configurations:
@@ -48,6 +50,7 @@ Every program is deployed at its declared ID and is exercised with a malformed d
 | Owner constraint              | `anchor_system_accounts` rejects an account explicitly created with a non-System owner.                                                                                   |
 | Sysvar address validation     | `anchor_sysvars` rejects ordinary accounts substituted for Clock, Rent, and Stake History.                                                                                |
 | Authority-bound PDA resize    | `anchor_realloc` proves initialize/grow/shrink for its owner and rejects an unrelated signer, a forged typed account, and duplicate resize targets without data mutation. |
+| Compact account lifecycle     | `compact_accounts` proves empty/nonempty creation, full growth, same-size writes, shrink/clear, exact rent adjustment, and rollback for bounds and authority failures.    |
 
 The broader Pina examples also run their purpose-built Mollusk, LiteSVM, and Quasar tests in `test:program-e2e`; these cover PDA derivation, ownership, token-account, arithmetic/range, initialization, and unauthorized-mutation flows that need program-specific state setup. Surfpool complements those tests with a full, deployed SBF boundary check. It provides evidence that the listed invariants hold for the tested attacks; it is not a proof that no other attack exists.
 

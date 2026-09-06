@@ -11,20 +11,26 @@ import {
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
+	type Codec,
 	combineCodec,
 	decodeAccount,
+	type Decoder,
 	type EncodedAccount,
+	type Encoder,
 	type FetchAccountConfig,
 	type FetchAccountsConfig,
 	fetchEncodedAccount,
 	fetchEncodedAccounts,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
 	getAddressDecoder,
 	getAddressEncoder,
+	getArrayDecoder,
+	getArrayEncoder,
 	getStructDecoder,
 	getStructEncoder,
+	getU16Decoder,
+	getU16Encoder,
+	getU64Decoder,
+	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
 	type MaybeAccount,
@@ -41,19 +47,18 @@ export function getSampleDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(SAMPLE_DISCRIMINATOR);
 }
 
-/**
- * The authenticated header at the start of every resizable sample account.
- *
- * Bytes after this fixed header are deliberately not exposed as a typed
- * collection. The example tests allocation and rent behaviour, not a data
- * serialization format; only the header participates in program logic.
- */
+/** A compact account whose active values occupy only the bytes they need. */
 export type Sample = {
 	discriminator: number;
 	/** Canonical PDA bump, persisted for inexpensive validation on resize. */
 	bump: number;
 	/** The only signer permitted to resize this sample. */
 	authority: Address;
+	/**
+	 * Dynamically encoded values; unused capacity occupies no account bytes.
+	 * Pina compact capacity: 64.
+	 */
+	values: Array<bigint>;
 };
 
 export type SampleArgs = {
@@ -61,21 +66,28 @@ export type SampleArgs = {
 	bump: number;
 	/** The only signer permitted to resize this sample. */
 	authority: Address;
+	/**
+	 * Dynamically encoded values; unused capacity occupies no account bytes.
+	 * Pina compact capacity: 64.
+	 */
+	values: Array<number | bigint>;
 };
 
 /** Gets the encoder for {@link SampleArgs} account data. */
-export function getSampleEncoder(): FixedSizeEncoder<SampleArgs> {
+export function getSampleEncoder(): Encoder<SampleArgs> {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"bump",
-			getU8Encoder(),
-		], ["authority", getAddressEncoder()]]),
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["bump", getU8Encoder()],
+			["authority", getAddressEncoder()],
+			["values", getArrayEncoder(getU64Encoder(), { size: getU16Encoder() })],
+		]),
 		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
 
 /** Gets the decoder for {@link Sample} account data. */
-export function getSampleDecoder(): FixedSizeDecoder<Sample> {
+export function getSampleDecoder(): Decoder<Sample> {
 	return getStructDecoder([
 		[
 			"discriminator",
@@ -83,11 +95,12 @@ export function getSampleDecoder(): FixedSizeDecoder<Sample> {
 		],
 		["bump", getU8Decoder()],
 		["authority", getAddressDecoder()],
+		["values", getArrayDecoder(getU64Decoder(), { size: getU16Decoder() })],
 	]);
 }
 
 /** Gets the codec for {@link Sample} account data. */
-export function getSampleCodec(): FixedSizeCodec<SampleArgs, Sample> {
+export function getSampleCodec(): Codec<SampleArgs, Sample> {
 	return combineCodec(getSampleEncoder(), getSampleDecoder());
 }
 

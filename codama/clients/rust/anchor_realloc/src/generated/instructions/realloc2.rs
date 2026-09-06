@@ -8,7 +8,7 @@
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 /// Exercises Anchor's duplicate-reallocation guard.
 ///

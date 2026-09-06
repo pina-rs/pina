@@ -8,7 +8,7 @@
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 pub const TEST_EVENT_CPI_DISCRIMINATOR: u8 = 2u8;
 

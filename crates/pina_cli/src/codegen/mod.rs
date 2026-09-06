@@ -46,7 +46,12 @@ use crate::ir::PdaIr;
 use crate::ir::PdaSeedIr;
 use crate::ir::ProgramIr;
 use crate::ir::ZeroPodEnumIr;
+use crate::parse::types::compact_vec_capacity;
+use crate::parse::types::compact_vec_prefix_size;
+use crate::parse::types::try_rust_type_to_codama_compact_tail;
+use crate::parse::types::try_rust_type_to_codama_compact_tail_at;
 use crate::parse::types::try_rust_type_to_codama_with_zeropod_enums;
+use crate::parse::types::type_node_size;
 
 /// Validate every IR type mapping and convert a `ProgramIr` into a Codama
 /// `RootNode`.
@@ -124,12 +129,105 @@ fn build_account_node(
 	zeropod_enums: &[ZeroPodEnumIr],
 ) -> Result<AccountNode, IdlError> {
 	let mut fields = vec![build_account_discriminator_field(&account.discriminator)];
-	for field in &account.fields {
-		fields.push(build_struct_field(
-			field,
-			format!("account `{}.{}`", account.name, field.name),
-			zeropod_enums,
-		)?);
+	let first_tail = if account.is_compact() {
+		Some(
+			account
+				.fields
+				.iter()
+				.position(|field| compact_vec_prefix_size(&field.rust_type).is_some())
+				.ok_or_else(|| {
+					IdlError::UnsupportedType {
+						ty: account.name.clone(),
+						context: format!("account `{}`", account.name),
+						reason: "compact accounts require at least one trailing `Vec<T, N>` field"
+							.to_string(),
+					}
+				})?,
+		)
+	} else {
+		None
+	};
+	let mut header_offset = account.discriminator.repr_size;
+	let tail_prefix_sizes = first_tail
+		.map(|start| {
+			account.fields[start..]
+				.iter()
+				.map(|field| {
+					compact_vec_prefix_size(&field.rust_type).ok_or_else(|| {
+						IdlError::UnsupportedType {
+							ty: field.rust_type.clone(),
+							context: format!("account `{}.{}`", account.name, field.name),
+							reason: "inline fields cannot follow a compact tail".to_string(),
+						}
+					})
+				})
+				.collect::<Result<Vec<_>, _>>()
+		})
+		.transpose()?;
+	let total_prefix_size = tail_prefix_sizes
+		.as_ref()
+		.map_or(0, |sizes| sizes.iter().sum());
+	let uses_shared_header_offsets = tail_prefix_sizes
+		.as_ref()
+		.is_some_and(|sizes| sizes.len() > 1);
+	let mut prefix_offset = 0;
+
+	for (index, field) in account.fields.iter().enumerate() {
+		let context = format!("account `{}.{}`", account.name, field.name);
+		let mut compact_capacity = None;
+		let mut node = if let Some(start) = first_tail.filter(|start| index >= *start) {
+			compact_capacity = compact_vec_capacity(&field.rust_type);
+			if index == start {
+				prefix_offset = header_offset;
+			}
+			let tail_index = index - start;
+			let skip = if tail_index == 0 {
+				total_prefix_size
+			} else {
+				0
+			};
+			let r#type = if uses_shared_header_offsets {
+				try_rust_type_to_codama_compact_tail_at(
+					&field.rust_type,
+					&context,
+					zeropod_enums,
+					Some(prefix_offset),
+					skip,
+				)?
+			} else {
+				try_rust_type_to_codama_compact_tail(&field.rust_type, &context, zeropod_enums)?
+			};
+			StructFieldTypeNode::new(field.name.as_str(), r#type)
+		} else {
+			let node = build_struct_field(field, context, zeropod_enums)?;
+			if account.is_compact() {
+				header_offset = header_offset
+					.checked_add(type_node_size(&node.r#type).ok_or_else(|| {
+						IdlError::UnsupportedType {
+							ty: field.rust_type.clone(),
+							context: format!("account `{}.{}`", account.name, field.name),
+							reason: "compact inline fields must have a fixed byte size".to_string(),
+						}
+					})?)
+					.ok_or_else(|| IdlError::Other("compact header size overflowed".to_string()))?;
+			}
+			node
+		};
+		if uses_shared_header_offsets
+			&& let Some(sizes) = &tail_prefix_sizes
+			&& let Some(start) = first_tail
+			&& index >= start
+		{
+			prefix_offset += sizes[index - start];
+		}
+		let mut docs = field.docs.clone();
+		if let Some(capacity) = compact_capacity {
+			docs.push(format!("Pina compact capacity: {capacity}."));
+		}
+		if !docs.is_empty() {
+			node.docs = docs.into();
+		}
+		fields.push(node);
 	}
 
 	let data = StructTypeNode::new(fields);
@@ -140,8 +238,9 @@ fn build_account_node(
 		.as_ref()
 		.map(|name| PdaLinkNode::new(name.as_str()));
 
-	if !account.docs.is_empty() {
-		node.docs = account.docs.clone().into();
+	let docs = account.visible_docs();
+	if !docs.is_empty() {
+		node.docs = docs.into();
 	}
 
 	Ok(node)
@@ -413,6 +512,112 @@ mod tests {
 		};
 
 		number_type.format
+	}
+
+	#[test]
+	fn compact_account_metadata_does_not_leak_into_idl_docs() {
+		let account = AccountIr {
+			name: "DynamicState".to_owned(),
+			fields: vec![FieldIr {
+				name: "values".to_owned(),
+				rust_type: "Vec<u64, 8>".to_owned(),
+				docs: vec![],
+			}],
+			discriminator: DiscriminatorIr {
+				value: 1,
+				repr_size: 1,
+			},
+			docs: vec![
+				"Dynamic values.".to_owned(),
+				crate::ir::COMPACT_ACCOUNT_DOC_MARKER.to_owned(),
+			],
+			pda_name: None,
+		};
+
+		let node = build_account_node(&account, &[])
+			.unwrap_or_else(|error| panic!("IDL codegen failed: {error}"));
+		let docs = node.docs.iter().map(String::as_str).collect::<Vec<_>>();
+		let field_docs = node
+			.data
+			.get_nested_type_node()
+			.fields
+			.iter()
+			.find(|field| field.name.as_ref() == "values")
+			.map(|field| field.docs.iter().map(String::as_str).collect::<Vec<_>>())
+			.unwrap_or_else(|| panic!("compact values field missing"));
+
+		assert_eq!(docs, vec!["Dynamic values."]);
+		assert_eq!(field_docs, vec!["Pina compact capacity: 8."]);
+		assert!(account.is_compact());
+	}
+
+	#[test]
+	fn compact_account_codegen_rejects_invalid_ir_shapes() {
+		fn compact_account(fields: Vec<FieldIr>) -> AccountIr {
+			AccountIr {
+				name: "DynamicState".to_owned(),
+				fields,
+				discriminator: DiscriminatorIr {
+					value: 1,
+					repr_size: 1,
+				},
+				docs: vec![crate::ir::COMPACT_ACCOUNT_DOC_MARKER.to_owned()],
+				pda_name: None,
+			}
+		}
+
+		fn field(name: &str, rust_type: &str) -> FieldIr {
+			FieldIr {
+				name: name.to_owned(),
+				rust_type: rust_type.to_owned(),
+				docs: vec![],
+			}
+		}
+
+		let missing_tail = build_account_node(&compact_account(vec![]), &[])
+			.expect_err("compact IR without a tail must be rejected");
+		assert!(missing_tail.to_string().contains("at least one trailing"));
+
+		let inline_after_tail = build_account_node(
+			&compact_account(vec![field("values", "Vec<u64, 8>"), field("count", "u64")]),
+			&[],
+		)
+		.expect_err("inline fields after a tail must be rejected");
+		assert!(
+			inline_after_tail
+				.to_string()
+				.contains("cannot follow a compact tail")
+		);
+
+		let enums = [ZeroPodEnumIr {
+			name: "Status".to_owned(),
+			repr_size: 1,
+			variants: vec![],
+			docs: vec![],
+		}];
+		let unresolved_inline_size = build_account_node(
+			&compact_account(vec![
+				field("status", "Status"),
+				field("values", "Vec<u64, 8>"),
+			]),
+			&enums,
+		)
+		.expect_err("compact inline fields need a known byte size");
+		assert!(
+			unresolved_inline_size
+				.to_string()
+				.contains("fixed byte size")
+		);
+
+		let invalid_tail = build_account_node(
+			&compact_account(vec![
+				field("values", "Vec<u64, 8>"),
+				field("unknown", "Vec<Unknown, 8>"),
+			]),
+			&[],
+		)
+		.expect_err("every compact tail element needs a known size");
+		assert!(invalid_tail.to_string().contains("element size"));
 	}
 
 	#[test]

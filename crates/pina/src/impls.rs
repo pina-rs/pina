@@ -7,11 +7,17 @@ use crate::AccountValidation;
 use crate::AccountView;
 use crate::Address;
 use crate::AsAccount;
+#[cfg(feature = "compact")]
+use crate::AsCompactAccount;
 #[cfg(feature = "token")]
 use crate::AsTokenAccount;
 use crate::CloseAccountWithRecipient;
+#[cfg(feature = "compact")]
+use crate::CompactAccountInfoValidation;
 use crate::LamportTransfer;
 use crate::PinaAccount;
+#[cfg(feature = "compact")]
+use crate::PinaCompactAccount;
 use crate::ProgramError;
 use crate::Ref;
 use crate::RefMut;
@@ -146,6 +152,18 @@ fn validate_type<T: PinaAccount>(account: AccountView, program_id: &Address) -> 
 	}
 
 	Ok(())
+}
+
+#[track_caller]
+#[cfg(feature = "compact")]
+fn validate_compact_type<T: PinaCompactAccount>(
+	account: AccountView,
+	program_id: &Address,
+) -> ProgramResult {
+	validate_owner(account, program_id)?;
+
+	let data = account.try_borrow()?;
+	T::validate_account_data(&data)
 }
 
 #[track_caller]
@@ -486,6 +504,19 @@ macro_rules! impl_account_info_validation {
 				Ok(self)
 			}
 		}
+
+		#[cfg(feature = "compact")]
+		impl<'a> CompactAccountInfoValidation for $type {
+			#[track_caller]
+			fn assert_compact_type<T: PinaCompactAccount>(
+				self,
+				program_id: &Address,
+			) -> Result<Self, ProgramError> {
+				validate_compact_type::<T>(*self, program_id)?;
+
+				Ok(self)
+			}
+		}
 	};
 }
 
@@ -515,6 +546,41 @@ impl AsAccount for AccountView {
 
 		RefMut::try_map(self.try_borrow_mut()?, |data| T::try_from_bytes_mut(data))
 			.map_err(|(_guard, error)| error)
+	}
+}
+
+#[cfg(feature = "compact")]
+impl AsCompactAccount for AccountView {
+	#[track_caller]
+	fn with_compact_account<T, R>(
+		&self,
+		program_id: &Address,
+		use_account: impl FnOnce(T::Ref<'_>) -> Result<R, ProgramError>,
+	) -> Result<R, ProgramError>
+	where
+		T: PinaCompactAccount,
+	{
+		self.assert_owner(program_id)?;
+		let data = self.try_borrow()?;
+		let account = T::try_from_bytes(&data)?;
+
+		use_account(account)
+	}
+
+	#[track_caller]
+	fn with_compact_account_mut<T, R>(
+		&mut self,
+		program_id: &Address,
+		use_account: impl FnOnce(&mut T::Mut<'_>) -> Result<R, ProgramError>,
+	) -> Result<R, ProgramError>
+	where
+		T: PinaCompactAccount,
+	{
+		self.assert_owner(program_id)?;
+		let mut data = self.try_borrow_mut()?;
+		let mut account = T::try_from_bytes_mut(&mut data)?;
+
+		use_account(&mut account)
 	}
 }
 

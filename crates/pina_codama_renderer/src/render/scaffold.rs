@@ -8,7 +8,11 @@ use crate::error::RenderError;
 use crate::error::Result;
 use crate::write_file_error;
 
-pub(crate) fn ensure_crate_scaffold(crate_dir: &Path, program_name: &str) -> Result<()> {
+pub(crate) fn ensure_crate_scaffold(
+	crate_dir: &Path,
+	program_name: &str,
+	uses_compact_accounts: bool,
+) -> Result<()> {
 	fs::create_dir_all(crate_dir.join("src")).map_err(|source| {
 		RenderError::WriteFile {
 			path: crate_dir.to_path_buf(),
@@ -31,6 +35,11 @@ pub(crate) fn ensure_crate_scaffold(crate_dir: &Path, program_name: &str) -> Res
 	let cargo_toml_path = crate_dir.join("Cargo.toml");
 	if !cargo_toml_path.exists() {
 		let package_name = format!("{}-client", snake(program_name).replace('_', "-"));
+		let pina_dependency = if uses_compact_accounts {
+			"pina = { workspace = true, features = [\"compact\"] }"
+		} else {
+			"pina = { workspace = true }"
+		};
 		let cargo_toml = format!(
 			r#"[package]
 name = "{package_name}"
@@ -39,7 +48,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-pina = {{ workspace = true }}
+{pina_dependency}
 num-derive = {{ workspace = true, default-features = true }}
 num-traits = {{ workspace = true, default-features = true }}
 solana-account-info = {{ workspace = true, default-features = true }}
@@ -93,7 +102,7 @@ mod tests {
 			.as_nanos();
 		let crate_dir = std::env::temp_dir().join(format!("pina-scaffold-{unique_id}"));
 
-		ensure_crate_scaffold(&crate_dir, "DemoProgram")
+		ensure_crate_scaffold(&crate_dir, "DemoProgram", false)
 			.unwrap_or_else(|error| panic!("should write scaffold: {error}"));
 		let cargo_toml = fs::read_to_string(crate_dir.join("Cargo.toml"))
 			.unwrap_or_else(|err| panic!("failed to read generated Cargo.toml: {err}"));

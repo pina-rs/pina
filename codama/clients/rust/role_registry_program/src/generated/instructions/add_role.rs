@@ -8,7 +8,7 @@
 	clippy::too_many_arguments
 )]
 
-use pina::zeropod;
+use pina::pinapod;
 
 pub const ADD_ROLE_DISCRIMINATOR: u8 = 1u8;
 

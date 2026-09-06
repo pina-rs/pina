@@ -30,6 +30,18 @@ pub(crate) fn expand(
 	let crate_path = &args.crate_path;
 	let seeds_name = format_ident!("{}Seeds", struct_name);
 	let seeds_with_bump_name = format_ident!("{}SeedsWithBump", struct_name);
+	let is_compact = item_struct.attrs.iter().any(|attr| {
+		if !attr.path().is_ident("account")
+			&& !attr.path().is_ident("pinapod")
+			&& !attr.path().is_ident("zeropod")
+		{
+			return false;
+		}
+		attr.parse_args_with(
+			syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
+		)
+		.is_ok_and(|items| items.iter().any(|item| item.path().is_ident("compact")))
+	});
 
 	// Validate the struct has named fields
 	let named_fields = match &item_struct.fields {
@@ -136,6 +148,17 @@ pub(crate) fn expand(
 			"Assert that `account` is the PDA for the given seeds, using the stored \
 			 `{bump_field}` field."
 		);
+		let load_bump = if is_compact {
+			quote! {
+				#crate_path::AsCompactAccount::with_compact_account::<Self, _>(
+					account,
+					program_id,
+					|state| Ok(state.#bump_field),
+				)?
+			}
+		} else {
+			quote!(#crate_path::AsAccount::as_account::<Self>(account, program_id)?.#bump_field)
+		};
 		quote! {
 			#[doc = #doc]
 			pub fn assert_seeds(
@@ -143,7 +166,7 @@ pub(crate) fn expand(
 				#(#find_seed_params,)*
 				program_id: &#crate_path::Address,
 			) -> ::core::result::Result<(), #crate_path::ProgramError> {
-				let bump = #crate_path::AsAccount::as_account::<Self>(account, program_id)?.bump;
+				let bump = #load_bump;
 				let seeds = Self::seeds(#(#seed_param_names,)*).with_bump(bump);
 				<&#crate_path::AccountView as #crate_path::AccountInfoValidation>::assert_seeds_with_bump(
 					account,

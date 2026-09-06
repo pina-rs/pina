@@ -15,13 +15,11 @@ use anchor_realloc::Realloc2Ix;
 use anchor_realloc::ReallocError;
 use anchor_realloc::ReallocIx;
 use anchor_realloc::Sample;
-use anchor_realloc::SampleZc;
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
 use mollusk_svm::result::InstructionResult;
 use pina::ProgramError;
-use pina::ZeroPodFixed;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
@@ -128,13 +126,13 @@ fn assert_sample(result: &InstructionResult, sample: &Pubkey, authority: &Pubkey
 	assert_eq!(account.owner, program_id());
 	assert_eq!(account.data.len(), len);
 
-	let header = account
-		.data
-		.get(..Sample::SIZE)
-		.unwrap_or_else(|| panic!("sample account is shorter than its header"));
-	let state: &SampleZc = <Sample as ZeroPodFixed>::from_bytes(header)
-		.unwrap_or_else(|error| panic!("sample header must remain valid: {error:?}"));
+	let state = Sample::try_from_bytes(&account.data)
+		.unwrap_or_else(|error| panic!("sample must remain valid: {error:?}"));
 	assert_eq!(state.authority, authority.to_bytes().into());
+	assert_eq!(state.values().len(), (len - Sample::HEADER_SIZE) / 8);
+	for (index, value) in state.values().iter().enumerate() {
+		assert_eq!(value.get(), index as u64);
+	}
 }
 
 /// The supported lifecycle creates an authority-bound PDA, grows it with
@@ -147,9 +145,9 @@ fn authority_can_initialize_grow_and_shrink_its_sample() {
 	let (sample, bump) = derive_sample(&authority);
 	let mut result = initialize_sample(&mollusk, &authority, &sample, bump);
 
-	assert_sample(&result, &sample, &authority, Sample::SIZE);
+	assert_sample(&result, &sample, &authority, Sample::HEADER_SIZE);
 
-	let grown_len = Sample::SIZE + 64;
+	let grown_len = Sample::HEADER_SIZE + 64;
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
 		&realloc_ix_data(grown_len),
@@ -165,7 +163,7 @@ fn authority_can_initialize_grow_and_shrink_its_sample() {
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
-		&realloc_ix_data(Sample::SIZE),
+		&realloc_ix_data(Sample::HEADER_SIZE),
 		vec![
 			AccountMeta::new(authority, true),
 			AccountMeta::new(sample, false),
@@ -177,7 +175,7 @@ fn authority_can_initialize_grow_and_shrink_its_sample() {
 		&result.resulting_accounts,
 		&[Check::success()],
 	);
-	assert_sample(&result, &sample, &authority, Sample::SIZE);
+	assert_sample(&result, &sample, &authority, Sample::HEADER_SIZE);
 }
 
 /// An attacker cannot use their signer to resize a victim's authenticated
@@ -198,7 +196,7 @@ fn unrelated_signer_cannot_resize_a_victim_sample() {
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
-		&realloc_ix_data(Sample::SIZE + 64),
+		&realloc_ix_data(Sample::HEADER_SIZE + 64),
 		vec![
 			AccountMeta::new(attacker, true),
 			AccountMeta::new(victim_sample, false),
@@ -230,15 +228,15 @@ fn canonical_pda_check_rejects_an_arbitrary_program_owned_sample() {
 	let mollusk = create_mollusk();
 	let authority = Pubkey::new_unique();
 	let forged_sample = Pubkey::new_unique();
-	let mut data = vec![0u8; Sample::SIZE];
-	let state = Sample::initialize(&mut data)
+	let mut data = vec![0u8; Sample::HEADER_SIZE];
+	let mut state = Sample::initialize(&mut data)
 		.unwrap_or_else(|error| panic!("sample data setup failed: {error:?}"));
 	state.bump = 0;
 	state.authority = authority.to_bytes().into();
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
-		&realloc_ix_data(Sample::SIZE + 64),
+		&realloc_ix_data(Sample::HEADER_SIZE + 64),
 		vec![
 			AccountMeta::new(authority, true),
 			AccountMeta::new(forged_sample, false),
@@ -287,7 +285,7 @@ fn realloc2_rejects_duplicate_authenticated_targets_without_mutation() {
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
-		&realloc2_ix_data(Sample::SIZE + 64),
+		&realloc2_ix_data(Sample::HEADER_SIZE + 64),
 		vec![
 			AccountMeta::new(authority, true),
 			AccountMeta::new(sample, false),

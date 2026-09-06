@@ -6,7 +6,9 @@
 //!
 //! ## Features
 //!
-//! - **Zero-copy account deserialization** via `zeropod` — no heap allocation.
+//! - **Zero-copy account deserialization** via `pinapod` — no heap allocation.
+//! - **Compact dynamic accounts** *(optional)* with checked trailing vectors
+//!   and typed, rent-adjusting creation/reallocation helpers.
 //! - **`no_std` compatible** — designed for on-chain deployment to the SBF
 //!   target.
 //! - **Discriminator system** — every account, instruction, and event type
@@ -23,11 +25,14 @@
 //!
 //! - `logs` *(default)* — enables on-chain logging via `solana-program-log`.
 //! - `derive` *(default)* — enables the `pina_macros` proc-macro crate.
+//! - `compact` — enables compact account schemas, checked loaders, and typed
+//!   account APIs. This also enables `derive`.
 //! - `token` — enables SPL token / token-2022 helpers and associated token
 //!   account utilities.
 //! - `memo` — enables memo program helpers.
-//! - `account-resize` — enables account realloc helpers on top of Pinocchio's
-//!   safe account resize support.
+//! - `account-resize` — enables raw realloc helpers on top of Pinocchio's safe
+//!   resize support. Enable it with `compact` for typed compact-account creation
+//!   and reallocation.
 
 #![no_std]
 // CU optimization for on-chain programs; inline_always ensures discriminator
@@ -52,6 +57,39 @@ mod utils;
 /// enabled.
 #[cfg(feature = "derive")]
 pub use pina_macros::*;
+/// Re-export of the [`pinapod`] crate for advanced direct use.
+///
+/// Pina's audited zero-copy contract is the closed field grammar enforced by
+/// [`account`], [`instruction`], and [`event`]. Direct Pinapod derives and
+/// manual trait implementations are outside that contract and must uphold
+/// Pinapod's complete safety invariants themselves.
+pub use pinapod;
+/// Backwards-compatible module alias for code generated against `ZeroPod`.
+pub use pinapod as zeropod;
+/// Declares whether a type uses a fixed or compact zero-copy layout.
+pub use pinapod::LayoutKind;
+/// Fixed-capacity UTF-8 string schema used by Pinapod derives.
+pub use pinapod::String;
+/// Bounded vector schema used by compact Pinapod derives.
+#[cfg(feature = "compact")]
+pub use pinapod::Vec;
+/// Marker trait for types that can be safely cast from any byte pattern.
+pub use pinapod::ZcElem;
+/// Maps a native Rust type to its pod (zero-copy) companion and byte size.
+pub use pinapod::ZcField;
+/// Validation trait for stored (pod) types.
+pub use pinapod::ZcValidate;
+/// Derives a validated zero-copy companion for a native schema.
+pub use pinapod::ZeroPod;
+/// Zero-copy access for compact (variable-length) types.
+#[cfg(feature = "compact")]
+pub use pinapod::ZeroPodCompact;
+/// Error type for Pinapod validation failures.
+pub use pinapod::ZeroPodError;
+/// Zero-copy access for fixed-size types.
+pub use pinapod::ZeroPodFixed;
+/// Schema trait for zero-copy types.
+pub use pinapod::ZeroPodSchema;
 /// Re-export of the [`pinocchio`] crate for low-level Solana program
 /// primitives.
 pub use pinocchio;
@@ -115,35 +153,6 @@ pub use solana_program_log::Logger;
 /// Logs the current compute unit usage to the Solana runtime.
 #[cfg(feature = "logs")]
 pub use solana_program_log::log_cu_usage;
-/// Re-export of the [`zeropod`] crate for advanced direct use.
-///
-/// Pina's audited zero-copy contract is the closed field grammar enforced by
-/// [`account`], [`instruction`], and [`event`]. Direct zeropod derives and
-/// manual trait implementations are outside that contract and must uphold
-/// zeropod's complete safety invariants themselves.
-pub use zeropod;
-/// Declares whether a type uses a fixed or compact zero-copy layout.
-pub use zeropod::LayoutKind;
-/// Fixed-capacity UTF-8 string schema used by zeropod derives.
-pub use zeropod::String;
-/// Fixed-capacity vector schema used by zeropod derives.
-pub use zeropod::Vec;
-/// Marker trait for types that can be safely cast from any byte pattern.
-pub use zeropod::ZcElem;
-/// Maps a native Rust type to its pod (zero-copy) companion and byte size.
-pub use zeropod::ZcField;
-/// Validation trait for stored (pod) types.
-pub use zeropod::ZcValidate;
-/// Derives a validated zero-copy companion for a native schema.
-pub use zeropod::ZeroPod;
-/// Zero-copy access for compact (variable-length) types.
-pub use zeropod::ZeroPodCompact;
-/// Error type for zeropod validation failures.
-pub use zeropod::ZeroPodError;
-/// Zero-copy access for fixed-size types.
-pub use zeropod::ZeroPodFixed;
-/// Schema trait for zero-copy types.
-pub use zeropod::ZeroPodSchema;
 
 /// CPI helpers for account creation, PDA allocation, and account closure.
 pub use crate::cpi::*;

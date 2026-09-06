@@ -42,6 +42,7 @@ const EXAMPLE_PROGRAMS = [
 	"anchor_realloc",
 	"anchor_system_accounts",
 	"anchor_sysvars",
+	"compact_accounts",
 	"counter_program",
 	"escrow_program",
 	"hello_solana",
@@ -455,6 +456,11 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
 	},
+	compact_accounts: {
+		instruction: "initialize",
+		accounts: "none",
+		programError: "NotEnoughAccountKeys",
+	},
 	anchor_system_accounts: {
 		instruction: "initialize",
 		accounts: "none",
@@ -525,6 +531,7 @@ const ACCESS_GUARD_PROGRAMS: Partial<
 	anchor_declare_program: "MissingRequiredSignature",
 	anchor_floats: "InvalidAccountData",
 	anchor_realloc: "InvalidAccountData",
+	compact_accounts: "InvalidAccountData",
 	anchor_system_accounts: "MissingRequiredSignature",
 	counter_program: "InvalidAccountData",
 	escrow_program: "InvalidAccountData",
@@ -735,7 +742,7 @@ async function runSpecificGuards(
 }
 
 const SYSTEM_PROGRAM_ID = "11111111111111111111111111111111";
-const SAMPLE_HEADER_SIZE = 34;
+const SAMPLE_HEADER_SIZE = 36;
 
 function reallocInstructionData(
 	discriminator: number,
@@ -767,10 +774,25 @@ function assertSampleHeader(
 	assert.equal(data[0], 1, "sample discriminator changed");
 	assert.equal(data[1], bump, "sample PDA bump changed");
 	assert.deepEqual(
-		data.slice(2, SAMPLE_HEADER_SIZE),
+		data.slice(2, 34),
 		getAddressEncoder().encode(address(authority)),
 		"sample authority changed",
 	);
+}
+
+function assertSampleValues(data: Uint8Array, count: number): void {
+	assert.equal(
+		new DataView(data.buffer, data.byteOffset).getUint16(34, true),
+		count,
+	);
+	assert.equal(data.length, SAMPLE_HEADER_SIZE + count * 8);
+	const view = new DataView(data.buffer, data.byteOffset);
+	for (let index = 0; index < count; index += 1) {
+		assert.equal(
+			view.getBigUint64(SAMPLE_HEADER_SIZE + index * 8, true),
+			BigInt(index),
+		);
+	}
 }
 
 // These cases exercise the security contract introduced by the authority-bound
@@ -805,12 +827,43 @@ async function runAnchorReallocGuards(
 
 	await submit(rawInstruction(
 		descriptor.programId,
-		reallocInstructionData(0, 98),
+		reallocInstructionData(0, 100),
 		[payerWritableSigner, sampleWritable, systemProgram],
 	));
 	const grownData = await fetchAccountData(surfnet, String(sample));
-	assert.equal(grownData.length, 98, "authorized growth did not resize sample");
+	assert.equal(
+		grownData.length,
+		100,
+		"authorized growth did not resize sample",
+	);
 	assertSampleHeader(grownData, bump, authority);
+	assertSampleValues(grownData, 8);
+
+	for (
+		const [target, message] of [
+			[101, "a target splitting a compact value was accepted"],
+			[
+				SAMPLE_HEADER_SIZE + 65 * 8,
+				"growth beyond compact capacity was accepted",
+			],
+		] as const
+	) {
+		await assertRejected(
+			() =>
+				submit(rawInstruction(
+					descriptor.programId,
+					reallocInstructionData(0, target),
+					[payerWritableSigner, sampleWritable, systemProgram],
+				)),
+			message,
+			{ Custom: 3018n },
+		);
+		assert.deepEqual(
+			await fetchAccountData(surfnet, String(sample)),
+			grownData,
+			"invalid compact growth mutated the sample",
+		);
+	}
 
 	const attacker = await createKeyPairSignerFromBytes(
 		new Uint8Array(Surfnet.newKeypair().secretKey),
@@ -854,7 +907,7 @@ async function runAnchorReallocGuards(
 		() =>
 			submit(rawInstruction(
 				descriptor.programId,
-				reallocInstructionData(0, 98),
+				reallocInstructionData(0, 100),
 				[
 					payerWritableSigner,
 					{ address: address(forgedAddress), role: AccountRole.WRITABLE },
@@ -874,7 +927,7 @@ async function runAnchorReallocGuards(
 		() =>
 			submit(rawInstruction(
 				descriptor.programId,
-				reallocInstructionData(1, 98),
+				reallocInstructionData(1, 100),
 				[payerWritableSigner, sampleWritable, sampleWritable, systemProgram],
 			)),
 		"duplicate resize targets were accepted",
@@ -894,6 +947,7 @@ async function runAnchorReallocGuards(
 	const shrunkData = await fetchAccountData(surfnet, String(sample));
 	assert.equal(shrunkData.length, SAMPLE_HEADER_SIZE);
 	assertSampleHeader(shrunkData, bump, authority);
+	assertSampleValues(shrunkData, 0);
 }
 
 async function runExample(descriptor: ExampleDescriptor): Promise<void> {

@@ -1,2 +1,3 @@
 *.snap whitespace=-blank-at-eol
 *.stderr whitespace=-blank-at-eof
+*.patch whitespace=-blank-at-eol,-blank-at-eof

@@ -22,6 +22,7 @@ The `examples/` workspace members demonstrate focused usage patterns. They are n
 - `anchor_system_accounts`: system-program owner validation parity.
 - `anchor_sysvars`: clock/rent/stake-history sysvar validation parity.
 - `anchor_realloc`: authority-bound PDA realloc lifecycle, growth limits, and duplicate-target safety checks.
+- `compact_accounts`: focused compact-account size management across create, grow, same-size update, shrink, clear, rent adjustment, and rejected boundary cases.
 
 Use examples as references for the specific framework behavior each one demonstrates. Do not infer unimplemented economic behavior from an instruction name. Read [Production Readiness](./production-readiness.md) before adapting an example for an asset-bearing program.
 

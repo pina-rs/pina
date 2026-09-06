@@ -6,7 +6,7 @@ mod custom {
 	#[derive(Clone, Copy)]
 	pub struct Custom;
 
-	impl ZcField for Custom {
+	unsafe impl ZcField for Custom {
 		type Pod = u8;
 
 		const POD_SIZE: usize = 1;

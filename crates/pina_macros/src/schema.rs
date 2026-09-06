@@ -1,11 +1,11 @@
 //! Closed field grammar for Pina's fixed zero-copy schemas.
 //!
-//! Zeropod's derive intentionally supports a fallback through `ZcField`.
-//! That extension point is useful for direct zeropod users, but Pina cannot
-//! safely accept it at an account or instruction boundary: `ZcField` and
-//! `ZcValidate` are safe traits, so an unknown mapping is not proof that its
-//! generated storage type may be referenced before validation. Pina therefore
-//! accepts only the concrete representations audited below.
+//! Pinapod's derive intentionally supports a fallback through `ZcField`.
+//! That extension point is useful for direct Pinapod users, but Pina cannot
+//! safely accept it at an account or instruction boundary: even though
+//! `ZcField` is an unsafe trait, an unknown implementation is outside Pina's
+//! closed schema contract. Pina therefore accepts only the concrete
+//! representations audited below.
 
 use quote::quote;
 use syn::Expr;
@@ -19,6 +19,10 @@ use syn::PathArguments;
 use syn::Token;
 use syn::Type;
 use syn::punctuated::Punctuated;
+
+fn is_pinapod_attribute(attribute: &syn::Attribute) -> bool {
+	attribute.path().is_ident("pinapod") || attribute.path().is_ident("zeropod")
+}
 
 /// Validate a schema and emit compile-time type and layout proofs.
 pub(crate) fn validate_fixed_schema(
@@ -34,14 +38,10 @@ pub(crate) fn validate_fixed_schema(
 		));
 	}
 
-	if item
-		.attrs
-		.iter()
-		.any(|attribute| attribute.path().is_ident("zeropod"))
-	{
+	if item.attrs.iter().any(is_pinapod_attribute) {
 		return Err(syn::Error::new_spanned(
 			item,
-			"`#[zeropod(...)]` cannot override a Pina account, instruction, or event layout",
+			"`#[pinapod(...)]` cannot override a Pina account, instruction, or event layout",
 		));
 	}
 
@@ -121,20 +121,281 @@ pub(crate) fn validate_fixed_schema(
 	})
 }
 
+/// Compile-time proofs and size metadata for a compact account schema.
+pub(crate) struct CompactSchema {
+	pub(crate) proofs: proc_macro2::TokenStream,
+	pub(crate) max_size: proc_macro2::TokenStream,
+	pub(crate) tail_alignment: proc_macro2::TokenStream,
+}
+
+/// Validate the interoperable compact-account subset.
+///
+/// Compact fields form a suffix, matching Pinapod's compact schema grammar.
+/// Every tail length lives in the fixed header and the active payloads are
+/// concatenated after it in declaration order.
+pub(crate) fn validate_compact_schema(
+	item: &ItemStruct,
+	crate_path: &syn::Path,
+	discriminator: &syn::Path,
+	header_name: &syn::Ident,
+) -> syn::Result<CompactSchema> {
+	validate_schema_container(item)?;
+
+	let Fields::Named(fields) = &item.fields else {
+		return Err(syn::Error::new_spanned(
+			item,
+			"Pina zero-copy schemas must have named fields",
+		));
+	};
+	let struct_name = &item.ident;
+	let mut field_proofs = Vec::with_capacity(fields.named.len());
+	let mut header_sizes = Vec::with_capacity(fields.named.len());
+	let mut tail_max_sizes = Vec::new();
+	let mut tail_element_sizes = Vec::new();
+	let mut tail_prefix_proofs = Vec::new();
+	let mut seen_tail = false;
+
+	for field in &fields.named {
+		if is_compact_vec(field) {
+			seen_tail = true;
+			let (source, element, capacity, prefix_size) = classify_compact_vec(field, crate_path)?;
+			let native = &element.native;
+			let pod = &element.pod;
+			field_proofs.push(mapping_proof(&source, native, pod, crate_path));
+			header_sizes.push(quote!(#prefix_size));
+			tail_max_sizes.push(quote!(#capacity * ::core::mem::size_of::<#pod>()));
+			tail_element_sizes.push(quote!(::core::mem::size_of::<#pod>()));
+			let prefix_max = match prefix_size {
+				1 => quote!(::core::primitive::u8::MAX as usize),
+				2 => quote!(::core::primitive::u16::MAX as usize),
+				4 => quote!(::core::primitive::u32::MAX as usize),
+				8 => quote!(usize::MAX),
+				_ => unreachable!("validated compact prefix size"),
+			};
+			tail_prefix_proofs.push(quote! {
+				::core::assert!(::core::mem::size_of::<#pod>() > 0);
+				::core::assert!(#capacity <= #prefix_max);
+			});
+			continue;
+		}
+
+		if seen_tail {
+			return Err(syn::Error::new_spanned(
+				field,
+				"inline fields cannot follow a compact `Vec` field; place every fixed field \
+				 before the dynamic suffix",
+			));
+		}
+
+		let audited = classify_field(field, crate_path)?;
+		let source = &field.ty;
+		let native = &audited.native;
+		let pod = &audited.pod;
+		field_proofs.push(mapping_proof(source, native, pod, crate_path));
+		header_sizes.push(quote!(::core::mem::size_of::<#pod>()));
+	}
+
+	if !seen_tail {
+		return Err(syn::Error::new_spanned(
+			item,
+			"compact accounts require at least one trailing `Vec<T, N>` field",
+		));
+	}
+
+	let expected_header = quote!(#discriminator::BYTES #(+ #header_sizes)*);
+	let max_size = quote!(#expected_header #(+ #tail_max_sizes)*);
+	let tail_alignment = quote!({
+		const fn gcd(mut left: usize, mut right: usize) -> usize {
+			while right != 0 {
+				let remainder = left % right;
+				left = right;
+				right = remainder;
+			}
+			left
+		}
+
+		let mut alignment = 0;
+		#(alignment = gcd(alignment, #tail_element_sizes);)*
+		alignment
+	});
+	let proofs = quote! {
+		#(#field_proofs)*
+
+		const _: fn() = || {
+			fn assert_layout<T: #crate_path::ZeroPodCompact<Header = #header_name>>() {}
+			assert_layout::<#struct_name>();
+		};
+
+		const _: () = {
+			::core::assert!(::core::mem::align_of::<#header_name>() == 1);
+			::core::assert!(::core::mem::size_of::<#header_name>() == #expected_header);
+			#(#tail_prefix_proofs)*
+		};
+	};
+
+	Ok(CompactSchema {
+		proofs,
+		max_size,
+		tail_alignment,
+	})
+}
+
+fn is_compact_vec(field: &Field) -> bool {
+	let Type::Path(type_path) = &field.ty else {
+		return false;
+	};
+
+	type_path
+		.path
+		.segments
+		.last()
+		.is_some_and(|segment| matches!(segment.ident.to_string().as_str(), "Vec" | "PodVec"))
+}
+
+fn validate_schema_container(item: &ItemStruct) -> syn::Result<()> {
+	if !item.generics.params.is_empty() || item.generics.where_clause.is_some() {
+		return Err(syn::Error::new_spanned(
+			&item.generics,
+			"Pina zero-copy schemas cannot be generic; use concrete audited field types",
+		));
+	}
+
+	if item.attrs.iter().any(is_pinapod_attribute) {
+		return Err(syn::Error::new_spanned(
+			item,
+			"`#[pinapod(...)]` cannot override a Pina account, instruction, or event layout",
+		));
+	}
+
+	for attribute in item
+		.attrs
+		.iter()
+		.filter(|attribute| attribute.path().is_ident("derive"))
+	{
+		let derives =
+			attribute.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated)?;
+		if let Some(derive) = derives.iter().find(|derive| {
+			derive
+				.segments
+				.last()
+				.is_some_and(|segment| segment.ident == "ZeroPod")
+		}) {
+			return Err(syn::Error::new_spanned(
+				derive,
+				"Pina owns the `ZeroPod` derive for account, instruction, and event schemas; \
+				 remove the manual derive",
+			));
+		}
+	}
+
+	Ok(())
+}
+
+fn classify_compact_vec(
+	field: &Field,
+	crate_path: &syn::Path,
+) -> syn::Result<(Type, AuditedField, Expr, usize)> {
+	if field.attrs.iter().any(is_pinapod_attribute) {
+		return Err(syn::Error::new_spanned(
+			field,
+			"`#[pinapod(...)]` field overrides are not supported by Pina schemas",
+		));
+	}
+
+	let Type::Path(type_path) = &field.ty else {
+		return Err(compact_tail_error(&field.ty));
+	};
+	let Some(segment) = type_path.path.segments.last() else {
+		return Err(compact_tail_error(&field.ty));
+	};
+	if !matches!(segment.ident.to_string().as_str(), "Vec" | "PodVec") {
+		return Err(compact_tail_error(&field.ty));
+	}
+	let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+		return Err(compact_tail_error(&field.ty));
+	};
+	if !(2..=3).contains(&arguments.args.len()) {
+		return Err(compact_tail_error(&field.ty));
+	}
+	let Some(GenericArgument::Type(element)) = arguments.args.first() else {
+		return Err(compact_tail_error(&field.ty));
+	};
+	let capacity = match arguments.args.iter().nth(1) {
+		Some(GenericArgument::Const(value)) if is_integer_literal(value) => value.clone(),
+		_ => return Err(compact_tail_error(&field.ty)),
+	};
+	let prefix_size = match arguments.args.iter().nth(2) {
+		None => 2,
+		Some(GenericArgument::Const(Expr::Lit(ExprLit {
+			lit: Lit::Int(value),
+			..
+		}))) => {
+			value
+				.base10_parse::<usize>()
+				.map_err(|_| compact_tail_error(&field.ty))?
+		}
+		_ => return Err(compact_tail_error(&field.ty)),
+	};
+	if !matches!(prefix_size, 1 | 2 | 4 | 8) {
+		return Err(syn::Error::new_spanned(
+			&field.ty,
+			"compact `Vec` prefixes must use 1, 2, 4, or 8 bytes",
+		));
+	}
+
+	let audited = match element {
+		Type::Array(array) => classify_byte_array(array, crate_path)?,
+		Type::Path(path) if path.qself.is_none() => classify_path(element, path, crate_path)?,
+		_ => return Err(compact_tail_error(&field.ty)),
+	};
+
+	Ok((element.clone(), audited, capacity, prefix_size))
+}
+
+fn mapping_proof(
+	source: &Type,
+	native: &proc_macro2::TokenStream,
+	pod: &proc_macro2::TokenStream,
+	crate_path: &syn::Path,
+) -> proc_macro2::TokenStream {
+	quote! {
+		const _: fn(#source) -> #native = |value| value;
+
+		const _: fn() = || {
+			fn assert_mapping<T: #crate_path::ZcField<Pod = #pod>>() {}
+			fn assert_storage<T: #crate_path::ZcElem>() {}
+
+			assert_mapping::<#source>();
+			assert_storage::<#pod>();
+		};
+
+		const _: () = {
+			::core::assert!(::core::mem::align_of::<#pod>() == 1);
+			::core::assert!(
+				::core::mem::size_of::<#pod>() == <#source as #crate_path::ZcField>::POD_SIZE,
+			);
+		};
+	}
+}
+
+fn compact_tail_error(ty: &Type) -> syn::Error {
+	syn::Error::new_spanned(
+		ty,
+		"compact account tails must be `Vec<T, N>` fields with an audited element type and \
+		 literal capacity",
+	)
+}
+
 struct AuditedField {
 	native: proc_macro2::TokenStream,
 	pod: proc_macro2::TokenStream,
 }
 
 fn classify_field(field: &Field, crate_path: &syn::Path) -> syn::Result<AuditedField> {
-	if field
-		.attrs
-		.iter()
-		.any(|attribute| attribute.path().is_ident("zeropod"))
-	{
+	if field.attrs.iter().any(is_pinapod_attribute) {
 		return Err(syn::Error::new_spanned(
 			field,
-			"`#[zeropod(...)]` field overrides are not supported by Pina schemas",
+			"`#[pinapod(...)]` field overrides are not supported by Pina schemas",
 		));
 	}
 

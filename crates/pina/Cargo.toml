@@ -20,10 +20,12 @@ token = [
 memo = ["dep:pinocchio-memo"]
 account-resize = ["pinocchio/account-resize", "pinocchio-system/account-resize"]
 derive = ["dep:pina_macros"]
+compact = ["derive", "pina_macros/compact"]
 
 [dependencies]
 pastey = { workspace = true, default-features = true }
 pina_macros = { workspace = true, optional = true }
+pinapod = { workspace = true, default-features = true }
 pinocchio = { workspace = true, default-features = true }
 pinocchio-associated-token-account = { workspace = true, optional = true, default-features = true }
 pinocchio-memo = { workspace = true, optional = true, default-features = true }
@@ -32,7 +34,6 @@ pinocchio-token = { workspace = true, optional = true, default-features = true }
 pinocchio-token-2022 = { workspace = true, optional = true, default-features = true }
 solana-address = { workspace = true, default-features = true }
 solana-program-log = { workspace = true, optional = true, features = ["macro"], default-features = true }
-zeropod = { workspace = true, default-features = true }
 
 [dev-dependencies]
 proptest = { workspace = true, default-features = true }

@@ -12,6 +12,10 @@ description = "derive macros for a solana and pinocchio smart contract framework
 [lib]
 proc-macro = true
 
+[features]
+default = []
+compact = []
+
 [dependencies]
 darling = { workspace = true, default-features = true }
 heck = { workspace = true, default-features = true }
