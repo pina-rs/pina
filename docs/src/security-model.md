@@ -77,7 +77,7 @@ Closing guidance under Pinocchio 0.11:
 - **Use `assert_type::<T>()`** to prevent type cosplay — it checks discriminator, owner, and data size
 - **Use `CloseAccountZeroed { account, recipient }.invoke()` or `zeroed()` + `close_with_recipient()`** when stale account bytes must be invalidated before close
 - **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
-- **Namespace PDA seeds** with type-specific prefixes to prevent PDA sharing across account types
+- **Give each account type its own seed namespace** so PDAs cannot collide across account types
 
 <!-- {/pinaSecurityBestPractices} -->
 

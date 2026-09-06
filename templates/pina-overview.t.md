@@ -68,15 +68,15 @@ All types are alignment-1 byte-backed values that implement zeropod's `ZcElem` a
 | `PodString` | Fixed-capacity string  | `PFX`-byte length prefix + `N` data bytes |
 | `PodVec`    | Fixed-capacity vec     | `PFX`-byte length prefix + `N` elements   |
 
-The full generic forms are `PodOption<T: ZcElem>`, `PodString<N, PFX = 1>`, and `PodVec<T: ZcElem, N, PFX = 2>`. All collection layouts are alignment 1 and padding-free when `T: ZcElem`. `ZcValidate` checks tags, length prefixes, active elements, and UTF-8 before safe access. Length prefixes (`PFX`) default to 1 byte for strings (max 255) and 2 bytes for vectors (max 65 535 elements).
+The full generic forms are `PodOption<T: ZcElem, PFX = 1>`, `PodString<N, PFX = 1>`, and `PodVec<T: ZcElem, N, PFX = 2>`. All collection layouts are alignment 1 and padding-free when `T: ZcElem`. `ZcValidate` checks tags, length prefixes, active elements, and UTF-8 before safe access. Length prefixes (`PFX`) default to 1 byte for strings (max 255) and 2 bytes for vectors (max 65 535 elements).
 
 <!-- {/podCollectionTypesTable} -->
 
 <!-- {@podCollectionDescription} -->
 
-Collection types store data inline without allocation for advanced direct zeropod use. Pina's `#[account]`, `#[instruction]`, and `#[event]` macros reject `PodString`/`String` and `PodVec`/`Vec` fields because their inactive capacity is not guaranteed to be initialized after every upstream construction path. Use fully initialized fixed byte arrays plus checked semantic helpers in macro-generated schemas. Semantic `Option<scalar>` remains supported because Pina proves its exact `PodOption` mapping and scalar storage contract.
+Collection types store data inline without allocation for advanced direct Pinapod use. Pina's `#[account]`, `#[instruction]`, and `#[event]` macros reject `PodString`/`String` and `PodVec`/`Vec` fields in fixed-layout schemas because their inactive capacity is not guaranteed to be initialized after every upstream construction path; compact schemas instead accept exactly one bounded `Vec`/`PodVec` tail. Use fully initialized fixed byte arrays plus checked semantic helpers in macro-generated schemas. Semantic `Option<scalar>` remains supported because Pina proves its exact `PodOption` mapping and scalar storage contract.
 
-For direct zeropod integrations, zeropod boundary validation must establish the active `PodString` bytes are valid UTF-8 before callers use `as_str()`. `PodVec` offers slice-based access via `as_slice()` / `as_slice_mut()`, and `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`. Those direct integrations are outside Pina's audited macro-generated contract and must uphold zeropod's complete safety invariants.
+For direct Pinapod integrations, Pinapod boundary validation must establish the active `PodString` bytes are valid UTF-8 before callers use `as_str()`. `PodVec` offers slice-based access via `as_slice()` / `as_slice_mut()`, and `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`. Those direct integrations are outside Pina's audited macro-generated contract and must uphold Pinapod's complete safety invariants.
 
 <!-- {/podCollectionDescription} -->
 
@@ -94,8 +94,11 @@ Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 | ----------------------- | ----------------------------- | ----------------------------------------------------------------- |
 | `pina`                  | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types. |
 | `pina_macros`           | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.    |
-| `pina_cli`              | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding.  |
+| `pina_cli`              | `crates/pina_cli`             | CLI for building, testing, inspecting, and generating Pina program artifacts. |
 | `pina_codama_renderer`  | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.     |
+| `pina_cpi_renderer`     | `crates/pina_cpi_renderer`    | Standalone Codama renderer generating Pina CPI client crates.     |
+| `pina_lints`            | `crates/pina_lints`           | Pina security lints and the driver behind `pina lint`.           |
+| `pina_test`             | `crates/pina_test`            | Surfpool-backed program test harness.                            |
 | `pina_profile`          | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                     |
 | `pina_sdk_ids`          | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.         |
 | `@pina-rs/codama-nodes` | `packages/nodes-from-pina`    | Pina IDL conversion and normalization for Codama root nodes.      |
@@ -106,7 +109,7 @@ Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 
 <!-- {@pinaFeatureHighlights} -->
 
-- **Validated zero-copy deserialization** — zeropod validates fixed-layout account data before Pina reinterprets it in place, with no heap allocation.
+- **Validated zero-copy deserialization** — Pinapod validates fixed-layout account data before Pina reinterprets it in place, with no heap allocation.
 - **`no_std` compatible** — all crates compile to the `bpfel-unknown-none` SBF target for on-chain deployment.
 - **Low compute units** — built on `pinocchio` instead of `solana-program`, saving thousands of CU per instruction.
 - **Discriminator system** — every account, instruction, and event type carries a typed discriminator as its first field.
@@ -131,10 +134,10 @@ Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 Programs are compiled to the `bpfel-unknown-none` target using `sbpf-linker`:
 
 ```sh
-cargo +nightly build --release --target bpfel-unknown-none -p my_program -Z build-std=core,alloc -F bpf-entrypoint
+cargo build --release --target bpfel-unknown-none -p my_program -Z build-std=core,alloc -F bpf-entrypoint
 ```
 
-The `bpf-entrypoint` feature gate separates the on-chain entrypoint from the library code used in tests.
+The pinned nightly toolchain from `rust-toolchain.toml` runs the build; the `bpf-entrypoint` feature gate separates the on-chain entrypoint from the library code used in tests.
 
 <!-- {/sbfBuildInstructions} -->
 
@@ -201,7 +204,7 @@ The profiler decodes each SBF instruction opcode and assigns costs: regular inst
 - **Use `assert_type::<T>()`** to prevent type cosplay — it checks discriminator, owner, and data size
 - **Use `CloseAccountZeroed { account, recipient }.invoke()` or `zeroed()` + `close_with_recipient()`** when stale account bytes must be invalidated before close
 - **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
-- **Namespace PDA seeds** with type-specific prefixes to prevent PDA sharing across account types
+- **Give each account type its own seed namespace** so PDAs cannot collide across account types
 
 <!-- {/pinaSecurityBestPractices} -->
 

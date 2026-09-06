@@ -12,7 +12,7 @@ Each module exposes an `ID` constant declared via `solana_address::declare_id!`.
 
 <!-- {=crateReadmeBadgeRow:"pina_sdk_ids"} -->
 
-[![Crates.io](https://img.shields.io/badge/crates.io-pina**sdk**ids-orange?logo=rust)](https://crates.io/crates/pina_sdk_ids) [![Docs.rs](https://img.shields.io/badge/docs.rs-pina**sdk**ids-1f425f?logo=docs.rs)](https://docs.rs/pina_sdk_ids/) [![CI](https://github.com/pina-rs/pina/actions/workflows/ci.yml/badge.svg)](https://github.com/pina-rs/pina/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/pina-rs/pina/branch/main/graph/badge.svg)](https://codecov.io/gh/pina-rs/pina) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/license/apache-2.0)
+[![Crates.io](https://img.shields.io/badge/crates.io-pina__sdk__ids-orange?logo=rust)](https://crates.io/crates/pina_sdk_ids) [![Docs.rs](https://img.shields.io/badge/docs.rs-pina__sdk__ids-1f425f?logo=docs.rs)](https://docs.rs/pina_sdk_ids/) [![CI](https://github.com/pina-rs/pina/actions/workflows/ci.yml/badge.svg)](https://github.com/pina-rs/pina/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/pina-rs/pina/branch/main/graph/badge.svg)](https://codecov.io/gh/pina-rs/pina) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/license/apache-2.0)
 
 <!-- {/crateReadmeBadgeRow} -->
 
