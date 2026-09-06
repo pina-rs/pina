@@ -126,6 +126,15 @@ pub(crate) struct CompactSchema {
 	pub(crate) proofs: proc_macro2::TokenStream,
 	pub(crate) max_size: proc_macro2::TokenStream,
 	pub(crate) tail_alignment: proc_macro2::TokenStream,
+	pub(crate) tails: Vec<CompactTail>,
+}
+
+/// Size metadata for one compact tail.
+pub(crate) struct CompactTail {
+	pub(crate) name: syn::Ident,
+	pub(crate) pod: proc_macro2::TokenStream,
+	pub(crate) capacity: Expr,
+	pub(crate) prefix_size: usize,
 }
 
 /// Validate the interoperable compact-account subset.
@@ -153,6 +162,7 @@ pub(crate) fn validate_compact_schema(
 	let mut tail_max_sizes = Vec::new();
 	let mut tail_element_sizes = Vec::new();
 	let mut tail_prefix_proofs = Vec::new();
+	let mut tails = Vec::new();
 	let mut seen_tail = false;
 
 	for field in &fields.named {
@@ -165,6 +175,18 @@ pub(crate) fn validate_compact_schema(
 			header_sizes.push(quote!(#prefix_size));
 			tail_max_sizes.push(quote!(#capacity * ::core::mem::size_of::<#pod>()));
 			tail_element_sizes.push(quote!(::core::mem::size_of::<#pod>()));
+			let Some(name) = &field.ident else {
+				return Err(syn::Error::new_spanned(
+					field,
+					"compact tails must be named",
+				));
+			};
+			tails.push(CompactTail {
+				name: name.clone(),
+				pod: pod.clone(),
+				capacity: capacity.clone(),
+				prefix_size,
+			});
 			let prefix_max = match prefix_size {
 				1 => quote!(::core::primitive::u8::MAX as usize),
 				2 => quote!(::core::primitive::u16::MAX as usize),
@@ -237,6 +259,7 @@ pub(crate) fn validate_compact_schema(
 		proofs,
 		max_size,
 		tail_alignment,
+		tails,
 	})
 }
 

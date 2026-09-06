@@ -15,14 +15,11 @@
 ))]
 extern crate std;
 
-use core::mem::size_of;
-
 use pina::*;
 
 declare_id!("85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn");
 
 const SEED_JOURNAL: &[u8] = b"compact-journal";
-pub const MAX_ENTRIES: usize = 8;
 
 #[error]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,22 +61,7 @@ pub struct Journal {
 	pub markers: PodVec<u8, 8, 8>,
 }
 
-/// Returns the exact encoded account size for `entry_count` active entries.
-///
-/// Prefer accepting a logical element count at instruction boundaries and
-/// deriving bytes with this helper. This makes split-element sizes impossible.
-///
-/// # Errors
-///
-/// Returns [`CompactAccountError::CapacityExceeded`] when the requested count
-/// exceeds [`MAX_ENTRIES`].
-pub fn account_size(entry_count: usize) -> Result<usize, ProgramError> {
-	if entry_count > MAX_ENTRIES {
-		return Err(CompactAccountError::CapacityExceeded.into());
-	}
-
-	Ok(Journal::HEADER_SIZE + entry_count * (size_of::<PodU64>() + size_of::<u8>()))
-}
+pub const MAX_ENTRIES: usize = Journal::ENTRIES_CAPACITY;
 
 #[instruction(discriminator = CompactInstruction::Initialize)]
 pub struct InitializeIx {
@@ -170,7 +152,8 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = InitializeIx::try_from_bytes(data)?;
 		let entry_count = usize::from(args.entry_count);
-		let space = account_size(entry_count)?;
+		let space = Journal::projected_bytes(entry_count, entry_count)
+			.map_err(|_| ProgramError::from(CompactAccountError::CapacityExceeded))?;
 		let authority_key = *self.authority.address();
 		let seeds = Journal::seeds(&authority_key);
 		let seeds_with_bump = seeds.with_bump(args.bump);
@@ -228,7 +211,8 @@ impl<'a> ProcessAccountInfos<'a> for ResizeAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = ResizeIx::try_from_bytes(data)?;
 		let target_count = usize::from(args.entry_count);
-		let target_size = account_size(target_count)?;
+		let target_size = Journal::projected_bytes(target_count, target_count)
+			.map_err(|_| ProgramError::from(CompactAccountError::CapacityExceeded))?;
 		let authority_key = *self.authority.address();
 
 		self.authority.assert_signer()?.assert_writable()?;
@@ -328,7 +312,7 @@ impl<'a> ProcessAccountInfos<'a> for WriteAccounts<'a> {
 				.commit()
 				.map_err(|_| ProgramError::InvalidAccountData)?
 		};
-		if encoded_size != account_size(len)? {
+		if encoded_size != Journal::projected_bytes(len, len)? {
 			return Err(ProgramError::InvalidAccountData);
 		}
 
@@ -371,18 +355,31 @@ mod tests {
 	#[test]
 	fn size_formula_covers_empty_partial_and_full_accounts() {
 		assert_eq!(Journal::HEADER_SIZE, 48);
+		assert_eq!(Journal::MIN_SIZE, Journal::HEADER_SIZE);
 		assert_eq!(Journal::MAX_SIZE, 120);
 		assert_eq!(Journal::TAIL_ALIGNMENT, 1);
-		assert_eq!(account_size(0), Ok(Journal::HEADER_SIZE));
-		assert_eq!(account_size(3), Ok(Journal::HEADER_SIZE + 27));
-		assert_eq!(account_size(MAX_ENTRIES), Ok(Journal::MAX_SIZE));
+		assert_eq!(Journal::ENTRIES_CAPACITY, 8);
+		assert_eq!(Journal::MARKERS_CAPACITY, 8);
+		assert_eq!(Journal::projected_bytes(0, 0), Ok(Journal::MIN_SIZE));
+		assert_eq!(
+			Journal::projected_bytes(3, 3),
+			Ok(Journal::HEADER_SIZE + 27)
+		);
+		assert_eq!(
+			Journal::projected_bytes(MAX_ENTRIES, Journal::MARKERS_CAPACITY),
+			Ok(Journal::MAX_SIZE)
+		);
 	}
 
 	#[test]
-	fn size_formula_rejects_counts_past_capacity() {
+	fn size_formula_rejects_each_count_past_its_capacity() {
 		assert_eq!(
-			account_size(MAX_ENTRIES + 1),
-			Err(CompactAccountError::CapacityExceeded.into())
+			Journal::projected_bytes(MAX_ENTRIES + 1, 0),
+			Err(ProgramError::InvalidAccountData)
+		);
+		assert_eq!(
+			Journal::projected_bytes(0, Journal::MARKERS_CAPACITY + 1),
+			Err(ProgramError::InvalidAccountData)
 		);
 	}
 
@@ -415,6 +412,12 @@ mod tests {
 			journal
 				.set_markers(&markers[..3])
 				.unwrap_or_else(|error| panic!("set markers: {error:?}"));
+			assert_eq!(journal.encoded_size(), Journal::MIN_SIZE);
+			assert_eq!(
+				journal.projected_size(),
+				Journal::projected_bytes(3, 3)
+					.unwrap_or_else(|error| panic!("project size: {error:?}"))
+			);
 			journal
 				.commit()
 				.unwrap_or_else(|error| panic!("commit journal: {error:?}"))
@@ -428,13 +431,15 @@ mod tests {
 		assert_eq!(journal.revision.get(), 2);
 		assert_eq!(journal.entries(), &entries[..3]);
 		assert_eq!(journal.markers(), &markers[..3]);
+		assert_eq!(journal.encoded_size(), encoded_size);
 	}
 
 	#[test]
 	fn compact_codec_handles_empty_and_full_tails() {
 		for count in [0, MAX_ENTRIES] {
 			let mut data = [0u8; Journal::MAX_SIZE];
-			let size = account_size(count).unwrap_or_else(|error| panic!("size: {error:?}"));
+			let size = Journal::projected_bytes(count, count)
+				.unwrap_or_else(|error| panic!("size: {error:?}"));
 			let entries = initialized_entries(count);
 			let markers = initialized_markers(count);
 			let encoded = {

@@ -76,7 +76,8 @@ fn assert_journal(
 	expected_entries: &[u64],
 ) {
 	let account = program.account(journal).expect("fetch journal account");
-	let expected_size = Journal::HEADER_SIZE + expected_entries.len() * 9;
+	let expected_size = Journal::projected_bytes(expected_entries.len(), expected_entries.len())
+		.expect("project journal size");
 	assert_eq!(account.owner, program.program_id());
 	assert_eq!(account.data.len(), expected_size);
 	assert_eq!(
@@ -107,6 +108,12 @@ fn assert_journal(
 	assert_eq!(
 		&account.data[entries_end..],
 		&(0..expected_entries.len() as u8).collect::<Vec<_>>(),
+	);
+	assert_eq!(
+		Journal::try_from_bytes(&account.data)
+			.expect("decode journal")
+			.encoded_size(),
+		expected_size,
 	);
 }
 
