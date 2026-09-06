@@ -248,7 +248,7 @@ For long-lived accounts, add a migration instruction that rewrites every stored 
 
 <!-- {=pinaDiscriminatorLayoutDecisionMatrix} -->
 
-## Discriminator layout decision matrix
+### Discriminator layout decision matrix
 
 The discriminator strategy determines byte layout, parser guarantees, and cross-protocol compatibility.
 

@@ -59,7 +59,7 @@ For instruction payloads:
 
 <!-- {=pinaDiscriminatorLayoutDecisionMatrix} -->
 
-## Discriminator layout decision matrix
+### Discriminator layout decision matrix
 
 The discriminator strategy determines byte layout, parser guarantees, and cross-protocol compatibility.
 

@@ -141,7 +141,7 @@ End-to-end setup steps:
 4. Generate clients from the IDLs: `codama:clients:generate`
 5. Run the full validation pipeline: `codama:test`
 
-If `pnpm-workspace.yaml` sets `useNodeVersion`, `devenv shell` activates the matching pnpm-managed `node`/`npm`/`npx`/`corepack` toolchain automatically.
+If `pnpm-workspace.yaml` sets `useNodeVersion`, pnpm-run scripts automatically use that pinned Node toolchain; the shell itself provides the Nix-managed Node 24 pair (`node`/`npm`/`npx`/`corepack`).
 
 ### Using Codama in separate projects
 
@@ -354,7 +354,7 @@ Pina supports the same discriminator-first layout in both account and instructio
 
 <!-- {=pinaDiscriminatorLayoutDecisionMatrix} -->
 
-## Discriminator layout decision matrix
+### Discriminator layout decision matrix
 
 The discriminator strategy determines byte layout, parser guarantees, and cross-protocol compatibility.
 
@@ -415,13 +415,13 @@ The `#[discriminator]` macro generates:
 Optional attributes:
 
 - `primitive = u16` — override the backing type (default: `u8`)
-- `final` — marks the enum as a final discriminator (generates a `BYTES` constant)
+- `final` — omits the `#[non_exhaustive]` attribute so the enum must be matched exhaustively
 
 ### Accounts (on-chain state)
 
 <br>
 
-The `#[account]` macro treats the struct as a native schema. It injects the discriminator, derives `zeropod::ZeroPod`, and exposes validated `ConfigZc` views over caller-owned account bytes:
+The `#[account]` macro treats the struct as a native schema. It injects the discriminator, derives `pinapod::ZeroPod` (re-exported as `pina::ZeroPod`), and exposes validated `ConfigZc` views over caller-owned account bytes:
 
 ```rust
 use pina::*;
@@ -800,8 +800,9 @@ CreateProgramAccountWithBump {
 ```rust
 use pina::*;
 
-// Direct lamport transfer between accounts.
+// Direct debit: the sender must be a program-owned signer account.
 source.send(1_000_000, destination)?;
+// System-program CPI credit: the source account must sign.
 destination.collect(1_000_000, source)?;
 
 // Close an account and return rent to recipient.
@@ -829,8 +830,8 @@ use pina::*;
 
 // Combine seeds with a bump for PDA signing.
 let bump = [255u8; 1];
-let combined = combine_seeds_with_bump(&[b"escrow", maker_key], &bump);
-let signer = Signer::from(&combined[..3]);
+let combined = combine_seeds_with_bump(&[b"escrow", maker_key], &bump)?;
+let signer = Signer::from(&combined[..=seeds.len()]);
 ```
 
 ### Logging
@@ -911,7 +912,7 @@ The profiler decodes each SBF instruction opcode and assigns costs: regular inst
 
 The `pina docs` subcommand renders built-in reference topics. Set the `PINA_TEMPLATES_DIR` environment variable to a directory containing `<topic>.t.md` template files to override or extend the default topics with your own content.
 
-## Crates
+## Packages
 
 <br>
 
@@ -940,32 +941,36 @@ The `pina docs` subcommand renders built-in reference topics. Set the `PINA_TEMP
 
 - Macros are minimal syntactic sugar to reduce repetition of code.
 - IDL generation is automated based on code you write, rather than annotations. So `payer.assert_signer()?` will generate an IDL that specifies that the account is a signer.
-- Everything in Rust from the on-chain program to the client code used on the browser — this project strives to make it possible to build everything in your favourite language.
+- One language end to end — from the on-chain program to the browser client — in whichever language you prefer.
 
 ## Examples
 
 <br>
 
-| Example                                                                           | Description                                                                 |
-| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| [`hello_solana`](examples/hello_solana)                                           | Minimal program — entrypoint, accounts, logging                             |
-| [`counter_program`](examples/counter_program)                                     | PDA state management with initialize and increment                          |
-| [`transfer_sol`](examples/transfer_sol)                                           | CPI and direct lamport transfers                                            |
-| [`escrow_program`](examples/escrow_program)                                       | Full token escrow with SPL token operations                                 |
-| [`vesting_program`](examples/vesting_program)                                     | Token vesting / lockup scaffold with vault ATA setup and schedule state     |
-| [`role_registry_program`](examples/role_registry_program)                         | Role-based configuration and registry PDAs                                  |
-| [`staking_rewards_program`](examples/staking_rewards_program)                     | Staking pool and user-position accounting scaffold                          |
-| [`pina_bpf`](examples/pina_bpf)                                                   | Minimal pina-native BPF hello world (nightly + `build-std=core,alloc`)      |
-| [`anchor_declare_id`](examples/anchor_declare_id)                                 | Anchor `declare-id` test parity port for program-id mismatch                |
-| [`anchor_declare_program`](examples/anchor_declare_program)                       | Anchor `declare-program` parity port for external-program ID checks         |
-| [`anchor_duplicate_mutable_accounts`](examples/anchor_duplicate_mutable_accounts) | Anchor duplicate mutable account checks adapted to explicit pina validation |
-| [`anchor_errors`](examples/anchor_errors)                                         | Anchor custom error-code parity and guard helper checks                     |
-| [`anchor_events`](examples/anchor_events)                                         | Anchor event schema parity via deterministic event serialization            |
-| [`anchor_floats`](examples/anchor_floats)                                         | Anchor float account/update behavior with authority checks                  |
-| [`anchor_system_accounts`](examples/anchor_system_accounts)                       | Anchor system-owned account constraint parity                               |
-| [`anchor_sysvars`](examples/anchor_sysvars)                                       | Anchor sysvar account validation parity                                     |
-| [`anchor_realloc`](examples/anchor_realloc)                                       | Dynamic compact account lifecycle with typed, rent-adjusted reallocations   |
-| [`compact_accounts`](examples/compact_accounts)                                   | Focused compact account sizing, mutation order, rent, and generated clients |
+| Example                                                                           | Description                                                                                   |
+| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| [`hello_solana`](examples/hello_solana)                                           | Minimal program — entrypoint, accounts, logging                                               |
+| [`counter_program`](examples/counter_program)                                     | PDA state management with initialize and increment                                            |
+| [`transfer_sol`](examples/transfer_sol)                                           | CPI and direct lamport transfers                                                              |
+| [`escrow_program`](examples/escrow_program)                                       | Full token escrow with SPL token operations                                                   |
+| [`vesting_program`](examples/vesting_program)                                     | Schedule-state and vault-ATA scaffold; does not transfer tokens or enforce time-based vesting |
+| [`role_registry_program`](examples/role_registry_program)                         | Role-based configuration and registry PDAs                                                    |
+| [`staking_rewards_program`](examples/staking_rewards_program)                     | Staking pool and user-position accounting scaffold                                            |
+| [`pina_bpf`](examples/pina_bpf)                                                   | Minimal pina-native BPF hello world (nightly + `build-std=core,alloc`)                        |
+| [`anchor_declare_id`](examples/anchor_declare_id)                                 | Anchor `declare-id` test parity port for program-id mismatch                                  |
+| [`anchor_declare_program`](examples/anchor_declare_program)                       | Anchor `declare-program` parity port for external-program ID checks                           |
+| [`anchor_duplicate_mutable_accounts`](examples/anchor_duplicate_mutable_accounts) | Anchor duplicate mutable account checks adapted to explicit pina validation                   |
+| [`anchor_errors`](examples/anchor_errors)                                         | Anchor custom error-code parity and guard helper checks                                       |
+| [`anchor_events`](examples/anchor_events)                                         | Anchor event schema parity via deterministic event serialization                              |
+| [`anchor_floats`](examples/anchor_floats)                                         | Anchor float account/update behavior with authority checks                                    |
+| [`anchor_system_accounts`](examples/anchor_system_accounts)                       | Anchor system-owned account constraint parity                                                 |
+| [`anchor_sysvars`](examples/anchor_sysvars)                                       | Anchor sysvar account validation parity                                                       |
+| [`anchor_realloc`](examples/anchor_realloc)                                       | Dynamic compact account lifecycle with typed, rent-adjusted reallocations                     |
+| [`compact_accounts`](examples/compact_accounts)                                   | Focused compact account sizing, mutation order, rent, and generated clients                   |
+| [`todo_program`](examples/todo_program)                                           | PDA-backed state with boolean and digest updates                                              |
+| [`profile_program`](examples/profile_program)                                     | User profile registry with bounded UTF-8 and tag fields                                       |
+| [`prop_amm_program`](examples/prop_amm_program)                                   | Anchor `prop-amm` port focused on authority-controlled oracle updates                         |
+| [`optional_accounts_program`](examples/optional_accounts_program)                 | Optional-account slots with explicit presence handling                                        |
 
 ## Security
 

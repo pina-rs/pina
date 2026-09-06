@@ -10,7 +10,7 @@ Use it for experimentation, internal prototyping, education, and controlled test
 - application-level audits are required,
 - framework hardening work is still in progress.
 
-Current hardening work is tracked openly in the repository, including the umbrella effort in #119 and follow-up items such as #120, #121, #122, #127, and #130.
+Recently completed hardening work is tracked openly in the repository: the loader-soundness, Miri-regression, adversarial-coverage, and zero-copy-architecture follow-ups (#120, #121, #122, #127, #130) have all landed, and the umbrella effort in #119 remains open until the full baseline is re-verified.
 
 Supported does **not** mean audited. It only means where security fixes are expected to land.
 
@@ -39,14 +39,16 @@ Pina cannot make an application secure by itself. Program authors are still resp
 
 Treat framework helpers as building blocks, not as a substitute for protocol-specific review.
 
-## Known limitations and active hardening areas
+## Known limitations and hardening record
 
-The current repository already tracks several security-focused follow-ups. Important examples include:
+Recent hardening work has landed in the repository. Completed examples include:
 
 - loader borrow-soundness hardening for typed account access: `#120` and `#121`,
 - dedicated Miri regression coverage for loader and token-helper paths: `#122`,
 - adversarial regression coverage for helper and account invariants: `#127`,
 - architecture documentation for zero-copy safety and runtime invariants: `#130`.
+
+The umbrella tracking issue for the remaining baseline re-verification is [`#119`](https://github.com/pina-rs/pina/issues/119).
 
 For deeper technical context, see:
 
@@ -62,7 +64,7 @@ For deeper technical context, see:
 | Latest published `0.x` | Best effort | Upgrade quickly; prompt backports are not guaranteed.        |
 | Older releases         | Unsupported | No maintenance branches or routine security backport policy. |
 
-Because the project is still unaudited, the safest option is to track the latest code and review the current open hardening work before any serious deployment decision.
+Because the project is still unaudited, the safest option is to track the latest code and review the remaining hardening work in [`#119`](https://github.com/pina-rs/pina/issues/119) before any serious deployment decision.
 
 ## Reporting a vulnerability
 

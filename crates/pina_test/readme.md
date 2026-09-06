@@ -23,7 +23,8 @@ let mut program = ProgramTest::start(program_id).await?;
 // Fund a counter PDA authority before the first transaction.
 program.fund(&user_pubkey, 1_000_000_000)?;
 
-// Send instruction data and accounts; the payer signs and confirms.
+// Send instruction data and accounts (the counter was initialized in an
+// earlier step); the payer signs and confirms.
 program
 	.send(&[INCREMENT_DISCRIMINATOR], vec![
 		AccountMeta::new(authority.pubkey(), true),
@@ -31,7 +32,7 @@ program
 	])?;
 
 let state = program.account(&counter_pda)?;
-assert_eq!(state.lamports, LAMPORTS_PER_SOL);
+assert_eq!(state.count, 1);
 
 program.stop()?;
 ```
