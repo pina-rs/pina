@@ -949,6 +949,30 @@ pub struct ReallocAccountZeroed<'account, 'payer, 'address> {
 	pub program_id: &'address Address,
 }
 
+#[cfg(feature = "account-resize")]
+impl ReallocAccountZeroed<'_, '_, '_> {
+	/// Reallocates the account using transaction-level signatures.
+	#[inline(always)]
+	pub fn invoke(&mut self) -> ProgramResult {
+		self.invoke_signed(&[])
+	}
+
+	/// Reallocates the account with PDA signer seeds for the payer.
+	///
+	/// Signers are used only when growth requires a system transfer. The Solana
+	/// runtime zero-initializes every newly allocated byte.
+	#[inline(always)]
+	pub fn invoke_signed(&mut self, signers: &[Signer<'_, '_>]) -> ProgramResult {
+		realloc_account_inner(
+			self.account,
+			self.new_size,
+			self.payer,
+			self.program_id,
+			signers,
+		)
+	}
+}
+
 /// Rent-adjusts and resizes a validated compact account.
 ///
 /// Unlike the raw reallocation builders, this API verifies the account's
@@ -982,30 +1006,6 @@ impl ReallocCompactAccount<'_, '_, '_> {
 		self.account.assert_compact_type::<T>(self.program_id)?;
 		T::validate_size(self.new_size)?;
 
-		realloc_account_inner(
-			self.account,
-			self.new_size,
-			self.payer,
-			self.program_id,
-			signers,
-		)
-	}
-}
-
-#[cfg(feature = "account-resize")]
-impl ReallocAccountZeroed<'_, '_, '_> {
-	/// Reallocates the account using transaction-level signatures.
-	#[inline(always)]
-	pub fn invoke(&mut self) -> ProgramResult {
-		self.invoke_signed(&[])
-	}
-
-	/// Reallocates the account with PDA signer seeds for the payer.
-	///
-	/// Signers are used only when growth requires a system transfer. The Solana
-	/// runtime zero-initializes every newly allocated byte.
-	#[inline(always)]
-	pub fn invoke_signed(&mut self, signers: &[Signer<'_, '_>]) -> ProgramResult {
 		realloc_account_inner(
 			self.account,
 			self.new_size,
