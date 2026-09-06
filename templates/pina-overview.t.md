@@ -90,20 +90,20 @@ Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 
 <!-- {@pinaWorkspacePackages} -->
 
-| Package                 | Path                          | Description                                                       |
-| ----------------------- | ----------------------------- | ----------------------------------------------------------------- |
-| `pina`                  | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types. |
-| `pina_macros`           | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.    |
+| Package                 | Path                          | Description                                                                   |
+| ----------------------- | ----------------------------- | ----------------------------------------------------------------------------- |
+| `pina`                  | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types.             |
+| `pina_macros`           | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.                |
 | `pina_cli`              | `crates/pina_cli`             | CLI for building, testing, inspecting, and generating Pina program artifacts. |
-| `pina_codama_renderer`  | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.     |
-| `pina_cpi_renderer`     | `crates/pina_cpi_renderer`    | Standalone Codama renderer generating Pina CPI client crates.     |
-| `pina_lints`            | `crates/pina_lints`           | Pina security lints and the driver behind `pina lint`.           |
-| `pina_test`             | `crates/pina_test`            | Surfpool-backed program test harness.                            |
-| `pina_profile`          | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                     |
-| `pina_sdk_ids`          | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.         |
-| `@pina-rs/codama-nodes` | `packages/nodes-from-pina`    | Pina IDL conversion and normalization for Codama root nodes.      |
-| `@pina-rs/cli`          | `packages/pina__cli`          | npm launcher for the prebuilt platform-specific CLI packages.     |
-| `@pina-rs/skill`        | `packages/pina__skill`        | Agent guidance and a non-destructive local skill installer.       |
+| `pina_codama_renderer`  | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.                 |
+| `pina_cpi_renderer`     | `crates/pina_cpi_renderer`    | Standalone Codama renderer generating Pina CPI client crates.                 |
+| `pina_lints`            | `crates/pina_lints`           | Pina security lints and the driver behind `pina lint`.                        |
+| `pina_test`             | `crates/pina_test`            | Surfpool-backed program test harness.                                         |
+| `pina_profile`          | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                                 |
+| `pina_sdk_ids`          | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.                     |
+| `@pina-rs/codama-nodes` | `packages/nodes-from-pina`    | Pina IDL conversion and normalization for Codama root nodes.                  |
+| `@pina-rs/cli`          | `packages/pina__cli`          | npm launcher for the prebuilt platform-specific CLI packages.                 |
+| `@pina-rs/skill`        | `packages/pina__skill`        | Agent guidance and a non-destructive local skill installer.                   |
 
 <!-- {/pinaWorkspacePackages} -->
 
