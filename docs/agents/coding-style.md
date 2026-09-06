@@ -20,7 +20,7 @@ Code is read far more often than it is written. Optimize for the reader.
 - **Edition**: 2024
 - **Formatter**: `fix:format` or `dprint fmt` (do not run `rustfmt` directly)
 - **Style Edition**: 2024
-- **Tabs**: Hard tabs (indent width: 2 for dprint, configured in rustfmt)
+- **Tabs**: Hard tabs (rustfmt uses tabs; dprint's `indentWidth: 2` governs markdown, TOML, and TypeScript)
 - **Max Width**: 100 characters
 
 ### TypeScript/JavaScript
@@ -269,7 +269,7 @@ Use `SCREAMING_SNAKE_CASE` for constants. Define them near their usage when modu
 /// Maximum number of bytes for a discriminator.
 pub const MAX_DISCRIMINATOR_SPACE: usize = 8;
 
-/// Known program addresses for default value resolution.
+// pina_cli: known program addresses for default value resolution.
 const KNOWN_ADDRESSES: &[(&str, &str)] = &[
 	("system::ID", "11111111111111111111111111111111"),
 	("token::ID", "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
@@ -337,7 +337,7 @@ Use doc comments (`///`) for all public APIs:
 /// }
 /// .invoke::<EscrowState>()?;
 /// ```
-#[must_use = "account creation has no effect until invoke is called"]
+#[must_use = "account creation has no effect until invoke or invoke_signed is called"]
 pub struct CreateProgramAccount<'account, 'address, 'seeds, 'seed> {
 	/// PDA account to allocate and initialize.
 	pub account: &'account mut AccountView,

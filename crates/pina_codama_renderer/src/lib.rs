@@ -13,11 +13,16 @@ pub use error::RenderError;
 pub use error::Result;
 use render::*;
 
+/// Configuration for rendering a Codama IDL into a client crate.
 #[derive(Clone, Debug)]
 pub struct RenderConfig {
+	/// Remove the generated folder before writing new sources. Defaults to `true`.
 	pub delete_folder_before_rendering: bool,
+	/// Destination for generated sources, relative to the client crate root. Defaults to `src/generated`.
 	pub generated_folder: PathBuf,
+	/// Destination policy applied before any files are written. Defaults to [`RenderMode::Auto`].
 	pub mode: RenderMode,
+	/// Create missing manifests and entrypoints around the generated folder. Defaults to `true`.
 	pub scaffold: bool,
 }
 
@@ -57,6 +62,7 @@ impl RenderMode {
 	}
 }
 
+/// Read and parse a Codama IDL JSON file into a [`RootNode`].
 pub fn read_root_node(path: &Path) -> Result<RootNode> {
 	let idl = fs::read_to_string(path).map_err(|source| {
 		RenderError::ReadFile {
@@ -72,11 +78,16 @@ pub fn read_root_node(path: &Path) -> Result<RootNode> {
 	})
 }
 
+/// Render a Codama IDL JSON file into the client crate at `crate_dir`.
 pub fn render_idl_file(path: &Path, crate_dir: &Path, config: &RenderConfig) -> Result<()> {
 	let root = read_root_node(path)?;
 	render_root_node(&root, crate_dir, config)
 }
 
+/// Render an already-parsed Codama [`RootNode`] into the client crate at `crate_dir`.
+///
+/// Honors [`RenderConfig::mode`] against the destination current state, writes the
+/// generated sources, and scaffolds manifests when [`RenderConfig::scaffold`] is set.
 pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig) -> Result<()> {
 	let mode = resolve_render_mode(crate_dir, config.mode)?;
 
@@ -197,6 +208,10 @@ pub(crate) fn write_file_error(path: &Path, source: std::io::Error) -> RenderErr
 	}
 }
 
+/// Render one program node into the client crate at `crate_dir`.
+///
+/// Convenience wrapper that wraps the program in a [`RootNode`] and delegates to
+/// [`render_root_node`].
 pub fn render_program(
 	program: &ProgramNode,
 	crate_dir: &Path,
