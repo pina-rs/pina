@@ -1016,7 +1016,7 @@ fn add_npx_renderer_package(command: &mut Command, renderer: ClientLanguage) {
 	match renderer {
 		ClientLanguage::Cpi | ClientLanguage::Rust => command.arg("codama@1.10.1"),
 		ClientLanguage::Typescript => command.arg("@codama/renderers-js@2.3.1"),
-		ClientLanguage::Dart => command.arg("codama-renderers-dart@0.5.1"),
+		ClientLanguage::Dart => command.arg("codama-renderers-dart@0.5.5"),
 	};
 }
 
@@ -1026,7 +1026,7 @@ fn add_pnpm_renderer_package(command: &mut Command, renderer: ClientLanguage) {
 	match renderer {
 		ClientLanguage::Cpi | ClientLanguage::Rust => command.arg("codama@1.10.1"),
 		ClientLanguage::Typescript => command.arg("@codama/renderers-js@2.3.1"),
-		ClientLanguage::Dart => command.arg("codama-renderers-dart@0.5.1"),
+		ClientLanguage::Dart => command.arg("codama-renderers-dart@0.5.5"),
 	};
 }
 
@@ -1253,19 +1253,25 @@ mod tests {
 
 	#[test]
 	fn renderer_command_helpers_cover_each_language() {
-		for language in [
-			ClientLanguage::Cpi,
-			ClientLanguage::Rust,
-			ClientLanguage::Typescript,
-			ClientLanguage::Dart,
+		for (language, package) in [
+			(ClientLanguage::Cpi, "codama@1.10.1"),
+			(ClientLanguage::Rust, "codama@1.10.1"),
+			(ClientLanguage::Typescript, "@codama/renderers-js@2.3.1"),
+			(ClientLanguage::Dart, "codama-renderers-dart@0.5.5"),
 		] {
 			let mut npx = Command::new("npx");
 			add_npx_renderer_package(&mut npx, language);
-			assert!(npx.get_args().next().is_some());
+			assert_eq!(
+				npx.get_args().collect::<Vec<_>>(),
+				[OsStr::new("-p"), OsStr::new(package)],
+			);
 
 			let mut pnpm = Command::new("pnpm");
 			add_pnpm_renderer_package(&mut pnpm, language);
-			assert!(pnpm.get_args().next().is_some());
+			assert_eq!(
+				pnpm.get_args().collect::<Vec<_>>(),
+				[OsStr::new("--package"), OsStr::new(package)],
+			);
 		}
 	}
 

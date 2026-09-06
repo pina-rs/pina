@@ -49,7 +49,7 @@ Encoder<Sample> getSampleEncoder() {
     ('authority', getAddressEncoder()),
     (
       'values',
-      getArrayEncoder<BigInt>(
+      getArrayEncoder(
         transformEncoder(getU64Encoder(), (BigInt value) => value),
         size: PrefixedArraySize(getU16Encoder()),
       ),
