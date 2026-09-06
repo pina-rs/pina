@@ -8,6 +8,7 @@ The installed CLI is authoritative:
 pina --help
 pina build --help
 pina generate --help
+pina cpi --help
 pina idl --help
 pina idl generate --help
 pina idl fetch --help

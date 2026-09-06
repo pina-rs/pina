@@ -42,6 +42,52 @@ pub(crate) fn rust_string_literal(value: &str) -> String {
 	format!("{value:?}")
 }
 
+pub(crate) fn rust_identifier(value: &str, context: &str) -> Result<String> {
+	if matches!(value, "crate" | "self" | "super" | "Self") {
+		return Err(RenderError::UnsupportedValue {
+			context: context.to_string(),
+			kind: "identifier",
+			reason: format!("`{value}` cannot be used as a Rust identifier"),
+		});
+	}
+
+	let identifier =
+		if matches!(
+			value,
+			"abstract"
+				| "as" | "async"
+				| "await" | "become"
+				| "box" | "break"
+				| "const" | "continue"
+				| "do" | "dyn"
+				| "else" | "enum"
+				| "extern" | "false"
+				| "final" | "fn"
+				| "for" | "gen"
+				| "if" | "impl"
+				| "in" | "let"
+				| "loop" | "macro"
+				| "match" | "mod"
+				| "move" | "mut"
+				| "override" | "priv"
+				| "pub" | "ref"
+				| "return" | "static"
+				| "struct" | "trait"
+				| "true" | "try"
+				| "type" | "typeof"
+				| "union" | "unsafe"
+				| "unsized" | "use"
+				| "virtual" | "where"
+				| "while" | "yield"
+		) {
+			format!("r#{value}")
+		} else {
+			value.to_string()
+		};
+
+	Ok(identifier)
+}
+
 pub(crate) fn render_docs(docs: &[String], indent_level: usize) -> Vec<String> {
 	docs.iter()
 		.flat_map(|doc| render_doc(doc, indent_level))
@@ -160,6 +206,21 @@ mod tests {
 		assert!(cast_unsigned(&Number::SignedInteger(-1), u128::MAX, "test").is_err());
 		assert!(cast_unsigned(&Number::Float(1.0), u128::MAX, "test").is_err());
 		assert!(cast_unsigned(&Number::UnsignedInteger(2), 1, "test").is_err());
+	}
+
+	#[test]
+	fn escapes_and_rejects_special_rust_identifiers() {
+		assert_eq!(
+			rust_identifier("value", "test").unwrap_or_default(),
+			"value"
+		);
+		assert_eq!(
+			rust_identifier("type", "test").unwrap_or_default(),
+			"r#type"
+		);
+		for forbidden in ["crate", "self", "super", "Self"] {
+			assert!(rust_identifier(forbidden, "test").is_err());
+		}
 	}
 
 	#[test]

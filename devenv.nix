@@ -329,6 +329,10 @@ in
     "test:all" = {
       exec = ''
         set -euo pipefail
+        if [ -z "''${HOME:-}" ]; then
+          export HOME="$DEVENV_ROOT/.cache/home"
+        fi
+        mkdir -p "$HOME"
         # The raw Anchor CPI integration test invokes the pinned local converter.
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
         # Ensure cargo-expand is available for macrotest expansion snapshots.
@@ -759,6 +763,10 @@ in
     "coverage:all" = {
       exec = ''
         set -euo pipefail
+        if [ -z "''${HOME:-}" ]; then
+          export HOME="$DEVENV_ROOT/.cache/home"
+        fi
+        mkdir -p "$HOME"
         # The raw Anchor CPI integration test invokes the pinned local converter.
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
         mkdir -p "$DEVENV_ROOT/target/coverage"

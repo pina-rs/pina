@@ -5,13 +5,16 @@ use codama_nodes::ProgramNode;
 use super::helpers::pascal;
 
 pub(crate) fn render_root_mod(program: &ProgramNode) -> String {
-	let mut lines = vec![
-		"mod instructions;".to_string(),
-		"mod programs;".to_string(),
-		String::new(),
-		"pub use instructions::*;".to_string(),
-		"pub use programs::*;".to_string(),
-	];
+	let mut lines = vec!["mod programs;".to_string()];
+
+	if !program.instructions.is_empty() {
+		lines.insert(0, "mod instructions;".to_string());
+		lines.push(String::new());
+		lines.push("pub use instructions::*;".to_string());
+	}
+
+	lines.push(String::new());
+	lines.push("pub use programs::*;".to_string());
 
 	if !program.instructions.is_empty() {
 		lines.push(String::new());

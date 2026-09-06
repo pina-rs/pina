@@ -179,14 +179,35 @@ fn scaffold_never_overwrites_consumer_files() {
 }
 
 #[test]
+fn scaffold_imports_a_custom_generated_folder() {
+	let root = load_fixture_root("vesting_program");
+	let crate_dir = unique_temp_dir("pina-cpi-renderer-custom-folder");
+	let config = RenderConfig {
+		generated_folder: PathBuf::from("src/custom/cpi"),
+		..RenderConfig::default()
+	};
+	render_root_node(&root, &crate_dir, &config)
+		.unwrap_or_else(|error| panic!("renders custom folder: {error}"));
+
+	let lib_rs = fs::read_to_string(crate_dir.join("src/lib.rs"))
+		.unwrap_or_else(|error| panic!("reads scaffold: {error}"));
+	assert!(lib_rs.contains("#[path = \"custom/cpi/mod.rs\"]"));
+	assert!(crate_dir.join("src/custom/cpi/mod.rs").is_file());
+
+	fs::remove_dir_all(&crate_dir).unwrap_or_else(|error| panic!("cleans up: {error}"));
+}
+
+#[test]
 fn refuses_a_directory_not_created_by_this_renderer() {
 	let root = load_fixture_root("vesting_program");
 	let crate_dir = unique_temp_dir("pina-cpi-renderer-foreign");
 	let generated = crate_dir.join("src/generated");
 	fs::create_dir_all(&generated).unwrap_or_else(|error| panic!("creates: {error}"));
-	validate_existing_generated_dir(&generated, true)
+	let crate_handle =
+		open_crate_dir(&crate_dir).unwrap_or_else(|error| panic!("opens crate directory: {error}"));
+	validate_existing_generated_dir(&crate_handle, &crate_dir, Path::new("src/generated"), true)
 		.unwrap_or_else(|error| panic!("accepts an empty managed directory: {error}"));
-	validate_existing_generated_dir(&generated, false)
+	validate_existing_generated_dir(&crate_handle, &crate_dir, Path::new("src/generated"), false)
 		.unwrap_or_else(|error| panic!("accepts an ordinary empty directory: {error}"));
 	fs::write(generated.join("foreign.rs"), "// not ours\n")
 		.unwrap_or_else(|error| panic!("writes: {error}"));
@@ -427,6 +448,41 @@ fn renders_public_key_bool_and_number_arguments() {
 }
 
 #[test]
+fn escapes_keyword_fields_and_rejects_unescapable_identifiers() {
+	let program = program_node(
+		"keywords",
+		"11111111111111111111111111111111",
+		vec![instruction_node(
+			"setType",
+			numeric_discriminator(1),
+			vec![InstructionAccountNode::new("match", false, false)],
+			vec![InstructionArgumentNode::new(
+				"type",
+				NumberTypeNode::le(U64),
+			)],
+		)],
+	);
+	let page = render_instruction_page(&program.instructions[0])
+		.unwrap_or_else(|error| panic!("keyword fields should render: {error}"));
+	assert!(page.contains("pub r#match: &'account AccountView,"));
+	assert!(page.contains("pub r#type: u64,"));
+	assert!(page.contains("self.r#match"));
+	assert!(page.contains("self.r#type.to_le_bytes()"));
+
+	let rejected = program_node(
+		"keywords",
+		"11111111111111111111111111111111",
+		vec![instruction_node(
+			"setSelf",
+			numeric_discriminator(2),
+			vec![InstructionAccountNode::new("self", false, false)],
+			vec![],
+		)],
+	);
+	assert!(render_program_to_files(&RootNode::new(rejected)).is_err());
+}
+
+#[test]
 fn renders_address_only_instruction_lifetimes() {
 	let program = program_node(
 		"registry",
@@ -520,6 +576,9 @@ fn public_entrypoints_cover_files_programs_and_parse_errors() {
 	let files = render_program_to_files(&empty)
 		.unwrap_or_else(|error| panic!("empty program should render: {error}"));
 	assert!(!files.contains_key(Path::new("instructions/mod.rs")));
+	let root_mod = &files[Path::new("mod.rs")];
+	assert!(!root_mod.contains("mod instructions;"));
+	assert!(!root_mod.contains("pub use instructions::*;"));
 
 	let missing = unique_temp_dir("pina-cpi-renderer-missing");
 	assert!(matches!(
@@ -551,14 +610,27 @@ fn output_validation_rejects_unsafe_and_unreadable_paths() {
 		Path::new(""),
 		Path::new("../generated"),
 		Path::new("/generated"),
+		Path::new("generated"),
+		Path::new("src"),
 	] {
 		assert!(matches!(
-			validate_generated_dir(&crate_dir, generated),
+			validate_generated_folder(generated),
 			Err(RenderError::UnsafeOutputPath { .. })
 		));
 	}
+	validate_generated_folder(Path::new("src/generated"))
+		.unwrap_or_else(|error| panic!("default generated folder should be valid: {error}"));
+	let crate_handle =
+		open_crate_dir(&crate_dir).unwrap_or_else(|error| panic!("opens crate directory: {error}"));
+	let path_blocker = crate_dir.join("path-blocker");
+	fs::write(&path_blocker, "not a directory")
+		.unwrap_or_else(|error| panic!("writes path blocker: {error}"));
 	assert!(matches!(
-		validate_generated_dir(&crate_dir, Path::new(&"x".repeat(300))),
+		validate_generated_path(
+			&crate_handle,
+			&crate_dir,
+			Path::new("path-blocker/generated")
+		),
 		Err(RenderError::ReadFile { .. })
 	));
 
@@ -566,22 +638,27 @@ fn output_validation_rejects_unsafe_and_unreadable_paths() {
 	symlink(crate_dir.join("missing-target"), &linked)
 		.unwrap_or_else(|error| panic!("creates symlink: {error}"));
 	assert!(matches!(
-		validate_generated_dir(&crate_dir, Path::new("linked/generated")),
+		validate_generated_path(&crate_handle, &crate_dir, Path::new("linked/generated")),
 		Err(RenderError::UnsafeOutputPath { .. })
 	));
 
 	let file = crate_dir.join("file");
 	fs::write(&file, "not a directory").unwrap_or_else(|error| panic!("writes file: {error}"));
 	assert!(matches!(
-		validate_existing_generated_dir(&file, false),
+		validate_existing_generated_dir(&crate_handle, &crate_dir, Path::new("file"), false),
 		Err(RenderError::UnsafeOutputPath { .. })
 	));
 	assert!(matches!(
-		validate_existing_generated_dir(&crate_dir.join("x".repeat(300)), false),
+		validate_existing_generated_dir(
+			&crate_handle,
+			&crate_dir,
+			Path::new("path-blocker/generated"),
+			false
+		),
 		Err(RenderError::ReadFile { .. })
 	));
 	assert!(matches!(
-		validate_tree_has_no_symlinks(&file),
+		validate_tree_has_no_symlinks(&crate_handle, &crate_dir, Path::new("file")),
 		Err(RenderError::ReadFile { .. })
 	));
 	let tree = crate_dir.join("tree");
@@ -591,12 +668,12 @@ fn output_validation_rejects_unsafe_and_unreadable_paths() {
 		.unwrap_or_else(|error| panic!("creates regular tree: {error}"));
 	fs::write(regular_tree.join("file.rs"), "source")
 		.unwrap_or_else(|error| panic!("writes regular tree: {error}"));
-	validate_tree_has_no_symlinks(&crate_dir.join("regular-tree"))
+	validate_tree_has_no_symlinks(&crate_handle, &crate_dir, Path::new("regular-tree"))
 		.unwrap_or_else(|error| panic!("regular tree should validate: {error}"));
 	symlink(crate_dir.join("missing-target"), tree.join("link"))
 		.unwrap_or_else(|error| panic!("creates tree symlink: {error}"));
 	assert!(matches!(
-		validate_tree_has_no_symlinks(&tree),
+		validate_tree_has_no_symlinks(&crate_handle, &crate_dir, Path::new("tree")),
 		Err(RenderError::UnsafeOutputPath { .. })
 	));
 
@@ -629,7 +706,7 @@ fn scaffold_reports_each_filesystem_failure() {
 	let blocked_crate = temp.join("blocked-crate");
 	fs::write(&blocked_crate, "file").unwrap_or_else(|error| panic!("writes blocker: {error}"));
 	assert!(matches!(
-		ensure_crate_scaffold(&blocked_crate, "blocked"),
+		open_crate_dir(&blocked_crate),
 		Err(RenderError::WriteFile { .. })
 	));
 
@@ -638,17 +715,84 @@ fn scaffold_reports_each_filesystem_failure() {
 	let blocked_base = temp.join("blocked-base");
 	fs::write(&blocked_base, "file").unwrap_or_else(|error| panic!("writes base blocker: {error}"));
 	assert!(matches!(
-		write_files(&blocked_base, &files),
+		open_crate_dir(&blocked_base),
 		Err(RenderError::WriteFile { .. })
 	));
 
 	let blocked_write = temp.join("blocked-write");
 	fs::create_dir_all(blocked_write.join("nested/file.rs"))
 		.unwrap_or_else(|error| panic!("creates write blocker: {error}"));
+	let blocked_handle = open_crate_dir(&blocked_write)
+		.unwrap_or_else(|error| panic!("opens blocked output: {error}"));
 	assert!(matches!(
-		write_files(&blocked_write, &files),
+		write_files(&blocked_handle, &blocked_write, Path::new(""), &files),
 		Err(RenderError::WriteFile { .. })
+	));
+	assert!(matches!(
+		missing_generated_dir(Path::new("generated"), std::io::Error::other("failure")),
+		Err(RenderError::ReadFile { .. })
 	));
 
 	fs::remove_dir_all(temp).unwrap_or_else(|error| panic!("cleans scaffold errors: {error}"));
+}
+
+#[cfg(unix)]
+#[test]
+fn scaffold_and_generated_writes_refuse_symlink_targets() {
+	use std::os::unix::fs::symlink;
+
+	let root = load_fixture_root("vesting_program");
+	let temp = unique_temp_dir("pina-cpi-renderer-symlink-sentinel");
+	let crate_dir = temp.join("crate");
+	let sentinel = temp.join("sentinel");
+	fs::create_dir_all(crate_dir.join("src"))
+		.unwrap_or_else(|error| panic!("creates crate: {error}"));
+	fs::write(&sentinel, "preserve me").unwrap_or_else(|error| panic!("writes sentinel: {error}"));
+	symlink(&sentinel, crate_dir.join("src/lib.rs"))
+		.unwrap_or_else(|error| panic!("links scaffold: {error}"));
+
+	assert!(matches!(
+		render_root_node(&root, &crate_dir, &RenderConfig::default()),
+		Err(RenderError::UnsafeOutputPath { .. })
+	));
+	assert_eq!(
+		fs::read_to_string(&sentinel).unwrap_or_default(),
+		"preserve me"
+	);
+
+	fs::remove_file(crate_dir.join("src/lib.rs"))
+		.unwrap_or_else(|error| panic!("removes scaffold link: {error}"));
+	symlink(&sentinel, crate_dir.join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("links manifest scaffold: {error}"));
+	assert!(matches!(
+		render_root_node(&root, &crate_dir, &RenderConfig::default()),
+		Err(RenderError::UnsafeOutputPath { .. })
+	));
+	assert_eq!(
+		fs::read_to_string(&sentinel).unwrap_or_default(),
+		"preserve me"
+	);
+	fs::remove_file(crate_dir.join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("removes manifest scaffold link: {error}"));
+	let config = RenderConfig {
+		delete_folder_before_rendering: false,
+		..RenderConfig::default()
+	};
+	render_root_node(&root, &crate_dir, &config)
+		.unwrap_or_else(|error| panic!("creates initial output: {error}"));
+	let generated_file = crate_dir.join("src/generated/programs.rs");
+	fs::remove_file(&generated_file)
+		.unwrap_or_else(|error| panic!("removes generated file: {error}"));
+	symlink(&sentinel, &generated_file)
+		.unwrap_or_else(|error| panic!("links generated file: {error}"));
+	assert!(matches!(
+		render_root_node(&root, &crate_dir, &config),
+		Err(RenderError::UnsafeOutputPath { .. })
+	));
+	assert_eq!(
+		fs::read_to_string(&sentinel).unwrap_or_default(),
+		"preserve me"
+	);
+
+	fs::remove_dir_all(temp).unwrap_or_else(|error| panic!("cleans symlink test: {error}"));
 }

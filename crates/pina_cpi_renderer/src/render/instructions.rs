@@ -12,6 +12,7 @@ use super::args::render_argument;
 use super::discriminator::render_constant_discriminator;
 use super::helpers::pascal;
 use super::helpers::render_docs;
+use super::helpers::rust_identifier;
 use super::helpers::snake;
 use crate::error::RenderError;
 use crate::error::Result;
@@ -335,10 +336,14 @@ fn render_accounts(instruction: &InstructionNode, context: &str) -> Result<Vec<R
 		});
 	}
 
-	Ok(instruction.accounts.iter().map(render_account).collect())
+	instruction
+		.accounts
+		.iter()
+		.map(|account| render_account(account, context))
+		.collect()
 }
 
-fn render_account(account: &InstructionAccountNode) -> RenderedAccount {
+fn render_account(account: &InstructionAccountNode, context: &str) -> Result<RenderedAccount> {
 	let name = account.name.as_ref().to_string();
 	let mut docs = vec![format!("\t/// CPI account `{name}`.")];
 	docs.extend(render_docs(&account.docs, 1));
@@ -362,13 +367,13 @@ fn render_account(account: &InstructionAccountNode) -> RenderedAccount {
 		);
 	}
 
-	RenderedAccount {
-		field: account.name.as_ref().to_snake_case(),
+	Ok(RenderedAccount {
+		field: rust_identifier(&account.name.as_ref().to_snake_case(), context)?,
 		is_writable: account.is_writable,
 		is_optional: account.is_optional == Some(true),
 		is_signer: account.is_signer,
 		docs,
-	}
+	})
 }
 
 fn render_arguments(

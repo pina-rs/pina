@@ -10,6 +10,8 @@ repository.workspace = true
 description = "Codama Rust renderer that generates standalone Pina CPI clients"
 
 [dependencies]
+cap-fs-ext = { workspace = true, default-features = true }
+cap-std = { workspace = true, default-features = true }
 codama-nodes = { workspace = true, default-features = true }
 heck = { workspace = true, default-features = true }
 serde_json = { workspace = true, default-features = true }

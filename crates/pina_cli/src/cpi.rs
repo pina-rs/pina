@@ -22,10 +22,11 @@ import { delimiter, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const packageName = "@codama/nodes-from-anchor";
-const searchRoots = [
-	process.cwd(),
-	...(process.env.PATH ?? "").split(delimiter).map(dirname),
-];
+const [resolutionMode, idlPath] = process.argv.slice(1);
+const pathRoots = (process.env.PATH ?? "").split(delimiter).filter(Boolean).map(dirname);
+const searchRoots = resolutionMode === "npx"
+	? pathRoots.slice(0, 1)
+	: [process.cwd(), ...pathRoots];
 let rootNodeFromAnchor;
 
 for (const root of searchRoots) {
@@ -38,10 +39,9 @@ for (const root of searchRoots) {
 }
 
 if (!rootNodeFromAnchor) {
-	throw new Error(`could not resolve ${packageName} from npx or the current project`);
+	throw new Error(`could not resolve ${packageName} from the ${resolutionMode} environment`);
 }
 
-const [idlPath] = process.argv.slice(1);
 if (!idlPath) {
 	throw new Error("missing Anchor IDL path");
 }
@@ -49,6 +49,21 @@ if (!idlPath) {
 const idl = JSON.parse(readFileSync(idlPath, "utf8"));
 process.stdout.write(JSON.stringify(rootNodeFromAnchor(idl)));
 "#;
+
+#[derive(Clone, Copy)]
+enum ConverterResolution {
+	Npx,
+	Project,
+}
+
+impl ConverterResolution {
+	const fn as_str(self) -> &'static str {
+		match self {
+			Self::Npx => "npx",
+			Self::Project => "project",
+		}
+	}
+}
 
 /// Options for generating one standalone Pina CPI crate.
 #[derive(Clone, Debug)]
@@ -216,7 +231,7 @@ fn parse_codama(value: &Value, path: &Path) -> Result<Option<RootNode>, CpiGener
 
 fn convert_anchor(path: &Path, npx: &str) -> Result<RootNode, CpiGenerateError> {
 	let (output, command_name) = if Path::new(npx).file_stem() == Some(OsStr::new("node")) {
-		(run_node_converter(Command::new(npx), path, "node")?, "node")
+		(run_project_converter(npx, path)?, "node")
 	} else {
 		(run_npx_converter(npx, path)?, npx)
 	};
@@ -233,20 +248,56 @@ fn convert_anchor(path: &Path, npx: &str) -> Result<RootNode, CpiGenerateError> 
 	})
 }
 
-fn run_npx_converter(npx: &str, path: &Path) -> Result<std::process::Output, CpiGenerateError> {
-	let mut command = Command::new(npx);
-	command.args(["-y", "-p", NODES_FROM_ANCHOR_PACKAGE, "node"]);
+fn run_project_converter(
+	node: &str,
+	path: &Path,
+) -> Result<std::process::Output, CpiGenerateError> {
+	run_node_converter(
+		Command::new(node),
+		path,
+		"node",
+		ConverterResolution::Project,
+	)
+}
 
-	run_node_converter(command, path, npx)
+fn run_npx_converter(npx: &str, path: &Path) -> Result<std::process::Output, CpiGenerateError> {
+	run_npx_converter_with_temp_dir(npx, path, tempfile::tempdir())
+}
+
+fn run_npx_converter_with_temp_dir(
+	npx: &str,
+	path: &Path,
+	isolated_dir: std::io::Result<tempfile::TempDir>,
+) -> Result<std::process::Output, CpiGenerateError> {
+	let absolute_path = path.canonicalize().map_err(|source| {
+		CpiGenerateError::ReadIdl {
+			path: path.to_path_buf(),
+			source,
+		}
+	})?;
+	let isolated_dir = isolated_dir.map_err(|source| {
+		CpiGenerateError::RunConverter {
+			cmd: npx.to_string(),
+			source,
+		}
+	})?;
+	let mut command = Command::new(npx);
+	command
+		.current_dir(isolated_dir.path())
+		.args(["-y", "-p", NODES_FROM_ANCHOR_PACKAGE, "node"]);
+
+	run_node_converter(command, &absolute_path, npx, ConverterResolution::Npx)
 }
 
 fn run_node_converter(
 	mut command: Command,
 	path: &Path,
 	name: &str,
+	resolution: ConverterResolution,
 ) -> Result<std::process::Output, CpiGenerateError> {
 	command
 		.args(["--input-type=module", "--eval", ANCHOR_CONVERT_SCRIPT])
+		.arg(resolution.as_str())
 		.arg(path);
 	command.output().map_err(|source| {
 		CpiGenerateError::RunConverter {
@@ -455,6 +506,64 @@ mod tests {
 
 	#[cfg(unix)]
 	#[test]
+	fn npx_resolution_does_not_load_a_project_local_converter() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
+		let project = temp.path().join("project");
+		let npx_root = temp.path().join("npx/node_modules");
+		let anchor = temp.path().join("anchor.json");
+		std::fs::create_dir_all(&project)
+			.unwrap_or_else(|error| panic!("failed to create project: {error}"));
+		std::fs::write(&anchor, b"{}")
+			.unwrap_or_else(|error| panic!("failed to write Anchor IDL: {error}"));
+
+		let write_package = |node_modules: &Path, source: &str| {
+			let package = node_modules.join("@codama/nodes-from-anchor");
+			std::fs::create_dir_all(&package)
+				.unwrap_or_else(|error| panic!("failed to create converter package: {error}"));
+			std::fs::write(
+				package.join("package.json"),
+				br#"{"type":"module","exports":"./index.js"}"#,
+			)
+			.unwrap_or_else(|error| panic!("failed to write converter manifest: {error}"));
+			std::fs::write(package.join("index.js"), source)
+				.unwrap_or_else(|error| panic!("failed to write converter module: {error}"));
+		};
+
+		write_package(
+			&project.join("node_modules"),
+			"throw new Error('project-local sentinel was loaded');\n",
+		);
+		let fixture = String::from_utf8(fixture_bytes())
+			.unwrap_or_else(|error| panic!("fixture must be UTF-8: {error}"));
+		write_package(
+			&npx_root,
+			&format!("export const rootNodeFromAnchor = () => ({fixture});\n"),
+		);
+		let npx_bin = npx_root.join(".bin");
+		std::fs::create_dir_all(&npx_bin)
+			.unwrap_or_else(|error| panic!("failed to create npx bin: {error}"));
+
+		let mut command = Command::new("node");
+		command.current_dir(&project);
+		let inherited_path = std::env::var_os("PATH").unwrap_or_default();
+		let mut paths = vec![npx_bin];
+		paths.extend(std::env::split_paths(&inherited_path));
+		command.env(
+			"PATH",
+			std::env::join_paths(paths)
+				.unwrap_or_else(|error| panic!("failed to assemble PATH: {error}")),
+		);
+
+		let output = run_node_converter(command, &anchor, "node", ConverterResolution::Npx)
+			.unwrap_or_else(|error| panic!("converter failed: {error}"));
+		let diagnostic = diagnostic_text(&output.stderr);
+		assert!(output.status.success(), "{}", diagnostic);
+		serde_json::from_slice::<RootNode>(&output.stdout)
+			.unwrap_or_else(|error| panic!("safe converter output was invalid: {error}"));
+	}
+
+	#[cfg(unix)]
+	#[test]
 	fn converter_failures_are_bounded_and_actionable() {
 		use std::os::unix::process::ExitStatusExt;
 
@@ -462,6 +571,18 @@ mod tests {
 		let anchor = temp.path().join("anchor.json");
 		std::fs::write(&anchor, b"{}")
 			.unwrap_or_else(|error| panic!("failed to write Anchor IDL: {error}"));
+		assert!(matches!(
+			run_npx_converter("npx", &temp.path().join("missing.json")),
+			Err(CpiGenerateError::ReadIdl { .. })
+		));
+		assert!(matches!(
+			run_npx_converter_with_temp_dir(
+				"npx",
+				&anchor,
+				Err(Error::other("temp directory failed")),
+			),
+			Err(CpiGenerateError::RunConverter { .. })
+		));
 
 		assert!(matches!(
 			convert_anchor(

@@ -1,5 +1,5 @@
 ---
-core: feat
+core: major
 pina_root: none
 ---
 
@@ -10,3 +10,5 @@ Adds a Codama Rust renderer and `@pina-rs/codama-renderer-cpi` visitor that gene
 Generated fields preserve IDL documentation and identify account privileges or instruction-argument roles. Program-ID fallback optional accounts and runtime signer choices retain their Codama semantics; omitted optional-account layouts, optional arguments, big-endian numbers, and unsupported argument or discriminator types are rejected with errors naming the exact node instead of generating instruction data that would never dispatch. Accounts the IDL derives from PDA seeds stay ordinary call fields, because the runtime resolves CPI accounts against the executing program's own account list.
 
 New `pina init` projects select the standalone CPI client in `pina.toml` instead of creating a program-local `cpi` feature and handwritten `src/cpi.rs`. The `pina_bpf` CPI regression consumes the generated Prop AMM crate for both `.invoke()` and PDA-backed `.invoke_signed()`. A committed raw Anchor fixture is passed through the pinned converter and its generated crate is compile-checked end to end.
+
+This is a breaking `core` API change: `Program::new` has been removed. Callers must migrate to `Program::try_new` and handle its `Result<Self, ProgramError>`.

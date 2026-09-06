@@ -133,9 +133,10 @@ fn discriminator_bytes(
 		(TypeNode::Number(number_type), ValueNode::Number(number_value)) => {
 			number_discriminator_bytes(number_type, &number_value.number, context)
 		}
-		(TypeNode::Array(_), ValueNode::Bytes(bytes_value)) => {
-			bytes_discriminator_bytes(bytes_value, context)
-		}
+		(
+			TypeNode::Array(_) | TypeNode::Bytes(_) | TypeNode::FixedSize(_),
+			ValueNode::Bytes(bytes_value),
+		) => bytes_discriminator_bytes(bytes_value, context),
 		(other_type, other_value) => {
 			Err(RenderError::UnsupportedDiscriminator {
 				context: context.to_string(),
@@ -162,12 +163,27 @@ fn number_discriminator_bytes(
 		});
 	}
 
-	let value = cast_unsigned(value, u128::from(u64::MAX), context)?;
 	let bytes = match number_type.format {
-		NumberFormat::U8 => (value as u8).to_le_bytes().to_vec(),
-		NumberFormat::U16 => (value as u16).to_le_bytes().to_vec(),
-		NumberFormat::U32 => (value as u32).to_le_bytes().to_vec(),
-		NumberFormat::U64 => (value as u64).to_le_bytes().to_vec(),
+		NumberFormat::U8 => {
+			(cast_unsigned(value, u128::from(u8::MAX), context)? as u8)
+				.to_le_bytes()
+				.to_vec()
+		}
+		NumberFormat::U16 => {
+			(cast_unsigned(value, u128::from(u16::MAX), context)? as u16)
+				.to_le_bytes()
+				.to_vec()
+		}
+		NumberFormat::U32 => {
+			(cast_unsigned(value, u128::from(u32::MAX), context)? as u32)
+				.to_le_bytes()
+				.to_vec()
+		}
+		NumberFormat::U64 => {
+			(cast_unsigned(value, u128::from(u64::MAX), context)? as u64)
+				.to_le_bytes()
+				.to_vec()
+		}
 		NumberFormat::I8
 		| NumberFormat::I16
 		| NumberFormat::I32
@@ -313,6 +329,24 @@ mod tests {
 				number_discriminator_bytes(&NumberTypeNode::le(format), &Number::from(1u8), "test")
 					.unwrap_or_else(|error| panic!("number should render: {error}")),
 				expected
+			);
+		}
+	}
+
+	#[test]
+	fn rejects_numeric_discriminators_that_exceed_the_declared_format() {
+		for (format, value) in [
+			(U8, u64::from(u8::MAX) + 1),
+			(U16, u64::from(u16::MAX) + 1),
+			(U32, u64::from(u32::MAX) + 1),
+		] {
+			assert!(
+				number_discriminator_bytes(
+					&NumberTypeNode::le(format),
+					&Number::from(value),
+					"test"
+				)
+				.is_err()
 			);
 		}
 	}

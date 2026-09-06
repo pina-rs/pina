@@ -11,6 +11,7 @@ use heck::ToSnakeCase;
 
 use crate::error::RenderError;
 use crate::error::Result;
+use crate::render::helpers::rust_identifier;
 
 /// How one instruction argument appears in the generated builder.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -33,7 +34,7 @@ pub(crate) fn render_argument(
 	argument_type: &TypeNode,
 	context: &str,
 ) -> Result<RenderedArgument> {
-	let field = name.to_snake_case();
+	let field = rust_identifier(&name.to_snake_case(), context)?;
 	match argument_type {
 		TypeNode::Number(number_type) => render_number_argument(&field, number_type, context),
 		TypeNode::Boolean(_) => {

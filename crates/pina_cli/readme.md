@@ -72,6 +72,8 @@ Generate a standalone Pina CPI crate from any Codama or Anchor IDL:
 pina cpi --idl ./idl.json --output ./clients/program-cpi
 ```
 
+Codama IDLs render without Node.js. Raw Anchor IDLs require Node.js with `npx`, or a compatible command supplied through `--npx`, to run the pinned converter.
+
 ### `pina verify`
 
 Build deterministically, compare the artifact with a deployed program, and publish a source record:
