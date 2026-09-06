@@ -11,6 +11,7 @@ install:all
 
 - Cargo binaries are managed via `cargo-run-bin` and pinned in `[workspace.metadata.bin]` in `Cargo.toml`.
 - External binaries such as Solana CLI/agave and surfpool are managed via `eget` with config in `.eget/.eget.toml`.
+- Kani is provided by the pinned `ifiokjr/nixpkgs` input through the dedicated devenv `kani` profile. Devenv links Kani's matching nightly Rust toolchain into the package, so proof tasks need no setup command or mutable `KANI_HOME`, while unrelated commands avoid realizing the large verifier closure.
 
 ## Common commands
 
@@ -29,6 +30,9 @@ cargo test
 cargo nextest run
 cargo test -p pina
 cargo test -p pina -- test_name
+devenv --profile kani shell -- test:kani
+devenv --profile kani shell -- test:kani:quick
+devenv --profile kani shell -- test:kani:compact
 ```
 
 ### Lint and format

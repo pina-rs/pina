@@ -35,6 +35,8 @@
 //!   and reallocation.
 
 #![no_std]
+// Kani injects `feature(register_tool)` while compiling proof harnesses.
+#![cfg_attr(kani, allow(unstable_features))]
 // CU optimization for on-chain programs; inline_always ensures discriminator
 // reads compile to a single load instruction in BPF bytecode.
 #![allow(clippy::inline_always)]
@@ -52,6 +54,8 @@ pub mod token_2022;
 mod traits;
 pub mod transaction;
 mod utils;
+#[cfg(kani)]
+mod verification;
 
 /// Re-export all proc macros from `pina_macros` when the `derive` feature is
 /// enabled.

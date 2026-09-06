@@ -79,6 +79,23 @@ coverage:all
 
 This produces an LCOV report at `target/coverage/lcov.info`.
 
+## Bit-precise verification
+
+Kani proves bounded safety and correctness properties over Pina's parsers, lamport arithmetic, realloc planning, fixed zero-copy validation, CPI metadata, and compact account layouts. Compact coverage includes the schema size/alignment checks used by typed creation and reallocation, valid-capacity initialization, and rejection of shrink targets that truncate an active tail:
+
+```bash
+# Fast proofs intended for every pull request.
+devenv --profile kani shell -- test:kani:quick
+
+# Heavier three-tail compact-layout state-machine proofs.
+devenv --profile kani shell -- test:kani:compact
+
+# Every proof harness.
+devenv --profile kani shell -- test:kani
+```
+
+Kani is provided by the pinned `ifiokjr/nixpkgs` devenv input. Compact proofs use explicit unwind bounds; a successful result applies to the bounded capacities and operation sequences encoded by each harness.
+
 For experimental Solana-VM coverage collection (non-blocking), run:
 
 ```bash

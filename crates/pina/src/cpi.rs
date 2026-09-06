@@ -830,6 +830,115 @@ impl AllocateAccountWithBump<'_, '_, '_, '_> {
 #[cfg(feature = "account-resize")]
 pub const MAX_PERMITTED_DATA_INCREASE: usize = pinocchio::account::MAX_PERMITTED_DATA_INCREASE;
 
+/// Lamport movement required to make a resized account rent-exempt.
+#[cfg(feature = "account-resize")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RentAdjustment {
+	/// No lamport movement is appropriate for this size transition.
+	None,
+
+	/// Transfer lamports from the payer into the resized account.
+	Fund {
+		/// Missing lamports required by the new rent minimum.
+		lamports: u64,
+	},
+
+	/// Return lamports above the new rent minimum to the payer.
+	Refund {
+		/// Excess lamports that can be returned safely.
+		lamports: u64,
+	},
+}
+
+/// Pure account-reallocation plan computed before any balance or data mutation.
+#[cfg(feature = "account-resize")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ReallocPlan {
+	/// Required account-data length after reallocation.
+	pub new_size: usize,
+
+	/// Rent transfer required for the new length.
+	pub adjustment: RentAdjustment,
+}
+
+#[cfg(feature = "account-resize")]
+impl ReallocPlan {
+	/// Plan a resize using the already-computed rent minimum for `new_size`.
+	///
+	/// This function is pure: an error never changes account data or balances,
+	/// and a successful plan can be inspected before any CPI or direct lamport
+	/// mutation occurs.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidRealloc`] when one growth request exceeds
+	/// [`MAX_PERMITTED_DATA_INCREASE`]. Shrinking and unchanged sizes are always
+	/// accepted.
+	pub fn try_new(
+		current_size: usize,
+		new_size: usize,
+		current_lamports: u64,
+		new_minimum_balance: u64,
+	) -> Result<Self, ProgramError> {
+		validate_realloc_size(current_size, new_size)?;
+
+		Ok(Self::from_valid_size(
+			current_size,
+			new_size,
+			current_lamports,
+			new_minimum_balance,
+		))
+	}
+
+	#[inline(always)]
+	fn from_valid_size(
+		current_size: usize,
+		new_size: usize,
+		current_lamports: u64,
+		new_minimum_balance: u64,
+	) -> Self {
+		let adjustment = match new_size.cmp(&current_size) {
+			core::cmp::Ordering::Greater => {
+				let lamports = new_minimum_balance.saturating_sub(current_lamports);
+
+				if lamports == 0 {
+					RentAdjustment::None
+				} else {
+					RentAdjustment::Fund { lamports }
+				}
+			}
+			core::cmp::Ordering::Less => {
+				let lamports = current_lamports.saturating_sub(new_minimum_balance);
+
+				if lamports == 0 {
+					RentAdjustment::None
+				} else {
+					RentAdjustment::Refund { lamports }
+				}
+			}
+			core::cmp::Ordering::Equal => RentAdjustment::None,
+		};
+
+		Self {
+			new_size,
+			adjustment,
+		}
+	}
+}
+
+#[cfg(feature = "account-resize")]
+#[inline(always)]
+fn validate_realloc_size(current_size: usize, new_size: usize) -> ProgramResult {
+	if new_size
+		.checked_sub(current_size)
+		.is_some_and(|growth| growth > MAX_PERMITTED_DATA_INCREASE)
+	{
+		return Err(ProgramError::InvalidRealloc);
+	}
+
+	Ok(())
+}
+
 /// Reallocates an account and adjusts its rent-exempt balance.
 ///
 /// When **growing**, transfers the additional rent-exempt lamports required from
@@ -1063,9 +1172,7 @@ fn realloc_account_inner_with_rent(
 	// serialized length is not exposed, so cumulative growth is still checked by
 	// the runtime and its error must be propagated by callers.
 	account.check_borrow_mut()?;
-	if new_size.saturating_sub(current_size) > MAX_PERMITTED_DATA_INCREASE {
-		return Err(ProgramError::InvalidRealloc);
-	}
+	validate_realloc_size(current_size, new_size)?;
 
 	let rent = if let Some(rent) = rent {
 		rent
@@ -1074,28 +1181,30 @@ fn realloc_account_inner_with_rent(
 	};
 	let new_minimum_balance = rent.try_minimum_balance(new_size)?;
 	let current_lamports = account.lamports();
+	let plan = ReallocPlan::from_valid_size(
+		current_size,
+		new_size,
+		current_lamports,
+		new_minimum_balance,
+	);
 
-	if new_size > current_size {
-		// Growing: transfer additional rent from payer to account.
-		let required_lamports = new_minimum_balance.saturating_sub(current_lamports);
-		if required_lamports > 0 {
+	match plan.adjustment {
+		RentAdjustment::Fund { lamports } => {
 			SystemTransfer {
 				from: payer,
 				to: account,
-				lamports: required_lamports,
+				lamports,
 			}
 			.invoke_signed(signers)?;
 		}
-	} else {
-		// Shrinking: return excess rent from account to payer.
-		let excess_lamports = current_lamports.saturating_sub(new_minimum_balance);
-		if excess_lamports > 0 {
-			account.send(excess_lamports, payer)?;
+		RentAdjustment::Refund { lamports } => {
+			account.send(lamports, payer)?;
 		}
+		RentAdjustment::None => {}
 	}
 
 	// Resize the account data. The runtime zero-initializes new bytes.
-	account.resize(new_size)
+	account.resize(plan.new_size)
 }
 
 /// Closes an account and returns its remaining lamports to a recipient.
@@ -1289,7 +1398,7 @@ impl<'a> CpiHandle<'a> {
 	}
 
 	#[inline(always)]
-	fn instruction_account(self) -> InstructionAccount<'a> {
+	pub(crate) fn instruction_account(self) -> InstructionAccount<'a> {
 		InstructionAccount::new(self.address(), self.is_writable(), self.is_signer())
 	}
 
@@ -1533,6 +1642,57 @@ mod tests {
 		Rent::from_bytes(&1u64.to_le_bytes()).unwrap_or_else(|error| panic!("test rent: {error:?}"))
 	}
 
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn realloc_plan_covers_unchanged_growth_and_shrinkage() {
+		assert_eq!(
+			ReallocPlan::try_new(8, 8, 10, 20),
+			Ok(ReallocPlan {
+				new_size: 8,
+				adjustment: RentAdjustment::None,
+			})
+		);
+		assert_eq!(
+			ReallocPlan::try_new(8, 16, 10, 25),
+			Ok(ReallocPlan {
+				new_size: 16,
+				adjustment: RentAdjustment::Fund { lamports: 15 },
+			})
+		);
+		assert_eq!(
+			ReallocPlan::try_new(8, 16, 25, 25),
+			Ok(ReallocPlan {
+				new_size: 16,
+				adjustment: RentAdjustment::None,
+			})
+		);
+		assert_eq!(
+			ReallocPlan::try_new(16, 8, 25, 10),
+			Ok(ReallocPlan {
+				new_size: 8,
+				adjustment: RentAdjustment::Refund { lamports: 15 },
+			})
+		);
+		assert_eq!(
+			ReallocPlan::try_new(16, 8, 10, 10),
+			Ok(ReallocPlan {
+				new_size: 8,
+				adjustment: RentAdjustment::None,
+			})
+		);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn realloc_plan_rejects_oversized_growth() {
+		let new_size = MAX_PERMITTED_DATA_INCREASE + 1;
+
+		assert_eq!(
+			ReallocPlan::try_new(0, new_size, 0, 0),
+			Err(ProgramError::InvalidRealloc)
+		);
+	}
+
 	#[test]
 	fn cpi_handle_arrays_are_typed_account_sets() {
 		let owner = Address::new_from_array([9; 32]);
@@ -1740,6 +1900,31 @@ mod tests {
 		.unwrap_or_else(|error| panic!("grow account: {error:?}"));
 
 		assert_eq!(account.data_len(), 16);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn realloc_prefunded_growth_resizes_without_moving_lamports() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored_account =
+			TestAccount::<32>::new(Address::new_from_array([1; 32]), owner, 1_000, 8);
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1, 0);
+		let mut account = stored_account.view();
+		let mut payer = stored_payer.view();
+
+		realloc_account_inner_with_rent(
+			&mut account,
+			16,
+			&mut payer,
+			&owner,
+			&[],
+			Some(test_rent()),
+		)
+		.unwrap_or_else(|error| panic!("grow prefunded account: {error:?}"));
+
+		assert_eq!(account.data_len(), 16);
+		assert_eq!(account.lamports(), 1_000);
+		assert_eq!(payer.lamports(), 1);
 	}
 
 	#[cfg(feature = "account-resize")]

@@ -12,6 +12,7 @@ const OWNER: Address = Address::new_from_array([9; 32]);
 #[discriminator(crate = ::pina)]
 enum CompactKind {
 	DynamicState = 7,
+	ThreeTailState = 8,
 }
 
 #[account(crate = ::pina, discriminator = CompactKind, compact)]
@@ -20,6 +21,59 @@ struct DynamicState {
 	pub authority: Address,
 	pub values: Vec<u64, 4>,
 	pub codes: Vec<u16, 3>,
+}
+
+#[account(
+	crate = ::pina,
+	discriminator = CompactKind,
+	variant = ThreeTailState,
+	compact
+)]
+struct ThreeTailState {
+	pub marker: u8,
+	pub bytes: Vec<u8, 2>,
+	pub words: Vec<u16, 2>,
+	pub triples: Vec<[u8; 3], 2>,
+}
+
+#[test]
+fn compact_account_preserves_full_tails_across_two_full_replacements() {
+	let byte_values = [[1u8, 2], [3, 4], [5, 6]];
+	let word_values = [
+		[PodU16::from(10), PodU16::from(11)],
+		[PodU16::from(12), PodU16::from(13)],
+		[PodU16::from(14), PodU16::from(15)],
+	];
+	let triple_values = [
+		[[20u8, 21, 22], [23, 24, 25]],
+		[[26, 27, 28], [29, 30, 31]],
+		[[32, 33, 34], [35, 36, 37]],
+	];
+	let mut data = [0u8; ThreeTailState::MAX_SIZE];
+	{
+		let mut state = ThreeTailState::initialize(&mut data)
+			.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
+		state.set_bytes(&byte_values[0]).unwrap();
+		state.set_words(&word_values[0]).unwrap();
+		state.set_triples(&triple_values[0]).unwrap();
+		state.commit().unwrap();
+	}
+
+	{
+		let mut state = ThreeTailState::try_from_bytes_mut(&mut data).unwrap();
+		state.set_words(&word_values[1]).unwrap();
+		state.commit().unwrap();
+	}
+
+	let committed_size = {
+		let mut state = ThreeTailState::try_from_bytes_mut(&mut data).unwrap();
+		state.set_triples(&triple_values[2]).unwrap();
+		state.commit().unwrap()
+	};
+	let state = ThreeTailState::try_from_bytes(&data[..committed_size]).unwrap();
+	assert_eq!(state.bytes(), &byte_values[0]);
+	assert_eq!(state.words(), &word_values[1]);
+	assert_eq!(state.triples(), &triple_values[2]);
 }
 
 #[test]

@@ -12,6 +12,8 @@ The GitHub CI workflow verifies:
 - `security:zizmor` in a dedicated `zizmor` job
 - `test:all` (workspace Rust tests, standalone fuzz-target compilation, and npm package tests)
 - `test:npm-packages` (scoped package metadata, native-target coverage, launchers, and skill installation)
+- `test:kani:quick` in a dedicated job for parser, arithmetic, compact-sizing, fixed-layout, and CPI invariants
+- `test:kani:compact` in a separate job for bounded compact-layout state machines, aligned initialization, and shrink-prefix validation
 - `feature-matrix` for `pina` across explicit configurations:
   - `default` (`build:pina:default` + `test:pina:default`)
   - `no-default` (`build:pina:no-default-only` + `test:pina:no-default` + `doc:pina:no-default`)
