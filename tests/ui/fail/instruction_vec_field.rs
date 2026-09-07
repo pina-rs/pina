@@ -1,5 +1,7 @@
 use pina::*;
 
+// PinaPod v0.2 migration: move this fixture to `pass` only after fixed vectors initialize
+// their complete storage representation.
 #[discriminator]
 pub enum Kind {
 	Push = 0,
