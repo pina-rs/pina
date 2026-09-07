@@ -498,7 +498,9 @@ ResizeCompactAccount {
 }
 .invoke::<Journal, _>(|data| {
 	let mut journal = Journal::try_from_bytes_mut(data)?;
-	journal.featured_entry.set(Some(featured_entry));
+	journal
+		.featured_entry
+		.set(Some(PodU64::from(featured_entry)));
 	journal
 		.set_title(title)
 		.map_err(|_| ProgramError::InvalidAccountData)?;

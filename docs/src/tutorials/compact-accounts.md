@@ -52,11 +52,11 @@ For compact string and vector tails, the exact encoded size is:
 HEADER_SIZE + Σ(active_string_bytes[i]) + Σ(active_vec_count[i] × size_of::<T[i]::Pod>())
 ```
 
-| State              |                                Account data length |
-| ------------------ | -------------------------------------------------: |
-| Every tail empty   |                                      `HEADER_SIZE` |
-| Mixed tail lengths | `HEADER_SIZE + Σ(len[i] × size_of::<T[i]::Pod>())` |
-| Every tail full    |                                         `MAX_SIZE` |
+| State              |                                                                         Account data length |
+| ------------------ | ------------------------------------------------------------------------------------------: |
+| Every tail empty   |                                                                               `HEADER_SIZE` |
+| Mixed tail lengths | `HEADER_SIZE + Σ(active_string_bytes[i]) + Σ(active_vec_count[i] × size_of::<T[i]::Pod>())` |
+| Every tail full    |                                                                                  `MAX_SIZE` |
 
 Use the generated APIs rather than repeating this formula:
 
@@ -123,7 +123,9 @@ ResizeCompactAccount {
 }
 .invoke::<Journal, _>(|data| {
 	let mut journal = Journal::try_from_bytes_mut(data)?;
-	journal.featured_entry.set(Some(featured_entry));
+	journal
+		.featured_entry
+		.set(Some(PodU64::from(featured_entry)));
 	journal
 		.set_title(title)
 		.map_err(|_| ProgramError::InvalidAccountData)?;
@@ -240,7 +242,7 @@ Validate the account's owner and authorization policy before trusting data. `ass
 - Compare `encoded_size()` with `account.data_len()` when distinguishing committed content from temporary spare allocation.
 - Rely on `validate_size` plus checked loaders to reject truncated, oversized, or corrupt data.
 - Keep signer, owner, stored-authority, and canonical-PDA checks explicit; compact layout validation does not define an authorization policy.
-- Generate the IDL and clients normally. Codama represents every tail as a dynamic array whose count is read from the shared header, preserving Pinapod's header-then-payload wire layout.
+- Generate the IDL and clients normally. Codama represents string tails as size-prefixed UTF-8 strings and vector tails as size-prefixed dynamic arrays. Their counts are read from the shared header, preserving Pinapod's header-then-payload wire layout.
 
 <!-- {/compactAccountUseCaseChecklist} -->
 
