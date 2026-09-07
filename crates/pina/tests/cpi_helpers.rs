@@ -28,7 +28,6 @@ use pina::ReallocAccount;
 use pina::ReallocAccountZeroed;
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 use pina::ReallocCompactAccount;
-#[cfg(all(feature = "account-resize", feature = "compact"))]
 use pina::Seed;
 use pina::Signer;
 use pina::ToCpiAccounts;

@@ -1140,13 +1140,13 @@ const decoder = getStructDecoder([
 		.expect("compact JS fixture should be readable");
 		let hardened = harden_codec_source_with_capacities(&source, &capacities);
 
-		assert_eq!(capacities.len(), 3);
+		assert_eq!(capacities.len(), 4);
 		for (expected, count) in [
 			("getPinaPodBoundedArrayEncoder(", 2),
 			("getPinaPodBoundedArrayDecoder(", 2),
-			("getPinaPodBoundedStringEncoder(", 1),
-			("getPinaPodBoundedStringDecoder(", 1),
-			("getPinaPodBoundedCountDecoder(", 3),
+			("getPinaPodBoundedStringEncoder(", 2),
+			("getPinaPodBoundedStringDecoder(", 2),
+			("getPinaPodBoundedCountDecoder(", 4),
 		] {
 			assert_eq!(
 				hardened.matches(expected).count(),
@@ -1187,15 +1187,15 @@ const decoder = getStructDecoder([
 		);
 		assert_eq!(
 			hardened.matches("getPinaPodBoundedStringEncoder(").count(),
-			1
+			2
 		);
 		assert_eq!(
 			hardened.matches("getPinaPodBoundedStringDecoder(").count(),
-			1
+			2
 		);
 		assert_eq!(
 			hardened.matches("getPinaPodBoundedCountDecoder(").count(),
-			3
+			4
 		);
 		assert!(hardened.contains("preOffset: () => 48"));
 	}
