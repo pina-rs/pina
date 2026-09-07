@@ -8,8 +8,8 @@
 	},
 	"devDependencies": {
 		"@blueshift-gg/quasar-svm": "^0.1.12",
-		"@solana/kit": "^8.1.0",
-		"@solana/program-client-core": "^8.1.0",
+		"@solana/kit": "^8.2.0",
+		"@solana/program-client-core": "^8.2.0",
 		"@solana-program/token": "^0.16.0",
 		"@types/node": "^26.4.0",
 		"typescript": "^7.0.2",
