@@ -26,7 +26,7 @@ A performant Solana smart contract framework built on top of [pinocchio](https:/
 
 <!-- {=pinaFeatureHighlights} -->
 
-- **Validated zero-copy deserialization** — Pinapod validates fixed-layout account data before Pina reinterprets it in place, with no heap allocation.
+- **Validated zero-copy deserialization** — Pinapod validates fixed-layout account data before Pina hands out its generated storage view over the account bytes, with no heap allocation.
 - **`no_std` compatible** — all crates compile to the `bpfel-unknown-none` SBF target for on-chain deployment.
 - **Low compute units** — built on `pinocchio` instead of `solana-program`, saving thousands of CU per instruction.
 - **Discriminator system** — every account, instruction, and event type carries a typed discriminator as its first field.
@@ -757,7 +757,7 @@ The full generic forms are `PodOption<T: ZcElem, PFX = 1>`, `PodString<N, PFX = 
 
 <!-- {=podCollectionDescription} -->
 
-Collection types store data inline without allocation for advanced direct Pinapod use. Pina's `#[account]`, `#[instruction]`, and `#[event]` macros reject `PodString`/`String` and `PodVec`/`Vec` fields in fixed-layout schemas because their inactive capacity is not guaranteed to be initialized after every upstream construction path; compact schemas instead accept exactly one bounded `Vec`/`PodVec` tail. Use fully initialized fixed byte arrays plus checked semantic helpers in macro-generated schemas. Semantic `Option<scalar>` remains supported because Pina proves its exact `PodOption` mapping and scalar storage contract.
+Collection types store data inline without allocation for advanced direct Pinapod use. Pina's `#[account]`, `#[instruction]`, and `#[event]` macros reject `PodString`/`String` and `PodVec`/`Vec` fields in fixed-layout schemas because their inactive capacity is not guaranteed to be initialized after every upstream construction path; compact schemas instead accept one or more trailing bounded `Vec`/`PodVec` tails. Use fully initialized fixed byte arrays plus checked semantic helpers in macro-generated schemas. Semantic `Option<scalar>` remains supported because Pina proves its exact `PodOption` mapping and scalar storage contract.
 
 For direct Pinapod integrations, Pinapod boundary validation must establish the active `PodString` bytes are valid UTF-8 before callers use `as_str()`. `PodVec` offers slice-based access via `as_slice()` / `as_slice_mut()`, and `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`. Those direct integrations are outside Pina's audited macro-generated contract and must uphold Pinapod's complete safety invariants.
 
@@ -829,8 +829,9 @@ Closing guidance under Pinocchio 0.11:
 use pina::*;
 
 // Combine seeds with a bump for PDA signing.
+let seeds = &[b"escrow", maker_key];
 let bump = [255u8; 1];
-let combined = combine_seeds_with_bump(&[b"escrow", maker_key], &bump)?;
+let combined = combine_seeds_with_bump(seeds, &bump)?;
 let signer = Signer::from(&combined[..=seeds.len()]);
 ```
 

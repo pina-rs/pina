@@ -17,7 +17,7 @@ scaffold = true
 
 # Optional per-lint level overrides.
 [lints]
-require_canonical_instruction_dispatch = "deny"
+require_canonical_instruction_dispatch_for_idl = "deny"
 
 # Optional target-specific overrides.
 [clients.cpi]

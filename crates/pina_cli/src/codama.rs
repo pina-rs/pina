@@ -256,7 +256,7 @@ struct BoundedOutput {
 
 /// Generate IDL fixtures and all configured clients for the selected examples.
 ///
-/// Returns the names of every example that was generated, in input order.
+/// Returns the names of every example that was generated, in sorted order.
 pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, CodamaError> {
 	let examples = collect_examples(options)?;
 	let programs = examples

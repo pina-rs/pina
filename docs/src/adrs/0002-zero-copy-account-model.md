@@ -45,7 +45,7 @@ Quasar does not avoid collection fields. At commit [`b0de7db`](https://github.co
 
 Pina deliberately did not claim parity with that compact representation in this decision. Pina preserved its existing fixed wire layouts, so its macros rejected fixed-capacity collection fields until Pina had an equally closed design that prevents inactive backing capacity from becoming observable.
 
-> Status update (0.13): the `compact` feature now provides that closed design for a single bounded `Vec`/`PodVec` tail — its backing capacity stays unobservable and every grow/shrink path is guard-backed. Fixed-layout schemas still reject collections, and `String`/`PodString` remain rejected in both modes.
+> Status update (0.13): the `compact` feature now provides that closed design for one or more trailing bounded `Vec`/`PodVec` tails — their backing capacity stays unobservable, inline fields cannot follow the first tail, and every grow/shrink path is guard-backed. Fixed-layout schemas still reject collections, and `String`/`PodString` remain rejected in both modes.
 
 ## Alternatives considered
 

@@ -1,6 +1,6 @@
 # Recommendations
 
-Status: fully implemented as of 0.13.0. Each item below links the mechanism that now covers it; this page remains as the historical record of the original roadmap.
+Status: fully implemented as of 0.13.0. The items below are kept exactly as originally proposed for the historical record; their mechanisms now exist in the repository — the compute-units workflow, the feature-matrix job, the security fixture suite, compile-fail macro tests, the ADR set, and the Anchor migration tutorial.
 
 This section contains concrete suggestions to better align the codebase with Pina's goals.
 

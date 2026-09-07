@@ -16,7 +16,7 @@ pub struct ProfileState {
 }
 ```
 
-Fixed-layout schemas require fully initialized bounded arrays like these (this mirrors the real `ProfileState` in `examples/profile_program`). Compact schemas may instead end in exactly one bounded `Vec`/`PodVec` tail under `#[account(compact)]`; `String`/`PodString` remain rejected in both modes.
+Fixed-layout schemas require fully initialized bounded arrays like these (this mirrors the real `ProfileState` in `examples/profile_program`). Compact schemas may instead end in one or more trailing bounded `Vec`/`PodVec` tails under `#[account(compact)]`; `String`/`PodString` remain rejected in both modes.
 
 The source struct is a native schema. `pinapod::ZeroPod` generates `ProfileStateZc`, whose fields have alignment-one storage representations. Pina's account loaders validate the runtime byte slice and return a borrow of that generated view. Native integers and booleans remain native in the schema; callers use `.get()` / `.set()` on their generated storage fields.
 

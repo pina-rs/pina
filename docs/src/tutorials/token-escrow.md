@@ -239,7 +239,7 @@ drop(escrow);
 
 `CreateProgramAccountWithBump::invoke` issues a `CreateAccount` CPI to the system program, allocating `EscrowState::SIZE` bytes and setting the owner to this program.
 
-`as_account_mut` reinterprets the raw account bytes as a guard-backed `RefMut<EscrowState>`; assign each field directly on that view. Integer fields are Pod wrappers, so `amount_a` uses `.set(0)` rather than plain assignment.
+`as_account_mut` reinterprets the raw account bytes as a guard-backed `RefMut<EscrowStateZc>`; assign each field on that generated view. Storage fields are little-endian Pod wrappers, so the right-hand side must be the same wrapper type — `args.amount_b` comes from the parsed instruction view as the identical `PodU64`, which is why it assigns directly, while `amount_a.set(0)` uses the wrapper's setter for literals. Reading values back uses `.get()`.
 
 ## Make: token operations via CPI
 
