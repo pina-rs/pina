@@ -35,15 +35,19 @@ import {
 import { getJournalCodec, type Journal, type JournalArgs } from "../accounts";
 import {
 	getInitializeInstructionAsync,
+	getRenameInstruction,
 	getResizeInstruction,
 	getWriteInstruction,
 	type InitializeAsyncInput,
 	type ParsedInitializeInstruction,
+	type ParsedRenameInstruction,
 	type ParsedResizeInstruction,
 	type ParsedWriteInstruction,
 	parseInitializeInstruction,
+	parseRenameInstruction,
 	parseResizeInstruction,
 	parseWriteInstruction,
+	type RenameInput,
 	type ResizeInput,
 	type WriteInput,
 } from "../instructions";
@@ -75,6 +79,7 @@ export enum CompactAccountsInstruction {
 	Initialize,
 	Resize,
 	Write,
+	Rename,
 }
 
 export function identifyCompactAccountsInstruction(
@@ -90,6 +95,9 @@ export function identifyCompactAccountsInstruction(
 	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
 		return CompactAccountsInstruction.Write;
 	}
+	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+		return CompactAccountsInstruction.Rename;
+	}
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "compactAccounts" },
@@ -104,7 +112,9 @@ export type ParsedCompactAccountsInstruction<
 	| { instructionType: CompactAccountsInstruction.Resize }
 		& ParsedResizeInstruction<TProgram>
 	| { instructionType: CompactAccountsInstruction.Write }
-		& ParsedWriteInstruction<TProgram>;
+		& ParsedWriteInstruction<TProgram>
+	| { instructionType: CompactAccountsInstruction.Rename }
+		& ParsedRenameInstruction<TProgram>;
 
 export function parseCompactAccountsInstruction<TProgram extends string>(
 	instruction:
@@ -132,6 +142,13 @@ export function parseCompactAccountsInstruction<TProgram extends string>(
 			return {
 				instructionType: CompactAccountsInstruction.Write,
 				...parseWriteInstruction(instruction),
+			};
+		}
+		case CompactAccountsInstruction.Rename: {
+			assertIsInstructionWithAccounts(instruction);
+			return {
+				instructionType: CompactAccountsInstruction.Rename,
+				...parseRenameInstruction(instruction),
 			};
 		}
 		default:
@@ -172,6 +189,9 @@ export type CompactAccountsPluginInstructions = {
 	write: (
 		input: WriteInput,
 	) => ReturnType<typeof getWriteInstruction> & SelfPlanAndSendFunctions;
+	rename: (
+		input: RenameInput,
+	) => ReturnType<typeof getRenameInstruction> & SelfPlanAndSendFunctions;
 };
 
 export type CompactAccountsPluginPdas = { journal: typeof findJournalPda };
@@ -198,6 +218,8 @@ export function compactAccountsProgram() {
 						addSelfPlanAndSendFunctions(client, getResizeInstruction(input)),
 					write: (input) =>
 						addSelfPlanAndSendFunctions(client, getWriteInstruction(input)),
+					rename: (input) =>
+						addSelfPlanAndSendFunctions(client, getRenameInstruction(input)),
 				},
 				pdas: { journal: findJournalPda },
 				identifyAccount: identifyCompactAccountsAccount,

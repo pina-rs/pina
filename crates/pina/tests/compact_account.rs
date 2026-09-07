@@ -14,6 +14,8 @@ enum CompactKind {
 	DynamicState = 7,
 	ThreeTailState = 8,
 	PrefixState = 9,
+	StringState = 10,
+	StringPrefixState = 11,
 }
 
 #[account(crate = ::pina, discriminator = CompactKind, compact)]
@@ -43,6 +45,92 @@ struct PrefixState {
 	pub two: PodVec<PodU16, 2, 2>,
 	pub four: PodVec<PodU32, 2, 4>,
 	pub eight: PodVec<PodU64, 2, 8>,
+}
+
+#[account(crate = ::pina, discriminator = CompactKind, compact)]
+struct StringState {
+	/// Semantic optional values use `PodOption<PodU64>` in the compact header.
+	pub featured: Option<u64>,
+	/// Strings are encoded as active UTF-8 tail bytes, without inactive capacity.
+	pub title: PodString<12>,
+	pub values: Vec<u8, 2>,
+}
+
+#[account(crate = ::pina, discriminator = CompactKind, compact)]
+struct StringPrefixState {
+	pub one: String<2>,
+	pub two: PodString<2, 2>,
+	pub four: PodString<2, 4>,
+	pub eight: PodString<2, 8>,
+}
+
+#[test]
+fn compact_account_combines_a_pod_option_header_with_a_pod_string_tail() {
+	assert_eq!(size_of::<PodOption<PodU64>>(), 9);
+	assert_eq!(StringState::HEADER_SIZE, 13);
+	assert_eq!(StringState::TITLE_CAPACITY, 12);
+	assert_eq!(StringState::VALUES_CAPACITY, 2);
+	assert_eq!(StringState::projected_bytes(5, 2), Ok(20));
+
+	let values = [3u8, 5];
+	let mut data = [0u8; StringState::MAX_SIZE];
+	let encoded_size = {
+		let mut state = StringState::initialize(&mut data)
+			.unwrap_or_else(|error| panic!("initialize string state: {error:?}"));
+		state.featured.set(Some(PodU64::from(42)));
+		state
+			.set_title("piña")
+			.unwrap_or_else(|error| panic!("set compact title: {error:?}"));
+		state
+			.set_values(&values)
+			.unwrap_or_else(|error| panic!("set compact values: {error:?}"));
+		assert_eq!(state.projected_size(), 20);
+		state
+			.commit()
+			.unwrap_or_else(|error| panic!("commit string state: {error:?}"))
+	};
+
+	let state = StringState::try_from_bytes(&data[..encoded_size])
+		.unwrap_or_else(|error| panic!("read string state: {error:?}"));
+	assert_eq!(state.featured.get().map(|value| value.get()), Some(42));
+	assert_eq!(state.title(), "piña");
+	assert_eq!(state.values(), &values);
+}
+
+#[test]
+fn compact_strings_support_every_prefix_width_and_independent_lengths() {
+	assert_eq!(StringPrefixState::HEADER_SIZE, 16);
+	assert_eq!(StringPrefixState::MIN_SIZE, 16);
+	assert_eq!(StringPrefixState::MAX_SIZE, 24);
+	assert_eq!(StringPrefixState::projected_bytes(1, 2, 0, 2), Ok(21));
+
+	let mut data = [0u8; StringPrefixState::MAX_SIZE];
+	let encoded_size = {
+		let mut state = StringPrefixState::initialize(&mut data)
+			.unwrap_or_else(|error| panic!("initialize string prefixes: {error:?}"));
+		state
+			.set_one("a")
+			.unwrap_or_else(|error| panic!("set one: {error:?}"));
+		state
+			.set_two("bc")
+			.unwrap_or_else(|error| panic!("set two: {error:?}"));
+		state
+			.set_four("")
+			.unwrap_or_else(|error| panic!("set four: {error:?}"));
+		state
+			.set_eight("de")
+			.unwrap_or_else(|error| panic!("set eight: {error:?}"));
+		state
+			.commit()
+			.unwrap_or_else(|error| panic!("commit string prefixes: {error:?}"))
+	};
+
+	let state = StringPrefixState::try_from_bytes(&data[..encoded_size])
+		.unwrap_or_else(|error| panic!("read string prefixes: {error:?}"));
+	assert_eq!(state.one(), "a");
+	assert_eq!(state.two(), "bc");
+	assert_eq!(state.four(), "");
+	assert_eq!(state.eight(), "de");
 }
 
 #[test]

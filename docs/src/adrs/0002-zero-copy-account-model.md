@@ -19,10 +19,10 @@ In practice that means:
 
 - macro-generated application schemas accept only audited scalar, address, byte-array, and scalar-option fields; loaders return the generated `TypeZc` storage view
 - typed loads must validate discriminator, size, content (`ZcValidate`), and relevant account identity constraints before use
-- dynamic, variable-length, or schema-driven reinterpretation is out of scope for the core loader model
-- custom/nested `ZcField` mappings, enum-typed payload fields, generic schemas, and `PodString`/`PodVec` or `String`/`Vec` fields are outside the macro-generated contract
+- dynamic, variable-length, or schema-driven reinterpretation is opt-in through the compact account loader model
+- custom/nested `ZcField` mappings, enum-typed payload fields, generic schemas, and dynamic fields outside a compact account suffix remain outside the macro-generated contract
 - Pina does not manually implement zeropod's unsafe traits, duplicate its pointer casts, or expose a schema/storage-view object representation as bytes
-- bounded text and lists use fully initialized fixed byte arrays with checked semantic helpers
+- fixed schemas use fully initialized bounded arrays; compact schemas may use bounded string and vector tails
 - manual `PinaAccount` / `ZeroPodFixed` implementations are advanced escape hatches whose authors own all zeropod safety invariants
 
 ## Consequences
@@ -35,7 +35,7 @@ Benefits:
 
 Costs:
 
-- some data models must use explicit versioning or companion accounts instead of variable-length in-place layouts
+- unbounded or nested dynamic data models must use explicit versioning or companion accounts instead of variable-length in-place layouts
 - loader APIs need stronger lifetime coupling than a simple `&T` return type can provide
 - future extensions must prove they preserve layout and aliasing safety, not just correctness in happy-path tests
 
@@ -45,7 +45,7 @@ Quasar does not avoid collection fields. At commit [`b0de7db`](https://github.co
 
 Pina deliberately did not claim parity with that compact representation in this decision. Pina preserved its existing fixed wire layouts, so its macros rejected fixed-capacity collection fields until Pina had an equally closed design that prevents inactive backing capacity from becoming observable.
 
-> Status update (0.13): the `compact` feature now provides that closed design for one or more trailing bounded `Vec`/`PodVec` tails — their backing capacity stays unobservable, inline fields cannot follow the first tail, and every grow/shrink path is guard-backed. Fixed-layout schemas still reject collections, and `String`/`PodString` remain rejected in both modes.
+> Status update (0.13): the `compact` feature now provides that closed design for one or more trailing bounded `String`/`PodString` and `Vec`/`PodVec` tails. Their backing capacity stays unobservable, inline fields cannot follow the first tail, and every grow/shrink path is guard-backed. Fixed-layout schemas still reject collections.
 
 ## Alternatives considered
 

@@ -13,12 +13,11 @@ use pina::pinapod;
 #[derive(pina::ZeroPod)]
 #[pinapod(compact)]
 pub struct Journal {
-	/// A compact account with two independently encoded dynamic fields.
+	/// A compact account with three independently encoded dynamic fields.
 	///
-	/// The one-byte discriminator, bump, authority, revision, and two vector
-	/// prefixes always occupy `Self::HEADER_SIZE` bytes. Each active entry adds
-	/// eight bytes and each active marker adds one byte, independently, up to
-	/// `Self::MAX_SIZE`.
+	/// The fixed header includes a semantic `Option<u64>` encoded as
+	/// `PodOption<PodU64>`. The title uses `PodString`, while entries and markers
+	/// use vectors; only their active bytes are allocated.
 	pub discriminator: u8,
 	/// Canonical PDA bump.
 	pub bump: u8,
@@ -26,6 +25,11 @@ pub struct Journal {
 	pub authority: solana_pubkey::Pubkey,
 	/// Number of successful resize or write operations.
 	pub revision: u32,
+	/// Most recently written entry value, stored as `PodOption<PodU64>`.
+	pub featured_entry: Option<u64>,
+	/// Human-readable title stored as active UTF-8 bytes.
+	/// Pina compact capacity: 24.
+	pub title: pina::String<24>,
 	/// Active entries. Unused capacity consumes no account bytes.
 	/// Pina compact capacity: 8.
 	pub entries: pina::Vec<u64, 8>,

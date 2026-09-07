@@ -8,6 +8,7 @@ use codama_nodes::AccountNode;
 use codama_nodes::AccountValueNode;
 use codama_nodes::ArrayTypeNode;
 use codama_nodes::BooleanTypeNode;
+use codama_nodes::BytesEncoding;
 use codama_nodes::ConstantDiscriminatorNode;
 use codama_nodes::ConstantPdaSeedNode;
 use codama_nodes::ConstantValueNode;
@@ -164,6 +165,26 @@ fn renders_compact_tail_through_a_post_offset_wrapper() {
 }
 
 #[test]
+fn renders_compact_string_tails_with_default_and_explicit_prefixes() {
+	let docs: Docs = vec!["Pina compact capacity: 32.".to_string()].into();
+	for (format, expected) in [
+		(U8, "pina::String<32>"),
+		(NumberFormat::U16, "pina::PodString<32, 2>"),
+		(NumberFormat::U32, "pina::PodString<32, 4>"),
+		(NumberFormat::U64, "pina::PodString<32, 8>"),
+	] {
+		let string =
+			SizePrefixTypeNode::<TypeNode>::new(StringTypeNode::utf8(), NumberTypeNode::le(format));
+		let tail = PostOffsetTypeNode::<TypeNode>::relative(string, 0).into();
+		assert_eq!(
+			render_type_for_compact_tail(&tail, &docs, "State.title")
+				.unwrap_or_else(|error| panic!("render failed: {error}")),
+			expected
+		);
+	}
+}
+
+#[test]
 fn rejects_non_compact_tail_nodes() {
 	let number = TypeNode::from(NumberTypeNode::le(NumberFormat::U64));
 	let fixed = TypeNode::from(ArrayTypeNode::fixed(
@@ -174,28 +195,50 @@ fn rejects_non_compact_tail_nodes() {
 	for node in [number, fixed] {
 		let error = render_type_for_compact_tail(&node, &Docs::new(), "State.values")
 			.expect_err("non-prefixed tail must be rejected");
-		assert!(error.to_string().contains("suffix of prefixed arrays"));
+		assert!(error.to_string().contains("suffix of prefixed"));
 	}
 }
 
 #[test]
 fn rejects_compact_tails_without_capacity_metadata_or_with_prefix_overflow() {
-	let tail = TypeNode::from(ArrayTypeNode::prefixed(
+	let array = TypeNode::from(ArrayTypeNode::prefixed(
 		NumberTypeNode::le(NumberFormat::U64),
 		NumberTypeNode::le(U8),
 	));
-	let missing = render_type_for_compact_tail(&tail, &Docs::new(), "State.values")
-		.expect_err("missing capacity metadata must be rejected");
-	assert!(missing.to_string().contains("Pina compact capacity"));
+	let string = TypeNode::from(SizePrefixTypeNode::<TypeNode>::new(
+		StringTypeNode::utf8(),
+		NumberTypeNode::le(U8),
+	));
+	for tail in [&array, &string] {
+		let missing = render_type_for_compact_tail(tail, &Docs::new(), "State.values")
+			.expect_err("missing capacity metadata must be rejected");
+		assert!(missing.to_string().contains("Pina compact capacity"));
 
-	let too_large: Docs = vec!["Pina compact capacity: 256.".to_string()].into();
-	let overflow = render_type_for_compact_tail(&tail, &too_large, "State.values")
-		.expect_err("capacity beyond prefix maximum must be rejected");
-	assert!(
-		overflow
-			.to_string()
-			.contains("exceeds the 1-byte prefix maximum")
-	);
+		let too_large: Docs = vec!["Pina compact capacity: 256.".to_string()].into();
+		let overflow = render_type_for_compact_tail(tail, &too_large, "State.values")
+			.expect_err("capacity beyond prefix maximum must be rejected");
+		assert!(
+			overflow
+				.to_string()
+				.contains("exceeds the 1-byte prefix maximum")
+		);
+	}
+}
+
+#[test]
+fn rejects_non_utf8_compact_strings() {
+	let string = StringTypeNode {
+		encoding: BytesEncoding::Base58,
+		display: None,
+	};
+	let tail = TypeNode::from(SizePrefixTypeNode::<TypeNode>::new(
+		string,
+		NumberTypeNode::le(U8),
+	));
+	let docs: Docs = vec!["Pina compact capacity: 32.".to_string()].into();
+	let error = render_type_for_compact_tail(&tail, &docs, "State.title")
+		.expect_err("non-UTF-8 string must be rejected");
+	assert!(error.to_string().contains("must use UTF-8"));
 }
 
 #[test]

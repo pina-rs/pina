@@ -9,6 +9,7 @@ import 'package:solana_kit_addresses/solana_kit_addresses.dart';
 import 'package:solana_kit_codecs_core/solana_kit_codecs_core.dart';
 import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structures.dart';
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
+import 'package:solana_kit_codecs_strings/solana_kit_codecs_strings.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
 @immutable
@@ -17,6 +18,8 @@ class Journal {
     required this.bump,
     required this.authority,
     required this.revision,
+    required this.featuredEntry,
+    required this.title,
     required this.entries,
     required this.markers,
   }) : discriminator = 1;
@@ -25,6 +28,8 @@ class Journal {
   final int bump;
   final Address authority;
   final int revision;
+  final BigInt? featuredEntry;
+  final String title;
   final List<BigInt> entries;
   final List<int> markers;
 
@@ -37,16 +42,26 @@ class Journal {
           bump == other.bump &&
           authority == other.authority &&
           revision == other.revision &&
+          featuredEntry == other.featuredEntry &&
+          title == other.title &&
           entries == other.entries &&
           markers == other.markers;
 
   @override
-  int get hashCode =>
-      Object.hash(discriminator, bump, authority, revision, entries, markers);
+  int get hashCode => Object.hash(
+    discriminator,
+    bump,
+    authority,
+    revision,
+    featuredEntry,
+    title,
+    entries,
+    markers,
+  );
 
   @override
   String toString() =>
-      'Journal(discriminator: $discriminator, bump: $bump, authority: $authority, revision: $revision, entries: $entries, markers: $markers)';
+      'Journal(discriminator: $discriminator, bump: $bump, authority: $authority, revision: $revision, featuredEntry: $featuredEntry, title: $title, entries: $entries, markers: $markers)';
 }
 
 Encoder<Journal> getJournalEncoder() {
@@ -56,21 +71,41 @@ Encoder<Journal> getJournalEncoder() {
     ('authority', getAddressEncoder()),
     ('revision', getU32Encoder()),
     (
-      'entries',
+      'featuredEntry',
+      getNullableEncoder<BigInt>(
+        transformEncoder(getU64Encoder(), (BigInt value) => value),
+        noneValue: const ZeroesNoneValue(),
+      ),
+    ),
+    (
+      'title',
       offsetEncoder(
-        getArrayEncoder(
-          transformEncoder(getU64Encoder(), (BigInt value) => value),
-          size: PrefixedArraySize(
+        addEncoderSizePrefix(
+          getUtf8Encoder(),
+          offsetEncoder(
             offsetEncoder(
-              offsetEncoder(
-                getU16Encoder(),
-                OffsetConfig(preOffset: (scope) => 38),
-              ),
-              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+              getU8Encoder(),
+              OffsetConfig(preOffset: (scope) => 47),
             ),
+            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
         ),
-        OffsetConfig(preOffset: (scope) => scope.preOffset + 10),
+        OffsetConfig(preOffset: (scope) => scope.preOffset + 11),
+      ),
+    ),
+    (
+      'entries',
+      getArrayEncoder(
+        transformEncoder(getU64Encoder(), (BigInt value) => value),
+        size: PrefixedArraySize(
+          offsetEncoder(
+            offsetEncoder(
+              getU16Encoder(),
+              OffsetConfig(preOffset: (scope) => 48),
+            ),
+            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+          ),
+        ),
       ),
     ),
     (
@@ -81,7 +116,7 @@ Encoder<Journal> getJournalEncoder() {
           offsetEncoder(
             offsetEncoder(
               getU64Encoder(),
-              OffsetConfig(preOffset: (scope) => 40),
+              OffsetConfig(preOffset: (scope) => 50),
             ),
             OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
@@ -97,6 +132,8 @@ Encoder<Journal> getJournalEncoder() {
       'bump': value.bump,
       'authority': value.authority,
       'revision': value.revision,
+      'featuredEntry': value.featuredEntry,
+      'title': value.title,
       'entries': value.entries,
       'markers': value.markers,
     },
@@ -110,21 +147,41 @@ Decoder<Journal> getJournalDecoder() {
     ('authority', getAddressDecoder()),
     ('revision', getU32Decoder()),
     (
-      'entries',
+      'featuredEntry',
+      getNullableDecoder<BigInt>(
+        getU64Decoder(),
+        noneValue: const ZeroesNoneValue(),
+      ),
+    ),
+    (
+      'title',
       offsetDecoder(
-        getArrayDecoder(
-          getU64Decoder(),
-          size: PrefixedArraySize(
+        addDecoderSizePrefix(
+          getUtf8Decoder(),
+          offsetDecoder(
             offsetDecoder(
-              offsetDecoder(
-                getU16Decoder(),
-                OffsetConfig(preOffset: (scope) => 38),
-              ),
-              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+              getU8Decoder(),
+              OffsetConfig(preOffset: (scope) => 47),
             ),
+            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
         ),
-        OffsetConfig(preOffset: (scope) => scope.preOffset + 10),
+        OffsetConfig(preOffset: (scope) => scope.preOffset + 11),
+      ),
+    ),
+    (
+      'entries',
+      getArrayDecoder(
+        getU64Decoder(),
+        size: PrefixedArraySize(
+          offsetDecoder(
+            offsetDecoder(
+              getU16Decoder(),
+              OffsetConfig(preOffset: (scope) => 48),
+            ),
+            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+          ),
+        ),
       ),
     ),
     (
@@ -135,7 +192,7 @@ Decoder<Journal> getJournalDecoder() {
           offsetDecoder(
             offsetDecoder(
               getU64Decoder(),
-              OffsetConfig(preOffset: (scope) => 40),
+              OffsetConfig(preOffset: (scope) => 50),
             ),
             OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
@@ -161,6 +218,8 @@ Decoder<Journal> getJournalDecoder() {
         bump: map['bump']! as int,
         authority: map['authority']! as Address,
         revision: map['revision']! as int,
+        featuredEntry: map['featuredEntry'] as BigInt?,
+        title: map['title']! as String,
         entries: map['entries']! as List<BigInt>,
         markers: map['markers']! as List<int>,
       ),

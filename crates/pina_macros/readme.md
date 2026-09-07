@@ -98,7 +98,7 @@ pub enum ExampleError {
 - `discriminator = PathToEnum`
 - `variant = EnumVariant` (optional; defaults to inferred struct name; cannot be combined with a `discriminator` path that includes a variant)
 - `crate = ::pina` (optional)
-- `compact` (requires the crate's `compact` feature; permits one or more trailing bounded `Vec<T, N>` fields)
+- `compact` (requires the crate's `compact` feature; permits one or more trailing bounded `String<N>` or `Vec<T, N>` fields)
 
 ### `#[error(...)]`
 

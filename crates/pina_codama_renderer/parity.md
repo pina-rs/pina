@@ -41,7 +41,7 @@ The renderer supports fixed string/byte, little-endian number, boolean, and publ
 
 ## Rejected layouts
 
-- variable-length strings, bytes, maps, or sets, and variable arrays outside the compact suffix of an account;
+- unbounded strings, bytes, maps, or sets, and variable strings or arrays outside the compact suffix of an account;
 - remainder or sentinel encodings;
 - big-endian and floating-point numbers;
 - sparse enums or enums with payload variants;
@@ -49,4 +49,4 @@ The renderer supports fixed string/byte, little-endian number, boolean, and publ
 - fixed-size wrappers whose semantic meaning cannot be recovered;
 - non-zero-offset or size-derived discriminators.
 
-Every accepted layout has one unambiguous validation path. Fixed accounts and all instruction/event layouts have one exact byte size; compact accounts have a fixed header and element-aligned dynamic tails. This is intentionally narrower than the complete Codama schema language.
+Every accepted layout has one unambiguous validation path. Fixed accounts and all instruction/event layouts have one exact byte size; compact accounts have a fixed header followed by bounded UTF-8 and element-aligned dynamic tails. This is intentionally narrower than the complete Codama schema language.

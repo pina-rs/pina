@@ -450,7 +450,7 @@ Compact mode is opt-in. Enable `compact` for schemas and checked loaders; add `a
 pina = { version = "...", features = ["compact", "account-resize"] }
 ```
 
-The `compact` feature also enables `derive`. Add `compact` to an account with a suffix of one or more bounded `Vec` fields. Fixed fields must come first, and every capacity must be a literal so the macro can audit and generate the maximum layout:
+The `compact` feature also enables `derive`. Add `compact` to an account with a suffix of one or more bounded `String` or `Vec` fields. Fixed fields, including `Option<scalar>` values stored as `PodOption`, must come first. Every dynamic capacity must be a literal so the macro can audit and generate the maximum layout:
 
 ```rust
 #[account(discriminator = AccountType, compact)]
@@ -458,14 +458,20 @@ pub struct Journal {
 	pub bump: u8,
 	pub authority: Address,
 	pub revision: u32,
+	pub featured_entry: Option<u64>,
+	pub title: PodString<24>,
 	pub entries: Vec<u64, 8>,
 	pub markers: PodVec<u8, 8, 8>,
 }
 
-let account_bytes = Journal::projected_bytes(active_entry_count, active_marker_count)?;
+let account_bytes = Journal::projected_bytes(
+	title.len(),
+	active_entry_count,
+	active_marker_count,
+)?;
 ```
 
-The macro generates `JournalHeader`, `JournalRef`, and `JournalMut`, plus `HEADER_SIZE`, `MIN_SIZE`, `MAX_SIZE`, one `*_CAPACITY` constant per tail, checked size/load/initialize methods, and the compact-account traits used by Pina's typed CPI builders. For this schema, `ENTRIES_CAPACITY` and `MARKERS_CAPACITY` are both eight. Every tail length is stored in the fixed header. Active payloads are concatenated after that header in declaration order; declared capacity is a validation bound, not reserved space.
+The macro generates `JournalHeader`, `JournalRef`, and `JournalMut`, plus `HEADER_SIZE`, `MIN_SIZE`, `MAX_SIZE`, one `*_CAPACITY` constant per tail, checked size/load/initialize methods, and the compact-account traits used by Pina's typed CPI builders. For this schema, `TITLE_CAPACITY` is 24 and `ENTRIES_CAPACITY` and `MARKERS_CAPACITY` are both eight. Every tail length is stored in the fixed header. Active UTF-8 bytes and vector elements are concatenated after that header in declaration order; declared capacity is a validation bound, not reserved space.
 
 Pina uses Pinapod, its maintained and wire-compatible ZeroPod fork. Each immutable and mutable accessor reads its own length prefix, so compact tails may have independent active lengths.
 
@@ -482,7 +488,7 @@ Compact mutation has one important ordering rule:
 Use `ResizeCompactAccount` for normal compact updates. It applies that ordering, enforces the exact `target_size`, and skips the physical resize when the allocation is unchanged:
 
 ```rust
-let target_size = Journal::projected_bytes(entries.len(), markers.len())?;
+let target_size = Journal::projected_bytes(title.len(), entries.len(), markers.len())?;
 
 ResizeCompactAccount {
 	account,
@@ -492,6 +498,10 @@ ResizeCompactAccount {
 }
 .invoke::<Journal, _>(|data| {
 	let mut journal = Journal::try_from_bytes_mut(data)?;
+	journal.featured_entry.set(Some(featured_entry));
+	journal
+		.set_title(title)
+		.map_err(|_| ProgramError::InvalidAccountData)?;
 	journal
 		.set_entries(entries)
 		.map_err(|_| ProgramError::InvalidAccountData)?;
@@ -521,7 +531,7 @@ ResizeCompactAccount {
 }
 .invoke_signed::<Journal, _>(rent_account_signers, |data| {
 	let mut journal = Journal::try_from_bytes_mut(data)?;
-	// Stage every tail, then commit before returning.
+	// Stage every string/vector tail, then commit before returning.
 	journal.commit().map_err(|_| ProgramError::InvalidAccountData)?;
 
 	Ok(())
@@ -544,6 +554,9 @@ if target_size > account.data_len() {
 let encoded_size = {
 	let mut data = account.try_borrow_mut()?;
 	let mut journal = Journal::try_from_bytes_mut(&mut data)?;
+	journal
+		.set_title(title)
+		.map_err(|_| ProgramError::InvalidAccountData)?;
 	journal
 		.set_entries(entries)
 		.map_err(|_| ProgramError::InvalidAccountData)?;
@@ -800,7 +813,7 @@ The full generic forms are `PodOption<T: ZcElem, PFX = 1>`, `PodString<N, PFX = 
 
 <!-- {=podCollectionDescription} -->
 
-Collection types store data inline without allocation for advanced direct Pinapod use. Pina's `#[account]`, `#[instruction]`, and `#[event]` macros reject `PodString`/`String` and `PodVec`/`Vec` fields in fixed-layout schemas because their inactive capacity is not guaranteed to be initialized after every upstream construction path; compact schemas instead accept one or more trailing bounded `Vec`/`PodVec` tails. Use fully initialized fixed byte arrays plus checked semantic helpers in macro-generated schemas. Semantic `Option<scalar>` remains supported because Pina proves its exact `PodOption` mapping and scalar storage contract.
+Collection types store data inline without allocation for advanced direct Pinapod use. Pina's `#[account]`, `#[instruction]`, and `#[event]` macros reject `PodString`/`String` and `PodVec`/`Vec` fields in fixed-layout schemas because their inactive capacity is not guaranteed to be initialized after every upstream construction path; compact account schemas instead accept one or more trailing bounded `String`/`PodString` and `Vec`/`PodVec` tails. Use fully initialized fixed byte arrays plus checked semantic helpers in other macro-generated schemas. Semantic `Option<scalar>` remains supported in the fixed header because Pina proves its exact `PodOption` mapping and scalar storage contract.
 
 For direct Pinapod integrations, Pinapod boundary validation must establish the active `PodString` bytes are valid UTF-8 before callers use `as_str()`. `PodVec` offers slice-based access via `as_slice()` / `as_slice_mut()`, and `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`. Those direct integrations are outside Pina's audited macro-generated contract and must uphold Pinapod's complete safety invariants.
 

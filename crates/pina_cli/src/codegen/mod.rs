@@ -46,8 +46,8 @@ use crate::ir::PdaIr;
 use crate::ir::PdaSeedIr;
 use crate::ir::ProgramIr;
 use crate::ir::ZeroPodEnumIr;
-use crate::parse::types::compact_vec_capacity;
-use crate::parse::types::compact_vec_prefix_size;
+use crate::parse::types::compact_tail_capacity;
+use crate::parse::types::compact_tail_prefix_size;
 use crate::parse::types::try_rust_type_to_codama_compact_tail;
 use crate::parse::types::try_rust_type_to_codama_compact_tail_at;
 use crate::parse::types::try_rust_type_to_codama_with_zeropod_enums;
@@ -134,12 +134,13 @@ fn build_account_node(
 			account
 				.fields
 				.iter()
-				.position(|field| compact_vec_prefix_size(&field.rust_type).is_some())
+				.position(|field| compact_tail_prefix_size(&field.rust_type).is_some())
 				.ok_or_else(|| {
 					IdlError::UnsupportedType {
 						ty: account.name.clone(),
 						context: format!("account `{}`", account.name),
-						reason: "compact accounts require at least one trailing `Vec<T, N>` field"
+						reason: "compact accounts require at least one trailing `String<N>` or \
+						         `Vec<T, N>` field"
 							.to_string(),
 					}
 				})?,
@@ -153,7 +154,7 @@ fn build_account_node(
 			account.fields[start..]
 				.iter()
 				.map(|field| {
-					compact_vec_prefix_size(&field.rust_type).ok_or_else(|| {
+					compact_tail_prefix_size(&field.rust_type).ok_or_else(|| {
 						IdlError::UnsupportedType {
 							ty: field.rust_type.clone(),
 							context: format!("account `{}.{}`", account.name, field.name),
@@ -176,7 +177,7 @@ fn build_account_node(
 		let context = format!("account `{}.{}`", account.name, field.name);
 		let mut compact_capacity = None;
 		let mut node = if let Some(start) = first_tail.filter(|start| index >= *start) {
-			compact_capacity = compact_vec_capacity(&field.rust_type);
+			compact_capacity = compact_tail_capacity(&field.rust_type);
 			if index == start {
 				prefix_offset = header_offset;
 			}

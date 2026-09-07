@@ -102,7 +102,7 @@ You can pass multiple `--idl` flags or `--idl-dir`. Add `--no-scaffold` to emit 
 
 ## Renderer Constraints
 
-`pina_codama_renderer` intentionally targets fixed-size layouts. Unsupported patterns produce explicit errors (for example variable-length strings/bytes, unsupported endian/number forms, and non-fixed arrays).
+`pina_codama_renderer` targets fixed-size layouts plus the audited size-prefixed string and array suffixes emitted for compact accounts. Unsupported patterns produce explicit errors (for example unbounded strings/bytes, unsupported endian/number forms, and dynamic fields outside a compact suffix).
 
 ## Extractor coverage
 

@@ -8,6 +8,8 @@
 
 import {
 	type Account,
+	addDecoderSizePrefix,
+	addEncoderSizePrefix,
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
@@ -25,6 +27,8 @@ import {
 	getAddressEncoder,
 	getArrayDecoder,
 	getArrayEncoder,
+	getOptionDecoder,
+	getOptionEncoder,
 	getStructDecoder,
 	getStructEncoder,
 	getU16Decoder,
@@ -35,15 +39,22 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	getUtf8Decoder,
+	getUtf8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	offsetDecoder,
 	offsetEncoder,
+	type Option,
+	type OptionOrNullable,
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
 import { findJournalPda, type JournalSeeds } from "../pdas";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
+import {
+	getZeroPodDiscriminatorDecoder,
+	getZeroPodOptionTagDecoder,
+} from "../zeropodCodecs";
 
 export const JOURNAL_DISCRIMINATOR = 1;
 
@@ -52,12 +63,11 @@ export function getJournalDiscriminatorBytes(): ReadonlyUint8Array {
 }
 
 /**
- * A compact account with two independently encoded dynamic fields.
+ * A compact account with three independently encoded dynamic fields.
  *
- * The one-byte discriminator, bump, authority, revision, and two vector
- * prefixes always occupy `Self::HEADER_SIZE` bytes. Each active entry adds
- * eight bytes and each active marker adds one byte, independently, up to
- * `Self::MAX_SIZE`.
+ * The fixed header includes a semantic `Option<u64>` encoded as
+ * `PodOption<PodU64>`. The title uses `PodString`, while entries and markers
+ * use vectors; only their active bytes are allocated.
  */
 export type Journal = {
 	discriminator: number;
@@ -67,6 +77,13 @@ export type Journal = {
 	authority: Address;
 	/** Number of successful resize or write operations. */
 	revision: number;
+	/** Most recently written entry value, stored as `PodOption<PodU64>`. */
+	featuredEntry: Option<bigint>;
+	/**
+	 * Human-readable title stored as active UTF-8 bytes.
+	 * Pina compact capacity: 24.
+	 */
+	title: string;
 	/**
 	 * Active entries. Unused capacity consumes no account bytes.
 	 * Pina compact capacity: 8.
@@ -86,6 +103,13 @@ export type JournalArgs = {
 	authority: Address;
 	/** Number of successful resize or write operations. */
 	revision: number;
+	/** Most recently written entry value, stored as `PodOption<PodU64>`. */
+	featuredEntry: OptionOrNullable<number | bigint>;
+	/**
+	 * Human-readable title stored as active UTF-8 bytes.
+	 * Pina compact capacity: 24.
+	 */
+	title: string;
 	/**
 	 * Active entries. Unused capacity consumes no account bytes.
 	 * Pina compact capacity: 8.
@@ -107,22 +131,36 @@ export function getJournalEncoder(): Encoder<JournalArgs> {
 			["authority", getAddressEncoder()],
 			["revision", getU32Encoder()],
 			[
-				"entries",
+				"featuredEntry",
+				getOptionEncoder(getU64Encoder(), { noneValue: "zeroes" }),
+			],
+			[
+				"title",
 				offsetEncoder(
-					getArrayEncoder(getU64Encoder(), {
-						size: offsetEncoder(
-							offsetEncoder(getU16Encoder(), { preOffset: () => 38 }),
+					addEncoderSizePrefix(
+						getUtf8Encoder(),
+						offsetEncoder(
+							offsetEncoder(getU8Encoder(), { preOffset: () => 47 }),
 							{ postOffset: ({ preOffset }) => preOffset + 0 },
 						),
-					}),
-					{ preOffset: ({ preOffset }) => preOffset + 10 },
+					),
+					{ preOffset: ({ preOffset }) => preOffset + 11 },
 				),
+			],
+			[
+				"entries",
+				getArrayEncoder(getU64Encoder(), {
+					size: offsetEncoder(
+						offsetEncoder(getU16Encoder(), { preOffset: () => 48 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
+					),
+				}),
 			],
 			[
 				"markers",
 				getArrayEncoder(getU8Encoder(), {
 					size: offsetEncoder(
-						offsetEncoder(getU64Encoder(), { preOffset: () => 40 }),
+						offsetEncoder(getU64Encoder(), { preOffset: () => 50 }),
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 				}),
@@ -143,22 +181,39 @@ export function getJournalDecoder(): Decoder<Journal> {
 		["authority", getAddressDecoder()],
 		["revision", getU32Decoder()],
 		[
-			"entries",
+			"featuredEntry",
+			getOptionDecoder(getU64Decoder(), {
+				prefix: getZeroPodOptionTagDecoder(getU8Decoder()),
+				noneValue: "zeroes",
+			}),
+		],
+		[
+			"title",
 			offsetDecoder(
-				getArrayDecoder(getU64Decoder(), {
-					size: offsetDecoder(
-						offsetDecoder(getU16Decoder(), { preOffset: () => 38 }),
+				addDecoderSizePrefix(
+					getUtf8Decoder(),
+					offsetDecoder(
+						offsetDecoder(getU8Decoder(), { preOffset: () => 47 }),
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
-				}),
-				{ preOffset: ({ preOffset }) => preOffset + 10 },
+				),
+				{ preOffset: ({ preOffset }) => preOffset + 11 },
 			),
+		],
+		[
+			"entries",
+			getArrayDecoder(getU64Decoder(), {
+				size: offsetDecoder(
+					offsetDecoder(getU16Decoder(), { preOffset: () => 48 }),
+					{ postOffset: ({ preOffset }) => preOffset + 0 },
+				),
+			}),
 		],
 		[
 			"markers",
 			getArrayDecoder(getU8Decoder(), {
 				size: offsetDecoder(
-					offsetDecoder(getU64Decoder(), { preOffset: () => 40 }),
+					offsetDecoder(getU64Decoder(), { preOffset: () => 50 }),
 					{ postOffset: ({ preOffset }) => preOffset + 0 },
 				),
 			}),
