@@ -32,6 +32,7 @@ where
 pub mod state {
 	pub use pinocchio_token::state::*;
 
+	/// Validated SPL Token account view alias produced by the token validators.
 	pub type TokenAccount = Account;
 }
 

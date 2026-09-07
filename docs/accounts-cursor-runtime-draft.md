@@ -112,24 +112,24 @@ That gives Pina an incremental migration path:
 
 ## Migration plan
 
-### Phase 1 — Internal cursor introduction
+### Phase 1 — Internal cursor introduction (shipped)
 
 - add `AccountsCursor<'a>` behind the current public API
 - reimplement `TryFromAccountInfos` derive output in terms of the cursor
 - preserve current exact/remaining behavior byte-for-byte where possible
 
-### Phase 2 — Explicit duplicate-account runtime checks
+### Phase 2 — Explicit duplicate-account runtime checks (shipped)
 
 - move duplicate mutable alias detection into cursor state
 - add adversarial regression tests for nested and repeated-account cases
 
-### Phase 3 — Structured remaining accounts
+### Phase 3 — Structured remaining accounts (pending)
 
 - add a typed remaining-accounts wrapper
 - update derive code and docs
 - preserve a simple slice-based escape hatch when needed
 
-### Phase 4 — Nested/composite account loaders
+### Phase 4 — Nested/composite account loaders (pending)
 
 - allow derive-generated account structs to contain parsed sub-groups
 - keep final semantic validation explicit in user code

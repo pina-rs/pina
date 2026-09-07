@@ -12,7 +12,7 @@ This crate powers the attributes/derives re-exported by `pina`.
 
 <!-- {=crateReadmeBadgeRow:"pina_macros"} -->
 
-[![Crates.io](https://img.shields.io/badge/crates.io-pina**macros-orange?logo=rust)](https://crates.io/crates/pina_macros) [![Docs.rs](https://img.shields.io/badge/docs.rs-pina**macros-1f425f?logo=docs.rs)](https://docs.rs/pina_macros/) [![CI](https://github.com/pina-rs/pina/actions/workflows/ci.yml/badge.svg)](https://github.com/pina-rs/pina/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/pina-rs/pina/branch/main/graph/badge.svg)](https://codecov.io/gh/pina-rs/pina) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/license/apache-2.0)
+[![Crates.io](https://img.shields.io/badge/crates.io-pina__macros-orange?logo=rust)](https://crates.io/crates/pina_macros) [![Docs.rs](https://img.shields.io/badge/docs.rs-pina__macros-1f425f?logo=docs.rs)](https://docs.rs/pina_macros/) [![CI](https://github.com/pina-rs/pina/actions/workflows/ci.yml/badge.svg)](https://github.com/pina-rs/pina/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/pina-rs/pina/branch/main/graph/badge.svg)](https://codecov.io/gh/pina-rs/pina) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/license/apache-2.0)
 
 <!-- {/crateReadmeBadgeRow} -->
 

@@ -132,8 +132,8 @@ Reach for this when the source account is still a token-program-owned account an
 use pina::ProgramResult;
 use pina::system;
 use pina::token_2022;
-use pina::token_2022::instructions::ExtensionDiscriminator;
 use pina::token_2022::instructions::Reallocate;
+use pina::token_2022::state::ExtensionType;
 
 fn enable_token_extensions(
 	account: &pina::AccountView,
@@ -146,10 +146,7 @@ fn enable_token_extensions(
 	system_program.assert_address(&system::ID)?;
 	owner.assert_signer()?;
 
-	let extensions = [
-		ExtensionDiscriminator::MemoTransfer,
-		ExtensionDiscriminator::TransferHook,
-	];
+	let extensions = [ExtensionType::MemoTransfer, ExtensionType::TransferHook];
 
 	Reallocate::new(
 		&token_2022::ID,

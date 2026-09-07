@@ -1,3 +1,3 @@
 # Security Lints
 
-{{#include ../../lints/readme.md:3:}}
+{{#include ../../crates/pina_lints/readme.md:3:}}

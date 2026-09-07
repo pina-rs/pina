@@ -26,7 +26,7 @@ A performant Solana smart contract framework built on top of [pinocchio](https:/
 
 <!-- {=pinaFeatureHighlights} -->
 
-- **Validated zero-copy deserialization** — zeropod validates fixed-layout account data before Pina reinterprets it in place, with no heap allocation.
+- **Validated zero-copy deserialization** — Pinapod validates fixed-layout account data before Pina hands out its generated storage view over the account bytes, with no heap allocation.
 - **`no_std` compatible** — all crates compile to the `bpfel-unknown-none` SBF target for on-chain deployment.
 - **Low compute units** — built on `pinocchio` instead of `solana-program`, saving thousands of CU per instruction.
 - **Discriminator system** — every account, instruction, and event type carries a typed discriminator as its first field.
@@ -42,17 +42,20 @@ A performant Solana smart contract framework built on top of [pinocchio](https:/
 
 <!-- {=pinaWorkspacePackages} -->
 
-| Package                 | Path                          | Description                                                       |
-| ----------------------- | ----------------------------- | ----------------------------------------------------------------- |
-| `pina`                  | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types. |
-| `pina_macros`           | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.    |
-| `pina_cli`              | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding.  |
-| `pina_codama_renderer`  | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.     |
-| `pina_profile`          | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                     |
-| `pina_sdk_ids`          | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.         |
-| `@pina-rs/codama-nodes` | `packages/nodes-from-pina`    | Pina IDL conversion and normalization for Codama root nodes.      |
-| `@pina-rs/cli`          | `packages/pina__cli`          | npm launcher for the prebuilt platform-specific CLI packages.     |
-| `@pina-rs/skill`        | `packages/pina__skill`        | Agent guidance and a non-destructive local skill installer.       |
+| Package                 | Path                          | Description                                                                   |
+| ----------------------- | ----------------------------- | ----------------------------------------------------------------------------- |
+| `pina`                  | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types.             |
+| `pina_macros`           | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.                |
+| `pina_cli`              | `crates/pina_cli`             | CLI for building, testing, inspecting, and generating Pina program artifacts. |
+| `pina_codama_renderer`  | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.                 |
+| `pina_cpi_renderer`     | `crates/pina_cpi_renderer`    | Standalone Codama renderer generating Pina CPI client crates.                 |
+| `pina_lints`            | `crates/pina_lints`           | Pina security lints and the driver behind `pina lint`.                        |
+| `pina_test`             | `crates/pina_test`            | Surfpool-backed program test harness.                                         |
+| `pina_profile`          | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                                 |
+| `pina_sdk_ids`          | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.                     |
+| `@pina-rs/codama-nodes` | `packages/nodes-from-pina`    | Pina IDL conversion and normalization for Codama root nodes.                  |
+| `@pina-rs/cli`          | `packages/pina__cli`          | npm launcher for the prebuilt platform-specific CLI packages.                 |
+| `@pina-rs/skill`        | `packages/pina__skill`        | Agent guidance and a non-destructive local skill installer.                   |
 
 <!-- {/pinaWorkspacePackages} -->
 
@@ -138,7 +141,7 @@ End-to-end setup steps:
 4. Generate clients from the IDLs: `codama:clients:generate`
 5. Run the full validation pipeline: `codama:test`
 
-If `pnpm-workspace.yaml` sets `useNodeVersion`, `devenv shell` activates the matching pnpm-managed `node`/`npm`/`npx`/`corepack` toolchain automatically.
+If `pnpm-workspace.yaml` sets `useNodeVersion`, pnpm-run scripts automatically use that pinned Node toolchain; the shell itself provides the Nix-managed Node 24 pair (`node`/`npm`/`npx`/`corepack`).
 
 ### Using Codama in separate projects
 
@@ -351,7 +354,7 @@ Pina supports the same discriminator-first layout in both account and instructio
 
 <!-- {=pinaDiscriminatorLayoutDecisionMatrix} -->
 
-## Discriminator layout decision matrix
+### Discriminator layout decision matrix
 
 The discriminator strategy determines byte layout, parser guarantees, and cross-protocol compatibility.
 
@@ -412,13 +415,13 @@ The `#[discriminator]` macro generates:
 Optional attributes:
 
 - `primitive = u16` — override the backing type (default: `u8`)
-- `final` — marks the enum as a final discriminator (generates a `BYTES` constant)
+- `final` — omits the `#[non_exhaustive]` attribute so the enum must be matched exhaustively
 
 ### Accounts (on-chain state)
 
 <br>
 
-The `#[account]` macro treats the struct as a native schema. It injects the discriminator, derives `zeropod::ZeroPod`, and exposes validated `ConfigZc` views over caller-owned account bytes:
+The `#[account]` macro treats the struct as a native schema. It injects the discriminator, derives `pinapod::ZeroPod` (re-exported as `pina::ZeroPod`), and exposes validated `ConfigZc` views over caller-owned account bytes:
 
 ```rust
 use pina::*;
@@ -748,15 +751,15 @@ Fixed-capacity collections that store fully initialized data inline without allo
 | `PodString` | Fixed-capacity string  | `PFX`-byte length prefix + `N` data bytes |
 | `PodVec`    | Fixed-capacity vec     | `PFX`-byte length prefix + `N` elements   |
 
-The full generic forms are `PodOption<T: ZcElem>`, `PodString<N, PFX = 1>`, and `PodVec<T: ZcElem, N, PFX = 2>`. All collection layouts are alignment 1 and padding-free when `T: ZcElem`. `ZcValidate` checks tags, length prefixes, active elements, and UTF-8 before safe access. Length prefixes (`PFX`) default to 1 byte for strings (max 255) and 2 bytes for vectors (max 65 535 elements).
+The full generic forms are `PodOption<T: ZcElem, PFX = 1>`, `PodString<N, PFX = 1>`, and `PodVec<T: ZcElem, N, PFX = 2>`. All collection layouts are alignment 1 and padding-free when `T: ZcElem`. `ZcValidate` checks tags, length prefixes, active elements, and UTF-8 before safe access. Length prefixes (`PFX`) default to 1 byte for strings (max 255) and 2 bytes for vectors (max 65 535 elements).
 
 <!-- {/podCollectionTypesTable} -->
 
 <!-- {=podCollectionDescription} -->
 
-Collection types store data inline without allocation for advanced direct zeropod use. Pina's `#[account]`, `#[instruction]`, and `#[event]` macros reject `PodString`/`String` and `PodVec`/`Vec` fields because their inactive capacity is not guaranteed to be initialized after every upstream construction path. Use fully initialized fixed byte arrays plus checked semantic helpers in macro-generated schemas. Semantic `Option<scalar>` remains supported because Pina proves its exact `PodOption` mapping and scalar storage contract.
+Collection types store data inline without allocation for advanced direct Pinapod use. Pina's `#[account]`, `#[instruction]`, and `#[event]` macros reject `PodString`/`String` and `PodVec`/`Vec` fields in fixed-layout schemas because their inactive capacity is not guaranteed to be initialized after every upstream construction path; compact schemas instead accept one or more trailing bounded `Vec`/`PodVec` tails. Use fully initialized fixed byte arrays plus checked semantic helpers in macro-generated schemas. Semantic `Option<scalar>` remains supported because Pina proves its exact `PodOption` mapping and scalar storage contract.
 
-For direct zeropod integrations, zeropod boundary validation must establish the active `PodString` bytes are valid UTF-8 before callers use `as_str()`. `PodVec` offers slice-based access via `as_slice()` / `as_slice_mut()`, and `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`. Those direct integrations are outside Pina's audited macro-generated contract and must uphold zeropod's complete safety invariants.
+For direct Pinapod integrations, Pinapod boundary validation must establish the active `PodString` bytes are valid UTF-8 before callers use `as_str()`. `PodVec` offers slice-based access via `as_slice()` / `as_slice_mut()`, and `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`. Those direct integrations are outside Pina's audited macro-generated contract and must uphold Pinapod's complete safety invariants.
 
 <!-- {/podCollectionDescription} -->
 
@@ -797,8 +800,9 @@ CreateProgramAccountWithBump {
 ```rust
 use pina::*;
 
-// Direct lamport transfer between accounts.
+// Direct debit: the sender must be a program-owned signer account.
 source.send(1_000_000, destination)?;
+// System-program CPI credit: the source account must sign.
 destination.collect(1_000_000, source)?;
 
 // Close an account and return rent to recipient.
@@ -825,9 +829,10 @@ Closing guidance under Pinocchio 0.11:
 use pina::*;
 
 // Combine seeds with a bump for PDA signing.
+let seeds = &[b"escrow", maker_key];
 let bump = [255u8; 1];
-let combined = combine_seeds_with_bump(&[b"escrow", maker_key], &bump);
-let signer = Signer::from(&combined[..3]);
+let combined = combine_seeds_with_bump(seeds, &bump)?;
+let signer = Signer::from(&combined[..=seeds.len()]);
 ```
 
 ### Logging
@@ -853,10 +858,10 @@ When the `logs` feature is disabled, `log!` compiles to nothing.
 Programs are compiled to the `bpfel-unknown-none` target using `sbpf-linker`:
 
 ```sh
-cargo +nightly build --release --target bpfel-unknown-none -p my_program -Z build-std=core,alloc -F bpf-entrypoint
+cargo build --release --target bpfel-unknown-none -p my_program -Z build-std=core,alloc -F bpf-entrypoint
 ```
 
-The `bpf-entrypoint` feature gate separates the on-chain entrypoint from the library code used in tests.
+The pinned nightly toolchain from `rust-toolchain.toml` runs the build; the `bpf-entrypoint` feature gate separates the on-chain entrypoint from the library code used in tests.
 
 <!-- {/sbfBuildInstructions} -->
 
@@ -908,23 +913,26 @@ The profiler decodes each SBF instruction opcode and assigns costs: regular inst
 
 The `pina docs` subcommand renders built-in reference topics. Set the `PINA_TEMPLATES_DIR` environment variable to a directory containing `<topic>.t.md` template files to override or extend the default topics with your own content.
 
-## Crates
+## Packages
 
 <br>
 
 <!-- {=pinaWorkspacePackages} -->
 
-| Package                 | Path                          | Description                                                       |
-| ----------------------- | ----------------------------- | ----------------------------------------------------------------- |
-| `pina`                  | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types. |
-| `pina_macros`           | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.    |
-| `pina_cli`              | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding.  |
-| `pina_codama_renderer`  | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.     |
-| `pina_profile`          | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                     |
-| `pina_sdk_ids`          | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.         |
-| `@pina-rs/codama-nodes` | `packages/nodes-from-pina`    | Pina IDL conversion and normalization for Codama root nodes.      |
-| `@pina-rs/cli`          | `packages/pina__cli`          | npm launcher for the prebuilt platform-specific CLI packages.     |
-| `@pina-rs/skill`        | `packages/pina__skill`        | Agent guidance and a non-destructive local skill installer.       |
+| Package                 | Path                          | Description                                                                   |
+| ----------------------- | ----------------------------- | ----------------------------------------------------------------------------- |
+| `pina`                  | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types.             |
+| `pina_macros`           | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.                |
+| `pina_cli`              | `crates/pina_cli`             | CLI for building, testing, inspecting, and generating Pina program artifacts. |
+| `pina_codama_renderer`  | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.                 |
+| `pina_cpi_renderer`     | `crates/pina_cpi_renderer`    | Standalone Codama renderer generating Pina CPI client crates.                 |
+| `pina_lints`            | `crates/pina_lints`           | Pina security lints and the driver behind `pina lint`.                        |
+| `pina_test`             | `crates/pina_test`            | Surfpool-backed program test harness.                                         |
+| `pina_profile`          | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                                 |
+| `pina_sdk_ids`          | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.                     |
+| `@pina-rs/codama-nodes` | `packages/nodes-from-pina`    | Pina IDL conversion and normalization for Codama root nodes.                  |
+| `@pina-rs/cli`          | `packages/pina__cli`          | npm launcher for the prebuilt platform-specific CLI packages.                 |
+| `@pina-rs/skill`        | `packages/pina__skill`        | Agent guidance and a non-destructive local skill installer.                   |
 
 <!-- {/pinaWorkspacePackages} -->
 
@@ -934,32 +942,36 @@ The `pina docs` subcommand renders built-in reference topics. Set the `PINA_TEMP
 
 - Macros are minimal syntactic sugar to reduce repetition of code.
 - IDL generation is automated based on code you write, rather than annotations. So `payer.assert_signer()?` will generate an IDL that specifies that the account is a signer.
-- Everything in Rust from the on-chain program to the client code used on the browser — this project strives to make it possible to build everything in your favourite language.
+- One language end to end — from the on-chain program to the browser client — in whichever language you prefer.
 
 ## Examples
 
 <br>
 
-| Example                                                                           | Description                                                                 |
-| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| [`hello_solana`](examples/hello_solana)                                           | Minimal program — entrypoint, accounts, logging                             |
-| [`counter_program`](examples/counter_program)                                     | PDA state management with initialize and increment                          |
-| [`transfer_sol`](examples/transfer_sol)                                           | CPI and direct lamport transfers                                            |
-| [`escrow_program`](examples/escrow_program)                                       | Full token escrow with SPL token operations                                 |
-| [`vesting_program`](examples/vesting_program)                                     | Token vesting / lockup scaffold with vault ATA setup and schedule state     |
-| [`role_registry_program`](examples/role_registry_program)                         | Role-based configuration and registry PDAs                                  |
-| [`staking_rewards_program`](examples/staking_rewards_program)                     | Staking pool and user-position accounting scaffold                          |
-| [`pina_bpf`](examples/pina_bpf)                                                   | Minimal pina-native BPF hello world (nightly + `build-std=core,alloc`)      |
-| [`anchor_declare_id`](examples/anchor_declare_id)                                 | Anchor `declare-id` test parity port for program-id mismatch                |
-| [`anchor_declare_program`](examples/anchor_declare_program)                       | Anchor `declare-program` parity port for external-program ID checks         |
-| [`anchor_duplicate_mutable_accounts`](examples/anchor_duplicate_mutable_accounts) | Anchor duplicate mutable account checks adapted to explicit pina validation |
-| [`anchor_errors`](examples/anchor_errors)                                         | Anchor custom error-code parity and guard helper checks                     |
-| [`anchor_events`](examples/anchor_events)                                         | Anchor event schema parity via deterministic event serialization            |
-| [`anchor_floats`](examples/anchor_floats)                                         | Anchor float account/update behavior with authority checks                  |
-| [`anchor_system_accounts`](examples/anchor_system_accounts)                       | Anchor system-owned account constraint parity                               |
-| [`anchor_sysvars`](examples/anchor_sysvars)                                       | Anchor sysvar account validation parity                                     |
-| [`anchor_realloc`](examples/anchor_realloc)                                       | Dynamic compact account lifecycle with typed, rent-adjusted reallocations   |
-| [`compact_accounts`](examples/compact_accounts)                                   | Focused compact account sizing, mutation order, rent, and generated clients |
+| Example                                                                           | Description                                                                                   |
+| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| [`hello_solana`](examples/hello_solana)                                           | Minimal program — entrypoint, accounts, logging                                               |
+| [`counter_program`](examples/counter_program)                                     | PDA state management with initialize and increment                                            |
+| [`transfer_sol`](examples/transfer_sol)                                           | CPI and direct lamport transfers                                                              |
+| [`escrow_program`](examples/escrow_program)                                       | Full token escrow with SPL token operations                                                   |
+| [`vesting_program`](examples/vesting_program)                                     | Schedule-state and vault-ATA scaffold; does not transfer tokens or enforce time-based vesting |
+| [`role_registry_program`](examples/role_registry_program)                         | Role-based configuration and registry PDAs                                                    |
+| [`staking_rewards_program`](examples/staking_rewards_program)                     | Staking pool and user-position accounting scaffold                                            |
+| [`pina_bpf`](examples/pina_bpf)                                                   | Minimal pina-native BPF hello world (nightly + `build-std=core,alloc`)                        |
+| [`anchor_declare_id`](examples/anchor_declare_id)                                 | Anchor `declare-id` test parity port for program-id mismatch                                  |
+| [`anchor_declare_program`](examples/anchor_declare_program)                       | Anchor `declare-program` parity port for external-program ID checks                           |
+| [`anchor_duplicate_mutable_accounts`](examples/anchor_duplicate_mutable_accounts) | Anchor duplicate mutable account checks adapted to explicit pina validation                   |
+| [`anchor_errors`](examples/anchor_errors)                                         | Anchor custom error-code parity and guard helper checks                                       |
+| [`anchor_events`](examples/anchor_events)                                         | Anchor event schema parity via deterministic event serialization                              |
+| [`anchor_floats`](examples/anchor_floats)                                         | Anchor float account/update behavior with authority checks                                    |
+| [`anchor_system_accounts`](examples/anchor_system_accounts)                       | Anchor system-owned account constraint parity                                                 |
+| [`anchor_sysvars`](examples/anchor_sysvars)                                       | Anchor sysvar account validation parity                                                       |
+| [`anchor_realloc`](examples/anchor_realloc)                                       | Dynamic compact account lifecycle with typed, rent-adjusted reallocations                     |
+| [`compact_accounts`](examples/compact_accounts)                                   | Focused compact account sizing, mutation order, rent, and generated clients                   |
+| [`todo_program`](examples/todo_program)                                           | PDA-backed state with boolean and digest updates                                              |
+| [`profile_program`](examples/profile_program)                                     | User profile registry with bounded UTF-8 and tag fields                                       |
+| [`prop_amm_program`](examples/prop_amm_program)                                   | Anchor `prop-amm` port focused on authority-controlled oracle updates                         |
+| [`optional_accounts_program`](examples/optional_accounts_program)                 | Optional-account slots with explicit presence handling                                        |
 
 ## Security
 
@@ -976,7 +988,7 @@ Pina provides strong built-in protections against common Solana vulnerabilities 
 - **Use `assert_type::<T>()`** to prevent type cosplay — it checks discriminator, owner, and data size
 - **Use `CloseAccountZeroed { account, recipient }.invoke()` or `zeroed()` + `close_with_recipient()`** when stale account bytes must be invalidated before close
 - **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
-- **Namespace PDA seeds** with type-specific prefixes to prevent PDA sharing across account types
+- **Give each account type its own seed namespace** so PDAs cannot collide across account types
 
 <!-- {/pinaSecurityBestPractices} -->
 

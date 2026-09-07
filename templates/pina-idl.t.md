@@ -212,7 +212,7 @@ See the mdBook chapter **Pina CLI → Generate and publish IDLs** for authority,
 
 <!-- {@pinaDiscriminatorLayoutDecisionMatrix} -->
 
-## Discriminator layout decision matrix
+### Discriminator layout decision matrix
 
 The discriminator strategy determines byte layout, parser guarantees, and cross-protocol compatibility.
 

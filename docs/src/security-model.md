@@ -77,19 +77,19 @@ Closing guidance under Pinocchio 0.11:
 - **Use `assert_type::<T>()`** to prevent type cosplay — it checks discriminator, owner, and data size
 - **Use `CloseAccountZeroed { account, recipient }.invoke()` or `zeroed()` + `close_with_recipient()`** when stale account bytes must be invalidated before close
 - **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
-- **Namespace PDA seeds** with type-specific prefixes to prevent PDA sharing across account types
+- **Give each account type its own seed namespace** so PDAs cannot collide across account types
 
 <!-- {/pinaSecurityBestPractices} -->
 
-## Content validation (zeropod)
+## Content validation (Pinapod)
 
-Pina's zero-copy account model is built on [zeropod](https://crates.io/crates/zeropod). Zeropod's generated storage view makes **validation load-bearing**: `PinaAccount::try_from_bytes` / `as_account` reject non-canonical booleans, invalid UTF-8, overlength vector prefixes, and invalid enum discriminants before returning a reference.
+Pina's zero-copy account model is built on [Pinapod](https://crates.io/crates/pinapod). Pinapod's generated storage view makes **validation load-bearing**: `PinaAccount::try_from_bytes` / `as_account` reject non-canonical booleans, invalid UTF-8, overlength vector prefixes, and invalid enum discriminants before returning a reference.
 
-The `#[account]` macro uses the native struct only as a schema and derives `zeropod::ZeroPod`. For `Account`, zeropod generates `AccountZc`; loaders return that companion, not a reference to the native schema. `PinaAccount::validate` checks the discriminator and every field, while `try_from_bytes` additionally enforces exact size.
+The `#[account]` macro uses the native struct only as a schema and derives `pinapod::ZeroPod` (re-exported as `pina::ZeroPod`). For `Account`, Pinapod generates `AccountZc`; loaders return that companion, not a reference to the native schema. `PinaAccount::validate` checks the discriminator and every field, while `try_from_bytes` additionally enforces exact size.
 
 ### Unit enums
 
-Unit enums with explicit discriminants can be native schema fields when they derive `zeropod::ZeroPod`. Zeropod generates an `EnumZc` companion that stores raw bytes and validates the discriminant before converting it to the native enum. Application schemas use the native enum; only generated storage views contain the companion.
+Unit enums with explicit discriminants can be native schema fields when they derive `pinapod::ZeroPod`. Pinapod generates an `EnumZc` companion that stores raw bytes and validates the discriminant before converting it to the native enum. Application schemas use the native enum; only generated storage views contain the companion.
 
 ### Inactive capacity
 

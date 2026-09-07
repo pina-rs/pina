@@ -12,7 +12,7 @@ use pina::pinapod;
 
 /// Resizes the complete account-data buffer to `len` bytes.
 ///
-/// `len` must equal [`Sample::projected_bytes`] for an active value count.
+/// `len` must equal `Sample::projected_bytes` for an active value count.
 pub const REALLOC_DISCRIMINATOR: u8 = 0u8;
 
 /// Accounts.

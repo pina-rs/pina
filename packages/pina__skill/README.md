@@ -12,8 +12,6 @@ Agent guidance for creating, auditing, and maintaining Pina Solana programs.
 
 <!-- {/npmReadmeBadgeRow} -->
 
-Agent guidance for creating, auditing, and maintaining Pina Solana programs.
-
 The skill covers project setup, discriminator-first data layouts, account validation, PDA design, IDL and client generation, SBF profiling, and proportionate verification. Its instructions preserve `no_std` compatibility and treat the checked-in project configuration as authoritative.
 
 ## Install

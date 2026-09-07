@@ -47,13 +47,16 @@ Manual:
 
 ```md
 ---
-package_name: change_type
+pina: feat
+pina_cli: none
 ---
 
 # Short heading
 
 Detailed description of the change.
 ```
+
+Each front-matter line maps one package id to its change type; list every affected package. The monochange changeset lints prefer the inline `package: type` form when the type already implies the bump.
 
 After creating or editing changesets:
 
@@ -63,11 +66,15 @@ dprint fmt .changeset/* --allow-no-files
 
 ## Change types
 
-- `major` — breaking changes
-- `feat` — new backwards-compatible features
-- `fix` — bug fixes
-- `docs` — documentation-only changes
-- `none` — general notes
+Change types map to changelog sections and imply a bump:
+
+- `breaking` (or `major`) — breaking changes
+- `feat` — new backwards-compatible features (minor bump)
+- `fix` — bug fixes (patch bump)
+- `docs` — documentation-only changes (no bump)
+- `none` — general notes (no bump)
+
+The `--bump` flag on `monochange run change` accepts `none`, `patch`, `minor`, or `major` and overrides the type-implied bump when needed.
 
 ## Package names
 

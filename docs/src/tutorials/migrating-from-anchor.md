@@ -133,7 +133,7 @@ pub struct MyAccount {
 }
 ```
 
-Pina uses zeropod-validated zero-copy layouts. Every field must be a fixed-size, alignment-1 `ZcElem` type. This means:
+Pina uses Pinapod-validated zero-copy layouts. Every field must be a fixed-size, alignment-1 `ZcElem` type. This means:
 
 | Anchor type | Pina type       | Notes                                    |
 | ----------- | --------------- | ---------------------------------------- |
@@ -147,7 +147,7 @@ Pina uses zeropod-validated zero-copy layouts. Every field must be a fixed-size,
 | `Vec<T>`    | Not supported   | Use fixed-size arrays                    |
 | `Option<T>` | Manual encoding | Use a sentinel value or a `PodBool` flag |
 
-Pod wrappers keep every field alignment 1 and provide zeropod validation. Convert to and from native types with `From`:
+Pod wrappers keep every field alignment 1 and provide Pinapod validation. Convert to and from native types with `From`:
 
 ```rust
 // Creating Pod values
@@ -248,7 +248,7 @@ For long-lived accounts, add a migration instruction that rewrites every stored 
 
 <!-- {=pinaDiscriminatorLayoutDecisionMatrix} -->
 
-## Discriminator layout decision matrix
+### Discriminator layout decision matrix
 
 The discriminator strategy determines byte layout, parser guarantees, and cross-protocol compatibility.
 
@@ -370,7 +370,7 @@ pub struct MyEvent {
 }
 ```
 
-Pina events are native zeropod schemas with explicit discriminators, just like accounts and instructions. The macro generates a validated `MyEventZc` storage view. Pina does not expose an object-representation `to_bytes()` method; event transport must use an API that owns and initializes its output buffer.
+Pina events are native Pinapod schemas with explicit discriminators, just like accounts and instructions. The macro generates a validated `MyEventZc` storage view. Pina does not expose an object-representation `to_bytes()` method; event transport must use an API that owns and initializes its output buffer.
 
 See `examples/anchor_events` for the full parity port.
 

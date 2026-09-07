@@ -126,6 +126,6 @@ if encoded_size < account.data_len() {
 - Compare `encoded_size()` with `account.data_len()` when distinguishing committed content from temporary spare allocation.
 - Rely on `validate_size` plus checked loaders to reject truncated, oversized, or corrupt data.
 - Keep signer, owner, stored-authority, and canonical-PDA checks explicit; compact layout validation does not define an authorization policy.
-- Generate the IDL and clients normally. Codama represents every tail as a dynamic array whose count is read from the shared header, preserving zeropod's header-then-payload wire layout.
+- Generate the IDL and clients normally. Codama represents every tail as a dynamic array whose count is read from the shared header, preserving Pinapod's header-then-payload wire layout.
 
 <!-- {/compactAccountUseCaseChecklist} -->

@@ -43,7 +43,9 @@ Costs:
 
 Quasar does not avoid collection fields. At commit [`b0de7db`](https://github.com/blueshift-gg/quasar/tree/b0de7db4cd271654a2dcf78807dd865e98e0b339), its account derive classifies `String` and `Vec` as dynamic fields, maps them to `PodString` and `PodVec`, and places the generated compact schema in a hidden child module ([layout generation](https://github.com/blueshift-gg/quasar/blob/b0de7db4cd271654a2dcf78807dd865e98e0b339/derive/src/account/layout.rs)). Quasar then encapsulates dynamic access behind compact read views, load-mutate-save guards, and explicit writer commits. A commit resizes the account to the active compact tail before saving it ([dynamic access](https://github.com/blueshift-gg/quasar/blob/b0de7db4cd271654a2dcf78807dd865e98e0b339/derive/src/account/dynamic.rs)). Its compile-pass coverage explicitly accepts bounded `String` and `Vec` account fields ([collection example](https://github.com/blueshift-gg/quasar/blob/b0de7db4cd271654a2dcf78807dd865e98e0b339/lang/tests/compile_pass/account_string_vec_alias.rs)).
 
-Pina deliberately does not claim parity with that compact representation in this decision. Pina preserves its existing fixed wire layouts, so its macros reject fixed-capacity collection fields until Pina has an equally closed design that prevents inactive backing capacity from becoming observable.
+Pina deliberately did not claim parity with that compact representation in this decision. Pina preserved its existing fixed wire layouts, so its macros rejected fixed-capacity collection fields until Pina had an equally closed design that prevents inactive backing capacity from becoming observable.
+
+> Status update (0.13): the `compact` feature now provides that closed design for one or more trailing bounded `Vec`/`PodVec` tails — their backing capacity stays unobservable, inline fields cannot follow the first tail, and every grow/shrink path is guard-backed. Fixed-layout schemas still reject collections, and `String`/`PodString` remain rejected in both modes.
 
 ## Alternatives considered
 

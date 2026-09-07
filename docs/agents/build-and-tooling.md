@@ -9,8 +9,9 @@ devenv shell
 install:all
 ```
 
-- Cargo binaries are managed via `cargo-run-bin` and pinned in `[workspace.metadata.bin]` in `Cargo.toml`.
-- External binaries such as Solana CLI/agave and surfpool are managed via `eget` with config in `.eget/.eget.toml`.
+- Cargo binaries are managed via `cargo-run-bin` and pinned in `[workspace.metadata.bin]` in `Cargo.toml` (`cargo-expand` is the one exception; devenv installs it directly with `cargo install`).
+- External binaries such as the Solana CLI/agave and surfpool are nix packages from the `ifiokjr-nixpkgs` flake input (`custom.agave`, `custom.surfpool` in `devenv.nix`).
+- Snapshot, coverage, and test-runner binaries (`cargo-insta`, `cargo-llvm-cov`, `cargo-nextest`) are also nix packages from devenv.
 - Kani is provided by the pinned `ifiokjr/nixpkgs` input through the dedicated devenv `kani` profile. Devenv links Kani's matching nightly Rust toolchain into the package, so proof tasks need no setup command or mutable `KANI_HOME`, while unrelated commands avoid realizing the large verifier closure.
 
 ## Common commands
@@ -81,13 +82,15 @@ cargo semver-checks
 
 ## Useful aliases
 
+Nix-provided binaries: `cargo-insta`, `cargo-llvm-cov`, `cargo-nextest`.
+
 Defined in `.cargo/config.toml`:
 
-- `cargo insta`
-- `cargo llvm-cov`
-- `cargo nextest`
+- `cargo build-bpf` — SBF build for the `pina_bpf` crate
+- `cargo build-escrow-program` (and the other `build-*-program` example aliases) — `cargo build-sbf` per example
 - `cargo semver-checks`
 - `cargo workspaces`
+- `cargo kani`
 
 ## Notes
 

@@ -1,4 +1,6 @@
-# Anchor `lang-v2` review and follow-up backlog
+# Anchor `lang-v2` review
+
+Status: complete. The prioritized backlog items below (#142, #143, #144) are all closed and implemented — typed CPI builders live in `crates/pina/src/cpi.rs` and the `AccountsCursor` runtime backs `#[derive(Accounts)]`. The P2 notes near the end are historical proposals, not open work. This review remains as the rationale record for the adopt/avoid guidance. and follow-up backlog
 
 This page records the focused review of `solana-foundation/anchor` on branch `anchor-next`, with emphasis on `lang-v2` and the `bench/programs/prop-amm` benchmark.
 

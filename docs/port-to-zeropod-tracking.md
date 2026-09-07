@@ -2,6 +2,8 @@
 
 _Origin: pina-rs/pina#193 and pina-rs/pina#195. Follow-up: pina-rs/pina#192._
 
+Status: complete. PR #192 merged on 2026-08-18; every item below is done.
+
 ## Design decisions
 
 1. **Native schemas, generated storage views.** `#[account]`, `#[instruction]`, and `#[event]` derive `zeropod::ZeroPod`. A schema such as `ProfileState` has native Rust fields; runtime data is accessed through `ProfileStateZc`.
@@ -21,7 +23,7 @@ _Origin: pina-rs/pina#193 and pina-rs/pina#195. Follow-up: pina-rs/pina#192._
 - [x] Generate native zeropod schemas and validated storage views in Rust Codama clients without Pina-owned raw casts.
 - [x] Regenerate all IDLs and clients after source documentation is current.
 - [x] Run formatting, workspace tests, no-default builds, docs, IDL drift, client contract tests, Miri, and real SBF examples.
-- [ ] Rebase, push, and complete hosted CI/review monitoring on PR #192.
+- [x] Rebase, push, and complete hosted CI/review monitoring on PR #192.
 
 ## Safety boundary
 
