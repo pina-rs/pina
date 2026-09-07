@@ -11,6 +11,7 @@
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
+use pina::ProgramError;
 use pina::ProgramResult;
 use pina::Signer;
 
@@ -54,12 +55,12 @@ impl ReallocIx {
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> [u8; 3] {
+	pub fn to_bytes(&self) -> Result<[u8; 3], ProgramError> {
 		let mut data = [0u8; 3];
 		data[..1].copy_from_slice(&REALLOC_DISCRIMINATOR);
 		data[1..3].copy_from_slice(&self.len.to_le_bytes());
 
-		data
+		Ok(data)
 	}
 }
 
@@ -82,7 +83,7 @@ impl<'account> Realloc<'account> {
 			CpiHandle::writable(self.sample)?,
 			CpiHandle::readonly(self.system_program),
 		];
-		let data = self.ix.to_bytes();
+		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

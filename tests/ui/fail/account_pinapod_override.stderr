@@ -1,0 +1,8 @@
+error: `#[pinapod(...)]` cannot override a Pina account, instruction, or event layout
+  --> tests/ui/fail/account_pinapod_override.rs:9:1
+   |
+ 9 | / #[pinapod(crate = pina::pinapod)]
+10 | | pub struct Overridden {
+11 | |     pub value: u64,
+12 | | }
+   | |_^

@@ -11,6 +11,7 @@
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
+use pina::ProgramError;
 use pina::ProgramResult;
 use pina::Signer;
 
@@ -61,12 +62,12 @@ impl CpiTransferIx {
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> [u8; 9] {
+	pub fn to_bytes(&self) -> Result<[u8; 9], ProgramError> {
 		let mut data = [0u8; 9];
 		data[..1].copy_from_slice(&CPI_TRANSFER_DISCRIMINATOR);
 		data[1..9].copy_from_slice(&self.amount.to_le_bytes());
 
-		data
+		Ok(data)
 	}
 }
 
@@ -89,7 +90,7 @@ impl<'account> CpiTransfer<'account> {
 			CpiHandle::writable(self.recipient)?,
 			CpiHandle::readonly(self.system_program),
 		];
-		let data = self.ix.to_bytes();
+		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

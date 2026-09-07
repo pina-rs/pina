@@ -50,22 +50,19 @@ impl RequireNeqInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut RequireNeqInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <RequireNeqInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data =
-				<RequireNeqInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; RequireNeqInstructionWire::SIZE];
+		<RequireNeqInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REQUIRE_NEQ_DISCRIMINATOR;
-		}
-		<RequireNeqInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 pub struct RequireNeqInstructionWire {
 	pub discriminator: u8,
 }

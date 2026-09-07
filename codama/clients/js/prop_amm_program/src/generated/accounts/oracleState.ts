@@ -34,7 +34,7 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 
 export const ORACLE_STATE_DISCRIMINATOR = 1;
 
@@ -66,7 +66,7 @@ export function getOracleStateDecoder(): FixedSizeDecoder<OracleState> {
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(
+			getPinaPodDiscriminatorDecoder(
 				ORACLE_STATE_DISCRIMINATOR,
 				getU8Decoder(),
 			),

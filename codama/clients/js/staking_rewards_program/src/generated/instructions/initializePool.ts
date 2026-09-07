@@ -36,8 +36,8 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { findPoolPda } from "../pdas";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const INITIALIZE_POOL_DISCRIMINATOR = 0;
 
@@ -115,7 +115,7 @@ export function getInitializePoolInstructionDataDecoder(): FixedSizeDecoder<
 > {
 	return getStructDecoder([[
 		"discriminator",
-		getZeroPodDiscriminatorDecoder(
+		getPinaPodDiscriminatorDecoder(
 			INITIALIZE_POOL_DISCRIMINATOR,
 			getU8Decoder(),
 		),

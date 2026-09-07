@@ -15,6 +15,7 @@ use pina_cpi_renderer::RenderConfig as CpiRenderConfig;
 use pina_cpi_renderer::RenderMode as CpiRenderMode;
 use pina_cpi_renderer::render_idl_file as render_cpi_idl_file;
 
+use crate::dart_client::harden_generated_dart_clients;
 use crate::dart_client::validate_dart_client_idls;
 use crate::dart_client::write_dart_package_barrels;
 use crate::error::CodamaError;
@@ -441,7 +442,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 		}
 
 		run_client_generation(plan, ClientLanguage::Typescript, &idl_paths)?;
-		harden_generated_clients(&plan.typescript_out, &examples)?;
+		harden_generated_clients(&plan.typescript_out, &examples, &idl_paths)?;
 	}
 
 	if plan.clients.contains(&ClientLanguage::Dart) {
@@ -454,6 +455,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 
 		validate_dart_client_idls(&plan.dart_out, &examples, &idl_paths)?;
 		run_client_generation(plan, ClientLanguage::Dart, &idl_paths)?;
+		harden_generated_dart_clients(&plan.dart_out, &examples, &idl_paths)?;
 		write_dart_package_barrels(&plan.dart_out, &examples)?;
 	}
 

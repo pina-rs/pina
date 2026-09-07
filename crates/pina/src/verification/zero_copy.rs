@@ -83,7 +83,7 @@ fn quick_discriminator_enum_accepts_exactly_declared_tags() {
 #[kani::proof]
 fn quick_initialized_fixed_accounts_are_canonical() {
 	let mut bytes: [u8; ProofState::SIZE] = kani::any();
-	let result = ProofState::initialize(&mut bytes);
+	let result = ProofState::initialize(&mut bytes, |_| Ok(()));
 
 	assert!(result.is_ok());
 	assert!(bytes_are_valid(&bytes));

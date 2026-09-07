@@ -34,8 +34,8 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { findAuthorityPda } from "../pdas";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PINA_BPF_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR = 2;
 
@@ -94,7 +94,7 @@ export function getForwardRotateWithPdaInstructionDataDecoder(): FixedSizeDecode
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(
+			getPinaPodDiscriminatorDecoder(
 				FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR,
 				getU8Decoder(),
 			),

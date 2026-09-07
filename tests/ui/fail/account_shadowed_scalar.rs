@@ -10,8 +10,6 @@ mod shadow {
 
 	unsafe impl ZcField for u8 {
 		type Pod = ::core::primitive::u8;
-
-		const POD_SIZE: usize = 1;
 	}
 }
 

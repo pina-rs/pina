@@ -80,22 +80,19 @@ impl OpenPositionInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut OpenPositionInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <OpenPositionInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data =
-				<OpenPositionInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; OpenPositionInstructionWire::SIZE];
+		<OpenPositionInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = OPEN_POSITION_DISCRIMINATOR;
-		}
-		<OpenPositionInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 pub struct OpenPositionInstructionWire {
 	pub discriminator: u8,
 	pub bump: u8,

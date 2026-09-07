@@ -1,6 +1,8 @@
 use codama_nodes::AccountNode;
 use codama_nodes::AccountValueNode;
 use codama_nodes::Base16;
+use codama_nodes::BytesTypeNode;
+use codama_nodes::CamelCaseString;
 use codama_nodes::ConstantDiscriminatorNode;
 use codama_nodes::ConstantPdaSeedNode;
 use codama_nodes::ConstantValueNode;
@@ -11,6 +13,7 @@ use codama_nodes::EnumEmptyVariantTypeNode;
 use codama_nodes::EnumTypeNode;
 use codama_nodes::EnumVariantTypeNode;
 use codama_nodes::ErrorNode;
+use codama_nodes::FixedSizeTypeNode;
 use codama_nodes::InstructionAccountNode;
 use codama_nodes::InstructionArgumentNode;
 use codama_nodes::InstructionInputValueNode;
@@ -34,6 +37,8 @@ use codama_nodes::StructFieldTypeNode;
 use codama_nodes::StructTypeNode;
 use codama_nodes::VariablePdaSeedNode;
 
+use crate::compact_capacity::COMPACT_CAPACITY_MARKER_PREFIX;
+use crate::compact_capacity::compact_capacity_marker_name;
 use crate::error::IdlError;
 use crate::ir::AccountIr;
 use crate::ir::DefaultValueIr;
@@ -44,13 +49,12 @@ use crate::ir::InstructionAccountIr;
 use crate::ir::InstructionIr;
 use crate::ir::PdaIr;
 use crate::ir::PdaSeedIr;
+use crate::ir::PinaPodEnumIr;
 use crate::ir::ProgramIr;
-use crate::ir::ZeroPodEnumIr;
-use crate::parse::types::compact_vec_capacity;
-use crate::parse::types::compact_vec_prefix_size;
+use crate::parse::types::compact_tail_schema;
 use crate::parse::types::try_rust_type_to_codama_compact_tail;
 use crate::parse::types::try_rust_type_to_codama_compact_tail_at;
-use crate::parse::types::try_rust_type_to_codama_with_zeropod_enums;
+use crate::parse::types::try_rust_type_to_codama_with_pinapod_enums;
 use crate::parse::types::type_node_size;
 
 /// Validate every IR type mapping and convert a `ProgramIr` into a Codama
@@ -58,19 +62,47 @@ use crate::parse::types::type_node_size;
 pub fn try_ir_to_root_node(ir: &ProgramIr) -> Result<RootNode, IdlError> {
 	let mut program = ProgramNode::new(ir.name.as_str(), ir.public_key.as_str());
 
-	for zeropod_enum in &ir.zeropod_enums {
-		program = program.add_defined_type(build_zeropod_enum_node(zeropod_enum));
+	for pinapod_enum in &ir.pinapod_enums {
+		let normalized_name = CamelCaseString::new(&pinapod_enum.name);
+		if normalized_name
+			.as_ref()
+			.starts_with(COMPACT_CAPACITY_MARKER_PREFIX)
+		{
+			return Err(IdlError::Other(format!(
+				"defined type `{}` uses Pina's reserved compact-capacity namespace `{}`",
+				pinapod_enum.name, COMPACT_CAPACITY_MARKER_PREFIX,
+			)));
+		}
+		program = program.add_defined_type(build_pinapod_enum_node(pinapod_enum));
 	}
 
 	for account in &ir.accounts {
-		program = program.add_account(build_account_node(account, &ir.zeropod_enums)?);
+		program = program.add_account(build_account_node(account, &ir.pinapod_enums)?);
+
+		if account.is_compact() {
+			for field in &account.fields {
+				if let Some(schema) = compact_tail_schema(&field.rust_type).map_err(|reason| {
+					IdlError::UnsupportedType {
+						ty: field.rust_type.clone(),
+						context: format!("account `{}.{}`", account.name, field.name),
+						reason,
+					}
+				})? {
+					program = program.add_defined_type(build_compact_capacity_marker(
+						&account.name,
+						&field.name,
+						schema.capacity(),
+					));
+				}
+			}
+		}
 	}
 
 	for instruction in &ir.instructions {
 		program = program.add_instruction(build_instruction_node(
 			instruction,
 			&ir.pdas,
-			&ir.zeropod_enums,
+			&ir.pinapod_enums,
 		)?);
 	}
 
@@ -85,14 +117,21 @@ pub fn try_ir_to_root_node(ir: &ProgramIr) -> Result<RootNode, IdlError> {
 	Ok(RootNode::new(program))
 }
 
+fn build_compact_capacity_marker(account: &str, field: &str, capacity: usize) -> DefinedTypeNode {
+	DefinedTypeNode::new(
+		compact_capacity_marker_name(account, field),
+		FixedSizeTypeNode::<codama_nodes::TypeNode>::new(BytesTypeNode::new(), capacity),
+	)
+}
+
 /// Convert a `ProgramIr` into a Codama `RootNode` without silent type
 /// substitutions.
 pub fn ir_to_root_node(ir: &ProgramIr) -> Result<RootNode, IdlError> {
 	try_ir_to_root_node(ir)
 }
 
-fn build_zeropod_enum_node(zeropod_enum: &ZeroPodEnumIr) -> DefinedTypeNode {
-	let variants = zeropod_enum
+fn build_pinapod_enum_node(pinapod_enum: &PinaPodEnumIr) -> DefinedTypeNode {
+	let variants = pinapod_enum
 		.variants
 		.iter()
 		.map(|variant| {
@@ -101,15 +140,15 @@ fn build_zeropod_enum_node(zeropod_enum: &ZeroPodEnumIr) -> DefinedTypeNode {
 			EnumVariantTypeNode::Empty(node)
 		})
 		.collect();
-	let format = match zeropod_enum.repr_size {
+	let format = match pinapod_enum.repr_size {
 		2 => NumberFormat::U16,
 		4 => NumberFormat::U32,
 		8 => NumberFormat::U64,
 		_ => NumberFormat::U8,
 	};
 	let mut node = DefinedTypeNode {
-		name: zeropod_enum.name.as_str().into(),
-		docs: zeropod_enum.docs.clone().into(),
+		name: pinapod_enum.name.as_str().into(),
+		docs: pinapod_enum.docs.clone().into(),
 		r#type: Box::new(
 			EnumTypeNode {
 				variants,
@@ -119,47 +158,65 @@ fn build_zeropod_enum_node(zeropod_enum: &ZeroPodEnumIr) -> DefinedTypeNode {
 		),
 	};
 	if node.docs.is_empty() {
-		node.docs = vec![format!("Zeropod schema enum `{}`.", zeropod_enum.name)].into();
+		node.docs = vec![format!("PinaPod schema enum `{}`.", pinapod_enum.name)].into();
 	}
 	node
 }
 
 fn build_account_node(
 	account: &AccountIr,
-	zeropod_enums: &[ZeroPodEnumIr],
+	pinapod_enums: &[PinaPodEnumIr],
 ) -> Result<AccountNode, IdlError> {
 	let mut fields = vec![build_account_discriminator_field(&account.discriminator)];
-	let first_tail = if account.is_compact() {
+	let compact_schemas = if account.is_compact() {
 		Some(
 			account
 				.fields
 				.iter()
-				.position(|field| compact_vec_prefix_size(&field.rust_type).is_some())
-				.ok_or_else(|| {
-					IdlError::UnsupportedType {
-						ty: account.name.clone(),
-						context: format!("account `{}`", account.name),
-						reason: "compact accounts require at least one trailing `Vec<T, N>` field"
-							.to_string(),
-					}
-				})?,
+				.map(|field| {
+					compact_tail_schema(&field.rust_type).map_err(|reason| {
+						IdlError::UnsupportedType {
+							ty: field.rust_type.clone(),
+							context: format!("account `{}.{}`", account.name, field.name),
+							reason,
+						}
+					})
+				})
+				.collect::<Result<Vec<_>, _>>()?,
 		)
 	} else {
 		None
 	};
+	let first_tail = compact_schemas
+		.as_ref()
+		.and_then(|schemas| schemas.iter().position(Option::is_some));
+	if account.is_compact() && first_tail.is_none() {
+		return Err(IdlError::UnsupportedType {
+			ty: account.name.clone(),
+			context: format!("account `{}`", account.name),
+			reason: "compact accounts require at least one dynamic compact field".to_string(),
+		});
+	}
 	let mut header_offset = account.discriminator.repr_size;
 	let tail_prefix_sizes = first_tail
 		.map(|start| {
-			account.fields[start..]
+			compact_schemas
+				.as_ref()
+				.expect("compact schemas exist when a tail was found")[start..]
 				.iter()
-				.map(|field| {
-					compact_vec_prefix_size(&field.rust_type).ok_or_else(|| {
-						IdlError::UnsupportedType {
-							ty: field.rust_type.clone(),
-							context: format!("account `{}.{}`", account.name, field.name),
-							reason: "inline fields cannot follow a compact tail".to_string(),
-						}
-					})
+				.enumerate()
+				.map(|(tail_index, schema)| {
+					schema
+						.as_ref()
+						.map(|schema| schema.header_size())
+						.ok_or_else(|| {
+							let field = &account.fields[start + tail_index];
+							IdlError::UnsupportedType {
+								ty: field.rust_type.clone(),
+								context: format!("account `{}.{}`", account.name, field.name),
+								reason: "inline fields cannot follow a compact tail".to_string(),
+							}
+						})
 				})
 				.collect::<Result<Vec<_>, _>>()
 		})
@@ -174,9 +231,7 @@ fn build_account_node(
 
 	for (index, field) in account.fields.iter().enumerate() {
 		let context = format!("account `{}.{}`", account.name, field.name);
-		let mut compact_capacity = None;
 		let mut node = if let Some(start) = first_tail.filter(|start| index >= *start) {
-			compact_capacity = compact_vec_capacity(&field.rust_type);
 			if index == start {
 				prefix_offset = header_offset;
 			}
@@ -190,16 +245,16 @@ fn build_account_node(
 				try_rust_type_to_codama_compact_tail_at(
 					&field.rust_type,
 					&context,
-					zeropod_enums,
+					pinapod_enums,
 					Some(prefix_offset),
 					skip,
 				)?
 			} else {
-				try_rust_type_to_codama_compact_tail(&field.rust_type, &context, zeropod_enums)?
+				try_rust_type_to_codama_compact_tail(&field.rust_type, &context, pinapod_enums)?
 			};
 			StructFieldTypeNode::new(field.name.as_str(), r#type)
 		} else {
-			let node = build_struct_field(field, context, zeropod_enums)?;
+			let node = build_struct_field(field, context, pinapod_enums)?;
 			if account.is_compact() {
 				header_offset = header_offset
 					.checked_add(type_node_size(&node.r#type).ok_or_else(|| {
@@ -220,12 +275,8 @@ fn build_account_node(
 		{
 			prefix_offset += sizes[index - start];
 		}
-		let mut docs = field.docs.clone();
-		if let Some(capacity) = compact_capacity {
-			docs.push(format!("Pina compact capacity: {capacity}."));
-		}
-		if !docs.is_empty() {
-			node.docs = docs.into();
+		if !field.docs.is_empty() {
+			node.docs = field.docs.clone().into();
 		}
 		fields.push(node);
 	}
@@ -249,7 +300,7 @@ fn build_account_node(
 fn build_instruction_node(
 	instruction: &InstructionIr,
 	pdas: &[PdaIr],
-	zeropod_enums: &[ZeroPodEnumIr],
+	pinapod_enums: &[PinaPodEnumIr],
 ) -> Result<InstructionNode, IdlError> {
 	let accounts: Vec<InstructionAccountNode> = instruction
 		.accounts
@@ -264,7 +315,7 @@ fn build_instruction_node(
 		let r#type = map_type(
 			&argument.rust_type,
 			format!("instruction `{}.{}`", instruction.name, argument.name),
-			zeropod_enums,
+			pinapod_enums,
 		)?;
 		arguments.push(InstructionArgumentNode::new(argument.name.as_str(), r#type));
 	}
@@ -375,9 +426,9 @@ fn build_default_value(default_value: &DefaultValueIr) -> InstructionInputValueN
 fn build_struct_field(
 	field: &FieldIr,
 	context: String,
-	zeropod_enums: &[ZeroPodEnumIr],
+	pinapod_enums: &[PinaPodEnumIr],
 ) -> Result<StructFieldTypeNode, IdlError> {
-	let type_node = map_type(&field.rust_type, context, zeropod_enums)?;
+	let type_node = map_type(&field.rust_type, context, pinapod_enums)?;
 	let mut node = StructFieldTypeNode::new(field.name.as_str(), type_node);
 
 	if !field.docs.is_empty() {
@@ -390,9 +441,9 @@ fn build_struct_field(
 fn map_type(
 	ty: &str,
 	context: String,
-	zeropod_enums: &[ZeroPodEnumIr],
+	pinapod_enums: &[PinaPodEnumIr],
 ) -> Result<codama_nodes::TypeNode, IdlError> {
-	try_rust_type_to_codama_with_zeropod_enums(ty, zeropod_enums).map_err(|reason| {
+	try_rust_type_to_codama_with_pinapod_enums(ty, pinapod_enums).map_err(|reason| {
 		IdlError::UnsupportedType {
 			ty: ty.to_owned(),
 			context,
@@ -458,7 +509,7 @@ fn build_pda_node(pda: &PdaIr) -> Result<PdaNode, IdlError> {
 							acc
 						});
 						PdaSeedNode::Constant(ConstantPdaSeedNode::new(
-							codama_nodes::BytesTypeNode::new(),
+							BytesTypeNode::new(),
 							codama_nodes::BytesValueNode::new(Base16, hex),
 						))
 					}
@@ -515,7 +566,7 @@ mod tests {
 	}
 
 	#[test]
-	fn compact_account_metadata_does_not_leak_into_idl_docs() {
+	fn compact_account_capacity_uses_machine_readable_marker_not_docs() {
 		let account = AccountIr {
 			name: "DynamicState".to_owned(),
 			fields: vec![FieldIr {
@@ -534,8 +585,18 @@ mod tests {
 			pda_name: None,
 		};
 
-		let node = build_account_node(&account, &[])
-			.unwrap_or_else(|error| panic!("IDL codegen failed: {error}"));
+		let ir = ProgramIr {
+			name: "capacity_program".to_owned(),
+			public_key: "11111111111111111111111111111111".to_owned(),
+			pinapod_enums: vec![],
+			accounts: vec![account],
+			instructions: vec![],
+			errors: vec![],
+			pdas: vec![],
+		};
+		let root =
+			try_ir_to_root_node(&ir).unwrap_or_else(|error| panic!("IDL codegen failed: {error}"));
+		let node = &root.program.accounts[0];
 		let docs = node.docs.iter().map(String::as_str).collect::<Vec<_>>();
 		let field_docs = node
 			.data
@@ -547,8 +608,47 @@ mod tests {
 			.unwrap_or_else(|| panic!("compact values field missing"));
 
 		assert_eq!(docs, vec!["Dynamic values."]);
-		assert_eq!(field_docs, vec!["Pina compact capacity: 8."]);
-		assert!(account.is_compact());
+		assert!(field_docs.is_empty());
+
+		let marker_name = compact_capacity_marker_name("DynamicState", "values");
+		let marker = root
+			.program
+			.defined_types
+			.iter()
+			.find(|defined_type| defined_type.name.as_ref() == marker_name)
+			.unwrap_or_else(|| panic!("compact capacity marker missing"));
+		let TypeNode::FixedSize(fixed) = marker.r#type.as_ref() else {
+			panic!("compact capacity marker must be fixed-size");
+		};
+		assert_eq!(fixed.size, 8);
+		assert!(matches!(fixed.r#type.as_ref(), TypeNode::Bytes(_)));
+		assert!(marker.docs.is_empty());
+	}
+
+	#[test]
+	fn rejects_source_types_in_reserved_capacity_namespace() {
+		let ir = ProgramIr {
+			name: "reserved_program".to_owned(),
+			public_key: "11111111111111111111111111111111".to_owned(),
+			pinapod_enums: vec![PinaPodEnumIr {
+				name: "PinaPodV1CompactCapacityPretender".to_owned(),
+				repr_size: 1,
+				variants: vec![],
+				docs: vec![],
+			}],
+			accounts: vec![],
+			instructions: vec![],
+			errors: vec![],
+			pdas: vec![],
+		};
+
+		let error = try_ir_to_root_node(&ir)
+			.expect_err("reserved capacity marker namespace must reject source types");
+		assert!(
+			error
+				.to_string()
+				.contains("reserved compact-capacity namespace")
+		);
 	}
 
 	#[test]
@@ -576,7 +676,7 @@ mod tests {
 
 		let missing_tail = build_account_node(&compact_account(vec![]), &[])
 			.expect_err("compact IR without a tail must be rejected");
-		assert!(missing_tail.to_string().contains("at least one trailing"));
+		assert!(missing_tail.to_string().contains("at least one dynamic"));
 
 		let inline_after_tail = build_account_node(
 			&compact_account(vec![field("values", "Vec<u64, 8>"), field("count", "u64")]),
@@ -589,7 +689,7 @@ mod tests {
 				.contains("cannot follow a compact tail")
 		);
 
-		let enums = [ZeroPodEnumIr {
+		let enums = [PinaPodEnumIr {
 			name: "Status".to_owned(),
 			repr_size: 1,
 			variants: vec![],
@@ -681,7 +781,7 @@ mod tests {
 		let ir = ProgramIr {
 			name: "discriminator_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
-			zeropod_enums: vec![],
+			pinapod_enums: vec![],
 			accounts: vec![AccountIr {
 				name: "State".to_string(),
 				pda_name: None,
@@ -730,7 +830,7 @@ mod tests {
 		let ir = ProgramIr {
 			name: "optional_pda_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
-			zeropod_enums: vec![],
+			pinapod_enums: vec![],
 			accounts: vec![],
 			instructions: vec![InstructionIr {
 				name: "touch".to_string(),
@@ -823,7 +923,7 @@ mod tests {
 			ProgramIr {
 				name: "strategy_program".to_string(),
 				public_key: "11111111111111111111111111111111".to_string(),
-				zeropod_enums: vec![],
+				pinapod_enums: vec![],
 				accounts: vec![],
 				instructions: vec![InstructionIr {
 					name: "do_it".to_string(),
@@ -868,7 +968,7 @@ mod tests {
 		let ir = ProgramIr {
 			name: "unsupported_collection_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
-			zeropod_enums: vec![],
+			pinapod_enums: vec![],
 			accounts: vec![AccountIr {
 				name: "State".to_string(),
 				pda_name: None,
@@ -896,19 +996,19 @@ mod tests {
 	}
 
 	#[test]
-	fn lowers_local_zeropod_enums() {
+	fn lowers_local_pinapod_enums() {
 		let ir = ProgramIr {
-			name: "zeropod_enum_program".to_string(),
+			name: "pinapod_enum_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
-			zeropod_enums: vec![ZeroPodEnumIr {
+			pinapod_enums: vec![PinaPodEnumIr {
 				name: "Color".to_string(),
 				repr_size: 1,
 				variants: vec![
-					crate::ir::ZeroPodEnumVariantIr {
+					crate::ir::PinaPodEnumVariantIr {
 						name: "Red".to_string(),
 						value: 0,
 					},
-					crate::ir::ZeroPodEnumVariantIr {
+					crate::ir::PinaPodEnumVariantIr {
 						name: "Blue".to_string(),
 						value: 1,
 					},
@@ -959,7 +1059,7 @@ mod tests {
 		let ir = ProgramIr {
 			name: "default_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
-			zeropod_enums: vec![],
+			pinapod_enums: vec![],
 			accounts: vec![],
 			instructions: vec![InstructionIr {
 				name: "initialize".to_string(),

@@ -11,6 +11,7 @@
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
+use pina::ProgramError;
 use pina::ProgramResult;
 use pina::Signer;
 
@@ -50,12 +51,12 @@ impl ResizeIx {
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> [u8; 2] {
+	pub fn to_bytes(&self) -> Result<[u8; 2], ProgramError> {
 		let mut data = [0u8; 2];
 		data[..1].copy_from_slice(&RESIZE_DISCRIMINATOR);
 		data[1..2].copy_from_slice(&self.entry_count.to_le_bytes());
 
-		data
+		Ok(data)
 	}
 }
 
@@ -78,7 +79,7 @@ impl<'account> Resize<'account> {
 			CpiHandle::writable(self.journal)?,
 			CpiHandle::readonly(self.system_program),
 		];
-		let data = self.ix.to_bytes();
+		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

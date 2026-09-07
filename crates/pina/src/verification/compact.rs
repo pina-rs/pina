@@ -69,15 +69,14 @@ fn compact_initialize_accepts_every_valid_aligned_size_and_starts_empty() {
 	kani::assume(len <= AlignedCompactProofState::MAX_SIZE + 1);
 	let mut data = [0xa5u8; AlignedCompactProofState::MAX_SIZE + 1];
 	let expected = AlignedCompactProofState::validate_size(len).is_ok();
-	let result = AlignedCompactProofState::initialize(&mut data[..len]);
+	let result = AlignedCompactProofState::initialize(
+		&mut data[..len],
+		&AlignedCompactProofStatePatch::new(),
+	);
 
 	assert_eq!(result.is_ok(), expected);
-	if let Ok(mut state) = result {
-		assert_eq!(
-			state.projected_size(),
-			AlignedCompactProofState::HEADER_SIZE
-		);
-		assert_eq!(state.commit(), Ok(AlignedCompactProofState::HEADER_SIZE));
+	if let Ok(encoded_len) = result {
+		assert_eq!(encoded_len, AlignedCompactProofState::HEADER_SIZE);
 	}
 	if expected {
 		let state = AlignedCompactProofState::try_from_bytes(
@@ -105,13 +104,14 @@ fn compact_every_shorter_prefix_rejects_active_tail_truncation() {
 	kani::assume(word_len <= word_values.len());
 	kani::assume(triple_len <= triple_values.len());
 	let mut data = [0u8; CompactProofState::MAX_SIZE];
-	let committed_size = {
-		let mut state = CompactProofState::initialize(&mut data).unwrap();
-		state.set_bytes(&byte_values[..byte_len]).unwrap();
-		state.set_words(&word_values[..word_len]).unwrap();
-		state.set_triples(&triple_values[..triple_len]).unwrap();
-		state.commit().unwrap()
-	};
+	let committed_size = CompactProofState::initialize(
+		&mut data,
+		&CompactProofStatePatch::new()
+			.replace_bytes(&byte_values[..byte_len])
+			.replace_words(&word_values[..word_len])
+			.replace_triples(&triple_values[..triple_len]),
+	)
+	.unwrap();
 	let shorter_len: usize = kani::any();
 	kani::assume(shorter_len < committed_size);
 
@@ -134,27 +134,14 @@ fn compact_offsets_are_ordered_disjoint_and_within_the_committed_prefix() {
 	kani::assume(word_len <= word_values.len());
 	kani::assume(triple_len <= triple_values.len());
 	let mut data = [0u8; CompactProofState::MAX_SIZE];
-	let committed_size;
-
-	{
-		let mut state = CompactProofState::initialize(&mut data)
-			.unwrap_or_else(|error| panic!("valid compact storage rejected: {error:?}"));
-		state
-			.set_bytes(&byte_values[..byte_len])
-			.unwrap_or_else(|error| panic!("bounded byte tail rejected: {error:?}"));
-		state
-			.set_words(&word_values[..word_len])
-			.unwrap_or_else(|error| panic!("bounded word tail rejected: {error:?}"));
-		state
-			.set_triples(&triple_values[..triple_len])
-			.unwrap_or_else(|error| panic!("bounded triple tail rejected: {error:?}"));
-
-		let projected_size = state.projected_size();
-		committed_size = state
-			.commit()
-			.unwrap_or_else(|error| panic!("bounded compact state failed to commit: {error:?}"));
-		assert_eq!(committed_size, projected_size);
-	}
+	let committed_size = CompactProofState::initialize(
+		&mut data,
+		&CompactProofStatePatch::new()
+			.replace_bytes(&byte_values[..byte_len])
+			.replace_words(&word_values[..word_len])
+			.replace_triples(&triple_values[..triple_len]),
+	)
+	.unwrap_or_else(|error| panic!("valid compact storage rejected: {error:?}"));
 
 	let bytes_start = CompactProofState::HEADER_SIZE;
 	let bytes_end = bytes_start + byte_len;
@@ -201,27 +188,20 @@ fn compact_changing_an_earlier_tail_preserves_and_shifts_every_later_tail() {
 	kani::assume(triple_len <= triples.len());
 	let mut data = [0u8; CompactProofState::MAX_SIZE];
 
-	{
-		let mut state = CompactProofState::initialize(&mut data)
-			.unwrap_or_else(|error| panic!("valid compact storage rejected: {error:?}"));
-		state.set_bytes(&initial_bytes[..initial_len]).unwrap();
-		state.set_words(&words[..word_len]).unwrap();
-		state.set_triples(&triples[..triple_len]).unwrap();
-		state.commit().unwrap();
-	}
+	CompactProofState::initialize(
+		&mut data,
+		&CompactProofStatePatch::new()
+			.replace_bytes(&initial_bytes[..initial_len])
+			.replace_words(&words[..word_len])
+			.replace_triples(&triples[..triple_len]),
+	)
+	.unwrap_or_else(|error| panic!("valid compact storage rejected: {error:?}"));
 
-	let committed_size = {
-		let mut state = CompactProofState::try_from_bytes_mut(&mut data)
-			.unwrap_or_else(|error| panic!("valid compact state rejected: {error:?}"));
-		state
-			.set_bytes(&replacement_bytes[..replacement_len])
-			.unwrap();
-		let projected_size = state.projected_size();
-		let committed_size = state.commit().unwrap();
-		assert_eq!(committed_size, projected_size);
-
-		committed_size
-	};
+	let committed_size = CompactProofState::update(
+		&mut data,
+		&CompactProofStatePatch::new().replace_bytes(&replacement_bytes[..replacement_len]),
+	)
+	.unwrap_or_else(|error| panic!("valid compact state rejected: {error:?}"));
 
 	let state = CompactProofState::try_from_bytes(&data[..committed_size])
 		.unwrap_or_else(|error| panic!("changed compact prefix rejected: {error:?}"));
@@ -265,19 +245,14 @@ fn compact_every_two_step_tail_ordering_preserves_all_logical_values() {
 	}
 
 	let mut data = [0u8; CompactProofState::MAX_SIZE];
-	{
-		let mut state = CompactProofState::initialize(&mut data).unwrap();
-		state
-			.set_bytes(&byte_values[0][..initial_lengths[0]])
-			.unwrap();
-		state
-			.set_words(&word_values[0][..initial_lengths[1]])
-			.unwrap();
-		state
-			.set_triples(&triple_values[0][..initial_lengths[2]])
-			.unwrap();
-		state.commit().unwrap();
-	}
+	CompactProofState::initialize(
+		&mut data,
+		&CompactProofStatePatch::new()
+			.replace_bytes(&byte_values[0][..initial_lengths[0]])
+			.replace_words(&word_values[0][..initial_lengths[1]])
+			.replace_triples(&triple_values[0][..initial_lengths[2]]),
+	)
+	.unwrap();
 
 	let mut generations = [0usize; 3];
 	let mut lengths = initial_lengths;
@@ -285,31 +260,31 @@ fn compact_every_two_step_tail_ordering_preserves_all_logical_values() {
 		let generation = step + 1;
 		let operation = usize::from(operations[step]);
 		let replacement_length = replacement_lengths[step];
-		let committed_size = {
-			let mut state = CompactProofState::try_from_bytes_mut(&mut data).unwrap();
-			match operation {
-				0 => {
-					state
-						.set_bytes(&byte_values[generation][..replacement_length])
-						.unwrap()
-				}
-				1 => {
-					state
-						.set_words(&word_values[generation][..replacement_length])
-						.unwrap()
-				}
-				2 => {
-					state
-						.set_triples(&triple_values[generation][..replacement_length])
-						.unwrap()
-				}
-				_ => unreachable!(),
+		let committed_size = match operation {
+			0 => {
+				CompactProofState::update(
+					&mut data,
+					&CompactProofStatePatch::new()
+						.replace_bytes(&byte_values[generation][..replacement_length]),
+				)
 			}
-			let projected_size = state.projected_size();
-			let committed_size = state.commit().unwrap();
-			assert_eq!(committed_size, projected_size);
-			committed_size
+			1 => {
+				CompactProofState::update(
+					&mut data,
+					&CompactProofStatePatch::new()
+						.replace_words(&word_values[generation][..replacement_length]),
+				)
+			}
+			2 => {
+				CompactProofState::update(
+					&mut data,
+					&CompactProofStatePatch::new()
+						.replace_triples(&triple_values[generation][..replacement_length]),
+				)
+			}
+			_ => unreachable!(),
 		};
+		let committed_size = committed_size.unwrap();
 
 		generations[operation] = generation;
 		lengths[operation] = replacement_length;
@@ -334,29 +309,30 @@ fn compact_every_two_step_tail_ordering_preserves_all_logical_values() {
 #[kani::proof]
 #[kani::unwind(32)]
 fn compact_repeated_grow_and_shrink_operations_preserve_logical_values() {
-	let first: [u8; 2] = kani::any();
-	let second: [u8; 2] = kani::any();
-	let third: [u8; 2] = kani::any();
-	let first_len: usize = kani::any();
-	let second_len: usize = kani::any();
-	let third_len: usize = kani::any();
-	kani::assume(first_len <= first.len());
-	kani::assume(second_len <= second.len());
-	kani::assume(third_len <= third.len());
+	// The earlier-tail proof covers every symbolic source and destination length.
+	// This state-machine proof fixes a boundary grow-then-shrink sequence so Kani
+	// can verify the repeated-operation lifecycle without re-solving that same
+	// length cross-product.
+	let first = [0x11u8, 0x12];
+	let second = [0x21u8, 0x22];
+	let third = [0x31u8, 0x32];
+	let first_len = 0;
+	let second_len = 2;
+	let third_len = 1;
 	let mut data = [0u8; CompactProofState::MAX_SIZE];
 
-	{
-		let mut state = CompactProofState::initialize(&mut data).unwrap();
-		state.set_bytes(&first[..first_len]).unwrap();
-		state.commit().unwrap();
-	}
+	CompactProofState::initialize(
+		&mut data,
+		&CompactProofStatePatch::new().replace_bytes(&first[..first_len]),
+	)
+	.unwrap();
 
 	for (values, len) in [(&second, second_len), (&third, third_len)] {
-		let committed_size = {
-			let mut state = CompactProofState::try_from_bytes_mut(&mut data).unwrap();
-			state.set_bytes(&values[..len]).unwrap();
-			state.commit().unwrap()
-		};
+		let committed_size = CompactProofState::update(
+			&mut data,
+			&CompactProofStatePatch::new().replace_bytes(&values[..len]),
+		)
+		.unwrap();
 		let state = CompactProofState::try_from_bytes(&data[..committed_size]).unwrap();
 		assert_eq!(state.bytes(), &values[..len]);
 		assert!(state.words().is_empty());

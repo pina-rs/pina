@@ -39,7 +39,7 @@ pub(crate) fn expand(
 	let zc_name = format_ident!("{}Zc", struct_name);
 	let header_name = format_ident!("{}Header", struct_name);
 	let ref_name = format_ident!("{}Ref", struct_name);
-	let mut_name = format_ident!("{}Mut", struct_name);
+	let patch_name = format_ident!("{}Patch", struct_name);
 
 	let AccountArgs {
 		crate_path,
@@ -61,32 +61,31 @@ pub(crate) fn expand(
 		)
 		.to_compile_error();
 	}
-	let (schema_proofs, compact_schema) = if compact {
+	let schema_proofs = if compact {
 		match schema::validate_compact_schema(
 			&item_struct,
 			&crate_path,
 			&discriminator,
 			&header_name,
 		) {
-			Ok(schema) => {
-				let max_size = schema.max_size;
-				let tail_alignment = schema.tail_alignment;
-				(schema.proofs, Some((max_size, tail_alignment)))
-			}
+			Ok(schema) => schema.proofs,
 			Err(error) => return error.to_compile_error(),
 		}
 	} else {
 		match schema::validate_fixed_schema(&item_struct, &crate_path, &discriminator, &zc_name) {
-			Ok(proofs) => (proofs, None),
+			Ok(proofs) => proofs,
 			Err(error) => return error.to_compile_error(),
 		}
 	};
 
-	let derives = [syn::parse_quote!(#crate_path::pinapod::ZeroPod)];
+	let derives = [syn::parse_quote!(#crate_path::pinapod::PinaPod)];
 
 	if let Err(error) = add_derives(&mut item_struct.attrs, &derives) {
 		return error.to_compile_error();
 	}
+	item_struct
+		.attrs
+		.push(syn::parse_quote!(#[pinapod(crate = #crate_path::pinapod, no_inherent)]));
 	if compact {
 		item_struct
 			.attrs
@@ -100,26 +99,24 @@ pub(crate) fn expand(
 	};
 
 	let discriminator_field = syn::parse_quote! {
+		#[pinapod(skip_accessor, skip_patch)]
 		discriminator: [u8; #discriminator::BYTES]
 	};
 	named_fields.named.insert(0, discriminator_field);
 
 	let error = quote!(#crate_path::ProgramError::InvalidAccountData);
-	let view_helpers = if let Some((max_size, _)) = &compact_schema {
-		generate_compact_view_helpers(&crate_path, &error, &ref_name, &mut_name, max_size)
+	let view_helpers = if compact {
+		generate_compact_view_helpers(&crate_path, &error, &ref_name, &patch_name)
 	} else {
-		generate_view_helpers(&crate_path, &error)
+		generate_view_helpers(&crate_path, &error, true)
 	};
 	let validation_type = if compact { &header_name } else { &zc_name };
 	let validation_impl = generate_validation_impl(&crate_path, validation_type);
-	let account_impl = if let Some((max_size, tail_alignment)) = compact_schema {
+	let account_impl = if compact {
 		quote! {
 			impl #crate_path::PinaCompactAccount for #struct_name {
 				type Ref<'data> = #ref_name<'data>;
-				type Mut<'data> = #mut_name<'data>;
-
-				const MAX_SIZE: usize = #max_size;
-				const TAIL_ALIGNMENT: usize = #tail_alignment;
+				type Patch<'patch> = #patch_name<'patch>;
 
 				fn try_from_bytes(
 					data: &[u8],
@@ -127,21 +124,41 @@ pub(crate) fn expand(
 					Self::try_from_bytes(data)
 				}
 
-				fn try_from_bytes_mut(
+				fn updated_len(
+					data: &[u8],
+					patch: &Self::Patch<'_>,
+				) -> Result<usize, #crate_path::ProgramError> {
+					Self::updated_len(data, patch)
+				}
+
+				fn update(
 					data: &mut [u8],
-				) -> Result<Self::Mut<'_>, #crate_path::ProgramError> {
-					Self::try_from_bytes_mut(data)
+					patch: &Self::Patch<'_>,
+				) -> Result<usize, #crate_path::ProgramError> {
+					Self::update(data, patch)
 				}
 
 				fn initialize(
 					data: &mut [u8],
-				) -> Result<Self::Mut<'_>, #crate_path::ProgramError> {
-					Self::initialize(data)
+					patch: &Self::Patch<'_>,
+				) -> Result<usize, #crate_path::ProgramError> {
+					Self::initialize(data, patch)
+				}
+			}
+
+		}
+	} else {
+		quote! {
+			impl #crate_path::PinaAccount for #struct_name {
+				fn write_zc_discriminator(
+					value: &mut <Self as #crate_path::PinaPodFixed>::Zc,
+				) {
+					<Self as #crate_path::HasDiscriminator>::write_discriminator(
+						&mut value.discriminator,
+					);
 				}
 			}
 		}
-	} else {
-		quote!(impl #crate_path::PinaAccount for #struct_name {})
 	};
 
 	let implementations = quote! {
@@ -244,36 +261,64 @@ fn generate_compact_view_helpers(
 	crate_path: &syn::Path,
 	error: &proc_macro2::TokenStream,
 	ref_name: &syn::Ident,
-	mut_name: &syn::Ident,
-	max_size: &proc_macro2::TokenStream,
+	patch_name: &syn::Ident,
 ) -> proc_macro2::TokenStream {
 	quote! {
 		/// The fixed header size, including the discriminator and tail length prefix.
-		pub const HEADER_SIZE: usize = <Self as #crate_path::ZeroPodCompact>::HEADER_SIZE;
+		pub const HEADER_SIZE: usize = <Self as #crate_path::PinaPodCompact>::HEADER_SIZE;
+
+		/// The minimum encoded and allocated size permitted by this compact schema.
+		pub const MIN_SIZE: usize = <Self as #crate_path::PinaPodCompact>::MIN_SIZE;
 
 		/// The maximum encoded size permitted by this compact schema.
-		pub const MAX_SIZE: usize = #max_size;
+		pub const MAX_SIZE: usize = <Self as #crate_path::PinaPodCompact>::MAX_SIZE;
+
+		/// Byte granularity of valid compact account allocations.
+		pub const TAIL_ALIGNMENT: usize = <Self as #crate_path::PinaPodCompact>::TAIL_ALIGNMENT;
 
 		/// Validate and borrow a compact account view.
 		pub fn try_from_bytes(data: &[u8]) -> Result<#ref_name<'_>, #crate_path::ProgramError> {
-			<Self as #crate_path::PinaCompactAccount>::validate_account_data(data)?;
+			if !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data) {
+				return Err(#error);
+			}
+
 			#ref_name::new(data).map_err(|_| #error)
 		}
 
-		/// Validate and mutably borrow a compact account view.
-		pub fn try_from_bytes_mut(
-			data: &mut [u8],
-		) -> Result<#mut_name<'_>, #crate_path::ProgramError> {
-			<Self as #crate_path::PinaCompactAccount>::validate_account_data(data)?;
-			#mut_name::new(data).map_err(|_| #error)
+		/// Calculate the encoded length after applying `patch` without changing `data`.
+		pub fn updated_len(
+			data: &[u8],
+			patch: &#patch_name<'_>,
+		) -> Result<usize, #crate_path::ProgramError> {
+			if !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data) {
+				return Err(#error);
+			}
+
+			patch.updated_len(data).map_err(|_| #error)
 		}
 
-		/// Initialize compact account storage and return its mutable view.
-		pub fn initialize(data: &mut [u8]) -> Result<#mut_name<'_>, #crate_path::ProgramError> {
-			<Self as #crate_path::PinaCompactAccount>::validate_size(data.len())?;
-			data.fill(0);
+		/// Atomically apply `patch` to initialized compact account storage.
+		pub fn update(
+			data: &mut [u8],
+			patch: &#patch_name<'_>,
+		) -> Result<usize, #crate_path::ProgramError> {
+			if !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data) {
+				return Err(#error);
+			}
+
+			let encoded_len = patch.update(data).map_err(|_| #error)?;
 			<Self as #crate_path::HasDiscriminator>::write_discriminator(data);
-			#mut_name::new(data).map_err(|_| #error)
+			Ok(encoded_len)
+		}
+
+		/// Initialize compact account storage from one complete patch.
+		pub fn initialize(
+			data: &mut [u8],
+			patch: &#patch_name<'_>,
+		) -> Result<usize, #crate_path::ProgramError> {
+			let encoded_len = patch.initialize(data).map_err(|_| #error)?;
+			<Self as #crate_path::HasDiscriminator>::write_discriminator(data);
+			Ok(encoded_len)
 		}
 	}
 }

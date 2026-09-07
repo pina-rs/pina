@@ -9,8 +9,9 @@ PDA-backed counter program.
 <br>
 
 - PDA-seeded accounts with `#[account]` / `#[pda]`.
+- Atomic fixed-account initialization with `CreateProgramAccountWithBump::invoke_with`.
 - Counter state mutation (`Initialize`, `Increment`).
-- Validation chains via `.assert_signer()?.assert_writable()?` and zeropod state views.
+- Validation chains via `.assert_signer()?.assert_writable()?` and PinaPod state views.
 
 ## Run
 

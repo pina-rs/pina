@@ -57,8 +57,7 @@
 							"kind": "structFieldTypeNode",
 							"name": "values",
 							"docs": [
-								"Dynamically encoded values; unused capacity occupies no account bytes.",
-								"Pina compact capacity: 64."
+								"Dynamically encoded values; unused capacity occupies no account bytes."
 							],
 							"type": {
 								"kind": "arrayTypeNode",
@@ -374,6 +373,19 @@
 						}
 					}
 				]
+			}
+		],
+		"definedTypes": [
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA6SampleF6Values",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 64,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
 			}
 		],
 		"pdas": [

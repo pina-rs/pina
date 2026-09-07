@@ -76,21 +76,19 @@ impl Realloc2InstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut Realloc2InstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <Realloc2InstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data = <Realloc2InstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; Realloc2InstructionWire::SIZE];
+		<Realloc2InstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REALLOC2_DISCRIMINATOR;
-		}
-		<Realloc2InstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 pub struct Realloc2InstructionWire {
 	pub discriminator: u8,
 	pub len: u16,

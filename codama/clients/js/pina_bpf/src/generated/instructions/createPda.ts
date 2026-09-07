@@ -34,8 +34,8 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PINA_BPF_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const CREATE_PDA_DISCRIMINATOR = 3;
 
@@ -89,7 +89,7 @@ export function getCreatePdaInstructionDataDecoder(): FixedSizeDecoder<
 > {
 	return getStructDecoder([[
 		"discriminator",
-		getZeroPodDiscriminatorDecoder(CREATE_PDA_DISCRIMINATOR, getU8Decoder()),
+		getPinaPodDiscriminatorDecoder(CREATE_PDA_DISCRIMINATOR, getU8Decoder()),
 	], ["bump", getU8Decoder()]]);
 }
 

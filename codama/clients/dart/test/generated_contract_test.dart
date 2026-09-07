@@ -61,12 +61,12 @@ void main() {
   });
 
   group('ProfileState account codec', () {
-    test('matches the exact zeropod wire layout and round-trips', () {
+    test('matches the exact PinaPod wire layout and round-trips', () {
       final state = ProfileState(
         bump: 254,
-        name: _boundedText('A\u0000B', 33),
-        bio: _boundedText('bio', 129),
-        tags: _tagBytes([BigInt.from(7), BigInt.from(9)]),
+        name: 'A\u0000B',
+        bio: 'bio',
+        tags: [BigInt.from(7), BigInt.from(9)],
         favoriteTag: BigInt.from(42),
         active: true,
       );
@@ -99,19 +99,16 @@ void main() {
       final decoded = getProfileStateDecoder().decode(encoded);
       expect(decoded.discriminator, 1);
       expect(decoded.bump, 254);
-      expect(decoded.name, orderedEquals(_boundedText('A\u0000B', 33)));
-      expect(decoded.bio, orderedEquals(_boundedText('bio', 129)));
-      expect(
-        decoded.tags,
-        orderedEquals(_tagBytes([BigInt.from(7), BigInt.from(9)])),
-      );
+      expect(decoded.name, 'A\u0000B');
+      expect(decoded.bio, 'bio');
+      expect(decoded.tags, [BigInt.from(7), BigInt.from(9)]);
       expect(decoded.favoriteTag, BigInt.from(42));
       expect(decoded.active, isTrue);
     });
 
-    test('rejects over-capacity fixed arrays instead of truncating', () {
-      final overlongName = _profile(name: Uint8List(34));
-      final tooManyTags = _profile(tags: Uint8List(67));
+    test('rejects over-capacity semantic values instead of truncating', () {
+      final overlongName = _profile(name: List.filled(33, 'x').join());
+      final tooManyTags = _profile(tags: List.filled(9, BigInt.zero));
 
       expect(
         () => getProfileStateEncoder().encode(overlongName),
@@ -143,20 +140,30 @@ void main() {
       );
     });
 
-    test('treats bounded storage contents as opaque fixed bytes', () {
+    test('rejects malformed semantic string and vector storage', () {
       final canonical = getProfileStateEncoder().encode(_profile());
       final fixture = contractFixture['profileState']! as Map<String, Object?>;
       final nameOffset = fixture['nameOffset']! as int;
       final tagsOffset = fixture['tagsOffset']! as int;
-      final opaque = Uint8List.fromList(canonical)
-        ..[nameOffset] = 33
+      final overlongName = Uint8List.fromList(canonical)..[nameOffset] = 33;
+      final malformedUtf8 = Uint8List.fromList(canonical)
+        ..[nameOffset] = 2
         ..[nameOffset + 1] = 0xc3
-        ..[nameOffset + 2] = 0x28
-        ..[tagsOffset] = 9;
+        ..[nameOffset + 2] = 0x28;
+      final tooManyTags = Uint8List.fromList(canonical)..[tagsOffset] = 9;
 
-      final decoded = getProfileStateDecoder().decode(opaque);
-      expect(decoded.name.sublist(0, 3), orderedEquals([33, 0xc3, 0x28]));
-      expect(decoded.tags[0], 9);
+      expect(
+        () => getProfileStateDecoder().decode(overlongName),
+        throwsA(anything),
+      );
+      expect(
+        () => getProfileStateDecoder().decode(malformedUtf8),
+        throwsA(anything),
+      );
+      expect(
+        () => getProfileStateDecoder().decode(tooManyTags),
+        throwsA(anything),
+      );
     });
 
     test('treats inactive option capacity as unobservable', () {
@@ -209,11 +216,12 @@ void main() {
           revision: 4,
           entries: entries,
           markers: markers,
+          note: null,
         ),
       );
       final decoded = getJournalDecoder().decode(encoded);
 
-      expect(encoded, hasLength(48 + entries.length * 8 + markers.length));
+      expect(encoded, hasLength(49 + entries.length * 8 + markers.length));
       expect(encoded.sublist(38, 40), [3, 0]);
       expect(encoded.sublist(40, 48), [2, 0, 0, 0, 0, 0, 0, 0]);
       expect(decoded.discriminator, 1);
@@ -222,6 +230,64 @@ void main() {
       expect(decoded.revision, 4);
       expect(decoded.entries, entries);
       expect(decoded.markers, markers);
+      expect(decoded.note, isNull);
+    });
+
+    test('rejects compact capacities at encode and decode boundaries', () {
+      Journal journal({
+        List<BigInt> entries = const [],
+        List<int> markers = const [],
+        String? note,
+      }) => Journal(
+        bump: 7,
+        authority: systemAddress,
+        revision: 4,
+        entries: entries,
+        markers: markers,
+        note: note,
+      );
+
+      expect(
+        () => getJournalEncoder().encode(
+          journal(entries: List.filled(9, BigInt.zero)),
+        ),
+        throwsA(anything),
+      );
+      expect(
+        () => getJournalEncoder().encode(journal(markers: List.filled(9, 0))),
+        throwsA(anything),
+      );
+      expect(
+        () => getJournalEncoder().encode(
+          journal(note: List.filled(65, 'x').join()),
+        ),
+        throwsA(anything),
+      );
+
+      final empty = getJournalEncoder().encode(journal());
+      final excessiveEntries = Uint8List.fromList(empty)..[38] = 9;
+      final excessiveMarkers = Uint8List.fromList(empty)..[40] = 9;
+      final invalidOption = Uint8List.fromList(empty)..[48] = 2;
+      final malformedUtf8 = Uint8List.fromList(
+        getJournalEncoder().encode(journal(note: 'x')),
+      )..[50] = 0xff;
+
+      expect(
+        () => getJournalDecoder().decode(excessiveEntries),
+        throwsA(anything),
+      );
+      expect(
+        () => getJournalDecoder().decode(excessiveMarkers),
+        throwsA(anything),
+      );
+      expect(
+        () => getJournalDecoder().decode(invalidOption),
+        throwsA(anything),
+      );
+      expect(
+        () => getJournalDecoder().decode(malformedUtf8),
+        throwsA(anything),
+      );
     });
   });
 
@@ -233,8 +299,8 @@ void main() {
         profile: systemAddress,
         systemProgram: systemAddress,
         bump: 9,
-        name: _boundedText('name', 33),
-        bio: _boundedText('bio', 129),
+        name: 'name',
+        bio: 'bio',
       );
       final data = instruction.data!;
       final fixture =
@@ -249,8 +315,8 @@ void main() {
       final parsed = parseInitializeInstruction(instruction);
       expect(parsed.discriminator, 0);
       expect(parsed.bump, 9);
-      expect(parsed.name, orderedEquals(_boundedText('name', 33)));
-      expect(parsed.bio, orderedEquals(_boundedText('bio', 129)));
+      expect(parsed.name, 'name');
+      expect(parsed.bio, 'bio');
     });
 
     test('rejects malformed discriminators and trailing bytes', () {
@@ -260,8 +326,8 @@ void main() {
         profile: systemAddress,
         systemProgram: systemAddress,
         bump: 9,
-        name: _boundedText('name', 33),
-        bio: _boundedText('bio', 129),
+        name: 'name',
+        bio: 'bio',
       );
       final malformedData = Uint8List.fromList(canonical.data!)..[0] = 1;
       final malformed = Instruction(
@@ -295,47 +361,15 @@ void main() {
   });
 }
 
-ProfileState _profile({Uint8List? name, Uint8List? tags}) {
+ProfileState _profile({String? name, List<BigInt>? tags}) {
   return ProfileState(
     bump: 7,
-    name: name ?? _boundedText('name', 33),
-    bio: _boundedText('bio', 129),
-    tags: tags ?? _tagBytes(const []),
+    name: name ?? 'name',
+    bio: 'bio',
+    tags: tags ?? const [],
     favoriteTag: null,
     active: false,
   );
-}
-
-Uint8List _boundedText(String value, int size) {
-  final payload = utf8.encode(value);
-  if (payload.length >= size || payload.length > 0xff) {
-    throw ArgumentError.value(value, 'value', 'does not fit bounded storage');
-  }
-
-  return Uint8List(size)
-    ..[0] = payload.length
-    ..setRange(1, payload.length + 1, payload);
-}
-
-Uint8List _tagBytes(List<BigInt> values) {
-  const capacity = 8;
-  if (values.length > capacity) {
-    throw RangeError.range(values.length, 0, capacity, 'values.length');
-  }
-
-  final bytes = Uint8List(2 + capacity * 8);
-  ByteData.sublistView(bytes).setUint16(0, values.length, Endian.little);
-  for (var index = 0; index < values.length; index++) {
-    final value = values[index];
-    if (value.isNegative || value.bitLength > 64) {
-      throw ArgumentError.value(value, 'values[$index]', 'must fit in u64');
-    }
-    for (var byte = 0; byte < 8; byte++) {
-      bytes[2 + index * 8 + byte] = ((value >> (byte * 8)) & BigInt.from(0xff))
-          .toInt();
-    }
-  }
-  return bytes;
 }
 
 enum _Status { inactive, active }

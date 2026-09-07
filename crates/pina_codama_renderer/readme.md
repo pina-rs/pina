@@ -6,7 +6,7 @@
 
 <br>
 
-Codama Rust renderer that generates Pina-style validated zeropod models and discriminator-first layouts from Codama JSON IDLs. The `pina codama generate` command drives it for every program you generate; it is also published to crates.io for custom render pipelines.
+Codama Rust renderer that generates Pina-style validated PinaPod models and discriminator-first layouts from Codama JSON IDLs. The `pina generate` command drives it for every program you generate. The renderer is also published to crates.io for custom render pipelines.
 
 <!-- {=crateReadmeBadgeRow:"pina_codama_renderer"} -->
 
@@ -27,23 +27,24 @@ cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
 
 `auto` creates an empty destination and otherwise updates only `src/generated`, preserving an existing `Cargo.toml` and `src/lib.rs`. Use `--mode create` or `--mode update` to require that lifecycle state, `--mode overwrite` for a complete clean regeneration, and `--no-scaffold` to emit generated sources without package files.
 
-## What It Generates
+## What it generates
 
 <br>
 
-- Native account, instruction, event, and defined-type schemas deriving `pina::ZeroPod`
-- Discriminator-first generated storage views with recursive zeropod validation
+- Native account, instruction, event, and defined-type schemas deriving `pina::PinaPod`
+- Discriminator-first generated storage views with recursive PinaPod validation
 - Checked account initialization from caller-owned buffers
+- Compact read views and generated patch types for supported bounded tails
 - Type-safe instruction builders that own and consume their initialized wire buffers without exposing object representations
 
 ## Constraints
 
 <br>
 
-The renderer only supports fixed-size layouts. The following Codama patterns will produce explicit errors:
+The renderer supports fixed layouts plus Pina's bounded compact-account grammar. The following Codama patterns produce explicit errors:
 
-- Variable-length strings/bytes
+- Unbounded strings, bytes, arrays, maps, and sets
+- Dynamic nesting outside `Option<String<N>>`, `Option<Vec<T, N>>`, and `Vec<String<M>, N>`
 - Big-endian numbers
 - Floats
-- Non-UTF8 constant byte seeds
-- Non-fixed arrays
+- Non-UTF-8 constant byte seeds

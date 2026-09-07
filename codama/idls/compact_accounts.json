@@ -73,12 +73,11 @@
 							"kind": "structFieldTypeNode",
 							"name": "entries",
 							"docs": [
-								"Active entries. Unused capacity consumes no account bytes.",
-								"Pina compact capacity: 8."
+								"Active entries. Unused capacity consumes no account bytes."
 							],
 							"type": {
 								"kind": "preOffsetTypeNode",
-								"offset": 10,
+								"offset": 11,
 								"strategy": "relative",
 								"type": {
 									"kind": "arrayTypeNode",
@@ -112,8 +111,7 @@
 							"kind": "structFieldTypeNode",
 							"name": "markers",
 							"docs": [
-								"One marker per entry, stored as a second compact tail.",
-								"Pina compact capacity: 8."
+								"One marker per entry, stored as a second compact tail."
 							],
 							"type": {
 								"kind": "arrayTypeNode",
@@ -137,6 +135,43 @@
 												"format": "u64",
 												"endian": "le"
 											}
+										}
+									}
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "note",
+							"docs": [
+								"Optional human-readable status attached to the latest resize."
+							],
+							"type": {
+								"kind": "optionTypeNode",
+								"item": {
+									"kind": "sizePrefixTypeNode",
+									"type": {
+										"kind": "stringTypeNode",
+										"encoding": "utf8"
+									},
+									"prefix": {
+										"kind": "numberTypeNode",
+										"format": "u8",
+										"endian": "le"
+									}
+								},
+								"prefix": {
+									"kind": "postOffsetTypeNode",
+									"offset": 0,
+									"strategy": "preOffset",
+									"type": {
+										"kind": "preOffsetTypeNode",
+										"offset": 48,
+										"strategy": "absolute",
+										"type": {
+											"kind": "numberTypeNode",
+											"format": "u8",
+											"endian": "le"
 										}
 									}
 								}
@@ -423,6 +458,41 @@
 						}
 					}
 				]
+			}
+		],
+		"definedTypes": [
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA7JournalF7Entries",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 8,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
+			},
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA7JournalF7Markers",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 8,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
+			},
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA7JournalF4Note",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 64,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
 			}
 		],
 		"pdas": [

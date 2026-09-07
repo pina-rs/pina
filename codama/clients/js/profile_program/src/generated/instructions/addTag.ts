@@ -37,8 +37,8 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { findProfilePda } from "../pdas";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const ADD_TAG_DISCRIMINATOR = 2;
 
@@ -87,7 +87,7 @@ export function getAddTagInstructionDataDecoder(): FixedSizeDecoder<
 > {
 	return getStructDecoder([[
 		"discriminator",
-		getZeroPodDiscriminatorDecoder(ADD_TAG_DISCRIMINATOR, getU8Decoder()),
+		getPinaPodDiscriminatorDecoder(ADD_TAG_DISCRIMINATOR, getU8Decoder()),
 	], ["tag", getU64Decoder()]]);
 }
 

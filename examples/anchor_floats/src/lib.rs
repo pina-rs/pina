@@ -170,10 +170,12 @@ mod tests {
 	#[test]
 	fn create_instruction_roundtrip() {
 		let mut bytes = [0u8; CreateInstruction::SIZE];
-		let instruction = CreateInstruction::initialize(&mut bytes)
-			.unwrap_or_else(|error| panic!("initialize: {error:?}"));
-		instruction.data_f32.set(1.0f32.to_bits());
-		instruction.data_f64.set(2.0f64.to_bits());
+		CreateInstruction::initialize(&mut bytes, |instruction| {
+			instruction.data_f32.set(1.0f32.to_bits());
+			instruction.data_f64.set(2.0f64.to_bits());
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("initialize: {error:?}"));
 		let decoded =
 			CreateInstruction::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
 
@@ -184,10 +186,12 @@ mod tests {
 	#[test]
 	fn update_instruction_roundtrip() {
 		let mut bytes = [0u8; UpdateInstruction::SIZE];
-		let instruction = UpdateInstruction::initialize(&mut bytes)
-			.unwrap_or_else(|error| panic!("initialize: {error:?}"));
-		instruction.data_f32.set(3.0f32.to_bits());
-		instruction.data_f64.set(4.0f64.to_bits());
+		UpdateInstruction::initialize(&mut bytes, |instruction| {
+			instruction.data_f32.set(3.0f32.to_bits());
+			instruction.data_f64.set(4.0f64.to_bits());
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("initialize: {error:?}"));
 		let decoded =
 			UpdateInstruction::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
 
@@ -200,11 +204,13 @@ mod tests {
 		let authority: Address = [1u8; 32].into();
 		let wrong_authority: Address = [2u8; 32].into();
 		let mut bytes = [0u8; FloatDataAccount::SIZE];
-		let account = FloatDataAccount::initialize(&mut bytes)
-			.unwrap_or_else(|error| panic!("initialize: {error:?}"));
-		account.data_f32.set(1.0f32.to_bits());
-		account.data_f64.set(2.0f64.to_bits());
-		account.authority = authority;
+		let account = FloatDataAccount::initialize(&mut bytes, |account| {
+			account.data_f32.set(1.0f32.to_bits());
+			account.data_f64.set(2.0f64.to_bits());
+			account.authority = authority;
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("initialize: {error:?}"));
 
 		let result = apply_update(account, &wrong_authority, 3.0, 4.0);
 		assert!(matches!(
@@ -217,11 +223,13 @@ mod tests {
 	fn apply_update_updates_values() {
 		let authority: Address = [1u8; 32].into();
 		let mut bytes = [0u8; FloatDataAccount::SIZE];
-		let account = FloatDataAccount::initialize(&mut bytes)
-			.unwrap_or_else(|error| panic!("initialize: {error:?}"));
-		account.data_f32.set(1.0f32.to_bits());
-		account.data_f64.set(2.0f64.to_bits());
-		account.authority = authority;
+		let account = FloatDataAccount::initialize(&mut bytes, |account| {
+			account.data_f32.set(1.0f32.to_bits());
+			account.data_f64.set(2.0f64.to_bits());
+			account.authority = authority;
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("initialize: {error:?}"));
 
 		let result = apply_update(account, &authority, 3.0, 4.0);
 		assert!(result.is_ok());

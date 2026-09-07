@@ -13,10 +13,6 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, FromPrimitive, PartialEq)]
 pub enum ProfileProgramError {
-	/// A bounded string field contained invalid UTF-8.
-	/// 0 - A bounded string field contained invalid UTF-8.
-	#[error("A bounded string field contained invalid UTF-8.")]
-	InvalidUtf8 = 0x0,
 	/// The tag list is full (capacity 8).
 	/// 1 - The tag list is full (capacity 8).
 	#[error("The tag list is full (capacity 8).")]

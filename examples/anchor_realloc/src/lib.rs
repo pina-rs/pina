@@ -9,7 +9,7 @@
 #![allow(clippy::inline_always)]
 #![expect(
 	clippy::len_without_is_empty,
-	reason = "zeropod generates len accessors for scalar wire fields, not collections"
+	reason = "PinaPod generates len accessors for scalar wire fields, not collections"
 )]
 #![no_std]
 
@@ -196,16 +196,10 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			owner: &ID,
 			seeds: &seeds.as_slices(),
 			bump: args.bump,
+			patch: SamplePatch::new().bump(args.bump).authority(authority_key),
 			space: Sample::HEADER_SIZE,
 		}
 		.invoke::<Sample>()?;
-
-		self.sample
-			.with_compact_account_mut::<Sample, _>(&ID, |sample| {
-				sample.bump = args.bump;
-				sample.authority = authority_key;
-				Ok(())
-			})?;
 
 		Ok(())
 	}
@@ -223,43 +217,20 @@ impl<'a> ProcessAccountInfos<'a> for ReallocAccounts<'a> {
 		validate_target_len(target_len)?;
 		validate_realloc_delta(self.sample.data_len(), target_len)?;
 
-		if target_len > self.sample.data_len() {
-			ReallocCompactAccount {
-				account: self.sample,
-				payer: self.authority,
-				new_size: target_len,
-				program_id: &ID,
-			}
-			.invoke::<Sample>()?;
-		}
-
 		let count = (target_len - Sample::HEADER_SIZE) / size_of::<PodU64>();
 		let mut values = [PodU64::from(0); 64];
 		for (index, value) in values.iter_mut().take(count).enumerate() {
 			value.set(u64::try_from(index).map_err(|_| ProgramError::InvalidArgument)?);
 		}
-		let encoded_size = {
-			let mut data = self.sample.try_borrow_mut()?;
-			let mut sample = Sample::try_from_bytes_mut(&mut data)?;
-			sample
-				.set_values(&values[..count])
-				.map_err(|_| ProgramError::InvalidAccountData)?;
-			sample
-				.commit()
-				.map_err(|_| ProgramError::InvalidAccountData)?
-		};
+		let encoded_size = UpdateResizableAccount {
+			account: self.sample,
+			rent_account: self.authority,
+			program_id: &ID,
+			patch: SamplePatch::new().replace_values(&values[..count]),
+		}
+		.invoke::<Sample>()?;
 		if encoded_size != target_len {
 			return Err(ProgramError::InvalidAccountData);
-		}
-
-		if target_len < self.sample.data_len() {
-			ReallocCompactAccount {
-				account: self.sample,
-				payer: self.authority,
-				new_size: target_len,
-				program_id: &ID,
-			}
-			.invoke::<Sample>()?;
 		}
 
 		Ok(())
@@ -329,7 +300,8 @@ mod tests {
 	#[test]
 	fn realloc_instruction_roundtrip() {
 		let mut bytes = [0u8; ReallocIx::SIZE];
-		let ix = ReallocIx::initialize(&mut bytes).unwrap_or_else(|e| panic!("encode: {e:?}"));
+		let ix = ReallocIx::initialize(&mut bytes, |_| Ok(()))
+			.unwrap_or_else(|e| panic!("encode: {e:?}"));
 		ix.len.set(Sample::HEADER_SIZE as u16);
 		let parsed = ReallocIx::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
 		assert_eq!(usize::from(parsed.len.get()), Sample::HEADER_SIZE);
@@ -387,18 +359,14 @@ mod tests {
 	fn sample_compact_codec_roundtrips_active_values() {
 		let mut data = [0u8; Sample::HEADER_SIZE + 24];
 		let values = [PodU64::from(3), PodU64::from(5), PodU64::from(8)];
-		let encoded_size = {
-			let mut sample = Sample::initialize(&mut data)
-				.unwrap_or_else(|error| panic!("initialize: {error:?}"));
-			sample.bump = 7;
-			sample.authority = Address::new_from_array([9; 32]);
-			sample
-				.set_values(&values)
-				.unwrap_or_else(|error| panic!("set values: {error:?}"));
-			sample
-				.commit()
-				.unwrap_or_else(|error| panic!("commit: {error:?}"))
-		};
+		let encoded_size = Sample::initialize(
+			&mut data,
+			&SamplePatch::new()
+				.bump(7)
+				.authority(Address::new_from_array([9; 32]))
+				.replace_values(&values),
+		)
+		.unwrap_or_else(|error| panic!("initialize: {error:?}"));
 
 		assert_eq!(encoded_size, data.len());
 		let sample =

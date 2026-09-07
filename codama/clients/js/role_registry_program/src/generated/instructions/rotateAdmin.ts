@@ -34,8 +34,8 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const ROTATE_ADMIN_DISCRIMINATOR = 4;
 
@@ -85,7 +85,7 @@ export function getRotateAdminInstructionDataDecoder(): FixedSizeDecoder<
 > {
 	return getStructDecoder([[
 		"discriminator",
-		getZeroPodDiscriminatorDecoder(ROTATE_ADMIN_DISCRIMINATOR, getU8Decoder()),
+		getPinaPodDiscriminatorDecoder(ROTATE_ADMIN_DISCRIMINATOR, getU8Decoder()),
 	]]);
 }
 

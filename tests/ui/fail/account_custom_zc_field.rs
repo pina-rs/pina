@@ -8,8 +8,6 @@ mod custom {
 
 	unsafe impl ZcField for Custom {
 		type Pod = u8;
-
-		const POD_SIZE: usize = 1;
 	}
 }
 

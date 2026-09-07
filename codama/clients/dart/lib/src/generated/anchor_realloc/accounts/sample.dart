@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+import '../pina_pod_codecs.dart';
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -49,9 +50,12 @@ Encoder<Sample> getSampleEncoder() {
     ('authority', getAddressEncoder()),
     (
       'values',
-      getArrayEncoder(
-        transformEncoder(getU64Encoder(), (BigInt value) => value),
-        size: PrefixedArraySize(getU16Encoder()),
+      getPinaPodBoundedArrayEncoder(
+        getArrayEncoder(
+          transformEncoder(getU64Encoder(), (BigInt value) => value),
+          size: PrefixedArraySize(getU16Encoder()),
+        ),
+        64,
       ),
     ),
   ]);
@@ -74,9 +78,13 @@ Decoder<Sample> getSampleDecoder() {
     ('authority', getAddressDecoder()),
     (
       'values',
-      getArrayDecoder(
-        getU64Decoder(),
-        size: PrefixedArraySize(getU16Decoder()),
+      getPinaPodBoundedArrayDecoder(
+        getArrayDecoder(
+          getU64Decoder(),
+          size: PrefixedArraySize(getU16Decoder()),
+        ),
+        getPinaPodBoundedCountDecoder(getU16Decoder(), 64),
+        64,
       ),
     ),
   ]);

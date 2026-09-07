@@ -38,9 +38,9 @@ import {
 } from "@solana/kit";
 import { findPoolPda, type PoolSeeds } from "../pdas";
 import {
-	getZeroPodBooleanDecoder,
-	getZeroPodDiscriminatorDecoder,
-} from "../zeropodCodecs";
+	getPinaPodBooleanDecoder,
+	getPinaPodDiscriminatorDecoder,
+} from "../pinaPodCodecs";
 
 export const POOL_STATE_DISCRIMINATOR = 1;
 
@@ -91,14 +91,14 @@ export function getPoolStateDecoder(): FixedSizeDecoder<PoolState> {
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(POOL_STATE_DISCRIMINATOR, getU8Decoder()),
+			getPinaPodDiscriminatorDecoder(POOL_STATE_DISCRIMINATOR, getU8Decoder()),
 		],
 		["admin", getAddressDecoder()],
 		["stakeMint", getAddressDecoder()],
 		["rewardMint", getAddressDecoder()],
 		["totalStaked", getU64Decoder()],
 		["rewardIndex", getU64Decoder()],
-		["paused", getZeroPodBooleanDecoder()],
+		["paused", getPinaPodBooleanDecoder()],
 		["bump", getU8Decoder()],
 	]);
 }

@@ -10,7 +10,7 @@
 
 use pina::pinapod;
 
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 #[pinapod(compact)]
 pub struct Journal {
 	/// A compact account with two independently encoded dynamic fields.
@@ -26,17 +26,17 @@ pub struct Journal {
 	/// Number of successful resize or write operations.
 	pub revision: u32,
 	/// Active entries. Unused capacity consumes no account bytes.
-	/// Pina compact capacity: 8.
 	pub entries: pina::Vec<u64, 8>,
 	/// One marker per entry, stored as a second compact tail.
-	/// Pina compact capacity: 8.
-	pub markers: pina::PodVec<<u8 as pina::ZcField>::Pod, 8, 8>,
+	pub markers: pina::PodVec<u8, 8, 8>,
+	/// Optional human-readable status attached to the latest resize.
+	pub note: Option<pina::String<64>>,
 }
 
 pub const JOURNAL_DISCRIMINATOR: u8 = 1u8;
 
 impl Journal {
-	pub const HEADER_SIZE: usize = <Self as pina::ZeroPodCompact>::HEADER_SIZE;
+	pub const HEADER_SIZE: usize = <Self as pina::PinaPodCompact>::HEADER_SIZE;
 
 	pub fn initialize(
 		data: &mut [u8],

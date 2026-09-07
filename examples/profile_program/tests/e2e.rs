@@ -39,7 +39,6 @@ use profile_program::ProfileState;
 use profile_program::ProfileStateZc;
 use profile_program::RemoveTagInstruction;
 use profile_program::UpdateProfileInstruction;
-use profile_program::encode_bounded_text;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
 use solana_instruction::Instruction;
@@ -90,45 +89,48 @@ fn derive_profile_pda(authority: &Pubkey) -> (Pubkey, u8) {
 
 /// Build `Initialize` instruction data: discriminator + bump + name + bio.
 fn initialize_ix_data(bump: u8, name: &str, bio: &str) -> Vec<u8> {
-	let name = encode_bounded_text::<33>(name)
-		.unwrap_or_else(|error| panic!("invalid profile name: {error:?}"));
-	let bio = encode_bounded_text::<129>(bio)
-		.unwrap_or_else(|error| panic!("invalid profile bio: {error:?}"));
-	let mut data = vec![ProfileInstruction::Initialize as u8, bump];
-	data.extend_from_slice(&name);
-	data.extend_from_slice(&bio);
+	let mut data = vec![0u8; InitializeInstruction::SIZE];
+	InitializeInstruction::initialize(&mut data, |instruction| {
+		instruction.bump = bump;
+		instruction.name.try_set(name)?;
+		instruction.bio.try_set(bio)?;
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("initialize instruction failed: {error:?}"));
 	data
 }
 
 /// Build `UpdateProfile` instruction data: discriminator + name + bio.
 fn update_profile_ix_data(name: &str, bio: &str) -> Vec<u8> {
-	let name = encode_bounded_text::<33>(name)
-		.unwrap_or_else(|error| panic!("invalid profile name: {error:?}"));
-	let bio = encode_bounded_text::<129>(bio)
-		.unwrap_or_else(|error| panic!("invalid profile bio: {error:?}"));
-	let mut data = vec![ProfileInstruction::UpdateProfile as u8];
-	data.extend_from_slice(&name);
-	data.extend_from_slice(&bio);
+	let mut data = vec![0u8; UpdateProfileInstruction::SIZE];
+	UpdateProfileInstruction::initialize(&mut data, |instruction| {
+		instruction.name.try_set(name)?;
+		instruction.bio.try_set(bio)?;
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("update instruction failed: {error:?}"));
 	data
 }
 
 /// Build `AddTag` instruction data: discriminator + tag.
 fn add_tag_ix_data(tag: u64) -> Vec<u8> {
 	let mut data = vec![0u8; AddTagInstruction::SIZE];
-	AddTagInstruction::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("add-tag initialization failed: {error:?}"))
-		.tag
-		.set(tag);
+	AddTagInstruction::initialize(&mut data, |instruction| {
+		instruction.tag.set(tag);
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("add-tag initialization failed: {error:?}"));
 	data
 }
 
 /// Build `RemoveTag` instruction data: discriminator + index.
 fn remove_tag_ix_data(index: u64) -> Vec<u8> {
 	let mut data = vec![0u8; RemoveTagInstruction::SIZE];
-	RemoveTagInstruction::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("remove-tag initialization failed: {error:?}"))
-		.index
-		.set(index);
+	RemoveTagInstruction::initialize(&mut data, |instruction| {
+		instruction.index.set(index);
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("remove-tag initialization failed: {error:?}"));
 	data
 }
 
@@ -161,11 +163,9 @@ fn assert_profile(
 		.get_account(profile)
 		.unwrap_or_else(|| panic!("profile account {profile} not found"));
 	let state: &ProfileStateZc = ProfileState::try_from_bytes(&account.data).unwrap();
-	assert_eq!(state.name_text().unwrap(), expected_name);
-	assert_eq!(state.bio_text().unwrap(), expected_bio);
-	let tags: Vec<u64> = (0..state.tag_count().unwrap())
-		.map(|index| state.tag(index).unwrap().unwrap())
-		.collect();
+	assert_eq!(state.name.as_str(), expected_name);
+	assert_eq!(state.bio.as_str(), expected_bio);
+	let tags: Vec<u64> = state.tags.iter().map(pina::PodU64::get).collect();
 	assert_eq!(tags, expected_tags);
 	assert!(state.favorite_tag.is_none());
 	assert_eq!(state.active.get(), expected_active);
@@ -305,7 +305,7 @@ fn initialize_rejects_invalid_utf8() {
 	let result = mollusk.process_and_validate_instruction(
 		&instruction,
 		&initialize_accounts(&authority, &profile),
-		&[Check::err(ProfileError::InvalidUtf8.into())],
+		&[Check::err(ProgramError::InvalidInstructionData)],
 	);
 	// Mollusk retains the input placeholder account after a failed instruction.
 	let account = result

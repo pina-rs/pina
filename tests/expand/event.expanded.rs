@@ -116,7 +116,9 @@ impl ::pina::IntoDiscriminator for EventDisc {
         (*self as u8).matches_discriminator(bytes)
     }
 }
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct TransferEvent {
+    #[pinapod(skip_accessor)]
     discriminator: [u8; EventDisc::BYTES],
     pub from: [u8; 32],
     pub to: [u8; 32],
@@ -125,127 +127,141 @@ pub struct TransferEvent {
 #[repr(C)]
 pub struct TransferEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    discriminator: [u8; EventDisc::BYTES],
-    pub from: [u8; 32],
-    pub to: [u8; 32],
-    pub amount: <PodU64 as pinapod::ZcField>::Pod,
+    discriminator: <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod,
+    pub from: <[u8; 32] as pina::pinapod::ZcField>::Pod,
+    pub to: <[u8; 32] as pina::pinapod::ZcField>::Pod,
+    pub amount: <PodU64 as pina::pinapod::ZcField>::Pod,
 }
-impl Copy for TransferEventZc
+impl ::core::marker::Copy for TransferEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
-impl Clone for TransferEventZc
+impl ::core::clone::Clone for TransferEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
-const _: () = if !(core::mem::align_of::<TransferEventZc>() == 1) {
+const _: () = if !(::core::mem::align_of::<TransferEventZc>() == 1) {
     ::core::panicking::panic(
-        "assertion failed: core::mem::align_of::<TransferEventZc>() == 1",
+        "assertion failed: ::core::mem::align_of::<TransferEventZc>() == 1",
     )
 };
 impl TransferEventZc {
     #[inline(always)]
-    pub fn discriminator(&self) -> &[u8; EventDisc::BYTES] {
-        &self.discriminator
-    }
-    #[inline(always)]
-    pub fn from(&self) -> &[u8; 32] {
+    pub fn from(&self) -> &<[u8; 32] as pina::pinapod::ZcField>::Pod {
         &self.from
     }
     #[inline(always)]
-    pub fn to(&self) -> &[u8; 32] {
+    pub fn to(&self) -> &<[u8; 32] as pina::pinapod::ZcField>::Pod {
         &self.to
     }
     #[inline(always)]
-    pub fn amount(&self) -> &<PodU64 as pinapod::ZcField>::Pod {
+    pub fn amount(&self) -> &<PodU64 as pina::pinapod::ZcField>::Pod {
         &self.amount
     }
 }
-impl pinapod::ZcValidate for TransferEventZc
+impl pina::pinapod::ZcValidate for TransferEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
-        <[u8; EventDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
+    fn validate_ref(
+        value: &Self,
+    ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        <<[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
-        <[u8; 32] as pinapod::ZcValidate>::validate_ref(&value.from)?;
-        <[u8; 32] as pinapod::ZcValidate>::validate_ref(&value.to)?;
-        <<PodU64 as pinapod::ZcField>::Pod as pinapod::ZcValidate>::validate_ref(
+        <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.from,
+        )?;
+        <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.to,
+        )?;
+        <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.amount,
         )?;
-        Ok(())
+        ::core::result::Result::Ok(())
     }
 }
-impl pinapod::ZeroPodSchema for TransferEvent
+impl pina::pinapod::PinaPod for TransferEvent
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-{
-    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
-}
-impl pinapod::ZeroPodFixed for TransferEvent
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{}
+unsafe impl pina::pinapod::PinaPodFixed for TransferEvent
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Zc = TransferEventZc;
-    const SIZE: usize = core::mem::size_of::<TransferEventZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
-        if data.len() < core::mem::size_of::<TransferEventZc>() {
-            return Err(pinapod::ZeroPodError::BufferTooSmall);
-        }
-        let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
-        Ok(())
-    }
 }
-unsafe impl pinapod::ZcField for TransferEvent
+unsafe impl pina::pinapod::ZcField for TransferEvent
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Pod = TransferEventZc;
-    const POD_SIZE: usize = core::mem::size_of::<TransferEventZc>();
 }
-unsafe impl pinapod::ZcElem for TransferEventZc
+unsafe impl pina::pinapod::ZcElem for TransferEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
 const _: fn([u8; 32]) -> [::core::primitive::u8; 32] = |value| value;
 const _: fn() = || {
@@ -260,13 +276,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<[::core::primitive::u8; 32]>() == 1",
         )
     }
-    if !(::core::mem::size_of::<[::core::primitive::u8; 32]>()
-        == <[u8; 32] as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<[::core::primitive::u8; 32]>() ==\n    <[u8; 32] as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn([u8; 32]) -> [::core::primitive::u8; 32] = |value| value;
 const _: fn() = || {
@@ -279,13 +288,6 @@ const _: () = {
     if !(::core::mem::align_of::<[::core::primitive::u8; 32]>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<[::core::primitive::u8; 32]>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<[::core::primitive::u8; 32]>()
-        == <[u8; 32] as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<[::core::primitive::u8; 32]>() ==\n    <[u8; 32] as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -300,11 +302,6 @@ const _: () = {
     if !(::core::mem::align_of::<pina::PodU64>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<pina::PodU64>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<pina::PodU64>() == <PodU64 as pina::ZcField>::POD_SIZE) {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<pina::PodU64>() == <PodU64 as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -329,43 +326,46 @@ const _: () = {
     }
 };
 impl TransferEvent {
-    /// The exact number of bytes required by the zeropod representation.
-    pub const SIZE: usize = <Self as pina::ZeroPodFixed>::SIZE;
-    /// Validate `data` and return zeropod's immutable zero-copy companion.
+    /// The exact number of bytes required by the PinaPod representation.
+    pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
+    /// Validate `data` and return PinaPod's immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
-    ) -> Result<&<Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
+    ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
             return Err(pina::ProgramError::InvalidInstructionData);
         }
-        <Self as pina::ZeroPodFixed>::from_bytes(data)
+        <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidInstructionData)
     }
-    /// Initialize caller-owned storage and return its mutable zero-copy view.
+    /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// The complete slice is initialized before zeropod validates it. The
-    /// returned borrow prevents the caller from observing or changing the raw
-    /// bytes while the typed view is live.
-    ///
-    /// Every accepted field has an audited all-zero representation. The macro
-    /// rejects custom types and other layouts whose zero state cannot be
-    /// established by Pina's closed schema grammar.
+    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// validates the finished representation once. The discriminator is written
+    /// before the caller configures the remaining fields. If the closure or final
+    /// validation fails, PinaPod zeros the complete slice again.
     ///
     /// # Errors
     ///
-    /// Returns the generated invalid-data error when `data` has the wrong
-    /// length or zeroed storage is not a valid zeropod representation.
-    pub fn initialize(
-        data: &mut [u8],
-    ) -> Result<&mut <Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
-        if data.len() != Self::SIZE {
-            return Err(pina::ProgramError::InvalidInstructionData);
-        }
-        data.fill(0);
-        <Self as pina::HasDiscriminator>::write_discriminator(data);
-        <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+    /// Returns the generated invalid-data error when `data` has the wrong length,
+    /// the closure fails, or the completed representation is invalid.
+    pub fn initialize<'data>(
+        data: &'data mut [u8],
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
+        <Self as pina::PinaPodFixed>::initialize(
+                data,
+                |value| {
+                    <Self as pina::HasDiscriminator>::write_discriminator(
+                        &mut value.discriminator,
+                    );
+                    initialize(value)
+                },
+            )
             .map_err(|_| pina::ProgramError::InvalidInstructionData)
     }
 }
@@ -373,104 +373,102 @@ impl pina::HasDiscriminator for TransferEvent {
     type Type = EventDisc;
     const VALUE: Self::Type = EventDisc::TransferEvent;
 }
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct InitEvent {
+    #[pinapod(skip_accessor)]
     discriminator: [u8; EventDisc::BYTES],
     pub choice: u8,
 }
 #[repr(C)]
 pub struct InitEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    discriminator: [u8; EventDisc::BYTES],
-    pub choice: u8,
+    discriminator: <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod,
+    pub choice: <u8 as pina::pinapod::ZcField>::Pod,
 }
-impl Copy for InitEventZc
+impl ::core::marker::Copy for InitEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
-impl Clone for InitEventZc
+impl ::core::clone::Clone for InitEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
-const _: () = if !(core::mem::align_of::<InitEventZc>() == 1) {
+const _: () = if !(::core::mem::align_of::<InitEventZc>() == 1) {
     ::core::panicking::panic(
-        "assertion failed: core::mem::align_of::<InitEventZc>() == 1",
+        "assertion failed: ::core::mem::align_of::<InitEventZc>() == 1",
     )
 };
 impl InitEventZc {
     #[inline(always)]
-    pub fn discriminator(&self) -> &[u8; EventDisc::BYTES] {
-        &self.discriminator
-    }
-    #[inline(always)]
-    pub fn choice(&self) -> u8 {
+    pub fn choice(&self) -> <u8 as pina::pinapod::ZcField>::Pod {
         self.choice
     }
 }
-impl pinapod::ZcValidate for InitEventZc
+impl pina::pinapod::ZcValidate for InitEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
-        <[u8; EventDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
+    fn validate_ref(
+        value: &Self,
+    ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        <<[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
-        <u8 as pinapod::ZcValidate>::validate_ref(&value.choice)?;
-        Ok(())
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.choice,
+        )?;
+        ::core::result::Result::Ok(())
     }
 }
-impl pinapod::ZeroPodSchema for InitEvent
+impl pina::pinapod::PinaPod for InitEvent
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-{
-    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
-}
-impl pinapod::ZeroPodFixed for InitEvent
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{}
+unsafe impl pina::pinapod::PinaPodFixed for InitEvent
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Zc = InitEventZc;
-    const SIZE: usize = core::mem::size_of::<InitEventZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
-        if data.len() < core::mem::size_of::<InitEventZc>() {
-            return Err(pinapod::ZeroPodError::BufferTooSmall);
-        }
-        let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
-        Ok(())
-    }
 }
-unsafe impl pinapod::ZcField for InitEvent
+unsafe impl pina::pinapod::ZcField for InitEvent
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Pod = InitEventZc;
-    const POD_SIZE: usize = core::mem::size_of::<InitEventZc>();
 }
-unsafe impl pinapod::ZcElem for InitEventZc
+unsafe impl pina::pinapod::ZcElem for InitEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
 const _: fn(u8) -> ::core::primitive::u8 = |value| value;
 const _: fn() = || {
@@ -483,13 +481,6 @@ const _: () = {
     if !(::core::mem::align_of::<::core::primitive::u8>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<::core::primitive::u8>()
-        == <u8 as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<::core::primitive::u8>() ==\n    <u8 as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -512,43 +503,46 @@ const _: () = {
     }
 };
 impl InitEvent {
-    /// The exact number of bytes required by the zeropod representation.
-    pub const SIZE: usize = <Self as pina::ZeroPodFixed>::SIZE;
-    /// Validate `data` and return zeropod's immutable zero-copy companion.
+    /// The exact number of bytes required by the PinaPod representation.
+    pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
+    /// Validate `data` and return PinaPod's immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
-    ) -> Result<&<Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
+    ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
             return Err(pina::ProgramError::InvalidInstructionData);
         }
-        <Self as pina::ZeroPodFixed>::from_bytes(data)
+        <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidInstructionData)
     }
-    /// Initialize caller-owned storage and return its mutable zero-copy view.
+    /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// The complete slice is initialized before zeropod validates it. The
-    /// returned borrow prevents the caller from observing or changing the raw
-    /// bytes while the typed view is live.
-    ///
-    /// Every accepted field has an audited all-zero representation. The macro
-    /// rejects custom types and other layouts whose zero state cannot be
-    /// established by Pina's closed schema grammar.
+    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// validates the finished representation once. The discriminator is written
+    /// before the caller configures the remaining fields. If the closure or final
+    /// validation fails, PinaPod zeros the complete slice again.
     ///
     /// # Errors
     ///
-    /// Returns the generated invalid-data error when `data` has the wrong
-    /// length or zeroed storage is not a valid zeropod representation.
-    pub fn initialize(
-        data: &mut [u8],
-    ) -> Result<&mut <Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
-        if data.len() != Self::SIZE {
-            return Err(pina::ProgramError::InvalidInstructionData);
-        }
-        data.fill(0);
-        <Self as pina::HasDiscriminator>::write_discriminator(data);
-        <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+    /// Returns the generated invalid-data error when `data` has the wrong length,
+    /// the closure fails, or the completed representation is invalid.
+    pub fn initialize<'data>(
+        data: &'data mut [u8],
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
+        <Self as pina::PinaPodFixed>::initialize(
+                data,
+                |value| {
+                    <Self as pina::HasDiscriminator>::write_discriminator(
+                        &mut value.discriminator,
+                    );
+                    initialize(value)
+                },
+            )
             .map_err(|_| pina::ProgramError::InvalidInstructionData)
     }
 }
@@ -556,89 +550,75 @@ impl pina::HasDiscriminator for InitEvent {
     type Type = EventDisc;
     const VALUE: Self::Type = EventDisc::InitializeEvent;
 }
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct EmptyEvent {
+    #[pinapod(skip_accessor)]
     discriminator: [u8; EventDisc::BYTES],
 }
 #[repr(C)]
 pub struct EmptyEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    discriminator: [u8; EventDisc::BYTES],
+    discriminator: <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod,
 }
-impl Copy for EmptyEventZc
+impl ::core::marker::Copy for EmptyEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
-impl Clone for EmptyEventZc
+impl ::core::clone::Clone for EmptyEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
-const _: () = if !(core::mem::align_of::<EmptyEventZc>() == 1) {
+const _: () = if !(::core::mem::align_of::<EmptyEventZc>() == 1) {
     ::core::panicking::panic(
-        "assertion failed: core::mem::align_of::<EmptyEventZc>() == 1",
+        "assertion failed: ::core::mem::align_of::<EmptyEventZc>() == 1",
     )
 };
-impl EmptyEventZc {
-    #[inline(always)]
-    pub fn discriminator(&self) -> &[u8; EventDisc::BYTES] {
-        &self.discriminator
-    }
-}
-impl pinapod::ZcValidate for EmptyEventZc
+impl pina::pinapod::ZcValidate for EmptyEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
-        <[u8; EventDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
+    fn validate_ref(
+        value: &Self,
+    ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        <<[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
-        Ok(())
+        ::core::result::Result::Ok(())
     }
 }
-impl pinapod::ZeroPodSchema for EmptyEvent
+impl pina::pinapod::PinaPod for EmptyEvent
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-{
-    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
-}
-impl pinapod::ZeroPodFixed for EmptyEvent
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{}
+unsafe impl pina::pinapod::PinaPodFixed for EmptyEvent
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Zc = EmptyEventZc;
-    const SIZE: usize = core::mem::size_of::<EmptyEventZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
-        if data.len() < core::mem::size_of::<EmptyEventZc>() {
-            return Err(pinapod::ZeroPodError::BufferTooSmall);
-        }
-        let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
-        Ok(())
-    }
 }
-unsafe impl pinapod::ZcField for EmptyEvent
+unsafe impl pina::pinapod::ZcField for EmptyEvent
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Pod = EmptyEventZc;
-    const POD_SIZE: usize = core::mem::size_of::<EmptyEventZc>();
 }
-unsafe impl pinapod::ZcElem for EmptyEventZc
+unsafe impl pina::pinapod::ZcElem for EmptyEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
 const _: fn() = || {
     fn assert_storage<T: pina::ZcElem>() {}
@@ -657,43 +637,46 @@ const _: () = {
     }
 };
 impl EmptyEvent {
-    /// The exact number of bytes required by the zeropod representation.
-    pub const SIZE: usize = <Self as pina::ZeroPodFixed>::SIZE;
-    /// Validate `data` and return zeropod's immutable zero-copy companion.
+    /// The exact number of bytes required by the PinaPod representation.
+    pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
+    /// Validate `data` and return PinaPod's immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
-    ) -> Result<&<Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
+    ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
             return Err(pina::ProgramError::InvalidInstructionData);
         }
-        <Self as pina::ZeroPodFixed>::from_bytes(data)
+        <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidInstructionData)
     }
-    /// Initialize caller-owned storage and return its mutable zero-copy view.
+    /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// The complete slice is initialized before zeropod validates it. The
-    /// returned borrow prevents the caller from observing or changing the raw
-    /// bytes while the typed view is live.
-    ///
-    /// Every accepted field has an audited all-zero representation. The macro
-    /// rejects custom types and other layouts whose zero state cannot be
-    /// established by Pina's closed schema grammar.
+    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// validates the finished representation once. The discriminator is written
+    /// before the caller configures the remaining fields. If the closure or final
+    /// validation fails, PinaPod zeros the complete slice again.
     ///
     /// # Errors
     ///
-    /// Returns the generated invalid-data error when `data` has the wrong
-    /// length or zeroed storage is not a valid zeropod representation.
-    pub fn initialize(
-        data: &mut [u8],
-    ) -> Result<&mut <Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
-        if data.len() != Self::SIZE {
-            return Err(pina::ProgramError::InvalidInstructionData);
-        }
-        data.fill(0);
-        <Self as pina::HasDiscriminator>::write_discriminator(data);
-        <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+    /// Returns the generated invalid-data error when `data` has the wrong length,
+    /// the closure fails, or the completed representation is invalid.
+    pub fn initialize<'data>(
+        data: &'data mut [u8],
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
+        <Self as pina::PinaPodFixed>::initialize(
+                data,
+                |value| {
+                    <Self as pina::HasDiscriminator>::write_discriminator(
+                        &mut value.discriminator,
+                    );
+                    initialize(value)
+                },
+            )
             .map_err(|_| pina::ProgramError::InvalidInstructionData)
     }
 }
@@ -701,7 +684,9 @@ impl pina::HasDiscriminator for EmptyEvent {
     type Type = EventDisc;
     const VALUE: Self::Type = EventDisc::EmptyEvent;
 }
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct AuditEvent {
+    #[pinapod(skip_accessor)]
     discriminator: [u8; EventDisc::BYTES],
     pub action: u8,
     pub timestamp: PodU64,
@@ -725,113 +710,117 @@ impl ::core::fmt::Debug for AuditEvent {
 #[repr(C)]
 pub struct AuditEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    discriminator: [u8; EventDisc::BYTES],
-    pub action: u8,
-    pub timestamp: <PodU64 as pinapod::ZcField>::Pod,
+    discriminator: <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod,
+    pub action: <u8 as pina::pinapod::ZcField>::Pod,
+    pub timestamp: <PodU64 as pina::pinapod::ZcField>::Pod,
 }
-impl Copy for AuditEventZc
+impl ::core::marker::Copy for AuditEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
-impl Clone for AuditEventZc
+impl ::core::clone::Clone for AuditEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
-const _: () = if !(core::mem::align_of::<AuditEventZc>() == 1) {
+const _: () = if !(::core::mem::align_of::<AuditEventZc>() == 1) {
     ::core::panicking::panic(
-        "assertion failed: core::mem::align_of::<AuditEventZc>() == 1",
+        "assertion failed: ::core::mem::align_of::<AuditEventZc>() == 1",
     )
 };
 impl AuditEventZc {
     #[inline(always)]
-    pub fn discriminator(&self) -> &[u8; EventDisc::BYTES] {
-        &self.discriminator
-    }
-    #[inline(always)]
-    pub fn action(&self) -> u8 {
+    pub fn action(&self) -> <u8 as pina::pinapod::ZcField>::Pod {
         self.action
     }
     #[inline(always)]
-    pub fn timestamp(&self) -> &<PodU64 as pinapod::ZcField>::Pod {
+    pub fn timestamp(&self) -> &<PodU64 as pina::pinapod::ZcField>::Pod {
         &self.timestamp
     }
 }
-impl pinapod::ZcValidate for AuditEventZc
+impl pina::pinapod::ZcValidate for AuditEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
-        <[u8; EventDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
+    fn validate_ref(
+        value: &Self,
+    ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        <<[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
-        <u8 as pinapod::ZcValidate>::validate_ref(&value.action)?;
-        <<PodU64 as pinapod::ZcField>::Pod as pinapod::ZcValidate>::validate_ref(
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.action,
+        )?;
+        <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.timestamp,
         )?;
-        Ok(())
+        ::core::result::Result::Ok(())
     }
 }
-impl pinapod::ZeroPodSchema for AuditEvent
+impl pina::pinapod::PinaPod for AuditEvent
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-{
-    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
-}
-impl pinapod::ZeroPodFixed for AuditEvent
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{}
+unsafe impl pina::pinapod::PinaPodFixed for AuditEvent
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Zc = AuditEventZc;
-    const SIZE: usize = core::mem::size_of::<AuditEventZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
-        if data.len() < core::mem::size_of::<AuditEventZc>() {
-            return Err(pinapod::ZeroPodError::BufferTooSmall);
-        }
-        let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
-        Ok(())
-    }
 }
-unsafe impl pinapod::ZcField for AuditEvent
+unsafe impl pina::pinapod::ZcField for AuditEvent
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Pod = AuditEventZc;
-    const POD_SIZE: usize = core::mem::size_of::<AuditEventZc>();
 }
-unsafe impl pinapod::ZcElem for AuditEventZc
+unsafe impl pina::pinapod::ZcElem for AuditEventZc
 where
-    [u8; EventDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
 const _: fn(u8) -> ::core::primitive::u8 = |value| value;
 const _: fn() = || {
@@ -846,13 +835,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
         )
     }
-    if !(::core::mem::size_of::<::core::primitive::u8>()
-        == <u8 as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<::core::primitive::u8>() ==\n    <u8 as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn(PodU64) -> pina::PodU64 = |value| value;
 const _: fn() = || {
@@ -865,11 +847,6 @@ const _: () = {
     if !(::core::mem::align_of::<pina::PodU64>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<pina::PodU64>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<pina::PodU64>() == <PodU64 as pina::ZcField>::POD_SIZE) {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<pina::PodU64>() == <PodU64 as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -893,43 +870,46 @@ const _: () = {
     }
 };
 impl AuditEvent {
-    /// The exact number of bytes required by the zeropod representation.
-    pub const SIZE: usize = <Self as pina::ZeroPodFixed>::SIZE;
-    /// Validate `data` and return zeropod's immutable zero-copy companion.
+    /// The exact number of bytes required by the PinaPod representation.
+    pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
+    /// Validate `data` and return PinaPod's immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
-    ) -> Result<&<Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
+    ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
             return Err(pina::ProgramError::InvalidInstructionData);
         }
-        <Self as pina::ZeroPodFixed>::from_bytes(data)
+        <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidInstructionData)
     }
-    /// Initialize caller-owned storage and return its mutable zero-copy view.
+    /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// The complete slice is initialized before zeropod validates it. The
-    /// returned borrow prevents the caller from observing or changing the raw
-    /// bytes while the typed view is live.
-    ///
-    /// Every accepted field has an audited all-zero representation. The macro
-    /// rejects custom types and other layouts whose zero state cannot be
-    /// established by Pina's closed schema grammar.
+    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// validates the finished representation once. The discriminator is written
+    /// before the caller configures the remaining fields. If the closure or final
+    /// validation fails, PinaPod zeros the complete slice again.
     ///
     /// # Errors
     ///
-    /// Returns the generated invalid-data error when `data` has the wrong
-    /// length or zeroed storage is not a valid zeropod representation.
-    pub fn initialize(
-        data: &mut [u8],
-    ) -> Result<&mut <Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
-        if data.len() != Self::SIZE {
-            return Err(pina::ProgramError::InvalidInstructionData);
-        }
-        data.fill(0);
-        <Self as pina::HasDiscriminator>::write_discriminator(data);
-        <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+    /// Returns the generated invalid-data error when `data` has the wrong length,
+    /// the closure fails, or the completed representation is invalid.
+    pub fn initialize<'data>(
+        data: &'data mut [u8],
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
+        <Self as pina::PinaPodFixed>::initialize(
+                data,
+                |value| {
+                    <Self as pina::HasDiscriminator>::write_discriminator(
+                        &mut value.discriminator,
+                    );
+                    initialize(value)
+                },
+            )
             .map_err(|_| pina::ProgramError::InvalidInstructionData)
     }
 }

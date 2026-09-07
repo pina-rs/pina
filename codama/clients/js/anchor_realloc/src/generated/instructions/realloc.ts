@@ -36,8 +36,8 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { ANCHOR_REALLOC_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const REALLOC_DISCRIMINATOR = 0;
 
@@ -91,7 +91,7 @@ export function getReallocInstructionDataDecoder(): FixedSizeDecoder<
 > {
 	return getStructDecoder([[
 		"discriminator",
-		getZeroPodDiscriminatorDecoder(REALLOC_DISCRIMINATOR, getU8Decoder()),
+		getPinaPodDiscriminatorDecoder(REALLOC_DISCRIMINATOR, getU8Decoder()),
 	], ["len", getU16Decoder()]]);
 }
 

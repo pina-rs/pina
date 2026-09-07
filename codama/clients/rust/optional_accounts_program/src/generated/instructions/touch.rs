@@ -70,21 +70,19 @@ impl TouchInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut TouchInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <TouchInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data = <TouchInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; TouchInstructionWire::SIZE];
+		<TouchInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = TOUCH_DISCRIMINATOR;
-		}
-		<TouchInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 pub struct TouchInstructionWire {
 	pub discriminator: u8,
 }

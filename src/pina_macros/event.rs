@@ -1,6 +1,6 @@
 //! `#[event]` contract tests through the public macro.
 //!
-//! The macro generates a zeropod-backed event payload with a discriminator
+//! The macro generates a PinaPod-backed event payload with a discriminator
 //! field, `SIZE`, `initialize`/`try_from_bytes`, and a `HasDiscriminator`
 //! impl linking back to the discriminator enum.
 

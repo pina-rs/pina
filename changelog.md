@@ -13,9 +13,11 @@ All notable changes to this project will be documented in this file.
 - Change `AsAccount::as_account` / `as_account_mut` to return guard-backed `Ref<T>` / `RefMut<T>` values.
 - Extend `#[derive(Accounts)]` to support `&'a mut AccountView` and `&'a mut [AccountView]`, and use mutable fields to infer writable accounts in generated IDLs.
 - Split close and realloc behavior: `close_with_recipient()` no longer zeroes account data implicitly, and realloc helpers are gated behind the new `account-resize` feature.
-- Replace Pina's local bytemuck primitive layer with zeropod's `ZcElem`, `ZcValidate`, `ZeroPodFixed`, and fixed-capacity collection model.
-- Separate native zeropod schemas from their generated zero-copy storage views. Account loaders now return `TypeZc`, and storage fields use zeropod's accessor methods.
+- Upgrade to PinaPod v0.2 and replace `ZeroPod*` names with `PinaPod`, `PinaPodFixed`, `PinaPodCompact`, and `PinaPodError`.
+- Make manual `PinaPodFixed` implementations unsafe and replace ambiguous fixed reads with exact and prefix methods.
+- Separate native PinaPod schemas from their generated zero-copy storage views. Account loaders return `TypeZc`, and storage fields use PinaPod's accessor methods.
 - Remove Pina's whole-object `to_bytes()`, `PinaSerialize`, generic `InstructionBuilder`, custom `PodEnum`, and generic pointer-cast helpers. Inactive string and vector capacity is no longer observable through Pina.
+- Replace staged compact setters, `commit`, and caller-ordered reallocation with generated patches and `UpdateResizableAccount`. The new builder uses `rent_account` for growth funding and shrink refunds.
 - Token loaders no longer project Token-2022 bytes into legacy SPL Token state. Multi-program callers receive a guard-backed enum that preserves the concrete upstream type and extension layout.
 
 ### Features
@@ -24,24 +26,29 @@ All notable changes to this project will be documented in this file.
 - Preserve `TokenAccount` compatibility aliases through `pina::token` and `pina::token_2022` wrapper modules.
 - Infer writable Codama/IDL accounts from mutable `#[derive(Accounts)]` fields in `pina_cli`.
 
-#### Re-export zeropod collections and validation
+#### Accept PinaPod collections and nested options
 
-Pina re-exports zeropod's fixed-capacity `PodOption`, `PodString`, and `PodVec` types. `PinaAccount` and macro-generated instruction/event parsers recursively validate tags, prefixes, active elements, booleans, enums, and UTF-8 at the byte boundary before returning typed references.
+Pina re-exports PinaPod's fixed-capacity `PodOption`, `PodString`, and `PodVec` types. Fixed account, instruction, and event schemas now accept `String<N>`, `Vec<T, N>`, and recursively fixed `Option<T>` fields. PinaPod initializes full fixed capacity, clears removed payloads, and recursively validates tags, prefixes, active elements, booleans, enums, and UTF-8.
+
+Compact schemas now accept multiple tails using `String<N>`, `Vec<T, N>` for fixed `T`, `Option<String<N>>`, `Option<Vec<T, N>>` for fixed `T`, and `Vec<String<M>, N>`. Fixed `Option<T>` values stay in the header. Use `PodString<N, PFX>` or `PodVec<T, N, PFX>` for an explicit `1`, `2`, `4`, or `8` byte prefix.
 
 New mdt providers:
 
 - `podCollectionTypesTable` — collection types reference table
 - `podCollectionDescription` — collection type semantics
 
-Account, instruction, and event schemas derive `zeropod::ZeroPod`. Their `initialize` helpers zero caller-owned storage, write the discriminator, and return the validated generated view. Generated client instruction builders own their fully initialized buffers and do not expose schema object representations.
+Account, instruction, and event schemas derive `PinaPod`. Their `initialize` helpers zero caller-owned storage, write the discriminator, configure the view, and validate the finished value. Generated client instruction builders own their initialized buffers and do not expose schema object representations.
 
-Generated JavaScript codecs reject over-capacity values rather than truncating them and validate discriminators, booleans, and UTF-8 using the same canonical rules as the on-chain zeropod views.
+`CreateProgramAccount` and `CreateProgramAccountWithBump` now provide `invoke_with` and `invoke_signed_with`. These methods configure the generated fixed-account view before final validation, so accounts with required nonzero initial values can be created in one operation. Plain `invoke` and `invoke_signed` remain the all-zero-field convenience paths. Compact creation builders now require a generated initialization patch.
+
+Generated TypeScript and Dart codecs reject over-capacity values rather than truncating them. Decoders validate capacities before allocation and apply the same discriminator, boolean, option, and UTF-8 rules as the on-chain PinaPod views.
 
 ### Documentation
 
 - Refresh tutorials, READMEs, API docs, and security guidance for the mutable-account parsing model.
 - Document the explicit `zeroed()` then `close_with_recipient()` close flow.
 - Regenerate Codama IDLs and committed Rust/JS clients for the updated writable-account inference.
+- Add a PinaPod v0.2 migration guide and update the Pina mdBook, crate READMEs, examples, templates, and bundled agent skill.
 
 ## [0.13.0](https://github.com/pina-rs/pina/releases/tag/v0.13.0) (2026-09-06)
 

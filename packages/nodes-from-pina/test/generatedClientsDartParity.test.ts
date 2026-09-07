@@ -38,7 +38,7 @@ const fixture = JSON.parse(
 	readFileSync(fixturePath, "utf8"),
 ) as ContractFixture;
 
-describe("Dart and JavaScript zeropod contract parity", () => {
+describe("Dart and JavaScript PinaPod contract parity", () => {
 	test("profile state matches the shared 240-byte golden", () => {
 		const encoded = getProfileStateEncoder().encode({
 			active: true,

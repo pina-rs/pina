@@ -363,12 +363,13 @@ mod tests {
 	#[test]
 	fn instruction_roundtrip() {
 		let mut bytes = [0u8; AddRoleInstruction::SIZE];
-		let ix = AddRoleInstruction::initialize(&mut bytes)
-			.unwrap_or_else(|error| panic!("initialize failed: {error:?}"));
-		ix.role_id.set(7);
-		ix.permissions.set(3);
-		ix.bump = 2;
-		let _ = ix;
+		AddRoleInstruction::initialize(&mut bytes, |instruction| {
+			instruction.role_id.set(7);
+			instruction.permissions.set(3);
+			instruction.bump = 2;
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("initialize failed: {error:?}"));
 		let parsed = AddRoleInstruction::try_from_bytes(&bytes)
 			.unwrap_or_else(|e| panic!("decode failed: {e:?}"));
 		assert_eq!(parsed.role_id.get(), 7);

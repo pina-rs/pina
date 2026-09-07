@@ -38,9 +38,9 @@ import {
 } from "@solana/kit";
 import { findRoleEntryPda, type RoleEntrySeeds } from "../pdas";
 import {
-	getZeroPodBooleanDecoder,
-	getZeroPodDiscriminatorDecoder,
-} from "../zeropodCodecs";
+	getPinaPodBooleanDecoder,
+	getPinaPodDiscriminatorDecoder,
+} from "../pinaPodCodecs";
 
 export const ROLE_ENTRY_DISCRIMINATOR = 2;
 
@@ -88,13 +88,13 @@ export function getRoleEntryDecoder(): FixedSizeDecoder<RoleEntry> {
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(ROLE_ENTRY_DISCRIMINATOR, getU8Decoder()),
+			getPinaPodDiscriminatorDecoder(ROLE_ENTRY_DISCRIMINATOR, getU8Decoder()),
 		],
 		["registry", getAddressDecoder()],
 		["roleId", getU64Decoder()],
 		["grantee", getAddressDecoder()],
 		["permissions", getU64Decoder()],
-		["active", getZeroPodBooleanDecoder()],
+		["active", getPinaPodBooleanDecoder()],
 		["bump", getU8Decoder()],
 	]);
 }

@@ -15,6 +15,7 @@ use anchor_realloc::Realloc2Ix;
 use anchor_realloc::ReallocError;
 use anchor_realloc::ReallocIx;
 use anchor_realloc::Sample;
+use anchor_realloc::SamplePatch;
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
@@ -59,29 +60,33 @@ fn derive_sample(authority: &Pubkey) -> (Pubkey, u8) {
 
 fn initialize_ix_data(bump: u8) -> Vec<u8> {
 	let mut data = vec![0u8; InitializeIx::SIZE];
-	InitializeIx::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("initialize instruction encoding failed: {error:?}"))
-		.bump = bump;
+	InitializeIx::initialize(&mut data, |instruction| {
+		instruction.bump = bump;
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("initialize instruction encoding failed: {error:?}"));
 	data
 }
 
 fn realloc_ix_data(len: usize) -> Vec<u8> {
 	let len = u16::try_from(len).unwrap_or_else(|_| panic!("test length does not fit u16"));
 	let mut data = vec![0u8; ReallocIx::SIZE];
-	ReallocIx::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("realloc instruction encoding failed: {error:?}"))
-		.len
-		.set(len);
+	ReallocIx::initialize(&mut data, |instruction| {
+		instruction.len.set(len);
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("realloc instruction encoding failed: {error:?}"));
 	data
 }
 
 fn realloc2_ix_data(len: usize) -> Vec<u8> {
 	let len = u16::try_from(len).unwrap_or_else(|_| panic!("test length does not fit u16"));
 	let mut data = vec![0u8; Realloc2Ix::SIZE];
-	Realloc2Ix::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("realloc2 instruction encoding failed: {error:?}"))
-		.len
-		.set(len);
+	Realloc2Ix::initialize(&mut data, |instruction| {
+		instruction.len.set(len);
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("realloc2 instruction encoding failed: {error:?}"));
 	data
 }
 
@@ -229,10 +234,11 @@ fn canonical_pda_check_rejects_an_arbitrary_program_owned_sample() {
 	let authority = Pubkey::new_unique();
 	let forged_sample = Pubkey::new_unique();
 	let mut data = vec![0u8; Sample::HEADER_SIZE];
-	let mut state = Sample::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("sample data setup failed: {error:?}"));
-	state.bump = 0;
-	state.authority = authority.to_bytes().into();
+	Sample::initialize(
+		&mut data,
+		&SamplePatch::new().bump(0).authority(authority.to_bytes()),
+	)
+	.unwrap_or_else(|error| panic!("sample data setup failed: {error:?}"));
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),

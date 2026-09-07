@@ -71,24 +71,21 @@ impl UpdateProfileInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut UpdateProfileInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <UpdateProfileInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data =
-				<UpdateProfileInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; UpdateProfileInstructionWire::SIZE];
+		<UpdateProfileInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = UPDATE_PROFILE_DISCRIMINATOR;
-		}
-		<UpdateProfileInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 pub struct UpdateProfileInstructionWire {
 	pub discriminator: u8,
-	pub name: [u8; 33],
-	pub bio: [u8; 129],
+	pub name: pina::String<32>,
+	pub bio: pina::String<128>,
 }

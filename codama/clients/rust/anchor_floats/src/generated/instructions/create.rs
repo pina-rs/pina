@@ -67,21 +67,19 @@ impl CreateInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut CreateInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <CreateInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data = <CreateInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; CreateInstructionWire::SIZE];
+		<CreateInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = CREATE_DISCRIMINATOR;
-		}
-		<CreateInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 pub struct CreateInstructionWire {
 	pub discriminator: u8,
 	pub data_f32: u32,

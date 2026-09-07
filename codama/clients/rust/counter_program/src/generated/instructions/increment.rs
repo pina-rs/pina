@@ -69,21 +69,19 @@ impl IncrementInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut IncrementInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <IncrementInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data = <IncrementInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; IncrementInstructionWire::SIZE];
+		<IncrementInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = INCREMENT_DISCRIMINATOR;
-		}
-		<IncrementInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 pub struct IncrementInstructionWire {
 	pub discriminator: u8,
 }

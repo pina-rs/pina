@@ -35,7 +35,7 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { findPositionPda, type PositionSeeds } from "../pdas";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 
 export const POSITION_STATE_DISCRIMINATOR = 2;
 
@@ -83,7 +83,7 @@ export function getPositionStateDecoder(): FixedSizeDecoder<PositionState> {
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(
+			getPinaPodDiscriminatorDecoder(
 				POSITION_STATE_DISCRIMINATOR,
 				getU8Decoder(),
 			),

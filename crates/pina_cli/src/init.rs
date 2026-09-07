@@ -362,9 +362,11 @@ fn parse_instruction_rejects_wrong_program_id() {{
 #[test]
 fn initialize_instruction_encodes_fields() {{
 	let mut data = [0u8; InitializeInstruction::SIZE];
-	let args = InitializeInstruction::initialize(&mut data)
-		.expect("initialize instruction storage");
-	args.value = 42;
+	InitializeInstruction::initialize(&mut data, |args| {{
+		args.value = 42;
+		Ok(())
+	}})
+	.expect("initialize instruction storage");
 
 	let decoded = InitializeInstruction::try_from_bytes(&data)
 		.expect("decode initialized instruction");
@@ -399,9 +401,11 @@ fn initialize_runs_on_surfpool() {{
 			.expect("start isolated program test");
 		let authority = program.payer();
 		let mut data = [0u8; InitializeInstruction::SIZE];
-		let args = InitializeInstruction::initialize(&mut data)
-			.expect("initialize instruction storage");
-		args.value = 42;
+		InitializeInstruction::initialize(&mut data, |args| {{
+			args.value = 42;
+			Ok(())
+		}})
+		.expect("initialize instruction storage");
 		let instruction = program.instruction(
 			&data,
 			vec![AccountMeta::new_readonly(authority, true)],

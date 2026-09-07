@@ -1,56 +1,64 @@
 # ADR 0002: Keep zero-copy behind explicit validation
 
-- Status: Accepted
+- Status: Accepted, amended for PinaPod v0.2
 - Date: 2026-04-18
+- Last amended: 2026-09-07
 - Deciders: Pina maintainers
-- Related: [Security model](../security-model.md), `security/loaders-audit.md`
+- Related: [Security model](../security-model.md), [PinaPod v0.2 migration](../migrations/pinapod-v0.2.md), `security/loaders-audit.md`
 
 ## Context
 
-Low compute usage is a stated project goal, and zero-copy account access is one of the biggest reasons to use Pina instead of heavier Solana framework stacks.
+Zero-copy account access reduces compute and memory use, but only when the representation contract is closed. A reference formed from unchecked account bytes can cause undefined behavior before later semantic validation runs.
 
-But zero-copy is only defensible when the layout contract is tight. Unsafe or dynamically shaped reinterpretation can erase the very safety properties the framework is supposed to enforce.
+The first version of this decision limited application schemas to scalar fields and fixed byte arrays. PinaPod v0.2 now fully initializes bounded containers, recursively validates active values, and limits compact mutation to generated patches. Those guarantees allow Pina to accept bounded strings, vectors, and options without weakening the boundary.
 
 ## Decision
 
-Pina keeps zero-copy account and instruction handling as a core design choice. Zeropod owns representation and byte-to-view conversion, while Pina's macros enforce a closed supported field grammar before invoking its derive.
+Pina keeps zero-copy account and instruction handling as a core design choice. PinaPod owns representation and byte-to-view conversion. Pina's macros enforce a closed field grammar before invoking the derive.
 
-In practice that means:
+The fixed schema grammar accepts audited scalars, addresses, byte arrays, `String<N>`, `Vec<T, N>`, and `Option<T>` where every nested `T` has a fixed PinaPod representation. `PodString<N, PFX>` and `PodVec<T, N, PFX>` select an explicit `1`, `2`, `4`, or `8` byte prefix.
 
-- macro-generated application schemas accept only audited scalar, address, byte-array, and scalar-option fields; loaders return the generated `TypeZc` storage view
-- typed loads must validate discriminator, size, content (`ZcValidate`), and relevant account identity constraints before use
-- dynamic, variable-length, or schema-driven reinterpretation is out of scope for the core loader model
-- custom/nested `ZcField` mappings, enum-typed payload fields, generic schemas, and `PodString`/`PodVec` or `String`/`Vec` fields are outside the macro-generated contract
-- Pina does not manually implement zeropod's unsafe traits, duplicate its pointer casts, or expose a schema/storage-view object representation as bytes
-- bounded text and lists use fully initialized fixed byte arrays with checked semantic helpers
-- manual `PinaAccount` / `ZeroPodFixed` implementations are advanced escape hatches whose authors own all zeropod safety invariants
+Compact accounts use a narrower grammar because each dynamic field needs generated offset and patch logic. They accept:
+
+- `String<N>`
+- `Vec<T, N>` for fixed `T`
+- `Option<T>` for fixed `T`
+- `Option<String<N>>`
+- `Option<Vec<T, N>>` for fixed `T`
+- `Vec<String<M>, N>`
+
+Dynamic fields form the final suffix, and one account can have several tails. Unsupported nesting fails at macro expansion with an error that lists the accepted forms.
+
+The boundary also requires these rules:
+
+- Typed loads validate the discriminator, size, content, and relevant account identity before use.
+- PinaPod initializes inactive fixed-container capacity and zeroes payload bytes removed by safe mutations.
+- Generated compact patches validate the complete update before changing account data or lamports.
+- Pina does not duplicate PinaPod pointer casts or expose a schema or storage-view object representation as bytes.
+- A manual `PinaPodFixed` implementation is an `unsafe` escape hatch whose author owns every documented invariant.
 
 ## Consequences
 
-Benefits:
+Fixed accounts can store bounded text, lists, and options without custom byte-array helpers. They pay rent for the declared capacity because the full representation is inline.
 
-- no heap copies are required for common account access paths
-- account parsing stays predictable in both runtime cost and memory behavior
-- the framework can keep `no_std` and low-dependency goals without abandoning typed APIs
+Compact accounts pay only for active tail data. Their API is more constrained: reads use generated views, and writes use a generated patch plus `UpdateResizableAccount`. The framework owns grow-before-write and write-before-shrink ordering.
 
-Costs:
+Pina remains narrower than Rust's type system and the complete Codama schema language. Custom mappings and unsupported dynamic nesting fail at compile time rather than falling back to unchecked behavior.
 
-- some data models must use explicit versioning or companion accounts instead of variable-length in-place layouts
-- loader APIs need stronger lifetime coupling than a simple `&T` return type can provide
-- future extensions must prove they preserve layout and aliasing safety, not just correctness in happy-path tests
+## Historical comparison
 
-### Comparison with Quasar
-
-Quasar does not avoid collection fields. At commit [`b0de7db`](https://github.com/blueshift-gg/quasar/tree/b0de7db4cd271654a2dcf78807dd865e98e0b339), its account derive classifies `String` and `Vec` as dynamic fields, maps them to `PodString` and `PodVec`, and places the generated compact schema in a hidden child module ([layout generation](https://github.com/blueshift-gg/quasar/blob/b0de7db4cd271654a2dcf78807dd865e98e0b339/derive/src/account/layout.rs)). Quasar then encapsulates dynamic access behind compact read views, load-mutate-save guards, and explicit writer commits. A commit resizes the account to the active compact tail before saving it ([dynamic access](https://github.com/blueshift-gg/quasar/blob/b0de7db4cd271654a2dcf78807dd865e98e0b339/derive/src/account/dynamic.rs)). Its compile-pass coverage explicitly accepts bounded `String` and `Vec` account fields ([collection example](https://github.com/blueshift-gg/quasar/blob/b0de7db4cd271654a2dcf78807dd865e98e0b339/lang/tests/compile_pass/account_string_vec_alias.rs)).
-
-Pina deliberately does not claim parity with that compact representation in this decision. Pina preserves its existing fixed wire layouts, so its macros reject fixed-capacity collection fields until Pina has an equally closed design that prevents inactive backing capacity from becoming observable.
+The original ADR compared Pina with Quasar and kept collections outside Pina's schema macros. That restriction was correct for the earlier container implementation, which could leave inactive backing bytes uninitialized and exposed staged compact mutation. PinaPod v0.2 removes those two blockers while preserving the existing wire format.
 
 ## Alternatives considered
 
 ### Copy-based deserialization into owned structs
 
-Rejected because it adds compute overhead, increases stack or heap pressure, and gives up one of Pina's primary performance advantages.
+Rejected because it adds compute, adds stack or heap pressure, and discards the in-place access model.
+
+### Arbitrary dynamic nesting
+
+Deferred because recursive offsets, partial updates, and generated clients need one unambiguous layout. The first compact release supports the forms listed above. Future releases can add a form after native, Miri, code-generation, and SBF tests prove the full lifecycle.
 
 ### Unsafe dynamic zero-copy for arbitrary layouts
 
-Rejected because it makes soundness depend on ad-hoc caller discipline and scattered invariants instead of framework-level rules.
+Rejected because it moves layout, initialization, and aliasing invariants into caller discipline.

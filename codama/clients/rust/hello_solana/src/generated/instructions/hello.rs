@@ -15,7 +15,7 @@ use pina::pinapod;
 /// - A discriminator field as the first byte of the struct.
 /// - `HasDiscriminator` implementation linking this struct to
 /// `HelloInstruction::Hello`.
-/// - A generated zeropod view plus checked `initialize` and `try_from_bytes`
+/// - A generated PinaPod view plus checked `initialize` and `try_from_bytes`
 /// helpers.
 ///
 /// `HelloInstructionData` has no payload fields — only the discriminator byte
@@ -67,21 +67,19 @@ impl HelloInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut HelloInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <HelloInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data = <HelloInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; HelloInstructionWire::SIZE];
+		<HelloInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = HELLO_DISCRIMINATOR;
-		}
-		<HelloInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 pub struct HelloInstructionWire {
 	pub discriminator: u8,
 }

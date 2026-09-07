@@ -3,6 +3,7 @@ use codama_nodes::NestedTypeNodeTrait;
 use codama_nodes::PdaNode;
 use codama_nodes::PdaSeedNode;
 
+use super::capacity::CompactCapacityIndex;
 use super::discriminator::render_constant_discriminator;
 use super::helpers::pascal;
 use super::helpers::render_docs;
@@ -49,6 +50,7 @@ pub(crate) fn render_account_page(
 	account: &AccountNode,
 	primary_program_const: &str,
 	pda: Option<&PdaNode>,
+	compact_capacities: &CompactCapacityIndex,
 ) -> Result<String> {
 	let account_name = pascal(account.name.as_ref());
 	let zc_name = format!("{account_name}Zc");
@@ -76,7 +78,9 @@ pub(crate) fn render_account_page(
 		let field_name = snake(field.name.as_ref());
 		let field_context = format!("{account_name}.{field_name}");
 		let field_type = if first_compact_tail.is_some_and(|start| index >= start) {
-			render_type_for_compact_tail(&field.r#type, &field.docs, &field_context)?
+			let capacity =
+				compact_capacities.capacity(account.name.as_ref(), field.name.as_ref())?;
+			render_type_for_compact_tail(&field.r#type, capacity, &field_context)?
 		} else {
 			render_type_for_pod(&field.r#type, &field_context)?
 		};
@@ -89,7 +93,7 @@ pub(crate) fn render_account_page(
 	let mut lines = Vec::new();
 	lines.push("use pina::pinapod;".to_string());
 	lines.push(String::new());
-	lines.push("#[derive(pina::ZeroPod)]".to_string());
+	lines.push("#[derive(pina::PinaPod)]".to_string());
 	if compact_account {
 		lines.push("#[pinapod(compact)]".to_string());
 	}
@@ -135,35 +139,30 @@ fn render_fixed_account_helpers(
 	discriminator: Option<&super::discriminator::DiscriminatorInfo>,
 ) -> Vec<String> {
 	let mut lines = Vec::new();
-	lines.push("\tpub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;".to_string());
+	lines.push("\tpub const LEN: usize = Self::SIZE;".to_string());
 	lines.push(String::new());
-	lines.push("\t/// Initialize zero-valid account storage.".to_string());
+	lines.push("\t/// Initialize and validate account storage in one pass.".to_string());
 	lines.push("\t///".to_string());
-	lines.push("\t/// Every non-discriminator field must accept an all-zero".to_string());
 	lines.push(
-		"\t/// representation. Otherwise this method returns `InvalidAccountData`.".to_string(),
+		"\t/// The destination is cleared again if configuration or validation fails.".to_string(),
 	);
 	lines.push(format!(
-		"\tpub fn initialize(data: &mut [u8]) -> Result<&mut {zc_name}, \
-		 solana_program_error::ProgramError> {{"
+		"\tpub fn initialize(\n\t\tdata: &mut [u8],\n\t\tconfigure: impl FnOnce(&mut \
+		 {zc_name}),\n\t) -> Result<&mut {zc_name}, solana_program_error::ProgramError> {{"
 	));
-	lines.push("\t\tif data.len() != Self::LEN {".to_string());
-	lines.push(
-		"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
-	);
-	lines.push("\t\t}".to_string());
-	lines.push("\t\tdata.fill(0);".to_string());
-	lines.push("\t\tlet account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)".to_string());
-	lines.push(
-		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
-	);
+	lines.push("\t\t<Self as pina::PinaPodFixed>::initialize(data, |account| {".to_string());
+	lines.push("\t\t\tconfigure(account);".to_string());
 	if let Some(discriminator) = discriminator {
 		lines.push(format!(
-			"\t\taccount.discriminator = {};",
+			"\t\t\taccount.discriminator = {};",
 			discriminator.name
 		));
 	}
-	lines.push("\t\tOk(account)".to_string());
+	lines.push("\t\t\tOk(())".to_string());
+	lines.push("\t\t})".to_string());
+	lines.push(
+		"\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)".to_string(),
+	);
 	lines.push("\t}".to_string());
 	lines.push(String::new());
 
@@ -171,12 +170,7 @@ fn render_fixed_account_helpers(
 		"\tpub fn from_bytes(data: &[u8]) -> Result<&{zc_name}, \
 		 solana_program_error::ProgramError> {{"
 	));
-	lines.push("\t\tif data.len() != Self::LEN {".to_string());
-	lines.push(
-		"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
-	);
-	lines.push("\t\t}".to_string());
-	lines.push("\t\tlet account = <Self as pina::ZeroPodFixed>::from_bytes(data)".to_string());
+	lines.push("\t\tlet account = <Self as pina::PinaPodFixed>::read_exact(data)".to_string());
 	lines.push(
 		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
 	);
@@ -198,12 +192,7 @@ fn render_fixed_account_helpers(
 		"\tpub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut {zc_name}, \
 		 solana_program_error::ProgramError> {{"
 	));
-	lines.push("\t\tif data.len() != Self::LEN {".to_string());
-	lines.push(
-		"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
-	);
-	lines.push("\t\t}".to_string());
-	lines.push("\t\tlet account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)".to_string());
+	lines.push("\t\tlet account = <Self as pina::PinaPodFixed>::read_exact_mut(data)".to_string());
 	lines.push(
 		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;".to_string(),
 	);
@@ -229,7 +218,7 @@ fn render_compact_account_helpers(
 	let ref_name = format!("{account_name}Ref");
 	let mut_name = format!("{account_name}Mut");
 	let mut lines = vec![
-		"\tpub const HEADER_SIZE: usize = <Self as pina::ZeroPodCompact>::HEADER_SIZE;".to_string(),
+		"\tpub const HEADER_SIZE: usize = <Self as pina::PinaPodCompact>::HEADER_SIZE;".to_string(),
 		String::new(),
 		"\tpub fn initialize(data: &mut [u8]) -> Result<".to_string()
 			+ &mut_name

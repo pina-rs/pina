@@ -1,0 +1,5 @@
+error: unsupported compact field; supported dynamic forms are `String<N>`, `Vec<T, N>` for fixed `T`, `Option<String<N>>`, `Option<Vec<T, N>>` for fixed `T`, and `Vec<String<M>, N>`; `Option<T>` is supported inline when `T` has a fixed representation
+  --> tests/ui/fail/account_compact_unsupported_nesting.rs:10:14
+   |
+10 |     pub values: Vec<Vec<u64, 2>, 4>,
+   |                 ^^^^^^^^^^^^^^^^^^^

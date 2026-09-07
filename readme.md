@@ -8,7 +8,7 @@
 
 <!-- {=pinaProjectDescription} -->
 
-A performant Solana smart contract framework built on top of [pinocchio](https://github.com/anza-xyz/pinocchio) — a zero-dependency alternative to `solana-program` that massively reduces compute units and dependency bloat.
+A Solana smart contract framework built on [pinocchio](https://github.com/anza-xyz/pinocchio), a zero-dependency alternative to `solana-program` that reduces compute usage and dependency size.
 
 <!-- {/pinaProjectDescription} -->
 
@@ -26,13 +26,13 @@ A performant Solana smart contract framework built on top of [pinocchio](https:/
 
 <!-- {=pinaFeatureHighlights} -->
 
-- **Validated zero-copy deserialization** — zeropod validates fixed-layout account data before Pina reinterprets it in place, with no heap allocation.
-- **`no_std` compatible** — all crates compile to the `bpfel-unknown-none` SBF target for on-chain deployment.
-- **Low compute units** — built on `pinocchio` instead of `solana-program`, saving thousands of CU per instruction.
-- **Discriminator system** — every account, instruction, and event type carries a typed discriminator as its first field.
-- **Validation chaining** — chain assertions on `AccountView` references.
-- **Proc-macro sugar** — `#[account]`, `#[instruction]`, `#[event]`, `#[error]`, `#[discriminator]`, and `#[derive(Accounts)]` eliminate boilerplate.
-- **CPI helpers** — PDA account creation, lamport transfers, and token operations.
+- **Validated zero-copy deserialization**: PinaPod validates account data before Pina returns an in-place view, with no heap allocation.
+- **`no_std` compatible**: all crates compile to the `bpfel-unknown-none` SBF target for on-chain deployment.
+- **Low compute units**: built on `pinocchio` instead of `solana-program`, saving thousands of CU per instruction.
+- **Discriminator system**: every account, instruction, and event type carries a typed discriminator as its first field.
+- **Validation chaining**: chain assertions on `AccountView` references.
+- **Proc-macro sugar**: `#[account]`, `#[instruction]`, `#[event]`, `#[error]`, `#[discriminator]`, and `#[derive(Accounts)]` eliminate boilerplate.
+- **CPI helpers**: PDA account creation, lamport transfers, and token operations.
 
 <!-- {/pinaFeatureHighlights} -->
 
@@ -42,17 +42,17 @@ A performant Solana smart contract framework built on top of [pinocchio](https:/
 
 <!-- {=pinaWorkspacePackages} -->
 
-| Package                 | Path                          | Description                                                       |
-| ----------------------- | ----------------------------- | ----------------------------------------------------------------- |
-| `pina`                  | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types. |
-| `pina_macros`           | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.    |
-| `pina_cli`              | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding.  |
-| `pina_codama_renderer`  | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.     |
-| `pina_profile`          | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                     |
-| `pina_sdk_ids`          | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.         |
-| `@pina-rs/codama-nodes` | `packages/nodes-from-pina`    | Pina IDL conversion and normalization for Codama root nodes.      |
-| `@pina-rs/cli`          | `packages/pina__cli`          | npm launcher for the prebuilt platform-specific CLI packages.     |
-| `@pina-rs/skill`        | `packages/pina__skill`        | Agent guidance and a non-destructive local skill installer.       |
+| Package                 | Path                          | Description                                                      |
+| ----------------------- | ----------------------------- | ---------------------------------------------------------------- |
+| `pina`                  | `crates/pina`                 | Core framework: traits, account loaders, CPI helpers, Pod types. |
+| `pina_macros`           | `crates/pina_macros`          | Proc macros: `#[account]`, `#[instruction]`, `#[event]`, etc.    |
+| `pina_cli`              | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding. |
+| `pina_codama_renderer`  | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.    |
+| `pina_profile`          | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                    |
+| `pina_sdk_ids`          | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.        |
+| `@pina-rs/codama-nodes` | `packages/nodes-from-pina`    | Pina IDL conversion and normalization for Codama root nodes.     |
+| `@pina-rs/cli`          | `packages/pina__cli`          | npm launcher for the prebuilt platform-specific CLI packages.    |
+| `@pina-rs/skill`        | `packages/pina__skill`        | Agent guidance and a non-destructive local skill installer.      |
 
 <!-- {/pinaWorkspacePackages} -->
 
@@ -126,9 +126,9 @@ pnpm run test:quasar-svm
 
 <!-- {/codamaWorkflowCommands} -->
 
-Rust client generation in this repository uses the custom `pina_codama_renderer` crate (`crates/pina_codama_renderer`) instead of Codama's default Rust renderer. Generated Rust models are native zeropod schemas with discriminator-first storage views and recursive content validation. Instruction builders own and consume an initialized wire buffer; they do not expose a whole-object `to_bytes()` API. Unsupported variable-size or noncanonical layouts fail generation explicitly.
+Rust client generation in this repository uses the custom `pina_codama_renderer` crate (`crates/pina_codama_renderer`) instead of Codama's default Rust renderer. Generated Rust models are native PinaPod schemas with discriminator-first storage views and recursive content validation. Instruction builders own and consume an initialized wire buffer; they do not expose a whole-object `to_bytes()` API. Unsupported variable-size or noncanonical layouts fail generation explicitly.
 
-`pina codama generate` also augments the stock JavaScript output with Pina's zeropod boundary checks. Generated encoders reject values that exceed fixed field capacity rather than truncating them, and decoders enforce discriminators plus canonical boolean and option tags. Fixed byte arrays remain opaque to generated clients: application helpers, such as the profile program's bounded-text and tag helpers, validate any length, UTF-8, or element-count semantics stored inside those arrays. Advanced semantic string codecs use strict UTF-8. Rendering a Pina IDL with the stock Codama JavaScript visitor alone does not add those runtime checks.
+`pina codama generate` also augments the stock JavaScript output with PinaPod boundary checks. Generated encoders reject values that exceed fixed or compact field capacity rather than truncating them. Decoders enforce discriminators, prefixes, strict UTF-8, and canonical boolean and option tags. Rendering a Pina IDL with the stock Codama JavaScript visitor alone does not add those runtime checks.
 
 End-to-end setup steps:
 
@@ -168,7 +168,7 @@ const codama = await createFromFile("./idls/my_program.json");
 await codama.accept(renderJsVisitor("./clients/js/my_program"));
 ```
 
-For Pina-style Rust client generation (discriminator-first, validated zeropod types), use this repository's renderer:
+For Pina-style Rust client generation with discriminator-first, validated PinaPod types, use this repository's renderer:
 
 ```sh
 cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
@@ -218,11 +218,11 @@ That last count-parity check is important because it catches silent extraction r
 <!-- {=pinaFeatureSelectionTips} -->
 
 - `derive` is the normal choice for program crates; disable it only when you want the low-level runtime traits without the proc macros.
-- `compact` enables `#[account(compact)]`, `PinaCompactAccount`, compact account validation/loaders, and `pina::Vec`; it also enables `derive`.
+- `compact` enables `#[account(compact)]`, `PinaCompactAccount`, generated patch types, checked compact loaders, and `pina::String` and `pina::Vec`. It also enables `derive`.
 - `logs` is useful during **initial development and debugging**, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
 - `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
 - `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.
-- `account-resize` enables `ReallocAccount` and `ReallocAccountZeroed`. Enable it together with `compact` for `ReallocCompactAccount` and the compact creation builders. Close helpers still do not implicitly resize or zero account data.
+- `account-resize` enables `ReallocAccount` and `ReallocAccountZeroed`. Enable it together with `compact` for `UpdateResizableAccount` and the compact creation builders. Close helpers still do not implicitly resize or zero account data.
 
 <!-- {/pinaFeatureSelectionTips} -->
 
@@ -232,7 +232,7 @@ That last count-parity check is important because it catches silent extraction r
 
 Project documentation lives in the mdBook under `docs/`.
 
-For repository-level security posture and reporting guidance, see [SECURITY.md](./SECURITY.md). For example-driven guidance, see [security/readme.md](./security/readme.md).
+For repository-level security posture and reporting guidance, see [SECURITY.md](./SECURITY.md). For example-driven guidance, see [security/readme.md](./security/readme.md). Programs upgrading from PinaPod v0.1 can follow the [PinaPod v0.2 migration guide](./docs/src/migrations/pinapod-v0.2.md).
 
 <!-- {=docsBuildCommand} -->
 
@@ -418,7 +418,7 @@ Optional attributes:
 
 <br>
 
-The `#[account]` macro treats the struct as a native schema. It injects the discriminator, derives `zeropod::ZeroPod`, and exposes validated `ConfigZc` views over caller-owned account bytes:
+The `#[account]` macro treats the struct as a native schema. It injects the discriminator, derives `PinaPod`, and exposes validated `ConfigZc` views over caller-owned account bytes:
 
 ```rust
 use pina::*;
@@ -432,22 +432,25 @@ pub enum MyAccount {
 pub struct Config {
 	pub authority: Address,
 	pub value: u64,
+	pub label: String<32>,
+	pub checkpoints: Vec<u64, 8>,
+	pub delegate: Option<Address>,
 	pub bump: u8,
 }
 ```
 
-The generated struct has an auto-injected `discriminator` field as the first field.
+The generated struct has an auto-injected `discriminator` field as the first field. This ordinary account is fixed-size: bounded strings, vectors, and options reserve their complete capacity in `Config::SIZE`. Use `PodString<N, PFX>` or `PodVec<T, N, PFX>` when the layout needs an explicit prefix width.
 
 <!-- {=compactAccountQuickstart} -->
 
-Compact mode is opt-in. Enable `compact` for schemas and checked loaders; add `account-resize` when using the typed creation and rent-adjusting reallocation builders:
+Compact mode stores a fixed header followed by one or more bounded tails. Enable `compact` for the schema and checked loaders. Enable `account-resize` to apply a patch and adjust rent in one operation:
 
 ```toml
 [dependencies]
 pina = { version = "...", features = ["compact", "account-resize"] }
 ```
 
-The `compact` feature also enables `derive`. Add `compact` to an account with a suffix of one or more bounded `Vec` fields. Fixed fields must come first, and every capacity must be a literal so the macro can audit and generate the maximum layout:
+Declare fixed fields first, then the compact tails. `String<N>` uses a one-byte length prefix, and `Vec<T, N>` uses a two-byte length prefix. Use `PodString<N, PFX>` or `PodVec<T, N, PFX>` when the schema needs an explicit prefix width. `PFX` is a byte count and must be `1`, `2`, `4`, or `8`.
 
 ```rust
 #[account(discriminator = AccountType, compact)]
@@ -457,69 +460,49 @@ pub struct Journal {
 	pub revision: u32,
 	pub entries: Vec<u64, 8>,
 	pub markers: PodVec<u8, 8, 8>,
-}
-
-fn account_size(entry_count: usize) -> Result<usize, ProgramError> {
-	if entry_count > 8 {
-		return Err(ProgramError::InvalidArgument);
-	}
-
-	Ok(Journal::HEADER_SIZE
-		+ entry_count * (core::mem::size_of::<PodU64>() + core::mem::size_of::<u8>()))
+	pub note: Option<String<64>>,
 }
 ```
 
-The macro generates `JournalHeader`, `JournalRef`, and `JournalMut`, plus `HEADER_SIZE`, `MAX_SIZE`, checked load/initialize methods, and the compact-account traits used by Pina's typed CPI builders. Every tail length is stored in the fixed header. Active payloads are concatenated after that header in declaration order; declared capacity is a validation bound, not reserved space.
+The compact grammar accepts these tail forms:
 
-Pina uses Pinapod, its maintained and wire-compatible ZeroPod fork. Each immutable and mutable accessor reads its own length prefix, so compact tails may have independent active lengths.
+- `String<N>`
+- `Vec<T, N>` where `T` has a fixed PinaPod representation
+- `Option<T>` where `T` has a fixed PinaPod representation
+- `Option<String<N>>`
+- `Option<Vec<T, N>>` where `T` has a fixed PinaPod representation
+- `Vec<String<M>, N>`
+
+`Option<T>` for fixed `T` stays in the header. The other forms use tail storage. A compact schema can contain several tails, but it cannot place a fixed field after the first tail. The macro rejects unsupported nesting and prints the accepted forms in its error.
+
+The macro generates `JournalHeader`, `JournalRef`, and `JournalPatch`. It also generates `HEADER_SIZE`, `MAX_SIZE`, checked reads, initialization, projected-size calculation, and atomic updates. Tail prefixes live in the header except for a present `Option<String<N>>` or `Option<Vec<T, N>>`, whose payload retains its own prefix. Each active element of `Vec<String<M>, N>` occupies the fixed `String<M>` footprint, although each string keeps its own logical length.
+
+Pina uses PinaPod for validated alignment-one storage. PinaPod initializes inactive collection capacity and validates each active nested value before Pina returns safe access.
 
 <!-- {/compactAccountQuickstart} -->
 
 <!-- {=compactAccountResizeOrdering} -->
 
-Compact mutation has one important ordering rule:
-
-- **Grow:** calculate and validate the target size, call `ReallocCompactAccount` first, then write and `commit` the longer tail.
-- **Same size:** write and `commit`; skip the realloc CPI.
-- **Shrink or clear:** write and `commit` the shorter tail first, then call `ReallocCompactAccount` with the returned encoded size.
+Apply all compact changes through one patch:
 
 ```rust
-if target_size > account.data_len() {
-	ReallocCompactAccount {
-		account,
-		payer,
-		new_size: target_size,
-		program_id,
-	}
-	.invoke::<Journal>()?;
+UpdateResizableAccount {
+	account: self.journal,
+	rent_account: self.authority,
+	program_id: &ID,
+	patch: JournalPatch::new()
+		.revision(next_revision)
+		.replace_entries(&entries)
+		.note(Some("Updated")),
 }
-
-let encoded_size = {
-	let mut data = account.try_borrow_mut()?;
-	let mut journal = Journal::try_from_bytes_mut(&mut data)?;
-	journal
-		.set_entries(entries)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	journal
-		.set_markers(markers)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	journal
-		.commit()
-		.map_err(|_| ProgramError::InvalidAccountData)?
-};
-
-if encoded_size < account.data_len() {
-	ReallocCompactAccount {
-		account,
-		payer,
-		new_size: encoded_size,
-		program_id,
-	}
-	.invoke::<Journal>()?;
-}
+.invoke::<Journal>()?;
 ```
 
-`ReallocCompactAccount` checks the current compact type, validates the destination size, and verifies that a shrink retains every active tail before moving rent. It preserves rent exemption on growth and refunds excess lamports to `payer` on shrink. Scope immutable runtime borrows with `with_compact_account`; use a direct `try_borrow_mut` guard when a tail setter must borrow instruction-local values through `commit`.
+`UpdateResizableAccount` validates the complete patch and calculates the final encoded length before it changes the account. It then grows before writing or shrinks after writing, adjusts the rent balance through `rent_account`, and clears bytes removed by the patch. If validation or size calculation fails, both account data and lamport balances remain unchanged.
+
+The field is named `rent_account` because the same account funds growth and receives a shrink refund. Existing low-level builders such as `ReallocAccount` keep their `payer` fields.
+
+The generated patch owns the update plan, so callers do not coordinate `set_*`, `commit`, and `ReallocCompactAccount`. Borrow the account for a `JournalRef` only while reading. End that borrow before invoking `UpdateResizableAccount`.
 
 <!-- {/compactAccountResizeOrdering} -->
 
@@ -696,7 +679,7 @@ Alignment-safe primitive wrappers for use in `#[repr(C)]` account structs. Solan
 | `PodU128` | `u128` | 16 bytes |
 | `PodI128` | `i128` | 16 bytes |
 
-All types are alignment-1 byte-backed values that implement zeropod's `ZcElem` and `ZcValidate` contracts.
+All types are alignment-one byte-backed values that implement PinaPod's `ZcElem` and `ZcValidate` contracts.
 
 <!-- {/podTypesTable} -->
 
@@ -749,15 +732,17 @@ Fixed-capacity collections that store fully initialized data inline without allo
 | `PodString` | Fixed-capacity string  | `PFX`-byte length prefix + `N` data bytes |
 | `PodVec`    | Fixed-capacity vec     | `PFX`-byte length prefix + `N` elements   |
 
-The full generic forms are `PodOption<T: ZcElem>`, `PodString<N, PFX = 1>`, and `PodVec<T: ZcElem, N, PFX = 2>`. All collection layouts are alignment 1 and padding-free when `T: ZcElem`. `ZcValidate` checks tags, length prefixes, active elements, and UTF-8 before safe access. Length prefixes (`PFX`) default to 1 byte for strings (max 255) and 2 bytes for vectors (max 65 535 elements).
+The full generic forms are `PodOption<T: ZcElem, PFX = 1>`, `PodString<N, PFX = 1>`, and `PodVec<T, N, PFX = 2>`. `PFX` is the length-prefix width in bytes and must be `1`, `2`, `4`, or `8`. `ZcValidate` checks tags, length prefixes, active elements, and UTF-8 before safe access.
 
 <!-- {/podCollectionTypesTable} -->
 
 <!-- {=podCollectionDescription} -->
 
-Collection types store data inline without allocation for advanced direct zeropod use. Pina's `#[account]`, `#[instruction]`, and `#[event]` macros reject `PodString`/`String` and `PodVec`/`Vec` fields because their inactive capacity is not guaranteed to be initialized after every upstream construction path. Use fully initialized fixed byte arrays plus checked semantic helpers in macro-generated schemas. Semantic `Option<scalar>` remains supported because Pina proves its exact `PodOption` mapping and scalar storage contract.
+Fixed account, instruction, and event schemas can use `String<N>`, `Vec<T, N>`, and `Option<T>` when every nested `T` has a fixed PinaPod representation. These values occupy their full capacity in the wire layout. PinaPod initializes inactive capacity, clears removed values, and validates active nested values before safe access.
 
-For direct zeropod integrations, zeropod boundary validation must establish the active `PodString` bytes are valid UTF-8 before callers use `as_str()`. `PodVec` offers slice-based access via `as_slice()` / `as_slice_mut()`, and `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`. Those direct integrations are outside Pina's audited macro-generated contract and must uphold zeropod's complete safety invariants.
+Use `PodString<N, PFX>` and `PodVec<T, N, PFX>` when the default prefix width does not fit the declared capacity or the wire protocol specifies another width. The const generic is explicit: write `PodVec<u64, 1024, 2>`, not a macro attribute that selects `u16`.
+
+Compact accounts store supported top-level strings, vectors, and dynamic options in tails, so unused capacity does not consume rent. See the compact-account guide for the accepted nesting forms and atomic patch API.
 
 <!-- {/podCollectionDescription} -->
 
@@ -791,7 +776,23 @@ CreateProgramAccountWithBump {
     bump,
 }
 .invoke::<MyState>()?;
+
+// Create and configure a fixed account before its final validation.
+CreateProgramAccountWithBump {
+    account: target,
+    payer,
+    owner: &program_id,
+    seeds: &[b"seed"],
+    bump,
+}
+.invoke_with::<MyState>(|state| {
+    state.authority = authority;
+    state.name.try_set("Alice")?;
+    Ok(())
+})?;
 ```
+
+`invoke` and `invoke_signed` leave every field other than the discriminator at zero. Use them only when that is a valid completed representation. `invoke_with` and `invoke_signed_with` accept a `Result<(), PinaPodError>` initializer and validate after it configures the generated zero-copy view. This is required for an advanced fixed schema with a nonzero-only storage enum, and it also avoids a separate mutable borrow for ordinary initial values.
 
 #### Lamport transfers
 
@@ -915,17 +916,17 @@ The `pina docs` subcommand renders built-in reference topics. Set the `PINA_TEMP
 
 <!-- {=pinaWorkspacePackages} -->
 
-| Package                 | Path                          | Description                                                       |
-| ----------------------- | ----------------------------- | ----------------------------------------------------------------- |
-| `pina`                  | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types. |
-| `pina_macros`           | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.    |
-| `pina_cli`              | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding.  |
-| `pina_codama_renderer`  | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.     |
-| `pina_profile`          | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                     |
-| `pina_sdk_ids`          | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.         |
-| `@pina-rs/codama-nodes` | `packages/nodes-from-pina`    | Pina IDL conversion and normalization for Codama root nodes.      |
-| `@pina-rs/cli`          | `packages/pina__cli`          | npm launcher for the prebuilt platform-specific CLI packages.     |
-| `@pina-rs/skill`        | `packages/pina__skill`        | Agent guidance and a non-destructive local skill installer.       |
+| Package                 | Path                          | Description                                                      |
+| ----------------------- | ----------------------------- | ---------------------------------------------------------------- |
+| `pina`                  | `crates/pina`                 | Core framework: traits, account loaders, CPI helpers, Pod types. |
+| `pina_macros`           | `crates/pina_macros`          | Proc macros: `#[account]`, `#[instruction]`, `#[event]`, etc.    |
+| `pina_cli`              | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding. |
+| `pina_codama_renderer`  | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.    |
+| `pina_profile`          | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                    |
+| `pina_sdk_ids`          | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.        |
+| `@pina-rs/codama-nodes` | `packages/nodes-from-pina`    | Pina IDL conversion and normalization for Codama root nodes.     |
+| `@pina-rs/cli`          | `packages/pina__cli`          | npm launcher for the prebuilt platform-specific CLI packages.    |
+| `@pina-rs/skill`        | `packages/pina__skill`        | Agent guidance and a non-destructive local skill installer.      |
 
 <!-- {/pinaWorkspacePackages} -->
 
@@ -959,8 +960,8 @@ The `pina docs` subcommand renders built-in reference topics. Set the `PINA_TEMP
 | [`anchor_floats`](examples/anchor_floats)                                         | Anchor float account/update behavior with authority checks                  |
 | [`anchor_system_accounts`](examples/anchor_system_accounts)                       | Anchor system-owned account constraint parity                               |
 | [`anchor_sysvars`](examples/anchor_sysvars)                                       | Anchor sysvar account validation parity                                     |
-| [`anchor_realloc`](examples/anchor_realloc)                                       | Dynamic compact account lifecycle with typed, rent-adjusted reallocations   |
-| [`compact_accounts`](examples/compact_accounts)                                   | Focused compact account sizing, mutation order, rent, and generated clients |
+| [`anchor_realloc`](examples/anchor_realloc)                                       | Dynamic compact account lifecycle with typed, rent-adjusted patches         |
+| [`compact_accounts`](examples/compact_accounts)                                   | Atomic compact patches, rent adjustment, and generated clients              |
 
 ## Security
 
@@ -973,8 +974,9 @@ Pina provides strong built-in protections against common Solana vulnerabilities 
 - **Always call `assert_signer()`** before trusting authority accounts
 - **Always call `assert_owner()` / `assert_owners()`** before `as_token_*()` methods
 - **Always call `assert_empty()`** before account initialization to prevent reinitialization attacks
+- **Use `invoke_with` or `invoke_signed_with`** when fixed-account creation must establish nonzero values before final PinaPod validation
 - **Always verify program accounts** with `assert_address()` / `assert_program()` before CPI invocations
-- **Use `assert_type::<T>()`** to prevent type cosplay — it checks discriminator, owner, and data size
+- **Use `assert_type::<T>()`** to prevent type cosplay: it checks discriminator, owner, and data size
 - **Use `CloseAccountZeroed { account, recipient }.invoke()` or `zeroed()` + `close_with_recipient()`** when stale account bytes must be invalidated before close
 - **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
 - **Namespace PDA seeds** with type-specific prefixes to prevent PDA sharing across account types

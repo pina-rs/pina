@@ -3,7 +3,7 @@
 //! Feeds arbitrary byte slices to the account deserialization path for
 //! real account types from the counter_program and role_registry_program
 //! examples, exercising discriminator checks, size validation, and
-//! zeropod content validation and zero-copy reinterpretation.
+//! PinaPod content validation and zero-copy reinterpretation.
 
 #![allow(clippy::all)]
 #![no_main]

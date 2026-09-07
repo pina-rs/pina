@@ -14,7 +14,24 @@ Use Pina's macros for their specific wire contracts:
 
 Use explicit discriminator values. Reordering enum variants must not change existing wire values.
 
-Fixed-layout storage fields must satisfy zeropod's representation and validation rules. Use Pina's POD wrappers for numeric and boolean storage. Keep text and collections in bounded fixed-capacity representations with explicit length validation.
+Fixed-layout storage fields must satisfy PinaPod's representation and validation rules. Pina schemas accept native numeric and boolean fields, `Address`, byte arrays, bounded `String<N>` and `Vec<T, N>`, and fixed `Option<T>` values. The derive maps native fields to alignment-one storage wrappers.
+
+Use `PodString<N, PFX>` or `PodVec<T, N, PFX>` when a wire layout needs an explicit prefix width. `PFX` is `1`, `2`, `4`, or `8` bytes. Keep the prefix in the type declaration instead of adding a macro attribute.
+
+Compact accounts place fixed fields first and one or more dynamic tails last. They support `Option<T>` for fixed `T`, `String<N>`, `Vec<T, N>` for fixed `T`, `Option<String<N>>`, `Option<Vec<T, N>>` for fixed `T`, and `Vec<String<M>, N>`. Apply compact changes through the generated patch and `UpdateResizableAccount`; do not coordinate a mutable view, `commit`, and raw reallocation at the call site.
+
+```rust
+UpdateResizableAccount {
+	account: self.journal,
+	rent_account: self.authority,
+	program_id: &ID,
+	patch: JournalPatch::new()
+		.revision(next_revision)
+		.replace_entries(&entries)
+		.note(Some("Updated")),
+}
+.invoke::<Journal>()?;
+```
 
 ## Account validation
 
@@ -61,17 +78,20 @@ CreateAccount {
 
 Do not introduce wrapper functions around removed helpers such as `create_account(...)`, `create_program_account::<T>(...)`, or `realloc_account(...)`. Use the matching builder:
 
-| Operation                                             | Builder                        |
-| ----------------------------------------------------- | ------------------------------ |
-| Create a regular account                              | `CreateAccount`                |
-| Derive and create a typed canonical PDA               | `CreateProgramAccount`         |
-| Validate an explicit bump and create a typed PDA      | `CreateProgramAccountWithBump` |
-| Derive and allocate an untyped canonical PDA          | `AllocateAccount`              |
-| Validate an explicit bump and allocate an untyped PDA | `AllocateAccountWithBump`      |
-| Reallocate while balancing rent                       | `ReallocAccount`               |
-| Reallocate with explicit zero-initialization intent   | `ReallocAccountZeroed`         |
-| Close and return lamports                             | `CloseAccount`                 |
-| Zero bytes, close, and return lamports                | `CloseAccountZeroed`           |
+| Operation                                              | Builder                               |
+| ------------------------------------------------------ | ------------------------------------- |
+| Create a regular account                               | `CreateAccount`                       |
+| Derive and create a typed canonical PDA                | `CreateProgramAccount`                |
+| Validate an explicit bump and create a typed PDA       | `CreateProgramAccountWithBump`        |
+| Derive and create a compact canonical PDA from a patch | `CreateCompactProgramAccount`         |
+| Create a compact PDA with an explicit bump and patch   | `CreateCompactProgramAccountWithBump` |
+| Derive and allocate an untyped canonical PDA           | `AllocateAccount`                     |
+| Validate an explicit bump and allocate an untyped PDA  | `AllocateAccountWithBump`             |
+| Reallocate while balancing rent                        | `ReallocAccount`                      |
+| Reallocate with explicit zero-initialization intent    | `ReallocAccountZeroed`                |
+| Apply a checked compact patch and adjust rent          | `UpdateResizableAccount`              |
+| Close and return lamports                              | `CloseAccount`                        |
+| Zero bytes, close, and return lamports                 | `CloseAccountZeroed`                  |
 
 Typed PDA creation places the account type on the invocation method:
 
@@ -85,9 +105,33 @@ let (address, bump) = CreateProgramAccount {
 .invoke::<State>()?;
 ```
 
+Choose the fixed-account invocation method by initialization contract:
+
+- `invoke::<T>()` and `invoke_signed::<T>(signers)` write the discriminator and leave all other bytes at zero. Use them only if final validation accepts that representation.
+- `invoke_with::<T>(initialize)` and `invoke_signed_with::<T>(signers, initialize)` configure `&mut T::Zc` before final validation. The closure returns `Result<(), PinaPodError>`.
+
+Prefer the closure form when the account has required nonzero initial values. It is mandatory for an advanced manual `PinaAccount` whose storage includes a nonzero-only enum. Do not infer from this escape hatch that Pina's `#[account]` macro accepts arbitrary custom enum fields; the macro grammar remains closed.
+
+Compact creation uses a generated patch instead of an initializer closure. Always supply the required `patch` field, including for a header-only default:
+
+```rust
+CreateCompactProgramAccountWithBump {
+	account: journal,
+	payer,
+	owner: &ID,
+	seeds,
+	bump,
+	patch: JournalPatch::new().bump(bump),
+	space: Journal::HEADER_SIZE,
+}
+.invoke::<Journal>()?;
+```
+
 Canonical PDA builders derive and validate the target address and return `(Address, u8)`. Explicit-bump builders verify the supplied bump before moving lamports. Both forms automatically append the target PDA signer to additional signers supplied by the caller. Use `u64` for create/allocation `space`; reallocation `new_size` remains `usize`.
 
 Close builders intentionally expose only `.invoke()`. They perform checked direct account mutation rather than a CPI, so signer seeds would have no effect.
+
+`UpdateResizableAccount` uses `rent_account` for the account that funds growth and receives shrink refunds. Existing low-level reallocation builders keep their `payer` fields.
 
 Generated CPI modules follow the same shape. Construct the generated instruction struct using its documented public account and data fields, then invoke it with the validated program account:
 

@@ -53,22 +53,19 @@ impl TestEventCpiInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut TestEventCpiInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <TestEventCpiInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data =
-				<TestEventCpiInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; TestEventCpiInstructionWire::SIZE];
+		<TestEventCpiInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = TEST_EVENT_CPI_DISCRIMINATOR;
-		}
-		<TestEventCpiInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 pub struct TestEventCpiInstructionWire {
 	pub discriminator: u8,
 }

@@ -1,4 +1,4 @@
-error: inline fields cannot follow a compact `Vec` field; place every fixed field before the dynamic suffix
+error: inline fields cannot follow a compact dynamic field; place every fixed field before the compact suffix
   --> tests/ui/compact_rejects_inline_field_after_tail.rs:11:2
    |
 11 |     fixed_after_tail: u8,

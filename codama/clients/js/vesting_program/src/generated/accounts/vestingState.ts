@@ -38,9 +38,9 @@ import {
 } from "@solana/kit";
 import { findVestingPda, type VestingSeeds } from "../pdas";
 import {
-	getZeroPodBooleanDecoder,
-	getZeroPodDiscriminatorDecoder,
-} from "../zeropodCodecs";
+	getPinaPodBooleanDecoder,
+	getPinaPodDiscriminatorDecoder,
+} from "../pinaPodCodecs";
 
 export const VESTING_STATE_DISCRIMINATOR = 1;
 
@@ -100,7 +100,7 @@ export function getVestingStateDecoder(): FixedSizeDecoder<VestingState> {
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(
+			getPinaPodDiscriminatorDecoder(
 				VESTING_STATE_DISCRIMINATOR,
 				getU8Decoder(),
 			),
@@ -113,7 +113,7 @@ export function getVestingStateDecoder(): FixedSizeDecoder<VestingState> {
 		["startTs", getU64Decoder()],
 		["cliffTs", getU64Decoder()],
 		["endTs", getU64Decoder()],
-		["cancelled", getZeroPodBooleanDecoder()],
+		["cancelled", getPinaPodBooleanDecoder()],
 		["bump", getU8Decoder()],
 	]);
 }

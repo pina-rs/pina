@@ -40,10 +40,10 @@ import {
 } from "@solana/kit";
 import { findTodoPda, type TodoSeeds } from "../pdas";
 import {
-	fixZeroPodEncoderSize,
-	getZeroPodBooleanDecoder,
-	getZeroPodDiscriminatorDecoder,
-} from "../zeropodCodecs";
+	fixPinaPodEncoderSize,
+	getPinaPodBooleanDecoder,
+	getPinaPodDiscriminatorDecoder,
+} from "../pinaPodCodecs";
 
 export const TODO_STATE_DISCRIMINATOR = 1;
 
@@ -74,7 +74,7 @@ export function getTodoStateEncoder(): FixedSizeEncoder<TodoStateArgs> {
 			["owner", getAddressEncoder()],
 			["bump", getU8Encoder()],
 			["completed", getBooleanEncoder()],
-			["digest", fixZeroPodEncoderSize(getBytesEncoder(), 32)],
+			["digest", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
 		]),
 		(value) => ({ ...value, discriminator: 1 }),
 	);
@@ -85,11 +85,11 @@ export function getTodoStateDecoder(): FixedSizeDecoder<TodoState> {
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(TODO_STATE_DISCRIMINATOR, getU8Decoder()),
+			getPinaPodDiscriminatorDecoder(TODO_STATE_DISCRIMINATOR, getU8Decoder()),
 		],
 		["owner", getAddressDecoder()],
 		["bump", getU8Decoder()],
-		["completed", getZeroPodBooleanDecoder()],
+		["completed", getPinaPodBooleanDecoder()],
 		["digest", fixDecoderSize(getBytesDecoder(), 32)],
 	]);
 }

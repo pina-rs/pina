@@ -35,7 +35,7 @@ fn process_instruction(
 
 - Every account, instruction, and event type has a discriminator as its first field.
 - `#[discriminator]` generates fixed-width byte conversions for the enum.
-- `#[account]`, `#[instruction]`, and `#[event]` inject discriminator fields, derive native zeropod storage views, and generate checked initialization and loading helpers.
+- `#[account]`, `#[instruction]`, and `#[event]` inject discriminator fields, derive native PinaPod storage views, and generate checked initialization and loading helpers.
 
 ### Account validation
 
@@ -61,4 +61,4 @@ Common alignment-safe wrapper types include:
 - `PodI64`
 - `PodI128`
 
-Use them in `#[repr(C)]` account structs whose fields satisfy zeropod's `ZcElem` and `ZcValidate` contracts.
+Use them in `#[repr(C)]` account structs whose fields satisfy PinaPod's `ZcElem` and `ZcValidate` contracts. Pina's schema macros also accept native scalars, bounded `String` and `Vec` values, and fixed `Option` values.

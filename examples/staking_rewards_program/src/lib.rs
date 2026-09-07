@@ -607,10 +607,11 @@ mod tests {
 	#[test]
 	fn instruction_roundtrip() {
 		let mut bytes = [0u8; DepositInstruction::SIZE];
-		DepositInstruction::initialize(&mut bytes)
-			.unwrap_or_else(|error| panic!("initialize failed: {error:?}"))
-			.amount
-			.set(50);
+		DepositInstruction::initialize(&mut bytes, |instruction| {
+			instruction.amount.set(50);
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("initialize failed: {error:?}"));
 		let parsed = DepositInstruction::try_from_bytes(&bytes)
 			.unwrap_or_else(|e| panic!("decode failed: {e:?}"));
 		assert_eq!(parsed.amount.get(), 50);

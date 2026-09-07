@@ -77,7 +77,7 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 
 /// Defines discriminator-first fixed or compact account data.
 ///
-/// The macro validates Pina's closed schema grammar, derives the zeropod
+/// The macro validates Pina's closed schema grammar, derives the PinaPod
 /// companion, and generates checked `initialize` and `try_from_bytes`
 /// helpers. Add `compact` to permit a suffix of bounded `Vec<T, N>` fields whose
 /// active elements, rather than their full capacities, occupy account data.
@@ -125,7 +125,7 @@ pub fn pda(args: TokenStream, input: TokenStream) -> TokenStream {
 
 /// Defines discriminator-first, fixed-size instruction data.
 ///
-/// Generated helpers enforce exact length, discriminator, and zeropod field
+/// Generated helpers enforce exact length, discriminator, and PinaPod field
 /// validation at the instruction boundary.
 ///
 /// # Example

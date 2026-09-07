@@ -11,6 +11,7 @@
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
+use pina::ProgramError;
 use pina::ProgramResult;
 use pina::Signer;
 
@@ -82,7 +83,7 @@ impl MakeIx {
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> [u8; 26] {
+	pub fn to_bytes(&self) -> Result<[u8; 26], ProgramError> {
 		let mut data = [0u8; 26];
 		data[..1].copy_from_slice(&MAKE_DISCRIMINATOR);
 		data[1..9].copy_from_slice(&self.seed.to_le_bytes());
@@ -90,7 +91,7 @@ impl MakeIx {
 		data[17..25].copy_from_slice(&self.amount_b.to_le_bytes());
 		data[25..26].copy_from_slice(&self.bump.to_le_bytes());
 
-		data
+		Ok(data)
 	}
 }
 
@@ -119,7 +120,7 @@ impl<'account> Make<'account> {
 			CpiHandle::readonly(self.system_program),
 			CpiHandle::readonly(self.token_program),
 		];
-		let data = self.ix.to_bytes();
+		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

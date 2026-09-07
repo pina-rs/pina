@@ -208,6 +208,13 @@ pub fn render_program(
 
 fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>> {
 	let program = &root.program;
+	let compact_capacities = CompactCapacityIndex::read(program)?;
+	let public_defined_types = program
+		.defined_types
+		.iter()
+		.filter(|defined_type| !compact_capacities.is_marker(defined_type.name.as_ref()))
+		.cloned()
+		.collect::<Vec<_>>();
 	let mut files = BTreeMap::new();
 
 	// Build program metadata
@@ -223,7 +230,10 @@ fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>>
 		.collect::<BTreeMap<_, _>>();
 
 	// Core module files
-	files.insert(PathBuf::from("mod.rs"), page(&render_root_mod(program)));
+	files.insert(
+		PathBuf::from("mod.rs"),
+		page(&render_root_mod(program, !public_defined_types.is_empty())),
+	);
 	files.insert(
 		PathBuf::from("programs.rs"),
 		page(&render_programs_mod(&program_constants)?),
@@ -241,7 +251,8 @@ fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>>
 			let pda = pdas_by_name
 				.get(account.pda.as_ref().map_or("", |p| p.name.as_ref()))
 				.copied();
-			let account_content = render_account_page(account, &primary_program_const, pda)?;
+			let account_content =
+				render_account_page(account, &primary_program_const, pda, &compact_capacities)?;
 
 			files.insert(PathBuf::from(filename), page(&account_content));
 		}
@@ -264,15 +275,15 @@ fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>>
 	}
 
 	// Type definitions
-	if !program.defined_types.is_empty() {
+	if !public_defined_types.is_empty() {
 		files.insert(
 			PathBuf::from("types/mod.rs"),
-			page(&render_defined_types_mod(&program.defined_types)),
+			page(&render_defined_types_mod(&public_defined_types)),
 		);
 
-		for defined_type in &program.defined_types {
+		for defined_type in public_defined_types {
 			let filename = format!("types/{}.rs", snake(defined_type.name.as_ref()));
-			let defined_type_content = render_defined_type_page(defined_type)?;
+			let defined_type_content = render_defined_type_page(&defined_type)?;
 
 			files.insert(PathBuf::from(filename), page(&defined_type_content));
 		}

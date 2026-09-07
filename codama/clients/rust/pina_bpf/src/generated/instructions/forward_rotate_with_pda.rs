@@ -74,24 +74,22 @@ impl ForwardRotateWithPdaInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut ForwardRotateWithPdaInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes =
-			vec![0u8; <ForwardRotateWithPdaInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data = <ForwardRotateWithPdaInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(
-				&mut bytes,
-			)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			configure(data);
-			data.discriminator = FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR;
-		}
-		<ForwardRotateWithPdaInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; ForwardRotateWithPdaInstructionWire::SIZE];
+		<ForwardRotateWithPdaInstructionWire as pina::PinaPodFixed>::initialize(
+			&mut bytes,
+			|data| {
+				configure(data);
+				data.discriminator = FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR;
+				Ok(())
+			},
+		)
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 pub struct ForwardRotateWithPdaInstructionWire {
 	pub discriminator: u8,
 	pub bump: u8,

@@ -377,10 +377,11 @@ mod tests {
 	#[test]
 	fn instruction_roundtrip() {
 		let mut bytes = [0u8; ClaimInstruction::SIZE];
-		ClaimInstruction::initialize(&mut bytes)
-			.unwrap_or_else(|error| panic!("initialize failed: {error:?}"))
-			.amount
-			.set(10);
+		ClaimInstruction::initialize(&mut bytes, |instruction| {
+			instruction.amount.set(10);
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("initialize failed: {error:?}"));
 		let parsed = ClaimInstruction::try_from_bytes(&bytes)
 			.unwrap_or_else(|e| panic!("decode failed: {e:?}"));
 		assert_eq!(parsed.amount.get(), 10);

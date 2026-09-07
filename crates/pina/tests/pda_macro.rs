@@ -98,14 +98,17 @@ pub struct NumericState {
 
 fn build_test_state_bytes(authority: Address, bump: u8) -> Vec<u8> {
 	let mut bytes = vec![0u8; TestState::SIZE];
-	let state = TestState::initialize(&mut bytes).expect("valid account storage");
-	state.authority = authority;
-	state.amount.set(42);
-	state.side = 1;
-	state.tag = [0xAB; 8];
-	state.width.set(7);
-	state.height.set(99);
-	state.bump = bump;
+	TestState::initialize(&mut bytes, |state| {
+		state.authority = authority;
+		state.amount.set(42);
+		state.side = 1;
+		state.tag = [0xAB; 8];
+		state.width.set(7);
+		state.height.set(99);
+		state.bump = bump;
+		Ok(())
+	})
+	.expect("valid account storage");
 	bytes
 }
 

@@ -22,12 +22,13 @@ fn initialized_config(
 	data: &mut [u8; ConfigState::SIZE],
 	authority: Address,
 ) -> &mut ConfigStateZc {
-	let config = ConfigState::initialize(data)
-		.unwrap_or_else(|error| panic!("account initialization failed: {error:?}"));
-	config.version = 1;
-	config.authority = authority;
-	config.bump = 255;
-	config
+	ConfigState::initialize(data, |config| {
+		config.version = 1;
+		config.authority = authority;
+		config.bump = 255;
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("account initialization failed: {error:?}"))
 }
 
 #[test]

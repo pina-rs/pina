@@ -110,41 +110,46 @@ fn pubkey_to_address(pk: &Pubkey) -> pina::Address {
 
 fn initialize_ix_data(bump: u8) -> Vec<u8> {
 	let mut data = vec![0u8; InitializeInstruction::SIZE];
-	InitializeInstruction::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("initialize instruction failed: {error:?}"))
-		.bump = bump;
+	InitializeInstruction::initialize(&mut data, |instruction| {
+		instruction.bump = bump;
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("initialize instruction failed: {error:?}"));
 	data
 }
 
 fn add_role_ix_data(role_id: u64, permissions: u64, bump: u8) -> Vec<u8> {
 	let mut data = vec![0u8; AddRoleInstruction::SIZE];
-	let ix = AddRoleInstruction::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("add-role initialization failed: {error:?}"));
-	ix.role_id.set(role_id);
-	ix.permissions.set(permissions);
-	ix.bump = bump;
+	AddRoleInstruction::initialize(&mut data, |instruction| {
+		instruction.role_id.set(role_id);
+		instruction.permissions.set(permissions);
+		instruction.bump = bump;
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("add-role initialization failed: {error:?}"));
 	data
 }
 
 fn update_role_ix_data(permissions: u64) -> Vec<u8> {
 	let mut data = vec![0u8; UpdateRoleInstruction::SIZE];
-	UpdateRoleInstruction::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("update-role initialization failed: {error:?}"))
-		.permissions
-		.set(permissions);
+	UpdateRoleInstruction::initialize(&mut data, |instruction| {
+		instruction.permissions.set(permissions);
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("update-role initialization failed: {error:?}"));
 	data
 }
 
 fn deactivate_role_ix_data() -> Vec<u8> {
 	let mut data = vec![0u8; DeactivateRoleInstruction::SIZE];
-	DeactivateRoleInstruction::initialize(&mut data)
+	DeactivateRoleInstruction::initialize(&mut data, |_| Ok(()))
 		.unwrap_or_else(|error| panic!("deactivate-role initialization failed: {error:?}"));
 	data
 }
 
 fn rotate_admin_ix_data() -> Vec<u8> {
 	let mut data = vec![0u8; RotateAdminInstruction::SIZE];
-	RotateAdminInstruction::initialize(&mut data)
+	RotateAdminInstruction::initialize(&mut data, |_| Ok(()))
 		.unwrap_or_else(|error| panic!("rotate-admin initialization failed: {error:?}"));
 	data
 }
@@ -157,11 +162,13 @@ fn rotate_admin_ix_data() -> Vec<u8> {
 /// that don't need to run Initialize first.
 fn registry_config_account(admin: &Pubkey, role_count: u64, bump: u8, lamports: u64) -> Account {
 	let mut data = vec![0u8; RegistryConfig::SIZE];
-	let state = RegistryConfig::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("registry initialization failed: {error:?}"));
-	state.admin = pubkey_to_address(admin);
-	state.role_count.set(role_count);
-	state.bump = bump;
+	RegistryConfig::initialize(&mut data, |state| {
+		state.admin = pubkey_to_address(admin);
+		state.role_count.set(role_count);
+		state.bump = bump;
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("registry initialization failed: {error:?}"));
 	Account {
 		lamports,
 		data,
@@ -183,14 +190,16 @@ fn role_entry_account(
 	lamports: u64,
 ) -> Account {
 	let mut data = vec![0u8; RoleEntry::SIZE];
-	let state = RoleEntry::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("role-entry initialization failed: {error:?}"));
-	state.registry = pubkey_to_address(registry);
-	state.role_id.set(role_id);
-	state.grantee = pubkey_to_address(grantee);
-	state.permissions.set(permissions);
-	state.active.set(active);
-	state.bump = bump;
+	RoleEntry::initialize(&mut data, |state| {
+		state.registry = pubkey_to_address(registry);
+		state.role_id.set(role_id);
+		state.grantee = pubkey_to_address(grantee);
+		state.permissions.set(permissions);
+		state.active.set(active);
+		state.bump = bump;
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("role-entry initialization failed: {error:?}"));
 	Account {
 		lamports,
 		data,
@@ -247,7 +256,7 @@ fn initialize_creates_registry_config() {
 		.expect("registry_config PDA should exist after Initialize");
 
 	let registry_config: &RegistryConfigZc =
-		<RegistryConfig as pina::ZeroPodFixed>::from_bytes(&registry_account.data).unwrap();
+		<RegistryConfig as pina::PinaPodFixed>::read_exact(&registry_account.data).unwrap();
 	assert_eq!(
 		registry_config.admin,
 		pubkey_to_address(&admin),
@@ -326,7 +335,7 @@ fn full_flow_initialize_add_update_deactivate() {
 
 	// Verify role_count == 0 after Initialize.
 	let registry_config: &RegistryConfigZc =
-		<RegistryConfig as pina::ZeroPodFixed>::from_bytes(&registry_after_init.data).unwrap();
+		<RegistryConfig as pina::PinaPodFixed>::read_exact(&registry_after_init.data).unwrap();
 	assert_eq!(registry_config.role_count.get(), 0);
 
 	// ----- Step 2: AddRole -----
@@ -377,7 +386,7 @@ fn full_flow_initialize_add_update_deactivate() {
 
 	// Verify role_count incremented to 1 and role entry is active.
 	let registry_config: &RegistryConfigZc =
-		<RegistryConfig as pina::ZeroPodFixed>::from_bytes(&registry_after_add.data).unwrap();
+		<RegistryConfig as pina::PinaPodFixed>::read_exact(&registry_after_add.data).unwrap();
 	assert_eq!(
 		registry_config.role_count.get(),
 		1,
@@ -385,7 +394,7 @@ fn full_flow_initialize_add_update_deactivate() {
 	);
 
 	let role_entry: &RoleEntryZc =
-		<RoleEntry as pina::ZeroPodFixed>::from_bytes(&role_entry_after_add.data).unwrap();
+		<RoleEntry as pina::PinaPodFixed>::read_exact(&role_entry_after_add.data).unwrap();
 	assert!(
 		role_entry.active.get(),
 		"role should be active after AddRole"
@@ -435,7 +444,7 @@ fn full_flow_initialize_add_update_deactivate() {
 
 	// Verify permissions were updated.
 	let role_entry: &RoleEntryZc =
-		<RoleEntry as pina::ZeroPodFixed>::from_bytes(&role_entry_after_update.data).unwrap();
+		<RoleEntry as pina::PinaPodFixed>::read_exact(&role_entry_after_update.data).unwrap();
 	assert_eq!(
 		role_entry.permissions.get(),
 		0b1111_1111,
@@ -478,7 +487,7 @@ fn full_flow_initialize_add_update_deactivate() {
 		.expect("role_entry_pda should exist after DeactivateRole");
 
 	let role_entry: &RoleEntryZc =
-		<RoleEntry as pina::ZeroPodFixed>::from_bytes(&role_entry_after_deactivate.data).unwrap();
+		<RoleEntry as pina::PinaPodFixed>::read_exact(&role_entry_after_deactivate.data).unwrap();
 	assert!(
 		!role_entry.active.get(),
 		"role should be inactive after DeactivateRole"
@@ -577,7 +586,7 @@ fn rotate_admin_changes_admin() {
 		.expect("registry_pda should exist after RotateAdmin");
 
 	let registry_config: &RegistryConfigZc =
-		<RegistryConfig as pina::ZeroPodFixed>::from_bytes(&registry_account.data).unwrap();
+		<RegistryConfig as pina::PinaPodFixed>::read_exact(&registry_account.data).unwrap();
 	assert_eq!(
 		registry_config.admin,
 		pubkey_to_address(&new_admin),

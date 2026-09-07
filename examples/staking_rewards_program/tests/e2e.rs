@@ -139,15 +139,17 @@ fn pool_state_account(
 	lamports: u64,
 ) -> Account {
 	let mut data = vec![0u8; PoolState::SIZE];
-	let state = PoolState::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("pool initialization failed: {error:?}"));
-	state.admin = pubkey_to_address(admin);
-	state.stake_mint = pubkey_to_address(stake_mint);
-	state.reward_mint = pubkey_to_address(reward_mint);
-	state.total_staked.set(total_staked);
-	state.reward_index.set(0);
-	state.paused.set(paused);
-	state.bump = bump;
+	PoolState::initialize(&mut data, |state| {
+		state.admin = pubkey_to_address(admin);
+		state.stake_mint = pubkey_to_address(stake_mint);
+		state.reward_mint = pubkey_to_address(reward_mint);
+		state.total_staked.set(total_staked);
+		state.reward_index.set(0);
+		state.paused.set(paused);
+		state.bump = bump;
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("pool initialization failed: {error:?}"));
 	Account {
 		lamports,
 		data,
@@ -168,14 +170,16 @@ fn position_state_account(
 	lamports: u64,
 ) -> Account {
 	let mut data = vec![0u8; PositionState::SIZE];
-	let state = PositionState::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("position initialization failed: {error:?}"));
-	state.pool = pubkey_to_address(pool);
-	state.owner = pubkey_to_address(owner);
-	state.staked_amount.set(staked_amount);
-	state.reward_debt.set(reward_debt);
-	state.pending_rewards.set(pending_rewards);
-	state.bump = bump;
+	PositionState::initialize(&mut data, |state| {
+		state.pool = pubkey_to_address(pool);
+		state.owner = pubkey_to_address(owner);
+		state.staked_amount.set(staked_amount);
+		state.reward_debt.set(reward_debt);
+		state.pending_rewards.set(pending_rewards);
+		state.bump = bump;
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("position initialization failed: {error:?}"));
 	Account {
 		lamports,
 		data,
@@ -231,36 +235,40 @@ fn associated_token_program_account() -> (Pubkey, Account) {
 /// Instruction bytes for `OpenPosition`.
 fn open_position_ix_data(bump: u8) -> Vec<u8> {
 	let mut data = vec![0u8; OpenPositionInstruction::SIZE];
-	OpenPositionInstruction::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("open-position initialization failed: {error:?}"))
-		.bump = bump;
+	OpenPositionInstruction::initialize(&mut data, |instruction| {
+		instruction.bump = bump;
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("open-position initialization failed: {error:?}"));
 	data
 }
 
 /// Instruction bytes for `Deposit`.
 fn deposit_ix_data(amount: u64) -> Vec<u8> {
 	let mut data = vec![0u8; DepositInstruction::SIZE];
-	DepositInstruction::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("deposit initialization failed: {error:?}"))
-		.amount
-		.set(amount);
+	DepositInstruction::initialize(&mut data, |instruction| {
+		instruction.amount.set(amount);
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("deposit initialization failed: {error:?}"));
 	data
 }
 
 /// Instruction bytes for `Withdraw`.
 fn withdraw_ix_data(amount: u64) -> Vec<u8> {
 	let mut data = vec![0u8; WithdrawInstruction::SIZE];
-	WithdrawInstruction::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("withdraw initialization failed: {error:?}"))
-		.amount
-		.set(amount);
+	WithdrawInstruction::initialize(&mut data, |instruction| {
+		instruction.amount.set(amount);
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("withdraw initialization failed: {error:?}"));
 	data
 }
 
 /// Instruction bytes for `Claim`.
 fn claim_ix_data() -> Vec<u8> {
 	let mut data = vec![0u8; ClaimInstruction::SIZE];
-	ClaimInstruction::initialize(&mut data)
+	ClaimInstruction::initialize(&mut data, |_| Ok(()))
 		.unwrap_or_else(|error| panic!("claim initialization failed: {error:?}"));
 	data
 }
@@ -342,7 +350,7 @@ fn open_position_creates_position_state() {
 	);
 
 	let pos_state: &PositionStateZc =
-		<PositionState as pina::ZeroPodFixed>::from_bytes(&pos_account.data).unwrap();
+		<PositionState as pina::PinaPodFixed>::read_exact(&pos_account.data).unwrap();
 	assert_eq!(
 		pos_state.pool.as_ref(),
 		pool_state_key.as_ref(),
@@ -460,7 +468,7 @@ fn withdraw_updates_balances() {
 		.get_account(&position_state_key)
 		.expect("position_state should exist after Withdraw");
 	let pos_state: &PositionStateZc =
-		<PositionState as pina::ZeroPodFixed>::from_bytes(&pos_account.data).unwrap();
+		<PositionState as pina::PinaPodFixed>::read_exact(&pos_account.data).unwrap();
 	assert_eq!(
 		pos_state.staked_amount.get(),
 		100,
@@ -472,7 +480,7 @@ fn withdraw_updates_balances() {
 		.get_account(&pool_state_key)
 		.expect("pool_state should exist after Withdraw");
 	let pool_st: &PoolStateZc =
-		<PoolState as pina::ZeroPodFixed>::from_bytes(&pool_account.data).unwrap();
+		<PoolState as pina::PinaPodFixed>::read_exact(&pool_account.data).unwrap();
 	assert_eq!(
 		pool_st.total_staked.get(),
 		400,

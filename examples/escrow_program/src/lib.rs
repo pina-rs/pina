@@ -164,7 +164,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 				&token_program,
 			)?;
 
-		// Create the escrow account
+		// Create and initialize the escrow account atomically.
 		CreateProgramAccountWithBump {
 			account: self.escrow,
 			payer: self.maker,
@@ -172,21 +172,19 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			seeds: &escrow_seeds.as_slices(),
 			bump: args.bump,
 		}
-		.invoke::<EscrowState>()?;
-
-		// Initialize escrow state
-		let mut escrow = self.escrow.as_account_mut::<EscrowState>(&ID)?;
-		escrow.maker = *self.maker.address();
-		escrow.mint_a = *self.mint_a.address();
-		escrow.mint_b = *self.mint_b.address();
-		// Record the observed vault delta after the transfer. The temporary zero
-		// prevents the requested amount from becoming protocol accounting before
-		// the CPI has actually delivered tokens.
-		escrow.amount_a.set(0);
-		escrow.amount_b = args.amount_b;
-		escrow.seed = args.seed;
-		escrow.bump = args.bump;
-		drop(escrow);
+		.invoke_with::<EscrowState>(|escrow| {
+			escrow.maker = *self.maker.address();
+			escrow.mint_a = *self.mint_a.address();
+			escrow.mint_b = *self.mint_b.address();
+			// Record the observed vault delta after the transfer. The temporary zero
+			// prevents the requested amount from becoming protocol accounting before
+			// the CPI has actually delivered tokens.
+			escrow.amount_a.set(0);
+			escrow.amount_b = args.amount_b;
+			escrow.seed = args.seed;
+			escrow.bump = args.bump;
+			Ok(())
+		})?;
 
 		// Create the vault token account
 		associated_token_account::instructions::Create {

@@ -133,21 +133,18 @@ pub struct MyAccount {
 }
 ```
 
-Pina uses zeropod-validated zero-copy layouts. Every field must be a fixed-size, alignment-1 `ZcElem` type. This means:
+Pina uses PinaPod-validated zero-copy layouts. Fixed accounts reserve the full capacity of bounded collections, while compact accounts place supported collections in variable-length tails.
 
-| Anchor type | Pina type       | Notes                                    |
-| ----------- | --------------- | ---------------------------------------- |
-| `Pubkey`    | `Address`       | Both are `[u8; 32]`                      |
-| `u64`       | `PodU64`        | Little-endian, alignment-safe            |
-| `u32`       | `PodU32`        | Little-endian, alignment-safe            |
-| `u16`       | `PodU16`        | Little-endian, alignment-safe            |
-| `i64`       | `PodI64`        | Little-endian, alignment-safe            |
-| `bool`      | `PodBool`       | Single byte                              |
-| `String`    | `[u8; N]`       | Fixed-size byte arrays only              |
-| `Vec<T>`    | Not supported   | Use fixed-size arrays                    |
-| `Option<T>` | Manual encoding | Use a sentinel value or a `PodBool` flag |
+| Anchor type                | Pina schema type | Notes                                                                   |
+| -------------------------- | ---------------- | ----------------------------------------------------------------------- |
+| `Pubkey`                   | `Address`        | Both store 32 bytes                                                     |
+| `u64`, `u32`, `u16`, `i64` | Same native type | PinaPod generates little-endian alignment-one storage                   |
+| `bool`                     | `bool`           | PinaPod generates a checked one-byte representation                     |
+| `String`                   | `String<N>`      | Choose a byte capacity; fixed accounts reserve all `N` bytes            |
+| `Vec<T>`                   | `Vec<T, N>`      | Choose an element capacity; compact accounts store only active elements |
+| `Option<T>`                | `Option<T>`      | `T` must have a supported fixed representation                          |
 
-Pod wrappers keep every field alignment 1 and provide zeropod validation. Convert to and from native types with `From`:
+PinaPod's generated storage wrappers keep every field alignment one and provide recursive validation. Direct `Pod*` wrappers still convert to and from native types with `From`:
 
 ```rust
 // Creating Pod values
@@ -370,7 +367,7 @@ pub struct MyEvent {
 }
 ```
 
-Pina events are native zeropod schemas with explicit discriminators, just like accounts and instructions. The macro generates a validated `MyEventZc` storage view. Pina does not expose an object-representation `to_bytes()` method; event transport must use an API that owns and initializes its output buffer.
+Pina events are native PinaPod schemas with explicit discriminators, like accounts and instructions. The macro generates a validated `MyEventZc` storage view. Pina does not expose an object-representation `to_bytes()` method; event transport must use an API that owns and initializes its output buffer.
 
 See `examples/anchor_events` for the full parity port.
 
@@ -443,6 +440,8 @@ CreateAccount {
 ```
 
 Space is automatically computed from `MyData::SIZE` for the PDA builder. For `CreateAccount` you pass the size explicitly. In both cases, rent-exemption lamports are calculated and transferred automatically.
+
+Use `invoke::<MyData>()` when the discriminator plus zeroed fields is already a valid complete value. Use `invoke_with` when creation must set fields before final PinaPod validation. If the payer also needs PDA signer seeds, use `invoke_signed_with::<MyData>(signers, initialize)`.
 
 ## no_std and the entrypoint
 

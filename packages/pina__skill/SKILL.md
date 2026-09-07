@@ -26,7 +26,7 @@ When no project exists, read [references/project-setup.md](references/project-se
 - Use explicit discriminator values and type-specific PDA seed namespaces. Prefer canonical bump validation.
 - Construct account-management operations and generated CPIs as documented instruction structs, then call `.invoke()` or `.invoke_signed(signers)`. Do not recreate the removed free-function helper API.
 - Keep instruction dispatch deterministic: parse once, match explicitly, then construct and validate the accounts type for that instruction.
-- Maintain discriminator-first, fixed-layout storage types expected by Pina and zeropod. Do not place ordinary Rust `bool`, `String`, or variable-length collections in zero-copy account layouts.
+- Maintain discriminator-first layouts expected by Pina and PinaPod. Use bounded `String<N>` and `Vec<T, N>` schema types, not heap-backed standard-library collections. Use `#[account(compact)]` only for Pina's documented compact grammar.
 - Preserve error values and wire formats unless the user explicitly accepts a compatibility change.
 
 Read [references/program-authoring.md](references/program-authoring.md) before changing macros, account layouts, validation chains, PDAs, CPIs, or close/reallocation logic.

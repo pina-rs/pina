@@ -149,8 +149,11 @@ impl Drop for AlignedMemory {
 
 fn build_balance_state_bytes(amount: u64) -> Vec<u8> {
 	let mut bytes = vec![0u8; BalanceState::SIZE];
-	let state = BalanceState::initialize(&mut bytes).expect("valid account storage");
-	state.amount.set(amount);
+	BalanceState::initialize(&mut bytes, |state| {
+		state.amount.set(amount);
+		Ok(())
+	})
+	.expect("valid account storage");
 	bytes
 }
 

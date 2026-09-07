@@ -23,8 +23,8 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { ANCHOR_EVENTS_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const TEST_EVENT_DISCRIMINATOR = 1;
 
@@ -58,7 +58,7 @@ export function getTestEventInstructionDataDecoder(): FixedSizeDecoder<
 > {
 	return getStructDecoder([[
 		"discriminator",
-		getZeroPodDiscriminatorDecoder(TEST_EVENT_DISCRIMINATOR, getU8Decoder()),
+		getPinaPodDiscriminatorDecoder(TEST_EVENT_DISCRIMINATOR, getU8Decoder()),
 	]]);
 }
 

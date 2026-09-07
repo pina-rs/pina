@@ -89,10 +89,12 @@ fn increment_ix_data() -> Vec<u8> {
 /// Build a counter account with the given state for testing.
 fn counter_account(bump: u8, count: u64, lamports: u64) -> Account {
 	let mut data = vec![0u8; CounterState::SIZE];
-	let state = CounterState::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("counter initialization failed: {error:?}"));
-	state.bump = bump;
-	state.count.set(count);
+	CounterState::initialize(&mut data, |state| {
+		state.bump = bump;
+		state.count.set(count);
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("counter initialization failed: {error:?}"));
 	Account {
 		lamports,
 		data,

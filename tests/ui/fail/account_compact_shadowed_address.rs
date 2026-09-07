@@ -5,8 +5,6 @@ pub struct Address([u8; 32]);
 
 unsafe impl ZcField for Address {
 	type Pod = [u8; 32];
-
-	const POD_SIZE: usize = 32;
 }
 
 #[discriminator]

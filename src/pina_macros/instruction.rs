@@ -1,6 +1,6 @@
 //! `#[instruction]` contract tests through the public macro.
 //!
-//! The macro generates a zeropod-backed instruction payload with a
+//! The macro generates a PinaPod-backed instruction payload with a
 //! discriminator field, `SIZE`, `try_from_bytes`, and a `HasDiscriminator`
 //! impl linking back to the discriminator enum.
 
@@ -59,7 +59,7 @@ fn minimal() {
 	assert!(Initialize::try_from_bytes(&[]).is_err());
 }
 
-/// Multi-field instructions round-trip all fields through zeropod.
+/// Multi-field instructions round-trip all fields through PinaPod.
 #[test]
 fn many_fields() {
 	let mut bytes: std::vec::Vec<u8> = std::vec![0; FlipBit::SIZE];

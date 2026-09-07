@@ -68,21 +68,19 @@ impl RemoveTagInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut RemoveTagInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <RemoveTagInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data = <RemoveTagInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; RemoveTagInstructionWire::SIZE];
+		<RemoveTagInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REMOVE_TAG_DISCRIMINATOR;
-		}
-		<RemoveTagInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 pub struct RemoveTagInstructionWire {
 	pub discriminator: u8,
 	pub index: u64,

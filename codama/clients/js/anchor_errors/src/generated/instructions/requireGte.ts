@@ -23,8 +23,8 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { ANCHOR_ERRORS_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const REQUIRE_GTE_DISCRIMINATOR = 6;
 
@@ -58,7 +58,7 @@ export function getRequireGteInstructionDataDecoder(): FixedSizeDecoder<
 > {
 	return getStructDecoder([[
 		"discriminator",
-		getZeroPodDiscriminatorDecoder(REQUIRE_GTE_DISCRIMINATOR, getU8Decoder()),
+		getPinaPodDiscriminatorDecoder(REQUIRE_GTE_DISCRIMINATOR, getU8Decoder()),
 	]]);
 }
 

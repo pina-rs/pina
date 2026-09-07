@@ -73,22 +73,19 @@ impl RotateAdminInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut RotateAdminInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <RotateAdminInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data =
-				<RotateAdminInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; RotateAdminInstructionWire::SIZE];
+		<RotateAdminInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = ROTATE_ADMIN_DISCRIMINATOR;
-		}
-		<RotateAdminInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 pub struct RotateAdminInstructionWire {
 	pub discriminator: u8,
 }

@@ -83,30 +83,33 @@ fn system_account(lamports: u64) -> Account {
 }
 
 fn read_oracle(account: &Account) -> &OracleStateZc {
-	<OracleState as pina::ZeroPodFixed>::from_bytes(&account.data).unwrap()
+	<OracleState as pina::PinaPodFixed>::read_exact(&account.data).unwrap()
 }
 
 fn initialize_ix_data() -> Vec<u8> {
 	let mut data = vec![0u8; InitializeInstruction::SIZE];
-	InitializeInstruction::initialize(&mut data)
+	InitializeInstruction::initialize(&mut data, |_| Ok(()))
 		.unwrap_or_else(|error| panic!("initialize instruction failed: {error:?}"));
 	data
 }
 
 fn update_ix_data(new_price: u64) -> Vec<u8> {
 	let mut data = vec![0u8; UpdateInstruction::SIZE];
-	UpdateInstruction::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("update instruction failed: {error:?}"))
-		.new_price
-		.set(new_price);
+	UpdateInstruction::initialize(&mut data, |instruction| {
+		instruction.new_price.set(new_price);
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("update instruction failed: {error:?}"));
 	data
 }
 
 fn rotate_authority_ix_data(new_authority: &Pubkey) -> Vec<u8> {
 	let mut data = vec![0u8; RotateAuthorityInstruction::SIZE];
-	RotateAuthorityInstruction::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("rotate instruction failed: {error:?}"))
-		.new_authority = new_authority.to_bytes().into();
+	RotateAuthorityInstruction::initialize(&mut data, |instruction| {
+		instruction.new_authority = new_authority.to_bytes().into();
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("rotate instruction failed: {error:?}"));
 	data
 }
 

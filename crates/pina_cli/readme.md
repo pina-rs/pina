@@ -246,13 +246,13 @@ const codama = await createFromFile("./idls/my_program.json");
 await codama.accept(renderJsVisitor("./clients/js/my_program"));
 ```
 
-The stock visitor emits the correct fixed-size wire layout, but its generic codecs are intentionally permissive. Use `pina codama generate` when you want the generated JavaScript client to enforce the same canonical zeropod values as the on-chain program.
+The stock visitor emits the correct wire layout, but its generic codecs are intentionally permissive. Use `pina codama generate` when you want the generated JavaScript client to enforce the same PinaPod values and compact capacities as the on-chain program.
 
 ### Pina-style Rust clients
 
 <br>
 
-This repository includes `crates/pina_codama_renderer`, which renders discriminator-first, zeropod-validated Rust client models from Codama JSON.
+This repository includes `crates/pina_codama_renderer`, which renders discriminator-first, PinaPod-validated Rust client models from Codama JSON.
 
 ```bash
 cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \

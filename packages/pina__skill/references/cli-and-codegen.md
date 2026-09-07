@@ -148,7 +148,7 @@ pina codama generate --examples-dir ./programs --idls-dir ./idls \
 
 Use repeatable `--example` filters for a focused run. Generated roots may be replaced; never store hand-written code inside them.
 
-Pina's generated clients preserve discriminator-first layouts and zeropod boundary checks. If a repository uses a custom renderer command, keep that command as the source of truth.
+Pina's generated clients preserve discriminator-first layouts and PinaPod boundary checks. Compact client codecs enforce declared capacity at both encode and decode boundaries. If a repository uses a custom renderer command, keep that command as the source of truth.
 
 ## Static SBF profiling
 

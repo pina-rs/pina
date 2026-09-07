@@ -17,20 +17,20 @@ use codama_nodes::StringTypeNode;
 use codama_nodes::TypeNode;
 use quote::ToTokens;
 
-use crate::ir::ZeroPodEnumIr;
+use crate::ir::PinaPodEnumIr;
 
 /// Fallible type mapping used by IDL generation.
 ///
 /// Unsupported Pod collection layouts are rejected rather than silently
 /// emitted as public keys with an incorrect wire size.
 pub fn try_rust_type_to_codama(ty: &str) -> Result<TypeNode, String> {
-	try_rust_type_to_codama_with_zeropod_enums(ty, &[])
+	try_rust_type_to_codama_with_pinapod_enums(ty, &[])
 }
 
-/// Fallible type mapping with the local zeropod enum registry.
-pub fn try_rust_type_to_codama_with_zeropod_enums(
+/// Fallible type mapping with the local PinaPod enum registry.
+pub fn try_rust_type_to_codama_with_pinapod_enums(
 	ty: &str,
-	zeropod_enums: &[ZeroPodEnumIr],
+	pinapod_enums: &[PinaPodEnumIr],
 ) -> Result<TypeNode, String> {
 	match ty {
 		"u8" => Ok(NumberTypeNode::le(NumberFormat::U8).into()),
@@ -46,13 +46,13 @@ pub fn try_rust_type_to_codama_with_zeropod_enums(
 		"PodBool" | "bool" => Ok(BooleanTypeNode::default().into()),
 		"Address" | "Pubkey" => Ok(PublicKeyTypeNode::new().into()),
 		_ => {
-			if zeropod_enums.iter().any(|item| item.name == ty) {
+			if pinapod_enums.iter().any(|item| item.name == ty) {
 				return Ok(DefinedTypeLinkNode::new(ty).into());
 			}
 			// Handle fixed-size byte arrays like [u8; 32]
 			if let Some(size) = parse_byte_array(ty) {
 				Ok(FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), size).into())
-			} else if let Some(node) = parse_pod_collection(ty, zeropod_enums)? {
+			} else if let Some(node) = parse_pod_collection(ty, pinapod_enums)? {
 				Ok(node)
 			} else {
 				Err(format!(
@@ -69,9 +69,188 @@ pub fn try_rust_type_to_codama_with_zeropod_enums(
 pub fn try_rust_type_to_codama_compact_tail(
 	ty: &str,
 	context: &str,
-	zeropod_enums: &[ZeroPodEnumIr],
+	pinapod_enums: &[PinaPodEnumIr],
 ) -> Result<TypeNode, crate::error::IdlError> {
-	try_rust_type_to_codama_compact_tail_at(ty, context, zeropod_enums, None, 0)
+	try_rust_type_to_codama_compact_tail_at(ty, context, pinapod_enums, None, 0)
+}
+
+/// The supported dynamic suffix grammar for a compact PinaPod account.
+///
+/// An optional dynamic tail keeps only its one-byte presence tag in the
+/// shared header. Its inner string/vector prefix is part of the payload.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum CompactTailSchema {
+	String {
+		capacity: usize,
+		prefix_size: usize,
+	},
+	Vec {
+		capacity: usize,
+		item_ty: String,
+		prefix_size: usize,
+	},
+	OptionString {
+		capacity: usize,
+		prefix_size: usize,
+	},
+	OptionVec {
+		capacity: usize,
+		item_ty: String,
+		prefix_size: usize,
+	},
+}
+
+impl CompactTailSchema {
+	pub(crate) fn capacity(&self) -> usize {
+		match self {
+			Self::String { capacity, .. }
+			| Self::Vec { capacity, .. }
+			| Self::OptionString { capacity, .. }
+			| Self::OptionVec { capacity, .. } => *capacity,
+		}
+	}
+
+	pub(crate) fn header_size(&self) -> usize {
+		match self {
+			Self::String { prefix_size, .. } | Self::Vec { prefix_size, .. } => *prefix_size,
+			Self::OptionString { .. } | Self::OptionVec { .. } => 1,
+		}
+	}
+}
+
+/// Parse a compact field without guessing at malformed dynamic spellings.
+///
+/// `Ok(None)` means the field has a fixed representation and belongs in the
+/// inline header. Recognized but unsupported dynamic nesting is an error.
+pub(crate) fn compact_tail_schema(ty: &str) -> Result<Option<CompactTailSchema>, String> {
+	let Some((name, args)) = parse_generic_args(ty) else {
+		if matches!(ty, "String" | "PodString" | "Vec" | "PodVec" | "Option") {
+			return Err(compact_tail_grammar_error(ty));
+		}
+		return Ok(None);
+	};
+
+	match name.as_str() {
+		"String" | "PodString" => parse_compact_string_schema(ty, &args).map(Some),
+		"Vec" | "PodVec" => parse_compact_vec_schema(ty, &args).map(Some),
+		"Option" => {
+			if args.len() != 1 {
+				return Err(format!(
+					"`{ty}` requires exactly one type argument in a compact account"
+				));
+			}
+			let inner_ty = &args[0];
+			let Some(inner) = compact_tail_schema(inner_ty)? else {
+				return Ok(None);
+			};
+			match inner {
+				CompactTailSchema::String {
+					capacity,
+					prefix_size,
+				} => {
+					Ok(Some(CompactTailSchema::OptionString {
+						capacity,
+						prefix_size,
+					}))
+				}
+				CompactTailSchema::Vec {
+					capacity,
+					item_ty,
+					prefix_size,
+				} if !is_dynamic_type_name(&item_ty) => {
+					Ok(Some(CompactTailSchema::OptionVec {
+						capacity,
+						item_ty,
+						prefix_size,
+					}))
+				}
+				CompactTailSchema::Vec { item_ty, .. } => {
+					Err(format!(
+						"unsupported dynamic nesting `{ty}`: `Option<Vec<String<M>, N>>` is not \
+						 supported; vector element `{item_ty}` is dynamic. {}",
+						compact_tail_supported_variants(),
+					))
+				}
+				CompactTailSchema::OptionString { .. } | CompactTailSchema::OptionVec { .. } => {
+					Err(format!(
+						"unsupported dynamic nesting `{ty}`: nested dynamic options are not \
+						 supported. {}",
+						compact_tail_supported_variants(),
+					))
+				}
+			}
+		}
+		_ => Ok(None),
+	}
+}
+
+fn parse_compact_string_schema(ty: &str, args: &[String]) -> Result<CompactTailSchema, String> {
+	if !(1..=2).contains(&args.len()) {
+		return Err(format!(
+			"`{ty}` requires a capacity and an optional 1, 2, 4, or 8-byte prefix"
+		));
+	}
+	let capacity = parse_collection_size(args.first(), ty, "capacity")?;
+	let prefix_size = match args.get(1) {
+		Some(value) => parse_collection_size(Some(value), ty, "prefix size")?,
+		None => 1,
+	};
+	validate_prefix_size(prefix_size, ty)?;
+	validate_collection_capacity(capacity, prefix_size, ty)?;
+	Ok(CompactTailSchema::String {
+		capacity,
+		prefix_size,
+	})
+}
+
+fn parse_compact_vec_schema(ty: &str, args: &[String]) -> Result<CompactTailSchema, String> {
+	if !(2..=3).contains(&args.len()) {
+		return Err(format!(
+			"`{ty}` requires an element type, capacity, and optional 1, 2, 4, or 8-byte prefix"
+		));
+	}
+	let item_ty = args[0].clone();
+	if let Some(item_schema) = compact_tail_schema(&item_ty)?
+		&& !matches!(item_schema, CompactTailSchema::String { .. })
+	{
+		return Err(format!(
+			"unsupported dynamic compact vector element `{item_ty}` in `{ty}`. {}",
+			compact_tail_supported_variants(),
+		));
+	}
+	let capacity = parse_collection_size(args.get(1), ty, "capacity")?;
+	let prefix_size = match args.get(2) {
+		Some(value) => parse_collection_size(Some(value), ty, "prefix size")?,
+		None => 2,
+	};
+	validate_prefix_size(prefix_size, ty)?;
+	validate_collection_capacity(capacity, prefix_size, ty)?;
+	Ok(CompactTailSchema::Vec {
+		capacity,
+		item_ty,
+		prefix_size,
+	})
+}
+
+fn is_dynamic_type_name(ty: &str) -> bool {
+	parse_generic_args(ty).is_some_and(|(name, _)| {
+		matches!(
+			name.as_str(),
+			"String" | "PodString" | "Vec" | "PodVec" | "Option"
+		)
+	})
+}
+
+fn compact_tail_supported_variants() -> &'static str {
+	"Supported compact fields are `String<N>`, `Vec<T, N>` for fixed `T`, `Option<T>` for fixed \
+	 `T`, `Option<String<N>>`, `Option<Vec<T, N>>` for fixed `T`, and `Vec<String<M>, N>`."
+}
+
+fn compact_tail_grammar_error(ty: &str) -> String {
+	format!(
+		"invalid compact field `{ty}`. {}",
+		compact_tail_supported_variants()
+	)
 }
 
 /// Map a compact tail whose prefix is stored in the shared compact header.
@@ -79,11 +258,11 @@ pub fn try_rust_type_to_codama_compact_tail(
 /// `prefix_offset` is absolute from the start of the account. `payload_skip`
 /// advances the first tail over the remaining header prefixes before its
 /// payload is decoded. Nested pre/post offsets make the count read restore the
-/// payload cursor, matching zeropod's header-then-payload layout.
+/// payload cursor, matching pinapod's header-then-payload layout.
 pub(crate) fn try_rust_type_to_codama_compact_tail_at(
 	ty: &str,
 	context: &str,
-	zeropod_enums: &[ZeroPodEnumIr],
+	pinapod_enums: &[PinaPodEnumIr],
 	prefix_offset: Option<usize>,
 	payload_skip: usize,
 ) -> Result<TypeNode, crate::error::IdlError> {
@@ -94,81 +273,108 @@ pub(crate) fn try_rust_type_to_codama_compact_tail_at(
 			reason,
 		}
 	};
-	let Some((name, args)) = parse_generic_args(ty) else {
-		return Err(error("compact tails must be `Vec<T, N>`".to_string()));
+	let schema = compact_tail_schema(ty)
+		.map_err(&error)?
+		.ok_or_else(|| error(compact_tail_grammar_error(ty)))?;
+	let prefix_offset = |prefix: NumberTypeNode| -> Result<_, crate::error::IdlError> {
+		if let Some(prefix_offset) = prefix_offset {
+			let offset = i32::try_from(prefix_offset).map_err(|_| {
+				error("compact header offset exceeds Codama's i32 range".to_string())
+			})?;
+			let prefix =
+				PreOffsetTypeNode::<NestedTypeNode<NumberTypeNode>>::absolute(prefix, offset);
+			Ok(PostOffsetTypeNode::<NestedTypeNode<NumberTypeNode>>::pre_offset(prefix, 0).into())
+		} else {
+			Ok(prefix.into())
+		}
 	};
-	if !matches!(name.as_str(), "Vec" | "PodVec") || !(2..=3).contains(&args.len()) {
-		return Err(error("compact tails must be `Vec<T, N>`".to_string()));
-	}
-	let item_ty = &args[0];
-	if !is_known_fixed_size_type(item_ty, zeropod_enums) {
-		return Err(error(format!(
-			"cannot determine compact `Vec` element size for `{item_ty}`"
-		)));
-	}
-	let capacity = parse_collection_size(args.get(1), ty, "capacity").map_err(error)?;
-	let prefix_size = match args.get(2) {
-		Some(value) => parse_collection_size(Some(value), ty, "prefix size").map_err(error)?,
-		None => 2,
+	let dynamic_payload = |item_ty: &str,
+	                       prefix_size: usize,
+	                       is_string: bool|
+	 -> Result<TypeNode, crate::error::IdlError> {
+		let prefix = prefix_number_type(prefix_size, ty).map_err(&error)?;
+		if is_string {
+			Ok(SizePrefixTypeNode::<TypeNode>::new(StringTypeNode::utf8(), prefix).into())
+		} else {
+			if !is_known_fixed_size_type(item_ty, pinapod_enums) {
+				return Err(error(format!(
+					"cannot determine compact `Vec` element size for `{item_ty}`"
+				)));
+			}
+			let item = try_rust_type_to_codama_with_pinapod_enums(item_ty, pinapod_enums)
+				.map_err(&error)?;
+			Ok(ArrayTypeNode::prefixed(item, prefix).into())
+		}
 	};
-	validate_prefix_size(prefix_size, ty).map_err(&error)?;
-	validate_collection_capacity(capacity, prefix_size, ty).map_err(&error)?;
-	let item = try_rust_type_to_codama_with_zeropod_enums(item_ty, zeropod_enums).map_err(error)?;
-	let prefix = prefix_number_type(prefix_size, ty).map_err(error)?;
 
-	let prefix: NestedTypeNode<NumberTypeNode> = if let Some(prefix_offset) = prefix_offset {
-		let offset = i32::try_from(prefix_offset)
-			.map_err(|_| error("compact header offset exceeds Codama's i32 range".to_string()))?;
-		let prefix = PreOffsetTypeNode::<NestedTypeNode<NumberTypeNode>>::absolute(prefix, offset);
-		PostOffsetTypeNode::<NestedTypeNode<NumberTypeNode>>::pre_offset(prefix, 0).into()
-	} else {
-		prefix.into()
+	let dynamic: TypeNode = match &schema {
+		CompactTailSchema::String { prefix_size, .. } => {
+			let prefix = prefix_offset(prefix_number_type(*prefix_size, ty).map_err(&error)?)?;
+			SizePrefixTypeNode::<TypeNode>::new(StringTypeNode::utf8(), prefix).into()
+		}
+		CompactTailSchema::Vec {
+			item_ty,
+			prefix_size,
+			..
+		} => {
+			if !is_known_fixed_size_type(item_ty, pinapod_enums) {
+				return Err(error(format!(
+					"cannot determine compact `Vec` element size for `{item_ty}`"
+				)));
+			}
+			let item = try_rust_type_to_codama_with_pinapod_enums(item_ty, pinapod_enums)
+				.map_err(&error)?;
+			let prefix = prefix_offset(prefix_number_type(*prefix_size, ty).map_err(&error)?)?;
+			ArrayTypeNode::prefixed(item, prefix).into()
+		}
+		CompactTailSchema::OptionString { prefix_size, .. } => {
+			let item = dynamic_payload("", *prefix_size, true)?;
+			let prefix = prefix_offset(NumberTypeNode::le(NumberFormat::U8))?;
+			OptionTypeNode {
+				fixed: None,
+				item: Box::new(item),
+				prefix,
+			}
+			.into()
+		}
+		CompactTailSchema::OptionVec {
+			item_ty,
+			prefix_size,
+			..
+		} => {
+			let item = dynamic_payload(item_ty, *prefix_size, false)?;
+			let prefix = prefix_offset(NumberTypeNode::le(NumberFormat::U8))?;
+			OptionTypeNode {
+				fixed: None,
+				item: Box::new(item),
+				prefix,
+			}
+			.into()
+		}
 	};
-	let array: TypeNode = ArrayTypeNode::prefixed(item, prefix).into();
 
 	if payload_skip == 0 {
-		Ok(array)
+		Ok(dynamic)
 	} else {
 		let offset = i32::try_from(payload_skip)
 			.map_err(|_| error("compact header size exceeds Codama's i32 range".to_string()))?;
-		Ok(PreOffsetTypeNode::<TypeNode>::relative(array, offset).into())
+		Ok(PreOffsetTypeNode::<TypeNode>::relative(dynamic, offset).into())
 	}
 }
 
-pub(crate) fn compact_vec_prefix_size(ty: &str) -> Option<usize> {
-	let (name, args) = parse_generic_args(ty)?;
-	if !matches!(name.as_str(), "Vec" | "PodVec") || !(2..=3).contains(&args.len()) {
-		return None;
-	}
-
-	match args.get(2) {
-		Some(value) => value.parse().ok(),
-		None => Some(2),
-	}
-}
-
-pub(crate) fn compact_vec_capacity(ty: &str) -> Option<usize> {
-	let (name, args) = parse_generic_args(ty)?;
-	if !matches!(name.as_str(), "Vec" | "PodVec") || !(2..=3).contains(&args.len()) {
-		return None;
-	}
-
-	args.get(1)?.parse().ok()
-}
-
-/// Parse a zeropod collection schema or explicit storage type into a semantic,
+/// Parse a pinapod collection schema or explicit storage type into a semantic,
 /// fixed-size Codama node.
 ///
 /// - `PodString<N, PFX = 1>` maps to a fixed-size, size-prefixed UTF-8 string.
 /// - `PodVec<T, N, PFX = 2>` maps to a fixed-size, prefix-counted array.
-/// - `Option<T>` maps to a fixed option with zeropod's one-byte tag.
+/// - `Option<T>` maps to a fixed option with pinapod's one-byte tag.
 /// - `PodOption<T, PFX = 1>` maps to a fixed option with an explicit tag width.
 ///
 /// Returns `Ok(None)` for non-collection types and an error for collection
 /// layouts whose byte size cannot be resolved statically.
 fn parse_pod_collection(
 	ty: &str,
-	zeropod_enums: &[ZeroPodEnumIr],
+	pinapod_enums: &[PinaPodEnumIr],
 ) -> Result<Option<TypeNode>, String> {
 	let Some((name, args)) = parse_generic_args(ty) else {
 		if ty == "String"
@@ -220,12 +426,12 @@ fn parse_pod_collection(
 			let item_ty = args
 				.first()
 				.ok_or_else(|| format!("`{ty}` is missing its element type"))?;
-			if !is_known_fixed_size_type(item_ty, zeropod_enums) {
+			if !is_known_fixed_size_type(item_ty, pinapod_enums) {
 				return Err(format!(
 					"cannot determine the byte size of PodVec element `{item_ty}` in `{ty}`"
 				));
 			}
-			let mut item = try_rust_type_to_codama_with_zeropod_enums(item_ty, zeropod_enums)?;
+			let mut item = try_rust_type_to_codama_with_pinapod_enums(item_ty, pinapod_enums)?;
 			let n = parse_collection_size(args.get(1), ty, "capacity")?;
 			let pfx: usize = match args.get(2) {
 				Some(s) => parse_collection_size(Some(s), ty, "prefix size")?,
@@ -236,7 +442,7 @@ fn parse_pod_collection(
 			// Wire layout: [count: PFX bytes][items: N × T]. Emit the full
 			// fixed size (prefix + elements) so generated clients decode the
 			// correct account size and field offsets.
-			let item_size = zeropod_enums
+			let item_size = pinapod_enums
 				.iter()
 				.find(|item| item.name == *item_ty)
 				.map(|item| item.repr_size)
@@ -271,19 +477,19 @@ fn parse_pod_collection(
 			let item_ty = args
 				.first()
 				.ok_or_else(|| format!("`{ty}` is missing its element type"))?;
-			if name == "PodOption" && !is_known_zeropod_storage_type(item_ty) {
+			if name == "PodOption" && !is_known_pinapod_storage_type(item_ty) {
 				return Err(format!(
-					"`{ty}` requires an alignment-one zeropod storage element; use \
+					"`{ty}` requires an alignment-one PinaPod storage element; use \
 					 `Option<{item_ty}>` for a native schema type"
 				));
 			}
-			if !is_known_fixed_size_type(item_ty, zeropod_enums) {
+			if !is_known_fixed_size_type(item_ty, pinapod_enums) {
 				return Err(format!(
 					"cannot determine the byte size of PodOption element `{item_ty}` in `{ty}`"
 				));
 			}
-			let mut item = try_rust_type_to_codama_with_zeropod_enums(item_ty, zeropod_enums)?;
-			let item_size = zeropod_enums
+			let mut item = try_rust_type_to_codama_with_pinapod_enums(item_ty, pinapod_enums)?;
+			let item_size = pinapod_enums
 				.iter()
 				.find(|item| item.name == *item_ty)
 				.map(|item| item.repr_size)
@@ -314,7 +520,7 @@ fn parse_pod_collection(
 	}
 }
 
-fn is_known_zeropod_storage_type(ty: &str) -> bool {
+fn is_known_pinapod_storage_type(ty: &str) -> bool {
 	matches!(
 		ty,
 		"u8" | "i8"
@@ -356,7 +562,7 @@ fn validate_option_prefix_size(pfx: usize, ty: &str) -> Result<(), String> {
 		Ok(())
 	} else {
 		Err(format!(
-			"`{ty}` has unsupported option prefix size {pfx}; zeropod supports 1, 2, or 4 bytes"
+			"`{ty}` has unsupported option prefix size {pfx}; pinapod supports 1, 2, or 4 bytes"
 		))
 	}
 }
@@ -391,7 +597,7 @@ fn prefix_number_type(pfx: usize, ty: &str) -> Result<NumberTypeNode, String> {
 	Ok(NumberTypeNode::le(format))
 }
 
-fn is_known_fixed_size_type(ty: &str, zeropod_enums: &[ZeroPodEnumIr]) -> bool {
+fn is_known_fixed_size_type(ty: &str, pinapod_enums: &[PinaPodEnumIr]) -> bool {
 	matches!(
 		ty,
 		"u8" | "u16"
@@ -407,7 +613,7 @@ fn is_known_fixed_size_type(ty: &str, zeropod_enums: &[ZeroPodEnumIr]) -> bool {
 			| "PodBool"
 			| "bool" | "Address"
 			| "Pubkey"
-	) || zeropod_enums.iter().any(|item| item.name == ty)
+	) || pinapod_enums.iter().any(|item| item.name == ty)
 		|| parse_byte_array(ty).is_some()
 		|| ty.starts_with("String<")
 		|| ty.starts_with("Vec<")
@@ -682,6 +888,37 @@ mod tests {
 	}
 
 	#[test]
+	fn maps_every_supported_compact_dynamic_shape() {
+		for (ty, expected_kind) in [
+			("String<8>", "sizePrefixTypeNode"),
+			("Vec<u64, 8>", "arrayTypeNode"),
+			("Option<String<8>>", "optionTypeNode"),
+			("Option<Vec<u64, 8>>", "optionTypeNode"),
+			("Vec<String<8>, 4>", "arrayTypeNode"),
+		] {
+			let mapped = try_rust_type_to_codama_compact_tail(ty, "test account", &[])
+				.unwrap_or_else(|error| panic!("failed to map `{ty}`: {error}"));
+			let value = serde_json::to_value(mapped)
+				.unwrap_or_else(|error| panic!("failed to serialize `{ty}`: {error}"));
+			assert_eq!(value["kind"], expected_kind, "wrong node for `{ty}`");
+		}
+
+		let option =
+			try_rust_type_to_codama_compact_tail("Option<Vec<u64, 8>>", "test account", &[])
+				.expect("option vector should map");
+		let value = serde_json::to_value(option).expect("option vector should serialize");
+		assert_eq!(value["prefix"]["format"], "u8");
+		assert_eq!(value["item"]["count"]["prefix"]["format"], "u16");
+
+		let string_vec =
+			try_rust_type_to_codama_compact_tail("Vec<String<8>, 4>", "test account", &[])
+				.expect("string vector should map");
+		let value = serde_json::to_value(string_vec).expect("string vector should serialize");
+		assert_eq!(value["item"]["kind"], "fixedSizeTypeNode");
+		assert_eq!(value["item"]["size"], 9);
+	}
+
+	#[test]
 	fn maps_compact_tail_prefixes_into_a_shared_header() {
 		let mapped = try_rust_type_to_codama_compact_tail_at(
 			"Vec<u64, 8>",
@@ -732,28 +969,52 @@ mod tests {
 	}
 
 	#[test]
-	fn recognizes_only_literal_compact_vec_prefixes() {
-		assert_eq!(compact_vec_prefix_size("Vec<u64, 8>"), Some(2));
-		assert_eq!(compact_vec_prefix_size("PodVec<u8, 8, 1>"), Some(1));
-		assert_eq!(compact_vec_prefix_size("Vec<u8, 8, PREFIX>"), None);
-		assert_eq!(compact_vec_prefix_size("String<8>"), None);
-		assert_eq!(compact_vec_capacity("Vec<u64, 8>"), Some(8));
-		assert_eq!(compact_vec_capacity("PodVec<u8, 16, 1>"), Some(16));
-		assert_eq!(compact_vec_capacity("Vec<u8, CAPACITY>"), None);
-		assert_eq!(compact_vec_capacity("String<8>"), None);
+	fn classifies_compact_tail_capacity_and_header_size() {
+		for (ty, capacity, header_size) in [
+			("String<8>", 8, 1),
+			("PodString<16, 2>", 16, 2),
+			("Vec<u64, 8>", 8, 2),
+			("PodVec<u8, 16, 1>", 16, 1),
+			("Option<String<8>>", 8, 1),
+			("Option<Vec<u64, 8, 4>>", 8, 1),
+			("Vec<String<8>, 4>", 4, 2),
+		] {
+			let schema = compact_tail_schema(ty)
+				.unwrap_or_else(|error| panic!("failed to classify `{ty}`: {error}"))
+				.unwrap_or_else(|| panic!("`{ty}` was not recognized as a compact tail"));
+			assert_eq!(schema.capacity(), capacity, "wrong capacity for `{ty}`");
+			assert_eq!(schema.header_size(), header_size, "wrong header for `{ty}`");
+		}
+
+		assert!(
+			compact_tail_schema("Option<u64>")
+				.expect("fixed option should parse")
+				.is_none()
+		);
+		assert!(
+			compact_tail_schema("u64")
+				.expect("scalar should parse")
+				.is_none()
+		);
 	}
 
 	#[test]
-	fn rejects_invalid_compact_vec_tails() {
+	fn rejects_invalid_compact_tails() {
 		for (ty, expected) in [
-			("u64", "compact tails must be"),
-			("String<u64, 8>", "compact tails must be"),
-			("Vec<u64>", "compact tails must be"),
+			("u64", "invalid compact field"),
+			("String<u64, 8>", "literal usize capacity"),
+			("Vec<u64>", "requires an element type"),
 			("Vec<MyPod, 8>", "cannot determine compact"),
 			("Vec<u64, CAPACITY>", "literal usize capacity"),
 			("Vec<u64, 8, PREFIX>", "literal usize prefix size"),
 			("Vec<u64, 8, 3>", "unsupported prefix size"),
 			("Vec<u64, 256, 1>", "cannot be represented"),
+			("Option<Vec<String<8>, 4>>", "Option<Vec<String<M>, N>>"),
+			("Option<Option<String<8>>>", "nested dynamic options"),
+			(
+				"Vec<Vec<u8, 4>, 2>",
+				"unsupported dynamic compact vector element",
+			),
 		] {
 			let error = try_rust_type_to_codama_compact_tail(ty, "account `State.values`", &[])
 				.expect_err("invalid compact tail must be rejected")
@@ -813,13 +1074,13 @@ mod tests {
 
 	#[test]
 	fn maps_options_over_local_enums_and_storage_types() {
-		let enums = [ZeroPodEnumIr {
+		let enums = [PinaPodEnumIr {
 			name: "Color".to_owned(),
 			repr_size: 1,
 			variants: Vec::new(),
 			docs: Vec::new(),
 		}];
-		let option = try_rust_type_to_codama_with_zeropod_enums("Option<Color>", &enums)
+		let option = try_rust_type_to_codama_with_pinapod_enums("Option<Color>", &enums)
 			.unwrap_or_else(|error| panic!("failed to map enum option: {error}"));
 		assert_eq!(type_node_size(&option), Some(2));
 		assert!(matches!(option, TypeNode::Option(_)));
@@ -863,7 +1124,7 @@ mod tests {
 	}
 
 	#[test]
-	fn rejects_pod_option_prefixes_zeropod_does_not_support() {
+	fn rejects_pod_option_prefixes_pinapod_does_not_support() {
 		for ty in [
 			"PodOption<PodU64, 0>",
 			"PodOption<PodU64, 3>",

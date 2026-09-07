@@ -592,7 +592,7 @@ fn renders_public_key_bool_and_number_arguments() {
 	let page = render_instruction_page(&program.instructions[0])
 		.unwrap_or_else(|error| panic!("renders: {error}"));
 
-	assert!(page.contains("pub sponsor: &'address Address,"));
+	assert!(page.contains("pub sponsor: &'argument Address,"));
 	assert!(page.contains("/// Instruction argument `sponsor`."));
 	assert!(page.contains("/// Address credited as the sponsor."));
 	assert!(page.contains("pub active: bool,"));
@@ -600,7 +600,7 @@ fn renders_public_key_bool_and_number_arguments() {
 	assert!(page.contains("pub member: &'account AccountView,"));
 	assert!(page.contains("CpiHandle::writable_signer(self.member)?"));
 	assert!(page.contains("CpiHandle::readonly_signer(self.authority)"));
-	assert!(page.contains("pub ix: EnrollIx<'address>,"));
+	assert!(page.contains("pub ix: EnrollIx<'argument>,"));
 	assert!(page.contains("pub fn invoke(&self, program: &ProgramAccount<'_>)"));
 	assert!(page.contains("pub fn invoke_signed("));
 	assert!(page.contains("context.invoke_signed(&data, signers)"));
@@ -657,10 +657,40 @@ fn renders_address_only_instruction_lifetimes() {
 	let page = render_instruction_page(&program.instructions[0])
 		.unwrap_or_else(|error| panic!("renders address-only instruction: {error}"));
 
-	assert!(page.contains("pub struct SetOwner<'address> {"));
-	assert!(page.contains("pub ix: SetOwnerIx<'address>,"));
-	assert!(page.contains("impl<'address> SetOwnerIx<'address>"));
-	assert!(page.contains("impl<'address> SetOwner<'address>"));
+	assert!(page.contains("pub struct SetOwner<'argument> {"));
+	assert!(page.contains("pub ix: SetOwnerIx<'argument>,"));
+	assert!(page.contains("impl<'argument> SetOwnerIx<'argument>"));
+	assert!(page.contains("impl<'argument> SetOwner<'argument>"));
+}
+
+#[test]
+fn shares_one_argument_lifetime_for_addresses_and_pinapod_strings() {
+	let string = codama_nodes::SizePrefixTypeNode::<codama_nodes::TypeNode>::new(
+		codama_nodes::StringTypeNode::utf8(),
+		NumberTypeNode::le(U8),
+	);
+	let string = codama_nodes::FixedSizeTypeNode::new(string, 33);
+	let program = program_node(
+		"registry",
+		"11111111111111111111111111111111",
+		vec![instruction_node(
+			"setProfile",
+			numeric_discriminator(9),
+			vec![],
+			vec![
+				InstructionArgumentNode::new("owner", PublicKeyTypeNode {}),
+				InstructionArgumentNode::new("name", string),
+			],
+		)],
+	);
+	let page = render_instruction_page(&program.instructions[0])
+		.unwrap_or_else(|error| panic!("renders address and String arguments: {error}"));
+
+	assert!(page.contains("pub struct SetProfile<'argument> {"));
+	assert!(page.contains("pub owner: &'argument Address,"));
+	assert!(page.contains("pub name: &'argument str,"));
+	assert!(page.contains("pub ix: SetProfileIx<'argument>,"));
+	assert!(page.contains("impl<'argument> SetProfileIx<'argument>"));
 }
 
 #[test]

@@ -34,8 +34,8 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { COMPACT_ACCOUNTS_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const RESIZE_DISCRIMINATOR = 1;
 
@@ -92,7 +92,7 @@ export function getResizeInstructionDataDecoder(): FixedSizeDecoder<
 > {
 	return getStructDecoder([[
 		"discriminator",
-		getZeroPodDiscriminatorDecoder(RESIZE_DISCRIMINATOR, getU8Decoder()),
+		getPinaPodDiscriminatorDecoder(RESIZE_DISCRIMINATOR, getU8Decoder()),
 	], ["entryCount", getU8Decoder()]]);
 }
 

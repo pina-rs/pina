@@ -57,5 +57,5 @@ pub struct Notice {
 
 fn main() {
 	let mut bytes = [0u8; State::SIZE];
-	let _ = State::initialize(&mut bytes);
+	let _ = State::initialize(&mut bytes, |_| Ok(()));
 }

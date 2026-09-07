@@ -8,6 +8,8 @@
 
 import {
 	type Account,
+	addDecoderSizePrefix,
+	addEncoderSizePrefix,
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
@@ -25,6 +27,8 @@ import {
 	getAddressEncoder,
 	getArrayDecoder,
 	getArrayEncoder,
+	getOptionDecoder,
+	getOptionEncoder,
 	getStructDecoder,
 	getStructEncoder,
 	getU16Decoder,
@@ -35,15 +39,28 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	getUtf8Decoder,
+	getUtf8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	offsetDecoder,
 	offsetEncoder,
+	type Option,
+	type OptionOrNullable,
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
 import { findJournalPda, type JournalSeeds } from "../pdas";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
+import {
+	getPinaPodBoundedArrayDecoder,
+	getPinaPodBoundedArrayEncoder,
+	getPinaPodBoundedCountDecoder,
+	getPinaPodBoundedStringDecoder,
+	getPinaPodBoundedStringEncoder,
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodOptionTagDecoder,
+	getPinaPodUtf8Decoder,
+} from "../pinaPodCodecs";
 
 export const JOURNAL_DISCRIMINATOR = 1;
 
@@ -66,16 +83,12 @@ export type Journal = {
 	authority: Address;
 	/** Number of successful resize or write operations. */
 	revision: number;
-	/**
-	 * Active entries. Unused capacity consumes no account bytes.
-	 * Pina compact capacity: 8.
-	 */
+	/** Active entries. Unused capacity consumes no account bytes. */
 	entries: Array<bigint>;
-	/**
-	 * One marker per entry, stored as a second compact tail.
-	 * Pina compact capacity: 8.
-	 */
+	/** One marker per entry, stored as a second compact tail. */
 	markers: Array<number>;
+	/** Optional human-readable status attached to the latest resize. */
+	note: Option<string>;
 };
 
 export type JournalArgs = {
@@ -85,16 +98,12 @@ export type JournalArgs = {
 	authority: Address;
 	/** Number of successful resize or write operations. */
 	revision: number;
-	/**
-	 * Active entries. Unused capacity consumes no account bytes.
-	 * Pina compact capacity: 8.
-	 */
+	/** Active entries. Unused capacity consumes no account bytes. */
 	entries: Array<number | bigint>;
-	/**
-	 * One marker per entry, stored as a second compact tail.
-	 * Pina compact capacity: 8.
-	 */
+	/** One marker per entry, stored as a second compact tail. */
 	markers: Array<number>;
+	/** Optional human-readable status attached to the latest resize. */
+	note: OptionOrNullable<string>;
 };
 
 /** Gets the encoder for {@link JournalArgs} account data. */
@@ -108,23 +117,44 @@ export function getJournalEncoder(): Encoder<JournalArgs> {
 			[
 				"entries",
 				offsetEncoder(
-					getArrayEncoder(getU64Encoder(), {
-						size: offsetEncoder(
-							offsetEncoder(getU16Encoder(), { preOffset: () => 38 }),
-							{ postOffset: ({ preOffset }) => preOffset + 0 },
-						),
-					}),
-					{ preOffset: ({ preOffset }) => preOffset + 10 },
+					getPinaPodBoundedArrayEncoder(
+						getArrayEncoder(getU64Encoder(), {
+							size: offsetEncoder(
+								offsetEncoder(getU16Encoder(), { preOffset: () => 38 }),
+								{ postOffset: ({ preOffset }) => preOffset + 0 },
+							),
+						}),
+						8,
+					),
+					{ preOffset: ({ preOffset }) => preOffset + 11 },
 				),
 			],
 			[
 				"markers",
-				getArrayEncoder(getU8Encoder(), {
-					size: offsetEncoder(
-						offsetEncoder(getU64Encoder(), { preOffset: () => 40 }),
-						{ postOffset: ({ preOffset }) => preOffset + 0 },
+				getPinaPodBoundedArrayEncoder(
+					getArrayEncoder(getU8Encoder(), {
+						size: offsetEncoder(
+							offsetEncoder(getU64Encoder(), { preOffset: () => 40 }),
+							{ postOffset: ({ preOffset }) => preOffset + 0 },
+						),
+					}),
+					8,
+				),
+			],
+			[
+				"note",
+				getOptionEncoder(
+					getPinaPodBoundedStringEncoder(
+						addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+						64,
 					),
-				}),
+					{
+						prefix: offsetEncoder(
+							offsetEncoder(getU8Encoder(), { preOffset: () => 48 }),
+							{ postOffset: ({ preOffset }) => preOffset },
+						),
+					},
+				),
 			],
 		]),
 		(value) => ({ ...value, discriminator: 1 }),
@@ -136,7 +166,7 @@ export function getJournalDecoder(): Decoder<Journal> {
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(JOURNAL_DISCRIMINATOR, getU8Decoder()),
+			getPinaPodDiscriminatorDecoder(JOURNAL_DISCRIMINATOR, getU8Decoder()),
 		],
 		["bump", getU8Decoder()],
 		["authority", getAddressDecoder()],
@@ -144,23 +174,63 @@ export function getJournalDecoder(): Decoder<Journal> {
 		[
 			"entries",
 			offsetDecoder(
-				getArrayDecoder(getU64Decoder(), {
-					size: offsetDecoder(
-						offsetDecoder(getU16Decoder(), { preOffset: () => 38 }),
-						{ postOffset: ({ preOffset }) => preOffset + 0 },
+				getPinaPodBoundedArrayDecoder(
+					getArrayDecoder(getU64Decoder(), {
+						size: offsetDecoder(
+							offsetDecoder(getU16Decoder(), { preOffset: () => 38 }),
+							{ postOffset: ({ preOffset }) => preOffset + 0 },
+						),
+					}),
+					getPinaPodBoundedCountDecoder(
+						offsetDecoder(
+							offsetDecoder(getU16Decoder(), { preOffset: () => 38 }),
+							{ postOffset: ({ preOffset }) => preOffset + 0 },
+						),
+						8,
 					),
-				}),
-				{ preOffset: ({ preOffset }) => preOffset + 10 },
+					8,
+				),
+				{ preOffset: ({ preOffset }) => preOffset + 11 },
 			),
 		],
 		[
 			"markers",
-			getArrayDecoder(getU8Decoder(), {
-				size: offsetDecoder(
-					offsetDecoder(getU64Decoder(), { preOffset: () => 40 }),
-					{ postOffset: ({ preOffset }) => preOffset + 0 },
+			getPinaPodBoundedArrayDecoder(
+				getArrayDecoder(getU8Decoder(), {
+					size: offsetDecoder(
+						offsetDecoder(getU64Decoder(), { preOffset: () => 40 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
+					),
+				}),
+				getPinaPodBoundedCountDecoder(
+					offsetDecoder(
+						offsetDecoder(getU64Decoder(), { preOffset: () => 40 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
+					),
+					8,
 				),
-			}),
+				8,
+			),
+		],
+		[
+			"note",
+			getOptionDecoder(
+				getPinaPodBoundedStringDecoder(
+					addDecoderSizePrefix(
+						getPinaPodUtf8Decoder(),
+						getPinaPodBoundedCountDecoder(getU8Decoder(), 64),
+					),
+					64,
+				),
+				{
+					prefix: offsetDecoder(
+						offsetDecoder(getPinaPodOptionTagDecoder(getU8Decoder()), {
+							preOffset: () => 48,
+						}),
+						{ postOffset: ({ preOffset }) => preOffset },
+					),
+				},
+			),
 		],
 	]);
 }

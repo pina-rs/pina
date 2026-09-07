@@ -50,21 +50,19 @@ impl RequireGtInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut RequireGtInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <RequireGtInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data = <RequireGtInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; RequireGtInstructionWire::SIZE];
+		<RequireGtInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REQUIRE_GT_DISCRIMINATOR;
-		}
-		<RequireGtInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 pub struct RequireGtInstructionWire {
 	pub discriminator: u8,
 }

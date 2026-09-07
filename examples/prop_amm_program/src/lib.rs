@@ -215,10 +215,11 @@ mod tests {
 	#[test]
 	fn update_instruction_roundtrip() {
 		let mut bytes = [0u8; UpdateInstruction::SIZE];
-		UpdateInstruction::initialize(&mut bytes)
-			.unwrap_or_else(|error| panic!("initialize: {error:?}"))
-			.new_price
-			.set(1_234);
+		UpdateInstruction::initialize(&mut bytes, |instruction| {
+			instruction.new_price.set(1_234);
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("initialize: {error:?}"));
 		let decoded =
 			UpdateInstruction::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
 
@@ -228,9 +229,11 @@ mod tests {
 	#[test]
 	fn rotate_authority_instruction_roundtrip() {
 		let mut bytes = [0u8; RotateAuthorityInstruction::SIZE];
-		RotateAuthorityInstruction::initialize(&mut bytes)
-			.unwrap_or_else(|error| panic!("initialize: {error:?}"))
-			.new_authority = [9u8; ADDRESS_BYTES].into();
+		RotateAuthorityInstruction::initialize(&mut bytes, |instruction| {
+			instruction.new_authority = [9u8; ADDRESS_BYTES].into();
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("initialize: {error:?}"));
 		let decoded = RotateAuthorityInstruction::try_from_bytes(&bytes)
 			.unwrap_or_else(|e| panic!("decode: {e:?}"));
 

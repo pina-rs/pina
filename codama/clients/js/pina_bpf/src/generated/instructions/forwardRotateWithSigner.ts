@@ -36,8 +36,8 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PINA_BPF_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const FORWARD_ROTATE_WITH_SIGNER_DISCRIMINATOR = 1;
 
@@ -95,7 +95,7 @@ export function getForwardRotateWithSignerInstructionDataDecoder(): FixedSizeDec
 > {
 	return getStructDecoder([[
 		"discriminator",
-		getZeroPodDiscriminatorDecoder(
+		getPinaPodDiscriminatorDecoder(
 			FORWARD_ROTATE_WITH_SIGNER_DISCRIMINATOR,
 			getU8Decoder(),
 		),

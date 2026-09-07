@@ -31,10 +31,7 @@ pub(crate) fn expand(
 	let seeds_name = format_ident!("{}Seeds", struct_name);
 	let seeds_with_bump_name = format_ident!("{}SeedsWithBump", struct_name);
 	let is_compact = item_struct.attrs.iter().any(|attr| {
-		if !attr.path().is_ident("account")
-			&& !attr.path().is_ident("pinapod")
-			&& !attr.path().is_ident("zeropod")
-		{
+		if !attr.path().is_ident("account") && !attr.path().is_ident("pinapod") {
 			return false;
 		}
 		attr.parse_args_with(

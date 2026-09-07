@@ -163,17 +163,10 @@ pub(crate) fn render_instruction_page(
 		"\tpub fn new(configure: impl FnOnce(&mut {wire_zc_name})) -> Result<Self, \
 		 solana_program_error::ProgramError> {{"
 	));
+	lines.push(format!("\t\tlet mut bytes = vec![0u8; {wire_name}::SIZE];"));
 	lines.push(format!(
-		"\t\tlet mut bytes = vec![0u8; <{wire_name} as pina::ZeroPodFixed>::SIZE];"
+		"\t\t<{wire_name} as pina::PinaPodFixed>::initialize(&mut bytes, |data| {{"
 	));
-	lines.push("\t\t{".to_string());
-	lines.push(format!(
-		"\t\t\tlet data = <{wire_name} as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)"
-	));
-	lines.push(
-		"\t\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;"
-			.to_string(),
-	);
 	lines.push("\t\t\tconfigure(data);".to_string());
 	// Security: The discriminator is framework-owned metadata. Writing it after
 	// the callback prevents otherwise valid user configuration from changing
@@ -182,10 +175,8 @@ pub(crate) fn render_instruction_page(
 		"\t\t\tdata.discriminator = {};",
 		discriminator.name
 	));
-	lines.push("\t\t}".to_string());
-	lines.push(format!(
-		"\t\t<{wire_name} as pina::ZeroPodFixed>::validate(&bytes)"
-	));
+	lines.push("\t\t\tOk(())".to_string());
+	lines.push("\t\t})".to_string());
 	lines.push(
 		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;"
 			.to_string(),
@@ -209,7 +200,7 @@ pub(crate) fn render_instruction_page(
 		wire_fields.push(format!("\tpub {argument_name}: {argument_type},"));
 	}
 	lines.push("#[doc(hidden)]".to_string());
-	lines.push("#[derive(pina::ZeroPod)]".to_string());
+	lines.push("#[derive(pina::PinaPod)]".to_string());
 	lines.push(format!("pub struct {wire_name} {{"));
 	lines.extend(wire_fields);
 	lines.push("}".to_string());

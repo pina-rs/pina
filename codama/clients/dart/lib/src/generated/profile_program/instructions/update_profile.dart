@@ -8,6 +8,7 @@ import 'package:solana_kit_addresses/solana_kit_addresses.dart';
 import 'package:solana_kit_codecs_core/solana_kit_codecs_core.dart';
 import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structures.dart';
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
+import 'package:solana_kit_codecs_strings/solana_kit_codecs_strings.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
@@ -17,15 +18,29 @@ class UpdateProfileInstructionData {
     : discriminator = 1;
 
   final int discriminator;
-  final Uint8List name;
-  final Uint8List bio;
+  final String name;
+  final String bio;
 }
 
 Encoder<UpdateProfileInstructionData> getUpdateProfileInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('name', fixEncoderSize(getBytesEncoder(), 33, allowTruncation: false)),
-    ('bio', fixEncoderSize(getBytesEncoder(), 129, allowTruncation: false)),
+    (
+      'name',
+      fixEncoderSize(
+        addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+        33,
+        allowTruncation: false,
+      ),
+    ),
+    (
+      'bio',
+      fixEncoderSize(
+        addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+        129,
+        allowTruncation: false,
+      ),
+    ),
   ]);
 
   return transformEncoder(
@@ -41,8 +56,20 @@ Encoder<UpdateProfileInstructionData> getUpdateProfileInstructionDataEncoder() {
 Decoder<UpdateProfileInstructionData> getUpdateProfileInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('name', fixDecoderSize(getBytesDecoder(), 33)),
-    ('bio', fixDecoderSize(getBytesDecoder(), 129)),
+    (
+      'name',
+      fixDecoderSize(
+        addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()),
+        33,
+      ),
+    ),
+    (
+      'bio',
+      fixDecoderSize(
+        addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()),
+        129,
+      ),
+    ),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
@@ -65,8 +92,8 @@ Decoder<UpdateProfileInstructionData> getUpdateProfileInstructionDataDecoder() {
 
     return (
       UpdateProfileInstructionData(
-        name: map['name']! as Uint8List,
-        bio: map['bio']! as Uint8List,
+        name: map['name']! as String,
+        bio: map['bio']! as String,
       ),
       newOffset,
     );
@@ -105,8 +132,8 @@ Instruction getUpdateProfileInstruction({
   required Address programAddress,
   required Address authority,
   required Address profile,
-  required Uint8List name,
-  required Uint8List bio,
+  required String name,
+  required String bio,
 }) {
   final instructionData = UpdateProfileInstructionData(name: name, bio: bio);
 

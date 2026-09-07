@@ -2,16 +2,16 @@
 
 <br>
 
-User profile registry demonstrating fully initialized bounded text and list fields stored inline in zero-copy account state.
+User profile registry demonstrating bounded PinaPod text and list fields stored inline in fixed zero-copy account state.
 
 ## What it covers
 
 <br>
 
-- `[u8; 33]` / `[u8; 129]` — length-prefixed UTF-8 with initialized capacity and checked `name_text()` / `bio_text()` accessors.
-- `[u8; 66]` — an initialized count plus eight little-endian `u64` slots, with checked append, lookup, and removal helpers.
+- `String<32>` / `String<128>` — length-prefixed UTF-8 with inline capacity and direct `as_str()` / `try_set()` accessors.
+- `Vec<u64, 8>` — a bounded list with `iter()`, `try_push()`, `remove()`, and `clear()` operations.
 - `bool` / `Option<u64>` — semantic source fields mapped to audited `PodBool` / `PodOption<PodU64>` storage by Pina.
-- Full lifecycle: initialize → update → add/remove tags, with custom `#[error]` codes for UTF-8, capacity, and index failures.
+- Full lifecycle: initialize → update → add/remove tags. PinaPod rejects invalid UTF-8 and oversized prefixes at the parse boundary, while custom `#[error]` codes cover tag capacity and index failures.
 
 ## Run
 

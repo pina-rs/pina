@@ -116,22 +116,19 @@ impl InitializePoolInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut InitializePoolInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <InitializePoolInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data =
-				<InitializePoolInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; InitializePoolInstructionWire::SIZE];
+		<InitializePoolInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = INITIALIZE_POOL_DISCRIMINATOR;
-		}
-		<InitializePoolInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 pub struct InitializePoolInstructionWire {
 	pub discriminator: u8,
 	pub bump: u8,

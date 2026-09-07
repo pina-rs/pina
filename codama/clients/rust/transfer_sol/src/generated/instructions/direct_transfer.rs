@@ -64,22 +64,19 @@ impl DirectTransferInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut DirectTransferInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <DirectTransferInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data =
-				<DirectTransferInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; DirectTransferInstructionWire::SIZE];
+		<DirectTransferInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = DIRECT_TRANSFER_DISCRIMINATOR;
-		}
-		<DirectTransferInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 pub struct DirectTransferInstructionWire {
 	pub discriminator: u8,
 	pub amount: u64,

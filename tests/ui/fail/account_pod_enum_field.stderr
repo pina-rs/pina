@@ -1,5 +1,5 @@
-error: custom `ZcField` mappings and nested schema types are unsupported because Pina cannot prove their alignment and bit validity; use an audited scalar, `Address`, `[u8; N]`, or `Option<scalar>`
-  --> tests/ui/fail/account_pod_enum_field.rs:17:13
+error: custom `ZcField` mappings and nested schema types are unsupported because Pina cannot prove their alignment and bit validity; use an audited scalar, `Address`, `[u8; N]`, `String<N>`, `Vec<T, N>`, or `Option<T>` where `T` is one of these fixed types
+  --> tests/ui/fail/account_pod_enum_field.rs:18:13
    |
-17 |     pub color: Color,
+18 |     pub color: Color,
    |                ^^^^^

@@ -1,6 +1,6 @@
 //! `#[account]` contract tests through the public macro.
 //!
-//! The macro generates a zeropod-backed account with a discriminator field,
+//! The macro generates a PinaPod-backed account with a discriminator field,
 //! `SIZE`, `try_from_bytes`, `initialize`, and a `HasDiscriminator` impl
 //! linking back to the discriminator enum. These tests exercise that surface
 //! through real invocations.
@@ -96,7 +96,7 @@ fn with_array_fields() {
 	assert!(DataAccount::try_from_bytes(&bytes).is_ok());
 }
 
-/// Pod types (`PodU64`, `PodBool`) contribute their zeropod byte widths.
+/// Pod types (`PodU64`, `PodBool`) contribute their PinaPod byte widths.
 #[test]
 fn with_pod_types() {
 	assert_eq!(BalanceAccount::SIZE, 1 + 32 + 8 + 1 + 1);

@@ -8,6 +8,7 @@ import 'package:solana_kit_addresses/solana_kit_addresses.dart';
 import 'package:solana_kit_codecs_core/solana_kit_codecs_core.dart';
 import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structures.dart';
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
+import 'package:solana_kit_codecs_strings/solana_kit_codecs_strings.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
@@ -21,16 +22,30 @@ class InitializeInstructionData {
 
   final int discriminator;
   final int bump;
-  final Uint8List name;
-  final Uint8List bio;
+  final String name;
+  final String bio;
 }
 
 Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('bump', getU8Encoder()),
-    ('name', fixEncoderSize(getBytesEncoder(), 33, allowTruncation: false)),
-    ('bio', fixEncoderSize(getBytesEncoder(), 129, allowTruncation: false)),
+    (
+      'name',
+      fixEncoderSize(
+        addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+        33,
+        allowTruncation: false,
+      ),
+    ),
+    (
+      'bio',
+      fixEncoderSize(
+        addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+        129,
+        allowTruncation: false,
+      ),
+    ),
   ]);
 
   return transformEncoder(
@@ -48,8 +63,20 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('bump', getU8Decoder()),
-    ('name', fixDecoderSize(getBytesDecoder(), 33)),
-    ('bio', fixDecoderSize(getBytesDecoder(), 129)),
+    (
+      'name',
+      fixDecoderSize(
+        addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()),
+        33,
+      ),
+    ),
+    (
+      'bio',
+      fixDecoderSize(
+        addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()),
+        129,
+      ),
+    ),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
@@ -70,8 +97,8 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
     return (
       InitializeInstructionData(
         bump: map['bump']! as int,
-        name: map['name']! as Uint8List,
-        bio: map['bio']! as Uint8List,
+        name: map['name']! as String,
+        bio: map['bio']! as String,
       ),
       newOffset,
     );
@@ -112,8 +139,8 @@ Instruction getInitializeInstruction({
   required Address profile,
   required Address systemProgram,
   required int bump,
-  required Uint8List name,
-  required Uint8List bio,
+  required String name,
+  required String bio,
 }) {
   final instructionData = InitializeInstructionData(
     bump: bump,

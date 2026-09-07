@@ -10,7 +10,7 @@ Secure adaptation of Anchor's account reallocation safety checks.
 
 - An explicit initialize → grow → shrink lifecycle for an authority-bound compact sample PDA.
 - A dynamic `Vec<u64, 64>` tail that stores only active values and appears as a prefixed array in the Codama IDL.
-- Reallocation growth-limit, type, capacity, element-boundary, and rent-exemption enforcement through `ReallocCompactAccount`.
+- Atomic patch, growth-limit, type, capacity, element-boundary, and rent-exemption enforcement through `UpdateResizableAccount`.
 - Type, owner, stored-authority, and canonical-PDA validation before every resize.
 - Duplicate realloc target detection, before any mutation.
 

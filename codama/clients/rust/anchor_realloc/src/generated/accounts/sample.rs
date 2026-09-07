@@ -10,7 +10,7 @@
 
 use pina::pinapod;
 
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
 #[pinapod(compact)]
 pub struct Sample {
 	/// A compact account whose active values occupy only the bytes they need.
@@ -20,14 +20,13 @@ pub struct Sample {
 	/// The only signer permitted to resize this sample.
 	pub authority: solana_pubkey::Pubkey,
 	/// Dynamically encoded values; unused capacity occupies no account bytes.
-	/// Pina compact capacity: 64.
 	pub values: pina::Vec<u64, 64>,
 }
 
 pub const SAMPLE_DISCRIMINATOR: u8 = 1u8;
 
 impl Sample {
-	pub const HEADER_SIZE: usize = <Self as pina::ZeroPodCompact>::HEADER_SIZE;
+	pub const HEADER_SIZE: usize = <Self as pina::PinaPodCompact>::HEADER_SIZE;
 
 	pub fn initialize(
 		data: &mut [u8],

@@ -9,6 +9,8 @@
 import {
 	type AccountMeta,
 	type AccountSignerMeta,
+	addDecoderSizePrefix,
+	addEncoderSizePrefix,
 	type Address,
 	combineCodec,
 	fixDecoderSize,
@@ -16,12 +18,12 @@ import {
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
 	fixEncoderSize,
-	getBytesDecoder,
-	getBytesEncoder,
 	getStructDecoder,
 	getStructEncoder,
 	getU8Decoder,
 	getU8Encoder,
+	getUtf8Decoder,
+	getUtf8Encoder,
 	type Instruction,
 	type InstructionWithAccounts,
 	type InstructionWithData,
@@ -39,11 +41,12 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { findProfilePda } from "../pdas";
-import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 import {
-	fixZeroPodEncoderSize,
-	getZeroPodDiscriminatorDecoder,
-} from "../zeropodCodecs";
+	fixPinaPodEncoderSize,
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodStringDecoder,
+} from "../pinaPodCodecs";
+import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const UPDATE_PROFILE_DISCRIMINATOR = 1;
 
@@ -73,14 +76,11 @@ export type UpdateProfileInstruction<
 
 export type UpdateProfileInstructionData = {
 	discriminator: number;
-	name: ReadonlyUint8Array;
-	bio: ReadonlyUint8Array;
+	name: string;
+	bio: string;
 };
 
-export type UpdateProfileInstructionDataArgs = {
-	name: ReadonlyUint8Array;
-	bio: ReadonlyUint8Array;
-};
+export type UpdateProfileInstructionDataArgs = { name: string; bio: string };
 
 export function getUpdateProfileInstructionDataEncoder(): FixedSizeEncoder<
 	UpdateProfileInstructionDataArgs
@@ -88,8 +88,17 @@ export function getUpdateProfileInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
 			"name",
-			fixZeroPodEncoderSize(getBytesEncoder(), 33),
-		], ["bio", fixZeroPodEncoderSize(getBytesEncoder(), 129)]]),
+			fixPinaPodEncoderSize(
+				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+				33,
+			),
+		], [
+			"bio",
+			fixPinaPodEncoderSize(
+				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+				129,
+			),
+		]]),
 		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
@@ -100,13 +109,13 @@ export function getUpdateProfileInstructionDataDecoder(): FixedSizeDecoder<
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(
+			getPinaPodDiscriminatorDecoder(
 				UPDATE_PROFILE_DISCRIMINATOR,
 				getU8Decoder(),
 			),
 		],
-		["name", fixDecoderSize(getBytesDecoder(), 33)],
-		["bio", fixDecoderSize(getBytesDecoder(), 129)],
+		["name", getPinaPodStringDecoder(getU8Decoder(), 33)],
+		["bio", getPinaPodStringDecoder(getU8Decoder(), 129)],
 	]);
 }
 
