@@ -139,6 +139,10 @@ pub(crate) fn expand(
 				) -> Result<Self::Mut<'_>, #crate_path::ProgramError> {
 					Self::initialize(data)
 				}
+
+				fn encoded_size(account: &Self::Ref<'_>) -> usize {
+					account.encoded_size()
+				}
 			}
 		}
 	} else {

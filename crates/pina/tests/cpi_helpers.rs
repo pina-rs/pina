@@ -28,6 +28,8 @@ use pina::ReallocAccount;
 use pina::ReallocAccountZeroed;
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 use pina::ReallocCompactAccount;
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+use pina::ResizeCompactAccount;
 use pina::Seed;
 use pina::Signer;
 use pina::ToCpiAccounts;
@@ -261,6 +263,7 @@ fn realloc_builders_are_exported() {
 #[test]
 fn compact_resize_builders_are_exported() {
 	assert!(size_of::<ReallocCompactAccount<'static, 'static, 'static>>() > 0);
+	assert!(size_of::<ResizeCompactAccount<'static, 'static, 'static>>() > 0);
 	assert!(size_of::<CreateCompactProgramAccount<'static, 'static, 'static, 'static>>() > 0);
 	assert!(
 		size_of::<CreateCompactProgramAccountWithBump<'static, 'static, 'static, 'static>>() > 0
@@ -360,9 +363,10 @@ fn compact_realloc_validates_current_data_and_target_size() {
 		false,
 		true,
 	);
-	let mut stored_payer = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
+	let mut stored_rent_account =
+		TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
 	let mut account = stored_account.view();
-	let mut payer = stored_payer.view();
+	let mut rent_account = stored_rent_account.view();
 	{
 		let mut data = account
 			.try_borrow_mut()
@@ -373,8 +377,8 @@ fn compact_realloc_validates_current_data_and_target_size() {
 
 	let unchanged = ReallocCompactAccount {
 		account: &mut account,
-		payer: &mut payer,
-		new_size: CompactBuilderState::HEADER_SIZE,
+		rent_account: &mut rent_account,
+		target_size: CompactBuilderState::HEADER_SIZE,
 		program_id: &owner,
 	}
 	.invoke::<CompactBuilderState>();
@@ -382,8 +386,8 @@ fn compact_realloc_validates_current_data_and_target_size() {
 
 	let invalid_target = ReallocCompactAccount {
 		account: &mut account,
-		payer: &mut payer,
-		new_size: CompactBuilderState::HEADER_SIZE + 1,
+		rent_account: &mut rent_account,
+		target_size: CompactBuilderState::HEADER_SIZE + 1,
 		program_id: &owner,
 	}
 	.invoke::<CompactBuilderState>();
@@ -397,8 +401,8 @@ fn compact_realloc_validates_current_data_and_target_size() {
 	}
 	let invalid_data = ReallocCompactAccount {
 		account: &mut account,
-		payer: &mut payer,
-		new_size: CompactBuilderState::HEADER_SIZE,
+		rent_account: &mut rent_account,
+		target_size: CompactBuilderState::HEADER_SIZE,
 		program_id: &owner,
 	}
 	.invoke::<CompactBuilderState>();
@@ -413,9 +417,10 @@ fn compact_realloc_rejects_shrinking_below_the_active_tail() {
 	let owner = Address::new_from_array([9u8; 32]);
 	let mut stored_account =
 		TestAccount::<ACTIVE_SIZE>::new(Address::new_from_array([1u8; 32]), false, true);
-	let mut stored_payer = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
+	let mut stored_rent_account =
+		TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
 	let mut account = stored_account.view();
-	let mut payer = stored_payer.view();
+	let mut rent_account = stored_rent_account.view();
 	{
 		let mut data = account
 			.try_borrow_mut()
@@ -436,8 +441,8 @@ fn compact_realloc_rejects_shrinking_below_the_active_tail() {
 
 	let result = ReallocCompactAccount {
 		account: &mut account,
-		payer: &mut payer,
-		new_size: CompactBuilderState::HEADER_SIZE,
+		rent_account: &mut rent_account,
+		target_size: CompactBuilderState::HEADER_SIZE,
 		program_id: &owner,
 	}
 	.invoke::<CompactBuilderState>();
@@ -451,14 +456,15 @@ fn compact_realloc_rejects_shrinking_below_the_active_tail() {
 fn realloc_zeroed_builder_accepts_an_unchanged_size() {
 	let owner = Address::new_from_array([9u8; 32]);
 	let mut stored_account = TestAccount::<8>::new(Address::new_from_array([1u8; 32]), false, true);
-	let mut stored_payer = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
+	let mut stored_rent_account =
+		TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
 	let mut account = stored_account.view();
-	let mut payer = stored_payer.view();
+	let mut rent_account = stored_rent_account.view();
 
 	let result = ReallocAccountZeroed {
 		account: &mut account,
-		payer: &mut payer,
-		new_size: 8,
+		rent_account: &mut rent_account,
+		target_size: 8,
 		program_id: &owner,
 	}
 	.invoke();
@@ -471,27 +477,28 @@ fn realloc_zeroed_builder_accepts_an_unchanged_size() {
 fn realloc_rejects_an_active_borrow_before_moving_rent() {
 	let owner = Address::new_from_array([9u8; 32]);
 	let mut stored_account = TestAccount::<8>::new(Address::new_from_array([1u8; 32]), false, true);
-	let mut stored_payer = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
+	let mut stored_rent_account =
+		TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
 	let mut account = stored_account.view();
 	let duplicate = account;
-	let mut payer = stored_payer.view();
+	let mut rent_account = stored_rent_account.view();
 	let account_lamports = account.lamports();
-	let payer_lamports = payer.lamports();
+	let rent_account_lamports = rent_account.lamports();
 	let data = duplicate
 		.try_borrow()
 		.unwrap_or_else(|error| panic!("borrow account data: {error:?}"));
 
 	let result = ReallocAccount {
 		account: &mut account,
-		payer: &mut payer,
-		new_size: 16,
+		rent_account: &mut rent_account,
+		target_size: 16,
 		program_id: &owner,
 	}
 	.invoke();
 
 	assert_eq!(result, Err(ProgramError::AccountBorrowFailed));
 	assert_eq!(account.lamports(), account_lamports);
-	assert_eq!(payer.lamports(), payer_lamports);
+	assert_eq!(rent_account.lamports(), rent_account_lamports);
 	assert_eq!(account.data_len(), 8);
 	drop(data);
 }
@@ -501,24 +508,25 @@ fn realloc_rejects_an_active_borrow_before_moving_rent() {
 fn realloc_rejects_oversized_single_growth_before_moving_rent() {
 	let owner = Address::new_from_array([9u8; 32]);
 	let mut stored_account = TestAccount::<8>::new(Address::new_from_array([1u8; 32]), false, true);
-	let mut stored_payer = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
+	let mut stored_rent_account =
+		TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
 	let mut account = stored_account.view();
-	let mut payer = stored_payer.view();
+	let mut rent_account = stored_rent_account.view();
 	let account_lamports = account.lamports();
-	let payer_lamports = payer.lamports();
-	let new_size = account.data_len() + MAX_PERMITTED_DATA_INCREASE + 1;
+	let rent_account_lamports = rent_account.lamports();
+	let target_size = account.data_len() + MAX_PERMITTED_DATA_INCREASE + 1;
 
 	let result = ReallocAccount {
 		account: &mut account,
-		payer: &mut payer,
-		new_size,
+		rent_account: &mut rent_account,
+		target_size,
 		program_id: &owner,
 	}
 	.invoke();
 
 	assert_eq!(result, Err(ProgramError::InvalidRealloc));
 	assert_eq!(account.lamports(), account_lamports);
-	assert_eq!(payer.lamports(), payer_lamports);
+	assert_eq!(rent_account.lamports(), rent_account_lamports);
 	assert_eq!(account.data_len(), 8);
 }
 
@@ -527,17 +535,18 @@ fn realloc_rejects_oversized_single_growth_before_moving_rent() {
 fn realloc_allows_the_maximum_single_growth_through_preflight() {
 	let owner = Address::new_from_array([9u8; 32]);
 	let mut stored_account = TestAccount::<8>::new(Address::new_from_array([1u8; 32]), false, true);
-	let mut stored_payer = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
+	let mut stored_rent_account =
+		TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
 	let mut account = stored_account.view();
-	let mut payer = stored_payer.view();
+	let mut rent_account = stored_rent_account.view();
 	let account_lamports = account.lamports();
-	let payer_lamports = payer.lamports();
-	let new_size = account.data_len() + MAX_PERMITTED_DATA_INCREASE;
+	let rent_account_lamports = rent_account.lamports();
+	let target_size = account.data_len() + MAX_PERMITTED_DATA_INCREASE;
 
 	let result = ReallocAccount {
 		account: &mut account,
-		payer: &mut payer,
-		new_size,
+		rent_account: &mut rent_account,
+		target_size,
 		program_id: &owner,
 	}
 	.invoke();
@@ -546,7 +555,7 @@ fn realloc_allows_the_maximum_single_growth_through_preflight() {
 	// the exact runtime growth limit passed the preflight `>` check.
 	assert_eq!(result, Err(ProgramError::UnsupportedSysvar));
 	assert_eq!(account.lamports(), account_lamports);
-	assert_eq!(payer.lamports(), payer_lamports);
+	assert_eq!(rent_account.lamports(), rent_account_lamports);
 	assert_eq!(account.data_len(), 8);
 }
 

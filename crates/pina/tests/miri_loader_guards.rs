@@ -368,24 +368,24 @@ fn realloc_rejects_an_active_alias_borrow_under_miri() {
 	let (account_views, _) = unsafe { deserialize_test_input::<4>(&mut input, &mut accts) };
 	let source_alias = account_views[0];
 	let source_lamports = account_views[0].lamports();
-	let payer_lamports = account_views[1].lamports();
+	let rent_account_lamports = account_views[1].lamports();
 	let source_data_len = account_views[0].data_len();
 	let data = source_alias
 		.try_borrow()
 		.unwrap_or_else(|error| panic!("borrow source alias: {error:?}"));
-	let (source, payer) = account_views.split_at_mut(1);
+	let (source, rent_account) = account_views.split_at_mut(1);
 
 	let result = ReallocAccount {
 		account: &mut source[0],
-		payer: &mut payer[0],
-		new_size: source_data_len + 1,
+		rent_account: &mut rent_account[0],
+		target_size: source_data_len + 1,
 		program_id: &TEST_PROGRAM_ID,
 	}
 	.invoke();
 
 	assert_eq!(result, Err(ProgramError::AccountBorrowFailed));
 	assert_eq!(source[0].lamports(), source_lamports);
-	assert_eq!(payer[0].lamports(), payer_lamports);
+	assert_eq!(rent_account[0].lamports(), rent_account_lamports);
 	assert_eq!(source[0].data_len(), source_data_len);
 	drop(data);
 }

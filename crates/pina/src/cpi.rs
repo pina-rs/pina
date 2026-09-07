@@ -837,13 +837,13 @@ pub enum RentAdjustment {
 	/// No lamport movement is appropriate for this size transition.
 	None,
 
-	/// Transfer lamports from the payer into the resized account.
+	/// Transfer lamports from the rent account into the resized account.
 	Fund {
-		/// Missing lamports required by the new rent minimum.
+		/// Missing lamports required by the target rent minimum.
 		lamports: u64,
 	},
 
-	/// Return lamports above the new rent minimum to the payer.
+	/// Return lamports above the target rent minimum to the rent account.
 	Refund {
 		/// Excess lamports that can be returned safely.
 		lamports: u64,
@@ -855,15 +855,15 @@ pub enum RentAdjustment {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ReallocPlan {
 	/// Required account-data length after reallocation.
-	pub new_size: usize,
+	pub target_size: usize,
 
-	/// Rent transfer required for the new length.
+	/// Rent transfer required for the target length.
 	pub adjustment: RentAdjustment,
 }
 
 #[cfg(feature = "account-resize")]
 impl ReallocPlan {
-	/// Plan a resize using the already-computed rent minimum for `new_size`.
+	/// Plan a resize using the already-computed rent minimum for `target_size`.
 	///
 	/// This function is pure: an error never changes account data or balances,
 	/// and a successful plan can be inspected before any CPI or direct lamport
@@ -876,30 +876,30 @@ impl ReallocPlan {
 	/// accepted.
 	pub fn try_new(
 		current_size: usize,
-		new_size: usize,
+		target_size: usize,
 		current_lamports: u64,
-		new_minimum_balance: u64,
+		target_minimum_balance: u64,
 	) -> Result<Self, ProgramError> {
-		validate_realloc_size(current_size, new_size)?;
+		validate_realloc_size(current_size, target_size)?;
 
 		Ok(Self::from_valid_size(
 			current_size,
-			new_size,
+			target_size,
 			current_lamports,
-			new_minimum_balance,
+			target_minimum_balance,
 		))
 	}
 
 	#[inline(always)]
 	fn from_valid_size(
 		current_size: usize,
-		new_size: usize,
+		target_size: usize,
 		current_lamports: u64,
-		new_minimum_balance: u64,
+		target_minimum_balance: u64,
 	) -> Self {
-		let adjustment = match new_size.cmp(&current_size) {
+		let adjustment = match target_size.cmp(&current_size) {
 			core::cmp::Ordering::Greater => {
-				let lamports = new_minimum_balance.saturating_sub(current_lamports);
+				let lamports = target_minimum_balance.saturating_sub(current_lamports);
 
 				if lamports == 0 {
 					RentAdjustment::None
@@ -908,7 +908,7 @@ impl ReallocPlan {
 				}
 			}
 			core::cmp::Ordering::Less => {
-				let lamports = current_lamports.saturating_sub(new_minimum_balance);
+				let lamports = current_lamports.saturating_sub(target_minimum_balance);
 
 				if lamports == 0 {
 					RentAdjustment::None
@@ -920,16 +920,17 @@ impl ReallocPlan {
 		};
 
 		Self {
-			new_size,
+			target_size,
 			adjustment,
 		}
 	}
 }
 
+/// Validates one runtime reallocation step against Solana's growth limit.
 #[cfg(feature = "account-resize")]
 #[inline(always)]
-fn validate_realloc_size(current_size: usize, new_size: usize) -> ProgramResult {
-	if new_size
+fn validate_realloc_size(current_size: usize, target_size: usize) -> ProgramResult {
+	if target_size
 		.checked_sub(current_size)
 		.is_some_and(|growth| growth > MAX_PERMITTED_DATA_INCREASE)
 	{
@@ -941,26 +942,41 @@ fn validate_realloc_size(current_size: usize, new_size: usize) -> ProgramResult 
 
 /// Reallocates an account and adjusts its rent-exempt balance.
 ///
-/// When **growing**, transfers the additional rent-exempt lamports required from
-/// `payer` to `account` via a system-program CPI. When **shrinking**, returns
-/// excess rent lamports from `account` to `payer` by direct lamport
-/// manipulation (the account must be owned by the executing program for this
-/// path).
+/// <!-- {=accountReallocationContract|trim|linePrefix:"/// ":true} -->
+/// `target_size` is the exact physical allocation after the call. When the account grows, `rent_account` funds the missing rent before Pina resizes the data. When the account shrinks, `rent_account` receives the excess rent. New bytes are zero-initialized by the Solana runtime.
 ///
-/// New bytes are zero-initialized by the Solana runtime.
+/// The Solana runtime limits account growth to `MAX_PERMITTED_DATA_INCREASE` bytes per top-level instruction. Pina rejects a single larger increase before it moves rent. Pinocchio does not expose the original serialized length, so cumulative growth from several reallocations in one instruction can still fail during `AccountView::resize`.
 ///
-/// # Limits
+/// Propagate reallocation errors. If a later resize or callback fails after rent moves, Solana restores the account only when the instruction returns that error.<!-- {/accountReallocationContract} -->
 ///
-/// The Solana runtime limits account growth to [`MAX_PERMITTED_DATA_INCREASE`]
-/// (10 KiB) per top-level instruction. Exceeding this limit returns
-/// `ProgramError::InvalidRealloc`.
+/// # Examples
 ///
-/// This builder rejects a single growth request larger than that limit before
-/// moving rent lamports. Pinocchio does not expose the account's original
-/// serialized length, so a later growth after an earlier reallocation in the
-/// same instruction can still fail during `resize` after rent lamports have
-/// moved. Propagate that error instead of catching it to preserve transaction
-/// atomicity.
+/// <!-- {=accountReallocationLowLevelExample|trim|linePrefix:"/// ":true} -->
+/// Use `ReallocAccount` when the bytes do not use a compact Pina schema:
+///
+/// ```ignore
+/// ReallocAccount {
+/// 	account,
+/// 	rent_account,
+/// 	target_size,
+/// 	program_id,
+/// }
+/// .invoke()?;
+/// ```
+///
+/// Use `invoke_signed` when `rent_account` is a PDA that must sign the system transfer used for growth:
+///
+/// ```ignore
+/// ReallocAccount {
+/// 	account,
+/// 	rent_account,
+/// 	target_size,
+/// 	program_id,
+/// }
+/// .invoke_signed(rent_account_signers)?;
+/// ```
+///
+/// `ReallocAccountZeroed` has the same behavior and field names. Its name records the caller's intent that newly allocated bytes start at zero. The current Solana runtime zero-initializes new bytes for both builders.<!-- {/accountReallocationLowLevelExample} -->
 ///
 /// # Errors
 ///
@@ -970,15 +986,15 @@ fn validate_realloc_size(current_size: usize, new_size: usize) -> ProgramResult 
 /// transfer, or the runtime `resize` call.
 #[cfg(feature = "account-resize")]
 #[must_use = "account reallocation has no effect until invoke or invoke_signed is called"]
-pub struct ReallocAccount<'account, 'payer, 'address> {
+pub struct ReallocAccount<'account, 'rent_account, 'address> {
 	/// Program-owned account whose data length and rent balance will change.
 	pub account: &'account mut AccountView,
 
 	/// Account that funds growth or receives excess rent after shrinking.
-	pub payer: &'payer mut AccountView,
+	pub rent_account: &'rent_account mut AccountView,
 
 	/// Required account-data length after reallocation.
-	pub new_size: usize,
+	pub target_size: usize,
 
 	/// Executing program ID used to validate account ownership.
 	pub program_id: &'address Address,
@@ -992,7 +1008,7 @@ impl ReallocAccount<'_, '_, '_> {
 		self.invoke_signed(&[])
 	}
 
-	/// Reallocates the account with PDA signer seeds for the payer.
+	/// Reallocates the account with PDA signer seeds for the rent account.
 	///
 	/// Signers are used only when growth requires a system transfer. Shrinking
 	/// moves lamports directly from the program-owned account.
@@ -1000,16 +1016,15 @@ impl ReallocAccount<'_, '_, '_> {
 	pub fn invoke_signed(&mut self, signers: &[Signer<'_, '_>]) -> ProgramResult {
 		realloc_account_inner(
 			self.account,
-			self.new_size,
-			self.payer,
+			self.target_size,
+			self.rent_account,
 			self.program_id,
 			signers,
 		)
 	}
 }
 
-/// Reallocates an account to `new_size` bytes with explicit zero-initialization,
-/// adjusting rent automatically.
+/// Reallocates an account to `target_size` bytes with explicit zero-initialization.
 ///
 /// This builder behaves identically to [`ReallocAccount`]. In the current
 /// Solana runtime, new bytes are always zero-initialized regardless of which
@@ -1017,24 +1032,12 @@ impl ReallocAccount<'_, '_, '_> {
 /// `realloc(new_len, zero_init)` parameter and to make zero-initialization
 /// intent explicit at the call site.
 ///
-/// When **growing**, transfers the additional rent-exempt lamports required from
-/// `payer` to `account` via a system-program CPI. When **shrinking**, returns
-/// excess rent lamports from `account` to `payer` by direct lamport
-/// manipulation (the account must be owned by the executing program for this
-/// path).
+/// <!-- {=accountReallocationContract|trim|linePrefix:"/// ":true} -->
+/// `target_size` is the exact physical allocation after the call. When the account grows, `rent_account` funds the missing rent before Pina resizes the data. When the account shrinks, `rent_account` receives the excess rent. New bytes are zero-initialized by the Solana runtime.
 ///
-/// # Limits
+/// The Solana runtime limits account growth to `MAX_PERMITTED_DATA_INCREASE` bytes per top-level instruction. Pina rejects a single larger increase before it moves rent. Pinocchio does not expose the original serialized length, so cumulative growth from several reallocations in one instruction can still fail during `AccountView::resize`.
 ///
-/// The Solana runtime limits account growth to [`MAX_PERMITTED_DATA_INCREASE`]
-/// (10 KiB) per top-level instruction. Exceeding this limit returns
-/// `ProgramError::InvalidRealloc`.
-///
-/// This builder rejects a single growth request larger than that limit before
-/// moving rent lamports. Pinocchio does not expose the account's original
-/// serialized length, so a later growth after an earlier reallocation in the
-/// same instruction can still fail during `resize` after rent lamports have
-/// moved. Propagate that error instead of catching it to preserve transaction
-/// atomicity.
+/// Propagate reallocation errors. If a later resize or callback fails after rent moves, Solana restores the account only when the instruction returns that error.<!-- {/accountReallocationContract} -->
 ///
 /// # Errors
 ///
@@ -1044,15 +1047,15 @@ impl ReallocAccount<'_, '_, '_> {
 /// transfer, or the runtime `resize` call.
 #[cfg(feature = "account-resize")]
 #[must_use = "account reallocation has no effect until invoke or invoke_signed is called"]
-pub struct ReallocAccountZeroed<'account, 'payer, 'address> {
+pub struct ReallocAccountZeroed<'account, 'rent_account, 'address> {
 	/// Program-owned account whose data length and rent balance will change.
 	pub account: &'account mut AccountView,
 
 	/// Account that funds growth or receives excess rent after shrinking.
-	pub payer: &'payer mut AccountView,
+	pub rent_account: &'rent_account mut AccountView,
 
 	/// Required account-data length after reallocation.
-	pub new_size: usize,
+	pub target_size: usize,
 
 	/// Executing program ID used to validate account ownership.
 	pub program_id: &'address Address,
@@ -1066,7 +1069,7 @@ impl ReallocAccountZeroed<'_, '_, '_> {
 		self.invoke_signed(&[])
 	}
 
-	/// Reallocates the account with PDA signer seeds for the payer.
+	/// Reallocates the account with PDA signer seeds for the rent account.
 	///
 	/// Signers are used only when growth requires a system transfer. The Solana
 	/// runtime zero-initializes every newly allocated byte.
@@ -1074,8 +1077,8 @@ impl ReallocAccountZeroed<'_, '_, '_> {
 	pub fn invoke_signed(&mut self, signers: &[Signer<'_, '_>]) -> ProgramResult {
 		realloc_account_inner(
 			self.account,
-			self.new_size,
-			self.payer,
+			self.target_size,
+			self.rent_account,
 			self.program_id,
 			signers,
 		)
@@ -1088,15 +1091,39 @@ impl ReallocAccountZeroed<'_, '_, '_> {
 /// current compact layout and constrains the target length to its declared
 /// header and capacity bounds. Shrinking also validates the retained byte
 /// slice, preventing active tail data from being truncated.
+///
+/// <!-- {=accountReallocationContract|trim|linePrefix:"/// ":true} -->
+/// `target_size` is the exact physical allocation after the call. When the account grows, `rent_account` funds the missing rent before Pina resizes the data. When the account shrinks, `rent_account` receives the excess rent. New bytes are zero-initialized by the Solana runtime.
+///
+/// The Solana runtime limits account growth to `MAX_PERMITTED_DATA_INCREASE` bytes per top-level instruction. Pina rejects a single larger increase before it moves rent. Pinocchio does not expose the original serialized length, so cumulative growth from several reallocations in one instruction can still fail during `AccountView::resize`.
+///
+/// Propagate reallocation errors. If a later resize or callback fails after rent moves, Solana restores the account only when the instruction returns that error.<!-- {/accountReallocationContract} -->
+///
+/// # Examples
+///
+/// <!-- {=reallocCompactAccountExample|trim|linePrefix:"/// ":true} -->
+/// `ReallocCompactAccount` is the lower-level compact builder. It changes the physical allocation immediately and does not edit or commit the compact view:
+///
+/// ```ignore
+/// ReallocCompactAccount {
+/// 	account,
+/// 	rent_account,
+/// 	target_size,
+/// 	program_id,
+/// }
+/// .invoke::<Journal>()?;
+/// ```
+///
+/// Call `invoke` before editing when the compact layout grows. To shrink, commit the shorter layout, drop its mutable data borrow, and then call `invoke`. Use `invoke_signed` instead when a PDA rent account must fund growth.<!-- {/reallocCompactAccountExample} -->
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 #[must_use = "account reallocation has no effect until invoke or invoke_signed is called"]
-pub struct ReallocCompactAccount<'account, 'payer, 'address> {
+pub struct ReallocCompactAccount<'account, 'rent_account, 'address> {
 	/// Program-owned compact account to resize.
 	pub account: &'account mut AccountView,
 	/// Account that funds growth or receives excess rent after shrinkage.
-	pub payer: &'payer mut AccountView,
+	pub rent_account: &'rent_account mut AccountView,
 	/// Required account-data length after reallocation.
-	pub new_size: usize,
+	pub target_size: usize,
 	/// Executing program ID used to validate ownership.
 	pub program_id: &'address Address,
 }
@@ -1108,25 +1135,195 @@ impl ReallocCompactAccount<'_, '_, '_> {
 		self.invoke_signed::<T>(&[])
 	}
 
-	/// Validates and resizes the compact account with payer signer seeds.
+	/// Validates and resizes the compact account with rent-account signer seeds.
 	pub fn invoke_signed<T: PinaCompactAccount>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
 		self.account.assert_compact_type::<T>(self.program_id)?;
-		T::validate_size(self.new_size)?;
-		if self.new_size < self.account.data_len() {
+		T::validate_size(self.target_size)?;
+		if self.target_size < self.account.data_len() {
 			let data = self.account.try_borrow()?;
-			T::validate_account_data(&data[..self.new_size])?;
+			T::validate_account_data(&data[..self.target_size])?;
 		}
 
 		realloc_account_inner(
 			self.account,
-			self.new_size,
-			self.payer,
+			self.target_size,
+			self.rent_account,
 			self.program_id,
 			signers,
 		)
+	}
+}
+
+/// Updates a compact account and enforces its exact committed size.
+///
+/// This builder handles the order required by compact zero-copy storage. It
+/// grows the account before `edit_account` runs, verifies the callback's commit,
+/// drops the mutable data borrow, and then shrinks the account. The rent account
+/// funds growth and receives refunds after shrinkage.
+///
+/// <!-- {=accountReallocationContract|trim|linePrefix:"/// ":true} -->
+/// `target_size` is the exact physical allocation after the call. When the account grows, `rent_account` funds the missing rent before Pina resizes the data. When the account shrinks, `rent_account` receives the excess rent. New bytes are zero-initialized by the Solana runtime.
+///
+/// The Solana runtime limits account growth to `MAX_PERMITTED_DATA_INCREASE` bytes per top-level instruction. Pina rejects a single larger increase before it moves rent. Pinocchio does not expose the original serialized length, so cumulative growth from several reallocations in one instruction can still fail during `AccountView::resize`.
+///
+/// Propagate reallocation errors. If a later resize or callback fails after rent moves, Solana restores the account only when the instruction returns that error.<!-- {/accountReallocationContract} -->
+///
+/// # Examples
+///
+/// <!-- {=resizeCompactAccountExample|trim|linePrefix:"/// ":true} -->
+/// Use `ResizeCompactAccount` for an exact compact update. The callback receives the account bytes under one mutable borrow. Load the generated mutable view inside the callback, stage every tail, and call `commit()` before returning:
+///
+/// ```ignore
+/// let target_size = Journal::projected_bytes(entries.len(), markers.len())?;
+///
+/// ResizeCompactAccount {
+/// 	account,
+/// 	rent_account,
+/// 	target_size,
+/// 	program_id,
+/// }
+/// .invoke::<Journal, _>(|data| {
+/// 	let mut journal = Journal::try_from_bytes_mut(data)?;
+/// 	journal
+/// 		.set_entries(entries)
+/// 		.map_err(|_| ProgramError::InvalidAccountData)?;
+/// 	journal
+/// 		.set_markers(markers)
+/// 		.map_err(|_| ProgramError::InvalidAccountData)?;
+/// 	journal.commit().map_err(|_| ProgramError::InvalidAccountData)?;
+///
+/// 	Ok(())
+/// })?;
+/// ```
+///
+/// The builder grows before the callback. After the callback, it verifies that the committed logical size equals `target_size`, drops the data borrow, and then shrinks and refunds rent when needed. Use `invoke_signed` with the same callback when `rent_account` is a PDA that funds growth.<!-- {/resizeCompactAccountExample} -->
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+#[must_use = "compact account updates have no effect until invoke or invoke_signed is called"]
+pub struct ResizeCompactAccount<'account, 'rent_account, 'address> {
+	/// Program-owned compact account to update and resize.
+	pub account: &'account mut AccountView,
+	/// Account that funds growth or receives excess rent after shrinkage.
+	pub rent_account: &'rent_account mut AccountView,
+	/// Exact account-data length required by the staged compact layout.
+	pub target_size: usize,
+	/// Executing program ID used to validate ownership.
+	pub program_id: &'address Address,
+}
+
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+impl ResizeCompactAccount<'_, '_, '_> {
+	/// Updates a compact account and resizes it to the exact committed size.
+	///
+	/// Growth happens before `edit_account` runs so larger tails fit in the
+	/// account. Use the supplied bytes to load the concrete mutable view, stage
+	/// its tails, and call `commit()`. Shrinkage happens after the closure returns
+	/// and Pina drops the mutable data borrow.
+	///
+	/// # Errors
+	///
+	/// Returns [`ProgramError::InvalidAccountData`] when `target_size` is invalid,
+	/// the compact account fails validation, or the committed size differs from
+	/// `target_size`. It also propagates errors from `edit_account`, rent
+	/// adjustment, and resizing.
+	///
+	/// Propagate errors from this method. Growth can move rent before the closure
+	/// runs, and Solana restores those changes only when the instruction fails.
+	pub fn invoke<T, R>(
+		&mut self,
+		edit_account: impl FnOnce(&mut [u8]) -> Result<R, ProgramError>,
+	) -> Result<R, ProgramError>
+	where
+		T: PinaCompactAccount,
+	{
+		self.invoke_signed::<T, R>(&[], edit_account)
+	}
+
+	/// Updates a compact account with signer seeds for the rent account.
+	///
+	/// Signers are used only when growth requires a system transfer. Shrinkage
+	/// returns excess rent directly to `rent_account` after the staged layout is
+	/// committed.
+	///
+	/// # Errors
+	///
+	/// Returns the same errors as [`Self::invoke`] and propagates signer errors
+	/// from the system transfer used to fund growth.
+	pub fn invoke_signed<T, R>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		edit_account: impl FnOnce(&mut [u8]) -> Result<R, ProgramError>,
+	) -> Result<R, ProgramError>
+	where
+		T: PinaCompactAccount,
+	{
+		self.invoke_signed_inner::<T, R>(signers, edit_account, None)
+	}
+
+	#[cfg(test)]
+	fn invoke_signed_with_rent<T, R>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		edit_account: impl FnOnce(&mut [u8]) -> Result<R, ProgramError>,
+		rent: Rent,
+	) -> Result<R, ProgramError>
+	where
+		T: PinaCompactAccount,
+	{
+		self.invoke_signed_inner::<T, R>(signers, edit_account, Some(rent))
+	}
+
+	fn invoke_signed_inner<T, R>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		edit_account: impl FnOnce(&mut [u8]) -> Result<R, ProgramError>,
+		rent: Option<Rent>,
+	) -> Result<R, ProgramError>
+	where
+		T: PinaCompactAccount,
+	{
+		self.account.assert_compact_type::<T>(self.program_id)?;
+		T::validate_size(self.target_size)?;
+
+		let allocated_size = self.account.data_len();
+
+		if self.target_size > allocated_size {
+			realloc_account_inner_with_rent(
+				self.account,
+				self.target_size,
+				self.rent_account,
+				self.program_id,
+				signers,
+				rent,
+			)?;
+		}
+
+		let result = {
+			let mut data = self.account.try_borrow_mut()?;
+			let result = edit_account(&mut data)?;
+			let account = T::try_from_bytes(&data)?;
+
+			if T::encoded_size(&account) != self.target_size {
+				return Err(ProgramError::InvalidAccountData);
+			}
+
+			result
+		};
+
+		if self.target_size < allocated_size {
+			realloc_account_inner_with_rent(
+				self.account,
+				self.target_size,
+				self.rent_account,
+				self.program_id,
+				signers,
+				rent,
+			)?;
+		}
+
+		Ok(result)
 	}
 }
 
@@ -1138,20 +1335,27 @@ impl ReallocCompactAccount<'_, '_, '_> {
 #[inline(always)]
 fn realloc_account_inner(
 	account: &mut AccountView,
-	new_size: usize,
-	payer: &mut AccountView,
+	target_size: usize,
+	rent_account: &mut AccountView,
 	program_id: &Address,
 	signers: &[Signer<'_, '_>],
 ) -> ProgramResult {
-	realloc_account_inner_with_rent(account, new_size, payer, program_id, signers, None)
+	realloc_account_inner_with_rent(
+		account,
+		target_size,
+		rent_account,
+		program_id,
+		signers,
+		None,
+	)
 }
 
 #[cfg(feature = "account-resize")]
 #[inline(always)]
 fn realloc_account_inner_with_rent(
 	account: &mut AccountView,
-	new_size: usize,
-	payer: &mut AccountView,
+	target_size: usize,
+	rent_account: &mut AccountView,
 	program_id: &Address,
 	signers: &[Signer<'_, '_>],
 	rent: Option<Rent>,
@@ -1164,7 +1368,7 @@ fn realloc_account_inner_with_rent(
 	let current_size = account.data_len();
 
 	// Early return when the size is unchanged.
-	if new_size == current_size {
+	if target_size == current_size {
 		return Ok(());
 	}
 
@@ -1172,39 +1376,39 @@ fn realloc_account_inner_with_rent(
 	// serialized length is not exposed, so cumulative growth is still checked by
 	// the runtime and its error must be propagated by callers.
 	account.check_borrow_mut()?;
-	validate_realloc_size(current_size, new_size)?;
+	validate_realloc_size(current_size, target_size)?;
 
 	let rent = if let Some(rent) = rent {
 		rent
 	} else {
 		Rent::get()?
 	};
-	let new_minimum_balance = rent.try_minimum_balance(new_size)?;
+	let target_minimum_balance = rent.try_minimum_balance(target_size)?;
 	let current_lamports = account.lamports();
 	let plan = ReallocPlan::from_valid_size(
 		current_size,
-		new_size,
+		target_size,
 		current_lamports,
-		new_minimum_balance,
+		target_minimum_balance,
 	);
 
 	match plan.adjustment {
 		RentAdjustment::Fund { lamports } => {
 			SystemTransfer {
-				from: payer,
+				from: rent_account,
 				to: account,
 				lamports,
 			}
 			.invoke_signed(signers)?;
 		}
 		RentAdjustment::Refund { lamports } => {
-			account.send(lamports, payer)?;
+			account.send(lamports, rent_account)?;
 		}
 		RentAdjustment::None => {}
 	}
 
 	// Resize the account data. The runtime zero-initializes new bytes.
-	account.resize(plan.new_size)
+	account.resize(plan.target_size)
 }
 
 /// Closes an account and returns its remaining lamports to a recipient.
@@ -1559,6 +1763,8 @@ mod tests {
 	use pinocchio::account::RuntimeAccount;
 
 	use super::*;
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
+	use crate::AsCompactAccount;
 	use crate::HasDiscriminator;
 	use crate::LayoutKind;
 	use crate::ZeroPodError;
@@ -1648,35 +1854,35 @@ mod tests {
 		assert_eq!(
 			ReallocPlan::try_new(8, 8, 10, 20),
 			Ok(ReallocPlan {
-				new_size: 8,
+				target_size: 8,
 				adjustment: RentAdjustment::None,
 			})
 		);
 		assert_eq!(
 			ReallocPlan::try_new(8, 16, 10, 25),
 			Ok(ReallocPlan {
-				new_size: 16,
+				target_size: 16,
 				adjustment: RentAdjustment::Fund { lamports: 15 },
 			})
 		);
 		assert_eq!(
 			ReallocPlan::try_new(8, 16, 25, 25),
 			Ok(ReallocPlan {
-				new_size: 16,
+				target_size: 16,
 				adjustment: RentAdjustment::None,
 			})
 		);
 		assert_eq!(
 			ReallocPlan::try_new(16, 8, 25, 10),
 			Ok(ReallocPlan {
-				new_size: 8,
+				target_size: 8,
 				adjustment: RentAdjustment::Refund { lamports: 15 },
 			})
 		);
 		assert_eq!(
 			ReallocPlan::try_new(16, 8, 10, 10),
 			Ok(ReallocPlan {
-				new_size: 8,
+				target_size: 8,
 				adjustment: RentAdjustment::None,
 			})
 		);
@@ -1685,10 +1891,10 @@ mod tests {
 	#[cfg(feature = "account-resize")]
 	#[test]
 	fn realloc_plan_rejects_oversized_growth() {
-		let new_size = MAX_PERMITTED_DATA_INCREASE + 1;
+		let target_size = MAX_PERMITTED_DATA_INCREASE + 1;
 
 		assert_eq!(
-			ReallocPlan::try_new(0, new_size, 0, 0),
+			ReallocPlan::try_new(0, target_size, 0, 0),
 			Err(ProgramError::InvalidRealloc)
 		);
 	}
@@ -1837,6 +2043,327 @@ mod tests {
 		);
 	}
 
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
+	#[test]
+	fn compact_resize_builder_grows_commits_and_returns_the_callback_value() {
+		let owner = Address::new_from_array([9; 32]);
+		let target_size = TestCompactState::projected_bytes(2)
+			.unwrap_or_else(|error| panic!("calculate compact target: {error:?}"));
+		let mut stored_account = TestAccount::<64>::new(
+			Address::new_from_array([1; 32]),
+			owner,
+			1,
+			TestCompactState::MIN_SIZE,
+		);
+		let mut stored_rent_account =
+			TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1_000, 0);
+		let mut account = stored_account.view();
+		let mut rent_account = stored_rent_account.view();
+		let items = [crate::PodU64::from(8), crate::PodU64::from(13)];
+		let initial_lamports = account.lamports() + rent_account.lamports();
+
+		{
+			let mut data = account
+				.try_borrow_mut()
+				.unwrap_or_else(|error| panic!("borrow compact state: {error:?}"));
+			TestCompactState::initialize(&mut data)
+				.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
+		}
+
+		let result = ResizeCompactAccount {
+			account: &mut account,
+			rent_account: &mut rent_account,
+			target_size,
+			program_id: &owner,
+		}
+		.invoke_signed_with_rent::<TestCompactState, _>(
+			&[],
+			|data| {
+				let mut state = TestCompactState::try_from_bytes_mut(data)?;
+				state.value = 21;
+				state
+					.set_items(&items)
+					.map_err(|_| ProgramError::InvalidAccountData)?;
+				state
+					.commit()
+					.map_err(|_| ProgramError::InvalidAccountData)?;
+
+				Ok(34)
+			},
+			test_rent(),
+		)
+		.unwrap_or_else(|error| panic!("grow compact state: {error:?}"));
+
+		assert_eq!(result, 34);
+		assert_eq!(account.data_len(), target_size);
+		assert_eq!(
+			account.lamports() + rent_account.lamports(),
+			initial_lamports
+		);
+		account
+			.with_compact_account::<TestCompactState, _>(&owner, |state| {
+				assert_eq!(state.value, 21);
+				assert_eq!(state.items(), items);
+
+				Ok(())
+			})
+			.unwrap_or_else(|error| panic!("read grown compact state: {error:?}"));
+	}
+
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
+	#[test]
+	fn compact_resize_builder_commits_before_shrinking_and_refunds_rent() {
+		let owner = Address::new_from_array([9; 32]);
+		let initial_size = TestCompactState::projected_bytes(2)
+			.unwrap_or_else(|error| panic!("calculate initial compact size: {error:?}"));
+		let mut stored_account =
+			TestAccount::<64>::new(Address::new_from_array([1; 32]), owner, 1_000, initial_size);
+		let mut stored_rent_account =
+			TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1, 0);
+		let mut account = stored_account.view();
+		let mut rent_account = stored_rent_account.view();
+		let items = [crate::PodU64::from(8), crate::PodU64::from(13)];
+		let initial_lamports = account.lamports() + rent_account.lamports();
+		let initial_rent_lamports = rent_account.lamports();
+
+		{
+			let mut data = account
+				.try_borrow_mut()
+				.unwrap_or_else(|error| panic!("borrow compact state: {error:?}"));
+			let mut state = TestCompactState::initialize(&mut data)
+				.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
+			state
+				.set_items(&items)
+				.unwrap_or_else(|error| panic!("set compact items: {error:?}"));
+			state
+				.commit()
+				.unwrap_or_else(|error| panic!("commit compact items: {error:?}"));
+		}
+
+		ResizeCompactAccount {
+			account: &mut account,
+			rent_account: &mut rent_account,
+			target_size: TestCompactState::MIN_SIZE,
+			program_id: &owner,
+		}
+		.invoke_signed_with_rent::<TestCompactState, _>(
+			&[],
+			|data| {
+				let mut state = TestCompactState::try_from_bytes_mut(data)?;
+				state
+					.set_items(&[])
+					.map_err(|_| ProgramError::InvalidAccountData)?;
+				state
+					.commit()
+					.map_err(|_| ProgramError::InvalidAccountData)?;
+
+				Ok(())
+			},
+			test_rent(),
+		)
+		.unwrap_or_else(|error| panic!("shrink compact state: {error:?}"));
+
+		assert_eq!(account.data_len(), TestCompactState::MIN_SIZE);
+		assert_eq!(
+			account.lamports() + rent_account.lamports(),
+			initial_lamports
+		);
+		assert!(rent_account.lamports() > initial_rent_lamports);
+	}
+
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
+	#[test]
+	fn compact_resize_builder_skips_realloc_for_an_unchanged_size() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored_account = TestAccount::<64>::new(
+			Address::new_from_array([1; 32]),
+			owner,
+			1,
+			TestCompactState::MIN_SIZE,
+		);
+		let mut stored_rent_account =
+			TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1, 0);
+		let mut account = stored_account.view();
+		let mut rent_account = stored_rent_account.view();
+
+		{
+			let mut data = account
+				.try_borrow_mut()
+				.unwrap_or_else(|error| panic!("borrow compact state: {error:?}"));
+			TestCompactState::initialize(&mut data)
+				.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
+		}
+
+		let empty_seeds: [Seed<'_>; 0] = [];
+		let signer = Signer::from(&empty_seeds);
+		let result = ResizeCompactAccount {
+			account: &mut account,
+			rent_account: &mut rent_account,
+			target_size: TestCompactState::MIN_SIZE,
+			program_id: &owner,
+		}
+		.invoke_signed::<TestCompactState, _>(&[signer], |data| {
+			let mut state = TestCompactState::try_from_bytes_mut(data)?;
+			state.value = 55;
+			state
+				.commit()
+				.map_err(|_| ProgramError::InvalidAccountData)?;
+
+			Ok(89)
+		})
+		.unwrap_or_else(|error| panic!("update compact state: {error:?}"));
+
+		assert_eq!(result, 89);
+		assert_eq!(account.data_len(), TestCompactState::MIN_SIZE);
+	}
+
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
+	#[test]
+	fn compact_resize_builder_rejects_mismatched_and_failed_updates() {
+		let owner = Address::new_from_array([9; 32]);
+		let allocated_size = TestCompactState::projected_bytes(1)
+			.unwrap_or_else(|error| panic!("calculate allocated compact size: {error:?}"));
+		let mut stored_account =
+			TestAccount::<64>::new(Address::new_from_array([1; 32]), owner, 1, allocated_size);
+		let mut stored_rent_account =
+			TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1, 0);
+		let mut account = stored_account.view();
+		let mut rent_account = stored_rent_account.view();
+
+		{
+			let mut data = account
+				.try_borrow_mut()
+				.unwrap_or_else(|error| panic!("borrow compact state: {error:?}"));
+			TestCompactState::initialize(&mut data)
+				.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
+		}
+
+		let mismatch = ResizeCompactAccount {
+			account: &mut account,
+			rent_account: &mut rent_account,
+			target_size: allocated_size,
+			program_id: &owner,
+		}
+		.invoke::<TestCompactState, _>(|data| {
+			let mut state = TestCompactState::try_from_bytes_mut(data)?;
+			state
+				.commit()
+				.map_err(|_| ProgramError::InvalidAccountData)?;
+
+			Ok(())
+		});
+		assert_eq!(mismatch, Err(ProgramError::InvalidAccountData));
+		assert_eq!(account.data_len(), allocated_size);
+
+		let callback_error = ResizeCompactAccount {
+			account: &mut account,
+			rent_account: &mut rent_account,
+			target_size: allocated_size,
+			program_id: &owner,
+		}
+		.invoke::<TestCompactState, _>(|_| Err::<(), _>(ProgramError::InvalidArgument));
+		assert_eq!(callback_error, Err(ProgramError::InvalidArgument));
+		assert_eq!(account.data_len(), allocated_size);
+
+		let invalid_target = ResizeCompactAccount {
+			account: &mut account,
+			rent_account: &mut rent_account,
+			target_size: TestCompactState::HEADER_SIZE + 1,
+			program_id: &owner,
+		}
+		.invoke::<TestCompactState, _>(|_| Ok(()));
+		assert_eq!(invalid_target, Err(ProgramError::InvalidAccountData));
+		assert_eq!(account.data_len(), allocated_size);
+	}
+
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
+	#[test]
+	fn compact_resize_builder_propagates_growth_and_shrink_realloc_failures() {
+		let owner = Address::new_from_array([9; 32]);
+		let grown_size = TestCompactState::projected_bytes(1)
+			.unwrap_or_else(|error| panic!("calculate grown compact size: {error:?}"));
+		let mut stored_growth_account = TestAccount::<64>::new(
+			Address::new_from_array([1; 32]),
+			owner,
+			1,
+			TestCompactState::MIN_SIZE,
+		);
+		let mut stored_empty_rent_account =
+			TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 0, 0);
+		let mut growth_account = stored_growth_account.view();
+		let mut empty_rent_account = stored_empty_rent_account.view();
+		{
+			let mut data = growth_account
+				.try_borrow_mut()
+				.unwrap_or_else(|error| panic!("borrow growth state: {error:?}"));
+			TestCompactState::initialize(&mut data)
+				.unwrap_or_else(|error| panic!("initialize growth state: {error:?}"));
+		}
+		let callback_count = core::cell::Cell::new(0);
+		let edit_account = |_: &mut [u8]| {
+			callback_count.set(callback_count.get() + 1);
+			Ok::<(), ProgramError>(())
+		};
+		edit_account(&mut []).unwrap_or_else(|error| panic!("exercise growth callback: {error:?}"));
+		assert_eq!(callback_count.get(), 1);
+		let growth = ResizeCompactAccount {
+			account: &mut growth_account,
+			rent_account: &mut empty_rent_account,
+			target_size: grown_size,
+			program_id: &owner,
+		}
+		.invoke_signed_with_rent::<TestCompactState, _>(
+			&[],
+			edit_account,
+			Rent::from_bytes(&u64::MAX.to_le_bytes())
+				.unwrap_or_else(|error| panic!("overflowing test rent: {error:?}")),
+		);
+		assert!(growth.is_err());
+		assert_eq!(callback_count.get(), 1);
+
+		let mut stored_shrink_account =
+			TestAccount::<64>::new(Address::new_from_array([3; 32]), owner, 1_000, grown_size);
+		let mut stored_full_rent_account =
+			TestAccount::<0>::new(Address::new_from_array([4; 32]), owner, u64::MAX, 0);
+		let mut shrink_account = stored_shrink_account.view();
+		let mut full_rent_account = stored_full_rent_account.view();
+		let item = [crate::PodU64::from(8)];
+		{
+			let mut data = shrink_account
+				.try_borrow_mut()
+				.unwrap_or_else(|error| panic!("borrow shrink state: {error:?}"));
+			let mut state = TestCompactState::initialize(&mut data)
+				.unwrap_or_else(|error| panic!("initialize shrink state: {error:?}"));
+			state
+				.set_items(&item)
+				.unwrap_or_else(|error| panic!("set shrink item: {error:?}"));
+			state
+				.commit()
+				.unwrap_or_else(|error| panic!("commit shrink item: {error:?}"));
+		}
+		let shrink = ResizeCompactAccount {
+			account: &mut shrink_account,
+			rent_account: &mut full_rent_account,
+			target_size: TestCompactState::MIN_SIZE,
+			program_id: &owner,
+		}
+		.invoke_signed_with_rent::<TestCompactState, _>(
+			&[],
+			|data| {
+				let mut state = TestCompactState::try_from_bytes_mut(data)?;
+				state
+					.set_items(&[])
+					.map_err(|_| ProgramError::InvalidAccountData)?;
+				state
+					.commit()
+					.map_err(|_| ProgramError::InvalidAccountData)?;
+				Ok(())
+			},
+			test_rent(),
+		);
+		assert_eq!(shrink, Err(ProgramError::ArithmeticOverflow));
+	}
+
 	#[test]
 	fn prefunded_pda_allocation_runs_transfer_allocate_and_assign() {
 		let owner = Address::new_from_array([9; 32]);
@@ -1885,14 +2412,15 @@ mod tests {
 		let owner = Address::new_from_array([9; 32]);
 		let mut stored_account =
 			TestAccount::<32>::new(Address::new_from_array([1; 32]), owner, 1, 8);
-		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1, 0);
+		let mut stored_rent_account =
+			TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1, 0);
 		let mut account = stored_account.view();
-		let mut payer = stored_payer.view();
+		let mut rent_account = stored_rent_account.view();
 
 		realloc_account_inner_with_rent(
 			&mut account,
 			16,
-			&mut payer,
+			&mut rent_account,
 			&owner,
 			&[],
 			Some(test_rent()),
@@ -1908,14 +2436,15 @@ mod tests {
 		let owner = Address::new_from_array([9; 32]);
 		let mut stored_account =
 			TestAccount::<32>::new(Address::new_from_array([1; 32]), owner, 1_000, 8);
-		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1, 0);
+		let mut stored_rent_account =
+			TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1, 0);
 		let mut account = stored_account.view();
-		let mut payer = stored_payer.view();
+		let mut rent_account = stored_rent_account.view();
 
 		realloc_account_inner_with_rent(
 			&mut account,
 			16,
-			&mut payer,
+			&mut rent_account,
 			&owner,
 			&[],
 			Some(test_rent()),
@@ -1924,7 +2453,7 @@ mod tests {
 
 		assert_eq!(account.data_len(), 16);
 		assert_eq!(account.lamports(), 1_000);
-		assert_eq!(payer.lamports(), 1);
+		assert_eq!(rent_account.lamports(), 1);
 	}
 
 	#[cfg(feature = "account-resize")]
@@ -1933,15 +2462,16 @@ mod tests {
 		let owner = Address::new_from_array([9; 32]);
 		let mut stored_account =
 			TestAccount::<32>::new(Address::new_from_array([1; 32]), owner, 1_000, 16);
-		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1, 0);
+		let mut stored_rent_account =
+			TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1, 0);
 		let mut account = stored_account.view();
-		let mut payer = stored_payer.view();
-		let initial_total = account.lamports() + payer.lamports();
+		let mut rent_account = stored_rent_account.view();
+		let initial_total = account.lamports() + rent_account.lamports();
 
 		realloc_account_inner_with_rent(
 			&mut account,
 			8,
-			&mut payer,
+			&mut rent_account,
 			&owner,
 			&[],
 			Some(test_rent()),
@@ -1949,7 +2479,7 @@ mod tests {
 		.unwrap_or_else(|error| panic!("shrink account: {error:?}"));
 
 		assert_eq!(account.data_len(), 8);
-		assert_eq!(account.lamports() + payer.lamports(), initial_total);
-		assert!(payer.lamports() > 1);
+		assert_eq!(account.lamports() + rent_account.lamports(), initial_total);
+		assert!(rent_account.lamports() > 1);
 	}
 }

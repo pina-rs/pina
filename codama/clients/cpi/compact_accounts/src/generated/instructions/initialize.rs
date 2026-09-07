@@ -46,19 +46,23 @@ pub struct InitializeIx {
 
 	/// Instruction argument `entryCount`.
 	pub entry_count: u8,
+
+	/// Instruction argument `markerCount`.
+	pub marker_count: u8,
 }
 
 impl InitializeIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 3;
+	pub const LEN: usize = 4;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> [u8; 3] {
-		let mut data = [0u8; 3];
+	pub fn to_bytes(&self) -> [u8; 4] {
+		let mut data = [0u8; 4];
 		data[..1].copy_from_slice(&INITIALIZE_DISCRIMINATOR);
 		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
 		data[2..3].copy_from_slice(&self.entry_count.to_le_bytes());
+		data[3..4].copy_from_slice(&self.marker_count.to_le_bytes());
 
 		data
 	}

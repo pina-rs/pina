@@ -16,11 +16,13 @@ class InitializeInstructionData {
   const InitializeInstructionData({
     required this.bump,
     required this.entryCount,
+    required this.markerCount,
   }) : discriminator = 0;
 
   final int discriminator;
   final int bump;
   final int entryCount;
+  final int markerCount;
 }
 
 Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
@@ -28,6 +30,7 @@ Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
     ('discriminator', getU8Encoder()),
     ('bump', getU8Encoder()),
     ('entryCount', getU8Encoder()),
+    ('markerCount', getU8Encoder()),
   ]);
 
   return transformEncoder(
@@ -36,6 +39,7 @@ Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
       'discriminator': 0,
       'bump': value.bump,
       'entryCount': value.entryCount,
+      'markerCount': value.markerCount,
     },
   );
 }
@@ -45,6 +49,7 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
     ('discriminator', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('entryCount', getU8Decoder()),
+    ('markerCount', getU8Decoder()),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
@@ -66,6 +71,7 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
       InitializeInstructionData(
         bump: map['bump']! as int,
         entryCount: map['entryCount']! as int,
+        markerCount: map['markerCount']! as int,
       ),
       newOffset,
     );
@@ -107,10 +113,12 @@ Instruction getInitializeInstruction({
   required Address systemProgram,
   required int bump,
   required int entryCount,
+  required int markerCount,
 }) {
   final instructionData = InitializeInstructionData(
     bump: bump,
     entryCount: entryCount,
+    markerCount: markerCount,
   );
 
   return Instruction(

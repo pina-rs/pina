@@ -117,6 +117,9 @@ pub trait PinaCompactAccount: HasDiscriminator + ZeroPodCompact {
 
 	/// Initialize caller-owned compact storage.
 	fn initialize(data: &mut [u8]) -> Result<Self::Mut<'_>, ProgramError>;
+
+	/// Return the bytes occupied by an immutable compact view's committed layout.
+	fn encoded_size(account: &Self::Ref<'_>) -> usize;
 }
 
 /// Validation trait for deserialized account data (e.g. `EscrowState`).
