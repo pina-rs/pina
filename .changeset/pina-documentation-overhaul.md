@@ -2,6 +2,12 @@
 pina: docs
 pina_cli: docs
 pina_codama_renderer: docs
+pina_lints: none
+pina_macros: none
+pina_profile: none
+pina_sdk_ids: none
+pina_skill: none
+pina_test: none
 ---
 
 # Overhaul the book, readmes, and rustdoc
