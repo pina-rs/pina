@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   compare:
+    name: compute-unit regression
     timeout-minutes: 180
     runs-on: ubuntu-24.04
     env:
