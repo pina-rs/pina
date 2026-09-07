@@ -30,11 +30,12 @@ pub(crate) fn expand(
 	let crate_path = &args.crate_path;
 	let seeds_name = format_ident!("{}Seeds", struct_name);
 	let seeds_with_bump_name = format_ident!("{}SeedsWithBump", struct_name);
+	let has_account_representation = item_struct
+		.attrs
+		.iter()
+		.any(|attr| attr.path().is_ident("account") || attr.path().is_ident("pinapod"));
 	let is_compact = item_struct.attrs.iter().any(|attr| {
-		if !attr.path().is_ident("account")
-			&& !attr.path().is_ident("pinapod")
-			&& !attr.path().is_ident("zeropod")
-		{
+		if !attr.path().is_ident("account") && !attr.path().is_ident("pinapod") {
 			return false;
 		}
 		attr.parse_args_with(
@@ -177,6 +178,66 @@ pub(crate) fn expand(
 			}
 		}
 	});
+	let load_pda = args.bump.as_ref().and_then(|bump_field| {
+		(has_account_representation && !is_compact).then(|| {
+			let load_doc = format!(
+				"Load and validate `{struct_name}` and its stored-bump PDA address in one pass."
+			);
+			let load_mut_doc = format!(
+				"Mutably load and validate `{struct_name}` and its stored-bump PDA address in one \
+				 pass."
+			);
+			quote! {
+				#[doc = #load_doc]
+				#[inline(always)]
+				pub fn load_pda<'account>(
+					account: &'account #crate_path::AccountView,
+					#(#find_seed_params,)*
+					program_id: &#crate_path::Address,
+				) -> ::core::result::Result<
+					#crate_path::Ref<'account, <Self as #crate_path::PinaPodFixed>::Zc>,
+					#crate_path::ProgramError,
+				> {
+					let account_address = *account.address();
+					let state = #crate_path::AsAccount::as_account::<Self>(account, program_id)?;
+					let seeds = Self::seeds(#(#seed_param_names,)*).with_bump(state.#bump_field);
+					let expected_address = #crate_path::create_program_address(
+						&seeds.as_slices(),
+						program_id,
+					)?;
+					if account_address != expected_address {
+						return Err(#crate_path::ProgramError::InvalidSeeds);
+					}
+
+					Ok(state)
+				}
+
+				#[doc = #load_mut_doc]
+				#[inline(always)]
+				pub fn load_pda_mut<'account>(
+					account: &'account mut #crate_path::AccountView,
+					#(#find_seed_params,)*
+					program_id: &#crate_path::Address,
+				) -> ::core::result::Result<
+					#crate_path::RefMut<'account, <Self as #crate_path::PinaPodFixed>::Zc>,
+					#crate_path::ProgramError,
+				> {
+					let account_address = *account.address();
+					let state = #crate_path::AsAccount::as_account_mut::<Self>(account, program_id)?;
+					let seeds = Self::seeds(#(#seed_param_names,)*).with_bump(state.#bump_field);
+					let expected_address = #crate_path::create_program_address(
+						&seeds.as_slices(),
+						program_id,
+					)?;
+					if account_address != expected_address {
+						return Err(#crate_path::ProgramError::InvalidSeeds);
+					}
+
+					Ok(state)
+				}
+			}
+		})
+	});
 
 	let generated = quote! {
 		#[doc = #seeds_doc]
@@ -219,6 +280,7 @@ pub(crate) fn expand(
 			}
 
 			#assert_seeds
+			#load_pda
 		}
 
 		impl<'a> #seeds_name<'a> {

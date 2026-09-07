@@ -11,6 +11,7 @@
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
+use pina::ProgramError;
 use pina::ProgramResult;
 use pina::Signer;
 
@@ -48,13 +49,13 @@ impl UpdateIx {
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> [u8; 13] {
+	pub fn to_bytes(&self) -> Result<[u8; 13], ProgramError> {
 		let mut data = [0u8; 13];
 		data[..1].copy_from_slice(&UPDATE_DISCRIMINATOR);
 		data[1..5].copy_from_slice(&self.data_f32.to_le_bytes());
 		data[5..13].copy_from_slice(&self.data_f64.to_le_bytes());
 
-		data
+		Ok(data)
 	}
 }
 
@@ -76,7 +77,7 @@ impl<'account> Update<'account> {
 			CpiHandle::writable(self.account)?,
 			CpiHandle::readonly_signer(self.authority),
 		];
-		let data = self.ix.to_bytes();
+		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

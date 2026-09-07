@@ -38,8 +38,8 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { findVestingPda } from "../pdas";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { VESTING_PROGRAM_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const INITIALIZE_DISCRIMINATOR = 0;
 
@@ -130,7 +130,7 @@ export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder()),
+			getPinaPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder()),
 		],
 		["totalAmount", getU64Decoder()],
 		["startTs", getU64Decoder()],

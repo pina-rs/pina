@@ -1,0 +1,8 @@
+error[E0599]: no method named `discriminator` found for struct `StatePatch<'__pinapod_patch>` in the current scope
+  --> tests/ui/fail/account_compact_discriminator_patch.rs:14:28
+   |
+ 8 | #[account(discriminator = Kind, compact)]
+   | ----------------------------------------- method `discriminator` not found for this struct
+...
+14 |     let _ = StatePatch::new().discriminator(2);
+   |                               ^^^^^^^^^^^^^ method not found in `StatePatch<'_>`

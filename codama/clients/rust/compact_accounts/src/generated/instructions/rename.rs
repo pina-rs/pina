@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const RENAME_DISCRIMINATOR: u8 = 3u8;
 
 /// Accounts.
@@ -65,21 +63,20 @@ impl RenameInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut RenameInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <RenameInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data = <RenameInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; core::mem::size_of::<RenameInstructionWireZc>()];
+		<RenameInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = RENAME_DISCRIMINATOR;
-		}
-		<RenameInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct RenameInstructionWire {
 	pub discriminator: u8,
 	pub title_len: u8,

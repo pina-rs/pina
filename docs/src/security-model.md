@@ -73,27 +73,31 @@ Closing guidance under Pinocchio 0.11:
 - **Always call `assert_signer()`** before trusting authority accounts
 - **Always call `assert_owner()` / `assert_owners()`** before `as_token_*()` methods
 - **Always call `assert_empty()`** before account initialization to prevent reinitialization attacks
+- **Use `invoke_with` or `invoke_signed_with`** when fixed-account creation must establish nonzero values before final PinaPod validation
+- **Use generated `load_pda` or `load_pda_mut`** when a fixed stored-bump PDA handler needs a typed guard, so recursive content and the PDA address are validated once
 - **Always verify program accounts** with `assert_address()` / `assert_program()` before CPI invocations
-- **Use `assert_type::<T>()`** to prevent type cosplay — it checks discriminator, owner, and data size
+- **Use `assert_type::<T>()`** to prevent type cosplay: it checks discriminator, owner, and data size
 - **Use `CloseAccountZeroed { account, recipient }.invoke()` or `zeroed()` + `close_with_recipient()`** when stale account bytes must be invalidated before close
 - **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
 - **Give each account type its own seed namespace** so PDAs cannot collide across account types
 
 <!-- {/pinaSecurityBestPractices} -->
 
-## Content validation (Pinapod)
+## Content validation with PinaPod
 
-Pina's zero-copy account model is built on [Pinapod](https://crates.io/crates/pinapod). Pinapod's generated storage view makes **validation load-bearing**: `PinaAccount::try_from_bytes` / `as_account` reject non-canonical booleans, invalid UTF-8, overlength vector prefixes, and invalid enum discriminants before returning a reference.
+Pina's zero-copy account model is built on PinaPod. Its generated storage view makes validation load-bearing: `PinaAccount::try_from_bytes` and `as_account` reject noncanonical booleans, invalid UTF-8, overlength vector prefixes, invalid option tags, invalid active nested values, and invalid enum discriminants before returning a reference.
 
-The `#[account]` macro uses the native struct only as a schema and derives `pinapod::ZeroPod` (re-exported as `pina::ZeroPod`). For `Account`, Pinapod generates `AccountZc`; loaders return that companion, not a reference to the native schema. `PinaAccount::validate` checks the discriminator and every field, while `try_from_bytes` additionally enforces exact size.
+The `#[account]` macro uses the native struct only as a schema and derives `PinaPod`. For `Account`, PinaPod generates `AccountZc`; loaders return that companion, not a reference to the native schema. `PinaAccount::validate_account_data` checks the discriminator, exact size, and every fixed field. Compact loaders also check every tail offset and active length.
 
 ### Unit enums
 
-Unit enums with explicit discriminants can be native schema fields when they derive `pinapod::ZeroPod`. Pinapod generates an `EnumZc` companion that stores raw bytes and validates the discriminant before converting it to the native enum. Application schemas use the native enum; only generated storage views contain the companion.
+Unit enums with explicit discriminants can derive `PinaPod`. PinaPod generates an `EnumZc` companion that stores raw bytes and validates the discriminant before converting it to the native enum. Pina's audited `#[account]` grammar does not accept arbitrary custom enums, so this form applies to direct PinaPod schemas and advanced manual `PinaAccount` implementations.
 
 ### Inactive capacity
 
-Fixed-capacity strings and vectors may contain uninitialized bytes outside their active range. Those bytes are intentionally unobservable: Pina exposes validated field accessors, never a byte slice over an in-memory schema or zero-copy view. Initialization starts from caller-owned, fully initialized account or instruction storage and returns a borrow tied to that storage.
+PinaPod initializes the full capacity of fixed strings, vectors, and options. Shortening or clearing a value also zeroes the removed payload, so stale application data does not remain in inactive capacity. Pina still exposes validated field accessors rather than a byte slice over an in-memory schema or storage view.
+
+Compact patches clear bytes removed by a tail replacement. `UpdateResizableAccount` validates the complete patch before moving rent or changing account bytes. A failed preflight leaves both data and lamports unchanged.
 
 ## Testing strategy
 

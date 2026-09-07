@@ -8,6 +8,8 @@
 
 import {
 	type Account,
+	addDecoderSizePrefix,
+	addEncoderSizePrefix,
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
@@ -23,18 +25,22 @@ import {
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
 	fixEncoderSize,
+	getArrayDecoder,
+	getArrayEncoder,
 	getBooleanDecoder,
 	getBooleanEncoder,
-	getBytesDecoder,
-	getBytesEncoder,
 	getOptionDecoder,
 	getOptionEncoder,
 	getStructDecoder,
 	getStructEncoder,
+	getU16Decoder,
+	getU16Encoder,
 	getU64Decoder,
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	getUtf8Decoder,
+	getUtf8Encoder,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type Option,
@@ -44,11 +50,12 @@ import {
 } from "@solana/kit";
 import { findProfilePda, type ProfileSeeds } from "../pdas";
 import {
-	fixZeroPodEncoderSize,
-	getZeroPodBooleanDecoder,
-	getZeroPodDiscriminatorDecoder,
-	getZeroPodOptionTagDecoder,
-} from "../zeropodCodecs";
+	fixPinaPodEncoderSize,
+	getPinaPodBooleanDecoder,
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodOptionTagDecoder,
+	getPinaPodStringDecoder,
+} from "../pinaPodCodecs";
 
 export const PROFILE_STATE_DISCRIMINATOR = 1;
 
@@ -62,7 +69,7 @@ export function getProfileStateDiscriminatorBytes(): ReadonlyUint8Array {
  * The `#[account]` macro generates:
  * - A discriminator field (`ProfileAccountType::ProfileState`) as the first
  * byte.
- * - `PinaAccount` and zeropod validation for checked zero-copy access.
+ * - `PinaAccount` and `PinaPod` validation for checked zero-copy access.
  * - `HasDiscriminator` linking this account to
  * `ProfileAccountType::ProfileState`.
  * - `initialize` and `try_from_bytes` helpers for caller-owned storage.
@@ -73,9 +80,9 @@ export function getProfileStateDiscriminatorBytes(): ReadonlyUint8Array {
  * |--------|------|----------------|
  * | 0      | 1    | discriminator  |
  * | 1      | 1    | bump           |
- * | 2      | 33   | bounded name bytes   |
- * | 35     | 129  | bounded bio bytes    |
- * | 164    | 66   | bounded tag bytes    |
+ * | 2      | 33   | name (`String<32>`)  |
+ * | 35     | 129  | bio (`String<128>`)  |
+ * | 164    | 66   | tags (`Vec<u64, 8>`) |
  * | 230    | 9    | favorite_tag (PodOption<PodU64>) |
  * | 239    | 1    | active (PodBool) |
  * ```
@@ -84,12 +91,12 @@ export type ProfileState = {
 	discriminator: number;
 	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
 	bump: number;
-	/** One length byte followed by 32 fully initialized UTF-8 bytes. */
-	name: ReadonlyUint8Array;
-	/** One length byte followed by 128 fully initialized UTF-8 bytes. */
-	bio: ReadonlyUint8Array;
-	/** A two-byte count followed by eight little-endian `u64` slots. */
-	tags: ReadonlyUint8Array;
+	/** UTF-8 display name with 32 bytes of inline capacity. */
+	name: string;
+	/** UTF-8 biography with 128 bytes of inline capacity. */
+	bio: string;
+	/** Up to eight tags stored inline. */
+	tags: Array<bigint>;
 	/**
 	 * An optional favourite tag. The generated view uses a one-byte tag and
 	 * an eight-byte value slot, even when the option is `None`.
@@ -102,12 +109,12 @@ export type ProfileState = {
 export type ProfileStateArgs = {
 	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
 	bump: number;
-	/** One length byte followed by 32 fully initialized UTF-8 bytes. */
-	name: ReadonlyUint8Array;
-	/** One length byte followed by 128 fully initialized UTF-8 bytes. */
-	bio: ReadonlyUint8Array;
-	/** A two-byte count followed by eight little-endian `u64` slots. */
-	tags: ReadonlyUint8Array;
+	/** UTF-8 display name with 32 bytes of inline capacity. */
+	name: string;
+	/** UTF-8 biography with 128 bytes of inline capacity. */
+	bio: string;
+	/** Up to eight tags stored inline. */
+	tags: Array<number | bigint>;
 	/**
 	 * An optional favourite tag. The generated view uses a one-byte tag and
 	 * an eight-byte value slot, even when the option is `None`.
@@ -120,18 +127,31 @@ export type ProfileStateArgs = {
 /** Gets the encoder for {@link ProfileStateArgs} account data. */
 export function getProfileStateEncoder(): FixedSizeEncoder<ProfileStateArgs> {
 	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["bump", getU8Encoder()],
-			["name", fixZeroPodEncoderSize(getBytesEncoder(), 33)],
-			["bio", fixZeroPodEncoderSize(getBytesEncoder(), 129)],
-			["tags", fixZeroPodEncoderSize(getBytesEncoder(), 66)],
-			[
-				"favoriteTag",
-				getOptionEncoder(getU64Encoder(), { noneValue: "zeroes" }),
-			],
-			["active", getBooleanEncoder()],
-		]),
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"bump",
+			getU8Encoder(),
+		], [
+			"name",
+			fixPinaPodEncoderSize(
+				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+				33,
+			),
+		], [
+			"bio",
+			fixPinaPodEncoderSize(
+				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+				129,
+			),
+		], [
+			"tags",
+			fixPinaPodEncoderSize(
+				getArrayEncoder(getU64Encoder(), { size: getU16Encoder() }),
+				66,
+			),
+		], [
+			"favoriteTag",
+			getOptionEncoder(getU64Encoder(), { noneValue: "zeroes" }),
+		], ["active", getBooleanEncoder()]]),
 		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
@@ -141,23 +161,29 @@ export function getProfileStateDecoder(): FixedSizeDecoder<ProfileState> {
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(
+			getPinaPodDiscriminatorDecoder(
 				PROFILE_STATE_DISCRIMINATOR,
 				getU8Decoder(),
 			),
 		],
 		["bump", getU8Decoder()],
-		["name", fixDecoderSize(getBytesDecoder(), 33)],
-		["bio", fixDecoderSize(getBytesDecoder(), 129)],
-		["tags", fixDecoderSize(getBytesDecoder(), 66)],
+		["name", getPinaPodStringDecoder(getU8Decoder(), 33)],
+		["bio", getPinaPodStringDecoder(getU8Decoder(), 129)],
+		[
+			"tags",
+			fixDecoderSize(
+				getArrayDecoder(getU64Decoder(), { size: getU16Decoder() }),
+				66,
+			),
+		],
 		[
 			"favoriteTag",
 			getOptionDecoder(getU64Decoder(), {
-				prefix: getZeroPodOptionTagDecoder(getU8Decoder()),
+				prefix: getPinaPodOptionTagDecoder(getU8Decoder()),
 				noneValue: "zeroes",
 			}),
 		],
-		["active", getZeroPodBooleanDecoder()],
+		["active", getPinaPodBooleanDecoder()],
 	]);
 }
 

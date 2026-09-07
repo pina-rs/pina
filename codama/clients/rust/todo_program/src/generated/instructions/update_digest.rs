@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const UPDATE_DIGEST_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
@@ -67,22 +65,20 @@ impl UpdateDigestInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut UpdateDigestInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <UpdateDigestInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data =
-				<UpdateDigestInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; core::mem::size_of::<UpdateDigestInstructionWireZc>()];
+		<UpdateDigestInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = UPDATE_DIGEST_DISCRIMINATOR;
-		}
-		<UpdateDigestInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct UpdateDigestInstructionWire {
 	pub discriminator: u8,
 	pub digest: [u8; 32],

@@ -101,11 +101,12 @@ fn compact_accounts_idl_preserves_multiple_dynamic_tails() {
 		.pointer("/program/accounts/0/data/fields")
 		.and_then(Value::as_array)
 		.expect("compact account fields");
-	assert_eq!(fields.len(), 8);
+	assert_eq!(fields.len(), 9);
 	let featured_entry = &fields[4];
 	let title = &fields[5];
 	let entries = &fields[6];
 	let markers = &fields[7];
+	let note = &fields[8];
 
 	assert_eq!(
 		featured_entry.pointer("/name").and_then(Value::as_str),
@@ -164,6 +165,20 @@ fn compact_accounts_idl_preserves_multiple_dynamic_tails() {
 	assert_eq!(
 		markers.pointer("/type/item/format").and_then(Value::as_str),
 		Some("u8"),
+	);
+	assert_eq!(note.pointer("/name").and_then(Value::as_str), Some("note"));
+	assert_eq!(
+		note.pointer("/type/kind").and_then(Value::as_str),
+		Some("optionTypeNode"),
+	);
+	assert_eq!(
+		note.pointer("/type/item/kind").and_then(Value::as_str),
+		Some("sizePrefixTypeNode"),
+	);
+	assert_eq!(
+		note.pointer("/type/item/type/encoding")
+			.and_then(Value::as_str),
+		Some("utf8"),
 	);
 }
 

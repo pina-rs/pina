@@ -5,7 +5,7 @@ pub enum SemanticOptionsAccount {
 	SemanticOptionsState = 1,
 }
 
-/// Account exercising native and explicit zeropod option layouts.
+/// Account exercising native and explicit PinaPod option layouts.
 #[account(discriminator = SemanticOptionsAccount)]
 pub struct SemanticOptionsState {
 	/// The ergonomic one-byte-tag schema form.
@@ -14,6 +14,6 @@ pub struct SemanticOptionsState {
 	pub wide: PodOption<PodU64, 2>,
 	/// A nested fixed-capacity string.
 	pub label: Option<String<8>>,
-	/// Options remain fixed-size zeropod elements inside vectors.
+	/// Options remain fixed-size PinaPod elements inside vectors.
 	pub values: Vec<Option<u16>, 3>,
 }

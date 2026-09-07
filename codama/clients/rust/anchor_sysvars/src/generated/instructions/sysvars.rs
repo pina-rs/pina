@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const SYSVARS_DISCRIMINATOR: u8 = 0u8;
 
 /// Accounts.
@@ -72,21 +70,20 @@ impl SysvarsInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut SysvarsInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <SysvarsInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data = <SysvarsInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; core::mem::size_of::<SysvarsInstructionWireZc>()];
+		<SysvarsInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = SYSVARS_DISCRIMINATOR;
-		}
-		<SysvarsInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct SysvarsInstructionWire {
 	pub discriminator: u8,
 }

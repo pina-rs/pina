@@ -113,7 +113,9 @@ impl ::pina::IntoDiscriminator for PdaDisc {
         (*self as u8).matches_discriminator(bytes)
     }
 }
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct CounterState {
+    #[pinapod(skip_accessor, skip_patch)]
     discriminator: [u8; PdaDisc::BYTES],
     pub authority: Address,
     pub bump: u8,
@@ -121,113 +123,117 @@ pub struct CounterState {
 #[repr(C)]
 pub struct CounterStateZc
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    discriminator: [u8; PdaDisc::BYTES],
-    pub authority: <Address as pinapod::ZcField>::Pod,
-    pub bump: u8,
+    discriminator: <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod,
+    pub authority: <Address as pina::pinapod::ZcField>::Pod,
+    pub bump: <u8 as pina::pinapod::ZcField>::Pod,
 }
-impl Copy for CounterStateZc
+impl ::core::marker::Copy for CounterStateZc
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
-impl Clone for CounterStateZc
+impl ::core::clone::Clone for CounterStateZc
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
-const _: () = if !(core::mem::align_of::<CounterStateZc>() == 1) {
+const _: () = if !(::core::mem::align_of::<CounterStateZc>() == 1) {
     ::core::panicking::panic(
-        "assertion failed: core::mem::align_of::<CounterStateZc>() == 1",
+        "assertion failed: ::core::mem::align_of::<CounterStateZc>() == 1",
     )
 };
 impl CounterStateZc {
     #[inline(always)]
-    pub fn discriminator(&self) -> &[u8; PdaDisc::BYTES] {
-        &self.discriminator
-    }
-    #[inline(always)]
-    pub fn authority(&self) -> &<Address as pinapod::ZcField>::Pod {
+    pub fn authority(&self) -> &<Address as pina::pinapod::ZcField>::Pod {
         &self.authority
     }
     #[inline(always)]
-    pub fn bump(&self) -> u8 {
+    pub fn bump(&self) -> <u8 as pina::pinapod::ZcField>::Pod {
         self.bump
     }
 }
-impl pinapod::ZcValidate for CounterStateZc
+impl pina::pinapod::ZcValidate for CounterStateZc
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
-        <[u8; PdaDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
+    fn validate_ref(
+        value: &Self,
+    ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        <<[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
-        <<Address as pinapod::ZcField>::Pod as pinapod::ZcValidate>::validate_ref(
+        <<Address as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.authority,
         )?;
-        <u8 as pinapod::ZcValidate>::validate_ref(&value.bump)?;
-        Ok(())
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.bump,
+        )?;
+        ::core::result::Result::Ok(())
     }
 }
-impl pinapod::ZeroPodSchema for CounterState
+impl pina::pinapod::PinaPod for CounterState
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-{
-    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
-}
-impl pinapod::ZeroPodFixed for CounterState
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{}
+unsafe impl pina::pinapod::PinaPodFixed for CounterState
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Zc = CounterStateZc;
-    const SIZE: usize = core::mem::size_of::<CounterStateZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
-        if data.len() < core::mem::size_of::<CounterStateZc>() {
-            return Err(pinapod::ZeroPodError::BufferTooSmall);
-        }
-        let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
-        Ok(())
-    }
 }
-unsafe impl pinapod::ZcField for CounterState
+unsafe impl pina::pinapod::ZcField for CounterState
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Pod = CounterStateZc;
-    const POD_SIZE: usize = core::mem::size_of::<CounterStateZc>();
 }
-unsafe impl pinapod::ZcElem for CounterStateZc
+unsafe impl pina::pinapod::ZcElem for CounterStateZc
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
 ///The PDA seeds for `CounterState`.
 pub struct CounterStateSeeds<'a> {
@@ -295,6 +301,50 @@ impl CounterState {
             )
             .map(|_| ())
     }
+    ///Load and validate `CounterState` and its stored-bump PDA address in one pass.
+    #[inline(always)]
+    pub fn load_pda<'account>(
+        account: &'account pina::AccountView,
+        authority: &Address,
+        program_id: &pina::Address,
+    ) -> ::core::result::Result<
+        pina::Ref<'account, <Self as pina::PinaPodFixed>::Zc>,
+        pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = pina::AsAccount::as_account::<Self>(account, program_id)?;
+        let seeds = Self::seeds(authority).with_bump(state.bump);
+        let expected_address = pina::create_program_address(
+            &seeds.as_slices(),
+            program_id,
+        )?;
+        if account_address != expected_address {
+            return Err(pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
+    ///Mutably load and validate `CounterState` and its stored-bump PDA address in one pass.
+    #[inline(always)]
+    pub fn load_pda_mut<'account>(
+        account: &'account mut pina::AccountView,
+        authority: &Address,
+        program_id: &pina::Address,
+    ) -> ::core::result::Result<
+        pina::RefMut<'account, <Self as pina::PinaPodFixed>::Zc>,
+        pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = pina::AsAccount::as_account_mut::<Self>(account, program_id)?;
+        let seeds = Self::seeds(authority).with_bump(state.bump);
+        let expected_address = pina::create_program_address(
+            &seeds.as_slices(),
+            program_id,
+        )?;
+        if account_address != expected_address {
+            return Err(pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
 }
 impl<'a> CounterStateSeeds<'a> {
     /// The seeds as byte slices, without the bump seed.
@@ -336,12 +386,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<pina::Address>() == 1",
         )
     }
-    if !(::core::mem::size_of::<pina::Address>() == <Address as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<pina::Address>() ==\n    <Address as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn(u8) -> ::core::primitive::u8 = |value| value;
 const _: fn() = || {
@@ -354,13 +398,6 @@ const _: () = {
     if !(::core::mem::align_of::<::core::primitive::u8>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<::core::primitive::u8>()
-        == <u8 as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<::core::primitive::u8>() ==\n    <u8 as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -384,44 +421,38 @@ const _: () = {
     }
 };
 impl CounterState {
-    /// The exact number of bytes required by the zeropod representation.
-    pub const SIZE: usize = <Self as pina::ZeroPodFixed>::SIZE;
-    /// Validate `data` and return zeropod's immutable zero-copy companion.
+    /// The exact number of bytes required by the `PinaPod` representation.
+    pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
-    ) -> Result<&<Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
+    ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::ZeroPodFixed>::from_bytes(data)
+        <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)
     }
-    /// Initialize caller-owned storage and return its mutable zero-copy view.
+    /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// The complete slice is initialized before zeropod validates it. The
-    /// returned borrow prevents the caller from observing or changing the raw
-    /// bytes while the typed view is live.
-    ///
-    /// Every accepted field has an audited all-zero representation. The macro
-    /// rejects custom types and other layouts whose zero state cannot be
-    /// established by Pina's closed schema grammar.
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
+    /// validates the finished representation once. The discriminator is written
+    /// before the caller configures the remaining fields. If the closure or final
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
-    /// Returns the generated invalid-data error when `data` has the wrong
-    /// length or zeroed storage is not a valid zeropod representation.
-    pub fn initialize(
-        data: &mut [u8],
-    ) -> Result<&mut <Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
-        if data.len() != Self::SIZE {
-            return Err(pina::ProgramError::InvalidAccountData);
-        }
-        data.fill(0);
-        <Self as pina::HasDiscriminator>::write_discriminator(data);
-        <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+    /// Returns the generated invalid-data error when `data` has the wrong length,
+    /// the closure fails, or the completed representation is invalid.
+    pub fn initialize<'data>(
+        data: &'data mut [u8],
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
+        <Self as pina::PinaAccount>::initialize(data, initialize)
     }
 }
 impl pina::HasDiscriminator for CounterState {
@@ -437,6 +468,7 @@ impl pina::AccountValidation for CounterStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -462,6 +494,7 @@ impl pina::AccountValidation for CounterStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -484,8 +517,14 @@ impl pina::AccountValidation for CounterStateZc {
         }
     }
 }
-impl pina::PinaAccount for CounterState {}
+impl pina::PinaAccount for CounterState {
+    fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
+        <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+}
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct AllSeedState {
+    #[pinapod(skip_accessor, skip_patch)]
     discriminator: [u8; PdaDisc::BYTES],
     pub authority: Address,
     pub amount: PodU64,
@@ -498,189 +537,237 @@ pub struct AllSeedState {
 #[repr(C)]
 pub struct AllSeedStateZc
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    [u8; 8]: pinapod::ZcValidate,
-    <PodU16 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    <PodU32 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 8]: pina::pinapod::ZcField,
+    <[u8; 8] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU16: pina::pinapod::ZcField,
+    <PodU16 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU32: pina::pinapod::ZcField,
+    <PodU32 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    discriminator: [u8; PdaDisc::BYTES],
-    pub authority: <Address as pinapod::ZcField>::Pod,
-    pub amount: <PodU64 as pinapod::ZcField>::Pod,
-    pub side: u8,
-    pub tag: [u8; 8],
-    pub width: <PodU16 as pinapod::ZcField>::Pod,
-    pub height: <PodU32 as pinapod::ZcField>::Pod,
-    pub bump: u8,
+    discriminator: <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod,
+    pub authority: <Address as pina::pinapod::ZcField>::Pod,
+    pub amount: <PodU64 as pina::pinapod::ZcField>::Pod,
+    pub side: <u8 as pina::pinapod::ZcField>::Pod,
+    pub tag: <[u8; 8] as pina::pinapod::ZcField>::Pod,
+    pub width: <PodU16 as pina::pinapod::ZcField>::Pod,
+    pub height: <PodU32 as pina::pinapod::ZcField>::Pod,
+    pub bump: <u8 as pina::pinapod::ZcField>::Pod,
 }
-impl Copy for AllSeedStateZc
+impl ::core::marker::Copy for AllSeedStateZc
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    [u8; 8]: pinapod::ZcValidate,
-    <PodU16 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    <PodU32 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 8]: pina::pinapod::ZcField,
+    <[u8; 8] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU16: pina::pinapod::ZcField,
+    <PodU16 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU32: pina::pinapod::ZcField,
+    <PodU32 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
-impl Clone for AllSeedStateZc
+impl ::core::clone::Clone for AllSeedStateZc
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    [u8; 8]: pinapod::ZcValidate,
-    <PodU16 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    <PodU32 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 8]: pina::pinapod::ZcField,
+    <[u8; 8] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU16: pina::pinapod::ZcField,
+    <PodU16 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU32: pina::pinapod::ZcField,
+    <PodU32 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
-const _: () = if !(core::mem::align_of::<AllSeedStateZc>() == 1) {
+const _: () = if !(::core::mem::align_of::<AllSeedStateZc>() == 1) {
     ::core::panicking::panic(
-        "assertion failed: core::mem::align_of::<AllSeedStateZc>() == 1",
+        "assertion failed: ::core::mem::align_of::<AllSeedStateZc>() == 1",
     )
 };
 impl AllSeedStateZc {
     #[inline(always)]
-    pub fn discriminator(&self) -> &[u8; PdaDisc::BYTES] {
-        &self.discriminator
-    }
-    #[inline(always)]
-    pub fn authority(&self) -> &<Address as pinapod::ZcField>::Pod {
+    pub fn authority(&self) -> &<Address as pina::pinapod::ZcField>::Pod {
         &self.authority
     }
     #[inline(always)]
-    pub fn amount(&self) -> &<PodU64 as pinapod::ZcField>::Pod {
+    pub fn amount(&self) -> &<PodU64 as pina::pinapod::ZcField>::Pod {
         &self.amount
     }
     #[inline(always)]
-    pub fn side(&self) -> u8 {
+    pub fn side(&self) -> <u8 as pina::pinapod::ZcField>::Pod {
         self.side
     }
     #[inline(always)]
-    pub fn tag(&self) -> &[u8; 8] {
+    pub fn tag(&self) -> &<[u8; 8] as pina::pinapod::ZcField>::Pod {
         &self.tag
     }
     #[inline(always)]
-    pub fn width(&self) -> &<PodU16 as pinapod::ZcField>::Pod {
+    pub fn width(&self) -> &<PodU16 as pina::pinapod::ZcField>::Pod {
         &self.width
     }
     #[inline(always)]
-    pub fn height(&self) -> &<PodU32 as pinapod::ZcField>::Pod {
+    pub fn height(&self) -> &<PodU32 as pina::pinapod::ZcField>::Pod {
         &self.height
     }
     #[inline(always)]
-    pub fn bump(&self) -> u8 {
+    pub fn bump(&self) -> <u8 as pina::pinapod::ZcField>::Pod {
         self.bump
     }
 }
-impl pinapod::ZcValidate for AllSeedStateZc
+impl pina::pinapod::ZcValidate for AllSeedStateZc
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    [u8; 8]: pinapod::ZcValidate,
-    <PodU16 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    <PodU32 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 8]: pina::pinapod::ZcField,
+    <[u8; 8] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU16: pina::pinapod::ZcField,
+    <PodU16 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU32: pina::pinapod::ZcField,
+    <PodU32 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
-        <[u8; PdaDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
+    fn validate_ref(
+        value: &Self,
+    ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        <<[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
-        <<Address as pinapod::ZcField>::Pod as pinapod::ZcValidate>::validate_ref(
+        <<Address as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.authority,
         )?;
-        <<PodU64 as pinapod::ZcField>::Pod as pinapod::ZcValidate>::validate_ref(
+        <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.amount,
         )?;
-        <u8 as pinapod::ZcValidate>::validate_ref(&value.side)?;
-        <[u8; 8] as pinapod::ZcValidate>::validate_ref(&value.tag)?;
-        <<PodU16 as pinapod::ZcField>::Pod as pinapod::ZcValidate>::validate_ref(
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.side,
+        )?;
+        <<[u8; 8] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.tag,
+        )?;
+        <<PodU16 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.width,
         )?;
-        <<PodU32 as pinapod::ZcField>::Pod as pinapod::ZcValidate>::validate_ref(
+        <<PodU32 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.height,
         )?;
-        <u8 as pinapod::ZcValidate>::validate_ref(&value.bump)?;
-        Ok(())
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.bump,
+        )?;
+        ::core::result::Result::Ok(())
     }
 }
-impl pinapod::ZeroPodSchema for AllSeedState
+impl pina::pinapod::PinaPod for AllSeedState
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    [u8; 8]: pinapod::ZcValidate,
-    <PodU16 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    <PodU32 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-{
-    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
-}
-impl pinapod::ZeroPodFixed for AllSeedState
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 8]: pina::pinapod::ZcField,
+    <[u8; 8] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU16: pina::pinapod::ZcField,
+    <PodU16 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU32: pina::pinapod::ZcField,
+    <PodU32 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{}
+unsafe impl pina::pinapod::PinaPodFixed for AllSeedState
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    [u8; 8]: pinapod::ZcValidate,
-    <PodU16 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    <PodU32 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 8]: pina::pinapod::ZcField,
+    <[u8; 8] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU16: pina::pinapod::ZcField,
+    <PodU16 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU32: pina::pinapod::ZcField,
+    <PodU32 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Zc = AllSeedStateZc;
-    const SIZE: usize = core::mem::size_of::<AllSeedStateZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
-        if data.len() < core::mem::size_of::<AllSeedStateZc>() {
-            return Err(pinapod::ZeroPodError::BufferTooSmall);
-        }
-        let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
-        Ok(())
-    }
 }
-unsafe impl pinapod::ZcField for AllSeedState
+unsafe impl pina::pinapod::ZcField for AllSeedState
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    [u8; 8]: pinapod::ZcValidate,
-    <PodU16 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    <PodU32 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 8]: pina::pinapod::ZcField,
+    <[u8; 8] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU16: pina::pinapod::ZcField,
+    <PodU16 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU32: pina::pinapod::ZcField,
+    <PodU32 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Pod = AllSeedStateZc;
-    const POD_SIZE: usize = core::mem::size_of::<AllSeedStateZc>();
 }
-unsafe impl pinapod::ZcElem for AllSeedStateZc
+unsafe impl pina::pinapod::ZcElem for AllSeedStateZc
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    [u8; 8]: pinapod::ZcValidate,
-    <PodU16 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    <PodU32 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 8]: pina::pinapod::ZcField,
+    <[u8; 8] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU16: pina::pinapod::ZcField,
+    <PodU16 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU32: pina::pinapod::ZcField,
+    <PodU32 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
 ///The PDA seeds for `AllSeedState`.
 pub struct AllSeedStateSeeds<'a> {
@@ -794,6 +881,62 @@ impl AllSeedState {
             )
             .map(|_| ())
     }
+    ///Load and validate `AllSeedState` and its stored-bump PDA address in one pass.
+    #[inline(always)]
+    pub fn load_pda<'account>(
+        account: &'account ::pina::AccountView,
+        authority: &Address,
+        amount: u64,
+        side: u8,
+        tag: [u8; 8usize],
+        width: u16,
+        height: u32,
+        program_id: &::pina::Address,
+    ) -> ::core::result::Result<
+        ::pina::Ref<'account, <Self as ::pina::PinaPodFixed>::Zc>,
+        ::pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = ::pina::AsAccount::as_account::<Self>(account, program_id)?;
+        let seeds = Self::seeds(authority, amount, side, tag, width, height)
+            .with_bump(state.bump);
+        let expected_address = ::pina::create_program_address(
+            &seeds.as_slices(),
+            program_id,
+        )?;
+        if account_address != expected_address {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
+    ///Mutably load and validate `AllSeedState` and its stored-bump PDA address in one pass.
+    #[inline(always)]
+    pub fn load_pda_mut<'account>(
+        account: &'account mut ::pina::AccountView,
+        authority: &Address,
+        amount: u64,
+        side: u8,
+        tag: [u8; 8usize],
+        width: u16,
+        height: u32,
+        program_id: &::pina::Address,
+    ) -> ::core::result::Result<
+        ::pina::RefMut<'account, <Self as ::pina::PinaPodFixed>::Zc>,
+        ::pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = ::pina::AsAccount::as_account_mut::<Self>(account, program_id)?;
+        let seeds = Self::seeds(authority, amount, side, tag, width, height)
+            .with_bump(state.bump);
+        let expected_address = ::pina::create_program_address(
+            &seeds.as_slices(),
+            program_id,
+        )?;
+        if account_address != expected_address {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
 }
 impl<'a> AllSeedStateSeeds<'a> {
     /// The seeds as byte slices, without the bump seed.
@@ -852,12 +995,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<pina::Address>() == 1",
         )
     }
-    if !(::core::mem::size_of::<pina::Address>() == <Address as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<pina::Address>() ==\n    <Address as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn(PodU64) -> pina::PodU64 = |value| value;
 const _: fn() = || {
@@ -872,11 +1009,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<pina::PodU64>() == 1",
         )
     }
-    if !(::core::mem::size_of::<pina::PodU64>() == <PodU64 as pina::ZcField>::POD_SIZE) {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<pina::PodU64>() == <PodU64 as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn(u8) -> ::core::primitive::u8 = |value| value;
 const _: fn() = || {
@@ -889,13 +1021,6 @@ const _: () = {
     if !(::core::mem::align_of::<::core::primitive::u8>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<::core::primitive::u8>()
-        == <u8 as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<::core::primitive::u8>() ==\n    <u8 as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -912,13 +1037,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<[::core::primitive::u8; 8]>() == 1",
         )
     }
-    if !(::core::mem::size_of::<[::core::primitive::u8; 8]>()
-        == <[u8; 8] as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<[::core::primitive::u8; 8]>() ==\n    <[u8; 8] as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn(PodU16) -> pina::PodU16 = |value| value;
 const _: fn() = || {
@@ -931,11 +1049,6 @@ const _: () = {
     if !(::core::mem::align_of::<pina::PodU16>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<pina::PodU16>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<pina::PodU16>() == <PodU16 as pina::ZcField>::POD_SIZE) {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<pina::PodU16>() == <PodU16 as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -952,11 +1065,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<pina::PodU32>() == 1",
         )
     }
-    if !(::core::mem::size_of::<pina::PodU32>() == <PodU32 as pina::ZcField>::POD_SIZE) {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<pina::PodU32>() == <PodU32 as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn(u8) -> ::core::primitive::u8 = |value| value;
 const _: fn() = || {
@@ -969,13 +1077,6 @@ const _: () = {
     if !(::core::mem::align_of::<::core::primitive::u8>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<::core::primitive::u8>()
-        == <u8 as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<::core::primitive::u8>() ==\n    <u8 as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -1004,44 +1105,38 @@ const _: () = {
     }
 };
 impl AllSeedState {
-    /// The exact number of bytes required by the zeropod representation.
-    pub const SIZE: usize = <Self as pina::ZeroPodFixed>::SIZE;
-    /// Validate `data` and return zeropod's immutable zero-copy companion.
+    /// The exact number of bytes required by the `PinaPod` representation.
+    pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
-    ) -> Result<&<Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
+    ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::ZeroPodFixed>::from_bytes(data)
+        <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)
     }
-    /// Initialize caller-owned storage and return its mutable zero-copy view.
+    /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// The complete slice is initialized before zeropod validates it. The
-    /// returned borrow prevents the caller from observing or changing the raw
-    /// bytes while the typed view is live.
-    ///
-    /// Every accepted field has an audited all-zero representation. The macro
-    /// rejects custom types and other layouts whose zero state cannot be
-    /// established by Pina's closed schema grammar.
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
+    /// validates the finished representation once. The discriminator is written
+    /// before the caller configures the remaining fields. If the closure or final
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
-    /// Returns the generated invalid-data error when `data` has the wrong
-    /// length or zeroed storage is not a valid zeropod representation.
-    pub fn initialize(
-        data: &mut [u8],
-    ) -> Result<&mut <Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
-        if data.len() != Self::SIZE {
-            return Err(pina::ProgramError::InvalidAccountData);
-        }
-        data.fill(0);
-        <Self as pina::HasDiscriminator>::write_discriminator(data);
-        <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+    /// Returns the generated invalid-data error when `data` has the wrong length,
+    /// the closure fails, or the completed representation is invalid.
+    pub fn initialize<'data>(
+        data: &'data mut [u8],
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
+        <Self as pina::PinaAccount>::initialize(data, initialize)
     }
 }
 impl pina::HasDiscriminator for AllSeedState {
@@ -1057,6 +1152,7 @@ impl pina::AccountValidation for AllSeedStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1082,6 +1178,7 @@ impl pina::AccountValidation for AllSeedStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1104,7 +1201,11 @@ impl pina::AccountValidation for AllSeedStateZc {
         }
     }
 }
-impl pina::PinaAccount for AllSeedState {}
+impl pina::PinaAccount for AllSeedState {
+    fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
+        <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+}
 pub struct VaultState {
     pub user: Address,
 }
@@ -1185,7 +1286,9 @@ impl<'a> VaultStateSeedsWithBump<'a> {
         pina::PdaSigner::from_seed_array(self.as_seed_array())
     }
 }
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct TodoState {
+    #[pinapod(skip_accessor, skip_patch)]
     discriminator: [u8; PdaDisc::BYTES],
     pub owner: Address,
     pub bump: u8,
@@ -1193,113 +1296,117 @@ pub struct TodoState {
 #[repr(C)]
 pub struct TodoStateZc
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    discriminator: [u8; PdaDisc::BYTES],
-    pub owner: <Address as pinapod::ZcField>::Pod,
-    pub bump: u8,
+    discriminator: <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod,
+    pub owner: <Address as pina::pinapod::ZcField>::Pod,
+    pub bump: <u8 as pina::pinapod::ZcField>::Pod,
 }
-impl Copy for TodoStateZc
+impl ::core::marker::Copy for TodoStateZc
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
-impl Clone for TodoStateZc
+impl ::core::clone::Clone for TodoStateZc
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
-const _: () = if !(core::mem::align_of::<TodoStateZc>() == 1) {
+const _: () = if !(::core::mem::align_of::<TodoStateZc>() == 1) {
     ::core::panicking::panic(
-        "assertion failed: core::mem::align_of::<TodoStateZc>() == 1",
+        "assertion failed: ::core::mem::align_of::<TodoStateZc>() == 1",
     )
 };
 impl TodoStateZc {
     #[inline(always)]
-    pub fn discriminator(&self) -> &[u8; PdaDisc::BYTES] {
-        &self.discriminator
-    }
-    #[inline(always)]
-    pub fn owner(&self) -> &<Address as pinapod::ZcField>::Pod {
+    pub fn owner(&self) -> &<Address as pina::pinapod::ZcField>::Pod {
         &self.owner
     }
     #[inline(always)]
-    pub fn bump(&self) -> u8 {
+    pub fn bump(&self) -> <u8 as pina::pinapod::ZcField>::Pod {
         self.bump
     }
 }
-impl pinapod::ZcValidate for TodoStateZc
+impl pina::pinapod::ZcValidate for TodoStateZc
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
-        <[u8; PdaDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
+    fn validate_ref(
+        value: &Self,
+    ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        <<[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
-        <<Address as pinapod::ZcField>::Pod as pinapod::ZcValidate>::validate_ref(
+        <<Address as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.owner,
         )?;
-        <u8 as pinapod::ZcValidate>::validate_ref(&value.bump)?;
-        Ok(())
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.bump,
+        )?;
+        ::core::result::Result::Ok(())
     }
 }
-impl pinapod::ZeroPodSchema for TodoState
+impl pina::pinapod::PinaPod for TodoState
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-{
-    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
-}
-impl pinapod::ZeroPodFixed for TodoState
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{}
+unsafe impl pina::pinapod::PinaPodFixed for TodoState
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Zc = TodoStateZc;
-    const SIZE: usize = core::mem::size_of::<TodoStateZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
-        if data.len() < core::mem::size_of::<TodoStateZc>() {
-            return Err(pinapod::ZeroPodError::BufferTooSmall);
-        }
-        let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
-        Ok(())
-    }
 }
-unsafe impl pinapod::ZcField for TodoState
+unsafe impl pina::pinapod::ZcField for TodoState
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Pod = TodoStateZc;
-    const POD_SIZE: usize = core::mem::size_of::<TodoStateZc>();
 }
-unsafe impl pinapod::ZcElem for TodoStateZc
+unsafe impl pina::pinapod::ZcElem for TodoStateZc
 where
-    [u8; PdaDisc::BYTES]: pinapod::ZcValidate,
-    <Address as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; PdaDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    Address: pina::pinapod::ZcField,
+    <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
 ///The PDA seeds for `TodoState`.
 pub struct TodoStateSeeds<'a> {
@@ -1365,6 +1472,50 @@ impl TodoState {
             )
             .map(|_| ())
     }
+    ///Load and validate `TodoState` and its stored-bump PDA address in one pass.
+    #[inline(always)]
+    pub fn load_pda<'account>(
+        account: &'account ::pina::AccountView,
+        owner: &Address,
+        program_id: &::pina::Address,
+    ) -> ::core::result::Result<
+        ::pina::Ref<'account, <Self as ::pina::PinaPodFixed>::Zc>,
+        ::pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = ::pina::AsAccount::as_account::<Self>(account, program_id)?;
+        let seeds = Self::seeds(owner).with_bump(state.bump);
+        let expected_address = ::pina::create_program_address(
+            &seeds.as_slices(),
+            program_id,
+        )?;
+        if account_address != expected_address {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
+    ///Mutably load and validate `TodoState` and its stored-bump PDA address in one pass.
+    #[inline(always)]
+    pub fn load_pda_mut<'account>(
+        account: &'account mut ::pina::AccountView,
+        owner: &Address,
+        program_id: &::pina::Address,
+    ) -> ::core::result::Result<
+        ::pina::RefMut<'account, <Self as ::pina::PinaPodFixed>::Zc>,
+        ::pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = ::pina::AsAccount::as_account_mut::<Self>(account, program_id)?;
+        let seeds = Self::seeds(owner).with_bump(state.bump);
+        let expected_address = ::pina::create_program_address(
+            &seeds.as_slices(),
+            program_id,
+        )?;
+        if account_address != expected_address {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
 }
 impl<'a> TodoStateSeeds<'a> {
     /// The seeds as byte slices, without the bump seed.
@@ -1406,12 +1557,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<pina::Address>() == 1",
         )
     }
-    if !(::core::mem::size_of::<pina::Address>() == <Address as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<pina::Address>() ==\n    <Address as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn(u8) -> ::core::primitive::u8 = |value| value;
 const _: fn() = || {
@@ -1424,13 +1569,6 @@ const _: () = {
     if !(::core::mem::align_of::<::core::primitive::u8>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<::core::primitive::u8>()
-        == <u8 as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<::core::primitive::u8>() ==\n    <u8 as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -1454,44 +1592,38 @@ const _: () = {
     }
 };
 impl TodoState {
-    /// The exact number of bytes required by the zeropod representation.
-    pub const SIZE: usize = <Self as pina::ZeroPodFixed>::SIZE;
-    /// Validate `data` and return zeropod's immutable zero-copy companion.
+    /// The exact number of bytes required by the `PinaPod` representation.
+    pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
-    ) -> Result<&<Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
+    ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::ZeroPodFixed>::from_bytes(data)
+        <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)
     }
-    /// Initialize caller-owned storage and return its mutable zero-copy view.
+    /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// The complete slice is initialized before zeropod validates it. The
-    /// returned borrow prevents the caller from observing or changing the raw
-    /// bytes while the typed view is live.
-    ///
-    /// Every accepted field has an audited all-zero representation. The macro
-    /// rejects custom types and other layouts whose zero state cannot be
-    /// established by Pina's closed schema grammar.
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
+    /// validates the finished representation once. The discriminator is written
+    /// before the caller configures the remaining fields. If the closure or final
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
-    /// Returns the generated invalid-data error when `data` has the wrong
-    /// length or zeroed storage is not a valid zeropod representation.
-    pub fn initialize(
-        data: &mut [u8],
-    ) -> Result<&mut <Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
-        if data.len() != Self::SIZE {
-            return Err(pina::ProgramError::InvalidAccountData);
-        }
-        data.fill(0);
-        <Self as pina::HasDiscriminator>::write_discriminator(data);
-        <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+    /// Returns the generated invalid-data error when `data` has the wrong length,
+    /// the closure fails, or the completed representation is invalid.
+    pub fn initialize<'data>(
+        data: &'data mut [u8],
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
+        <Self as pina::PinaAccount>::initialize(data, initialize)
     }
 }
 impl pina::HasDiscriminator for TodoState {
@@ -1507,6 +1639,7 @@ impl pina::AccountValidation for TodoStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1532,6 +1665,7 @@ impl pina::AccountValidation for TodoStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1554,7 +1688,11 @@ impl pina::AccountValidation for TodoStateZc {
         }
     }
 }
-impl pina::PinaAccount for TodoState {}
+impl pina::PinaAccount for TodoState {
+    fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
+        <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+}
 pub struct AuthorityState {}
 ///The PDA seeds for `AuthorityState`.
 pub struct AuthorityStateSeeds<'a> {

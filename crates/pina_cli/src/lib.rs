@@ -1,6 +1,7 @@
 pub mod build;
 pub mod codama;
 pub mod codegen;
+mod compact_capacity;
 pub mod cpi;
 pub mod deploy;
 pub mod doctor;

@@ -38,11 +38,11 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
-import { COMPACT_ACCOUNTS_PROGRAM_ADDRESS } from "../programs";
 import {
-	fixZeroPodEncoderSize,
-	getZeroPodDiscriminatorDecoder,
-} from "../zeropodCodecs";
+	fixPinaPodEncoderSize,
+	getPinaPodDiscriminatorDecoder,
+} from "../pinaPodCodecs";
+import { COMPACT_ACCOUNTS_PROGRAM_ADDRESS } from "../programs";
 
 export const RENAME_DISCRIMINATOR = 3;
 
@@ -93,7 +93,7 @@ export function getRenameInstructionDataEncoder(): FixedSizeEncoder<
 		getStructEncoder([["discriminator", getU8Encoder()], [
 			"titleLen",
 			getU8Encoder(),
-		], ["title", fixZeroPodEncoderSize(getBytesEncoder(), 24)]]),
+		], ["title", fixPinaPodEncoderSize(getBytesEncoder(), 24)]]),
 		(value) => ({ ...value, discriminator: 3 }),
 	);
 }
@@ -104,7 +104,7 @@ export function getRenameInstructionDataDecoder(): FixedSizeDecoder<
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(RENAME_DISCRIMINATOR, getU8Decoder()),
+			getPinaPodDiscriminatorDecoder(RENAME_DISCRIMINATOR, getU8Decoder()),
 		],
 		["titleLen", getU8Decoder()],
 		["title", fixDecoderSize(getBytesDecoder(), 24)],

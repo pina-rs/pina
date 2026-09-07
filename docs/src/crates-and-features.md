@@ -4,8 +4,8 @@
 
 | Package                 | Path                          | Description                                                                   |
 | ----------------------- | ----------------------------- | ----------------------------------------------------------------------------- |
-| `pina`                  | `crates/pina`                 | Core framework — traits, account loaders, CPI helpers, Pod types.             |
-| `pina_macros`           | `crates/pina_macros`          | Proc macros — `#[account]`, `#[instruction]`, `#[event]`, etc.                |
+| `pina`                  | `crates/pina`                 | Core framework: traits, account loaders, CPI helpers, and Pod types.          |
+| `pina_macros`           | `crates/pina_macros`          | Proc macros: `#[account]`, `#[instruction]`, `#[event]`, and others.          |
 | `pina_cli`              | `crates/pina_cli`             | CLI for building, testing, inspecting, and generating Pina program artifacts. |
 | `pina_codama_renderer`  | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.                 |
 | `pina_cpi_renderer`     | `crates/pina_cpi_renderer`    | Standalone Codama renderer generating Pina CPI client crates.                 |
@@ -52,11 +52,11 @@ Feature flags:
 <!-- {=pinaFeatureSelectionTips} -->
 
 - `derive` is the normal choice for program crates; disable it only when you want the low-level runtime traits without the proc macros.
-- `compact` enables `#[account(compact)]`, `PinaCompactAccount`, compact account validation/loaders, and `pina::Vec`; it also enables `derive`.
+- `compact` enables `#[account(compact)]`, `PinaCompactAccount`, generated patch types, checked compact loaders, and `pina::String` and `pina::Vec`. It also enables `derive`.
 - `logs` is useful during **initial development and debugging**, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
 - `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
 - `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.
-- `account-resize` enables `ReallocAccount` and `ReallocAccountZeroed`. Enable it together with `compact` for `ResizeCompactAccount`, `ReallocCompactAccount`, and the compact creation builders. Close helpers still do not implicitly resize or zero account data.
+- `account-resize` enables `ReallocAccount` and `ReallocAccountZeroed`. Enable it together with `compact` for `UpdateResizableAccount`, `ReallocCompactAccount`, and the compact creation builders. Close helpers still do not implicitly resize or zero account data.
 
 <!-- {/pinaFeatureSelectionTips} -->
 
@@ -83,20 +83,20 @@ Commands:
 
 <!-- {=pinaCliCommands} -->
 
-- `pina init <name>` — scaffold a project-aware Pina program
-- `pina build` — build SBF and publish the program IDL
-- `pina generate` — generate configured CPI, Rust, TypeScript, or Dart clients
-- `pina test [--unit]` — run native/Mollusk or SBF/Surfpool tests
-- `pina dev [--yes]` — run Surfpool's persistent watch/redeploy loop
-- `pina verify` — compare deployments and record verified source
-- `pina idl --path <dir>` — generate a Codama IDL JSON from a Pina program
-- `pina docs [topic]` — list or render bundled terminal documentation
-- `pina keys [show|sync|new]` — inspect or explicitly update program identity
-- `pina doctor [--json]` — diagnose project and toolchain readiness
-- `pina completions <shell>` — generate a shell completion script
-- `pina profile [path.so]` — profile a compiled or discovered SBF binary statically
-- `pina deploy` — plan and execute an explicit cluster deployment
-- `pina codama generate` — run the legacy repository-wide client workflow
+- `pina init <name>`: scaffold a project-aware Pina program
+- `pina build`: build SBF and publish the program IDL
+- `pina generate`: generate configured CPI, Rust, TypeScript, or Dart clients
+- `pina test [--unit]`: run native/Mollusk or SBF/Surfpool tests
+- `pina dev [--yes]`: run Surfpool's persistent watch/redeploy loop
+- `pina verify`: compare deployments and record verified source
+- `pina idl --path <dir>`: generate a Codama IDL JSON from a Pina program
+- `pina docs [topic]`: list or render bundled terminal documentation
+- `pina keys [show|sync|new]`: inspect or explicitly update program identity
+- `pina doctor [--json]`: diagnose project and toolchain readiness
+- `pina completions <shell>`: generate a shell completion script
+- `pina profile [path.so]`: profile a compiled or discovered SBF binary statically
+- `pina deploy`: plan and execute an explicit cluster deployment
+- `pina codama generate`: run the legacy repository-wide client workflow
 
 <!-- {/pinaCliCommands} -->
 
@@ -127,7 +127,7 @@ The consuming program depends on the generated crate directly. This avoids coupl
 
 ## Pod types
 
-The `pina::pod` module re-exports Pinapod's alignment-safe POD primitive wrappers (`PodBool`, `PodU*`, `PodI*`) and fixed-capacity collection types (`PodOption`, `PodString`, `PodVec`), shared by `pina` and generated clients.
+The `pina::pod` module re-exports PinaPod's alignment-safe POD primitive wrappers (`PodBool`, `PodU*`, `PodI*`) and fixed-capacity collection types (`PodOption`, `PodString`, `PodVec`), shared by `pina` and generated clients.
 
 <!-- {=podArithmeticDescription} -->
 
@@ -145,15 +145,17 @@ Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 | `PodString` | Fixed-capacity string  | `PFX`-byte length prefix + `N` data bytes |
 | `PodVec`    | Fixed-capacity vec     | `PFX`-byte length prefix + `N` elements   |
 
-The full generic forms are `PodOption<T: ZcElem, PFX = 1>`, `PodString<N, PFX = 1>`, and `PodVec<T: ZcElem, N, PFX = 2>`. All collection layouts are alignment 1 and padding-free when `T: ZcElem`. `ZcValidate` checks tags, length prefixes, active elements, and UTF-8 before safe access. Length prefixes (`PFX`) default to 1 byte for strings (max 255) and 2 bytes for vectors (max 65 535 elements).
+The full generic forms are `PodOption<T: ZcElem, PFX = 1>`, `PodString<N, PFX = 1>`, and `PodVec<T, N, PFX = 2>`. `PFX` is the prefix width in bytes and must be `1`, `2`, `4`, or `8`. Strings default to one byte and vectors default to two bytes. `ZcValidate` checks tags, prefixes, active elements, and UTF-8 before safe access.
 
 <!-- {/podCollectionTypesTable} -->
 
 <!-- {=podCollectionDescription} -->
 
-Collection types store data inline without allocation for advanced direct Pinapod use. Pina's `#[account]`, `#[instruction]`, and `#[event]` macros reject `PodString`/`String` and `PodVec`/`Vec` fields in fixed-layout schemas because their inactive capacity is not guaranteed to be initialized after every upstream construction path; compact account schemas instead accept one or more trailing bounded `String`/`PodString` and `Vec`/`PodVec` tails. Use fully initialized fixed byte arrays plus checked semantic helpers in other macro-generated schemas. Semantic `Option<scalar>` remains supported in the fixed header because Pina proves its exact `PodOption` mapping and scalar storage contract.
+Fixed account, instruction, and event schemas can use `String<N>`, `Vec<T, N>`, and `Option<T>` when every nested `T` has a fixed PinaPod representation. These values occupy their full capacity in the wire layout. PinaPod initializes inactive capacity, clears removed values, and validates active nested values before safe access.
 
-For direct Pinapod integrations, Pinapod boundary validation must establish the active `PodString` bytes are valid UTF-8 before callers use `as_str()`. `PodVec` offers slice-based access via `as_slice()` / `as_slice_mut()`, and `PodOption` mirrors the `Option<T>` API with `get()`, `set()`, and `clear()`. Those direct integrations are outside Pina's audited macro-generated contract and must uphold Pinapod's complete safety invariants.
+Use `PodString<N, PFX>` and `PodVec<T, N, PFX>` when the default prefix width does not fit the declared capacity or the wire protocol specifies another width. The const generic is explicit: write `PodVec<u64, 1024, 2>`, not a macro attribute that selects `u16`.
+
+Compact accounts store supported top-level strings, vectors, and dynamic options in tails, so unused capacity does not consume rent. See the compact-account guide for the accepted nesting forms and atomic patch API.
 
 <!-- {/podCollectionDescription} -->
 
@@ -184,7 +186,7 @@ Repository-local renderer that generates Pina-style Rust client code from Codama
 - `discriminator.rs` — discriminator rendering
 - `seeds.rs` — seed parameter/constant rendering
 
-Use this when you want generated Rust models to match Pina's fixed-size, discriminator-first, Pinapod-validated conventions.
+Use this when you want generated Rust models to match Pina's discriminator-first, PinaPod-validated conventions for fixed and compact accounts.
 
 ## `crates/pina_sdk_ids`
 

@@ -14,7 +14,24 @@ Use Pina's macros for their specific wire contracts:
 
 Use explicit discriminator values. Reordering enum variants must not change existing wire values.
 
-Fixed-layout storage fields must satisfy zeropod's representation and validation rules. Use Pina's POD wrappers for numeric and boolean storage. Keep text and collections in bounded fixed-capacity representations with explicit length validation.
+Fixed-layout storage fields must satisfy PinaPod's representation and validation rules. Pina schemas accept native numeric and boolean fields, `Address`, byte arrays, bounded `String<N>` and `Vec<T, N>`, and fixed `Option<T>` values. The derive maps native fields to alignment-one storage wrappers.
+
+Use `PodString<N, PFX>` or `PodVec<T, N, PFX>` when a wire layout needs an explicit prefix width. `PFX` is `1`, `2`, `4`, or `8` bytes. Keep the prefix in the type declaration instead of adding a macro attribute.
+
+Compact accounts place fixed fields first and one or more dynamic tails last. They support `Option<T>` for fixed `T`, `String<N>`, `Vec<T, N>` for fixed `T`, `Option<String<N>>`, `Option<Vec<T, N>>` for fixed `T`, and `Vec<String<M>, N>`. Apply compact changes through the generated patch and `UpdateResizableAccount`; do not coordinate a mutable view, `commit`, and raw reallocation at the call site.
+
+```rust
+UpdateResizableAccount {
+	account: self.journal,
+	rent_account: self.authority,
+	program_id: &ID,
+	patch: JournalPatch::new()
+		.revision(next_revision)
+		.replace_entries(&entries)
+		.note(Some("Updated")),
+}
+.invoke::<Journal>()?;
+```
 
 ## Account validation
 
@@ -61,19 +78,21 @@ CreateAccount {
 
 Do not introduce wrapper functions around removed helpers such as `create_account(...)`, `create_program_account::<T>(...)`, or `realloc_account(...)`. Use the matching builder:
 
-| Operation                                             | Builder                        |
-| ----------------------------------------------------- | ------------------------------ |
-| Create a regular account                              | `CreateAccount`                |
-| Derive and create a typed canonical PDA               | `CreateProgramAccount`         |
-| Validate an explicit bump and create a typed PDA      | `CreateProgramAccountWithBump` |
-| Derive and allocate an untyped canonical PDA          | `AllocateAccount`              |
-| Validate an explicit bump and allocate an untyped PDA | `AllocateAccountWithBump`      |
-| Reallocate while balancing rent                       | `ReallocAccount`               |
-| Reallocate with explicit zero-initialization intent   | `ReallocAccountZeroed`         |
-| Update and exactly resize a compact account           | `ResizeCompactAccount`         |
-| Resize compact bytes without editing the account      | `ReallocCompactAccount`        |
-| Close and return lamports                             | `CloseAccount`                 |
-| Zero bytes, close, and return lamports                | `CloseAccountZeroed`           |
+| Operation                                              | Builder                               |
+| ------------------------------------------------------ | ------------------------------------- |
+| Create a regular account                               | `CreateAccount`                       |
+| Derive and create a typed canonical PDA                | `CreateProgramAccount`                |
+| Validate an explicit bump and create a typed PDA       | `CreateProgramAccountWithBump`        |
+| Derive and create a compact canonical PDA from a patch | `CreateCompactProgramAccount`         |
+| Create a compact PDA with an explicit bump and patch   | `CreateCompactProgramAccountWithBump` |
+| Derive and allocate an untyped canonical PDA           | `AllocateAccount`                     |
+| Validate an explicit bump and allocate an untyped PDA  | `AllocateAccountWithBump`             |
+| Reallocate while balancing rent                        | `ReallocAccount`                      |
+| Reallocate with explicit zero-initialization intent    | `ReallocAccountZeroed`                |
+| Apply a checked compact patch and adjust rent          | `UpdateResizableAccount`              |
+| Resize compact bytes without applying a patch          | `ReallocCompactAccount`               |
+| Close and return lamports                              | `CloseAccount`                        |
+| Zero bytes, close, and return lamports                 | `CloseAccountZeroed`                  |
 
 Typed PDA creation places the account type on the invocation method:
 
@@ -87,15 +106,37 @@ let (address, bump) = CreateProgramAccount {
 .invoke::<State>()?;
 ```
 
+Choose the fixed-account invocation method by initialization contract:
+
+- `invoke::<T>()` and `invoke_signed::<T>(signers)` write the discriminator and leave all other bytes at zero. Use them only if final validation accepts that representation.
+- `invoke_with::<T>(initialize)` and `invoke_signed_with::<T>(signers, initialize)` configure `&mut T::Zc` before final validation. The closure returns `Result<(), PinaPodError>`.
+
+Prefer the closure form when the account has required nonzero initial values. It is mandatory for an advanced manual `PinaAccount` whose storage includes a nonzero-only enum. Do not infer from this escape hatch that Pina's `#[account]` macro accepts arbitrary custom enum fields; the macro grammar remains closed.
+
+Compact creation uses a generated patch instead of an initializer closure. Always supply the required `patch` field, including for a header-only default:
+
+```rust
+CreateCompactProgramAccountWithBump {
+	account: journal,
+	payer,
+	owner: &ID,
+	seeds,
+	bump,
+	patch: JournalPatch::new().bump(bump),
+	space: Journal::MIN_SIZE,
+}
+.invoke::<Journal>()?;
+```
+
 Canonical PDA builders derive and validate the target address and return `(Address, u8)`. Explicit-bump builders verify the supplied bump before moving lamports. Both forms automatically append the target PDA signer to additional signers supplied by the caller. Use `u64` for create/allocation `space`; reallocation `target_size` remains `usize`.
 
 <!-- {=accountReallocationContract} -->
 
-`target_size` is the exact physical allocation after the call. When the account grows, `rent_account` funds the missing rent before Pina resizes the data. When the account shrinks, `rent_account` receives the excess rent. New bytes are zero-initialized by the Solana runtime.
+`UpdateResizableAccount` derives the target allocation from its patch. Lower-level reallocation builders take an explicit `target_size`. Every reallocation builder uses `rent_account` for the account that funds growth or receives a shrink refund. When a compact account grows, `rent_account` funds the missing rent before Pina applies the patch. When it shrinks, Pina applies the shorter representation before returning excess rent to `rent_account`. The Solana runtime zero-initializes new bytes.
 
 The Solana runtime limits account growth to `MAX_PERMITTED_DATA_INCREASE` bytes per top-level instruction. Pina rejects a single larger increase before it moves rent. Pinocchio does not expose the original serialized length, so cumulative growth from several reallocations in one instruction can still fail during `AccountView::resize`.
 
-Propagate reallocation errors. If a later resize or callback fails after rent moves, Solana restores the account only when the instruction returns that error.
+Propagate reallocation errors. If a later resize or update fails after rent moves, Solana restores the account only when the instruction returns that error.
 
 <!-- {/accountReallocationContract} -->
 
@@ -125,44 +166,34 @@ ReallocAccount {
 .invoke_signed(rent_account_signers)?;
 ```
 
-`ReallocAccountZeroed` has the same behavior and field names. Its name records the caller's intent that newly allocated bytes start at zero. The current Solana runtime zero-initializes new bytes for both builders.
+`ReallocAccountZeroed` has the same field names. Its name records the caller's intent that newly allocated bytes start at zero. The current Solana runtime zero-initializes new bytes for both builders.
 
 <!-- {/accountReallocationLowLevelExample} -->
 
-<!-- {=resizeCompactAccountExample} -->
+<!-- {=updateResizableAccountExample} -->
 
-Use `ResizeCompactAccount` for an exact compact update. The callback receives the account bytes under one mutable borrow. Load the generated mutable view inside the callback, stage every tail, and call `commit()` before returning:
+Use `UpdateResizableAccount` for a compact update. Its generated patch distinguishes unchanged fields from replacements:
 
 ```ignore
-let target_size = Journal::projected_bytes(entries.len(), markers.len())?;
-
-ResizeCompactAccount {
-	account,
-	rent_account,
-	target_size,
-	program_id,
+UpdateResizableAccount {
+	account: self.journal,
+	rent_account: self.authority,
+	program_id: &ID,
+	patch: JournalPatch::new()
+		.revision(next_revision)
+		.replace_entries(&entries)
+		.note(Some("Updated")),
 }
-.invoke::<Journal, _>(|data| {
-	let mut journal = Journal::try_from_bytes_mut(data)?;
-	journal
-		.set_entries(entries)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	journal
-		.set_markers(markers)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	journal.commit().map_err(|_| ProgramError::InvalidAccountData)?;
-
-	Ok(())
-})?;
+.invoke::<Journal>()?;
 ```
 
-The builder grows before the callback. After the callback, it verifies that the committed logical size equals `target_size`, drops the data borrow, and then shrinks and refunds rent when needed. Use `invoke_signed` with the same callback when `rent_account` is a PDA that funds growth.
+The builder validates the complete patch and calculates the target size before changing bytes or lamports. It grows before applying a longer representation and applies a shorter representation before shrinking. It skips the resize when the allocation does not change. Use `invoke_signed::<Journal>(signers)` when `rent_account` is a PDA that funds growth.
 
-<!-- {/resizeCompactAccountExample} -->
+<!-- {/updateResizableAccountExample} -->
 
 <!-- {=reallocCompactAccountExample} -->
 
-`ReallocCompactAccount` is the lower-level compact builder. It changes the physical allocation immediately and does not edit or commit the compact view:
+`ReallocCompactAccount` is the lower-level compact builder. It changes the physical allocation and does not apply a patch:
 
 ```ignore
 ReallocCompactAccount {
@@ -174,11 +205,13 @@ ReallocCompactAccount {
 .invoke::<Journal>()?;
 ```
 
-Call `invoke` before editing when the compact layout grows. To shrink, commit the shorter layout, drop its mutable data borrow, and then call `invoke`. Use `invoke_signed` instead when a PDA rent account must fund growth.
+For growth, call `invoke` before writing the longer representation. For shrinkage, write a valid shorter representation, drop its mutable data borrow, and then call `invoke`. Use `invoke_signed` when a PDA rent account funds growth. Prefer `UpdateResizableAccount` unless the caller needs explicit allocation control.
 
 <!-- {/reallocCompactAccountExample} -->
 
 Close builders intentionally expose only `.invoke()`. They perform checked direct account mutation rather than a CPI, so signer seeds would have no effect.
+
+All reallocation builders use `rent_account` for the account that funds growth and receives shrink refunds. Lower-level builders take an explicit `target_size`; `UpdateResizableAccount` derives it from the patch.
 
 Generated CPI modules follow the same shape. Construct the generated instruction struct using its documented public account and data fields, then invoke it with the validated program account:
 

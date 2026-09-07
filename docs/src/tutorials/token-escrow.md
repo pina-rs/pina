@@ -88,7 +88,7 @@ pub struct EscrowState {
 }
 ```
 
-The macro auto-injects a discriminator field as the first byte (set to `EscrowAccount::EscrowState`) and derives Pinapod's native-schema machinery. `EscrowStateZc` is the generated storage view: its integer fields are alignment-one little-endian wrappers, and account loaders return that validated view without copying.
+The macro auto-injects a discriminator field as the first byte, set to `EscrowAccount::EscrowState`, and derives PinaPod's native-schema machinery. `EscrowStateZc` is the generated storage view. Its integer fields are alignment-one little-endian wrappers, and account loaders return that validated view without copying.
 
 The `seed` and `bump` fields are stored so that PDA derivation can be verified on subsequent instructions without re-computing it.
 
@@ -224,22 +224,19 @@ CreateProgramAccountWithBump {
 	seeds: &escrow_seeds.as_slices(),
 	bump: args.bump,
 }
-.invoke::<EscrowState>()?;
-
-let mut escrow = self.escrow.as_account_mut::<EscrowState>(&ID)?;
-escrow.maker = *self.maker.address();
-escrow.mint_a = *self.mint_a.address();
-escrow.mint_b = *self.mint_b.address();
-escrow.amount_a.set(0);
-escrow.amount_b = args.amount_b;
-escrow.seed = args.seed;
-escrow.bump = args.bump;
-drop(escrow);
+.invoke_with::<EscrowState>(|escrow| {
+	escrow.maker = *self.maker.address();
+	escrow.mint_a = *self.mint_a.address();
+	escrow.mint_b = *self.mint_b.address();
+	escrow.amount_a.set(0);
+	escrow.amount_b = args.amount_b;
+	escrow.seed = args.seed;
+	escrow.bump = args.bump;
+	Ok(())
+})?;
 ```
 
-`CreateProgramAccountWithBump::invoke` issues a `CreateAccount` CPI to the system program, allocating `EscrowState::SIZE` bytes and setting the owner to this program.
-
-`as_account_mut` reinterprets the raw account bytes as a guard-backed `RefMut<EscrowStateZc>`; assign each field on that generated view. Storage fields are little-endian Pod wrappers, so the right-hand side must be the same wrapper type — `args.amount_b` comes from the parsed instruction view as the identical `PodU64`, which is why it assigns directly, while `amount_a.set(0)` uses the wrapper's setter for literals. Reading values back uses `.get()`.
+`CreateProgramAccountWithBump::invoke_with` issues a `CreateAccount` CPI, allocates `EscrowState::SIZE` bytes, writes the discriminator, runs the initializer, and validates the completed state. Plain `invoke` is for account types whose fields may all remain zero after the discriminator is written. The closure form keeps allocation and typed initialization in one operation and does not expose a partially configured account between those steps.
 
 ## Make: token operations via CPI
 

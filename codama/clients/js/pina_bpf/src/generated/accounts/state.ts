@@ -31,7 +31,7 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { findStatePda } from "../pdas";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 
 export const STATE_DISCRIMINATOR = 1;
 
@@ -58,7 +58,7 @@ export function getStateEncoder(): FixedSizeEncoder<StateArgs> {
 export function getStateDecoder(): FixedSizeDecoder<State> {
 	return getStructDecoder([[
 		"discriminator",
-		getZeroPodDiscriminatorDecoder(STATE_DISCRIMINATOR, getU8Decoder()),
+		getPinaPodDiscriminatorDecoder(STATE_DISCRIMINATOR, getU8Decoder()),
 	], ["bump", getU8Decoder()]]);
 }
 

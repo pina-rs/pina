@@ -38,15 +38,15 @@ const fixture = JSON.parse(
 	readFileSync(fixturePath, "utf8"),
 ) as ContractFixture;
 
-describe("Dart and JavaScript zeropod contract parity", () => {
+describe("Dart and JavaScript PinaPod contract parity", () => {
 	test("profile state matches the shared 240-byte golden", () => {
 		const encoded = getProfileStateEncoder().encode({
 			active: true,
-			bio: boundedText("bio", 129),
+			bio: "bio",
 			bump: 254,
 			favoriteTag: 42n,
-			name: boundedText("A\0B", 33),
-			tags: tagBytes([7n, 9n]),
+			name: "A\0B",
+			tags: [7n, 9n],
 		});
 
 		expect(encoded.length).toBe(fixture.profileState.size);
@@ -57,9 +57,9 @@ describe("Dart and JavaScript zeropod contract parity", () => {
 
 	test("initialize data matches the shared 164-byte golden", () => {
 		const encoded = getInitializeInstructionDataEncoder().encode({
-			bio: boundedText("bio", 129),
+			bio: "bio",
 			bump: 9,
-			name: boundedText("name", 33),
+			name: "name",
 		});
 
 		expect(encoded.length).toBe(fixture.initializeInstruction.size);
@@ -95,22 +95,21 @@ describe("Dart and JavaScript zeropod contract parity", () => {
 		expect(() => instructionDecoder.decode(malformedInstruction)).toThrow();
 	});
 
-	test("treats bounded storage contents as opaque fixed bytes", () => {
+	test("rejects malformed bounded string and vector contents", () => {
 		const decoder = getProfileStateDecoder();
 		const golden = Uint8Array.from(
 			Buffer.from(fixture.profileState.encodedHex, "hex"),
 		);
-		const opaque = Uint8Array.from(golden);
-		opaque[fixture.profileState.nameOffset] = 33;
-		opaque[fixture.profileState.nameOffset + 1] = 0xc3;
-		opaque[fixture.profileState.nameOffset + 2] = 0x28;
-		opaque[fixture.profileState.tagsOffset] = 9;
+		const invalidUtf8 = Uint8Array.from(golden);
+		invalidUtf8[fixture.profileState.nameOffset] = 2;
+		invalidUtf8[fixture.profileState.nameOffset + 1] = 0xc3;
+		invalidUtf8[fixture.profileState.nameOffset + 2] = 0x28;
+		expect(() => decoder.decode(invalidUtf8)).toThrow();
 
-		const decoded = decoder.decode(opaque);
-		expect(decoded.name.slice(0, 3)).toEqual(
-			Uint8Array.from([33, 0xc3, 0x28]),
-		);
-		expect(decoded.tags[0]).toBe(9);
+		const oversizedVector = Uint8Array.from(golden);
+		oversizedVector[fixture.profileState.tagsOffset] = 9;
+		oversizedVector[fixture.profileState.tagsOffset + 1] = 0;
+		expect(() => decoder.decode(oversizedVector)).toThrow();
 	});
 
 	test("treats inactive option capacity as unobservable", () => {
@@ -118,11 +117,11 @@ describe("Dart and JavaScript zeropod contract parity", () => {
 		const encoded = Uint8Array.from(
 			getProfileStateEncoder().encode({
 				active: false,
-				bio: boundedText("bio", 129),
+				bio: "bio",
 				bump: 1,
 				favoriteTag: null,
-				name: boundedText("name", 33),
-				tags: tagBytes([]),
+				name: "name",
+				tags: [],
 			}),
 		);
 
@@ -141,50 +140,23 @@ describe("Dart and JavaScript zeropod contract parity", () => {
 		expect(() =>
 			getProfileStateEncoder().encode({
 				active: false,
-				bio: boundedText("bio", 129),
+				bio: "bio",
 				bump: 1,
 				favoriteTag: null,
-				name: new Uint8Array(34),
-				tags: tagBytes([]),
+				name: "x".repeat(33),
+				tags: [],
 			})
 		).toThrow();
 
 		expect(() =>
 			getProfileStateEncoder().encode({
 				active: false,
-				bio: boundedText("bio", 129),
+				bio: "bio",
 				bump: 1,
 				favoriteTag: null,
-				name: boundedText("name", 33),
-				tags: new Uint8Array(67),
+				name: "name",
+				tags: Array.from({ length: 9 }, (_, index) => BigInt(index)),
 			})
 		).toThrow();
 	});
 });
-
-function boundedText(value: string, size: number): Uint8Array {
-	const payload = new TextEncoder().encode(value);
-	if (payload.length >= size || payload.length > 0xff) {
-		throw new RangeError("value does not fit bounded storage");
-	}
-
-	const bytes = new Uint8Array(size);
-	bytes[0] = payload.length;
-	bytes.set(payload, 1);
-	return bytes;
-}
-
-function tagBytes(values: readonly bigint[]): Uint8Array {
-	const capacity = 8;
-	if (values.length > capacity) {
-		throw new RangeError("values do not fit bounded storage");
-	}
-
-	const bytes = new Uint8Array(2 + capacity * 8);
-	const view = new DataView(bytes.buffer);
-	view.setUint16(0, values.length, true);
-	values.forEach((value, index) => {
-		view.setBigUint64(2 + index * 8, BigInt.asUintN(64, value), true);
-	});
-	return bytes;
-}

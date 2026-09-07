@@ -34,8 +34,8 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { VESTING_PROGRAM_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const CANCEL_DISCRIMINATOR = 2;
 
@@ -92,7 +92,7 @@ export function getCancelInstructionDataDecoder(): FixedSizeDecoder<
 > {
 	return getStructDecoder([[
 		"discriminator",
-		getZeroPodDiscriminatorDecoder(CANCEL_DISCRIMINATOR, getU8Decoder()),
+		getPinaPodDiscriminatorDecoder(CANCEL_DISCRIMINATOR, getU8Decoder()),
 	]]);
 }
 

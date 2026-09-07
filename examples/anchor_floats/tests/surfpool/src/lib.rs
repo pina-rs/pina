@@ -85,7 +85,7 @@ fn create_roundtrips_float_bit_patterns() {
 		assert_eq!(raw.owner, program_id);
 		assert_eq!(raw.data.len(), 45, "FloatDataAccount layout is 45 bytes");
 		assert_eq!(raw.data[0], 1, "account discriminator is FloatDataAccount");
-		// The zeropod wire view stores the u64 before the u32.
+		// The PinaPod wire view stores the u64 before the u32.
 		assert_eq!(
 			&raw.data[1..9],
 			e_full.to_bits().to_le_bytes(),

@@ -24,7 +24,7 @@ pub struct FlipBit {
 #[test]
 fn test_instruction_macro() {
 	let mut bytes = [0u8; FlipBit::SIZE];
-	let flip_bit = FlipBit::initialize(&mut bytes)
+	let flip_bit = FlipBit::initialize(&mut bytes, |_| Ok(()))
 		.unwrap_or_else(|error| panic!("instruction initialization failed: {error:?}"));
 	flip_bit.section_index = 1;
 	flip_bit.array_index = 2;

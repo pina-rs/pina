@@ -64,18 +64,25 @@ pub use pina_macros::*;
 /// Re-export of the [`pinapod`] crate for advanced direct use.
 ///
 /// Pina's audited zero-copy contract is the closed field grammar enforced by
-/// [`account`], [`instruction`], and [`event`]. Direct Pinapod derives and
+/// [`account`], [`instruction`], and [`event`]. Direct `PinaPod` derives and
 /// manual trait implementations are outside that contract and must uphold
-/// Pinapod's complete safety invariants themselves.
+/// `PinaPod`'s complete safety invariants themselves.
 pub use pinapod;
-/// Backwards-compatible module alias for code generated against `ZeroPod`.
-pub use pinapod as zeropod;
-/// Declares whether a type uses a fixed or compact zero-copy layout.
-pub use pinapod::LayoutKind;
-/// Fixed-capacity UTF-8 string schema used by Pinapod derives.
-pub use pinapod::String;
-/// Bounded vector schema used by compact Pinapod derives.
+/// Derives a validated zero-copy companion for a native schema.
+pub use pinapod::PinaPod;
+/// Zero-copy access for compact (variable-length) types.
 #[cfg(feature = "compact")]
+pub use pinapod::PinaPodCompact;
+/// Error type for `PinaPod` validation failures.
+pub use pinapod::PinaPodError;
+/// Zero-copy access for fixed-size types.
+pub use pinapod::PinaPodFixed;
+/// Atomic update contract implemented by generated compact patches.
+#[cfg(feature = "compact")]
+pub use pinapod::PinaPodPatch;
+/// Fixed-capacity UTF-8 string schema used by `PinaPod` derives.
+pub use pinapod::String;
+/// Bounded vector schema used by fixed and compact `PinaPod` derives.
 pub use pinapod::Vec;
 /// Marker trait for types that can be safely cast from any byte pattern.
 pub use pinapod::ZcElem;
@@ -83,17 +90,6 @@ pub use pinapod::ZcElem;
 pub use pinapod::ZcField;
 /// Validation trait for stored (pod) types.
 pub use pinapod::ZcValidate;
-/// Derives a validated zero-copy companion for a native schema.
-pub use pinapod::ZeroPod;
-/// Zero-copy access for compact (variable-length) types.
-#[cfg(feature = "compact")]
-pub use pinapod::ZeroPodCompact;
-/// Error type for Pinapod validation failures.
-pub use pinapod::ZeroPodError;
-/// Zero-copy access for fixed-size types.
-pub use pinapod::ZeroPodFixed;
-/// Schema trait for zero-copy types.
-pub use pinapod::ZeroPodSchema;
 /// Re-export of the [`pinocchio`] crate for low-level Solana program
 /// primitives.
 pub use pinocchio;
@@ -138,8 +134,8 @@ pub use pinocchio_associated_token_account as associated_token_account;
 pub use pinocchio_memo as memo;
 /// Re-export of `pinocchio_system` for system program CPI helpers.
 pub use pinocchio_system as system;
-/// Zeropod's alignment-one storage primitives (`PodBool`, `PodU16`,
-/// `PodU64`, etc.). Prefer native field types in schemas; the `ZeroPod`
+/// `PinaPod`'s alignment-one storage primitives (`PodBool`, `PodU16`,
+/// `PodU64`, etc.). Prefer native field types in schemas; the `PinaPod`
 /// derive selects these representation types for the generated `*Zc` view.
 pub use pod::*;
 /// Macro for creating a compile-time [`Address`] from a base-58 string

@@ -125,7 +125,9 @@ impl ::pina::IntoDiscriminator for AccountDisc {
         (*self as u8).matches_discriminator(bytes)
     }
 }
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ConfigState {
+    #[pinapod(skip_accessor, skip_patch)]
     discriminator: [u8; AccountDisc::BYTES],
     pub version: u8,
     pub bump: u8,
@@ -133,111 +135,117 @@ pub struct ConfigState {
 #[repr(C)]
 pub struct ConfigStateZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    discriminator: [u8; AccountDisc::BYTES],
-    pub version: u8,
-    pub bump: u8,
+    discriminator: <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod,
+    pub version: <u8 as pina::pinapod::ZcField>::Pod,
+    pub bump: <u8 as pina::pinapod::ZcField>::Pod,
 }
-impl Copy for ConfigStateZc
+impl ::core::marker::Copy for ConfigStateZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
-impl Clone for ConfigStateZc
+impl ::core::clone::Clone for ConfigStateZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
-const _: () = if !(core::mem::align_of::<ConfigStateZc>() == 1) {
+const _: () = if !(::core::mem::align_of::<ConfigStateZc>() == 1) {
     ::core::panicking::panic(
-        "assertion failed: core::mem::align_of::<ConfigStateZc>() == 1",
+        "assertion failed: ::core::mem::align_of::<ConfigStateZc>() == 1",
     )
 };
 impl ConfigStateZc {
     #[inline(always)]
-    pub fn discriminator(&self) -> &[u8; AccountDisc::BYTES] {
-        &self.discriminator
-    }
-    #[inline(always)]
-    pub fn version(&self) -> u8 {
+    pub fn version(&self) -> <u8 as pina::pinapod::ZcField>::Pod {
         self.version
     }
     #[inline(always)]
-    pub fn bump(&self) -> u8 {
+    pub fn bump(&self) -> <u8 as pina::pinapod::ZcField>::Pod {
         self.bump
     }
 }
-impl pinapod::ZcValidate for ConfigStateZc
+impl pina::pinapod::ZcValidate for ConfigStateZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
-        <[u8; AccountDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
+    fn validate_ref(
+        value: &Self,
+    ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
-        <u8 as pinapod::ZcValidate>::validate_ref(&value.version)?;
-        <u8 as pinapod::ZcValidate>::validate_ref(&value.bump)?;
-        Ok(())
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.version,
+        )?;
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.bump,
+        )?;
+        ::core::result::Result::Ok(())
     }
 }
-impl pinapod::ZeroPodSchema for ConfigState
+impl pina::pinapod::PinaPod for ConfigState
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-{
-    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
-}
-impl pinapod::ZeroPodFixed for ConfigState
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{}
+unsafe impl pina::pinapod::PinaPodFixed for ConfigState
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Zc = ConfigStateZc;
-    const SIZE: usize = core::mem::size_of::<ConfigStateZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
-        if data.len() < core::mem::size_of::<ConfigStateZc>() {
-            return Err(pinapod::ZeroPodError::BufferTooSmall);
-        }
-        let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
-        Ok(())
-    }
 }
-unsafe impl pinapod::ZcField for ConfigState
+unsafe impl pina::pinapod::ZcField for ConfigState
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Pod = ConfigStateZc;
-    const POD_SIZE: usize = core::mem::size_of::<ConfigStateZc>();
 }
-unsafe impl pinapod::ZcElem for ConfigStateZc
+unsafe impl pina::pinapod::ZcElem for ConfigStateZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
 const _: fn(u8) -> ::core::primitive::u8 = |value| value;
 const _: fn() = || {
@@ -252,13 +260,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
         )
     }
-    if !(::core::mem::size_of::<::core::primitive::u8>()
-        == <u8 as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<::core::primitive::u8>() ==\n    <u8 as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn(u8) -> ::core::primitive::u8 = |value| value;
 const _: fn() = || {
@@ -271,13 +272,6 @@ const _: () = {
     if !(::core::mem::align_of::<::core::primitive::u8>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<::core::primitive::u8>()
-        == <u8 as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<::core::primitive::u8>() ==\n    <u8 as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -301,44 +295,38 @@ const _: () = {
     }
 };
 impl ConfigState {
-    /// The exact number of bytes required by the zeropod representation.
-    pub const SIZE: usize = <Self as pina::ZeroPodFixed>::SIZE;
-    /// Validate `data` and return zeropod's immutable zero-copy companion.
+    /// The exact number of bytes required by the `PinaPod` representation.
+    pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
-    ) -> Result<&<Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
+    ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::ZeroPodFixed>::from_bytes(data)
+        <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)
     }
-    /// Initialize caller-owned storage and return its mutable zero-copy view.
+    /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// The complete slice is initialized before zeropod validates it. The
-    /// returned borrow prevents the caller from observing or changing the raw
-    /// bytes while the typed view is live.
-    ///
-    /// Every accepted field has an audited all-zero representation. The macro
-    /// rejects custom types and other layouts whose zero state cannot be
-    /// established by Pina's closed schema grammar.
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
+    /// validates the finished representation once. The discriminator is written
+    /// before the caller configures the remaining fields. If the closure or final
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
-    /// Returns the generated invalid-data error when `data` has the wrong
-    /// length or zeroed storage is not a valid zeropod representation.
-    pub fn initialize(
-        data: &mut [u8],
-    ) -> Result<&mut <Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
-        if data.len() != Self::SIZE {
-            return Err(pina::ProgramError::InvalidAccountData);
-        }
-        data.fill(0);
-        <Self as pina::HasDiscriminator>::write_discriminator(data);
-        <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+    /// Returns the generated invalid-data error when `data` has the wrong length,
+    /// the closure fails, or the completed representation is invalid.
+    pub fn initialize<'data>(
+        data: &'data mut [u8],
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
+        <Self as pina::PinaAccount>::initialize(data, initialize)
     }
 }
 impl pina::HasDiscriminator for ConfigState {
@@ -354,6 +342,7 @@ impl pina::AccountValidation for ConfigStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -379,6 +368,7 @@ impl pina::AccountValidation for ConfigStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -401,8 +391,14 @@ impl pina::AccountValidation for ConfigStateZc {
         }
     }
 }
-impl pina::PinaAccount for ConfigState {}
+impl pina::PinaAccount for ConfigState {
+    fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
+        <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+}
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct GameState {
+    #[pinapod(skip_accessor, skip_patch)]
     discriminator: [u8; AccountDisc::BYTES],
     pub score: u8,
     pub level: u8,
@@ -426,111 +422,117 @@ impl ::core::fmt::Debug for GameState {
 #[repr(C)]
 pub struct GameStateZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    discriminator: [u8; AccountDisc::BYTES],
-    pub score: u8,
-    pub level: u8,
+    discriminator: <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod,
+    pub score: <u8 as pina::pinapod::ZcField>::Pod,
+    pub level: <u8 as pina::pinapod::ZcField>::Pod,
 }
-impl Copy for GameStateZc
+impl ::core::marker::Copy for GameStateZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
-impl Clone for GameStateZc
+impl ::core::clone::Clone for GameStateZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
-const _: () = if !(core::mem::align_of::<GameStateZc>() == 1) {
+const _: () = if !(::core::mem::align_of::<GameStateZc>() == 1) {
     ::core::panicking::panic(
-        "assertion failed: core::mem::align_of::<GameStateZc>() == 1",
+        "assertion failed: ::core::mem::align_of::<GameStateZc>() == 1",
     )
 };
 impl GameStateZc {
     #[inline(always)]
-    pub fn discriminator(&self) -> &[u8; AccountDisc::BYTES] {
-        &self.discriminator
-    }
-    #[inline(always)]
-    pub fn score(&self) -> u8 {
+    pub fn score(&self) -> <u8 as pina::pinapod::ZcField>::Pod {
         self.score
     }
     #[inline(always)]
-    pub fn level(&self) -> u8 {
+    pub fn level(&self) -> <u8 as pina::pinapod::ZcField>::Pod {
         self.level
     }
 }
-impl pinapod::ZcValidate for GameStateZc
+impl pina::pinapod::ZcValidate for GameStateZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
-        <[u8; AccountDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
+    fn validate_ref(
+        value: &Self,
+    ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
-        <u8 as pinapod::ZcValidate>::validate_ref(&value.score)?;
-        <u8 as pinapod::ZcValidate>::validate_ref(&value.level)?;
-        Ok(())
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.score,
+        )?;
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.level,
+        )?;
+        ::core::result::Result::Ok(())
     }
 }
-impl pinapod::ZeroPodSchema for GameState
+impl pina::pinapod::PinaPod for GameState
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-{
-    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
-}
-impl pinapod::ZeroPodFixed for GameState
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{}
+unsafe impl pina::pinapod::PinaPodFixed for GameState
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Zc = GameStateZc;
-    const SIZE: usize = core::mem::size_of::<GameStateZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
-        if data.len() < core::mem::size_of::<GameStateZc>() {
-            return Err(pinapod::ZeroPodError::BufferTooSmall);
-        }
-        let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
-        Ok(())
-    }
 }
-unsafe impl pinapod::ZcField for GameState
+unsafe impl pina::pinapod::ZcField for GameState
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Pod = GameStateZc;
-    const POD_SIZE: usize = core::mem::size_of::<GameStateZc>();
 }
-unsafe impl pinapod::ZcElem for GameStateZc
+unsafe impl pina::pinapod::ZcElem for GameStateZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
 const _: fn(u8) -> ::core::primitive::u8 = |value| value;
 const _: fn() = || {
@@ -545,13 +547,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
         )
     }
-    if !(::core::mem::size_of::<::core::primitive::u8>()
-        == <u8 as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<::core::primitive::u8>() ==\n    <u8 as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn(u8) -> ::core::primitive::u8 = |value| value;
 const _: fn() = || {
@@ -564,13 +559,6 @@ const _: () = {
     if !(::core::mem::align_of::<::core::primitive::u8>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<::core::primitive::u8>()
-        == <u8 as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<::core::primitive::u8>() ==\n    <u8 as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -594,44 +582,38 @@ const _: () = {
     }
 };
 impl GameState {
-    /// The exact number of bytes required by the zeropod representation.
-    pub const SIZE: usize = <Self as pina::ZeroPodFixed>::SIZE;
-    /// Validate `data` and return zeropod's immutable zero-copy companion.
+    /// The exact number of bytes required by the `PinaPod` representation.
+    pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
-    ) -> Result<&<Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
+    ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::ZeroPodFixed>::from_bytes(data)
+        <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)
     }
-    /// Initialize caller-owned storage and return its mutable zero-copy view.
+    /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// The complete slice is initialized before zeropod validates it. The
-    /// returned borrow prevents the caller from observing or changing the raw
-    /// bytes while the typed view is live.
-    ///
-    /// Every accepted field has an audited all-zero representation. The macro
-    /// rejects custom types and other layouts whose zero state cannot be
-    /// established by Pina's closed schema grammar.
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
+    /// validates the finished representation once. The discriminator is written
+    /// before the caller configures the remaining fields. If the closure or final
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
-    /// Returns the generated invalid-data error when `data` has the wrong
-    /// length or zeroed storage is not a valid zeropod representation.
-    pub fn initialize(
-        data: &mut [u8],
-    ) -> Result<&mut <Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
-        if data.len() != Self::SIZE {
-            return Err(pina::ProgramError::InvalidAccountData);
-        }
-        data.fill(0);
-        <Self as pina::HasDiscriminator>::write_discriminator(data);
-        <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+    /// Returns the generated invalid-data error when `data` has the wrong length,
+    /// the closure fails, or the completed representation is invalid.
+    pub fn initialize<'data>(
+        data: &'data mut [u8],
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
+        <Self as pina::PinaAccount>::initialize(data, initialize)
     }
 }
 impl pina::HasDiscriminator for GameState {
@@ -647,6 +629,7 @@ impl pina::AccountValidation for GameStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -672,6 +655,7 @@ impl pina::AccountValidation for GameStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -694,8 +678,14 @@ impl pina::AccountValidation for GameStateZc {
         }
     }
 }
-impl pina::PinaAccount for GameState {}
+impl pina::PinaAccount for GameState {
+    fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
+        <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+}
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct DataAccount {
+    #[pinapod(skip_accessor, skip_patch)]
     discriminator: [u8; AccountDisc::BYTES],
     pub authority: [u8; 32],
     pub data: [u8; 64],
@@ -704,125 +694,141 @@ pub struct DataAccount {
 #[repr(C)]
 pub struct DataAccountZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    [u8; 64]: pinapod::ZcValidate,
-    [u8; 4]: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 64]: pina::pinapod::ZcField,
+    <[u8; 64] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 4]: pina::pinapod::ZcField,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    discriminator: [u8; AccountDisc::BYTES],
-    pub authority: [u8; 32],
-    pub data: [u8; 64],
-    pub flags: [u8; 4],
+    discriminator: <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod,
+    pub authority: <[u8; 32] as pina::pinapod::ZcField>::Pod,
+    pub data: <[u8; 64] as pina::pinapod::ZcField>::Pod,
+    pub flags: <[u8; 4] as pina::pinapod::ZcField>::Pod,
 }
-impl Copy for DataAccountZc
+impl ::core::marker::Copy for DataAccountZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    [u8; 64]: pinapod::ZcValidate,
-    [u8; 4]: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 64]: pina::pinapod::ZcField,
+    <[u8; 64] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 4]: pina::pinapod::ZcField,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
-impl Clone for DataAccountZc
+impl ::core::clone::Clone for DataAccountZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    [u8; 64]: pinapod::ZcValidate,
-    [u8; 4]: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 64]: pina::pinapod::ZcField,
+    <[u8; 64] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 4]: pina::pinapod::ZcField,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
-const _: () = if !(core::mem::align_of::<DataAccountZc>() == 1) {
+const _: () = if !(::core::mem::align_of::<DataAccountZc>() == 1) {
     ::core::panicking::panic(
-        "assertion failed: core::mem::align_of::<DataAccountZc>() == 1",
+        "assertion failed: ::core::mem::align_of::<DataAccountZc>() == 1",
     )
 };
 impl DataAccountZc {
     #[inline(always)]
-    pub fn discriminator(&self) -> &[u8; AccountDisc::BYTES] {
-        &self.discriminator
-    }
-    #[inline(always)]
-    pub fn authority(&self) -> &[u8; 32] {
+    pub fn authority(&self) -> &<[u8; 32] as pina::pinapod::ZcField>::Pod {
         &self.authority
     }
     #[inline(always)]
-    pub fn data(&self) -> &[u8; 64] {
+    pub fn data(&self) -> &<[u8; 64] as pina::pinapod::ZcField>::Pod {
         &self.data
     }
     #[inline(always)]
-    pub fn flags(&self) -> &[u8; 4] {
+    pub fn flags(&self) -> &<[u8; 4] as pina::pinapod::ZcField>::Pod {
         &self.flags
     }
 }
-impl pinapod::ZcValidate for DataAccountZc
+impl pina::pinapod::ZcValidate for DataAccountZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    [u8; 64]: pinapod::ZcValidate,
-    [u8; 4]: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 64]: pina::pinapod::ZcField,
+    <[u8; 64] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 4]: pina::pinapod::ZcField,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
-        <[u8; AccountDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
+    fn validate_ref(
+        value: &Self,
+    ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
-        <[u8; 32] as pinapod::ZcValidate>::validate_ref(&value.authority)?;
-        <[u8; 64] as pinapod::ZcValidate>::validate_ref(&value.data)?;
-        <[u8; 4] as pinapod::ZcValidate>::validate_ref(&value.flags)?;
-        Ok(())
+        <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.authority,
+        )?;
+        <<[u8; 64] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.data,
+        )?;
+        <<[u8; 4] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.flags,
+        )?;
+        ::core::result::Result::Ok(())
     }
 }
-impl pinapod::ZeroPodSchema for DataAccount
+impl pina::pinapod::PinaPod for DataAccount
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    [u8; 64]: pinapod::ZcValidate,
-    [u8; 4]: pinapod::ZcValidate,
-{
-    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
-}
-impl pinapod::ZeroPodFixed for DataAccount
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 64]: pina::pinapod::ZcField,
+    <[u8; 64] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 4]: pina::pinapod::ZcField,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{}
+unsafe impl pina::pinapod::PinaPodFixed for DataAccount
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    [u8; 64]: pinapod::ZcValidate,
-    [u8; 4]: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 64]: pina::pinapod::ZcField,
+    <[u8; 64] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 4]: pina::pinapod::ZcField,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Zc = DataAccountZc;
-    const SIZE: usize = core::mem::size_of::<DataAccountZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
-        if data.len() < core::mem::size_of::<DataAccountZc>() {
-            return Err(pinapod::ZeroPodError::BufferTooSmall);
-        }
-        let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
-        Ok(())
-    }
 }
-unsafe impl pinapod::ZcField for DataAccount
+unsafe impl pina::pinapod::ZcField for DataAccount
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    [u8; 64]: pinapod::ZcValidate,
-    [u8; 4]: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 64]: pina::pinapod::ZcField,
+    <[u8; 64] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 4]: pina::pinapod::ZcField,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Pod = DataAccountZc;
-    const POD_SIZE: usize = core::mem::size_of::<DataAccountZc>();
 }
-unsafe impl pinapod::ZcElem for DataAccountZc
+unsafe impl pina::pinapod::ZcElem for DataAccountZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    [u8; 64]: pinapod::ZcValidate,
-    [u8; 4]: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 64]: pina::pinapod::ZcField,
+    <[u8; 64] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 4]: pina::pinapod::ZcField,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
 const _: fn([u8; 32]) -> [::core::primitive::u8; 32] = |value| value;
 const _: fn() = || {
@@ -835,13 +841,6 @@ const _: () = {
     if !(::core::mem::align_of::<[::core::primitive::u8; 32]>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<[::core::primitive::u8; 32]>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<[::core::primitive::u8; 32]>()
-        == <[u8; 32] as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<[::core::primitive::u8; 32]>() ==\n    <[u8; 32] as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -858,13 +857,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<[::core::primitive::u8; 64]>() == 1",
         )
     }
-    if !(::core::mem::size_of::<[::core::primitive::u8; 64]>()
-        == <[u8; 64] as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<[::core::primitive::u8; 64]>() ==\n    <[u8; 64] as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn([u8; 4]) -> [::core::primitive::u8; 4] = |value| value;
 const _: fn() = || {
@@ -877,13 +869,6 @@ const _: () = {
     if !(::core::mem::align_of::<[::core::primitive::u8; 4]>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<[::core::primitive::u8; 4]>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<[::core::primitive::u8; 4]>()
-        == <[u8; 4] as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<[::core::primitive::u8; 4]>() ==\n    <[u8; 4] as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -908,44 +893,38 @@ const _: () = {
     }
 };
 impl DataAccount {
-    /// The exact number of bytes required by the zeropod representation.
-    pub const SIZE: usize = <Self as pina::ZeroPodFixed>::SIZE;
-    /// Validate `data` and return zeropod's immutable zero-copy companion.
+    /// The exact number of bytes required by the `PinaPod` representation.
+    pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
-    ) -> Result<&<Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
+    ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::ZeroPodFixed>::from_bytes(data)
+        <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)
     }
-    /// Initialize caller-owned storage and return its mutable zero-copy view.
+    /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// The complete slice is initialized before zeropod validates it. The
-    /// returned borrow prevents the caller from observing or changing the raw
-    /// bytes while the typed view is live.
-    ///
-    /// Every accepted field has an audited all-zero representation. The macro
-    /// rejects custom types and other layouts whose zero state cannot be
-    /// established by Pina's closed schema grammar.
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
+    /// validates the finished representation once. The discriminator is written
+    /// before the caller configures the remaining fields. If the closure or final
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
-    /// Returns the generated invalid-data error when `data` has the wrong
-    /// length or zeroed storage is not a valid zeropod representation.
-    pub fn initialize(
-        data: &mut [u8],
-    ) -> Result<&mut <Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
-        if data.len() != Self::SIZE {
-            return Err(pina::ProgramError::InvalidAccountData);
-        }
-        data.fill(0);
-        <Self as pina::HasDiscriminator>::write_discriminator(data);
-        <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+    /// Returns the generated invalid-data error when `data` has the wrong length,
+    /// the closure fails, or the completed representation is invalid.
+    pub fn initialize<'data>(
+        data: &'data mut [u8],
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
+        <Self as pina::PinaAccount>::initialize(data, initialize)
     }
 }
 impl pina::HasDiscriminator for DataAccount {
@@ -961,6 +940,7 @@ impl pina::AccountValidation for DataAccountZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -986,6 +966,7 @@ impl pina::AccountValidation for DataAccountZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1008,8 +989,14 @@ impl pina::AccountValidation for DataAccountZc {
         }
     }
 }
-impl pina::PinaAccount for DataAccount {}
+impl pina::PinaAccount for DataAccount {
+    fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
+        <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+}
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct BalanceAccount {
+    #[pinapod(skip_accessor, skip_patch)]
     discriminator: [u8; AccountDisc::BYTES],
     pub owner: [u8; 32],
     pub amount: PodU64,
@@ -1019,143 +1006,165 @@ pub struct BalanceAccount {
 #[repr(C)]
 pub struct BalanceAccountZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    <PodBool as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodBool: pina::pinapod::ZcField,
+    <PodBool as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    discriminator: [u8; AccountDisc::BYTES],
-    pub owner: [u8; 32],
-    pub amount: <PodU64 as pinapod::ZcField>::Pod,
-    pub decimals: u8,
-    pub is_frozen: <PodBool as pinapod::ZcField>::Pod,
+    discriminator: <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod,
+    pub owner: <[u8; 32] as pina::pinapod::ZcField>::Pod,
+    pub amount: <PodU64 as pina::pinapod::ZcField>::Pod,
+    pub decimals: <u8 as pina::pinapod::ZcField>::Pod,
+    pub is_frozen: <PodBool as pina::pinapod::ZcField>::Pod,
 }
-impl Copy for BalanceAccountZc
+impl ::core::marker::Copy for BalanceAccountZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    <PodBool as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodBool: pina::pinapod::ZcField,
+    <PodBool as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
-impl Clone for BalanceAccountZc
+impl ::core::clone::Clone for BalanceAccountZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    <PodBool as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodBool: pina::pinapod::ZcField,
+    <PodBool as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
-const _: () = if !(core::mem::align_of::<BalanceAccountZc>() == 1) {
+const _: () = if !(::core::mem::align_of::<BalanceAccountZc>() == 1) {
     ::core::panicking::panic(
-        "assertion failed: core::mem::align_of::<BalanceAccountZc>() == 1",
+        "assertion failed: ::core::mem::align_of::<BalanceAccountZc>() == 1",
     )
 };
 impl BalanceAccountZc {
     #[inline(always)]
-    pub fn discriminator(&self) -> &[u8; AccountDisc::BYTES] {
-        &self.discriminator
-    }
-    #[inline(always)]
-    pub fn owner(&self) -> &[u8; 32] {
+    pub fn owner(&self) -> &<[u8; 32] as pina::pinapod::ZcField>::Pod {
         &self.owner
     }
     #[inline(always)]
-    pub fn amount(&self) -> &<PodU64 as pinapod::ZcField>::Pod {
+    pub fn amount(&self) -> &<PodU64 as pina::pinapod::ZcField>::Pod {
         &self.amount
     }
     #[inline(always)]
-    pub fn decimals(&self) -> u8 {
+    pub fn decimals(&self) -> <u8 as pina::pinapod::ZcField>::Pod {
         self.decimals
     }
     #[inline(always)]
-    pub fn is_frozen(&self) -> &<PodBool as pinapod::ZcField>::Pod {
+    pub fn is_frozen(&self) -> &<PodBool as pina::pinapod::ZcField>::Pod {
         &self.is_frozen
     }
 }
-impl pinapod::ZcValidate for BalanceAccountZc
+impl pina::pinapod::ZcValidate for BalanceAccountZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    <PodBool as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodBool: pina::pinapod::ZcField,
+    <PodBool as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
-        <[u8; AccountDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
+    fn validate_ref(
+        value: &Self,
+    ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
-        <[u8; 32] as pinapod::ZcValidate>::validate_ref(&value.owner)?;
-        <<PodU64 as pinapod::ZcField>::Pod as pinapod::ZcValidate>::validate_ref(
+        <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.owner,
+        )?;
+        <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.amount,
         )?;
-        <u8 as pinapod::ZcValidate>::validate_ref(&value.decimals)?;
-        <<PodBool as pinapod::ZcField>::Pod as pinapod::ZcValidate>::validate_ref(
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.decimals,
+        )?;
+        <<PodBool as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.is_frozen,
         )?;
-        Ok(())
+        ::core::result::Result::Ok(())
     }
 }
-impl pinapod::ZeroPodSchema for BalanceAccount
+impl pina::pinapod::PinaPod for BalanceAccount
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    <PodBool as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-{
-    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
-}
-impl pinapod::ZeroPodFixed for BalanceAccount
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodBool: pina::pinapod::ZcField,
+    <PodBool as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{}
+unsafe impl pina::pinapod::PinaPodFixed for BalanceAccount
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    <PodBool as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodBool: pina::pinapod::ZcField,
+    <PodBool as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Zc = BalanceAccountZc;
-    const SIZE: usize = core::mem::size_of::<BalanceAccountZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
-        if data.len() < core::mem::size_of::<BalanceAccountZc>() {
-            return Err(pinapod::ZeroPodError::BufferTooSmall);
-        }
-        let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
-        Ok(())
-    }
 }
-unsafe impl pinapod::ZcField for BalanceAccount
+unsafe impl pina::pinapod::ZcField for BalanceAccount
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    <PodBool as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodBool: pina::pinapod::ZcField,
+    <PodBool as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Pod = BalanceAccountZc;
-    const POD_SIZE: usize = core::mem::size_of::<BalanceAccountZc>();
 }
-unsafe impl pinapod::ZcElem for BalanceAccountZc
+unsafe impl pina::pinapod::ZcElem for BalanceAccountZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    <PodBool as pinapod::ZcField>::Pod: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodBool: pina::pinapod::ZcField,
+    <PodBool as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
 const _: fn([u8; 32]) -> [::core::primitive::u8; 32] = |value| value;
 const _: fn() = || {
@@ -1168,13 +1177,6 @@ const _: () = {
     if !(::core::mem::align_of::<[::core::primitive::u8; 32]>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<[::core::primitive::u8; 32]>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<[::core::primitive::u8; 32]>()
-        == <[u8; 32] as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<[::core::primitive::u8; 32]>() ==\n    <[u8; 32] as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -1191,11 +1193,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<pina::PodU64>() == 1",
         )
     }
-    if !(::core::mem::size_of::<pina::PodU64>() == <PodU64 as pina::ZcField>::POD_SIZE) {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<pina::PodU64>() == <PodU64 as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn(u8) -> ::core::primitive::u8 = |value| value;
 const _: fn() = || {
@@ -1210,13 +1207,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
         )
     }
-    if !(::core::mem::size_of::<::core::primitive::u8>()
-        == <u8 as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<::core::primitive::u8>() ==\n    <u8 as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn(PodBool) -> pina::PodBool = |value| value;
 const _: fn() = || {
@@ -1229,12 +1219,6 @@ const _: () = {
     if !(::core::mem::align_of::<pina::PodBool>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<pina::PodBool>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<pina::PodBool>() == <PodBool as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<pina::PodBool>() ==\n    <PodBool as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -1260,44 +1244,38 @@ const _: () = {
     }
 };
 impl BalanceAccount {
-    /// The exact number of bytes required by the zeropod representation.
-    pub const SIZE: usize = <Self as pina::ZeroPodFixed>::SIZE;
-    /// Validate `data` and return zeropod's immutable zero-copy companion.
+    /// The exact number of bytes required by the `PinaPod` representation.
+    pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
-    ) -> Result<&<Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
+    ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::ZeroPodFixed>::from_bytes(data)
+        <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)
     }
-    /// Initialize caller-owned storage and return its mutable zero-copy view.
+    /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// The complete slice is initialized before zeropod validates it. The
-    /// returned borrow prevents the caller from observing or changing the raw
-    /// bytes while the typed view is live.
-    ///
-    /// Every accepted field has an audited all-zero representation. The macro
-    /// rejects custom types and other layouts whose zero state cannot be
-    /// established by Pina's closed schema grammar.
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
+    /// validates the finished representation once. The discriminator is written
+    /// before the caller configures the remaining fields. If the closure or final
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
-    /// Returns the generated invalid-data error when `data` has the wrong
-    /// length or zeroed storage is not a valid zeropod representation.
-    pub fn initialize(
-        data: &mut [u8],
-    ) -> Result<&mut <Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
-        if data.len() != Self::SIZE {
-            return Err(pina::ProgramError::InvalidAccountData);
-        }
-        data.fill(0);
-        <Self as pina::HasDiscriminator>::write_discriminator(data);
-        <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+    /// Returns the generated invalid-data error when `data` has the wrong length,
+    /// the closure fails, or the completed representation is invalid.
+    pub fn initialize<'data>(
+        data: &'data mut [u8],
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
+        <Self as pina::PinaAccount>::initialize(data, initialize)
     }
 }
 impl pina::HasDiscriminator for BalanceAccount {
@@ -1313,6 +1291,7 @@ impl pina::AccountValidation for BalanceAccountZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1338,6 +1317,7 @@ impl pina::AccountValidation for BalanceAccountZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1360,105 +1340,107 @@ impl pina::AccountValidation for BalanceAccountZc {
         }
     }
 }
-impl pina::PinaAccount for BalanceAccount {}
+impl pina::PinaAccount for BalanceAccount {
+    fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
+        <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+}
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct MyStruct {
+    #[pinapod(skip_accessor, skip_patch)]
     discriminator: [u8; AccountDisc::BYTES],
     pub value: u8,
 }
 #[repr(C)]
 pub struct MyStructZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    discriminator: [u8; AccountDisc::BYTES],
-    pub value: u8,
+    discriminator: <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod,
+    pub value: <u8 as pina::pinapod::ZcField>::Pod,
 }
-impl Copy for MyStructZc
+impl ::core::marker::Copy for MyStructZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
-impl Clone for MyStructZc
+impl ::core::clone::Clone for MyStructZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
-const _: () = if !(core::mem::align_of::<MyStructZc>() == 1) {
+const _: () = if !(::core::mem::align_of::<MyStructZc>() == 1) {
     ::core::panicking::panic(
-        "assertion failed: core::mem::align_of::<MyStructZc>() == 1",
+        "assertion failed: ::core::mem::align_of::<MyStructZc>() == 1",
     )
 };
 impl MyStructZc {
     #[inline(always)]
-    pub fn discriminator(&self) -> &[u8; AccountDisc::BYTES] {
-        &self.discriminator
-    }
-    #[inline(always)]
-    pub fn value(&self) -> u8 {
+    pub fn value(&self) -> <u8 as pina::pinapod::ZcField>::Pod {
         self.value
     }
 }
-impl pinapod::ZcValidate for MyStructZc
+impl pina::pinapod::ZcValidate for MyStructZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
-        <[u8; AccountDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
+    fn validate_ref(
+        value: &Self,
+    ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
-        <u8 as pinapod::ZcValidate>::validate_ref(&value.value)?;
-        Ok(())
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.value,
+        )?;
+        ::core::result::Result::Ok(())
     }
 }
-impl pinapod::ZeroPodSchema for MyStruct
+impl pina::pinapod::PinaPod for MyStruct
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-{
-    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
-}
-impl pinapod::ZeroPodFixed for MyStruct
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{}
+unsafe impl pina::pinapod::PinaPodFixed for MyStruct
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Zc = MyStructZc;
-    const SIZE: usize = core::mem::size_of::<MyStructZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
-        if data.len() < core::mem::size_of::<MyStructZc>() {
-            return Err(pinapod::ZeroPodError::BufferTooSmall);
-        }
-        let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
-        Ok(())
-    }
 }
-unsafe impl pinapod::ZcField for MyStruct
+unsafe impl pina::pinapod::ZcField for MyStruct
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Pod = MyStructZc;
-    const POD_SIZE: usize = core::mem::size_of::<MyStructZc>();
 }
-unsafe impl pinapod::ZcElem for MyStructZc
+unsafe impl pina::pinapod::ZcElem for MyStructZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
 const _: fn(u8) -> ::core::primitive::u8 = |value| value;
 const _: fn() = || {
@@ -1471,13 +1453,6 @@ const _: () = {
     if !(::core::mem::align_of::<::core::primitive::u8>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<::core::primitive::u8>()
-        == <u8 as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<::core::primitive::u8>() ==\n    <u8 as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -1500,44 +1475,38 @@ const _: () = {
     }
 };
 impl MyStruct {
-    /// The exact number of bytes required by the zeropod representation.
-    pub const SIZE: usize = <Self as pina::ZeroPodFixed>::SIZE;
-    /// Validate `data` and return zeropod's immutable zero-copy companion.
+    /// The exact number of bytes required by the `PinaPod` representation.
+    pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
-    ) -> Result<&<Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
+    ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::ZeroPodFixed>::from_bytes(data)
+        <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)
     }
-    /// Initialize caller-owned storage and return its mutable zero-copy view.
+    /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// The complete slice is initialized before zeropod validates it. The
-    /// returned borrow prevents the caller from observing or changing the raw
-    /// bytes while the typed view is live.
-    ///
-    /// Every accepted field has an audited all-zero representation. The macro
-    /// rejects custom types and other layouts whose zero state cannot be
-    /// established by Pina's closed schema grammar.
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
+    /// validates the finished representation once. The discriminator is written
+    /// before the caller configures the remaining fields. If the closure or final
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
-    /// Returns the generated invalid-data error when `data` has the wrong
-    /// length or zeroed storage is not a valid zeropod representation.
-    pub fn initialize(
-        data: &mut [u8],
-    ) -> Result<&mut <Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
-        if data.len() != Self::SIZE {
-            return Err(pina::ProgramError::InvalidAccountData);
-        }
-        data.fill(0);
-        <Self as pina::HasDiscriminator>::write_discriminator(data);
-        <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+    /// Returns the generated invalid-data error when `data` has the wrong length,
+    /// the closure fails, or the completed representation is invalid.
+    pub fn initialize<'data>(
+        data: &'data mut [u8],
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
+        <Self as pina::PinaAccount>::initialize(data, initialize)
     }
 }
 impl pina::HasDiscriminator for MyStruct {
@@ -1553,6 +1522,7 @@ impl pina::AccountValidation for MyStructZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1578,6 +1548,7 @@ impl pina::AccountValidation for MyStructZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1600,8 +1571,14 @@ impl pina::AccountValidation for MyStructZc {
         }
     }
 }
-impl pina::PinaAccount for MyStruct {}
+impl pina::PinaAccount for MyStruct {
+    fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
+        <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+}
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct LargeState {
+    #[pinapod(skip_accessor, skip_patch)]
     discriminator: [u8; AccountDisc::BYTES],
     pub authority: [u8; 32],
     pub bump: u8,
@@ -1615,197 +1592,261 @@ pub struct LargeState {
 #[repr(C)]
 pub struct LargeStateZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    [u8; 3]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 3]: pina::pinapod::ZcField,
+    <[u8; 3] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    discriminator: [u8; AccountDisc::BYTES],
-    pub authority: [u8; 32],
-    pub bump: u8,
-    pub treasury_bump: u8,
-    pub mint_bump: u8,
-    pub version: u8,
-    pub padding: [u8; 3],
-    pub total_supply: <PodU64 as pinapod::ZcField>::Pod,
-    pub name: [u8; 32],
+    discriminator: <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod,
+    pub authority: <[u8; 32] as pina::pinapod::ZcField>::Pod,
+    pub bump: <u8 as pina::pinapod::ZcField>::Pod,
+    pub treasury_bump: <u8 as pina::pinapod::ZcField>::Pod,
+    pub mint_bump: <u8 as pina::pinapod::ZcField>::Pod,
+    pub version: <u8 as pina::pinapod::ZcField>::Pod,
+    pub padding: <[u8; 3] as pina::pinapod::ZcField>::Pod,
+    pub total_supply: <PodU64 as pina::pinapod::ZcField>::Pod,
+    pub name: <[u8; 32] as pina::pinapod::ZcField>::Pod,
 }
-impl Copy for LargeStateZc
+impl ::core::marker::Copy for LargeStateZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    [u8; 3]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 3]: pina::pinapod::ZcField,
+    <[u8; 3] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
-impl Clone for LargeStateZc
+impl ::core::clone::Clone for LargeStateZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    [u8; 3]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 3]: pina::pinapod::ZcField,
+    <[u8; 3] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
-const _: () = if !(core::mem::align_of::<LargeStateZc>() == 1) {
+const _: () = if !(::core::mem::align_of::<LargeStateZc>() == 1) {
     ::core::panicking::panic(
-        "assertion failed: core::mem::align_of::<LargeStateZc>() == 1",
+        "assertion failed: ::core::mem::align_of::<LargeStateZc>() == 1",
     )
 };
 impl LargeStateZc {
     #[inline(always)]
-    pub fn discriminator(&self) -> &[u8; AccountDisc::BYTES] {
-        &self.discriminator
-    }
-    #[inline(always)]
-    pub fn authority(&self) -> &[u8; 32] {
+    pub fn authority(&self) -> &<[u8; 32] as pina::pinapod::ZcField>::Pod {
         &self.authority
     }
     #[inline(always)]
-    pub fn bump(&self) -> u8 {
+    pub fn bump(&self) -> <u8 as pina::pinapod::ZcField>::Pod {
         self.bump
     }
     #[inline(always)]
-    pub fn treasury_bump(&self) -> u8 {
+    pub fn treasury_bump(&self) -> <u8 as pina::pinapod::ZcField>::Pod {
         self.treasury_bump
     }
     #[inline(always)]
-    pub fn mint_bump(&self) -> u8 {
+    pub fn mint_bump(&self) -> <u8 as pina::pinapod::ZcField>::Pod {
         self.mint_bump
     }
     #[inline(always)]
-    pub fn version(&self) -> u8 {
+    pub fn version(&self) -> <u8 as pina::pinapod::ZcField>::Pod {
         self.version
     }
     #[inline(always)]
-    pub fn padding(&self) -> &[u8; 3] {
+    pub fn padding(&self) -> &<[u8; 3] as pina::pinapod::ZcField>::Pod {
         &self.padding
     }
     #[inline(always)]
-    pub fn total_supply(&self) -> &<PodU64 as pinapod::ZcField>::Pod {
+    pub fn total_supply(&self) -> &<PodU64 as pina::pinapod::ZcField>::Pod {
         &self.total_supply
     }
     #[inline(always)]
-    pub fn name(&self) -> &[u8; 32] {
+    pub fn name(&self) -> &<[u8; 32] as pina::pinapod::ZcField>::Pod {
         &self.name
     }
 }
-impl pinapod::ZcValidate for LargeStateZc
+impl pina::pinapod::ZcValidate for LargeStateZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    [u8; 3]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 3]: pina::pinapod::ZcField,
+    <[u8; 3] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
-    fn validate_ref(value: &Self) -> Result<(), pinapod::ZeroPodError> {
-        <[u8; AccountDisc::BYTES] as pinapod::ZcValidate>::validate_ref(
+    fn validate_ref(
+        value: &Self,
+    ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
-        <[u8; 32] as pinapod::ZcValidate>::validate_ref(&value.authority)?;
-        <u8 as pinapod::ZcValidate>::validate_ref(&value.bump)?;
-        <u8 as pinapod::ZcValidate>::validate_ref(&value.treasury_bump)?;
-        <u8 as pinapod::ZcValidate>::validate_ref(&value.mint_bump)?;
-        <u8 as pinapod::ZcValidate>::validate_ref(&value.version)?;
-        <[u8; 3] as pinapod::ZcValidate>::validate_ref(&value.padding)?;
-        <<PodU64 as pinapod::ZcField>::Pod as pinapod::ZcValidate>::validate_ref(
+        <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.authority,
+        )?;
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.bump,
+        )?;
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.treasury_bump,
+        )?;
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.mint_bump,
+        )?;
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.version,
+        )?;
+        <<[u8; 3] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.padding,
+        )?;
+        <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.total_supply,
         )?;
-        <[u8; 32] as pinapod::ZcValidate>::validate_ref(&value.name)?;
-        Ok(())
+        <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+            &value.name,
+        )?;
+        ::core::result::Result::Ok(())
     }
 }
-impl pinapod::ZeroPodSchema for LargeState
+impl pina::pinapod::PinaPod for LargeState
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    [u8; 3]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-{
-    const LAYOUT: pinapod::LayoutKind = pinapod::LayoutKind::Fixed;
-}
-impl pinapod::ZeroPodFixed for LargeState
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 3]: pina::pinapod::ZcField,
+    <[u8; 3] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{}
+unsafe impl pina::pinapod::PinaPodFixed for LargeState
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    [u8; 3]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 3]: pina::pinapod::ZcField,
+    <[u8; 3] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Zc = LargeStateZc;
-    const SIZE: usize = core::mem::size_of::<LargeStateZc>();
-    fn from_bytes(data: &[u8]) -> Result<&Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &*(data.as_ptr() as *const Self::Zc) })
-    }
-    fn from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, pinapod::ZeroPodError> {
-        Self::validate(data)?;
-        Ok(unsafe { &mut *(data.as_mut_ptr() as *mut Self::Zc) })
-    }
-    fn validate(data: &[u8]) -> Result<(), pinapod::ZeroPodError> {
-        if data.len() < core::mem::size_of::<LargeStateZc>() {
-            return Err(pinapod::ZeroPodError::BufferTooSmall);
-        }
-        let __zc = unsafe { &*(data.as_ptr() as *const Self::Zc) };
-        <Self::Zc as pinapod::ZcValidate>::validate_ref(__zc)?;
-        Ok(())
-    }
 }
-unsafe impl pinapod::ZcField for LargeState
+unsafe impl pina::pinapod::ZcField for LargeState
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    [u8; 3]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 3]: pina::pinapod::ZcField,
+    <[u8; 3] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
     type Pod = LargeStateZc;
-    const POD_SIZE: usize = core::mem::size_of::<LargeStateZc>();
 }
-unsafe impl pinapod::ZcElem for LargeStateZc
+unsafe impl pina::pinapod::ZcElem for LargeStateZc
 where
-    [u8; AccountDisc::BYTES]: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    u8: pinapod::ZcValidate,
-    [u8; 3]: pinapod::ZcValidate,
-    <PodU64 as pinapod::ZcField>::Pod: pinapod::ZcValidate,
-    [u8; 32]: pinapod::ZcValidate,
+    [u8; AccountDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 3]: pina::pinapod::ZcField,
+    <[u8; 3] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {}
 const _: fn([u8; 32]) -> [::core::primitive::u8; 32] = |value| value;
 const _: fn() = || {
@@ -1820,11 +1861,18 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<[::core::primitive::u8; 32]>() == 1",
         )
     }
-    if !(::core::mem::size_of::<[::core::primitive::u8; 32]>()
-        == <[u8; 32] as pina::ZcField>::POD_SIZE)
-    {
+};
+const _: fn(u8) -> ::core::primitive::u8 = |value| value;
+const _: fn() = || {
+    fn assert_mapping<T: pina::ZcField<Pod = ::core::primitive::u8>>() {}
+    fn assert_storage<T: pina::ZcElem>() {}
+    assert_mapping::<u8>();
+    assert_storage::<::core::primitive::u8>();
+};
+const _: () = {
+    if !(::core::mem::align_of::<::core::primitive::u8>() == 1) {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<[::core::primitive::u8; 32]>() ==\n    <[u8; 32] as pina::ZcField>::POD_SIZE",
+            "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
         )
     }
 };
@@ -1841,13 +1889,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
         )
     }
-    if !(::core::mem::size_of::<::core::primitive::u8>()
-        == <u8 as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<::core::primitive::u8>() ==\n    <u8 as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn(u8) -> ::core::primitive::u8 = |value| value;
 const _: fn() = || {
@@ -1862,13 +1903,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
         )
     }
-    if !(::core::mem::size_of::<::core::primitive::u8>()
-        == <u8 as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<::core::primitive::u8>() ==\n    <u8 as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn(u8) -> ::core::primitive::u8 = |value| value;
 const _: fn() = || {
@@ -1881,34 +1915,6 @@ const _: () = {
     if !(::core::mem::align_of::<::core::primitive::u8>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<::core::primitive::u8>()
-        == <u8 as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<::core::primitive::u8>() ==\n    <u8 as pina::ZcField>::POD_SIZE",
-        )
-    }
-};
-const _: fn(u8) -> ::core::primitive::u8 = |value| value;
-const _: fn() = || {
-    fn assert_mapping<T: pina::ZcField<Pod = ::core::primitive::u8>>() {}
-    fn assert_storage<T: pina::ZcElem>() {}
-    assert_mapping::<u8>();
-    assert_storage::<::core::primitive::u8>();
-};
-const _: () = {
-    if !(::core::mem::align_of::<::core::primitive::u8>() == 1) {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<::core::primitive::u8>()
-        == <u8 as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<::core::primitive::u8>() ==\n    <u8 as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -1925,13 +1931,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<[::core::primitive::u8; 3]>() == 1",
         )
     }
-    if !(::core::mem::size_of::<[::core::primitive::u8; 3]>()
-        == <[u8; 3] as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<[::core::primitive::u8; 3]>() ==\n    <[u8; 3] as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn(PodU64) -> pina::PodU64 = |value| value;
 const _: fn() = || {
@@ -1946,11 +1945,6 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<pina::PodU64>() == 1",
         )
     }
-    if !(::core::mem::size_of::<pina::PodU64>() == <PodU64 as pina::ZcField>::POD_SIZE) {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<pina::PodU64>() == <PodU64 as pina::ZcField>::POD_SIZE",
-        )
-    }
 };
 const _: fn([u8; 32]) -> [::core::primitive::u8; 32] = |value| value;
 const _: fn() = || {
@@ -1963,13 +1957,6 @@ const _: () = {
     if !(::core::mem::align_of::<[::core::primitive::u8; 32]>() == 1) {
         ::core::panicking::panic(
             "assertion failed: ::core::mem::align_of::<[::core::primitive::u8; 32]>() == 1",
-        )
-    }
-    if !(::core::mem::size_of::<[::core::primitive::u8; 32]>()
-        == <[u8; 32] as pina::ZcField>::POD_SIZE)
-    {
-        ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<[::core::primitive::u8; 32]>() ==\n    <[u8; 32] as pina::ZcField>::POD_SIZE",
         )
     }
 };
@@ -1999,44 +1986,38 @@ const _: () = {
     }
 };
 impl LargeState {
-    /// The exact number of bytes required by the zeropod representation.
-    pub const SIZE: usize = <Self as pina::ZeroPodFixed>::SIZE;
-    /// Validate `data` and return zeropod's immutable zero-copy companion.
+    /// The exact number of bytes required by the `PinaPod` representation.
+    pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
-    ) -> Result<&<Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
+    ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
         if data.len() != Self::SIZE
             || !<Self as pina::HasDiscriminator>::matches_discriminator(data)
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::ZeroPodFixed>::from_bytes(data)
+        <Self as pina::PinaPodFixed>::read_exact(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)
     }
-    /// Initialize caller-owned storage and return its mutable zero-copy view.
+    /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// The complete slice is initialized before zeropod validates it. The
-    /// returned borrow prevents the caller from observing or changing the raw
-    /// bytes while the typed view is live.
-    ///
-    /// Every accepted field has an audited all-zero representation. The macro
-    /// rejects custom types and other layouts whose zero state cannot be
-    /// established by Pina's closed schema grammar.
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
+    /// validates the finished representation once. The discriminator is written
+    /// before the caller configures the remaining fields. If the closure or final
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
-    /// Returns the generated invalid-data error when `data` has the wrong
-    /// length or zeroed storage is not a valid zeropod representation.
-    pub fn initialize(
-        data: &mut [u8],
-    ) -> Result<&mut <Self as pina::ZeroPodFixed>::Zc, pina::ProgramError> {
-        if data.len() != Self::SIZE {
-            return Err(pina::ProgramError::InvalidAccountData);
-        }
-        data.fill(0);
-        <Self as pina::HasDiscriminator>::write_discriminator(data);
-        <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+    /// Returns the generated invalid-data error when `data` has the wrong length,
+    /// the closure fails, or the completed representation is invalid.
+    pub fn initialize<'data>(
+        data: &'data mut [u8],
+        initialize: impl FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
+        <Self as pina::PinaAccount>::initialize(data, initialize)
     }
 }
 impl pina::HasDiscriminator for LargeState {
@@ -2052,6 +2033,7 @@ impl pina::AccountValidation for LargeStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -2077,6 +2059,7 @@ impl pina::AccountValidation for LargeStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -2099,4 +2082,8 @@ impl pina::AccountValidation for LargeStateZc {
         }
     }
 }
-impl pina::PinaAccount for LargeState {}
+impl pina::PinaAccount for LargeState {
+    fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
+        <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+}

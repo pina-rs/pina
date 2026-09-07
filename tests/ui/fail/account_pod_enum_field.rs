@@ -1,6 +1,7 @@
 use pina::*;
 
-#[derive(ZeroPod, Clone, Copy)]
+#[derive(PinaPod, Clone, Copy)]
+#[pinapod(crate = pina::pinapod)]
 #[repr(u8)]
 pub enum Color {
 	Red = 0,

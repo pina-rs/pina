@@ -35,7 +35,7 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { type EscrowSeeds, findEscrowPda } from "../pdas";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 
 export const ESCROW_STATE_DISCRIMINATOR = 1;
 
@@ -90,7 +90,7 @@ export function getEscrowStateDecoder(): FixedSizeDecoder<EscrowState> {
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(
+			getPinaPodDiscriminatorDecoder(
 				ESCROW_STATE_DISCRIMINATOR,
 				getU8Decoder(),
 			),

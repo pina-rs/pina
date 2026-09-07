@@ -17,7 +17,7 @@
 					"The `#[account]` macro generates:",
 					"- A discriminator field (`ProfileAccountType::ProfileState`) as the first",
 					"byte.",
-					"- `PinaAccount` and zeropod validation for checked zero-copy access.",
+					"- `PinaAccount` and `PinaPod` validation for checked zero-copy access.",
 					"- `HasDiscriminator` linking this account to",
 					"`ProfileAccountType::ProfileState`.",
 					"- `initialize` and `try_from_bytes` helpers for caller-owned storage.",
@@ -28,9 +28,9 @@
 					"|--------|------|----------------|",
 					"| 0      | 1    | discriminator  |",
 					"| 1      | 1    | bump           |",
-					"| 2      | 33   | bounded name bytes   |",
-					"| 35     | 129  | bounded bio bytes    |",
-					"| 164    | 66   | bounded tag bytes    |",
+					"| 2      | 33   | name (`String<32>`)  |",
+					"| 35     | 129  | bio (`String<128>`)  |",
+					"| 164    | 66   | tags (`Vec<u64, 8>`) |",
 					"| 230    | 9    | favorite_tag (PodOption<PodU64>) |",
 					"| 239    | 1    | active (PodBool) |",
 					"```"
@@ -68,13 +68,22 @@
 							"kind": "structFieldTypeNode",
 							"name": "name",
 							"docs": [
-								"One length byte followed by 32 fully initialized UTF-8 bytes."
+								"UTF-8 display name with 32 bytes of inline capacity."
 							],
 							"type": {
 								"kind": "fixedSizeTypeNode",
 								"size": 33,
 								"type": {
-									"kind": "bytesTypeNode"
+									"kind": "sizePrefixTypeNode",
+									"type": {
+										"kind": "stringTypeNode",
+										"encoding": "utf8"
+									},
+									"prefix": {
+										"kind": "numberTypeNode",
+										"format": "u8",
+										"endian": "le"
+									}
 								}
 							}
 						},
@@ -82,13 +91,22 @@
 							"kind": "structFieldTypeNode",
 							"name": "bio",
 							"docs": [
-								"One length byte followed by 128 fully initialized UTF-8 bytes."
+								"UTF-8 biography with 128 bytes of inline capacity."
 							],
 							"type": {
 								"kind": "fixedSizeTypeNode",
 								"size": 129,
 								"type": {
-									"kind": "bytesTypeNode"
+									"kind": "sizePrefixTypeNode",
+									"type": {
+										"kind": "stringTypeNode",
+										"encoding": "utf8"
+									},
+									"prefix": {
+										"kind": "numberTypeNode",
+										"format": "u8",
+										"endian": "le"
+									}
 								}
 							}
 						},
@@ -96,13 +114,26 @@
 							"kind": "structFieldTypeNode",
 							"name": "tags",
 							"docs": [
-								"A two-byte count followed by eight little-endian `u64` slots."
+								"Up to eight tags stored inline."
 							],
 							"type": {
 								"kind": "fixedSizeTypeNode",
 								"size": 66,
 								"type": {
-									"kind": "bytesTypeNode"
+									"kind": "arrayTypeNode",
+									"item": {
+										"kind": "numberTypeNode",
+										"format": "u64",
+										"endian": "le"
+									},
+									"count": {
+										"kind": "prefixedCountNode",
+										"prefix": {
+											"kind": "numberTypeNode",
+											"format": "u16",
+											"endian": "le"
+										}
+									}
 								}
 							}
 						},
@@ -176,10 +207,7 @@
 				"docs": [
 					"Instruction data for `Initialize`.",
 					"",
-					"Contains the PDA bump seed and fixed-width encodings of the initial name and",
-					"bio. The name occupies 33 bytes and the bio occupies 129 bytes. Each field",
-					"starts with a one-byte payload length, followed by its UTF-8 payload and",
-					"zero padding through the end of the field."
+					"Contains the PDA bump seed and bounded initial name and bio."
 				],
 				"accounts": [
 					{
@@ -266,7 +294,16 @@
 							"kind": "fixedSizeTypeNode",
 							"size": 33,
 							"type": {
-								"kind": "bytesTypeNode"
+								"kind": "sizePrefixTypeNode",
+								"type": {
+									"kind": "stringTypeNode",
+									"encoding": "utf8"
+								},
+								"prefix": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								}
 							}
 						}
 					},
@@ -277,7 +314,16 @@
 							"kind": "fixedSizeTypeNode",
 							"size": 129,
 							"type": {
-								"kind": "bytesTypeNode"
+								"kind": "sizePrefixTypeNode",
+								"type": {
+									"kind": "stringTypeNode",
+									"encoding": "utf8"
+								},
+								"prefix": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								}
 							}
 						}
 					}
@@ -368,7 +414,16 @@
 							"kind": "fixedSizeTypeNode",
 							"size": 33,
 							"type": {
-								"kind": "bytesTypeNode"
+								"kind": "sizePrefixTypeNode",
+								"type": {
+									"kind": "stringTypeNode",
+									"encoding": "utf8"
+								},
+								"prefix": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								}
 							}
 						}
 					},
@@ -379,7 +434,16 @@
 							"kind": "fixedSizeTypeNode",
 							"size": 129,
 							"type": {
-								"kind": "bytesTypeNode"
+								"kind": "sizePrefixTypeNode",
+								"type": {
+									"kind": "stringTypeNode",
+									"encoding": "utf8"
+								},
+								"prefix": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								}
 							}
 						}
 					}
@@ -609,15 +673,6 @@
 			}
 		],
 		"errors": [
-			{
-				"kind": "errorNode",
-				"name": "invalidUtf8",
-				"code": 0,
-				"message": "A bounded string field contained invalid UTF-8.",
-				"docs": [
-					"A bounded string field contained invalid UTF-8."
-				]
-			},
 			{
 				"kind": "errorNode",
 				"name": "tagOverflow",

@@ -98,14 +98,17 @@ pub struct NumericState {
 
 fn build_test_state_bytes(authority: Address, bump: u8) -> Vec<u8> {
 	let mut bytes = vec![0u8; TestState::SIZE];
-	let state = TestState::initialize(&mut bytes).expect("valid account storage");
-	state.authority = authority;
-	state.amount.set(42);
-	state.side = 1;
-	state.tag = [0xAB; 8];
-	state.width.set(7);
-	state.height.set(99);
-	state.bump = bump;
+	TestState::initialize(&mut bytes, |state| {
+		state.authority = authority;
+		state.amount.set(42);
+		state.side = 1;
+		state.tag = [0xAB; 8];
+		state.width.set(7);
+		state.height.set(99);
+		state.bump = bump;
+		Ok(())
+	})
+	.expect("valid account storage");
 	bytes
 }
 
@@ -441,6 +444,79 @@ fn assert_seeds_rejects_wrong_seed_value() {
 		result.is_err(),
 		"expected assert_seeds to reject a wrong seed value"
 	);
+}
+
+#[test]
+fn load_pda_returns_a_validated_typed_guard() {
+	let authority = unique_address(17);
+	let (pda, bump) = TestState::find_pda(&authority, 42, 1, [0xAB; 8], 7, 99, &TEST_PROGRAM_ID);
+	let state_bytes = build_test_state_bytes(authority, bump);
+	let test_account = build_account_view(pda, &state_bytes);
+
+	let state = TestState::load_pda(
+		&test_account.view,
+		&authority,
+		42,
+		1,
+		[0xAB; 8],
+		7,
+		99,
+		&TEST_PROGRAM_ID,
+	)
+	.expect("valid typed PDA");
+
+	assert_eq!(state.bump, bump);
+	assert_eq!(state.amount.get(), 42);
+}
+
+#[test]
+fn load_pda_mut_returns_a_writable_validated_guard() {
+	let authority = unique_address(18);
+	let (pda, bump) = TestState::find_pda(&authority, 42, 1, [0xAB; 8], 7, 99, &TEST_PROGRAM_ID);
+	let state_bytes = build_test_state_bytes(authority, bump);
+	let mut test_account = build_account_view(pda, &state_bytes);
+
+	{
+		let mut state = TestState::load_pda_mut(
+			&mut test_account.view,
+			&authority,
+			42,
+			1,
+			[0xAB; 8],
+			7,
+			99,
+			&TEST_PROGRAM_ID,
+		)
+		.expect("valid writable typed PDA");
+		state.amount.set(43);
+	}
+
+	let state = test_account
+		.view
+		.as_account::<TestState>(&TEST_PROGRAM_ID)
+		.expect("mutated account remains valid");
+	assert_eq!(state.amount.get(), 43);
+}
+
+#[test]
+fn load_pda_mut_rejects_the_wrong_address_before_exposing_the_guard() {
+	let authority = unique_address(19);
+	let (_pda, bump) = TestState::find_pda(&authority, 42, 1, [0xAB; 8], 7, 99, &TEST_PROGRAM_ID);
+	let state_bytes = build_test_state_bytes(authority, bump);
+	let mut test_account = build_account_view(unique_address(20), &state_bytes);
+
+	let result = TestState::load_pda_mut(
+		&mut test_account.view,
+		&authority,
+		42,
+		1,
+		[0xAB; 8],
+		7,
+		99,
+		&TEST_PROGRAM_ID,
+	);
+
+	assert!(matches!(result, Err(ProgramError::InvalidSeeds)));
 }
 
 // ---------------------------------------------------------------------------

@@ -8,16 +8,15 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ProfileState {
 	/// On-chain profile state.
 	///
 	/// The `#[account]` macro generates:
 	/// - A discriminator field (`ProfileAccountType::ProfileState`) as the first
 	/// byte.
-	/// - `PinaAccount` and zeropod validation for checked zero-copy access.
+	/// - `PinaAccount` and `PinaPod` validation for checked zero-copy access.
 	/// - `HasDiscriminator` linking this account to
 	/// `ProfileAccountType::ProfileState`.
 	/// - `initialize` and `try_from_bytes` helpers for caller-owned storage.
@@ -28,21 +27,21 @@ pub struct ProfileState {
 	/// |--------|------|----------------|
 	/// | 0      | 1    | discriminator  |
 	/// | 1      | 1    | bump           |
-	/// | 2      | 33   | bounded name bytes   |
-	/// | 35     | 129  | bounded bio bytes    |
-	/// | 164    | 66   | bounded tag bytes    |
+	/// | 2      | 33   | name (`String<32>`)  |
+	/// | 35     | 129  | bio (`String<128>`)  |
+	/// | 164    | 66   | tags (`Vec<u64, 8>`) |
 	/// | 230    | 9    | favorite_tag (PodOption<PodU64>) |
 	/// | 239    | 1    | active (PodBool) |
 	/// ```
 	pub discriminator: u8,
 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
 	pub bump: u8,
-	/// One length byte followed by 32 fully initialized UTF-8 bytes.
-	pub name: [u8; 33],
-	/// One length byte followed by 128 fully initialized UTF-8 bytes.
-	pub bio: [u8; 129],
-	/// A two-byte count followed by eight little-endian `u64` slots.
-	pub tags: [u8; 66],
+	/// UTF-8 display name with 32 bytes of inline capacity.
+	pub name: pina::String<32>,
+	/// UTF-8 biography with 128 bytes of inline capacity.
+	pub bio: pina::String<128>,
+	/// Up to eight tags stored inline.
+	pub tags: pina::Vec<u64, 8>,
 	/// An optional favourite tag. The generated view uses a one-byte tag and
 	/// an eight-byte value slot, even when the option is `None`.
 	pub favorite_tag: Option<u64>,
@@ -53,30 +52,25 @@ pub struct ProfileState {
 pub const PROFILE_STATE_DISCRIMINATOR: u8 = 1u8;
 
 impl ProfileState {
-	pub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;
+	pub const LEN: usize = core::mem::size_of::<ProfileStateZc>();
 
-	/// Initialize zero-valid account storage.
+	/// Initialize and validate account storage in one pass.
 	///
-	/// Every non-discriminator field must accept an all-zero
-	/// representation. Otherwise this method returns `InvalidAccountData`.
+	/// The destination is cleared again if configuration or validation fails.
 	pub fn initialize(
 		data: &mut [u8],
+		configure: impl FnOnce(&mut ProfileStateZc),
 	) -> Result<&mut ProfileStateZc, solana_program_error::ProgramError> {
-		if data.len() != Self::LEN {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		data.fill(0);
-		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
-			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
-		account.discriminator = PROFILE_STATE_DISCRIMINATOR;
-		Ok(account)
+		<Self as pina::PinaPodFixed>::initialize(data, |account| {
+			configure(account);
+			account.discriminator = PROFILE_STATE_DISCRIMINATOR;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
 
 	pub fn from_bytes(data: &[u8]) -> Result<&ProfileStateZc, solana_program_error::ProgramError> {
-		if data.len() != Self::LEN {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		let account = <Self as pina::ZeroPodFixed>::from_bytes(data)
+		let account = <Self as pina::PinaPodFixed>::read_exact(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != PROFILE_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
@@ -87,10 +81,7 @@ impl ProfileState {
 	pub fn from_bytes_mut(
 		data: &mut [u8],
 	) -> Result<&mut ProfileStateZc, solana_program_error::ProgramError> {
-		if data.len() != Self::LEN {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != PROFILE_STATE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);

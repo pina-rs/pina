@@ -75,7 +75,7 @@ const codama = await createFromFile("./idls/my_program.json");
 await codama.accept(renderJsVisitor("./clients/js/my_program"));
 ```
 
-Generated clients are treated as an untrusted boundary. The checked-in contract suite requires fixed-capacity encoders to reject overflow and requires decoders to enforce discriminators, canonical boolean and option tags, exact top-level lengths, and embedded NUL preservation in semantic strings. Fixed byte arrays are intentionally opaque: generated clients preserve their bytes exactly, while the on-chain program's checked helpers validate any application-level length, UTF-8, or element-count convention inside them. A renderer version that cannot satisfy those contracts is rejected instead of producing a client with a different wire format.
+Generated clients are an untrusted boundary. The checked-in contract suite requires encoders to reject fixed and compact capacity overflow. Decoders enforce discriminators, declared capacities, canonical boolean and option tags, exact top-level lengths, and strict UTF-8. A renderer version that cannot satisfy those contracts is rejected instead of producing a client with a different wire format.
 
 ### 3. Generate Dart clients with Codama
 
@@ -89,7 +89,7 @@ Run `codama:test` to resolve the committed lockfile, format the generated Dart, 
 
 ### 4. Generate Pina-style Rust clients (optional)
 
-This repository ships `crates/pina_codama_renderer`, which emits Rust models aligned with Pina's discriminator-first, fixed-size POD layouts.
+This repository ships `crates/pina_codama_renderer`, which emits Rust models aligned with Pina's discriminator-first PinaPod layouts.
 
 ```bash
 cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
@@ -100,9 +100,9 @@ cargo run --manifest-path ./crates/pina_codama_renderer/Cargo.toml -- \
 
 You can pass multiple `--idl` flags or `--idl-dir`. Add `--no-scaffold` to emit only `src/generated`; use `--mode overwrite` for an intentional clean regeneration.
 
-## Renderer Constraints
+## Renderer constraints
 
-`pina_codama_renderer` targets fixed-size layouts plus the audited size-prefixed string and array suffixes emitted for compact accounts. Unsupported patterns produce explicit errors (for example unbounded strings/bytes, unsupported endian/number forms, and dynamic fields outside a compact suffix).
+`pina_codama_renderer` supports fixed layouts and Pina's bounded compact-account grammar. It rejects unbounded collections, unsupported dynamic nesting, unsupported endian or number forms, and ambiguous layouts.
 
 ## Extractor coverage
 

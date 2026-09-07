@@ -11,6 +11,7 @@
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
+use pina::ProgramError;
 use pina::ProgramResult;
 use pina::Signer;
 
@@ -18,14 +19,11 @@ use crate::ProgramAccount;
 
 /// Instruction data for `Initialize`.
 ///
-/// Contains the PDA bump seed and fixed-width encodings of the initial name and
-/// bio. The name occupies 33 bytes and the bio occupies 129 bytes. Each field
-/// starts with a one-byte payload length, followed by its UTF-8 payload and
-/// zero padding through the end of the field.
+/// Contains the PDA bump seed and bounded initial name and bio.
 /// CPI call for the `initialize` instruction.
 #[derive(Clone, Copy, Debug)]
 #[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
-pub struct Initialize<'account> {
+pub struct Initialize<'account, 'argument> {
 	/// CPI account `authority`.
 	/// The wallet creating the profile. Pays for account creation and becomes
 	/// the authority whose address seeds the PDA.
@@ -43,40 +41,50 @@ pub struct Initialize<'account> {
 	pub system_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `initialize`.
-	pub ix: InitializeIx,
+	pub ix: InitializeIx<'argument>,
 }
 
 /// Instruction arguments for the `initialize` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct InitializeIx {
+pub struct InitializeIx<'argument> {
 	/// Instruction argument `bump`.
 	pub bump: u8,
 
 	/// Instruction argument `name`.
-	pub name: [u8; 33],
+	pub name: &'argument str,
 
 	/// Instruction argument `bio`.
-	pub bio: [u8; 129],
+	pub bio: &'argument str,
 }
 
-impl InitializeIx {
+impl<'argument> InitializeIx<'argument> {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 164;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> [u8; 164] {
+	pub fn to_bytes(&self) -> Result<[u8; 164], ProgramError> {
 		let mut data = [0u8; 164];
 		data[..1].copy_from_slice(&INITIALIZE_DISCRIMINATOR);
 		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
-		data[2..35].copy_from_slice(&self.name);
-		data[35..164].copy_from_slice(&self.bio);
+		let value = self.name.as_bytes();
+		if value.len() > 32 {
+			return Err(ProgramError::InvalidInstructionData);
+		}
+		data[2..2 + 1].copy_from_slice(&(value.len() as u8).to_le_bytes());
+		data[2 + 1..2 + 1 + value.len()].copy_from_slice(value);
+		let value = self.bio.as_bytes();
+		if value.len() > 128 {
+			return Err(ProgramError::InvalidInstructionData);
+		}
+		data[35..35 + 1].copy_from_slice(&(value.len() as u8).to_le_bytes());
+		data[35 + 1..35 + 1 + value.len()].copy_from_slice(value);
 
-		data
+		Ok(data)
 	}
 }
 
-impl<'account> Initialize<'account> {
+impl<'account, 'argument> Initialize<'account, 'argument> {
 	/// Invokes the instruction with no PDA seeds.
 	#[inline(always)]
 	pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
@@ -95,7 +103,7 @@ impl<'account> Initialize<'account> {
 			CpiHandle::writable(self.profile)?,
 			CpiHandle::readonly(self.system_program),
 		];
-		let data = self.ix.to_bytes();
+		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

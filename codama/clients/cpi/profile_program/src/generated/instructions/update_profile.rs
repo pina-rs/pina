@@ -11,6 +11,7 @@
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
+use pina::ProgramError;
 use pina::ProgramResult;
 use pina::Signer;
 
@@ -20,7 +21,7 @@ use crate::ProgramAccount;
 /// CPI call for the `update_profile` instruction.
 #[derive(Clone, Copy, Debug)]
 #[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
-pub struct UpdateProfile<'account> {
+pub struct UpdateProfile<'account, 'argument> {
 	/// CPI account `authority`.
 	/// The profile's authority. Must sign to prove ownership.
 	/// Required privileges: read-only and signer.
@@ -32,36 +33,46 @@ pub struct UpdateProfile<'account> {
 	pub profile: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `update_profile`.
-	pub ix: UpdateProfileIx,
+	pub ix: UpdateProfileIx<'argument>,
 }
 
 /// Instruction arguments for the `update_profile` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct UpdateProfileIx {
+pub struct UpdateProfileIx<'argument> {
 	/// Instruction argument `name`.
-	pub name: [u8; 33],
+	pub name: &'argument str,
 
 	/// Instruction argument `bio`.
-	pub bio: [u8; 129],
+	pub bio: &'argument str,
 }
 
-impl UpdateProfileIx {
+impl<'argument> UpdateProfileIx<'argument> {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 163;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> [u8; 163] {
+	pub fn to_bytes(&self) -> Result<[u8; 163], ProgramError> {
 		let mut data = [0u8; 163];
 		data[..1].copy_from_slice(&UPDATE_PROFILE_DISCRIMINATOR);
-		data[1..34].copy_from_slice(&self.name);
-		data[34..163].copy_from_slice(&self.bio);
+		let value = self.name.as_bytes();
+		if value.len() > 32 {
+			return Err(ProgramError::InvalidInstructionData);
+		}
+		data[1..1 + 1].copy_from_slice(&(value.len() as u8).to_le_bytes());
+		data[1 + 1..1 + 1 + value.len()].copy_from_slice(value);
+		let value = self.bio.as_bytes();
+		if value.len() > 128 {
+			return Err(ProgramError::InvalidInstructionData);
+		}
+		data[34..34 + 1].copy_from_slice(&(value.len() as u8).to_le_bytes());
+		data[34 + 1..34 + 1 + value.len()].copy_from_slice(value);
 
-		data
+		Ok(data)
 	}
 }
 
-impl<'account> UpdateProfile<'account> {
+impl<'account, 'argument> UpdateProfile<'account, 'argument> {
 	/// Invokes the instruction with no PDA seeds.
 	#[inline(always)]
 	pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
@@ -79,7 +90,7 @@ impl<'account> UpdateProfile<'account> {
 			CpiHandle::readonly_signer(self.authority),
 			CpiHandle::writable(self.profile)?,
 		];
-		let data = self.ix.to_bytes();
+		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

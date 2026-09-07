@@ -72,28 +72,34 @@ fn build_event(instruction: EventsInstruction) -> EmittedEvent {
 	match instruction {
 		EventsInstruction::Initialize => {
 			let mut bytes = [0u8; MyEvent::SIZE];
-			let event = MyEvent::initialize(&mut bytes)
-				.unwrap_or_else(|error| panic!("initialize event: {error:?}"));
-			event.data.set(5);
-			event.label = LABEL_HELLO;
+			MyEvent::initialize(&mut bytes, |event| {
+				event.data.set(5);
+				event.label = LABEL_HELLO;
+				Ok(())
+			})
+			.unwrap_or_else(|error| panic!("initialize event: {error:?}"));
 			EmittedEvent::MyEvent(bytes)
 		}
 
 		EventsInstruction::TestEvent => {
 			let mut bytes = [0u8; MyOtherEvent::SIZE];
-			let event = MyOtherEvent::initialize(&mut bytes)
-				.unwrap_or_else(|error| panic!("initialize event: {error:?}"));
-			event.data.set(6);
-			event.label = LABEL_BYE;
+			MyOtherEvent::initialize(&mut bytes, |event| {
+				event.data.set(6);
+				event.label = LABEL_BYE;
+				Ok(())
+			})
+			.unwrap_or_else(|error| panic!("initialize event: {error:?}"));
 			EmittedEvent::MyOtherEvent(bytes)
 		}
 
 		EventsInstruction::TestEventCpi => {
 			let mut bytes = [0u8; MyOtherEvent::SIZE];
-			let event = MyOtherEvent::initialize(&mut bytes)
-				.unwrap_or_else(|error| panic!("initialize event: {error:?}"));
-			event.data.set(7);
-			event.label = LABEL_CPI;
+			MyOtherEvent::initialize(&mut bytes, |event| {
+				event.data.set(7);
+				event.label = LABEL_CPI;
+				Ok(())
+			})
+			.unwrap_or_else(|error| panic!("initialize event: {error:?}"));
 			EmittedEvent::MyOtherEvent(bytes)
 		}
 	}
@@ -160,10 +166,12 @@ mod tests {
 	#[test]
 	fn my_event_roundtrip_storage_view() {
 		let mut bytes = [0u8; MyEvent::SIZE];
-		let event = MyEvent::initialize(&mut bytes)
-			.unwrap_or_else(|error| panic!("initialize event: {error:?}"));
-		event.data.set(5);
-		event.label = LABEL_HELLO;
+		MyEvent::initialize(&mut bytes, |event| {
+			event.data.set(5);
+			event.label = LABEL_HELLO;
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("initialize event: {error:?}"));
 		let decoded = MyEvent::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
 
 		assert_eq!(decoded.label, LABEL_HELLO);

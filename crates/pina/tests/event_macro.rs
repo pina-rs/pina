@@ -16,7 +16,7 @@ pub struct Initialize {
 #[test]
 fn test_event_compiles() {
 	let mut bytes = [0u8; Initialize::SIZE];
-	let event = Initialize::initialize(&mut bytes).unwrap();
+	let event = Initialize::initialize(&mut bytes, |_| Ok(())).unwrap();
 	event.choice = 10;
 	assert_eq!(event.choice, 10);
 
@@ -28,7 +28,7 @@ fn test_event_compiles() {
 fn test_event_bytes() {
 	let mut bytes = [0u8; Initialize::SIZE];
 	{
-		let event = Initialize::initialize(&mut bytes).unwrap();
+		let event = Initialize::initialize(&mut bytes, |_| Ok(())).unwrap();
 		event.choice = 10;
 	}
 	let from_bytes = Initialize::try_from_bytes(&bytes).unwrap();

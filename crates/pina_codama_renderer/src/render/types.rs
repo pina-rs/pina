@@ -11,7 +11,6 @@ use codama_nodes::NestedTypeNodeTrait;
 use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
 use codama_nodes::OptionTypeNode;
-use codama_nodes::SizePrefixTypeNode;
 use codama_nodes::StructTypeNode;
 use codama_nodes::TypeNode;
 
@@ -90,75 +89,69 @@ pub(crate) fn render_type_for_pod(r#type: &TypeNode, context: &str) -> Result<St
 }
 
 pub(crate) fn is_compact_tail(r#type: &TypeNode) -> bool {
-	compact_tail_string(r#type).is_some()
-		|| compact_tail_array(r#type)
-			.is_some_and(|array| matches!(array.count.as_ref(), CountNode::Prefixed(_)))
+	match compact_tail_core(r#type) {
+		TypeNode::Array(array) => matches!(array.count.as_ref(), CountNode::Prefixed(_)),
+		TypeNode::SizePrefix(prefix) => matches!(prefix.r#type.as_ref(), TypeNode::String(_)),
+		TypeNode::Option(option) if option.fixed != Some(true) => {
+			matches!(option.item.as_ref(), TypeNode::Array(array) if matches!(array.count.as_ref(), CountNode::Prefixed(_)))
+				|| matches!(option.item.as_ref(), TypeNode::SizePrefix(prefix) if matches!(prefix.r#type.as_ref(), TypeNode::String(_)))
+		}
+		_ => false,
+	}
 }
 
 pub(crate) fn render_type_for_compact_tail(
 	r#type: &TypeNode,
-	docs: &Docs,
+	capacity: usize,
 	context: &str,
 ) -> Result<String> {
-	if let Some(string) = compact_tail_string(r#type) {
-		if !matches!(string.r#type.as_ref(), TypeNode::String(value) if matches!(value.encoding, BytesEncoding::Utf8))
-		{
+	let core = compact_tail_core(r#type);
+	if let TypeNode::Option(option) = core
+		&& option.fixed != Some(true)
+	{
+		let tag_size = render_option_prefix_size(option.prefix.get_nested_type_node(), context)?;
+		if tag_size != 1 {
 			return Err(RenderError::UnsupportedType {
 				context: context.to_string(),
 				kind: r#type.kind(),
-				reason: "compact string tails must use UTF-8 encoding".to_string(),
+				reason: "dynamic compact options require PinaPod's one-byte presence tag"
+					.to_string(),
 			});
 		}
-		let prefix_size = render_prefix_size(string.prefix.get_nested_type_node(), context)?;
-		let capacity = validated_compact_tail_capacity(r#type, docs, prefix_size, context)?;
-
-		return if prefix_size == 1 {
-			Ok(format!("pina::String<{capacity}>"))
-		} else {
-			Ok(format!("pina::PodString<{capacity}, {prefix_size}>"))
-		};
+		let payload = render_compact_payload(&option.item, capacity, context)?;
+		return Ok(format!("Option<{payload}>"));
 	}
-	let Some(array) = compact_tail_array(r#type) else {
-		return Err(RenderError::UnsupportedType {
-			context: context.to_string(),
-			kind: r#type.kind(),
-			reason: "compact accounts require a suffix of prefixed strings or arrays".to_string(),
-		});
-	};
-	let CountNode::Prefixed(count) = array.count.as_ref() else {
-		return Err(RenderError::UnsupportedType {
-			context: context.to_string(),
-			kind: r#type.kind(),
-			reason: "compact accounts require a suffix of prefixed arrays".to_string(),
-		});
-	};
-	let prefix_size = render_prefix_size(count.prefix.get_nested_type_node(), context)?;
-	let capacity = validated_compact_tail_capacity(r#type, docs, prefix_size, context)?;
-	let item_type = render_type_for_pod(&array.item, context)?;
 
-	if prefix_size == 2 {
-		Ok(format!("pina::Vec<{item_type}, {capacity}>"))
-	} else {
-		Ok(format!(
-			"pina::PodVec<<{item_type} as pina::ZcField>::Pod, {capacity}, {prefix_size}>"
-		))
-	}
+	render_compact_payload(core, capacity, context)
 }
 
-fn validated_compact_tail_capacity(
-	r#type: &TypeNode,
-	docs: &Docs,
-	prefix_size: usize,
-	context: &str,
-) -> Result<usize> {
-	let capacity = compact_tail_capacity(docs).ok_or_else(|| {
-		RenderError::UnsupportedType {
-			context: context.to_string(),
-			kind: r#type.kind(),
-			reason: "compact tails must include a `Pina compact capacity: N.` documentation entry"
-				.to_string(),
+fn render_compact_payload(r#type: &TypeNode, capacity: usize, context: &str) -> Result<String> {
+	let (prefix_size, item_type) = match r#type {
+		TypeNode::SizePrefix(prefix) if matches!(prefix.r#type.as_ref(), TypeNode::String(string) if matches!(string.encoding, BytesEncoding::Utf8)) =>
+		{
+			let prefix_size = render_prefix_size(prefix.prefix.get_nested_type_node(), context)?;
+			let value = if prefix_size == 1 {
+				format!("pina::String<{capacity}>")
+			} else {
+				format!("pina::PodString<{capacity}, {prefix_size}>")
+			};
+			(prefix_size, value)
 		}
-	})?;
+		TypeNode::Array(array) => {
+			let CountNode::Prefixed(count) = array.count.as_ref() else {
+				return Err(compact_tail_error(r#type, context));
+			};
+			let prefix_size = render_prefix_size(count.prefix.get_nested_type_node(), context)?;
+			let item_type = render_type_for_pod(&array.item, context)?;
+			let value = if prefix_size == 2 {
+				format!("pina::Vec<{item_type}, {capacity}>")
+			} else {
+				format!("pina::PodVec<{item_type}, {capacity}, {prefix_size}>")
+			};
+			(prefix_size, value)
+		}
+		_ => return Err(compact_tail_error(r#type, context)),
+	};
 	let prefix_max = if prefix_size == 1 {
 		u8::MAX as usize
 	} else if prefix_size == 2 {
@@ -177,33 +170,24 @@ fn validated_compact_tail_capacity(
 			),
 		});
 	}
-
-	Ok(capacity)
+	Ok(item_type)
 }
 
-fn compact_tail_capacity(docs: &Docs) -> Option<usize> {
-	docs.iter().find_map(|line| {
-		line.strip_prefix("Pina compact capacity: ")
-			.and_then(|value| value.strip_suffix('.'))
-			.and_then(|value| value.parse().ok())
-	})
-}
-
-fn compact_tail_array(r#type: &TypeNode) -> Option<&codama_nodes::ArrayTypeNode> {
+fn compact_tail_core(r#type: &TypeNode) -> &TypeNode {
 	match r#type {
-		TypeNode::Array(array) => Some(array),
-		TypeNode::PreOffset(offset) => compact_tail_array(&offset.r#type),
-		TypeNode::PostOffset(offset) => compact_tail_array(&offset.r#type),
-		_ => None,
+		TypeNode::PreOffset(offset) => compact_tail_core(&offset.r#type),
+		TypeNode::PostOffset(offset) => compact_tail_core(&offset.r#type),
+		_ => r#type,
 	}
 }
 
-fn compact_tail_string(r#type: &TypeNode) -> Option<&SizePrefixTypeNode<TypeNode>> {
-	match r#type {
-		TypeNode::SizePrefix(string) => Some(string),
-		TypeNode::PreOffset(offset) => compact_tail_string(&offset.r#type),
-		TypeNode::PostOffset(offset) => compact_tail_string(&offset.r#type),
-		_ => None,
+fn compact_tail_error(r#type: &TypeNode, context: &str) -> RenderError {
+	RenderError::UnsupportedType {
+		context: context.to_string(),
+		kind: r#type.kind(),
+		reason: "compact accounts support String, Vec with fixed elements, and Option around \
+		         either"
+			.to_string(),
 	}
 }
 
@@ -212,7 +196,7 @@ fn render_pod_option_type(option: &OptionTypeNode, context: &str) -> Result<Stri
 		return Err(RenderError::UnsupportedType {
 			context: context.to_string(),
 			kind: "optionTypeNode",
-			reason: "zeropod options must use a fixed-size value slot".to_string(),
+			reason: "PinaPod options must use a fixed-size value slot".to_string(),
 		});
 	}
 
@@ -298,7 +282,7 @@ fn render_pod_collection_type(
 	let vector_type = if prefix_size == 2 {
 		format!("pina::Vec<{item_type}, {capacity}>")
 	} else {
-		format!("pina::PodVec<<{item_type} as pina::ZcField>::Pod, {capacity}, {prefix_size}>")
+		format!("pina::PodVec<{item_type}, {capacity}, {prefix_size}>")
 	};
 	Ok(Some(vector_type))
 }
@@ -440,7 +424,7 @@ pub(crate) fn render_defined_type_page(defined_type: &DefinedTypeNode) -> Result
 			render_defined_struct(name.as_str(), struct_type, &defined_type.docs)
 		}
 		TypeNode::Enum(enum_type) => {
-			render_defined_zeropod_enum(name.as_str(), enum_type, &defined_type.docs)
+			render_defined_pinapod_enum(name.as_str(), enum_type, &defined_type.docs)
 		}
 		TypeNode::Link(link) => {
 			Ok(format!(
@@ -455,7 +439,7 @@ pub(crate) fn render_defined_type_page(defined_type: &DefinedTypeNode) -> Result
 	}
 }
 
-fn render_defined_zeropod_enum(
+fn render_defined_pinapod_enum(
 	name: &str,
 	enum_type: &EnumTypeNode,
 	docs: &Docs,
@@ -465,7 +449,7 @@ fn render_defined_zeropod_enum(
 		return Err(RenderError::UnsupportedType {
 			context: format!("defined type `{name}`"),
 			kind: "enumTypeNode",
-			reason: "zeropod enums must use little-endian unsigned discriminants".to_string(),
+			reason: "PinaPod enums must use little-endian unsigned discriminants".to_string(),
 		});
 	}
 	let repr = match number.format {
@@ -477,15 +461,14 @@ fn render_defined_zeropod_enum(
 			return Err(RenderError::UnsupportedType {
 				context: format!("defined type `{name}`"),
 				kind: "enumTypeNode",
-				reason: "zeropod enums require u8, u16, u32, or u64 discriminants".to_string(),
+				reason: "PinaPod enums require u8, u16, u32, or u64 discriminants".to_string(),
 			});
 		}
 	};
 
 	let mut lines = render_docs(docs, 0);
-	lines.insert(0, "use pina::pinapod;".to_string());
-	lines.insert(1, String::new());
-	lines.push("#[derive(Clone, Copy, Debug, PartialEq, Eq, pina::ZeroPod)]".to_string());
+	lines.push("#[derive(Clone, Copy, Debug, PartialEq, Eq, pina::PinaPod)]".to_string());
+	lines.push("#[pinapod(crate = pina::pinapod)]".to_string());
 	lines.push(format!("#[repr({repr})]"));
 	lines.push(format!("pub enum {name} {{"));
 	for (index, variant) in enum_type.variants.iter().enumerate() {
@@ -493,7 +476,7 @@ fn render_defined_zeropod_enum(
 			return Err(RenderError::UnsupportedType {
 				context: format!("defined type `{name}`"),
 				kind: "enumTypeNode",
-				reason: "zeropod enums support unit variants only".to_string(),
+				reason: "PinaPod enums support unit variants only".to_string(),
 			});
 		};
 		let variant_name = pascal(variant.name.as_ref());
@@ -505,11 +488,12 @@ fn render_defined_zeropod_enum(
 }
 
 fn render_defined_struct(name: &str, struct_type: &StructTypeNode, docs: &Docs) -> Result<String> {
-	let mut lines = vec!["use pina::pinapod;".to_string(), String::new()];
+	let mut lines = Vec::new();
 	for doc_line in render_docs(docs, 0) {
 		lines.push(doc_line);
 	}
-	lines.push("#[derive(pina::ZeroPod)]".to_string());
+	lines.push("#[derive(pina::PinaPod)]".to_string());
+	lines.push("#[pinapod(crate = pina::pinapod, no_inherent)]".to_string());
 	lines.push(format!("pub struct {name} {{"));
 	for field in &struct_type.fields {
 		let field_name = snake(field.name.as_ref());

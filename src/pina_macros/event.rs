@@ -1,6 +1,6 @@
 //! `#[event]` contract tests through the public macro.
 //!
-//! The macro generates a zeropod-backed event payload with a discriminator
+//! The macro generates a `PinaPod`-backed event payload with a discriminator
 //! field, `SIZE`, `initialize`/`try_from_bytes`, and a `HasDiscriminator`
 //! impl linking back to the discriminator enum.
 
@@ -42,10 +42,11 @@ pub struct AuditEvent {
 #[test]
 fn basic_roundtrip() {
 	let mut bytes = [0_u8; TransferEvent::SIZE];
-	{
-		let view = TransferEvent::initialize(&mut bytes).unwrap();
+	TransferEvent::initialize(&mut bytes, |view| {
 		view.amount.set(500);
-	}
+		Ok(())
+	})
+	.unwrap();
 	let parsed = TransferEvent::try_from_bytes(&bytes).unwrap();
 	assert_eq!(parsed.amount.get(), 500);
 }
@@ -61,10 +62,11 @@ fn with_variant() {
 #[test]
 fn with_path_variant() {
 	let mut bytes: std::vec::Vec<u8> = std::vec![0; InitEvent::SIZE];
-	{
-		let view = InitEvent::initialize(&mut bytes).unwrap();
+	InitEvent::initialize(&mut bytes, |view| {
 		view.choice = 7;
-	}
+		Ok(())
+	})
+	.unwrap();
 	let parsed = InitEvent::try_from_bytes(&bytes).unwrap();
 	assert_eq!(parsed.choice, 7);
 }
@@ -82,6 +84,6 @@ fn minimal() {
 fn with_existing_derive() {
 	let size = AuditEvent::SIZE;
 	let mut bytes = vec![0_u8; size];
-	AuditEvent::initialize(&mut bytes).unwrap();
+	AuditEvent::initialize(&mut bytes, |_| Ok(())).unwrap();
 	assert!(AuditEvent::try_from_bytes(&bytes).is_ok());
 }

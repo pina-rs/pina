@@ -6111,12 +6111,22 @@ dependencies = [
 name = "pina_root"
 version = "0.0.4"
 dependencies = [
+ "anchor_realloc",
+ "counter_program",
  "insta",
  "macrotest",
+ "mollusk-svm",
  "pina",
  "pina_macros",
  "prettyplease 0.3.0",
+ "profile_program",
  "quote",
+ "serde_json",
+ "sha2 0.11.0",
+ "solana-account 4.3.2",
+ "solana-instruction 3.4.1",
+ "solana-pubkey 4.2.1",
+ "solana-sdk-ids 3.1.0",
  "syn 3.0.4",
  "trybuild",
 ]
@@ -6163,9 +6173,9 @@ dependencies = [
 
 [[package]]
 name = "pinapod"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72175fa13b1fceeed06738c5688f1b30f29e6409de5cf7bec708dcd6ce8c4e47"
+checksum = "12d955b5be60fe5659f304013dcd963775dfa8ceec398eb7b57aff2b42552426"
 dependencies = [
  "pinapod-derive",
  "solana-address 2.6.1",
@@ -6174,10 +6184,11 @@ dependencies = [
 
 [[package]]
 name = "pinapod-derive"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26158eeaa46a9b825024d64c99ab06601b1e392fdba785f26bf6bee134156c44"
+checksum = "65389cbb6125a3449530b94ebb34bb7428ba85a7cce69692a453bd0fefa9bc90"
 dependencies = [
+ "proc-macro-crate 3.5.0",
  "proc-macro2",
  "quote",
  "syn 2.0.119",

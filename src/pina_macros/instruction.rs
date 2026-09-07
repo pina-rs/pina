@@ -1,6 +1,6 @@
 //! `#[instruction]` contract tests through the public macro.
 //!
-//! The macro generates a zeropod-backed instruction payload with a
+//! The macro generates a `PinaPod`-backed instruction payload with a
 //! discriminator field, `SIZE`, `try_from_bytes`, and a `HasDiscriminator`
 //! impl linking back to the discriminator enum.
 
@@ -59,17 +59,18 @@ fn minimal() {
 	assert!(Initialize::try_from_bytes(&[]).is_err());
 }
 
-/// Multi-field instructions round-trip all fields through zeropod.
+/// Multi-field instructions round-trip all fields through `PinaPod`.
 #[test]
 fn many_fields() {
 	let mut bytes: std::vec::Vec<u8> = std::vec![0; FlipBit::SIZE];
-	{
-		let view = FlipBit::initialize(&mut bytes).unwrap();
+	FlipBit::initialize(&mut bytes, |view| {
 		view.section_index = 1;
 		view.array_index = 2;
 		view.offset = 3;
 		view.value = 42;
-	}
+		Ok(())
+	})
+	.unwrap();
 	let parsed = FlipBit::try_from_bytes(&bytes).unwrap();
 	assert_eq!(parsed.section_index, 1);
 	assert_eq!(parsed.array_index, 2);
@@ -81,10 +82,11 @@ fn many_fields() {
 #[test]
 fn roundtrip_with_pod() {
 	let mut bytes: std::vec::Vec<u8> = std::vec![0; Transfer::SIZE];
-	{
-		let view = Transfer::initialize(&mut bytes).unwrap();
+	Transfer::initialize(&mut bytes, |view| {
 		view.amount.set(100);
-	}
+		Ok(())
+	})
+	.unwrap();
 	let parsed = Transfer::try_from_bytes(&bytes).unwrap();
 	assert_eq!(parsed.amount.get(), 100);
 }
@@ -111,6 +113,6 @@ fn with_path_variant() {
 fn with_array_and_pod() {
 	assert_eq!(ComplexInstruction::SIZE, 1 + 32 + 8 + 1 + 4,);
 	let mut bytes: std::vec::Vec<u8> = std::vec![0; ComplexInstruction::SIZE];
-	ComplexInstruction::initialize(&mut bytes).unwrap();
+	ComplexInstruction::initialize(&mut bytes, |_| Ok(())).unwrap();
 	assert!(ComplexInstruction::try_from_bytes(&bytes).is_ok());
 }

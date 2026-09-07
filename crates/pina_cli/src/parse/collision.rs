@@ -223,7 +223,7 @@ mod tests {
 		ProgramIr {
 			name: "test".to_owned(),
 			public_key: "1111111111111111111111111111111111".to_owned(),
-			zeropod_enums: vec![],
+			pinapod_enums: vec![],
 			accounts,
 			instructions,
 			errors: vec![],

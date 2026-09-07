@@ -62,8 +62,9 @@ pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<S
 	let has_addresses = arguments
 		.iter()
 		.any(|argument| argument.rust_type.contains("Address"));
-	let ix_generics = lifetime_generics(false, has_addresses);
-	let struct_generics = lifetime_generics(has_accounts, has_addresses);
+	let has_borrowed_arguments = arguments.iter().any(|argument| argument.borrows);
+	let ix_generics = lifetime_generics(false, has_borrowed_arguments);
+	let struct_generics = lifetime_generics(has_accounts, has_borrowed_arguments);
 	let ix_type = format!("{ix_name}{ix_generics}");
 
 	let mut lines = vec![
@@ -80,6 +81,7 @@ pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<S
 		"use pina::CpiContext;".to_string(),
 		"use pina::CpiHandle;".to_string(),
 		"use pina::ProgramResult;".to_string(),
+		"use pina::ProgramError;".to_string(),
 		"use pina::Signer;".to_string(),
 		String::new(),
 		"use crate::ProgramAccount;".to_string(),
@@ -135,7 +137,7 @@ pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<S
 	}
 	lines.push(String::new());
 
-	let ix_impl = impl_header(&ix_name, false, has_addresses);
+	let ix_impl = impl_header(&ix_name, false, has_borrowed_arguments);
 	lines.push(format!("{ix_impl} {{"));
 	lines.push(
 		"\t/// Number of bytes in the encoded instruction, including its discriminator."
@@ -145,7 +147,9 @@ pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<S
 	lines.push(String::new());
 	lines.push("\t/// Encodes the discriminator and instruction arguments for CPI.".to_string());
 	lines.push("\t#[inline(always)]".to_string());
-	lines.push(format!("\tpub fn to_bytes(&self) -> [u8; {wire_size}] {{"));
+	lines.push(format!(
+		"\tpub fn to_bytes(&self) -> Result<[u8; {wire_size}], ProgramError> {{"
+	));
 	lines.push(format!("\t\tlet mut data = [0u8; {wire_size}];"));
 	lines.push(format!(
 		"\t\tdata[..{}].copy_from_slice(&{});",
@@ -158,12 +162,12 @@ pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<S
 		offset += argument.wire_size;
 	}
 	lines.push(String::new());
-	lines.push("\t\tdata".to_string());
+	lines.push("\t\tOk(data)".to_string());
 	lines.push("\t}".to_string());
 	lines.push("}".to_string());
 	lines.push(String::new());
 
-	let builder_impl = impl_header(&struct_name, has_accounts, has_addresses);
+	let builder_impl = impl_header(&struct_name, has_accounts, has_borrowed_arguments);
 	lines.push(format!("{builder_impl} {{"));
 	lines.push("\t/// Invokes the instruction with no PDA seeds.".to_string());
 	lines.push("\t#[inline(always)]".to_string());
@@ -181,7 +185,7 @@ pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<S
 	lines.push("\t\tsigners: &[Signer<'_, '_>],".to_string());
 	lines.push("\t) -> ProgramResult {".to_string());
 	lines.extend(render_account_handles(&accounts));
-	lines.push("\t\tlet data = self.ix.to_bytes();".to_string());
+	lines.push("\t\tlet data = self.ix.to_bytes()?;".to_string());
 	lines.push("\t\tlet context = CpiContext::new(*program, accounts);".to_string());
 	lines.push(String::new());
 	lines.push("\t\tcontext.invoke_signed(&data, signers)".to_string());
@@ -198,17 +202,17 @@ pub(crate) fn render_instruction_page(instruction: &InstructionNode) -> Result<S
 	Ok(lines.join("\n"))
 }
 
-fn lifetime_generics(has_accounts: bool, has_addresses: bool) -> String {
-	match (has_accounts, has_addresses) {
+fn lifetime_generics(has_accounts: bool, has_arguments: bool) -> String {
+	match (has_accounts, has_arguments) {
 		(false, false) => String::new(),
 		(true, false) => "<'account>".to_string(),
-		(false, true) => "<'address>".to_string(),
-		(true, true) => "<'account, 'address>".to_string(),
+		(false, true) => "<'argument>".to_string(),
+		(true, true) => "<'account, 'argument>".to_string(),
 	}
 }
 
-fn impl_header(name: &str, has_accounts: bool, has_addresses: bool) -> String {
-	let generics = lifetime_generics(has_accounts, has_addresses);
+fn impl_header(name: &str, has_accounts: bool, has_arguments: bool) -> String {
+	let generics = lifetime_generics(has_accounts, has_arguments);
 	if generics.is_empty() {
 		format!("impl {name}")
 	} else {

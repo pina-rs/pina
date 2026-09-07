@@ -1,4 +1,4 @@
-# Compact Accounts
+# Compact accounts
 
 Compact mode is for discriminator-first accounts with a fixed header and one or more bounded, variable-length tails. It is a good fit when unused collection capacity should not consume rent.
 
@@ -6,14 +6,14 @@ Compact mode is for discriminator-first accounts with a fixed header and one or 
 
 <!-- {=compactAccountQuickstart} -->
 
-Compact mode is opt-in. Enable `compact` for schemas and checked loaders; add `account-resize` when using the typed creation and rent-adjusting reallocation builders:
+Compact mode stores a fixed header followed by one or more bounded tails. Enable `compact` for the schema and checked loaders. Enable `account-resize` to apply a patch and adjust rent in one operation:
 
 ```toml
 [dependencies]
 pina = { version = "...", features = ["compact", "account-resize"] }
 ```
 
-The `compact` feature also enables `derive`. Add `compact` to an account with a suffix of one or more bounded `String` or `Vec` fields. Fixed fields, including `Option<scalar>` values stored as `PodOption`, must come first. Every dynamic capacity must be a literal so the macro can audit and generate the maximum layout:
+The `compact` feature also enables `derive`. Declare fixed fields first, then the compact tails. `String<N>` uses a one-byte length prefix, and `Vec<T, N>` uses a two-byte length prefix. Use `PodString<N, PFX>` or `PodVec<T, N, PFX>` when the schema needs an explicit prefix width. `PFX` is a byte count and must be `1`, `2`, `4`, or `8`.
 
 ```rust
 #[account(discriminator = AccountType, compact)]
@@ -22,65 +22,64 @@ pub struct Journal {
 	pub authority: Address,
 	pub revision: u32,
 	pub featured_entry: Option<u64>,
-	pub title: PodString<24>,
+	pub title: String<24>,
 	pub entries: Vec<u64, 8>,
 	pub markers: PodVec<u8, 8, 8>,
+	pub note: Option<String<64>>,
 }
-
-let account_bytes = Journal::projected_bytes(
-	title.len(),
-	active_entry_count,
-	active_marker_count,
-)?;
 ```
 
-The macro generates `JournalHeader`, `JournalRef`, and `JournalMut`, plus `HEADER_SIZE`, `MIN_SIZE`, `MAX_SIZE`, one `*_CAPACITY` constant per tail, checked size/load/initialize methods, and the compact-account traits used by Pina's typed CPI builders. For this schema, `TITLE_CAPACITY` is 24 and `ENTRIES_CAPACITY` and `MARKERS_CAPACITY` are both eight. Every tail length is stored in the fixed header. Active UTF-8 bytes and vector elements are concatenated after that header in declaration order; declared capacity is a validation bound, not reserved space.
+The compact grammar accepts these tail forms:
 
-Pina uses Pinapod, its maintained and wire-compatible ZeroPod fork. Each immutable and mutable accessor reads its own length prefix, so compact tails may have independent active lengths.
+- `String<N>`
+- `Vec<T, N>` where `T` has a fixed PinaPod representation
+- `Option<T>` where `T` has a fixed PinaPod representation
+- `Option<String<N>>`
+- `Option<Vec<T, N>>` where `T` has a fixed PinaPod representation
+- `Vec<String<M>, N>`
+
+`Option<T>` for fixed `T` stays in the header. The other forms use tail storage. A compact schema can contain several tails, but it cannot place a fixed field after the first tail. The macro rejects unsupported nesting and prints the accepted forms in its error.
+
+The macro generates `JournalHeader`, `JournalRef`, and `JournalPatch`. It also generates `HEADER_SIZE`, `MIN_SIZE`, `MAX_SIZE`, checked reads, initialization, projected-size calculation, and atomic updates. `MIN_SIZE` equals `HEADER_SIZE`. Tail prefixes live in the header except for a present `Option<String<N>>` or `Option<Vec<T, N>>`, whose payload retains its own prefix. Each active element of `Vec<String<M>, N>` occupies the fixed `String<M>` footprint, although each string keeps its own logical length.
+
+Pina uses PinaPod for validated alignment-one storage. PinaPod initializes inactive collection capacity and validates each active nested value before Pina returns safe access.
 
 <!-- {/compactAccountQuickstart} -->
 
-Dynamic fields must form the final suffix. Each must be `String<N>`, `PodString<N, PFX>`, `Vec<T, N>`, or `PodVec<T, N, PFX>` with literal capacity and prefix values. Vector elements must use one of the audited scalar, address, or fixed-array types accepted by the macro. Fixed fields after the first dynamic field and nested dynamic collections are rejected at compile time.
+Dynamic fields must form the final suffix. Capacities and explicit prefix widths must be integer literals. The macro rejects a fixed field after the first tail and any nesting outside the grammar above.
 
 ## Calculate size from elements
 
 <!-- {=compactAccountSizeRules} -->
 
-For compact string and vector tails, the exact encoded size is:
-
-```text
-HEADER_SIZE + Σ(active_string_bytes[i]) + Σ(active_vec_count[i] × size_of::<T[i]::Pod>())
-```
-
-| State              |                                                                         Account data length |
-| ------------------ | ------------------------------------------------------------------------------------------: |
-| Every tail empty   |                                                                               `HEADER_SIZE` |
-| Mixed tail lengths | `HEADER_SIZE + Σ(active_string_bytes[i]) + Σ(active_vec_count[i] × size_of::<T[i]::Pod>())` |
-| Every tail full    |                                                                                  `MAX_SIZE` |
-
-Use the generated APIs rather than repeating this formula:
+Use the generated patch API to calculate account size. Manual arithmetic duplicates the generated header, option, and element-footprint rules:
 
 ```rust
-let target_size = Journal::projected_bytes(title.len(), entries_count, markers_count)?;
-let allocated_size = account.data_len();
-let encoded_size = journal.encoded_size();
-let staged_size = journal.projected_size();
+let patch = JournalPatch::new()
+	.revision(next_revision)
+	.replace_entries(&entries)
+	.note(Some("Updated"));
+
+let target_size = Journal::updated_len(current_data, &patch)?;
 ```
 
-- `account.data_len()` is the physical allocation and rent basis.
-- `encoded_size()` is the committed logical size from the stored tail lengths.
-- `projected_size()` on a mutable view includes staged `set_*` replacements.
-- `Journal::projected_bytes(...)` validates each requested count independently and returns the target logical size before a view exists.
+`MIN_SIZE` and `HEADER_SIZE` are the smallest valid allocation. `MAX_SIZE` is the largest. The exact encoded length depends on the active values:
 
-`PinaCompactAccount::validate_size` rejects a buffer smaller than the shared header, larger than `MAX_SIZE`, or split across the greatest common byte alignment of all tail element types (`TAIL_ALIGNMENT`). Aligned spare bytes inside those bounds are permitted during grow-before-commit workflows, so `encoded_size()` can be smaller than `account.data_len()`. Checked loading validates every encoded length against its declared capacity and verifies that each active payload fits in the physical buffer. `commit()` returns the exact encoded size to use when shrinking.
+- `String<N>` contributes its UTF-8 byte length.
+- `Vec<T, N>` contributes `len * size_of::<T::Pod>()`.
+- An absent dynamic `Option` contributes no tail bytes.
+- A present dynamic `Option` contributes its prefix and active payload.
+- `Vec<String<M>, N>` contributes `len * size_of::<PodString<M>>()`. Each element has a fixed footprint.
+
+`PinaCompactAccount::validate_size` rejects a buffer outside `MIN_SIZE..=MAX_SIZE`. Checked loading also validates every length, option tag, active element, and UTF-8 sequence. A `JournalRef` reports `encoded_len()`, `storage_len()`, and `spare_capacity()` without exposing mutable length metadata.
 
 <!-- {/compactAccountSizeRules} -->
 
-Prefer element counts in instruction data. Turning arbitrary byte lengths into a public API makes callers reason about the header and allows them to request split-element sizes. The generated `projected_bytes(...)` method keeps the wire API aligned with the schema and validates each tail's declared capacity.
+Prefer logical values in instruction data. Let the generated patch calculate bytes so callers do not need to reproduce header, option, or element-footprint rules.
 
 ## Create at the needed size
 
-Use `CreateCompactProgramAccount` when Pina should derive the canonical bump, or `CreateCompactProgramAccountWithBump` when a checked instruction argument already carries the bump. Both builders accept any valid initial compact size:
+Use `CreateCompactProgramAccount` when Pina should derive the canonical bump, or `CreateCompactProgramAccountWithBump` when a checked instruction argument already carries the bump. Both builders require a generated patch. For a header-only representation, allocate `HEADER_SIZE` and use the patch to set any nonzero fixed fields:
 
 ```rust
 CreateCompactProgramAccountWithBump {
@@ -89,122 +88,43 @@ CreateCompactProgramAccountWithBump {
 	owner: &ID,
 	seeds: &Journal::seeds(authority.address()).as_slices(),
 	bump,
-	space: Journal::projected_bytes(
-		initial_title.len(),
-		initial_entry_count,
-		initial_marker_count,
-	)?,
+	patch: JournalPatch::new()
+		.bump(bump)
+		.authority(*authority.address())
+		.revision(0),
+	space: Journal::HEADER_SIZE,
 }
 .invoke::<Journal>()?;
 ```
 
-Initialize and commit the compact view after creation. A nonempty initial tail must be written completely; do not treat freshly allocated bytes as initialized collection elements.
+The typed create builder applies the patch while it initializes the account. Omitted patch fields use their zero, empty, or absent representation. Use `JournalPatch::new()` when all header fields may remain zero and every tail starts empty. To create nonempty tails, add their replacement methods to the patch and allocate enough `space` for the encoded values. `UpdateResizableAccount` can populate or replace several tails later.
 
 ## Grow, update, shrink, and clear
 
 <!-- {=compactAccountResizeOrdering} -->
 
-Compact mutation has one important ordering rule:
-
-- **Grow:** allocate and fund rent before staging longer tails.
-- **Same size:** commit without reallocating.
-- **Shrink or clear:** commit shorter tails before truncating bytes and refunding rent.
-
-Use `ResizeCompactAccount` for normal compact updates. It applies that ordering, enforces the exact `target_size`, and skips the physical resize when the allocation is unchanged:
+Apply all compact changes through one patch:
 
 ```rust
-let target_size = Journal::projected_bytes(title.len(), entries.len(), markers.len())?;
-
-ResizeCompactAccount {
-	account,
-	rent_account,
-	target_size,
-	program_id,
+UpdateResizableAccount {
+	account: self.journal,
+	rent_account: self.authority,
+	program_id: &ID,
+	patch: JournalPatch::new()
+		.revision(next_revision)
+		.replace_entries(&entries)
+		.note(Some("Updated")),
 }
-.invoke::<Journal, _>(|data| {
-	let mut journal = Journal::try_from_bytes_mut(data)?;
-	journal
-		.featured_entry
-		.set(Some(PodU64::from(featured_entry)));
-	journal
-		.set_title(title)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	journal
-		.set_entries(entries)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	journal
-		.set_markers(markers)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	let projected_size = journal.projected_size();
-	let encoded_size = journal
-		.commit()
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	debug_assert_eq!(encoded_size, projected_size);
-
-	Ok(())
-})?;
+.invoke::<Journal>()?;
 ```
 
-The callback receives the account bytes under one mutable runtime borrow. Create the concrete mutable view inside the callback so Pinapod can prove that borrowed tail slices outlive the view. Call `commit()` before returning. After the callback returns, `ResizeCompactAccount` reloads the committed view and rejects a size that differs from `target_size`. It then drops the data borrow before shrinking.
+`UpdateResizableAccount` validates the complete patch and calculates the final encoded length before it changes the account. It grows the allocation before applying a longer representation. For a shorter representation, it applies the patch before shrinking the allocation. If the allocation stays the same size, the builder skips the resize. It adjusts the rent balance through `rent_account` and clears bytes removed by the patch. If validation or size calculation fails, both account data and lamport balances remain unchanged.
 
-Use `invoke_signed` when `rent_account` is a PDA that must sign the system transfer used for growth. The callback contract stays the same:
+Use `invoke_signed::<Journal>(signers)` when `rent_account` is a PDA that must sign the system transfer used for growth. The patch and resize ordering stay the same.
 
-```rust
-ResizeCompactAccount {
-	account,
-	rent_account,
-	target_size,
-	program_id,
-}
-.invoke_signed::<Journal, _>(rent_account_signers, |data| {
-	let mut journal = Journal::try_from_bytes_mut(data)?;
-	// Stage every string/vector tail, then commit before returning.
-	journal.commit().map_err(|_| ProgramError::InvalidAccountData)?;
+The `rent_account` field has the same meaning across `UpdateResizableAccount`, `ReallocAccount`, `ReallocAccountZeroed`, and `ReallocCompactAccount`: it funds growth and receives a shrink refund. The lower-level builders take an explicit `target_size`; the high-level builder derives it from the patch.
 
-	Ok(())
-})?;
-```
-
-Use `ReallocCompactAccount` when you need explicit allocation control, such as reserving temporary spare bytes. `invoke` resizes immediately. You must enforce the compact ordering yourself:
-
-```rust
-if target_size > account.data_len() {
-	ReallocCompactAccount {
-		account,
-		rent_account,
-		target_size,
-		program_id,
-	}
-	.invoke::<Journal>()?;
-}
-
-let encoded_size = {
-	let mut data = account.try_borrow_mut()?;
-	let mut journal = Journal::try_from_bytes_mut(&mut data)?;
-	journal
-		.set_title(title)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	journal
-		.set_entries(entries)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	journal
-		.set_markers(markers)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	journal.commit().map_err(|_| ProgramError::InvalidAccountData)?
-};
-
-if encoded_size < account.data_len() {
-	ReallocCompactAccount {
-		account,
-		rent_account,
-		target_size: encoded_size,
-		program_id,
-	}
-	.invoke::<Journal>()?;
-}
-```
-
-`ReallocCompactAccount` checks the current compact type and target allocation. Before an explicit shrink, it also verifies that the retained bytes contain the full committed layout. Both builders preserve rent exemption on growth and return excess lamports to `rent_account` after shrinkage. Scope immutable runtime borrows with `with_compact_account`. Create mutable views under a direct `try_borrow_mut` guard when tail setters borrow instruction-local values through `commit()`.
+The generated patch owns the update plan, so callers do not coordinate `set_*`, `commit`, and `ReallocCompactAccount`. Borrow the account for a `JournalRef` only while reading. End that borrow before invoking `UpdateResizableAccount`.
 
 <!-- {/compactAccountResizeOrdering} -->
 
@@ -225,24 +145,21 @@ Validate the account's owner and authorization policy before trusting data. `ass
 
 ## Codama clients
 
-`pina idl` emits compact text as a size-prefixed UTF-8 string and compact vectors as size-prefixed dynamic arrays. `pina generate` then creates configured Rust, TypeScript, and Dart clients without handwritten codecs. `HEADER_SIZE` and `MAX_SIZE` are runtime-side schema constants; client applications should normally submit logical byte and element counts and let the program calculate account bytes.
+`pina idl` emits compact tails with their prefix and capacity metadata. `pina generate` creates Rust, TypeScript, and Dart clients that reject over-capacity values at encode and decode boundaries. Client applications submit logical values and let the generated patch calculate account bytes.
 
 ## Use-case checklist
 
 <!-- {=compactAccountUseCaseChecklist} -->
 
-- Create header-only state with `space: Journal::MIN_SIZE`, or create directly at `Journal::projected_bytes(...)`.
-- Load without reallocating through `with_compact_account::<T, _>`.
-- Update fixed header fields or replace same-length tail values without changing rent.
-- Store optional scalar header values with `Option<T>`; generated views expose their `PodOption` representation without changing the account size.
-- Grow or shrink several string and vector tails in one commit; later payloads are shifted to follow earlier payloads.
-- Grow up to `T::MAX_SIZE`, funding the rent delta from a writable rent account.
-- Shrink to the size returned by `commit()`, including clearing every tail back to `Journal::MIN_SIZE`, and refund excess rent.
-- Use generated `*_CAPACITY` constants and `projected_bytes(...)` to reject each tail count beyond capacity before CPI.
-- Compare `encoded_size()` with `account.data_len()` when distinguishing committed content from temporary spare allocation.
-- Rely on `validate_size` plus checked loaders to reject truncated, oversized, or corrupt data.
-- Keep signer, owner, stored-authority, and canonical-PDA checks explicit; compact layout validation does not define an authorization policy.
-- Generate the IDL and clients normally. Codama represents string tails as size-prefixed UTF-8 strings and vector tails as size-prefixed dynamic arrays. Their counts are read from the shared header, preserving Pinapod's header-then-payload wire layout.
+- Supply the required generated `patch` to every compact create builder, including `JournalPatch::new()` for an all-zero, empty-tail default.
+- Create empty compact state with `space: T::MIN_SIZE`; allocate enough space for any nonempty values included in the initial patch.
+- Read through `with_compact_account::<T, _>` or a generated `TRef`.
+- Replace fixed fields and several tails in one generated patch.
+- Grow or shrink up to `T::MAX_SIZE` through `UpdateResizableAccount`.
+- Treat `rent_account` as both the growth funder and the shrink refund recipient.
+- Reject unsupported nesting at compile time and reject corrupt prefixes, tags, UTF-8, and elements at load time.
+- Keep signer, writable, owner, stored-authority, and canonical-PDA checks explicit. Layout validation does not grant authority.
+- Regenerate the IDL and clients after a compact schema changes. Do not edit generated clients by hand.
 
 <!-- {/compactAccountUseCaseChecklist} -->
 

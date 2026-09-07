@@ -54,11 +54,14 @@ pub(crate) fn expand(
 			Err(error) => return error.to_compile_error(),
 		};
 
-	let derives = [syn::parse_quote!(#crate_path::pinapod::ZeroPod)];
+	let derives = [syn::parse_quote!(#crate_path::pinapod::PinaPod)];
 
 	if let Err(error) = add_derives(&mut item_struct.attrs, &derives) {
 		return error.to_compile_error();
 	}
+	item_struct
+		.attrs
+		.push(syn::parse_quote!(#[pinapod(crate = #crate_path::pinapod, no_inherent)]));
 
 	// Add discriminator field
 	let Fields::Named(named_fields) = &mut item_struct.fields else {
@@ -67,6 +70,7 @@ pub(crate) fn expand(
 	};
 
 	let discriminator_field = syn::parse_quote! {
+		#[pinapod(skip_accessor)]
 		discriminator: [u8; #discriminator::BYTES]
 	};
 	named_fields.named.insert(0, discriminator_field);
@@ -74,6 +78,7 @@ pub(crate) fn expand(
 	let view_helpers = generate_view_helpers(
 		&crate_path,
 		&quote!(#crate_path::ProgramError::InvalidInstructionData),
+		false,
 	);
 
 	let implementations = quote! {

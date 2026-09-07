@@ -11,6 +11,7 @@
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
+use pina::ProgramError;
 use pina::ProgramResult;
 use pina::Signer;
 
@@ -21,7 +22,8 @@ use crate::ProgramAccount;
 #[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
 pub struct Write<'account> {
 	/// CPI account `authority`.
-	/// Required privileges: read-only and signer.
+	/// Funds growth if a future write patch changes the encoded length.
+	/// Required privileges: writable and signer.
 	pub authority: &'account AccountView,
 
 	/// CPI account `journal`.
@@ -48,13 +50,13 @@ impl WriteIx {
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> [u8; 10] {
+	pub fn to_bytes(&self) -> Result<[u8; 10], ProgramError> {
 		let mut data = [0u8; 10];
 		data[..1].copy_from_slice(&WRITE_DISCRIMINATOR);
 		data[1..2].copy_from_slice(&self.index.to_le_bytes());
 		data[2..10].copy_from_slice(&self.value.to_le_bytes());
 
-		data
+		Ok(data)
 	}
 }
 
@@ -73,10 +75,10 @@ impl<'account> Write<'account> {
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
 		let accounts: [CpiHandle<'_>; 2] = [
-			CpiHandle::readonly_signer(self.authority),
+			CpiHandle::writable_signer(self.authority)?,
 			CpiHandle::writable(self.journal)?,
 		];
-		let data = self.ix.to_bytes();
+		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

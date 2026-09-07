@@ -1,7 +1,7 @@
 error[E0308]: mismatched types
-  --> tests/ui/fail/account_shadowed_scalar.rs:23:1
+  --> tests/ui/fail/account_shadowed_scalar.rs:21:1
    |
-23 | #[account(discriminator = Kind)]
+21 | #[account(discriminator = Kind)]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `u8`, found `shadow::u8`
    |
    = note: `u8` and `shadow::u8` have similar names, but are actually distinct types

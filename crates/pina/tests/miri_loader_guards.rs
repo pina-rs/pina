@@ -19,13 +19,17 @@ const BPF_ALIGN_OF_U128: usize = 8;
 const UNINIT: MaybeUninit<AccountView> = MaybeUninit::<AccountView>::uninit();
 const STATIC_ACCOUNT_DATA: usize = 88 + MAX_PERMITTED_DATA_INCREASE;
 
-#[derive(ZeroPod)]
+#[derive(PinaPod)]
 struct TestState {
 	discriminator: [u8; 1],
 	value: u64,
 }
 
-impl PinaAccount for TestState {}
+impl PinaAccount for TestState {
+	fn write_zc_discriminator(value: &mut Self::Zc) {
+		Self::write_discriminator(&mut value.discriminator);
+	}
+}
 
 impl HasDiscriminator for TestState {
 	type Type = u8;
@@ -202,7 +206,7 @@ unsafe fn deserialize_test_input<const MAX_ACCOUNTS: usize>(
 fn build_test_state_bytes(value: u64) -> Vec<u8> {
 	let mut bytes = vec![0u8; TestState::SIZE];
 	TestState::write_discriminator(&mut bytes);
-	let state = <TestState as ZeroPodFixed>::from_bytes_mut(&mut bytes)
+	let state = <TestState as PinaPodFixed>::read_exact_mut(&mut bytes)
 		.expect("zeroed storage with a valid discriminator");
 	state.value.set(value);
 	bytes

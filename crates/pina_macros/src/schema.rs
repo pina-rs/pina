@@ -1,7 +1,7 @@
 //! Closed field grammar for Pina's fixed zero-copy schemas.
 //!
-//! Pinapod's derive intentionally supports a fallback through `ZcField`.
-//! That extension point is useful for direct Pinapod users, but Pina cannot
+//! `PinaPod`'s derive intentionally supports a fallback through `ZcField`.
+//! That extension point is useful for direct `PinaPod` users, but Pina cannot
 //! safely accept it at an account or instruction boundary: even though
 //! `ZcField` is an unsafe trait, an unknown implementation is outside Pina's
 //! closed schema contract. Pina therefore accepts only the concrete
@@ -21,7 +21,7 @@ use syn::Type;
 use syn::punctuated::Punctuated;
 
 fn is_pinapod_attribute(attribute: &syn::Attribute) -> bool {
-	attribute.path().is_ident("pinapod") || attribute.path().is_ident("zeropod")
+	attribute.path().is_ident("pinapod")
 }
 
 /// Validate a schema and emit compile-time type and layout proofs.
@@ -56,11 +56,11 @@ pub(crate) fn validate_fixed_schema(
 			derive
 				.segments
 				.last()
-				.is_some_and(|segment| segment.ident == "ZeroPod")
+				.is_some_and(|segment| segment.ident == "PinaPod")
 		}) {
 			return Err(syn::Error::new_spanned(
 				derive,
-				"Pina owns the `ZeroPod` derive for account, instruction, and event schemas; \
+				"Pina owns the `PinaPod` derive for account, instruction, and event schemas; \
 				 remove the manual derive",
 			));
 		}
@@ -76,7 +76,7 @@ pub(crate) fn validate_fixed_schema(
 	let mut field_sizes = Vec::with_capacity(fields.named.len());
 
 	for field in &fields.named {
-		let audited = classify_field(field, crate_path)?;
+		let audited = classify_fixed_field(field, crate_path)?;
 		let source = &field.ty;
 		let native = &audited.native;
 		let pod = &audited.pod;
@@ -94,10 +94,6 @@ pub(crate) fn validate_fixed_schema(
 
 			const _: () = {
 				::core::assert!(::core::mem::align_of::<#pod>() == 1);
-				::core::assert!(
-					::core::mem::size_of::<#pod>()
-						== <#source as #crate_path::ZcField>::POD_SIZE,
-				);
 			};
 		});
 		field_sizes.push(quote!(::core::mem::size_of::<#pod>()));
@@ -124,8 +120,6 @@ pub(crate) fn validate_fixed_schema(
 /// Compile-time proofs and size metadata for a compact account schema.
 pub(crate) struct CompactSchema {
 	pub(crate) proofs: proc_macro2::TokenStream,
-	pub(crate) max_size: proc_macro2::TokenStream,
-	pub(crate) tail_alignment: proc_macro2::TokenStream,
 	pub(crate) tails: Vec<CompactTail>,
 }
 
@@ -133,13 +127,31 @@ pub(crate) struct CompactSchema {
 pub(crate) struct CompactTail {
 	pub(crate) name: syn::Ident,
 	pub(crate) pod: proc_macro2::TokenStream,
-	pub(crate) capacity: Expr,
-	pub(crate) prefix_size: usize,
+	pub(crate) capacity: proc_macro2::TokenStream,
+	pub(crate) optional: bool,
+}
+
+enum CompactField {
+	Inline(AuditedField),
+	String {
+		source: Type,
+		audited: AuditedField,
+		capacity: proc_macro2::TokenStream,
+		prefix_size: usize,
+		optional: bool,
+	},
+	Vec {
+		element_source: Type,
+		element: AuditedField,
+		capacity: proc_macro2::TokenStream,
+		prefix_size: usize,
+		optional: bool,
+	},
 }
 
 /// Validate the interoperable compact-account subset.
 ///
-/// Compact fields form a suffix, matching Pinapod's compact schema grammar.
+/// Compact fields form a suffix, matching `PinaPod`'s compact schema grammar.
 /// Every tail length lives in the fixed header and the active payloads are
 /// concatenated after it in declaration order.
 pub(crate) fn validate_compact_schema(
@@ -166,63 +178,99 @@ pub(crate) fn validate_compact_schema(
 	let mut seen_tail = false;
 
 	for field in &fields.named {
-		if is_compact_tail(field) {
-			seen_tail = true;
-			let (source, element, tail_pod, capacity, prefix_size) =
-				classify_compact_tail(field, crate_path)?;
-			let native = &element.native;
-			let proof_pod = &element.pod;
-			let pod = &tail_pod;
-			field_proofs.push(mapping_proof(&source, native, proof_pod, crate_path));
-			header_sizes.push(quote!(#prefix_size));
-			tail_max_sizes.push(quote!(#capacity * ::core::mem::size_of::<#pod>()));
-			tail_element_sizes.push(quote!(::core::mem::size_of::<#pod>()));
-			let Some(name) = &field.ident else {
-				return Err(syn::Error::new_spanned(
-					field,
-					"compact tails must be named",
-				));
-			};
-			tails.push(CompactTail {
-				name: name.clone(),
-				pod: pod.clone(),
-				capacity: capacity.clone(),
+		match classify_compact_field(field, crate_path)? {
+			CompactField::Inline(audited) => {
+				if seen_tail {
+					return Err(syn::Error::new_spanned(
+						field,
+						"inline fields cannot follow a compact dynamic field; place every fixed \
+						 field before the compact suffix",
+					));
+				}
+
+				let source = &field.ty;
+				let native = &audited.native;
+				let pod = &audited.pod;
+				field_proofs.push(mapping_proof(source, native, pod, crate_path));
+				header_sizes.push(quote!(::core::mem::size_of::<#pod>()));
+			}
+			CompactField::String {
+				source,
+				audited,
+				capacity,
 				prefix_size,
-			});
-			let prefix_max = match prefix_size {
-				1 => quote!(::core::primitive::u8::MAX as usize),
-				2 => quote!(::core::primitive::u16::MAX as usize),
-				4 => quote!(::core::primitive::u32::MAX as usize),
-				8 => quote!(usize::MAX),
-				_ => unreachable!("validated compact prefix size"),
-			};
-			tail_prefix_proofs.push(quote! {
-				::core::assert!(::core::mem::size_of::<#pod>() > 0);
-				::core::assert!(#capacity <= #prefix_max);
-			});
-			continue;
+				optional,
+			} => {
+				seen_tail = true;
+				let native = &audited.native;
+				let pod = &audited.pod;
+				field_proofs.push(mapping_proof(&source, native, pod, crate_path));
+				header_sizes.push(if optional {
+					quote!(1usize)
+				} else {
+					quote!(#prefix_size)
+				});
+				tail_max_sizes.push(if optional {
+					quote!(#prefix_size + #capacity)
+				} else {
+					quote!(#capacity)
+				});
+				tail_element_sizes.push(quote!(1usize));
+				tail_prefix_proofs.push(compact_prefix_proof(&capacity, prefix_size));
+				tails.push(CompactTail {
+					name: field.ident.clone().ok_or_else(|| {
+						syn::Error::new_spanned(field, "compact tails must be named")
+					})?,
+					pod: quote!(::core::primitive::u8),
+					capacity,
+					optional,
+				});
+			}
+			CompactField::Vec {
+				element_source,
+				element,
+				capacity,
+				prefix_size,
+				optional,
+			} => {
+				seen_tail = true;
+				let native = &element.native;
+				let pod = &element.pod;
+				field_proofs.push(mapping_proof(&element_source, native, pod, crate_path));
+				header_sizes.push(if optional {
+					quote!(1usize)
+				} else {
+					quote!(#prefix_size)
+				});
+				let payload_max = quote!(#capacity * ::core::mem::size_of::<#pod>());
+				tail_max_sizes.push(if optional {
+					quote!(#prefix_size + #payload_max)
+				} else {
+					payload_max
+				});
+				tail_element_sizes.push(if optional {
+					quote!(gcd(#prefix_size, ::core::mem::size_of::<#pod>()))
+				} else {
+					quote!(::core::mem::size_of::<#pod>())
+				});
+				tail_prefix_proofs.push(compact_vec_proof(&capacity, prefix_size, pod));
+				tails.push(CompactTail {
+					name: field.ident.clone().ok_or_else(|| {
+						syn::Error::new_spanned(field, "compact tails must be named")
+					})?,
+					pod: pod.clone(),
+					capacity,
+					optional,
+				});
+			}
 		}
-
-		if seen_tail {
-			return Err(syn::Error::new_spanned(
-				field,
-				"inline fields cannot follow a compact `String` or `Vec` field; place every fixed \
-				 field before the dynamic suffix",
-			));
-		}
-
-		let audited = classify_field(field, crate_path)?;
-		let source = &field.ty;
-		let native = &audited.native;
-		let pod = &audited.pod;
-		field_proofs.push(mapping_proof(source, native, pod, crate_path));
-		header_sizes.push(quote!(::core::mem::size_of::<#pod>()));
 	}
 
 	if !seen_tail {
 		return Err(syn::Error::new_spanned(
 			item,
-			"compact accounts require at least one trailing `String<N>` or `Vec<T, N>` field",
+			"compact accounts require at least one dynamic field: `String<N>`, `Vec<T, N>`, \
+			 `Option<String<N>>`, or `Option<Vec<T, N>>`",
 		));
 	}
 
@@ -246,36 +294,27 @@ pub(crate) fn validate_compact_schema(
 		#(#field_proofs)*
 
 		const _: fn() = || {
-			fn assert_layout<T: #crate_path::ZeroPodCompact<Header = #header_name>>() {}
+			fn assert_layout<T: #crate_path::PinaPodCompact<Header = #header_name>>() {}
 			assert_layout::<#struct_name>();
 		};
 
 		const _: () = {
 			::core::assert!(::core::mem::align_of::<#header_name>() == 1);
 			::core::assert!(::core::mem::size_of::<#header_name>() == #expected_header);
+			::core::assert!(
+				<#struct_name as #crate_path::PinaPodCompact>::MIN_SIZE == #expected_header
+			);
+			::core::assert!(
+				<#struct_name as #crate_path::PinaPodCompact>::MAX_SIZE == #max_size
+			);
+			::core::assert!(
+				<#struct_name as #crate_path::PinaPodCompact>::TAIL_ALIGNMENT == #tail_alignment
+			);
 			#(#tail_prefix_proofs)*
 		};
 	};
 
-	Ok(CompactSchema {
-		proofs,
-		max_size,
-		tail_alignment,
-		tails,
-	})
-}
-
-fn is_compact_tail(field: &Field) -> bool {
-	let Type::Path(type_path) = &field.ty else {
-		return false;
-	};
-
-	type_path.path.segments.last().is_some_and(|segment| {
-		matches!(
-			segment.ident.to_string().as_str(),
-			"String" | "PodString" | "Vec" | "PodVec"
-		)
-	})
+	Ok(CompactSchema { proofs, tails })
 }
 
 fn validate_schema_container(item: &ItemStruct) -> syn::Result<()> {
@@ -304,11 +343,11 @@ fn validate_schema_container(item: &ItemStruct) -> syn::Result<()> {
 			derive
 				.segments
 				.last()
-				.is_some_and(|segment| segment.ident == "ZeroPod")
+				.is_some_and(|segment| segment.ident == "PinaPod")
 		}) {
 			return Err(syn::Error::new_spanned(
 				derive,
-				"Pina owns the `ZeroPod` derive for account, instruction, and event schemas; \
+				"Pina owns the `PinaPod` derive for account, instruction, and event schemas; \
 				 remove the manual derive",
 			));
 		}
@@ -317,10 +356,7 @@ fn validate_schema_container(item: &ItemStruct) -> syn::Result<()> {
 	Ok(())
 }
 
-fn classify_compact_tail(
-	field: &Field,
-	crate_path: &syn::Path,
-) -> syn::Result<(Type, AuditedField, proc_macro2::TokenStream, Expr, usize)> {
+fn classify_compact_field(field: &Field, crate_path: &syn::Path) -> syn::Result<CompactField> {
 	if field.attrs.iter().any(is_pinapod_attribute) {
 		return Err(syn::Error::new_spanned(
 			field,
@@ -329,91 +365,187 @@ fn classify_compact_tail(
 	}
 
 	let Type::Path(type_path) = &field.ty else {
-		return Err(compact_tail_error(&field.ty));
+		return classify_fixed_type(&field.ty, crate_path).map(CompactField::Inline);
 	};
 	let Some(segment) = type_path.path.segments.last() else {
-		return Err(compact_tail_error(&field.ty));
-	};
-	let field_kind = segment.ident.to_string();
-	let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
-		return Err(compact_tail_error(&field.ty));
-	};
-	if matches!(field_kind.as_str(), "String" | "PodString") {
-		if arguments.args.is_empty()
-			|| arguments.args.len() > 2
-			|| (field_kind == "String" && arguments.args.len() != 1)
-		{
-			return Err(compact_tail_error(&field.ty));
-		}
-		let capacity = match arguments.args.first() {
-			Some(GenericArgument::Const(value)) if is_integer_literal(value) => value.clone(),
-			_ => return Err(compact_tail_error(&field.ty)),
-		};
-		let prefix_size = compact_prefix_size(arguments.args.iter().nth(1), &field.ty, "String")?;
-		let source = field.ty.clone();
-		let storage = quote!(#crate_path::PodString<#capacity, #prefix_size>);
-		return Ok((
-			source,
-			AuditedField {
-				native: storage.clone(),
-				pod: storage,
-			},
-			quote!(::core::primitive::u8),
-			capacity,
-			prefix_size,
-		));
-	}
-	if !matches!(field_kind.as_str(), "Vec" | "PodVec") {
-		return Err(compact_tail_error(&field.ty));
-	}
-	if !(2..=3).contains(&arguments.args.len()) {
-		return Err(compact_tail_error(&field.ty));
-	}
-	let Some(GenericArgument::Type(element)) = arguments.args.first() else {
-		return Err(compact_tail_error(&field.ty));
-	};
-	let capacity = match arguments.args.iter().nth(1) {
-		Some(GenericArgument::Const(value)) if is_integer_literal(value) => value.clone(),
-		_ => return Err(compact_tail_error(&field.ty)),
-	};
-	let prefix_size = compact_prefix_size(arguments.args.iter().nth(2), &field.ty, "Vec")?;
-
-	let audited = match element {
-		Type::Array(array) => classify_byte_array(array, crate_path)?,
-		Type::Path(path) if path.qself.is_none() => classify_path(element, path, crate_path)?,
-		_ => return Err(compact_tail_error(&field.ty)),
+		return Err(compact_supported_error(&field.ty));
 	};
 
-	let tail_pod = audited.pod.clone();
-	Ok((element.clone(), audited, tail_pod, capacity, prefix_size))
+	match segment.ident.to_string().as_str() {
+		"String" | "PodString" => classify_compact_string(&field.ty, crate_path, false),
+		"Vec" | "PodVec" => classify_compact_vec(&field.ty, crate_path, false),
+		"Option" => classify_compact_option(&field.ty, segment, crate_path),
+		_ => classify_fixed_type(&field.ty, crate_path).map(CompactField::Inline),
+	}
 }
 
-fn compact_prefix_size(
-	argument: Option<&GenericArgument>,
+fn classify_compact_string(
 	ty: &Type,
-	field_kind: &str,
-) -> syn::Result<usize> {
-	let default = if field_kind == "String" { 1 } else { 2 };
-	let prefix_size = match argument {
-		None => default,
-		Some(GenericArgument::Const(Expr::Lit(ExprLit {
-			lit: Lit::Int(value),
-			..
-		}))) => {
-			value
-				.base10_parse::<usize>()
-				.map_err(|_| compact_tail_error(ty))?
-		}
-		_ => return Err(compact_tail_error(ty)),
+	crate_path: &syn::Path,
+	optional: bool,
+) -> syn::Result<CompactField> {
+	let Type::Path(type_path) = ty else {
+		return Err(compact_supported_error(ty));
 	};
-	if !matches!(prefix_size, 1 | 2 | 4 | 8) {
-		return Err(syn::Error::new_spanned(
-			ty,
-			format!("compact `{field_kind}` prefixes must use 1, 2, 4, or 8 bytes"),
-		));
+	let Some(segment) = type_path.path.segments.last() else {
+		return Err(compact_supported_error(ty));
+	};
+	let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+		return Err(compact_supported_error(ty));
+	};
+	let is_alias = segment.ident == "String";
+	let valid_argument_count = if is_alias {
+		arguments.args.len() == 1
+	} else {
+		(1..=2).contains(&arguments.args.len())
+	};
+	if !valid_argument_count {
+		return Err(compact_supported_error(ty));
+	}
+	let capacity = literal_const_argument(arguments.args.first(), ty, "string capacity")?;
+	let capacity = quote!(#capacity);
+	let prefix_size = if is_alias {
+		1
+	} else {
+		literal_prefix_argument(arguments.args.iter().nth(1), 1, ty).map_err(|_| {
+			syn::Error::new_spanned(ty, "compact `String` prefixes must use 1, 2, 4, or 8 bytes")
+		})?
+	};
+	let source = if optional {
+		syn::parse_quote!(::core::option::Option<#ty>)
+	} else {
+		ty.clone()
+	};
+	let audited = classify_fixed_type(&source, crate_path)?;
+
+	Ok(CompactField::String {
+		source,
+		audited,
+		capacity,
+		prefix_size,
+		optional,
+	})
+}
+
+fn classify_compact_vec(
+	ty: &Type,
+	crate_path: &syn::Path,
+	optional: bool,
+) -> syn::Result<CompactField> {
+	let Type::Path(type_path) = ty else {
+		return Err(compact_supported_error(ty));
+	};
+	let Some(segment) = type_path.path.segments.last() else {
+		return Err(compact_supported_error(ty));
+	};
+	let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+		return Err(compact_supported_error(ty));
+	};
+	let is_alias = segment.ident == "Vec";
+	let valid_argument_count = if is_alias {
+		arguments.args.len() == 2
+	} else {
+		(2..=3).contains(&arguments.args.len())
+	};
+	if !valid_argument_count {
+		return Err(compact_supported_error(ty));
+	}
+	let Some(GenericArgument::Type(element)) = arguments.args.first() else {
+		return Err(compact_supported_error(ty));
+	};
+	if optional && is_compact_string_type(element) {
+		return Err(compact_supported_error(ty));
+	}
+	if !is_compact_string_type(element) && contains_dynamic_compact_type(element) {
+		return Err(compact_supported_error(ty));
+	}
+	let capacity = match arguments.args.iter().nth(1) {
+		Some(GenericArgument::Const(value)) if is_integer_literal(value) => quote!(#value),
+		_ => return Err(compact_supported_error(ty)),
+	};
+	let prefix_size = if is_alias {
+		2
+	} else {
+		literal_prefix_argument(arguments.args.iter().nth(2), 2, ty).map_err(|_| {
+			syn::Error::new_spanned(ty, "compact `Vec` prefixes must use 1, 2, 4, or 8 bytes")
+		})?
+	};
+	let audited =
+		classify_fixed_type(element, crate_path).map_err(|_| compact_supported_error(ty))?;
+
+	Ok(CompactField::Vec {
+		element_source: element.clone(),
+		element: audited,
+		capacity,
+		prefix_size,
+		optional,
+	})
+}
+
+fn classify_compact_option(
+	ty: &Type,
+	segment: &syn::PathSegment,
+	crate_path: &syn::Path,
+) -> syn::Result<CompactField> {
+	let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+		return Err(compact_supported_error(ty));
+	};
+	if arguments.args.len() != 1 {
+		return Err(compact_supported_error(ty));
+	}
+	let Some(GenericArgument::Type(inner)) = arguments.args.first() else {
+		return Err(compact_supported_error(ty));
+	};
+
+	if is_compact_string_type(inner) {
+		return classify_compact_string(inner, crate_path, true);
+	}
+	if is_compact_vec_type(inner) {
+		return classify_compact_vec(inner, crate_path, true);
+	}
+	if contains_dynamic_compact_type(inner) {
+		return Err(compact_supported_error(ty));
 	}
 
-	Ok(prefix_size)
+	classify_fixed_type(ty, crate_path).map(CompactField::Inline)
+}
+
+fn is_compact_string_type(ty: &Type) -> bool {
+	last_type_name(ty).is_some_and(|name| name == "String" || name == "PodString")
+}
+
+fn is_compact_vec_type(ty: &Type) -> bool {
+	last_type_name(ty).is_some_and(|name| name == "Vec" || name == "PodVec")
+}
+
+fn contains_dynamic_compact_type(ty: &Type) -> bool {
+	if is_compact_string_type(ty) || is_compact_vec_type(ty) {
+		return true;
+	}
+	if last_type_name(ty).is_none_or(|name| name != "Option") {
+		return false;
+	}
+
+	let Type::Path(type_path) = ty else {
+		return false;
+	};
+	let Some(segment) = type_path.path.segments.last() else {
+		return false;
+	};
+	let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+		return false;
+	};
+
+	arguments.args.first().is_some_and(|argument| {
+		matches!(argument, GenericArgument::Type(inner) if contains_dynamic_compact_type(inner))
+	})
+}
+
+fn last_type_name(ty: &Type) -> Option<&syn::Ident> {
+	let Type::Path(type_path) = ty else {
+		return None;
+	};
+	type_path.path.segments.last().map(|segment| &segment.ident)
 }
 
 fn mapping_proof(
@@ -435,19 +567,45 @@ fn mapping_proof(
 
 		const _: () = {
 			::core::assert!(::core::mem::align_of::<#pod>() == 1);
-			::core::assert!(
-				::core::mem::size_of::<#pod>() == <#source as #crate_path::ZcField>::POD_SIZE,
-			);
 		};
 	}
 }
 
-fn compact_tail_error(ty: &Type) -> syn::Error {
+fn compact_supported_error(ty: &Type) -> syn::Error {
 	syn::Error::new_spanned(
 		ty,
-		"compact account tails must be `String<N>` or `Vec<T, N>` fields with an audited element \
-		 type and literal capacity",
+		"unsupported compact field; supported dynamic forms are `String<N>`, `Vec<T, N>` for \
+		 fixed `T`, `Option<String<N>>`, `Option<Vec<T, N>>` for fixed `T`, and `Vec<String<M>, \
+		 N>`; `Option<T>` is supported inline when `T` has a fixed representation",
 	)
+}
+
+fn compact_prefix_proof(
+	capacity: &proc_macro2::TokenStream,
+	prefix_size: usize,
+) -> proc_macro2::TokenStream {
+	let prefix_max = match prefix_size {
+		1 => quote!(::core::primitive::u8::MAX as usize),
+		2 => quote!(::core::primitive::u16::MAX as usize),
+		4 => quote!(::core::primitive::u32::MAX as usize),
+		8 => quote!(usize::MAX),
+		_ => unreachable!("validated compact prefix size"),
+	};
+
+	quote!(::core::assert!(#capacity <= #prefix_max);)
+}
+
+fn compact_vec_proof(
+	capacity: &proc_macro2::TokenStream,
+	prefix_size: usize,
+	pod: &proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+	let prefix_proof = compact_prefix_proof(capacity, prefix_size);
+
+	quote! {
+		::core::assert!(::core::mem::size_of::<#pod>() > 0);
+		#prefix_proof
+	}
 }
 
 struct AuditedField {
@@ -455,7 +613,7 @@ struct AuditedField {
 	pod: proc_macro2::TokenStream,
 }
 
-fn classify_field(field: &Field, crate_path: &syn::Path) -> syn::Result<AuditedField> {
+fn classify_fixed_field(field: &Field, crate_path: &syn::Path) -> syn::Result<AuditedField> {
 	if field.attrs.iter().any(is_pinapod_attribute) {
 		return Err(syn::Error::new_spanned(
 			field,
@@ -463,9 +621,13 @@ fn classify_field(field: &Field, crate_path: &syn::Path) -> syn::Result<AuditedF
 		));
 	}
 
-	match &field.ty {
+	classify_fixed_type(&field.ty, crate_path)
+}
+
+fn classify_fixed_type(ty: &Type, crate_path: &syn::Path) -> syn::Result<AuditedField> {
+	match ty {
 		Type::Array(array) => classify_byte_array(array, crate_path),
-		Type::Path(path) if path.qself.is_none() => classify_path(&field.ty, path, crate_path),
+		Type::Path(path) if path.qself.is_none() => classify_path(ty, path, crate_path),
 		other => Err(unsupported(other)),
 	}
 }
@@ -565,14 +727,8 @@ fn classify_parameterized_path(
 ) -> syn::Result<AuditedField> {
 	match segment.ident.to_string().as_str() {
 		"Option" => classify_option(ty, segment, crate_path),
-		"String" | "PodString" | "Vec" | "PodVec" => {
-			Err(syn::Error::new_spanned(
-				ty,
-				"fixed-capacity `String` and `Vec` fields are temporarily unsupported because \
-				 upstream collection defaults can contain uninitialized inactive capacity; use \
-				 fully initialized fixed fields such as `[u8; N]`",
-			))
-		}
+		"String" | "PodString" => classify_string(ty, segment, crate_path),
+		"Vec" | "PodVec" => classify_vec(ty, segment, crate_path),
 		"PodOption" => {
 			Err(syn::Error::new_spanned(
 				ty,
@@ -582,6 +738,93 @@ fn classify_parameterized_path(
 		}
 		_ => Err(custom_mapping(ty)),
 	}
+}
+
+fn classify_string(
+	ty: &Type,
+	segment: &syn::PathSegment,
+	crate_path: &syn::Path,
+) -> syn::Result<AuditedField> {
+	let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+		return Err(unsupported(ty));
+	};
+	let is_alias = segment.ident == "String";
+	let valid_argument_count = if is_alias {
+		arguments.args.len() == 1
+	} else {
+		(1..=2).contains(&arguments.args.len())
+	};
+
+	if !valid_argument_count {
+		return Err(syn::Error::new_spanned(
+			ty,
+			"`String<N>` requires one literal capacity; `PodString<N, PFX>` accepts an optional \
+			 literal prefix width",
+		));
+	}
+
+	let capacity = literal_const_argument(arguments.args.first(), ty, "string capacity")?;
+	let prefix_size = if is_alias {
+		1
+	} else {
+		literal_prefix_argument(arguments.args.iter().nth(1), 1, ty)?
+	};
+	let native = if is_alias {
+		quote!(#crate_path::String<#capacity>)
+	} else {
+		quote!(#crate_path::PodString<#capacity, #prefix_size>)
+	};
+
+	Ok(AuditedField {
+		native: native.clone(),
+		pod: native,
+	})
+}
+
+fn classify_vec(
+	ty: &Type,
+	segment: &syn::PathSegment,
+	crate_path: &syn::Path,
+) -> syn::Result<AuditedField> {
+	let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+		return Err(unsupported(ty));
+	};
+	let is_alias = segment.ident == "Vec";
+	let valid_argument_count = if is_alias {
+		arguments.args.len() == 2
+	} else {
+		(2..=3).contains(&arguments.args.len())
+	};
+
+	if !valid_argument_count {
+		return Err(syn::Error::new_spanned(
+			ty,
+			"`Vec<T, N>` requires a fixed element type and literal capacity; `PodVec<T, N, PFX>` \
+			 also accepts a literal prefix width",
+		));
+	}
+
+	let Some(GenericArgument::Type(element)) = arguments.args.first() else {
+		return Err(unsupported(ty));
+	};
+	let element = classify_fixed_type(element, crate_path)?;
+	let element_native = element.native;
+	let capacity = literal_const_argument(arguments.args.iter().nth(1), ty, "vector capacity")?;
+	let prefix_size = if is_alias {
+		2
+	} else {
+		literal_prefix_argument(arguments.args.iter().nth(2), 2, ty)?
+	};
+	let native = if is_alias {
+		quote!(#crate_path::Vec<#element_native, #capacity>)
+	} else {
+		quote!(#crate_path::PodVec<#element_native, #capacity, #prefix_size>)
+	};
+
+	Ok(AuditedField {
+		native: native.clone(),
+		pod: native,
+	})
 }
 
 fn classify_option(
@@ -596,16 +839,16 @@ fn classify_option(
 	if arguments.args.len() != 1 {
 		return Err(syn::Error::new_spanned(
 			ty,
-			"`Option` fields require exactly one audited scalar type",
+			"`Option` fields require exactly one fixed PinaPod type",
 		));
 	}
 	let Some(GenericArgument::Type(inner)) = arguments.args.first() else {
 		return Err(syn::Error::new_spanned(
 			ty,
-			"`Option` fields require an audited scalar type",
+			"`Option` fields require a fixed PinaPod type",
 		));
 	};
-	let audited = classify_option_scalar(inner, crate_path)?;
+	let audited = classify_fixed_type(inner, crate_path)?;
 	let native_inner = audited.native;
 	let pod_inner = audited.pod;
 
@@ -613,20 +856,6 @@ fn classify_option(
 		native: quote!(::core::option::Option<#native_inner>),
 		pod: quote!(#crate_path::PodOption<#pod_inner>),
 	})
-}
-
-fn classify_option_scalar(ty: &Type, crate_path: &syn::Path) -> syn::Result<AuditedField> {
-	let Type::Path(type_path) = ty else {
-		return Err(nested_option(ty));
-	};
-	let Some(segment) = type_path.path.segments.last() else {
-		return Err(nested_option(ty));
-	};
-
-	if !segment.arguments.is_empty() {
-		return Err(nested_option(ty));
-	}
-	classify_scalar(segment, crate_path).ok_or_else(|| nested_option(ty))
 }
 
 fn classify_scalar(segment: &syn::PathSegment, crate_path: &syn::Path) -> Option<AuditedField> {
@@ -669,27 +898,67 @@ fn is_integer_literal(expr: &Expr) -> bool {
 	)
 }
 
-fn nested_option(ty: &Type) -> syn::Error {
-	syn::Error::new_spanned(
-		ty,
-		"unsupported `Option` payload; only native integer and boolean scalars are accepted (no \
-		 nested options, collections, arrays, addresses, pod wrappers, or custom types)",
-	)
+fn literal_const_argument<'a>(
+	argument: Option<&'a GenericArgument>,
+	ty: &Type,
+	name: &str,
+) -> syn::Result<&'a Expr> {
+	match argument {
+		Some(GenericArgument::Const(value)) if is_integer_literal(value) => Ok(value),
+		_ => {
+			Err(syn::Error::new_spanned(
+				ty,
+				format!("{name} must be an integer literal"),
+			))
+		}
+	}
+}
+
+fn literal_prefix_argument(
+	argument: Option<&GenericArgument>,
+	default: usize,
+	ty: &Type,
+) -> syn::Result<usize> {
+	let Some(argument) = argument else {
+		return Ok(default);
+	};
+	let GenericArgument::Const(Expr::Lit(ExprLit {
+		lit: Lit::Int(value),
+		..
+	})) = argument
+	else {
+		return Err(syn::Error::new_spanned(
+			ty,
+			"PinaPod prefix widths must be integer literals: 1, 2, 4, or 8",
+		));
+	};
+	let prefix_size = value
+		.base10_parse::<usize>()
+		.map_err(|_| syn::Error::new_spanned(ty, "PinaPod prefix widths must be 1, 2, 4, or 8"))?;
+
+	if !matches!(prefix_size, 1 | 2 | 4 | 8) {
+		return Err(syn::Error::new_spanned(
+			ty,
+			"PinaPod prefix widths must be 1, 2, 4, or 8",
+		));
+	}
+
+	Ok(prefix_size)
 }
 
 fn custom_mapping(ty: &Type) -> syn::Error {
 	syn::Error::new_spanned(
 		ty,
 		"custom `ZcField` mappings and nested schema types are unsupported because Pina cannot \
-		 prove their alignment and bit validity; use an audited scalar, `Address`, `[u8; N]`, or \
-		 `Option<scalar>`",
+		 prove their alignment and bit validity; use an audited scalar, `Address`, `[u8; N]`, \
+		 `String<N>`, `Vec<T, N>`, or `Option<T>` where `T` is one of these fixed types",
 	)
 }
 
 fn unsupported(ty: &Type) -> syn::Error {
 	syn::Error::new_spanned(
 		ty,
-		"unsupported Pina zero-copy field; expected an audited scalar, `Address`, `[u8; N]`, or \
-		 `Option<scalar>`",
+		"unsupported Pina zero-copy field; expected an audited scalar, `Address`, `[u8; N]`, \
+		 `String<N>`, `Vec<T, N>`, or `Option<T>` where `T` is one of these fixed types",
 	)
 }

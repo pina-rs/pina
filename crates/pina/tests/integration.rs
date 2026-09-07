@@ -119,9 +119,11 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.system_program.assert_address(&system::ID)?;
 
 		let mut account_data = self.state_account.try_borrow_mut()?;
-		let state = TestState::initialize(&mut account_data)?;
-		state.bump = args.bump;
-		state.value = args.initial_value;
+		TestState::initialize(&mut account_data, |state| {
+			state.bump = args.bump;
+			state.value = args.initial_value;
+			Ok(())
+		})?;
 
 		Ok(())
 	}
@@ -455,34 +457,39 @@ unsafe fn deserialize_test_input<const MAX_ACCOUNTS: usize>(
 /// Create a `TestState` serialized as bytes with proper discriminator.
 fn build_test_state_bytes(bump: u8, value: u64) -> Vec<u8> {
 	let mut data = vec![0u8; TestState::SIZE];
-	let state = TestState::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("state initialization failed: {error:?}"));
-	state.bump = bump;
-	state.value.set(value);
+	TestState::initialize(&mut data, |state| {
+		state.bump = bump;
+		state.value.set(value);
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("state initialization failed: {error:?}"));
 	data
 }
 
 fn build_initialize_bytes(bump: u8, initial_value: u64) -> Vec<u8> {
 	let mut data = vec![0u8; InitializeInstr::SIZE];
-	let instruction = InitializeInstr::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("initialize instruction failed: {error:?}"));
-	instruction.bump = bump;
-	instruction.initial_value.set(initial_value);
+	InitializeInstr::initialize(&mut data, |instruction| {
+		instruction.bump = bump;
+		instruction.initial_value.set(initial_value);
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("initialize instruction failed: {error:?}"));
 	data
 }
 
 fn build_update_bytes(new_value: u64) -> Vec<u8> {
 	let mut data = vec![0u8; UpdateInstr::SIZE];
-	UpdateInstr::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("update instruction failed: {error:?}"))
-		.new_value
-		.set(new_value);
+	UpdateInstr::initialize(&mut data, |instruction| {
+		instruction.new_value.set(new_value);
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("update instruction failed: {error:?}"));
 	data
 }
 
 fn build_close_bytes() -> Vec<u8> {
 	let mut data = vec![0u8; CloseInstr::SIZE];
-	CloseInstr::initialize(&mut data)
+	CloseInstr::initialize(&mut data, |_| Ok(()))
 		.unwrap_or_else(|error| panic!("close instruction failed: {error:?}"));
 	data
 }
@@ -1459,10 +1466,12 @@ fn account_data_roundtrip_through_account_view() {
 		let mut account_data = account_views[0]
 			.try_borrow_mut()
 			.unwrap_or_else(|e| panic!("borrow failed: {e:?}"));
-		let state = TestState::initialize(&mut account_data)
-			.unwrap_or_else(|e| panic!("initialization failed: {e:?}"));
-		state.bump = 123;
-		state.value.set(u64::MAX);
+		TestState::initialize(&mut account_data, |state| {
+			state.bump = 123;
+			state.value.set(u64::MAX);
+			Ok(())
+		})
+		.unwrap_or_else(|e| panic!("initialization failed: {e:?}"));
 	}
 
 	// Read state back via as_account (discriminator is now valid).
@@ -1505,6 +1514,31 @@ fn account_data_mutation_persists() {
 		.unwrap_or_else(|e| panic!("read failed: {e:?}"));
 	assert_eq!(state.value.get(), 12345);
 	assert_eq!(state.bump, 10, "bump should be unchanged");
+}
+
+#[test]
+fn as_account_mut_rejects_readonly_accounts_without_changing_bytes() {
+	let key: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+	let state_bytes = build_test_state_bytes(10, 500);
+	let accounts = [AccountBuilder::new()
+		.address(key)
+		.owner(TEST_PROGRAM_ID)
+		.lamports(1_000_000)
+		.data(&state_bytes)];
+	let dummy_data: &[u8] = &[0u8];
+	let mut input = unsafe { create_test_input(&accounts, dummy_data) };
+	let mut accts = [UNINIT; 10];
+	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+	let error = account_views[0]
+		.as_account_mut::<TestState>(&TEST_PROGRAM_ID)
+		.err();
+
+	assert_eq!(error, Some(ProgramError::InvalidAccountData));
+	let data = account_views[0]
+		.try_borrow()
+		.unwrap_or_else(|error| panic!("borrow unchanged account data: {error:?}"));
+	assert_eq!(&*data, &state_bytes);
 }
 
 /// Tests that as_account keeps the runtime borrow active until drop.

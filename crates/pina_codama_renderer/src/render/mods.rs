@@ -4,7 +4,7 @@ use super::helpers::canonical_pubkey;
 use super::helpers::program_id_const_name;
 use crate::error::Result;
 
-pub(crate) fn render_root_mod(program: &ProgramNode) -> String {
+pub(crate) fn render_root_mod(program: &ProgramNode, has_public_types: bool) -> String {
 	let mut lines = Vec::new();
 
 	if !program.accounts.is_empty() {
@@ -17,7 +17,7 @@ pub(crate) fn render_root_mod(program: &ProgramNode) -> String {
 		lines.push("pub mod instructions;".to_string());
 	}
 	lines.push("pub mod programs;".to_string());
-	if !program.defined_types.is_empty() {
+	if has_public_types {
 		lines.push("pub mod types;".to_string());
 	}
 	lines.push(String::new());

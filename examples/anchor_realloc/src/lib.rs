@@ -9,7 +9,7 @@
 #![allow(clippy::inline_always)]
 #![expect(
 	clippy::len_without_is_empty,
-	reason = "zeropod generates len accessors for scalar wire fields, not collections"
+	reason = "PinaPod generates len accessors for scalar wire fields, not collections"
 )]
 #![no_std]
 
@@ -157,10 +157,7 @@ fn validate_distinct_realloc_targets(account1: &Address, account2: &Address) -> 
 }
 
 fn validate_sample(sample: AccountView, authority: &Address) -> ProgramResult {
-	sample
-		.assert_not_empty()?
-		.assert_writable()?
-		.assert_owner(&ID)?;
+	sample.assert_not_empty()?.assert_writable()?;
 
 	let (bump, stored_authority) =
 		sample.with_compact_account::<Sample, _>(&ID, |state| Ok((state.bump, state.authority)))?;
@@ -170,7 +167,6 @@ fn validate_sample(sample: AccountView, authority: &Address) -> ProgramResult {
 	if canonical_bump != bump {
 		return Err(ProgramError::InvalidSeeds);
 	}
-	Sample::assert_seeds(&sample, authority, &ID)?;
 
 	// The PDA check is the primary authority control. Retain the stored value as
 	// defense in depth against accidental writes from future program instructions.
@@ -205,16 +201,10 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			owner: &ID,
 			seeds: &seeds.as_slices(),
 			bump: args.bump,
+			patch: SamplePatch::new().bump(args.bump).authority(authority_key),
 			space: Sample::MIN_SIZE,
 		}
 		.invoke::<Sample>()?;
-
-		self.sample
-			.with_compact_account_mut::<Sample, _>(&ID, |sample| {
-				sample.bump = args.bump;
-				sample.authority = authority_key;
-				Ok(())
-			})?;
 
 		Ok(())
 	}
@@ -237,23 +227,17 @@ impl<'a> ProcessAccountInfos<'a> for ReallocAccounts<'a> {
 			value.set(u64::try_from(index).map_err(|_| ProgramError::InvalidArgument)?);
 		}
 
-		ResizeCompactAccount {
+		let encoded_size = UpdateResizableAccount {
 			account: self.sample,
 			rent_account: self.authority,
-			target_size: target_len,
 			program_id: &ID,
+			patch: SamplePatch::new().replace_values(&values[..count]),
 		}
-		.invoke::<Sample, _>(|data| {
-			let mut sample = Sample::try_from_bytes_mut(data)?;
-			sample
-				.set_values(&values[..count])
-				.map_err(|_| ProgramError::InvalidAccountData)?;
-			sample
-				.commit()
-				.map_err(|_| ProgramError::InvalidAccountData)?;
+		.invoke::<Sample>()?;
 
-			Ok(())
-		})?;
+		if encoded_size != target_len {
+			return Err(ProgramError::InvalidAccountData);
+		}
 
 		Ok(())
 	}
@@ -322,8 +306,11 @@ mod tests {
 	#[test]
 	fn realloc_instruction_roundtrip() {
 		let mut bytes = [0u8; ReallocIx::SIZE];
-		let ix = ReallocIx::initialize(&mut bytes).unwrap_or_else(|e| panic!("encode: {e:?}"));
-		ix.len.set(Sample::MIN_SIZE as u16);
+		ReallocIx::initialize(&mut bytes, |ix| {
+			ix.len.set(Sample::MIN_SIZE as u16);
+			Ok(())
+		})
+		.unwrap_or_else(|e| panic!("encode: {e:?}"));
 		let parsed = ReallocIx::try_from_bytes(&bytes).unwrap_or_else(|e| panic!("decode: {e:?}"));
 		assert_eq!(usize::from(parsed.len.get()), Sample::MIN_SIZE);
 	}
@@ -386,27 +373,19 @@ mod tests {
 		let mut backing = [0u8; Sample::MAX_SIZE];
 		let data = &mut backing[..target_size];
 		let values = [PodU64::from(3), PodU64::from(5), PodU64::from(8)];
-		let encoded_size = {
-			let mut sample = Sample::initialize(&mut *data)
-				.unwrap_or_else(|error| panic!("initialize: {error:?}"));
-			assert_eq!(sample.encoded_size(), Sample::MIN_SIZE);
-			sample.bump = 7;
-			sample.authority = Address::new_from_array([9; 32]);
-			sample
-				.set_values(&values)
-				.unwrap_or_else(|error| panic!("set values: {error:?}"));
-			assert_eq!(sample.projected_size(), target_size);
-			let encoded_size = sample
-				.commit()
-				.unwrap_or_else(|error| panic!("commit: {error:?}"));
-			assert_eq!(sample.encoded_size(), encoded_size);
-			encoded_size
-		};
+		let encoded_size = Sample::initialize(
+			&mut *data,
+			&SamplePatch::new()
+				.bump(7)
+				.authority(Address::new_from_array([9; 32]))
+				.replace_values(&values),
+		)
+		.unwrap_or_else(|error| panic!("initialize: {error:?}"));
 
 		assert_eq!(encoded_size, target_size);
 		let sample =
 			Sample::try_from_bytes(&*data).unwrap_or_else(|error| panic!("decode: {error:?}"));
-		assert_eq!(sample.encoded_size(), target_size);
+		assert_eq!(sample.encoded_len(), target_size);
 		assert_eq!(sample.bump, 7);
 		assert_eq!(sample.authority, Address::new_from_array([9; 32]));
 		assert_eq!(sample.values(), values);

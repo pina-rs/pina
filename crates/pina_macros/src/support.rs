@@ -44,53 +44,64 @@ pub(crate) fn add_derives(attributes: &mut Vec<Attribute>, additions: &[Path]) -
 /// Generates bytes-first construction and validated viewing helpers.
 ///
 /// These helpers never turn a native schema value into bytes. Callers provide
-/// initialized storage, and zeropod returns the generated zero-copy companion
+/// initialized storage, and `PinaPod` returns the generated zero-copy companion
 /// that is allowed to observe and mutate that storage.
 pub(crate) fn generate_view_helpers(
 	crate_path: &Path,
 	error: &proc_macro2::TokenStream,
+	account_boundary: bool,
 ) -> proc_macro2::TokenStream {
-	quote! {
-		/// The exact number of bytes required by the zeropod representation.
-		pub const SIZE: usize = <Self as #crate_path::ZeroPodFixed>::SIZE;
+	let initialize = if account_boundary {
+		quote! {
+			<Self as #crate_path::PinaAccount>::initialize(data, initialize)
+		}
+	} else {
+		quote! {
+			<Self as #crate_path::PinaPodFixed>::initialize(data, |value| {
+				<Self as #crate_path::HasDiscriminator>::write_discriminator(
+					&mut value.discriminator,
+				);
+				initialize(value)
+			})
+			.map_err(|_| #error)
+		}
+	};
 
-		/// Validate `data` and return zeropod's immutable zero-copy companion.
+	quote! {
+		/// The exact number of bytes required by the `PinaPod` representation.
+		pub const SIZE: usize = ::core::mem::size_of::<<Self as #crate_path::PinaPodFixed>::Zc>();
+
+		/// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
 		pub fn try_from_bytes(
 			data: &[u8],
-		) -> Result<&<Self as #crate_path::ZeroPodFixed>::Zc, #crate_path::ProgramError> {
+		) -> Result<&<Self as #crate_path::PinaPodFixed>::Zc, #crate_path::ProgramError> {
 			if data.len() != Self::SIZE
 				|| !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data)
 			{
 				return Err(#error);
 			}
 
-			<Self as #crate_path::ZeroPodFixed>::from_bytes(data).map_err(|_| #error)
+			<Self as #crate_path::PinaPodFixed>::read_exact(data).map_err(|_| #error)
 		}
 
-			/// Initialize caller-owned storage and return its mutable zero-copy view.
+			/// Initialize caller-owned storage with a complete typed configuration.
 			///
-			/// The complete slice is initialized before zeropod validates it. The
-			/// returned borrow prevents the caller from observing or changing the raw
-			/// bytes while the typed view is live.
-			///
-			/// Every accepted field has an audited all-zero representation. The macro
-			/// rejects custom types and other layouts whose zero state cannot be
-			/// established by Pina's closed schema grammar.
+			/// `PinaPod` zeros the complete slice before calling `initialize`, then
+			/// validates the finished representation once. The discriminator is written
+			/// before the caller configures the remaining fields. If the closure or final
+			/// validation fails, `PinaPod` zeros the complete slice again.
 			///
 			/// # Errors
 			///
-			/// Returns the generated invalid-data error when `data` has the wrong
-			/// length or zeroed storage is not a valid zeropod representation.
-			pub fn initialize(
-			data: &mut [u8],
-		) -> Result<&mut <Self as #crate_path::ZeroPodFixed>::Zc, #crate_path::ProgramError> {
-			if data.len() != Self::SIZE {
-				return Err(#error);
-			}
-
-			data.fill(0);
-			<Self as #crate_path::HasDiscriminator>::write_discriminator(data);
-			<Self as #crate_path::ZeroPodFixed>::from_bytes_mut(data).map_err(|_| #error)
+			/// Returns the generated invalid-data error when `data` has the wrong length,
+			/// the closure fails, or the completed representation is invalid.
+			pub fn initialize<'data>(
+			data: &'data mut [u8],
+			initialize: impl FnOnce(
+				&mut <Self as #crate_path::PinaPodFixed>::Zc,
+			) -> Result<(), #crate_path::PinaPodError>,
+		) -> Result<&'data mut <Self as #crate_path::PinaPodFixed>::Zc, #crate_path::ProgramError> {
+			#initialize
 		}
 	}
 }

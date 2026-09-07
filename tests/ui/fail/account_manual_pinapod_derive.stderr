@@ -1,0 +1,5 @@
+error: Pina owns the `PinaPod` derive for account, instruction, and event schemas; remove the manual derive
+ --> tests/ui/fail/account_manual_pinapod_derive.rs:9:10
+  |
+9 | #[derive(PinaPod)]
+  |          ^^^^^^^

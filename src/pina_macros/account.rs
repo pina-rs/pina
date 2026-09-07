@@ -1,6 +1,6 @@
 //! `#[account]` contract tests through the public macro.
 //!
-//! The macro generates a zeropod-backed account with a discriminator field,
+//! The macro generates a `PinaPod`-backed account with a discriminator field,
 //! `SIZE`, `try_from_bytes`, `initialize`, and a `HasDiscriminator` impl
 //! linking back to the discriminator enum. These tests exercise that surface
 //! through real invocations.
@@ -68,11 +68,12 @@ pub struct LargeState {
 #[test]
 fn basic_roundtrip() {
 	let mut bytes: std::vec::Vec<u8> = std::vec![0xFF; ConfigState::SIZE];
-	{
-		let view = ConfigState::initialize(&mut bytes).unwrap();
+	ConfigState::initialize(&mut bytes, |view| {
 		view.version = 42;
 		view.bump = 255;
-	}
+		Ok(())
+	})
+	.unwrap();
 	let parsed = ConfigState::try_from_bytes(&bytes).unwrap();
 	assert_eq!(parsed.version, 42);
 	assert_eq!(parsed.bump, 255);
@@ -82,7 +83,7 @@ fn basic_roundtrip() {
 #[test]
 fn with_existing_derives() {
 	let mut bytes: std::vec::Vec<u8> = std::vec![0; GameState::SIZE];
-	GameState::initialize(&mut bytes).unwrap();
+	GameState::initialize(&mut bytes, |_| Ok(())).unwrap();
 	let parsed = GameState::try_from_bytes(&bytes).unwrap();
 	assert_eq!(parsed.score, 0);
 }
@@ -92,16 +93,16 @@ fn with_existing_derives() {
 fn with_array_fields() {
 	assert_eq!(DataAccount::SIZE, 1 + 32 + 64 + 4);
 	let mut bytes: std::vec::Vec<u8> = std::vec![0; DataAccount::SIZE];
-	DataAccount::initialize(&mut bytes).unwrap();
+	DataAccount::initialize(&mut bytes, |_| Ok(())).unwrap();
 	assert!(DataAccount::try_from_bytes(&bytes).is_ok());
 }
 
-/// Pod types (`PodU64`, `PodBool`) contribute their zeropod byte widths.
+/// Pod types (`PodU64`, `PodBool`) contribute their `PinaPod` byte widths.
 #[test]
 fn with_pod_types() {
 	assert_eq!(BalanceAccount::SIZE, 1 + 32 + 8 + 1 + 1);
 	let mut bytes: std::vec::Vec<u8> = std::vec![0; BalanceAccount::SIZE];
-	BalanceAccount::initialize(&mut bytes).unwrap();
+	BalanceAccount::initialize(&mut bytes, |_| Ok(())).unwrap();
 	assert!(BalanceAccount::try_from_bytes(&bytes).is_ok());
 }
 
@@ -116,7 +117,7 @@ fn with_custom_variant() {
 #[test]
 fn with_path_variant() {
 	let mut bytes: std::vec::Vec<u8> = std::vec![0; MyStruct::SIZE];
-	MyStruct::initialize(&mut bytes).unwrap();
+	MyStruct::initialize(&mut bytes, |_| Ok(())).unwrap();
 	assert!(MyStruct::try_from_bytes(&bytes).is_ok());
 }
 
@@ -125,7 +126,7 @@ fn with_path_variant() {
 fn many_fields() {
 	assert_eq!(LargeState::SIZE, 1 + 32 + 1 + 1 + 1 + 1 + 3 + 8 + 32);
 	let mut bytes: std::vec::Vec<u8> = std::vec![0; LargeState::SIZE];
-	LargeState::initialize(&mut bytes).unwrap();
+	LargeState::initialize(&mut bytes, |_| Ok(())).unwrap();
 	assert!(LargeState::try_from_bytes(&bytes).is_ok());
 }
 

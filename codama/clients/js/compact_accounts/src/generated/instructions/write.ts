@@ -23,20 +23,20 @@ import {
 	type Instruction,
 	type InstructionWithAccounts,
 	type InstructionWithData,
-	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	type TransactionSigner,
 	transformEncoder,
 	type WritableAccount,
+	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { COMPACT_ACCOUNTS_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const WRITE_DISCRIMINATOR = 2;
 
@@ -55,7 +55,7 @@ export type WriteInstruction<
 	& InstructionWithAccounts<
 		[
 			TAccountAuthority extends string ?
-					& ReadonlySignerAccount<TAccountAuthority>
+					& WritableSignerAccount<TAccountAuthority>
 					& AccountSignerMeta<TAccountAuthority>
 				: TAccountAuthority,
 			TAccountJournal extends string ? WritableAccount<TAccountJournal>
@@ -93,7 +93,7 @@ export function getWriteInstructionDataDecoder(): FixedSizeDecoder<
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(WRITE_DISCRIMINATOR, getU8Decoder()),
+			getPinaPodDiscriminatorDecoder(WRITE_DISCRIMINATOR, getU8Decoder()),
 		],
 		["index", getU8Decoder()],
 		["value", getU64Decoder()],
@@ -114,6 +114,7 @@ export type WriteInput<
 	TAccountAuthority extends string = string,
 	TAccountJournal extends string = string,
 > = {
+	/** Funds growth if a future write patch changes the encoded length. */
 	authority: TransactionSigner<TAccountAuthority>;
 	journal: Address<TAccountJournal>;
 	index: WriteInstructionDataArgs["index"];
@@ -134,7 +135,7 @@ export function getWriteInstruction<
 
 	// Original accounts.
 	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: false },
+		authority: { value: input.authority ?? null, isWritable: true },
 		journal: { value: input.journal ?? null, isWritable: true },
 	};
 	const accounts = originalAccounts as Record<
@@ -164,6 +165,7 @@ export type ParsedWriteInstruction<
 > = {
 	programAddress: Address<TProgram>;
 	accounts: {
+		/** Funds growth if a future write patch changes the encoded length. */
 		authority: TAccountMetas[0];
 		journal: TAccountMetas[1];
 	};

@@ -34,8 +34,8 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const OPEN_POSITION_DISCRIMINATOR = 1;
 
@@ -95,7 +95,7 @@ export function getOpenPositionInstructionDataDecoder(): FixedSizeDecoder<
 > {
 	return getStructDecoder([[
 		"discriminator",
-		getZeroPodDiscriminatorDecoder(OPEN_POSITION_DISCRIMINATOR, getU8Decoder()),
+		getPinaPodDiscriminatorDecoder(OPEN_POSITION_DISCRIMINATOR, getU8Decoder()),
 	], ["bump", getU8Decoder()]]);
 }
 

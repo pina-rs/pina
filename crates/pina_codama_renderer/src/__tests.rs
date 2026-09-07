@@ -9,6 +9,7 @@ use codama_nodes::AccountValueNode;
 use codama_nodes::ArrayTypeNode;
 use codama_nodes::BooleanTypeNode;
 use codama_nodes::BytesEncoding;
+use codama_nodes::BytesTypeNode;
 use codama_nodes::ConstantDiscriminatorNode;
 use codama_nodes::ConstantPdaSeedNode;
 use codama_nodes::ConstantValueNode;
@@ -48,6 +49,8 @@ use codama_nodes::TypeNode;
 use codama_nodes::U8;
 use codama_nodes::VariablePdaSeedNode;
 
+use super::render::capacity::CompactCapacityIndex;
+use super::render::capacity::compact_capacity_marker_name;
 use super::render::seeds::render_variable_seed_parameter;
 use super::render::types::render_type_for_compact_tail;
 use super::render::types::render_type_for_pod;
@@ -94,12 +97,109 @@ fn read_generated_file(crate_dir: &Path, path: &str) -> String {
 	})
 }
 
+fn compact_capacity_root(marker: Option<DefinedTypeNode>) -> RootNode {
+	let tail = ArrayTypeNode::prefixed(
+		NumberTypeNode::le(NumberFormat::U64),
+		NumberTypeNode::le(NumberFormat::U16),
+	);
+	let account = AccountNode {
+		name: "journal".into(),
+		size: None,
+		docs: Docs::default(),
+		data: StructTypeNode::new(vec![
+			StructFieldTypeNode::new("discriminator", NumberTypeNode::le(U8)),
+			StructFieldTypeNode::new("entries", tail),
+		])
+		.into(),
+		pda: None,
+		discriminators: vec![DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(NumberTypeNode::le(U8), NumberValueNode::new(1u8)),
+			0,
+		))],
+	};
+	let marker = marker.into_iter().collect();
+
+	RootNode::new(ProgramNode {
+		name: "capacityProgram".into(),
+		public_key: "11111111111111111111111111111111".to_string(),
+		accounts: vec![account],
+		instructions: vec![],
+		defined_types: marker,
+		pdas: vec![],
+		errors: vec![],
+		events: vec![],
+		constants: vec![],
+		version: String::new(),
+		origin: None,
+		docs: Docs::default(),
+	})
+}
+
+fn compact_capacity_marker(capacity: usize) -> DefinedTypeNode {
+	DefinedTypeNode::new(
+		compact_capacity_marker_name("journal", "entries"),
+		FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), capacity),
+	)
+}
+
 #[test]
 fn renders_counter_account_with_pod_types() {
 	let crate_dir = render_fixture_program("counter_program", "pina-codama-render-counter");
 	let content = read_generated_file(&crate_dir, "accounts/counter_state.rs");
 
 	insta::assert_snapshot!("counter_state_account_rs", content);
+}
+
+#[test]
+fn consumes_machine_readable_capacity_and_omits_marker_artifacts() {
+	let root = compact_capacity_root(Some(compact_capacity_marker(8)));
+	let index = CompactCapacityIndex::read(&root.program)
+		.unwrap_or_else(|error| panic!("capacity index failed: {error}"));
+	assert_eq!(
+		index
+			.capacity("journal", "entries")
+			.unwrap_or_else(|error| panic!("capacity lookup failed: {error}")),
+		8,
+	);
+
+	let crate_dir = unique_temp_dir("pina-codama-capacity-marker");
+	render_root_node(&root, &crate_dir, &RenderConfig::default())
+		.unwrap_or_else(|error| panic!("render failed: {error}"));
+	let account = read_generated_file(&crate_dir, "accounts/journal.rs");
+	let root_module = read_generated_file(&crate_dir, "mod.rs");
+
+	assert!(account.contains("pub entries: pina::Vec<u64, 8>"));
+	assert!(!root_module.contains("pub mod types;"));
+	assert!(!crate_dir.join("src/generated/types").exists());
+}
+
+#[test]
+fn rejects_missing_or_malformed_capacity_markers_instead_of_reading_docs() {
+	let mut missing = compact_capacity_root(None);
+	let codama_nodes::NestedTypeNode::Value(data) = &mut missing.program.accounts[0].data else {
+		panic!("expected direct compact account struct");
+	};
+	data.fields[1].docs = vec!["Pina compact capacity: 999.".to_string()].into();
+	let error = CompactCapacityIndex::read(&missing.program)
+		.expect_err("documentation cannot supply compact capacity");
+	assert!(error.to_string().contains("missing its capacity marker"));
+
+	let name = compact_capacity_marker_name("journal", "entries");
+	let malformed = DefinedTypeNode::new(name, NumberTypeNode::le(U8));
+	let malformed = compact_capacity_root(Some(malformed));
+	let error = CompactCapacityIndex::read(&malformed.program)
+		.expect_err("malformed compact capacity marker must fail closed");
+	assert!(error.to_string().contains("fixedSizeTypeNode"));
+
+	let orphan = DefinedTypeNode::new(
+		compact_capacity_marker_name("journal", "missing"),
+		FixedSizeTypeNode::<TypeNode>::new(BytesTypeNode::new(), 8),
+	);
+	let mut orphan_root = compact_capacity_root(Some(compact_capacity_marker(8)));
+	orphan_root.program.defined_types.push(orphan);
+	let error = CompactCapacityIndex::read(&orphan_root.program)
+		.expect_err("orphan compact capacity marker must fail closed");
+	assert!(error.to_string().contains("does not resolve"));
 }
 
 #[test]
@@ -112,36 +212,29 @@ fn renders_compact_account_fixture_with_dynamic_helpers() {
 	assert!(manifest.contains("pina = { workspace = true, features = [\"compact\"] }"));
 	assert!(content.contains("#[pinapod(compact)]"));
 	assert!(content.contains("pub entries: pina::Vec<u64, 8>"));
-	assert!(content.contains("pub markers: pina::PodVec<<u8 as pina::ZcField>::Pod, 8, 8>"));
+	assert!(content.contains("pub markers: pina::PodVec<u8, 8, 8>"));
 	assert!(content.contains("pub const HEADER_SIZE: usize"));
-	assert!(content.contains("pub fn initialize(data: &mut [u8])"));
+	assert!(content.contains("pub fn initialize(data: &mut [u8], patch: JournalPatch<'_>)"));
 	assert!(content.contains("pub fn from_bytes(data: &[u8])"));
-	assert!(content.contains("pub fn from_bytes_mut(data: &mut [u8])"));
+	assert!(!content.contains("JournalMut"));
 	syn::parse_file(&content)
 		.unwrap_or_else(|error| panic!("generated compact account is invalid Rust: {error}"));
 }
 
 #[test]
 fn renders_every_compact_collection_prefix() {
-	let docs: Docs = vec!["Pina compact capacity: 64.".to_string()].into();
 	for (format, expected) in [
-		(U8, "pina::PodVec<<u64 as pina::ZcField>::Pod, 64, 1>"),
+		(U8, "pina::PodVec<u64, 64, 1>"),
 		(NumberFormat::U16, "pina::Vec<u64, 64>"),
-		(
-			NumberFormat::U32,
-			"pina::PodVec<<u64 as pina::ZcField>::Pod, 64, 4>",
-		),
-		(
-			NumberFormat::U64,
-			"pina::PodVec<<u64 as pina::ZcField>::Pod, 64, 8>",
-		),
+		(NumberFormat::U32, "pina::PodVec<u64, 64, 4>"),
+		(NumberFormat::U64, "pina::PodVec<u64, 64, 8>"),
 	] {
 		let tail = TypeNode::from(ArrayTypeNode::prefixed(
 			NumberTypeNode::le(NumberFormat::U64),
 			NumberTypeNode::le(format),
 		));
 		assert_eq!(
-			render_type_for_compact_tail(&tail, &docs, "State.values")
+			render_type_for_compact_tail(&tail, 64, "State.values")
 				.unwrap_or_else(|error| panic!("render failed: {error}")),
 			expected
 		);
@@ -155,10 +248,8 @@ fn renders_compact_tail_through_a_post_offset_wrapper() {
 		NumberTypeNode::le(NumberFormat::U16),
 	);
 	let tail = PostOffsetTypeNode::<TypeNode>::relative(array, 0).into();
-	let docs: Docs = vec!["Pina compact capacity: 8.".to_string()].into();
-
 	assert_eq!(
-		render_type_for_compact_tail(&tail, &docs, "State.values")
+		render_type_for_compact_tail(&tail, 8, "State.values")
 			.unwrap_or_else(|error| panic!("render failed: {error}")),
 		"pina::Vec<u64, 8>"
 	);
@@ -166,7 +257,6 @@ fn renders_compact_tail_through_a_post_offset_wrapper() {
 
 #[test]
 fn renders_compact_string_tails_with_default_and_explicit_prefixes() {
-	let docs: Docs = vec!["Pina compact capacity: 32.".to_string()].into();
 	for (format, expected) in [
 		(U8, "pina::String<32>"),
 		(NumberFormat::U16, "pina::PodString<32, 2>"),
@@ -177,7 +267,7 @@ fn renders_compact_string_tails_with_default_and_explicit_prefixes() {
 			SizePrefixTypeNode::<TypeNode>::new(StringTypeNode::utf8(), NumberTypeNode::le(format));
 		let tail = PostOffsetTypeNode::<TypeNode>::relative(string, 0).into();
 		assert_eq!(
-			render_type_for_compact_tail(&tail, &docs, "State.title")
+			render_type_for_compact_tail(&tail, 32, "State.title")
 				.unwrap_or_else(|error| panic!("render failed: {error}")),
 			expected
 		);
@@ -193,36 +283,63 @@ fn rejects_non_compact_tail_nodes() {
 	));
 
 	for node in [number, fixed] {
-		let error = render_type_for_compact_tail(&node, &Docs::new(), "State.values")
+		let error = render_type_for_compact_tail(&node, 4, "State.values")
 			.expect_err("non-prefixed tail must be rejected");
-		assert!(error.to_string().contains("suffix of prefixed"));
+		assert!(error.to_string().contains("support String, Vec"));
 	}
 }
 
 #[test]
-fn rejects_compact_tails_without_capacity_metadata_or_with_prefix_overflow() {
-	let array = TypeNode::from(ArrayTypeNode::prefixed(
-		NumberTypeNode::le(NumberFormat::U64),
-		NumberTypeNode::le(U8),
-	));
+fn renders_every_supported_compact_tail_shape() {
 	let string = TypeNode::from(SizePrefixTypeNode::<TypeNode>::new(
 		StringTypeNode::utf8(),
 		NumberTypeNode::le(U8),
 	));
-	for tail in [&array, &string] {
-		let missing = render_type_for_compact_tail(tail, &Docs::new(), "State.values")
-			.expect_err("missing capacity metadata must be rejected");
-		assert!(missing.to_string().contains("Pina compact capacity"));
+	assert_eq!(
+		render_type_for_compact_tail(&string, 8, "State.name")
+			.expect("compact string should render"),
+		"pina::String<8>",
+	);
 
-		let too_large: Docs = vec!["Pina compact capacity: 256.".to_string()].into();
-		let overflow = render_type_for_compact_tail(tail, &too_large, "State.values")
-			.expect_err("capacity beyond prefix maximum must be rejected");
-		assert!(
-			overflow
-				.to_string()
-				.contains("exceeds the 1-byte prefix maximum")
-		);
-	}
+	let string_item = FixedSizeTypeNode::<TypeNode>::new(
+		SizePrefixTypeNode::<TypeNode>::new(StringTypeNode::utf8(), NumberTypeNode::le(U8)),
+		9,
+	);
+	let strings = TypeNode::from(ArrayTypeNode::prefixed(
+		string_item,
+		NumberTypeNode::le(NumberFormat::U16),
+	));
+	assert_eq!(
+		render_type_for_compact_tail(&strings, 4, "State.names")
+			.expect("compact string vector should render"),
+		"pina::Vec<pina::String<8>, 4>",
+	);
+
+	let option = TypeNode::from(OptionTypeNode {
+		fixed: None,
+		item: Box::new(string),
+		prefix: NumberTypeNode::le(U8).into(),
+	});
+	assert_eq!(
+		render_type_for_compact_tail(&option, 8, "State.nickname")
+			.expect("compact optional string should render"),
+		"Option<pina::String<8>>",
+	);
+}
+
+#[test]
+fn rejects_compact_tail_capacity_beyond_prefix_maximum() {
+	let tail = TypeNode::from(ArrayTypeNode::prefixed(
+		NumberTypeNode::le(NumberFormat::U64),
+		NumberTypeNode::le(U8),
+	));
+	let overflow = render_type_for_compact_tail(&tail, 256, "State.values")
+		.expect_err("capacity beyond prefix maximum must be rejected");
+	assert!(
+		overflow
+			.to_string()
+			.contains("exceeds the 1-byte prefix maximum")
+	);
 }
 
 #[test]
@@ -235,10 +352,9 @@ fn rejects_non_utf8_compact_strings() {
 		string,
 		NumberTypeNode::le(U8),
 	));
-	let docs: Docs = vec!["Pina compact capacity: 32.".to_string()].into();
-	let error = render_type_for_compact_tail(&tail, &docs, "State.title")
+	let error = render_type_for_compact_tail(&tail, 32, "State.title")
 		.expect_err("non-UTF-8 string must be rejected");
-	assert!(error.to_string().contains("must use UTF-8"));
+	assert!(error.to_string().contains("support String, Vec"));
 }
 
 #[test]
@@ -348,7 +464,7 @@ fn renders_semantic_pod_option_types() {
 }
 
 #[test]
-fn rejects_non_zeropod_option_layouts() {
+fn rejects_non_pinapod_option_layouts() {
 	let variable = TypeNode::from(OptionTypeNode::new(NumberTypeNode::le(NumberFormat::U64)));
 	let error = render_type_for_pod(&variable, "State.value")
 		.expect_err("variable option must not render as PodOption");
@@ -382,7 +498,7 @@ fn rejects_non_zeropod_option_layouts() {
 	assert!(render_type_for_pod(&values, "State.values").is_err());
 
 	let overflowing_option = OptionTypeNode::fixed(FixedSizeTypeNode::<TypeNode>::new(
-		codama_nodes::BytesTypeNode::new(),
+		BytesTypeNode::new(),
 		usize::MAX,
 	));
 	let values = ArrayTypeNode::prefixed(overflowing_option, NumberTypeNode::le(NumberFormat::U16));
@@ -782,7 +898,7 @@ fn renders_defined_type_aliases_with_pod_wrappers() {
 }
 
 #[test]
-fn renders_defined_structs_with_the_pinapod_helper_in_scope() {
+fn renders_defined_structs_with_the_pinapod_crate_path() {
 	let defined = DefinedTypeNode {
 		name: "settings".into(),
 		docs: vec!["Shared settings.".to_string()].into(),
@@ -797,13 +913,13 @@ fn renders_defined_structs_with_the_pinapod_helper_in_scope() {
 
 	let content = render_defined_type_page(&defined)
 		.unwrap_or_else(|error| panic!("defined struct render failed: {error}"));
-	assert!(content.starts_with("use pina::pinapod;\n\n"));
-	assert!(content.contains("#[derive(pina::ZeroPod)]"));
+	assert!(content.contains("#[derive(pina::PinaPod)]"));
+	assert!(content.contains("#[pinapod(crate = pina::pinapod, no_inherent)]"));
 	assert!(content.contains("pub counter: u64,"));
 }
 
 #[test]
-fn renders_zeropod_enum_defined_type() {
+fn renders_pinapod_enum_defined_type() {
 	let mut red = EnumEmptyVariantTypeNode::new("red");
 	red.discriminator = Some(0);
 	let mut blue = EnumEmptyVariantTypeNode::new("blue");
@@ -856,12 +972,12 @@ fn renders_zeropod_enum_defined_type() {
 	};
 	let root = RootNode::new(program);
 	let output_dir = unique_temp_dir("pina-codama-render-pod-enum");
-	let crate_dir = output_dir.join("zeropod_enum_program");
+	let crate_dir = output_dir.join("pinapod_enum_program");
 	render_root_node(&root, &crate_dir, &RenderConfig::default())
 		.unwrap_or_else(|error| panic!("render failed: {error}"));
 
 	let content = read_generated_file(&crate_dir, "types/color.rs");
-	assert!(content.contains("#[derive(Clone, Copy, Debug, PartialEq, Eq, pina::ZeroPod)]"));
+	assert!(content.contains("#[derive(Clone, Copy, Debug, PartialEq, Eq, pina::PinaPod)]"));
 	assert!(content.contains("pub enum Color"));
 	assert!(content.contains("Red = 0"));
 	assert!(content.contains("Blue = 1"));
@@ -918,7 +1034,7 @@ fn rejects_missing_instruction_discriminators() {
 }
 
 #[test]
-fn writes_scaffold_with_zeropod_dependency() {
+fn writes_scaffold_with_pinapod_dependency() {
 	let root = load_fixture_root("hello_solana");
 	let output_dir = unique_temp_dir("pina-codama-render-scaffold");
 	let crate_dir = output_dir.join("hello_solana");
@@ -934,7 +1050,7 @@ fn writes_scaffold_with_zeropod_dependency() {
 		)
 	});
 
-	insta::assert_snapshot!("writes_scaffold_with_zeropod_dependency", cargo_toml);
+	insta::assert_snapshot!("writes_scaffold_with_pinapod_dependency", cargo_toml);
 }
 
 #[test]

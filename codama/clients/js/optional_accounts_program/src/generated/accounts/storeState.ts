@@ -33,7 +33,7 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { findStorePda, type StoreSeeds } from "../pdas";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 
 export const STORE_STATE_DISCRIMINATOR = 1;
 
@@ -66,7 +66,7 @@ export function getStoreStateDecoder(): FixedSizeDecoder<StoreState> {
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(STORE_STATE_DISCRIMINATOR, getU8Decoder()),
+			getPinaPodDiscriminatorDecoder(STORE_STATE_DISCRIMINATOR, getU8Decoder()),
 		],
 		["bump", getU8Decoder()],
 		["count", getU64Decoder()],

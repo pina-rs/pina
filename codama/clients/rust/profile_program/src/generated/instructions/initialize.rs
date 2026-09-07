@@ -8,14 +8,9 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 /// Instruction data for `Initialize`.
 ///
-/// Contains the PDA bump seed and fixed-width encodings of the initial name and
-/// bio. The name occupies 33 bytes and the bio occupies 129 bytes. Each field
-/// starts with a one-byte payload length, followed by its UTF-8 payload and
-/// zero padding through the end of the field.
+/// Contains the PDA bump seed and bounded initial name and bio.
 pub const INITIALIZE_DISCRIMINATOR: u8 = 0u8;
 
 /// Accounts.
@@ -78,25 +73,23 @@ impl InitializeInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut InitializeInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <InitializeInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data =
-				<InitializeInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-					.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; core::mem::size_of::<InitializeInstructionWireZc>()];
+		<InitializeInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = INITIALIZE_DISCRIMINATOR;
-		}
-		<InitializeInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct InitializeInstructionWire {
 	pub discriminator: u8,
 	pub bump: u8,
-	pub name: [u8; 33],
-	pub bio: [u8; 129],
+	pub name: pina::String<32>,
+	pub bio: pina::String<128>,
 }

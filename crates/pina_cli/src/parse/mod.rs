@@ -84,7 +84,7 @@ pub fn assemble_program_ir_multi(
 	let mut dispatch = Vec::new();
 	let mut dispatch_source_count = 0;
 	let mut all_validation_props = HashMap::new();
-	let mut all_zeropod_enums = Vec::new();
+	let mut all_pinapod_enums = Vec::new();
 	let mut public_key = None;
 	let mut pdas_ir = Vec::new();
 	let all_seed_constants = files
@@ -105,7 +105,7 @@ pub fn assemble_program_ir_multi(
 				.map_err(|error| IdlError::Other(error.to_string()))?,
 		);
 		all_errors.extend(error_enum::extract_error_enums(file));
-		all_zeropod_enums.extend(pod_enum::extract_zeropod_enums(file)?);
+		all_pinapod_enums.extend(pod_enum::extract_pinapod_enums(file)?);
 
 		let file_dispatch = entrypoint::extract_dispatch_map(file);
 		if !file_dispatch.is_empty() {
@@ -137,7 +137,7 @@ pub fn assemble_program_ir_multi(
 		&all_instruction_structs,
 		&all_ix_accounts_structs,
 		&all_errors,
-		&all_zeropod_enums,
+		&all_pinapod_enums,
 		&dispatch,
 		&all_validation_props,
 		&pdas_ir,
@@ -159,7 +159,7 @@ fn assemble_from_extracted(
 	instruction_structs: &[instruction_data::InstructionStruct],
 	ix_accounts_structs: &[accounts_struct::AccountsStruct],
 	errors: &[ErrorIr],
-	zeropod_enums: &[crate::ir::ZeroPodEnumIr],
+	pinapod_enums: &[crate::ir::PinaPodEnumIr],
 	dispatch: &[entrypoint::DispatchEntry],
 	validation_props: &HashMap<String, HashMap<String, validation::AccountProperties>>,
 	pdas_ir: &[PdaIr],
@@ -220,7 +220,7 @@ fn assemble_from_extracted(
 	let ir = ProgramIr {
 		name: program_name.to_owned(),
 		public_key,
-		zeropod_enums: zeropod_enums.to_vec(),
+		pinapod_enums: pinapod_enums.to_vec(),
 		accounts,
 		instructions,
 		errors: errors.to_vec(),
@@ -269,12 +269,12 @@ fn build_accountless_instructions_from_structs(
 /// Returns `Ok(())` when the IR is valid, or an [`IdlError`] describing the
 /// first set of violations found.
 pub fn validate_program_ir(ir: &ProgramIr) -> Result<(), IdlError> {
-	let mut zeropod_enum_names = HashSet::new();
-	for zeropod_enum in &ir.zeropod_enums {
-		if !zeropod_enum_names.insert(zeropod_enum.name.as_str()) {
+	let mut pinapod_enum_names = HashSet::new();
+	for pinapod_enum in &ir.pinapod_enums {
+		if !pinapod_enum_names.insert(pinapod_enum.name.as_str()) {
 			return Err(IdlError::Other(format!(
-				"Duplicate ZeroPod enum `{}` cannot be flattened into one Codama program",
-				zeropod_enum.name
+				"Duplicate PinaPod enum `{}` cannot be flattened into one Codama program",
+				pinapod_enum.name
 			)));
 		}
 	}
@@ -719,11 +719,11 @@ mod tests {
 	}
 
 	#[test]
-	fn assemble_program_ir_collects_local_zeropod_enums() {
+	fn assemble_program_ir_collects_local_pinapod_enums() {
 		let source = r#"
 			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 
-			#[derive(ZeroPod)]
+			#[derive(PinaPod)]
 			#[repr(u8)]
 			pub enum Color {
 				Red = 0,
@@ -745,8 +745,8 @@ mod tests {
 		let ir = assemble_program_ir(&file, "example")
 			.unwrap_or_else(|error| panic!("assemble failed: {error}"));
 
-		assert_eq!(ir.zeropod_enums.len(), 1);
-		assert_eq!(ir.zeropod_enums[0].name, "Color");
+		assert_eq!(ir.pinapod_enums.len(), 1);
+		assert_eq!(ir.pinapod_enums[0].name, "Color");
 		assert_eq!(ir.accounts[0].fields[0].rust_type, "Color");
 		assert_eq!(ir.accounts[0].fields[1].rust_type, "Vec<Color, 8>");
 
@@ -765,11 +765,11 @@ mod tests {
 	}
 
 	#[test]
-	fn assemble_program_ir_rejects_duplicate_zeropod_enums() {
+	fn assemble_program_ir_rejects_duplicate_pinapod_enums() {
 		let first = syn::parse_file(
 			r#"
 				declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
-				#[derive(ZeroPod)]
+				#[derive(PinaPod)]
 				#[repr(u8)]
 				enum Color { Red = 0 }
 			"#,
@@ -777,7 +777,7 @@ mod tests {
 		.unwrap_or_else(|error| panic!("parse failed: {error}"));
 		let second = syn::parse_file(
 			r#"
-				#[derive(ZeroPod)]
+				#[derive(PinaPod)]
 				#[repr(u8)]
 				enum Color { Blue = 0 }
 			"#,
@@ -786,7 +786,7 @@ mod tests {
 
 		let error = assemble_program_ir_multi(&[&first, &second], "example")
 			.expect_err("duplicate flattened companions must fail");
-		assert!(error.to_string().contains("Duplicate ZeroPod enum"));
+		assert!(error.to_string().contains("Duplicate PinaPod enum"));
 	}
 
 	#[test]
@@ -827,7 +827,7 @@ mod tests {
 		let ir = ProgramIr {
 			name: "example".to_owned(),
 			public_key: "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS".to_owned(),
-			zeropod_enums: Vec::new(),
+			pinapod_enums: Vec::new(),
 			accounts: Vec::new(),
 			instructions: Vec::new(),
 			errors: Vec::new(),

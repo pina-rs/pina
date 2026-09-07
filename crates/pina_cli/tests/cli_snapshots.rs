@@ -599,12 +599,12 @@ fn codama_generate_success_output_snapshot() {
 	assert!(
 		js_out
 			.join("counter_program")
-			.join("src/generated/zeropodCodecs.ts")
+			.join("src/generated/pinaPodCodecs.ts")
 			.is_file(),
 		"expected generated JavaScript validation helpers at {}",
 		js_out
 			.join("counter_program")
-			.join("src/generated/zeropodCodecs.ts")
+			.join("src/generated/pinaPodCodecs.ts")
 			.display()
 	);
 }

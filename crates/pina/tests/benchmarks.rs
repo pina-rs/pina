@@ -261,10 +261,13 @@ fn benchmark_parse_instruction_wrong_program_id() {
 #[test]
 fn benchmark_account_try_from_bytes() {
 	let mut bytes = vec![0u8; TestState::SIZE];
-	let state = TestState::initialize(&mut bytes).expect("valid account storage");
-	state.bump = 42;
-	state.count.set(999);
-	state.authority = [7u8; 32].into();
+	TestState::initialize(&mut bytes, |state| {
+		state.bump = 42;
+		state.count.set(999);
+		state.authority = [7u8; 32].into();
+		Ok(())
+	})
+	.expect("valid account storage");
 
 	bench("PinaAccount try_from_bytes (TestState)", || {
 		let _ = black_box(TestState::try_from_bytes(black_box(&bytes)));

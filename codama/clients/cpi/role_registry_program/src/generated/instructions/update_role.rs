@@ -11,6 +11,7 @@
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
+use pina::ProgramError;
 use pina::ProgramResult;
 use pina::Signer;
 
@@ -49,12 +50,12 @@ impl UpdateRoleIx {
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> [u8; 9] {
+	pub fn to_bytes(&self) -> Result<[u8; 9], ProgramError> {
 		let mut data = [0u8; 9];
 		data[..1].copy_from_slice(&UPDATE_ROLE_DISCRIMINATOR);
 		data[1..9].copy_from_slice(&self.permissions.to_le_bytes());
 
-		data
+		Ok(data)
 	}
 }
 
@@ -77,7 +78,7 @@ impl<'account> UpdateRole<'account> {
 			CpiHandle::readonly(self.registry_config),
 			CpiHandle::writable(self.role_entry)?,
 		];
-		let data = self.ix.to_bytes();
+		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

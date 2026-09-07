@@ -3,10 +3,6 @@
 
 /// Error codes for the ProfileProgram program.
 
-/// A bounded string field contained invalid UTF-8.
-/// Message: "A bounded string field contained invalid UTF-8."
-const int profileProgramErrorInvalidUtf8 = 0x0; // 0
-
 /// The tag list is full (capacity 8).
 /// Message: "The tag list is full (capacity 8)."
 const int profileProgramErrorTagOverflow = 0x1; // 1
@@ -17,8 +13,6 @@ const int profileProgramErrorTagNotFound = 0x2; // 2
 
 /// Map of error codes to human-readable messages.
 const Map<int, String> _profileProgramErrorMessages = {
-  profileProgramErrorInvalidUtf8:
-      'A bounded string field contained invalid UTF-8.',
   profileProgramErrorTagOverflow: 'The tag list is full (capacity 8).',
   profileProgramErrorTagNotFound: 'The tag index is out of range.',
 };

@@ -23,8 +23,8 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PINA_BPF_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const HELLO_DISCRIMINATOR = 0;
 
@@ -58,7 +58,7 @@ export function getHelloInstructionDataDecoder(): FixedSizeDecoder<
 > {
 	return getStructDecoder([[
 		"discriminator",
-		getZeroPodDiscriminatorDecoder(HELLO_DISCRIMINATOR, getU8Decoder()),
+		getPinaPodDiscriminatorDecoder(HELLO_DISCRIMINATOR, getU8Decoder()),
 	]]);
 }
 

@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const ADD_ROLE_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
@@ -81,21 +79,20 @@ impl AddRoleInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut AddRoleInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <AddRoleInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data = <AddRoleInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; core::mem::size_of::<AddRoleInstructionWireZc>()];
+		<AddRoleInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = ADD_ROLE_DISCRIMINATOR;
-		}
-		<AddRoleInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct AddRoleInstructionWire {
 	pub discriminator: u8,
 	pub role_id: u64,

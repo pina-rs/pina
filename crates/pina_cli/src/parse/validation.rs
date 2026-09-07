@@ -279,19 +279,24 @@ fn collect_assertions_from_expr(
 		}
 
 		Expr::Call(call) => {
-			// Recognize generated `Type::assert_seeds(self.<field>, ...)`
-			// static calls from the `#[pda]` attribute macro. All three
-			// generated methods mark the account as a PDA.
+			// Recognize generated static calls from the `#[pda]` attribute
+			// macro. Stored-bump assertions and one-pass loaders all mark the
+			// account as a PDA; the mutable loader also proves writability.
 			if let Expr::Path(path) = &*call.func {
 				let method = path.path.segments.last().map(|s| s.ident.to_string());
 				if matches!(
 					method.as_deref(),
-					Some("assert_seeds" | "assert_seeds_with_bump" | "assert_canonical_bump")
+					Some(
+						"assert_seeds"
+							| "assert_seeds_with_bump"
+							| "assert_canonical_bump"
+							| "load_pda" | "load_pda_mut"
+					)
 				) && let Some(first_arg) = call.args.first()
 					&& let Some(field_name) = resolve_self_field(first_arg, bindings)
 				{
 					let entry = props.entry(field_name).or_default();
-					apply_assertion("assert_seeds", &call.args, entry);
+					apply_assertion(method.as_deref().unwrap_or_default(), &call.args, entry);
 				}
 			}
 
@@ -362,8 +367,12 @@ fn apply_assertion(
 	match method {
 		"assert_signer" => props.is_signer = true,
 		"assert_writable" => props.is_writable = true,
-		"assert_seeds" | "assert_seeds_with_bump" | "assert_canonical_bump" => {
+		"assert_seeds" | "assert_seeds_with_bump" | "assert_canonical_bump" | "load_pda" => {
 			props.is_pda = true;
+		}
+		"load_pda_mut" => {
+			props.is_pda = true;
+			props.is_writable = true;
 		}
 		"assert_address" => {
 			if let Some(addr) = first_arg_to_known_address(args) {
@@ -509,6 +518,27 @@ mod tests {
 		let all = extract_validation_properties(&file);
 		let props = &all["MyAccounts"];
 		assert!(props["counter"].is_pda);
+	}
+
+	#[test]
+	fn extracts_pda_and_writable_from_generated_one_pass_loader() {
+		let source = r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					let mut counter = CounterState::load_pda_mut(
+						self.counter,
+						self.authority.address(),
+						&ID,
+					)?;
+					Ok(())
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let all = extract_validation_properties(&file);
+		let props = &all["MyAccounts"];
+		assert!(props["counter"].is_pda);
+		assert!(props["counter"].is_writable);
 	}
 
 	#[test]

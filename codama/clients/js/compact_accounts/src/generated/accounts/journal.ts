@@ -52,9 +52,15 @@ import {
 } from "@solana/kit";
 import { findJournalPda, type JournalSeeds } from "../pdas";
 import {
-	getZeroPodDiscriminatorDecoder,
-	getZeroPodOptionTagDecoder,
-} from "../zeropodCodecs";
+	getPinaPodBoundedArrayDecoder,
+	getPinaPodBoundedArrayEncoder,
+	getPinaPodBoundedCountDecoder,
+	getPinaPodBoundedStringDecoder,
+	getPinaPodBoundedStringEncoder,
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodOptionTagDecoder,
+	getPinaPodUtf8Decoder,
+} from "../pinaPodCodecs";
 
 export const JOURNAL_DISCRIMINATOR = 1;
 
@@ -63,11 +69,11 @@ export function getJournalDiscriminatorBytes(): ReadonlyUint8Array {
 }
 
 /**
- * A compact account with three independently encoded dynamic fields.
+ * A compact account with four independently encoded dynamic fields.
  *
  * The fixed header includes a semantic `Option<u64>` encoded as
- * `PodOption<PodU64>`. The title uses `PodString`, while entries and markers
- * use vectors; only their active bytes are allocated.
+ * `PodOption<PodU64>`. The title and optional note use compact strings, while
+ * entries and markers use vectors; only their active bytes are allocated.
  */
 export type Journal = {
 	discriminator: number;
@@ -79,21 +85,14 @@ export type Journal = {
 	revision: number;
 	/** Most recently written entry value, stored as `PodOption<PodU64>`. */
 	featuredEntry: Option<bigint>;
-	/**
-	 * Human-readable title stored as active UTF-8 bytes.
-	 * Pina compact capacity: 24.
-	 */
+	/** Human-readable title stored as active UTF-8 bytes. */
 	title: string;
-	/**
-	 * Active entries. Unused capacity consumes no account bytes.
-	 * Pina compact capacity: 8.
-	 */
+	/** Active entries. Unused capacity consumes no account bytes. */
 	entries: Array<bigint>;
-	/**
-	 * Independently sized markers stored as a second compact tail.
-	 * Pina compact capacity: 8.
-	 */
+	/** Independently sized markers stored as a second compact tail. */
 	markers: Array<number>;
+	/** Optional human-readable status attached to the latest resize. */
+	note: Option<string>;
 };
 
 export type JournalArgs = {
@@ -105,21 +104,14 @@ export type JournalArgs = {
 	revision: number;
 	/** Most recently written entry value, stored as `PodOption<PodU64>`. */
 	featuredEntry: OptionOrNullable<number | bigint>;
-	/**
-	 * Human-readable title stored as active UTF-8 bytes.
-	 * Pina compact capacity: 24.
-	 */
+	/** Human-readable title stored as active UTF-8 bytes. */
 	title: string;
-	/**
-	 * Active entries. Unused capacity consumes no account bytes.
-	 * Pina compact capacity: 8.
-	 */
+	/** Active entries. Unused capacity consumes no account bytes. */
 	entries: Array<number | bigint>;
-	/**
-	 * Independently sized markers stored as a second compact tail.
-	 * Pina compact capacity: 8.
-	 */
+	/** Independently sized markers stored as a second compact tail. */
 	markers: Array<number>;
+	/** Optional human-readable status attached to the latest resize. */
+	note: OptionOrNullable<string>;
 };
 
 /** Gets the encoder for {@link JournalArgs} account data. */
@@ -137,33 +129,57 @@ export function getJournalEncoder(): Encoder<JournalArgs> {
 			[
 				"title",
 				offsetEncoder(
-					addEncoderSizePrefix(
-						getUtf8Encoder(),
-						offsetEncoder(
-							offsetEncoder(getU8Encoder(), { preOffset: () => 47 }),
-							{ postOffset: ({ preOffset }) => preOffset + 0 },
+					getPinaPodBoundedStringEncoder(
+						addEncoderSizePrefix(
+							getUtf8Encoder(),
+							offsetEncoder(
+								offsetEncoder(getU8Encoder(), { preOffset: () => 47 }),
+								{ postOffset: ({ preOffset }) => preOffset + 0 },
+							),
 						),
+						24,
 					),
-					{ preOffset: ({ preOffset }) => preOffset + 11 },
+					{ preOffset: ({ preOffset }) => preOffset + 12 },
 				),
 			],
 			[
 				"entries",
-				getArrayEncoder(getU64Encoder(), {
-					size: offsetEncoder(
-						offsetEncoder(getU16Encoder(), { preOffset: () => 48 }),
-						{ postOffset: ({ preOffset }) => preOffset + 0 },
-					),
-				}),
+				getPinaPodBoundedArrayEncoder(
+					getArrayEncoder(getU64Encoder(), {
+						size: offsetEncoder(
+							offsetEncoder(getU16Encoder(), { preOffset: () => 48 }),
+							{ postOffset: ({ preOffset }) => preOffset + 0 },
+						),
+					}),
+					8,
+				),
 			],
 			[
 				"markers",
-				getArrayEncoder(getU8Encoder(), {
-					size: offsetEncoder(
-						offsetEncoder(getU64Encoder(), { preOffset: () => 50 }),
-						{ postOffset: ({ preOffset }) => preOffset + 0 },
+				getPinaPodBoundedArrayEncoder(
+					getArrayEncoder(getU8Encoder(), {
+						size: offsetEncoder(
+							offsetEncoder(getU64Encoder(), { preOffset: () => 50 }),
+							{ postOffset: ({ preOffset }) => preOffset + 0 },
+						),
+					}),
+					8,
+				),
+			],
+			[
+				"note",
+				getOptionEncoder(
+					getPinaPodBoundedStringEncoder(
+						addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+						64,
 					),
-				}),
+					{
+						prefix: offsetEncoder(
+							offsetEncoder(getU8Encoder(), { preOffset: () => 58 }),
+							{ postOffset: ({ preOffset }) => preOffset },
+						),
+					},
+				),
 			],
 		]),
 		(value) => ({ ...value, discriminator: 1 }),
@@ -175,7 +191,7 @@ export function getJournalDecoder(): Decoder<Journal> {
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(JOURNAL_DISCRIMINATOR, getU8Decoder()),
+			getPinaPodDiscriminatorDecoder(JOURNAL_DISCRIMINATOR, getU8Decoder()),
 		],
 		["bump", getU8Decoder()],
 		["authority", getAddressDecoder()],
@@ -183,40 +199,86 @@ export function getJournalDecoder(): Decoder<Journal> {
 		[
 			"featuredEntry",
 			getOptionDecoder(getU64Decoder(), {
-				prefix: getZeroPodOptionTagDecoder(getU8Decoder()),
+				prefix: getPinaPodOptionTagDecoder(getU8Decoder()),
 				noneValue: "zeroes",
 			}),
 		],
 		[
 			"title",
 			offsetDecoder(
-				addDecoderSizePrefix(
-					getUtf8Decoder(),
-					offsetDecoder(
-						offsetDecoder(getU8Decoder(), { preOffset: () => 47 }),
-						{ postOffset: ({ preOffset }) => preOffset + 0 },
+				getPinaPodBoundedStringDecoder(
+					addDecoderSizePrefix(
+						getPinaPodUtf8Decoder(),
+						getPinaPodBoundedCountDecoder(
+							offsetDecoder(
+								offsetDecoder(getU8Decoder(), { preOffset: () => 47 }),
+								{ postOffset: ({ preOffset }) => preOffset + 0 },
+							),
+							24,
+						),
 					),
+					24,
 				),
-				{ preOffset: ({ preOffset }) => preOffset + 11 },
+				{ preOffset: ({ preOffset }) => preOffset + 12 },
 			),
 		],
 		[
 			"entries",
-			getArrayDecoder(getU64Decoder(), {
-				size: offsetDecoder(
-					offsetDecoder(getU16Decoder(), { preOffset: () => 48 }),
-					{ postOffset: ({ preOffset }) => preOffset + 0 },
+			getPinaPodBoundedArrayDecoder(
+				getArrayDecoder(getU64Decoder(), {
+					size: offsetDecoder(
+						offsetDecoder(getU16Decoder(), { preOffset: () => 48 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
+					),
+				}),
+				getPinaPodBoundedCountDecoder(
+					offsetDecoder(
+						offsetDecoder(getU16Decoder(), { preOffset: () => 48 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
+					),
+					8,
 				),
-			}),
+				8,
+			),
 		],
 		[
 			"markers",
-			getArrayDecoder(getU8Decoder(), {
-				size: offsetDecoder(
-					offsetDecoder(getU64Decoder(), { preOffset: () => 50 }),
-					{ postOffset: ({ preOffset }) => preOffset + 0 },
+			getPinaPodBoundedArrayDecoder(
+				getArrayDecoder(getU8Decoder(), {
+					size: offsetDecoder(
+						offsetDecoder(getU64Decoder(), { preOffset: () => 50 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
+					),
+				}),
+				getPinaPodBoundedCountDecoder(
+					offsetDecoder(
+						offsetDecoder(getU64Decoder(), { preOffset: () => 50 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
+					),
+					8,
 				),
-			}),
+				8,
+			),
+		],
+		[
+			"note",
+			getOptionDecoder(
+				getPinaPodBoundedStringDecoder(
+					addDecoderSizePrefix(
+						getPinaPodUtf8Decoder(),
+						getPinaPodBoundedCountDecoder(getU8Decoder(), 64),
+					),
+					64,
+				),
+				{
+					prefix: offsetDecoder(
+						offsetDecoder(getPinaPodOptionTagDecoder(getU8Decoder()), {
+							preOffset: () => 58,
+						}),
+						{ postOffset: ({ preOffset }) => preOffset },
+					),
+				},
+			),
 		],
 	]);
 }

@@ -131,7 +131,7 @@ fn validate_type<T: PinaAccount>(account: AccountView, program_id: &Address) -> 
 		return Err(ProgramError::InvalidAccountData);
 	}
 
-	if data.len() != T::SIZE {
+	if data.len() != size_of::<T::Zc>() {
 		log!(
 			"address: {} has invalid data length for the account type",
 			account.address().as_ref()
@@ -141,7 +141,7 @@ fn validate_type<T: PinaAccount>(account: AccountView, program_id: &Address) -> 
 		return Err(ProgramError::AccountDataTooSmall);
 	}
 
-	if <T as crate::ZeroPodFixed>::validate(&data).is_err() {
+	if <T as crate::PinaPodFixed>::validate_exact(&data).is_err() {
 		log!(
 			"address: {} contains invalid zero-copy account data",
 			account.address().as_ref()
@@ -530,7 +530,7 @@ impl AsAccount for AccountView {
 		T: PinaAccount,
 	{
 		self.assert_owner(program_id)?;
-		self.assert_data_len(T::SIZE)?;
+		self.assert_data_len(size_of::<T::Zc>())?;
 
 		Ref::try_map(self.try_borrow()?, |data| T::try_from_bytes(data))
 			.map_err(|(_guard, error)| error)
@@ -541,8 +541,8 @@ impl AsAccount for AccountView {
 	where
 		T: PinaAccount,
 	{
-		self.assert_owner(program_id)?;
-		self.assert_data_len(T::SIZE)?;
+		self.assert_writable()?.assert_owner(program_id)?;
+		self.assert_data_len(size_of::<T::Zc>())?;
 
 		RefMut::try_map(self.try_borrow_mut()?, |data| T::try_from_bytes_mut(data))
 			.map_err(|(_guard, error)| error)
@@ -568,19 +568,18 @@ impl AsCompactAccount for AccountView {
 	}
 
 	#[track_caller]
-	fn with_compact_account_mut<T, R>(
+	fn update_compact_account<T>(
 		&mut self,
 		program_id: &Address,
-		use_account: impl FnOnce(&mut T::Mut<'_>) -> Result<R, ProgramError>,
-	) -> Result<R, ProgramError>
+		patch: &T::Patch<'_>,
+	) -> Result<usize, ProgramError>
 	where
 		T: PinaCompactAccount,
 	{
-		self.assert_owner(program_id)?;
+		self.assert_writable()?.assert_owner(program_id)?;
 		let mut data = self.try_borrow_mut()?;
-		let mut account = T::try_from_bytes_mut(&mut data)?;
 
-		use_account(&mut account)
+		T::update(&mut data, patch)
 	}
 }
 

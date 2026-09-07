@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+import '../pina_pod_codecs.dart';
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -22,6 +23,7 @@ class Journal {
     required this.title,
     required this.entries,
     required this.markers,
+    required this.note,
   }) : discriminator = 1;
 
   final int discriminator;
@@ -32,6 +34,7 @@ class Journal {
   final String title;
   final List<BigInt> entries;
   final List<int> markers;
+  final String? note;
 
   @override
   bool operator ==(Object other) =>
@@ -45,7 +48,8 @@ class Journal {
           featuredEntry == other.featuredEntry &&
           title == other.title &&
           entries == other.entries &&
-          markers == other.markers;
+          markers == other.markers &&
+          note == other.note;
 
   @override
   int get hashCode => Object.hash(
@@ -57,11 +61,12 @@ class Journal {
     title,
     entries,
     markers,
+    note,
   );
 
   @override
   String toString() =>
-      'Journal(discriminator: $discriminator, bump: $bump, authority: $authority, revision: $revision, featuredEntry: $featuredEntry, title: $title, entries: $entries, markers: $markers)';
+      'Journal(discriminator: $discriminator, bump: $bump, authority: $authority, revision: $revision, featuredEntry: $featuredEntry, title: $title, entries: $entries, markers: $markers, note: $note)';
 }
 
 Encoder<Journal> getJournalEncoder() {
@@ -80,46 +85,71 @@ Encoder<Journal> getJournalEncoder() {
     (
       'title',
       offsetEncoder(
-        addEncoderSizePrefix(
-          getUtf8Encoder(),
-          offsetEncoder(
+        getPinaPodBoundedStringEncoder(
+          addEncoderSizePrefix(
+            getUtf8Encoder(),
             offsetEncoder(
-              getU8Encoder(),
-              OffsetConfig(preOffset: (scope) => 47),
+              offsetEncoder(
+                getU8Encoder(),
+                OffsetConfig(preOffset: (scope) => 47),
+              ),
+              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
-            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
+          24,
         ),
-        OffsetConfig(preOffset: (scope) => scope.preOffset + 11),
+        OffsetConfig(preOffset: (scope) => scope.preOffset + 12),
       ),
     ),
     (
       'entries',
-      getArrayEncoder(
-        transformEncoder(getU64Encoder(), (BigInt value) => value),
-        size: PrefixedArraySize(
-          offsetEncoder(
+      getPinaPodBoundedArrayEncoder(
+        getArrayEncoder(
+          transformEncoder(getU64Encoder(), (BigInt value) => value),
+          size: PrefixedArraySize(
             offsetEncoder(
-              getU16Encoder(),
-              OffsetConfig(preOffset: (scope) => 48),
+              offsetEncoder(
+                getU16Encoder(),
+                OffsetConfig(preOffset: (scope) => 48),
+              ),
+              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
-            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
         ),
+        8,
       ),
     ),
     (
       'markers',
-      getArrayEncoder(
-        transformEncoder(getU8Encoder(), (int value) => value),
-        size: PrefixedArraySize(
-          offsetEncoder(
+      getPinaPodBoundedArrayEncoder(
+        getArrayEncoder(
+          transformEncoder(getU8Encoder(), (int value) => value),
+          size: PrefixedArraySize(
             offsetEncoder(
-              getU64Encoder(),
-              OffsetConfig(preOffset: (scope) => 50),
+              offsetEncoder(
+                getU64Encoder(),
+                OffsetConfig(preOffset: (scope) => 50),
+              ),
+              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
-            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
+        ),
+        8,
+      ),
+    ),
+    (
+      'note',
+      getNullableEncoder<String>(
+        transformEncoder(
+          getPinaPodBoundedStringEncoder(
+            addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+            64,
+          ),
+          (String value) => value,
+        ),
+        prefix: offsetEncoder(
+          offsetEncoder(getU8Encoder(), OffsetConfig(preOffset: (scope) => 58)),
+          OffsetConfig(postOffset: (scope) => scope.preOffset),
         ),
       ),
     ),
@@ -136,6 +166,7 @@ Encoder<Journal> getJournalEncoder() {
       'title': value.title,
       'entries': value.entries,
       'markers': value.markers,
+      'note': value.note,
     },
   );
 }
@@ -156,24 +187,41 @@ Decoder<Journal> getJournalDecoder() {
     (
       'title',
       offsetDecoder(
-        addDecoderSizePrefix(
-          getUtf8Decoder(),
-          offsetDecoder(
-            offsetDecoder(
-              getU8Decoder(),
-              OffsetConfig(preOffset: (scope) => 47),
+        getPinaPodBoundedStringDecoder(
+          addDecoderSizePrefix(
+            getUtf8Decoder(),
+            getPinaPodBoundedCountDecoder(
+              offsetDecoder(
+                offsetDecoder(
+                  getU8Decoder(),
+                  OffsetConfig(preOffset: (scope) => 47),
+                ),
+                OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+              ),
+              24,
             ),
-            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
+          24,
         ),
-        OffsetConfig(preOffset: (scope) => scope.preOffset + 11),
+        OffsetConfig(preOffset: (scope) => scope.preOffset + 12),
       ),
     ),
     (
       'entries',
-      getArrayDecoder(
-        getU64Decoder(),
-        size: PrefixedArraySize(
+      getPinaPodBoundedArrayDecoder(
+        getArrayDecoder(
+          getU64Decoder(),
+          size: PrefixedArraySize(
+            offsetDecoder(
+              offsetDecoder(
+                getU16Decoder(),
+                OffsetConfig(preOffset: (scope) => 48),
+              ),
+              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+            ),
+          ),
+        ),
+        getPinaPodBoundedCountDecoder(
           offsetDecoder(
             offsetDecoder(
               getU16Decoder(),
@@ -181,14 +229,27 @@ Decoder<Journal> getJournalDecoder() {
             ),
             OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
+          8,
         ),
+        8,
       ),
     ),
     (
       'markers',
-      getArrayDecoder(
-        getU8Decoder(),
-        size: PrefixedArraySize(
+      getPinaPodBoundedArrayDecoder(
+        getArrayDecoder(
+          getU8Decoder(),
+          size: PrefixedArraySize(
+            offsetDecoder(
+              offsetDecoder(
+                getU64Decoder(),
+                OffsetConfig(preOffset: (scope) => 50),
+              ),
+              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+            ),
+          ),
+        ),
+        getPinaPodBoundedCountDecoder(
           offsetDecoder(
             offsetDecoder(
               getU64Decoder(),
@@ -196,6 +257,24 @@ Decoder<Journal> getJournalDecoder() {
             ),
             OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
+          8,
+        ),
+        8,
+      ),
+    ),
+    (
+      'note',
+      getNullableDecoder<String>(
+        getPinaPodBoundedStringDecoder(
+          addDecoderSizePrefix(
+            getUtf8Decoder(),
+            getPinaPodBoundedCountDecoder(getU8Decoder(), 64),
+          ),
+          64,
+        ),
+        prefix: offsetDecoder(
+          offsetDecoder(getU8Decoder(), OffsetConfig(preOffset: (scope) => 58)),
+          OffsetConfig(postOffset: (scope) => scope.preOffset),
         ),
       ),
     ),
@@ -222,6 +301,7 @@ Decoder<Journal> getJournalDecoder() {
         title: map['title']! as String,
         entries: map['entries']! as List<BigInt>,
         markers: map['markers']! as List<int>,
+        note: map['note'] as String?,
       ),
       newOffset,
     );

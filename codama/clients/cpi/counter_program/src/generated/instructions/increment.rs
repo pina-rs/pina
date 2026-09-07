@@ -11,6 +11,7 @@
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
+use pina::ProgramError;
 use pina::ProgramResult;
 use pina::Signer;
 
@@ -46,11 +47,11 @@ impl IncrementIx {
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> [u8; 1] {
+	pub fn to_bytes(&self) -> Result<[u8; 1], ProgramError> {
 		let mut data = [0u8; 1];
 		data[..1].copy_from_slice(&INCREMENT_DISCRIMINATOR);
 
-		data
+		Ok(data)
 	}
 }
 
@@ -72,7 +73,7 @@ impl<'account> Increment<'account> {
 			CpiHandle::readonly_signer(self.authority),
 			CpiHandle::writable(self.counter)?,
 		];
-		let data = self.ix.to_bytes();
+		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

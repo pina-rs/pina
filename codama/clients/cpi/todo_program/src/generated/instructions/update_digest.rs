@@ -11,6 +11,7 @@
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
+use pina::ProgramError;
 use pina::ProgramResult;
 use pina::Signer;
 
@@ -45,12 +46,12 @@ impl UpdateDigestIx {
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> [u8; 33] {
+	pub fn to_bytes(&self) -> Result<[u8; 33], ProgramError> {
 		let mut data = [0u8; 33];
 		data[..1].copy_from_slice(&UPDATE_DIGEST_DISCRIMINATOR);
 		data[1..33].copy_from_slice(&self.digest);
 
-		data
+		Ok(data)
 	}
 }
 
@@ -72,7 +73,7 @@ impl<'account> UpdateDigest<'account> {
 			CpiHandle::readonly_signer(self.owner),
 			CpiHandle::writable(self.todo)?,
 		];
-		let data = self.ix.to_bytes();
+		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

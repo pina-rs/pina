@@ -12,6 +12,7 @@ use pina::AccountView;
 use pina::Address;
 use pina::CpiContext;
 use pina::CpiHandle;
+use pina::ProgramError;
 use pina::ProgramResult;
 use pina::Signer;
 
@@ -20,7 +21,7 @@ use crate::ProgramAccount;
 /// CPI call for the `rotate_authority` instruction.
 #[derive(Clone, Copy, Debug)]
 #[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
-pub struct RotateAuthority<'account, 'address> {
+pub struct RotateAuthority<'account, 'argument> {
 	/// CPI account `oracle`.
 	/// Required privileges: writable.
 	pub oracle: &'account AccountView,
@@ -30,32 +31,32 @@ pub struct RotateAuthority<'account, 'address> {
 	pub authority: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `rotate_authority`.
-	pub ix: RotateAuthorityIx<'address>,
+	pub ix: RotateAuthorityIx<'argument>,
 }
 
 /// Instruction arguments for the `rotate_authority` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct RotateAuthorityIx<'address> {
+pub struct RotateAuthorityIx<'argument> {
 	/// Instruction argument `newAuthority`.
-	pub new_authority: &'address Address,
+	pub new_authority: &'argument Address,
 }
 
-impl<'address> RotateAuthorityIx<'address> {
+impl<'argument> RotateAuthorityIx<'argument> {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 33;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> [u8; 33] {
+	pub fn to_bytes(&self) -> Result<[u8; 33], ProgramError> {
 		let mut data = [0u8; 33];
 		data[..1].copy_from_slice(&ROTATE_AUTHORITY_DISCRIMINATOR);
 		data[1..33].copy_from_slice(self.new_authority.as_ref());
 
-		data
+		Ok(data)
 	}
 }
 
-impl<'account, 'address> RotateAuthority<'account, 'address> {
+impl<'account, 'argument> RotateAuthority<'account, 'argument> {
 	/// Invokes the instruction with no PDA seeds.
 	#[inline(always)]
 	pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
@@ -73,7 +74,7 @@ impl<'account, 'address> RotateAuthority<'account, 'address> {
 			CpiHandle::writable(self.oracle)?,
 			CpiHandle::readonly_signer(self.authority),
 		];
-		let data = self.ix.to_bytes();
+		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

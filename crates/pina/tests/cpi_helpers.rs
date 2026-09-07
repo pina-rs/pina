@@ -28,11 +28,11 @@ use pina::ReallocAccount;
 use pina::ReallocAccountZeroed;
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 use pina::ReallocCompactAccount;
-#[cfg(all(feature = "account-resize", feature = "compact"))]
-use pina::ResizeCompactAccount;
 use pina::Seed;
 use pina::Signer;
 use pina::ToCpiAccounts;
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+use pina::UpdateResizableAccount;
 use pina::combine_seeds_with_bump;
 use pina::try_find_program_address;
 use pinocchio::AccountView;
@@ -263,10 +263,32 @@ fn realloc_builders_are_exported() {
 #[test]
 fn compact_resize_builders_are_exported() {
 	assert!(size_of::<ReallocCompactAccount<'static, 'static, 'static>>() > 0);
-	assert!(size_of::<ResizeCompactAccount<'static, 'static, 'static>>() > 0);
-	assert!(size_of::<CreateCompactProgramAccount<'static, 'static, 'static, 'static>>() > 0);
 	assert!(
-		size_of::<CreateCompactProgramAccountWithBump<'static, 'static, 'static, 'static>>() > 0
+		size_of::<
+			CreateCompactProgramAccount<
+				'static,
+				'static,
+				'static,
+				'static,
+				CompactBuilderStatePatch<'static>,
+			>,
+		>() > 0
+	);
+	assert!(
+		size_of::<
+			CreateCompactProgramAccountWithBump<
+				'static,
+				'static,
+				'static,
+				'static,
+				CompactBuilderStatePatch<'static>,
+			>,
+		>() > 0
+	);
+	assert!(
+		size_of::<
+			UpdateResizableAccount<'static, 'static, 'static, CompactBuilderStatePatch<'static>>,
+		>() > 0
 	);
 }
 
@@ -289,6 +311,7 @@ fn compact_creation_rejects_invalid_sizes_before_cpi() {
 		payer: &payer,
 		owner: &owner,
 		seeds,
+		patch: CompactBuilderStatePatch::new(),
 		space: split_element,
 	}
 	.invoke::<CompactBuilderState>();
@@ -300,6 +323,7 @@ fn compact_creation_rejects_invalid_sizes_before_cpi() {
 		owner: &owner,
 		seeds,
 		bump,
+		patch: CompactBuilderStatePatch::new(),
 		space: CompactBuilderState::MAX_SIZE + 8,
 	}
 	.invoke::<CompactBuilderState>();
@@ -322,6 +346,7 @@ fn canonical_compact_creation_rejects_seed_lists_that_cannot_form_a_pda() {
 		payer: &payer,
 		owner: &owner,
 		seeds: &seeds,
+		patch: CompactBuilderStatePatch::new(),
 		space: CompactBuilderState::HEADER_SIZE,
 	}
 	.invoke::<CompactBuilderState>();
@@ -347,11 +372,112 @@ fn compact_creation_accepts_a_valid_header_before_rent_lookup() {
 		payer: &payer,
 		owner: &owner,
 		seeds,
+		patch: CompactBuilderStatePatch::new(),
 		space: CompactBuilderState::HEADER_SIZE,
 	}
 	.invoke::<CompactBuilderState>();
 
 	assert_eq!(result, Err(ProgramError::UnsupportedSysvar));
+}
+
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+#[test]
+fn resizable_update_applies_an_owned_patch_without_reallocation() {
+	let owner = Address::new_from_array([9u8; 32]);
+	let mut stored_account = TestAccount::<{ CompactBuilderState::HEADER_SIZE }>::new(
+		Address::new_from_array([1u8; 32]),
+		false,
+		true,
+	);
+	let mut stored_rent = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
+	let mut account = stored_account.view();
+	let mut rent_account = stored_rent.view();
+	{
+		let mut data = account
+			.try_borrow_mut()
+			.unwrap_or_else(|error| panic!("borrow compact data: {error:?}"));
+		CompactBuilderState::initialize(&mut data, &CompactBuilderStatePatch::new())
+			.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
+	}
+
+	let encoded_len = UpdateResizableAccount {
+		account: &mut account,
+		rent_account: &mut rent_account,
+		program_id: &owner,
+		patch: CompactBuilderStatePatch::new().value(7),
+	}
+	.invoke::<CompactBuilderState>()
+	.unwrap_or_else(|error| panic!("update compact account: {error:?}"));
+
+	assert_eq!(encoded_len, CompactBuilderState::HEADER_SIZE);
+	let data = account
+		.try_borrow()
+		.unwrap_or_else(|error| panic!("borrow updated compact data: {error:?}"));
+	let state = CompactBuilderState::try_from_bytes(&data)
+		.unwrap_or_else(|error| panic!("read updated compact data: {error:?}"));
+	assert!(state.items().is_empty());
+	assert_eq!(data[1], 7);
+}
+
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+#[test]
+fn resizable_update_rejects_readonly_accounts_without_changing_bytes() {
+	let owner = Address::new_from_array([9u8; 32]);
+	let mut stored_account = TestAccount::<{ CompactBuilderState::HEADER_SIZE }>::new(
+		Address::new_from_array([1u8; 32]),
+		false,
+		false,
+	);
+	CompactBuilderState::initialize(&mut stored_account.data, &CompactBuilderStatePatch::new())
+		.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
+	let before = stored_account.data;
+	let mut stored_rent = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
+	let mut account = stored_account.view();
+	let mut rent_account = stored_rent.view();
+
+	let result = UpdateResizableAccount {
+		account: &mut account,
+		rent_account: &mut rent_account,
+		program_id: &owner,
+		patch: CompactBuilderStatePatch::new().value(7),
+	}
+	.invoke::<CompactBuilderState>();
+
+	assert_eq!(result, Err(ProgramError::InvalidAccountData));
+	let data = account
+		.try_borrow()
+		.unwrap_or_else(|error| panic!("borrow unchanged compact data: {error:?}"));
+	assert_eq!(&*data, &before);
+}
+
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+#[test]
+fn compact_creation_rejects_readonly_target_or_payer_before_cpi() {
+	let owner = Address::new_from_array([5u8; 32]);
+	let seeds: &[&[u8]] = &[b"compact"];
+	let (address, _) =
+		try_find_program_address(seeds, &owner).unwrap_or_else(|| panic!("expected compact PDA"));
+
+	for (target_writable, payer_writable) in [(false, true), (true, false)] {
+		let mut stored_target = TestAccount::<0>::new(address, false, target_writable);
+		stored_target.header.lamports = 0;
+		let mut stored_payer =
+			TestAccount::<0>::new(Address::new_from_array([6u8; 32]), true, payer_writable);
+		let mut target = stored_target.view();
+		let payer = stored_payer.view();
+
+		let result = CreateCompactProgramAccount {
+			account: &mut target,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			patch: CompactBuilderStatePatch::new(),
+			space: CompactBuilderState::HEADER_SIZE,
+		}
+		.invoke::<CompactBuilderState>();
+
+		assert_eq!(result, Err(ProgramError::InvalidAccountData));
+	}
 }
 
 #[cfg(all(feature = "account-resize", feature = "compact"))]
@@ -371,7 +497,7 @@ fn compact_realloc_validates_current_data_and_target_size() {
 		let mut data = account
 			.try_borrow_mut()
 			.unwrap_or_else(|error| panic!("borrow compact data: {error:?}"));
-		CompactBuilderState::initialize(&mut data)
+		CompactBuilderState::initialize(&mut data, &CompactBuilderStatePatch::new())
 			.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
 	}
 
@@ -425,16 +551,13 @@ fn compact_realloc_rejects_shrinking_below_the_active_tail() {
 		let mut data = account
 			.try_borrow_mut()
 			.unwrap_or_else(|error| panic!("borrow compact data: {error:?}"));
-		let mut state = CompactBuilderState::initialize(&mut data)
-			.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
 		let items = [pina::PodU64::from(7)];
-		state
-			.set_items(&items)
-			.unwrap_or_else(|error| panic!("set compact items: {error:?}"));
 		assert_eq!(
-			state
-				.commit()
-				.unwrap_or_else(|error| panic!("commit compact state: {error:?}")),
+			CompactBuilderState::initialize(
+				&mut data,
+				&CompactBuilderStatePatch::new().replace_items(&items),
+			)
+			.unwrap_or_else(|error| panic!("initialize compact state: {error:?}")),
 			ACTIVE_SIZE
 		);
 	}

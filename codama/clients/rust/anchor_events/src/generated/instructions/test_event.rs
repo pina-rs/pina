@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const TEST_EVENT_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
@@ -50,21 +48,20 @@ impl TestEventInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut TestEventInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; <TestEventInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data = <TestEventInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(&mut bytes)
-				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; core::mem::size_of::<TestEventInstructionWireZc>()];
+		<TestEventInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = TEST_EVENT_DISCRIMINATOR;
-		}
-		<TestEventInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct TestEventInstructionWire {
 	pub discriminator: u8,
 }

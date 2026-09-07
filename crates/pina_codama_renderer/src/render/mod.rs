@@ -1,4 +1,5 @@
 pub(crate) mod accounts;
+pub(crate) mod capacity;
 pub(crate) mod discriminator;
 pub(crate) mod errors;
 pub(crate) mod helpers;
@@ -12,6 +13,7 @@ pub(crate) mod types;
 pub(crate) use accounts::is_compact_account;
 pub(crate) use accounts::render_account_page;
 pub(crate) use accounts::render_accounts_mod;
+pub(crate) use capacity::CompactCapacityIndex;
 pub(crate) use errors::render_errors_mod;
 pub(crate) use errors::render_errors_page;
 pub(crate) use helpers::GENERATED_HEADER;

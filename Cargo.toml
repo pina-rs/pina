@@ -139,10 +139,20 @@ pina = { workspace = true, features = ["compact", "derive"] }
 pina_macros = { workspace = true, features = ["compact"] }
 
 [dev-dependencies]
+anchor_realloc = { path = "examples/anchor_realloc", version = "0.0.0" }
+counter_program = { path = "examples/counter_program", version = "0.0.0" }
 insta = { workspace = true }
 macrotest = { workspace = true }
+mollusk-svm = { workspace = true, default-features = true }
 prettyplease = { workspace = true }
+profile_program = { path = "examples/profile_program", version = "0.0.0" }
 quote = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+solana-account = { workspace = true, default-features = true }
+solana-instruction = { workspace = true, default-features = true }
+solana-pubkey = { workspace = true, default-features = true }
+solana-sdk-ids = { workspace = true, default-features = true }
 syn = { workspace = true, features = ["full"] }
 trybuild = { workspace = true }
 
@@ -185,7 +195,7 @@ owo-colors = { default-features = false, version = "^4.0" }
 paste = { default-features = false, version = "^1" }
 pastey = { default-features = false, version = "^0.2" }
 pina_test = { path = "crates/pina_test", version = "0.14.0" }
-pinapod = { default-features = false, version = "0.1.0", features = ["solana-address", "solana-program-error"] }
+pinapod = { version = "0.2", default-features = false, features = ["solana-address", "solana-program-error"] }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }
 pinocchio-memo = { default-features = false, version = "^0.4" }

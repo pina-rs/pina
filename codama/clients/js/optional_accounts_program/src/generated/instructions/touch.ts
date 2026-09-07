@@ -33,8 +33,8 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const TOUCH_DISCRIMINATOR = 1;
 
@@ -80,7 +80,7 @@ export function getTouchInstructionDataDecoder(): FixedSizeDecoder<
 > {
 	return getStructDecoder([[
 		"discriminator",
-		getZeroPodDiscriminatorDecoder(TOUCH_DISCRIMINATOR, getU8Decoder()),
+		getPinaPodDiscriminatorDecoder(TOUCH_DISCRIMINATOR, getU8Decoder()),
 	]]);
 }
 

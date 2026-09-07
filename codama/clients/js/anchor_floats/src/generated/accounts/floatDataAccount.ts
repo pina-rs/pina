@@ -36,7 +36,7 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 
 export const FLOAT_DATA_ACCOUNT_DISCRIMINATOR = 1;
 
@@ -79,7 +79,7 @@ export function getFloatDataAccountDecoder(): FixedSizeDecoder<
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(
+			getPinaPodDiscriminatorDecoder(
 				FLOAT_DATA_ACCOUNT_DISCRIMINATOR,
 				getU8Decoder(),
 			),

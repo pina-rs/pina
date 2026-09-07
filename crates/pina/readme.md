@@ -38,7 +38,29 @@ cargo add pina --features token
 - `#[account]`, `#[instruction]`, `#[event]`, `#[error]`, `#[discriminator]`, and `#[derive(Accounts)]` integration via the default `derive` feature.
 - Validation chains on `AccountView` (`assert_signer`, `assert_writable`, `assert_owner`, PDA checks, sysvar checks, and more).
 - Zero-copy POD wrappers (`PodU*`, `PodI*`, `PodBool`) for stable on-chain layouts.
+- Bounded `String`, `Vec`, and `Option` fields in fixed or compact schemas.
 - CPI helpers for system/token operations.
+
+## Fixed accounts
+
+An ordinary `#[account]` reserves every field's full capacity:
+
+```rust
+#[account(discriminator = AccountType)]
+pub struct Profile {
+	pub authority: Address,
+	pub name: String<32>,
+	pub scores: Vec<u64, 8>,
+	pub delegate: Option<Address>,
+	pub note: Option<String<64>>,
+}
+```
+
+PinaPod initializes the complete fixed representation and validates active nested values before a loader returns `ProfileZc`. Use `PodString<N, PFX>` or `PodVec<T, N, PFX>` when a layout needs an explicit `1`, `2`, `4`, or `8` byte prefix.
+
+Typed fixed-account creation uses `invoke::<T>()` when the discriminator plus otherwise zeroed fields is valid. Use `invoke_with::<T>(initialize)` to configure `&mut T::Zc` before final validation. The signed equivalents are `invoke_signed` and `invoke_signed_with`.
+
+Fixed accounts declared with `#[pda(bump = ...)]` also generate `load_pda` and `load_pda_mut`. Prefer these when a handler needs a typed guard: they check the account boundary and stored-bump PDA address in one pass.
 
 ## Compact accounts
 
@@ -46,14 +68,14 @@ cargo add pina --features token
 
 <!-- {=compactAccountQuickstart} -->
 
-Compact mode is opt-in. Enable `compact` for schemas and checked loaders; add `account-resize` when using the typed creation and rent-adjusting reallocation builders:
+Compact mode stores a fixed header followed by one or more bounded tails. Enable `compact` for the schema and checked loaders. Enable `account-resize` to apply a patch and adjust rent in one operation:
 
 ```toml
 [dependencies]
 pina = { version = "...", features = ["compact", "account-resize"] }
 ```
 
-The `compact` feature also enables `derive`. Add `compact` to an account with a suffix of one or more bounded `String` or `Vec` fields. Fixed fields, including `Option<scalar>` values stored as `PodOption`, must come first. Every dynamic capacity must be a literal so the macro can audit and generate the maximum layout:
+The `compact` feature also enables `derive`. Declare fixed fields first, then the compact tails. `String<N>` uses a one-byte length prefix, and `Vec<T, N>` uses a two-byte length prefix. Use `PodString<N, PFX>` or `PodVec<T, N, PFX>` when the schema needs an explicit prefix width. `PFX` is a byte count and must be `1`, `2`, `4`, or `8`.
 
 ```rust
 #[account(discriminator = AccountType, compact)]
@@ -62,131 +84,60 @@ pub struct Journal {
 	pub authority: Address,
 	pub revision: u32,
 	pub featured_entry: Option<u64>,
-	pub title: PodString<24>,
+	pub title: String<24>,
 	pub entries: Vec<u64, 8>,
 	pub markers: PodVec<u8, 8, 8>,
+	pub note: Option<String<64>>,
 }
-
-let account_bytes = Journal::projected_bytes(
-	title.len(),
-	active_entry_count,
-	active_marker_count,
-)?;
 ```
 
-The macro generates `JournalHeader`, `JournalRef`, and `JournalMut`, plus `HEADER_SIZE`, `MIN_SIZE`, `MAX_SIZE`, one `*_CAPACITY` constant per tail, checked size/load/initialize methods, and the compact-account traits used by Pina's typed CPI builders. For this schema, `TITLE_CAPACITY` is 24 and `ENTRIES_CAPACITY` and `MARKERS_CAPACITY` are both eight. Every tail length is stored in the fixed header. Active UTF-8 bytes and vector elements are concatenated after that header in declaration order; declared capacity is a validation bound, not reserved space.
+The compact grammar accepts these tail forms:
 
-Pina uses Pinapod, its maintained and wire-compatible ZeroPod fork. Each immutable and mutable accessor reads its own length prefix, so compact tails may have independent active lengths.
+- `String<N>`
+- `Vec<T, N>` where `T` has a fixed PinaPod representation
+- `Option<T>` where `T` has a fixed PinaPod representation
+- `Option<String<N>>`
+- `Option<Vec<T, N>>` where `T` has a fixed PinaPod representation
+- `Vec<String<M>, N>`
+
+`Option<T>` for fixed `T` stays in the header. The other forms use tail storage. A compact schema can contain several tails, but it cannot place a fixed field after the first tail. The macro rejects unsupported nesting and prints the accepted forms in its error.
+
+The macro generates `JournalHeader`, `JournalRef`, and `JournalPatch`. It also generates `HEADER_SIZE`, `MIN_SIZE`, `MAX_SIZE`, checked reads, initialization, projected-size calculation, and atomic updates. `MIN_SIZE` equals `HEADER_SIZE`. Tail prefixes live in the header except for a present `Option<String<N>>` or `Option<Vec<T, N>>`, whose payload retains its own prefix. Each active element of `Vec<String<M>, N>` occupies the fixed `String<M>` footprint, although each string keeps its own logical length.
+
+Pina uses PinaPod for validated alignment-one storage. PinaPod initializes inactive collection capacity and validates each active nested value before Pina returns safe access.
 
 <!-- {/compactAccountQuickstart} -->
 
 <!-- {=compactAccountResizeOrdering} -->
 
-Compact mutation has one important ordering rule:
-
-- **Grow:** allocate and fund rent before staging longer tails.
-- **Same size:** commit without reallocating.
-- **Shrink or clear:** commit shorter tails before truncating bytes and refunding rent.
-
-Use `ResizeCompactAccount` for normal compact updates. It applies that ordering, enforces the exact `target_size`, and skips the physical resize when the allocation is unchanged:
+Apply all compact changes through one patch:
 
 ```rust
-let target_size = Journal::projected_bytes(title.len(), entries.len(), markers.len())?;
-
-ResizeCompactAccount {
-	account,
-	rent_account,
-	target_size,
-	program_id,
+UpdateResizableAccount {
+	account: self.journal,
+	rent_account: self.authority,
+	program_id: &ID,
+	patch: JournalPatch::new()
+		.revision(next_revision)
+		.replace_entries(&entries)
+		.note(Some("Updated")),
 }
-.invoke::<Journal, _>(|data| {
-	let mut journal = Journal::try_from_bytes_mut(data)?;
-	journal
-		.featured_entry
-		.set(Some(PodU64::from(featured_entry)));
-	journal
-		.set_title(title)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	journal
-		.set_entries(entries)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	journal
-		.set_markers(markers)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	let projected_size = journal.projected_size();
-	let encoded_size = journal
-		.commit()
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	debug_assert_eq!(encoded_size, projected_size);
-
-	Ok(())
-})?;
+.invoke::<Journal>()?;
 ```
 
-The callback receives the account bytes under one mutable runtime borrow. Create the concrete mutable view inside the callback so Pinapod can prove that borrowed tail slices outlive the view. Call `commit()` before returning. After the callback returns, `ResizeCompactAccount` reloads the committed view and rejects a size that differs from `target_size`. It then drops the data borrow before shrinking.
+`UpdateResizableAccount` validates the complete patch and calculates the final encoded length before it changes the account. It grows the allocation before applying a longer representation. For a shorter representation, it applies the patch before shrinking the allocation. If the allocation stays the same size, the builder skips the resize. It adjusts the rent balance through `rent_account` and clears bytes removed by the patch. If validation or size calculation fails, both account data and lamport balances remain unchanged.
 
-Use `invoke_signed` when `rent_account` is a PDA that must sign the system transfer used for growth. The callback contract stays the same:
+Use `invoke_signed::<Journal>(signers)` when `rent_account` is a PDA that must sign the system transfer used for growth. The patch and resize ordering stay the same.
 
-```rust
-ResizeCompactAccount {
-	account,
-	rent_account,
-	target_size,
-	program_id,
-}
-.invoke_signed::<Journal, _>(rent_account_signers, |data| {
-	let mut journal = Journal::try_from_bytes_mut(data)?;
-	// Stage every string/vector tail, then commit before returning.
-	journal.commit().map_err(|_| ProgramError::InvalidAccountData)?;
+The `rent_account` field has the same meaning across `UpdateResizableAccount`, `ReallocAccount`, `ReallocAccountZeroed`, and `ReallocCompactAccount`: it funds growth and receives a shrink refund. The lower-level builders take an explicit `target_size`; the high-level builder derives it from the patch.
 
-	Ok(())
-})?;
-```
-
-Use `ReallocCompactAccount` when you need explicit allocation control, such as reserving temporary spare bytes. `invoke` resizes immediately. You must enforce the compact ordering yourself:
-
-```rust
-if target_size > account.data_len() {
-	ReallocCompactAccount {
-		account,
-		rent_account,
-		target_size,
-		program_id,
-	}
-	.invoke::<Journal>()?;
-}
-
-let encoded_size = {
-	let mut data = account.try_borrow_mut()?;
-	let mut journal = Journal::try_from_bytes_mut(&mut data)?;
-	journal
-		.set_title(title)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	journal
-		.set_entries(entries)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	journal
-		.set_markers(markers)
-		.map_err(|_| ProgramError::InvalidAccountData)?;
-	journal.commit().map_err(|_| ProgramError::InvalidAccountData)?
-};
-
-if encoded_size < account.data_len() {
-	ReallocCompactAccount {
-		account,
-		rent_account,
-		target_size: encoded_size,
-		program_id,
-	}
-	.invoke::<Journal>()?;
-}
-```
-
-`ReallocCompactAccount` checks the current compact type and target allocation. Before an explicit shrink, it also verifies that the retained bytes contain the full committed layout. Both builders preserve rent exemption on growth and return excess lamports to `rent_account` after shrinkage. Scope immutable runtime borrows with `with_compact_account`. Create mutable views under a direct `try_borrow_mut` guard when tail setters borrow instruction-local values through `commit()`.
+The generated patch owns the update plan, so callers do not coordinate `set_*`, `commit`, and `ReallocCompactAccount`. Borrow the account for a `JournalRef` only while reading. End that borrow before invoking `UpdateResizableAccount`.
 
 <!-- {/compactAccountResizeOrdering} -->
 
 See `examples/compact_accounts` for a complete lifecycle with unit and Surfpool coverage.
+
+`CreateCompactProgramAccount` and `CreateCompactProgramAccountWithBump` require a generated `patch` field. Pass the account's generated patch, such as `JournalPatch::new()`, for an all-zero, empty-tail default, or set the initial header and tail values in that patch.
 
 ## Feature Flags
 
@@ -212,11 +163,11 @@ See `examples/compact_accounts` for a complete lifecycle with unit and Surfpool 
 <!-- {=pinaFeatureSelectionTips} -->
 
 - `derive` is the normal choice for program crates; disable it only when you want the low-level runtime traits without the proc macros.
-- `compact` enables `#[account(compact)]`, `PinaCompactAccount`, compact account validation/loaders, and `pina::Vec`; it also enables `derive`.
+- `compact` enables `#[account(compact)]`, `PinaCompactAccount`, generated patch types, checked compact loaders, and `pina::String` and `pina::Vec`. It also enables `derive`.
 - `logs` is useful during **initial development and debugging**, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
 - `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
 - `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.
-- `account-resize` enables `ReallocAccount` and `ReallocAccountZeroed`. Enable it together with `compact` for `ResizeCompactAccount`, `ReallocCompactAccount`, and the compact creation builders. Close helpers still do not implicitly resize or zero account data.
+- `account-resize` enables `ReallocAccount` and `ReallocAccountZeroed`. Enable it together with `compact` for `UpdateResizableAccount`, `ReallocCompactAccount`, and the compact creation builders. Close helpers still do not implicitly resize or zero account data.
 
 <!-- {/pinaFeatureSelectionTips} -->
 

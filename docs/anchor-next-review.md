@@ -127,7 +127,7 @@ Scope for Pina:
 
 - Keep discriminator-first layouts.
 - Avoid allocator requirements.
-- Prefer small, fixed-capacity, zeropod-validated designs.
+- Prefer small, bounded, PinaPod-validated designs.
 - Land only after stronger tests, docs, and invariants are written down.
 
 ## `prop_amm` port outcome

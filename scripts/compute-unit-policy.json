@@ -5,7 +5,22 @@
 		"anchor_events",
 		"anchor_sysvars",
 		"anchor_system_accounts",
-		"anchor_realloc"
+		"anchor_realloc",
+		"compact_accounts",
+		"counter_program",
+		"profile_program"
+	],
+	"runtimeCases": [
+		"anchor_realloc/grow_0_to_8",
+		"anchor_realloc/initialize",
+		"anchor_realloc/rewrite_8_to_8",
+		"anchor_realloc/shrink_8_to_0",
+		"counter_program/increment",
+		"counter_program/initialize",
+		"profile_program/add_tag",
+		"profile_program/initialize",
+		"profile_program/remove_tag",
+		"profile_program/update_profile"
 	],
 	"warn": {
 		"deltaCu": 250,
@@ -15,7 +30,10 @@
 		"deltaCu": 500,
 		"deltaPercent": 10.0
 	},
-	"approvedTotals": {
-		"anchor_realloc": 4839
+	"approvedTotals": {},
+	"runtimeApprovedTotals": {
+		"anchor_realloc/initialize": 9782,
+		"profile_program/add_tag": 2271,
+		"profile_program/initialize": 7392
 	}
 }

@@ -77,7 +77,7 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 
 /// Defines discriminator-first fixed or compact account data.
 ///
-/// The macro validates Pina's closed schema grammar, derives the zeropod
+/// The macro validates Pina's closed schema grammar, derives the `PinaPod`
 /// companion, and generates checked `initialize` and `try_from_bytes`
 /// helpers. Add `compact` to permit a suffix of bounded `String<N>` and
 /// `Vec<T, N>` fields whose active contents, rather than their full capacities,
@@ -109,7 +109,10 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 /// Defines typed PDA seeds for an account struct.
 ///
 /// `seeds` accepts byte-string constants and typed dynamic seeds. An optional
-/// `bump` field enables generated stored-bump verification.
+/// `bump` field enables generated stored-bump verification. Fixed `#[account]`
+/// schemas with a stored bump also receive `load_pda` and `load_pda_mut`, which
+/// validate the account representation and PDA address in one pass before
+/// returning a borrow guard.
 ///
 /// # Example
 ///
@@ -127,7 +130,7 @@ pub fn pda(args: TokenStream, input: TokenStream) -> TokenStream {
 
 /// Defines discriminator-first, fixed-size instruction data.
 ///
-/// Generated helpers enforce exact length, discriminator, and zeropod field
+/// Generated helpers enforce exact length, discriminator, and `PinaPod` field
 /// validation at the instruction boundary.
 ///
 /// # Example

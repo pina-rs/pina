@@ -134,18 +134,20 @@ fn vesting_state_account(
 	lamports: u64,
 ) -> Account {
 	let mut data = vec![0u8; VestingState::SIZE];
-	let state = VestingState::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("vesting initialization failed: {error:?}"));
-	state.admin = pubkey_to_address(admin);
-	state.beneficiary = pubkey_to_address(beneficiary);
-	state.mint = pubkey_to_address(mint);
-	state.total_amount.set(total_amount);
-	state.claimed_amount.set(claimed_amount);
-	state.start_ts.set(start_ts);
-	state.cliff_ts.set(cliff_ts);
-	state.end_ts.set(end_ts);
-	state.cancelled.set(cancelled);
-	state.bump = bump;
+	VestingState::initialize(&mut data, |state| {
+		state.admin = pubkey_to_address(admin);
+		state.beneficiary = pubkey_to_address(beneficiary);
+		state.mint = pubkey_to_address(mint);
+		state.total_amount.set(total_amount);
+		state.claimed_amount.set(claimed_amount);
+		state.start_ts.set(start_ts);
+		state.cliff_ts.set(cliff_ts);
+		state.end_ts.set(end_ts);
+		state.cancelled.set(cancelled);
+		state.bump = bump;
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("vesting initialization failed: {error:?}"));
 	Account {
 		lamports,
 		data,
@@ -188,7 +190,7 @@ fn mock_ata_account(lamports: u64) -> Account {
 /// Build instruction data for Cancel (just discriminator byte 2).
 fn cancel_ix_data() -> Vec<u8> {
 	let mut data = vec![0u8; CancelInstruction::SIZE];
-	CancelInstruction::initialize(&mut data)
+	CancelInstruction::initialize(&mut data, |_| Ok(()))
 		.unwrap_or_else(|error| panic!("cancel initialization failed: {error:?}"));
 	data
 }
@@ -196,10 +198,11 @@ fn cancel_ix_data() -> Vec<u8> {
 /// Build instruction data for Claim (discriminator byte 1 + amount).
 fn claim_ix_data(amount: u64) -> Vec<u8> {
 	let mut data = vec![0u8; ClaimInstruction::SIZE];
-	ClaimInstruction::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("claim initialization failed: {error:?}"))
-		.amount
-		.set(amount);
+	ClaimInstruction::initialize(&mut data, |instruction| {
+		instruction.amount.set(amount);
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("claim initialization failed: {error:?}"));
 	data
 }
 
@@ -212,13 +215,15 @@ fn initialize_ix_data(
 	bump: u8,
 ) -> Vec<u8> {
 	let mut data = vec![0u8; InitializeInstruction::SIZE];
-	let ix = InitializeInstruction::initialize(&mut data)
-		.unwrap_or_else(|error| panic!("initialize instruction failed: {error:?}"));
-	ix.total_amount.set(total_amount);
-	ix.start_ts.set(start_ts);
-	ix.cliff_ts.set(cliff_ts);
-	ix.end_ts.set(end_ts);
-	ix.bump = bump;
+	InitializeInstruction::initialize(&mut data, |instruction| {
+		instruction.total_amount.set(total_amount);
+		instruction.start_ts.set(start_ts);
+		instruction.cliff_ts.set(cliff_ts);
+		instruction.end_ts.set(end_ts);
+		instruction.bump = bump;
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("initialize instruction failed: {error:?}"));
 	data
 }
 
@@ -319,7 +324,7 @@ fn cancel_sets_cancelled_flag() {
 		.get_account(&vesting_pda)
 		.expect("vesting_state account should exist after cancel");
 	let vesting_state: &VestingStateZc =
-		<VestingState as pina::ZeroPodFixed>::from_bytes(&vesting_account.data).unwrap();
+		<VestingState as pina::PinaPodFixed>::read_exact(&vesting_account.data).unwrap();
 	assert!(
 		vesting_state.cancelled.get(),
 		"cancelled flag should be true after Cancel"

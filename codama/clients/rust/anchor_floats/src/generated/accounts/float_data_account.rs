@@ -8,9 +8,8 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct FloatDataAccount {
 	pub discriminator: u8,
 	pub data_f64: u64,
@@ -21,32 +20,27 @@ pub struct FloatDataAccount {
 pub const FLOAT_DATA_ACCOUNT_DISCRIMINATOR: u8 = 1u8;
 
 impl FloatDataAccount {
-	pub const LEN: usize = <Self as pina::ZeroPodFixed>::SIZE;
+	pub const LEN: usize = core::mem::size_of::<FloatDataAccountZc>();
 
-	/// Initialize zero-valid account storage.
+	/// Initialize and validate account storage in one pass.
 	///
-	/// Every non-discriminator field must accept an all-zero
-	/// representation. Otherwise this method returns `InvalidAccountData`.
+	/// The destination is cleared again if configuration or validation fails.
 	pub fn initialize(
 		data: &mut [u8],
+		configure: impl FnOnce(&mut FloatDataAccountZc),
 	) -> Result<&mut FloatDataAccountZc, solana_program_error::ProgramError> {
-		if data.len() != Self::LEN {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		data.fill(0);
-		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
-			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
-		account.discriminator = FLOAT_DATA_ACCOUNT_DISCRIMINATOR;
-		Ok(account)
+		<Self as pina::PinaPodFixed>::initialize(data, |account| {
+			configure(account);
+			account.discriminator = FLOAT_DATA_ACCOUNT_DISCRIMINATOR;
+			Ok(())
+		})
+		.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
 
 	pub fn from_bytes(
 		data: &[u8],
 	) -> Result<&FloatDataAccountZc, solana_program_error::ProgramError> {
-		if data.len() != Self::LEN {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		let account = <Self as pina::ZeroPodFixed>::from_bytes(data)
+		let account = <Self as pina::PinaPodFixed>::read_exact(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != FLOAT_DATA_ACCOUNT_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
@@ -57,10 +51,7 @@ impl FloatDataAccount {
 	pub fn from_bytes_mut(
 		data: &mut [u8],
 	) -> Result<&mut FloatDataAccountZc, solana_program_error::ProgramError> {
-		if data.len() != Self::LEN {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		let account = <Self as pina::ZeroPodFixed>::from_bytes_mut(data)
+		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != FLOAT_DATA_ACCOUNT_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);

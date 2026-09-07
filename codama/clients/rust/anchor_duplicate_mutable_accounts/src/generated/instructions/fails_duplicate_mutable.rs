@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const FAILS_DUPLICATE_MUTABLE_DISCRIMINATOR: u8 = 0u8;
 
 /// Accounts.
@@ -58,25 +56,23 @@ impl FailsDuplicateMutableInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut FailsDuplicateMutableInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes =
-			vec![0u8; <FailsDuplicateMutableInstructionWire as pina::ZeroPodFixed>::SIZE];
-		{
-			let data =
-				<FailsDuplicateMutableInstructionWire as pina::ZeroPodFixed>::from_bytes_mut(
-					&mut bytes,
-				)
-				.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
-			configure(data);
-			data.discriminator = FAILS_DUPLICATE_MUTABLE_DISCRIMINATOR;
-		}
-		<FailsDuplicateMutableInstructionWire as pina::ZeroPodFixed>::validate(&bytes)
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		let mut bytes = vec![0u8; core::mem::size_of::<FailsDuplicateMutableInstructionWireZc>()];
+		<FailsDuplicateMutableInstructionWire as pina::PinaPodFixed>::initialize(
+			&mut bytes,
+			|data| {
+				configure(data);
+				data.discriminator = FAILS_DUPLICATE_MUTABLE_DISCRIMINATOR;
+				Ok(())
+			},
+		)
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
 
 #[doc(hidden)]
-#[derive(pina::ZeroPod)]
+#[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct FailsDuplicateMutableInstructionWire {
 	pub discriminator: u8,
 }

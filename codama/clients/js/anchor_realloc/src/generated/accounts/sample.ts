@@ -39,7 +39,12 @@ import {
 	transformEncoder,
 } from "@solana/kit";
 import { findSamplePda, type SampleSeeds } from "../pdas";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
+import {
+	getPinaPodBoundedArrayDecoder,
+	getPinaPodBoundedArrayEncoder,
+	getPinaPodBoundedCountDecoder,
+	getPinaPodDiscriminatorDecoder,
+} from "../pinaPodCodecs";
 
 export const SAMPLE_DISCRIMINATOR = 1;
 
@@ -54,10 +59,7 @@ export type Sample = {
 	bump: number;
 	/** The only signer permitted to resize this sample. */
 	authority: Address;
-	/**
-	 * Dynamically encoded values; unused capacity occupies no account bytes.
-	 * Pina compact capacity: 64.
-	 */
+	/** Dynamically encoded values; unused capacity occupies no account bytes. */
 	values: Array<bigint>;
 };
 
@@ -66,10 +68,7 @@ export type SampleArgs = {
 	bump: number;
 	/** The only signer permitted to resize this sample. */
 	authority: Address;
-	/**
-	 * Dynamically encoded values; unused capacity occupies no account bytes.
-	 * Pina compact capacity: 64.
-	 */
+	/** Dynamically encoded values; unused capacity occupies no account bytes. */
 	values: Array<number | bigint>;
 };
 
@@ -80,7 +79,13 @@ export function getSampleEncoder(): Encoder<SampleArgs> {
 			["discriminator", getU8Encoder()],
 			["bump", getU8Encoder()],
 			["authority", getAddressEncoder()],
-			["values", getArrayEncoder(getU64Encoder(), { size: getU16Encoder() })],
+			[
+				"values",
+				getPinaPodBoundedArrayEncoder(
+					getArrayEncoder(getU64Encoder(), { size: getU16Encoder() }),
+					64,
+				),
+			],
 		]),
 		(value) => ({ ...value, discriminator: 1 }),
 	);
@@ -91,11 +96,18 @@ export function getSampleDecoder(): Decoder<Sample> {
 	return getStructDecoder([
 		[
 			"discriminator",
-			getZeroPodDiscriminatorDecoder(SAMPLE_DISCRIMINATOR, getU8Decoder()),
+			getPinaPodDiscriminatorDecoder(SAMPLE_DISCRIMINATOR, getU8Decoder()),
 		],
 		["bump", getU8Decoder()],
 		["authority", getAddressDecoder()],
-		["values", getArrayDecoder(getU64Decoder(), { size: getU16Decoder() })],
+		[
+			"values",
+			getPinaPodBoundedArrayDecoder(
+				getArrayDecoder(getU64Decoder(), { size: getU16Decoder() }),
+				getPinaPodBoundedCountDecoder(getU16Decoder(), 64),
+				64,
+			),
+		],
 	]);
 }
 

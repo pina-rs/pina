@@ -36,8 +36,8 @@ import {
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { findSamplePda } from "../pdas";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { ANCHOR_REALLOC_PROGRAM_ADDRESS } from "../programs";
-import { getZeroPodDiscriminatorDecoder } from "../zeropodCodecs";
 
 export const INITIALIZE_DISCRIMINATOR = 2;
 
@@ -91,7 +91,7 @@ export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
 > {
 	return getStructDecoder([[
 		"discriminator",
-		getZeroPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder()),
+		getPinaPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder()),
 	], ["bump", getU8Decoder()]]);
 }
 

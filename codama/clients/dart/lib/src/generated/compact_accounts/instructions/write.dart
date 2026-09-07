@@ -110,7 +110,7 @@ Instruction getWriteInstruction({
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: authority, role: AccountRole.readonlySigner),
+      AccountMeta(address: authority, role: AccountRole.writableSigner),
       AccountMeta(address: journal, role: AccountRole.writable),
     ],
     data: getWriteInstructionDataEncoder().encode(instructionData),

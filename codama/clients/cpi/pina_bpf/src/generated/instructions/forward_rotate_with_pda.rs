@@ -12,6 +12,7 @@ use pina::AccountView;
 use pina::Address;
 use pina::CpiContext;
 use pina::CpiHandle;
+use pina::ProgramError;
 use pina::ProgramResult;
 use pina::Signer;
 
@@ -20,7 +21,7 @@ use crate::ProgramAccount;
 /// CPI call for the `forward_rotate_with_pda` instruction.
 #[derive(Clone, Copy, Debug)]
 #[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
-pub struct ForwardRotateWithPda<'account, 'address> {
+pub struct ForwardRotateWithPda<'account, 'argument> {
 	/// CPI account `oracle`.
 	/// Required privileges: writable.
 	pub oracle: &'account AccountView,
@@ -34,36 +35,36 @@ pub struct ForwardRotateWithPda<'account, 'address> {
 	pub prop_amm_program: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `forward_rotate_with_pda`.
-	pub ix: ForwardRotateWithPdaIx<'address>,
+	pub ix: ForwardRotateWithPdaIx<'argument>,
 }
 
 /// Instruction arguments for the `forward_rotate_with_pda` CPI call.
 #[derive(Clone, Copy, Debug)]
-pub struct ForwardRotateWithPdaIx<'address> {
+pub struct ForwardRotateWithPdaIx<'argument> {
 	/// Instruction argument `bump`.
 	pub bump: u8,
 
 	/// Instruction argument `newAuthority`.
-	pub new_authority: &'address Address,
+	pub new_authority: &'argument Address,
 }
 
-impl<'address> ForwardRotateWithPdaIx<'address> {
+impl<'argument> ForwardRotateWithPdaIx<'argument> {
 	/// Number of bytes in the encoded instruction, including its discriminator.
 	pub const LEN: usize = 34;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> [u8; 34] {
+	pub fn to_bytes(&self) -> Result<[u8; 34], ProgramError> {
 		let mut data = [0u8; 34];
 		data[..1].copy_from_slice(&FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR);
 		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
 		data[2..34].copy_from_slice(self.new_authority.as_ref());
 
-		data
+		Ok(data)
 	}
 }
 
-impl<'account, 'address> ForwardRotateWithPda<'account, 'address> {
+impl<'account, 'argument> ForwardRotateWithPda<'account, 'argument> {
 	/// Invokes the instruction with no PDA seeds.
 	#[inline(always)]
 	pub fn invoke(&self, program: &ProgramAccount<'_>) -> ProgramResult {
@@ -82,7 +83,7 @@ impl<'account, 'address> ForwardRotateWithPda<'account, 'address> {
 			CpiHandle::readonly(self.authority),
 			CpiHandle::readonly(self.prop_amm_program),
 		];
-		let data = self.ix.to_bytes();
+		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
 
 		context.invoke_signed(&data, signers)

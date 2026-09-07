@@ -8,6 +8,7 @@ import 'package:solana_kit_accounts/solana_kit_accounts.dart';
 import 'package:solana_kit_codecs_core/solana_kit_codecs_core.dart';
 import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structures.dart';
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
+import 'package:solana_kit_codecs_strings/solana_kit_codecs_strings.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
 @immutable
@@ -23,9 +24,9 @@ class ProfileState {
 
   final int discriminator;
   final int bump;
-  final Uint8List name;
-  final Uint8List bio;
-  final Uint8List tags;
+  final String name;
+  final String bio;
+  final List<BigInt> tags;
   final BigInt? favoriteTag;
   final bool active;
 
@@ -55,9 +56,33 @@ Encoder<ProfileState> getProfileStateEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('bump', getU8Encoder()),
-    ('name', fixEncoderSize(getBytesEncoder(), 33, allowTruncation: false)),
-    ('bio', fixEncoderSize(getBytesEncoder(), 129, allowTruncation: false)),
-    ('tags', fixEncoderSize(getBytesEncoder(), 66, allowTruncation: false)),
+    (
+      'name',
+      fixEncoderSize(
+        addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+        33,
+        allowTruncation: false,
+      ),
+    ),
+    (
+      'bio',
+      fixEncoderSize(
+        addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+        129,
+        allowTruncation: false,
+      ),
+    ),
+    (
+      'tags',
+      fixEncoderSize(
+        getArrayEncoder(
+          transformEncoder(getU64Encoder(), (BigInt value) => value),
+          size: PrefixedArraySize(getU16Encoder()),
+        ),
+        66,
+        allowTruncation: false,
+      ),
+    ),
     (
       'favoriteTag',
       getNullableEncoder<BigInt>(
@@ -86,9 +111,30 @@ Decoder<ProfileState> getProfileStateDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('bump', getU8Decoder()),
-    ('name', fixDecoderSize(getBytesDecoder(), 33)),
-    ('bio', fixDecoderSize(getBytesDecoder(), 129)),
-    ('tags', fixDecoderSize(getBytesDecoder(), 66)),
+    (
+      'name',
+      fixDecoderSize(
+        addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()),
+        33,
+      ),
+    ),
+    (
+      'bio',
+      fixDecoderSize(
+        addDecoderSizePrefix(getUtf8Decoder(), getU8Decoder()),
+        129,
+      ),
+    ),
+    (
+      'tags',
+      fixDecoderSize(
+        getArrayDecoder(
+          getU64Decoder(),
+          size: PrefixedArraySize(getU16Decoder()),
+        ),
+        66,
+      ),
+    ),
     (
       'favoriteTag',
       getNullableDecoder<BigInt>(
@@ -114,9 +160,9 @@ Decoder<ProfileState> getProfileStateDecoder() {
     return (
       ProfileState(
         bump: map['bump']! as int,
-        name: map['name']! as Uint8List,
-        bio: map['bio']! as Uint8List,
-        tags: map['tags']! as Uint8List,
+        name: map['name']! as String,
+        bio: map['bio']! as String,
+        tags: map['tags']! as List<BigInt>,
         favoriteTag: map['favoriteTag'] as BigInt?,
         active: map['active']! as bool,
       ),
