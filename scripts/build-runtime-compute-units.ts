@@ -159,9 +159,10 @@ function main(): number {
 	for (let index = 0; index < values.length; index += 2) {
 		const workspace = realpathSync(values[index] ?? ".");
 		const output = resolve(values[index + 1] ?? ".");
-		rmSync(output, { recursive: true, force: true });
 		mkdirSync(output, { recursive: true });
 		for (const program of PROGRAMS) {
+			const artifact = join(output, `${program}.so`);
+			rmSync(artifact, { force: true });
 			process.stdout.write(
 				`Building runtime CU ELF for ${program} at ${workspace}\n`,
 			);
@@ -176,7 +177,6 @@ function main(): number {
 			if (status !== 0) {
 				return status;
 			}
-			const artifact = join(output, `${program}.so`);
 			if (!existsSync(artifact)) {
 				throw new Error(`cargo-build-sbf did not produce ${artifact}`);
 			}
