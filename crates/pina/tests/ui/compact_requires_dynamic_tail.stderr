@@ -1,4 +1,4 @@
-error: compact accounts require at least one trailing `Vec<T, N>` field
+error: compact accounts require at least one trailing `String<N>` or `Vec<T, N>` field
   --> tests/ui/compact_requires_dynamic_tail.rs:9:1
    |
  9 | / struct InvalidCompactAccount {

@@ -202,24 +202,37 @@ void main() {
     test('round trips compact headers and dynamic tails', () {
       final entries = [BigInt.from(5), BigInt.from(8), BigInt.from(13)];
       final markers = [21, 34];
+      const title = 'piña';
       final encoded = getJournalEncoder().encode(
         Journal(
           bump: 7,
           authority: systemAddress,
           revision: 4,
+          featuredEntry: BigInt.from(13),
+          title: title,
           entries: entries,
           markers: markers,
         ),
       );
       final decoded = getJournalDecoder().decode(encoded);
 
-      expect(encoded, hasLength(48 + entries.length * 8 + markers.length));
-      expect(encoded.sublist(38, 40), [3, 0]);
-      expect(encoded.sublist(40, 48), [2, 0, 0, 0, 0, 0, 0, 0]);
+      expect(
+        encoded,
+        hasLength(
+          58 + utf8.encode(title).length + entries.length * 8 + markers.length,
+        ),
+      );
+      expect(encoded.sublist(38, 47), [1, 13, 0, 0, 0, 0, 0, 0, 0]);
+      expect(encoded[47], utf8.encode(title).length);
+      expect(encoded.sublist(48, 50), [3, 0]);
+      expect(encoded.sublist(50, 58), [2, 0, 0, 0, 0, 0, 0, 0]);
+      expect(encoded.sublist(58, 63), utf8.encode(title));
       expect(decoded.discriminator, 1);
       expect(decoded.bump, 7);
       expect(decoded.authority, systemAddress);
       expect(decoded.revision, 4);
+      expect(decoded.featuredEntry, BigInt.from(13));
+      expect(decoded.title, title);
       expect(decoded.entries, entries);
       expect(decoded.markers, markers);
     });

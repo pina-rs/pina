@@ -11,6 +11,7 @@ use codama_nodes::NestedTypeNodeTrait;
 use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
 use codama_nodes::OptionTypeNode;
+use codama_nodes::SizePrefixTypeNode;
 use codama_nodes::StructTypeNode;
 use codama_nodes::TypeNode;
 
@@ -89,8 +90,9 @@ pub(crate) fn render_type_for_pod(r#type: &TypeNode, context: &str) -> Result<St
 }
 
 pub(crate) fn is_compact_tail(r#type: &TypeNode) -> bool {
-	compact_tail_array(r#type)
-		.is_some_and(|array| matches!(array.count.as_ref(), CountNode::Prefixed(_)))
+	compact_tail_string(r#type).is_some()
+		|| compact_tail_array(r#type)
+			.is_some_and(|array| matches!(array.count.as_ref(), CountNode::Prefixed(_)))
 }
 
 pub(crate) fn render_type_for_compact_tail(
@@ -98,11 +100,29 @@ pub(crate) fn render_type_for_compact_tail(
 	docs: &Docs,
 	context: &str,
 ) -> Result<String> {
+	if let Some(string) = compact_tail_string(r#type) {
+		if !matches!(string.r#type.as_ref(), TypeNode::String(value) if matches!(value.encoding, BytesEncoding::Utf8))
+		{
+			return Err(RenderError::UnsupportedType {
+				context: context.to_string(),
+				kind: r#type.kind(),
+				reason: "compact string tails must use UTF-8 encoding".to_string(),
+			});
+		}
+		let prefix_size = render_prefix_size(string.prefix.get_nested_type_node(), context)?;
+		let capacity = validated_compact_tail_capacity(r#type, docs, prefix_size, context)?;
+
+		return if prefix_size == 1 {
+			Ok(format!("pina::String<{capacity}>"))
+		} else {
+			Ok(format!("pina::PodString<{capacity}, {prefix_size}>"))
+		};
+	}
 	let Some(array) = compact_tail_array(r#type) else {
 		return Err(RenderError::UnsupportedType {
 			context: context.to_string(),
 			kind: r#type.kind(),
-			reason: "compact accounts require a suffix of prefixed arrays".to_string(),
+			reason: "compact accounts require a suffix of prefixed strings or arrays".to_string(),
 		});
 	};
 	let CountNode::Prefixed(count) = array.count.as_ref() else {
@@ -112,8 +132,25 @@ pub(crate) fn render_type_for_compact_tail(
 			reason: "compact accounts require a suffix of prefixed arrays".to_string(),
 		});
 	};
-	let item_type = render_type_for_pod(&array.item, context)?;
 	let prefix_size = render_prefix_size(count.prefix.get_nested_type_node(), context)?;
+	let capacity = validated_compact_tail_capacity(r#type, docs, prefix_size, context)?;
+	let item_type = render_type_for_pod(&array.item, context)?;
+
+	if prefix_size == 2 {
+		Ok(format!("pina::Vec<{item_type}, {capacity}>"))
+	} else {
+		Ok(format!(
+			"pina::PodVec<<{item_type} as pina::ZcField>::Pod, {capacity}, {prefix_size}>"
+		))
+	}
+}
+
+fn validated_compact_tail_capacity(
+	r#type: &TypeNode,
+	docs: &Docs,
+	prefix_size: usize,
+	context: &str,
+) -> Result<usize> {
 	let capacity = compact_tail_capacity(docs).ok_or_else(|| {
 		RenderError::UnsupportedType {
 			context: context.to_string(),
@@ -141,13 +178,7 @@ pub(crate) fn render_type_for_compact_tail(
 		});
 	}
 
-	if prefix_size == 2 {
-		Ok(format!("pina::Vec<{item_type}, {capacity}>"))
-	} else {
-		Ok(format!(
-			"pina::PodVec<<{item_type} as pina::ZcField>::Pod, {capacity}, {prefix_size}>"
-		))
-	}
+	Ok(capacity)
 }
 
 fn compact_tail_capacity(docs: &Docs) -> Option<usize> {
@@ -163,6 +194,15 @@ fn compact_tail_array(r#type: &TypeNode) -> Option<&codama_nodes::ArrayTypeNode>
 		TypeNode::Array(array) => Some(array),
 		TypeNode::PreOffset(offset) => compact_tail_array(&offset.r#type),
 		TypeNode::PostOffset(offset) => compact_tail_array(&offset.r#type),
+		_ => None,
+	}
+}
+
+fn compact_tail_string(r#type: &TypeNode) -> Option<&SizePrefixTypeNode<TypeNode>> {
+	match r#type {
+		TypeNode::SizePrefix(string) => Some(string),
+		TypeNode::PreOffset(offset) => compact_tail_string(&offset.r#type),
+		TypeNode::PostOffset(offset) => compact_tail_string(&offset.r#type),
 		_ => None,
 	}
 }

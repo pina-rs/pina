@@ -97,29 +97,72 @@ fn hello_solana_idl() {
 fn compact_accounts_idl_preserves_multiple_dynamic_tails() {
 	let idl = serde_json::to_value(example_program_idl("compact_accounts"))
 		.unwrap_or_else(|error| panic!("serialize compact_accounts IDL: {error}"));
+	let fields = idl
+		.pointer("/program/accounts/0/data/fields")
+		.and_then(Value::as_array)
+		.expect("compact account fields");
+	assert_eq!(fields.len(), 8);
+	let featured_entry = &fields[4];
+	let title = &fields[5];
+	let entries = &fields[6];
+	let markers = &fields[7];
+
 	assert_eq!(
-		idl.pointer("/program/accounts/0/data/fields/4/type/type/count/kind")
+		featured_entry.pointer("/name").and_then(Value::as_str),
+		Some("featuredEntry"),
+	);
+	assert_eq!(
+		featured_entry.pointer("/type/kind").and_then(Value::as_str),
+		Some("optionTypeNode"),
+	);
+	assert_eq!(
+		featured_entry
+			.pointer("/type/fixed")
+			.and_then(Value::as_bool),
+		Some(true),
+	);
+	assert_eq!(
+		title.pointer("/name").and_then(Value::as_str),
+		Some("title")
+	);
+	assert_eq!(
+		title.pointer("/type/type/kind").and_then(Value::as_str),
+		Some("sizePrefixTypeNode"),
+	);
+	assert_eq!(
+		title
+			.pointer("/type/type/type/encoding")
 			.and_then(Value::as_str),
+		Some("utf8"),
+	);
+	assert_eq!(
+		entries.pointer("/name").and_then(Value::as_str),
+		Some("entries")
+	);
+	assert_eq!(
+		entries.pointer("/type/count/kind").and_then(Value::as_str),
 		Some("prefixedCountNode"),
 	);
 	assert_eq!(
-		idl.pointer("/program/accounts/0/data/fields/4/type/type/count/prefix/type/type/format")
+		entries
+			.pointer("/type/count/prefix/type/type/format")
 			.and_then(Value::as_str),
 		Some("u16"),
 	);
 	assert_eq!(
-		idl.pointer("/program/accounts/0/data/fields/4/type/type/item/format")
-			.and_then(Value::as_str),
+		entries.pointer("/type/item/format").and_then(Value::as_str),
 		Some("u64"),
 	);
 	assert_eq!(
-		idl.pointer("/program/accounts/0/data/fields/5/type/count/kind")
-			.and_then(Value::as_str),
+		markers.pointer("/name").and_then(Value::as_str),
+		Some("markers")
+	);
+	assert_eq!(
+		markers.pointer("/type/count/kind").and_then(Value::as_str),
 		Some("prefixedCountNode"),
 	);
 	assert_eq!(
-		idl.pointer("/program/accounts/0/data/fields/5/type/item/format")
-			.and_then(Value::as_str),
+		markers.pointer("/type/item/format").and_then(Value::as_str),
 		Some("u8"),
 	);
 }

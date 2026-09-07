@@ -7,7 +7,7 @@ Compact mode is opt-in. Enable `compact` for schemas and checked loaders; add `a
 pina = { version = "...", features = ["compact", "account-resize"] }
 ```
 
-The `compact` feature also enables `derive`. Add `compact` to an account with a suffix of one or more bounded `Vec` fields. Fixed fields must come first, and every capacity must be a literal so the macro can audit and generate the maximum layout:
+The `compact` feature also enables `derive`. Add `compact` to an account with a suffix of one or more bounded `String` or `Vec` fields. Fixed fields, including `Option<scalar>` values stored as `PodOption`, must come first. Every dynamic capacity must be a literal so the macro can audit and generate the maximum layout:
 
 ```rust
 #[account(discriminator = AccountType, compact)]
@@ -15,14 +15,20 @@ pub struct Journal {
 	pub bump: u8,
 	pub authority: Address,
 	pub revision: u32,
+	pub featured_entry: Option<u64>,
+	pub title: PodString<24>,
 	pub entries: Vec<u64, 8>,
 	pub markers: PodVec<u8, 8, 8>,
 }
 
-let account_bytes = Journal::projected_bytes(active_entry_count, active_marker_count)?;
+let account_bytes = Journal::projected_bytes(
+	title.len(),
+	active_entry_count,
+	active_marker_count,
+)?;
 ```
 
-The macro generates `JournalHeader`, `JournalRef`, and `JournalMut`, plus `HEADER_SIZE`, `MIN_SIZE`, `MAX_SIZE`, one `*_CAPACITY` constant per tail, checked size/load/initialize methods, and the compact-account traits used by Pina's typed CPI builders. For this schema, `ENTRIES_CAPACITY` and `MARKERS_CAPACITY` are both eight. Every tail length is stored in the fixed header. Active payloads are concatenated after that header in declaration order; declared capacity is a validation bound, not reserved space.
+The macro generates `JournalHeader`, `JournalRef`, and `JournalMut`, plus `HEADER_SIZE`, `MIN_SIZE`, `MAX_SIZE`, one `*_CAPACITY` constant per tail, checked size/load/initialize methods, and the compact-account traits used by Pina's typed CPI builders. For this schema, `TITLE_CAPACITY` is 24 and `ENTRIES_CAPACITY` and `MARKERS_CAPACITY` are both eight. Every tail length is stored in the fixed header. Active UTF-8 bytes and vector elements are concatenated after that header in declaration order; declared capacity is a validation bound, not reserved space.
 
 Pina uses Pinapod, its maintained and wire-compatible ZeroPod fork. Each immutable and mutable accessor reads its own length prefix, so compact tails may have independent active lengths.
 
@@ -30,22 +36,22 @@ Pina uses Pinapod, its maintained and wire-compatible ZeroPod fork. Each immutab
 
 <!-- {@compactAccountSizeRules} -->
 
-For compact tails `Vec<T0, N0>`, `Vec<T1, N1>`, and so on, the exact encoded size is:
+For compact string and vector tails, the exact encoded size is:
 
 ```text
-HEADER_SIZE + Σ(active_count[i] × size_of::<T[i]::Pod>())
+HEADER_SIZE + Σ(active_string_bytes[i]) + Σ(active_vec_count[i] × size_of::<T[i]::Pod>())
 ```
 
-| State              |                                Account data length |
-| ------------------ | -------------------------------------------------: |
-| Every tail empty   |                                      `HEADER_SIZE` |
-| Mixed tail lengths | `HEADER_SIZE + Σ(len[i] × size_of::<T[i]::Pod>())` |
-| Every tail full    |                                         `MAX_SIZE` |
+| State              |                                                                         Account data length |
+| ------------------ | ------------------------------------------------------------------------------------------: |
+| Every tail empty   |                                                                               `HEADER_SIZE` |
+| Mixed tail lengths | `HEADER_SIZE + Σ(active_string_bytes[i]) + Σ(active_vec_count[i] × size_of::<T[i]::Pod>())` |
+| Every tail full    |                                                                                  `MAX_SIZE` |
 
 Use the generated APIs rather than repeating this formula:
 
 ```rust
-let target_size = Journal::projected_bytes(entries_count, markers_count)?;
+let target_size = Journal::projected_bytes(title.len(), entries_count, markers_count)?;
 let allocated_size = account.data_len();
 let encoded_size = journal.encoded_size();
 let staged_size = journal.projected_size();
@@ -71,7 +77,7 @@ Compact mutation has one important ordering rule:
 Use `ResizeCompactAccount` for normal compact updates. It applies that ordering, enforces the exact `target_size`, and skips the physical resize when the allocation is unchanged:
 
 ```rust
-let target_size = Journal::projected_bytes(entries.len(), markers.len())?;
+let target_size = Journal::projected_bytes(title.len(), entries.len(), markers.len())?;
 
 ResizeCompactAccount {
 	account,
@@ -81,6 +87,12 @@ ResizeCompactAccount {
 }
 .invoke::<Journal, _>(|data| {
 	let mut journal = Journal::try_from_bytes_mut(data)?;
+	journal
+		.featured_entry
+		.set(Some(PodU64::from(featured_entry)));
+	journal
+		.set_title(title)
+		.map_err(|_| ProgramError::InvalidAccountData)?;
 	journal
 		.set_entries(entries)
 		.map_err(|_| ProgramError::InvalidAccountData)?;
@@ -110,7 +122,7 @@ ResizeCompactAccount {
 }
 .invoke_signed::<Journal, _>(rent_account_signers, |data| {
 	let mut journal = Journal::try_from_bytes_mut(data)?;
-	// Stage every tail, then commit before returning.
+	// Stage every string/vector tail, then commit before returning.
 	journal.commit().map_err(|_| ProgramError::InvalidAccountData)?;
 
 	Ok(())
@@ -133,6 +145,9 @@ if target_size > account.data_len() {
 let encoded_size = {
 	let mut data = account.try_borrow_mut()?;
 	let mut journal = Journal::try_from_bytes_mut(&mut data)?;
+	journal
+		.set_title(title)
+		.map_err(|_| ProgramError::InvalidAccountData)?;
 	journal
 		.set_entries(entries)
 		.map_err(|_| ProgramError::InvalidAccountData)?;
@@ -162,13 +177,14 @@ if encoded_size < account.data_len() {
 - Create header-only state with `space: Journal::MIN_SIZE`, or create directly at `Journal::projected_bytes(...)`.
 - Load without reallocating through `with_compact_account::<T, _>`.
 - Update fixed header fields or replace same-length tail values without changing rent.
-- Grow or shrink several tails in one commit; later payloads are shifted to follow earlier payloads.
+- Store optional scalar header values with `Option<T>`; generated views expose their `PodOption` representation without changing the account size.
+- Grow or shrink several string and vector tails in one commit; later payloads are shifted to follow earlier payloads.
 - Grow up to `T::MAX_SIZE`, funding the rent delta from a writable rent account.
 - Shrink to the size returned by `commit()`, including clearing every tail back to `Journal::MIN_SIZE`, and refund excess rent.
 - Use generated `*_CAPACITY` constants and `projected_bytes(...)` to reject each tail count beyond capacity before CPI.
 - Compare `encoded_size()` with `account.data_len()` when distinguishing committed content from temporary spare allocation.
 - Rely on `validate_size` plus checked loaders to reject truncated, oversized, or corrupt data.
 - Keep signer, owner, stored-authority, and canonical-PDA checks explicit; compact layout validation does not define an authorization policy.
-- Generate the IDL and clients normally. Codama represents every tail as a dynamic array whose count is read from the shared header, preserving Pinapod's header-then-payload wire layout.
+- Generate the IDL and clients normally. Codama represents string tails as size-prefixed UTF-8 strings and vector tails as size-prefixed dynamic arrays. Their counts are read from the shared header, preserving Pinapod's header-then-payload wire layout.
 
 <!-- {/compactAccountUseCaseChecklist} -->

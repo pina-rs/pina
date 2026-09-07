@@ -166,12 +166,14 @@ pub(crate) fn validate_compact_schema(
 	let mut seen_tail = false;
 
 	for field in &fields.named {
-		if is_compact_vec(field) {
+		if is_compact_tail(field) {
 			seen_tail = true;
-			let (source, element, capacity, prefix_size) = classify_compact_vec(field, crate_path)?;
+			let (source, element, tail_pod, capacity, prefix_size) =
+				classify_compact_tail(field, crate_path)?;
 			let native = &element.native;
-			let pod = &element.pod;
-			field_proofs.push(mapping_proof(&source, native, pod, crate_path));
+			let proof_pod = &element.pod;
+			let pod = &tail_pod;
+			field_proofs.push(mapping_proof(&source, native, proof_pod, crate_path));
 			header_sizes.push(quote!(#prefix_size));
 			tail_max_sizes.push(quote!(#capacity * ::core::mem::size_of::<#pod>()));
 			tail_element_sizes.push(quote!(::core::mem::size_of::<#pod>()));
@@ -204,8 +206,8 @@ pub(crate) fn validate_compact_schema(
 		if seen_tail {
 			return Err(syn::Error::new_spanned(
 				field,
-				"inline fields cannot follow a compact `Vec` field; place every fixed field \
-				 before the dynamic suffix",
+				"inline fields cannot follow a compact `String` or `Vec` field; place every fixed \
+				 field before the dynamic suffix",
 			));
 		}
 
@@ -220,7 +222,7 @@ pub(crate) fn validate_compact_schema(
 	if !seen_tail {
 		return Err(syn::Error::new_spanned(
 			item,
-			"compact accounts require at least one trailing `Vec<T, N>` field",
+			"compact accounts require at least one trailing `String<N>` or `Vec<T, N>` field",
 		));
 	}
 
@@ -263,16 +265,17 @@ pub(crate) fn validate_compact_schema(
 	})
 }
 
-fn is_compact_vec(field: &Field) -> bool {
+fn is_compact_tail(field: &Field) -> bool {
 	let Type::Path(type_path) = &field.ty else {
 		return false;
 	};
 
-	type_path
-		.path
-		.segments
-		.last()
-		.is_some_and(|segment| matches!(segment.ident.to_string().as_str(), "Vec" | "PodVec"))
+	type_path.path.segments.last().is_some_and(|segment| {
+		matches!(
+			segment.ident.to_string().as_str(),
+			"String" | "PodString" | "Vec" | "PodVec"
+		)
+	})
 }
 
 fn validate_schema_container(item: &ItemStruct) -> syn::Result<()> {
@@ -314,10 +317,10 @@ fn validate_schema_container(item: &ItemStruct) -> syn::Result<()> {
 	Ok(())
 }
 
-fn classify_compact_vec(
+fn classify_compact_tail(
 	field: &Field,
 	crate_path: &syn::Path,
-) -> syn::Result<(Type, AuditedField, Expr, usize)> {
+) -> syn::Result<(Type, AuditedField, proc_macro2::TokenStream, Expr, usize)> {
 	if field.attrs.iter().any(is_pinapod_attribute) {
 		return Err(syn::Error::new_spanned(
 			field,
@@ -331,12 +334,38 @@ fn classify_compact_vec(
 	let Some(segment) = type_path.path.segments.last() else {
 		return Err(compact_tail_error(&field.ty));
 	};
-	if !matches!(segment.ident.to_string().as_str(), "Vec" | "PodVec") {
-		return Err(compact_tail_error(&field.ty));
-	}
+	let field_kind = segment.ident.to_string();
 	let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
 		return Err(compact_tail_error(&field.ty));
 	};
+	if matches!(field_kind.as_str(), "String" | "PodString") {
+		if arguments.args.is_empty()
+			|| arguments.args.len() > 2
+			|| (field_kind == "String" && arguments.args.len() != 1)
+		{
+			return Err(compact_tail_error(&field.ty));
+		}
+		let capacity = match arguments.args.first() {
+			Some(GenericArgument::Const(value)) if is_integer_literal(value) => value.clone(),
+			_ => return Err(compact_tail_error(&field.ty)),
+		};
+		let prefix_size = compact_prefix_size(arguments.args.iter().nth(1), &field.ty, "String")?;
+		let source = field.ty.clone();
+		let storage = quote!(#crate_path::PodString<#capacity, #prefix_size>);
+		return Ok((
+			source,
+			AuditedField {
+				native: storage.clone(),
+				pod: storage,
+			},
+			quote!(::core::primitive::u8),
+			capacity,
+			prefix_size,
+		));
+	}
+	if !matches!(field_kind.as_str(), "Vec" | "PodVec") {
+		return Err(compact_tail_error(&field.ty));
+	}
 	if !(2..=3).contains(&arguments.args.len()) {
 		return Err(compact_tail_error(&field.ty));
 	}
@@ -347,24 +376,7 @@ fn classify_compact_vec(
 		Some(GenericArgument::Const(value)) if is_integer_literal(value) => value.clone(),
 		_ => return Err(compact_tail_error(&field.ty)),
 	};
-	let prefix_size = match arguments.args.iter().nth(2) {
-		None => 2,
-		Some(GenericArgument::Const(Expr::Lit(ExprLit {
-			lit: Lit::Int(value),
-			..
-		}))) => {
-			value
-				.base10_parse::<usize>()
-				.map_err(|_| compact_tail_error(&field.ty))?
-		}
-		_ => return Err(compact_tail_error(&field.ty)),
-	};
-	if !matches!(prefix_size, 1 | 2 | 4 | 8) {
-		return Err(syn::Error::new_spanned(
-			&field.ty,
-			"compact `Vec` prefixes must use 1, 2, 4, or 8 bytes",
-		));
-	}
+	let prefix_size = compact_prefix_size(arguments.args.iter().nth(2), &field.ty, "Vec")?;
 
 	let audited = match element {
 		Type::Array(array) => classify_byte_array(array, crate_path)?,
@@ -372,7 +384,36 @@ fn classify_compact_vec(
 		_ => return Err(compact_tail_error(&field.ty)),
 	};
 
-	Ok((element.clone(), audited, capacity, prefix_size))
+	let tail_pod = audited.pod.clone();
+	Ok((element.clone(), audited, tail_pod, capacity, prefix_size))
+}
+
+fn compact_prefix_size(
+	argument: Option<&GenericArgument>,
+	ty: &Type,
+	field_kind: &str,
+) -> syn::Result<usize> {
+	let default = if field_kind == "String" { 1 } else { 2 };
+	let prefix_size = match argument {
+		None => default,
+		Some(GenericArgument::Const(Expr::Lit(ExprLit {
+			lit: Lit::Int(value),
+			..
+		}))) => {
+			value
+				.base10_parse::<usize>()
+				.map_err(|_| compact_tail_error(ty))?
+		}
+		_ => return Err(compact_tail_error(ty)),
+	};
+	if !matches!(prefix_size, 1 | 2 | 4 | 8) {
+		return Err(syn::Error::new_spanned(
+			ty,
+			format!("compact `{field_kind}` prefixes must use 1, 2, 4, or 8 bytes"),
+		));
+	}
+
+	Ok(prefix_size)
 }
 
 fn mapping_proof(
@@ -404,8 +445,8 @@ fn mapping_proof(
 fn compact_tail_error(ty: &Type) -> syn::Error {
 	syn::Error::new_spanned(
 		ty,
-		"compact account tails must be `Vec<T, N>` fields with an audited element type and \
-		 literal capacity",
+		"compact account tails must be `String<N>` or `Vec<T, N>` fields with an audited element \
+		 type and literal capacity",
 	)
 }
 

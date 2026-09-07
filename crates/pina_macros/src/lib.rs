@@ -79,9 +79,9 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// The macro validates Pina's closed schema grammar, derives the zeropod
 /// companion, and generates checked `initialize` and `try_from_bytes`
-/// helpers. Add `compact` to permit a suffix of bounded `Vec<T, N>` fields whose
-/// active elements, rather than their full capacities, occupy account data.
-/// Compact accounts require the `compact` crate feature.
+/// helpers. Add `compact` to permit a suffix of bounded `String<N>` and
+/// `Vec<T, N>` fields whose active contents, rather than their full capacities,
+/// occupy account data. Compact accounts require the `compact` crate feature.
 ///
 /// # Example
 ///
@@ -95,6 +95,8 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 /// #[account(discriminator = AccountType::History, compact)]
 /// struct History {
 ///     authority: Address,
+///     featured: Option<u64>,
+///     title: PodString<32>,
 ///     values: Vec<u64, 64>,
 ///     tags: Vec<u8, 128>,
 /// }

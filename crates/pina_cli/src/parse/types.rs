@@ -95,10 +95,49 @@ pub(crate) fn try_rust_type_to_codama_compact_tail_at(
 		}
 	};
 	let Some((name, args)) = parse_generic_args(ty) else {
-		return Err(error("compact tails must be `Vec<T, N>`".to_string()));
+		return Err(error(
+			"compact tails must be `String<N>` or `Vec<T, N>`".to_string(),
+		));
 	};
+	if matches!(name.as_str(), "String" | "PodString") {
+		if !(1..=2).contains(&args.len()) || (name == "String" && args.len() != 1) {
+			return Err(error(
+				"compact string tails must be `String<N>` or `PodString<N, PFX>`".to_string(),
+			));
+		}
+		let capacity = parse_collection_size(args.first(), ty, "capacity").map_err(error)?;
+		let prefix_size = match args.get(1) {
+			Some(value) => parse_collection_size(Some(value), ty, "prefix size").map_err(error)?,
+			None => 1,
+		};
+		validate_prefix_size(prefix_size, ty).map_err(&error)?;
+		validate_collection_capacity(capacity, prefix_size, ty).map_err(&error)?;
+		let prefix = prefix_number_type(prefix_size, ty).map_err(error)?;
+		let prefix: NestedTypeNode<NumberTypeNode> = if let Some(prefix_offset) = prefix_offset {
+			let offset = i32::try_from(prefix_offset).map_err(|_| {
+				error("compact header offset exceeds Codama's i32 range".to_string())
+			})?;
+			let prefix =
+				PreOffsetTypeNode::<NestedTypeNode<NumberTypeNode>>::absolute(prefix, offset);
+			PostOffsetTypeNode::<NestedTypeNode<NumberTypeNode>>::pre_offset(prefix, 0).into()
+		} else {
+			prefix.into()
+		};
+		let string: TypeNode =
+			SizePrefixTypeNode::<TypeNode>::new(StringTypeNode::utf8(), prefix).into();
+
+		return if payload_skip == 0 {
+			Ok(string)
+		} else {
+			let offset = i32::try_from(payload_skip)
+				.map_err(|_| error("compact header size exceeds Codama's i32 range".to_string()))?;
+			Ok(PreOffsetTypeNode::<TypeNode>::relative(string, offset).into())
+		};
+	}
 	if !matches!(name.as_str(), "Vec" | "PodVec") || !(2..=3).contains(&args.len()) {
-		return Err(error("compact tails must be `Vec<T, N>`".to_string()));
+		return Err(error(
+			"compact tails must be `String<N>` or `Vec<T, N>`".to_string(),
+		));
 	}
 	let item_ty = &args[0];
 	if !is_known_fixed_size_type(item_ty, zeropod_enums) {
@@ -135,25 +174,30 @@ pub(crate) fn try_rust_type_to_codama_compact_tail_at(
 	}
 }
 
-pub(crate) fn compact_vec_prefix_size(ty: &str) -> Option<usize> {
+pub(crate) fn compact_tail_prefix_size(ty: &str) -> Option<usize> {
 	let (name, args) = parse_generic_args(ty)?;
-	if !matches!(name.as_str(), "Vec" | "PodVec") || !(2..=3).contains(&args.len()) {
-		return None;
-	}
-
-	match args.get(2) {
-		Some(value) => value.parse().ok(),
-		None => Some(2),
+	match name.as_str() {
+		"String" if args.len() == 1 => Some(1),
+		"PodString" if (1..=2).contains(&args.len()) => {
+			args.get(1).map_or(Some(1), |value| value.parse().ok())
+		}
+		"Vec" | "PodVec" if (2..=3).contains(&args.len()) => {
+			args.get(2).map_or(Some(2), |value| value.parse().ok())
+		}
+		_ => None,
 	}
 }
 
-pub(crate) fn compact_vec_capacity(ty: &str) -> Option<usize> {
+pub(crate) fn compact_tail_capacity(ty: &str) -> Option<usize> {
 	let (name, args) = parse_generic_args(ty)?;
-	if !matches!(name.as_str(), "Vec" | "PodVec") || !(2..=3).contains(&args.len()) {
-		return None;
-	}
+	let capacity_index = match name.as_str() {
+		"String" if args.len() == 1 => 0,
+		"PodString" if (1..=2).contains(&args.len()) => 0,
+		"Vec" | "PodVec" if (2..=3).contains(&args.len()) => 1,
+		_ => return None,
+	};
 
-	args.get(1)?.parse().ok()
+	args.get(capacity_index)?.parse().ok()
 }
 
 /// Parse a zeropod collection schema or explicit storage type into a semantic,
@@ -682,8 +726,30 @@ mod tests {
 	}
 
 	#[test]
+	fn maps_compact_string_tails_without_fixed_capacity_padding() {
+		for (ty, prefix) in [
+			("String<32>", NumberFormat::U8),
+			("PodString<512, 2>", NumberFormat::U16),
+			("PodString<32, 4>", NumberFormat::U32),
+			("PodString<32, 8>", NumberFormat::U64),
+		] {
+			let mapped = try_rust_type_to_codama_compact_tail(ty, "test account", &[])
+				.unwrap_or_else(|error| panic!("failed to map `{ty}`: {error}"));
+			assert_eq!(
+				mapped,
+				SizePrefixTypeNode::<TypeNode>::new(
+					StringTypeNode::utf8(),
+					NumberTypeNode::le(prefix),
+				)
+				.into(),
+				"wrong compact node for `{ty}`"
+			);
+		}
+	}
+
+	#[test]
 	fn maps_compact_tail_prefixes_into_a_shared_header() {
-		let mapped = try_rust_type_to_codama_compact_tail_at(
+		let vector = try_rust_type_to_codama_compact_tail_at(
 			"Vec<u64, 8>",
 			"test account",
 			&[],
@@ -691,21 +757,52 @@ mod tests {
 			4,
 		)
 		.unwrap_or_else(|error| panic!("failed to map relocated tail: {error}"));
-		let value = serde_json::to_value(mapped)
+		let vector = serde_json::to_value(vector)
 			.unwrap_or_else(|error| panic!("serialize relocated tail: {error}"));
 		assert_eq!(
-			value.pointer("/offset").and_then(serde_json::Value::as_i64),
+			vector
+				.pointer("/offset")
+				.and_then(serde_json::Value::as_i64),
 			Some(4)
 		);
 		assert_eq!(
-			value
+			vector
 				.pointer("/type/count/prefix/type/offset")
 				.and_then(serde_json::Value::as_i64),
 			Some(38)
 		);
 		assert_eq!(
-			value
+			vector
 				.pointer("/type/count/prefix/strategy")
+				.and_then(serde_json::Value::as_str),
+			Some("preOffset")
+		);
+
+		let string = try_rust_type_to_codama_compact_tail_at(
+			"PodString<512, 2>",
+			"test account",
+			&[],
+			Some(40),
+			7,
+		)
+		.unwrap_or_else(|error| panic!("failed to map relocated string: {error}"));
+		let string = serde_json::to_value(string)
+			.unwrap_or_else(|error| panic!("serialize relocated string: {error}"));
+		assert_eq!(
+			string
+				.pointer("/offset")
+				.and_then(serde_json::Value::as_i64),
+			Some(7)
+		);
+		assert_eq!(
+			string
+				.pointer("/type/prefix/type/offset")
+				.and_then(serde_json::Value::as_i64),
+			Some(40)
+		);
+		assert_eq!(
+			string
+				.pointer("/type/prefix/strategy")
 				.and_then(serde_json::Value::as_str),
 			Some("preOffset")
 		);
@@ -714,40 +811,46 @@ mod tests {
 	#[test]
 	fn rejects_compact_offsets_outside_codama_range() {
 		let too_large = i32::MAX as usize + 1;
-		for (prefix, skip, expected) in [
-			(Some(too_large), 0, "header offset"),
-			(None, too_large, "header size"),
+		for (ty, prefix, skip, expected) in [
+			("Vec<u8, 8>", Some(too_large), 0, "header offset"),
+			("Vec<u8, 8>", None, too_large, "header size"),
+			("String<8>", Some(too_large), 0, "header offset"),
+			("String<8>", None, too_large, "header size"),
 		] {
-			let error = try_rust_type_to_codama_compact_tail_at(
-				"Vec<u8, 8>",
-				"test account",
-				&[],
-				prefix,
-				skip,
-			)
-			.expect_err("oversized offset must fail")
-			.to_string();
+			let error =
+				try_rust_type_to_codama_compact_tail_at(ty, "test account", &[], prefix, skip)
+					.expect_err("oversized offset must fail")
+					.to_string();
 			assert!(error.contains(expected), "unexpected error: {error}");
 		}
 	}
 
 	#[test]
-	fn recognizes_only_literal_compact_vec_prefixes() {
-		assert_eq!(compact_vec_prefix_size("Vec<u64, 8>"), Some(2));
-		assert_eq!(compact_vec_prefix_size("PodVec<u8, 8, 1>"), Some(1));
-		assert_eq!(compact_vec_prefix_size("Vec<u8, 8, PREFIX>"), None);
-		assert_eq!(compact_vec_prefix_size("String<8>"), None);
-		assert_eq!(compact_vec_capacity("Vec<u64, 8>"), Some(8));
-		assert_eq!(compact_vec_capacity("PodVec<u8, 16, 1>"), Some(16));
-		assert_eq!(compact_vec_capacity("Vec<u8, CAPACITY>"), None);
-		assert_eq!(compact_vec_capacity("String<8>"), None);
+	fn recognizes_only_literal_compact_tail_prefixes_and_capacities() {
+		assert_eq!(compact_tail_prefix_size("Vec<u64, 8>"), Some(2));
+		assert_eq!(compact_tail_prefix_size("PodVec<u8, 8, 1>"), Some(1));
+		assert_eq!(compact_tail_prefix_size("String<8>"), Some(1));
+		assert_eq!(compact_tail_prefix_size("PodString<512, 2>"), Some(2));
+		assert_eq!(compact_tail_prefix_size("Vec<u8, 8, PREFIX>"), None);
+		assert_eq!(compact_tail_prefix_size("PodString<8, PREFIX>"), None);
+		assert_eq!(compact_tail_prefix_size("String<8, 1>"), None);
+		assert_eq!(compact_tail_capacity("Vec<u64, 8>"), Some(8));
+		assert_eq!(compact_tail_capacity("PodVec<u8, 16, 1>"), Some(16));
+		assert_eq!(compact_tail_capacity("String<8>"), Some(8));
+		assert_eq!(compact_tail_capacity("PodString<512, 2>"), Some(512));
+		assert_eq!(compact_tail_capacity("Vec<u8, CAPACITY>"), None);
+		assert_eq!(compact_tail_capacity("String<CAPACITY>"), None);
+		assert_eq!(compact_tail_capacity("String<8, 1>"), None);
 	}
 
 	#[test]
-	fn rejects_invalid_compact_vec_tails() {
+	fn rejects_invalid_compact_tails() {
 		for (ty, expected) in [
 			("u64", "compact tails must be"),
-			("String<u64, 8>", "compact tails must be"),
+			("String<u64, 8>", "compact string tails must be"),
+			("PodString<8, PREFIX>", "literal usize prefix size"),
+			("PodString<8, 3>", "unsupported prefix size"),
+			("PodString<256, 1>", "cannot be represented"),
 			("Vec<u64>", "compact tails must be"),
 			("Vec<MyPod, 8>", "cannot determine compact"),
 			("Vec<u64, CAPACITY>", "literal usize capacity"),

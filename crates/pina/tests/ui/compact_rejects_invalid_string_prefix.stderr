@@ -1,0 +1,5 @@
+error: compact `String` prefixes must use 1, 2, 4, or 8 bytes
+  --> tests/ui/compact_rejects_invalid_string_prefix.rs:10:9
+   |
+10 |     title: PodString<8, 3>,
+   |            ^^^^^^^^^^^^^^^
