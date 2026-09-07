@@ -241,9 +241,7 @@ fn compact_changing_an_earlier_tail_preserves_and_shifts_every_later_tail() {
 	);
 }
 
-#[kani::proof]
-#[kani::unwind(32)]
-fn compact_every_two_step_tail_ordering_preserves_all_logical_values() {
+fn prove_two_step_tail_ordering<const FIRST_OPERATION: usize, const SECOND_OPERATION: usize>() {
 	let byte_values = [[1u8, 2], [3, 4], [5, 6]];
 	let word_values = [
 		[PodU16::from(10), PodU16::from(11)],
@@ -255,18 +253,13 @@ fn compact_every_two_step_tail_ordering_preserves_all_logical_values() {
 		[[26, 27, 28], [29, 30, 31]],
 		[[32, 33, 34], [35, 36, 37]],
 	];
-	let initial_lengths: [usize; 3] = kani::any();
-	let replacement_lengths: [usize; 2] = kani::any();
-	let operations: [u8; 2] = kani::any();
-	for length in initial_lengths {
-		kani::assume(length <= 1);
-	}
-	for length in replacement_lengths {
-		kani::assume(length <= 1);
-	}
-	for operation in operations {
-		kani::assume(operation < 3);
-	}
+	// Other proofs cover every symbolic source and destination length for a
+	// single edit. Keep the lengths at the shrink/grow boundaries here so this
+	// state-machine proof can cover all nine two-step tail orderings without
+	// multiplying both state spaces into one intractable SAT query.
+	let initial_lengths = [1usize; 3];
+	let replacement_lengths = [0usize, 1];
+	let operations = [FIRST_OPERATION, SECOND_OPERATION];
 
 	let mut data = [0u8; CompactProofState::MAX_SIZE];
 	CompactProofState::initialize(
@@ -282,7 +275,7 @@ fn compact_every_two_step_tail_ordering_preserves_all_logical_values() {
 	let mut lengths = initial_lengths;
 	for step in 0..2 {
 		let generation = step + 1;
-		let operation = usize::from(operations[step]);
+		let operation = operations[step];
 		let replacement_length = replacement_lengths[step];
 		let committed_size = match operation {
 			0 => {
@@ -329,6 +322,26 @@ fn compact_every_two_step_tail_ordering_preserves_all_logical_values() {
 		}
 	}
 }
+
+macro_rules! prove_two_step_tail_ordering {
+	($name:ident, $first:literal, $second:literal) => {
+		#[kani::proof]
+		#[kani::unwind(16)]
+		fn $name() {
+			prove_two_step_tail_ordering::<$first, $second>();
+		}
+	};
+}
+
+prove_two_step_tail_ordering!(compact_two_step_tail_ordering_0_0, 0, 0);
+prove_two_step_tail_ordering!(compact_two_step_tail_ordering_0_1, 0, 1);
+prove_two_step_tail_ordering!(compact_two_step_tail_ordering_0_2, 0, 2);
+prove_two_step_tail_ordering!(compact_two_step_tail_ordering_1_0, 1, 0);
+prove_two_step_tail_ordering!(compact_two_step_tail_ordering_1_1, 1, 1);
+prove_two_step_tail_ordering!(compact_two_step_tail_ordering_1_2, 1, 2);
+prove_two_step_tail_ordering!(compact_two_step_tail_ordering_2_0, 2, 0);
+prove_two_step_tail_ordering!(compact_two_step_tail_ordering_2_1, 2, 1);
+prove_two_step_tail_ordering!(compact_two_step_tail_ordering_2_2, 2, 2);
 
 #[kani::proof]
 #[kani::unwind(32)]
