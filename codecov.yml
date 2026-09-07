@@ -1,7 +1,9 @@
-# Coverage accounting scope: the Surfpool harness and the example
-# integration packages are exercised by real-runtime suites that cannot run
-# inside the CI coverage job, so they are excluded from patch targets.
+# Coverage accounting scope: generated clients are verified by deterministic
+# regeneration and language-specific contract suites. The Surfpool harness and
+# example integration packages are exercised by real-runtime suites that cannot
+# run inside the CI coverage job. These paths are excluded from patch targets.
 ignore:
+  - "codama/clients"
   - "crates/pina_test"
   - "pina_root"
   - "examples"
