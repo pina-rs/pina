@@ -11,7 +11,7 @@
 		"check:npm-packages": "node scripts/npm/check-packages.mjs",
 		"test:codama-nodes": "pnpm --filter @pina-rs/codama-nodes test",
 		"test:codama-renderer-cpi": "pnpm --filter @pina-rs/codama-renderer-cpi test",
-		"test:compute-units": "node --test scripts/tests/compare-compute-units.test.ts",
+		"test:compute-units": "node --test scripts/tests/*.test.ts",
 		"test:idls": "pnpm --filter pina-codama-idl-tests test",
 		"test:npm-packages": "node --test scripts/npm/tests/*.test.mjs",
 		"test:quasar-svm": "pnpm --filter pina-quasar-svm-e2e test",

@@ -12,6 +12,8 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
+import { findExecutable } from "./find-executable.ts";
+
 const TOOLS_VERSION = "v1.54";
 const PROGRAMS = [
 	"anchor_realloc",
@@ -22,32 +24,31 @@ const PROGRAMS = [
 interface CommandOptions {
 	cwd?: string;
 	env: NodeJS.ProcessEnv;
-	capture?: boolean;
 }
 
 function command(
 	program: string,
 	args: string[],
 	options: CommandOptions,
-): { status: number; stdout: string } {
+): number {
 	const result = spawnSync(program, args, {
 		cwd: options.cwd,
 		env: options.env,
 		encoding: "utf8",
-		stdio: options.capture ? ["ignore", "pipe", "inherit"] : "inherit",
+		stdio: "inherit",
 	});
 	if (result.error !== undefined) {
 		throw result.error;
 	}
-	return { status: result.status ?? 1, stdout: result.stdout ?? "" };
+	return result.status ?? 1;
 }
 
 function findCargoBuildSbf(env: NodeJS.ProcessEnv): string {
-	const located = command("which", ["cargo-build-sbf"], { env, capture: true });
-	if (located.status !== 0 || located.stdout.trim().length === 0) {
+	const located = findExecutable("cargo-build-sbf", env);
+	if (located === undefined) {
 		throw new Error("cargo-build-sbf is not available in PATH");
 	}
-	return located.stdout.trim();
+	return located;
 }
 
 function isSymlink(path: string): boolean {
@@ -102,9 +103,9 @@ function prepareLinuxTools(env: NodeJS.ProcessEnv): string {
 		],
 		{ env },
 	);
-	if (installed.status !== 0) {
+	if (installed !== 0) {
 		throw new Error(
-			`cargo-build-sbf tool installation failed with status ${installed.status}`,
+			`cargo-build-sbf tool installation failed with status ${installed}`,
 		);
 	}
 	return executable;
@@ -132,10 +133,9 @@ function buildProgram(
 		"--locked",
 	];
 	if (linux) {
-		return command(executable, args, { cwd: workspace, env }).status;
+		return command(executable, args, { cwd: workspace, env });
 	}
-	return command("cargo", ["build-sbf", ...args], { cwd: workspace, env })
-		.status;
+	return command("cargo", ["build-sbf", ...args], { cwd: workspace, env });
 }
 
 function main(): number {
