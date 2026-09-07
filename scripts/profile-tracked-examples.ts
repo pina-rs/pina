@@ -158,9 +158,18 @@ function main(): number {
 	const packages = new Map(metadata.packages.map((item) => [item.name, item]));
 	const buildGroups = new Map<string, string[]>();
 	for (const program of policy.trackedPrograms) {
-		const pinaDependency = packages
-			.get(program)
-			?.dependencies.find((dependency) => dependency.name === "pina");
+		if (!/^[A-Za-z0-9_-]+$/u.test(program)) {
+			throw new Error(`invalid tracked Cargo package name: ${program}`);
+		}
+		const package_ = packages.get(program);
+		if (package_ === undefined) {
+			throw new Error(
+				`tracked Cargo package is not in the workspace: ${program}`,
+			);
+		}
+		const pinaDependency = package_.dependencies.find(
+			(dependency) => dependency.name === "pina",
+		);
 		const groupKey = pinaDependency?.features.toSorted().join(",") ?? program;
 		buildGroups.set(groupKey, [...(buildGroups.get(groupKey) ?? []), program]);
 	}
