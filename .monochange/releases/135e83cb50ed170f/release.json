@@ -1,0 +1,744 @@
+{
+	"schema_version": "0.4",
+	"kind": "monochange.releaseRecord",
+	"created_at": "2026-09-07T20:57:33Z",
+	"command": "release",
+	"version": null,
+	"versions": {
+		"core": "0.15.0",
+		"pina_root": "0.0.5"
+	},
+	"release_targets": [
+		{
+			"id": "core",
+			"kind": "group",
+			"version": "0.15.0",
+			"version_format": "primary",
+			"tag": true,
+			"release": true,
+			"tag_name": "v0.15.0",
+			"members": [
+				"pina",
+				"pina_cli",
+				"pina_lints",
+				"pina_macros",
+				"pina_codama_renderer",
+				"pina_cpi_renderer",
+				"pina_profile",
+				"pina_sdk_ids",
+				"pina_test",
+				"pina_codama_nodes",
+				"pina_codama_renderer_cpi",
+				"pina_cli_npm",
+				"pina_cli_darwin_arm64",
+				"pina_cli_darwin_x64",
+				"pina_cli_freebsd_x64",
+				"pina_cli_linux_arm64_gnu",
+				"pina_cli_linux_arm64_musl",
+				"pina_cli_linux_x64_gnu",
+				"pina_cli_linux_x64_musl",
+				"pina_cli_win32_arm64_msvc",
+				"pina_cli_win32_x64_msvc",
+				"pina_skill"
+			]
+		},
+		{
+			"id": "pina_root",
+			"kind": "package",
+			"version": "0.0.5",
+			"version_format": "namespaced",
+			"tag": false,
+			"release": false,
+			"tag_name": "pina_root/v0.0.5",
+			"members": [
+				"pina_root"
+			]
+		}
+	],
+	"released_packages": [
+		"@pina-rs/cli",
+		"@pina-rs/cli-darwin-arm64",
+		"@pina-rs/cli-darwin-x64",
+		"@pina-rs/cli-freebsd-x64",
+		"@pina-rs/cli-linux-arm64-gnu",
+		"@pina-rs/cli-linux-arm64-musl",
+		"@pina-rs/cli-linux-x64-gnu",
+		"@pina-rs/cli-linux-x64-musl",
+		"@pina-rs/cli-win32-arm64-msvc",
+		"@pina-rs/cli-win32-x64-msvc",
+		"@pina-rs/codama-nodes",
+		"@pina-rs/codama-renderer-cpi",
+		"@pina-rs/skill",
+		"pina",
+		"pina_cli",
+		"pina_codama_renderer",
+		"pina_cpi_renderer",
+		"pina_lints",
+		"pina_macros",
+		"pina_profile",
+		"pina_root",
+		"pina_sdk_ids",
+		"pina_test"
+	],
+	"changed_files": [
+		"Cargo.lock",
+		"Cargo.toml",
+		"changelog.md",
+		"crates/pina/Cargo.toml",
+		"crates/pina_cli/Cargo.toml",
+		"crates/pina_codama_renderer/Cargo.toml",
+		"crates/pina_cpi_renderer/Cargo.toml",
+		"crates/pina_lints/Cargo.toml",
+		"crates/pina_macros/Cargo.toml",
+		"crates/pina_profile/Cargo.toml",
+		"crates/pina_sdk_ids/Cargo.toml",
+		"crates/pina_test/Cargo.toml",
+		"packages/codama-renderer-cpi/package.json",
+		"packages/nodes-from-pina/package.json",
+		"packages/pina__cli/package.json",
+		"packages/pina__cli-darwin-arm64/package.json",
+		"packages/pina__cli-darwin-x64/package.json",
+		"packages/pina__cli-freebsd-x64/package.json",
+		"packages/pina__cli-linux-arm64-gnu/package.json",
+		"packages/pina__cli-linux-arm64-musl/package.json",
+		"packages/pina__cli-linux-x64-gnu/package.json",
+		"packages/pina__cli-linux-x64-musl/package.json",
+		"packages/pina__cli-win32-arm64-msvc/package.json",
+		"packages/pina__cli-win32-x64-msvc/package.json",
+		"packages/pina__skill/package.json",
+		"pnpm-lock.yaml",
+		"pnpm-workspace.yaml"
+	],
+	"package_publications": [
+		{
+			"package": "pina",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_arm64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_freebsd_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_npm",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_arm64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_x64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_nodes",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cpi",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cpi_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_lints",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_macros",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_profile",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_sdk_ids",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_skill",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_test",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.15.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			},
+			"timeout": {
+				"timeout_seconds": 900,
+				"retries": 2
+			}
+		}
+	],
+	"updated_changelogs": [
+		"changelog.md"
+	],
+	"deleted_changesets": [
+		".changeset/pinapod-v0.2-migration.md"
+	],
+	"changesets": [
+		{
+			"path": ".changeset/pinapod-v0.2-migration.md",
+			"summary": "migrate Pina to the safe PinaPod 0.2 account API",
+			"details": "Replace the ZeroPod-era account surface with PinaPod fixed and compact accounts while preserving existing on-chain bytes. Fixed accounts now support bounded strings, vectors, and options. Compact accounts support multiple tails, optional bounded values, and bounded vectors of fixed-footprint strings through checked patches and automatic resizing.\n\nAccount creation uses one-pass `invoke_with` initialization, stored-bump fixed PDAs gain `load_pda` and `load_pda_mut`, and resizable builders consistently use `rent_account` and `target_size`. Generated Rust, CPI, JavaScript, and Dart clients expose semantic string, vector, and option values at their boundaries.\n\nThe migration also strengthens validation around account borrows and trusted CPI builders, adds exact Mollusk instruction compute-unit comparisons alongside static SBF profiles, and documents the reviewed performance exceptions and complete downstream migration.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_codama_renderer",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_cpi_renderer",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_codama_nodes",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_codama_renderer_cpi",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_lints",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_skill",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_cli_darwin_arm64",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_darwin_x64",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_freebsd_x64",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_linux_arm64_gnu",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_linux_arm64_musl",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_linux_x64_gnu",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_linux_x64_musl",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_npm",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_win32_arm64_msvc",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli_win32_x64_msvc",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_profile",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_root",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_sdk_ids",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_test",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "4999d0f797be71a8aa22ce470f31920d644866ee",
+						"short_sha": "4999d0f",
+						"url": "https://github.com/pina-rs/pina/commit/4999d0f797be71a8aa22ce470f31920d644866ee",
+						"authored_at": "2026-09-07T21:47:17+01:00",
+						"committed_at": "2026-09-07T21:47:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#311",
+						"title": "feat!: migrate Pina to PinaPod 0.2",
+						"url": "https://github.com/pina-rs/pina/pull/311",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "4999d0f797be71a8aa22ce470f31920d644866ee",
+						"short_sha": "4999d0f",
+						"url": "https://github.com/pina-rs/pina/commit/4999d0f797be71a8aa22ce470f31920d644866ee",
+						"authored_at": "2026-09-07T21:47:17+01:00",
+						"committed_at": "2026-09-07T21:47:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#311",
+						"title": "feat!: migrate Pina to PinaPod 0.2",
+						"url": "https://github.com/pina-rs/pina/pull/311",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		}
+	],
+	"changelogs": [
+		{
+			"owner_id": "core",
+			"owner_kind": "group",
+			"path": "changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.15.0](https://github.com/pina-rs/pina/releases/tag/v0.15.0) (2026-09-07)",
+				"summary": [
+					"Grouped release for `core`."
+				],
+				"sections": [
+					{
+						"title": "Breaking Changes",
+						"collapsed": false,
+						"entries": [
+							"#### migrate Pina to the safe PinaPod 0.2 account API\n_Packages:_ _pina_, _pina_cli_, _pina_macros_, _pina_codama_renderer_, _pina_cpi_renderer_, _pina_codama_nodes_, _pina_codama_renderer_cpi_\n\nReplace the ZeroPod-era account surface with PinaPod fixed and compact accounts while preserving existing on-chain bytes. Fixed accounts now support bounded strings, vectors, and options. Compact accounts support multiple tails, optional bounded values, and bounded vectors of fixed-footprint strings through checked patches and automatic resizing.\n\nAccount creation uses one-pass `invoke_with` initialization, stored-bump fixed PDAs gain `load_pda` and `load_pda_mut`, and resizable builders consistently use `rent_account` and `target_size`. Generated Rust, CPI, JavaScript, and Dart clients expose semantic string, vector, and option values at their boundaries.\n\nThe migration also strengthens validation around account borrows and trusted CPI builders, adds exact Mollusk instruction compute-unit comparisons alongside static SBF profiles, and documents the reviewed performance exceptions and complete downstream migration.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #311](https://github.com/pina-rs/pina/pull/311)"
+						]
+					},
+					{
+						"title": "Features",
+						"collapsed": false,
+						"entries": [
+							"#### migrate Pina to the safe PinaPod 0.2 account API\n_Packages:_ _pina_lints_\n\nReplace the ZeroPod-era account surface with PinaPod fixed and compact accounts while preserving existing on-chain bytes. Fixed accounts now support bounded strings, vectors, and options. Compact accounts support multiple tails, optional bounded values, and bounded vectors of fixed-footprint strings through checked patches and automatic resizing.\n\nAccount creation uses one-pass `invoke_with` initialization, stored-bump fixed PDAs gain `load_pda` and `load_pda_mut`, and resizable builders consistently use `rent_account` and `target_size`. Generated Rust, CPI, JavaScript, and Dart clients expose semantic string, vector, and option values at their boundaries.\n\nThe migration also strengthens validation around account borrows and trusted CPI builders, adds exact Mollusk instruction compute-unit comparisons alongside static SBF profiles, and documents the reviewed performance exceptions and complete downstream migration.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #311](https://github.com/pina-rs/pina/pull/311)"
+						]
+					},
+					{
+						"title": "Documentation",
+						"collapsed": false,
+						"entries": [
+							"#### migrate Pina to the safe PinaPod 0.2 account API\n_Packages:_ _pina_skill_\n\nReplace the ZeroPod-era account surface with PinaPod fixed and compact accounts while preserving existing on-chain bytes. Fixed accounts now support bounded strings, vectors, and options. Compact accounts support multiple tails, optional bounded values, and bounded vectors of fixed-footprint strings through checked patches and automatic resizing.\n\nAccount creation uses one-pass `invoke_with` initialization, stored-bump fixed PDAs gain `load_pda` and `load_pda_mut`, and resizable builders consistently use `rent_account` and `target_size`. Generated Rust, CPI, JavaScript, and Dart clients expose semantic string, vector, and option values at their boundaries.\n\nThe migration also strengthens validation around account borrows and trusted CPI builders, adds exact Mollusk instruction compute-unit comparisons alongside static SBF profiles, and documents the reviewed performance exceptions and complete downstream migration.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #311](https://github.com/pina-rs/pina/pull/311)"
+						]
+					},
+					{
+						"title": "Notes",
+						"collapsed": false,
+						"entries": [
+							"#### migrate Pina to the safe PinaPod 0.2 account API\n_Packages:_ _pina_profile_, _pina_sdk_ids_, _pina_test_, _pina_cli_npm_, _pina_cli_darwin_arm64_, _pina_cli_darwin_x64_, _pina_cli_freebsd_x64_, _pina_cli_linux_arm64_gnu_, _pina_cli_linux_arm64_musl_, _pina_cli_linux_x64_gnu_, _pina_cli_linux_x64_musl_, _pina_cli_win32_arm64_msvc_, _pina_cli_win32_x64_msvc_\n\nReplace the ZeroPod-era account surface with PinaPod fixed and compact accounts while preserving existing on-chain bytes. Fixed accounts now support bounded strings, vectors, and options. Compact accounts support multiple tails, optional bounded values, and bounded vectors of fixed-footprint strings through checked patches and automatic resizing.\n\nAccount creation uses one-pass `invoke_with` initialization, stored-bump fixed PDAs gain `load_pda` and `load_pda_mut`, and resizable builders consistently use `rent_account` and `target_size`. Generated Rust, CPI, JavaScript, and Dart clients expose semantic string, vector, and option values at their boundaries.\n\nThe migration also strengthens validation around account borrows and trusted CPI builders, adds exact Mollusk instruction compute-unit comparisons alongside static SBF profiles, and documents the reviewed performance exceptions and complete downstream migration.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #311](https://github.com/pina-rs/pina/pull/311)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.15.0](https://github.com/pina-rs/pina/releases/tag/v0.15.0) (2026-09-07)\n\nGrouped release for `core`.\n### Breaking Changes\n\n#### migrate Pina to the safe PinaPod 0.2 account API\n_Packages:_ _pina_, _pina_cli_, _pina_macros_, _pina_codama_renderer_, _pina_cpi_renderer_, _pina_codama_nodes_, _pina_codama_renderer_cpi_\n\nReplace the ZeroPod-era account surface with PinaPod fixed and compact accounts while preserving existing on-chain bytes. Fixed accounts now support bounded strings, vectors, and options. Compact accounts support multiple tails, optional bounded values, and bounded vectors of fixed-footprint strings through checked patches and automatic resizing.\n\nAccount creation uses one-pass `invoke_with` initialization, stored-bump fixed PDAs gain `load_pda` and `load_pda_mut`, and resizable builders consistently use `rent_account` and `target_size`. Generated Rust, CPI, JavaScript, and Dart clients expose semantic string, vector, and option values at their boundaries.\n\nThe migration also strengthens validation around account borrows and trusted CPI builders, adds exact Mollusk instruction compute-unit comparisons alongside static SBF profiles, and documents the reviewed performance exceptions and complete downstream migration.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #311](https://github.com/pina-rs/pina/pull/311)\n\n### Features\n\n#### migrate Pina to the safe PinaPod 0.2 account API\n_Packages:_ _pina_lints_\n\nReplace the ZeroPod-era account surface with PinaPod fixed and compact accounts while preserving existing on-chain bytes. Fixed accounts now support bounded strings, vectors, and options. Compact accounts support multiple tails, optional bounded values, and bounded vectors of fixed-footprint strings through checked patches and automatic resizing.\n\nAccount creation uses one-pass `invoke_with` initialization, stored-bump fixed PDAs gain `load_pda` and `load_pda_mut`, and resizable builders consistently use `rent_account` and `target_size`. Generated Rust, CPI, JavaScript, and Dart clients expose semantic string, vector, and option values at their boundaries.\n\nThe migration also strengthens validation around account borrows and trusted CPI builders, adds exact Mollusk instruction compute-unit comparisons alongside static SBF profiles, and documents the reviewed performance exceptions and complete downstream migration.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #311](https://github.com/pina-rs/pina/pull/311)\n\n### Documentation\n\n#### migrate Pina to the safe PinaPod 0.2 account API\n_Packages:_ _pina_skill_\n\nReplace the ZeroPod-era account surface with PinaPod fixed and compact accounts while preserving existing on-chain bytes. Fixed accounts now support bounded strings, vectors, and options. Compact accounts support multiple tails, optional bounded values, and bounded vectors of fixed-footprint strings through checked patches and automatic resizing.\n\nAccount creation uses one-pass `invoke_with` initialization, stored-bump fixed PDAs gain `load_pda` and `load_pda_mut`, and resizable builders consistently use `rent_account` and `target_size`. Generated Rust, CPI, JavaScript, and Dart clients expose semantic string, vector, and option values at their boundaries.\n\nThe migration also strengthens validation around account borrows and trusted CPI builders, adds exact Mollusk instruction compute-unit comparisons alongside static SBF profiles, and documents the reviewed performance exceptions and complete downstream migration.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #311](https://github.com/pina-rs/pina/pull/311)\n\n### Notes\n\n#### migrate Pina to the safe PinaPod 0.2 account API\n_Packages:_ _pina_profile_, _pina_sdk_ids_, _pina_test_, _pina_cli_npm_, _pina_cli_darwin_arm64_, _pina_cli_darwin_x64_, _pina_cli_freebsd_x64_, _pina_cli_linux_arm64_gnu_, _pina_cli_linux_arm64_musl_, _pina_cli_linux_x64_gnu_, _pina_cli_linux_x64_musl_, _pina_cli_win32_arm64_msvc_, _pina_cli_win32_x64_msvc_\n\nReplace the ZeroPod-era account surface with PinaPod fixed and compact accounts while preserving existing on-chain bytes. Fixed accounts now support bounded strings, vectors, and options. Compact accounts support multiple tails, optional bounded values, and bounded vectors of fixed-footprint strings through checked patches and automatic resizing.\n\nAccount creation uses one-pass `invoke_with` initialization, stored-bump fixed PDAs gain `load_pda` and `load_pda_mut`, and resizable builders consistently use `rent_account` and `target_size`. Generated Rust, CPI, JavaScript, and Dart clients expose semantic string, vector, and option values at their boundaries.\n\nThe migration also strengthens validation around account borrows and trusted CPI builders, adds exact Mollusk instruction compute-unit comparisons alongside static SBF profiles, and documents the reviewed performance exceptions and complete downstream migration.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #311](https://github.com/pina-rs/pina/pull/311)"
+		}
+	],
+	"provider": {
+		"kind": "github",
+		"owner": "pina-rs",
+		"repo": "pina",
+		"host": null
+	}
+}

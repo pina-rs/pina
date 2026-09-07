@@ -50,6 +50,66 @@ Generated TypeScript and Dart codecs reject over-capacity values rather than tru
 - Regenerate Codama IDLs and committed Rust/JS clients for the updated writable-account inference.
 - Add a PinaPod v0.2 migration guide and update the Pina mdBook, crate READMEs, examples, templates, and bundled agent skill.
 
+## [0.15.0](https://github.com/pina-rs/pina/releases/tag/v0.15.0) (2026-09-07)
+
+Grouped release for `core`.
+
+### Breaking Changes
+
+#### migrate Pina to the safe PinaPod 0.2 account API
+
+_Packages:_ _pina_, _pina_cli_, _pina_macros_, _pina_codama_renderer_, _pina_cpi_renderer_, _pina_codama_nodes_, _pina_codama_renderer_cpi_
+
+Replace the ZeroPod-era account surface with PinaPod fixed and compact accounts while preserving existing on-chain bytes. Fixed accounts now support bounded strings, vectors, and options. Compact accounts support multiple tails, optional bounded values, and bounded vectors of fixed-footprint strings through checked patches and automatic resizing.
+
+Account creation uses one-pass `invoke_with` initialization, stored-bump fixed PDAs gain `load_pda` and `load_pda_mut`, and resizable builders consistently use `rent_account` and `target_size`. Generated Rust, CPI, JavaScript, and Dart clients expose semantic string, vector, and option values at their boundaries.
+
+The migration also strengthens validation around account borrows and trusted CPI builders, adds exact Mollusk instruction compute-unit comparisons alongside static SBF profiles, and documents the reviewed performance exceptions and complete downstream migration.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #311](https://github.com/pina-rs/pina/pull/311)
+
+### Features
+
+#### migrate Pina to the safe PinaPod 0.2 account API
+
+_Packages:_ _pina_lints_
+
+Replace the ZeroPod-era account surface with PinaPod fixed and compact accounts while preserving existing on-chain bytes. Fixed accounts now support bounded strings, vectors, and options. Compact accounts support multiple tails, optional bounded values, and bounded vectors of fixed-footprint strings through checked patches and automatic resizing.
+
+Account creation uses one-pass `invoke_with` initialization, stored-bump fixed PDAs gain `load_pda` and `load_pda_mut`, and resizable builders consistently use `rent_account` and `target_size`. Generated Rust, CPI, JavaScript, and Dart clients expose semantic string, vector, and option values at their boundaries.
+
+The migration also strengthens validation around account borrows and trusted CPI builders, adds exact Mollusk instruction compute-unit comparisons alongside static SBF profiles, and documents the reviewed performance exceptions and complete downstream migration.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #311](https://github.com/pina-rs/pina/pull/311)
+
+### Documentation
+
+#### migrate Pina to the safe PinaPod 0.2 account API
+
+_Packages:_ _pina_skill_
+
+Replace the ZeroPod-era account surface with PinaPod fixed and compact accounts while preserving existing on-chain bytes. Fixed accounts now support bounded strings, vectors, and options. Compact accounts support multiple tails, optional bounded values, and bounded vectors of fixed-footprint strings through checked patches and automatic resizing.
+
+Account creation uses one-pass `invoke_with` initialization, stored-bump fixed PDAs gain `load_pda` and `load_pda_mut`, and resizable builders consistently use `rent_account` and `target_size`. Generated Rust, CPI, JavaScript, and Dart clients expose semantic string, vector, and option values at their boundaries.
+
+The migration also strengthens validation around account borrows and trusted CPI builders, adds exact Mollusk instruction compute-unit comparisons alongside static SBF profiles, and documents the reviewed performance exceptions and complete downstream migration.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #311](https://github.com/pina-rs/pina/pull/311)
+
+### Notes
+
+#### migrate Pina to the safe PinaPod 0.2 account API
+
+_Packages:_ _pina_profile_, _pina_sdk_ids_, _pina_test_, _pina_cli_npm_, _pina_cli_darwin_arm64_, _pina_cli_darwin_x64_, _pina_cli_freebsd_x64_, _pina_cli_linux_arm64_gnu_, _pina_cli_linux_arm64_musl_, _pina_cli_linux_x64_gnu_, _pina_cli_linux_x64_musl_, _pina_cli_win32_arm64_msvc_, _pina_cli_win32_x64_msvc_
+
+Replace the ZeroPod-era account surface with PinaPod fixed and compact accounts while preserving existing on-chain bytes. Fixed accounts now support bounded strings, vectors, and options. Compact accounts support multiple tails, optional bounded values, and bounded vectors of fixed-footprint strings through checked patches and automatic resizing.
+
+Account creation uses one-pass `invoke_with` initialization, stored-bump fixed PDAs gain `load_pda` and `load_pda_mut`, and resizable builders consistently use `rent_account` and `target_size`. Generated Rust, CPI, JavaScript, and Dart clients expose semantic string, vector, and option values at their boundaries.
+
+The migration also strengthens validation around account borrows and trusted CPI builders, adds exact Mollusk instruction compute-unit comparisons alongside static SBF profiles, and documents the reviewed performance exceptions and complete downstream migration.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #311](https://github.com/pina-rs/pina/pull/311)
+
 ## [0.14.0](https://github.com/pina-rs/pina/releases/tag/v0.14.0) (2026-09-07)
 
 Grouped release for `core`.
