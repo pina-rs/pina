@@ -15,8 +15,9 @@
 					"A compact account with two independently encoded dynamic fields.",
 					"",
 					"The one-byte discriminator, bump, authority, revision, and two vector",
-					"prefixes always occupy `Self::HEADER_SIZE` bytes. Each active row adds an",
-					"eight-byte entry and a one-byte marker, up to `Self::MAX_SIZE`."
+					"prefixes always occupy `Self::HEADER_SIZE` bytes. Each active entry adds",
+					"eight bytes and each active marker adds one byte, independently, up to",
+					"`Self::MAX_SIZE`."
 				],
 				"data": {
 					"kind": "structTypeNode",
@@ -112,7 +113,7 @@
 							"kind": "structFieldTypeNode",
 							"name": "markers",
 							"docs": [
-								"One marker per entry, stored as a second compact tail.",
+								"Independently sized markers stored as a second compact tail.",
 								"Pina compact capacity: 8."
 							],
 							"type": {
@@ -254,6 +255,15 @@
 							"format": "u8",
 							"endian": "le"
 						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "markerCount",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
 					}
 				],
 				"discriminators": [
@@ -326,6 +336,15 @@
 					{
 						"kind": "instructionArgumentNode",
 						"name": "entryCount",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "markerCount",
 						"type": {
 							"kind": "numberTypeNode",
 							"format": "u8",

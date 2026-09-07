@@ -116,9 +116,9 @@ pub struct Realloc2Accounts<'a> {
 	pub system_program: &'a AccountView,
 }
 
-fn validate_realloc_delta(current_len: usize, new_len: usize) -> ProgramResult {
-	if new_len > current_len {
-		let delta = new_len - current_len;
+fn validate_realloc_delta(current_len: usize, target_len: usize) -> ProgramResult {
+	if target_len > current_len {
+		let delta = target_len - current_len;
 
 		if delta > MAX_PERMITTED_DATA_INCREASE {
 			return Err(ReallocError::AccountReallocExceedsLimit.into());
@@ -232,54 +232,28 @@ impl<'a> ProcessAccountInfos<'a> for ReallocAccounts<'a> {
 		let count = target_values_count(target_len)?;
 		validate_realloc_delta(self.sample.data_len(), target_len)?;
 
-		if target_len > self.sample.data_len() {
-			ReallocCompactAccount {
-				account: self.sample,
-				payer: self.authority,
-				new_size: target_len,
-				program_id: &ID,
-			}
-			.invoke::<Sample>()?;
-		}
-
 		let mut values = [PodU64::from(0); Sample::VALUES_CAPACITY];
 		for (index, value) in values.iter_mut().take(count).enumerate() {
 			value.set(u64::try_from(index).map_err(|_| ProgramError::InvalidArgument)?);
 		}
-		let encoded_size = {
-			let mut data = self.sample.try_borrow_mut()?;
-			let mut sample = Sample::try_from_bytes_mut(&mut data)?;
+
+		ResizeCompactAccount {
+			account: self.sample,
+			rent_account: self.authority,
+			target_size: target_len,
+			program_id: &ID,
+		}
+		.invoke::<Sample, _>(|data| {
+			let mut sample = Sample::try_from_bytes_mut(data)?;
 			sample
 				.set_values(&values[..count])
 				.map_err(|_| ProgramError::InvalidAccountData)?;
-
-			if sample.projected_size() != target_len {
-				return Err(ProgramError::InvalidAccountData);
-			}
-
-			let encoded_size = sample
+			sample
 				.commit()
 				.map_err(|_| ProgramError::InvalidAccountData)?;
 
-			if sample.encoded_size() != encoded_size {
-				return Err(ProgramError::InvalidAccountData);
-			}
-
-			encoded_size
-		};
-		if encoded_size != target_len {
-			return Err(ProgramError::InvalidAccountData);
-		}
-
-		if target_len < self.sample.data_len() {
-			ReallocCompactAccount {
-				account: self.sample,
-				payer: self.authority,
-				new_size: target_len,
-				program_id: &ID,
-			}
-			.invoke::<Sample>()?;
-		}
+			Ok(())
+		})?;
 
 		Ok(())
 	}

@@ -225,7 +225,7 @@ That last count-parity check is important because it catches silent extraction r
 - `logs` is useful during **initial development and debugging**, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
 - `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
 - `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.
-- `account-resize` enables `ReallocAccount` and `ReallocAccountZeroed`. Enable it together with `compact` for `ReallocCompactAccount` and the compact creation builders. Close helpers still do not implicitly resize or zero account data.
+- `account-resize` enables `ReallocAccount` and `ReallocAccountZeroed`. Enable it together with `compact` for `ResizeCompactAccount`, `ReallocCompactAccount`, and the compact creation builders. Close helpers still do not implicitly resize or zero account data.
 
 <!-- {/pinaFeatureSelectionTips} -->
 
@@ -475,25 +475,23 @@ Pina uses Pinapod, its maintained and wire-compatible ZeroPod fork. Each immutab
 
 Compact mutation has one important ordering rule:
 
-- **Grow:** calculate and validate the target size, call `ReallocCompactAccount` first, then write and `commit` the longer tail.
-- **Same size:** write and `commit`; skip the realloc CPI.
-- **Shrink or clear:** write and `commit` the shorter tail first, then call `ReallocCompactAccount` with the returned encoded size.
+- **Grow:** allocate and fund rent before staging longer tails.
+- **Same size:** commit without reallocating.
+- **Shrink or clear:** commit shorter tails before truncating bytes and refunding rent.
+
+Use `ResizeCompactAccount` for normal compact updates. It applies that ordering, enforces the exact `target_size`, and skips the physical resize when the allocation is unchanged:
 
 ```rust
-if target_size > account.data_len() {
-	ReallocCompactAccount {
-		account,
-		payer,
-		new_size: target_size,
-		program_id,
-	}
-	.invoke::<Journal>()?;
-}
+let target_size = Journal::projected_bytes(entries.len(), markers.len())?;
 
-let encoded_size = {
-	let mut data = account.try_borrow_mut()?;
-	let mut journal = Journal::try_from_bytes_mut(&mut data)?;
-	let committed_size = journal.encoded_size();
+ResizeCompactAccount {
+	account,
+	rent_account,
+	target_size,
+	program_id,
+}
+.invoke::<Journal, _>(|data| {
+	let mut journal = Journal::try_from_bytes_mut(data)?;
 	journal
 		.set_entries(entries)
 		.map_err(|_| ProgramError::InvalidAccountData)?;
@@ -505,23 +503,68 @@ let encoded_size = {
 		.commit()
 		.map_err(|_| ProgramError::InvalidAccountData)?;
 	debug_assert_eq!(encoded_size, projected_size);
-	debug_assert!(committed_size <= account.data_len());
 
-	encoded_size
+	Ok(())
+})?;
+```
+
+The callback receives the account bytes under one mutable runtime borrow. Create the concrete mutable view inside the callback so Pinapod can prove that borrowed tail slices outlive the view. Call `commit()` before returning. After the callback returns, `ResizeCompactAccount` reloads the committed view and rejects a size that differs from `target_size`. It then drops the data borrow before shrinking.
+
+Use `invoke_signed` when `rent_account` is a PDA that must sign the system transfer used for growth. The callback contract stays the same:
+
+```rust
+ResizeCompactAccount {
+	account,
+	rent_account,
+	target_size,
+	program_id,
+}
+.invoke_signed::<Journal, _>(rent_account_signers, |data| {
+	let mut journal = Journal::try_from_bytes_mut(data)?;
+	// Stage every tail, then commit before returning.
+	journal.commit().map_err(|_| ProgramError::InvalidAccountData)?;
+
+	Ok(())
+})?;
+```
+
+Use `ReallocCompactAccount` when you need explicit allocation control, such as reserving temporary spare bytes. `invoke` resizes immediately. You must enforce the compact ordering yourself:
+
+```rust
+if target_size > account.data_len() {
+	ReallocCompactAccount {
+		account,
+		rent_account,
+		target_size,
+		program_id,
+	}
+	.invoke::<Journal>()?;
+}
+
+let encoded_size = {
+	let mut data = account.try_borrow_mut()?;
+	let mut journal = Journal::try_from_bytes_mut(&mut data)?;
+	journal
+		.set_entries(entries)
+		.map_err(|_| ProgramError::InvalidAccountData)?;
+	journal
+		.set_markers(markers)
+		.map_err(|_| ProgramError::InvalidAccountData)?;
+	journal.commit().map_err(|_| ProgramError::InvalidAccountData)?
 };
 
 if encoded_size < account.data_len() {
 	ReallocCompactAccount {
 		account,
-		payer,
-		new_size: encoded_size,
+		rent_account,
+		target_size: encoded_size,
 		program_id,
 	}
 	.invoke::<Journal>()?;
 }
 ```
 
-`ReallocCompactAccount` checks the current compact type, validates the destination size, and verifies that a shrink retains every active tail before moving rent. It preserves rent exemption on growth and refunds excess lamports to `payer` on shrink. Scope immutable runtime borrows with `with_compact_account`; use a direct `try_borrow_mut` guard when a tail setter must borrow instruction-local values through `commit`.
+`ReallocCompactAccount` checks the current compact type and target allocation. Before an explicit shrink, it also verifies that the retained bytes contain the full committed layout. Both builders preserve rent exemption on growth and return excess lamports to `rent_account` after shrinkage. Scope immutable runtime borrows with `with_compact_account`. Create mutable views under a direct `try_borrow_mut` guard when tail setters borrow instruction-local values through `commit()`.
 
 <!-- {/compactAccountResizeOrdering} -->
 

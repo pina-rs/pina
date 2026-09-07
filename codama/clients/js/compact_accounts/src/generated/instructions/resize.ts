@@ -71,9 +71,13 @@ export type ResizeInstruction<
 export type ResizeInstructionData = {
 	discriminator: number;
 	entryCount: number;
+	markerCount: number;
 };
 
-export type ResizeInstructionDataArgs = { entryCount: number };
+export type ResizeInstructionDataArgs = {
+	entryCount: number;
+	markerCount: number;
+};
 
 export function getResizeInstructionDataEncoder(): FixedSizeEncoder<
 	ResizeInstructionDataArgs
@@ -82,7 +86,7 @@ export function getResizeInstructionDataEncoder(): FixedSizeEncoder<
 		getStructEncoder([["discriminator", getU8Encoder()], [
 			"entryCount",
 			getU8Encoder(),
-		]]),
+		], ["markerCount", getU8Encoder()]]),
 		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
@@ -90,10 +94,14 @@ export function getResizeInstructionDataEncoder(): FixedSizeEncoder<
 export function getResizeInstructionDataDecoder(): FixedSizeDecoder<
 	ResizeInstructionData
 > {
-	return getStructDecoder([[
-		"discriminator",
-		getZeroPodDiscriminatorDecoder(RESIZE_DISCRIMINATOR, getU8Decoder()),
-	], ["entryCount", getU8Decoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getZeroPodDiscriminatorDecoder(RESIZE_DISCRIMINATOR, getU8Decoder()),
+		],
+		["entryCount", getU8Decoder()],
+		["markerCount", getU8Decoder()],
+	]);
 }
 
 export function getResizeInstructionDataCodec(): FixedSizeCodec<
@@ -116,6 +124,7 @@ export type ResizeInput<
 	journal: Address<TAccountJournal>;
 	systemProgram?: Address<TAccountSystemProgram>;
 	entryCount: ResizeInstructionDataArgs["entryCount"];
+	markerCount: ResizeInstructionDataArgs["markerCount"];
 };
 
 export function getResizeInstruction<

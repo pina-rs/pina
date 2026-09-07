@@ -13,16 +13,21 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 @immutable
 class ResizeInstructionData {
-  const ResizeInstructionData({required this.entryCount}) : discriminator = 1;
+  const ResizeInstructionData({
+    required this.entryCount,
+    required this.markerCount,
+  }) : discriminator = 1;
 
   final int discriminator;
   final int entryCount;
+  final int markerCount;
 }
 
 Encoder<ResizeInstructionData> getResizeInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('entryCount', getU8Encoder()),
+    ('markerCount', getU8Encoder()),
   ]);
 
   return transformEncoder(
@@ -30,6 +35,7 @@ Encoder<ResizeInstructionData> getResizeInstructionDataEncoder() {
     (ResizeInstructionData value) => <String, Object?>{
       'discriminator': 1,
       'entryCount': value.entryCount,
+      'markerCount': value.markerCount,
     },
   );
 }
@@ -38,6 +44,7 @@ Decoder<ResizeInstructionData> getResizeInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('entryCount', getU8Decoder()),
+    ('markerCount', getU8Decoder()),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
@@ -56,7 +63,10 @@ Decoder<ResizeInstructionData> getResizeInstructionDataDecoder() {
     }
 
     return (
-      ResizeInstructionData(entryCount: map['entryCount']! as int),
+      ResizeInstructionData(
+        entryCount: map['entryCount']! as int,
+        markerCount: map['markerCount']! as int,
+      ),
       newOffset,
     );
   }
@@ -96,8 +106,12 @@ Instruction getResizeInstruction({
   required Address journal,
   required Address systemProgram,
   required int entryCount,
+  required int markerCount,
 }) {
-  final instructionData = ResizeInstructionData(entryCount: entryCount);
+  final instructionData = ResizeInstructionData(
+    entryCount: entryCount,
+    markerCount: markerCount,
+  );
 
   return Instruction(
     programAddress: programAddress,

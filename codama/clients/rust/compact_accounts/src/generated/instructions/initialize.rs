@@ -90,4 +90,5 @@ pub struct InitializeInstructionWire {
 	pub discriminator: u8,
 	pub bump: u8,
 	pub entry_count: u8,
+	pub marker_count: u8,
 }

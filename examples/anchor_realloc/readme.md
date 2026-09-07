@@ -10,7 +10,8 @@ Secure adaptation of Anchor's account reallocation safety checks.
 
 - An explicit initialize → grow → shrink lifecycle for an authority-bound compact sample PDA.
 - A dynamic `Vec<u64, 64>` tail that stores only active values and appears as a prefixed array in the Codama IDL.
-- Reallocation growth-limit, type, capacity, element-boundary, and rent-exemption enforcement through `ReallocCompactAccount`.
+- Automatic grow-before-edit and shrink-after-commit ordering through `ResizeCompactAccount`, including exact rent funding and refunds.
+- Lower-level growth-limit, type, capacity, and element-boundary validation shared with `ReallocCompactAccount`.
 - Type, owner, stored-authority, and canonical-PDA validation before every resize.
 - Duplicate realloc target detection, before any mutation.
 
@@ -38,6 +39,8 @@ let staged_len = sample.projected_size();
 ```
 
 `Sample::MIN_SIZE` is the empty-tail allocation. `projected_bytes` validates the requested value count against `VALUES_CAPACITY`. An immutable or mutable view reports its committed logical size through `encoded_size()`. After `set_values`, a mutable view reports the pending size through `projected_size()` until `commit()` writes the new tail length.
+
+`ResizeCompactAccount::invoke` receives a callback that stages and commits the compact view. It grows the physical allocation before that callback, verifies the committed size against the exact target, and shrinks only after the mutable borrow has been dropped. Use `invoke_signed` when the rent account is a PDA. Use `ReallocCompactAccount` only when you intentionally need lower-level allocation control or spare bytes.
 
 ## Security Invariants
 

@@ -16,8 +16,9 @@ pub struct Journal {
 	/// A compact account with two independently encoded dynamic fields.
 	///
 	/// The one-byte discriminator, bump, authority, revision, and two vector
-	/// prefixes always occupy `Self::HEADER_SIZE` bytes. Each active row adds an
-	/// eight-byte entry and a one-byte marker, up to `Self::MAX_SIZE`.
+	/// prefixes always occupy `Self::HEADER_SIZE` bytes. Each active entry adds
+	/// eight bytes and each active marker adds one byte, independently, up to
+	/// `Self::MAX_SIZE`.
 	pub discriminator: u8,
 	/// Canonical PDA bump.
 	pub bump: u8,
@@ -28,7 +29,7 @@ pub struct Journal {
 	/// Active entries. Unused capacity consumes no account bytes.
 	/// Pina compact capacity: 8.
 	pub entries: pina::Vec<u64, 8>,
-	/// One marker per entry, stored as a second compact tail.
+	/// Independently sized markers stored as a second compact tail.
 	/// Pina compact capacity: 8.
 	pub markers: pina::PodVec<<u8 as pina::ZcField>::Pod, 8, 8>,
 }

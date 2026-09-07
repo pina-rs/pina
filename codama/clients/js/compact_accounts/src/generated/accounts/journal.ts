@@ -55,8 +55,9 @@ export function getJournalDiscriminatorBytes(): ReadonlyUint8Array {
  * A compact account with two independently encoded dynamic fields.
  *
  * The one-byte discriminator, bump, authority, revision, and two vector
- * prefixes always occupy `Self::HEADER_SIZE` bytes. Each active row adds an
- * eight-byte entry and a one-byte marker, up to `Self::MAX_SIZE`.
+ * prefixes always occupy `Self::HEADER_SIZE` bytes. Each active entry adds
+ * eight bytes and each active marker adds one byte, independently, up to
+ * `Self::MAX_SIZE`.
  */
 export type Journal = {
 	discriminator: number;
@@ -72,7 +73,7 @@ export type Journal = {
 	 */
 	entries: Array<bigint>;
 	/**
-	 * One marker per entry, stored as a second compact tail.
+	 * Independently sized markers stored as a second compact tail.
 	 * Pina compact capacity: 8.
 	 */
 	markers: Array<number>;
@@ -91,7 +92,7 @@ export type JournalArgs = {
 	 */
 	entries: Array<number | bigint>;
 	/**
-	 * One marker per entry, stored as a second compact tail.
+	 * Independently sized markers stored as a second compact tail.
 	 * Pina compact capacity: 8.
 	 */
 	markers: Array<number>;
