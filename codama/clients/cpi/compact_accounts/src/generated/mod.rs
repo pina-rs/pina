@@ -14,4 +14,4 @@ pub use instructions::*;
 pub use programs::*;
 
 /// Number of instructions rendered for the `compactAccounts` program.
-pub const INSTRUCTION_COUNT: usize = 3;
+pub const INSTRUCTION_COUNT: usize = 4;

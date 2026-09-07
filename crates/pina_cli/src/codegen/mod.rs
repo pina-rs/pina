@@ -51,6 +51,7 @@ use crate::ir::PdaIr;
 use crate::ir::PdaSeedIr;
 use crate::ir::PinaPodEnumIr;
 use crate::ir::ProgramIr;
+use crate::parse::types::CompactTailSchema;
 use crate::parse::types::compact_tail_schema;
 use crate::parse::types::try_rust_type_to_codama_compact_tail;
 use crate::parse::types::try_rust_type_to_codama_compact_tail_at;
@@ -208,7 +209,7 @@ fn build_account_node(
 				.map(|(tail_index, schema)| {
 					schema
 						.as_ref()
-						.map(|schema| schema.header_size())
+						.map(CompactTailSchema::header_size)
 						.ok_or_else(|| {
 							let field = &account.fields[start + tail_index];
 							IdlError::UnsupportedType {

@@ -8,9 +8,8 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct RoleEntry {
 	pub discriminator: u8,
 	pub registry: solana_pubkey::Pubkey,
@@ -24,7 +23,7 @@ pub struct RoleEntry {
 pub const ROLE_ENTRY_DISCRIMINATOR: u8 = 2u8;
 
 impl RoleEntry {
-	pub const LEN: usize = Self::SIZE;
+	pub const LEN: usize = core::mem::size_of::<RoleEntryZc>();
 
 	/// Initialize and validate account storage in one pass.
 	///

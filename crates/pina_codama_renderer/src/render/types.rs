@@ -467,9 +467,8 @@ fn render_defined_pinapod_enum(
 	};
 
 	let mut lines = render_docs(docs, 0);
-	lines.insert(0, "use pina::pinapod;".to_string());
-	lines.insert(1, String::new());
 	lines.push("#[derive(Clone, Copy, Debug, PartialEq, Eq, pina::PinaPod)]".to_string());
+	lines.push("#[pinapod(crate = pina::pinapod)]".to_string());
 	lines.push(format!("#[repr({repr})]"));
 	lines.push(format!("pub enum {name} {{"));
 	for (index, variant) in enum_type.variants.iter().enumerate() {
@@ -489,11 +488,12 @@ fn render_defined_pinapod_enum(
 }
 
 fn render_defined_struct(name: &str, struct_type: &StructTypeNode, docs: &Docs) -> Result<String> {
-	let mut lines = vec!["use pina::pinapod;".to_string(), String::new()];
+	let mut lines = Vec::new();
 	for doc_line in render_docs(docs, 0) {
 		lines.push(doc_line);
 	}
 	lines.push("#[derive(pina::PinaPod)]".to_string());
+	lines.push("#[pinapod(crate = pina::pinapod, no_inherent)]".to_string());
 	lines.push(format!("pub struct {name} {{"));
 	for field in &struct_type.fields {
 		let field_name = snake(field.name.as_ref());

@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const REQUIRE_NEQ_DISCRIMINATOR: u8 = 4u8;
 
 /// Accounts.
@@ -50,7 +48,7 @@ impl RequireNeqInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut RequireNeqInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; RequireNeqInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<RequireNeqInstructionWireZc>()];
 		<RequireNeqInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REQUIRE_NEQ_DISCRIMINATOR;
@@ -63,6 +61,7 @@ impl RequireNeqInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct RequireNeqInstructionWire {
 	pub discriminator: u8,
 }

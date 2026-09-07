@@ -69,11 +69,11 @@ export function getJournalDiscriminatorBytes(): ReadonlyUint8Array {
 }
 
 /**
- * A compact account with two independently encoded dynamic fields.
+ * A compact account with four independently encoded dynamic fields.
  *
- * The one-byte discriminator, bump, authority, revision, and two vector
- * prefixes always occupy [`Self::HEADER_SIZE`] bytes. Each active row adds an
- * eight-byte entry and a one-byte marker, up to [`Self::MAX_SIZE`].
+ * The fixed header includes a semantic `Option<u64>` encoded as
+ * `PodOption<PodU64>`. The title and optional note use compact strings, while
+ * entries and markers use vectors; only their active bytes are allocated.
  */
 export type Journal = {
 	discriminator: number;
@@ -83,9 +83,13 @@ export type Journal = {
 	authority: Address;
 	/** Number of successful resize or write operations. */
 	revision: number;
+	/** Most recently written entry value, stored as `PodOption<PodU64>`. */
+	featuredEntry: Option<bigint>;
+	/** Human-readable title stored as active UTF-8 bytes. */
+	title: string;
 	/** Active entries. Unused capacity consumes no account bytes. */
 	entries: Array<bigint>;
-	/** One marker per entry, stored as a second compact tail. */
+	/** Independently sized markers stored as a second compact tail. */
 	markers: Array<number>;
 	/** Optional human-readable status attached to the latest resize. */
 	note: Option<string>;
@@ -98,9 +102,13 @@ export type JournalArgs = {
 	authority: Address;
 	/** Number of successful resize or write operations. */
 	revision: number;
+	/** Most recently written entry value, stored as `PodOption<PodU64>`. */
+	featuredEntry: OptionOrNullable<number | bigint>;
+	/** Human-readable title stored as active UTF-8 bytes. */
+	title: string;
 	/** Active entries. Unused capacity consumes no account bytes. */
 	entries: Array<number | bigint>;
-	/** One marker per entry, stored as a second compact tail. */
+	/** Independently sized markers stored as a second compact tail. */
 	markers: Array<number>;
 	/** Optional human-readable status attached to the latest resize. */
 	note: OptionOrNullable<string>;
@@ -115,18 +123,35 @@ export function getJournalEncoder(): Encoder<JournalArgs> {
 			["authority", getAddressEncoder()],
 			["revision", getU32Encoder()],
 			[
-				"entries",
+				"featuredEntry",
+				getOptionEncoder(getU64Encoder(), { noneValue: "zeroes" }),
+			],
+			[
+				"title",
 				offsetEncoder(
-					getPinaPodBoundedArrayEncoder(
-						getArrayEncoder(getU64Encoder(), {
-							size: offsetEncoder(
-								offsetEncoder(getU16Encoder(), { preOffset: () => 38 }),
+					getPinaPodBoundedStringEncoder(
+						addEncoderSizePrefix(
+							getUtf8Encoder(),
+							offsetEncoder(
+								offsetEncoder(getU8Encoder(), { preOffset: () => 47 }),
 								{ postOffset: ({ preOffset }) => preOffset + 0 },
 							),
-						}),
-						8,
+						),
+						24,
 					),
-					{ preOffset: ({ preOffset }) => preOffset + 11 },
+					{ preOffset: ({ preOffset }) => preOffset + 12 },
+				),
+			],
+			[
+				"entries",
+				getPinaPodBoundedArrayEncoder(
+					getArrayEncoder(getU64Encoder(), {
+						size: offsetEncoder(
+							offsetEncoder(getU16Encoder(), { preOffset: () => 48 }),
+							{ postOffset: ({ preOffset }) => preOffset + 0 },
+						),
+					}),
+					8,
 				),
 			],
 			[
@@ -134,7 +159,7 @@ export function getJournalEncoder(): Encoder<JournalArgs> {
 				getPinaPodBoundedArrayEncoder(
 					getArrayEncoder(getU8Encoder(), {
 						size: offsetEncoder(
-							offsetEncoder(getU64Encoder(), { preOffset: () => 40 }),
+							offsetEncoder(getU64Encoder(), { preOffset: () => 50 }),
 							{ postOffset: ({ preOffset }) => preOffset + 0 },
 						),
 					}),
@@ -150,7 +175,7 @@ export function getJournalEncoder(): Encoder<JournalArgs> {
 					),
 					{
 						prefix: offsetEncoder(
-							offsetEncoder(getU8Encoder(), { preOffset: () => 48 }),
+							offsetEncoder(getU8Encoder(), { preOffset: () => 58 }),
 							{ postOffset: ({ preOffset }) => preOffset },
 						),
 					},
@@ -172,25 +197,48 @@ export function getJournalDecoder(): Decoder<Journal> {
 		["authority", getAddressDecoder()],
 		["revision", getU32Decoder()],
 		[
-			"entries",
+			"featuredEntry",
+			getOptionDecoder(getU64Decoder(), {
+				prefix: getPinaPodOptionTagDecoder(getU8Decoder()),
+				noneValue: "zeroes",
+			}),
+		],
+		[
+			"title",
 			offsetDecoder(
-				getPinaPodBoundedArrayDecoder(
-					getArrayDecoder(getU64Decoder(), {
-						size: offsetDecoder(
-							offsetDecoder(getU16Decoder(), { preOffset: () => 38 }),
-							{ postOffset: ({ preOffset }) => preOffset + 0 },
+				getPinaPodBoundedStringDecoder(
+					addDecoderSizePrefix(
+						getPinaPodUtf8Decoder(),
+						getPinaPodBoundedCountDecoder(
+							offsetDecoder(
+								offsetDecoder(getU8Decoder(), { preOffset: () => 47 }),
+								{ postOffset: ({ preOffset }) => preOffset + 0 },
+							),
+							24,
 						),
-					}),
-					getPinaPodBoundedCountDecoder(
-						offsetDecoder(
-							offsetDecoder(getU16Decoder(), { preOffset: () => 38 }),
-							{ postOffset: ({ preOffset }) => preOffset + 0 },
-						),
-						8,
+					),
+					24,
+				),
+				{ preOffset: ({ preOffset }) => preOffset + 12 },
+			),
+		],
+		[
+			"entries",
+			getPinaPodBoundedArrayDecoder(
+				getArrayDecoder(getU64Decoder(), {
+					size: offsetDecoder(
+						offsetDecoder(getU16Decoder(), { preOffset: () => 48 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
+					),
+				}),
+				getPinaPodBoundedCountDecoder(
+					offsetDecoder(
+						offsetDecoder(getU16Decoder(), { preOffset: () => 48 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 					8,
 				),
-				{ preOffset: ({ preOffset }) => preOffset + 11 },
+				8,
 			),
 		],
 		[
@@ -198,13 +246,13 @@ export function getJournalDecoder(): Decoder<Journal> {
 			getPinaPodBoundedArrayDecoder(
 				getArrayDecoder(getU8Decoder(), {
 					size: offsetDecoder(
-						offsetDecoder(getU64Decoder(), { preOffset: () => 40 }),
+						offsetDecoder(getU64Decoder(), { preOffset: () => 50 }),
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 				}),
 				getPinaPodBoundedCountDecoder(
 					offsetDecoder(
-						offsetDecoder(getU64Decoder(), { preOffset: () => 40 }),
+						offsetDecoder(getU64Decoder(), { preOffset: () => 50 }),
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 					8,
@@ -225,7 +273,7 @@ export function getJournalDecoder(): Decoder<Journal> {
 				{
 					prefix: offsetDecoder(
 						offsetDecoder(getPinaPodOptionTagDecoder(getU8Decoder()), {
-							preOffset: () => 48,
+							preOffset: () => 58,
 						}),
 						{ postOffset: ({ preOffset }) => preOffset },
 					),

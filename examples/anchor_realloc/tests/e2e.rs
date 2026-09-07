@@ -90,6 +90,11 @@ fn realloc2_ix_data(len: usize) -> Vec<u8> {
 	data
 }
 
+fn sample_size(values_count: usize) -> usize {
+	Sample::projected_bytes(values_count)
+		.unwrap_or_else(|error| panic!("sample size projection failed: {error:?}"))
+}
+
 fn initialize_accounts(authority: &Pubkey, sample: &Pubkey) -> Vec<(Pubkey, Account)> {
 	vec![
 		(
@@ -134,7 +139,8 @@ fn assert_sample(result: &InstructionResult, sample: &Pubkey, authority: &Pubkey
 	let state = Sample::try_from_bytes(&account.data)
 		.unwrap_or_else(|error| panic!("sample must remain valid: {error:?}"));
 	assert_eq!(state.authority, authority.to_bytes().into());
-	assert_eq!(state.values().len(), (len - Sample::HEADER_SIZE) / 8);
+	assert_eq!(state.encoded_len(), len);
+	assert_eq!(sample_size(state.values().len()), len);
 	for (index, value) in state.values().iter().enumerate() {
 		assert_eq!(value.get(), index as u64);
 	}
@@ -150,9 +156,9 @@ fn authority_can_initialize_grow_and_shrink_its_sample() {
 	let (sample, bump) = derive_sample(&authority);
 	let mut result = initialize_sample(&mollusk, &authority, &sample, bump);
 
-	assert_sample(&result, &sample, &authority, Sample::HEADER_SIZE);
+	assert_sample(&result, &sample, &authority, Sample::MIN_SIZE);
 
-	let grown_len = Sample::HEADER_SIZE + 64;
+	let grown_len = sample_size(8);
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
 		&realloc_ix_data(grown_len),
@@ -168,7 +174,7 @@ fn authority_can_initialize_grow_and_shrink_its_sample() {
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
-		&realloc_ix_data(Sample::HEADER_SIZE),
+		&realloc_ix_data(Sample::MIN_SIZE),
 		vec![
 			AccountMeta::new(authority, true),
 			AccountMeta::new(sample, false),
@@ -180,7 +186,7 @@ fn authority_can_initialize_grow_and_shrink_its_sample() {
 		&result.resulting_accounts,
 		&[Check::success()],
 	);
-	assert_sample(&result, &sample, &authority, Sample::HEADER_SIZE);
+	assert_sample(&result, &sample, &authority, Sample::MIN_SIZE);
 }
 
 /// An attacker cannot use their signer to resize a victim's authenticated
@@ -201,7 +207,7 @@ fn unrelated_signer_cannot_resize_a_victim_sample() {
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
-		&realloc_ix_data(Sample::HEADER_SIZE + 64),
+		&realloc_ix_data(sample_size(8)),
 		vec![
 			AccountMeta::new(attacker, true),
 			AccountMeta::new(victim_sample, false),
@@ -233,7 +239,7 @@ fn canonical_pda_check_rejects_an_arbitrary_program_owned_sample() {
 	let mollusk = create_mollusk();
 	let authority = Pubkey::new_unique();
 	let forged_sample = Pubkey::new_unique();
-	let mut data = vec![0u8; Sample::HEADER_SIZE];
+	let mut data = vec![0u8; Sample::MIN_SIZE];
 	Sample::initialize(
 		&mut data,
 		&SamplePatch::new().bump(0).authority(authority.to_bytes()),
@@ -242,7 +248,7 @@ fn canonical_pda_check_rejects_an_arbitrary_program_owned_sample() {
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
-		&realloc_ix_data(Sample::HEADER_SIZE + 64),
+		&realloc_ix_data(sample_size(8)),
 		vec![
 			AccountMeta::new(authority, true),
 			AccountMeta::new(forged_sample, false),
@@ -291,7 +297,7 @@ fn realloc2_rejects_duplicate_authenticated_targets_without_mutation() {
 
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
-		&realloc2_ix_data(Sample::HEADER_SIZE + 64),
+		&realloc2_ix_data(sample_size(8)),
 		vec![
 			AccountMeta::new(authority, true),
 			AccountMeta::new(sample, false),

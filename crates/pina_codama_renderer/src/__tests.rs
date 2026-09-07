@@ -8,6 +8,7 @@ use codama_nodes::AccountNode;
 use codama_nodes::AccountValueNode;
 use codama_nodes::ArrayTypeNode;
 use codama_nodes::BooleanTypeNode;
+use codama_nodes::BytesEncoding;
 use codama_nodes::BytesTypeNode;
 use codama_nodes::ConstantDiscriminatorNode;
 use codama_nodes::ConstantPdaSeedNode;
@@ -213,9 +214,9 @@ fn renders_compact_account_fixture_with_dynamic_helpers() {
 	assert!(content.contains("pub entries: pina::Vec<u64, 8>"));
 	assert!(content.contains("pub markers: pina::PodVec<u8, 8, 8>"));
 	assert!(content.contains("pub const HEADER_SIZE: usize"));
-	assert!(content.contains("pub fn initialize(data: &mut [u8])"));
+	assert!(content.contains("pub fn initialize(data: &mut [u8], patch: JournalPatch<'_>)"));
 	assert!(content.contains("pub fn from_bytes(data: &[u8])"));
-	assert!(content.contains("pub fn from_bytes_mut(data: &mut [u8])"));
+	assert!(!content.contains("JournalMut"));
 	syn::parse_file(&content)
 		.unwrap_or_else(|error| panic!("generated compact account is invalid Rust: {error}"));
 }
@@ -252,6 +253,25 @@ fn renders_compact_tail_through_a_post_offset_wrapper() {
 			.unwrap_or_else(|error| panic!("render failed: {error}")),
 		"pina::Vec<u64, 8>"
 	);
+}
+
+#[test]
+fn renders_compact_string_tails_with_default_and_explicit_prefixes() {
+	for (format, expected) in [
+		(U8, "pina::String<32>"),
+		(NumberFormat::U16, "pina::PodString<32, 2>"),
+		(NumberFormat::U32, "pina::PodString<32, 4>"),
+		(NumberFormat::U64, "pina::PodString<32, 8>"),
+	] {
+		let string =
+			SizePrefixTypeNode::<TypeNode>::new(StringTypeNode::utf8(), NumberTypeNode::le(format));
+		let tail = PostOffsetTypeNode::<TypeNode>::relative(string, 0).into();
+		assert_eq!(
+			render_type_for_compact_tail(&tail, 32, "State.title")
+				.unwrap_or_else(|error| panic!("render failed: {error}")),
+			expected
+		);
+	}
 }
 
 #[test]
@@ -320,6 +340,21 @@ fn rejects_compact_tail_capacity_beyond_prefix_maximum() {
 			.to_string()
 			.contains("exceeds the 1-byte prefix maximum")
 	);
+}
+
+#[test]
+fn rejects_non_utf8_compact_strings() {
+	let string = StringTypeNode {
+		encoding: BytesEncoding::Base58,
+		display: None,
+	};
+	let tail = TypeNode::from(SizePrefixTypeNode::<TypeNode>::new(
+		string,
+		NumberTypeNode::le(U8),
+	));
+	let error = render_type_for_compact_tail(&tail, 32, "State.title")
+		.expect_err("non-UTF-8 string must be rejected");
+	assert!(error.to_string().contains("support String, Vec"));
 }
 
 #[test]
@@ -863,7 +898,7 @@ fn renders_defined_type_aliases_with_pod_wrappers() {
 }
 
 #[test]
-fn renders_defined_structs_with_the_pinapod_helper_in_scope() {
+fn renders_defined_structs_with_the_pinapod_crate_path() {
 	let defined = DefinedTypeNode {
 		name: "settings".into(),
 		docs: vec!["Shared settings.".to_string()].into(),
@@ -878,8 +913,8 @@ fn renders_defined_structs_with_the_pinapod_helper_in_scope() {
 
 	let content = render_defined_type_page(&defined)
 		.unwrap_or_else(|error| panic!("defined struct render failed: {error}"));
-	assert!(content.starts_with("use pina::pinapod;\n\n"));
 	assert!(content.contains("#[derive(pina::PinaPod)]"));
+	assert!(content.contains("#[pinapod(crate = pina::pinapod, no_inherent)]"));
 	assert!(content.contains("pub counter: u64,"));
 }
 

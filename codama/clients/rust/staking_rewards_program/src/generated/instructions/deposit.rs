@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const DEPOSIT_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
@@ -103,7 +101,7 @@ impl DepositInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut DepositInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; DepositInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<DepositInstructionWireZc>()];
 		<DepositInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = DEPOSIT_DISCRIMINATOR;
@@ -116,6 +114,7 @@ impl DepositInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct DepositInstructionWire {
 	pub discriminator: u8,
 	pub amount: u64,

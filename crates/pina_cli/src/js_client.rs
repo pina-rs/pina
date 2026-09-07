@@ -775,9 +775,10 @@ fn javascript_expression_len(source: &str) -> Option<usize> {
 			'[' => brackets = brackets.checked_add(1)?,
 			']' => brackets = brackets.checked_sub(1)?,
 			'{' => braces = braces.checked_add(1)?,
-			'}' if parentheses == 0 && brackets == 0 && braces == 0 => return Some(index),
+			'}' | ',' if parentheses == 0 && brackets == 0 && braces == 0 => {
+				return Some(index);
+			}
 			'}' => braces = braces.checked_sub(1)?,
-			',' if parentheses == 0 && brackets == 0 && braces == 0 => return Some(index),
 			_ => {}
 		}
 	}

@@ -6,8 +6,8 @@
 		"test": "vitest run --pool threads"
 	},
 	"devDependencies": {
-		"@solana/kit": "^8.1.0",
-		"@solana/program-client-core": "^8.1.0",
+		"@solana/kit": "^8.2.0",
+		"@solana/program-client-core": "^8.2.0",
 		"litesvm": "^1.4.1",
 		"vitest": "^4.1.11",
 		"typescript": "^7.0.2",

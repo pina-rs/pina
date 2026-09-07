@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const RESIZE_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
@@ -65,7 +63,7 @@ impl ResizeInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut ResizeInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; ResizeInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<ResizeInstructionWireZc>()];
 		<ResizeInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = RESIZE_DISCRIMINATOR;
@@ -78,7 +76,9 @@ impl ResizeInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ResizeInstructionWire {
 	pub discriminator: u8,
 	pub entry_count: u8,
+	pub marker_count: u8,
 }

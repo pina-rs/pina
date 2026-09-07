@@ -8,9 +8,8 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct PositionState {
 	pub discriminator: u8,
 	pub pool: solana_pubkey::Pubkey,
@@ -24,7 +23,7 @@ pub struct PositionState {
 pub const POSITION_STATE_DISCRIMINATOR: u8 = 2u8;
 
 impl PositionState {
-	pub const LEN: usize = Self::SIZE;
+	pub const LEN: usize = core::mem::size_of::<PositionStateZc>();
 
 	/// Initialize and validate account storage in one pass.
 	///

@@ -45,9 +45,11 @@ Compact accounts pay only for active tail data. Their API is more constrained: r
 
 Pina remains narrower than Rust's type system and the complete Codama schema language. Custom mappings and unsupported dynamic nesting fail at compile time rather than falling back to unchecked behavior.
 
+Unbounded dynamic data models must use explicit versioning or companion accounts. Loader APIs keep runtime borrow guards because a plain `&T` cannot represent the account-data borrow lifetime. Future field forms must prove their layout and aliasing safety before Pina adds them to the macro grammar.
+
 ## Historical comparison
 
-The original ADR compared Pina with Quasar and kept collections outside Pina's schema macros. That restriction was correct for the earlier container implementation, which could leave inactive backing bytes uninitialized and exposed staged compact mutation. PinaPod v0.2 removes those two blockers while preserving the existing wire format.
+The original ADR compared Pina with Quasar and kept collections outside Pina's schema macros. That restriction was correct for the earlier container implementation, which could leave inactive backing bytes uninitialized and exposed staged compact mutation. PinaPod v0.2 removes those two blockers while preserving the existing wire format. The [migration guide](../migrations/pinapod-v0.2.md) records the source changes, and the [PinaPod safety boundary](../pinapod-safety-boundary.md) records the current invariants.
 
 ## Alternatives considered
 

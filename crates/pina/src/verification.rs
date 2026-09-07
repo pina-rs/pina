@@ -162,11 +162,11 @@ fn quick_checked_close_conserves_lamports_or_rejects_overflow() {
 #[kani::proof]
 fn quick_realloc_plan_rejects_only_oversized_growth() {
 	let current_size: usize = kani::any();
-	let new_size: usize = kani::any();
+	let target_size: usize = kani::any();
 	let current_lamports: u64 = kani::any();
 	let minimum_balance: u64 = kani::any();
-	let result = ReallocPlan::try_new(current_size, new_size, current_lamports, minimum_balance);
-	let oversized = new_size
+	let result = ReallocPlan::try_new(current_size, target_size, current_lamports, minimum_balance);
+	let oversized = target_size
 		.checked_sub(current_size)
 		.is_some_and(|growth| growth > MAX_PERMITTED_DATA_INCREASE);
 
@@ -184,7 +184,7 @@ fn quick_unchanged_realloc_never_transfers_lamports() {
 	assert_eq!(
 		result,
 		Ok(ReallocPlan {
-			new_size: size,
+			target_size: size,
 			adjustment: RentAdjustment::None,
 		})
 	);
@@ -194,35 +194,35 @@ fn quick_unchanged_realloc_never_transfers_lamports() {
 #[kani::proof]
 fn quick_realloc_plan_direction_and_amount_are_exact() {
 	let current_size: usize = kani::any();
-	let new_size: usize = kani::any();
+	let target_size: usize = kani::any();
 	let current_lamports: u64 = kani::any();
 	let minimum_balance: u64 = kani::any();
-	let result = ReallocPlan::try_new(current_size, new_size, current_lamports, minimum_balance);
+	let result = ReallocPlan::try_new(current_size, target_size, current_lamports, minimum_balance);
 
 	let Ok(plan) = result else {
-		assert!(new_size > current_size);
+		assert!(target_size > current_size);
 		return;
 	};
 
 	match plan.adjustment {
 		RentAdjustment::Fund { lamports } => {
-			assert!(new_size > current_size);
+			assert!(target_size > current_size);
 			assert!(minimum_balance > current_lamports);
 			assert_eq!(lamports, minimum_balance - current_lamports);
 			assert_eq!(current_lamports + lamports, minimum_balance);
 		}
 		RentAdjustment::Refund { lamports } => {
-			assert!(new_size < current_size);
+			assert!(target_size < current_size);
 			assert!(current_lamports > minimum_balance);
 			assert_eq!(lamports, current_lamports - minimum_balance);
 			assert_eq!(current_lamports - lamports, minimum_balance);
 		}
 		RentAdjustment::None => {
 			assert!(
-				new_size == current_size
+				target_size == current_size
 					|| current_lamports == minimum_balance
-					|| (new_size > current_size && current_lamports > minimum_balance)
-					|| (new_size < current_size && current_lamports < minimum_balance)
+					|| (target_size > current_size && current_lamports > minimum_balance)
+					|| (target_size < current_size && current_lamports < minimum_balance)
 			);
 		}
 	}

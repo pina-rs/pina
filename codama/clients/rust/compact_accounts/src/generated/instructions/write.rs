@@ -8,13 +8,12 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const WRITE_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
 pub struct Write {
+	/// Funds growth if a future write patch changes the encoded length.
 	pub authority: solana_pubkey::Pubkey,
 	pub journal: solana_pubkey::Pubkey,
 }
@@ -35,10 +34,7 @@ impl Write {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.authority,
-			true,
-		));
+		accounts.push(solana_instruction::AccountMeta::new(self.authority, true));
 		accounts.push(solana_instruction::AccountMeta::new(self.journal, false));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
@@ -58,7 +54,7 @@ impl WriteInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut WriteInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; WriteInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<WriteInstructionWireZc>()];
 		<WriteInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = WRITE_DISCRIMINATOR;
@@ -71,6 +67,7 @@ impl WriteInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct WriteInstructionWire {
 	pub discriminator: u8,
 	pub index: u8,

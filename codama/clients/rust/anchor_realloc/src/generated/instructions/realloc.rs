@@ -8,11 +8,9 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 /// Resizes the complete account-data buffer to `len` bytes.
 ///
-/// `len` includes [`Sample::HEADER_SIZE`] and must end on a value boundary.
+/// `len` must equal `Sample::projected_bytes` for an active value count.
 pub const REALLOC_DISCRIMINATOR: u8 = 0u8;
 
 /// Accounts.
@@ -69,7 +67,7 @@ impl ReallocInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut ReallocInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; ReallocInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<ReallocInstructionWireZc>()];
 		<ReallocInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REALLOC_DISCRIMINATOR;
@@ -82,6 +80,7 @@ impl ReallocInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ReallocInstructionWire {
 	pub discriminator: u8,
 	pub len: u16,

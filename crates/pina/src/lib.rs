@@ -64,25 +64,25 @@ pub use pina_macros::*;
 /// Re-export of the [`pinapod`] crate for advanced direct use.
 ///
 /// Pina's audited zero-copy contract is the closed field grammar enforced by
-/// [`account`], [`instruction`], and [`event`]. Direct PinaPod derives and
+/// [`account`], [`instruction`], and [`event`]. Direct `PinaPod` derives and
 /// manual trait implementations are outside that contract and must uphold
-/// PinaPod's complete safety invariants themselves.
+/// `PinaPod`'s complete safety invariants themselves.
 pub use pinapod;
 /// Derives a validated zero-copy companion for a native schema.
 pub use pinapod::PinaPod;
 /// Zero-copy access for compact (variable-length) types.
 #[cfg(feature = "compact")]
 pub use pinapod::PinaPodCompact;
-/// Error type for PinaPod validation failures.
+/// Error type for `PinaPod` validation failures.
 pub use pinapod::PinaPodError;
 /// Zero-copy access for fixed-size types.
 pub use pinapod::PinaPodFixed;
 /// Atomic update contract implemented by generated compact patches.
 #[cfg(feature = "compact")]
 pub use pinapod::PinaPodPatch;
-/// Fixed-capacity UTF-8 string schema used by PinaPod derives.
+/// Fixed-capacity UTF-8 string schema used by `PinaPod` derives.
 pub use pinapod::String;
-/// Bounded vector schema used by fixed and compact PinaPod derives.
+/// Bounded vector schema used by fixed and compact `PinaPod` derives.
 pub use pinapod::Vec;
 /// Marker trait for types that can be safely cast from any byte pattern.
 pub use pinapod::ZcElem;
@@ -134,7 +134,7 @@ pub use pinocchio_associated_token_account as associated_token_account;
 pub use pinocchio_memo as memo;
 /// Re-export of `pinocchio_system` for system program CPI helpers.
 pub use pinocchio_system as system;
-/// PinaPod's alignment-one storage primitives (`PodBool`, `PodU16`,
+/// `PinaPod`'s alignment-one storage primitives (`PodBool`, `PodU16`,
 /// `PodU64`, etc.). Prefer native field types in schemas; the `PinaPod`
 /// derive selects these representation types for the generated `*Zc` view.
 pub use pod::*;

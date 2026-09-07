@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const REQUIRE_EQ_DISCRIMINATOR: u8 = 3u8;
 
 /// Accounts.
@@ -50,7 +48,7 @@ impl RequireEqInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut RequireEqInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; RequireEqInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<RequireEqInstructionWireZc>()];
 		<RequireEqInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REQUIRE_EQ_DISCRIMINATOR;
@@ -63,6 +61,7 @@ impl RequireEqInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct RequireEqInstructionWire {
 	pub discriminator: u8,
 }

@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const ROTATE_ADMIN_DISCRIMINATOR: u8 = 4u8;
 
 /// Accounts.
@@ -73,7 +71,7 @@ impl RotateAdminInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut RotateAdminInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; RotateAdminInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<RotateAdminInstructionWireZc>()];
 		<RotateAdminInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = ROTATE_ADMIN_DISCRIMINATOR;
@@ -86,6 +84,7 @@ impl RotateAdminInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct RotateAdminInstructionWire {
 	pub discriminator: u8,
 }

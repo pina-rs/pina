@@ -41,7 +41,7 @@ The renderer supports fixed string/byte, little-endian number, boolean, and publ
 
 ## Rejected layouts
 
-- variable-length strings, bytes, maps, or sets, and variable arrays outside the compact suffix of an account;
+- unbounded strings, bytes, maps, or sets, and variable strings or arrays outside the compact suffix of an account;
 - remainder or sentinel encodings;
 - big-endian and floating-point numbers;
 - sparse enums or enums with payload variants;

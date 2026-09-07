@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const VALIDATE_EXTERNAL_PROGRAM_DISCRIMINATOR: u8 = 0u8;
 
 /// Accounts.
@@ -67,7 +65,7 @@ impl ValidateExternalProgramInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut ValidateExternalProgramInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; ValidateExternalProgramInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<ValidateExternalProgramInstructionWireZc>()];
 		<ValidateExternalProgramInstructionWire as pina::PinaPodFixed>::initialize(
 			&mut bytes,
 			|data| {
@@ -83,6 +81,7 @@ impl ValidateExternalProgramInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ValidateExternalProgramInstructionWire {
 	pub discriminator: u8,
 }

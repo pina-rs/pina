@@ -2,10 +2,13 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
+/// Result alias for rendering operations.
 pub type Result<T> = std::result::Result<T, RenderError>;
 
+/// Errors raised while reading an IDL or rendering a client crate.
 #[derive(Debug, Error)]
 pub enum RenderError {
+	/// A filesystem path required by rendering could not be read from disk.
 	#[error("failed to read `{path}`: {source}")]
 	ReadFile {
 		path: PathBuf,

@@ -18,7 +18,7 @@
 - `logs` is useful during **initial development and debugging**, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
 - `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
 - `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.
-- `account-resize` enables `ReallocAccount` and `ReallocAccountZeroed`. Enable it together with `compact` for `UpdateResizableAccount` and the compact creation builders. Close helpers still do not implicitly resize or zero account data.
+- `account-resize` enables `ReallocAccount` and `ReallocAccountZeroed`. Enable it together with `compact` for `UpdateResizableAccount`, `ReallocCompactAccount`, and the compact creation builders. Close helpers still do not implicitly resize or zero account data.
 
 <!-- {/pinaFeatureSelectionTips} -->
 
@@ -68,7 +68,7 @@ All types are alignment-one byte-backed values that implement PinaPod's `ZcElem`
 | `PodString` | Fixed-capacity string  | `PFX`-byte length prefix + `N` data bytes |
 | `PodVec`    | Fixed-capacity vec     | `PFX`-byte length prefix + `N` elements   |
 
-The full generic forms are `PodOption<T: ZcElem, PFX = 1>`, `PodString<N, PFX = 1>`, and `PodVec<T, N, PFX = 2>`. `PFX` is the length-prefix width in bytes and must be `1`, `2`, `4`, or `8`. `ZcValidate` checks tags, length prefixes, active elements, and UTF-8 before safe access.
+The full generic forms are `PodOption<T: ZcElem, PFX = 1>`, `PodString<N, PFX = 1>`, and `PodVec<T, N, PFX = 2>`. `PFX` is the prefix width in bytes and must be `1`, `2`, `4`, or `8`. Strings default to one byte and vectors default to two bytes. `ZcValidate` checks tags, prefixes, active elements, and UTF-8 before safe access.
 
 <!-- {/podCollectionTypesTable} -->
 
@@ -92,17 +92,20 @@ Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 
 <!-- {@pinaWorkspacePackages} -->
 
-| Package                 | Path                          | Description                                                      |
-| ----------------------- | ----------------------------- | ---------------------------------------------------------------- |
-| `pina`                  | `crates/pina`                 | Core framework: traits, account loaders, CPI helpers, Pod types. |
-| `pina_macros`           | `crates/pina_macros`          | Proc macros: `#[account]`, `#[instruction]`, `#[event]`, etc.    |
-| `pina_cli`              | `crates/pina_cli`             | CLI/library for IDL generation, Codama integration, scaffolding. |
-| `pina_codama_renderer`  | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.    |
-| `pina_profile`          | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                    |
-| `pina_sdk_ids`          | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.        |
-| `@pina-rs/codama-nodes` | `packages/nodes-from-pina`    | Pina IDL conversion and normalization for Codama root nodes.     |
-| `@pina-rs/cli`          | `packages/pina__cli`          | npm launcher for the prebuilt platform-specific CLI packages.    |
-| `@pina-rs/skill`        | `packages/pina__skill`        | Agent guidance and a non-destructive local skill installer.      |
+| Package                 | Path                          | Description                                                                   |
+| ----------------------- | ----------------------------- | ----------------------------------------------------------------------------- |
+| `pina`                  | `crates/pina`                 | Core framework: traits, account loaders, CPI helpers, and Pod types.          |
+| `pina_macros`           | `crates/pina_macros`          | Proc macros: `#[account]`, `#[instruction]`, `#[event]`, and others.          |
+| `pina_cli`              | `crates/pina_cli`             | CLI for building, testing, inspecting, and generating Pina program artifacts. |
+| `pina_codama_renderer`  | `crates/pina_codama_renderer` | Repository-local Codama Rust renderer for Pina-style clients.                 |
+| `pina_cpi_renderer`     | `crates/pina_cpi_renderer`    | Standalone Codama renderer generating Pina CPI client crates.                 |
+| `pina_lints`            | `crates/pina_lints`           | Pina security lints and the driver behind `pina lint`.                        |
+| `pina_test`             | `crates/pina_test`            | Surfpool-backed program test harness.                                         |
+| `pina_profile`          | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                                 |
+| `pina_sdk_ids`          | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.                     |
+| `@pina-rs/codama-nodes` | `packages/nodes-from-pina`    | Pina IDL conversion and normalization for Codama root nodes.                  |
+| `@pina-rs/cli`          | `packages/pina__cli`          | npm launcher for the prebuilt platform-specific CLI packages.                 |
+| `@pina-rs/skill`        | `packages/pina__skill`        | Agent guidance and a non-destructive local skill installer.                   |
 
 <!-- {/pinaWorkspacePackages} -->
 
@@ -133,10 +136,10 @@ Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 Programs are compiled to the `bpfel-unknown-none` target using `sbpf-linker`:
 
 ```sh
-cargo +nightly build --release --target bpfel-unknown-none -p my_program -Z build-std=core,alloc -F bpf-entrypoint
+cargo build --release --target bpfel-unknown-none -p my_program -Z build-std=core,alloc -F bpf-entrypoint
 ```
 
-The `bpf-entrypoint` feature gate separates the on-chain entrypoint from the library code used in tests.
+The pinned nightly toolchain from `rust-toolchain.toml` runs the build; the `bpf-entrypoint` feature gate separates the on-chain entrypoint from the library code used in tests.
 
 <!-- {/sbfBuildInstructions} -->
 
@@ -204,7 +207,7 @@ The profiler decodes each SBF instruction opcode and assigns costs: regular inst
 - **Use `assert_type::<T>()`** to prevent type cosplay: it checks discriminator, owner, and data size
 - **Use `CloseAccountZeroed { account, recipient }.invoke()` or `zeroed()` + `close_with_recipient()`** when stale account bytes must be invalidated before close
 - **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
-- **Namespace PDA seeds** with type-specific prefixes to prevent PDA sharing across account types
+- **Give each account type its own seed namespace** so PDAs cannot collide across account types
 
 <!-- {/pinaSecurityBestPractices} -->
 

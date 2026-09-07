@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const TEST_EVENT_CPI_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
@@ -53,7 +51,7 @@ impl TestEventCpiInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut TestEventCpiInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; TestEventCpiInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<TestEventCpiInstructionWireZc>()];
 		<TestEventCpiInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = TEST_EVENT_CPI_DISCRIMINATOR;
@@ -66,6 +64,7 @@ impl TestEventCpiInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct TestEventCpiInstructionWire {
 	pub discriminator: u8,
 }

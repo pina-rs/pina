@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const TOUCH_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
@@ -70,7 +68,7 @@ impl TouchInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut TouchInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; TouchInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<TouchInstructionWireZc>()];
 		<TouchInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = TOUCH_DISCRIMINATOR;
@@ -83,6 +81,7 @@ impl TouchInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct TouchInstructionWire {
 	pub discriminator: u8,
 }

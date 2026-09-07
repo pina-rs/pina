@@ -8,9 +8,8 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct OracleState {
 	pub discriminator: u8,
 	pub authority: solana_pubkey::Pubkey,
@@ -20,7 +19,7 @@ pub struct OracleState {
 pub const ORACLE_STATE_DISCRIMINATOR: u8 = 1u8;
 
 impl OracleState {
-	pub const LEN: usize = Self::SIZE;
+	pub const LEN: usize = core::mem::size_of::<OracleStateZc>();
 
 	/// Initialize and validate account storage in one pass.
 	///

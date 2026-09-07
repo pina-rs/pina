@@ -3,12 +3,14 @@
 ## Main crates
 
 - `crates/pina` — core framework: traits, account loaders, CPI helpers, Pod types, `nostd_entrypoint!`
-- `crates/pina_macros` — proc macros such as `#[account]`, `#[instruction]`, `#[event]`, `#[error]`, `#[discriminator]`, `#[derive(Accounts)]`
+- `crates/pina_macros` — proc macros such as `#[account]`, `#[instruction]`, `#[event]`, `#[error]`, `#[discriminator]`, `#[pda]`, `#[derive(Accounts)]`
 - `crates/pina_sdk_ids` — typed Solana program and sysvar IDs
-- `crates/pina_cli` — CLI/library for IDL generation and Codama workflows
-- `crates/pina_codama_renderer` — repository-local Codama Rust renderer
-- `crates/pina_cpi_renderer` — repository-local Codama Rust renderer for standalone Pina CPI clients
+- `crates/pina_cli` — CLI for building, testing, inspecting, deploying, and generating Pina program artifacts (IDL extraction, Codama workflows, lint driving)
+- `crates/pina_codama_renderer` — repository-local Codama Rust renderer for Pina-style client crates
+- `crates/pina_cpi_renderer` — standalone Codama renderer for on-chain CPI client crates
 - `packages/codama-renderer-cpi` — Codama visitor for the standalone Pina CPI renderer
+- `crates/pina_lints` — Pina security lints plus the nightly lint driver behind `pina lint`
+- `crates/pina_test` — published Surfpool-backed program test harness
 - `crates/pina_profile` — static CU profiler for compiled SBF programs
 
 There are also multiple examples and security fixtures under `examples/` and `security/`.

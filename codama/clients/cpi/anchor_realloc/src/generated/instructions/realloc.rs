@@ -19,7 +19,7 @@ use crate::ProgramAccount;
 
 /// Resizes the complete account-data buffer to `len` bytes.
 ///
-/// `len` includes [`Sample::HEADER_SIZE`] and must end on a value boundary.
+/// `len` must equal `Sample::projected_bytes` for an active value count.
 /// CPI call for the `realloc` instruction.
 #[derive(Clone, Copy, Debug)]
 #[must_use = "the CPI has no effect until invoke or invoke_signed is called"]

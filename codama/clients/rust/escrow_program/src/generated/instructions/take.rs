@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const TAKE_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
@@ -125,7 +123,7 @@ impl TakeInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut TakeInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; TakeInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<TakeInstructionWireZc>()];
 		<TakeInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = TAKE_DISCRIMINATOR;
@@ -138,6 +136,7 @@ impl TakeInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct TakeInstructionWire {
 	pub discriminator: u8,
 }

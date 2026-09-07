@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const FORWARD_ROTATE_WITH_SIGNER_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
@@ -74,7 +72,7 @@ impl ForwardRotateWithSignerInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut ForwardRotateWithSignerInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; ForwardRotateWithSignerInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<ForwardRotateWithSignerInstructionWireZc>()];
 		<ForwardRotateWithSignerInstructionWire as pina::PinaPodFixed>::initialize(
 			&mut bytes,
 			|data| {
@@ -90,6 +88,7 @@ impl ForwardRotateWithSignerInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ForwardRotateWithSignerInstructionWire {
 	pub discriminator: u8,
 	pub new_authority: solana_pubkey::Pubkey,

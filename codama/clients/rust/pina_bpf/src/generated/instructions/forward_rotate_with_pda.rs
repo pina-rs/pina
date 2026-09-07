@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
@@ -74,7 +72,7 @@ impl ForwardRotateWithPdaInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut ForwardRotateWithPdaInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; ForwardRotateWithPdaInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<ForwardRotateWithPdaInstructionWireZc>()];
 		<ForwardRotateWithPdaInstructionWire as pina::PinaPodFixed>::initialize(
 			&mut bytes,
 			|data| {
@@ -90,6 +88,7 @@ impl ForwardRotateWithPdaInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ForwardRotateWithPdaInstructionWire {
 	pub discriminator: u8,
 	pub bump: u8,

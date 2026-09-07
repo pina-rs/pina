@@ -209,11 +209,14 @@ void main() {
     test('round trips compact headers and dynamic tails', () {
       final entries = [BigInt.from(5), BigInt.from(8), BigInt.from(13)];
       final markers = [21, 34];
+      const title = 'piña';
       final encoded = getJournalEncoder().encode(
         Journal(
           bump: 7,
           authority: systemAddress,
           revision: 4,
+          featuredEntry: BigInt.from(13),
+          title: title,
           entries: entries,
           markers: markers,
           note: null,
@@ -221,27 +224,40 @@ void main() {
       );
       final decoded = getJournalDecoder().decode(encoded);
 
-      expect(encoded, hasLength(49 + entries.length * 8 + markers.length));
-      expect(encoded.sublist(38, 40), [3, 0]);
-      expect(encoded.sublist(40, 48), [2, 0, 0, 0, 0, 0, 0, 0]);
+      expect(
+        encoded,
+        hasLength(
+          59 + utf8.encode(title).length + entries.length * 8 + markers.length,
+        ),
+      );
+      expect(encoded.sublist(38, 47), [1, 13, 0, 0, 0, 0, 0, 0, 0]);
+      expect(encoded[47], utf8.encode(title).length);
+      expect(encoded.sublist(48, 50), [3, 0]);
+      expect(encoded.sublist(50, 58), [2, 0, 0, 0, 0, 0, 0, 0]);
+      expect(encoded[58], 0);
+      expect(encoded.sublist(59, 64), utf8.encode(title));
       expect(decoded.discriminator, 1);
       expect(decoded.bump, 7);
       expect(decoded.authority, systemAddress);
       expect(decoded.revision, 4);
+      expect(decoded.featuredEntry, BigInt.from(13));
+      expect(decoded.title, title);
       expect(decoded.entries, entries);
       expect(decoded.markers, markers);
-      expect(decoded.note, isNull);
     });
 
     test('rejects compact capacities at encode and decode boundaries', () {
       Journal journal({
         List<BigInt> entries = const [],
         List<int> markers = const [],
+        String title = '',
         String? note,
       }) => Journal(
         bump: 7,
         authority: systemAddress,
         revision: 4,
+        featuredEntry: null,
+        title: title,
         entries: entries,
         markers: markers,
         note: note,
@@ -259,18 +275,25 @@ void main() {
       );
       expect(
         () => getJournalEncoder().encode(
+          journal(title: List.filled(25, 'x').join()),
+        ),
+        throwsA(anything),
+      );
+      expect(
+        () => getJournalEncoder().encode(
           journal(note: List.filled(65, 'x').join()),
         ),
         throwsA(anything),
       );
 
       final empty = getJournalEncoder().encode(journal());
-      final excessiveEntries = Uint8List.fromList(empty)..[38] = 9;
-      final excessiveMarkers = Uint8List.fromList(empty)..[40] = 9;
-      final invalidOption = Uint8List.fromList(empty)..[48] = 2;
+      final excessiveEntries = Uint8List.fromList(empty)..[48] = 9;
+      final excessiveMarkers = Uint8List.fromList(empty)..[50] = 9;
+      final invalidOption = Uint8List.fromList(empty)..[38] = 2;
+      final invalidNoteOption = Uint8List.fromList(empty)..[58] = 2;
       final malformedUtf8 = Uint8List.fromList(
-        getJournalEncoder().encode(journal(note: 'x')),
-      )..[50] = 0xff;
+        getJournalEncoder().encode(journal(title: 'x')),
+      )..[59] = 0xff;
 
       expect(
         () => getJournalDecoder().decode(excessiveEntries),
@@ -282,6 +305,10 @@ void main() {
       );
       expect(
         () => getJournalDecoder().decode(invalidOption),
+        throwsA(anything),
+      );
+      expect(
+        () => getJournalDecoder().decode(invalidNoteOption),
         throwsA(anything),
       );
       expect(

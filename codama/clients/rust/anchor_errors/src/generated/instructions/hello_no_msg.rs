@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const HELLO_NO_MSG_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
@@ -50,7 +48,7 @@ impl HelloNoMsgInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut HelloNoMsgInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; HelloNoMsgInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<HelloNoMsgInstructionWireZc>()];
 		<HelloNoMsgInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = HELLO_NO_MSG_DISCRIMINATOR;
@@ -63,6 +61,7 @@ impl HelloNoMsgInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct HelloNoMsgInstructionWire {
 	pub discriminator: u8,
 }

@@ -63,6 +63,29 @@ fn quick_schema_size_validation_matches_declared_bounds_and_alignment() {
 }
 
 #[kani::proof]
+fn compact_projected_bytes_validates_each_count_and_matches_the_layout() {
+	let byte_len: usize = kani::any();
+	let word_len: usize = kani::any();
+	let triple_len: usize = kani::any();
+	kani::assume(byte_len <= CompactProofState::BYTES_CAPACITY + 1);
+	kani::assume(word_len <= CompactProofState::WORDS_CAPACITY + 1);
+	kani::assume(triple_len <= CompactProofState::TRIPLES_CAPACITY + 1);
+	let expected = if byte_len <= CompactProofState::BYTES_CAPACITY
+		&& word_len <= CompactProofState::WORDS_CAPACITY
+		&& triple_len <= CompactProofState::TRIPLES_CAPACITY
+	{
+		Ok(CompactProofState::HEADER_SIZE + byte_len + word_len * 2 + triple_len * 3)
+	} else {
+		Err(ProgramError::InvalidAccountData)
+	};
+
+	assert_eq!(
+		CompactProofState::projected_bytes(byte_len, word_len, triple_len),
+		expected
+	);
+}
+
+#[kani::proof]
 #[kani::unwind(16)]
 fn compact_initialize_accepts_every_valid_aligned_size_and_starts_empty() {
 	let len: usize = kani::any();
@@ -163,6 +186,7 @@ fn compact_offsets_are_ordered_disjoint_and_within_the_committed_prefix() {
 
 	let state = CompactProofState::try_from_bytes(&data[..committed_size])
 		.unwrap_or_else(|error| panic!("committed compact prefix rejected: {error:?}"));
+	assert_eq!(state.encoded_len(), committed_size);
 	assert_eq!(state.bytes(), &byte_values[..byte_len]);
 	assert_eq!(state.words(), &word_values[..word_len]);
 	assert_eq!(state.triples(), &triple_values[..triple_len]);

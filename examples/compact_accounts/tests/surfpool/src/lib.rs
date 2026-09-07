@@ -7,9 +7,9 @@ use pina_test::Pubkey;
 use pina_test::Rent;
 use pina_test::Signer;
 use program_under_test::CompactInstruction;
+use program_under_test::DEFAULT_TITLE;
 use program_under_test::ID;
 use program_under_test::Journal;
-use program_under_test::MAX_ENTRIES;
 
 const SEED_JOURNAL: &[u8] = b"compact-journal";
 
@@ -23,9 +23,15 @@ fn initialize_instruction(
 	journal: &Pubkey,
 	bump: u8,
 	entry_count: u8,
+	marker_count: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[CompactInstruction::Initialize as u8, bump, entry_count],
+		&[
+			CompactInstruction::Initialize as u8,
+			bump,
+			entry_count,
+			marker_count,
+		],
 		vec![
 			AccountMeta::new(*authority, true),
 			AccountMeta::new(*journal, false),
@@ -39,9 +45,10 @@ fn resize_instruction(
 	authority: &Pubkey,
 	journal: &Pubkey,
 	entry_count: u8,
+	marker_count: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[CompactInstruction::Resize as u8, entry_count],
+		&[CompactInstruction::Resize as u8, entry_count, marker_count],
 		vec![
 			AccountMeta::new(*authority, true),
 			AccountMeta::new(*journal, false),
@@ -68,15 +75,47 @@ fn write_instruction(
 	)
 }
 
+fn rename_instruction(
+	program: &ProgramTest,
+	authority: &Pubkey,
+	journal: &Pubkey,
+	title: &str,
+) -> pina_test::Instruction {
+	let mut data = vec![CompactInstruction::Rename as u8, title.len() as u8];
+	let mut title_bytes = [0; Journal::TITLE_CAPACITY];
+	title_bytes[..title.len()].copy_from_slice(title.as_bytes());
+	data.extend_from_slice(&title_bytes);
+	program.instruction(
+		&data,
+		vec![
+			AccountMeta::new(*authority, true),
+			AccountMeta::new(*journal, false),
+			AccountMeta::new_readonly(Pubkey::default(), false),
+		],
+	)
+}
+
+struct ExpectedJournal<'a> {
+	revision: u32,
+	featured_entry: Option<u64>,
+	title: &'a str,
+	entries: &'a [u64],
+	markers: &'a [u8],
+}
+
 fn assert_journal(
 	program: &ProgramTest,
 	journal: &Pubkey,
 	authority: &Pubkey,
-	revision: u32,
-	expected_entries: &[u64],
+	expected: ExpectedJournal<'_>,
 ) {
 	let account = program.account(journal).expect("fetch journal account");
-	let expected_size = Journal::HEADER_SIZE + expected_entries.len() * 9;
+	let expected_size = Journal::projected_bytes(
+		expected.title.len(),
+		expected.entries.len(),
+		expected.markers.len(),
+	)
+	.expect("project journal size");
 	assert_eq!(account.owner, program.program_id());
 	assert_eq!(account.data.len(), expected_size);
 	assert_eq!(
@@ -84,30 +123,24 @@ fn assert_journal(
 		Rent::default().minimum_balance(expected_size),
 		"compact realloc keeps exactly the rent-exempt minimum",
 	);
-	assert_eq!(account.data[0], 1, "journal discriminator");
-	assert_eq!(&account.data[2..34], authority.as_ref());
+	let journal = Journal::try_from_bytes(&account.data).expect("decode journal");
+	assert_eq!(journal.authority.to_bytes(), authority.to_bytes());
+	assert_eq!(journal.revision.get(), expected.revision);
 	assert_eq!(
-		u32::from_le_bytes(account.data[34..38].try_into().expect("revision bytes")),
-		revision
+		journal.featured_entry.get().map(|value| value.get()),
+		expected.featured_entry,
 	);
+	assert_eq!(journal.title(), expected.title);
 	assert_eq!(
-		u16::from_le_bytes(account.data[38..40].try_into().expect("entry-count bytes")) as usize,
-		expected_entries.len(),
+		journal
+			.entries()
+			.iter()
+			.map(|entry| entry.get())
+			.collect::<Vec<_>>(),
+		expected.entries,
 	);
-	assert_eq!(
-		u64::from_le_bytes(account.data[40..48].try_into().expect("marker-count bytes")) as usize,
-		expected_entries.len(),
-	);
-	let entries_end = Journal::HEADER_SIZE + expected_entries.len() * 8;
-	let entries = account.data[Journal::HEADER_SIZE..entries_end]
-		.chunks_exact(8)
-		.map(|bytes| u64::from_le_bytes(bytes.try_into().expect("entry bytes")))
-		.collect::<Vec<_>>();
-	assert_eq!(entries, expected_entries);
-	assert_eq!(
-		&account.data[entries_end..],
-		&(0..expected_entries.len() as u8).collect::<Vec<_>>(),
-	);
+	assert_eq!(journal.markers(), expected.markers);
+	assert_eq!(journal.encoded_size(), expected_size);
 }
 
 #[test]
@@ -123,10 +156,21 @@ fn initializes_at_header_only_and_at_a_nonempty_size() {
 
 		program
 			.send_instruction(initialize_instruction(
-				&program, &authority, &empty, empty_bump, 0,
+				&program, &authority, &empty, empty_bump, 0, 0,
 			))
 			.expect("initialize header-only journal");
-		assert_journal(&program, &empty, &authority, 0, &[]);
+		assert_journal(
+			&program,
+			&empty,
+			&authority,
+			ExpectedJournal {
+				revision: 0,
+				featured_entry: None,
+				title: DEFAULT_TITLE,
+				entries: &[],
+				markers: &[],
+			},
+		);
 
 		let second_authority = Keypair::new();
 		program
@@ -141,6 +185,7 @@ fn initializes_at_header_only_and_at_a_nonempty_size() {
 					&nonempty,
 					nonempty_bump,
 					3,
+					5,
 				),
 				&[&second_authority],
 			)
@@ -149,8 +194,76 @@ fn initializes_at_header_only_and_at_a_nonempty_size() {
 			&program,
 			&nonempty,
 			&second_authority.pubkey(),
-			0,
-			&[0, 1, 2],
+			ExpectedJournal {
+				revision: 0,
+				featured_entry: None,
+				title: DEFAULT_TITLE,
+				entries: &[0, 1, 2],
+				markers: &[0, 1, 2, 3, 4],
+			},
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+#[test]
+#[ignore = "run with pina test"]
+fn grows_and_shrinks_a_compact_pod_string_with_exact_rent() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+		let authority = program.payer();
+		let (journal, bump) = journal_pda(&program_id, &authority);
+		program
+			.send_instruction(initialize_instruction(
+				&program, &authority, &journal, bump, 2, 3,
+			))
+			.expect("initialize journal");
+
+		program
+			.send_instruction(rename_instruction(
+				&program,
+				&authority,
+				&journal,
+				"compact journal",
+			))
+			.expect("grow title");
+		let balance_after_growth = program.balance(&authority).expect("balance after growth");
+		assert_journal(
+			&program,
+			&journal,
+			&authority,
+			ExpectedJournal {
+				revision: 1,
+				featured_entry: None,
+				title: "compact journal",
+				entries: &[0, 1],
+				markers: &[0, 1, 2],
+			},
+		);
+
+		program
+			.send_instruction(rename_instruction(&program, &authority, &journal, "pina"))
+			.expect("shrink title");
+		let balance_after_shrink = program.balance(&authority).expect("balance after shrink");
+		assert!(
+			balance_after_shrink > balance_after_growth,
+			"the title shrink refunds more rent than the transaction fee",
+		);
+		assert_journal(
+			&program,
+			&journal,
+			&authority,
+			ExpectedJournal {
+				revision: 2,
+				featured_entry: None,
+				title: "pina",
+				entries: &[0, 1],
+				markers: &[0, 1, 2],
+			},
 		);
 
 		program.stop().expect("stop isolated program test");
@@ -169,7 +282,7 @@ fn grows_updates_without_reallocating_shrinks_and_clears() {
 		let (journal, bump) = journal_pda(&program_id, &authority);
 		program
 			.send_instruction(initialize_instruction(
-				&program, &authority, &journal, bump, 2,
+				&program, &authority, &journal, bump, 2, 4,
 			))
 			.expect("initialize journal");
 
@@ -178,21 +291,45 @@ fn grows_updates_without_reallocating_shrinks_and_clears() {
 				&program,
 				&authority,
 				&journal,
-				MAX_ENTRIES as u8,
+				Journal::ENTRIES_CAPACITY as u8,
+				6,
 			))
 			.expect("grow to full capacity");
 		let balance_after_growth = program.balance(&authority).expect("balance after growth");
-		assert_journal(&program, &journal, &authority, 1, &[0, 1, 2, 3, 4, 5, 6, 7]);
+		assert_journal(
+			&program,
+			&journal,
+			&authority,
+			ExpectedJournal {
+				revision: 1,
+				featured_entry: None,
+				title: DEFAULT_TITLE,
+				entries: &[0, 1, 2, 3, 4, 5, 6, 7],
+				markers: &[0, 1, 2, 3, 4, 5],
+			},
+		);
 
 		program
 			.send_instruction(resize_instruction(
 				&program,
 				&authority,
 				&journal,
-				MAX_ENTRIES as u8,
+				Journal::ENTRIES_CAPACITY as u8,
+				6,
 			))
 			.expect("same-size resize");
-		assert_journal(&program, &journal, &authority, 2, &[0, 1, 2, 3, 4, 5, 6, 7]);
+		assert_journal(
+			&program,
+			&journal,
+			&authority,
+			ExpectedJournal {
+				revision: 2,
+				featured_entry: None,
+				title: DEFAULT_TITLE,
+				entries: &[0, 1, 2, 3, 4, 5, 6, 7],
+				markers: &[0, 1, 2, 3, 4, 5],
+			},
+		);
 
 		program
 			.send_instruction(write_instruction(&program, &authority, &journal, 3, 99))
@@ -201,24 +338,99 @@ fn grows_updates_without_reallocating_shrinks_and_clears() {
 			&program,
 			&journal,
 			&authority,
-			3,
-			&[0, 1, 2, 99, 4, 5, 6, 7],
+			ExpectedJournal {
+				revision: 3,
+				featured_entry: Some(99),
+				title: DEFAULT_TITLE,
+				entries: &[0, 1, 2, 99, 4, 5, 6, 7],
+				markers: &[0, 1, 2, 3, 4, 5],
+			},
 		);
 
 		program
-			.send_instruction(resize_instruction(&program, &authority, &journal, 3))
-			.expect("shrink journal");
+			.send_instruction(resize_instruction(&program, &authority, &journal, 3, 8))
+			.expect("shrink entries while growing markers");
 		let balance_after_shrink = program.balance(&authority).expect("balance after shrink");
 		assert!(
 			balance_after_shrink > balance_after_growth,
 			"rent refund from removing five entries exceeds the transaction fee",
 		);
-		assert_journal(&program, &journal, &authority, 4, &[0, 1, 2]);
+		assert_journal(
+			&program,
+			&journal,
+			&authority,
+			ExpectedJournal {
+				revision: 4,
+				featured_entry: Some(99),
+				title: DEFAULT_TITLE,
+				entries: &[0, 1, 2],
+				markers: &[0, 1, 2, 3, 4, 5, 6, 7],
+			},
+		);
 
 		program
-			.send_instruction(resize_instruction(&program, &authority, &journal, 0))
-			.expect("clear to header-only");
-		assert_journal(&program, &journal, &authority, 5, &[]);
+			.send_instruction(resize_instruction(&program, &authority, &journal, 5, 2))
+			.expect("grow entries while shrinking markers");
+		assert_journal(
+			&program,
+			&journal,
+			&authority,
+			ExpectedJournal {
+				revision: 5,
+				featured_entry: Some(99),
+				title: DEFAULT_TITLE,
+				entries: &[0, 1, 2, 3, 4],
+				markers: &[0, 1],
+			},
+		);
+
+		program
+			.send_instruction(resize_instruction(&program, &authority, &journal, 0, 2))
+			.expect("clear entries while preserving markers");
+		assert_journal(
+			&program,
+			&journal,
+			&authority,
+			ExpectedJournal {
+				revision: 6,
+				featured_entry: Some(99),
+				title: DEFAULT_TITLE,
+				entries: &[],
+				markers: &[0, 1],
+			},
+		);
+
+		program
+			.send_instruction(resize_instruction(&program, &authority, &journal, 0, 0))
+			.expect("clear vector tails while preserving the title");
+		assert_journal(
+			&program,
+			&journal,
+			&authority,
+			ExpectedJournal {
+				revision: 7,
+				featured_entry: Some(99),
+				title: DEFAULT_TITLE,
+				entries: &[],
+				markers: &[],
+			},
+		);
+
+		program
+			.send_instruction(rename_instruction(&program, &authority, &journal, ""))
+			.expect("clear the final string tail to header-only");
+		assert_journal(
+			&program,
+			&journal,
+			&authority,
+			ExpectedJournal {
+				revision: 8,
+				featured_entry: Some(99),
+				title: "",
+				entries: &[],
+				markers: &[],
+			},
+		);
 
 		program.stop().expect("stop isolated program test");
 	});
@@ -236,7 +448,7 @@ fn rejected_growth_past_capacity_preserves_data_and_lamports() {
 		let (journal, bump) = journal_pda(&program_id, &authority);
 		program
 			.send_instruction(initialize_instruction(
-				&program, &authority, &journal, bump, 2,
+				&program, &authority, &journal, bump, 2, 3,
 			))
 			.expect("initialize journal");
 		let before = program.account(&journal).expect("journal before rejection");
@@ -246,7 +458,8 @@ fn rejected_growth_past_capacity_preserves_data_and_lamports() {
 				&program,
 				&authority,
 				&journal,
-				(MAX_ENTRIES + 1) as u8,
+				(Journal::ENTRIES_CAPACITY + 1) as u8,
+				0,
 			))
 			.expect_err("capacity overflow must fail");
 		let after = program.account(&journal).expect("journal after rejection");
@@ -269,7 +482,7 @@ fn rejected_out_of_bounds_write_preserves_data() {
 		let (journal, bump) = journal_pda(&program_id, &authority);
 		program
 			.send_instruction(initialize_instruction(
-				&program, &authority, &journal, bump, 2,
+				&program, &authority, &journal, bump, 2, 3,
 			))
 			.expect("initialize journal");
 		let before = program.account(&journal).expect("journal before rejection");
@@ -291,6 +504,49 @@ fn rejected_out_of_bounds_write_preserves_data() {
 
 #[test]
 #[ignore = "run with pina test"]
+fn rejected_invalid_titles_preserve_data_and_lamports() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+		let authority = program.payer();
+		let (journal, bump) = journal_pda(&program_id, &authority);
+		program
+			.send_instruction(initialize_instruction(
+				&program, &authority, &journal, bump, 2, 3,
+			))
+			.expect("initialize journal");
+		let before = program.account(&journal).expect("journal before rejection");
+
+		for (title_len, first_byte) in [((Journal::TITLE_CAPACITY + 1) as u8, b'x'), (1, 0xff)] {
+			let mut data = vec![CompactInstruction::Rename as u8, title_len];
+			let mut title = [0; Journal::TITLE_CAPACITY];
+			title[0] = first_byte;
+			data.extend_from_slice(&title);
+			let instruction = program.instruction(
+				&data,
+				vec![
+					AccountMeta::new(authority, true),
+					AccountMeta::new(journal, false),
+					AccountMeta::new_readonly(Pubkey::default(), false),
+				],
+			);
+			program
+				.send_instruction(instruction)
+				.expect_err("invalid title must fail");
+		}
+
+		let after = program.account(&journal).expect("journal after rejection");
+		assert_eq!(after.data, before.data);
+		assert_eq!(after.lamports, before.lamports);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
+#[test]
+#[ignore = "run with pina test"]
 fn foreign_signer_cannot_resize_another_authoritys_journal() {
 	pina_test::run(async {
 		let program_id = Pubkey::new_from_array(ID.to_bytes());
@@ -301,7 +557,7 @@ fn foreign_signer_cannot_resize_another_authoritys_journal() {
 		let (journal, bump) = journal_pda(&program_id, &authority);
 		program
 			.send_instruction(initialize_instruction(
-				&program, &authority, &journal, bump, 2,
+				&program, &authority, &journal, bump, 2, 3,
 			))
 			.expect("initialize journal");
 		let before = program.account(&journal).expect("journal before attack");
@@ -312,7 +568,7 @@ fn foreign_signer_cannot_resize_another_authoritys_journal() {
 
 		program
 			.send_with_signers(
-				resize_instruction(&program, &attacker.pubkey(), &journal, 4),
+				resize_instruction(&program, &attacker.pubkey(), &journal, 4, 5),
 				&[&attacker],
 			)
 			.expect_err("foreign signer must fail PDA validation");
@@ -346,6 +602,7 @@ fn initialization_rejects_noncanonical_bumps_and_oversized_tails() {
 				&journal,
 				bump.wrapping_add(1),
 				0,
+				0,
 			))
 			.expect_err("noncanonical bump must fail");
 		program
@@ -354,9 +611,20 @@ fn initialization_rejects_noncanonical_bumps_and_oversized_tails() {
 				&authority,
 				&journal,
 				bump,
-				(MAX_ENTRIES + 1) as u8,
+				(Journal::ENTRIES_CAPACITY + 1) as u8,
+				0,
 			))
-			.expect_err("oversized initial tail must fail");
+			.expect_err("oversized initial entry tail must fail");
+		program
+			.send_instruction(initialize_instruction(
+				&program,
+				&authority,
+				&journal,
+				bump,
+				0,
+				(Journal::MARKERS_CAPACITY + 1) as u8,
+			))
+			.expect_err("oversized initial marker tail must fail");
 		assert!(
 			program.account(&journal).is_err(),
 			"failed initialization must not create the PDA"
@@ -381,7 +649,7 @@ fn signer_and_system_program_constraints_are_enforced() {
 		let (journal, bump) = journal_pda(&program_id, &unsigned_authority);
 
 		let unsigned = program.instruction(
-			&[CompactInstruction::Initialize as u8, bump, 0],
+			&[CompactInstruction::Initialize as u8, bump, 0, 0],
 			vec![
 				AccountMeta::new(unsigned_authority, false),
 				AccountMeta::new(journal, false),
@@ -395,7 +663,7 @@ fn signer_and_system_program_constraints_are_enforced() {
 		let authority = program.payer();
 		let (journal, bump) = journal_pda(&program_id, &authority);
 		let wrong_system = program.instruction(
-			&[CompactInstruction::Initialize as u8, bump, 0],
+			&[CompactInstruction::Initialize as u8, bump, 0, 0],
 			vec![
 				AccountMeta::new(authority, true),
 				AccountMeta::new(journal, false),

@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 /// Creates the per-authority sample PDA.
 pub const INITIALIZE_DISCRIMINATOR: u8 = 2u8;
 
@@ -71,7 +69,7 @@ impl InitializeInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut InitializeInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; InitializeInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<InitializeInstructionWireZc>()];
 		<InitializeInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = INITIALIZE_DISCRIMINATOR;
@@ -84,6 +82,7 @@ impl InitializeInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct InitializeInstructionWire {
 	pub discriminator: u8,
 	pub bump: u8,

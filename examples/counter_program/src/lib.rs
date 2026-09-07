@@ -4,7 +4,7 @@
 //! and mutate it across transactions. It covers:
 //!
 //! - **Account schemas** with `#[account]` — native Rust fields plus a
-//!   generated, validated PinaPod view over account bytes.
+//!   generated, validated `PinaPod` view over account bytes.
 //! - **PDA-based accounts** — the counter is stored at a Program Derived
 //!   Address seeded by the authority's public key, so each user gets their own
 //!   counter.
@@ -93,7 +93,7 @@ pub enum CounterAccountType {
 pub struct CounterState {
 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
 	pub bump: u8,
-	/// The current counter value. The PinaPod view stores it using its
+	/// The current counter value. The `PinaPod` view stores it using its
 	/// alignment-one, little-endian representation.
 	pub count: u64,
 }

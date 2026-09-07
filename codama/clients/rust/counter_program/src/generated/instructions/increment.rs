@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 /// Instruction data for `Increment`. No extra payload beyond the
 /// discriminator byte.
 pub const INCREMENT_DISCRIMINATOR: u8 = 1u8;
@@ -69,7 +67,7 @@ impl IncrementInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut IncrementInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; IncrementInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<IncrementInstructionWireZc>()];
 		<IncrementInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = INCREMENT_DISCRIMINATOR;
@@ -82,6 +80,7 @@ impl IncrementInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct IncrementInstructionWire {
 	pub discriminator: u8,
 }

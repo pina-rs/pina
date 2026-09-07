@@ -44,7 +44,7 @@ pub(crate) fn add_derives(attributes: &mut Vec<Attribute>, additions: &[Path]) -
 /// Generates bytes-first construction and validated viewing helpers.
 ///
 /// These helpers never turn a native schema value into bytes. Callers provide
-/// initialized storage, and PinaPod returns the generated zero-copy companion
+/// initialized storage, and `PinaPod` returns the generated zero-copy companion
 /// that is allowed to observe and mutate that storage.
 pub(crate) fn generate_view_helpers(
 	crate_path: &Path,
@@ -68,10 +68,10 @@ pub(crate) fn generate_view_helpers(
 	};
 
 	quote! {
-		/// The exact number of bytes required by the PinaPod representation.
+		/// The exact number of bytes required by the `PinaPod` representation.
 		pub const SIZE: usize = ::core::mem::size_of::<<Self as #crate_path::PinaPodFixed>::Zc>();
 
-		/// Validate `data` and return PinaPod's immutable zero-copy companion.
+		/// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
 		pub fn try_from_bytes(
 			data: &[u8],
 		) -> Result<&<Self as #crate_path::PinaPodFixed>::Zc, #crate_path::ProgramError> {
@@ -86,10 +86,10 @@ pub(crate) fn generate_view_helpers(
 
 			/// Initialize caller-owned storage with a complete typed configuration.
 			///
-			/// PinaPod zeros the complete slice before calling `initialize`, then
+			/// `PinaPod` zeros the complete slice before calling `initialize`, then
 			/// validates the finished representation once. The discriminator is written
 			/// before the caller configures the remaining fields. If the closure or final
-			/// validation fails, PinaPod zeros the complete slice again.
+			/// validation fails, `PinaPod` zeros the complete slice again.
 			///
 			/// # Errors
 			///

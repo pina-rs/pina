@@ -18,6 +18,16 @@ audit:
 
 minimumReleaseAgeExclude:
   - codama-renderers-dart@0.5.5
+  - "@pina-rs/cli-darwin-arm64@0.13.0"
+  - "@pina-rs/cli-darwin-x64@0.13.0"
+  - "@pina-rs/cli-freebsd-x64@0.13.0"
+  - "@pina-rs/cli-linux-arm64-gnu@0.13.0"
+  - "@pina-rs/cli-linux-arm64-musl@0.13.0"
+  - "@pina-rs/cli-linux-x64-gnu@0.13.0"
+  - "@pina-rs/cli-linux-x64-musl@0.13.0"
+  - "@pina-rs/cli-win32-arm64-msvc@0.13.0"
+  - "@pina-rs/cli-win32-x64-msvc@0.13.0"
+  - "@pina-rs/cli@0.13.0"
 
 onlyBuiltDependencies:
   - esbuild

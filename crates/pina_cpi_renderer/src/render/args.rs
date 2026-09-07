@@ -130,7 +130,7 @@ fn render_fixed_size_argument(
 	context: &str,
 ) -> Result<RenderedArgument> {
 	match fixed_size.r#type.as_ref() {
-		TypeNode::Bytes(_) => render_fixed_bytes_argument(field, fixed_size.size),
+		TypeNode::Bytes(_) => Ok(render_fixed_bytes_argument(field, fixed_size.size)),
 		TypeNode::SizePrefix(prefix) if matches!(prefix.r#type.as_ref(), TypeNode::String(_)) => {
 			render_pinapod_string_argument(field, fixed_size.size, prefix, context)
 		}
@@ -149,15 +149,15 @@ fn render_fixed_size_argument(
 	}
 }
 
-fn render_fixed_bytes_argument(field: &str, wire_size: usize) -> Result<RenderedArgument> {
-	Ok(RenderedArgument {
+fn render_fixed_bytes_argument(field: &str, wire_size: usize) -> RenderedArgument {
+	RenderedArgument {
 		write: format!("data[{{offset}}..{{offset_end}}].copy_from_slice(&self.{field});"),
 		field: field.to_string(),
 		rust_type: format!("[u8; {wire_size}]"),
 		wire_size,
 		borrows: false,
 		docs: Vec::new(),
-	})
+	}
 }
 
 fn render_pinapod_string_argument(

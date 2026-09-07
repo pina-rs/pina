@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const ADD_ROLE_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
@@ -81,7 +79,7 @@ impl AddRoleInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut AddRoleInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; AddRoleInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<AddRoleInstructionWireZc>()];
 		<AddRoleInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = ADD_ROLE_DISCRIMINATOR;
@@ -94,6 +92,7 @@ impl AddRoleInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct AddRoleInstructionWire {
 	pub discriminator: u8,
 	pub role_id: u64,

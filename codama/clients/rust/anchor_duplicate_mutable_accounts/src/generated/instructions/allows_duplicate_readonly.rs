@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
@@ -64,7 +62,7 @@ impl AllowsDuplicateReadonlyInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut AllowsDuplicateReadonlyInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; AllowsDuplicateReadonlyInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<AllowsDuplicateReadonlyInstructionWireZc>()];
 		<AllowsDuplicateReadonlyInstructionWire as pina::PinaPodFixed>::initialize(
 			&mut bytes,
 			|data| {
@@ -80,6 +78,7 @@ impl AllowsDuplicateReadonlyInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct AllowsDuplicateReadonlyInstructionWire {
 	pub discriminator: u8,
 }

@@ -8,9 +8,8 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct TodoState {
 	pub discriminator: u8,
 	pub owner: solana_pubkey::Pubkey,
@@ -22,7 +21,7 @@ pub struct TodoState {
 pub const TODO_STATE_DISCRIMINATOR: u8 = 1u8;
 
 impl TodoState {
-	pub const LEN: usize = Self::SIZE;
+	pub const LEN: usize = core::mem::size_of::<TodoStateZc>();
 
 	/// Initialize and validate account storage in one pass.
 	///

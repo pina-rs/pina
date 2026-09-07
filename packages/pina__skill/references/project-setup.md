@@ -43,7 +43,7 @@ The usual structure is:
 ```rust
 #![cfg_attr(not(test), no_std)]
 
-use pina::prelude::*;
+use pina::*;
 
 nostd_entrypoint!(process_instruction);
 

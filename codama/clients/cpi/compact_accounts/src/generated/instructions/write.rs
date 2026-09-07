@@ -22,7 +22,8 @@ use crate::ProgramAccount;
 #[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
 pub struct Write<'account> {
 	/// CPI account `authority`.
-	/// Required privileges: read-only and signer.
+	/// Funds growth if a future write patch changes the encoded length.
+	/// Required privileges: writable and signer.
 	pub authority: &'account AccountView,
 
 	/// CPI account `journal`.
@@ -74,7 +75,7 @@ impl<'account> Write<'account> {
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
 		let accounts: [CpiHandle<'_>; 2] = [
-			CpiHandle::readonly_signer(self.authority),
+			CpiHandle::writable_signer(self.authority)?,
 			CpiHandle::writable(self.journal)?,
 		];
 		let data = self.ix.to_bytes()?;

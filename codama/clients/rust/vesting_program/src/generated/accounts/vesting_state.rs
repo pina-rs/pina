@@ -8,9 +8,8 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct VestingState {
 	pub discriminator: u8,
 	pub admin: solana_pubkey::Pubkey,
@@ -28,7 +27,7 @@ pub struct VestingState {
 pub const VESTING_STATE_DISCRIMINATOR: u8 = 1u8;
 
 impl VestingState {
-	pub const LEN: usize = Self::SIZE;
+	pub const LEN: usize = core::mem::size_of::<VestingStateZc>();
 
 	/// Initialize and validate account storage in one pass.
 	///

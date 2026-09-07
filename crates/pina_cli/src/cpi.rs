@@ -446,7 +446,7 @@ mod tests {
 			assert!(source.contains("pub fn invoke_signed("));
 			assert!(source.contains("pub struct Initialize<'account>"));
 			assert!(source.contains("pub ix: InitializeIx"));
-			assert!(source.contains("let data = self.ix.to_bytes();"));
+			assert!(source.contains("let data = self.ix.to_bytes()?;"));
 			assert!(source.contains("CpiContext::new(*program, accounts)"));
 		}
 	}

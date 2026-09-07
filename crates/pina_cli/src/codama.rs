@@ -185,15 +185,27 @@ dependencies:
 }
 "#;
 
+/// Options for workspace-wide Codama generation across all examples.
+///
+/// Mirrors the `pina codama generate` arguments: source examples, IDL fixtures,
+/// and one output directory per generated client ecosystem.
 #[derive(Debug, Clone)]
 pub struct CodamaGenerateOptions {
+	/// Directory containing the example program crates.
 	pub examples_dir: PathBuf,
+	/// Directory holding the committed `codama/idls` fixtures.
 	pub idls_dir: PathBuf,
+	/// Output directory for generated Rust client crates.
 	pub rust_out: PathBuf,
+	/// Output directory for generated CPI client crates.
 	pub cpi_out: PathBuf,
+	/// Output directory for generated TypeScript clients.
 	pub js_out: PathBuf,
+	/// Output directory for generated Dart clients.
 	pub dart_out: PathBuf,
+	/// Example names to generate; empty selects every example.
 	pub examples: Vec<String>,
+	/// Command used to invoke Node-based Codama tooling.
 	pub npx: String,
 }
 
@@ -243,6 +255,9 @@ struct BoundedOutput {
 	stderr: Vec<u8>,
 }
 
+/// Generate IDL fixtures and all configured clients for the selected examples.
+///
+/// Returns the names of every example that was generated, in sorted order.
 pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, CodamaError> {
 	let examples = collect_examples(options)?;
 	let programs = examples

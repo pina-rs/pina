@@ -1,0 +1,1000 @@
+{
+	"schema_version": "0.4",
+	"kind": "monochange.releaseRecord",
+	"created_at": "2026-09-07T07:12:07Z",
+	"command": "release",
+	"version": null,
+	"versions": {
+		"core": "0.14.0",
+		"pina_root": "0.0.4"
+	},
+	"release_targets": [
+		{
+			"id": "core",
+			"kind": "group",
+			"version": "0.14.0",
+			"version_format": "primary",
+			"tag": true,
+			"release": true,
+			"tag_name": "v0.14.0",
+			"members": [
+				"pina",
+				"pina_cli",
+				"pina_lints",
+				"pina_macros",
+				"pina_codama_renderer",
+				"pina_cpi_renderer",
+				"pina_profile",
+				"pina_sdk_ids",
+				"pina_test",
+				"pina_codama_nodes",
+				"pina_codama_renderer_cpi",
+				"pina_cli_npm",
+				"pina_cli_darwin_arm64",
+				"pina_cli_darwin_x64",
+				"pina_cli_freebsd_x64",
+				"pina_cli_linux_arm64_gnu",
+				"pina_cli_linux_arm64_musl",
+				"pina_cli_linux_x64_gnu",
+				"pina_cli_linux_x64_musl",
+				"pina_cli_win32_arm64_msvc",
+				"pina_cli_win32_x64_msvc",
+				"pina_skill"
+			]
+		},
+		{
+			"id": "pina_root",
+			"kind": "package",
+			"version": "0.0.4",
+			"version_format": "namespaced",
+			"tag": false,
+			"release": false,
+			"tag_name": "pina_root/v0.0.4",
+			"members": [
+				"pina_root"
+			]
+		}
+	],
+	"released_packages": [
+		"@pina-rs/cli",
+		"@pina-rs/cli-darwin-arm64",
+		"@pina-rs/cli-darwin-x64",
+		"@pina-rs/cli-freebsd-x64",
+		"@pina-rs/cli-linux-arm64-gnu",
+		"@pina-rs/cli-linux-arm64-musl",
+		"@pina-rs/cli-linux-x64-gnu",
+		"@pina-rs/cli-linux-x64-musl",
+		"@pina-rs/cli-win32-arm64-msvc",
+		"@pina-rs/cli-win32-x64-msvc",
+		"@pina-rs/codama-nodes",
+		"@pina-rs/codama-renderer-cpi",
+		"@pina-rs/skill",
+		"pina",
+		"pina_cli",
+		"pina_codama_renderer",
+		"pina_cpi_renderer",
+		"pina_lints",
+		"pina_macros",
+		"pina_profile",
+		"pina_root",
+		"pina_sdk_ids",
+		"pina_test"
+	],
+	"changed_files": [
+		"Cargo.lock",
+		"Cargo.toml",
+		"changelog.md",
+		"crates/pina/Cargo.toml",
+		"crates/pina_cli/Cargo.toml",
+		"crates/pina_codama_renderer/Cargo.toml",
+		"crates/pina_cpi_renderer/Cargo.toml",
+		"crates/pina_lints/Cargo.toml",
+		"crates/pina_macros/Cargo.toml",
+		"crates/pina_profile/Cargo.toml",
+		"crates/pina_sdk_ids/Cargo.toml",
+		"crates/pina_test/Cargo.toml",
+		"packages/codama-renderer-cpi/package.json",
+		"packages/nodes-from-pina/package.json",
+		"packages/pina__cli/package.json",
+		"packages/pina__cli-darwin-arm64/package.json",
+		"packages/pina__cli-darwin-x64/package.json",
+		"packages/pina__cli-freebsd-x64/package.json",
+		"packages/pina__cli-linux-arm64-gnu/package.json",
+		"packages/pina__cli-linux-arm64-musl/package.json",
+		"packages/pina__cli-linux-x64-gnu/package.json",
+		"packages/pina__cli-linux-x64-musl/package.json",
+		"packages/pina__cli-win32-arm64-msvc/package.json",
+		"packages/pina__cli-win32-x64-msvc/package.json",
+		"packages/pina__skill/package.json",
+		"pnpm-lock.yaml",
+		"pnpm-workspace.yaml"
+	],
+	"package_publications": [
+		{
+			"package": "pina",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_arm64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_freebsd_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_npm",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_arm64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_x64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_nodes",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cpi",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cpi_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_lints",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_macros",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_profile",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_sdk_ids",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_skill",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_test",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.14.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			},
+			"timeout": {
+				"timeout_seconds": 900,
+				"retries": 2
+			}
+		}
+	],
+	"updated_changelogs": [
+		"changelog.md"
+	],
+	"deleted_changesets": [
+		".changeset/1788720522-pina.md",
+		".changeset/1788749469-pina.md",
+		".changeset/1788750000-pina.md",
+		".changeset/pina-documentation-overhaul.md"
+	],
+	"changesets": [
+		{
+			"path": ".changeset/1788720522-pina.md",
+			"summary": "Generate checked compact-account size helpers",
+			"details": "Compact accounts now expose MIN_SIZE, per-tail capacity constants, count-aware projected_bytes calculations, and encoded_size on immutable and mutable views. Use account.data_len() for allocated bytes, encoded_size() for committed logical bytes, and projected_size() for staged mutable edits.\n\nThe compact account examples use these helpers for initialization, growth, shrinking, and committed-versus-staged size checks.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "7240a9d3694f98d2a71c4582ec177e1052785493",
+						"short_sha": "7240a9d",
+						"url": "https://github.com/pina-rs/pina/commit/7240a9d3694f98d2a71c4582ec177e1052785493",
+						"authored_at": "2026-09-06T20:51:59+01:00",
+						"committed_at": "2026-09-06T20:51:59+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#304",
+						"title": "feat(accounts): generate compact size helpers",
+						"url": "https://github.com/pina-rs/pina/pull/304",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "d70097079748d42abbde56b2250e2ec89fb91c3b",
+						"short_sha": "d700970",
+						"url": "https://github.com/pina-rs/pina/commit/d70097079748d42abbde56b2250e2ec89fb91c3b",
+						"authored_at": "2026-09-06T22:33:48+01:00",
+						"committed_at": "2026-09-06T22:33:48+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#306",
+						"title": "refactor(examples): use compact size helpers",
+						"url": "https://github.com/pina-rs/pina/pull/306",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/1788749469-pina.md",
+			"summary": "Make compact resizing automatic and clarify rent semantics",
+			"details": "Reallocation builders now use `target_size` and `rent_account` instead of `new_size` and `payer`:\n\n```rust\nReallocAccount {\n\taccount,\n\trent_account,\n\ttarget_size,\n\tprogram_id,\n}\n.invoke()?;\n```\n\nUse `ResizeCompactAccount::invoke` for exact compact updates. Its callback commits the generated mutable view. Pina grows before the callback, verifies the committed size, and shrinks afterward:\n\n```rust\nlet target_size = Journal::projected_bytes(entries.len(), markers.len())?;\n\nResizeCompactAccount {\n\taccount,\n\trent_account,\n\ttarget_size,\n\tprogram_id,\n}\n.invoke::<Journal, _>(|data| {\n\tlet mut journal = Journal::try_from_bytes_mut(data)?;\n\tjournal\n\t\t.set_entries(entries)\n\t\t.map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal\n\t\t.set_markers(markers)\n\t\t.map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal.commit().map_err(|_| ProgramError::InvalidAccountData)?;\n\n\tOk(())\n})?;\n```",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_skill",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c5092deb5ff96e7bee11690e6defdbb4d6f48601",
+						"short_sha": "c5092de",
+						"url": "https://github.com/pina-rs/pina/commit/c5092deb5ff96e7bee11690e6defdbb4d6f48601",
+						"authored_at": "2026-09-07T06:33:14+01:00",
+						"committed_at": "2026-09-07T06:33:14+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#309",
+						"title": "feat(accounts)!: automate compact account resizing",
+						"url": "https://github.com/pina-rs/pina/pull/309",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c5092deb5ff96e7bee11690e6defdbb4d6f48601",
+						"short_sha": "c5092de",
+						"url": "https://github.com/pina-rs/pina/commit/c5092deb5ff96e7bee11690e6defdbb4d6f48601",
+						"authored_at": "2026-09-07T06:33:14+01:00",
+						"committed_at": "2026-09-07T06:33:14+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#309",
+						"title": "feat(accounts)!: automate compact account resizing",
+						"url": "https://github.com/pina-rs/pina/pull/309",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/1788750000-pina.md",
+			"summary": "Support compact strings alongside multiple dynamic fields",
+			"details": "Compact accounts now accept bounded `String` and `PodString` fields in the dynamic suffix. String tails may be combined with any number of `Vec` or `PodVec` tails, and each field keeps an independent active length:\n\n```rust\n#[account(discriminator = AccountType, compact)]\npub struct Journal {\n\tpub featured_entry: Option<u64>,\n\tpub title: PodString<24>,\n\tpub entries: Vec<u64, 8>,\n\tpub markers: PodVec<u8, 8, 8>,\n}\n\nlet target_size = Journal::projected_bytes(\n\ttitle.len(),\n\tentries.len(),\n\tmarkers.len(),\n)?;\n```\n\nThe generated fixed header stores `Option<u64>` as `PodOption<PodU64>`, while only the active UTF-8 title bytes and active vector elements contribute to the account allocation.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_codama_renderer",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "77bb4fd378589162206911bc436cbf4bdd74b19d",
+						"short_sha": "77bb4fd",
+						"url": "https://github.com/pina-rs/pina/commit/77bb4fd378589162206911bc436cbf4bdd74b19d",
+						"authored_at": "2026-09-07T08:01:51+01:00",
+						"committed_at": "2026-09-07T08:01:51+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#310",
+						"title": "feat(accounts): support compact string tails",
+						"url": "https://github.com/pina-rs/pina/pull/310",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "77bb4fd378589162206911bc436cbf4bdd74b19d",
+						"short_sha": "77bb4fd",
+						"url": "https://github.com/pina-rs/pina/commit/77bb4fd378589162206911bc436cbf4bdd74b19d",
+						"authored_at": "2026-09-07T08:01:51+01:00",
+						"committed_at": "2026-09-07T08:01:51+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#310",
+						"title": "feat(accounts): support compact string tails",
+						"url": "https://github.com/pina-rs/pina/pull/310",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/pina-documentation-overhaul.md",
+			"summary": "Overhaul the book, readmes, and rustdoc",
+			"details": "The published book, root readme, crate readmes, security policy, agent guidance, and rustdoc all get a verified accuracy pass: the empty Security Lints page includes the real lint catalog again, badges stop rendering mangled `pina**cli` labels, stale claims (zeropod naming, flash-loan guards, closed audit findings, closed issue backlogs, vesting token behavior, node toolchain provenance, changeset front matter) are corrected against the code, the workspace and examples inventories gain the crates and examples that shipped since they were written, the tutorials no longer show snippets that cannot compile, and internal working notes move out of the user-facing book with their statuses refreshed. The pina_codama_renderer entry API, the pina token aliases, and the pina_cli Codama generation options gain rustdoc, and generated clients no longer emit broken intra-doc links.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_codama_renderer",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_lints",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_profile",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_sdk_ids",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_skill",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_test",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "ad6a2ed60589c6d9aec7d2add263f2df3152670d",
+						"short_sha": "ad6a2ed",
+						"url": "https://github.com/pina-rs/pina/commit/ad6a2ed60589c6d9aec7d2add263f2df3152670d",
+						"authored_at": "2026-09-07T04:04:08+01:00",
+						"committed_at": "2026-09-07T04:04:08+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#307",
+						"title": "docs: verified accuracy and quality pass across book, readmes, and rustdoc",
+						"url": "https://github.com/pina-rs/pina/pull/307",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "ad6a2ed60589c6d9aec7d2add263f2df3152670d",
+						"short_sha": "ad6a2ed",
+						"url": "https://github.com/pina-rs/pina/commit/ad6a2ed60589c6d9aec7d2add263f2df3152670d",
+						"authored_at": "2026-09-07T04:04:08+01:00",
+						"committed_at": "2026-09-07T04:04:08+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#307",
+						"title": "docs: verified accuracy and quality pass across book, readmes, and rustdoc",
+						"url": "https://github.com/pina-rs/pina/pull/307",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		}
+	],
+	"changelogs": [
+		{
+			"owner_id": "core",
+			"owner_kind": "group",
+			"path": "changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.14.0](https://github.com/pina-rs/pina/releases/tag/v0.14.0) (2026-09-07)",
+				"summary": [
+					"Grouped release for `core`."
+				],
+				"sections": [
+					{
+						"title": "Breaking Changes",
+						"collapsed": false,
+						"entries": [
+							"#### Make compact resizing automatic and clarify rent semantics\n_Packages:_ _pina_, _pina_macros_\n\nReallocation builders now use `target_size` and `rent_account` instead of `new_size` and `payer`:\n\n```rust\nReallocAccount {\n\taccount,\n\trent_account,\n\ttarget_size,\n\tprogram_id,\n}\n.invoke()?;\n```\n\nUse `ResizeCompactAccount::invoke` for exact compact updates. Its callback commits the generated mutable view. Pina grows before the callback, verifies the committed size, and shrinks afterward:\n\n```rust\nlet target_size = Journal::projected_bytes(entries.len(), markers.len())?;\n\nResizeCompactAccount {\n\taccount,\n\trent_account,\n\ttarget_size,\n\tprogram_id,\n}\n.invoke::<Journal, _>(|data| {\n\tlet mut journal = Journal::try_from_bytes_mut(data)?;\n\tjournal\n\t\t.set_entries(entries)\n\t\t.map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal\n\t\t.set_markers(markers)\n\t\t.map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal.commit().map_err(|_| ProgramError::InvalidAccountData)?;\n\n\tOk(())\n})?;\n```\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #309](https://github.com/pina-rs/pina/pull/309)"
+						]
+					},
+					{
+						"title": "Features",
+						"collapsed": false,
+						"entries": [
+							"#### Generate checked compact-account size helpers\n_Packages:_ _pina_, _pina_macros_\n\nCompact accounts now expose MIN_SIZE, per-tail capacity constants, count-aware projected_bytes calculations, and encoded_size on immutable and mutable views. Use account.data_len() for allocated bytes, encoded_size() for committed logical bytes, and projected_size() for staged mutable edits.\n\nThe compact account examples use these helpers for initialization, growth, shrinking, and committed-versus-staged size checks.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #304](https://github.com/pina-rs/pina/pull/304)",
+							"#### Support compact strings alongside multiple dynamic fields\n_Packages:_ _pina_, _pina_cli_, _pina_macros_, _pina_codama_renderer_\n\nCompact accounts now accept bounded `String` and `PodString` fields in the dynamic suffix. String tails may be combined with any number of `Vec` or `PodVec` tails, and each field keeps an independent active length:\n\n```rust\n#[account(discriminator = AccountType, compact)]\npub struct Journal {\n\tpub featured_entry: Option<u64>,\n\tpub title: PodString<24>,\n\tpub entries: Vec<u64, 8>,\n\tpub markers: PodVec<u8, 8, 8>,\n}\n\nlet target_size = Journal::projected_bytes(\n\ttitle.len(),\n\tentries.len(),\n\tmarkers.len(),\n)?;\n```\n\nThe generated fixed header stores `Option<u64>` as `PodOption<PodU64>`, while only the active UTF-8 title bytes and active vector elements contribute to the account allocation.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #310](https://github.com/pina-rs/pina/pull/310)"
+						]
+					},
+					{
+						"title": "Documentation",
+						"collapsed": false,
+						"entries": [
+							"#### Overhaul the book, readmes, and rustdoc\n_Packages:_ _pina_, _pina_cli_, _pina_codama_renderer_\n\nThe published book, root readme, crate readmes, security policy, agent guidance, and rustdoc all get a verified accuracy pass: the empty Security Lints page includes the real lint catalog again, badges stop rendering mangled `pina**cli` labels, stale claims (zeropod naming, flash-loan guards, closed audit findings, closed issue backlogs, vesting token behavior, node toolchain provenance, changeset front matter) are corrected against the code, the workspace and examples inventories gain the crates and examples that shipped since they were written, the tutorials no longer show snippets that cannot compile, and internal working notes move out of the user-facing book with their statuses refreshed. The pina_codama_renderer entry API, the pina token aliases, and the pina_cli Codama generation options gain rustdoc, and generated clients no longer emit broken intra-doc links.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #307](https://github.com/pina-rs/pina/pull/307)",
+							"#### Make compact resizing automatic and clarify rent semantics\n_Packages:_ _pina_skill_\n\nReallocation builders now use `target_size` and `rent_account` instead of `new_size` and `payer`:\n\n```rust\nReallocAccount {\n\taccount,\n\trent_account,\n\ttarget_size,\n\tprogram_id,\n}\n.invoke()?;\n```\n\nUse `ResizeCompactAccount::invoke` for exact compact updates. Its callback commits the generated mutable view. Pina grows before the callback, verifies the committed size, and shrinks afterward:\n\n```rust\nlet target_size = Journal::projected_bytes(entries.len(), markers.len())?;\n\nResizeCompactAccount {\n\taccount,\n\trent_account,\n\ttarget_size,\n\tprogram_id,\n}\n.invoke::<Journal, _>(|data| {\n\tlet mut journal = Journal::try_from_bytes_mut(data)?;\n\tjournal\n\t\t.set_entries(entries)\n\t\t.map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal\n\t\t.set_markers(markers)\n\t\t.map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal.commit().map_err(|_| ProgramError::InvalidAccountData)?;\n\n\tOk(())\n})?;\n```\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #309](https://github.com/pina-rs/pina/pull/309)"
+						]
+					},
+					{
+						"title": "Notes",
+						"collapsed": false,
+						"entries": [
+							"#### Overhaul the book, readmes, and rustdoc\n_Packages:_ _pina_lints_, _pina_macros_, _pina_profile_, _pina_sdk_ids_, _pina_test_, _pina_skill_\n\nThe published book, root readme, crate readmes, security policy, agent guidance, and rustdoc all get a verified accuracy pass: the empty Security Lints page includes the real lint catalog again, badges stop rendering mangled `pina**cli` labels, stale claims (zeropod naming, flash-loan guards, closed audit findings, closed issue backlogs, vesting token behavior, node toolchain provenance, changeset front matter) are corrected against the code, the workspace and examples inventories gain the crates and examples that shipped since they were written, the tutorials no longer show snippets that cannot compile, and internal working notes move out of the user-facing book with their statuses refreshed. The pina_codama_renderer entry API, the pina token aliases, and the pina_cli Codama generation options gain rustdoc, and generated clients no longer emit broken intra-doc links.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #307](https://github.com/pina-rs/pina/pull/307)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.14.0](https://github.com/pina-rs/pina/releases/tag/v0.14.0) (2026-09-07)\n\nGrouped release for `core`.\n### Breaking Changes\n\n#### Make compact resizing automatic and clarify rent semantics\n_Packages:_ _pina_, _pina_macros_\n\nReallocation builders now use `target_size` and `rent_account` instead of `new_size` and `payer`:\n\n```rust\nReallocAccount {\n\taccount,\n\trent_account,\n\ttarget_size,\n\tprogram_id,\n}\n.invoke()?;\n```\n\nUse `ResizeCompactAccount::invoke` for exact compact updates. Its callback commits the generated mutable view. Pina grows before the callback, verifies the committed size, and shrinks afterward:\n\n```rust\nlet target_size = Journal::projected_bytes(entries.len(), markers.len())?;\n\nResizeCompactAccount {\n\taccount,\n\trent_account,\n\ttarget_size,\n\tprogram_id,\n}\n.invoke::<Journal, _>(|data| {\n\tlet mut journal = Journal::try_from_bytes_mut(data)?;\n\tjournal\n\t\t.set_entries(entries)\n\t\t.map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal\n\t\t.set_markers(markers)\n\t\t.map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal.commit().map_err(|_| ProgramError::InvalidAccountData)?;\n\n\tOk(())\n})?;\n```\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #309](https://github.com/pina-rs/pina/pull/309)\n\n### Features\n\n#### Generate checked compact-account size helpers\n_Packages:_ _pina_, _pina_macros_\n\nCompact accounts now expose MIN_SIZE, per-tail capacity constants, count-aware projected_bytes calculations, and encoded_size on immutable and mutable views. Use account.data_len() for allocated bytes, encoded_size() for committed logical bytes, and projected_size() for staged mutable edits.\n\nThe compact account examples use these helpers for initialization, growth, shrinking, and committed-versus-staged size checks.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #304](https://github.com/pina-rs/pina/pull/304)\n\n#### Support compact strings alongside multiple dynamic fields\n_Packages:_ _pina_, _pina_cli_, _pina_macros_, _pina_codama_renderer_\n\nCompact accounts now accept bounded `String` and `PodString` fields in the dynamic suffix. String tails may be combined with any number of `Vec` or `PodVec` tails, and each field keeps an independent active length:\n\n```rust\n#[account(discriminator = AccountType, compact)]\npub struct Journal {\n\tpub featured_entry: Option<u64>,\n\tpub title: PodString<24>,\n\tpub entries: Vec<u64, 8>,\n\tpub markers: PodVec<u8, 8, 8>,\n}\n\nlet target_size = Journal::projected_bytes(\n\ttitle.len(),\n\tentries.len(),\n\tmarkers.len(),\n)?;\n```\n\nThe generated fixed header stores `Option<u64>` as `PodOption<PodU64>`, while only the active UTF-8 title bytes and active vector elements contribute to the account allocation.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #310](https://github.com/pina-rs/pina/pull/310)\n\n### Documentation\n\n#### Overhaul the book, readmes, and rustdoc\n_Packages:_ _pina_, _pina_cli_, _pina_codama_renderer_\n\nThe published book, root readme, crate readmes, security policy, agent guidance, and rustdoc all get a verified accuracy pass: the empty Security Lints page includes the real lint catalog again, badges stop rendering mangled `pina**cli` labels, stale claims (zeropod naming, flash-loan guards, closed audit findings, closed issue backlogs, vesting token behavior, node toolchain provenance, changeset front matter) are corrected against the code, the workspace and examples inventories gain the crates and examples that shipped since they were written, the tutorials no longer show snippets that cannot compile, and internal working notes move out of the user-facing book with their statuses refreshed. The pina_codama_renderer entry API, the pina token aliases, and the pina_cli Codama generation options gain rustdoc, and generated clients no longer emit broken intra-doc links.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #307](https://github.com/pina-rs/pina/pull/307)\n\n#### Make compact resizing automatic and clarify rent semantics\n_Packages:_ _pina_skill_\n\nReallocation builders now use `target_size` and `rent_account` instead of `new_size` and `payer`:\n\n```rust\nReallocAccount {\n\taccount,\n\trent_account,\n\ttarget_size,\n\tprogram_id,\n}\n.invoke()?;\n```\n\nUse `ResizeCompactAccount::invoke` for exact compact updates. Its callback commits the generated mutable view. Pina grows before the callback, verifies the committed size, and shrinks afterward:\n\n```rust\nlet target_size = Journal::projected_bytes(entries.len(), markers.len())?;\n\nResizeCompactAccount {\n\taccount,\n\trent_account,\n\ttarget_size,\n\tprogram_id,\n}\n.invoke::<Journal, _>(|data| {\n\tlet mut journal = Journal::try_from_bytes_mut(data)?;\n\tjournal\n\t\t.set_entries(entries)\n\t\t.map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal\n\t\t.set_markers(markers)\n\t\t.map_err(|_| ProgramError::InvalidAccountData)?;\n\tjournal.commit().map_err(|_| ProgramError::InvalidAccountData)?;\n\n\tOk(())\n})?;\n```\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #309](https://github.com/pina-rs/pina/pull/309)\n\n### Notes\n\n#### Overhaul the book, readmes, and rustdoc\n_Packages:_ _pina_lints_, _pina_macros_, _pina_profile_, _pina_sdk_ids_, _pina_test_, _pina_skill_\n\nThe published book, root readme, crate readmes, security policy, agent guidance, and rustdoc all get a verified accuracy pass: the empty Security Lints page includes the real lint catalog again, badges stop rendering mangled `pina**cli` labels, stale claims (zeropod naming, flash-loan guards, closed audit findings, closed issue backlogs, vesting token behavior, node toolchain provenance, changeset front matter) are corrected against the code, the workspace and examples inventories gain the crates and examples that shipped since they were written, the tutorials no longer show snippets that cannot compile, and internal working notes move out of the user-facing book with their statuses refreshed. The pina_codama_renderer entry API, the pina token aliases, and the pina_cli Codama generation options gain rustdoc, and generated clients no longer emit broken intra-doc links.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #307](https://github.com/pina-rs/pina/pull/307)"
+		}
+	],
+	"provider": {
+		"kind": "github",
+		"owner": "pina-rs",
+		"repo": "pina",
+		"host": null
+	}
+}

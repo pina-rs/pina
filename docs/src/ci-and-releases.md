@@ -18,9 +18,15 @@ The GitHub CI workflow verifies:
   - `default` (`build:pina:default` + `test:pina:default`)
   - `no-default` (`build:pina:no-default-only` + `test:pina:no-default` + `doc:pina:no-default`)
   - `token-only` (`build:pina:token-only` + `test:pina:token-only`)
+  - `compact-only` (`build:pina:compact-only` + `test:pina:compact-only` + `doc:pina:compact-only`)
+  - `account-resize-only` (`build:pina:account-resize-only` + `test:pina:account-resize-only`)
   - `all-features` (`build:pina:all-features` + `test:pina:all-features`)
 - `test:program-e2e` (Example program tests, SBF builds, mollusk-svm integration tests, and BPF artifact verification)
 - `test:idl` (regenerate `codama/idls` and the Rust, JavaScript, and Dart clients; validate every output; and fail on any diff)
+- `windows-cli` (portability: the `pina_cli` test suite on `x86_64-pc-windows-msvc`)
+- `pina-test` (`verify:pina-test` for the published Surfpool test harness)
+- `fuzz` (`test:fuzz:smoke` for every fuzz target, with artifacts uploaded)
+- `miri` (`test:miri` zero-copy regressions for loader guards and token helpers)
 - `cargo build --locked`
 - `cargo build --all-features --locked`
 
@@ -56,9 +62,9 @@ Every program is deployed at its declared ID and is exercised with a malformed d
 
 The broader Pina examples also run their purpose-built Mollusk, LiteSVM, and Quasar tests in `test:program-e2e`; these cover PDA derivation, ownership, token-account, arithmetic/range, initialization, and unauthorized-mutation flows that need program-specific state setup. Surfpool complements those tests with a full, deployed SBF boundary check. It provides evidence that the listed invariants hold for the tested attacks; it is not a proof that no other attack exists.
 
-### Known audit blocker
+### Previously-tracked audit finding
 
-The `security/06-duplicate-mutable-accounts/secure` fixture checks distinct, program-owned balances but does not require that its signer matches the source balance's stored owner. It can debit a victim's logical balance into an attacker's destination. Its source fix needs a stateful regression: an unauthorized transfer must fail without changing either balance, while the legitimate owner path must succeed. The generic harness intentionally does not treat readonly-metadata rejection as evidence that this authorization invariant is enforced.
+An earlier revision of the `security/06-duplicate-mutable-accounts/secure` fixture checked distinct, program-owned balances but did not require that its signer matches the source balance's stored owner, so an unrelated signer could debit a victim's logical balance into an attacker's destination. That authorization invariant is now enforced: `validate_source_authority` rejects a signer that does not match the source balance's stored owner with `LedgerError::UnauthorizedSigner`, and dedicated regression tests cover both the unauthorized-transfer rejection and the legitimate owner path.
 
 ## Compute-unit regression policy
 
@@ -101,8 +107,8 @@ The comparison writes artifacts to `target/cu/`, including a markdown summary an
 The `coverage` workflow runs focused coverage with `cargo llvm-cov` and publishes an LCOV artifact:
 
 - Command: `coverage:all`
-- Artifact: `target/coverage/lcov.info`
-- Optional upload: Codecov (`fail_ci_if_error: false`)
+- Artifacts: `target/coverage/lcov.info` and `target/coverage/pina-test.info`
+- Optional upload: Codecov (`fail_ci_if_error: true`, so a failed upload fails the job)
 
 ## Docs publishing
 

@@ -8,16 +8,15 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 #[pinapod(compact)]
 pub struct Journal {
-	/// A compact account with two independently encoded dynamic fields.
+	/// A compact account with four independently encoded dynamic fields.
 	///
-	/// The one-byte discriminator, bump, authority, revision, and two vector
-	/// prefixes always occupy [`Self::HEADER_SIZE`] bytes. Each active row adds an
-	/// eight-byte entry and a one-byte marker, up to [`Self::MAX_SIZE`].
+	/// The fixed header includes a semantic `Option<u64>` encoded as
+	/// `PodOption<PodU64>`. The title and optional note use compact strings, while
+	/// entries and markers use vectors; only their active bytes are allocated.
 	pub discriminator: u8,
 	/// Canonical PDA bump.
 	pub bump: u8,
@@ -25,9 +24,13 @@ pub struct Journal {
 	pub authority: solana_pubkey::Pubkey,
 	/// Number of successful resize or write operations.
 	pub revision: u32,
+	/// Most recently written entry value, stored as `PodOption<PodU64>`.
+	pub featured_entry: Option<u64>,
+	/// Human-readable title stored as active UTF-8 bytes.
+	pub title: pina::String<24>,
 	/// Active entries. Unused capacity consumes no account bytes.
 	pub entries: pina::Vec<u64, 8>,
-	/// One marker per entry, stored as a second compact tail.
+	/// Independently sized markers stored as a second compact tail.
 	pub markers: pina::PodVec<u8, 8, 8>,
 	/// Optional human-readable status attached to the latest resize.
 	pub note: Option<pina::String<64>>,
@@ -40,30 +43,16 @@ impl Journal {
 
 	pub fn initialize(
 		data: &mut [u8],
-	) -> Result<JournalMut<'_>, solana_program_error::ProgramError> {
-		if data.len() < Self::HEADER_SIZE {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		data.fill(0);
-		let mut account = JournalMut::new(data)
-			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
-		account.discriminator = JOURNAL_DISCRIMINATOR;
-		Ok(account)
+		patch: JournalPatch<'_>,
+	) -> Result<usize, solana_program_error::ProgramError> {
+		patch
+			.discriminator(JOURNAL_DISCRIMINATOR)
+			.initialize(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
 
 	pub fn from_bytes(data: &[u8]) -> Result<JournalRef<'_>, solana_program_error::ProgramError> {
 		let account = JournalRef::new(data)
-			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
-		if account.discriminator != JOURNAL_DISCRIMINATOR {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		Ok(account)
-	}
-
-	pub fn from_bytes_mut(
-		data: &mut [u8],
-	) -> Result<JournalMut<'_>, solana_program_error::ProgramError> {
-		let account = JournalMut::new(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != JOURNAL_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);

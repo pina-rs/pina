@@ -152,7 +152,7 @@ CreateCompactProgramAccountWithBump {
 		.bump(bump)
 		.authority(*self.authority.address())
 		.revision(0),
-	space: Journal::HEADER_SIZE,
+	space: Journal::MIN_SIZE,
 }
 .invoke::<Journal>()?;
 ```
@@ -182,7 +182,7 @@ UpdateResizableAccount {
 
 `UpdateResizableAccount` ends the data borrow before resizing. It grows the account before writing, or writes a valid shorter representation before shrinking. It clears bytes removed by the update. If preflight validation fails, account bytes and lamport balances remain unchanged.
 
-Use `rent_account` for this builder. The account both funds growth and receives excess rent after a shrink. Existing low-level operations such as `AllocateAccount`, `CreateProgramAccount`, `ReallocAccount`, and `ReallocAccountZeroed` retain `payer` because those APIs model a payer directly.
+Use `rent_account` for this builder. The account both funds growth and receives excess rent after a shrink. The lower-level `ReallocAccount`, `ReallocAccountZeroed`, and `ReallocCompactAccount` builders use the same field name and take an explicit `target_size`. Creation and allocation builders retain `payer` because those APIs only fund a new account.
 
 ## Keep wire bytes stable
 

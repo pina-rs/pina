@@ -8,9 +8,8 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 #[pinapod(compact)]
 pub struct Sample {
 	/// A compact account whose active values occupy only the bytes they need.
@@ -30,30 +29,16 @@ impl Sample {
 
 	pub fn initialize(
 		data: &mut [u8],
-	) -> Result<SampleMut<'_>, solana_program_error::ProgramError> {
-		if data.len() < Self::HEADER_SIZE {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		data.fill(0);
-		let mut account = SampleMut::new(data)
-			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
-		account.discriminator = SAMPLE_DISCRIMINATOR;
-		Ok(account)
+		patch: SamplePatch<'_>,
+	) -> Result<usize, solana_program_error::ProgramError> {
+		patch
+			.discriminator(SAMPLE_DISCRIMINATOR)
+			.initialize(data)
+			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
 
 	pub fn from_bytes(data: &[u8]) -> Result<SampleRef<'_>, solana_program_error::ProgramError> {
 		let account = SampleRef::new(data)
-			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
-		if account.discriminator != SAMPLE_DISCRIMINATOR {
-			return Err(solana_program_error::ProgramError::InvalidAccountData);
-		}
-		Ok(account)
-	}
-
-	pub fn from_bytes_mut(
-		data: &mut [u8],
-	) -> Result<SampleMut<'_>, solana_program_error::ProgramError> {
-		let account = SampleMut::new(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != SAMPLE_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);

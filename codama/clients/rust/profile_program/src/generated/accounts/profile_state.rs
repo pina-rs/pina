@@ -8,9 +8,8 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ProfileState {
 	/// On-chain profile state.
 	///
@@ -53,7 +52,7 @@ pub struct ProfileState {
 pub const PROFILE_STATE_DISCRIMINATOR: u8 = 1u8;
 
 impl ProfileState {
-	pub const LEN: usize = Self::SIZE;
+	pub const LEN: usize = core::mem::size_of::<ProfileStateZc>();
 
 	/// Initialize and validate account storage in one pass.
 	///

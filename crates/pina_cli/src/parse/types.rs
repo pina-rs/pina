@@ -27,7 +27,7 @@ pub fn try_rust_type_to_codama(ty: &str) -> Result<TypeNode, String> {
 	try_rust_type_to_codama_with_pinapod_enums(ty, &[])
 }
 
-/// Fallible type mapping with the local PinaPod enum registry.
+/// Fallible type mapping with the local `PinaPod` enum registry.
 pub fn try_rust_type_to_codama_with_pinapod_enums(
 	ty: &str,
 	pinapod_enums: &[PinaPodEnumIr],
@@ -74,7 +74,7 @@ pub fn try_rust_type_to_codama_compact_tail(
 	try_rust_type_to_codama_compact_tail_at(ty, context, pinapod_enums, None, 0)
 }
 
-/// The supported dynamic suffix grammar for a compact PinaPod account.
+/// The supported dynamic suffix grammar for a compact `PinaPod` account.
 ///
 /// An optional dynamic tail keeps only its one-byte presence tag in the
 /// shared header. Its inner string/vector prefix is part of the payload.
@@ -919,8 +919,30 @@ mod tests {
 	}
 
 	#[test]
+	fn maps_compact_string_tails_without_fixed_capacity_padding() {
+		for (ty, prefix) in [
+			("String<32>", NumberFormat::U8),
+			("PodString<512, 2>", NumberFormat::U16),
+			("PodString<32, 4>", NumberFormat::U32),
+			("PodString<32, 8>", NumberFormat::U64),
+		] {
+			let mapped = try_rust_type_to_codama_compact_tail(ty, "test account", &[])
+				.unwrap_or_else(|error| panic!("failed to map `{ty}`: {error}"));
+			assert_eq!(
+				mapped,
+				SizePrefixTypeNode::<TypeNode>::new(
+					StringTypeNode::utf8(),
+					NumberTypeNode::le(prefix),
+				)
+				.into(),
+				"wrong compact node for `{ty}`"
+			);
+		}
+	}
+
+	#[test]
 	fn maps_compact_tail_prefixes_into_a_shared_header() {
-		let mapped = try_rust_type_to_codama_compact_tail_at(
+		let vector = try_rust_type_to_codama_compact_tail_at(
 			"Vec<u64, 8>",
 			"test account",
 			&[],
@@ -928,21 +950,52 @@ mod tests {
 			4,
 		)
 		.unwrap_or_else(|error| panic!("failed to map relocated tail: {error}"));
-		let value = serde_json::to_value(mapped)
+		let vector = serde_json::to_value(vector)
 			.unwrap_or_else(|error| panic!("serialize relocated tail: {error}"));
 		assert_eq!(
-			value.pointer("/offset").and_then(serde_json::Value::as_i64),
+			vector
+				.pointer("/offset")
+				.and_then(serde_json::Value::as_i64),
 			Some(4)
 		);
 		assert_eq!(
-			value
+			vector
 				.pointer("/type/count/prefix/type/offset")
 				.and_then(serde_json::Value::as_i64),
 			Some(38)
 		);
 		assert_eq!(
-			value
+			vector
 				.pointer("/type/count/prefix/strategy")
+				.and_then(serde_json::Value::as_str),
+			Some("preOffset")
+		);
+
+		let string = try_rust_type_to_codama_compact_tail_at(
+			"PodString<512, 2>",
+			"test account",
+			&[],
+			Some(40),
+			7,
+		)
+		.unwrap_or_else(|error| panic!("failed to map relocated string: {error}"));
+		let string = serde_json::to_value(string)
+			.unwrap_or_else(|error| panic!("serialize relocated string: {error}"));
+		assert_eq!(
+			string
+				.pointer("/offset")
+				.and_then(serde_json::Value::as_i64),
+			Some(7)
+		);
+		assert_eq!(
+			string
+				.pointer("/type/prefix/type/offset")
+				.and_then(serde_json::Value::as_i64),
+			Some(40)
+		);
+		assert_eq!(
+			string
+				.pointer("/type/prefix/strategy")
 				.and_then(serde_json::Value::as_str),
 			Some("preOffset")
 		);
@@ -951,19 +1004,16 @@ mod tests {
 	#[test]
 	fn rejects_compact_offsets_outside_codama_range() {
 		let too_large = i32::MAX as usize + 1;
-		for (prefix, skip, expected) in [
-			(Some(too_large), 0, "header offset"),
-			(None, too_large, "header size"),
+		for (ty, prefix, skip, expected) in [
+			("Vec<u8, 8>", Some(too_large), 0, "header offset"),
+			("Vec<u8, 8>", None, too_large, "header size"),
+			("String<8>", Some(too_large), 0, "header offset"),
+			("String<8>", None, too_large, "header size"),
 		] {
-			let error = try_rust_type_to_codama_compact_tail_at(
-				"Vec<u8, 8>",
-				"test account",
-				&[],
-				prefix,
-				skip,
-			)
-			.expect_err("oversized offset must fail")
-			.to_string();
+			let error =
+				try_rust_type_to_codama_compact_tail_at(ty, "test account", &[], prefix, skip)
+					.expect_err("oversized offset must fail")
+					.to_string();
 			assert!(error.contains(expected), "unexpected error: {error}");
 		}
 	}
@@ -1004,6 +1054,9 @@ mod tests {
 			("u64", "invalid compact field"),
 			("String<u64, 8>", "literal usize capacity"),
 			("Vec<u64>", "requires an element type"),
+			("PodString<8, PREFIX>", "literal usize prefix size"),
+			("PodString<8, 3>", "unsupported prefix size"),
+			("PodString<256, 1>", "cannot be represented"),
 			("Vec<MyPod, 8>", "cannot determine compact"),
 			("Vec<u64, CAPACITY>", "literal usize capacity"),
 			("Vec<u64, 8, PREFIX>", "literal usize prefix size"),

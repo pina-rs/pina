@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const CLAIM_DISCRIMINATOR: u8 = 4u8;
 
 /// Accounts.
@@ -106,7 +104,7 @@ impl ClaimInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut ClaimInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; ClaimInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<ClaimInstructionWireZc>()];
 		<ClaimInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = CLAIM_DISCRIMINATOR;
@@ -119,6 +117,7 @@ impl ClaimInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ClaimInstructionWire {
 	pub discriminator: u8,
 }

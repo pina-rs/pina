@@ -1,7 +1,7 @@
 //! A focused compact-account lifecycle example.
 //!
-//! [`Journal`] stores a fixed header and only the active bytes of its trailing
-//! entries, markers, and note. [`ResizeAccounts`] applies one atomic patch that
+//! [`Journal`] stores a fixed header and only the active bytes of its title,
+//! entries, markers, and optional note. Mutations use one atomic patch that
 //! plans rent adjustment, reallocation, and validated encoding together.
 
 #![allow(clippy::inline_always)]
@@ -22,7 +22,7 @@ use pina::*;
 declare_id!("85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn");
 
 const SEED_JOURNAL: &[u8] = b"compact-journal";
-pub const MAX_ENTRIES: usize = 8;
+pub const DEFAULT_TITLE: &str = "journal";
 
 #[error]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,6 +37,7 @@ pub enum CompactInstruction {
 	Initialize = 0,
 	Resize = 1,
 	Write = 2,
+	Rename = 3,
 }
 
 #[discriminator]
@@ -44,11 +45,11 @@ pub enum CompactAccountType {
 	Journal = 1,
 }
 
-/// A compact account with two independently encoded dynamic fields.
+/// A compact account with four independently encoded dynamic fields.
 ///
-/// The one-byte discriminator, bump, authority, revision, and two vector
-/// prefixes always occupy [`Self::HEADER_SIZE`] bytes. Each active row adds an
-/// eight-byte entry and a one-byte marker, up to [`Self::MAX_SIZE`].
+/// The fixed header includes a semantic `Option<u64>` encoded as
+/// `PodOption<PodU64>`. The title and optional note use compact strings, while
+/// entries and markers use vectors; only their active bytes are allocated.
 #[account(discriminator = CompactAccountType, compact)]
 #[pda(seeds = [SEED_JOURNAL, authority: Address], bump = bump)]
 pub struct Journal {
@@ -58,31 +59,17 @@ pub struct Journal {
 	pub authority: Address,
 	/// Number of successful resize or write operations.
 	pub revision: u32,
+	/// Most recently written entry value, stored as `PodOption<PodU64>`.
+	pub featured_entry: Option<u64>,
+	/// Human-readable title stored as active UTF-8 bytes.
+	pub title: String<24>,
 	/// Active entries. Unused capacity consumes no account bytes.
 	pub entries: Vec<u64, 8>,
-	/// One marker per entry, stored as a second compact tail.
+	/// Independently sized markers stored as a second compact tail.
 	pub markers: PodVec<u8, 8, 8>,
 	/// Optional human-readable status attached to the latest resize.
 	#[allow(unused_qualifications)]
 	pub note: Option<pina::String<64>>,
-}
-
-/// Returns the exact encoded account size for `entry_count` active entries and
-/// no note.
-///
-/// Prefer accepting a logical element count at instruction boundaries and
-/// deriving bytes with this helper. This makes split-element sizes impossible.
-///
-/// # Errors
-///
-/// Returns [`CompactAccountError::CapacityExceeded`] when the requested count
-/// exceeds [`MAX_ENTRIES`].
-pub fn account_size(entry_count: usize) -> Result<usize, ProgramError> {
-	if entry_count > MAX_ENTRIES {
-		return Err(CompactAccountError::CapacityExceeded.into());
-	}
-
-	Ok(Journal::HEADER_SIZE + entry_count * (size_of::<PodU64>() + size_of::<u8>()))
 }
 
 #[instruction(discriminator = CompactInstruction::Initialize)]
@@ -90,18 +77,30 @@ pub struct InitializeIx {
 	pub bump: u8,
 	/// Initial number of active entries. They are filled with `0..entry_count`.
 	pub entry_count: u8,
+	/// Initial number of active markers. They are filled with `0..marker_count`.
+	pub marker_count: u8,
 }
 
 #[instruction(discriminator = CompactInstruction::Resize)]
 pub struct ResizeIx {
 	/// New logical length. Growth appends each new entry's index as its value.
 	pub entry_count: u8,
+	/// New marker length, independent of `entry_count`.
+	pub marker_count: u8,
 }
 
 #[instruction(discriminator = CompactInstruction::Write)]
 pub struct WriteIx {
 	pub index: u8,
 	pub value: u64,
+}
+
+#[instruction(discriminator = CompactInstruction::Rename)]
+pub struct RenameIx {
+	/// Active byte length within `title`.
+	pub title_len: u8,
+	/// UTF-8 title bytes. Bytes after `title_len` are ignored.
+	pub title: [u8; 24],
 }
 
 #[derive(Accounts, Debug)]
@@ -123,8 +122,17 @@ pub struct ResizeAccounts<'a> {
 
 #[derive(Accounts, Debug)]
 pub struct WriteAccounts<'a> {
-	pub authority: &'a AccountView,
+	/// Funds growth if a future write patch changes the encoded length.
+	pub authority: &'a mut AccountView,
 	pub journal: &'a mut AccountView,
+}
+
+#[derive(Accounts, Debug)]
+pub struct RenameAccounts<'a> {
+	/// Funds title growth and receives rent refunded by title shrinkage.
+	pub authority: &'a mut AccountView,
+	pub journal: &'a mut AccountView,
+	pub system_program: &'a AccountView,
 }
 
 fn validate_journal(journal: AccountView, authority: &Address) -> ProgramResult {
@@ -138,9 +146,11 @@ fn validate_journal(journal: AccountView, authority: &Address) -> ProgramResult 
 	Journal::assert_seeds(&journal, authority, &ID)?;
 	let canonical_bump =
 		journal.assert_canonical_bump(&Journal::seeds(authority).as_slices(), &ID)?;
+
 	if bump != canonical_bump {
 		return Err(ProgramError::InvalidSeeds);
 	}
+
 	if stored_authority != *authority {
 		return Err(CompactAccountError::AuthorityMismatch.into());
 	}
@@ -154,30 +164,71 @@ fn next_revision(revision: u32) -> Result<u32, ProgramError> {
 		.ok_or(ProgramError::ArithmeticOverflow)
 }
 
-fn initialized_entries(entry_count: usize) -> [PodU64; MAX_ENTRIES] {
-	let mut entries = [PodU64::ZERO; MAX_ENTRIES];
+fn initialized_entries(entry_count: usize) -> [PodU64; Journal::ENTRIES_CAPACITY] {
+	let mut entries = [PodU64::ZERO; Journal::ENTRIES_CAPACITY];
 	for (index, entry) in entries.iter_mut().take(entry_count).enumerate() {
 		entry.set(index as u64);
 	}
 	entries
 }
 
-fn initialized_markers(entry_count: usize) -> [u8; MAX_ENTRIES] {
-	let mut markers = [0; MAX_ENTRIES];
-	for (index, marker) in markers.iter_mut().take(entry_count).enumerate() {
+fn initialized_markers(marker_count: usize) -> [u8; Journal::MARKERS_CAPACITY] {
+	let mut markers = [0; Journal::MARKERS_CAPACITY];
+	for (index, marker) in markers.iter_mut().take(marker_count).enumerate() {
 		*marker = index as u8;
 	}
 	markers
+}
+
+fn title_from_bytes(bytes: &[u8; 24], title_len: usize) -> Result<&str, ProgramError> {
+	let title = bytes
+		.get(..title_len)
+		.ok_or(ProgramError::InvalidInstructionData)?;
+	core::str::from_utf8(title).map_err(|_| ProgramError::InvalidInstructionData)
+}
+
+fn journal_size(
+	title_len: usize,
+	entry_count: usize,
+	marker_count: usize,
+	note_len: Option<usize>,
+) -> Result<usize, ProgramError> {
+	if title_len > Journal::TITLE_CAPACITY
+		|| entry_count > Journal::ENTRIES_CAPACITY
+		|| marker_count > Journal::MARKERS_CAPACITY
+		|| note_len.is_some_and(|len| len > Journal::NOTE_CAPACITY)
+	{
+		return Err(CompactAccountError::CapacityExceeded.into());
+	}
+
+	let entry_bytes = entry_count
+		.checked_mul(size_of::<PodU64>())
+		.ok_or(CompactAccountError::CapacityExceeded)?;
+	let note_bytes = match note_len {
+		Some(len) => {
+			len.checked_add(size_of::<u8>())
+				.ok_or(CompactAccountError::CapacityExceeded)?
+		}
+		None => 0,
+	};
+
+	Journal::HEADER_SIZE
+		.checked_add(title_len)
+		.and_then(|size| size.checked_add(entry_bytes))
+		.and_then(|size| size.checked_add(marker_count))
+		.and_then(|size| size.checked_add(note_bytes))
+		.ok_or_else(|| CompactAccountError::CapacityExceeded.into())
 }
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = InitializeIx::try_from_bytes(data)?;
 		let entry_count = usize::from(args.entry_count);
-		let space = account_size(entry_count)?;
+		let marker_count = usize::from(args.marker_count);
+		let space = journal_size(DEFAULT_TITLE.len(), entry_count, marker_count, None)?;
 		let authority_key = *self.authority.address();
 		let entries = initialized_entries(entry_count);
-		let markers = initialized_markers(entry_count);
+		let markers = initialized_markers(marker_count);
 		let seeds = Journal::seeds(&authority_key);
 		let seeds_with_bump = seeds.with_bump(args.bump);
 
@@ -204,12 +255,12 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 				.bump(args.bump)
 				.authority(authority_key)
 				.revision(0)
+				.title(DEFAULT_TITLE)
 				.replace_entries(&entries[..entry_count])
-				.replace_markers(&markers[..entry_count]),
+				.replace_markers(&markers[..marker_count]),
 			space,
 		}
 		.invoke::<Journal>()?;
-
 		Ok(())
 	}
 }
@@ -217,9 +268,10 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 impl<'a> ProcessAccountInfos<'a> for ResizeAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = ResizeIx::try_from_bytes(data)?;
-		let target_count = usize::from(args.entry_count);
-		account_size(target_count)?;
+		let target_entry_count = usize::from(args.entry_count);
+		let target_marker_count = usize::from(args.marker_count);
 		let authority_key = *self.authority.address();
+		journal_size(0, target_entry_count, target_marker_count, None)?;
 
 		self.authority.assert_signer()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
@@ -229,19 +281,20 @@ impl<'a> ProcessAccountInfos<'a> for ResizeAccounts<'a> {
 			.journal
 			.with_compact_account::<Journal, _>(&ID, |journal| {
 				let current = journal.entries();
-				let mut entries = [PodU64::ZERO; MAX_ENTRIES];
+				let mut entries = [PodU64::ZERO; Journal::ENTRIES_CAPACITY];
 				entries[..current.len()].copy_from_slice(current);
 				Ok((entries, current.len(), journal.revision.get()))
 			})?;
+
 		for (index, entry) in entries
 			.iter_mut()
 			.enumerate()
-			.take(target_count)
+			.take(target_entry_count)
 			.skip(current_count)
 		{
 			entry.set(index as u64);
 		}
-		let markers = initialized_markers(target_count);
+		let markers = initialized_markers(target_marker_count);
 
 		UpdateResizableAccount {
 			account: self.journal,
@@ -249,8 +302,8 @@ impl<'a> ProcessAccountInfos<'a> for ResizeAccounts<'a> {
 			program_id: &ID,
 			patch: JournalPatch::new()
 				.revision(next_revision(revision)?)
-				.replace_entries(&entries[..target_count])
-				.replace_markers(&markers[..target_count])
+				.replace_entries(&entries[..target_entry_count])
+				.replace_markers(&markers[..target_marker_count])
 				.note(Some("Updated")),
 		}
 		.invoke::<Journal>()?;
@@ -265,28 +318,60 @@ impl<'a> ProcessAccountInfos<'a> for WriteAccounts<'a> {
 		let index = usize::from(args.index);
 		let authority_key = *self.authority.address();
 
-		self.authority.assert_signer()?;
+		self.authority.assert_signer()?.assert_writable()?;
 		validate_journal(*self.journal, &authority_key)?;
 
-		let (mut entries, len, revision) =
-			self.journal
-				.with_compact_account::<Journal, _>(&ID, |journal| {
-					let current = journal.entries();
-					if index >= current.len() {
-						return Err(CompactAccountError::IndexOutOfBounds.into());
-					}
-					let mut entries = [PodU64::ZERO; MAX_ENTRIES];
-					entries[..current.len()].copy_from_slice(current);
-					Ok((entries, current.len(), journal.revision.get()))
-				})?;
+		let (mut entries, entry_count, revision) = self
+			.journal
+			.with_compact_account::<Journal, _>(&ID, |journal| {
+				let current = journal.entries();
+				if index >= current.len() {
+					return Err(CompactAccountError::IndexOutOfBounds.into());
+				}
+				let mut entries = [PodU64::ZERO; Journal::ENTRIES_CAPACITY];
+				entries[..current.len()].copy_from_slice(current);
+				Ok((entries, current.len(), journal.revision.get()))
+			})?;
 		entries[index].set(args.value.get());
 
-		self.journal.update_compact_account::<Journal>(
-			&ID,
-			&JournalPatch::new()
+		UpdateResizableAccount {
+			account: self.journal,
+			rent_account: self.authority,
+			program_id: &ID,
+			patch: JournalPatch::new()
 				.revision(next_revision(revision)?)
-				.replace_entries(&entries[..len]),
-		)?;
+				.featured_entry(Some(args.value.get()))
+				.replace_entries(&entries[..entry_count]),
+		}
+		.invoke::<Journal>()?;
+
+		Ok(())
+	}
+}
+
+impl<'a> ProcessAccountInfos<'a> for RenameAccounts<'a> {
+	fn process(self, data: &[u8]) -> ProgramResult {
+		let args = RenameIx::try_from_bytes(data)?;
+		let title_len = usize::from(args.title_len);
+		let title = title_from_bytes(&args.title, title_len)?;
+		let authority_key = *self.authority.address();
+
+		self.authority.assert_signer()?.assert_writable()?;
+		self.system_program.assert_address(&system::ID)?;
+		validate_journal(*self.journal, &authority_key)?;
+		let revision = self
+			.journal
+			.with_compact_account::<Journal, _>(&ID, |journal| Ok(journal.revision.get()))?;
+
+		UpdateResizableAccount {
+			account: self.journal,
+			rent_account: self.authority,
+			program_id: &ID,
+			patch: JournalPatch::new()
+				.revision(next_revision(revision)?)
+				.title(title),
+		}
+		.invoke::<Journal>()?;
 
 		Ok(())
 	}
@@ -316,6 +401,9 @@ pub mod entrypoint {
 			CompactInstruction::Write => {
 				WriteAccounts::try_from((program_id, accounts))?.process(data)
 			}
+			CompactInstruction::Rename => {
+				RenameAccounts::try_from((program_id, accounts))?.process(data)
+			}
 		}
 	}
 }
@@ -326,30 +414,49 @@ mod tests {
 
 	#[test]
 	fn size_formula_covers_empty_partial_and_full_accounts() {
-		assert_eq!(Journal::HEADER_SIZE, 49);
-		assert_eq!(Journal::MAX_SIZE, 186);
+		assert_eq!(Journal::HEADER_SIZE, 59);
+		assert_eq!(Journal::MIN_SIZE, Journal::HEADER_SIZE);
+		assert_eq!(Journal::MAX_SIZE, 220);
 		assert_eq!(Journal::TAIL_ALIGNMENT, 1);
-		assert_eq!(account_size(0), Ok(Journal::HEADER_SIZE));
-		assert_eq!(account_size(3), Ok(Journal::HEADER_SIZE + 27));
+		assert_eq!(Journal::TITLE_CAPACITY, 24);
+		assert_eq!(Journal::ENTRIES_CAPACITY, 8);
+		assert_eq!(Journal::MARKERS_CAPACITY, 8);
+		assert_eq!(Journal::NOTE_CAPACITY, 64);
+		assert_eq!(journal_size(0, 0, 0, None), Ok(Journal::MIN_SIZE));
+		assert_eq!(journal_size(5, 3, 5, None), Ok(Journal::HEADER_SIZE + 34));
 		assert_eq!(
-			account_size(MAX_ENTRIES),
-			Ok(Journal::HEADER_SIZE + MAX_ENTRIES * 9)
+			journal_size(
+				Journal::TITLE_CAPACITY,
+				Journal::ENTRIES_CAPACITY,
+				Journal::MARKERS_CAPACITY,
+				Some(Journal::NOTE_CAPACITY),
+			),
+			Ok(Journal::MAX_SIZE)
 		);
+		assert_eq!(journal_size(0, 0, 0, Some(0)), Ok(Journal::MIN_SIZE + 1));
 	}
 
 	#[test]
-	fn size_formula_rejects_counts_past_capacity() {
-		assert_eq!(
-			account_size(MAX_ENTRIES + 1),
-			Err(CompactAccountError::CapacityExceeded.into())
-		);
+	fn size_formula_rejects_each_count_past_its_capacity() {
+		for result in [
+			journal_size(Journal::TITLE_CAPACITY + 1, 0, 0, None),
+			journal_size(0, Journal::ENTRIES_CAPACITY + 1, 0, None),
+			journal_size(0, 0, Journal::MARKERS_CAPACITY + 1, None),
+			journal_size(0, 0, 0, Some(Journal::NOTE_CAPACITY + 1)),
+		] {
+			assert!(matches!(
+				result,
+				Err(ProgramError::Custom(code))
+					if code == CompactAccountError::CapacityExceeded as u32
+			));
+		}
 	}
 
 	#[test]
 	fn generated_size_validation_rejects_every_invalid_shape() {
-		assert!(Journal::validate_size(Journal::HEADER_SIZE).is_ok());
+		assert!(Journal::validate_size(Journal::MIN_SIZE).is_ok());
 		assert!(Journal::validate_size(Journal::MAX_SIZE).is_ok());
-		for invalid in [Journal::HEADER_SIZE - 1, Journal::MAX_SIZE + 1] {
+		for invalid in [Journal::MIN_SIZE - 1, Journal::MAX_SIZE + 1] {
 			assert_eq!(
 				Journal::validate_size(invalid),
 				Err(ProgramError::InvalidAccountData)
@@ -358,30 +465,39 @@ mod tests {
 	}
 
 	#[test]
-	fn compact_codec_roundtrips_header_and_active_entries() {
-		let mut data = [0u8; Journal::HEADER_SIZE + 27];
+	fn compact_codec_roundtrips_header_and_independent_tails() {
+		let mut data = [0u8; Journal::MAX_SIZE];
 		let entries = initialized_entries(3);
-		let markers = initialized_markers(3);
+		let markers = initialized_markers(5);
 		let encoded_size = Journal::initialize(
 			&mut data,
 			&JournalPatch::new()
 				.bump(4)
 				.authority(Address::new_from_array([7; 32]))
 				.revision(2)
+				.featured_entry(Some(13_u64))
+				.title("piña")
 				.replace_entries(&entries[..3])
-				.replace_markers(&markers[..3]),
+				.replace_markers(&markers[..5])
+				.note(Some("Updated")),
 		)
 		.unwrap_or_else(|error| panic!("initialize journal: {error:?}"));
 
-		assert_eq!(encoded_size, data.len());
-		let journal = Journal::try_from_bytes(&data)
+		assert_eq!(encoded_size, Journal::HEADER_SIZE + 42);
+		let journal = Journal::try_from_bytes(&data[..encoded_size])
 			.unwrap_or_else(|error| panic!("decode journal: {error:?}"));
 		assert_eq!(journal.bump, 4);
 		assert_eq!(journal.authority, Address::new_from_array([7; 32]));
 		assert_eq!(journal.revision.get(), 2);
+		assert_eq!(
+			journal.featured_entry.get().map(|value| value.get()),
+			Some(13)
+		);
+		assert_eq!(journal.title(), "piña");
 		assert_eq!(journal.entries(), &entries[..3]);
-		assert_eq!(journal.markers(), &markers[..3]);
-		assert_eq!(journal.note(), None);
+		assert_eq!(journal.markers(), &markers[..5]);
+		assert_eq!(journal.note(), Some("Updated"));
+		assert_eq!(journal.encoded_len(), encoded_size);
 	}
 
 	#[test]
@@ -403,49 +519,67 @@ mod tests {
 	}
 
 	#[test]
-	fn compact_codec_handles_empty_and_full_tails() {
-		for count in [0, MAX_ENTRIES] {
+	fn compact_codec_handles_independent_empty_and_full_tails() {
+		let full_title = "abcdefghijklmnopqrstuvwx";
+		for (title, entry_count, marker_count) in [
+			("", 0, 0),
+			("", 0, Journal::MARKERS_CAPACITY),
+			(full_title, Journal::ENTRIES_CAPACITY, 0),
+			(
+				full_title,
+				Journal::ENTRIES_CAPACITY,
+				Journal::MARKERS_CAPACITY,
+			),
+		] {
 			let mut data = [0u8; Journal::MAX_SIZE];
-			let size = account_size(count).unwrap_or_else(|error| panic!("size: {error:?}"));
-			let entries = initialized_entries(count);
-			let markers = initialized_markers(count);
+			let size = journal_size(title.len(), entry_count, marker_count, None)
+				.unwrap_or_else(|error| panic!("size: {error:?}"));
+			let entries = initialized_entries(entry_count);
+			let markers = initialized_markers(marker_count);
 			let encoded = Journal::initialize(
 				&mut data[..size],
 				&JournalPatch::new()
-					.replace_entries(&entries[..count])
-					.replace_markers(&markers[..count]),
+					.title(title)
+					.replace_entries(&entries[..entry_count])
+					.replace_markers(&markers[..marker_count]),
 			)
 			.unwrap_or_else(|error| panic!("initialize: {error:?}"));
 			assert_eq!(encoded, size);
 			assert_eq!(
 				Journal::try_from_bytes(&data[..size])
 					.unwrap_or_else(|error| panic!("decode: {error:?}"))
+					.title(),
+				title,
+			);
+			assert_eq!(
+				Journal::try_from_bytes(&data[..size])
+					.unwrap_or_else(|error| panic!("decode: {error:?}"))
 					.entries(),
-				&entries[..count]
+				&entries[..entry_count]
 			);
 			assert_eq!(
 				Journal::try_from_bytes(&data[..size])
 					.unwrap_or_else(|error| panic!("decode: {error:?}"))
 					.markers(),
-				&markers[..count]
+				&markers[..marker_count]
 			);
 		}
 	}
 
 	#[test]
 	fn compact_codec_rejects_corrupt_discriminators_prefixes_and_capacity() {
-		let mut data = [0u8; Journal::HEADER_SIZE];
+		let mut data = [0u8; Journal::MIN_SIZE];
 		Journal::initialize(&mut data, &JournalPatch::new())
 			.unwrap_or_else(|error| panic!("initialize journal: {error:?}"));
 		data[0] = 99;
 		assert!(Journal::try_from_bytes(&data).is_err());
 
 		data[0] = CompactAccountType::Journal as u8;
-		data[38..40].copy_from_slice(&1u16.to_le_bytes());
+		data[48..50].copy_from_slice(&1u16.to_le_bytes());
 		assert!(Journal::try_from_bytes(&data).is_err());
 
 		let mut full_data = [0u8; Journal::MAX_SIZE];
-		let too_many = [PodU64::ZERO; MAX_ENTRIES + 1];
+		let too_many = [PodU64::ZERO; Journal::ENTRIES_CAPACITY + 1];
 		assert!(
 			Journal::initialize(
 				&mut full_data,
@@ -453,38 +587,96 @@ mod tests {
 			)
 			.is_err()
 		);
+		assert!(
+			Journal::initialize(
+				&mut full_data,
+				&JournalPatch::new().title("this title exceeds twenty-four bytes"),
+			)
+			.is_err()
+		);
+		assert!(
+			Journal::initialize(
+				&mut full_data,
+				&JournalPatch::new().note(Some(
+					"this optional note contains more than sixty-four bytes of active UTF-8 data",
+				)),
+			)
+			.is_err()
+		);
+
+		let mut invalid_utf8 = [0u8; Journal::MAX_SIZE];
+		let encoded_size = Journal::initialize(&mut invalid_utf8, &JournalPatch::new().title("x"))
+			.unwrap_or_else(|error| panic!("initialize title: {error:?}"));
+		invalid_utf8[Journal::HEADER_SIZE] = 0xff;
+		assert!(Journal::try_from_bytes(&invalid_utf8[..encoded_size]).is_err());
 	}
 
 	#[test]
 	fn instruction_codecs_roundtrip_all_size_arguments() {
 		let mut initialize_bytes = [0u8; InitializeIx::SIZE];
-		let initialize = InitializeIx::initialize(&mut initialize_bytes, |_| Ok(()))
-			.unwrap_or_else(|error| panic!("initialize ix: {error:?}"));
-		initialize.bump = 9;
-		initialize.entry_count = 3;
+		InitializeIx::initialize(&mut initialize_bytes, |initialize| {
+			initialize.bump = 9;
+			initialize.entry_count = 3;
+			initialize.marker_count = 5;
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("initialize ix: {error:?}"));
 		let decoded = InitializeIx::try_from_bytes(&initialize_bytes)
 			.unwrap_or_else(|error| panic!("decode initialize ix: {error:?}"));
-		assert_eq!((decoded.bump, decoded.entry_count), (9, 3));
+		assert_eq!(
+			(decoded.bump, decoded.entry_count, decoded.marker_count),
+			(9, 3, 5)
+		);
 
 		let mut resize_bytes = [0u8; ResizeIx::SIZE];
-		ResizeIx::initialize(&mut resize_bytes, |_| Ok(()))
-			.unwrap_or_else(|error| panic!("resize ix: {error:?}"))
-			.entry_count = MAX_ENTRIES as u8;
+		ResizeIx::initialize(&mut resize_bytes, |resize| {
+			resize.entry_count = Journal::ENTRIES_CAPACITY as u8;
+			resize.marker_count = 2;
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("resize ix: {error:?}"));
+		let decoded = ResizeIx::try_from_bytes(&resize_bytes)
+			.unwrap_or_else(|error| panic!("decode resize ix: {error:?}"));
 		assert_eq!(
-			ResizeIx::try_from_bytes(&resize_bytes)
-				.unwrap_or_else(|error| panic!("decode resize ix: {error:?}"))
-				.entry_count,
-			MAX_ENTRIES as u8
+			(decoded.entry_count, decoded.marker_count),
+			(Journal::ENTRIES_CAPACITY as u8, 2)
+		);
+
+		let mut rename_bytes = [0u8; RenameIx::SIZE];
+		RenameIx::initialize(&mut rename_bytes, |rename| {
+			rename.title_len = 5;
+			rename.title[..5].copy_from_slice("piña".as_bytes());
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("initialize rename ix: {error:?}"));
+		let decoded = RenameIx::try_from_bytes(&rename_bytes)
+			.unwrap_or_else(|error| panic!("decode rename ix: {error:?}"));
+		assert_eq!(title_from_bytes(&decoded.title, 5), Ok("piña"));
+	}
+
+	#[test]
+	fn title_decoder_rejects_out_of_range_and_invalid_utf8() {
+		let mut title = [0; 24];
+		assert_eq!(
+			title_from_bytes(&title, Journal::TITLE_CAPACITY + 1),
+			Err(ProgramError::InvalidInstructionData)
+		);
+		title[0] = 0xff;
+		assert_eq!(
+			title_from_bytes(&title, 1),
+			Err(ProgramError::InvalidInstructionData)
 		);
 	}
 
 	#[test]
 	fn write_instruction_roundtrips_native_u64() {
 		let mut bytes = [0u8; WriteIx::SIZE];
-		let write = WriteIx::initialize(&mut bytes, |_| Ok(()))
-			.unwrap_or_else(|error| panic!("write ix: {error:?}"));
-		write.index = 2;
-		write.value.set(55);
+		WriteIx::initialize(&mut bytes, |write| {
+			write.index = 2;
+			write.value.set(55);
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("write ix: {error:?}"));
 		let decoded = WriteIx::try_from_bytes(&bytes)
 			.unwrap_or_else(|error| panic!("decode write ix: {error:?}"));
 		assert_eq!(decoded.index, 2);

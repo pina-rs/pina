@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 /// Instruction data for `RemoveTag`. Removes the tag at `index`.
 pub const REMOVE_TAG_DISCRIMINATOR: u8 = 3u8;
 
@@ -68,7 +66,7 @@ impl RemoveTagInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut RemoveTagInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; RemoveTagInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<RemoveTagInstructionWireZc>()];
 		<RemoveTagInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REMOVE_TAG_DISCRIMINATOR;
@@ -81,6 +79,7 @@ impl RemoveTagInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct RemoveTagInstructionWire {
 	pub discriminator: u8,
 	pub index: u64,

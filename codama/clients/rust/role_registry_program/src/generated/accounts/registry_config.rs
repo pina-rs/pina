@@ -8,9 +8,8 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct RegistryConfig {
 	pub discriminator: u8,
 	pub admin: solana_pubkey::Pubkey,
@@ -21,7 +20,7 @@ pub struct RegistryConfig {
 pub const REGISTRY_CONFIG_DISCRIMINATOR: u8 = 1u8;
 
 impl RegistryConfig {
-	pub const LEN: usize = Self::SIZE;
+	pub const LEN: usize = core::mem::size_of::<RegistryConfigZc>();
 
 	/// Initialize and validate account storage in one pass.
 	///

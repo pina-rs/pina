@@ -13,6 +13,9 @@ const OWNER: Address = Address::new_from_array([9; 32]);
 enum CompactKind {
 	DynamicState = 7,
 	ThreeTailState = 8,
+	PrefixState = 9,
+	StringState = 10,
+	StringPrefixState = 11,
 }
 
 #[account(crate = ::pina, discriminator = CompactKind, compact)]
@@ -34,6 +37,84 @@ struct ThreeTailState {
 	pub bytes: Vec<u8, 2>,
 	pub words: Vec<u16, 2>,
 	pub triples: Vec<[u8; 3], 2>,
+}
+
+#[account(crate = ::pina, discriminator = CompactKind, compact)]
+struct PrefixState {
+	pub one: PodVec<u8, 2, 1>,
+	pub two: PodVec<PodU16, 2, 2>,
+	pub four: PodVec<PodU32, 2, 4>,
+	pub eight: PodVec<PodU64, 2, 8>,
+}
+
+#[account(crate = ::pina, discriminator = CompactKind, compact)]
+struct StringState {
+	/// Semantic optional values use `PodOption<PodU64>` in the compact header.
+	pub featured: Option<u64>,
+	/// Strings are encoded as active UTF-8 tail bytes, without inactive capacity.
+	pub title: PodString<12>,
+	pub values: Vec<u8, 2>,
+}
+
+#[account(crate = ::pina, discriminator = CompactKind, compact)]
+struct StringPrefixState {
+	pub one: String<2>,
+	pub two: PodString<2, 2>,
+	pub four: PodString<2, 4>,
+	pub eight: PodString<2, 8>,
+}
+
+#[test]
+fn compact_account_combines_a_pod_option_header_with_a_pod_string_tail() {
+	assert_eq!(size_of::<PodOption<PodU64>>(), 9);
+	assert_eq!(StringState::HEADER_SIZE, 13);
+	assert_eq!(StringState::TITLE_CAPACITY, 12);
+	assert_eq!(StringState::VALUES_CAPACITY, 2);
+	assert_eq!(StringState::projected_bytes(5, 2), Ok(20));
+
+	let values = [3u8, 5];
+	let mut data = [0u8; StringState::MAX_SIZE];
+	let encoded_size = StringState::initialize(
+		&mut data,
+		&StringStatePatch::new()
+			.featured(Some(42_u64))
+			.title("piña")
+			.replace_values(&values),
+	)
+	.unwrap_or_else(|error| panic!("initialize string state: {error:?}"));
+	assert_eq!(encoded_size, 20);
+
+	let state = StringState::try_from_bytes(&data[..encoded_size])
+		.unwrap_or_else(|error| panic!("read string state: {error:?}"));
+	assert_eq!(state.featured.get().map(|value| value.get()), Some(42));
+	assert_eq!(state.title(), "piña");
+	assert_eq!(state.values(), &values);
+}
+
+#[test]
+fn compact_strings_support_every_prefix_width_and_independent_lengths() {
+	assert_eq!(StringPrefixState::HEADER_SIZE, 16);
+	assert_eq!(StringPrefixState::MIN_SIZE, 16);
+	assert_eq!(StringPrefixState::MAX_SIZE, 24);
+	assert_eq!(StringPrefixState::projected_bytes(1, 2, 0, 2), Ok(21));
+
+	let mut data = [0u8; StringPrefixState::MAX_SIZE];
+	let encoded_size = StringPrefixState::initialize(
+		&mut data,
+		&StringPrefixStatePatch::new()
+			.one("a")
+			.two("bc")
+			.four("")
+			.eight("de"),
+	)
+	.unwrap_or_else(|error| panic!("initialize string prefixes: {error:?}"));
+
+	let state = StringPrefixState::try_from_bytes(&data[..encoded_size])
+		.unwrap_or_else(|error| panic!("read string prefixes: {error:?}"));
+	assert_eq!(state.one(), "a");
+	assert_eq!(state.two(), "bc");
+	assert_eq!(state.four(), "");
+	assert_eq!(state.eight(), "de");
 }
 
 #[test]
@@ -79,8 +160,15 @@ fn compact_account_preserves_full_tails_across_two_full_replacements() {
 #[test]
 fn compact_account_roundtrips_active_tail_without_fixed_capacity_padding() {
 	assert_eq!(DynamicState::HEADER_SIZE, 38);
+	assert_eq!(DynamicState::MIN_SIZE, DynamicState::HEADER_SIZE);
 	assert_eq!(DynamicState::MAX_SIZE, 76);
 	assert_eq!(DynamicState::TAIL_ALIGNMENT, 2);
+	assert_eq!(DynamicState::VALUES_CAPACITY, 4);
+	assert_eq!(DynamicState::CODES_CAPACITY, 3);
+	assert_eq!(
+		DynamicState::projected_bytes(2, 2),
+		Ok(DynamicState::HEADER_SIZE + 16 + 4)
+	);
 
 	let mut data = [0u8; DynamicState::MAX_SIZE];
 	let values = [PodU64::from(11), PodU64::from(22)];
@@ -105,6 +193,64 @@ fn compact_account_roundtrips_active_tail_without_fixed_capacity_padding() {
 	assert_eq!(state.values()[0].get(), 11);
 	assert_eq!(state.values()[1].get(), 22);
 	assert_eq!(state.codes(), &codes);
+	assert_eq!(state.encoded_len(), encoded_size);
+}
+
+#[test]
+fn projected_bytes_rejects_each_tail_past_its_own_capacity() {
+	assert_eq!(
+		DynamicState::projected_bytes(DynamicState::VALUES_CAPACITY + 1, 0),
+		Err(ProgramError::InvalidAccountData)
+	);
+	assert_eq!(
+		DynamicState::projected_bytes(0, DynamicState::CODES_CAPACITY + 1),
+		Err(ProgramError::InvalidAccountData)
+	);
+}
+
+#[test]
+fn compact_size_helpers_cover_every_prefix_width_and_staged_edit() {
+	assert_eq!(PrefixState::MIN_SIZE, PrefixState::HEADER_SIZE);
+	assert_eq!(PrefixState::HEADER_SIZE, 16);
+	assert_eq!(PrefixState::ONE_CAPACITY, 2);
+	assert_eq!(PrefixState::TWO_CAPACITY, 2);
+	assert_eq!(PrefixState::FOUR_CAPACITY, 2);
+	assert_eq!(PrefixState::EIGHT_CAPACITY, 2);
+
+	let one = [1u8, 2];
+	let two = [PodU16::from(3)];
+	let four = [PodU32::from(5), PodU32::from(8)];
+	let eight = [PodU64::from(13)];
+	let expected = PrefixState::projected_bytes(one.len(), two.len(), four.len(), eight.len())
+		.unwrap_or_else(|error| panic!("project prefix state size: {error:?}"));
+	let mut data = [0u8; PrefixState::MAX_SIZE];
+	let committed = PrefixState::initialize(
+		&mut data,
+		&PrefixStatePatch::new()
+			.replace_one(&one)
+			.replace_two(&two)
+			.replace_four(&four)
+			.replace_eight(&eight),
+	)
+	.unwrap_or_else(|error| panic!("initialize prefix state: {error:?}"));
+	assert_eq!(committed, expected);
+
+	let state = PrefixState::try_from_bytes(&data)
+		.unwrap_or_else(|error| panic!("read prefix state: {error:?}"));
+	assert_eq!(state.encoded_len(), committed);
+	assert!(state.encoded_len() < data.len());
+
+	for counts in [[3, 0, 0, 0], [0, 3, 0, 0], [0, 0, 3, 0], [0, 0, 0, 3]] {
+		assert_eq!(
+			PrefixState::projected_bytes(counts[0], counts[1], counts[2], counts[3]),
+			Err(ProgramError::InvalidAccountData)
+		);
+	}
+
+	let projected =
+		PrefixState::updated_len(&data, &PrefixStatePatch::new().replace_one(&one[..1]))
+			.unwrap_or_else(|error| panic!("project prefix state update: {error:?}"));
+	assert_eq!(projected, committed - 1);
 }
 
 #[test]
@@ -161,6 +307,13 @@ fn compact_account_validation_rejects_every_invalid_boundary() {
 	let mut too_large = [0u8; DynamicState::MAX_SIZE + 1];
 	assert!(DynamicState::initialize(&mut too_small, &DynamicStatePatch::new()).is_err());
 	assert!(DynamicState::initialize(&mut too_large, &DynamicStatePatch::new()).is_err());
+	DynamicState::initialize(
+		&mut too_large[..DynamicState::MAX_SIZE],
+		&DynamicStatePatch::new(),
+	)
+	.unwrap_or_else(|error| panic!("initialize maximum compact storage: {error:?}"));
+	assert!(DynamicState::try_from_bytes(&too_large).is_err());
+	assert!(DynamicState::updated_len(&too_large, &DynamicStatePatch::new()).is_err());
 
 	let mut split_alignment = [0u8; DynamicState::HEADER_SIZE + 1];
 	assert!(DynamicState::initialize(&mut split_alignment, &DynamicStatePatch::new()).is_err());

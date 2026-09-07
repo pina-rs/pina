@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const CANCEL_DISCRIMINATOR: u8 = 2u8;
 
 /// Accounts.
@@ -83,7 +81,7 @@ impl CancelInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut CancelInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; CancelInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<CancelInstructionWireZc>()];
 		<CancelInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = CANCEL_DISCRIMINATOR;
@@ -96,6 +94,7 @@ impl CancelInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct CancelInstructionWire {
 	pub discriminator: u8,
 }

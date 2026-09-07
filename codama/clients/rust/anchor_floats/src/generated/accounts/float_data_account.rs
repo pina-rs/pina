@@ -8,9 +8,8 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct FloatDataAccount {
 	pub discriminator: u8,
 	pub data_f64: u64,
@@ -21,7 +20,7 @@ pub struct FloatDataAccount {
 pub const FLOAT_DATA_ACCOUNT_DISCRIMINATOR: u8 = 1u8;
 
 impl FloatDataAccount {
-	pub const LEN: usize = Self::SIZE;
+	pub const LEN: usize = core::mem::size_of::<FloatDataAccountZc>();
 
 	/// Initialize and validate account storage in one pass.
 	///

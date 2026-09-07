@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const TOGGLE_COMPLETED_DISCRIMINATOR: u8 = 1u8;
 
 /// Accounts.
@@ -67,7 +65,7 @@ impl ToggleCompletedInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut ToggleCompletedInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; ToggleCompletedInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<ToggleCompletedInstructionWireZc>()];
 		<ToggleCompletedInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = TOGGLE_COMPLETED_DISCRIMINATOR;
@@ -80,6 +78,7 @@ impl ToggleCompletedInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ToggleCompletedInstructionWire {
 	pub discriminator: u8,
 }

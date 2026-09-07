@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 /// Instruction data for `AddTag`. Appends a tag to the profile.
 pub const ADD_TAG_DISCRIMINATOR: u8 = 2u8;
 
@@ -68,7 +66,7 @@ impl AddTagInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut AddTagInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; AddTagInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<AddTagInstructionWireZc>()];
 		<AddTagInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = ADD_TAG_DISCRIMINATOR;
@@ -81,6 +79,7 @@ impl AddTagInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct AddTagInstructionWire {
 	pub discriminator: u8,
 	pub tag: u64,

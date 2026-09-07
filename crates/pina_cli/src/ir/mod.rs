@@ -15,7 +15,7 @@ pub struct ProgramIr {
 	pub pdas: Vec<PdaIr>,
 }
 
-/// A local unit enum derived with PinaPod and its generated companion.
+/// A local unit enum derived with `PinaPod` and its generated companion.
 #[derive(Debug, Clone)]
 pub struct PinaPodEnumIr {
 	pub name: String,

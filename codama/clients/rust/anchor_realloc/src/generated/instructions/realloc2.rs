@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 /// Exercises Anchor's duplicate-reallocation guard.
 ///
 /// Both sample accounts must be the same canonical PDA for the signer, so the
@@ -76,7 +74,7 @@ impl Realloc2InstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut Realloc2InstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; Realloc2InstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<Realloc2InstructionWireZc>()];
 		<Realloc2InstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REALLOC2_DISCRIMINATOR;
@@ -89,6 +87,7 @@ impl Realloc2InstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct Realloc2InstructionWire {
 	pub discriminator: u8,
 	pub len: u16,

@@ -82,13 +82,14 @@ jobs:
 
       - name: configure git authentication
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Release PRs opened with GITHUB_TOKEN do not trigger their workflows.
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: gh auth setup-git
 
       - name: refresh release pull request
         if: steps.release_record.outputs.is_release_commit != 'true' && steps.pending_changesets.outputs.has_changesets == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           set -euo pipefail
           # A changeset that only bumps `docs`/`none` produces no releaseable

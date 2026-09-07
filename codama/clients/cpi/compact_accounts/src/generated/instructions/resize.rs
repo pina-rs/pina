@@ -43,18 +43,22 @@ pub struct Resize<'account> {
 pub struct ResizeIx {
 	/// Instruction argument `entryCount`.
 	pub entry_count: u8,
+
+	/// Instruction argument `markerCount`.
+	pub marker_count: u8,
 }
 
 impl ResizeIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 2;
+	pub const LEN: usize = 3;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 2], ProgramError> {
-		let mut data = [0u8; 2];
+	pub fn to_bytes(&self) -> Result<[u8; 3], ProgramError> {
+		let mut data = [0u8; 3];
 		data[..1].copy_from_slice(&RESIZE_DISCRIMINATOR);
 		data[1..2].copy_from_slice(&self.entry_count.to_le_bytes());
+		data[2..3].copy_from_slice(&self.marker_count.to_le_bytes());
 
 		Ok(data)
 	}

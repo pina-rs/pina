@@ -8,9 +8,8 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct State {
 	pub discriminator: u8,
 	pub bump: u8,
@@ -19,7 +18,7 @@ pub struct State {
 pub const STATE_DISCRIMINATOR: u8 = 1u8;
 
 impl State {
-	pub const LEN: usize = Self::SIZE;
+	pub const LEN: usize = core::mem::size_of::<StateZc>();
 
 	/// Initialize and validate account storage in one pass.
 	///

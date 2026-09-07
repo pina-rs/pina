@@ -20,7 +20,7 @@ const compactAccountsProgramAddress = Address(
 enum CompactAccountsAccount { journal }
 
 /// Known instructions for the CompactAccounts program.
-enum CompactAccountsInstruction { initialize, resize, write }
+enum CompactAccountsInstruction { initialize, resize, write, rename }
 
 /// Identifies the type of a CompactAccounts instruction.
 CompactAccountsInstruction identifyCompactAccountsInstruction(Uint8List data) {
@@ -32,6 +32,9 @@ CompactAccountsInstruction identifyCompactAccountsInstruction(Uint8List data) {
   }
   if (containsBytes(data, getU8Encoder().encode(2), 0)) {
     return CompactAccountsInstruction.write;
+  }
+  if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+    return CompactAccountsInstruction.rename;
   }
 
   throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
@@ -71,6 +74,14 @@ final class ParsedWrite extends ParsedCompactAccountsInstruction {
   final WriteInstructionData data;
 }
 
+/// A parsed Rename instruction.
+final class ParsedRename extends ParsedCompactAccountsInstruction {
+  const ParsedRename({required this.data})
+    : super(CompactAccountsInstruction.rename);
+
+  final RenameInstructionData data;
+}
+
 /// Parses a CompactAccounts instruction.
 ParsedCompactAccountsInstruction parseCompactAccountsInstruction(
   Instruction instruction,
@@ -86,6 +97,9 @@ ParsedCompactAccountsInstruction parseCompactAccountsInstruction(
     ),
     CompactAccountsInstruction.write => ParsedWrite(
       data: parseWriteInstruction(instruction),
+    ),
+    CompactAccountsInstruction.rename => ParsedRename(
+      data: parseRenameInstruction(instruction),
     ),
   };
 }

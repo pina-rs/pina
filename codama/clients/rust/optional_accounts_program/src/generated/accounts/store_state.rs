@@ -8,9 +8,8 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct StoreState {
 	/// On-chain store state touched through the optional mutable slot.
 	///
@@ -23,7 +22,7 @@ pub struct StoreState {
 pub const STORE_STATE_DISCRIMINATOR: u8 = 1u8;
 
 impl StoreState {
-	pub const LEN: usize = Self::SIZE;
+	pub const LEN: usize = core::mem::size_of::<StoreStateZc>();
 
 	/// Initialize and validate account storage in one pass.
 	///

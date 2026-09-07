@@ -50,6 +50,156 @@ Generated TypeScript and Dart codecs reject over-capacity values rather than tru
 - Regenerate Codama IDLs and committed Rust/JS clients for the updated writable-account inference.
 - Add a PinaPod v0.2 migration guide and update the Pina mdBook, crate READMEs, examples, templates, and bundled agent skill.
 
+## [0.14.0](https://github.com/pina-rs/pina/releases/tag/v0.14.0) (2026-09-07)
+
+Grouped release for `core`.
+
+### Breaking Changes
+
+#### Make compact resizing automatic and clarify rent semantics
+
+_Packages:_ _pina_, _pina_macros_
+
+Reallocation builders now use `target_size` and `rent_account` instead of `new_size` and `payer`:
+
+```rust
+ReallocAccount {
+	account,
+	rent_account,
+	target_size,
+	program_id,
+}
+.invoke()?;
+```
+
+Use `ResizeCompactAccount::invoke` for exact compact updates. Its callback commits the generated mutable view. Pina grows before the callback, verifies the committed size, and shrinks afterward:
+
+```rust
+let target_size = Journal::projected_bytes(entries.len(), markers.len())?;
+
+ResizeCompactAccount {
+	account,
+	rent_account,
+	target_size,
+	program_id,
+}
+.invoke::<Journal, _>(|data| {
+	let mut journal = Journal::try_from_bytes_mut(data)?;
+	journal
+		.set_entries(entries)
+		.map_err(|_| ProgramError::InvalidAccountData)?;
+	journal
+		.set_markers(markers)
+		.map_err(|_| ProgramError::InvalidAccountData)?;
+	journal.commit().map_err(|_| ProgramError::InvalidAccountData)?;
+
+	Ok(())
+})?;
+```
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #309](https://github.com/pina-rs/pina/pull/309)
+
+### Features
+
+#### Generate checked compact-account size helpers
+
+_Packages:_ _pina_, _pina_macros_
+
+Compact accounts now expose MIN_SIZE, per-tail capacity constants, count-aware projected_bytes calculations, and encoded_size on immutable and mutable views. Use account.data_len() for allocated bytes, encoded_size() for committed logical bytes, and projected_size() for staged mutable edits.
+
+The compact account examples use these helpers for initialization, growth, shrinking, and committed-versus-staged size checks.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #304](https://github.com/pina-rs/pina/pull/304)
+
+#### Support compact strings alongside multiple dynamic fields
+
+_Packages:_ _pina_, _pina_cli_, _pina_macros_, _pina_codama_renderer_
+
+Compact accounts now accept bounded `String` and `PodString` fields in the dynamic suffix. String tails may be combined with any number of `Vec` or `PodVec` tails, and each field keeps an independent active length:
+
+```rust
+#[account(discriminator = AccountType, compact)]
+pub struct Journal {
+	pub featured_entry: Option<u64>,
+	pub title: PodString<24>,
+	pub entries: Vec<u64, 8>,
+	pub markers: PodVec<u8, 8, 8>,
+}
+
+let target_size = Journal::projected_bytes(
+	title.len(),
+	entries.len(),
+	markers.len(),
+)?;
+```
+
+The generated fixed header stores `Option<u64>` as `PodOption<PodU64>`, while only the active UTF-8 title bytes and active vector elements contribute to the account allocation.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #310](https://github.com/pina-rs/pina/pull/310)
+
+### Documentation
+
+#### Overhaul the book, readmes, and rustdoc
+
+_Packages:_ _pina_, _pina_cli_, _pina_codama_renderer_
+
+The published book, root readme, crate readmes, security policy, agent guidance, and rustdoc all get a verified accuracy pass: the empty Security Lints page includes the real lint catalog again, badges stop rendering mangled `pina**cli` labels, stale claims (zeropod naming, flash-loan guards, closed audit findings, closed issue backlogs, vesting token behavior, node toolchain provenance, changeset front matter) are corrected against the code, the workspace and examples inventories gain the crates and examples that shipped since they were written, the tutorials no longer show snippets that cannot compile, and internal working notes move out of the user-facing book with their statuses refreshed. The pina_codama_renderer entry API, the pina token aliases, and the pina_cli Codama generation options gain rustdoc, and generated clients no longer emit broken intra-doc links.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #307](https://github.com/pina-rs/pina/pull/307)
+
+#### Make compact resizing automatic and clarify rent semantics
+
+_Packages:_ _pina_skill_
+
+Reallocation builders now use `target_size` and `rent_account` instead of `new_size` and `payer`:
+
+```rust
+ReallocAccount {
+	account,
+	rent_account,
+	target_size,
+	program_id,
+}
+.invoke()?;
+```
+
+Use `ResizeCompactAccount::invoke` for exact compact updates. Its callback commits the generated mutable view. Pina grows before the callback, verifies the committed size, and shrinks afterward:
+
+```rust
+let target_size = Journal::projected_bytes(entries.len(), markers.len())?;
+
+ResizeCompactAccount {
+	account,
+	rent_account,
+	target_size,
+	program_id,
+}
+.invoke::<Journal, _>(|data| {
+	let mut journal = Journal::try_from_bytes_mut(data)?;
+	journal
+		.set_entries(entries)
+		.map_err(|_| ProgramError::InvalidAccountData)?;
+	journal
+		.set_markers(markers)
+		.map_err(|_| ProgramError::InvalidAccountData)?;
+	journal.commit().map_err(|_| ProgramError::InvalidAccountData)?;
+
+	Ok(())
+})?;
+```
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #309](https://github.com/pina-rs/pina/pull/309)
+
+### Notes
+
+#### Overhaul the book, readmes, and rustdoc
+
+_Packages:_ _pina_lints_, _pina_macros_, _pina_profile_, _pina_sdk_ids_, _pina_test_, _pina_skill_
+
+The published book, root readme, crate readmes, security policy, agent guidance, and rustdoc all get a verified accuracy pass: the empty Security Lints page includes the real lint catalog again, badges stop rendering mangled `pina**cli` labels, stale claims (zeropod naming, flash-loan guards, closed audit findings, closed issue backlogs, vesting token behavior, node toolchain provenance, changeset front matter) are corrected against the code, the workspace and examples inventories gain the crates and examples that shipped since they were written, the tutorials no longer show snippets that cannot compile, and internal working notes move out of the user-facing book with their statuses refreshed. The pina_codama_renderer entry API, the pina token aliases, and the pina_cli Codama generation options gain rustdoc, and generated clients no longer emit broken intra-doc links.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #307](https://github.com/pina-rs/pina/pull/307)
+
 ## [0.13.0](https://github.com/pina-rs/pina/releases/tag/v0.13.0) (2026-09-06)
 
 Grouped release for `core`.

@@ -1,7 +1,7 @@
 //! Closed field grammar for Pina's fixed zero-copy schemas.
 //!
-//! PinaPod's derive intentionally supports a fallback through `ZcField`.
-//! That extension point is useful for direct PinaPod users, but Pina cannot
+//! `PinaPod`'s derive intentionally supports a fallback through `ZcField`.
+//! That extension point is useful for direct `PinaPod` users, but Pina cannot
 //! safely accept it at an account or instruction boundary: even though
 //! `ZcField` is an unsafe trait, an unknown implementation is outside Pina's
 //! closed schema contract. Pina therefore accepts only the concrete
@@ -120,6 +120,15 @@ pub(crate) fn validate_fixed_schema(
 /// Compile-time proofs and size metadata for a compact account schema.
 pub(crate) struct CompactSchema {
 	pub(crate) proofs: proc_macro2::TokenStream,
+	pub(crate) tails: Vec<CompactTail>,
+}
+
+/// Size metadata for one compact tail.
+pub(crate) struct CompactTail {
+	pub(crate) name: syn::Ident,
+	pub(crate) pod: proc_macro2::TokenStream,
+	pub(crate) capacity: proc_macro2::TokenStream,
+	pub(crate) optional: bool,
 }
 
 enum CompactField {
@@ -142,7 +151,7 @@ enum CompactField {
 
 /// Validate the interoperable compact-account subset.
 ///
-/// Compact fields form a suffix, matching PinaPod's compact schema grammar.
+/// Compact fields form a suffix, matching `PinaPod`'s compact schema grammar.
 /// Every tail length lives in the fixed header and the active payloads are
 /// concatenated after it in declaration order.
 pub(crate) fn validate_compact_schema(
@@ -165,6 +174,7 @@ pub(crate) fn validate_compact_schema(
 	let mut tail_max_sizes = Vec::new();
 	let mut tail_element_sizes = Vec::new();
 	let mut tail_prefix_proofs = Vec::new();
+	let mut tails = Vec::new();
 	let mut seen_tail = false;
 
 	for field in &fields.named {
@@ -207,6 +217,14 @@ pub(crate) fn validate_compact_schema(
 				});
 				tail_element_sizes.push(quote!(1usize));
 				tail_prefix_proofs.push(compact_prefix_proof(&capacity, prefix_size));
+				tails.push(CompactTail {
+					name: field.ident.clone().ok_or_else(|| {
+						syn::Error::new_spanned(field, "compact tails must be named")
+					})?,
+					pod: quote!(::core::primitive::u8),
+					capacity,
+					optional,
+				});
 			}
 			CompactField::Vec {
 				element_source,
@@ -236,6 +254,14 @@ pub(crate) fn validate_compact_schema(
 					quote!(::core::mem::size_of::<#pod>())
 				});
 				tail_prefix_proofs.push(compact_vec_proof(&capacity, prefix_size, pod));
+				tails.push(CompactTail {
+					name: field.ident.clone().ok_or_else(|| {
+						syn::Error::new_spanned(field, "compact tails must be named")
+					})?,
+					pod: pod.clone(),
+					capacity,
+					optional,
+				});
 			}
 		}
 	}
@@ -288,7 +314,7 @@ pub(crate) fn validate_compact_schema(
 		};
 	};
 
-	Ok(CompactSchema { proofs })
+	Ok(CompactSchema { proofs, tails })
 }
 
 fn validate_schema_container(item: &ItemStruct) -> syn::Result<()> {
@@ -381,7 +407,9 @@ fn classify_compact_string(
 	let prefix_size = if is_alias {
 		1
 	} else {
-		literal_prefix_argument(arguments.args.iter().nth(1), 1, ty)?
+		literal_prefix_argument(arguments.args.iter().nth(1), 1, ty).map_err(|_| {
+			syn::Error::new_spanned(ty, "compact `String` prefixes must use 1, 2, 4, or 8 bytes")
+		})?
 	};
 	let source = if optional {
 		syn::parse_quote!(::core::option::Option<#ty>)
@@ -438,7 +466,9 @@ fn classify_compact_vec(
 	let prefix_size = if is_alias {
 		2
 	} else {
-		literal_prefix_argument(arguments.args.iter().nth(2), 2, ty)?
+		literal_prefix_argument(arguments.args.iter().nth(2), 2, ty).map_err(|_| {
+			syn::Error::new_spanned(ty, "compact `Vec` prefixes must use 1, 2, 4, or 8 bytes")
+		})?
 	};
 	let audited =
 		classify_fixed_type(element, crate_path).map_err(|_| compact_supported_error(ty))?;

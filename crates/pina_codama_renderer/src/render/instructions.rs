@@ -66,8 +66,6 @@ pub(crate) fn render_instruction_page(
 	})?;
 
 	let mut lines = Vec::new();
-	lines.push("use pina::pinapod;".to_string());
-	lines.push(String::new());
 	for doc_line in render_docs(&instruction.docs, 0) {
 		lines.push(doc_line);
 	}
@@ -163,7 +161,9 @@ pub(crate) fn render_instruction_page(
 		"\tpub fn new(configure: impl FnOnce(&mut {wire_zc_name})) -> Result<Self, \
 		 solana_program_error::ProgramError> {{"
 	));
-	lines.push(format!("\t\tlet mut bytes = vec![0u8; {wire_name}::SIZE];"));
+	lines.push(format!(
+		"\t\tlet mut bytes = vec![0u8; core::mem::size_of::<{wire_zc_name}>()];"
+	));
 	lines.push(format!(
 		"\t\t<{wire_name} as pina::PinaPodFixed>::initialize(&mut bytes, |data| {{"
 	));
@@ -201,6 +201,7 @@ pub(crate) fn render_instruction_page(
 	}
 	lines.push("#[doc(hidden)]".to_string());
 	lines.push("#[derive(pina::PinaPod)]".to_string());
+	lines.push("#[pinapod(crate = pina::pinapod, no_inherent)]".to_string());
 	lines.push(format!("pub struct {wire_name} {{"));
 	lines.extend(wire_fields);
 	lines.push("}".to_string());

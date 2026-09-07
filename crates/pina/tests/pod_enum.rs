@@ -1,7 +1,7 @@
-//! Verifies standalone PinaPod enum support.
+//! Verifies standalone `PinaPod` enum support.
 //!
 //! Pina's macro-generated account, instruction, and event schemas reject
-//! custom field mappings, including these enums. Direct PinaPod users may
+//! custom field mappings, including these enums. Direct `PinaPod` users may
 //! still compose audited standalone schemas outside that closed boundary.
 
 use core::mem::align_of;

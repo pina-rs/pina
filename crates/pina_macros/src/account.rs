@@ -61,19 +61,19 @@ pub(crate) fn expand(
 		)
 		.to_compile_error();
 	}
-	let schema_proofs = if compact {
+	let (schema_proofs, compact_schema) = if compact {
 		match schema::validate_compact_schema(
 			&item_struct,
 			&crate_path,
 			&discriminator,
 			&header_name,
 		) {
-			Ok(schema) => schema.proofs,
+			Ok(schema) => (schema.proofs.clone(), Some(schema)),
 			Err(error) => return error.to_compile_error(),
 		}
 	} else {
 		match schema::validate_fixed_schema(&item_struct, &crate_path, &discriminator, &zc_name) {
-			Ok(proofs) => proofs,
+			Ok(proofs) => (proofs, None),
 			Err(error) => return error.to_compile_error(),
 		}
 	};
@@ -105,8 +105,8 @@ pub(crate) fn expand(
 	named_fields.named.insert(0, discriminator_field);
 
 	let error = quote!(#crate_path::ProgramError::InvalidAccountData);
-	let view_helpers = if compact {
-		generate_compact_view_helpers(&crate_path, &error, &ref_name, &patch_name)
+	let view_helpers = if let Some(schema) = &compact_schema {
+		generate_compact_view_helpers(&crate_path, &error, &ref_name, &patch_name, schema)
 	} else {
 		generate_view_helpers(&crate_path, &error, true)
 	};
@@ -262,7 +262,77 @@ fn generate_compact_view_helpers(
 	error: &proc_macro2::TokenStream,
 	ref_name: &syn::Ident,
 	patch_name: &syn::Ident,
+	schema: &schema::CompactSchema,
 ) -> proc_macro2::TokenStream {
+	let capacity_constants = schema.tails.iter().map(|tail| {
+		let name = format_ident!("{}_CAPACITY", tail.name.to_string().to_uppercase());
+		let field_name = tail.name.to_string();
+		let capacity = &tail.capacity;
+		let documentation = format!("Maximum element count for the `{field_name}` compact tail.");
+
+		quote! {
+			#[doc = #documentation]
+			pub const #name: usize = #capacity;
+		}
+	});
+	let projected_bytes = if schema.tails.iter().any(|tail| tail.optional) {
+		quote!()
+	} else {
+		let count_arguments: Vec<_> = schema
+			.tails
+			.iter()
+			.map(|tail| format_ident!("{}_count", tail.name))
+			.collect();
+		let capacity_checks = schema
+			.tails
+			.iter()
+			.zip(&count_arguments)
+			.map(|(tail, count)| {
+				let capacity = format_ident!("{}_CAPACITY", tail.name.to_string().to_uppercase());
+
+				quote! {
+					if #count > Self::#capacity {
+						return Err(#error);
+					}
+				}
+			});
+		let size_additions = schema
+			.tails
+			.iter()
+			.zip(&count_arguments)
+			.map(|(tail, count)| {
+				let pod = &tail.pod;
+
+				quote! {
+					let tail_size = #count
+						.checked_mul(::core::mem::size_of::<#pod>())
+						.ok_or(#error)?;
+					let size = size.checked_add(tail_size).ok_or(#error)?;
+				}
+			});
+
+		quote! {
+			/// Calculate the exact encoded size for the requested compact tail counts.
+			///
+			/// Count arguments follow the compact tails' declaration order.
+			///
+			/// # Errors
+			///
+			/// Returns `InvalidAccountData` when any count exceeds its declared capacity or the
+			/// byte-size calculation overflows.
+			pub fn projected_bytes(
+				#(#count_arguments: usize),*
+			) -> Result<usize, #crate_path::ProgramError> {
+				#(#capacity_checks)*
+
+				let size = Self::HEADER_SIZE;
+				#(#size_additions)*
+
+				Ok(size)
+			}
+		}
+	};
+
 	quote! {
 		/// The fixed header size, including the discriminator and tail length prefix.
 		pub const HEADER_SIZE: usize = <Self as #crate_path::PinaPodCompact>::HEADER_SIZE;
@@ -276,8 +346,14 @@ fn generate_compact_view_helpers(
 		/// Byte granularity of valid compact account allocations.
 		pub const TAIL_ALIGNMENT: usize = <Self as #crate_path::PinaPodCompact>::TAIL_ALIGNMENT;
 
+		#(#capacity_constants)*
+		#projected_bytes
+
 		/// Validate and borrow a compact account view.
 		pub fn try_from_bytes(data: &[u8]) -> Result<#ref_name<'_>, #crate_path::ProgramError> {
+			<Self as #crate_path::PinaPodCompact>::validate_storage_len(data.len())
+				.map_err(|_| #error)?;
+
 			if !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data) {
 				return Err(#error);
 			}
@@ -290,6 +366,9 @@ fn generate_compact_view_helpers(
 			data: &[u8],
 			patch: &#patch_name<'_>,
 		) -> Result<usize, #crate_path::ProgramError> {
+			<Self as #crate_path::PinaPodCompact>::validate_storage_len(data.len())
+				.map_err(|_| #error)?;
+
 			if !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data) {
 				return Err(#error);
 			}
@@ -302,6 +381,9 @@ fn generate_compact_view_helpers(
 			data: &mut [u8],
 			patch: &#patch_name<'_>,
 		) -> Result<usize, #crate_path::ProgramError> {
+			<Self as #crate_path::PinaPodCompact>::validate_storage_len(data.len())
+				.map_err(|_| #error)?;
+
 			if !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data) {
 				return Err(#error);
 			}

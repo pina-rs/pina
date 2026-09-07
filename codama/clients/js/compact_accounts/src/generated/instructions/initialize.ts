@@ -74,21 +74,25 @@ export type InitializeInstructionData = {
 	discriminator: number;
 	bump: number;
 	entryCount: number;
+	markerCount: number;
 };
 
 export type InitializeInstructionDataArgs = {
 	bump: number;
 	entryCount: number;
+	markerCount: number;
 };
 
 export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
 	InitializeInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"bump",
-			getU8Encoder(),
-		], ["entryCount", getU8Encoder()]]),
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["bump", getU8Encoder()],
+			["entryCount", getU8Encoder()],
+			["markerCount", getU8Encoder()],
+		]),
 		(value) => ({ ...value, discriminator: 0 }),
 	);
 }
@@ -103,6 +107,7 @@ export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
 		],
 		["bump", getU8Decoder()],
 		["entryCount", getU8Decoder()],
+		["markerCount", getU8Decoder()],
 	]);
 }
 
@@ -128,6 +133,7 @@ export type InitializeAsyncInput<
 	systemProgram?: Address<TAccountSystemProgram>;
 	bump: InitializeInstructionDataArgs["bump"];
 	entryCount: InitializeInstructionDataArgs["entryCount"];
+	markerCount: InitializeInstructionDataArgs["markerCount"];
 };
 
 export async function getInitializeInstructionAsync<
@@ -215,6 +221,7 @@ export type InitializeInput<
 	systemProgram?: Address<TAccountSystemProgram>;
 	bump: InitializeInstructionDataArgs["bump"];
 	entryCount: InitializeInstructionDataArgs["entryCount"];
+	markerCount: InitializeInstructionDataArgs["markerCount"];
 };
 
 export function getInitializeInstruction<

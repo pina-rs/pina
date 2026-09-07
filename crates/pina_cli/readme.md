@@ -14,7 +14,7 @@ The complete command reference is published in the [Pina CLI book](https://pina-
 
 <!-- {=crateReadmeBadgeRow:"pina_cli"} -->
 
-[![Crates.io](https://img.shields.io/badge/crates.io-pina**cli-orange?logo=rust)](https://crates.io/crates/pina_cli) [![Docs.rs](https://img.shields.io/badge/docs.rs-pina**cli-1f425f?logo=docs.rs)](https://docs.rs/pina_cli/) [![CI](https://github.com/pina-rs/pina/actions/workflows/ci.yml/badge.svg)](https://github.com/pina-rs/pina/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/pina-rs/pina/branch/main/graph/badge.svg)](https://codecov.io/gh/pina-rs/pina) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/license/apache-2.0)
+[![Crates.io](https://img.shields.io/badge/crates.io-pina__cli-orange?logo=rust)](https://crates.io/crates/pina_cli) [![Docs.rs](https://img.shields.io/badge/docs.rs-pina__cli-1f425f?logo=docs.rs)](https://docs.rs/pina_cli/) [![CI](https://github.com/pina-rs/pina/actions/workflows/ci.yml/badge.svg)](https://github.com/pina-rs/pina/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/pina-rs/pina/branch/main/graph/badge.svg)](https://codecov.io/gh/pina-rs/pina) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/license/apache-2.0)
 
 <!-- {/crateReadmeBadgeRow} -->
 

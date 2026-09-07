@@ -8,8 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use pina::pinapod;
-
 pub const REQUIRE_GT_DISCRIMINATOR: u8 = 5u8;
 
 /// Accounts.
@@ -50,7 +48,7 @@ impl RequireGtInstructionData {
 	pub fn new(
 		configure: impl FnOnce(&mut RequireGtInstructionWireZc),
 	) -> Result<Self, solana_program_error::ProgramError> {
-		let mut bytes = vec![0u8; RequireGtInstructionWire::SIZE];
+		let mut bytes = vec![0u8; core::mem::size_of::<RequireGtInstructionWireZc>()];
 		<RequireGtInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REQUIRE_GT_DISCRIMINATOR;
@@ -63,6 +61,7 @@ impl RequireGtInstructionData {
 
 #[doc(hidden)]
 #[derive(pina::PinaPod)]
+#[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct RequireGtInstructionWire {
 	pub discriminator: u8,
 }

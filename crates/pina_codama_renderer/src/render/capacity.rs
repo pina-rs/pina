@@ -1,4 +1,4 @@
-//! PinaPod compact-capacity metadata carried through Codama 0.13.2.
+//! `PinaPod` compact-capacity metadata carried through Codama 0.13.2.
 //!
 //! Codama 0.13.2 has no extension map or maximum-count property for a
 //! prefixed collection. Pina therefore emits reserved defined-type markers.
@@ -45,7 +45,7 @@ impl CompactCapacityIndex {
 
 				if previous.is_some() {
 					return Err(metadata_error(
-						marker_name,
+						&marker_name,
 						"two compact fields resolve to the same reserved marker name".to_string(),
 					));
 				}
@@ -63,34 +63,34 @@ impl CompactCapacityIndex {
 			let marker_name = marker.name.as_ref().to_owned();
 			let Some((account_name, field_name)) = expected.remove(&marker_name) else {
 				return Err(metadata_error(
-					marker_name,
+					&marker_name,
 					"marker does not resolve to one compact account field".to_string(),
 				));
 			};
 
 			if !marker_names.insert(marker_name.clone()) {
 				return Err(metadata_error(
-					marker_name,
+					&marker_name,
 					"duplicate marker names are not allowed".to_string(),
 				));
 			}
 
 			if !marker.docs.is_empty() {
 				return Err(metadata_error(
-					marker_name,
+					&marker_name,
 					"capacity markers cannot contain documentation".to_string(),
 				));
 			}
 
 			let TypeNode::FixedSize(fixed) = marker.r#type.as_ref() else {
 				return Err(metadata_error(
-					marker_name,
+					&marker_name,
 					"capacity marker must be a fixedSizeTypeNode".to_string(),
 				));
 			};
 			if !matches!(fixed.r#type.as_ref(), TypeNode::Bytes(_)) {
 				return Err(metadata_error(
-					marker_name,
+					&marker_name,
 					"capacity marker must wrap a bytesTypeNode".to_string(),
 				));
 			}
@@ -100,7 +100,7 @@ impl CompactCapacityIndex {
 
 		if let Some((marker_name, _)) = expected.into_iter().next() {
 			return Err(metadata_error(
-				marker_name,
+				&marker_name,
 				"compact account field is missing its capacity marker".to_string(),
 			));
 		}
@@ -117,7 +117,7 @@ impl CompactCapacityIndex {
 			.copied()
 			.ok_or_else(|| {
 				metadata_error(
-					compact_capacity_marker_name(account, field),
+					&compact_capacity_marker_name(account, field),
 					"compact account field is missing its capacity marker".to_string(),
 				)
 			})
@@ -143,7 +143,7 @@ pub(crate) fn is_compact_capacity_marker(name: &str) -> bool {
 	name.starts_with(COMPACT_CAPACITY_MARKER_PREFIX)
 }
 
-fn metadata_error(marker: String, reason: String) -> RenderError {
+fn metadata_error(marker: &str, reason: String) -> RenderError {
 	RenderError::UnsupportedValue {
 		context: format!("defined type `{marker}`"),
 		kind: "PinaPod compact capacity marker",
