@@ -1,6 +1,6 @@
 {
 	"name": "@pina-rs/cli-linux-x64-musl",
-	"version": "0.13.0",
+	"version": "0.14.0",
 	"description": "Prebuilt Pina CLI binary for Linux x64 (musl)",
 	"homepage": "https://pina.rs",
 	"bugs": { "url": "https://github.com/pina-rs/pina/issues" },
