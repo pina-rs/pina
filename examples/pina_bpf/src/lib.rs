@@ -176,10 +176,11 @@ impl<'a> ProcessAccountInfos<'a> for CreatePdaAccounts<'a> {
 				seeds: &[SEED_STATE_PREFIX],
 				bump: args.bump,
 			}
-			.invoke::<State>()?;
+			.invoke_with::<State>(|state| {
+				state.bump = args.bump;
 
-			let mut state = self.state.as_account_mut::<State>(&ID)?;
-			state.bump = args.bump;
+				Ok(())
+			})?;
 
 			Ok(())
 		}

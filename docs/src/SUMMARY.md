@@ -35,6 +35,7 @@
 - [Crates and Features](./crates-and-features.md)
 - [Codama Workflow](./codama-workflow.md)
 - [Examples](./examples.md)
+- [Compute-unit performance](./compute-unit-performance.md)
 - [Tutorials]()
   - [Your First Program](./tutorials/first-program.md)
   - [Compact Accounts](./tutorials/compact-accounts.md)

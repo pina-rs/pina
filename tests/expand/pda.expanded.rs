@@ -301,6 +301,50 @@ impl CounterState {
             )
             .map(|_| ())
     }
+    ///Load and validate `CounterState` and its stored-bump PDA address in one pass.
+    #[inline(always)]
+    pub fn load_pda<'account>(
+        account: &'account pina::AccountView,
+        authority: &Address,
+        program_id: &pina::Address,
+    ) -> ::core::result::Result<
+        pina::Ref<'account, <Self as pina::PinaPodFixed>::Zc>,
+        pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = pina::AsAccount::as_account::<Self>(account, program_id)?;
+        let seeds = Self::seeds(authority).with_bump(state.bump);
+        let expected_address = pina::create_program_address(
+            &seeds.as_slices(),
+            program_id,
+        )?;
+        if account_address != expected_address {
+            return Err(pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
+    ///Mutably load and validate `CounterState` and its stored-bump PDA address in one pass.
+    #[inline(always)]
+    pub fn load_pda_mut<'account>(
+        account: &'account mut pina::AccountView,
+        authority: &Address,
+        program_id: &pina::Address,
+    ) -> ::core::result::Result<
+        pina::RefMut<'account, <Self as pina::PinaPodFixed>::Zc>,
+        pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = pina::AsAccount::as_account_mut::<Self>(account, program_id)?;
+        let seeds = Self::seeds(authority).with_bump(state.bump);
+        let expected_address = pina::create_program_address(
+            &seeds.as_slices(),
+            program_id,
+        )?;
+        if account_address != expected_address {
+            return Err(pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
 }
 impl<'a> CounterStateSeeds<'a> {
     /// The seeds as byte slices, without the bump seed.
@@ -377,9 +421,9 @@ const _: () = {
     }
 };
 impl CounterState {
-    /// The exact number of bytes required by the PinaPod representation.
+    /// The exact number of bytes required by the `PinaPod` representation.
     pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
-    /// Validate `data` and return PinaPod's immutable zero-copy companion.
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
@@ -393,10 +437,10 @@ impl CounterState {
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, PinaPod zeros the complete slice again.
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
@@ -424,6 +468,7 @@ impl pina::AccountValidation for CounterStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -449,6 +494,7 @@ impl pina::AccountValidation for CounterStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -835,6 +881,62 @@ impl AllSeedState {
             )
             .map(|_| ())
     }
+    ///Load and validate `AllSeedState` and its stored-bump PDA address in one pass.
+    #[inline(always)]
+    pub fn load_pda<'account>(
+        account: &'account ::pina::AccountView,
+        authority: &Address,
+        amount: u64,
+        side: u8,
+        tag: [u8; 8usize],
+        width: u16,
+        height: u32,
+        program_id: &::pina::Address,
+    ) -> ::core::result::Result<
+        ::pina::Ref<'account, <Self as ::pina::PinaPodFixed>::Zc>,
+        ::pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = ::pina::AsAccount::as_account::<Self>(account, program_id)?;
+        let seeds = Self::seeds(authority, amount, side, tag, width, height)
+            .with_bump(state.bump);
+        let expected_address = ::pina::create_program_address(
+            &seeds.as_slices(),
+            program_id,
+        )?;
+        if account_address != expected_address {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
+    ///Mutably load and validate `AllSeedState` and its stored-bump PDA address in one pass.
+    #[inline(always)]
+    pub fn load_pda_mut<'account>(
+        account: &'account mut ::pina::AccountView,
+        authority: &Address,
+        amount: u64,
+        side: u8,
+        tag: [u8; 8usize],
+        width: u16,
+        height: u32,
+        program_id: &::pina::Address,
+    ) -> ::core::result::Result<
+        ::pina::RefMut<'account, <Self as ::pina::PinaPodFixed>::Zc>,
+        ::pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = ::pina::AsAccount::as_account_mut::<Self>(account, program_id)?;
+        let seeds = Self::seeds(authority, amount, side, tag, width, height)
+            .with_bump(state.bump);
+        let expected_address = ::pina::create_program_address(
+            &seeds.as_slices(),
+            program_id,
+        )?;
+        if account_address != expected_address {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
 }
 impl<'a> AllSeedStateSeeds<'a> {
     /// The seeds as byte slices, without the bump seed.
@@ -1003,9 +1105,9 @@ const _: () = {
     }
 };
 impl AllSeedState {
-    /// The exact number of bytes required by the PinaPod representation.
+    /// The exact number of bytes required by the `PinaPod` representation.
     pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
-    /// Validate `data` and return PinaPod's immutable zero-copy companion.
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
@@ -1019,10 +1121,10 @@ impl AllSeedState {
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, PinaPod zeros the complete slice again.
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
@@ -1050,6 +1152,7 @@ impl pina::AccountValidation for AllSeedStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1075,6 +1178,7 @@ impl pina::AccountValidation for AllSeedStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1368,6 +1472,50 @@ impl TodoState {
             )
             .map(|_| ())
     }
+    ///Load and validate `TodoState` and its stored-bump PDA address in one pass.
+    #[inline(always)]
+    pub fn load_pda<'account>(
+        account: &'account ::pina::AccountView,
+        owner: &Address,
+        program_id: &::pina::Address,
+    ) -> ::core::result::Result<
+        ::pina::Ref<'account, <Self as ::pina::PinaPodFixed>::Zc>,
+        ::pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = ::pina::AsAccount::as_account::<Self>(account, program_id)?;
+        let seeds = Self::seeds(owner).with_bump(state.bump);
+        let expected_address = ::pina::create_program_address(
+            &seeds.as_slices(),
+            program_id,
+        )?;
+        if account_address != expected_address {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
+    ///Mutably load and validate `TodoState` and its stored-bump PDA address in one pass.
+    #[inline(always)]
+    pub fn load_pda_mut<'account>(
+        account: &'account mut ::pina::AccountView,
+        owner: &Address,
+        program_id: &::pina::Address,
+    ) -> ::core::result::Result<
+        ::pina::RefMut<'account, <Self as ::pina::PinaPodFixed>::Zc>,
+        ::pina::ProgramError,
+    > {
+        let account_address = *account.address();
+        let state = ::pina::AsAccount::as_account_mut::<Self>(account, program_id)?;
+        let seeds = Self::seeds(owner).with_bump(state.bump);
+        let expected_address = ::pina::create_program_address(
+            &seeds.as_slices(),
+            program_id,
+        )?;
+        if account_address != expected_address {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        }
+        Ok(state)
+    }
 }
 impl<'a> TodoStateSeeds<'a> {
     /// The seeds as byte slices, without the bump seed.
@@ -1444,9 +1592,9 @@ const _: () = {
     }
 };
 impl TodoState {
-    /// The exact number of bytes required by the PinaPod representation.
+    /// The exact number of bytes required by the `PinaPod` representation.
     pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
-    /// Validate `data` and return PinaPod's immutable zero-copy companion.
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
@@ -1460,10 +1608,10 @@ impl TodoState {
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, PinaPod zeros the complete slice again.
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
@@ -1491,6 +1639,7 @@ impl pina::AccountValidation for TodoStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1516,6 +1665,7 @@ impl pina::AccountValidation for TodoStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }

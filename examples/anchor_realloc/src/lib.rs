@@ -157,10 +157,7 @@ fn validate_distinct_realloc_targets(account1: &Address, account2: &Address) -> 
 }
 
 fn validate_sample(sample: AccountView, authority: &Address) -> ProgramResult {
-	sample
-		.assert_not_empty()?
-		.assert_writable()?
-		.assert_owner(&ID)?;
+	sample.assert_not_empty()?.assert_writable()?;
 
 	let (bump, stored_authority) =
 		sample.with_compact_account::<Sample, _>(&ID, |state| Ok((state.bump, state.authority)))?;
@@ -170,7 +167,6 @@ fn validate_sample(sample: AccountView, authority: &Address) -> ProgramResult {
 	if canonical_bump != bump {
 		return Err(ProgramError::InvalidSeeds);
 	}
-	Sample::assert_seeds(&sample, authority, &ID)?;
 
 	// The PDA check is the primary authority control. Retain the stored value as
 	// defense in depth against accidental writes from future program instructions.

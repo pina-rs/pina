@@ -74,6 +74,18 @@ fn is_cpi_invocation(cx: &LateContext<'_>, expr: &Expr<'_>, method: &str) -> boo
 	})
 }
 
+fn is_generated_pda_mut_borrow(callee: &Expr<'_>) -> bool {
+	let ExprKind::Path(path) = &callee.kind else {
+		return false;
+	};
+	let method = match path {
+		rustc_hir::QPath::Resolved(_, path) => path.segments.last().map(|segment| segment.ident),
+		rustc_hir::QPath::TypeRelative(_, segment) => Some(segment.ident),
+	};
+
+	method.is_some_and(|method| method.name.as_str() == "load_pda_mut")
+}
+
 fn contains_mutable_borrow(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
 	match &expr.kind {
 		ExprKind::MethodCall(segment, receiver, args, _) => {
@@ -89,7 +101,8 @@ fn contains_mutable_borrow(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
 		| ExprKind::Type(scrutinee, _)
 		| ExprKind::UnsafeBinderCast(_, scrutinee, _) => contains_mutable_borrow(cx, scrutinee),
 		ExprKind::Call(callee, args) => {
-			contains_mutable_borrow(cx, callee)
+			is_generated_pda_mut_borrow(callee)
+				|| contains_mutable_borrow(cx, callee)
 				|| args
 					.iter()
 					.any(|argument| contains_mutable_borrow(cx, argument))

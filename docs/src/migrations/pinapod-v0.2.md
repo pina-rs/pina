@@ -111,6 +111,25 @@ builder.invoke_signed_with::<Profile>(&payer_signers, |profile| {
 })?;
 ```
 
+## Load fixed PDA accounts in one pass
+
+Do not validate a fixed PDA with `assert_type`, load it again through the generated `assert_seeds`, and then load it a third time for mutation. Bounded strings and nested containers make each recursive validation meaningful, so repeating the boundary also repeats its compute cost.
+
+Use the one-pass helpers generated for fixed `#[account]` plus `#[pda(bump = ...)]` schemas:
+
+```rust
+let mut profile = Profile::load_pda_mut(
+	self.profile,
+	self.authority.address(),
+	&ID,
+)?;
+profile.name.try_set("Alice")?;
+```
+
+`load_pda_mut` checks writability, owner, exact size, discriminator, every active PinaPod value, and the account address derived from the stored bump before it returns the mutable guard. `load_pda` provides the same one-pass contract for immutable access. Both guards retain the runtime data borrow, so drop them before a CPI that can access the account.
+
+Keep `Type::assert_seeds` for a validation-only path that does not need a typed guard. The one-pass loaders are the preferred path when code reads or writes the account immediately afterward.
+
 ## Keep compact nesting inside the supported grammar
 
 A compact account places fixed fields first and compact tails last. It can contain several tails. PinaPod v0.2 accepts these compact forms:
@@ -191,6 +210,7 @@ The following source changes do not change existing serialized data:
 - Renaming the derive and traits changes Rust names only.
 - Replacing fixed read method names changes validation entry points only.
 - Replacing create-then-mutate code with `invoke_with` changes initialization order, not the completed fixed-account bytes.
+- Replacing `assert_type` plus `assert_seeds` plus `as_account*` with `load_pda*` changes validation order, not account bytes.
 - Replacing staged compact mutation with a patch changes how callers produce the same compact bytes.
 - Adding client capacity metadata changes validation, not the encoded prefix or payload.
 
@@ -227,6 +247,9 @@ devenv shell cargo test -p pina_cli --all-features --locked
 devenv shell cargo test -p pina_codama_renderer --locked
 devenv shell build:pina:no-default
 devenv shell test:idl
+devenv shell -- report:cu:compare:main
 ```
 
 Then run the generated TypeScript and Dart contract suites, the tracked SBF compact-account build, and the Surfpool lifecycle tests. The failure cases must compare both account data and lamport balances before and after the rejected update.
+
+The compute-unit report must show savings as positive values and increases as negative values. Exact runtime increases fail unless `scripts/compute-unit-policy.json` records a reviewed absolute ceiling. See [Compute-unit performance](../compute-unit-performance.md) for the PinaPod v0.2 measurements and methodology.

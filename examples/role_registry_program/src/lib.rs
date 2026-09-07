@@ -194,12 +194,13 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			seeds: &registry_seeds.as_slices(),
 			bump: args.bump,
 		}
-		.invoke::<RegistryConfig>()?;
+		.invoke_with::<RegistryConfig>(|registry_config| {
+			registry_config.admin = admin_address;
+			registry_config.role_count.set(0);
+			registry_config.bump = args.bump;
 
-		let mut registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
-		registry_config.admin = admin_address;
-		registry_config.role_count.set(0);
-		registry_config.bump = args.bump;
+			Ok(())
+		})?;
 
 		Ok(())
 	}
@@ -237,6 +238,8 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 				.checked_add(1)
 				.ok_or(ProgramError::ArithmeticOverflow)?
 		};
+		let registry_address = *self.registry_config.address();
+		let grantee_address = *self.grantee.address();
 
 		CreateProgramAccountWithBump {
 			account: self.role_entry,
@@ -245,15 +248,16 @@ impl<'a> ProcessAccountInfos<'a> for AddRoleAccounts<'a> {
 			seeds: &role_entry_seeds.as_slices(),
 			bump: args.bump,
 		}
-		.invoke::<RoleEntry>()?;
+		.invoke_with::<RoleEntry>(|role_entry| {
+			role_entry.registry = registry_address;
+			role_entry.role_id = args.role_id;
+			role_entry.grantee = grantee_address;
+			role_entry.permissions = args.permissions;
+			role_entry.active.set(true);
+			role_entry.bump = args.bump;
 
-		let mut role_entry = self.role_entry.as_account_mut::<RoleEntry>(&ID)?;
-		role_entry.registry = *self.registry_config.address();
-		role_entry.role_id = args.role_id;
-		role_entry.grantee = *self.grantee.address();
-		role_entry.permissions = args.permissions;
-		role_entry.active.set(true);
-		role_entry.bump = args.bump;
+			Ok(())
+		})?;
 
 		let mut registry_config = self.registry_config.as_account_mut::<RegistryConfig>(&ID)?;
 		registry_config.role_count.set(role_count);

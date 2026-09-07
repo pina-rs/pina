@@ -64,7 +64,6 @@ in
       perl
       pkg-config
       protobuf
-      python3
       rust-jemalloc-sys
       # Upstream rustup 1.28+ fails in nix builds: check suite is network-sensitive
       # and the install phase fails generating shell completions because the sandbox
@@ -375,6 +374,8 @@ in
           --manifest-path ${lib.escapeShellArg "${currentDir}/crates/pina_fuzz/fuzz/Cargo.toml"} \
           --all-targets \
           --locked
+        pnpm run check:scripts
+        pnpm run test:compute-units
         test:npm-packages
       '';
       description = "Run workspace tests, compile fuzz targets, and verify npm packages.";
@@ -757,7 +758,7 @@ in
       exec = ''
         set -euo pipefail
         rm -rf "$DEVENV_ROOT/target/cu/current"
-        "$DEVENV_ROOT/scripts/profile-tracked-examples.sh" \
+        node "$DEVENV_ROOT/scripts/profile-tracked-examples.ts" \
           "$DEVENV_ROOT" \
           "$DEVENV_ROOT/target/cu/current"
       '';
@@ -783,18 +784,38 @@ in
 
         rm -rf "$DEVENV_ROOT/target/cu/base" "$DEVENV_ROOT/target/cu/head"
 
-        "$DEVENV_ROOT/scripts/profile-tracked-examples.sh" \
+        node "$DEVENV_ROOT/scripts/profile-tracked-examples.ts" \
           "$worktree_dir" \
           "$DEVENV_ROOT/target/cu/base"
 
-        "$DEVENV_ROOT/scripts/profile-tracked-examples.sh" \
+        node "$DEVENV_ROOT/scripts/profile-tracked-examples.ts" \
           "$DEVENV_ROOT" \
           "$DEVENV_ROOT/target/cu/head"
 
-        python3 "$DEVENV_ROOT/scripts/compare-compute-units.py" \
+        node "$DEVENV_ROOT/scripts/build-runtime-compute-units.ts" \
+          "$worktree_dir" \
+          "$DEVENV_ROOT/target/cu/runtime-base-elf" \
+          "$DEVENV_ROOT" \
+          "$DEVENV_ROOT/target/cu/runtime-head-elf"
+
+        node "$DEVENV_ROOT/scripts/measure-runtime-compute-units.ts" \
+          "$DEVENV_ROOT" \
+          "$worktree_dir" \
+          "$DEVENV_ROOT/target/cu/runtime-base-elf" \
+          "$DEVENV_ROOT/target/cu/runtime-base.json"
+
+        node "$DEVENV_ROOT/scripts/measure-runtime-compute-units.ts" \
+          "$DEVENV_ROOT" \
+          "$DEVENV_ROOT" \
+          "$DEVENV_ROOT/target/cu/runtime-head-elf" \
+          "$DEVENV_ROOT/target/cu/runtime-head.json"
+
+        node "$DEVENV_ROOT/scripts/compare-compute-units.ts" \
           --policy-file "$DEVENV_ROOT/scripts/compute-unit-policy.json" \
           --base-dir "$DEVENV_ROOT/target/cu/base" \
           --head-dir "$DEVENV_ROOT/target/cu/head" \
+          --base-runtime "$DEVENV_ROOT/target/cu/runtime-base.json" \
+          --head-runtime "$DEVENV_ROOT/target/cu/runtime-head.json" \
           --markdown-output "$DEVENV_ROOT/target/cu/comparison.md" \
           --json-output "$DEVENV_ROOT/target/cu/comparison.json"
 
@@ -1201,6 +1222,7 @@ in
         set -euo pipefail
         lint:clippy
         lint:format
+        pnpm run check:scripts
         verify:docs
         security:pina-lint
         lint:monochange

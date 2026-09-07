@@ -227,16 +227,15 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			seeds: &seeds.as_slices(),
 			bump: args.bump,
 		}
-		.invoke::<ProfileState>()?;
-
-		// Initialize account data
-		let mut profile = self.profile.as_account_mut::<ProfileState>(&ID)?;
-		profile.bump = args.bump;
-		profile.name = args.name;
-		profile.bio = args.bio;
-		profile.tags.clear();
-		profile.favorite_tag.clear();
-		profile.active.set(true);
+		.invoke_with::<ProfileState>(|profile| {
+			profile.bump = args.bump;
+			profile.name = args.name;
+			profile.bio = args.bio;
+			profile.tags.clear();
+			profile.favorite_tag.clear();
+			profile.active.set(true);
+			Ok(())
+		})?;
 
 		log!("Profile initialized");
 
@@ -246,18 +245,11 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 
 impl<'a> ProcessAccountInfos<'a> for ProfileAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
-		// Validate accounts
+		// Load and validate the profile once. The guard keeps the validated
+		// representation borrowed while the stored bump is checked and the
+		// selected mutation is applied.
 		self.authority.assert_signer()?;
-
-		let authority_key = self.authority.address();
-		self.profile
-			.assert_not_empty()?
-			.assert_writable()?
-			.assert_type::<ProfileState>(&ID)?;
-
-		// Verify the profile is the PDA for the authority, using the stored
-		// bump field (avoids re-deriving the canonical bump on-chain).
-		ProfileState::assert_seeds(self.profile, authority_key, &ID)?;
+		let mut profile = ProfileState::load_pda_mut(self.profile, self.authority.address(), &ID)?;
 
 		// Dispatch on the instruction discriminator
 		let instruction = ProfileInstruction::try_from(
@@ -268,8 +260,6 @@ impl<'a> ProcessAccountInfos<'a> for ProfileAccounts<'a> {
 		match instruction {
 			ProfileInstruction::UpdateProfile => {
 				let args = UpdateProfileInstruction::try_from_bytes(data)?;
-
-				let mut profile = self.profile.as_account_mut::<ProfileState>(&ID)?;
 				profile.name = args.name;
 				profile.bio = args.bio;
 
@@ -277,8 +267,6 @@ impl<'a> ProcessAccountInfos<'a> for ProfileAccounts<'a> {
 			}
 			ProfileInstruction::AddTag => {
 				let args = AddTagInstruction::try_from_bytes(data)?;
-
-				let mut profile = self.profile.as_account_mut::<ProfileState>(&ID)?;
 				profile
 					.tags
 					.try_push(args.tag.get())
@@ -289,8 +277,6 @@ impl<'a> ProcessAccountInfos<'a> for ProfileAccounts<'a> {
 			ProfileInstruction::RemoveTag => {
 				let args = RemoveTagInstruction::try_from_bytes(data)?;
 				let index = args.index.get();
-
-				let mut profile = self.profile.as_account_mut::<ProfileState>(&ID)?;
 				let index = usize::try_from(index).map_err(|_| ProfileError::TagNotFound)?;
 				profile
 					.tags

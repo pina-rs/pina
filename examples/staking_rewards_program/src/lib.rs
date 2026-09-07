@@ -274,18 +274,17 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 			seeds: &pool_seeds.as_slices(),
 			bump: args.bump,
 		}
-		.invoke::<PoolState>()?;
+		.invoke_with::<PoolState>(|pool_state| {
+			pool_state.admin = *self.admin.address();
+			pool_state.stake_mint = *self.stake_mint.address();
+			pool_state.reward_mint = *self.reward_mint.address();
+			pool_state.total_staked.set(0);
+			pool_state.reward_index.set(0);
+			pool_state.paused.set(false);
+			pool_state.bump = args.bump;
 
-		// Initialize pool state
-		let mut pool_state = self.pool_state.as_account_mut::<PoolState>(&ID)?;
-		pool_state.admin = *self.admin.address();
-		pool_state.stake_mint = *self.stake_mint.address();
-		pool_state.reward_mint = *self.reward_mint.address();
-		pool_state.total_staked.set(0);
-		pool_state.reward_index.set(0);
-		pool_state.paused.set(false);
-		pool_state.bump = args.bump;
-		drop(pool_state);
+			Ok(())
+		})?;
 
 		// Create stake vault
 		associated_token_account::instructions::Create {
@@ -352,16 +351,16 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 			seeds: &position_seeds.as_slices(),
 			bump: args.bump,
 		}
-		.invoke::<PositionState>()?;
+		.invoke_with::<PositionState>(|position_state| {
+			position_state.pool = pool_address;
+			position_state.owner = user_address;
+			position_state.staked_amount.set(0);
+			position_state.reward_debt.set(0);
+			position_state.pending_rewards.set(0);
+			position_state.bump = args.bump;
 
-		// Initialize position state
-		let mut position_state = self.position_state.as_account_mut::<PositionState>(&ID)?;
-		position_state.pool = *self.pool_state.address();
-		position_state.owner = user_address;
-		position_state.staked_amount.set(0);
-		position_state.reward_debt.set(0);
-		position_state.pending_rewards.set(0);
-		position_state.bump = args.bump;
+			Ok(())
+		})?;
 
 		Ok(())
 	}

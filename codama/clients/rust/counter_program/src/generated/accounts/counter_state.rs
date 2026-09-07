@@ -32,7 +32,7 @@ pub struct CounterState {
 	pub discriminator: u8,
 	/// The PDA bump seed, stored on-chain so we don't need to re-derive it.
 	pub bump: u8,
-	/// The current counter value. The PinaPod view stores it using its
+	/// The current counter value. The `PinaPod` view stores it using its
 	/// alignment-one, little-endian representation.
 	pub count: u64,
 }

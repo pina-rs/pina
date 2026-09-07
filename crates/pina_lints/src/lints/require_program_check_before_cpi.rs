@@ -104,6 +104,7 @@ fn is_trusted_pina_cpi_type(cx: &LateContext<'_>, receiver: &Expr<'_>) -> bool {
 
 fn is_trusted_pina_cpi_type_path(path: &str) -> bool {
 	path.strip_prefix("pina::cpi::")
+		.or_else(|| path.strip_prefix("pina::"))
 		.is_some_and(|name| TRUSTED_PINA_CPI_TYPES.contains(&name))
 }
 
@@ -119,6 +120,7 @@ mod tests {
 			"ReallocCompactAccount",
 			"UpdateResizableAccount",
 		] {
+			assert!(is_trusted_pina_cpi_type_path(&format!("pina::{name}")));
 			assert!(is_trusted_pina_cpi_type_path(&format!("pina::cpi::{name}")));
 		}
 	}
@@ -130,6 +132,9 @@ mod tests {
 		));
 		assert!(!is_trusted_pina_cpi_type_path(
 			"pina::cpi::UpdateResizableAccountUnchecked",
+		));
+		assert!(!is_trusted_pina_cpi_type_path(
+			"pina::external::UpdateResizableAccount",
 		));
 	}
 }

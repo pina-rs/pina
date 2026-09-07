@@ -44,7 +44,7 @@ Add `--features compact` when invoking `#[account(compact)]` through a direct `p
 - `#[account]`: defines discriminator-first fixed or compact account POD structs and generated builders.
 - `#[instruction]`: defines discriminator-first instruction data POD structs.
 - `#[event]`: defines discriminator-first event POD structs.
-- `#[pda]`: defines typed PDA seed, derivation, and validation helpers.
+- `#[pda]`: defines typed PDA seed, derivation, validation, and one-pass fixed-account loader helpers.
 - `#[error]`: maps custom enums to `ProgramError::Custom(code)`.
 - `#[derive(Accounts)]`: parses `&mut [AccountView]` into a named struct of shared and/or mutable account references.
 
@@ -122,6 +122,7 @@ pub enum ExampleError {
 
 - Generated instructions, events, and ordinary accounts accept audited scalars, addresses, byte arrays, bounded `String` and `Vec` fields, and recursively fixed `Option` fields. PinaPod supplies alignment-one storage and load-bearing validation.
 - `#[account(compact)]` accepts a final suffix made from `String<N>`, `Vec<T, N>` for fixed `T`, `Option<String<N>>`, `Option<Vec<T, N>>` for fixed `T`, and `Vec<String<M>, N>`. Fixed `Option<T>` fields stay in the header. Unsupported nesting produces a compile-time error that lists these forms.
+- A fixed `#[account]` with `#[pda(bump = ...)]` generates `load_pda` and `load_pda_mut`. These methods validate the typed representation and stored-bump PDA address before returning a guard, without repeating recursive validation.
 - Use `PodString<N, PFX>` or `PodVec<T, N, PFX>` for an explicit `1`, `2`, `4`, or `8` byte prefix. Prefix widths are const arguments, not macro attributes.
 - The macros are designed for `no_std` Solana program crates.
 - If you use `pina`, these macros are available directly without importing `pina_macros`.

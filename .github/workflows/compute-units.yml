@@ -35,25 +35,54 @@ jobs:
 
       - name: profile base revision
         run: |
-          bash ./scripts/profile-tracked-examples.sh \
+          node ./scripts/profile-tracked-examples.ts \
             "${{ github.workspace }}/../pina-base" \
             "${{ github.workspace }}/target/cu/base"
         shell: devenv shell -c -- bash -e {0}
 
       - name: profile head revision
         run: |
-          bash ./scripts/profile-tracked-examples.sh \
+          node ./scripts/profile-tracked-examples.ts \
             "${{ github.workspace }}" \
             "${{ github.workspace }}/target/cu/head"
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: build exact runtime ELFs
+        run: |
+          node ./scripts/build-runtime-compute-units.ts \
+            "${{ github.workspace }}/../pina-base" \
+            "${{ github.workspace }}/target/cu/runtime-base-elf" \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}/target/cu/runtime-head-elf"
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: measure exact base instruction compute units
+        run: |
+          node ./scripts/measure-runtime-compute-units.ts \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}/../pina-base" \
+            "${{ github.workspace }}/target/cu/runtime-base-elf" \
+            "${{ github.workspace }}/target/cu/runtime-base.json"
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: measure exact head instruction compute units
+        run: |
+          node ./scripts/measure-runtime-compute-units.ts \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}/target/cu/runtime-head-elf" \
+            "${{ github.workspace }}/target/cu/runtime-head.json"
         shell: devenv shell -c -- bash -e {0}
 
       - name: compare compute-unit reports
         run: |
           set +e
-          python3 ./scripts/compare-compute-units.py \
+          node ./scripts/compare-compute-units.ts \
             --policy-file ./scripts/compute-unit-policy.json \
             --base-dir ./target/cu/base \
             --head-dir ./target/cu/head \
+            --base-runtime ./target/cu/runtime-base.json \
+            --head-runtime ./target/cu/runtime-head.json \
             --markdown-output ./target/cu/comparison.md \
             --json-output ./target/cu/comparison.json
           status=$?

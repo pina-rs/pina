@@ -77,6 +77,12 @@ The initializer returns `Result<(), PinaPodError>`. PinaPod clears the complete 
 
 Advanced manual `PinaAccount` implementations can contain a storage enum whose valid discriminants start above zero. Such a type must use `invoke_with` and set the enum before final validation. Pina's closed `#[account]` grammar does not accept arbitrary custom enum fields, so this is not an extension of the audited macro grammar.
 
+### Fixed PDA loading
+
+For a fixed account with a stored PDA bump, `Type::load_pda` and `Type::load_pda_mut` validate the owner, size, discriminator, active nested values, and derived account address before exposing a guard. The mutable form also requires writability. This is one validation boundary: it does not call `assert_type`, generated `assert_seeds`, and `as_account_mut` as three separate passes.
+
+The loaded guard still owns the runtime account-data borrow. End its scope or call `drop` before a CPI that may access the same account. Pina's `deny_account_borrows_across_cpi` lint recognizes guards returned by `load_pda_mut`.
+
 ### Compact account creation
 
 Compact creation does not use an initializer closure. `CreateCompactProgramAccount` and `CreateCompactProgramAccountWithBump` require a generated `patch` field:

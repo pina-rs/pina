@@ -16,7 +16,7 @@ expression: idl
         "kind": "accountNode",
         "name": "semanticOptionsState",
         "docs": [
-          "Account exercising native and explicit zeropod option layouts."
+          "Account exercising native and explicit PinaPod option layouts."
         ],
         "data": {
           "kind": "structTypeNode",
@@ -113,7 +113,7 @@ expression: idl
               "kind": "structFieldTypeNode",
               "name": "values",
               "docs": [
-                "Options remain fixed-size zeropod elements inside vectors."
+                "Options remain fixed-size PinaPod elements inside vectors."
               ],
               "type": {
                 "kind": "fixedSizeTypeNode",

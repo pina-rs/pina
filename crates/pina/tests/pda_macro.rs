@@ -446,6 +446,79 @@ fn assert_seeds_rejects_wrong_seed_value() {
 	);
 }
 
+#[test]
+fn load_pda_returns_a_validated_typed_guard() {
+	let authority = unique_address(17);
+	let (pda, bump) = TestState::find_pda(&authority, 42, 1, [0xAB; 8], 7, 99, &TEST_PROGRAM_ID);
+	let state_bytes = build_test_state_bytes(authority, bump);
+	let test_account = build_account_view(pda, &state_bytes);
+
+	let state = TestState::load_pda(
+		&test_account.view,
+		&authority,
+		42,
+		1,
+		[0xAB; 8],
+		7,
+		99,
+		&TEST_PROGRAM_ID,
+	)
+	.expect("valid typed PDA");
+
+	assert_eq!(state.bump, bump);
+	assert_eq!(state.amount.get(), 42);
+}
+
+#[test]
+fn load_pda_mut_returns_a_writable_validated_guard() {
+	let authority = unique_address(18);
+	let (pda, bump) = TestState::find_pda(&authority, 42, 1, [0xAB; 8], 7, 99, &TEST_PROGRAM_ID);
+	let state_bytes = build_test_state_bytes(authority, bump);
+	let mut test_account = build_account_view(pda, &state_bytes);
+
+	{
+		let mut state = TestState::load_pda_mut(
+			&mut test_account.view,
+			&authority,
+			42,
+			1,
+			[0xAB; 8],
+			7,
+			99,
+			&TEST_PROGRAM_ID,
+		)
+		.expect("valid writable typed PDA");
+		state.amount.set(43);
+	}
+
+	let state = test_account
+		.view
+		.as_account::<TestState>(&TEST_PROGRAM_ID)
+		.expect("mutated account remains valid");
+	assert_eq!(state.amount.get(), 43);
+}
+
+#[test]
+fn load_pda_mut_rejects_the_wrong_address_before_exposing_the_guard() {
+	let authority = unique_address(19);
+	let (_pda, bump) = TestState::find_pda(&authority, 42, 1, [0xAB; 8], 7, 99, &TEST_PROGRAM_ID);
+	let state_bytes = build_test_state_bytes(authority, bump);
+	let mut test_account = build_account_view(unique_address(20), &state_bytes);
+
+	let result = TestState::load_pda_mut(
+		&mut test_account.view,
+		&authority,
+		42,
+		1,
+		[0xAB; 8],
+		7,
+		99,
+		&TEST_PROGRAM_ID,
+	);
+
+	assert!(matches!(result, Err(ProgramError::InvalidSeeds)));
+}
+
 // ---------------------------------------------------------------------------
 // AccountView construction helpers (SVM input format)
 // ---------------------------------------------------------------------------

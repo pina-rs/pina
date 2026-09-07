@@ -203,6 +203,7 @@ The profiler decodes each SBF instruction opcode and assigns costs: regular inst
 - **Always call `assert_owner()` / `assert_owners()`** before `as_token_*()` methods
 - **Always call `assert_empty()`** before account initialization to prevent reinitialization attacks
 - **Use `invoke_with` or `invoke_signed_with`** when fixed-account creation must establish nonzero values before final PinaPod validation
+- **Use generated `load_pda` or `load_pda_mut`** when a fixed stored-bump PDA handler needs a typed guard, so recursive content and the PDA address are validated once
 - **Always verify program accounts** with `assert_address()` / `assert_program()` before CPI invocations
 - **Use `assert_type::<T>()`** to prevent type cosplay: it checks discriminator, owner, and data size
 - **Use `CloseAccountZeroed { account, recipient }.invoke()` or `zeroed()` + `close_with_recipient()`** when stale account bytes must be invalidated before close

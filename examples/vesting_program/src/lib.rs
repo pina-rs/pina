@@ -205,20 +205,20 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			seeds: &vesting_seeds.as_slices(),
 			bump: args.bump,
 		}
-		.invoke::<VestingState>()?;
+		.invoke_with::<VestingState>(|vesting_state| {
+			vesting_state.admin = admin_address;
+			vesting_state.beneficiary = beneficiary_address;
+			vesting_state.mint = mint_address;
+			vesting_state.total_amount = args.total_amount;
+			vesting_state.claimed_amount.set(0);
+			vesting_state.start_ts = args.start_ts;
+			vesting_state.cliff_ts = args.cliff_ts;
+			vesting_state.end_ts = args.end_ts;
+			vesting_state.cancelled.set(false);
+			vesting_state.bump = args.bump;
 
-		let mut vesting_state = self.vesting_state.as_account_mut::<VestingState>(&ID)?;
-		vesting_state.admin = admin_address;
-		vesting_state.beneficiary = beneficiary_address;
-		vesting_state.mint = mint_address;
-		vesting_state.total_amount = args.total_amount;
-		vesting_state.claimed_amount.set(0);
-		vesting_state.start_ts = args.start_ts;
-		vesting_state.cliff_ts = args.cliff_ts;
-		vesting_state.end_ts = args.end_ts;
-		vesting_state.cancelled.set(false);
-		vesting_state.bump = args.bump;
-		drop(vesting_state);
+			Ok(())
+		})?;
 
 		associated_token_account::instructions::Create {
 			account: self.vault,

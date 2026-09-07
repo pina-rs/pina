@@ -205,17 +205,7 @@ impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 		// Validate accounts
 		self.authority.assert_signer()?;
 
-		let authority_key = self.authority.address();
-		self.counter
-			.assert_not_empty()?
-			.assert_type::<CounterState>(&ID)?;
-
-		// Verify the account is the PDA for the authority, using the stored
-		// bump field (avoids re-deriving the canonical bump on-chain).
-		CounterState::assert_seeds(self.counter, authority_key, &ID)?;
-
-		// Mutate state
-		let mut counter = self.counter.as_account_mut::<CounterState>(&ID)?;
+		let mut counter = CounterState::load_pda_mut(self.counter, self.authority.address(), &ID)?;
 		let current = counter.count.get();
 		let next = current
 			.checked_add(1)

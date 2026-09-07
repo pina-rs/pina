@@ -136,14 +136,10 @@ pub struct RenameAccounts<'a> {
 }
 
 fn validate_journal(journal: AccountView, authority: &Address) -> ProgramResult {
-	journal
-		.assert_not_empty()?
-		.assert_writable()?
-		.assert_owner(&ID)?;
+	journal.assert_not_empty()?.assert_writable()?;
 
 	let (bump, stored_authority) = journal
 		.with_compact_account::<Journal, _>(&ID, |state| Ok((state.bump, state.authority)))?;
-	Journal::assert_seeds(&journal, authority, &ID)?;
 	let canonical_bump =
 		journal.assert_canonical_bump(&Journal::seeds(authority).as_slices(), &ID)?;
 

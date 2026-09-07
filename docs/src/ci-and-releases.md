@@ -34,7 +34,7 @@ Separate PR workflows also verify:
 
 - `binary-size` for SBF artifact size reporting
 - `surfpool` builds each example SBF program and exercises its runtime guards through the Surfpool SDK
-- `compute-units` for tracked static CU regression reporting vs the PR base revision
+- `compute-units` for exact Mollusk instruction CU and tracked static SBF regression reporting vs the PR base revision
 
 The main CI workflow also runs `release-publish` on every pull request. When a PR contains releaseable changesets, the job creates the same release commit as the production release workflow and keeps that commit local to the runner. Registry readiness and a publish dry-run both select every package from its embedded release record, and CI requires their package sets to match so a newly added package cannot be omitted by a maintained allowlist. Cargo cannot completely verify dependent crates until their same-release dependencies exist in crates.io; Monochange plans those packages and publishes them in dependency order during the real release. Prepared release PRs are checked directly. Pull requests without a publishable release keep the job visible but skip the preflight explicitly.
 
@@ -68,7 +68,12 @@ An earlier revision of the `security/06-duplicate-mutable-accounts/secure` fixtu
 
 ## Compute-unit regression policy
 
-The `compute-units` workflow builds tracked SBF example programs on both the PR head and the PR base, runs `pina profile --json` on each `.so`, and compares the resulting static `total_cu` estimates.
+The `compute-units` workflow checks out the pull-request base in a sibling worktree and builds both revisions. It compares two signals:
+
+- Exact runtime CU from deterministic Mollusk instruction fixtures that load the copied base and head ELF files directly.
+- Static `pina profile --json` estimates for a broader set of tracked SBF examples.
+
+The exact harness records each ELF SHA-256, source revision, Cargo lockfile SHA-256, SBF toolchain, Mollusk version, and repetition count. Each instruction runs twice and must return the same count. Missing head cases, unexpected cases, and every unapproved runtime increase fail CI.
 
 Tracked programs are defined in `scripts/compute-unit-policy.json`:
 
@@ -78,18 +83,24 @@ Tracked programs are defined in `scripts/compute-unit-policy.json`:
 - `anchor_sysvars`
 - `anchor_system_accounts`
 - `anchor_realloc`
+- `compact_accounts`
+- `counter_program`
+- `profile_program`
 
 Current policy:
 
 - warn when `total_cu` increases by at least `+250` CU and `+5.0%`
 - fail when `total_cu` increases by at least `+500` CU and `+10.0%`
-- decreases and smaller increases are informational
+- decreases are positive and increases are negative
+- smaller static increases remain visible but do not fail the threshold gate
+- exact runtime increases fail unless a reviewed absolute ceiling permits that total
 
 Notes:
 
-- this workflow intentionally uses **static** SBF estimates from `pina profile`, not runtime validator traces
-- the tradeoff is deliberate: static profiling is deterministic and stable for PR-vs-base comparison
+- exact cases use real instruction execution through Mollusk; static profiles complement them with broader whole-program coverage
+- the runtime inventory covers fixed scalar state, fixed `String`/`Vec`/`Option` state, and compact realloc growth, rewrite, and shrink paths
 - reviewed redesigns may record an absolute total in `approvedTotals`; the allowance applies only while the base is below that total, so later increases are still evaluated normally
+- reviewed exact-runtime redesigns use `runtimeApprovedTotals` with the same absolute-ceiling behavior
 - the tracked set should favor example programs that build reliably on both the PR head and the PR base with the gallery linker used in CI; richer CPI-heavy and token-heavy flows remain covered by the main `ci` and program E2E jobs
 - if the tracked set or thresholds need to change, update `scripts/compute-unit-policy.json`
 
@@ -101,6 +112,8 @@ report:cu:compare:main
 ```
 
 The comparison writes artifacts to `target/cu/`, including a markdown summary and a machine-readable JSON report.
+
+See [Compute-unit performance](./compute-unit-performance.md) for the exact PinaPod v0.2 migration results and approval rationale.
 
 ## Coverage
 

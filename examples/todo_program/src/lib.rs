@@ -98,14 +98,13 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 			seeds: &seeds.as_slices(),
 			bump: args.bump,
 		}
-		.invoke::<TodoState>()?;
-
-		// Initialize account data
-		let mut todo = self.todo.as_account_mut::<TodoState>(&ID)?;
-		todo.owner = *owner;
-		todo.bump = args.bump;
-		todo.completed.set(false);
-		todo.digest = args.digest;
+		.invoke_with::<TodoState>(|todo| {
+			todo.owner = *owner;
+			todo.bump = args.bump;
+			todo.completed.set(false);
+			todo.digest = args.digest;
+			Ok(())
+		})?;
 
 		Ok(())
 	}
@@ -124,33 +123,19 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 
 		// Validate accounts
 		self.owner.assert_signer()?;
-		self.todo
-			.assert_not_empty()?
-			.assert_type::<TodoState>(&ID)?;
-
-		let stored_owner = {
-			let todo = self.todo.as_account::<TodoState>(&ID)?;
-			todo.owner
-		};
-		self.owner.assert_address(&stored_owner)?;
-
-		// Verify the todo is the PDA for the owner, using the stored bump
-		// field (avoids re-deriving the canonical bump on-chain).
-		TodoState::assert_seeds(self.todo, owner, &ID)?;
+		let mut todo = TodoState::load_pda_mut(self.todo, owner, &ID)?;
+		self.owner.assert_address(&todo.owner)?;
 
 		// Execute instruction
 		match instruction {
 			TodoInstruction::ToggleCompleted => {
 				let _ = ToggleCompletedInstruction::try_from_bytes(data)?;
-				let mut todo = self.todo.as_account_mut::<TodoState>(&ID)?;
 				let completed = todo.completed.get();
 
 				todo.completed.set(!completed);
 			}
 			TodoInstruction::UpdateDigest => {
 				let args = UpdateDigestInstruction::try_from_bytes(data)?;
-				let mut todo = self.todo.as_account_mut::<TodoState>(&ID)?;
-
 				todo.digest = args.digest;
 			}
 			TodoInstruction::Initialize => {

@@ -60,6 +60,8 @@ PinaPod initializes the complete fixed representation and validates active neste
 
 Typed fixed-account creation uses `invoke::<T>()` when the discriminator plus otherwise zeroed fields is valid. Use `invoke_with::<T>(initialize)` to configure `&mut T::Zc` before final validation. The signed equivalents are `invoke_signed` and `invoke_signed_with`.
 
+Fixed accounts declared with `#[pda(bump = ...)]` also generate `load_pda` and `load_pda_mut`. Prefer these when a handler needs a typed guard: they check the account boundary and stored-bump PDA address in one pass.
+
 ## Compact accounts
 
 <br>

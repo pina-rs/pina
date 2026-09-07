@@ -295,9 +295,9 @@ const _: () = {
     }
 };
 impl ConfigState {
-    /// The exact number of bytes required by the PinaPod representation.
+    /// The exact number of bytes required by the `PinaPod` representation.
     pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
-    /// Validate `data` and return PinaPod's immutable zero-copy companion.
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
@@ -311,10 +311,10 @@ impl ConfigState {
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, PinaPod zeros the complete slice again.
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
@@ -342,6 +342,7 @@ impl pina::AccountValidation for ConfigStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -367,6 +368,7 @@ impl pina::AccountValidation for ConfigStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -580,9 +582,9 @@ const _: () = {
     }
 };
 impl GameState {
-    /// The exact number of bytes required by the PinaPod representation.
+    /// The exact number of bytes required by the `PinaPod` representation.
     pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
-    /// Validate `data` and return PinaPod's immutable zero-copy companion.
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
@@ -596,10 +598,10 @@ impl GameState {
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, PinaPod zeros the complete slice again.
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
@@ -627,6 +629,7 @@ impl pina::AccountValidation for GameStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -652,6 +655,7 @@ impl pina::AccountValidation for GameStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -889,9 +893,9 @@ const _: () = {
     }
 };
 impl DataAccount {
-    /// The exact number of bytes required by the PinaPod representation.
+    /// The exact number of bytes required by the `PinaPod` representation.
     pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
-    /// Validate `data` and return PinaPod's immutable zero-copy companion.
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
@@ -905,10 +909,10 @@ impl DataAccount {
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, PinaPod zeros the complete slice again.
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
@@ -936,6 +940,7 @@ impl pina::AccountValidation for DataAccountZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -961,6 +966,7 @@ impl pina::AccountValidation for DataAccountZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1238,9 +1244,9 @@ const _: () = {
     }
 };
 impl BalanceAccount {
-    /// The exact number of bytes required by the PinaPod representation.
+    /// The exact number of bytes required by the `PinaPod` representation.
     pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
-    /// Validate `data` and return PinaPod's immutable zero-copy companion.
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
@@ -1254,10 +1260,10 @@ impl BalanceAccount {
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, PinaPod zeros the complete slice again.
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
@@ -1285,6 +1291,7 @@ impl pina::AccountValidation for BalanceAccountZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1310,6 +1317,7 @@ impl pina::AccountValidation for BalanceAccountZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1467,9 +1475,9 @@ const _: () = {
     }
 };
 impl MyStruct {
-    /// The exact number of bytes required by the PinaPod representation.
+    /// The exact number of bytes required by the `PinaPod` representation.
     pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
-    /// Validate `data` and return PinaPod's immutable zero-copy companion.
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
@@ -1483,10 +1491,10 @@ impl MyStruct {
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, PinaPod zeros the complete slice again.
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
@@ -1514,6 +1522,7 @@ impl pina::AccountValidation for MyStructZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1539,6 +1548,7 @@ impl pina::AccountValidation for MyStructZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -1976,9 +1986,9 @@ const _: () = {
     }
 };
 impl LargeState {
-    /// The exact number of bytes required by the PinaPod representation.
+    /// The exact number of bytes required by the `PinaPod` representation.
     pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
-    /// Validate `data` and return PinaPod's immutable zero-copy companion.
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
@@ -1992,10 +2002,10 @@ impl LargeState {
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, PinaPod zeros the complete slice again.
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
@@ -2023,6 +2033,7 @@ impl pina::AccountValidation for LargeStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
@@ -2048,6 +2059,7 @@ impl pina::AccountValidation for LargeStateZc {
         if condition(self) {
             return Ok(self);
         }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }

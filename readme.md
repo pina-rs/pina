@@ -620,6 +620,15 @@ state.assert(|s| s.value > PodU64::from(0))?;
 state.assert_msg(|s| s.bump == 255, "bump must be 255")?;
 ```
 
+For fixed accounts with a stored `#[pda(bump = ...)]`, prefer the generated one-pass loader when the handler needs state immediately:
+
+```rust
+let mut state = Config::load_pda_mut(account, authority.address(), &program_id)?;
+state.value.set(42);
+```
+
+`load_pda` and `load_pda_mut` validate the typed representation and stored-bump PDA address before returning a guard. The mutable form also enforces writability. This avoids repeating recursive `String`, `Vec`, and `Option` validation through separate `assert_type`, `assert_seeds`, and `as_account_mut` calls.
+
 ### `#[derive(Accounts)]`
 
 <br>
@@ -991,6 +1000,7 @@ Pina provides strong built-in protections against common Solana vulnerabilities 
 - **Always call `assert_owner()` / `assert_owners()`** before `as_token_*()` methods
 - **Always call `assert_empty()`** before account initialization to prevent reinitialization attacks
 - **Use `invoke_with` or `invoke_signed_with`** when fixed-account creation must establish nonzero values before final PinaPod validation
+- **Use generated `load_pda` or `load_pda_mut`** when a fixed stored-bump PDA handler needs a typed guard, so recursive content and the PDA address are validated once
 - **Always verify program accounts** with `assert_address()` / `assert_program()` before CPI invocations
 - **Use `assert_type::<T>()`** to prevent type cosplay: it checks discriminator, owner, and data size
 - **Use `CloseAccountZeroed { account, recipient }.invoke()` or `zeroed()` + `close_with_recipient()`** when stale account bytes must be invalidated before close

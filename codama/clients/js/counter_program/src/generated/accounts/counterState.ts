@@ -66,7 +66,7 @@ export type CounterState = {
 	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
 	bump: number;
 	/**
-	 * The current counter value. The PinaPod view stores it using its
+	 * The current counter value. The `PinaPod` view stores it using its
 	 * alignment-one, little-endian representation.
 	 */
 	count: bigint;
@@ -76,7 +76,7 @@ export type CounterStateArgs = {
 	/** The PDA bump seed, stored on-chain so we don't need to re-derive it. */
 	bump: number;
 	/**
-	 * The current counter value. The PinaPod view stores it using its
+	 * The current counter value. The `PinaPod` view stores it using its
 	 * alignment-one, little-endian representation.
 	 */
 	count: number | bigint;

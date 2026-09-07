@@ -7,6 +7,7 @@ Pina is a Rust workspace for building performant, `no_std` Solana programs on to
 - **Always run commands inside `devenv shell`** so the nix-managed toolchain (cargo, mdt, dprint, clippy, etc.) is used instead of stale cargo-installed or system binaries.
 - Use `devenv` for the development shell and repo task runner.
 - Use `cargo` for workspace tasks; use `pnpm` only for JS/Codama subprojects.
+- Write committed scripts in the repository's dominant dynamic language. Rust is not a scripting-language exception: in this Rust workspace, use TypeScript rather than Rust for scripts. Reserve Python scripts for predominantly Python projects, and fall back to TypeScript when no dynamic language dominates.
 - Format with `fix:format` or `dprint fmt`; do not run `rustfmt` directly.
 - Workspace code must preserve `no_std` compatibility where applicable.
 - `unsafe_code` and `unstable_features` are denied workspace-wide.

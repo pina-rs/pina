@@ -12,7 +12,7 @@ Secure adaptation of Anchor's account reallocation safety checks.
 - A dynamic `Vec<u64, 64>` tail that stores only active values and appears as a prefixed array in the Codama IDL.
 - Automatic grow-before-update and shrink-after-update ordering through `UpdateResizableAccount`, including exact rent funding and refunds.
 - Lower-level growth-limit, type, capacity, and element-boundary validation shared with `ReallocCompactAccount`.
-- Type, owner, stored-authority, and canonical-PDA validation before every resize.
+- One complete compact load plus stored-authority and canonical-PDA validation before every resize, without repeating the same compact parse.
 - Duplicate realloc target detection, before any mutation.
 
 ## Differences from Anchor

@@ -173,11 +173,11 @@ impl<'a> ProcessAccountInfos<'a> for InitAccounts<'a> {
 			seeds: &seeds.as_slices(),
 			bump: args.bump,
 		}
-		.invoke::<StoreState>()?;
-
-		let mut store = self.store.as_account_mut::<StoreState>(&ID)?;
-		store.bump = args.bump;
-		store.count.set(0);
+		.invoke_with::<StoreState>(|store| {
+			store.bump = args.bump;
+			store.count.set(0);
+			Ok(())
+		})?;
 
 		log!("store initialized");
 
@@ -193,10 +193,7 @@ impl<'a> ProcessAccountInfos<'a> for TouchAccounts<'a> {
 
 		match self.store {
 			Some(store) => {
-				store.assert_not_empty()?.assert_type::<StoreState>(&ID)?;
-				StoreState::assert_seeds(store, self.authority.address(), &ID)?;
-
-				let mut state = store.as_account_mut::<StoreState>(&ID)?;
+				let mut state = StoreState::load_pda_mut(store, self.authority.address(), &ID)?;
 				let next = state
 					.count
 					.get()
@@ -230,9 +227,7 @@ impl<'a> ProcessAccountInfos<'a> for InspectAccounts<'a> {
 
 		match self.store {
 			Some(store) => {
-				store.assert_type::<StoreState>(&ID)?;
-				StoreState::assert_seeds(store, self.authority.address(), &ID)?;
-				let state = store.as_account::<StoreState>(&ID)?;
+				let state = StoreState::load_pda(store, self.authority.address(), &ID)?;
 				log!("store count: {}", state.count.get());
 			}
 			None => {

@@ -64,7 +64,7 @@
 							"kind": "structFieldTypeNode",
 							"name": "count",
 							"docs": [
-								"The current counter value. The PinaPod view stores it using its",
+								"The current counter value. The `PinaPod` view stores it using its",
 								"alignment-one, little-endian representation."
 							],
 							"type": {

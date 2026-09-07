@@ -209,9 +209,9 @@ const _: () = {
     }
 };
 impl Initialize {
-    /// The exact number of bytes required by the PinaPod representation.
+    /// The exact number of bytes required by the `PinaPod` representation.
     pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
-    /// Validate `data` and return PinaPod's immutable zero-copy companion.
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
@@ -225,10 +225,10 @@ impl Initialize {
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, PinaPod zeros the complete slice again.
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
@@ -506,9 +506,9 @@ const _: () = {
     }
 };
 impl FlipBit {
-    /// The exact number of bytes required by the PinaPod representation.
+    /// The exact number of bytes required by the `PinaPod` representation.
     pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
-    /// Validate `data` and return PinaPod's immutable zero-copy companion.
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
@@ -522,10 +522,10 @@ impl FlipBit {
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, PinaPod zeros the complete slice again.
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
@@ -683,9 +683,9 @@ const _: () = {
     }
 };
 impl Transfer {
-    /// The exact number of bytes required by the PinaPod representation.
+    /// The exact number of bytes required by the `PinaPod` representation.
     pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
-    /// Validate `data` and return PinaPod's immutable zero-copy companion.
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
@@ -699,10 +699,10 @@ impl Transfer {
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, PinaPod zeros the complete slice again.
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
@@ -900,9 +900,9 @@ const _: () = {
     }
 };
 impl CustomTransferData {
-    /// The exact number of bytes required by the PinaPod representation.
+    /// The exact number of bytes required by the `PinaPod` representation.
     pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
-    /// Validate `data` and return PinaPod's immutable zero-copy companion.
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
@@ -916,10 +916,10 @@ impl CustomTransferData {
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, PinaPod zeros the complete slice again.
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///
@@ -1197,9 +1197,9 @@ const _: () = {
     }
 };
 impl ComplexInstruction {
-    /// The exact number of bytes required by the PinaPod representation.
+    /// The exact number of bytes required by the `PinaPod` representation.
     pub const SIZE: usize = ::core::mem::size_of::<<Self as pina::PinaPodFixed>::Zc>();
-    /// Validate `data` and return PinaPod's immutable zero-copy companion.
+    /// Validate `data` and return `PinaPod`'s immutable zero-copy companion.
     pub fn try_from_bytes(
         data: &[u8],
     ) -> Result<&<Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
@@ -1213,10 +1213,10 @@ impl ComplexInstruction {
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
-    /// PinaPod zeros the complete slice before calling `initialize`, then
+    /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, PinaPod zeros the complete slice again.
+    /// validation fails, `PinaPod` zeros the complete slice again.
     ///
     /// # Errors
     ///

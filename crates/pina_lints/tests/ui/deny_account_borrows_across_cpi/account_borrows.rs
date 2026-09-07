@@ -7,6 +7,7 @@ struct Guard;
 struct Cpi;
 struct Cache;
 struct Scheduler;
+struct State;
 
 impl AccountView {
 	fn try_borrow_mut(&mut self) -> Result<Guard, ()> {
@@ -29,6 +30,12 @@ impl Cpi {
 impl Scheduler {
 	fn invoke(&self) -> Result<(), ()> {
 		Ok(())
+	}
+}
+
+impl State {
+	fn load_pda_mut(_account: &mut AccountView) -> Result<Guard, ()> {
+		Ok(Guard)
 	}
 }
 
@@ -56,6 +63,12 @@ fn process_break_payload(account: &mut AccountView, cpi: &Cpi) -> Result<(), ()>
 		break cpi.invoke();
 		//~^ ERROR: CPI invoked while a mutable account-data borrow is still alive
 	}
+}
+
+fn process_generated_pda_borrow(account: &mut AccountView, cpi: &Cpi) -> Result<(), ()> {
+	let _guard = State::load_pda_mut(account)?;
+	cpi.invoke()
+	//~^ ERROR: CPI invoked while a mutable account-data borrow is still alive
 }
 
 fn process_unrelated_borrow(cache: &mut Cache, cpi: &Cpi) -> Result<(), ()> {

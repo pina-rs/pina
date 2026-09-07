@@ -109,7 +109,10 @@ pub fn account(args: TokenStream, input: TokenStream) -> TokenStream {
 /// Defines typed PDA seeds for an account struct.
 ///
 /// `seeds` accepts byte-string constants and typed dynamic seeds. An optional
-/// `bump` field enables generated stored-bump verification.
+/// `bump` field enables generated stored-bump verification. Fixed `#[account]`
+/// schemas with a stored bump also receive `load_pda` and `load_pda_mut`, which
+/// validate the account representation and PDA address in one pass before
+/// returning a borrow guard.
 ///
 /// # Example
 ///

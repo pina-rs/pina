@@ -12,6 +12,7 @@ User profile registry demonstrating bounded PinaPod text and list fields stored 
 - `Vec<u64, 8>` — a bounded list with `iter()`, `try_push()`, `remove()`, and `clear()` operations.
 - `bool` / `Option<u64>` — semantic source fields mapped to audited `PodBool` / `PodOption<PodU64>` storage by Pina.
 - Full lifecycle: initialize → update → add/remove tags. PinaPod rejects invalid UTF-8 and oversized prefixes at the parse boundary, while custom `#[error]` codes cover tag capacity and index failures.
+- Atomic `invoke_with` creation and one-pass `ProfileState::load_pda_mut` mutations, so nested fixed fields are not recursively validated several times per instruction.
 
 ## Run
 
