@@ -1222,6 +1222,7 @@ in
         set -euo pipefail
         lint:clippy
         lint:format
+        pnpm install --frozen-lockfile --ignore-scripts
         pnpm run check:scripts
         verify:docs
         security:pina-lint
