@@ -28,6 +28,7 @@ impl Initialize {
 		admin: solana_pubkey::Pubkey,
 		beneficiary: solana_pubkey::Pubkey,
 		mint: solana_pubkey::Pubkey,
+		vesting_state: solana_pubkey::Pubkey,
 		vault: solana_pubkey::Pubkey,
 		token_program: solana_pubkey::Pubkey,
 	) -> Self {
@@ -35,16 +36,7 @@ impl Initialize {
 			admin,
 			beneficiary,
 			mint,
-			vesting_state: solana_pubkey::Pubkey::find_program_address(
-				&[
-					"vesting".as_bytes(),
-					admin.as_ref(),
-					beneficiary.as_ref(),
-					mint.as_ref(),
-				],
-				&crate::VESTING_PROGRAM_ID,
-			)
-			.0,
+			vesting_state,
 			vault,
 			associated_token_program: solana_pubkey::pubkey!(
 				"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"

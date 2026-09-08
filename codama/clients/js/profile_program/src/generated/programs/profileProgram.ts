@@ -40,10 +40,10 @@ import {
 import {
 	type AddTagAsyncInput,
 	getAddTagInstructionAsync,
-	getInitializeInstructionAsync,
+	getInitializeInstruction,
 	getRemoveTagInstructionAsync,
 	getUpdateProfileInstructionAsync,
-	type InitializeAsyncInput,
+	type InitializeInput,
 	parseAddTagInstruction,
 	type ParsedAddTagInstruction,
 	type ParsedInitializeInstruction,
@@ -183,10 +183,8 @@ export type ProfileProgramPluginAccounts = {
 
 export type ProfileProgramPluginInstructions = {
 	initialize: (
-		input: InitializeAsyncInput,
-	) =>
-		& ReturnType<typeof getInitializeInstructionAsync>
-		& SelfPlanAndSendFunctions;
+		input: InitializeInput,
+	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
 	updateProfile: (
 		input: UpdateProfileAsyncInput,
 	) =>
@@ -222,7 +220,7 @@ export function profileProgramProgram() {
 					initialize: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstructionAsync(input),
+							getInitializeInstruction(input),
 						),
 					updateProfile: (input) =>
 						addSelfPlanAndSendFunctions(

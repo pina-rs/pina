@@ -1,6 +1,8 @@
 ---
 pina: breaking
+pina_cli: fix
 pina_lints: fix
+pina_skill: fix
 ---
 
 # Consolidate canonical PDA creation

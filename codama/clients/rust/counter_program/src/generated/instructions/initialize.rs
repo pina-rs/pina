@@ -27,14 +27,10 @@ pub struct Initialize {
 }
 
 impl Initialize {
-	pub fn new(authority: solana_pubkey::Pubkey) -> Self {
+	pub fn new(authority: solana_pubkey::Pubkey, counter: solana_pubkey::Pubkey) -> Self {
 		Self {
 			authority,
-			counter: solana_pubkey::Pubkey::find_program_address(
-				&["counter".as_bytes(), authority.as_ref()],
-				&crate::COUNTER_PROGRAM_ID,
-			)
-			.0,
+			counter,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}

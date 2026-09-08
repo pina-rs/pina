@@ -19,14 +19,10 @@ pub struct Initialize {
 }
 
 impl Initialize {
-	pub fn new(admin: solana_pubkey::Pubkey) -> Self {
+	pub fn new(admin: solana_pubkey::Pubkey, registry_config: solana_pubkey::Pubkey) -> Self {
 		Self {
 			admin,
-			registry_config: solana_pubkey::Pubkey::find_program_address(
-				&["registry".as_bytes(), admin.as_ref()],
-				&crate::ROLE_REGISTRY_PROGRAM_ID,
-			)
-			.0,
+			registry_config,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}

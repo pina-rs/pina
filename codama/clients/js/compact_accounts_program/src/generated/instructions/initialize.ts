@@ -32,10 +32,8 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
-	getAddressFromResolvedInstructionAccount,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
-import { findJournalPda } from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -119,95 +117,6 @@ export function getInitializeInstructionDataCodec(): FixedSizeCodec<
 		getInitializeInstructionDataEncoder(),
 		getInitializeInstructionDataDecoder(),
 	);
-}
-
-export type InitializeAsyncInput<
-	TAccountAuthority extends string = string,
-	TAccountJournal extends string = string,
-	TAccountSystemProgram extends string = string,
-> = {
-	/** Funds rent and becomes the journal authority. */
-	authority: TransactionSigner<TAccountAuthority>;
-	/** Empty canonical journal PDA. */
-	journal?: Address<TAccountJournal>;
-	systemProgram?: Address<TAccountSystemProgram>;
-	bump: InitializeInstructionDataArgs["bump"];
-	entryCount: InitializeInstructionDataArgs["entryCount"];
-	markerCount: InitializeInstructionDataArgs["markerCount"];
-};
-
-export async function getInitializeInstructionAsync<
-	TAccountAuthority extends string,
-	TAccountJournal extends string,
-	TAccountSystemProgram extends string,
-	TProgramAddress extends Address =
-		typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
->(
-	input: InitializeAsyncInput<
-		TAccountAuthority,
-		TAccountJournal,
-		TAccountSystemProgram
-	>,
-	config?: { programAddress?: TProgramAddress },
-): Promise<
-	InitializeInstruction<
-		TProgramAddress,
-		TAccountAuthority,
-		TAccountJournal,
-		TAccountSystemProgram
-	>
-> {
-	// Program address.
-	const programAddress = config?.programAddress ??
-		COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
-
-	// Original accounts.
-	const originalAccounts = {
-		authority: { value: input.authority ?? null, isWritable: true },
-		journal: { value: input.journal ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-	};
-	const accounts = originalAccounts as Record<
-		keyof typeof originalAccounts,
-		ResolvedInstructionAccount
-	>;
-
-	// Original args.
-	const args = { ...input };
-
-	// Resolve default values.
-	if (!accounts.journal.value) {
-		accounts.journal.value = await findJournalPda({
-			authority: getAddressFromResolvedInstructionAccount(
-				"authority",
-				accounts.authority.value,
-			),
-		}, { programAddress });
-	}
-	if (!accounts.systemProgram.value) {
-		accounts.systemProgram.value =
-			"11111111111111111111111111111111" as Address<
-				"11111111111111111111111111111111"
-			>;
-	}
-
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-	return Object.freeze({
-		accounts: [
-			getAccountMeta("authority", accounts.authority),
-			getAccountMeta("journal", accounts.journal),
-			getAccountMeta("systemProgram", accounts.systemProgram),
-		],
-		data: getInitializeInstructionDataEncoder().encode(
-			args as InitializeInstructionDataArgs,
-		),
-		programAddress,
-	} as InitializeInstruction<
-		TProgramAddress,
-		TAccountAuthority,
-		TAccountJournal,
-		TAccountSystemProgram
-	>);
 }
 
 export type InitializeInput<

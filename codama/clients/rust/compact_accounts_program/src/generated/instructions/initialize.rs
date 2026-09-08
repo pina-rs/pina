@@ -21,14 +21,10 @@ pub struct Initialize {
 }
 
 impl Initialize {
-	pub fn new(authority: solana_pubkey::Pubkey) -> Self {
+	pub fn new(authority: solana_pubkey::Pubkey, journal: solana_pubkey::Pubkey) -> Self {
 		Self {
 			authority,
-			journal: solana_pubkey::Pubkey::find_program_address(
-				&["compact-journal".as_bytes(), authority.as_ref()],
-				&crate::COMPACT_ACCOUNTS_PROGRAM_ID,
-			)
-			.0,
+			journal,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}
