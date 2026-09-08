@@ -139,6 +139,12 @@ function measure(executable: string): Map<string, number> {
 		}
 	}
 
+	if (samples.size === 0) {
+		throw new Error(
+			`no [BENCH] measurements captured from ${executable}`,
+		);
+	}
+
 	return new Map(
 		[...samples].map(([id, values]) => [id, median(values)]),
 	);

@@ -10,22 +10,13 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 
-interface CargoDependency {
-	name: string;
-}
-
-interface CargoPackage {
-	name: string;
-	dependencies: CargoDependency[];
-	features: Record<string, string[]>;
-	manifest_path: string;
-}
-
-interface CargoMetadata {
-	packages: CargoPackage[];
-}
+import {
+	type CargoMetadata,
+	type ExampleProgram,
+	loadExampleInventory,
+} from "./example-inventory.ts";
 
 interface IdlInstruction {
 	name: string;
@@ -51,9 +42,7 @@ interface RecordedSample {
 	computeUnits: number;
 }
 
-interface ExampleProgram {
-	directory: string;
-	name: string;
+interface MeasuredProgram extends ExampleProgram {
 	testPackage: string;
 }
 
@@ -100,46 +89,23 @@ function commandAsync(
 	});
 }
 
-function loadMetadata(workspace: string): CargoMetadata {
-	const result = command(
-		"cargo",
-		["metadata", "--format-version", "1", "--no-deps", "--locked"],
-		{ cwd: workspace, capture: true },
-	);
-
-	if (result.status !== 0) {
-		throw new Error(`cargo metadata failed with status ${result.status}`);
-	}
-
-	return JSON.parse(result.stdout) as CargoMetadata;
-}
-
-function discoverPrograms(
+function attachTestPackages(
 	metadata: CargoMetadata,
 	workspace: string,
-): ExampleProgram[] {
+	programs: ExampleProgram[],
+): MeasuredProgram[] {
 	const packagesByManifest = new Map(
 		metadata.packages.map((package_) => [
 			relative(workspace, package_.manifest_path),
 			package_,
 		]),
 	);
-	const programs: ExampleProgram[] = [];
+	const measuredPrograms: MeasuredProgram[] = [];
 
-	for (const package_ of metadata.packages) {
-		const manifest = relative(workspace, package_.manifest_path).split(sep);
-		const isExample = manifest.length === 3 && manifest[0] === "examples" &&
-			manifest[2] === "Cargo.toml" &&
-			Object.hasOwn(package_.features, "bpf-entrypoint");
-
-		if (!isExample) {
-			continue;
-		}
-
-		const directory = manifest[1] ?? package_.name;
+	for (const program of programs) {
 		const testManifest = join(
 			"examples",
-			directory,
+			program.directory,
 			"tests",
 			"surfpool",
 			"Cargo.toml",
@@ -147,24 +113,21 @@ function discoverPrograms(
 		const testPackage = packagesByManifest.get(testManifest);
 
 		if (testPackage === undefined) {
-			throw new Error(`${package_.name} has no Surfpool test package`);
+			throw new Error(`${program.name} has no Surfpool test package`);
 		}
 
-		programs.push({
-			directory,
-			name: package_.name,
+		measuredPrograms.push({
+			...program,
 			testPackage: testPackage.name,
 		});
 	}
 
-	return programs.toSorted((left, right) =>
-		left.name.localeCompare(right.name)
-	);
+	return measuredPrograms;
 }
 
 function instructionNames(
 	workspace: string,
-	program: ExampleProgram,
+	program: MeasuredProgram,
 ): Map<number, string> {
 	const path = join(
 		workspace,
@@ -205,7 +168,7 @@ function instructionNames(
 
 function programPublicKey(
 	workspace: string,
-	program: ExampleProgram,
+	program: MeasuredProgram,
 ): string {
 	const path = join(workspace, "codama", "idls", `${program.directory}.json`);
 	const idl = JSON.parse(readFileSync(path, "utf8")) as CodamaIdl;
@@ -218,19 +181,8 @@ function programPublicKey(
 	return publicKey;
 }
 
-function availableInstructionNames(
-	workspace: string,
-	program: ExampleProgram,
-): Map<number, string> {
-	try {
-		return instructionNames(workspace, program);
-	} catch (error: unknown) {
-		if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-			return new Map();
-		}
-
-		throw error;
-	}
+function isMissingFile(error: unknown): boolean {
+	return (error as NodeJS.ErrnoException).code === "ENOENT";
 }
 
 function readSamples(path: string): RecordedSample[] {
@@ -287,25 +239,66 @@ async function main(): Promise<number> {
 	const sourceWorkspace = realpathSync(sourceArgument);
 	const elfDirectory = resolve(elfArgument);
 	const outputFile = resolve(outputArgument);
-	const metadata = loadMetadata(harnessWorkspace);
-	const programs = discoverPrograms(metadata, harnessWorkspace);
+	const inventory = loadExampleInventory(harnessWorkspace);
+	const programs = attachTestPackages(
+		inventory.metadata,
+		harnessWorkspace,
+		inventory.programs,
+	);
 	const testFailures: string[] = [];
-	const unavailablePrograms: string[] = [];
+	const unavailablePrograms = new Set<string>();
+	const instructionNamesByProgram = new Map<string, Map<number, string>>();
 	mkdirSync(dirname(outputFile), { recursive: true });
+
+	for (const program of programs) {
+		try {
+			instructionNamesByProgram.set(
+				program.name,
+				instructionNames(sourceWorkspace, program),
+			);
+		} catch (error: unknown) {
+			if (!isMissingFile(error)) {
+				throw error;
+			}
+
+			instructionNamesByProgram.set(program.name, new Map<number, string>());
+
+			if (sourceWorkspace === harnessWorkspace) {
+				unavailablePrograms.add(program.name);
+			}
+		}
+	}
 
 	const batches: Array<{
 		manifest: Record<string, { artifact: string; program: string }>;
-		programs: ExampleProgram[];
+		programs: MeasuredProgram[];
 	}> = [];
 
 	for (const program of programs) {
+		if (unavailablePrograms.has(program.name)) {
+			continue;
+		}
+
 		const artifact = join(elfDirectory, `${program.name}.so`);
 
 		if (!existsSync(artifact)) {
-			unavailablePrograms.push(program.name);
+			unavailablePrograms.add(program.name);
 			continue;
 		}
-		const publicKey = programPublicKey(harnessWorkspace, program);
+
+		let publicKey: string;
+
+		try {
+			publicKey = programPublicKey(harnessWorkspace, program);
+		} catch (error: unknown) {
+			if (!isMissingFile(error)) {
+				throw error;
+			}
+
+			unavailablePrograms.add(program.name);
+			continue;
+		}
+
 		let batch = batches
 			.filter((item) => item.manifest[publicKey] === undefined)
 			.toSorted((left, right) =>
@@ -381,7 +374,8 @@ async function main(): Promise<number> {
 	const samplesByCase = new Map<string, number[]>();
 
 	for (const program of programs) {
-		const names = availableInstructionNames(sourceWorkspace, program);
+		const names = instructionNamesByProgram.get(program.name) ??
+			new Map<number, string>();
 
 		for (
 			const sample of samples.filter((item) => item.program === program.name)
@@ -410,7 +404,8 @@ async function main(): Promise<number> {
 		.toSorted((left, right) => left.id.localeCompare(right.id));
 	const measuredCases = new Set(cases.map((item) => item.id));
 	const missingCases = programs.flatMap((program) =>
-		[...availableInstructionNames(sourceWorkspace, program).values()]
+		[...(instructionNamesByProgram.get(program.name) ??
+			new Map<number, string>()).values()]
 			.map((name) => `${program.name}/${name}`)
 			.filter((id) => !measuredCases.has(id))
 	).toSorted();
@@ -425,14 +420,14 @@ async function main(): Promise<number> {
 		cases,
 		missingCases,
 		testFailures: testFailures.toSorted(),
-		unavailablePrograms,
+		unavailablePrograms: [...unavailablePrograms].toSorted(),
 	};
 	writeFileSync(outputFile, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 
 	if (
 		!allowIncomplete &&
 		(missingCases.length > 0 || testFailures.length > 0 ||
-			unavailablePrograms.length > 0)
+			unavailablePrograms.size > 0)
 	) {
 		return 2;
 	}

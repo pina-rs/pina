@@ -71,6 +71,25 @@ test("missing head cases fail while missing base cases establish a baseline", ()
 	assert.equal(missingBase.newBaselines.length, 1);
 });
 
+test("base-only runtime cases are removed unless policy still requires them", () => {
+	const optionalCasePolicy = { ...policy, runtimeCases: [] };
+	const removed = compareRuntimeReports(
+		optionalCasePolicy,
+		{ cases: [{ id: "example/removed", computeUnits: 1_000 }] },
+		{ cases: [] },
+	);
+	assert.deepEqual(removed.removedCases, ["example/removed"]);
+	assert.equal(removed.hardErrors.length, 0);
+
+	const required = compareRuntimeReports(
+		{ ...policy, runtimeCases: ["example/removed"] },
+		{ cases: [{ id: "example/removed", computeUnits: 1_000 }] },
+		{ cases: [] },
+	);
+	assert.equal(required.removedCases.length, 0);
+	assert.equal(required.hardErrors.length, 1);
+});
+
 test("static reports use the same performance-score direction", () => {
 	const root = mkdtempSync(join(tmpdir(), "pina-cu-comparison-"));
 	const base = join(root, "base");

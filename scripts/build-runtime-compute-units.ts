@@ -6,72 +6,24 @@ import {
 	existsSync,
 	lstatSync,
 	mkdirSync,
+	readdirSync,
 	readlinkSync,
 	realpathSync,
 	rmSync,
 	unlinkSync,
 } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
+import {
+	type ExampleProgram,
+	loadExampleInventory,
+} from "./example-inventory.ts";
 import { findExecutable } from "./find-executable.ts";
 
 const TOOLS_VERSION = "v1.54";
 interface CommandOptions {
 	cwd?: string;
 	env: NodeJS.ProcessEnv;
-}
-
-interface ExampleProgram {
-	manifest: string;
-	name: string;
-}
-
-interface CargoMetadata {
-	packages: Array<{
-		features: Record<string, string[]>;
-		manifest_path: string;
-		name: string;
-	}>;
-}
-
-function discoverPrograms(
-	workspace: string,
-	env: NodeJS.ProcessEnv,
-): ExampleProgram[] {
-	const result = spawnSync(
-		"cargo",
-		["metadata", "--format-version", "1", "--no-deps", "--locked"],
-		{
-			cwd: workspace,
-			env,
-			encoding: "utf8",
-			stdio: ["ignore", "pipe", "inherit"],
-		},
-	);
-
-	if (result.error !== undefined) {
-		throw result.error;
-	}
-
-	if (result.status !== 0) {
-		throw new Error(`cargo metadata failed with status ${result.status ?? 1}`);
-	}
-
-	const metadata = JSON.parse(result.stdout ?? "") as CargoMetadata;
-
-	return metadata.packages
-		.filter((package_) => {
-			const parts = relative(workspace, package_.manifest_path).split(sep);
-
-			return parts.length === 3 && parts[0] === "examples" &&
-				parts[2] === "Cargo.toml" &&
-				Object.hasOwn(package_.features, "bpf-entrypoint");
-		})
-		.map((package_) => ({
-			manifest: package_.manifest_path,
-			name: package_.name,
-		}))
-		.toSorted((left, right) => left.name.localeCompare(right.name));
 }
 
 function command(
@@ -208,11 +160,13 @@ function main(): number {
 		const workspace = realpathSync(values[index] ?? ".");
 		const output = resolve(values[index + 1] ?? ".");
 		mkdirSync(output, { recursive: true });
-		for (const program of discoverPrograms(workspace, env)) {
+		const { programs } = loadExampleInventory(workspace, { env });
+
+		for (const program of programs) {
 			const artifact = join(output, `${program.name}.so`);
-			const libraryArtifact = join(output, `lib${program.name}.so`);
+			const cargoArtifact = join(output, `${program.artifactName}.so`);
 			rmSync(artifact, { force: true });
-			rmSync(libraryArtifact, { force: true });
+			rmSync(cargoArtifact, { force: true });
 			process.stdout.write(
 				`Building runtime CU ELF for ${program.name} at ${workspace}\n`,
 			);
@@ -227,11 +181,17 @@ function main(): number {
 			if (status !== 0) {
 				return status;
 			}
-			if (!existsSync(artifact) && existsSync(libraryArtifact)) {
-				copyFileSync(libraryArtifact, artifact);
+			if (!existsSync(cargoArtifact)) {
+				const outputFiles = readdirSync(output).toSorted().join(", ");
+				throw new Error(
+					`cargo-build-sbf did not produce ${cargoArtifact}; output contains: ${
+						outputFiles.length === 0 ? "nothing" : outputFiles
+					}`,
+				);
 			}
-			if (!existsSync(artifact)) {
-				throw new Error(`cargo-build-sbf did not produce ${artifact}`);
+
+			if (cargoArtifact !== artifact) {
+				copyFileSync(cargoArtifact, artifact);
 			}
 		}
 	}

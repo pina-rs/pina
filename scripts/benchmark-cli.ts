@@ -32,7 +32,11 @@ interface Arguments {
 	jsonOutput: string;
 }
 
-type PerformanceStatus = "improved" | "regressed" | "within-noise";
+type PerformanceStatus =
+	| "improved"
+	| "new-baseline"
+	| "regressed"
+	| "within-noise";
 
 function requireValue(values: string[], index: number, option: string): string {
 	const value = values[index + 1];
@@ -115,9 +119,20 @@ function classify(percent: number): PerformanceStatus {
 function statusLabel(status: PerformanceStatus): string {
 	return {
 		improved: "🚀 improved",
+		"new-baseline": "🆕 new baseline",
 		regressed: "⚠️ regressed",
 		"within-noise": "➖ within noise",
 	}[status];
+}
+
+function commandSucceeds(binary: string, args: readonly string[]): boolean {
+	const result = spawnSync(binary, args, { stdio: "ignore" });
+
+	if (result.error !== undefined) {
+		throw result.error;
+	}
+
+	return result.status === 0;
 }
 
 function formatCount(count: number, singular: string): string {
@@ -126,18 +141,35 @@ function formatCount(count: number, singular: string): string {
 
 function run(arguments_: Arguments): void {
 	const commands: string[] = [];
+	const baseSupported = new Map<string, boolean>();
 
 	for (const command of COMMANDS) {
-		for (
-			const [revision, binary] of [
-				["base", arguments_.baseBin],
-				["head", arguments_.headBin],
-			] as const
-		) {
-			const name = `${revision}/${command.id}`;
-			const invocation = [binary, ...command.args].map(shellQuote).join(" ");
-			commands.push("--command-name", name, invocation);
+		const supportsBase = commandSucceeds(arguments_.baseBin, command.args);
+		baseSupported.set(command.id, supportsBase);
+
+		if (!commandSucceeds(arguments_.headBin, command.args)) {
+			throw new Error(
+				`head CLI command failed before benchmarking: pina ${
+					command.args.join(" ")
+				}`,
+			);
 		}
+
+		if (supportsBase) {
+			const baseInvocation = [arguments_.baseBin, ...command.args]
+				.map(shellQuote)
+				.join(" ");
+			commands.push(
+				"--command-name",
+				`base/${command.id}`,
+				baseInvocation,
+			);
+		}
+
+		const headInvocation = [arguments_.headBin, ...command.args]
+			.map(shellQuote)
+			.join(" ");
+		commands.push("--command-name", `head/${command.id}`, headInvocation);
 	}
 
 	mkdirSync(dirname(arguments_.jsonOutput), { recursive: true });
@@ -179,8 +211,22 @@ function run(arguments_: Arguments): void {
 		const base = results.get(`base/${command.id}`);
 		const head = results.get(`head/${command.id}`);
 
-		if (base === undefined || head === undefined) {
+		if (head === undefined) {
 			throw new Error(`hyperfine omitted ${command.id}`);
+		}
+
+		if (baseSupported.get(command.id) === false) {
+			statuses.push("new-baseline");
+			rows.push(
+				`| \`pina ${command.args.join(" ")}\` | n/a | ${
+					(head.mean * 1_000).toFixed(2)
+				} ms | n/a | ${statusLabel("new-baseline")} |`,
+			);
+			continue;
+		}
+
+		if (base === undefined) {
+			throw new Error(`hyperfine omitted base/${command.id}`);
 		}
 
 		const percent = performancePercent(base.mean, head.mean);
@@ -198,12 +244,17 @@ function run(arguments_: Arguments): void {
 	const regressions = statuses.filter((item) => item === "regressed").length;
 	const improvements = statuses.filter((item) => item === "improved").length;
 	const withinNoise = statuses.filter((item) => item === "within-noise").length;
+	const newBaselines =
+		statuses.filter((item) => item === "new-baseline").length;
 	const summary = [
 		regressions === 0
 			? "✅ No advisory regressions"
 			: `⚠️ ${formatCount(regressions, "advisory regression")}`,
 		`🚀 ${formatCount(improvements, "improvement")}`,
 		`➖ ${withinNoise} within noise`,
+		...(newBaselines > 0
+			? [`🆕 ${formatCount(newBaselines, "new baseline")}`]
+			: []),
 	].join(" · ");
 	const lines = [
 		"## CLI performance",

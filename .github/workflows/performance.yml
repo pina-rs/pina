@@ -356,6 +356,20 @@ jobs:
           base_short="${BASE_SHA:0:8}"
           head_short="${HEAD_SHA:0:8}"
 
+          append_report() {
+            local path="$1"
+            local heading="$2"
+
+            if [ -f "$path" ]; then
+              cat "$path"
+              return
+            fi
+
+            echo "## $heading"
+            echo
+            echo "⚠️ Benchmark report unavailable. See the workflow job log."
+          }
+
           {
             echo "# Performance report"
             echo
@@ -370,19 +384,20 @@ jobs:
             fi
             echo "Each section shows its result at a glance. Expand the details to inspect the full table."
             echo
-            cat ./target/performance/reports/performance-instructions/report.md
+            append_report ./target/performance/reports/performance-instructions/report.md "Instruction compute units"
             echo
-            cat ./target/performance/reports/performance-programs/report.md
+            append_report ./target/performance/reports/performance-programs/report.md "Program compute units and build sizes"
             echo
-            cat ./target/performance/reports/performance-cli/report.md
+            append_report ./target/performance/reports/performance-cli/report.md "CLI performance"
             echo
-            cat ./target/performance/reports/performance-core/core.md
+            append_report ./target/performance/reports/performance-core/core.md "Core host performance"
             echo
             echo "CLI and host timings are advisory; instruction-CU regressions enforce the configured policy."
           } > ./target/performance/comment.md
         shell: bash
 
       - name: post performance comment
+        if: github.event.pull_request.head.repo.full_name == github.repository
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: performance-benchmarks

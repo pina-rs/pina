@@ -96,6 +96,7 @@ export interface RuntimeComparison {
 interface RuntimeComparisonResult {
 	comparisons: RuntimeComparison[];
 	newBaselines: string[];
+	removedCases: string[];
 	hardErrors: string[];
 }
 
@@ -307,6 +308,7 @@ export function compareRuntimeReports(
 ): RuntimeComparisonResult {
 	const comparisons: RuntimeComparison[] = [];
 	const newBaselines: string[] = [];
+	const removedCases: string[] = [];
 	const hardErrors: string[] = [];
 	const baseCases = new Map(
 		(baseReport.cases ?? []).map((item) => [item.id, item]),
@@ -319,6 +321,7 @@ export function compareRuntimeReports(
 		...headCases.keys(),
 		...(policy.runtimeCases ?? []),
 	]);
+	const requiredCases = new Set(policy.runtimeCases ?? []);
 
 	for (const caseId of trackedCases) {
 		const base = baseCases.get(caseId);
@@ -328,7 +331,13 @@ export function compareRuntimeReports(
 			continue;
 		}
 		if (head === undefined) {
-			hardErrors.push(`\`${caseId}\` is missing from the head runtime report`);
+			if (requiredCases.has(caseId)) {
+				hardErrors.push(
+					`\`${caseId}\` is missing from the head runtime report`,
+				);
+			} else {
+				removedCases.push(caseId);
+			}
 			continue;
 		}
 		if (base === undefined) {
@@ -371,7 +380,7 @@ export function compareRuntimeReports(
 	for (const program of headReport.unavailablePrograms ?? []) {
 		hardErrors.push(`head benchmark ELF is unavailable for \`${program}\``);
 	}
-	return { comparisons, newBaselines, hardErrors };
+	return { comparisons, newBaselines, removedCases, hardErrors };
 }
 
 function formatInt(value: number): string {
@@ -573,14 +582,21 @@ function renderMarkdown(
 	const runtimeUnchanged = runtime.comparisons.filter(
 		(item) => item.status === "unchanged",
 	).length;
-	const runtimeSummary = benchmarkSummary({
-		advisoryRegressions: runtimeAdvisoryRegressions,
-		blockingRegressions: runtimeBlockingRegressions,
-		errors: runtime.hardErrors.length,
-		improvements: runtimeImprovements,
-		newBaselines: runtime.newBaselines.length,
-		unchanged: runtimeUnchanged,
-	});
+	const runtimeSummary = benchmarkSummary(
+		{
+			advisoryRegressions: runtimeAdvisoryRegressions,
+			blockingRegressions: runtimeBlockingRegressions,
+			errors: runtime.hardErrors.length,
+			improvements: runtimeImprovements,
+			newBaselines: runtime.newBaselines.length,
+			unchanged: runtimeUnchanged,
+		},
+		runtime.removedCases.length > 0
+			? [
+				`🗂️ ${formatCount(runtime.removedCases.length, "removed case")}`,
+			]
+			: [],
+	);
 	const staticBlockingRegressions = staticComparisons.filter(
 		(item) => item.status === "fail",
 	).length;
@@ -668,6 +684,14 @@ function renderMarkdown(
 			"",
 			"New runtime baselines:",
 			...runtime.newBaselines.map((item) => `- ${item}`),
+		);
+	}
+	if (!staticOnly && runtime.removedCases.length > 0) {
+		lines.push(
+			"",
+			`Removed runtime cases: ${
+				runtime.removedCases.map((item) => `\`${item}\``).join(", ")
+			}`,
 		);
 	}
 	if (!staticOnly && runtime.hardErrors.length > 0) {
@@ -782,6 +806,7 @@ export function run(arguments_: Arguments): number {
 	let runtime: RuntimeComparisonResult = {
 		comparisons: [],
 		newBaselines: [],
+		removedCases: [],
 		hardErrors: [],
 	};
 	if (
@@ -817,6 +842,7 @@ export function run(arguments_: Arguments): number {
 							runtime.comparisons.filter((item) => item.status === "fail")
 								.length,
 						runtimeNewBaselines: runtime.newBaselines.length,
+						runtimeRemovedCases: runtime.removedCases.length,
 						runtimeErrors: runtime.hardErrors.length,
 						comparedPrograms: staticResult.comparisons.length,
 						failures:
@@ -839,6 +865,7 @@ export function run(arguments_: Arguments): number {
 						headProvenance: headRuntime.provenance,
 						cases: runtime.comparisons,
 						newBaselines: runtime.newBaselines,
+						removedCases: runtime.removedCases,
 						errors: runtime.hardErrors,
 					},
 					newStaticBaselines: staticResult.newBaselines,

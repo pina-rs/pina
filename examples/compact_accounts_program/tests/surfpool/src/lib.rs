@@ -1,5 +1,7 @@
 #![cfg(test)]
 
+use core::mem::size_of;
+
 use pina_test::AccountMeta;
 use pina_test::Keypair;
 use pina_test::ProgramTest;
@@ -101,6 +103,15 @@ struct ExpectedJournal<'a> {
 	title: &'a str,
 	entries: &'a [u64],
 	markers: &'a [u8],
+	note: Option<&'a str>,
+}
+
+fn expected_journal_size(expected: &ExpectedJournal<'_>) -> usize {
+	Journal::HEADER_SIZE
+		+ expected.title.len()
+		+ expected.entries.len() * size_of::<u64>()
+		+ expected.markers.len()
+		+ expected.note.map_or(0, |note| size_of::<u8>() + note.len())
 }
 
 fn assert_journal(
@@ -111,7 +122,7 @@ fn assert_journal(
 ) {
 	let account = program.account(journal).expect("fetch journal account");
 	let journal = Journal::try_from_bytes(&account.data).expect("decode journal");
-	let expected_size = journal.encoded_len();
+	let expected_size = expected_journal_size(&expected);
 	assert_eq!(account.owner, program.program_id());
 	assert_eq!(account.data.len(), expected_size);
 	assert_eq!(
@@ -135,6 +146,7 @@ fn assert_journal(
 		expected.entries,
 	);
 	assert_eq!(journal.markers(), expected.markers);
+	assert_eq!(journal.note(), expected.note);
 	assert_eq!(journal.encoded_len(), expected_size);
 }
 
@@ -164,6 +176,7 @@ fn initializes_at_header_only_and_at_a_nonempty_size() {
 				title: DEFAULT_TITLE,
 				entries: &[],
 				markers: &[],
+				note: None,
 			},
 		);
 
@@ -195,6 +208,7 @@ fn initializes_at_header_only_and_at_a_nonempty_size() {
 				title: DEFAULT_TITLE,
 				entries: &[0, 1, 2],
 				markers: &[0, 1, 2, 3, 4],
+				note: None,
 			},
 		);
 
@@ -237,6 +251,7 @@ fn grows_and_shrinks_a_compact_pod_string_with_exact_rent() {
 				title: "compact journal",
 				entries: &[0, 1],
 				markers: &[0, 1, 2],
+				note: None,
 			},
 		);
 
@@ -258,6 +273,7 @@ fn grows_and_shrinks_a_compact_pod_string_with_exact_rent() {
 				title: "pina",
 				entries: &[0, 1],
 				markers: &[0, 1, 2],
+				note: None,
 			},
 		);
 
@@ -301,6 +317,7 @@ fn grows_updates_without_reallocating_shrinks_and_clears() {
 				title: DEFAULT_TITLE,
 				entries: &[0, 1, 2, 3, 4, 5, 6, 7],
 				markers: &[0, 1, 2, 3, 4, 5],
+				note: Some("Updated"),
 			},
 		);
 
@@ -323,6 +340,7 @@ fn grows_updates_without_reallocating_shrinks_and_clears() {
 				title: DEFAULT_TITLE,
 				entries: &[0, 1, 2, 3, 4, 5, 6, 7],
 				markers: &[0, 1, 2, 3, 4, 5],
+				note: Some("Updated"),
 			},
 		);
 
@@ -339,6 +357,7 @@ fn grows_updates_without_reallocating_shrinks_and_clears() {
 				title: DEFAULT_TITLE,
 				entries: &[0, 1, 2, 99, 4, 5, 6, 7],
 				markers: &[0, 1, 2, 3, 4, 5],
+				note: Some("Updated"),
 			},
 		);
 
@@ -360,6 +379,7 @@ fn grows_updates_without_reallocating_shrinks_and_clears() {
 				title: DEFAULT_TITLE,
 				entries: &[0, 1, 2],
 				markers: &[0, 1, 2, 3, 4, 5, 6, 7],
+				note: Some("Updated"),
 			},
 		);
 
@@ -376,6 +396,7 @@ fn grows_updates_without_reallocating_shrinks_and_clears() {
 				title: DEFAULT_TITLE,
 				entries: &[0, 1, 2, 3, 4],
 				markers: &[0, 1],
+				note: Some("Updated"),
 			},
 		);
 
@@ -392,6 +413,7 @@ fn grows_updates_without_reallocating_shrinks_and_clears() {
 				title: DEFAULT_TITLE,
 				entries: &[],
 				markers: &[0, 1],
+				note: Some("Updated"),
 			},
 		);
 
@@ -408,6 +430,7 @@ fn grows_updates_without_reallocating_shrinks_and_clears() {
 				title: DEFAULT_TITLE,
 				entries: &[],
 				markers: &[],
+				note: Some("Updated"),
 			},
 		);
 
@@ -424,6 +447,7 @@ fn grows_updates_without_reallocating_shrinks_and_clears() {
 				title: "",
 				entries: &[],
 				markers: &[],
+				note: Some("Updated"),
 			},
 		);
 
