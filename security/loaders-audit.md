@@ -158,7 +158,7 @@ Use the same fix direction as F1:
 
 - return guard-backed token wrappers instead of bare `&Mint` / `&TokenAccount`
 - keep the runtime borrow object alive inside the wrapper
-- keep owner and address validation inside every safe loader
+- keep canonical owner validation inside every token loader, and keep derived-address, wallet, and mint validation inside the ATA loader
 
 ### Suggested priority
 
