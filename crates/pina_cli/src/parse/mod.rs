@@ -441,12 +441,13 @@ fn build_instruction_accounts(
 		.fields
 		.iter()
 		.map(|field| {
-			let props = val_props
+			let inferred = val_props
 				.and_then(|m| m.get(&field.name))
 				.cloned()
 				.unwrap_or_default();
+			let declared = &field.declared_properties;
 
-			let pda_name = if props.is_pda {
+			let pda_name = if inferred.is_pda {
 				Some(
 					infer_pda_name_for_field(&field.name, pdas_ir)
 						.ok_or_else(|| IdlError::unresolved_pda(&field.name))?,
@@ -457,11 +458,11 @@ fn build_instruction_accounts(
 
 			Ok(InstructionAccountIr {
 				name: field.name.clone(),
-				is_writable: field.is_mutable || props.is_writable,
-				is_signer: props.is_signer,
+				is_writable: field.is_mutable || declared.is_writable || inferred.is_writable,
+				is_signer: declared.is_signer || inferred.is_signer,
 				is_optional: field.is_optional,
-				default_value: props.default_value,
-				is_pda: props.is_pda,
+				default_value: declared.default_value.clone().or(inferred.default_value),
+				is_pda: inferred.is_pda,
 				pda_name,
 				docs: field.docs.clone(),
 			})

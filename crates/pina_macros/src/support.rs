@@ -66,6 +66,49 @@ pub(crate) fn generate_view_helpers(
 			.map_err(|_| #error)
 		}
 	};
+	#[cfg(feature = "validation")]
+	let validate_value = quote! {
+		<<Self as #crate_path::PinaPodFixed>::Zc as #crate_path::PinaValidate>::validate(value)?;
+	};
+	#[cfg(feature = "validation")]
+	let validate_initialized = if account_boundary {
+		quote! {}
+	} else {
+		quote! {
+			<<Self as #crate_path::PinaPodFixed>::Zc as #crate_path::PinaValidate>::validate(value)?;
+		}
+	};
+	#[cfg(feature = "validation")]
+	let read = quote! {
+		let value = <Self as #crate_path::PinaPodFixed>::read_exact(data)
+			.map_err(|_| #error)?;
+		#validate_value
+
+		Ok(value)
+	};
+	#[cfg(not(feature = "validation"))]
+	let read = quote! {
+		<Self as #crate_path::PinaPodFixed>::read_exact(data).map_err(|_| #error)
+	};
+	#[cfg(feature = "validation")]
+	let initialize_body = quote! {
+		let value = #initialize?;
+		#validate_initialized
+
+		Ok(value)
+	};
+	#[cfg(not(feature = "validation"))]
+	let initialize_body = initialize;
+	#[cfg(feature = "validation")]
+	let initialization_failure_docs = quote! {
+		/// structural validation fails, `PinaPod` zeros the complete slice again.
+		/// Application validation runs afterward and returns its declared
+		/// `ProgramError`.
+	};
+	#[cfg(not(feature = "validation"))]
+	let initialization_failure_docs = quote! {
+		/// validation fails, `PinaPod` zeros the complete slice again.
+	};
 
 	quote! {
 		/// The exact number of bytes required by the `PinaPod` representation.
@@ -81,15 +124,15 @@ pub(crate) fn generate_view_helpers(
 				return Err(#error);
 			}
 
-			<Self as #crate_path::PinaPodFixed>::read_exact(data).map_err(|_| #error)
+			#read
 		}
 
 			/// Initialize caller-owned storage with a complete typed configuration.
 			///
-			/// `PinaPod` zeros the complete slice before calling `initialize`, then
-			/// validates the finished representation once. The discriminator is written
-			/// before the caller configures the remaining fields. If the closure or final
-			/// validation fails, `PinaPod` zeros the complete slice again.
+		/// `PinaPod` zeros the complete slice before calling `initialize`, then
+		/// validates the finished representation once. The discriminator is written
+		/// before the caller configures the remaining fields. If the closure or final
+		#initialization_failure_docs
 			///
 			/// # Errors
 			///
@@ -101,7 +144,7 @@ pub(crate) fn generate_view_helpers(
 				&mut <Self as #crate_path::PinaPodFixed>::Zc,
 			) -> Result<(), #crate_path::PinaPodError>,
 		) -> Result<&'data mut <Self as #crate_path::PinaPodFixed>::Zc, #crate_path::ProgramError> {
-			#initialize
+			#initialize_body
 		}
 	}
 }

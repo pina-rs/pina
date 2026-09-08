@@ -1,0 +1,5 @@
+error: could not parse the `#[derive(Accounts)]` input: Unknown field: `singner`. Did you mean `signer`? at authority/validate[0]. Struct options are `crate = path` and `validate(with = function)`. Field options are `remaining`, `distinct`, and `validate(...)`; account validation rules are `signer`, `writable`, `executable`, `address`, `addresses`, `owner`, `owners`, `program`, `sysvar`, `empty`, `not_empty`, `data_len`, `distinct_from`, and `error`
+ --> tests/ui/validation_rejects_typo.rs:5:18
+  |
+5 |     #[pina(validate(singner))]
+  |                     ^^^^^^^

@@ -12,6 +12,9 @@ use crate::schema;
 use crate::support::add_derives;
 use crate::support::generate_view_helpers;
 use crate::support::resolve_discriminator_variant;
+use crate::validation;
+#[cfg(feature = "validation")]
+use crate::validation::ValueTarget;
 
 pub(crate) fn expand(
 	args: proc_macro2::TokenStream,
@@ -25,13 +28,17 @@ pub(crate) fn expand(
 
 	let args = match AccountArgs::from_list(&nested_metas) {
 		Ok(v) => v,
-		Err(e) => return e.write_errors(),
+		Err(error) => return validation::attribute_error(&error, "account"),
 	};
 
 	// Parse input struct
 	let mut item_struct: ItemStruct = match syn::parse2(input) {
 		Ok(v) => v,
 		Err(e) => return e.to_compile_error(),
+	};
+	let field_validations = match validation::take_value_validations(&mut item_struct) {
+		Ok(value) => value,
+		Err(error) => return error.to_compile_error(),
 	};
 
 	// Extract configuration
@@ -46,7 +53,12 @@ pub(crate) fn expand(
 		discriminator,
 		variant,
 		compact,
+		validate,
 	} = args;
+	#[cfg(not(feature = "validation"))]
+	if validation::validation_requested(&field_validations, validate.as_ref()) {
+		return validation::feature_error(&item_struct);
+	}
 	let (discriminator, variant) =
 		match resolve_discriminator_variant(&discriminator, variant, &struct_name) {
 			Ok(v) => v,
@@ -112,6 +124,34 @@ pub(crate) fn expand(
 	};
 	let validation_type = if compact { &header_name } else { &zc_name };
 	let validation_impl = generate_validation_impl(&crate_path, validation_type);
+	#[cfg(feature = "validation")]
+	let value_validation_impl = validation::generate_value_validation(
+		&crate_path,
+		compact_schema.as_ref().map_or_else(
+			|| ValueTarget::Fixed(&zc_name),
+			|schema| {
+				ValueTarget::Compact {
+					target: &ref_name,
+					tails: &schema.tails,
+				}
+			},
+		),
+		&field_validations,
+		validate.as_ref(),
+		&quote!(#crate_path::ProgramError::InvalidAccountData),
+	);
+	#[cfg(not(feature = "validation"))]
+	let value_validation_impl = quote! {};
+	#[cfg(feature = "validation")]
+	let application_validation_hook = (!compact).then(|| {
+		quote! {
+			fn validate_account_value(value: &Self::Zc) -> #crate_path::ProgramResult {
+				<#zc_name as #crate_path::PinaValidate>::validate(value)
+			}
+		}
+	});
+	#[cfg(not(feature = "validation"))]
+	let application_validation_hook: Option<proc_macro2::TokenStream> = None;
 	let account_impl = if compact {
 		quote! {
 			impl #crate_path::PinaCompactAccount for #struct_name {
@@ -122,6 +162,10 @@ pub(crate) fn expand(
 					data: &[u8],
 				) -> Result<Self::Ref<'_>, #crate_path::ProgramError> {
 					Self::try_from_bytes(data)
+				}
+
+				fn validate_account_data(data: &[u8]) -> Result<(), #crate_path::ProgramError> {
+					Self::try_from_bytes(data).map(|_| ())
 				}
 
 				fn updated_len(
@@ -150,6 +194,8 @@ pub(crate) fn expand(
 	} else {
 		quote! {
 			impl #crate_path::PinaAccount for #struct_name {
+				#application_validation_hook
+
 				fn write_zc_discriminator(
 					value: &mut <Self as #crate_path::PinaPodFixed>::Zc,
 				) {
@@ -173,6 +219,7 @@ pub(crate) fn expand(
 		}
 
 		#validation_impl
+		#value_validation_impl
 
 		#account_impl
 	};
@@ -264,6 +311,22 @@ fn generate_compact_view_helpers(
 	patch_name: &syn::Ident,
 	schema: &schema::CompactSchema,
 ) -> proc_macro2::TokenStream {
+	#[cfg(feature = "validation")]
+	let validate_value = quote! {
+		<#ref_name<'_> as #crate_path::PinaValidate>::validate(&value)?;
+	};
+	#[cfg(not(feature = "validation"))]
+	let validate_value = quote! {};
+	#[cfg(feature = "validation")]
+	let validate_initialized = quote! {
+		let value = #ref_name::new(&data[..encoded_len]).map_err(|_| #error)?;
+		if let Err(error) = <#ref_name<'_> as #crate_path::PinaValidate>::validate(&value) {
+			data.fill(0);
+			return Err(error);
+		}
+	};
+	#[cfg(not(feature = "validation"))]
+	let validate_initialized = quote! {};
 	let capacity_constants = schema.tails.iter().map(|tail| {
 		let name = format_ident!("{}_CAPACITY", tail.name.to_string().to_uppercase());
 		let field_name = tail.name.to_string();
@@ -358,7 +421,10 @@ fn generate_compact_view_helpers(
 				return Err(#error);
 			}
 
-			#ref_name::new(data).map_err(|_| #error)
+			let value = #ref_name::new(data).map_err(|_| #error)?;
+			#validate_value
+
+			Ok(value)
 		}
 
 		/// Calculate the encoded length after applying `patch` without changing `data`.
@@ -400,6 +466,8 @@ fn generate_compact_view_helpers(
 		) -> Result<usize, #crate_path::ProgramError> {
 			let encoded_len = patch.initialize(data).map_err(|_| #error)?;
 			<Self as #crate_path::HasDiscriminator>::write_discriminator(data);
+			#validate_initialized
+
 			Ok(encoded_len)
 		}
 	}

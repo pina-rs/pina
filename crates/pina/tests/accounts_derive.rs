@@ -48,6 +48,50 @@ struct ParentAccounts<'a> {
 	pub nested: NestedAccounts<'a>,
 }
 
+#[cfg(feature = "validation")]
+#[derive(Accounts)]
+#[pina(crate = pina, validate(with = validate_accounts_hook))]
+struct ValidatedAccounts<'a> {
+	#[pina(validate(signer, address = EXPECTED_SIGNER))]
+	pub signer: &'a AccountView,
+	#[pina(validate(distinct_from = signer, not_empty))]
+	pub data: &'a AccountView,
+}
+
+// Keep the complete declarative account vocabulary type-checked. Individual
+// runtime behavior is covered by the underlying AccountInfoValidation tests.
+#[cfg(feature = "validation")]
+#[derive(Accounts)]
+#[pina(crate = pina)]
+#[allow(dead_code)]
+struct AccountValidationVocabulary<'a> {
+	#[pina(validate(
+		writable,
+		addresses = [EXPECTED_SIGNER, MOCK_PROGRAM_ID],
+		owners = [EXPECTED_SIGNER, MOCK_PROGRAM_ID],
+		data_len = 0,
+		error = ProgramError::Custom(52)
+	))]
+	pub shared_writable: &'a AccountView,
+	#[pina(validate(executable))]
+	pub executable: &'a AccountView,
+	#[pina(validate(program = system::ID))]
+	pub system_program: &'a AccountView,
+	#[pina(validate(sysvar = CLOCK_SYSVAR_ID))]
+	pub clock: Option<&'a AccountView>,
+	#[pina(validate(empty))]
+	pub empty: &'a AccountView,
+}
+
+#[cfg(feature = "validation")]
+fn validate_accounts_hook(accounts: &ValidatedAccounts<'_>) -> ProgramResult {
+	if accounts.data.data_len() == 1 {
+		Ok(())
+	} else {
+		Err(ProgramError::Custom(51))
+	}
+}
+
 #[derive(Accounts)]
 #[pina(crate = pina)]
 struct TestAccountsRemainingMut<'a> {
@@ -278,6 +322,11 @@ fn test_accounts_derive_nested_loader_order() {
 
 /// The mock program ID used for testing.
 const MOCK_PROGRAM_ID: Address = Address::new_from_array([5u8; 32]);
+#[cfg(feature = "validation")]
+const EXPECTED_SIGNER: Address = Address::new_from_array([7u8; 32]);
+#[cfg(feature = "validation")]
+#[allow(dead_code)]
+const CLOCK_SYSVAR_ID: Address = address!("SysvarC1ock11111111111111111111111111111111");
 /// `assert_eq(core::mem::align_of::<u128>(), 8)` is true for BPF but not
 /// for some host machines.
 const BPF_ALIGN_OF_U128: usize = 8;
@@ -485,6 +534,70 @@ fn test_input_layout_preserves_signer_and_writable_flags() {
 	assert!(!accounts[0].is_signer());
 	assert!(!accounts[1].is_writable());
 	assert!(accounts[1].is_signer());
+}
+
+#[cfg(feature = "validation")]
+#[test]
+fn accounts_validation_runs_after_parsing() {
+	let mut input = create_input_with_layout(
+		2,
+		&[],
+		|_| false,
+		|index| index == 0,
+		|index| {
+			if index == 0 {
+				EXPECTED_SIGNER
+			} else {
+				key_from_byte(8)
+			}
+		},
+	);
+	let mut accounts = [UNINIT; 2];
+	// SAFETY: the buffer encodes exactly two accounts.
+	let accounts = unsafe { slice_input(&mut input, &mut accounts) };
+
+	let parsed = ValidatedAccounts::try_from_account_infos(&MOCK_PROGRAM_ID, accounts).unwrap();
+	parsed.validate().unwrap();
+}
+
+#[cfg(feature = "validation")]
+#[test]
+fn accounts_validation_rejects_a_missing_signer() {
+	let mut input = create_input_with_layout(
+		2,
+		&[],
+		|_| false,
+		|_| false,
+		|index| {
+			if index == 0 {
+				EXPECTED_SIGNER
+			} else {
+				key_from_byte(8)
+			}
+		},
+	);
+	let mut accounts = [UNINIT; 2];
+	// SAFETY: the buffer encodes exactly two accounts.
+	let accounts = unsafe { slice_input(&mut input, &mut accounts) };
+
+	let result = ValidatedAccounts::try_from_account_infos(&MOCK_PROGRAM_ID, accounts);
+	assert!(matches!(
+		result,
+		Err(ProgramError::MissingRequiredSignature)
+	));
+}
+
+#[cfg(feature = "validation")]
+#[test]
+fn accounts_validation_rejects_duplicate_relationships() {
+	let mut input =
+		create_input_with_layout(2, &[], |_| false, |index| index == 0, |_| EXPECTED_SIGNER);
+	let mut accounts = [UNINIT; 2];
+	// SAFETY: the buffer encodes exactly two accounts.
+	let accounts = unsafe { slice_input(&mut input, &mut accounts) };
+
+	let result = ValidatedAccounts::try_from_account_infos(&MOCK_PROGRAM_ID, accounts);
+	assert!(matches!(result, Err(ProgramError::InvalidAccountData)));
 }
 
 #[test]

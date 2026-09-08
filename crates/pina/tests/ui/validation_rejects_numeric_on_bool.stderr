@@ -1,0 +1,5 @@
+error: `min` and `max` on field `enabled` require an integer field; supported types are the fixed-width signed and unsigned Rust integers and Pina `Pod*` integer types
+  --> tests/ui/validation_rejects_numeric_on_bool.rs:11:11
+   |
+11 |     enabled: bool,
+   |              ^^^^
