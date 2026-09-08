@@ -238,6 +238,48 @@ pub(crate) fn expand(
 			}
 		})
 	});
+	let with_pda = args.bump.as_ref().and_then(|bump_field| {
+		(has_account_representation && is_compact).then(|| {
+			let with_doc = format!(
+				"Load and validate `{struct_name}`, its canonical stored bump, and its PDA \
+				 address for the duration of `use_account`."
+			);
+			quote! {
+				#[doc = #with_doc]
+				#[inline(always)]
+				pub fn with_pda<R>(
+					account: &#crate_path::AccountView,
+					#(#find_seed_params,)*
+					program_id: &#crate_path::Address,
+					use_account: impl FnOnce(
+						<Self as #crate_path::PinaCompactAccount>::Ref<'_>,
+					) -> ::core::result::Result<R, #crate_path::ProgramError>,
+				) -> ::core::result::Result<R, #crate_path::ProgramError> {
+					let account_address = *account.address();
+
+					#crate_path::AsCompactAccount::with_compact_account::<Self, _>(
+						account,
+						program_id,
+						|state| {
+							let seeds = Self::seeds(#(#seed_param_names,)*);
+							let Some((expected_address, canonical_bump)) = #crate_path::try_find_program_address(
+								&seeds.as_slices(),
+								program_id,
+							) else {
+								return Err(#crate_path::ProgramError::InvalidSeeds);
+							};
+
+							if account_address != expected_address || state.#bump_field != canonical_bump {
+								return Err(#crate_path::ProgramError::InvalidSeeds);
+							}
+
+							use_account(state)
+						},
+					)
+				}
+			}
+		})
+	});
 
 	let generated = quote! {
 		#[doc = #seeds_doc]
@@ -281,6 +323,7 @@ pub(crate) fn expand(
 
 			#assert_seeds
 			#load_pda
+			#with_pda
 		}
 
 		impl<'a> #seeds_name<'a> {

@@ -35,9 +35,9 @@ import {
 import { getJournalCodec, type Journal, type JournalArgs } from "../accounts";
 import {
 	getInitializeInstructionAsync,
-	getRenameInstruction,
-	getResizeInstruction,
-	getWriteInstruction,
+	getRenameInstructionAsync,
+	getResizeInstructionAsync,
+	getWriteInstructionAsync,
 	type InitializeAsyncInput,
 	type ParsedInitializeInstruction,
 	type ParsedRenameInstruction,
@@ -47,9 +47,9 @@ import {
 	parseRenameInstruction,
 	parseResizeInstruction,
 	parseWriteInstruction,
-	type RenameInput,
-	type ResizeInput,
-	type WriteInput,
+	type RenameAsyncInput,
+	type ResizeAsyncInput,
+	type WriteAsyncInput,
 } from "../instructions";
 import { findJournalPda } from "../pdas";
 
@@ -186,14 +186,14 @@ export type CompactAccountsProgramPluginInstructions = {
 		& ReturnType<typeof getInitializeInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	resize: (
-		input: ResizeInput,
-	) => ReturnType<typeof getResizeInstruction> & SelfPlanAndSendFunctions;
+		input: ResizeAsyncInput,
+	) => ReturnType<typeof getResizeInstructionAsync> & SelfPlanAndSendFunctions;
 	write: (
-		input: WriteInput,
-	) => ReturnType<typeof getWriteInstruction> & SelfPlanAndSendFunctions;
+		input: WriteAsyncInput,
+	) => ReturnType<typeof getWriteInstructionAsync> & SelfPlanAndSendFunctions;
 	rename: (
-		input: RenameInput,
-	) => ReturnType<typeof getRenameInstruction> & SelfPlanAndSendFunctions;
+		input: RenameAsyncInput,
+	) => ReturnType<typeof getRenameInstructionAsync> & SelfPlanAndSendFunctions;
 };
 
 export type CompactAccountsProgramPluginPdas = {
@@ -222,11 +222,20 @@ export function compactAccountsProgramProgram() {
 							getInitializeInstructionAsync(input),
 						),
 					resize: (input) =>
-						addSelfPlanAndSendFunctions(client, getResizeInstruction(input)),
+						addSelfPlanAndSendFunctions(
+							client,
+							getResizeInstructionAsync(input),
+						),
 					write: (input) =>
-						addSelfPlanAndSendFunctions(client, getWriteInstruction(input)),
+						addSelfPlanAndSendFunctions(
+							client,
+							getWriteInstructionAsync(input),
+						),
 					rename: (input) =>
-						addSelfPlanAndSendFunctions(client, getRenameInstruction(input)),
+						addSelfPlanAndSendFunctions(
+							client,
+							getRenameInstructionAsync(input),
+						),
 				},
 				pdas: { journal: findJournalPda },
 				identifyAccount: identifyCompactAccountsProgramAccount,

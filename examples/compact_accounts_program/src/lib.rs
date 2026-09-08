@@ -135,18 +135,7 @@ pub struct RenameAccounts<'a> {
 	pub system_program: &'a AccountView,
 }
 
-fn validate_journal(journal: AccountView, authority: &Address) -> ProgramResult {
-	journal.assert_not_empty()?.assert_writable()?;
-
-	let (bump, stored_authority) = journal
-		.with_compact_account::<Journal, _>(&ID, |state| Ok((state.bump, state.authority)))?;
-	let canonical_bump =
-		journal.assert_canonical_bump(&Journal::seeds(authority).as_slices(), &ID)?;
-
-	if bump != canonical_bump {
-		return Err(ProgramError::InvalidSeeds);
-	}
-
+fn assert_journal_authority(stored_authority: Address, authority: &Address) -> ProgramResult {
 	if stored_authority != *authority {
 		return Err(CompactAccountError::AuthorityMismatch.into());
 	}
@@ -271,11 +260,11 @@ impl<'a> ProcessAccountInfos<'a> for ResizeAccounts<'a> {
 
 		self.authority.assert_signer()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
-		validate_journal(*self.journal, &authority_key)?;
+		self.journal.assert_writable()?;
 
-		let (mut entries, current_count, revision) = self
-			.journal
-			.with_compact_account::<Journal, _>(&ID, |journal| {
+		let (mut entries, current_count, revision) =
+			Journal::with_pda(self.journal, &authority_key, &ID, |journal| {
+				assert_journal_authority(journal.authority, &authority_key)?;
 				let current = journal.entries();
 				let mut entries = [PodU64::ZERO; Journal::ENTRIES_CAPACITY];
 				entries[..current.len()].copy_from_slice(current);
@@ -315,11 +304,11 @@ impl<'a> ProcessAccountInfos<'a> for WriteAccounts<'a> {
 		let authority_key = *self.authority.address();
 
 		self.authority.assert_signer()?.assert_writable()?;
-		validate_journal(*self.journal, &authority_key)?;
+		self.journal.assert_writable()?;
 
-		let (mut entries, entry_count, revision) = self
-			.journal
-			.with_compact_account::<Journal, _>(&ID, |journal| {
+		let (mut entries, entry_count, revision) =
+			Journal::with_pda(self.journal, &authority_key, &ID, |journal| {
+				assert_journal_authority(journal.authority, &authority_key)?;
 				let current = journal.entries();
 				if index >= current.len() {
 					return Err(CompactAccountError::IndexOutOfBounds.into());
@@ -354,10 +343,12 @@ impl<'a> ProcessAccountInfos<'a> for RenameAccounts<'a> {
 
 		self.authority.assert_signer()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
-		validate_journal(*self.journal, &authority_key)?;
-		let revision = self
-			.journal
-			.with_compact_account::<Journal, _>(&ID, |journal| Ok(journal.revision.get()))?;
+		self.journal.assert_writable()?;
+		let revision = Journal::with_pda(self.journal, &authority_key, &ID, |journal| {
+			assert_journal_authority(journal.authority, &authority_key)?;
+
+			Ok(journal.revision.get())
+		})?;
 
 		UpdateResizableAccount {
 			account: self.journal,

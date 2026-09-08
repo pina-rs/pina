@@ -130,6 +130,23 @@ profile.name.try_set("Alice")?;
 
 Keep `Type::assert_seeds` for a validation-only path that does not need a typed guard. The one-pass loaders are the preferred path when code reads or writes the account immediately afterward.
 
+## Load compact PDA accounts in one borrow
+
+Do not validate a compact PDA with `assert_compact_type`, load its bump through generated `assert_seeds`, and then parse it again with `with_compact_account`.
+
+Use `Type::with_pda` for a compact `#[account]` with `#[pda(bump = ...)]`:
+
+```rust
+let (revision, entries) = Journal::with_pda(
+	self.journal,
+	self.authority.address(),
+	&ID,
+	|journal| Ok((journal.revision.get(), journal.entries().len())),
+)?;
+```
+
+`with_pda` validates ownership, compact data, the canonical bump, and the derived account address before it runs the closure. The closure cannot return the borrowed compact view. Use `assert_compact_type` or generated `assert_seeds` only when code needs validation without field access.
+
 ## Keep compact nesting inside the supported grammar
 
 A compact account places fixed fields first and compact tails last. It can contain several tails. PinaPod v0.2 accepts these compact forms:
@@ -211,6 +228,7 @@ The following source changes do not change existing serialized data:
 - Replacing fixed read method names changes validation entry points only.
 - Replacing create-then-mutate code with `invoke_with` changes initialization order, not the completed fixed-account bytes.
 - Replacing `assert_type` plus `assert_seeds` plus `as_account*` with `load_pda*` changes validation order, not account bytes.
+- Replacing `assert_compact_type` plus `assert_seeds` plus `with_compact_account` with `with_pda` changes validation order, not account bytes.
 - Replacing staged compact mutation with a patch changes how callers produce the same compact bytes.
 - Adding client capacity metadata changes validation, not the encoded prefix or payload.
 

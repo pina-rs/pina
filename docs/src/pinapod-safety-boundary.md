@@ -83,6 +83,12 @@ For a fixed account with a stored PDA bump, `Type::load_pda` and `Type::load_pda
 
 The loaded guard still owns the runtime account-data borrow. End its scope or call `drop` before a CPI that may access the same account. Pina's `deny_account_borrows_across_cpi` lint recognizes guards returned by `load_pda_mut`.
 
+### Compact PDA loading
+
+For a compact account with a stored PDA bump, `Type::with_pda` validates the owner, discriminator, size, every active tail, canonical bump, and derived account address before it runs the closure. The runtime borrow guard remains active for the closure and is released when the closure returns.
+
+Use `Type::with_pda` when the handler needs compact data. Do not call `assert_compact_type`, generated `assert_seeds`, and `with_compact_account` first. Those calls repeat compact parsing and PDA derivation. Keep `assert_compact_type` or generated `assert_seeds` for validation-only code.
+
 ### Compact account creation
 
 Compact creation does not use an initializer closure. `CreateCompactProgramAccount` and `CreateCompactProgramAccountWithBump` require a generated `patch` field:
