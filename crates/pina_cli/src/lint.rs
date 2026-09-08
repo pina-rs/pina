@@ -65,7 +65,8 @@ pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 	let project = Project::discover(&options.project)?;
 	let cargo_home = cargo_home()?;
 	let driver = prepare_driver(&cargo_home, &project.root)?;
-	let driver_build = driver_build_identity(&driver.path)?;
+	let driver_build =
+		driver_build_identity(&driver.path).map_err(|source| LintError::RunCargo { source })?;
 	let manifest = project.program_dir.join("Cargo.toml");
 
 	let levels = project

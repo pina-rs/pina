@@ -57,12 +57,6 @@ pub enum DriverError {
 
 	#[error("The lint driver install finished without producing {path}")]
 	MissingDriver { path: PathBuf },
-
-	#[error("Could not fingerprint the lint driver at {path}: {source}")]
-	FingerprintDriver {
-		path: PathBuf,
-		source: std::io::Error,
-	},
 }
 
 /// Resolve the driver for the given project root.
@@ -161,24 +155,14 @@ fn is_executable(path: &Path) -> bool {
 ///
 /// The identity is forwarded into rustc dep-info so Cargo invalidates a prior
 /// lint result when a rebuilt driver occupies the same path.
-pub fn driver_build_identity(path: &Path) -> Result<String, DriverError> {
-	let file = File::open(path).map_err(|source| {
-		DriverError::FingerprintDriver {
-			path: path.to_owned(),
-			source,
-		}
-	})?;
+pub fn driver_build_identity(path: &Path) -> std::io::Result<String> {
+	let file = File::open(path)?;
 	let mut reader = BufReader::new(file);
 	let mut buffer = [0u8; 16 * 1024];
 	let mut hash = 0xcbf2_9ce4_8422_2325u64;
 
 	loop {
-		let read = reader.read(&mut buffer).map_err(|source| {
-			DriverError::FingerprintDriver {
-				path: path.to_owned(),
-				source,
-			}
-		})?;
+		let read = reader.read(&mut buffer)?;
 		if read == 0 {
 			break;
 		}
