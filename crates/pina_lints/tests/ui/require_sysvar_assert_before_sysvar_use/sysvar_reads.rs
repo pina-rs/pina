@@ -186,6 +186,28 @@ fn process_conditionally_checked_typed_method(
 	Ok(())
 }
 
+fn process_unchecked_first_conditional_typed_method(
+	rent_account: &AccountView,
+	data: &[u8],
+	condition: bool,
+) -> Result<(), ()> {
+	let parsed = if condition {
+		Rent::from_bytes(data)?
+	} else {
+		Rent::from_account_view(rent_account)?
+	};
+	let _ = parsed.minimum_balance(8);
+	//~^ ERROR: sysvar access should be preceded by
+
+	let parsed = match condition {
+		true => Rent::from_bytes(data)?,
+		false => Rent::from_account_view(rent_account)?,
+	};
+	let _ = parsed.minimum_balance(16);
+	//~^ ERROR: sysvar access should be preceded by
+	Ok(())
+}
+
 fn process_unchecked_typed_destructure(data: &[u8]) -> Result<(), ()> {
 	let Clock { slot, .. } = Clock::from_bytes(data)?;
 	//~^ ERROR: sysvar access should be preceded by
@@ -215,6 +237,45 @@ fn process_checked_typed_match(clock_account: &AccountView) -> Result<(), ()> {
 			let _ = slot;
 		}
 	}
+	Ok(())
+}
+
+fn process_checked_result_patterns(clock_account: &AccountView) -> Result<(), ()> {
+	let Ok(clock) = Clock::from_account_view(clock_account) else {
+		return Err(());
+	};
+	let _ = clock.slot;
+
+	if let Ok(clock) = Clock::from_account_view(clock_account) {
+		let _ = clock.slot;
+	}
+
+	match Clock::from_account_view(clock_account) {
+		Ok(clock) => {
+			let _ = clock.slot;
+		}
+		Err(()) => return Err(()),
+	}
+
+	let Some(Ok(clock)) = Some(Clock::from_account_view(clock_account)) else {
+		return Err(());
+	};
+	let _ = clock.slot;
+	Ok(())
+}
+
+fn process_checked_prebound_destructure(clock_account: &AccountView) -> Result<(), ()> {
+	let clock = Clock::from_account_view(clock_account)?;
+	let Clock { slot, .. } = clock;
+	let _ = slot;
+	Ok(())
+}
+
+fn process_unchecked_prebound_destructure(data: &[u8]) -> Result<(), ()> {
+	let clock = Clock::from_bytes(data)?;
+	let Clock { slot, .. } = clock;
+	//~^ ERROR: sysvar access should be preceded by
+	let _ = slot;
 	Ok(())
 }
 
@@ -250,6 +311,48 @@ fn process_discarded_checked_typed_sysvar(
 		Clock::from_account_view(clock_account).map(|_| Clock::from_bytes(data).unwrap())?;
 	let _ = clock.slot;
 	//~^ ERROR: sysvar access should be preceded by
+	Ok(())
+}
+
+fn process_replaced_and_then_typed_sysvar(
+	clock_account: &AccountView,
+	data: &[u8],
+) -> Result<(), ()> {
+	let clock = Clock::from_account_view(clock_account).and_then(|_| Clock::from_bytes(data))?;
+	let _ = clock.slot;
+	//~^ ERROR: sysvar access should be preceded by
+	Ok(())
+}
+
+fn process_checked_result_adapters(clock_account: &AccountView) -> Result<(), ()> {
+	let clock = Clock::from_account_view(clock_account).map(|clock| {
+		let _ = clock.slot;
+		clock
+	})?;
+	let _ = clock.slot;
+
+	let clock = Clock::from_account_view(clock_account).inspect(|clock| {
+		let _ = clock.slot;
+	})?;
+	let _ = clock.slot;
+
+	let clock = Clock::from_account_view(clock_account).and_then(|clock| {
+		let _ = clock.slot;
+		Ok(clock)
+	})?;
+	let _ = clock.slot;
+	Ok(())
+}
+
+fn process_adapter_does_not_validate_captured_value(
+	clock_account: &AccountView,
+	data: &[u8],
+) -> Result<(), ()> {
+	let unchecked = Clock::from_bytes(data)?;
+	Clock::from_account_view(clock_account).inspect(|_| {
+		let _ = unchecked.slot;
+		//~^ ERROR: sysvar access should be preceded by
+	})?;
 	Ok(())
 }
 

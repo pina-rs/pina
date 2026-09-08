@@ -64,7 +64,23 @@ LL |     let _ = parsed.minimum_balance(8);
    = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
 
 error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
-  --> $DIR/sysvar_reads.rs:190:6
+  --> $DIR/sysvar_reads.rs:199:10
+   |
+LL |     let _ = parsed.minimum_balance(8);
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:206:10
+   |
+LL |     let _ = parsed.minimum_balance(16);
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:212:6
    |
 LL |     let Clock { slot, .. } = Clock::from_bytes(data)?;
    |         ^^^^^^^^^^^^^^^^^^
@@ -72,7 +88,7 @@ LL |     let Clock { slot, .. } = Clock::from_bytes(data)?;
    = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
 
 error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
-  --> $DIR/sysvar_reads.rs:204:3
+  --> $DIR/sysvar_reads.rs:226:3
    |
 LL |         Clock { slot, .. } => {
    |         ^^^^^^^^^^^^^^^^^^
@@ -80,7 +96,15 @@ LL |         Clock { slot, .. } => {
    = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
 
 error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
-  --> $DIR/sysvar_reads.rs:222:14
+  --> $DIR/sysvar_reads.rs:276:6
+   |
+LL |     let Clock { slot, .. } = clock;
+   |         ^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:283:14
    |
 LL |     if let Some(Clock { slot, .. }) = Some(Clock::from_bytes(data)?) {
    |                 ^^^^^^^^^^^^^^^^^^
@@ -88,7 +112,7 @@ LL |     if let Some(Clock { slot, .. }) = Some(Clock::from_bytes(data)?) {
    = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
 
 error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
-  --> $DIR/sysvar_reads.rs:238:11
+  --> $DIR/sysvar_reads.rs:299:11
    |
 LL |         let _ = clock.slot;
    |                 ^^^^^^^^^^
@@ -96,11 +120,27 @@ LL |         let _ = clock.slot;
    = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
 
 error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
-  --> $DIR/sysvar_reads.rs:251:10
+  --> $DIR/sysvar_reads.rs:312:10
    |
 LL |     let _ = clock.slot;
    |             ^^^^^^^^^^
    |
    = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
 
-error: aborting due to 13 previous errors
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:322:10
+   |
+LL |     let _ = clock.slot;
+   |             ^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:353:11
+   |
+LL |         let _ = unchecked.slot;
+   |                 ^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: aborting due to 18 previous errors

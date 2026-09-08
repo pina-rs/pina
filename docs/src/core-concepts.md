@@ -130,7 +130,7 @@ let rent = Rent::from_account_view(rent_account)?;
 let instructions = Instructions::try_from(instructions_account)?;
 ```
 
-These loaders validate the sysvar address while parsing. Keep `assert_sysvar()` for identity-only checks and deliberate raw data access.
+These loaders validate the sysvar address while parsing. Their validation remains visible to Pina's lint through `let`-`else`, `if let`, `match`, nested or prebound destructuring, and value-preserving `Result` adapters such as `inspect`, identity `map`, and identity `and_then`. Every branch that can produce the sysvar value must use a checked loader. Keep `assert_sysvar()` for identity-only checks and deliberate raw data access.
 
 ## Typed account conversions
 

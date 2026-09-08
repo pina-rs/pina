@@ -94,10 +94,47 @@ impl DynamicCpiMethod {
 	}
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct DynamicCpiMethods(u8);
+
+impl DynamicCpiMethods {
+	const INVOKE: u8 = 1;
+	const INVOKE_SIGNED: u8 = 2;
+
+	const fn contains(self, method: DynamicCpiMethod) -> bool {
+		let bit = match method {
+			DynamicCpiMethod::Invoke => Self::INVOKE,
+			DynamicCpiMethod::InvokeSigned => Self::INVOKE_SIGNED,
+		};
+		self.0 & bit != 0
+	}
+
+	const fn from_method(method: DynamicCpiMethod) -> Self {
+		match method {
+			DynamicCpiMethod::Invoke => Self(Self::INVOKE),
+			DynamicCpiMethod::InvokeSigned => Self(Self::INVOKE_SIGNED),
+		}
+	}
+
+	const fn is_empty(self) -> bool {
+		self.0 == 0
+	}
+
+	const fn union(self, other: Self) -> Self {
+		Self(self.0 | other.0)
+	}
+
+	fn iter(self) -> impl Iterator<Item = DynamicCpiMethod> {
+		[DynamicCpiMethod::Invoke, DynamicCpiMethod::InvokeSigned]
+			.into_iter()
+			.filter(move |method| self.contains(*method))
+	}
+}
+
 #[derive(Clone, Debug, Default)]
 struct ValidationState {
 	places: HashSet<Place>,
-	cpi_aliases: HashMap<HirId, DynamicCpiMethod>,
+	cpi_aliases: HashMap<HirId, DynamicCpiMethods>,
 }
 
 impl ValidationState {
@@ -209,11 +246,16 @@ fn intersect_states(states: &[ValidationState]) -> ValidationState {
 	intersection
 		.places
 		.retain(|place| states[1..].iter().all(|state| state.contains(place)));
-	intersection.cpi_aliases.retain(|binding, method| {
-		states[1..]
-			.iter()
-			.all(|state| state.cpi_aliases.get(binding) == Some(method))
-	});
+	intersection.cpi_aliases.clear();
+	for state in states {
+		for (binding, methods) in &state.cpi_aliases {
+			intersection
+				.cpi_aliases
+				.entry(*binding)
+				.and_modify(|current| *current = current.union(*methods))
+				.or_insert(*methods);
+		}
+	}
 	intersection
 }
 
@@ -226,17 +268,17 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		&self,
 		expr: &'tcx Expr<'tcx>,
 		state: &ValidationState,
-	) -> Option<DynamicCpiMethod> {
+	) -> DynamicCpiMethods {
 		if let Some(method) = dynamic_cpi_method(self.cx, expr) {
-			return Some(method);
+			return DynamicCpiMethods::from_method(method);
 		}
 
 		match &expr.kind {
 			ExprKind::Path(path) => {
 				let Res::Local(binding) = self.cx.qpath_res(path, expr.hir_id) else {
-					return None;
+					return DynamicCpiMethods::default();
 				};
-				state.cpi_aliases.get(&binding).copied()
+				state.cpi_aliases.get(&binding).copied().unwrap_or_default()
 			}
 			ExprKind::Unary(_, inner)
 			| ExprKind::Use(inner, _)
@@ -246,23 +288,21 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			| ExprKind::AddrOf(_, _, inner)
 			| ExprKind::UnsafeBinderCast(_, inner, _) => self.resolve_cpi_alias(inner, state),
 			ExprKind::Block(block, _) => {
-				block
-					.expr
-					.and_then(|tail| self.resolve_cpi_alias(tail, state))
+				block.expr.map_or_else(DynamicCpiMethods::default, |tail| {
+					self.resolve_cpi_alias(tail, state)
+				})
 			}
 			ExprKind::If(_, then, Some(otherwise)) => {
-				let then_method = self.resolve_cpi_alias(then, state)?;
-				(self.resolve_cpi_alias(otherwise, state) == Some(then_method))
-					.then_some(then_method)
+				self.resolve_cpi_alias(then, state)
+					.union(self.resolve_cpi_alias(otherwise, state))
 			}
 			ExprKind::Match(_, arms, _) => {
-				let mut methods = arms
-					.iter()
-					.map(|arm| self.resolve_cpi_alias(arm.body, state));
-				let first = methods.next()??;
-				methods.all(|method| method == Some(first)).then_some(first)
+				arms.iter()
+					.fold(DynamicCpiMethods::default(), |methods, arm| {
+						methods.union(self.resolve_cpi_alias(arm.body, state))
+					})
 			}
-			_ => None,
+			_ => DynamicCpiMethods::default(),
 		}
 	}
 
@@ -311,8 +351,8 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 							}
 
 							let cpi_method = self.resolve_cpi_alias(init, state);
-							if let Some(method) = cpi_method {
-								state.cpi_aliases.insert(binding, method);
+							if !cpi_method.is_empty() {
+								state.cpi_aliases.insert(binding, cpi_method);
 							}
 						}
 					}
@@ -375,18 +415,16 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					self.visit_expr(argument, state);
 				}
 
-				let method = self.resolve_cpi_alias(callee, state);
-				let Some(method) = method else {
+				let methods = self.resolve_cpi_alias(callee, state);
+				let Some(method) = methods.iter().find(|method| {
+					!args.get(method.program_index()).is_some_and(|target| {
+						is_static_address(target)
+							|| place_identity(target).is_some_and(|place| state.contains(&place))
+					})
+				}) else {
 					return;
 				};
-
-				let validated = args.get(method.program_index()).is_some_and(|target| {
-					is_static_address(target)
-						|| place_identity(target).is_some_and(|place| state.contains(&place))
-				});
-				if !validated {
-					self.lint_unchecked_cpi(expr, method.name());
-				}
+				self.lint_unchecked_cpi(expr, method.name());
 			}
 			ExprKind::Block(block, _) => self.visit_block(block, state),
 			ExprKind::Match(scrutinee, arms, _) => {
@@ -443,15 +481,15 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			ExprKind::Assign(lhs, rhs, _) | ExprKind::AssignOp(_, lhs, rhs) => {
 				self.visit_expr(lhs, state);
 				self.visit_expr(rhs, state);
-				let cpi_method = self.resolve_cpi_alias(rhs, state);
+				let cpi_methods = self.resolve_cpi_alias(rhs, state);
 				if let Some(place) = place_identity(lhs) {
 					let binding = match &place {
 						Place::Local(binding) => Some(*binding),
 						Place::Field(..) => None,
 					};
 					self.invalidate(state, &place);
-					if let (Some(binding), Some(method)) = (binding, cpi_method) {
-						state.cpi_aliases.insert(binding, method);
+					if let Some(binding) = binding.filter(|_| !cpi_methods.is_empty()) {
+						state.cpi_aliases.insert(binding, cpi_methods);
 					}
 				}
 			}

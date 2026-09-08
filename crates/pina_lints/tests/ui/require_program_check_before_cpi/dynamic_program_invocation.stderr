@@ -80,7 +80,7 @@ LL |     invoke(&Instruction, token_program.address())?;
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:141:2
+  --> $DIR/dynamic_program_invocation.rs:128:2
    |
 LL |     invoke(&Instruction, token_program.address())?;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -88,7 +88,39 @@ LL |     invoke(&Instruction, token_program.address())?;
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:163:2
+  --> $DIR/dynamic_program_invocation.rs:135:2
+   |
+LL |     invoke(&Instruction, token_program.address())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:149:2
+   |
+LL |     invoke(&Instruction, token_program.address())?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:155:2
+   |
+LL |     invoke(&Instruction, token_program.address())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:168:2
+   |
+LL |     invoke(&Instruction, token_program.address())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:198:2
    |
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -96,7 +128,7 @@ LL |     Instruction.invoke_with_unverified_program(token_program.address())
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:173:2
+  --> $DIR/dynamic_program_invocation.rs:208:2
    |
 LL |     Instruction.invoke_with_unverified_program(second.token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -104,7 +136,7 @@ LL |     Instruction.invoke_with_unverified_program(second.token_program.address
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:187:3
+  --> $DIR/dynamic_program_invocation.rs:222:3
    |
 LL |         Instruction.invoke_with_unverified_program(token_program.address())?;
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -112,7 +144,7 @@ LL |         Instruction.invoke_with_unverified_program(token_program.address())
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:202:2
+  --> $DIR/dynamic_program_invocation.rs:237:2
    |
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -120,7 +152,7 @@ LL |     Instruction.invoke_with_unverified_program(token_program.address())
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:215:2
+  --> $DIR/dynamic_program_invocation.rs:250:2
    |
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -128,11 +160,11 @@ LL |     Instruction.invoke_with_unverified_program(token_program.address())
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:229:2
+  --> $DIR/dynamic_program_invocation.rs:264:2
    |
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
-error: aborting due to 17 previous errors
+error: aborting due to 21 previous errors

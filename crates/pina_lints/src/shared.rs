@@ -26,6 +26,7 @@ pub struct CallInfo {
 	pub method: String,
 	pub receiver: Option<String>,
 	pub receiver_binding: Option<HirId>,
+	pub receiver_hir_id: Option<HirId>,
 	pub receiver_span: Option<Span>,
 	pub receiver_type_definitions: Vec<TypeDefinition>,
 	pub path: Option<String>,
@@ -57,6 +58,7 @@ pub struct AssignmentInfo {
 pub struct FieldAccessInfo {
 	pub span: Span,
 	pub receiver_binding: Option<HirId>,
+	pub receiver_hir_id: HirId,
 	pub receiver_span: Span,
 	pub receiver_type_definitions: Vec<TypeDefinition>,
 }
@@ -70,7 +72,7 @@ pub struct TypeDefinition {
 #[derive(Debug, Clone)]
 pub struct PatternProjectionInfo {
 	pub span: Span,
-	pub value_span: Span,
+	pub value_hir_id: HirId,
 	pub value_type_definitions: Vec<TypeDefinition>,
 }
 
@@ -169,7 +171,7 @@ fn collect_pattern_projection(
 			);
 			facts.pattern_projections.push(PatternProjectionInfo {
 				span: pattern.span,
-				value_span: value.span,
+				value_hir_id: value.hir_id,
 				value_type_definitions: definitions,
 			});
 			for field in *fields {
@@ -381,6 +383,7 @@ fn collect_from_expr_inner(
 				method: method.to_string(),
 				receiver: expression_identity(receiver),
 				receiver_binding: expression_local_binding(receiver),
+				receiver_hir_id: Some(receiver.hir_id),
 				receiver_span: Some(receiver.span),
 				receiver_type_definitions: expression_type_definitions(cx, receiver),
 				path: None,
@@ -440,6 +443,7 @@ fn collect_from_expr_inner(
 					method,
 					receiver: None,
 					receiver_binding: None,
+					receiver_hir_id: None,
 					receiver_span: None,
 					receiver_type_definitions: Vec::new(),
 					path: Some(path_name),
@@ -491,6 +495,7 @@ fn collect_from_expr_inner(
 			facts.field_accesses.push(FieldAccessInfo {
 				span: expr.span,
 				receiver_binding: expression_local_binding(receiver),
+				receiver_hir_id: receiver.hir_id,
 				receiver_span: receiver.span,
 				receiver_type_definitions: expression_type_definitions(cx, receiver),
 			});

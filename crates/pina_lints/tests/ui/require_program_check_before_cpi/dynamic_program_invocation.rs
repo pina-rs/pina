@@ -125,7 +125,15 @@ fn conditional_function_items(token_program: &ProgramAccount, condition: bool) -
 	} else {
 		unrelated_invoke
 	};
+	invoke(&Instruction, token_program.address())?;
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+
+	let invoke: InvokeFn = match condition {
+		true => unrelated_invoke,
+		false => Instruction::invoke_with_unverified_program,
+	};
 	invoke(&Instruction, token_program.address())
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
 }
 
 fn branch_assignments_join_aliases(
@@ -142,6 +150,33 @@ fn branch_assignments_join_aliases(
 	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
 
 	if condition {
+		invoke = unrelated_invoke;
+	}
+	invoke(&Instruction, token_program.address())
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+}
+
+fn partial_match_assignment_tracks_reachable_unverified_alias(
+	token_program: &ProgramAccount,
+	condition: bool,
+) -> Result<(), ()> {
+	let mut invoke = unrelated_invoke as InvokeFn;
+	match condition {
+		true => invoke = Instruction::invoke_with_unverified_program,
+		false => (),
+	}
+	invoke(&Instruction, token_program.address())
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+}
+
+fn every_branch_can_invalidate_an_unverified_alias(
+	token_program: &ProgramAccount,
+	condition: bool,
+) -> Result<(), ()> {
+	let mut invoke = Instruction::invoke_with_unverified_program as InvokeFn;
+	if condition {
+		invoke = unrelated_invoke;
+	} else {
 		invoke = unrelated_invoke;
 	}
 	invoke(&Instruction, token_program.address())
