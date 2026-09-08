@@ -1,0 +1,34 @@
+warning: account borrow guard `guard` is never read
+  --> $DIR/guards.rs:55:14
+   |
+LL |     let guard = account.try_borrow_mut()?;
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: the guard holds the account data borrow until the end of its scope; discard the validation value immediately by calling it as a `?` statement, binding it with `let _ = ...`, or reading it before the scope ends
+   = note: `#[warn(deny_unused_account_borrow_guards)]` on by default
+
+warning: account borrow guard `_guard` is never read
+  --> $DIR/guards.rs:62:15
+   |
+LL |     let _guard = mint.as_token_mint_for_program(&0)?;
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: the guard holds the account data borrow until the end of its scope; discard the validation value immediately by calling it as a `?` statement, binding it with `let _ = ...`, or reading it before the scope ends
+
+warning: account borrow guard `guard` is never read
+  --> $DIR/guards.rs:68:14
+   |
+LL |     let guard = mint.as_associated_token_account_checked(&0)?;
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: the guard holds the account data borrow until the end of its scope; discard the validation value immediately by calling it as a `?` statement, binding it with `let _ = ...`, or reading it before the scope ends
+
+warning: account borrow guard `guard` is never read
+  --> $DIR/guards.rs:75:15
+   |
+LL |         let guard = State::load_pda(account)?;
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: the guard holds the account data borrow until the end of its scope; discard the validation value immediately by calling it as a `?` statement, binding it with `let _ = ...`, or reading it before the scope ends
+
+warning: 4 warnings emitted

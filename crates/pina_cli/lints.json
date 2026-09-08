@@ -7,6 +7,10 @@
 			"level": "warn"
 		},
 		{
+			"name": "deny_unused_account_borrow_guards",
+			"level": "warn"
+		},
+		{
 			"name": "require_associated_token_address_before_ata_cast",
 			"level": "deny"
 		},

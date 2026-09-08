@@ -74,6 +74,7 @@ pub const DYLINT_VERSION: &str = "0.1.0";
 pub static LINTS: &[&rustc_lint::Lint] = &[
 	lints::deny_account_borrows_across_cpi::DENY_ACCOUNT_BORROWS_ACROSS_CPI,
 	lints::deny_heap_allocations_in_onchain_instruction_handlers::DENY_HEAP_ALLOCATIONS_IN_ONCHAIN_INSTRUCTION_HANDLERS,
+	lints::deny_unused_account_borrow_guards::DENY_UNUSED_ACCOUNT_BORROW_GUARDS,
 	lints::require_associated_token_address_before_ata_cast::REQUIRE_ASSOCIATED_TOKEN_ADDRESS_BEFORE_ATA_CAST,
 	lints::require_bounded_remaining_accounts::REQUIRE_BOUNDED_REMAINING_ACCOUNTS,
 	lints::require_canonical_bump_before_pda_write::REQUIRE_CANONICAL_BUMP_BEFORE_PDA_WRITE,
@@ -98,6 +99,7 @@ pub static LINTS: &[&rustc_lint::Lint] = &[
 pub const LINT_NAMES: &[&str] = &[
 	"deny_account_borrows_across_cpi",
 	"deny_heap_allocations_in_onchain_instruction_handlers",
+	"deny_unused_account_borrow_guards",
 	"require_associated_token_address_before_ata_cast",
 	"require_bounded_remaining_accounts",
 	"require_canonical_bump_before_pda_write",
@@ -187,6 +189,14 @@ fn register_one_lint(name: &str, lint_store: &mut rustc_lint::LintStore) {
 				Box::new(
 					lints::deny_heap_allocations_in_onchain_instruction_handlers::DenyHeapAllocationsInOnchainInstructionHandlers,
 				)
+			});
+		}
+		"deny_unused_account_borrow_guards" => {
+			lint_store.register_lints(&[
+				lints::deny_unused_account_borrow_guards::DENY_UNUSED_ACCOUNT_BORROW_GUARDS,
+			]);
+			lint_store.register_late_pass(|_| {
+				Box::new(lints::deny_unused_account_borrow_guards::DenyUnusedAccountBorrowGuards)
 			});
 		}
 		"require_associated_token_address_before_ata_cast" => {

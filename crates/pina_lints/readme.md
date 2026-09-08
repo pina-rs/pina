@@ -77,6 +77,7 @@ Deny-level security lints should not be disabled at crate scope; see the [suppre
 | `require_reason_for_duplicate_remaining_accounts`       | deny  | Duplicate mutable remaining accounts are justified  |
 | `require_canonical_bump_before_pda_write`               | deny  | PDA namespaces use canonical bumps                  |
 | `deny_account_borrows_across_cpi`                       | deny  | Mutable data guards end before CPI                  |
+| `deny_unused_account_borrow_guards`                     | warn  | Unread borrow guards are discarded immediately      |
 | `require_consistent_token_program`                      | deny  | Token validation and CPI share one program identity |
 | `require_explicit_token_2022_extension_policy`          | deny  | Token-2022 extensions are explicitly allow-listed   |
 | `require_post_cpi_balance_reload`                       | deny  | Custody deposits use an observed balance delta      |
@@ -217,6 +218,21 @@ transfer.invoke()?;
 ```
 
 An explicit `drop(guard)` or the end of a nested block releases the guard. The analysis follows block scope and explicit drops. It resolves method definitions before classifying a borrow or CPI, so an unrelated type that happens to define `try_borrow_mut()` or `invoke()` does not trigger the lint. Account borrows hidden inside custom wrapper constructors and CPIs hidden behind opaque helpers are outside its current model.
+
+### `deny_unused_account_borrow_guards`
+
+Detects account borrow guards bound to locals that are never read.
+
+```rust
+// Flagged: the guard is bound but never read, so the account data borrow
+// stays open until the end of the enclosing scope for nothing.
+let _guard = mint.as_token_mint_for_program(&token_program)?;
+
+// Preferred: discard the validation value immediately.
+mint.as_token_mint_for_program(&token_program)?;
+```
+
+Assertion-style guards exist only for their `?` validation. Binding them without reading keeps the borrow open to the end of the scope, which obscures the borrow boundary and can turn a later borrow of the same account data into a runtime panic. Discard immediately by calling the validation as a `?` statement, binding with `let _ = ...`, or passing the guard to `drop`; when the value matters, read it. The lint recognizes `try_borrow`, `as_account`, the token guard loaders, and generated `load_pda` helpers, and it counts any use of the binding — method calls, field access, `&` borrows, and closure captures — as a read. Guards constructed behind opaque helper functions are outside its model, and a direct `drop(local)` call is treated as a discard rather than a read.
 
 ### `require_consistent_token_program`
 

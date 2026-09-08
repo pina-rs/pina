@@ -136,11 +136,9 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			.assert_no_extensions()?;
 		let decimals = mint_a.decimals();
 		drop(mint_a);
-		let mint_b = self
-			.mint_b
+		self.mint_b
 			.as_token_mint_for_program(&token_program)?
 			.assert_no_extensions()?;
-		drop(mint_b);
 		drop(self.maker_ata_a.as_associated_token_account_checked(
 			self.maker.address(),
 			self.mint_a.address(),
