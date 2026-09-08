@@ -172,4 +172,4 @@ For a compact account without a stored bump, use `with_compact_account::<T, _>`.
 
 <!-- {/compactAccountUseCaseChecklist} -->
 
-The complete [`compact_accounts`](https://github.com/pina-rs/pina/tree/main/examples/compact_accounts) example includes unit coverage and isolated Surfpool tests for creation, nonempty initialization, growth, same-size mutation, maximum capacity, shrink, clear, rent adjustment, and rejected authorization and bounds cases.
+The complete [`compact_accounts_program`](https://github.com/pina-rs/pina/tree/main/examples/compact_accounts_program) example includes unit coverage and isolated Surfpool tests for creation, nonempty initialization, growth, same-size mutation, maximum capacity, shrink, clear, rent adjustment, and rejected authorization and bounds cases.

@@ -139,7 +139,7 @@ The generated patch owns the update plan, so callers do not coordinate `set_*`, 
 
 <!-- {/compactAccountResizeOrdering} -->
 
-See `examples/compact_accounts` for a complete lifecycle with unit and Surfpool coverage.
+See `examples/compact_accounts_program` for a complete lifecycle with unit and Surfpool coverage.
 
 `CreateCompactProgramAccount::invoke` accepts a generated patch such as `JournalPatch::new()`. Use `invoke_with_bump` to construct the patch from the derived canonical bump. `CreateCompactProgramAccountWithBump` retains a `patch` field and rejects a supplied bump that is not canonical.
 
