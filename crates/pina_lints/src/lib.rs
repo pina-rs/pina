@@ -87,7 +87,6 @@ pub static LINTS: &[&rustc_lint::Lint] = &[
 	lints::require_owner_before_token_cast::REQUIRE_OWNER_BEFORE_TOKEN_CAST,
 	lints::require_post_cpi_balance_reload::REQUIRE_POST_CPI_BALANCE_RELOAD,
 	lints::require_program_check_before_cpi::REQUIRE_PROGRAM_CHECK_BEFORE_CPI,
-	lints::require_program_owned_before_lamport_mutation::REQUIRE_PROGRAM_OWNED_BEFORE_LAMPORT_MUTATION,
 	lints::require_reason_for_duplicate_remaining_accounts::REQUIRE_REASON_FOR_DUPLICATE_REMAINING_ACCOUNTS,
 	lints::require_sysvar_assert_before_sysvar_use::REQUIRE_SYSVAR_ASSERT_BEFORE_SYSVAR_USE,
 	lints::require_type_assert_before_zero_copy_cast::REQUIRE_TYPE_ASSERT_BEFORE_ZERO_COPY_CAST,
@@ -112,7 +111,6 @@ pub const LINT_NAMES: &[&str] = &[
 	"require_owner_before_token_cast",
 	"require_post_cpi_balance_reload",
 	"require_program_check_before_cpi",
-	"require_program_owned_before_lamport_mutation",
 	"require_reason_for_duplicate_remaining_accounts",
 	"require_sysvar_assert_before_sysvar_use",
 	"require_type_assert_before_zero_copy_cast",
@@ -304,16 +302,6 @@ fn register_one_lint(name: &str, lint_store: &mut rustc_lint::LintStore) {
 			]);
 			lint_store.register_late_pass(|_| {
 				Box::new(lints::require_program_check_before_cpi::RequireProgramCheckBeforeCpi)
-			});
-		}
-		"require_program_owned_before_lamport_mutation" => {
-			lint_store.register_lints(&[
-				lints::require_program_owned_before_lamport_mutation::REQUIRE_PROGRAM_OWNED_BEFORE_LAMPORT_MUTATION,
-			]);
-			lint_store.register_late_pass(|_| {
-				Box::new(
-					lints::require_program_owned_before_lamport_mutation::RequireProgramOwnedBeforeLamportMutation,
-				)
 			});
 		}
 		"require_reason_for_duplicate_remaining_accounts" => {

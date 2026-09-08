@@ -1,5 +1,5 @@
 error: account close should be preceded by `zeroed()` on the same account
-  --> $DIR/account_close.rs:33:2
+  --> $DIR/account_close.rs:35:2
    |
 LL |     state.close()?;
    |     ^^^^^^^^^^^^^
@@ -9,10 +9,10 @@ LL |     state.close()?;
    = note: `#[deny(require_zeroed_before_close)]` on by default
 
 error: account close should be preceded by `zeroed()` on the same account
-  --> $DIR/account_close.rs:39:2
+  --> $DIR/account_close.rs:41:2
    |
-LL |     state.close_with_recipient(recipient)?;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     state.close_with_recipient(&ID, recipient)?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: call `account.zeroed()?` before closing to reduce stale-data reuse risk
    = help: heuristic limitation: this lint tracks lexical call order and merges `if`/`match` branches, so review branch-sensitive code manually

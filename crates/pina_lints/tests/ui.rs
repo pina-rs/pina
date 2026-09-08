@@ -59,11 +59,6 @@ fn ui_require_owner_before_token_cast() {
 }
 
 #[test]
-fn ui_require_program_owned_before_lamport_mutation() {
-	run_ui_tests("require_program_owned_before_lamport_mutation");
-}
-
-#[test]
 fn ui_require_sysvar_assert_before_sysvar_use() {
 	run_ui_tests("require_sysvar_assert_before_sysvar_use");
 }
