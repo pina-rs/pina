@@ -84,7 +84,11 @@ pub(crate) fn is_pina_method(
 		&& methods.contains(&cx.tcx.item_name(definition).as_str())
 }
 
-fn is_result_method(cx: &LateContext<'_>, expression: &Expr<'_>, methods: &[&str]) -> bool {
+pub(crate) fn is_result_method(
+	cx: &LateContext<'_>,
+	expression: &Expr<'_>,
+	methods: &[&str],
+) -> bool {
 	let ExprKind::MethodCall(segment, ..) = &expression.kind else {
 		return false;
 	};
@@ -118,11 +122,7 @@ pub(crate) fn result_success_is_required(cx: &LateContext<'_>, expression: &Expr
 				if is_result_method(cx, parent, &["expect", "unwrap"]) {
 					return true;
 				}
-				if is_result_method(
-					cx,
-					parent,
-					&["and_then", "inspect", "inspect_err", "map", "map_err"],
-				) {
+				if is_result_method(cx, parent, &["inspect_err", "map_err"]) {
 					child = parent.hir_id;
 					continue;
 				}
@@ -151,6 +151,23 @@ pub(crate) fn result_success_is_required(cx: &LateContext<'_>, expression: &Expr
 			_ => return false,
 		}
 	}
+}
+
+pub(crate) fn try_branch_argument<'a>(
+	cx: &LateContext<'_>,
+	expression: &'a Expr<'a>,
+) -> Option<&'a Expr<'a>> {
+	let ExprKind::Call(callee, arguments) = &expression.kind else {
+		return None;
+	};
+	let [argument] = *arguments else {
+		return None;
+	};
+	let is_try_branch = expression_definition(cx, callee).is_some_and(|(path, crate_name)| {
+		crate_name == "core" && path.ends_with("::ops::Try::branch")
+	});
+
+	is_try_branch.then_some(argument)
 }
 
 fn expression_definition(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<(String, String)> {

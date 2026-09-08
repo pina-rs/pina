@@ -21,7 +21,8 @@ crate::declare_late_lint! {
 	///
 	/// Warns when raw sysvar-like accounts are read without successfully
 	/// asserting their identity through Pina and the matching canonical sysvar
-	/// ID first.
+	/// ID first. Success-side `Result` callbacks do not establish a proof because
+	/// they can replace the asserted binding before execution continues.
 	///
 	/// ### Why is this bad?
 	///
@@ -85,8 +86,9 @@ fn receiver_sysvar_name(receiver: &str) -> Option<&'static str> {
 }
 
 fn is_sysvar_receiver(name: &str) -> bool {
-	let terminal = sysvar_identifier(name).to_ascii_lowercase();
-	KNOWN_SYSVAR_NAMES.contains(&terminal.as_str())
+	let terminal = terminal_identifier(name).to_ascii_lowercase();
+	let normalized = sysvar_identifier(&terminal);
+	KNOWN_SYSVAR_NAMES.contains(&normalized)
 		|| terminal.ends_with("_sysvar")
 		|| terminal.ends_with("_instructions")
 }
@@ -243,30 +245,6 @@ impl Place {
 	}
 }
 
-fn place_identity(expression: &Expr<'_>) -> Option<Place> {
-	match &expression.kind {
-		ExprKind::Field(base, identifier) => {
-			Some(Place::Field(
-				Box::new(place_identity(base)?),
-				identifier.name,
-			))
-		}
-		ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) => {
-			let Res::Local(binding) = path.res else {
-				return None;
-			};
-			Some(Place::Local(binding))
-		}
-		ExprKind::Match(scrutinee, ..)
-		| ExprKind::Unary(_, scrutinee)
-		| ExprKind::Use(scrutinee, _)
-		| ExprKind::Type(scrutinee, _)
-		| ExprKind::DropTemps(scrutinee)
-		| ExprKind::AddrOf(_, _, scrutinee) => place_identity(scrutinee),
-		_ => None,
-	}
-}
-
 #[derive(Clone, Debug, Default)]
 struct ValidationState {
 	places: HashSet<Place>,
@@ -298,6 +276,45 @@ struct Analyzer<'cx, 'tcx> {
 }
 
 impl<'tcx> Analyzer<'_, 'tcx> {
+	fn place_identity(&self, expression: &Expr<'_>) -> Option<Place> {
+		match &expression.kind {
+			ExprKind::Field(base, identifier) => {
+				Some(Place::Field(
+					Box::new(self.place_identity(base)?),
+					identifier.name,
+				))
+			}
+			ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) => {
+				let Res::Local(binding) = path.res else {
+					return None;
+				};
+				Some(Place::Local(binding))
+			}
+			ExprKind::MethodCall(_, receiver, ..)
+				if shared::is_pina_method(self.cx, expression, &["assert_sysvar"])
+					|| shared::is_result_method(
+						self.cx,
+						expression,
+						&["expect", "inspect_err", "map_err", "unwrap"],
+					) =>
+			{
+				self.place_identity(receiver)
+			}
+			ExprKind::Match(scrutinee, _, rustc_hir::MatchSource::TryDesugar(_)) => {
+				self.place_identity(scrutinee)
+			}
+			ExprKind::Call(..) => {
+				self.place_identity(shared::try_branch_argument(self.cx, expression)?)
+			}
+			ExprKind::Unary(_, inner)
+			| ExprKind::Use(inner, _)
+			| ExprKind::Type(inner, _)
+			| ExprKind::DropTemps(inner)
+			| ExprKind::AddrOf(_, _, inner) => self.place_identity(inner),
+			_ => None,
+		}
+	}
+
 	fn expression_can_continue(&self, expression: &Expr<'_>) -> bool {
 		!self.cx.typeck_results().expr_ty(expression).is_never()
 	}
@@ -326,7 +343,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		let expected = receiver_sysvar_name(&receiver_name)?;
 		let asserted = canonical_sysvar_name(self.cx, arguments.first()?)?;
 		(expected == asserted)
-			.then(|| place_identity(receiver))
+			.then(|| self.place_identity(receiver))
 			.flatten()
 	}
 
@@ -351,7 +368,8 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					if let Some(initializer) = local.init {
 						self.visit_expr(initializer, state);
 						if let rustc_hir::PatKind::Binding(_, binding, _, None) = local.pat.kind
-							&& place_identity(initializer)
+							&& self
+								.place_identity(initializer)
 								.is_some_and(|source| state.contains(&source))
 						{
 							state.insert(Place::Local(binding));
@@ -406,7 +424,9 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					return;
 				};
 				if is_sysvar_receiver(&receiver_name)
-					&& !place_identity(receiver).is_some_and(|place| state.contains(&place))
+					&& !self
+						.place_identity(receiver)
+						.is_some_and(|place| state.contains(&place))
 				{
 					emit_unchecked_sysvar(self.cx, expression.span);
 				}
@@ -435,7 +455,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				if looks_like_raw_access
 					&& !arguments
 						.first()
-						.and_then(place_identity)
+						.and_then(|argument| self.place_identity(argument))
 						.is_some_and(|place| state.contains(&place))
 				{
 					emit_unchecked_sysvar(self.cx, expression.span);
@@ -509,13 +529,13 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			ExprKind::Assign(left, right, _) | ExprKind::AssignOp(_, left, right) => {
 				self.visit_expr(left, state);
 				self.visit_expr(right, state);
-				if let Some(place) = place_identity(left) {
+				if let Some(place) = self.place_identity(left) {
 					self.invalidate(state, &place);
 				}
 			}
 			ExprKind::AddrOf(_, rustc_hir::Mutability::Mut, inner) => {
 				self.visit_expr(inner, state);
-				if let Some(place) = place_identity(inner) {
+				if let Some(place) = self.place_identity(inner) {
 					self.invalidate(state, &place);
 				}
 			}

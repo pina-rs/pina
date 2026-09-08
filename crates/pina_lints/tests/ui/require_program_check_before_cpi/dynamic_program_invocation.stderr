@@ -176,11 +176,35 @@ LL |     Instruction.invoke_with_unverified_program(token_program.address())
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:242:2
+  --> $DIR/dynamic_program_invocation.rs:244:2
    |
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
-error: aborting due to 23 previous errors
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:330:2
+   |
+LL |     Instruction.invoke_with_unverified_program(token_program.address())?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:337:2
+   |
+LL |     Instruction.invoke_with_unverified_program(token_program.address())?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:345:2
+   |
+LL |     Instruction.invoke_with_unverified_program(token_program.address())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
+
+error: aborting due to 26 previous errors

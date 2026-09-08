@@ -24,15 +24,18 @@ crate::declare_late_lint! {
 	/// program address that has not passed
 	/// `assert_address()`, `assert_addresses()`, or `assert_program()` on the
 	/// same account within the same function. The resolved Pina assertion must
-	/// succeed on every continuing path. The lint also rejects taking either
-	/// unverified CPI method as a function value.
+	/// succeed on every continuing path without a success-side callback. The
+	/// lint also rejects taking either unverified CPI method as a function value.
 	///
 	/// ### Why is this bad?
 	///
 	/// A dynamic program argument controls the CPI target. Without verifying
 	/// that exact argument, an attacker can substitute a malicious program.
 	/// Discarding the assertion `Result`, inspecting failure, or checking only
-	/// one branch does not establish a proof.
+	/// one branch does not establish a proof. Success-side adapters such as
+	/// `map()`, `and_then()`, and `inspect()` do not establish a proof because
+	/// their callbacks can replace the validated binding before execution
+	/// continues.
 	/// Static `.invoke()` and `.invoke_signed()` builders encode their target in
 	/// the builder and do not accept a replaceable program argument. Restricting
 	/// unverified calls to direct method or UFCS syntax keeps the target proof
@@ -121,31 +124,6 @@ impl ValidationState {
 	}
 }
 
-fn place_identity(expr: &Expr<'_>) -> Option<Place> {
-	match &expr.kind {
-		ExprKind::Field(base, ident) => {
-			let base = place_identity(base)?;
-			Some(Place::Field(Box::new(base), ident.name))
-		}
-		ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) => {
-			let Res::Local(binding) = path.res else {
-				return None;
-			};
-
-			Some(Place::Local(binding))
-		}
-		ExprKind::MethodCall(segment, receiver, ..) if segment.ident.name.as_str() == "address" => {
-			place_identity(receiver)
-		}
-		ExprKind::Unary(rustc_hir::UnOp::Deref, inner) => place_identity(inner),
-		ExprKind::Use(inner, _)
-		| ExprKind::Type(inner, _)
-		| ExprKind::DropTemps(inner)
-		| ExprKind::AddrOf(_, _, inner) => place_identity(inner),
-		_ => None,
-	}
-}
-
 fn program_argument<'a>(method: &str, args: &'a [Expr<'a>]) -> Option<&'a Expr<'a>> {
 	let index = match method {
 		"invoke_with_unverified_program" => 0,
@@ -224,6 +202,45 @@ struct Analyzer<'cx, 'tcx> {
 }
 
 impl<'tcx> Analyzer<'_, 'tcx> {
+	fn place_identity(&self, expression: &Expr<'_>) -> Option<Place> {
+		match &expression.kind {
+			ExprKind::Field(base, identifier) => {
+				let base = self.place_identity(base)?;
+				Some(Place::Field(Box::new(base), identifier.name))
+			}
+			ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) => {
+				let Res::Local(binding) = path.res else {
+					return None;
+				};
+
+				Some(Place::Local(binding))
+			}
+			ExprKind::MethodCall(segment, receiver, ..)
+				if segment.ident.name.as_str() == "address"
+					|| shared::is_pina_method(self.cx, expression, PROGRAM_CHECK_METHODS)
+					|| shared::is_result_method(
+						self.cx,
+						expression,
+						&["expect", "inspect_err", "map_err", "unwrap"],
+					) =>
+			{
+				self.place_identity(receiver)
+			}
+			ExprKind::Match(scrutinee, _, rustc_hir::MatchSource::TryDesugar(_)) => {
+				self.place_identity(scrutinee)
+			}
+			ExprKind::Call(..) => {
+				self.place_identity(shared::try_branch_argument(self.cx, expression)?)
+			}
+			ExprKind::Unary(rustc_hir::UnOp::Deref, inner) => self.place_identity(inner),
+			ExprKind::Use(inner, _)
+			| ExprKind::Type(inner, _)
+			| ExprKind::DropTemps(inner)
+			| ExprKind::AddrOf(_, _, inner) => self.place_identity(inner),
+			_ => None,
+		}
+	}
+
 	fn invalidate(&self, state: &mut ValidationState, assigned: &Place) {
 		state
 			.places
@@ -285,7 +302,8 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 						// without affecting the source account's validation.
 						if let rustc_hir::PatKind::Binding(_, binding, _, None) = local.pat.kind {
 							let inherits_identity = is_static_address(init)
-								|| place_identity(init)
+								|| self
+									.place_identity(init)
 									.is_some_and(|source| state.contains(&source));
 							if inherits_identity {
 								state.insert(Place::Local(binding));
@@ -321,7 +339,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				if PROGRAM_CHECK_METHODS.contains(&method) {
 					if shared::is_pina_method(self.cx, expr, PROGRAM_CHECK_METHODS)
 						&& shared::result_success_is_required(self.cx, expr)
-						&& let Some(place) = place_identity(receiver)
+						&& let Some(place) = self.place_identity(receiver)
 					{
 						state.insert(place);
 					}
@@ -341,7 +359,9 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 
 				let validated = program_argument(method, args).is_some_and(|target| {
 					is_static_address(target)
-						|| place_identity(target).is_some_and(|place| state.contains(&place))
+						|| self
+							.place_identity(target)
+							.is_some_and(|place| state.contains(&place))
 				});
 
 				if !validated {
@@ -362,7 +382,9 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				};
 				let validated = args.get(method.program_index()).is_some_and(|target| {
 					is_static_address(target)
-						|| place_identity(target).is_some_and(|place| state.contains(&place))
+						|| self
+							.place_identity(target)
+							.is_some_and(|place| state.contains(&place))
 				});
 				if !validated {
 					self.lint_unchecked_cpi(expr, method.name());
@@ -438,13 +460,13 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			ExprKind::Assign(lhs, rhs, _) | ExprKind::AssignOp(_, lhs, rhs) => {
 				self.visit_expr(lhs, state);
 				self.visit_expr(rhs, state);
-				if let Some(place) = place_identity(lhs) {
+				if let Some(place) = self.place_identity(lhs) {
 					self.invalidate(state, &place);
 				}
 			}
 			ExprKind::AddrOf(_, rustc_hir::Mutability::Mut, inner) => {
 				self.visit_expr(inner, state);
-				if let Some(place) = place_identity(inner) {
+				if let Some(place) = self.place_identity(inner) {
 					self.invalidate(state, &place);
 				}
 			}

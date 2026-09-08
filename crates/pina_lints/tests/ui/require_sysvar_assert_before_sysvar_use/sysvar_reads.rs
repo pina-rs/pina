@@ -532,6 +532,70 @@ fn process_enforced_raw_sysvar_assertions(clock: &ClockView) -> Result<(), ()> {
 	Ok(())
 }
 
+fn process_success_adapters_cannot_mutate_asserted_sysvar(
+	checked: &ClockView,
+	attacker: &ClockView,
+) -> Result<(), ()> {
+	let mut clock = checked;
+	clock
+		.assert_sysvar(&sysvar::clock::ID)
+		.map(|_| clock = attacker)?;
+	let _ = clock.try_borrow()?;
+	//~^ ERROR: raw sysvar access should be preceded by
+
+	let mut clock = checked;
+	clock
+		.assert_sysvar(&sysvar::clock::ID)
+		.inspect(|_| clock = attacker)?;
+	let _ = clock.try_borrow()?;
+	//~^ ERROR: raw sysvar access should be preceded by
+
+	let mut clock = checked;
+	clock.assert_sysvar(&sysvar::clock::ID).and_then(|_| {
+		clock = attacker;
+		Ok(())
+	})?;
+	let _ = clock.try_borrow()?;
+	//~^ ERROR: raw sysvar access should be preceded by
+	Ok(())
+}
+
+fn process_chainable_sysvar_assertions(clock: &ClockView) -> Result<(), ()> {
+	let _ = clock.assert_sysvar(&sysvar::clock::ID)?.try_borrow()?;
+	let clock = clock.assert_sysvar(&sysvar::clock::ID)?;
+	let _ = clock.try_borrow()?;
+
+	let _ = clock
+		.assert_sysvar(&sysvar::clock::ID)
+		.map_err(|error| error)?
+		.try_borrow()?;
+	let _ = clock
+		.assert_sysvar(&sysvar::clock::ID)
+		.unwrap()
+		.try_borrow()?;
+	let _ = clock
+		.assert_sysvar(&sysvar::clock::ID)
+		.inspect_err(|_| {})?
+		.try_borrow()?;
+	let _ = clock
+		.assert_sysvar(&sysvar::clock::ID)
+		.expect("sysvar validation")
+		.try_borrow()?;
+	Ok(())
+}
+
+fn process_generic_sysvar_suffix(epoch_sysvar: &ClockView) -> Result<(), ()> {
+	let _ = epoch_sysvar.try_borrow()?;
+	//~^ ERROR: raw sysvar access should be preceded by
+	Ok(())
+}
+
+fn process_generic_instructions_suffix(sysvar_instructions: &ClockView) -> Result<(), ()> {
+	let _ = sysvar_instructions.try_borrow()?;
+	//~^ ERROR: raw sysvar access should be preceded by
+	Ok(())
+}
+
 fn main() {}
 
 // compile-fail

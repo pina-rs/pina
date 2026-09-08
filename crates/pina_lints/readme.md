@@ -101,7 +101,7 @@ The analysis tracks concrete local/field places and builder bindings within one 
 
 ### `require_program_check_before_cpi`
 
-Detects `invoke_with_unverified_program()` and `invoke_signed_with_unverified_program()` calls without a proof for the exact dynamic program argument. Pina's `assert_program()`, `assert_address()`, or `assert_addresses()` must succeed on every continuing path to the invocation. Enforce the assertion with `?`, `unwrap()`, or `expect()`. Discarding its `Result` or inspecting failure does not establish a proof. Prefer `assert_program()` for an explicit program account because it checks both the address and the executable flag.
+Detects `invoke_with_unverified_program()` and `invoke_signed_with_unverified_program()` calls without a proof for the exact dynamic program argument. Pina's `assert_program()`, `assert_address()`, or `assert_addresses()` must succeed on every continuing path to the invocation. Enforce the assertion with `?`, `unwrap()`, or `expect()`. Failure-side `map_err()` and `inspect_err()` adapters are also accepted before extraction. Discarding the `Result` or inspecting failure does not establish a proof. Success-side `map()`, `and_then()`, and `inspect()` adapters do not establish a proof because their callbacks can replace the validated binding before execution continues. Prefer `assert_program()` for an explicit program account because it checks both the address and the executable flag.
 
 ```rust
 token_program.assert_program(&token::ID)?;
@@ -110,7 +110,7 @@ transfer.invoke_with_unverified_program(token_program.address())?;
 
 Pinocchio Token's `.invoke_with_program()` and `.invoke_signed_with_program()` methods call `Program::verify()` themselves, so they do not need a separate assertion. Prefer those verified methods unless the handler has already validated the program account and deliberately needs the lower-overhead unverified variant. Static `.invoke()` and `.invoke_signed()` builders encode their target program and also need no separate program account assertion. Passing a constant such as `&token::ID` to an unverified invocation is accepted because the caller cannot substitute the value.
 
-The analyzer resolves the validation method to Pina rather than trusting its spelling. It tracks concrete local variables and fields, then intersects the validation state across continuing `if` and `match` branches. An unrelated account or a same-named local method cannot authorize the dynamic target. A check in one branch does not authorize a later call unless every continuing path establishes the same proof.
+The analyzer resolves the validation method to Pina rather than trusting its spelling. It tracks concrete local variables and fields, including the account value returned by a chained Pina assertion, then intersects the validation state across continuing `if` and `match` branches. An unrelated account or a same-named local method cannot authorize the dynamic target. A check in one branch does not authorize a later call unless every continuing path establishes the same proof.
 
 Call unverified CPI methods directly with method or UFCS syntax. Taking one as a function value is denied at the function item, including casts, assignments, containers, closures, and conditional expressions. This deliberate boundary keeps the exact target argument visible to the lint instead of approximating Rust's full value and closure data flow. If a reviewed abstraction must store one of these functions, use a narrowly scoped lint allowance and document how it authenticates the supplied program.
 
@@ -155,7 +155,7 @@ let rent = Rent::from_account_view(rent_account)?;
 let instructions = Instructions::try_from(instructions_account)?;
 ```
 
-Keep `assert_sysvar()` when code only validates identity or deliberately borrows the raw account data. A raw-access proof must call the resolved Pina method with the canonical ID. Enforce its `Result` with `?`, `unwrap()`, or `expect()` on every continuing control-flow path. Discarded results, failure inspection, same-named methods, look-alike ID constants, and one-branch checks are not proofs.
+Keep `assert_sysvar()` when code only validates identity or deliberately borrows the raw account data. A raw-access proof must call the resolved Pina method with the canonical ID. Enforce its `Result` with `?`, `unwrap()`, or `expect()` on every continuing control-flow path; chaining from the returned account value is supported. Failure-side `map_err()` and `inspect_err()` adapters are also accepted before extraction. Discarded results, failure inspection, same-named methods, look-alike ID constants, and one-branch checks are not proofs. Success-side `map()`, `and_then()`, and `inspect()` adapters are not proofs because their callbacks can replace the asserted account before a later raw read.
 
 The lint identifies Pinocchio constructors that do not validate identity by their resolved definition: `Clock` and `Rent` byte constructors, `Instructions::new_unchecked`, and `SlotHashes::new` / `new_unchecked`. It reports direct calls at their source and rejects storing these constructors as function values. This source boundary catches replacement through adapters, helper calls, mutable borrows, aliases, and destructuring without attempting to reconstruct arbitrary downstream value provenance.
 

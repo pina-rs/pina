@@ -616,11 +616,11 @@ Available assertions:
 
 Use `assert_program()` when you explicitly validate a program account. Static `.invoke()` and `.invoke_signed()` builders encode their program ID. Pinocchio Token's `.invoke_with_program()` and `.invoke_signed_with_program()` methods validate their supplied ID with `Program::verify()`. Neither form needs a preceding account assertion.
 
-If you call `.invoke_with_unverified_program()` or `.invoke_signed_with_unverified_program()`, validate the exact supplied account first with Pina's assertion API. Prefer `assert_program()`, propagate assertion failure on every continuing path, and call the method directly. Do not store it as a function value.
+If you call `.invoke_with_unverified_program()` or `.invoke_signed_with_unverified_program()`, validate the exact supplied account first with Pina's assertion API. Prefer `assert_program()`, propagate assertion failure on every continuing path, and call the method directly. You can bind or chain from the account value returned by the assertion. Success-side `Result` callbacks such as `map()`, `and_then()`, and `inspect()` do not establish a proof because they can replace the validated binding. Do not store an unverified CPI method as a function value.
 
 When you need sysvar data, prefer Pinocchio's checked typed loaders such as `Clock::from_account_view()`, `Rent::from_account_view()`, and `Instructions::try_from()`. The sysvar lint rejects `Clock` and `Rent` byte constructors, `Instructions::new_unchecked`, and `SlotHashes::new` or `new_unchecked` because they do not validate sysvar identity.
 
-For deliberate raw access, successfully call Pina's `assert_sysvar()` with the matching `pina_sdk_ids::sysvar::<name>::ID` on every continuing path. Call a reviewed unchecked constructor directly after that assertion. Place a narrow lint allowance on the constructor. Identity-unchecked constructors cannot be hidden in function values.
+For deliberate raw access, successfully call Pina's `assert_sysvar()` with the matching `pina_sdk_ids::sysvar::<name>::ID` on every continuing path. You can bind or chain from the account value returned by the assertion. Success-side `Result` callbacks such as `map()`, `and_then()`, and `inspect()` do not establish a proof because they can replace the asserted binding. Call a reviewed unchecked constructor directly after that assertion. Place a narrow lint allowance on the constructor. Identity-unchecked constructors cannot be hidden in function values.
 
 When you need token data, use the checked loader instead of an assertion followed by a second parse:
 
