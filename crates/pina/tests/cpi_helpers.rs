@@ -219,6 +219,62 @@ fn program_account_builders_validate_the_target_before_rent_lookup() {
 }
 
 #[test]
+fn program_account_public_creation_paths_reach_checked_allocation() {
+	let owner = Address::new_from_array([5u8; 32]);
+	let seeds: &[&[u8]] = &[b"builder-public-paths"];
+	let (address, bump) =
+		try_find_program_address(seeds, &owner).unwrap_or_else(|| panic!("expected builder PDA"));
+	let mut stored_target = TestAccount::<0>::new(address, false, true);
+	stored_target.header.lamports = 0;
+	let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([6u8; 32]), true, true);
+	let mut target = stored_target.view();
+	let payer = stored_payer.view();
+
+	let signed = CreateProgramAccount {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+	}
+	.invoke_signed::<BuilderState>(&[]);
+	assert_eq!(signed, Err(ProgramError::UnsupportedSysvar));
+
+	let with_bump = CreateProgramAccount {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+	}
+	.invoke_with_bump::<BuilderState>(|state, derived_bump| {
+		state.value = derived_bump;
+		Ok(())
+	});
+	assert_eq!(with_bump, Err(ProgramError::UnsupportedSysvar));
+
+	let signed_with_bump = CreateProgramAccount {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+	}
+	.invoke_signed_with_bump::<BuilderState>(&[], |state, derived_bump| {
+		state.value = derived_bump;
+		Ok(())
+	});
+	assert_eq!(signed_with_bump, Err(ProgramError::UnsupportedSysvar));
+
+	let explicit_signed = CreateProgramAccountWithBump {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+		bump,
+	}
+	.invoke_signed::<BuilderState>(&[]);
+	assert_eq!(explicit_signed, Err(ProgramError::UnsupportedSysvar));
+}
+
+#[test]
 fn explicit_bump_creation_rejects_a_valid_noncanonical_pda() {
 	let owner = Address::new_from_array([5u8; 32]);
 	let seeds: &[&[u8]] = &[b"builder"];
@@ -443,6 +499,58 @@ fn compact_creation_accepts_a_valid_header_before_rent_lookup() {
 	.invoke::<CompactBuilderState>(CompactBuilderStatePatch::new());
 
 	assert_eq!(result, Err(ProgramError::UnsupportedSysvar));
+}
+
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+#[test]
+fn compact_public_bump_creation_paths_reach_checked_allocation() {
+	let owner = Address::new_from_array([5u8; 32]);
+	let seeds: &[&[u8]] = &[b"compact-public-paths"];
+	let (address, bump) =
+		try_find_program_address(seeds, &owner).unwrap_or_else(|| panic!("expected compact PDA"));
+	let mut stored_target = TestAccount::<0>::new(address, false, true);
+	stored_target.header.lamports = 0;
+	let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([6u8; 32]), true, true);
+	let mut target = stored_target.view();
+	let payer = stored_payer.view();
+
+	let with_bump = CreateCompactProgramAccount {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+		space: CompactBuilderState::HEADER_SIZE,
+	}
+	.invoke_with_bump::<CompactBuilderState, _>(|derived_bump| {
+		assert_eq!(derived_bump, bump);
+		CompactBuilderStatePatch::new().value(derived_bump)
+	});
+	assert_eq!(with_bump, Err(ProgramError::UnsupportedSysvar));
+
+	let signed_with_bump = CreateCompactProgramAccount {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+		space: CompactBuilderState::HEADER_SIZE,
+	}
+	.invoke_signed_with_bump::<CompactBuilderState, _>(&[], |derived_bump| {
+		assert_eq!(derived_bump, bump);
+		CompactBuilderStatePatch::new().value(derived_bump)
+	});
+	assert_eq!(signed_with_bump, Err(ProgramError::UnsupportedSysvar));
+
+	let explicit = CreateCompactProgramAccountWithBump {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+		bump,
+		patch: CompactBuilderStatePatch::new().value(bump),
+		space: CompactBuilderState::HEADER_SIZE,
+	}
+	.invoke::<CompactBuilderState>();
+	assert_eq!(explicit, Err(ProgramError::UnsupportedSysvar));
 }
 
 #[cfg(all(feature = "account-resize", feature = "compact"))]
@@ -1036,6 +1144,45 @@ fn allocation_rejects_more_signers_than_the_runtime_accepts() {
 	.invoke_signed(&signers);
 
 	assert_eq!(result, Err(ProgramError::InvalidArgument));
+
+	let (canonical_address, _) =
+		try_find_program_address(seeds, &owner).unwrap_or_else(|| panic!("expected state PDA"));
+	let mut canonical_target = TestAccount::<0>::new(canonical_address, false, true);
+	canonical_target.header.lamports = 0;
+	let canonical_target_view = canonical_target.view();
+	let canonical_result = AllocateAccount {
+		account: &canonical_target_view,
+		payer: &payer_view,
+		space: 8,
+		owner: &owner,
+		seeds,
+	}
+	.invoke_signed(&signers);
+
+	assert_eq!(canonical_result, Err(ProgramError::InvalidArgument));
+}
+
+#[test]
+fn noncanonical_allocation_rejects_a_seed_list_without_a_bump_slot() {
+	let owner = Address::new_from_array([5u8; 32]);
+	let seed = [1u8];
+	let seeds = [&seed[..]; MAX_SEEDS];
+	let mut target = TestAccount::<0>::new(Address::new_from_array([7u8; 32]), false, true);
+	let mut payer = TestAccount::<0>::new(Address::new_from_array([6u8; 32]), true, true);
+	let target_view = target.view();
+	let payer_view = payer.view();
+
+	let result = AllocateAccountWithNonCanonicalBump {
+		account: &target_view,
+		payer: &payer_view,
+		space: 8,
+		owner: &owner,
+		seeds: &seeds,
+		bump: 0,
+	}
+	.invoke();
+
+	assert_eq!(result, Err(ProgramError::InvalidSeeds));
 }
 
 #[test]
