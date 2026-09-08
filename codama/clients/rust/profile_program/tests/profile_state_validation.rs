@@ -88,8 +88,11 @@ fn instruction_builder_owns_the_discriminator() {
 			.unwrap_or_else(|error| panic!("name should fit: {error}"));
 	})
 	.unwrap_or_else(|error| panic!("instruction data failed: {error}"));
-	let instruction =
-		Initialize::new(solana_pubkey::Pubkey::new_from_array([7; 32])).instruction(data);
+	let instruction = Initialize::new(
+		solana_pubkey::Pubkey::new_from_array([7; 32]),
+		solana_pubkey::Pubkey::new_from_array([8; 32]),
+	)
+	.instruction(data);
 
 	assert_eq!(instruction.data[0], 0);
 	assert_eq!(instruction.data[1], 42);
