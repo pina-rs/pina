@@ -10,6 +10,17 @@
 		"counter_program",
 		"profile_program"
 	],
+	"baselineProgramAliases": {
+		"account_realloc": "anchor_realloc",
+		"custom_errors": "anchor_errors",
+		"declare_id": "anchor_declare_id",
+		"declare_program": "anchor_declare_program",
+		"duplicate_mutable_accounts": "anchor_duplicate_mutable_accounts",
+		"events": "anchor_events",
+		"float_accounts": "anchor_floats",
+		"system_accounts": "anchor_system_accounts",
+		"sysvar_checks": "anchor_sysvars"
+	},
 	"runtimeCases": [
 		"account_realloc/grow_0_to_8",
 		"account_realloc/initialize",

@@ -5,12 +5,15 @@ import {
 	existsSync,
 	lstatSync,
 	mkdirSync,
+	readFileSync,
 	readlinkSync,
 	realpathSync,
+	renameSync,
 	rmSync,
 	unlinkSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { findExecutable } from "./find-executable.ts";
 
@@ -20,6 +23,21 @@ const PROGRAMS = [
 	"counter_program",
 	"profile_program",
 ] as const;
+
+// Baseline ELF builds may run against an older revision where a tracked
+// example was renamed. The alias map records the historical package name so
+// the base workspace can still be built; artifacts are always emitted under
+// the canonical (head) program name.
+const BASELINE_ALIASES: Record<string, string> = (() => {
+	const policyPath = join(
+		dirname(fileURLToPath(import.meta.url)),
+		"compute-unit-policy.json",
+	);
+	const policy = JSON.parse(readFileSync(policyPath, "utf8")) as {
+		baselineProgramAliases?: Record<string, string>;
+	};
+	return policy.baselineProgramAliases ?? {};
+})();
 
 interface CommandOptions {
 	cwd?: string;
@@ -119,12 +137,17 @@ function buildProgram(
 	env: NodeJS.ProcessEnv,
 	linux: boolean,
 ): number {
+	// Resolve the example directory for this workspace, falling back to the
+	// historical (aliased) name when the revision predates a rename.
+	const manifestDirectory = existsSync(join(workspace, "examples", program))
+		? program
+		: BASELINE_ALIASES[program] ?? program;
 	const args = [
 		...(linux
 			? ["--skip-tools-install", "--tools-version", TOOLS_VERSION]
 			: []),
 		"--manifest-path",
-		join(workspace, "examples", program, "Cargo.toml"),
+		join(workspace, "examples", manifestDirectory, "Cargo.toml"),
 		"--sbf-out-dir",
 		output,
 		"--features",
@@ -132,10 +155,19 @@ function buildProgram(
 		"--",
 		"--locked",
 	];
-	if (linux) {
-		return command(executable, args, { cwd: workspace, env });
+	const status = linux
+		? command(executable, args, { cwd: workspace, env })
+		: command("cargo", ["build-sbf", ...args], { cwd: workspace, env });
+	if (status !== 0) {
+		return status;
 	}
-	return command("cargo", ["build-sbf", ...args], { cwd: workspace, env });
+	if (manifestDirectory !== program) {
+		const built = join(output, `${manifestDirectory}.so`);
+		const canonical = join(output, `${program}.so`);
+		rmSync(canonical, { force: true });
+		renameSync(built, canonical);
+	}
+	return 0;
 }
 
 function main(): number {

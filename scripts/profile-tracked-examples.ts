@@ -18,6 +18,7 @@ const OK_STATUS = "ok";
 
 interface Policy {
 	trackedPrograms: string[];
+	baselineProgramAliases?: Record<string, string>;
 }
 
 interface CargoDependency {
@@ -156,17 +157,26 @@ function main(): number {
 	}
 	const metadata = JSON.parse(metadataResult.stdout) as CargoMetadata;
 	const packages = new Map(metadata.packages.map((item) => [item.name, item]));
+	const aliases = policy.baselineProgramAliases ?? {};
 	const buildGroups = new Map<string, string[]>();
+	const buildNames = new Map<string, string>();
 	for (const program of policy.trackedPrograms) {
 		if (!/^[A-Za-z0-9_-]+$/u.test(program)) {
 			throw new Error(`invalid tracked Cargo package name: ${program}`);
 		}
-		const package_ = packages.get(program);
+		// Baseline profiling may run against an older revision where a tracked
+		// example was renamed. Fall back to the aliased (historical) package name
+		// for building while emitting artifacts under the canonical name.
+		const buildName = packages.has(program) ? program : aliases[program];
+		const package_ = buildName === undefined
+			? undefined
+			: packages.get(buildName);
 		if (package_ === undefined) {
 			throw new Error(
 				`tracked Cargo package is not in the workspace: ${program}`,
 			);
 		}
+		buildNames.set(program, buildName);
 		const pinaDependency = package_.dependencies.find(
 			(dependency) => dependency.name === "pina",
 		);
@@ -177,9 +187,10 @@ function main(): number {
 	const results: Record<string, ProfileResult> = {};
 	for (const programs of buildGroups.values()) {
 		for (const program of programs) {
+			const buildName = buildNames.get(program) ?? program;
 			rmSync(join(outputDirectory, `${program}.json`), { force: true });
 			rmSync(join(outputDirectory, `${program}.so`), { force: true });
-			rmSync(join(workspaceRoot, "target", "deploy", `${program}.so`), {
+			rmSync(join(workspaceRoot, "target", "deploy", `${buildName}.so`), {
 				force: true,
 			});
 		}
@@ -192,7 +203,10 @@ function main(): number {
 				`+${bpfToolchain}`,
 				"build-bpf",
 				"--locked",
-				...programs.flatMap((program) => ["-p", program]),
+				...programs.flatMap((program) => [
+					"-p",
+					buildNames.get(program) ?? program,
+				]),
 			],
 			{ cwd: workspaceRoot },
 		);
@@ -210,7 +224,10 @@ function main(): number {
 		}
 
 		for (const program of programs) {
-			const artifact = resolveArtifact(workspaceRoot, program);
+			const artifact = resolveArtifact(
+				workspaceRoot,
+				buildNames.get(program) ?? program,
+			);
 			if (artifact === undefined) {
 				results[program] = {
 					status: "unavailable",
