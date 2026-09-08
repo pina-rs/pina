@@ -34,11 +34,11 @@ import {
 } from "@solana/program-client-core";
 import { getJournalCodec, type Journal, type JournalArgs } from "../accounts";
 import {
-	getInitializeInstruction,
+	getInitializeInstructionAsync,
 	getRenameInstructionAsync,
 	getResizeInstructionAsync,
 	getWriteInstructionAsync,
-	type InitializeInput,
+	type InitializeAsyncInput,
 	type ParsedInitializeInstruction,
 	type ParsedRenameInstruction,
 	type ParsedResizeInstruction,
@@ -181,8 +181,10 @@ export type CompactAccountsProgramPluginAccounts = {
 
 export type CompactAccountsProgramPluginInstructions = {
 	initialize: (
-		input: InitializeInput,
-	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
+		input: InitializeAsyncInput,
+	) =>
+		& ReturnType<typeof getInitializeInstructionAsync>
+		& SelfPlanAndSendFunctions;
 	resize: (
 		input: ResizeAsyncInput,
 	) => ReturnType<typeof getResizeInstructionAsync> & SelfPlanAndSendFunctions;
@@ -217,7 +219,7 @@ export function compactAccountsProgramProgram() {
 					initialize: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstruction(input),
+							getInitializeInstructionAsync(input),
 						),
 					resize: (input) =>
 						addSelfPlanAndSendFunctions(

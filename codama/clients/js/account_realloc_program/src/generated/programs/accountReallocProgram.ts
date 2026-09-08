@@ -34,10 +34,10 @@ import {
 } from "@solana/program-client-core";
 import { getSampleCodec, type Sample, type SampleArgs } from "../accounts";
 import {
-	getInitializeInstruction,
+	getInitializeInstructionAsync,
 	getRealloc2Instruction,
 	getReallocInstruction,
-	type InitializeInput,
+	type InitializeAsyncInput,
 	type ParsedInitializeInstruction,
 	type ParsedRealloc2Instruction,
 	type ParsedReallocInstruction,
@@ -162,8 +162,10 @@ export type AccountReallocProgramPluginAccounts = {
 
 export type AccountReallocProgramPluginInstructions = {
 	initialize: (
-		input: InitializeInput,
-	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
+		input: InitializeAsyncInput,
+	) =>
+		& ReturnType<typeof getInitializeInstructionAsync>
+		& SelfPlanAndSendFunctions;
 	realloc: (
 		input: ReallocInput,
 	) => ReturnType<typeof getReallocInstruction> & SelfPlanAndSendFunctions;
@@ -193,7 +195,7 @@ export function accountReallocProgramProgram() {
 					initialize: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstruction(input),
+							getInitializeInstructionAsync(input),
 						),
 					realloc: (input) =>
 						addSelfPlanAndSendFunctions(client, getReallocInstruction(input)),

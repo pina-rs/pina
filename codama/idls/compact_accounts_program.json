@@ -276,7 +276,24 @@
 						"isOptional": false,
 						"docs": [
 							"Empty canonical journal PDA."
-						]
+						],
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "journal"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
 					},
 					{
 						"kind": "instructionAccountNode",

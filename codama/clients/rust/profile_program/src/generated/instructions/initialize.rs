@@ -26,10 +26,14 @@ pub struct Initialize {
 }
 
 impl Initialize {
-	pub fn new(authority: solana_pubkey::Pubkey, profile: solana_pubkey::Pubkey) -> Self {
+	pub fn new(authority: solana_pubkey::Pubkey) -> Self {
 		Self {
 			authority,
-			profile,
+			profile: solana_pubkey::Pubkey::find_program_address(
+				&["profile".as_bytes(), authority.as_ref()],
+				&crate::PROFILE_PROGRAM_ID,
+			)
+			.0,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}

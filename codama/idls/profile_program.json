@@ -229,7 +229,24 @@
 						"isOptional": false,
 						"docs": [
 							"The profile PDA account (must be empty — not yet created)."
-						]
+						],
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "profile"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
 					},
 					{
 						"kind": "instructionAccountNode",

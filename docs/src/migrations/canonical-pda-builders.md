@@ -91,6 +91,26 @@ Code that already has a patch but does not store a bump uses `.invoke::<Journal>
 
 `CreateCompactProgramAccountWithBump` keeps its `patch` field, but now rejects a noncanonical supplied bump before allocation.
 
+## Keep generated-client PDA resolution
+
+The IDL extractor recognizes all four typed creation builders as canonical PDA checks:
+
+- `CreateProgramAccount`
+- `CreateProgramAccountWithBump`
+- `CreateCompactProgramAccount`
+- `CreateCompactProgramAccountWithBump`
+
+Removing the redundant assertions does not make the target account required in generated clients. JavaScript callers can keep using the asynchronous builder and omit the PDA account:
+
+```typescript
+const instruction = await getInitializeInstructionAsync({
+	authority,
+	bump,
+});
+```
+
+The generated client derives the account from the PDA metadata in the IDL. You can still pass the account explicitly when needed.
+
 ## Use noncanonical allocation only for compatibility
 
 `AllocateAccountWithBump` is deprecated. Its replacement is `AllocateAccountWithNonCanonicalBump`, which makes the relaxed guarantee clear in code review. It accepts any valid PDA bump and only allocates untyped bytes. Use it for an existing address scheme that cannot migrate to canonical bumps. Use `AllocateAccount` for new PDA namespaces.

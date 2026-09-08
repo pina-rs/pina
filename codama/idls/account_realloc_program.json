@@ -128,7 +128,24 @@
 						"isOptional": false,
 						"docs": [
 							"Empty PDA derived from `[b\"sample\", authority]`."
-						]
+						],
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "sample"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
 					},
 					{
 						"kind": "instructionAccountNode",

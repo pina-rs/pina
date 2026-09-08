@@ -172,7 +172,40 @@
 						"name": "vestingState",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "vesting"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "admin",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "admin"
+									}
+								},
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "beneficiary",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "beneficiary"
+									}
+								},
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "mint",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "mint"
+									}
+								}
+							]
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
