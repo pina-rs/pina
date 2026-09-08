@@ -419,12 +419,11 @@ pub my_account: Account<'info, MyData>,
 
 ```rust
 // For PDA accounts:
-CreateProgramAccountWithBump {
+CreateProgramAccount {
 	account: self.my_account,
 	payer: self.payer,
 	owner: &ID,
 	seeds,
-	bump,
 }
 .invoke::<MyData>()?;
 
@@ -439,6 +438,8 @@ CreateAccount {
 ```
 
 Space is automatically computed from `MyData::SIZE` for the PDA builder. For `CreateAccount` you pass the size explicitly. In both cases, rent-exemption lamports are calculated and transferred automatically.
+
+`CreateProgramAccount` derives the canonical bump itself. Use `CreateProgramAccountWithBump` only when the instruction intentionally supplies a bump; that explicit-bump variant verifies the supplied value is canonical before creating the account.
 
 Use `invoke::<MyData>()` when the discriminator plus zeroed fields is already a valid complete value. Use `invoke_with` when creation must set fields before final PinaPod validation. If the payer also needs PDA signer seeds, use `invoke_signed_with::<MyData>(signers, initialize)`.
 
