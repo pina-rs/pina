@@ -23,3 +23,5 @@ fn process_unchecked(account: &Account, seeds: &[&[u8]], program: &[u8]) -> Resu
 }
 
 fn main() {}
+
+// compile-fail

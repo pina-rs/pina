@@ -96,3 +96,5 @@ fn process_break_payload(remaining: &[u8]) {
 }
 
 fn main() {}
+
+// compile-fail

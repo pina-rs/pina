@@ -68,3 +68,5 @@ fn process_wrapped_load(account: &Account, program: &[u8]) -> Result<(), ()> {
 }
 
 fn main() {}
+
+// compile-fail

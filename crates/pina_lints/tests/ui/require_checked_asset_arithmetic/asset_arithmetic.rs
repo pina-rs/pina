@@ -45,3 +45,5 @@ fn process_break_payload(balance: u64, amount: u64) -> u64 {
 }
 
 fn main() {}
+
+// compile-fail

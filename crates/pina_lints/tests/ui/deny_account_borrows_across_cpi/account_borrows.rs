@@ -89,3 +89,5 @@ fn process_unrelated_invoke(account: &mut AccountView, scheduler: &Scheduler) ->
 }
 
 fn main() {}
+
+// compile-fail

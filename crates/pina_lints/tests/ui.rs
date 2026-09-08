@@ -6,6 +6,9 @@
 //!
 //! Supported fixture directives:
 //!
+//! - `// compile-fail` — require a non-zero compiler exit and diagnostics.
+//! - `// check-warn` — require a successful compiler exit and diagnostics.
+//! - `// check-pass` — require a successful compiler exit without diagnostics.
 //! - `// aux-build: <name>.rs` — compile `auxiliary/<name>.rs` first and pass
 //!   it to the fixture through `--extern`.
 //! - `// normalize-stderr-test: "<regex>" -> "<replacement>"` — rewrite the
@@ -21,6 +24,14 @@ use std::process::Output;
 
 use regex::Regex;
 
+/// Expected compiler outcome for one fixture.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ExpectedOutcome {
+	CompileFail,
+	CheckWarn,
+	CheckPass,
+}
+
 /// A stderr normalization rule parsed from a fixture.
 struct Normalize {
 	pattern: Regex,
@@ -31,6 +42,7 @@ struct Normalize {
 struct Directives {
 	aux_builds: Vec<String>,
 	normalize_stderr: Vec<Normalize>,
+	expected_outcome: ExpectedOutcome,
 }
 
 #[test]
@@ -181,6 +193,55 @@ fn run_ui_tests(lint: &str) {
 			);
 			panic!("stderr mismatch for {}", fixture.display());
 		}
+
+		assert_expected_outcome(&fixture, &output, &expected, directives.expected_outcome);
+	}
+}
+
+/// Assert that a fixture's exit status and diagnostic expectation agree.
+fn assert_expected_outcome(
+	fixture: &Path,
+	output: &Output,
+	expected_stderr: &str,
+	expected_outcome: ExpectedOutcome,
+) {
+	match expected_outcome {
+		ExpectedOutcome::CompileFail => {
+			assert!(
+				!expected_stderr.is_empty(),
+				"compile-fail fixture {} must expect diagnostics",
+				fixture.display(),
+			);
+			assert!(
+				!output.status.success(),
+				"compile-fail fixture {} compiled successfully",
+				fixture.display(),
+			);
+		}
+		ExpectedOutcome::CheckWarn => {
+			assert!(
+				!expected_stderr.is_empty(),
+				"check-warn fixture {} must expect diagnostics",
+				fixture.display(),
+			);
+			assert!(
+				output.status.success(),
+				"check-warn fixture {} failed to compile",
+				fixture.display(),
+			);
+		}
+		ExpectedOutcome::CheckPass => {
+			assert!(
+				expected_stderr.is_empty(),
+				"check-pass fixture {} must not expect diagnostics",
+				fixture.display(),
+			);
+			assert!(
+				output.status.success(),
+				"check-pass fixture {} failed to compile",
+				fixture.display(),
+			);
+		}
 	}
 }
 
@@ -213,30 +274,58 @@ fn read_to_string(path: &Path) -> String {
 		.unwrap_or_else(|source| panic!("could not read {}: {source}", path.display()))
 }
 
-/// Parse the `aux-build` and `normalize-stderr-test` directives of a fixture.
+/// Parse the expected outcome, auxiliary builds, and normalization directives.
 fn parse_directives(fixture: &Path) -> Directives {
 	let source = read_to_string(fixture);
-	let mut directives = Directives {
-		aux_builds: Vec::new(),
-		normalize_stderr: Vec::new(),
-	};
+	let mut aux_builds = Vec::new();
+	let mut normalize_stderr = Vec::new();
+	let mut expected_outcome = None;
 
 	for line in source.lines() {
-		if let Some(name) = line.trim().strip_prefix("// aux-build: ") {
-			directives.aux_builds.push(name.trim().to_owned());
+		let line = line.trim();
+		let outcome = match line {
+			"// compile-fail" => Some(ExpectedOutcome::CompileFail),
+			"// check-warn" => Some(ExpectedOutcome::CheckWarn),
+			"// check-pass" => Some(ExpectedOutcome::CheckPass),
+			_ => None,
+		};
+
+		if let Some(outcome) = outcome {
+			assert!(
+				expected_outcome.replace(outcome).is_none(),
+				"fixture {} declares more than one expected outcome",
+				fixture.display(),
+			);
 		}
-		if let Some(rule) = line.trim().strip_prefix("// normalize-stderr-test: ") {
+
+		if let Some(name) = line.strip_prefix("// aux-build: ") {
+			aux_builds.push(name.trim().to_owned());
+		}
+
+		if let Some(rule) = line.strip_prefix("// normalize-stderr-test: ") {
 			let (pattern, replacement) = rule
 				.split_once(" -> ")
 				.unwrap_or_else(|| panic!("invalid normalize-stderr-test rule: {rule}"));
-			directives.normalize_stderr.push(Normalize {
+			normalize_stderr.push(Normalize {
 				pattern: Regex::new(&unquote(pattern))
 					.unwrap_or_else(|source| panic!("invalid normalization pattern: {source}")),
 				replacement: unquote(replacement),
 			});
 		}
 	}
-	directives
+
+	let expected_outcome = expected_outcome.unwrap_or_else(|| {
+		panic!(
+			"fixture {} must declare compile-fail, check-warn, or check-pass",
+			fixture.display(),
+		)
+	});
+
+	Directives {
+		aux_builds,
+		normalize_stderr,
+		expected_outcome,
+	}
 }
 
 /// Strip the surrounding quotes of a directive argument.

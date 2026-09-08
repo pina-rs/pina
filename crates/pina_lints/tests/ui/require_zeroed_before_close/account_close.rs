@@ -50,3 +50,5 @@ fn process_combined_helper(state: &mut AccountView, recipient: ()) -> Result<(),
 }
 
 fn main() {}
+
+// compile-fail

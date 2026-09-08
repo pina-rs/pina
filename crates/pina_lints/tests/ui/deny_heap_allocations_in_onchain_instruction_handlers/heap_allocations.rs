@@ -45,3 +45,5 @@ fn helper_for_offchain_use(account: &AccountView) -> AccountView {
 }
 
 fn main() {}
+
+// check-warn

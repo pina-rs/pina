@@ -36,3 +36,5 @@ struct EmptyExplanation<'a> {
 }
 
 fn main() {}
+
+// compile-fail

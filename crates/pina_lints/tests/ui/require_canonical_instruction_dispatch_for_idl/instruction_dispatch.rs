@@ -48,3 +48,5 @@ impl Instruction {
 }
 
 fn main() {}
+
+// check-warn
