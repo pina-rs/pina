@@ -97,25 +97,13 @@ fn is_sysvar_receiver(name: &str) -> bool {
 		|| terminal.ends_with("_instructions")
 }
 
-fn trusted_definition(definition: &shared::TypeDefinition) -> bool {
-	definition.crate_name == "pinocchio" && TRUSTED_SYSVAR_TYPES.contains(&definition.path.as_str())
-}
-
-fn has_trusted_sysvar_receiver(definitions: &[shared::TypeDefinition]) -> bool {
-	let Some(outer) = definitions.first() else {
-		return false;
-	};
-	if trusted_definition(outer) {
-		return true;
-	}
-
-	// Checked loaders for borrowed sysvars return an account-borrow wrapper
-	// whose `Deref` target is the trusted Pinocchio type.
-	outer.crate_name == "solana_account_view"
-		&& matches!(
-			terminal_identifier(&outer.path),
-			"Ref" | "RefMut" | "MappedRef" | "MappedRefMut"
-		) && definitions[1..].iter().any(trusted_definition)
+fn is_trusted_sysvar_method(call: &shared::CallInfo) -> bool {
+	call.def_crate.as_deref() == Some("pinocchio")
+		&& call.def_path.as_deref().is_some_and(|path| {
+			TRUSTED_SYSVAR_TYPES
+				.iter()
+				.any(|trusted| path.starts_with(trusted))
+		})
 }
 
 #[derive(Clone, Copy)]
@@ -246,7 +234,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireSysvarAssertBeforeSysvarUse {
 			if call.method == "assert_sysvar" {
 				continue;
 			}
-			if has_trusted_sysvar_receiver(&call.receiver_type_definitions) {
+			if is_trusted_sysvar_method(call) {
 				continue;
 			}
 

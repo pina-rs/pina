@@ -7,7 +7,6 @@
 extern crate rustc_ast;
 extern crate rustc_hir;
 extern crate rustc_lint;
-extern crate rustc_middle;
 extern crate rustc_span;
 
 use std::collections::HashMap;
@@ -26,7 +25,6 @@ pub struct CallInfo {
 	pub method: String,
 	pub receiver: Option<String>,
 	pub receiver_span: Option<Span>,
-	pub receiver_type_definitions: Vec<TypeDefinition>,
 	pub path: Option<String>,
 	pub def_path: Option<String>,
 	pub def_crate: Option<String>,
@@ -36,7 +34,6 @@ pub struct CallInfo {
 	pub arg_def_crates: Vec<Option<String>>,
 	pub arg_bindings: Vec<Option<HirId>>,
 	pub result_binding: Option<String>,
-	pub result_binding_id: Option<HirId>,
 }
 
 #[derive(Debug, Clone)]
@@ -49,16 +46,7 @@ pub struct AliasInfo {
 pub struct AssignmentInfo {
 	pub span: Span,
 	pub identity: String,
-	pub binding: Option<HirId>,
 }
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct TypeDefinition {
-	pub path: String,
-	pub crate_name: String,
-}
-
-type ResultBinding<'a> = (HirId, &'a str);
 
 #[derive(Debug, Default)]
 pub struct FunctionFacts {
@@ -77,16 +65,9 @@ pub fn collect_function_facts(cx: &LateContext<'_>, body: &Body<'_>) -> Function
 }
 
 fn definition_identity(cx: &LateContext<'_>, def_id: rustc_hir::def_id::DefId) -> (String, String) {
-	definition_identity_from_tcx(cx.tcx, def_id)
-}
-
-fn definition_identity_from_tcx(
-	tcx: rustc_middle::ty::TyCtxt<'_>,
-	def_id: rustc_hir::def_id::DefId,
-) -> (String, String) {
 	(
-		tcx.def_path_str(def_id),
-		tcx.crate_name(def_id.krate).as_str().to_string(),
+		cx.tcx.def_path_str(def_id),
+		cx.tcx.crate_name(def_id.krate).as_str().to_string(),
 	)
 }
 
@@ -104,35 +85,6 @@ fn expression_definition(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<(Strin
 		| ExprKind::AddrOf(_, _, inner) => expression_definition(cx, inner),
 		_ => None,
 	}
-}
-
-fn collect_type_definitions(
-	tcx: rustc_middle::ty::TyCtxt<'_>,
-	type_: rustc_middle::ty::Ty<'_>,
-	definitions: &mut Vec<TypeDefinition>,
-) {
-	let type_ = type_.peel_refs();
-	if let Some(definition) = type_.ty_adt_def() {
-		let (path, crate_name) = definition_identity_from_tcx(tcx, definition.did());
-		let type_definition = TypeDefinition { path, crate_name };
-		if !definitions.contains(&type_definition) {
-			definitions.push(type_definition);
-		}
-	}
-
-	if let rustc_middle::ty::TyKind::Adt(_, arguments) = type_.kind() {
-		for argument in arguments.iter() {
-			if let Some(inner) = argument.as_type() {
-				collect_type_definitions(tcx, inner, definitions);
-			}
-		}
-	}
-}
-
-fn expression_type_definitions(cx: &LateContext<'_>, expr: &Expr<'_>) -> Vec<TypeDefinition> {
-	let mut definitions = Vec::new();
-	collect_type_definitions(cx.tcx, cx.typeck_results().expr_ty(expr), &mut definitions);
-	definitions
 }
 
 pub fn receiver_name(expr: &Expr<'_>) -> Option<String> {
@@ -228,7 +180,7 @@ fn collect_from_block(
 	cx: &LateContext<'_>,
 	block: &rustc_hir::Block<'_>,
 	facts: &mut FunctionFacts,
-	result_binding: Option<ResultBinding<'_>>,
+	result_binding: Option<&str>,
 ) {
 	for stmt in block.stmts {
 		match &stmt.kind {
@@ -255,7 +207,7 @@ fn collect_from_block(
 						cx,
 						init,
 						facts,
-						binding.as_ref().map(|(id, name)| (*id, name.as_str())),
+						binding.as_ref().map(|(_, name)| name.as_str()),
 					);
 				}
 			}
@@ -274,7 +226,7 @@ fn collect_from_expr(
 	cx: &LateContext<'_>,
 	expr: &Expr<'_>,
 	facts: &mut FunctionFacts,
-	result_binding: Option<ResultBinding<'_>>,
+	result_binding: Option<&str>,
 ) {
 	collect_from_expr_inner(cx, expr, facts, result_binding, false);
 }
@@ -283,7 +235,7 @@ fn collect_from_expr_inner(
 	cx: &LateContext<'_>,
 	expr: &Expr<'_>,
 	facts: &mut FunctionFacts,
-	result_binding: Option<ResultBinding<'_>>,
+	result_binding: Option<&str>,
 	forward_call_argument_binding: bool,
 ) {
 	match &expr.kind {
@@ -310,7 +262,6 @@ fn collect_from_expr_inner(
 				method: method.to_string(),
 				receiver: expression_identity(receiver),
 				receiver_span: Some(receiver.span),
-				receiver_type_definitions: expression_type_definitions(cx, receiver),
 				path: None,
 				def_path: definition.as_ref().map(|(path, _)| path.clone()),
 				def_crate: definition.map(|(_, crate_name)| crate_name),
@@ -327,8 +278,7 @@ fn collect_from_expr_inner(
 					})
 					.collect(),
 				arg_bindings: args.iter().map(expression_local_binding).collect(),
-				result_binding: result_binding.map(|(_, name)| name.to_string()),
-				result_binding_id: result_binding.map(|(id, _)| id),
+				result_binding: result_binding.map(str::to_string),
 			});
 		}
 		ExprKind::Call(callee, args) => {
@@ -368,7 +318,6 @@ fn collect_from_expr_inner(
 					method,
 					receiver: None,
 					receiver_span: None,
-					receiver_type_definitions: Vec::new(),
 					path: Some(path_name),
 					def_path: definition.as_ref().map(|(path, _)| path.clone()),
 					def_crate: definition.map(|(_, crate_name)| crate_name),
@@ -385,8 +334,7 @@ fn collect_from_expr_inner(
 						})
 						.collect(),
 					arg_bindings: args.iter().map(expression_local_binding).collect(),
-					result_binding: result_binding.map(|(_, name)| name.to_string()),
-					result_binding_id: result_binding.map(|(id, _)| id),
+					result_binding: result_binding.map(str::to_string),
 				});
 			}
 		}
@@ -437,7 +385,6 @@ fn collect_from_expr_inner(
 				facts.assignments.push(AssignmentInfo {
 					span: expr.span,
 					identity,
-					binding: expression_local_binding(lhs),
 				});
 			}
 			collect_from_expr(cx, lhs, facts, None);

@@ -1,5 +1,5 @@
 ---
-pina_lints: fix
+pina_lints: breaking
 pina_sdk_ids: docs
 ---
 
