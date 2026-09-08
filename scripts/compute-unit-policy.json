@@ -12,14 +12,18 @@
 	],
 	"baselineProgramAliases": {
 		"account_realloc_program": "anchor_realloc",
+		"compact_accounts_program": "compact_accounts",
 		"custom_errors_program": "anchor_errors",
 		"declare_id_program": "anchor_declare_id",
 		"declare_program": "anchor_declare_program",
 		"duplicate_mutable_accounts_program": "anchor_duplicate_mutable_accounts",
 		"events_program": "anchor_events",
 		"float_accounts_program": "anchor_floats",
+		"hello_solana_program": "hello_solana",
+		"pina_bpf_program": "pina_bpf",
 		"system_accounts_program": "anchor_system_accounts",
-		"sysvar_checks_program": "anchor_sysvars"
+		"sysvar_checks_program": "anchor_sysvars",
+		"transfer_sol_program": "transfer_sol"
 	},
 	"runtimeCases": [
 		"account_realloc_program/grow_0_to_8",
