@@ -597,19 +597,19 @@ in
 
         # Run unit and parity tests for all example programs.
         cargo test --locked \
-          -p anchor_declare_id \
-          -p anchor_declare_program \
-          -p anchor_duplicate_mutable_accounts \
-          -p anchor_errors \
-          -p anchor_events \
-          -p anchor_floats \
-          -p anchor_realloc \
-          -p compact_accounts \
-          -p anchor_system_accounts \
-          -p anchor_sysvars \
+          -p declare_id_program \
+          -p declare_program \
+          -p duplicate_mutable_accounts_program \
+          -p custom_errors_program \
+          -p events_program \
+          -p float_accounts_program \
+          -p account_realloc_program \
+          -p compact_accounts_program \
+          -p system_accounts_program \
+          -p sysvar_checks_program \
           -p escrow_program \
           -p optional_accounts_program \
-          -p pina_bpf \
+          -p pina_bpf_program \
           -p profile_program
 
         # Blueshift's upstream-gallery-21 linker is LLVM 21-based.
@@ -711,7 +711,7 @@ in
           cargo build-staking-rewards-program
           cargo build-vesting-program
         fi
-        cargo test --locked -p pina_bpf bpf_build_ -- --ignored
+        cargo test --locked -p pina_bpf_program bpf_build_ -- --ignored
 
         # Run mollusk-svm e2e tests against the compiled SBF binaries.
         # These verify that generated clients produce valid instructions

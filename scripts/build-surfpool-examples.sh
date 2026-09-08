@@ -32,7 +32,7 @@ while IFS= read -r manifest; do
 	echo "Building ${example_name} for Surfpool"
 	rm -f -- "$direct_artifact" "$library_artifact"
 	features=(bpf-entrypoint)
-	if [[ "$example_name" == "pina_bpf" ]]; then
+	if [[ "$example_name" == "pina_bpf_program" ]]; then
 		features+=(cpi-runtime-tests)
 	fi
 	cargo-build-sbf \

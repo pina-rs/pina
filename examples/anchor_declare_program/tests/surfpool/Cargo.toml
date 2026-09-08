@@ -1,9 +1,0 @@
-[package]
-name = "anchor-declare-program-surfpool-tests"
-version = "0.0.0"
-edition = "2024"
-publish = false
-
-[dependencies]
-pina_test = { workspace = true }
-program_under_test = { package = "anchor_declare_program", path = "../.." }

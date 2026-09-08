@@ -1,9 +1,0 @@
-[package]
-name = "pina-bpf-surfpool-tests"
-version = "0.0.0"
-edition = "2024"
-publish = false
-
-[dependencies]
-pina_test = { workspace = true }
-program_under_test = { package = "pina_bpf", path = "../.." }

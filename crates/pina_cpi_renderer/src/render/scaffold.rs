@@ -31,6 +31,7 @@ pub(crate) fn ensure_crate_scaffold(
 	crate_dir: &Dir,
 	crate_path: &Path,
 	program_name: &str,
+	package_name: Option<&str>,
 	generated_folder: &Path,
 ) -> Result<()> {
 	ensure_relative_directory(crate_dir, crate_path, Path::new("src"))?;
@@ -49,10 +50,16 @@ pub(crate) fn ensure_crate_scaffold(
 	};
 	create_scaffold_file(crate_dir, crate_path, Path::new("src/lib.rs"), &lib_rs)?;
 
-	let package_name = format!("{}-cpi", snake(program_name).replace('_', "-"));
+	// Default to the source name's own word separator: snake-cased names get
+	// an `_cpi` suffix and hyphenated names keep a `-cpi` suffix.
+	let crate_name = match package_name {
+		Some(name) if name.contains('-') => format!("{name}-cpi"),
+		Some(name) => format!("{name}_cpi"),
+		None => format!("{}_cpi", snake(program_name)),
+	};
 	let cargo_toml = [
 		"[package]".to_string(),
-		format!("name = \"{package_name}\""),
+		format!("name = \"{crate_name}\""),
 		"version = \"0.0.0\"".to_string(),
 		"edition = \"2021\"".to_string(),
 		"publish = false".to_string(),

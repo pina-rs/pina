@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 import {
 	getJournalDecoder,
 	getJournalEncoder,
-} from "../../../clients/js/compact_accounts/src/generated";
+} from "../../../clients/js/compact_accounts_program/src/generated";
 
 const SYSTEM_ADDRESS = address("11111111111111111111111111111111");
 

@@ -1124,8 +1124,9 @@ const decoder = getStructDecoder([
 	#[test]
 	fn hardens_every_capacity_in_the_checked_in_compact_fixture() {
 		let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-		let idl = std::fs::read_to_string(workspace.join("codama/idls/compact_accounts.json"))
-			.expect("compact IDL should be readable");
+		let idl =
+			std::fs::read_to_string(workspace.join("codama/idls/compact_accounts_program.json"))
+				.expect("compact IDL should be readable");
 		let root: RootNode = serde_json::from_str(&idl).expect("compact IDL should deserialize");
 		let index = CompactCapacityIndex::read(&root.program).expect("markers should validate");
 		let capacities = index
@@ -1134,10 +1135,11 @@ const decoder = getStructDecoder([
 			.filter(|((account, _), _)| account == "journal")
 			.map(|((_, field), capacity)| (field.clone(), *capacity))
 			.collect::<Vec<_>>();
-		let source = std::fs::read_to_string(
-			workspace.join("codama/clients/js/compact_accounts/src/generated/accounts/journal.ts"),
-		)
-		.expect("compact JS fixture should be readable");
+		let source =
+			std::fs::read_to_string(workspace.join(
+				"codama/clients/js/compact_accounts_program/src/generated/accounts/journal.ts",
+			))
+			.expect("compact JS fixture should be readable");
 		let hardened = harden_codec_source_with_capacities(&source, &capacities);
 
 		assert_eq!(capacities.len(), 4);
@@ -1161,21 +1163,26 @@ const decoder = getStructDecoder([
 	#[test]
 	fn hardens_generated_tree_using_idl_capacity_metadata() {
 		let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-		let idl = workspace.join("codama/idls/compact_accounts.json");
-		let source = std::fs::read_to_string(
-			workspace.join("codama/clients/js/compact_accounts/src/generated/accounts/journal.ts"),
-		)
-		.expect("compact JS fixture should be readable");
+		let idl = workspace.join("codama/idls/compact_accounts_program.json");
+		let source =
+			std::fs::read_to_string(workspace.join(
+				"codama/clients/js/compact_accounts_program/src/generated/accounts/journal.ts",
+			))
+			.expect("compact JS fixture should be readable");
 		let temporary = tempfile::tempdir().expect("temporary output should be created");
 		let generated = temporary
 			.path()
-			.join("compact_accounts/src/generated/accounts");
+			.join("compact_accounts_program/src/generated/accounts");
 		std::fs::create_dir_all(&generated).expect("generated tree should be created");
 		let output = generated.join("journal.ts");
 		std::fs::write(&output, source).expect("fixture should be copied");
 
-		harden_generated_clients(temporary.path(), &["compact_accounts".to_owned()], &[idl])
-			.expect("generated tree should harden");
+		harden_generated_clients(
+			temporary.path(),
+			&["compact_accounts_program".to_owned()],
+			&[idl],
+		)
+		.expect("generated tree should harden");
 		let hardened = std::fs::read_to_string(output).expect("hardened fixture should read");
 		assert_eq!(
 			hardened.matches("getPinaPodBoundedArrayEncoder(").count(),

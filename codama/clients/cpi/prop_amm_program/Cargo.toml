@@ -1,5 +1,5 @@
 [package]
-name = "prop-amm-program-cpi"
+name = "prop_amm_program_cpi"
 version = "0.0.0"
 edition = "2021"
 publish = false

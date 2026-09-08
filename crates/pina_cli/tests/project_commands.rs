@@ -1038,7 +1038,7 @@ fn generate_uses_pina_toml_to_create_a_standalone_cpi_crate() {
 	let instruction =
 		fs::read_to_string(crate_dir.join("src/generated/instructions/initialize.rs"))
 			.unwrap_or_else(|error| panic!("failed to read CPI instruction: {error}"));
-	assert!(manifest.contains("name = \"custom-program-cpi\""));
+	assert!(manifest.contains("name = \"hyphen-package-cpi\""));
 	assert!(manifest.contains("pina ="));
 	assert!(instruction.contains("pub struct Initialize<'account>"));
 	assert!(instruction.contains("pub ix: InitializeIx"));
@@ -1116,7 +1116,7 @@ fn generate_preserves_scaffolds_on_update_and_replaces_them_on_overwrite() {
 	assert!(
 		fs::read_to_string(crate_dir.join("Cargo.toml"))
 			.unwrap_or_else(|error| panic!("failed to read replaced manifest: {error}"))
-			.contains("name = \"custom-program-cpi\"")
+			.contains("name = \"hyphen-package-cpi\"")
 	);
 }
 

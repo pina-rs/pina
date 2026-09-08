@@ -153,6 +153,49 @@ fn renders_vesting_fixture_to_disk() {
 }
 
 #[test]
+fn scaffold_names_the_crate_after_the_package_name() {
+	let root = load_fixture_root("vesting_program");
+
+	let snake = RenderConfig {
+		package_name: Some("compact_accounts_program".to_string()),
+		..RenderConfig::default()
+	};
+	let snake_dir = unique_temp_dir("pina-cpi-renderer-name-snake");
+	render_root_node(&root, &snake_dir, &snake).unwrap_or_else(|error| panic!("renders: {error}"));
+	assert!(snake_dir.join("Cargo.toml").is_file());
+	let manifest = fs::read_to_string(snake_dir.join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("reads: {error}"));
+	assert!(manifest.contains("name = \"compact_accounts_program_cpi\""));
+	fs::remove_dir_all(&snake_dir).unwrap_or_else(|error| panic!("cleans up: {error}"));
+
+	let kebab = RenderConfig {
+		package_name: Some("my-kebab-program".to_string()),
+		..RenderConfig::default()
+	};
+	let kebab_dir = unique_temp_dir("pina-cpi-renderer-name-kebab");
+	render_root_node(&root, &kebab_dir, &kebab).unwrap_or_else(|error| panic!("renders: {error}"));
+	let manifest = fs::read_to_string(kebab_dir.join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("reads: {error}"));
+	assert!(manifest.contains("name = \"my-kebab-program-cpi\""));
+	fs::remove_dir_all(&kebab_dir).unwrap_or_else(|error| panic!("cleans up: {error}"));
+}
+
+#[test]
+fn scaffold_falls_back_to_the_snake_cased_program_name() {
+	let root = load_fixture_root("vesting_program");
+	let crate_dir = unique_temp_dir("pina-cpi-renderer-name-fallback");
+	render_root_node(&root, &crate_dir, &RenderConfig::default())
+		.unwrap_or_else(|error| panic!("renders: {error}"));
+
+	let manifest = fs::read_to_string(crate_dir.join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("reads: {error}"));
+	// The IDL program name `vestingProgram` snake-cases to `vesting_program`.
+	assert!(manifest.contains("name = \"vesting_program_cpi\""));
+
+	fs::remove_dir_all(&crate_dir).unwrap_or_else(|error| panic!("cleans up: {error}"));
+}
+
+#[test]
 fn scaffold_never_overwrites_consumer_files() {
 	let root = load_fixture_root("vesting_program");
 	let crate_dir = unique_temp_dir("pina-cpi-renderer-pinned");

@@ -3,7 +3,7 @@ source: crates/pina_codama_renderer/src/__tests.rs
 expression: cargo_toml
 ---
 [package]
-name = "hello-solana-client"
+name = "hello-solana-program-client"
 version = "0.0.0"
 edition = "2021"
 publish = false

@@ -204,7 +204,8 @@ fn rejects_missing_or_malformed_capacity_markers_instead_of_reading_docs() {
 
 #[test]
 fn renders_compact_account_fixture_with_dynamic_helpers() {
-	let crate_dir = render_fixture_program("compact_accounts", "pina-codama-render-compact");
+	let crate_dir =
+		render_fixture_program("compact_accounts_program", "pina-codama-render-compact");
 	let content = read_generated_file(&crate_dir, "accounts/journal.rs");
 	let manifest = fs::read_to_string(crate_dir.join("Cargo.toml"))
 		.unwrap_or_else(|error| panic!("read compact client manifest: {error}"));
@@ -516,7 +517,7 @@ fn renders_instruction_data_with_discriminator_prefix() {
 
 #[test]
 fn renders_root_mod_with_unused_program_reexport_allowance() {
-	let crate_dir = render_fixture_program("anchor_declare_id", "pina-codama-render-root-mod");
+	let crate_dir = render_fixture_program("declare_id_program", "pina-codama-render-root-mod");
 	let content = read_generated_file(&crate_dir, "mod.rs");
 
 	insta::assert_snapshot!("root_mod_with_unused_program_reexport_allowance", content);
@@ -1035,7 +1036,7 @@ fn rejects_missing_instruction_discriminators() {
 
 #[test]
 fn writes_scaffold_with_pinapod_dependency() {
-	let root = load_fixture_root("hello_solana");
+	let root = load_fixture_root("hello_solana_program");
 	let output_dir = unique_temp_dir("pina-codama-render-scaffold");
 	let crate_dir = output_dir.join("hello_solana");
 
@@ -1055,7 +1056,7 @@ fn writes_scaffold_with_pinapod_dependency() {
 
 #[test]
 fn generation_modes_preserve_or_replace_scaffolds() {
-	let root = load_fixture_root("hello_solana");
+	let root = load_fixture_root("hello_solana_program");
 	let crate_dir = unique_temp_dir("pina-codama-render-modes");
 	let create = RenderConfig {
 		mode: RenderMode::Create,
@@ -1109,7 +1110,7 @@ fn generation_modes_preserve_or_replace_scaffolds() {
 
 #[test]
 fn source_only_generation_and_strict_update_are_explicit() {
-	let root = load_fixture_root("hello_solana");
+	let root = load_fixture_root("hello_solana_program");
 	let crate_dir = unique_temp_dir("pina-codama-render-source-only");
 	let update = RenderConfig {
 		mode: RenderMode::Update,
@@ -1155,7 +1156,7 @@ fn generation_modes_reject_unsafe_destination_trees_and_unreadable_paths() {
 	use std::os::unix::fs::PermissionsExt;
 	use std::os::unix::fs::symlink;
 
-	let root = load_fixture_root("hello_solana");
+	let root = load_fixture_root("hello_solana_program");
 	let output = unique_temp_dir("pina-codama-render-mode-safety");
 	fs::create_dir_all(&output)
 		.unwrap_or_else(|error| panic!("failed to create safety fixture: {error}"));
@@ -1279,7 +1280,7 @@ fn renders_untrusted_multiline_text_as_valid_rust() {
 	syn::parse_file(account_source)
 		.unwrap_or_else(|error| panic!("generated account source is invalid: {error}"));
 
-	let mut error_root = load_fixture_root("anchor_errors");
+	let mut error_root = load_fixture_root("custom_errors_program");
 	error_root.program.errors[0].message =
 		"bad message\n)]\npub const INJECTED: bool = true;".to_string();
 	let error_files = render_program_to_files(&error_root)

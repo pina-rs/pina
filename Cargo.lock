@@ -13,6 +13,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "account-realloc-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "account_realloc_program",
+ "pina_test",
+]
+
+[[package]]
+name = "account_realloc_program"
+version = "0.0.0"
+dependencies = [
+ "mollusk-svm",
+ "pina",
+ "solana-account 4.3.2",
+ "solana-instruction 3.4.1",
+ "solana-pubkey 4.2.1",
+ "solana-sdk-ids 3.1.0",
+]
+
+[[package]]
+name = "account_realloc_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "account_realloc_program_cpi"
+version = "0.0.0"
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -320,186 +348,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9d4ee0d472d1cd2e28c97dfa124b3d8d992e10eb0a035f33f5d12e3a177ba3b"
 
 [[package]]
-name = "anchor-declare-id-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-declare-id-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-declare-id-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_declare_id",
- "pina_test",
-]
-
-[[package]]
-name = "anchor-declare-program-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-declare-program-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-declare-program-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_declare_program",
- "pina_test",
-]
-
-[[package]]
-name = "anchor-duplicate-mutable-accounts-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-duplicate-mutable-accounts-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-duplicate-mutable-accounts-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_duplicate_mutable_accounts",
- "pina_test",
-]
-
-[[package]]
-name = "anchor-errors-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-errors-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-errors-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_errors",
- "pina_test",
-]
-
-[[package]]
-name = "anchor-events-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-events-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-events-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_events",
- "pina_test",
-]
-
-[[package]]
-name = "anchor-floats-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-floats-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-floats-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_floats",
- "pina_test",
-]
-
-[[package]]
 name = "anchor-lang-idl"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -521,164 +369,6 @@ checksum = "2bdf143115440fe621bdac3a29a1f7472e09f6cd82b2aa569429a0c13f103838"
 dependencies = [
  "anyhow",
  "serde",
-]
-
-[[package]]
-name = "anchor-realloc-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-realloc-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-realloc-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_realloc",
- "pina_test",
-]
-
-[[package]]
-name = "anchor-system-accounts-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-system-accounts-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-system-accounts-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_system_accounts",
- "pina_test",
-]
-
-[[package]]
-name = "anchor-sysvars-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-sysvars-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-sysvars-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_sysvars",
- "pina_test",
-]
-
-[[package]]
-name = "anchor_declare_id"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor_declare_program"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor_duplicate_mutable_accounts"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor_errors"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor_events"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor_floats"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor_realloc"
-version = "0.0.0"
-dependencies = [
- "mollusk-svm",
- "pina",
- "solana-account 4.3.2",
- "solana-instruction 3.4.1",
- "solana-pubkey 4.2.1",
- "solana-sdk-ids 3.1.0",
-]
-
-[[package]]
-name = "anchor_system_accounts"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor_sysvars"
-version = "0.0.0"
-dependencies = [
- "pina",
 ]
 
 [[package]]
@@ -1957,41 +1647,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "compact-accounts-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "compact-accounts-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
 name = "compact-accounts-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "compact_accounts",
+ "compact_accounts_program",
  "pina_test",
 ]
 
 [[package]]
-name = "compact_accounts"
+name = "compact_accounts_program"
 version = "0.0.0"
 dependencies = [
  "pina",
 ]
+
+[[package]]
+name = "compact_accounts_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "compact_accounts_program_cpi"
+version = "0.0.0"
 
 [[package]]
 name = "compression-codecs"
@@ -2194,13 +1870,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "counter-program-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
 name = "counter-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -2219,6 +1888,13 @@ dependencies = [
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
  "solana-system-interface 3.2.0",
+]
+
+[[package]]
+name = "counter_program_cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -2482,6 +2158,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "custom-errors-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "custom_errors_program",
+ "pina_test",
+]
+
+[[package]]
+name = "custom_errors_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "custom_errors_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "custom_errors_program_cpi"
+version = "0.0.0"
+
+[[package]]
 name = "darling"
 version = "0.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2604,6 +2303,52 @@ name = "data-encoding"
 version = "2.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4583a4551df46e2792f82ceeac45e850d2e2d5debba0b91f102385cda5b11f06"
+
+[[package]]
+name = "declare-id-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "declare_id_program",
+ "pina_test",
+]
+
+[[package]]
+name = "declare-program-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "declare_program",
+ "pina_test",
+]
+
+[[package]]
+name = "declare_id_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "declare_id_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "declare_id_program_cpi"
+version = "0.0.0"
+
+[[package]]
+name = "declare_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "declare_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "declare_program_cpi"
+version = "0.0.0"
 
 [[package]]
 name = "defmt"
@@ -2923,6 +2668,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "duplicate-mutable-accounts-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "duplicate_mutable_accounts_program",
+ "pina_test",
+]
+
+[[package]]
+name = "duplicate_mutable_accounts_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "duplicate_mutable_accounts_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "duplicate_mutable_accounts_program_cpi"
+version = "0.0.0"
+
+[[package]]
 name = "dyn-clone"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3177,13 +2945,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "escrow-program-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
 name = "escrow-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -3198,6 +2959,13 @@ dependencies = [
  "mollusk-svm",
  "pina",
  "tokio",
+]
+
+[[package]]
+name = "escrow_program_cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -3219,6 +2987,29 @@ dependencies = [
  "event-listener",
  "pin-project-lite",
 ]
+
+[[package]]
+name = "events_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "events_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "events_program-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "events_program",
+ "pina_test",
+]
+
+[[package]]
+name = "events_program_cpi"
+version = "0.0.0"
 
 [[package]]
 name = "fake-simd"
@@ -3365,6 +3156,29 @@ dependencies = [
  "miniz_oxide",
  "zlib-rs",
 ]
+
+[[package]]
+name = "float-accounts-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "float_accounts_program",
+ "pina_test",
+]
+
+[[package]]
+name = "float_accounts_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "float_accounts_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "float_accounts_program_cpi"
+version = "0.0.0"
 
 [[package]]
 name = "fnv"
@@ -3773,41 +3587,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
-name = "hello-solana-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "hello-solana-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
 name = "hello-solana-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "hello_solana",
+ "hello_solana_program",
  "pina_test",
 ]
 
 [[package]]
-name = "hello_solana"
+name = "hello_solana_program"
 version = "0.0.0"
 dependencies = [
  "pina",
 ]
+
+[[package]]
+name = "hello_solana_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "hello_solana_program_cpi"
+version = "0.0.0"
 
 [[package]]
 name = "hermit-abi"
@@ -5698,13 +5498,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "optional-accounts-program-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
 name = "optional-accounts-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -5724,6 +5517,13 @@ dependencies = [
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
  "solana-system-interface 3.2.0",
+]
+
+[[package]]
+name = "optional_accounts_program_cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -5964,42 +5764,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "pina-bpf-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "pina-bpf-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
 name = "pina-bpf-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "pina_bpf",
+ "pina_bpf_program",
  "pina_test",
 ]
 
 [[package]]
-name = "pina_bpf"
+name = "pina_bpf_program"
 version = "0.0.0"
 dependencies = [
  "pina",
- "prop-amm-program-cpi",
+ "prop_amm_program_cpi",
 ]
+
+[[package]]
+name = "pina_bpf_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "pina_bpf_program_cpi"
+version = "0.0.0"
 
 [[package]]
 name = "pina_cli"
@@ -6111,7 +5897,7 @@ dependencies = [
 name = "pina_root"
 version = "0.0.5"
 dependencies = [
- "anchor_realloc",
+ "account_realloc_program",
  "counter_program",
  "insta",
  "macrotest",
@@ -6467,13 +6253,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "profile-program-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
 name = "profile-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -6494,6 +6273,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "profile_program_cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "prop-amm-program-client"
 version = "0.0.0"
 dependencies = [
@@ -6506,13 +6292,6 @@ dependencies = [
  "solana-program-error 3.0.1",
  "solana-pubkey 4.2.1",
  "thiserror 2.0.20",
-]
-
-[[package]]
-name = "prop-amm-program-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
 ]
 
 [[package]]
@@ -6533,6 +6312,13 @@ dependencies = [
  "solana-instruction 3.4.1",
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
+]
+
+[[package]]
+name = "prop_amm_program_cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -7072,13 +6858,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "role-registry-program-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
 name = "role-registry-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -7096,6 +6875,13 @@ dependencies = [
  "solana-instruction 3.4.1",
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
+]
+
+[[package]]
+name = "role_registry_program_cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -11844,13 +11630,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "staking-rewards-program-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
 name = "staking-rewards-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -11868,6 +11647,13 @@ dependencies = [
  "solana-instruction 3.4.1",
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
+]
+
+[[package]]
+name = "staking_rewards_program_cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]
@@ -12178,6 +11964,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "system-accounts-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "pina_test",
+ "system_accounts_program",
+]
+
+[[package]]
 name = "system-configuration"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12197,6 +11991,44 @@ dependencies = [
  "core-foundation-sys",
  "libc",
 ]
+
+[[package]]
+name = "system_accounts_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "system_accounts_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "system_accounts_program_cpi"
+version = "0.0.0"
+
+[[package]]
+name = "sysvar-checks-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "pina_test",
+ "sysvar_checks_program",
+]
+
+[[package]]
+name = "sysvar_checks_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "sysvar_checks_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "sysvar_checks_program_cpi"
+version = "0.0.0"
 
 [[package]]
 name = "tap"
@@ -12413,13 +12245,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "todo-program-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
 name = "todo-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -12429,6 +12254,13 @@ dependencies = [
 
 [[package]]
 name = "todo_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "todo_program_cpi"
 version = "0.0.0"
 dependencies = [
  "pina",
@@ -12710,41 +12542,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "transfer-sol-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "transfer-sol-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
 name = "transfer-sol-surfpool-tests"
 version = "0.0.0"
 dependencies = [
  "pina_test",
- "transfer_sol",
+ "transfer_sol_program",
 ]
 
 [[package]]
-name = "transfer_sol"
+name = "transfer_sol_program"
 version = "0.0.0"
 dependencies = [
  "pina",
 ]
+
+[[package]]
+name = "transfer_sol_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "transfer_sol_program_cpi"
+version = "0.0.0"
 
 [[package]]
 name = "try-lock"
@@ -13145,13 +12963,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "vesting-program-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
 name = "vesting-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
@@ -13170,6 +12981,13 @@ dependencies = [
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
  "solana-system-interface 3.2.0",
+]
+
+[[package]]
+name = "vesting_program_cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]

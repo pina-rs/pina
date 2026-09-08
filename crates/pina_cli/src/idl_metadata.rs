@@ -1057,13 +1057,13 @@ mod tests {
 			.unwrap_or_else(|error| panic!("generated fixture directory failed: {error}"));
 		std::fs::write(
 			generated_program.join("Cargo.toml"),
-			"[package]\nname = \"anchor_declare_id\"\nversion = \"0.0.0\"\nedition = \
+			"[package]\nname = \"declare_id_program\"\nversion = \"0.0.0\"\nedition = \
 			 \"2024\"\n\n[lib]\ncrate-type = [\"cdylib\", \"lib\"]\n",
 		)
 		.unwrap_or_else(|error| panic!("generated fixture manifest failed: {error}"));
 		std::fs::write(
 			generated_program.join("src/lib.rs"),
-			include_str!("../../../examples/anchor_declare_id/src/lib.rs"),
+			include_str!("../../../examples/declare_id_program/src/lib.rs"),
 		)
 		.unwrap_or_else(|error| panic!("generated fixture source failed: {error}"));
 		let generated = load_local_idl(&generated_program, None)

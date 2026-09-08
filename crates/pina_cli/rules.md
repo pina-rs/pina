@@ -381,7 +381,7 @@ What it should cover:
 
 ## Which current examples are too shallow, and how to deepen them
 
-### `hello_solana`
+### `hello_solana_program`
 
 Status: intentionally minimal.
 
@@ -413,7 +413,7 @@ How to deepen it:
 - add pagination or bounded growth if the account stores multiple items
 - add close/refund behavior for archived items
 
-### `transfer_sol`
+### `transfer_sol_program`
 
 Status: useful for transfer mechanics, but linear.
 
@@ -435,7 +435,7 @@ How to deepen it further:
 - add a dispute or timeout path
 - split the code into more modules to demonstrate maintainable scale
 
-### `anchor_events`
+### `events_program`
 
 Status: useful parity test, but the current shape is synthetic.
 
@@ -445,7 +445,7 @@ How to deepen it:
 - connect event emission to a user-facing flow like create/update/close
 - keep the serialization tests, but make the example tell a product story
 
-### `anchor_realloc`
+### `account_realloc_program`
 
 Status: narrow by design, but more technical than user-facing.
 
@@ -455,7 +455,7 @@ How to deepen it:
 - keep the realloc guards, but embed them in a useful lifecycle
 - add tests that show how growth affects serialization and validation
 
-### `anchor_*` parity examples in general
+### Anchor parity examples in general
 
 Status: valuable, but their purpose is niche.
 

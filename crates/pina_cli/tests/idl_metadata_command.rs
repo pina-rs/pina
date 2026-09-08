@@ -25,7 +25,7 @@ fn workspace_root() -> PathBuf {
 }
 
 fn fixture_idl() -> Value {
-	let root = pina_cli::generate_idl(&workspace_root().join("examples/anchor_declare_id"), None)
+	let root = pina_cli::generate_idl(&workspace_root().join("examples/declare_id_program"), None)
 		.unwrap_or_else(|error| panic!("fixture generation failed: {error}"));
 	serde_json::to_value(root)
 		.unwrap_or_else(|error| panic!("fixture serialization failed: {error}"))
@@ -247,7 +247,7 @@ fn fetch_infers_the_program_from_a_generated_project_idl() {
 		tempfile::tempdir().unwrap_or_else(|error| panic!("temporary directory failed: {error}"));
 	let value = fixture_idl();
 	let (runner, _) = fake_npx(directory.path(), &raw_zlib(&value), 0);
-	let project = workspace_root().join("examples/anchor_declare_id");
+	let project = workspace_root().join("examples/declare_id_program");
 	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.args([
 			"idl",
@@ -492,7 +492,7 @@ fn confirmed_publish_can_generate_the_project_idl_in_memory() {
 		tempfile::tempdir().unwrap_or_else(|error| panic!("temporary directory failed: {error}"));
 	let authority = keypair(directory.path());
 	let (runner, _) = fake_npx(directory.path(), "published", 0);
-	let project = workspace_root().join("examples/anchor_declare_id");
+	let project = workspace_root().join("examples/declare_id_program");
 	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.args([
 			"idl",

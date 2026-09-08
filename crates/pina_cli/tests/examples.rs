@@ -7,27 +7,27 @@ use pina_cli::project::Project;
 use serde_json::Value;
 
 const EXAMPLES: &[&str] = &[
-	"anchor_declare_id",
-	"anchor_declare_program",
-	"anchor_duplicate_mutable_accounts",
-	"anchor_errors",
-	"anchor_events",
-	"anchor_floats",
-	"anchor_realloc",
-	"anchor_system_accounts",
-	"anchor_sysvars",
-	"compact_accounts",
+	"account_realloc_program",
+	"compact_accounts_program",
 	"counter_program",
+	"custom_errors_program",
+	"declare_id_program",
+	"declare_program",
+	"duplicate_mutable_accounts_program",
 	"escrow_program",
-	"hello_solana",
+	"events_program",
+	"float_accounts_program",
+	"hello_solana_program",
 	"optional_accounts_program",
-	"pina_bpf",
+	"pina_bpf_program",
 	"profile_program",
 	"prop_amm_program",
 	"role_registry_program",
 	"staking_rewards_program",
+	"system_accounts_program",
+	"sysvar_checks_program",
 	"todo_program",
-	"transfer_sol",
+	"transfer_sol_program",
 	"vesting_program",
 ];
 
@@ -83,20 +83,20 @@ fn todo_program_idl() {
 
 #[test]
 fn transfer_sol_idl() {
-	let idl = example_program_idl("transfer_sol");
-	insta::assert_json_snapshot!("transfer_sol", idl);
+	let idl = example_program_idl("transfer_sol_program");
+	insta::assert_json_snapshot!("transfer_sol_program", idl);
 }
 
 #[test]
 fn hello_solana_idl() {
-	let idl = example_program_idl("hello_solana");
-	insta::assert_json_snapshot!("hello_solana", idl);
+	let idl = example_program_idl("hello_solana_program");
+	insta::assert_json_snapshot!("hello_solana_program", idl);
 }
 
 #[test]
 fn compact_accounts_idl_preserves_multiple_dynamic_tails() {
-	let idl = serde_json::to_value(example_program_idl("compact_accounts"))
-		.unwrap_or_else(|error| panic!("serialize compact_accounts IDL: {error}"));
+	let idl = serde_json::to_value(example_program_idl("compact_accounts_program"))
+		.unwrap_or_else(|error| panic!("serialize compact_accounts_program IDL: {error}"));
 	let fields = idl
 		.pointer("/program/accounts/0/data/fields")
 		.and_then(Value::as_array)
@@ -185,12 +185,12 @@ fn compact_accounts_idl_preserves_multiple_dynamic_tails() {
 #[test]
 fn committed_example_idls_match_generated_output() {
 	for example in [
-		"compact_accounts",
+		"compact_accounts_program",
 		"counter_program",
 		"escrow_program",
-		"hello_solana",
+		"hello_solana_program",
 		"todo_program",
-		"transfer_sol",
+		"transfer_sol_program",
 	] {
 		assert_matches_committed_idl(example);
 	}

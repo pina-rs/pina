@@ -1,0 +1,81 @@
+---
+source: crates/pina_cli/tests/examples.rs
+assertion_line: 93
+expression: idl
+---
+{
+  "kind": "rootNode",
+  "standard": "codama",
+  "version": "1.8.0",
+  "program": {
+    "kind": "programNode",
+    "name": "helloSolanaProgram",
+    "publicKey": "DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A",
+    "version": "0.0.0",
+    "instructions": [
+      {
+        "kind": "instructionNode",
+        "name": "hello",
+        "docs": [
+          "The `#[instruction]` attribute macro generates:",
+          "",
+          "- A discriminator field as the first byte of the struct.",
+          "- `HasDiscriminator` implementation linking this struct to",
+          "`HelloInstruction::Hello`.",
+          "- A generated `PinaPod` view plus checked `initialize` and `try_from_bytes`",
+          "helpers.",
+          "",
+          "`HelloInstructionData` has no payload fields — only the discriminator byte",
+          "is needed to identify the instruction."
+        ],
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "user",
+            "isWritable": false,
+            "isSigner": true,
+            "isOptional": false,
+            "docs": [
+              "The user invoking the program. Must be a signer so we can trust the",
+              "address is authentic."
+            ]
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 0
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "constantDiscriminatorNode",
+            "offset": 0,
+            "constant": {
+              "kind": "constantValueNode",
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u8",
+                "endian": "le"
+              },
+              "value": {
+                "kind": "numberValueNode",
+                "number": 0
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

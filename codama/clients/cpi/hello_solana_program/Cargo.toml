@@ -1,0 +1,5 @@
+[package]
+name = "hello_solana_program_cpi"
+version = "0.0.0"
+edition = "2021"
+publish = false

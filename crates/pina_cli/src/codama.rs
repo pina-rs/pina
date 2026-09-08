@@ -233,6 +233,9 @@ pub struct ProjectGenerateOutput {
 struct GenerationPlan {
 	programs: Vec<(String, PathBuf)>,
 	override_idl_names: bool,
+	/// Maps a program name to the package name its generated CPI crate
+	/// should use. Unset entries fall back to the snake-cased IDL name.
+	cpi_package_names: BTreeMap<String, String>,
 	idls_dir: PathBuf,
 	rust_out: PathBuf,
 	cpi_out: PathBuf,
@@ -267,6 +270,10 @@ pub fn generate_codama(options: &CodamaGenerateOptions) -> Result<Vec<String>, C
 	let plan = GenerationPlan {
 		programs,
 		override_idl_names: false,
+		cpi_package_names: examples
+			.iter()
+			.map(|example| (example.clone(), example.clone()))
+			.collect(),
 		idls_dir: options.idls_dir.clone(),
 		rust_out: options.rust_out.clone(),
 		cpi_out: options.cpi_out.clone(),
@@ -335,6 +342,10 @@ pub fn generate_project_clients(
 	let plan = GenerationPlan {
 		programs: vec![(project.library_name.clone(), project.program_dir.clone())],
 		override_idl_names: true,
+		cpi_package_names: BTreeMap::from([(
+			project.library_name.clone(),
+			project.package_name.clone(),
+		)]),
 		idls_dir: project.idl_dir.clone(),
 		rust_out: client_target(ClientLanguage::Rust),
 		cpi_out: client_target(ClientLanguage::Cpi),
@@ -436,15 +447,16 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 
 	if plan.clients.contains(&ClientLanguage::Cpi) {
 		let settings = plan.generation[&ClientLanguage::Cpi];
-		let render_config = CpiRenderConfig {
-			mode: cpi_render_mode(settings.mode),
-			scaffold: settings.scaffold,
-			..CpiRenderConfig::default()
-		};
 
 		for (example, idl_path) in examples.iter().zip(idl_paths.iter()) {
 			let crate_dir = plan.cpi_out.join(example);
 			validate_render_target(&crate_dir)?;
+			let render_config = CpiRenderConfig {
+				mode: cpi_render_mode(settings.mode),
+				scaffold: settings.scaffold,
+				package_name: plan.cpi_package_names.get(example).cloned(),
+				..CpiRenderConfig::default()
+			};
 			render_cpi_client(idl_path, &crate_dir, &render_config)?;
 		}
 	}
@@ -1067,6 +1079,7 @@ mod tests {
 		GenerationPlan {
 			programs: Vec::new(),
 			override_idl_names: false,
+			cpi_package_names: BTreeMap::new(),
 			idls_dir: PathBuf::from("idl"),
 			rust_out: PathBuf::from("rust"),
 			cpi_out: PathBuf::from("cpi"),
@@ -1189,6 +1202,7 @@ mod tests {
 		let plan = GenerationPlan {
 			programs: Vec::new(),
 			override_idl_names: false,
+			cpi_package_names: BTreeMap::new(),
 			idls_dir: PathBuf::from("idl"),
 			rust_out: PathBuf::from("rust"),
 			cpi_out: PathBuf::from("cpi"),
@@ -1487,11 +1501,12 @@ mod tests {
 			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 		let temp_root = std::fs::canonicalize(temp.path())
 			.unwrap_or_else(|error| panic!("failed to canonicalize temp dir: {error}"));
-		let program = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello_solana");
+		let program =
+			Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello_solana_program");
 		let mut plan = empty_plan("npx");
 		plan.idls_dir = temp_root.join("idls");
-		plan.programs = vec![("hello_solana".to_owned(), program)];
-		std::fs::create_dir_all(plan.idls_dir.join("hello_solana.json"))
+		plan.programs = vec![("hello_solana_program".to_owned(), program)];
+		std::fs::create_dir_all(plan.idls_dir.join("hello_solana_program.json"))
 			.unwrap_or_else(|error| panic!("failed to block IDL output: {error}"));
 		assert!(matches!(
 			generate_plan(&plan),

@@ -33,27 +33,27 @@ const SBF_OUT_DIR = process.env.SBF_OUT_DIR ??
 // Keep this list intentional. The inventory assertion below turns adding an
 // example into a required Surfpool test decision instead of a silent omission.
 const EXAMPLE_PROGRAMS = [
-	"anchor_declare_id",
-	"anchor_declare_program",
-	"anchor_duplicate_mutable_accounts",
-	"anchor_errors",
-	"anchor_events",
-	"anchor_floats",
-	"anchor_realloc",
-	"anchor_system_accounts",
-	"anchor_sysvars",
-	"compact_accounts",
+	"account_realloc_program",
+	"compact_accounts_program",
 	"counter_program",
+	"custom_errors_program",
+	"declare_id_program",
+	"declare_program",
+	"duplicate_mutable_accounts_program",
 	"escrow_program",
-	"hello_solana",
+	"events_program",
+	"float_accounts_program",
+	"hello_solana_program",
 	"optional_accounts_program",
-	"pina_bpf",
+	"pina_bpf_program",
 	"profile_program",
 	"prop_amm_program",
 	"role_registry_program",
 	"staking_rewards_program",
+	"system_accounts_program",
+	"sysvar_checks_program",
 	"todo_program",
-	"transfer_sol",
+	"transfer_sol_program",
 	"vesting_program",
 ] as const;
 
@@ -429,44 +429,44 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 	ExampleProgram,
 	ExpectedEntrypointCase
 > = {
-	anchor_declare_id: { instruction: "initialize", accounts: "none" },
-	anchor_declare_program: {
+	declare_id_program: { instruction: "initialize", accounts: "none" },
+	declare_program: {
 		instruction: "validateExternalProgram",
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
 	},
-	anchor_duplicate_mutable_accounts: {
+	duplicate_mutable_accounts_program: {
 		instruction: "failsDuplicateMutable",
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
 	},
-	anchor_errors: {
+	custom_errors_program: {
 		instruction: "hello",
 		accounts: "none",
 		programError: { Custom: 6000n },
 	},
-	anchor_events: { instruction: "initialize", accounts: "none" },
-	anchor_floats: {
+	events_program: { instruction: "initialize", accounts: "none" },
+	float_accounts_program: {
 		instruction: "create",
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
 	},
-	anchor_realloc: {
+	account_realloc_program: {
 		instruction: "realloc",
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
 	},
-	compact_accounts: {
+	compact_accounts_program: {
 		instruction: "initialize",
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
 	},
-	anchor_system_accounts: {
+	system_accounts_program: {
 		instruction: "initialize",
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
 	},
-	anchor_sysvars: {
+	sysvar_checks_program: {
 		instruction: "sysvars",
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
@@ -481,13 +481,13 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
 	},
-	hello_solana: { instruction: "hello", accounts: "payerSigner" },
+	hello_solana_program: { instruction: "hello", accounts: "payerSigner" },
 	optional_accounts_program: {
 		instruction: "init",
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
 	},
-	pina_bpf: { instruction: "hello", accounts: "none" },
+	pina_bpf_program: { instruction: "hello", accounts: "none" },
 	profile_program: {
 		instruction: "initialize",
 		accounts: "none",
@@ -513,7 +513,7 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
 	},
-	transfer_sol: {
+	transfer_sol_program: {
 		instruction: "cpiTransfer",
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
@@ -528,21 +528,21 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 const ACCESS_GUARD_PROGRAMS: Partial<
 	Record<ExampleProgram, ExpectedProgramError>
 > = {
-	anchor_declare_program: "MissingRequiredSignature",
-	anchor_floats: "InvalidAccountData",
-	anchor_realloc: "InvalidAccountData",
-	compact_accounts: "InvalidAccountData",
-	anchor_system_accounts: "MissingRequiredSignature",
+	declare_program: "MissingRequiredSignature",
+	float_accounts_program: "InvalidAccountData",
+	account_realloc_program: "InvalidAccountData",
+	compact_accounts_program: "InvalidAccountData",
+	system_accounts_program: "MissingRequiredSignature",
 	counter_program: "InvalidAccountData",
 	escrow_program: "InvalidAccountData",
-	hello_solana: "MissingRequiredSignature",
+	hello_solana_program: "MissingRequiredSignature",
 	optional_accounts_program: "MissingRequiredSignature",
 	profile_program: "InvalidAccountData",
 	prop_amm_program: "InvalidAccountData",
 	role_registry_program: "InvalidAccountData",
 	staking_rewards_program: "InvalidAccountData",
 	todo_program: "InvalidAccountData",
-	transfer_sol: "InvalidAccountData",
+	transfer_sol_program: "InvalidAccountData",
 	vesting_program: "InvalidAccountData",
 };
 
@@ -640,11 +640,11 @@ async function runSpecificGuards(
 	};
 
 	switch (descriptor.name) {
-		case "anchor_realloc": {
+		case "account_realloc_program": {
 			await runAnchorReallocGuards(descriptor, submit, payer, surfnet);
 			return;
 		}
-		case "hello_solana": {
+		case "hello_solana_program": {
 			const data = encodeInstruction(instructionByName(descriptor, "hello"));
 			await assertRejected(
 				() => {
@@ -654,12 +654,12 @@ async function runSpecificGuards(
 						role: AccountRole.READONLY,
 					}]));
 				},
-				"hello_solana accepted an unsigned user account",
+				"hello_solana_program accepted an unsigned user account",
 				"MissingRequiredSignature",
 			);
 			return;
 		}
-		case "anchor_duplicate_mutable_accounts": {
+		case "duplicate_mutable_accounts_program": {
 			const data = encodeInstruction(
 				instructionByName(descriptor, "failsDuplicateMutable"),
 			);
@@ -685,7 +685,7 @@ async function runSpecificGuards(
 			);
 			return;
 		}
-		case "anchor_declare_program": {
+		case "declare_program": {
 			const data = encodeInstruction(
 				instructionByName(descriptor, "validateExternalProgram"),
 			);
@@ -700,7 +700,7 @@ async function runSpecificGuards(
 			);
 			return;
 		}
-		case "anchor_system_accounts": {
+		case "system_accounts_program": {
 			const data = encodeInstruction(
 				instructionByName(descriptor, "initialize"),
 			);
@@ -722,7 +722,7 @@ async function runSpecificGuards(
 			);
 			return;
 		}
-		case "anchor_sysvars": {
+		case "sysvar_checks_program": {
 			const data = encodeInstruction(instructionByName(descriptor, "sysvars"));
 			await assertRejected(
 				() =>
