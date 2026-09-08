@@ -71,7 +71,7 @@ Deny-level security lints should not be disabled at crate scope; see the [suppre
 | `require_writable_before_account_resize`                | deny  | Resize targets are writable                         |
 | `require_zeroed_before_close`                           | deny  | Closed account data is invalidated                  |
 | `require_sysvar_assert_before_sysvar_use`               | deny  | Sysvar accounts cannot be substituted               |
-| `require_type_assert_before_zero_copy_cast`             | deny  | Raw zero-copy casts follow type validation          |
+| `require_type_assert_before_zero_copy_cast`             | deny  | Raw account casts use guard-backed typed loading    |
 | `require_reason_for_duplicate_remaining_accounts`       | deny  | Duplicate mutable remaining accounts are justified  |
 | `require_canonical_bump_before_pda_write`               | deny  | PDA namespaces use canonical bumps                  |
 | `deny_account_borrows_across_cpi`                       | deny  | Mutable data guards end before CPI                  |
@@ -144,14 +144,13 @@ The lint recognizes standard Solana sysvar names and instruction-sysvar loader f
 
 ### `require_type_assert_before_zero_copy_cast`
 
-Detects raw zero-copy cast methods and known `bytemuck` cast functions when no prior `assert_type::<T>()`, `as_account::<T>()`, or `as_account_mut::<T>()` establishes the account layout.
+Detects raw zero-copy cast methods and known `bytemuck` cast functions in account-processing code. Use a Pina conversion that validates and borrows the account as one operation.
 
 ```rust
-account.assert_type::<Vault>(&ID)?;
 let vault = account.as_account::<Vault>(&ID)?;
 ```
 
-Pina instruction and account `try_from_bytes()` associated functions are safe framework conversions and are not treated as raw casts. The analysis correlates the nearest account borrow and validation within one function.
+For PDAs, prefer the generated `load_pda*` methods because they also validate the address and stored bump. `assert_type::<T>()` remains useful when a handler only needs validation, but it is a moment-in-time check and does not make a later raw cast safe. Pina instruction and account `try_from_bytes()` associated functions are safe framework conversions and are not treated as raw casts.
 
 ### `require_reason_for_duplicate_remaining_accounts`
 

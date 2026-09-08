@@ -11,11 +11,13 @@ use crate::shared;
 crate::declare_late_lint! {
 	/// ### What it does
 	///
-	/// Warns when raw bytemuck casts are used on account data without a type assertion.
+	/// Warns when raw bytemuck casts are used in account-processing code.
 	///
 	/// ### Why is this bad?
 	///
 	/// Raw zero-copy casts can reinterpret spoofed or incorrectly sized account bytes as trusted state.
+	/// A preceding `assert_type::<T>()` is only a moment-in-time validation and does not bind the
+	/// later cast to the validated borrow.
 	///
 	/// ### Example
 	///
@@ -24,7 +26,7 @@ crate::declare_late_lint! {
 	/// ```
 	pub REQUIRE_TYPE_ASSERT_BEFORE_ZERO_COPY_CAST,
 	Deny,
-	"raw zero-copy casts should be preceded by `assert_type::<T>()` or a safe Pina account conversion"
+	"raw zero-copy account casts should use a guard-backed Pina account conversion"
 }
 
 const TARGET_METHODS: &[&str] = &[
@@ -40,17 +42,6 @@ const TARGET_PATHS: &[&str] = &[
 	"bytemuck::cast_ref",
 	"bytemuck::cast_mut",
 ];
-const REQUIRED_METHODS: &[&str] = &["assert_type", "as_account", "as_account_mut"];
-const BORROW_METHODS: &[&str] = &["try_borrow", "try_borrow_mut"];
-
-fn prior_borrow_receiver(calls: &[shared::CallInfo], index: usize) -> Option<String> {
-	calls[..index]
-		.iter()
-		.rev()
-		.find(|call| BORROW_METHODS.contains(&call.method.as_str()))
-		.and_then(|call| call.receiver.clone())
-}
-
 impl<'tcx> LateLintPass<'tcx> for RequireTypeAssertBeforeZeroCopyCast {
 	fn check_fn(
 		&mut self,
@@ -69,7 +60,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireTypeAssertBeforeZeroCopyCast {
 		}
 
 		let facts = shared::collect_function_facts(cx, body);
-		for (index, call) in facts.calls.iter().enumerate() {
+		for call in &facts.calls {
 			let is_cast_method =
 				call.receiver.is_some() && TARGET_METHODS.contains(&call.method.as_str());
 			let is_cast_path = call
@@ -80,31 +71,20 @@ impl<'tcx> LateLintPass<'tcx> for RequireTypeAssertBeforeZeroCopyCast {
 				continue;
 			}
 
-			let guard_receiver =
-				prior_borrow_receiver(&facts.calls, index).or_else(|| call.receiver.clone());
-			let has_guard = guard_receiver.as_ref().is_some_and(|receiver| {
-				shared::has_prior_method_with_receiver_match(
-					&facts.calls,
-					index,
-					REQUIRED_METHODS,
-					&Some(receiver.clone()),
-				)
+			cx.lint(REQUIRE_TYPE_ASSERT_BEFORE_ZERO_COPY_CAST, |diag| {
+				diag.span(call.span);
+				diag.primary_message(
+					"raw zero-copy account casts bypass guard-backed account validation",
+				);
+				diag.help(
+					"replace the cast with `as_account::<T>()`, `as_account_mut::<T>()`, or a \
+					 generated `load_pda*` method",
+				);
+				diag.help(
+					"`assert_type::<T>()` is validation-only and does not make a later raw cast \
+					 safe",
+				);
 			});
-
-			if !has_guard {
-				cx.lint(REQUIRE_TYPE_ASSERT_BEFORE_ZERO_COPY_CAST, |diag| {
-					diag.span(call.span);
-					diag.primary_message(
-						"raw zero-copy casts should be preceded by `assert_type::<T>()` or a safe \
-						 Pina account conversion",
-					);
-					diag.help(
-						"prefer `assert_type::<T>()` or `as_account::<T>()` over raw \
-						 `bytemuck::try_from_bytes` casts",
-					);
-					diag.help(shared::CONTROL_FLOW_LIMITATION_HELP);
-				});
-			}
 		}
 	}
 }

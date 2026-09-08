@@ -67,12 +67,13 @@ fn process_borrowed_cast(data: &AccountView, bytes: &[u8]) -> Result<(), ()> {
 	Ok(())
 }
 
-fn process_asserted_cast(data: &AccountView) -> Result<(), ()> {
+fn process_assertion_does_not_guard_cast(data: &AccountView) -> Result<(), ()> {
 	data.assert_type::<VaultData>(&OWNER)?;
 	let guard = data.try_borrow()?;
 	let _ = guard;
-	// A guard established on the borrowed receiver satisfies the cast.
+	// Validation does not bind this unrelated raw cast to the checked account.
 	let view = unsafe { bytemuck::cast_ref::<VaultData>(&VaultData { amount: 0 }) }?;
+	//~^ ERROR: raw zero-copy account casts bypass guard-backed account validation
 	let _ = view.amount;
 	Ok(())
 }
