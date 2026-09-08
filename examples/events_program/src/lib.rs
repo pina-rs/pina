@@ -40,18 +40,46 @@ pub enum EventDiscriminator {
 	MyOtherEvent = 2,
 }
 
-#[event(discriminator = EventDiscriminator)]
+#[event(
+	discriminator = EventDiscriminator,
+	validate(with = validate_my_event)
+)]
 #[derive(Debug)]
 pub struct MyEvent {
+	#[pina(validate(min = 1, max = 5))]
 	pub data: u64,
+
+	#[pina(validate(exact_len = 8))]
 	pub label: [u8; 8],
 }
 
-#[event(discriminator = EventDiscriminator)]
+fn validate_my_event(event: &MyEventZc) -> ProgramResult {
+	if event.label[0] == 0 {
+		return Err(ProgramError::InvalidInstructionData);
+	}
+
+	Ok(())
+}
+
+#[event(
+	discriminator = EventDiscriminator,
+	validate(with = validate_my_other_event)
+)]
 #[derive(Debug)]
 pub struct MyOtherEvent {
+	#[pina(validate(min = 6, max = 7))]
 	pub data: u64,
+
+	#[pina(validate(exact_len = 8))]
 	pub label: [u8; 8],
+}
+
+fn validate_my_other_event(event: &MyOtherEventZc) -> ProgramResult {
+	if event.label[0] == 0 {
+		return Err(ProgramError::InvalidInstructionData);
+	}
+
+	Ok(())
 }
 
 #[allow(dead_code)]
@@ -176,6 +204,28 @@ mod tests {
 
 		assert_eq!(decoded.label, LABEL_HELLO);
 		assert_eq!(decoded.data.get(), 5);
+	}
+
+	#[test]
+	fn event_validation_rejects_invalid_fields_and_custom_rules() {
+		let mut bytes = [0u8; MyEvent::SIZE];
+		let numeric_error = MyEvent::initialize(&mut bytes, |event| {
+			event.data.set(0);
+			event.label = LABEL_HELLO;
+			Ok(())
+		})
+		.err()
+		.unwrap();
+		assert_eq!(numeric_error, ProgramError::InvalidInstructionData);
+
+		let custom_error = MyEvent::initialize(&mut bytes, |event| {
+			event.data.set(5);
+			event.label = [0; 8];
+			Ok(())
+		})
+		.err()
+		.unwrap();
+		assert_eq!(custom_error, ProgramError::InvalidInstructionData);
 	}
 
 	#[test]

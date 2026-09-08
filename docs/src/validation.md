@@ -137,3 +137,76 @@ You can also write an ordinary function returning `ProgramResult`, call it at th
 Codama generation supports both styles. `pina idl` reads declarative `signer` and `writable` rules plus known `address`, `program`, and `sysvar` constants from `#[derive(Accounts)]`. Existing direct `assert_signer`, `assert_writable`, `assert_address`, and PDA validation-chain inference remains supported. Runtime-only value bounds, owners, data lengths, relationships, and custom hooks do not have Codama account-meta equivalents; they stay on-chain constraints and do not prevent IDL or client generation.
 
 <!-- {/pinaValidationAlternativesAndCodegen} -->
+
+<!-- {=pinaValidationBeforeAfter} -->
+
+## Before and After
+
+Before the `validation` feature, programs wrote boundary checks directly in each processor. This remains supported:
+
+```rust
+let args = TransferInstruction::try_from_bytes(data)?;
+if args.amount() == 0 || args.amount() > 1_000_000 {
+	return Err(TransferError::InvalidAmount.into());
+}
+
+self.authority.assert_signer()?;
+self.source.assert_owner(&ID)?.assert_not_empty()?;
+self.token_program.assert_program(&token::ID)?;
+```
+
+With the feature enabled, the same reusable checks can live beside the fields that declare the boundary. `try_from_bytes` and `#[derive(Accounts)]` run them automatically before `process` receives the decoded values:
+
+```rust
+#[instruction(discriminator = Instruction::Transfer)]
+pub struct TransferInstruction {
+	#[pina(validate(
+		min = 1,
+		max = 1_000_000,
+		error = TransferError::InvalidAmount
+	))]
+	pub amount: u64,
+}
+
+#[derive(Accounts)]
+pub struct TransferAccounts<'a> {
+	#[pina(validate(signer))]
+	pub authority: &'a AccountView,
+
+	#[pina(validate(owner = ID, not_empty))]
+	pub source: &'a mut AccountView,
+
+	#[pina(validate(program = token::ID))]
+	pub token_program: &'a AccountView,
+}
+```
+
+The generated code calls the same validation primitives as the manual form. This makes the annotations removable syntax sugar rather than a second security model.
+
+<!-- {/pinaValidationBeforeAfter} -->
+
+<!-- {=pinaValidationExampleGuide} -->
+
+## Complete Boundary-Validation Example
+
+The `examples/validation_program` project uses the feature across every supported macro boundary:
+
+| Boundary             | Example coverage                                                                             |
+| -------------------- | -------------------------------------------------------------------------------------------- |
+| Instruction data     | Numeric bounds, bounded strings, exact vector lengths, custom errors, and a cross-field hook |
+| Instruction accounts | Signer, writable, owner, program, empty, non-empty, distinct-account rules, and struct hooks |
+| Stored account state | Numeric bounds and a hook that keeps the minimum no greater than the maximum                 |
+| Events               | Numeric, string, and vector constraints plus a hook that rejects duplicate approvals         |
+
+The processor also keeps one policy rule explicit because it combines decoded instruction data with loaded account state. That distinction is intentional: annotations validate one received value or account list, while ordinary Rust remains the clearest place for rules spanning multiple boundaries.
+
+Run its native and deployed-program tests from the repository root:
+
+```bash
+devenv shell -- cargo test -p validation_program
+devenv shell -- pina test --project examples/validation_program
+```
+
+The existing `events_program` also enables `validation` and applies event rules without changing its transport-focused structure. It is the smaller reference for adding validation to an established program.
+
+<!-- {/pinaValidationExampleGuide} -->

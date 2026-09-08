@@ -9,6 +9,7 @@ Pina parity port of Anchor's event definitions and serialization semantics.
 <br>
 
 - Event discriminators with `#[event(discriminator = ...)]`.
+- Declarative numeric and exact-length rules plus custom event hooks.
 - Deterministic event payload encoding/decoding.
 - Instruction-to-event mapping logic.
 

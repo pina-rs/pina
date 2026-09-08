@@ -24,6 +24,7 @@ The `examples/` workspace members demonstrate focused usage patterns. They are n
 - `account_realloc_program`: authority-bound PDA realloc lifecycle, growth limits, and duplicate-target safety checks.
 - `compact_accounts_program`: generated compact patches across create, grow, same-size update, shrink, clear, rent adjustment, and rejected boundary cases.
 - `optional_accounts_program`: optional-account slots with explicit presence handling and count tracking.
+- `validation_program`: end-to-end declarative validation for instructions, instruction accounts, stored account state, and events.
 
 Use examples as references for the specific framework behavior each one demonstrates. Do not infer unimplemented economic behavior from an instruction name. Read [Production Readiness](./production-readiness.md) before adapting an example for an asset-bearing program.
 
