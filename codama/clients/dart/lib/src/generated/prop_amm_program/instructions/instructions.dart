@@ -4,4 +4,3 @@
 export 'initialize.dart';
 export 'rotate_authority.dart';
 export 'update.dart';
-

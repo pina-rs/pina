@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,14 +11,10 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-
 @immutable
 class InitializeInstructionData {
-  const InitializeInstructionData({
-    required this.bump,
-    required this.digest,
-  }) :
-      discriminator = 0;
+  const InitializeInstructionData({required this.bump, required this.digest})
+    : discriminator = 0;
 
   final int discriminator;
   final int bump;
@@ -51,20 +46,15 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'initialize instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'initialize instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (InitializeInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(0),
-    ).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -72,8 +62,8 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
 
     return (
       InitializeInstructionData(
-      bump: map['bump']! as int,
-      digest: map['digest']! as Uint8List,
+        bump: map['bump']! as int,
+        digest: map['digest']! as Uint8List,
       ),
       newOffset,
     );
@@ -99,8 +89,12 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
   };
 }
 
-Codec<InitializeInstructionData, InitializeInstructionData> getInitializeInstructionDataCodec() {
-  return combineCodec(getInitializeInstructionDataEncoder(), getInitializeInstructionDataDecoder());
+Codec<InitializeInstructionData, InitializeInstructionData>
+getInitializeInstructionDataCodec() {
+  return combineCodec(
+    getInitializeInstructionDataEncoder(),
+    getInitializeInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [Initialize] instruction.
@@ -112,17 +106,14 @@ Instruction getInitializeInstruction({
   required int bump,
   required Uint8List digest,
 }) {
-  final instructionData = InitializeInstructionData(
-      bump: bump,
-      digest: digest,
-  );
+  final instructionData = InitializeInstructionData(bump: bump, digest: digest);
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: owner, role: AccountRole.readonlySigner),
-    AccountMeta(address: todo, role: AccountRole.writable),
-    AccountMeta(address: systemProgram, role: AccountRole.readonly),
+      AccountMeta(address: owner, role: AccountRole.readonlySigner),
+      AccountMeta(address: todo, role: AccountRole.writable),
+      AccountMeta(address: systemProgram, role: AccountRole.readonly),
     ],
     data: getInitializeInstructionDataEncoder().encode(instructionData),
   );
