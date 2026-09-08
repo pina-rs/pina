@@ -18,6 +18,7 @@ use crate::LamportTransfer;
 use crate::PinaAccount;
 #[cfg(feature = "compact")]
 use crate::PinaCompactAccount;
+use crate::PinaProgramError;
 use crate::ProgramError;
 use crate::Ref;
 use crate::RefMut;
@@ -138,7 +139,7 @@ fn validate_type<T: PinaAccount>(account: AccountView, program_id: &Address) -> 
 		);
 		log_caller();
 
-		return Err(ProgramError::AccountDataTooSmall);
+		return Err(PinaProgramError::InvalidAccountSize.into());
 	}
 
 	#[cfg(not(feature = "validation"))]

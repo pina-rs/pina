@@ -326,7 +326,14 @@ pub trait AccountInfoValidation {
 	fn assert_not_empty(self) -> Result<Self, ProgramError>
 	where
 		Self: Sized;
-	/// Assert that the account is of the type provided.
+	/// Validate a fixed account without loading it.
+	///
+	/// Checks the program owner, discriminator, exact representation size, and
+	/// every active nested PinaPod value. Prefer [`AsAccount::as_account`],
+	/// [`AsAccount::as_account_mut`], or a generated `load_pda*` method when the
+	/// caller needs typed account data. Those methods perform the same validation
+	/// while returning a guard, so a preceding `assert_type` would duplicate the
+	/// work.
 	fn assert_type<T: PinaAccount>(self, program_id: &Address) -> Result<Self, ProgramError>
 	where
 		Self: Sized;
