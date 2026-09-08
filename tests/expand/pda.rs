@@ -8,6 +8,7 @@ pub enum PdaDisc {
 	CounterState = 1,
 	AllSeedState = 2,
 	TodoState = 3,
+	Compact = 4,
 }
 
 #[account(crate = pina, discriminator = PdaDisc, variant = CounterState)]
@@ -51,6 +52,14 @@ pub struct VaultState {
 pub struct TodoState {
 	pub owner: Address,
 	pub bump: u8,
+}
+
+#[account(crate = pina, discriminator = PdaDisc, variant = Compact, compact)]
+#[pda(crate = pina, seeds = [b"compact", authority: Address], bump = bump)]
+pub struct CompactState {
+	pub authority: Address,
+	pub bump: u8,
+	pub values: Vec<u64, 4>,
 }
 
 #[pda(crate = pina, seeds = [b"authority"])]

@@ -19,8 +19,15 @@ pub struct Write {
 }
 
 impl Write {
-	pub fn new(authority: solana_pubkey::Pubkey, journal: solana_pubkey::Pubkey) -> Self {
-		Self { authority, journal }
+	pub fn new(authority: solana_pubkey::Pubkey) -> Self {
+		Self {
+			authority,
+			journal: solana_pubkey::Pubkey::find_program_address(
+				&["compact-journal".as_bytes(), authority.as_ref()],
+				&crate::COMPACT_ACCOUNTS_ID,
+			)
+			.0,
+		}
 	}
 
 	pub fn instruction(&self, data: WriteInstructionData) -> solana_instruction::Instruction {

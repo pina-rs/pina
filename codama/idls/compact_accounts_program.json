@@ -388,7 +388,24 @@
 						"name": "journal",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "journal"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -474,7 +491,24 @@
 						"name": "journal",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "journal"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
 					}
 				],
 				"arguments": [
@@ -549,7 +583,24 @@
 						"name": "journal",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "journal"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
 					},
 					{
 						"kind": "instructionAccountNode",

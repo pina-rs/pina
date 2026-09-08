@@ -106,6 +106,8 @@ The macro generates `JournalHeader`, `JournalRef`, and `JournalPatch`. It also g
 
 Pina uses PinaPod for validated alignment-one storage. PinaPod initializes inactive collection capacity and validates each active nested value before Pina returns safe access.
 
+When a compact account also declares `#[pda(..., bump = bump)]`, the macro generates `Type::with_pda`. This closure-scoped loader checks owner, compact data, the canonical stored bump, and the derived account address while one runtime borrow remains active.
+
 <!-- {/compactAccountQuickstart} -->
 
 <!-- {=compactAccountResizeOrdering} -->
@@ -131,7 +133,7 @@ Use `invoke_signed::<Journal>(signers)` when `rent_account` is a PDA that must s
 
 The `rent_account` field has the same meaning across `UpdateResizableAccount`, `ReallocAccount`, `ReallocAccountZeroed`, and `ReallocCompactAccount`: it funds growth and receives a shrink refund. The lower-level builders take an explicit `target_size`; the high-level builder derives it from the patch.
 
-The generated patch owns the update plan, so callers do not coordinate `set_*`, `commit`, and `ReallocCompactAccount`. Borrow the account for a `JournalRef` only while reading. End that borrow before invoking `UpdateResizableAccount`.
+The generated patch owns the update plan, so callers do not coordinate `set_*`, `commit`, and `ReallocCompactAccount`. Use `Journal::with_pda` to read a stored-bump compact PDA without a separate `assert_compact_type` or `assert_seeds` pass. End the closure before invoking `UpdateResizableAccount`.
 
 <!-- {/compactAccountResizeOrdering} -->
 
