@@ -33,8 +33,10 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { findJournalPda } from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -108,6 +110,68 @@ export function getWriteInstructionDataCodec(): FixedSizeCodec<
 		getWriteInstructionDataEncoder(),
 		getWriteInstructionDataDecoder(),
 	);
+}
+
+export type WriteAsyncInput<
+	TAccountAuthority extends string = string,
+	TAccountJournal extends string = string,
+> = {
+	/** Funds growth if a future write patch changes the encoded length. */
+	authority: TransactionSigner<TAccountAuthority>;
+	journal?: Address<TAccountJournal>;
+	index: WriteInstructionDataArgs["index"];
+	value: WriteInstructionDataArgs["value"];
+};
+
+export async function getWriteInstructionAsync<
+	TAccountAuthority extends string,
+	TAccountJournal extends string,
+	TProgramAddress extends Address =
+		typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: WriteAsyncInput<TAccountAuthority, TAccountJournal>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	WriteInstruction<TProgramAddress, TAccountAuthority, TAccountJournal>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: { value: input.authority ?? null, isWritable: true },
+		journal: { value: input.journal ?? null, isWritable: true },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.journal.value) {
+		accounts.journal.value = await findJournalPda({
+			authority: getAddressFromResolvedInstructionAccount(
+				"authority",
+				accounts.authority.value,
+			),
+		}, { programAddress });
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("journal", accounts.journal),
+		],
+		data: getWriteInstructionDataEncoder().encode(
+			args as WriteInstructionDataArgs,
+		),
+		programAddress,
+	} as WriteInstruction<TProgramAddress, TAccountAuthority, TAccountJournal>);
 }
 
 export type WriteInput<

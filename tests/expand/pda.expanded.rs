@@ -6,6 +6,7 @@ pub enum PdaDisc {
     CounterState = 1,
     AllSeedState = 2,
     TodoState = 3,
+    Compact = 4,
 }
 #[automatically_derived]
 impl ::core::fmt::Debug for PdaDisc {
@@ -17,6 +18,7 @@ impl ::core::fmt::Debug for PdaDisc {
                 PdaDisc::CounterState => "CounterState",
                 PdaDisc::AllSeedState => "AllSeedState",
                 PdaDisc::TodoState => "TodoState",
+                PdaDisc::Compact => "Compact",
             },
         )
     }
@@ -76,11 +78,13 @@ impl ::core::convert::TryFrom<u8> for PdaDisc {
         const __COUNTER_STATE: u8 = 1;
         const __ALL_SEED_STATE: u8 = 2;
         const __TODO_STATE: u8 = 3;
+        const __COMPACT: u8 = 4;
         #[deny(unreachable_patterns)]
         match number {
             __COUNTER_STATE => ::core::result::Result::Ok(Self::CounterState),
             __ALL_SEED_STATE => ::core::result::Result::Ok(Self::AllSeedState),
             __TODO_STATE => ::core::result::Result::Ok(Self::TodoState),
+            __COMPACT => ::core::result::Result::Ok(Self::Compact),
             #[allow(unreachable_patterns)]
             _ => {
                 ::core::result::Result::Err(
@@ -1691,6 +1695,1187 @@ impl pina::AccountValidation for TodoStateZc {
 impl pina::PinaAccount for TodoState {
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+}
+#[pinapod(crate = pina::pinapod, no_inherent)]
+#[pinapod(compact)]
+pub struct CompactState {
+    #[pinapod(skip_accessor, skip_patch)]
+    discriminator: [u8; PdaDisc::BYTES],
+    pub authority: Address,
+    pub bump: u8,
+    pub values: Vec<u64, 4>,
+}
+#[doc(hidden)]
+#[allow(dead_code, non_snake_case, unused_imports)]
+mod __pinapod_compact_CompactState {
+    use super::*;
+    #[inline(always)]
+    fn __pinapod_checked_add(
+        left: usize,
+        right: usize,
+    ) -> Result<usize, pina::pinapod::PinaPodError> {
+        left.checked_add(right).ok_or(pina::pinapod::PinaPodError::Overflow)
+    }
+    #[inline(always)]
+    fn __pinapod_checked_mul(
+        left: usize,
+        right: usize,
+    ) -> Result<usize, pina::pinapod::PinaPodError> {
+        left.checked_mul(right).ok_or(pina::pinapod::PinaPodError::Overflow)
+    }
+    const fn __pinapod_gcd(mut left: usize, mut right: usize) -> usize {
+        while right != 0 {
+            let remainder = left % right;
+            left = right;
+            right = remainder;
+        }
+        left
+    }
+    #[inline(always)]
+    fn __pinapod_prefix_max(width: usize) -> Option<usize> {
+        match width {
+            1 => Some(u8::MAX as usize),
+            2 => Some(u16::MAX as usize),
+            4 => usize::try_from(u32::MAX).ok(),
+            8 => Some(usize::MAX),
+            _ => None,
+        }
+    }
+    #[inline(always)]
+    fn __pinapod_check_prefix(
+        value: usize,
+        width: usize,
+    ) -> Result<(), pina::pinapod::PinaPodError> {
+        match __pinapod_prefix_max(width) {
+            Some(max) if value <= max => Ok(()),
+            _ => Err(pina::pinapod::PinaPodError::Overflow),
+        }
+    }
+    #[inline(always)]
+    fn __pinapod_decode_prefix(
+        bytes: &[u8],
+    ) -> Result<usize, pina::pinapod::PinaPodError> {
+        let value = match bytes {
+            [a] => u64::from(*a),
+            [a, b] => u64::from(u16::from_le_bytes([*a, *b])),
+            [a, b, c, d] => u64::from(u32::from_le_bytes([*a, *b, *c, *d])),
+            [a, b, c, d, e, f, g, h] => {
+                u64::from_le_bytes([*a, *b, *c, *d, *e, *f, *g, *h])
+            }
+            _ => return Err(pina::pinapod::PinaPodError::InvalidLength),
+        };
+        usize::try_from(value).map_err(|_| pina::pinapod::PinaPodError::Overflow)
+    }
+    #[inline(always)]
+    fn __pinapod_read_prefix(
+        data: &[u8],
+        offset: usize,
+        width: usize,
+    ) -> Result<usize, pina::pinapod::PinaPodError> {
+        let end = __pinapod_checked_add(offset, width)?;
+        let bytes = data
+            .get(offset..end)
+            .ok_or(pina::pinapod::PinaPodError::BufferTooSmall)?;
+        __pinapod_decode_prefix(bytes)
+    }
+    #[inline(always)]
+    fn __pinapod_write_prefix(
+        data: &mut [u8],
+        offset: usize,
+        width: usize,
+        value: usize,
+    ) -> Result<(), pina::pinapod::PinaPodError> {
+        __pinapod_check_prefix(value, width)?;
+        let end = __pinapod_checked_add(offset, width)?;
+        let destination = data
+            .get_mut(offset..end)
+            .ok_or(pina::pinapod::PinaPodError::BufferTooSmall)?;
+        let bytes = (value as u64).to_le_bytes();
+        destination.copy_from_slice(&bytes[..width]);
+        Ok(())
+    }
+    #[repr(C)]
+    pub struct CompactStateHeader
+    where
+        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    {
+        discriminator: [u8; PdaDisc::BYTES],
+        pub authority: <Address as pina::pinapod::ZcField>::Pod,
+        pub bump: <u8 as pina::pinapod::ZcField>::Pod,
+        __values_len: [u8; 2usize],
+    }
+    const _: () = if !(core::mem::align_of::<CompactStateHeader>() == 1) {
+        ::core::panicking::panic(
+            "assertion failed: core::mem::align_of::<CompactStateHeader>() == 1",
+        )
+    };
+    impl Copy for CompactStateHeader
+    where
+        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    {}
+    impl Clone for CompactStateHeader
+    where
+        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    {
+        fn clone(&self) -> Self {
+            *self
+        }
+    }
+    impl pina::pinapod::ZcValidate for CompactStateHeader
+    where
+        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    {
+        fn validate_ref(value: &Self) -> Result<(), pina::pinapod::PinaPodError> {
+            <[u8; PdaDisc::BYTES] as pina::pinapod::ZcValidate>::validate_ref(
+                &value.discriminator,
+            )?;
+            <<Address as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.authority,
+            )?;
+            <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.bump,
+            )?;
+            Ok(())
+        }
+    }
+    unsafe impl pina::pinapod::ZcElem for CompactStateHeader
+    where
+        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    {}
+    impl pina::pinapod::PinaPod for CompactState
+    where
+        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    {}
+    unsafe impl pina::pinapod::PinaPodCompact for CompactState
+    where
+        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    {
+        type Header = CompactStateHeader;
+        const MIN_SIZE: usize = core::mem::size_of::<CompactStateHeader>();
+        const MAX_SIZE: usize = {
+            let mut __size = core::mem::size_of::<CompactStateHeader>();
+            __size = match __size
+                .checked_add(
+                    match (4 as usize)
+                        .checked_mul(
+                            core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>(),
+                        )
+                    {
+                        Some(value) => value,
+                        None => {
+                            ::core::panicking::panic_fmt(
+                                format_args!("compact schema maximum size overflows usize"),
+                            );
+                        }
+                    },
+                )
+            {
+                Some(value) => value,
+                None => {
+                    ::core::panicking::panic_fmt(
+                        format_args!("compact schema maximum size overflows usize"),
+                    );
+                }
+            };
+            __size
+        };
+        const TAIL_ALIGNMENT: usize = {
+            let mut __alignment = 0usize;
+            __alignment = __pinapod_gcd(
+                __alignment,
+                core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>(),
+            );
+            if __alignment == 0 { 1 } else { __alignment }
+        };
+        const HEADER_SIZE: usize = core::mem::size_of::<CompactStateHeader>();
+        fn validate(data: &[u8]) -> Result<(), pina::pinapod::PinaPodError> {
+            let __pinapod_type_check: fn(
+                Vec<u64, 4>,
+            ) -> pina::pinapod::pod::PodVecRepr<
+                <u64 as pina::pinapod::ZcField>::Pod,
+                4,
+                2usize,
+            > = |value| value;
+            let _ = __pinapod_type_check;
+            let _ = pina::pinapod::pod::PodVec::<u8, 4, 2usize>::VALID;
+            let _ = const {
+                if !(core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>() != 0) {
+                    {
+                        ::core::panicking::panic_fmt(
+                            format_args!(
+                                "compact vector elements must not be zero-sized",
+                            ),
+                        );
+                    }
+                }
+            };
+            Self::validate_storage_len(data.len())?;
+            if data.len() < core::mem::size_of::<CompactStateHeader>() {
+                return Err(pina::pinapod::PinaPodError::BufferTooSmall);
+            }
+            let __hdr = unsafe { &*(data.as_ptr() as *const CompactStateHeader) };
+            <CompactStateHeader as pina::pinapod::ZcValidate>::validate_ref(__hdr)?;
+            let mut __tail_offset = core::mem::size_of::<CompactStateHeader>();
+            let __values_len = __pinapod_decode_prefix(&__hdr.__values_len)?;
+            if __values_len > 4 {
+                return Err(pina::pinapod::PinaPodError::InvalidLength);
+            }
+            let __elem_size = core::mem::size_of::<
+                <u64 as pina::pinapod::ZcField>::Pod,
+            >();
+            if __elem_size == 0 {
+                return Err(pina::pinapod::PinaPodError::InvalidLength);
+            }
+            let __byte_len = __pinapod_checked_mul(__values_len, __elem_size)?;
+            let __tail_end = __pinapod_checked_add(__tail_offset, __byte_len)?;
+            let __tail = data
+                .get(__tail_offset..__tail_end)
+                .ok_or(pina::pinapod::PinaPodError::BufferTooSmall)?;
+            for __i in 0..__values_len {
+                let __elem_offset = __pinapod_checked_mul(__i, __elem_size)?;
+                let __elem_ptr = unsafe {
+                    &*(__tail.as_ptr().add(__elem_offset)
+                        as *const <u64 as pina::pinapod::ZcField>::Pod)
+                };
+                <<u64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                    __elem_ptr,
+                )?;
+            }
+            __tail_offset = __tail_end;
+            Ok(())
+        }
+    }
+    pub struct CompactStateRef<'__pinapod_data>
+    where
+        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    {
+        data: &'__pinapod_data [u8],
+        encoded_len: usize,
+    }
+    impl<'__pinapod_data> core::ops::Deref for CompactStateRef<'__pinapod_data>
+    where
+        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    {
+        type Target = CompactStateHeader;
+        fn deref(&self) -> &CompactStateHeader {
+            self.header()
+        }
+    }
+    impl<'__pinapod_data> CompactStateRef<'__pinapod_data>
+    where
+        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    {
+        pub fn new(
+            data: &'__pinapod_data [u8],
+        ) -> Result<Self, pina::pinapod::PinaPodError> {
+            <CompactState as pina::pinapod::PinaPodCompact>::validate(data)?;
+            let mut value = Self { data, encoded_len: 0 };
+            value.encoded_len = value.current_encoded_len();
+            Ok(value)
+        }
+        fn header(&self) -> &'__pinapod_data CompactStateHeader {
+            unsafe { &*(self.data.as_ptr() as *const CompactStateHeader) }
+        }
+        fn current_encoded_len(&self) -> usize {
+            let __hdr = self.header();
+            let mut __offset = core::mem::size_of::<CompactStateHeader>();
+            let __values_offset_count = u16::from_le_bytes(__hdr.__values_len) as usize;
+            __offset
+                += __values_offset_count
+                    * core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>();
+            __offset
+        }
+        pub fn encoded_len(&self) -> usize {
+            self.encoded_len
+        }
+        pub fn storage_len(&self) -> usize {
+            self.data.len()
+        }
+        pub fn spare_capacity(&self) -> usize {
+            self.data.len() - self.encoded_len
+        }
+        pub fn values(&self) -> &'__pinapod_data [<u64 as pina::pinapod::ZcField>::Pod] {
+            let __hdr = self.header();
+            let __count = u16::from_le_bytes(__hdr.__values_len) as usize;
+            let mut __offset = core::mem::size_of::<CompactStateHeader>();
+            unsafe {
+                let __ptr = self.data.as_ptr().add(__offset)
+                    as *const <u64 as pina::pinapod::ZcField>::Pod;
+                core::slice::from_raw_parts(__ptr, __count)
+            }
+        }
+    }
+    struct CompactStateMut<'__pinapod_data>
+    where
+        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    {
+        data: &'__pinapod_data mut [u8],
+        total_len: usize,
+        __values_edit: Option<(*const u8, usize)>,
+    }
+    impl<'__pinapod_data> core::ops::Deref for CompactStateMut<'__pinapod_data>
+    where
+        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    {
+        type Target = CompactStateHeader;
+        fn deref(&self) -> &CompactStateHeader {
+            self.header()
+        }
+    }
+    impl<'__pinapod_data> CompactStateMut<'__pinapod_data>
+    where
+        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    {
+        pub fn new(
+            data: &'__pinapod_data mut [u8],
+        ) -> Result<Self, pina::pinapod::PinaPodError> {
+            <CompactState as pina::pinapod::PinaPodCompact>::validate(data)?;
+            let mut value = Self {
+                data,
+                total_len: 0,
+                __values_edit: None,
+            };
+            value.total_len = value.current_encoded_len();
+            Ok(value)
+        }
+        /// # Safety
+        /// Caller must ensure `data` is at least `HEADER_SIZE` bytes and
+        /// contains a valid compact header. The tail region must be
+        /// consistent with the header length prefixes.
+        unsafe fn new_unchecked(data: &'__pinapod_data mut [u8]) -> Self {
+            let mut value = Self {
+                data,
+                total_len: 0,
+                __values_edit: None,
+            };
+            value.total_len = value.current_encoded_len();
+            value
+        }
+        fn header(&self) -> &CompactStateHeader {
+            unsafe { &*(self.data.as_ptr() as *const CompactStateHeader) }
+        }
+        fn header_mut(&mut self) -> &mut CompactStateHeader {
+            unsafe { &mut *(self.data.as_mut_ptr() as *mut CompactStateHeader) }
+        }
+        pub fn discriminator_mut(&mut self) -> &mut [u8; PdaDisc::BYTES] {
+            &mut self.header_mut().discriminator
+        }
+        pub fn authority_mut(
+            &mut self,
+        ) -> &mut <Address as pina::pinapod::ZcField>::Pod {
+            &mut self.header_mut().authority
+        }
+        pub fn bump_mut(&mut self) -> &mut <u8 as pina::pinapod::ZcField>::Pod {
+            &mut self.header_mut().bump
+        }
+        pub fn set_values(
+            &mut self,
+            value: &'__pinapod_data [<u64 as pina::pinapod::ZcField>::Pod],
+        ) -> Result<(), pina::pinapod::PinaPodError> {
+            if value.len() > 4 || __pinapod_check_prefix(value.len(), 2usize).is_err() {
+                return Err(pina::pinapod::PinaPodError::Overflow);
+            }
+            for __item in value {
+                <<u64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                    __item,
+                )?;
+            }
+            self.__values_edit = Some((value.as_ptr() as *const u8, value.len()));
+            Ok(())
+        }
+        fn current_encoded_len(&self) -> usize {
+            let __hdr = self.header();
+            let mut __offset = core::mem::size_of::<CompactStateHeader>();
+            let __values_offset_count = u16::from_le_bytes(__hdr.__values_len) as usize;
+            __offset
+                += __values_offset_count
+                    * core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>();
+            __offset
+        }
+        fn try_projected_size(&self) -> Result<usize, pina::pinapod::PinaPodError> {
+            let mut __total = self.total_len;
+            if let Some((_, __new_count)) = self.__values_edit {
+                let __hdr = self.header();
+                let __old_count = u16::from_le_bytes(__hdr.__values_len) as usize;
+                let __old_len = __pinapod_checked_mul(
+                    __old_count,
+                    core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>(),
+                )?;
+                let __new_len = __pinapod_checked_mul(
+                    __new_count,
+                    core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>(),
+                )?;
+                __total = __total
+                    .checked_sub(__old_len)
+                    .ok_or(pina::pinapod::PinaPodError::Overflow)?;
+                __total = __pinapod_checked_add(__total, __new_len)?;
+            }
+            Ok(__total)
+        }
+        pub fn projected_size(&self) -> usize {
+            self.try_projected_size().unwrap_or(usize::MAX)
+        }
+        pub fn commit(&mut self) -> Result<usize, pina::pinapod::PinaPodError> {
+            let __old_off_values: usize = core::mem::size_of::<CompactStateHeader>();
+            let __new_off_values: usize = core::mem::size_of::<CompactStateHeader>();
+            let __old_len_values: usize = {
+                let __hdr = self.header();
+                let __count = u16::from_le_bytes(__hdr.__values_len) as usize;
+                __pinapod_checked_mul(
+                    __count,
+                    core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>(),
+                )?
+            };
+            let __new_len_values: usize = match self.__values_edit {
+                Some((_, __count)) => {
+                    __pinapod_checked_mul(
+                        __count,
+                        core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>(),
+                    )?
+                }
+                None => __old_len_values,
+            };
+            let __old_end = __pinapod_checked_add(__old_off_values, __old_len_values)?;
+            if __old_end > self.total_len {
+                return Err(pina::pinapod::PinaPodError::BufferTooSmall);
+            }
+            let __new_end = __pinapod_checked_add(__new_off_values, __new_len_values)?;
+            if __new_end > self.data.len() {
+                return Err(pina::pinapod::PinaPodError::BufferTooSmall);
+            }
+            let __old_total = self.total_len;
+            let __final_total: usize = __pinapod_checked_add(
+                __new_off_values,
+                __new_len_values,
+            )?;
+            if __final_total > self.data.len() {
+                return Err(pina::pinapod::PinaPodError::BufferTooSmall);
+            }
+            let __buf_ptr = self.data.as_mut_ptr();
+            if self.__values_edit.is_none() && __new_off_values < __old_off_values
+                && __old_len_values > 0
+            {
+                unsafe {
+                    core::ptr::copy(
+                        __buf_ptr.add(__old_off_values) as *const u8,
+                        __buf_ptr.add(__new_off_values),
+                        __old_len_values,
+                    );
+                }
+            }
+            if self.__values_edit.is_none() && __new_off_values > __old_off_values
+                && __old_len_values > 0
+            {
+                unsafe {
+                    core::ptr::copy(
+                        __buf_ptr.add(__old_off_values) as *const u8,
+                        __buf_ptr.add(__new_off_values),
+                        __old_len_values,
+                    );
+                }
+            }
+            if let Some((__src_ptr, _)) = self.__values_edit {
+                if __new_len_values > 0 {
+                    let __source = unsafe {
+                        core::slice::from_raw_parts(__src_ptr, __new_len_values)
+                    };
+                    let __end = __pinapod_checked_add(
+                        __new_off_values,
+                        __new_len_values,
+                    )?;
+                    self.data[__new_off_values..__end].copy_from_slice(__source);
+                }
+            }
+            if let Some((_, __count)) = self.__values_edit {
+                __pinapod_write_prefix(
+                    &mut self.header_mut().__values_len,
+                    0,
+                    2usize,
+                    __count,
+                )?;
+            }
+            if __final_total < __old_total {
+                self.data[__final_total..__old_total].fill(0);
+            }
+            self.total_len = __final_total;
+            self.__values_edit = None;
+            Ok(__final_total)
+        }
+    }
+    pub struct CompactStatePatch<'__pinapod_patch>
+    where
+        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    {
+        authority: Option<<Address as pina::pinapod::ZcField>::Pod>,
+        bump: Option<<u8 as pina::pinapod::ZcField>::Pod>,
+        values: Option<&'__pinapod_patch [<u64 as pina::pinapod::ZcField>::Pod]>,
+        __pinapod_lifetime: core::marker::PhantomData<&'__pinapod_patch ()>,
+    }
+    impl<'__pinapod_patch> CompactStatePatch<'__pinapod_patch>
+    where
+        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    {
+        pub fn new() -> Self {
+            Self {
+                authority: None,
+                bump: None,
+                values: None,
+                __pinapod_lifetime: core::marker::PhantomData,
+            }
+        }
+        pub fn authority(
+            mut self,
+            value: impl Into<<Address as pina::pinapod::ZcField>::Pod>,
+        ) -> Self {
+            self.authority = Some(value.into());
+            self
+        }
+        pub fn bump(
+            mut self,
+            value: impl Into<<u8 as pina::pinapod::ZcField>::Pod>,
+        ) -> Self {
+            self.bump = Some(value.into());
+            self
+        }
+        pub fn replace_values(
+            mut self,
+            value: &'__pinapod_patch [<u64 as pina::pinapod::ZcField>::Pod],
+        ) -> Self {
+            self.values = Some(value);
+            self
+        }
+        fn validate_inputs(&self) -> Result<(), pina::pinapod::PinaPodError> {
+            if let Some(value) = &self.authority {
+                <<Address as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                    value,
+                )?;
+            }
+            if let Some(value) = &self.bump {
+                <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                    value,
+                )?;
+            }
+            if let Some(value) = self.values {
+                if value.len() > 4 {
+                    return Err(pina::pinapod::PinaPodError::Overflow);
+                }
+                __pinapod_check_prefix(value.len(), 2usize)?;
+                if core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>() == 0 {
+                    return Err(pina::pinapod::PinaPodError::InvalidLength);
+                }
+                for item in value {
+                    <<u64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                        item,
+                    )?;
+                }
+            }
+            Ok(())
+        }
+        pub fn updated_len(
+            &self,
+            data: &[u8],
+        ) -> Result<usize, pina::pinapod::PinaPodError> {
+            self.validate_inputs()?;
+            let view = <CompactStateRef<'_>>::new(data)?;
+            let mut updated_len = view.encoded_len();
+            if let Some(value) = self.values {
+                let old_len = __pinapod_checked_mul(
+                    view.values().len(),
+                    core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>(),
+                )?;
+                let new_len = __pinapod_checked_mul(
+                    value.len(),
+                    core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>(),
+                )?;
+                updated_len = updated_len
+                    .checked_sub(old_len)
+                    .ok_or(pina::pinapod::PinaPodError::Overflow)?;
+                updated_len = __pinapod_checked_add(updated_len, new_len)?;
+            }
+            Ok(updated_len)
+        }
+        fn initialized_len(&self) -> Result<usize, pina::pinapod::PinaPodError> {
+            self.validate_inputs()?;
+            let mut initialized_len = core::mem::size_of::<CompactStateHeader>();
+            if let Some(value) = self.values {
+                let new_len = __pinapod_checked_mul(
+                    value.len(),
+                    core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>(),
+                )?;
+                initialized_len = __pinapod_checked_add(initialized_len, new_len)?;
+            }
+            Ok(initialized_len)
+        }
+        pub fn update(
+            &self,
+            data: &mut [u8],
+        ) -> Result<usize, pina::pinapod::PinaPodError> {
+            let expected_len = self.updated_len(data)?;
+            if expected_len > data.len() {
+                return Err(pina::pinapod::PinaPodError::BufferTooSmall);
+            }
+            let mut writer = unsafe { <CompactStateMut<'_>>::new_unchecked(data) };
+            if let Some(value) = self.values {
+                writer.__values_edit = Some((value.as_ptr() as *const u8, value.len()));
+            }
+            let encoded_len = writer.commit()?;
+            if let Some(value) = self.authority {
+                *writer.authority_mut() = value;
+            }
+            if let Some(value) = self.bump {
+                *writer.bump_mut() = value;
+            }
+            if true {
+                match (&encoded_len, &expected_len) {
+                    (left_val, right_val) => {
+                        if !(*left_val == *right_val) {
+                            let kind = ::core::panicking::AssertKind::Eq;
+                            ::core::panicking::assert_failed(
+                                kind,
+                                &*left_val,
+                                &*right_val,
+                                ::core::option::Option::None,
+                            );
+                        }
+                    }
+                };
+            }
+            Ok(encoded_len)
+        }
+        fn try_initialize(
+            &self,
+            data: &mut [u8],
+        ) -> Result<usize, pina::pinapod::PinaPodError> {
+            <CompactState as pina::pinapod::PinaPodCompact>::validate_storage_len(
+                data.len(),
+            )?;
+            let expected_len = self.initialized_len()?;
+            if expected_len > data.len() {
+                return Err(pina::pinapod::PinaPodError::BufferTooSmall);
+            }
+            let encoded_len = {
+                let mut writer = unsafe { <CompactStateMut<'_>>::new_unchecked(data) };
+                if let Some(value) = self.values {
+                    writer.__values_edit = Some((
+                        value.as_ptr() as *const u8,
+                        value.len(),
+                    ));
+                }
+                let encoded_len = writer.commit()?;
+                if let Some(value) = self.authority {
+                    *writer.authority_mut() = value;
+                }
+                if let Some(value) = self.bump {
+                    *writer.bump_mut() = value;
+                }
+                encoded_len
+            };
+            <CompactState as pina::pinapod::PinaPodCompact>::validate(
+                &data[..encoded_len],
+            )?;
+            if true {
+                match (&encoded_len, &expected_len) {
+                    (left_val, right_val) => {
+                        if !(*left_val == *right_val) {
+                            let kind = ::core::panicking::AssertKind::Eq;
+                            ::core::panicking::assert_failed(
+                                kind,
+                                &*left_val,
+                                &*right_val,
+                                ::core::option::Option::None,
+                            );
+                        }
+                    }
+                };
+            }
+            Ok(encoded_len)
+        }
+        pub fn initialize(
+            &self,
+            data: &mut [u8],
+        ) -> Result<usize, pina::pinapod::PinaPodError> {
+            data.fill(0);
+            let result = self.try_initialize(data);
+            if result.is_err() {
+                data.fill(0);
+            }
+            result
+        }
+    }
+    impl<'__pinapod_patch> pina::pinapod::PinaPodPatch<CompactState>
+    for CompactStatePatch<'__pinapod_patch>
+    where
+        [u8; PdaDisc::BYTES]: pina::pinapod::ZcElem,
+        <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+        <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    {
+        fn updated_len(
+            &self,
+            data: &[u8],
+        ) -> Result<usize, pina::pinapod::PinaPodError> {
+            <CompactStatePatch<'__pinapod_patch>>::updated_len(self, data)
+        }
+        fn update(&self, data: &mut [u8]) -> Result<usize, pina::pinapod::PinaPodError> {
+            <CompactStatePatch<'__pinapod_patch>>::update(self, data)
+        }
+        fn initialize(
+            &self,
+            data: &mut [u8],
+        ) -> Result<usize, pina::pinapod::PinaPodError> {
+            <CompactStatePatch<'__pinapod_patch>>::initialize(self, data)
+        }
+    }
+}
+#[allow(unused_imports)]
+pub use __pinapod_compact_CompactState::{
+    CompactStateHeader, CompactStatePatch, CompactStateRef,
+};
+///The PDA seeds for `CompactState`.
+pub struct CompactStateSeeds<'a> {
+    ///The `authority` seed.
+    pub authority: &'a Address,
+}
+#[automatically_derived]
+#[doc(hidden)]
+unsafe impl<'a> ::core::clone::TrivialClone for CompactStateSeeds<'a> {}
+#[automatically_derived]
+impl<'a> ::core::clone::Clone for CompactStateSeeds<'a> {
+    #[inline]
+    fn clone(&self) -> CompactStateSeeds<'a> {
+        let _: ::core::clone::AssertParamIsClone<&'a Address>;
+        *self
+    }
+}
+#[automatically_derived]
+impl<'a> ::core::marker::Copy for CompactStateSeeds<'a> {}
+///The PDA seeds for `CompactState`, including the bump seed.
+pub struct CompactStateSeedsWithBump<'a> {
+    inner: CompactStateSeeds<'a>,
+    _bump: [u8; 1],
+}
+impl CompactState {
+    /// Build the PDA seeds for this account.
+    pub fn seeds<'a>(authority: &'a Address) -> CompactStateSeeds<'a> {
+        CompactStateSeeds {
+            authority: authority,
+        }
+    }
+    /// Find the canonical PDA for this account and its bump seed.
+    pub fn try_find_pda(
+        authority: &Address,
+        program_id: &Address,
+    ) -> ::core::option::Option<(pina::Address, u8)> {
+        let seeds = Self::seeds(authority);
+        pina::try_find_program_address(&seeds.as_slices(), program_id)
+    }
+    /// Find the canonical PDA for this account and its bump seed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no valid PDA exists for the given seeds.
+    pub fn find_pda(authority: &Address, program_id: &Address) -> (pina::Address, u8) {
+        Self::try_find_pda(authority, program_id)
+            .unwrap_or_else(|| {
+                ::core::panicking::panic_fmt(
+                    format_args!("could not find program address from seeds"),
+                );
+            })
+    }
+    ///Assert that `account` is the PDA for the given seeds, using the stored `bump` field.
+    pub fn assert_seeds(
+        account: &pina::AccountView,
+        authority: &Address,
+        program_id: &pina::Address,
+    ) -> ::core::result::Result<(), pina::ProgramError> {
+        let bump = pina::AsCompactAccount::with_compact_account::<
+            Self,
+            _,
+        >(account, program_id, |state| Ok(state.bump))?;
+        let seeds = Self::seeds(authority).with_bump(bump);
+        <&pina::AccountView as pina::AccountInfoValidation>::assert_seeds_with_bump(
+                account,
+                &seeds.as_slices(),
+                program_id,
+            )
+            .map(|_| ())
+    }
+    ///Load and validate `CompactState`, its canonical stored bump, and its PDA address for the duration of `use_account`.
+    #[inline(always)]
+    pub fn with_pda<R>(
+        account: &pina::AccountView,
+        authority: &Address,
+        program_id: &pina::Address,
+        use_account: impl FnOnce(
+            <Self as pina::PinaCompactAccount>::Ref<'_>,
+        ) -> ::core::result::Result<R, pina::ProgramError>,
+    ) -> ::core::result::Result<R, pina::ProgramError> {
+        let account_address = *account.address();
+        pina::AsCompactAccount::with_compact_account::<
+            Self,
+            _,
+        >(
+            account,
+            program_id,
+            |state| {
+                let seeds = Self::seeds(authority);
+                let Some((expected_address, canonical_bump)) = pina::try_find_program_address(
+                    &seeds.as_slices(),
+                    program_id,
+                ) else {
+                    return Err(pina::ProgramError::InvalidSeeds);
+                };
+                if account_address != expected_address || state.bump != canonical_bump {
+                    return Err(pina::ProgramError::InvalidSeeds);
+                }
+                use_account(state)
+            },
+        )
+    }
+}
+impl<'a> CompactStateSeeds<'a> {
+    /// The seeds as byte slices, without the bump seed.
+    pub fn as_slices(&self) -> [&[u8]; 2usize] {
+        [b"compact", self.authority.as_ref()]
+    }
+    /// Append the bump seed to the seeds.
+    pub fn with_bump(&self, bump: u8) -> CompactStateSeedsWithBump<'a> {
+        CompactStateSeedsWithBump {
+            inner: *self,
+            _bump: [bump],
+        }
+    }
+}
+impl<'a> CompactStateSeedsWithBump<'a> {
+    /// The seeds as byte slices, including the bump seed.
+    pub fn as_slices(&self) -> [&[u8]; 3usize] {
+        [b"compact", self.inner.authority.as_ref(), &self._bump]
+    }
+    /// The seeds as Pinocchio CPI seed values, including the bump seed.
+    pub fn as_seed_array(&self) -> [pina::Seed<'_>; 3usize] {
+        self.as_slices().map(pina::Seed::from)
+    }
+    /// The seeds as an owned PDA signer helper.
+    pub fn to_signer(&self) -> pina::PdaSigner<'_, 3usize> {
+        pina::PdaSigner::from_seed_array(self.as_seed_array())
+    }
+}
+const _: fn(Address) -> pina::Address = |value| value;
+const _: fn() = || {
+    fn assert_mapping<T: pina::ZcField<Pod = pina::Address>>() {}
+    fn assert_storage<T: pina::ZcElem>() {}
+    assert_mapping::<Address>();
+    assert_storage::<pina::Address>();
+};
+const _: () = {
+    if !(::core::mem::align_of::<pina::Address>() == 1) {
+        ::core::panicking::panic(
+            "assertion failed: ::core::mem::align_of::<pina::Address>() == 1",
+        )
+    }
+};
+const _: fn(u8) -> ::core::primitive::u8 = |value| value;
+const _: fn() = || {
+    fn assert_mapping<T: pina::ZcField<Pod = ::core::primitive::u8>>() {}
+    fn assert_storage<T: pina::ZcElem>() {}
+    assert_mapping::<u8>();
+    assert_storage::<::core::primitive::u8>();
+};
+const _: () = {
+    if !(::core::mem::align_of::<::core::primitive::u8>() == 1) {
+        ::core::panicking::panic(
+            "assertion failed: ::core::mem::align_of::<::core::primitive::u8>() == 1",
+        )
+    }
+};
+const _: fn(u64) -> ::core::primitive::u64 = |value| value;
+const _: fn() = || {
+    fn assert_mapping<T: pina::ZcField<Pod = pina::PodU64>>() {}
+    fn assert_storage<T: pina::ZcElem>() {}
+    assert_mapping::<u64>();
+    assert_storage::<pina::PodU64>();
+};
+const _: () = {
+    if !(::core::mem::align_of::<pina::PodU64>() == 1) {
+        ::core::panicking::panic(
+            "assertion failed: ::core::mem::align_of::<pina::PodU64>() == 1",
+        )
+    }
+};
+const _: fn() = || {
+    fn assert_layout<T: pina::PinaPodCompact<Header = CompactStateHeader>>() {}
+    assert_layout::<CompactState>();
+};
+const _: () = {
+    if !(::core::mem::align_of::<CompactStateHeader>() == 1) {
+        ::core::panicking::panic(
+            "assertion failed: ::core::mem::align_of::<CompactStateHeader>() == 1",
+        )
+    }
+    if !(::core::mem::size_of::<CompactStateHeader>()
+        == PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>()
+            + ::core::mem::size_of::<::core::primitive::u8>() + 2usize)
+    {
+        ::core::panicking::panic(
+            "assertion failed: ::core::mem::size_of::<CompactStateHeader>() ==\n    PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>() +\n            ::core::mem::size_of::<::core::primitive::u8>() + 2usize",
+        )
+    }
+    if !(<CompactState as pina::PinaPodCompact>::MIN_SIZE
+        == PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>()
+            + ::core::mem::size_of::<::core::primitive::u8>() + 2usize)
+    {
+        ::core::panicking::panic(
+            "assertion failed: <CompactState as pina::PinaPodCompact>::MIN_SIZE ==\n    PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>() +\n            ::core::mem::size_of::<::core::primitive::u8>() + 2usize",
+        )
+    }
+    if !(<CompactState as pina::PinaPodCompact>::MAX_SIZE
+        == PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>()
+            + ::core::mem::size_of::<::core::primitive::u8>() + 2usize
+            + 4 * ::core::mem::size_of::<pina::PodU64>())
+    {
+        ::core::panicking::panic(
+            "assertion failed: <CompactState as pina::PinaPodCompact>::MAX_SIZE ==\n    PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>() +\n                ::core::mem::size_of::<::core::primitive::u8>() + 2usize +\n        4 * ::core::mem::size_of::<pina::PodU64>()",
+        )
+    }
+    if !(<CompactState as pina::PinaPodCompact>::TAIL_ALIGNMENT
+        == {
+            const fn gcd(mut left: usize, mut right: usize) -> usize {
+                while right != 0 {
+                    let remainder = left % right;
+                    left = right;
+                    right = remainder;
+                }
+                left
+            }
+            let mut alignment = 0;
+            alignment = gcd(alignment, ::core::mem::size_of::<pina::PodU64>());
+            alignment
+        })
+    {
+        ::core::panicking::panic(
+            "assertion failed: <CompactState as pina::PinaPodCompact>::TAIL_ALIGNMENT ==\n    {\n        const fn gcd(mut left: usize, mut right: usize) -> usize {\n            while right != 0 {\n                let remainder = left % right;\n                left = right;\n                right = remainder;\n            }\n            left\n        }\n        let mut alignment = 0;\n        alignment = gcd(alignment, ::core::mem::size_of::<pina::PodU64>());\n        alignment\n    }",
+        )
+    }
+    if !(::core::mem::size_of::<pina::PodU64>() > 0) {
+        ::core::panicking::panic(
+            "assertion failed: ::core::mem::size_of::<pina::PodU64>() > 0",
+        )
+    }
+    if !(4 <= ::core::primitive::u16::MAX as usize) {
+        ::core::panicking::panic(
+            "assertion failed: 4 <= ::core::primitive::u16::MAX as usize",
+        )
+    }
+};
+impl CompactState {
+    /// The fixed header size, including the discriminator and tail length prefix.
+    pub const HEADER_SIZE: usize = <Self as pina::PinaPodCompact>::HEADER_SIZE;
+    /// The minimum encoded and allocated size permitted by this compact schema.
+    pub const MIN_SIZE: usize = <Self as pina::PinaPodCompact>::MIN_SIZE;
+    /// The maximum encoded size permitted by this compact schema.
+    pub const MAX_SIZE: usize = <Self as pina::PinaPodCompact>::MAX_SIZE;
+    /// Byte granularity of valid compact account allocations.
+    pub const TAIL_ALIGNMENT: usize = <Self as pina::PinaPodCompact>::TAIL_ALIGNMENT;
+    ///Maximum element count for the `values` compact tail.
+    pub const VALUES_CAPACITY: usize = 4;
+    /// Calculate the exact encoded size for the requested compact tail counts.
+    ///
+    /// Count arguments follow the compact tails' declaration order.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InvalidAccountData` when any count exceeds its declared capacity or the
+    /// byte-size calculation overflows.
+    pub fn projected_bytes(values_count: usize) -> Result<usize, pina::ProgramError> {
+        if values_count > Self::VALUES_CAPACITY {
+            return Err(pina::ProgramError::InvalidAccountData);
+        }
+        let size = Self::HEADER_SIZE;
+        let tail_size = values_count
+            .checked_mul(::core::mem::size_of::<pina::PodU64>())
+            .ok_or(pina::ProgramError::InvalidAccountData)?;
+        let size = size
+            .checked_add(tail_size)
+            .ok_or(pina::ProgramError::InvalidAccountData)?;
+        Ok(size)
+    }
+    /// Validate and borrow a compact account view.
+    pub fn try_from_bytes(
+        data: &[u8],
+    ) -> Result<CompactStateRef<'_>, pina::ProgramError> {
+        <Self as pina::PinaPodCompact>::validate_storage_len(data.len())
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        if !<Self as pina::HasDiscriminator>::matches_discriminator(data) {
+            return Err(pina::ProgramError::InvalidAccountData);
+        }
+        CompactStateRef::new(data).map_err(|_| pina::ProgramError::InvalidAccountData)
+    }
+    /// Calculate the encoded length after applying `patch` without changing `data`.
+    pub fn updated_len(
+        data: &[u8],
+        patch: &CompactStatePatch<'_>,
+    ) -> Result<usize, pina::ProgramError> {
+        <Self as pina::PinaPodCompact>::validate_storage_len(data.len())
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        if !<Self as pina::HasDiscriminator>::matches_discriminator(data) {
+            return Err(pina::ProgramError::InvalidAccountData);
+        }
+        patch.updated_len(data).map_err(|_| pina::ProgramError::InvalidAccountData)
+    }
+    /// Atomically apply `patch` to initialized compact account storage.
+    pub fn update(
+        data: &mut [u8],
+        patch: &CompactStatePatch<'_>,
+    ) -> Result<usize, pina::ProgramError> {
+        <Self as pina::PinaPodCompact>::validate_storage_len(data.len())
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        if !<Self as pina::HasDiscriminator>::matches_discriminator(data) {
+            return Err(pina::ProgramError::InvalidAccountData);
+        }
+        let encoded_len = patch
+            .update(data)
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        <Self as pina::HasDiscriminator>::write_discriminator(data);
+        Ok(encoded_len)
+    }
+    /// Initialize compact account storage from one complete patch.
+    pub fn initialize(
+        data: &mut [u8],
+        patch: &CompactStatePatch<'_>,
+    ) -> Result<usize, pina::ProgramError> {
+        let encoded_len = patch
+            .initialize(data)
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        <Self as pina::HasDiscriminator>::write_discriminator(data);
+        Ok(encoded_len)
+    }
+}
+impl pina::HasDiscriminator for CompactState {
+    type Type = PdaDisc;
+    const VALUE: Self::Type = PdaDisc::Compact;
+}
+impl pina::AccountValidation for CompactStateHeader {
+    #[track_caller]
+    fn assert<F>(&self, condition: F) -> Result<&Self, pina::ProgramError>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        if condition(self) {
+            return Ok(self);
+        }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
+        pina::log_caller();
+        Err(pina::ProgramError::InvalidAccountData)
+    }
+    #[track_caller]
+    fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, pina::ProgramError>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        match pina::assert(
+            condition(self),
+            pina::ProgramError::InvalidAccountData,
+            msg,
+        ) {
+            Err(err) => Err(err),
+            Ok(()) => Ok(self),
+        }
+    }
+    #[track_caller]
+    fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, pina::ProgramError>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        if condition(self) {
+            return Ok(self);
+        }
+        ::pina::solana_program_log::logger::log_message("Account is invalid".as_bytes());
+        pina::log_caller();
+        Err(pina::ProgramError::InvalidAccountData)
+    }
+    #[track_caller]
+    fn assert_mut_msg<F>(
+        &mut self,
+        condition: F,
+        msg: &str,
+    ) -> Result<&mut Self, pina::ProgramError>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        match pina::assert(
+            condition(self),
+            pina::ProgramError::InvalidAccountData,
+            msg,
+        ) {
+            Err(err) => Err(err),
+            Ok(()) => Ok(self),
+        }
+    }
+}
+impl pina::PinaCompactAccount for CompactState {
+    type Ref<'data> = CompactStateRef<'data>;
+    type Patch<'patch> = CompactStatePatch<'patch>;
+    fn try_from_bytes(data: &[u8]) -> Result<Self::Ref<'_>, pina::ProgramError> {
+        Self::try_from_bytes(data)
+    }
+    fn updated_len(
+        data: &[u8],
+        patch: &Self::Patch<'_>,
+    ) -> Result<usize, pina::ProgramError> {
+        Self::updated_len(data, patch)
+    }
+    fn update(
+        data: &mut [u8],
+        patch: &Self::Patch<'_>,
+    ) -> Result<usize, pina::ProgramError> {
+        Self::update(data, patch)
+    }
+    fn initialize(
+        data: &mut [u8],
+        patch: &Self::Patch<'_>,
+    ) -> Result<usize, pina::ProgramError> {
+        Self::initialize(data, patch)
     }
 }
 pub struct AuthorityState {}

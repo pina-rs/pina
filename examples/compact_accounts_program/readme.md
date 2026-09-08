@@ -48,6 +48,8 @@ The macro generates `JournalHeader`, `JournalRef`, and `JournalPatch`. It also g
 
 Pina uses PinaPod for validated alignment-one storage. PinaPod initializes inactive collection capacity and validates each active nested value before Pina returns safe access.
 
+When a compact account also declares `#[pda(..., bump = bump)]`, the macro generates `Type::with_pda`. This closure-scoped loader checks owner, compact data, the canonical stored bump, and the derived account address while one runtime borrow remains active.
+
 <!-- {/compactAccountQuickstart} -->
 
 The example exercises multiple independent tails, an explicit prefix width, atomic growth and shrink, and validation in generated clients. Its tests compare exact account bytes and rent balances across both successful and rejected updates.
@@ -132,7 +134,7 @@ Use `invoke_signed::<Journal>(signers)` when `rent_account` is a PDA that must s
 
 The `rent_account` field has the same meaning across `UpdateResizableAccount`, `ReallocAccount`, `ReallocAccountZeroed`, and `ReallocCompactAccount`: it funds growth and receives a shrink refund. The lower-level builders take an explicit `target_size`; the high-level builder derives it from the patch.
 
-The generated patch owns the update plan, so callers do not coordinate `set_*`, `commit`, and `ReallocCompactAccount`. Borrow the account for a `JournalRef` only while reading. End that borrow before invoking `UpdateResizableAccount`.
+The generated patch owns the update plan, so callers do not coordinate `set_*`, `commit`, and `ReallocCompactAccount`. Use `Journal::with_pda` to read a stored-bump compact PDA without a separate `assert_compact_type` or `assert_seeds` pass. End the closure before invoking `UpdateResizableAccount`.
 
 <!-- {/compactAccountResizeOrdering} -->
 
@@ -144,12 +146,13 @@ The generated patch owns the update plan, so callers do not coordinate `set_*`, 
 
 - Supply the required generated `patch` to every compact create builder, including `JournalPatch::new()` for an all-zero, empty-tail default.
 - Create empty compact state with `space: T::MIN_SIZE`; allocate enough space for any nonempty values included in the initial patch.
-- Read through `with_compact_account::<T, _>` or a generated `TRef`.
+- Read an ordinary compact account through `with_compact_account::<T, _>`.
+- Read a stored-bump compact PDA through its generated `Type::with_pda` helper.
 - Replace fixed fields and several tails in one generated patch.
 - Grow or shrink up to `T::MAX_SIZE` through `UpdateResizableAccount`.
 - Treat `rent_account` as both the growth funder and the shrink refund recipient.
 - Reject unsupported nesting at compile time and reject corrupt prefixes, tags, UTF-8, and elements at load time.
-- Keep signer, writable, owner, stored-authority, and canonical-PDA checks explicit. Layout validation does not grant authority.
+- Keep signer, writable, and stored-authority checks explicit. `Type::with_pda` covers owner, layout, canonical stored bump, and PDA address validation.
 - Regenerate the IDL and clients after a compact schema changes. Do not edit generated clients by hand.
 
 <!-- {/compactAccountUseCaseChecklist} -->

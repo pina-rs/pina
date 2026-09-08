@@ -291,6 +291,7 @@ fn collect_assertions_from_expr(
 							| "assert_seeds_with_bump"
 							| "assert_canonical_bump"
 							| "load_pda" | "load_pda_mut"
+							| "with_pda"
 					)
 				) && let Some(first_arg) = call.args.first()
 					&& let Some(field_name) = resolve_self_field(first_arg, bindings)
@@ -367,7 +368,11 @@ fn apply_assertion(
 	match method {
 		"assert_signer" => props.is_signer = true,
 		"assert_writable" => props.is_writable = true,
-		"assert_seeds" | "assert_seeds_with_bump" | "assert_canonical_bump" | "load_pda" => {
+		"assert_seeds"
+		| "assert_seeds_with_bump"
+		| "assert_canonical_bump"
+		| "load_pda"
+		| "with_pda" => {
 			props.is_pda = true;
 		}
 		"load_pda_mut" => {
@@ -539,6 +544,29 @@ mod tests {
 		let props = &all["MyAccounts"];
 		assert!(props["counter"].is_pda);
 		assert!(props["counter"].is_writable);
+	}
+
+	#[test]
+	fn extracts_pda_from_generated_compact_loader() {
+		let source = r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					CounterState::with_pda(
+						self.counter,
+						self.authority.address(),
+						&ID,
+						|state| Ok(state.value),
+					)?;
+					Ok(())
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let all = extract_validation_properties(&file);
+		let props = &all["MyAccounts"];
+
+		assert!(props["counter"].is_pda);
+		assert!(!props["counter"].is_writable);
 	}
 
 	#[test]

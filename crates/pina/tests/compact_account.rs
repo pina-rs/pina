@@ -16,6 +16,7 @@ enum CompactKind {
 	PrefixState = 9,
 	StringState = 10,
 	StringPrefixState = 11,
+	CompactPda = 12,
 }
 
 #[account(crate = ::pina, discriminator = CompactKind, compact)]
@@ -62,6 +63,23 @@ struct StringPrefixState {
 	pub two: PodString<2, 2>,
 	pub four: PodString<2, 4>,
 	pub eight: PodString<2, 8>,
+}
+
+#[account(
+	crate = ::pina,
+	discriminator = CompactKind,
+	variant = CompactPda,
+	compact
+)]
+#[pda(
+	crate = ::pina,
+	seeds = [b"compact-state", authority: Address],
+	bump = bump,
+)]
+struct CompactPdaState {
+	pub bump: u8,
+	pub authority: Address,
+	pub values: Vec<u64, 4>,
 }
 
 #[test]
@@ -369,6 +387,142 @@ fn account_view_loaders_scope_compact_borrows() {
 }
 
 #[test]
+fn compact_pda_loader_validates_data_and_address_in_one_borrow() {
+	let authority = Address::new_from_array([7; 32]);
+	let (address, bump) = CompactPdaState::find_pda(&authority, &OWNER);
+	let values = [PodU64::from(11), PodU64::from(13)];
+	let mut stored = TestAccount::<{ CompactPdaState::MAX_SIZE }>::new_with_address(address);
+	let mut account = stored.view();
+
+	{
+		let mut data = account
+			.try_borrow_mut()
+			.unwrap_or_else(|error| panic!("borrow compact PDA data: {error:?}"));
+		CompactPdaState::initialize(
+			&mut data,
+			&CompactPdaStatePatch::new()
+				.bump(bump)
+				.authority(authority)
+				.replace_values(&values),
+		)
+		.unwrap_or_else(|error| panic!("initialize compact PDA: {error:?}"));
+	}
+
+	let mut aliased_account = account;
+	let loaded = CompactPdaState::with_pda(&account, &authority, &OWNER, |state| {
+		assert!(aliased_account.try_borrow_mut().is_err());
+
+		Ok((state.bump, state.authority, state.values()[1].get()))
+	})
+	.unwrap_or_else(|error| panic!("load compact PDA: {error:?}"));
+
+	assert_eq!(loaded, (bump, authority, 13));
+	assert!(account.try_borrow_mut().is_ok());
+}
+
+#[test]
+fn compact_pda_loader_rejects_a_wrong_owner_before_running_the_closure() {
+	let authority = Address::new_from_array([8; 32]);
+	let (address, bump) = CompactPdaState::find_pda(&authority, &OWNER);
+	let mut stored = TestAccount::<{ CompactPdaState::MAX_SIZE }>::new_with_address(address);
+	stored.header.owner = Address::new_from_array([10; 32]);
+	CompactPdaState::initialize(
+		&mut stored.data,
+		&CompactPdaStatePatch::new().bump(bump).authority(authority),
+	)
+	.unwrap_or_else(|error| panic!("initialize compact PDA: {error:?}"));
+	let account = stored.view();
+	let mut closure_ran = false;
+
+	let result = CompactPdaState::with_pda(&account, &authority, &OWNER, |_| {
+		closure_ran = true;
+		Ok(())
+	});
+
+	assert_eq!(result, Err(ProgramError::InvalidAccountOwner));
+	assert!(!closure_ran);
+}
+
+#[test]
+fn compact_pda_loader_rejects_a_wrong_stored_bump_before_running_the_closure() {
+	let authority = Address::new_from_array([11; 32]);
+	let (address, bump) = CompactPdaState::find_pda(&authority, &OWNER);
+	let mut stored = TestAccount::<{ CompactPdaState::MAX_SIZE }>::new_with_address(address);
+	CompactPdaState::initialize(
+		&mut stored.data,
+		&CompactPdaStatePatch::new()
+			.bump(bump.wrapping_add(1))
+			.authority(authority),
+	)
+	.unwrap_or_else(|error| panic!("initialize compact PDA: {error:?}"));
+	let account = stored.view();
+	let mut closure_ran = false;
+
+	let result = CompactPdaState::with_pda(&account, &authority, &OWNER, |_| {
+		closure_ran = true;
+		Ok(())
+	});
+
+	assert_eq!(result, Err(ProgramError::InvalidSeeds));
+	assert!(!closure_ran);
+}
+
+#[test]
+fn compact_pda_loader_rejects_a_valid_noncanonical_bump() {
+	let authority = Address::new_from_array([13; 32]);
+	let (_, canonical_bump) = CompactPdaState::find_pda(&authority, &OWNER);
+	let seeds = CompactPdaState::seeds(&authority);
+	let (address, noncanonical_bump) = (0..=u8::MAX)
+		.find_map(|candidate| {
+			if candidate == canonical_bump {
+				return None;
+			}
+
+			let seeds_with_bump = seeds.with_bump(candidate);
+			create_program_address(&seeds_with_bump.as_slices(), &OWNER)
+				.ok()
+				.map(|address| (address, candidate))
+		})
+		.unwrap_or_else(|| panic!("expected at least one valid noncanonical bump"));
+	let mut stored = TestAccount::<{ CompactPdaState::MAX_SIZE }>::new_with_address(address);
+	CompactPdaState::initialize(
+		&mut stored.data,
+		&CompactPdaStatePatch::new()
+			.bump(noncanonical_bump)
+			.authority(authority),
+	)
+	.unwrap_or_else(|error| panic!("initialize compact PDA: {error:?}"));
+	let account = stored.view();
+
+	let result = CompactPdaState::with_pda(&account, &authority, &OWNER, |_| Ok(()));
+
+	assert_eq!(result, Err(ProgramError::InvalidSeeds));
+}
+
+#[test]
+fn compact_pda_loader_rejects_invalid_data_before_running_the_closure() {
+	let authority = Address::new_from_array([12; 32]);
+	let (address, bump) = CompactPdaState::find_pda(&authority, &OWNER);
+	let mut stored = TestAccount::<{ CompactPdaState::MAX_SIZE }>::new_with_address(address);
+	CompactPdaState::initialize(
+		&mut stored.data,
+		&CompactPdaStatePatch::new().bump(bump).authority(authority),
+	)
+	.unwrap_or_else(|error| panic!("initialize compact PDA: {error:?}"));
+	stored.data[0] = u8::MAX;
+	let account = stored.view();
+	let mut closure_ran = false;
+
+	let result = CompactPdaState::with_pda(&account, &authority, &OWNER, |_| {
+		closure_ran = true;
+		Ok(())
+	});
+
+	assert_eq!(result, Err(ProgramError::InvalidAccountData));
+	assert!(!closure_ran);
+}
+
+#[test]
 fn compact_updates_reject_readonly_accounts_without_changing_bytes() {
 	let mut stored = TestAccount::<{ DynamicState::MAX_SIZE }>::new();
 	DynamicState::initialize(&mut stored.data, &DynamicStatePatch::new())
@@ -395,6 +549,10 @@ struct TestAccount<const N: usize> {
 
 impl<const N: usize> TestAccount<N> {
 	fn new() -> Self {
+		Self::new_with_address(Address::new_from_array([1; 32]))
+	}
+
+	fn new_with_address(address: Address) -> Self {
 		Self {
 			header: RuntimeAccount {
 				borrow_state: NOT_BORROWED,
@@ -402,7 +560,7 @@ impl<const N: usize> TestAccount<N> {
 				is_writable: 1,
 				executable: 0,
 				padding: [0; 4],
-				address: Address::new_from_array([1; 32]),
+				address,
 				owner: OWNER,
 				lamports: 1,
 				data_len: N as u64,

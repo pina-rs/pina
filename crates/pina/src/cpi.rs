@@ -1253,11 +1253,10 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 
 		let current_size = self.account.data_len();
 		if target_size > current_size {
-			realloc_account_inner_with_rent(
+			realloc_validated_account_inner_with_rent(
 				self.account,
 				target_size,
 				self.rent_account,
-				self.program_id,
 				signers,
 				rent,
 			)?;
@@ -1273,11 +1272,10 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 		debug_assert_eq!(encoded_len, target_size);
 
 		if target_size < current_size {
-			realloc_account_inner_with_rent(
+			realloc_validated_account_inner_with_rent(
 				self.account,
 				target_size,
 				self.rent_account,
-				self.program_id,
 				signers,
 				rent,
 			)?;
@@ -1317,19 +1315,22 @@ impl ReallocCompactAccount<'_, '_, '_> {
 		&mut self,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		self.account.assert_compact_type::<T>(self.program_id)?;
+		self.account
+			.assert_writable()?
+			.assert_compact_type::<T>(self.program_id)?;
 		T::validate_size(self.target_size)?;
+
 		if self.target_size < self.account.data_len() {
 			let data = self.account.try_borrow()?;
 			T::validate_account_data(&data[..self.target_size])?;
 		}
 
-		realloc_account_inner(
+		realloc_validated_account_inner_with_rent(
 			self.account,
 			self.target_size,
 			self.rent_account,
-			self.program_id,
 			signers,
+			None,
 		)
 	}
 }
@@ -1369,9 +1370,25 @@ fn realloc_account_inner_with_rent(
 ) -> ProgramResult {
 	use crate::AccountInfoValidation;
 
-	// Validate the account is writable and owned by the program.
 	account.assert_writable()?.assert_owner(program_id)?;
 
+	realloc_validated_account_inner_with_rent(account, target_size, rent_account, signers, rent)
+}
+
+/// Reallocates an account after its caller has validated writability and owner.
+///
+/// Compact update paths validate the representation as well as these account
+/// properties before they call this helper. Keeping the resize work separate
+/// prevents duplicate owner checks in those hot paths.
+#[cfg(feature = "account-resize")]
+#[inline(always)]
+fn realloc_validated_account_inner_with_rent(
+	account: &mut AccountView,
+	target_size: usize,
+	rent_account: &mut AccountView,
+	signers: &[Signer<'_, '_>],
+	rent: Option<Rent>,
+) -> ProgramResult {
 	let current_size = account.data_len();
 
 	// Early return when the size is unchanged.

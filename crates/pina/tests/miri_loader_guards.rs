@@ -37,6 +37,23 @@ impl HasDiscriminator for TestState {
 	const VALUE: u8 = 7;
 }
 
+#[discriminator(crate = ::pina)]
+enum CompactAccountType {
+	CompactState = 8,
+}
+
+#[account(crate = ::pina, discriminator = CompactAccountType, compact)]
+#[pda(
+	crate = ::pina,
+	seeds = [b"miri-compact", authority: Address],
+	bump = bump,
+)]
+struct CompactState {
+	pub bump: u8,
+	pub authority: Address,
+	pub values: pina::Vec<u64, 4>,
+}
+
 struct AccountBuilder {
 	address: Address,
 	owner: Address,
@@ -212,6 +229,21 @@ fn build_test_state_bytes(value: u64) -> Vec<u8> {
 	bytes
 }
 
+fn build_compact_state_bytes(authority: Address, bump: u8) -> Vec<u8> {
+	let values = [PodU64::from(13), PodU64::from(21)];
+	let mut bytes = vec![0u8; CompactState::MAX_SIZE];
+	CompactState::initialize(
+		&mut bytes,
+		&CompactStatePatch::new()
+			.bump(bump)
+			.authority(authority)
+			.replace_values(&values),
+	)
+	.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
+
+	bytes
+}
+
 #[cfg(feature = "token")]
 fn write_address_bytes(data: &mut [u8], offset: usize, address: &Address) {
 	data[offset..offset + ADDRESS_BYTES].copy_from_slice(address.as_ref());
@@ -270,6 +302,37 @@ fn as_account_rejects_overlapping_mutable_borrows_under_miri() {
 
 	drop(state);
 
+	assert!(shadow.try_borrow_mut().is_ok());
+}
+
+#[test]
+fn compact_pda_view_keeps_the_runtime_borrow_for_the_closure_under_miri() {
+	let authority = Address::new_from_array([7; 32]);
+	let (account_key, bump) = CompactState::find_pda(&authority, &TEST_PROGRAM_ID);
+	let state_bytes = build_compact_state_bytes(authority, bump);
+	let accounts = [AccountBuilder::new()
+		.address(account_key)
+		.owner(TEST_PROGRAM_ID)
+		.lamports(1_000_000)
+		.data(&state_bytes)
+		.is_writable(true)];
+	let mut input = unsafe { create_test_input(&accounts, &[]) };
+	let mut accts = [UNINIT; 4];
+	let (account_views, _) = unsafe { deserialize_test_input::<4>(&mut input, &mut accts) };
+	let account = account_views[0];
+	let mut shadow = account_views[0];
+
+	let value = CompactState::with_pda(&account, &authority, &TEST_PROGRAM_ID, |state| {
+		assert!(matches!(
+			shadow.try_borrow_mut(),
+			Err(ProgramError::AccountBorrowFailed)
+		));
+
+		Ok(state.values()[1].get())
+	})
+	.unwrap_or_else(|error| panic!("load compact PDA: {error:?}"));
+
+	assert_eq!(value, 21);
 	assert!(shadow.try_borrow_mut().is_ok());
 }
 
