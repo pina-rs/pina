@@ -219,6 +219,7 @@ fn program_account_builders_validate_the_target_before_rent_lookup() {
 
 #[test]
 fn close_account_builders_transfer_lamports_and_optionally_clear_data() {
+	let program_id = Address::new_from_array([9u8; 32]);
 	let mut stored_plain = TestAccount::<8>::new(Address::new_from_array([1u8; 32]), false, true);
 	let mut stored_zeroed = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), false, true);
 	let mut stored_recipient =
@@ -235,12 +236,14 @@ fn close_account_builders_transfer_lamports_and_optionally_clear_data() {
 	CloseAccount {
 		account: &mut plain,
 		recipient: &mut recipient,
+		program_id: &program_id,
 	}
 	.invoke()
 	.unwrap_or_else(|error| panic!("close plain account: {error:?}"));
 	CloseAccountZeroed {
 		account: &mut zeroed,
 		recipient: &mut recipient,
+		program_id: &program_id,
 	}
 	.invoke()
 	.unwrap_or_else(|error| panic!("close zeroed account: {error:?}"));
@@ -250,6 +253,44 @@ fn close_account_builders_transfer_lamports_and_optionally_clear_data() {
 	assert_eq!(recipient.lamports(), 35);
 	assert_eq!(stored_plain.data, [7; 8]);
 	assert_eq!(stored_zeroed.data, [0; 8]);
+}
+
+#[test]
+fn close_account_builders_reject_accounts_owned_by_another_program() {
+	let program_id = Address::new_from_array([8u8; 32]);
+	let mut stored_plain = TestAccount::<8>::new(Address::new_from_array([1u8; 32]), false, true);
+	let mut stored_zeroed = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), false, true);
+	let mut stored_recipient =
+		TestAccount::<0>::new(Address::new_from_array([3u8; 32]), false, true);
+	stored_plain.header.lamports = 10;
+	stored_zeroed.header.lamports = 20;
+	stored_recipient.header.lamports = 5;
+	stored_plain.data.fill(7);
+	stored_zeroed.data.fill(9);
+	let mut plain = stored_plain.view();
+	let mut zeroed = stored_zeroed.view();
+	let mut recipient = stored_recipient.view();
+
+	let plain_result = CloseAccount {
+		account: &mut plain,
+		recipient: &mut recipient,
+		program_id: &program_id,
+	}
+	.invoke();
+	let zeroed_result = CloseAccountZeroed {
+		account: &mut zeroed,
+		recipient: &mut recipient,
+		program_id: &program_id,
+	}
+	.invoke();
+
+	assert_eq!(plain_result, Err(ProgramError::InvalidAccountOwner));
+	assert_eq!(zeroed_result, Err(ProgramError::InvalidAccountOwner));
+	assert_eq!(plain.lamports(), 10);
+	assert_eq!(zeroed.lamports(), 20);
+	assert_eq!(recipient.lamports(), 5);
+	assert_eq!(stored_plain.data, [7; 8]);
+	assert_eq!(stored_zeroed.data, [9; 8]);
 }
 
 #[cfg(feature = "account-resize")]

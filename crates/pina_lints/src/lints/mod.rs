@@ -25,7 +25,6 @@ pub mod require_idl_root_to_define_one_program_id;
 pub mod require_owner_before_token_cast;
 pub mod require_post_cpi_balance_reload;
 pub mod require_program_check_before_cpi;
-pub mod require_program_owned_before_lamport_mutation;
 pub mod require_reason_for_duplicate_remaining_accounts;
 pub mod require_sysvar_assert_before_sysvar_use;
 pub mod require_type_assert_before_zero_copy_cast;

@@ -815,13 +815,13 @@ CreateProgramAccountWithBump {
 ```rust
 use pina::*;
 
-// Direct debit: the sender must be a program-owned signer account.
-source.send(1_000_000, destination)?;
+// Direct debit: verifies that this program owns the sender.
+source.send_owned(&ID, 1_000_000, destination)?;
 // System-program CPI credit: the source account must sign.
 destination.collect(1_000_000, source)?;
 
 // Close an account and return rent to recipient.
-account.close_with_recipient(recipient)?;
+account.close_with_recipient(&ID, recipient)?;
 ```
 
 #### Closing safety
@@ -832,8 +832,8 @@ account.close_with_recipient(recipient)?;
 
 Closing guidance under Pinocchio 0.11:
 
-- `close_with_recipient()` transfers lamports and closes the account handle, but it does not zero or resize account data for you.
-- When stale bytes must be invalidated, use `CloseAccountZeroed { account, recipient }.invoke()` or manually call `zeroed()` before `close_with_recipient()`.
+- `close_with_recipient(&ID, recipient)` verifies that `ID` owns the account, transfers its lamports, and closes the account handle. It does not zero or resize account data.
+- When stale bytes must be invalidated, use `CloseAccountZeroed { account, recipient, program_id: &ID }.invoke()` or manually call `zeroed()` before `close_with_recipient(&ID, recipient)`.
 - The `account-resize` feature only affects realloc helpers; it does not change close semantics.
 
 <!-- {/pinaCloseAccountGuidance} -->
@@ -1003,7 +1003,8 @@ Pina provides strong built-in protections against common Solana vulnerabilities 
 - **Use generated `load_pda` or `load_pda_mut`** when a fixed stored-bump PDA handler needs a typed guard, so recursive content and the PDA address are validated once
 - **Always verify program accounts** with `assert_address()` / `assert_program()` before CPI invocations
 - **Use `assert_type::<T>()`** to prevent type cosplay: it checks discriminator, owner, and data size
-- **Use `CloseAccountZeroed { account, recipient }.invoke()` or `zeroed()` + `close_with_recipient()`** when stale account bytes must be invalidated before close
+- **Use `send_owned(&ID, amount, recipient)`** for direct lamport debits; it verifies that the program owns the sender before mutation
+- **Use `CloseAccountZeroed { account, recipient, program_id: &ID }.invoke()` or `zeroed()` + `close_with_recipient(&ID, recipient)`** when stale account bytes must be invalidated before close
 - **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
 - **Give each account type its own seed namespace** so PDAs cannot collide across account types
 

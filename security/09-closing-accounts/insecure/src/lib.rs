@@ -58,7 +58,8 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAndCloseAccounts<'a> {
 		// BUG: Only transfers lamports without zeroing data or closing.
 		// The account can be revived within the same transaction by
 		// sending lamports back to it. The stale data remains.
-		self.reward.send(self.reward.lamports(), self.recipient)?;
+		self.reward
+			.send_owned(&ID, self.reward.lamports(), self.recipient)?;
 
 		Ok(())
 	}

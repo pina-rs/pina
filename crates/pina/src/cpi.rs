@@ -29,8 +29,6 @@ use crate::AccountInfoValidation;
 use crate::CloseAccountWithRecipient;
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 use crate::CompactAccountInfoValidation;
-#[cfg(feature = "account-resize")]
-use crate::LamportTransfer;
 use crate::MAX_SEEDS;
 use crate::PinaAccount;
 #[cfg(all(feature = "account-resize", feature = "compact"))]
@@ -1411,7 +1409,7 @@ fn realloc_account_inner_with_rent(
 			.invoke_signed(signers)?;
 		}
 		RentAdjustment::Refund { lamports } => {
-			account.send(lamports, rent_account)?;
+			crate::impls::send_lamports_after_owner_check(account, lamports, rent_account)?;
 		}
 		RentAdjustment::None => {}
 	}
@@ -1437,7 +1435,8 @@ fn realloc_account_inner_with_rent(
 ///
 /// # Errors
 ///
-/// Returns errors from lamport transfer or account close operations.
+/// Returns `ProgramError::InvalidAccountOwner` when `program_id` does not own
+/// `account`, plus errors from lamport transfer or account close operations.
 ///
 /// # Examples
 ///
@@ -1446,23 +1445,28 @@ fn realloc_account_inner_with_rent(
 /// CloseAccount {
 /// 	account: escrow_account,
 /// 	recipient: authority,
+/// 	program_id: &program_id,
 /// }
 /// .invoke()?;
 /// ```
 #[must_use = "account closure has no effect until invoke is called"]
-pub struct CloseAccount<'account, 'recipient> {
+pub struct CloseAccount<'account, 'recipient, 'address> {
 	/// Program-owned account to close.
 	pub account: &'account mut AccountView,
 
 	/// Writable account that receives the closed account's lamports.
 	pub recipient: &'recipient mut AccountView,
+
+	/// Executing program that must own `account`.
+	pub program_id: &'address Address,
 }
 
-impl CloseAccount<'_, '_> {
+impl CloseAccount<'_, '_, '_> {
 	/// Transfers the account's lamports to the recipient and closes it.
 	#[inline(always)]
 	pub fn invoke(&mut self) -> ProgramResult {
-		self.account.close_with_recipient(self.recipient)
+		self.account
+			.close_with_recipient(self.program_id, self.recipient)
 	}
 }
 
@@ -1481,8 +1485,9 @@ impl CloseAccount<'_, '_> {
 ///
 /// # Errors
 ///
-/// Returns errors from account borrowing, lamport transfer, or account close
-/// operations.
+/// Returns `ProgramError::InvalidAccountOwner` when `program_id` does not own
+/// `account`, plus errors from account borrowing, lamport transfer, or account
+/// close operations.
 ///
 /// # Examples
 ///
@@ -1491,23 +1496,28 @@ impl CloseAccount<'_, '_> {
 /// CloseAccountZeroed {
 /// 	account: escrow_account,
 /// 	recipient: authority,
+/// 	program_id: &program_id,
 /// }
 /// .invoke()?;
 /// ```
 #[must_use = "account closure has no effect until invoke is called"]
-pub struct CloseAccountZeroed<'account, 'recipient> {
+pub struct CloseAccountZeroed<'account, 'recipient, 'address> {
 	/// Program-owned account whose bytes will be cleared before closing.
 	pub account: &'account mut AccountView,
 
 	/// Writable account that receives the closed account's lamports.
 	pub recipient: &'recipient mut AccountView,
+
+	/// Executing program that must own `account`.
+	pub program_id: &'address Address,
 }
 
-impl CloseAccountZeroed<'_, '_> {
+impl CloseAccountZeroed<'_, '_, '_> {
 	/// Clears the account data, transfers its lamports, and closes it.
 	#[inline(always)]
 	pub fn invoke(&mut self) -> ProgramResult {
-		self.account.close_account_zeroed(self.recipient)
+		self.account
+			.close_account_zeroed(self.program_id, self.recipient)
 	}
 }
 

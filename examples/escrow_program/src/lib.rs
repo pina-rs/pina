@@ -378,7 +378,7 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 
 		// Clear the raw backing bytes while closing; typed zero-copy views never
 		// expose inactive storage for blanket mutation.
-		self.escrow.close_account_zeroed(self.maker)
+		self.escrow.close_account_zeroed(&ID, self.maker)
 	}
 }
 

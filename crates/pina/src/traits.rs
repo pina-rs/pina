@@ -720,9 +720,10 @@ pub trait AsTokenAccount {
 
 /// Direct lamport transfer between accounts.
 ///
-/// `send` directly manipulates lamport balances (no CPI). This only works
-/// when the sender is owned by the executing program. `collect` uses a system
-/// program CPI transfer and works with any signer account.
+/// `send_owned` directly manipulates lamport balances (no CPI). It verifies
+/// that the executing program owns the sender before changing either balance.
+/// `collect` uses a system program CPI transfer and works with any signer
+/// account.
 ///
 /// <!-- {=pinaPublicResultContract|trim|linePrefix:"/// ":true} -->
 /// All APIs in this section are designed for on-chain determinism.
@@ -735,16 +736,23 @@ pub trait AsTokenAccount {
 ///
 /// ```ignore
 /// // Direct lamport transfer (sender must be owned by the executing program):
-/// vault_account.send(1_000_000, recipient_account)?;
+/// vault_account.send_owned(&program_id, 1_000_000, recipient_account)?;
 ///
 /// // CPI transfer via system program (from must be a signer):
 /// vault_account.collect(500_000, payer_account)?;
 /// ```
 pub trait LamportTransfer {
 	/// Debit `lamports` from this account and credit them to `to` by directly
-	/// mutating both accounts' lamport balances. The sender must be owned by
-	/// the executing program.
-	fn send(&mut self, lamports: u64, to: &mut AccountView) -> ProgramResult;
+	/// mutating both accounts' lamport balances.
+	///
+	/// The method verifies that `program_id` owns the sender before either
+	/// balance changes.
+	fn send_owned(
+		&mut self,
+		program_id: &Address,
+		lamports: u64,
+		to: &mut AccountView,
+	) -> ProgramResult;
 	/// Transfer `lamports` from the `from` account to this account via a
 	/// system program CPI. The `from` account must be a signer.
 	fn collect(&self, lamports: u64, from: &AccountView) -> ProgramResult;
@@ -765,10 +773,10 @@ pub trait LamportTransfer {
 /// // Zero the escrow state first when stale bytes would be dangerous,
 /// // then close it and return rent to the authority:
 /// escrow_account.as_account_mut::<EscrowState>(&program_id)?.zeroed();
-/// escrow_account.close_with_recipient(authority_account)?;
+/// escrow_account.close_with_recipient(&program_id, authority_account)?;
 ///
 /// // Or use the built-in helper to clear the raw account bytes first:
-/// escrow_account.close_account_zeroed(authority_account)?;
+/// escrow_account.close_account_zeroed(&program_id, authority_account)?;
 /// ```
 pub trait CloseAccountWithRecipient {
 	/// Close the account and transfer all remaining lamports to the recipient.
@@ -776,7 +784,11 @@ pub trait CloseAccountWithRecipient {
 	/// This helper does not zero account data for you. Call `zeroed()` first
 	/// when the account's old bytes must not remain revivable within the same
 	/// transaction.
-	fn close_with_recipient(&mut self, recipient: &mut AccountView) -> ProgramResult;
+	fn close_with_recipient(
+		&mut self,
+		program_id: &Address,
+		recipient: &mut AccountView,
+	) -> ProgramResult;
 
 	/// Zero the current account data bytes, then close the account and transfer
 	/// all remaining lamports to the recipient.
@@ -784,7 +796,11 @@ pub trait CloseAccountWithRecipient {
 	/// This helper clears the existing data region in-place before calling
 	/// [`Self::close_with_recipient`]. It does not implicitly reallocate the
 	/// account, even when the `account-resize` feature is enabled.
-	fn close_account_zeroed(&mut self, recipient: &mut AccountView) -> ProgramResult;
+	fn close_account_zeroed(
+		&mut self,
+		program_id: &Address,
+		recipient: &mut AccountView,
+	) -> ProgramResult;
 }
 
 /// Cursor for parsing instruction accounts exactly once.
