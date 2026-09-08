@@ -18,7 +18,7 @@
 //!   zero-copy structs with a discriminator and typed fields (`PodU64`).
 //! - **`system::instructions::Transfer`** — pina re-exports pinocchio-system's
 //!   struct-based CPI helpers.
-//! - **`LamportTransfer` trait** — `account.send(lamports, recipient)` for
+//! - **`LamportTransfer` trait** — `account.send_owned(&ID, lamports, recipient)` for
 //!   program-owned account transfers without CPI.
 //! - **Custom error types** — `#[error]` macro for program-specific errors with
 //!   automatic `ProgramError::Custom` conversion.
@@ -181,9 +181,9 @@ impl<'a> ProcessAccountInfos<'a> for DirectTransferAccounts<'a> {
 
 		// --- Validate accounts ---
 
-		// Sender must sign, be writable, and be owned by this program.
+		// Sender must sign. `send_owned` verifies writability and program ownership.
 		// Only the owning program can debit an account's lamports.
-		self.sender.assert_signer()?.assert_owner(&ID)?;
+		self.sender.assert_signer()?;
 
 		// Recipient must be writable.
 
@@ -194,10 +194,10 @@ impl<'a> ProcessAccountInfos<'a> for DirectTransferAccounts<'a> {
 
 		// --- Execute the direct transfer ---
 		//
-		// `LamportTransfer::send` directly modifies the lamport balances
+		// `LamportTransfer::send_owned` directly modifies the lamport balances
 		// of both accounts. This avoids the overhead of a CPI but only
 		// works when the sender is owned by the calling program.
-		self.sender.send(amount, self.recipient)?;
+		self.sender.send_owned(&ID, amount, self.recipient)?;
 
 		log!("Direct transfer complete");
 

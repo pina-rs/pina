@@ -55,6 +55,6 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAndCloseAccounts<'a> {
 		self.authority.assert_address(&reward_authority)?;
 
 		// SECURE: clear the raw backing bytes, then close and reclaim rent.
-		self.reward.close_account_zeroed(self.recipient)
+		self.reward.close_account_zeroed(&ID, self.recipient)
 	}
 }

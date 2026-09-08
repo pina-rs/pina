@@ -812,9 +812,10 @@ pub(crate) fn checked_close_balance(
 #[track_caller]
 fn checked_close_recipient_balance(
 	account: AccountView,
+	program_id: &Address,
 	recipient: AccountView,
 ) -> Result<u64, ProgramError> {
-	account.assert_writable()?;
+	account.assert_writable()?.assert_owner(program_id)?;
 	recipient.assert_writable()?;
 
 	if account.address() == recipient.address() {
@@ -833,43 +834,17 @@ fn checked_close_recipient_balance(
 
 impl LamportTransfer for AccountView {
 	/// Send the specified lamports to the `recipient` account.
-	/// The sender must be writable and owned by the executing program.
+	/// The sender must be writable and owned by `program_id`.
 	#[inline(always)]
 	#[track_caller]
-	fn send(&mut self, lamports: u64, recipient: &mut AccountView) -> ProgramResult {
-		self.assert_writable()?;
-		recipient.assert_writable()?;
-
-		if self.address() == recipient.address() {
-			log!("Could not send lamports: sender and recipient must differ");
-			log_caller();
-
-			return Err(ProgramError::InvalidArgument);
-		}
-
-		let current = self.lamports();
-		let recipient_balance = recipient.lamports();
-		let (new_balance, new_recipient_balance) =
-			checked_send_balances(current, recipient_balance, lamports).map_err(|error| {
-				match error {
-					ProgramError::InsufficientFunds => {
-						log!("Could not subtract lamports: insufficient funds");
-					}
-
-					ProgramError::ArithmeticOverflow => {
-						log!("Could not add lamports: arithmetic overflow");
-					}
-
-					_ => {}
-				}
-				log_caller();
-				error
-			})?;
-
-		self.set_lamports(new_balance);
-		recipient.set_lamports(new_recipient_balance);
-
-		Ok(())
+	fn send_owned(
+		&mut self,
+		program_id: &Address,
+		lamports: u64,
+		recipient: &mut AccountView,
+	) -> ProgramResult {
+		self.assert_owner(program_id)?;
+		send_lamports_after_owner_check(self, lamports, recipient)
 	}
 
 	/// The `from` account must be mutable and a signer for this to be
@@ -885,18 +860,73 @@ impl LamportTransfer for AccountView {
 	}
 }
 
+/// Transfer lamports after the caller has established sender ownership.
+///
+/// Reallocation uses this helper because it validates ownership before
+/// calculating the rent adjustment. Public callers use
+/// [`LamportTransfer::send_owned`], which performs that check itself.
+#[inline(always)]
+#[track_caller]
+pub(crate) fn send_lamports_after_owner_check(
+	sender: &mut AccountView,
+	lamports: u64,
+	recipient: &mut AccountView,
+) -> ProgramResult {
+	sender.assert_writable()?;
+	recipient.assert_writable()?;
+
+	if sender.address() == recipient.address() {
+		log!("Could not send lamports: sender and recipient must differ");
+		log_caller();
+
+		return Err(ProgramError::InvalidArgument);
+	}
+
+	let current = sender.lamports();
+	let recipient_balance = recipient.lamports();
+	let (new_balance, new_recipient_balance) =
+		checked_send_balances(current, recipient_balance, lamports).map_err(|error| {
+			match error {
+				ProgramError::InsufficientFunds => {
+					log!("Could not subtract lamports: insufficient funds");
+				}
+
+				ProgramError::ArithmeticOverflow => {
+					log!("Could not add lamports: arithmetic overflow");
+				}
+
+				_ => {}
+			}
+			log_caller();
+			error
+		})?;
+
+	sender.set_lamports(new_balance);
+	recipient.set_lamports(new_recipient_balance);
+
+	Ok(())
+}
+
 impl CloseAccountWithRecipient for AccountView {
 	#[track_caller]
-	fn close_with_recipient(&mut self, recipient: &mut AccountView) -> ProgramResult {
-		let new_balance = checked_close_recipient_balance(*self, *recipient)?;
+	fn close_with_recipient(
+		&mut self,
+		program_id: &Address,
+		recipient: &mut AccountView,
+	) -> ProgramResult {
+		let new_balance = checked_close_recipient_balance(*self, program_id, *recipient)?;
 		recipient.set_lamports(new_balance);
 		self.set_lamports(0);
 		self.close()
 	}
 
 	#[track_caller]
-	fn close_account_zeroed(&mut self, recipient: &mut AccountView) -> ProgramResult {
-		let new_balance = checked_close_recipient_balance(*self, *recipient)?;
+	fn close_account_zeroed(
+		&mut self,
+		program_id: &Address,
+		recipient: &mut AccountView,
+	) -> ProgramResult {
+		let new_balance = checked_close_recipient_balance(*self, program_id, *recipient)?;
 
 		{
 			let mut data = self.try_borrow_mut()?;

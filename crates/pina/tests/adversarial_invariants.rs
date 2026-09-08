@@ -433,7 +433,7 @@ fn mutable_remaining_accounts_reject_duplicate_addresses_by_default() {
 }
 
 #[test]
-fn send_conserves_lamports_on_success() {
+fn send_owned_conserves_lamports_on_success() {
 	let unique_accounts = [
 		AccountBuilder::new()
 			.address(fake_address(14))
@@ -453,7 +453,7 @@ fn send_conserves_lamports_on_success() {
 
 	let (sender, recipient) = account_views.split_at_mut(1);
 	sender[0]
-		.send(125, &mut recipient[0])
+		.send_owned(&TEST_PROGRAM_ID, 125, &mut recipient[0])
 		.unwrap_or_else(|error| panic!("send should succeed: {error:?}"));
 
 	let total_after = account_views[0].lamports() + account_views[1].lamports();
@@ -463,7 +463,7 @@ fn send_conserves_lamports_on_success() {
 }
 
 #[test]
-fn send_overflow_preserves_balances() {
+fn send_owned_overflow_preserves_balances() {
 	let unique_accounts = [
 		AccountBuilder::new()
 			.address(fake_address(16))
@@ -483,14 +483,41 @@ fn send_overflow_preserves_balances() {
 	let recipient_before = account_views[1].lamports();
 
 	let (sender, recipient) = account_views.split_at_mut(1);
-	let result = sender[0].send(1, &mut recipient[0]);
+	let result = sender[0].send_owned(&TEST_PROGRAM_ID, 1, &mut recipient[0]);
 	assert_eq!(result, Err(ProgramError::ArithmeticOverflow));
 	assert_eq!(account_views[0].lamports(), sender_before);
 	assert_eq!(account_views[1].lamports(), recipient_before);
 }
 
 #[test]
-fn close_with_recipient_conserves_lamports_and_zeroes_source() {
+fn send_owned_rejects_wrong_owner_without_mutation() {
+	let unique_accounts = [
+		AccountBuilder::new()
+			.address(fake_address(18))
+			.owner(system::ID)
+			.lamports(400)
+			.is_writable(true),
+		AccountBuilder::new()
+			.address(fake_address(19))
+			.owner(TEST_PROGRAM_ID)
+			.lamports(600)
+			.is_writable(true),
+	];
+
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+	let sender_before = account_views[0].lamports();
+	let recipient_before = account_views[1].lamports();
+	let (sender, recipient) = account_views.split_at_mut(1);
+	let result = sender[0].send_owned(&TEST_PROGRAM_ID, 125, &mut recipient[0]);
+
+	assert_eq!(result, Err(ProgramError::InvalidAccountOwner));
+	assert_eq!(account_views[0].lamports(), sender_before);
+	assert_eq!(account_views[1].lamports(), recipient_before);
+}
+
+#[test]
+fn close_with_recipient_conserves_lamports_and_closes_source() {
 	let state_bytes = build_balance_state_bytes(33);
 	let unique_accounts = [
 		AccountBuilder::new()
@@ -512,7 +539,7 @@ fn close_with_recipient_conserves_lamports_and_zeroes_source() {
 
 	let (closing, recipient) = account_views.split_at_mut(1);
 	closing[0]
-		.close_with_recipient(&mut recipient[0])
+		.close_with_recipient(&TEST_PROGRAM_ID, &mut recipient[0])
 		.unwrap_or_else(|error| panic!("close should succeed: {error:?}"));
 
 	let total_after = account_views[0].lamports() + account_views[1].lamports();
@@ -547,7 +574,7 @@ fn close_with_recipient_overflow_preserves_balances_and_data() {
 	let data_len_before = account_views[0].data_len();
 
 	let (closing, recipient) = account_views.split_at_mut(1);
-	let result = closing[0].close_with_recipient(&mut recipient[0]);
+	let result = closing[0].close_with_recipient(&TEST_PROGRAM_ID, &mut recipient[0]);
 	assert_eq!(result, Err(ProgramError::ArithmeticOverflow));
 	assert_eq!(account_views[0].lamports(), source_before);
 	assert_eq!(account_views[1].lamports(), recipient_before);
@@ -583,7 +610,7 @@ fn close_with_recipient_active_borrow_preserves_balances_and_data() {
 		.try_borrow()
 		.unwrap_or_else(|error| panic!("borrow duplicate account data: {error:?}"));
 
-	let result = source[0].close_with_recipient(&mut recipient[0]);
+	let result = source[0].close_with_recipient(&TEST_PROGRAM_ID, &mut recipient[0]);
 
 	assert_eq!(result, Err(ProgramError::AccountBorrowFailed));
 	assert_eq!(recipient[0].lamports(), recipient_before);
@@ -591,6 +618,49 @@ fn close_with_recipient_active_borrow_preserves_balances_and_data() {
 	assert_eq!(source[0].data_len(), data_len_before);
 	assert!(!source[0].is_data_empty());
 	drop(data);
+}
+
+#[test]
+fn close_helpers_reject_wrong_owner_without_mutation() {
+	let state_bytes = build_balance_state_bytes(66);
+	let unique_accounts = [
+		AccountBuilder::new()
+			.address(fake_address(24))
+			.owner(system::ID)
+			.lamports(700)
+			.data(&state_bytes)
+			.is_writable(true),
+		AccountBuilder::new()
+			.address(fake_address(25))
+			.owner(system::ID)
+			.lamports(300)
+			.is_writable(true),
+	];
+
+	for zeroed in [false, true] {
+		let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+		let account_views = initialized_account_views(&mut accounts, count);
+		let source_before = account_views[0].lamports();
+		let recipient_before = account_views[1].lamports();
+		let data_before = account_views[0]
+			.try_borrow()
+			.unwrap_or_else(|error| panic!("borrow source data: {error:?}"))
+			.to_vec();
+		let (source, recipient) = account_views.split_at_mut(1);
+		let result = if zeroed {
+			source[0].close_account_zeroed(&TEST_PROGRAM_ID, &mut recipient[0])
+		} else {
+			source[0].close_with_recipient(&TEST_PROGRAM_ID, &mut recipient[0])
+		};
+
+		assert_eq!(result, Err(ProgramError::InvalidAccountOwner));
+		assert_eq!(source[0].lamports(), source_before);
+		assert_eq!(recipient[0].lamports(), recipient_before);
+		let data_after = source[0]
+			.try_borrow()
+			.unwrap_or_else(|error| panic!("borrow source data after rejection: {error:?}"));
+		assert_eq!(&*data_after, data_before.as_slice());
+	}
 }
 
 #[test]
