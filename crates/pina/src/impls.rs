@@ -886,16 +886,10 @@ pub(crate) fn send_lamports_after_owner_check(
 	let recipient_balance = recipient.lamports();
 	let (new_balance, new_recipient_balance) =
 		checked_send_balances(current, recipient_balance, lamports).map_err(|error| {
-			match error {
-				ProgramError::InsufficientFunds => {
-					log!("Could not subtract lamports: insufficient funds");
-				}
-
-				ProgramError::ArithmeticOverflow => {
-					log!("Could not add lamports: arithmetic overflow");
-				}
-
-				_ => {}
+			if error == ProgramError::InsufficientFunds {
+				log!("Could not subtract lamports: insufficient funds");
+			} else if error == ProgramError::ArithmeticOverflow {
+				log!("Could not add lamports: arithmetic overflow");
 			}
 			log_caller();
 			error
