@@ -84,6 +84,7 @@ pub fn assemble_program_ir_multi(
 	let mut dispatch = Vec::new();
 	let mut dispatch_source_count = 0;
 	let mut all_validation_props = HashMap::new();
+	let mut all_declared_validation_props = HashMap::new();
 	let mut all_pinapod_enums = Vec::new();
 	let mut public_key = None;
 	let mut pdas_ir = Vec::new();
@@ -118,6 +119,10 @@ pub fn assemble_program_ir_multi(
 
 		let file_validation_props = validation::extract_validation_properties(file);
 		all_validation_props.extend(file_validation_props);
+		let file_declared_validation_props =
+			validation::extract_declared_validation_properties(file)
+				.map_err(|error| IdlError::Other(error.to_string()))?;
+		all_declared_validation_props.extend(file_declared_validation_props);
 
 		let file_seed_constants = seeds::extract_seed_constants(file);
 		let file_pdas = seeds::extract_pda_from_seed_macros(file, &file_seed_constants);
@@ -125,6 +130,19 @@ pub fn assemble_program_ir_multi(
 
 		pdas_ir.extend(file_pdas);
 		pdas_ir.extend(file_attr_pdas);
+	}
+
+	for (struct_name, fields) in all_declared_validation_props {
+		let properties = all_validation_props.entry(struct_name).or_default();
+		for (field_name, declared) in fields {
+			let property = properties.entry(field_name).or_default();
+			property.is_signer |= declared.is_signer;
+			property.is_writable |= declared.is_writable;
+			property.is_pda |= declared.is_pda;
+			if declared.default_value.is_some() {
+				property.default_value = declared.default_value;
+			}
+		}
 	}
 
 	let public_key = public_key.ok_or(IdlError::NoProgramId)?;
@@ -441,13 +459,12 @@ fn build_instruction_accounts(
 		.fields
 		.iter()
 		.map(|field| {
-			let inferred = val_props
+			let properties = val_props
 				.and_then(|m| m.get(&field.name))
 				.cloned()
 				.unwrap_or_default();
-			let declared = &field.declared_properties;
 
-			let pda_name = if inferred.is_pda {
+			let pda_name = if properties.is_pda {
 				Some(
 					infer_pda_name_for_field(&field.name, pdas_ir)
 						.ok_or_else(|| IdlError::unresolved_pda(&field.name))?,
@@ -458,11 +475,11 @@ fn build_instruction_accounts(
 
 			Ok(InstructionAccountIr {
 				name: field.name.clone(),
-				is_writable: field.is_mutable || declared.is_writable || inferred.is_writable,
-				is_signer: declared.is_signer || inferred.is_signer,
+				is_writable: field.is_mutable || properties.is_writable,
+				is_signer: properties.is_signer,
 				is_optional: field.is_optional,
-				default_value: declared.default_value.clone().or(inferred.default_value),
-				is_pda: inferred.is_pda,
+				default_value: properties.default_value,
+				is_pda: properties.is_pda,
 				pda_name,
 				docs: field.docs.clone(),
 			})

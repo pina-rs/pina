@@ -20,8 +20,6 @@ pub struct AccountsField {
 	/// Whether the field is wrapped in `Option<...>`, marking the account
 	/// slot as optional in generated clients.
 	pub is_optional: bool,
-	/// Client-visible properties declared through `#[pina(validate(...))]`.
-	pub declared_properties: super::validation::AccountProperties,
 }
 
 /// Extract all `#[derive(Accounts)]` structs from a file.
@@ -49,7 +47,7 @@ pub fn extract_accounts_structs(file: &File) -> Result<Vec<AccountsStruct>, syn:
 	Ok(result)
 }
 
-fn has_accounts_derive(attrs: &[syn::Attribute]) -> bool {
+pub(crate) fn has_accounts_derive(attrs: &[syn::Attribute]) -> bool {
 	for attr in attrs {
 		if !attr.path().is_ident("derive") {
 			continue;
@@ -88,15 +86,15 @@ fn extract_account_fields(fields: &syn::Fields) -> Result<Vec<AccountsField>, sy
 			// An optional mutable account (`Option<&mut AccountView>`) still
 			// declares a writable slot for provided values.
 			let is_mutable = is_mutable || inner_is_mutable == Some(true);
-			let declared_properties =
-				super::validation::extract_attribute_properties(&field.attrs)?;
+			// Parse helper attributes here as well as during IR assembly so callers
+			// of this parser receive the same precise diagnostics.
+			let _ = super::validation::extract_attribute_properties(&field.attrs)?;
 
 			Ok(AccountsField {
 				name,
 				docs,
 				is_mutable,
 				is_optional,
-				declared_properties,
 			})
 		})
 		.collect()
@@ -299,37 +297,6 @@ mod tests {
 		let structs = extract_accounts_structs(&file).expect("qualified AccountView");
 		assert!(structs[0].fields[0].is_optional);
 		assert!(!structs[0].fields[0].is_mutable);
-	}
-
-	#[test]
-	fn extracts_client_metadata_from_validation_attributes() {
-		let source = r#"
-			#[derive(Accounts)]
-			struct ValidateAccounts<'a> {
-				#[pina(validate(signer, writable))]
-				authority: &'a AccountView,
-				#[pina(validate(program = system::ID))]
-				system_program: &'a AccountView,
-				#[pina(validate(sysvar = sysvars::clock::ID))]
-				clock: &'a AccountView,
-			}
-		"#;
-		let file = syn::parse_file(source).expect("valid Rust");
-		let structs = extract_accounts_structs(&file).expect("valid validation attributes");
-		let fields = &structs[0].fields;
-
-		assert!(fields[0].declared_properties.is_signer);
-		assert!(fields[0].declared_properties.is_writable);
-		assert!(matches!(
-			&fields[1].declared_properties.default_value,
-			Some(crate::ir::DefaultValueIr::PublicKey(address))
-				if address == "11111111111111111111111111111111"
-		));
-		assert!(matches!(
-			&fields[2].declared_properties.default_value,
-			Some(crate::ir::DefaultValueIr::PublicKey(address))
-				if address == "SysvarC1ock11111111111111111111111111111111"
-		));
 	}
 
 	#[test]

@@ -148,6 +148,41 @@ pub fn extract_attribute_properties(
 	Ok(properties)
 }
 
+/// Extract declarative properties without adding parser state to the public
+/// `AccountsField` model.
+pub(crate) fn extract_declared_validation_properties(
+	file: &syn::File,
+) -> Result<HashMap<String, HashMap<String, AccountProperties>>, syn::Error> {
+	let mut result = HashMap::new();
+
+	for item in &file.items {
+		let Item::Struct(item_struct) = item else {
+			continue;
+		};
+		if !super::accounts_struct::has_accounts_derive(&item_struct.attrs) {
+			continue;
+		}
+		let syn::Fields::Named(fields) = &item_struct.fields else {
+			continue;
+		};
+
+		let mut field_properties = HashMap::new();
+		for field in &fields.named {
+			let name = field
+				.ident
+				.as_ref()
+				.expect("named fields always have identifiers");
+			field_properties.insert(
+				name.to_string(),
+				extract_attribute_properties(&field.attrs)?,
+			);
+		}
+		result.insert(item_struct.ident.to_string(), field_properties);
+	}
+
+	Ok(result)
+}
+
 /// Analyse all `impl ProcessAccountInfos for X` blocks in a file and return a
 /// map from the struct name (without lifetime) to a map of field name ->
 /// properties.
@@ -572,6 +607,66 @@ fn type_to_name(ty: &syn::Type) -> String {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[test]
+	fn extracts_declarative_account_properties_privately() {
+		let source = r#"
+			enum NotAnAccount { Value }
+			struct PlainStruct { value: u8 }
+			#[derive(Accounts)]
+			struct TupleAccounts(&'static AccountView);
+			#[derive(Accounts)]
+			struct ValidateAccounts<'a> {
+				#[pina(validate(signer, writable, executable, empty, not_empty))]
+				authority: &'a AccountView,
+				#[pina(validate(program = system::ID))]
+				system_program: &'a AccountView,
+				#[pina(validate(sysvar = sysvars::clock::ID))]
+				clock: &'a AccountView,
+				#[pina(remaining)]
+				remaining: &'a [AccountView],
+				#[pina(distinct)]
+				payer: &'a AccountView,
+				#[pina(distinct = authority)]
+				recipient: &'a AccountView,
+			}
+		"#;
+		let file = syn::parse_file(source).expect("valid Rust");
+		let all = extract_declared_validation_properties(&file)
+			.expect("supported declarative validation");
+		let fields = &all["ValidateAccounts"];
+
+		assert!(fields["authority"].is_signer);
+		assert!(fields["authority"].is_writable);
+		assert!(matches!(
+			&fields["system_program"].default_value,
+			Some(DefaultValueIr::PublicKey(address))
+				if address == "11111111111111111111111111111111"
+		));
+		assert!(matches!(
+			&fields["clock"].default_value,
+			Some(DefaultValueIr::PublicKey(address))
+				if address == "SysvarC1ock11111111111111111111111111111111"
+		));
+		assert!(!all.contains_key("TupleAccounts"));
+		assert!(!all.contains_key("PlainStruct"));
+	}
+
+	#[test]
+	fn rejects_unknown_declarative_account_option() {
+		let field: syn::Field = syn::parse_quote! {
+			#[pina(validte(signer))]
+			authority: &'static AccountView
+		};
+		let error = extract_attribute_properties(&field.attrs)
+			.expect_err("an unknown outer helper option must fail");
+		let message = error.to_string();
+
+		assert!(message.contains("unknown `#[pina]` account-field option"));
+		assert!(message.contains("`validate(...)`"));
+		assert!(message.contains("`remaining`"));
+		assert!(message.contains("`distinct`"));
+	}
 
 	#[test]
 	fn extracts_signer_and_writable() {

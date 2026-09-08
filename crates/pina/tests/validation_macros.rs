@@ -1,6 +1,11 @@
 #![cfg(feature = "validation")]
+#![allow(unsafe_code)]
 
 use pina::*;
+use pinocchio::account::NOT_BORROWED;
+use pinocchio::account::RuntimeAccount;
+
+const VALIDATION_OWNER: Address = Address::new_from_array([9; 32]);
 
 #[discriminator(crate = ::pina, primitive = u8, final)]
 enum ValidationKind {
@@ -48,6 +53,7 @@ struct ValidatedEvent {
 struct ValidatedAccount {
 	#[pina(validate(min = 1, max = 5))]
 	version: u8,
+	enabled: bool,
 }
 
 #[test]
@@ -111,9 +117,55 @@ fn event_and_account_helpers_validate_automatically() {
 	let mut account_bytes = [0u8; ValidatedAccount::SIZE];
 	let account_error = ValidatedAccount::initialize(&mut account_bytes, |value| {
 		value.version = 0;
+		value.enabled.set(true);
 		Ok(())
 	})
 	.err()
 	.unwrap();
 	assert_eq!(account_error, ProgramError::InvalidAccountData);
+}
+
+#[test]
+fn account_validation_rejects_structurally_invalid_data_at_both_boundaries() {
+	let mut bytes = [0u8; ValidatedAccount::SIZE];
+	ValidatedAccount::initialize(&mut bytes, |value| {
+		value.version = 3;
+		value.enabled.set(true);
+		Ok(())
+	})
+	.unwrap();
+	ValidatedAccount::validate_account_data(&bytes).unwrap();
+
+	bytes[ValidatedAccount::SIZE - 1] = 2;
+	assert_eq!(
+		ValidatedAccount::validate_account_data(&bytes),
+		Err(ProgramError::InvalidAccountData)
+	);
+
+	let mut account = TestAccount {
+		header: RuntimeAccount {
+			borrow_state: NOT_BORROWED,
+			is_signer: 0,
+			is_writable: 0,
+			executable: 0,
+			padding: [0; 4],
+			address: Address::new_from_array([1; 32]),
+			owner: VALIDATION_OWNER,
+			lamports: 1,
+			data_len: ValidatedAccount::SIZE as u64,
+		},
+		data: bytes,
+	};
+	let view = unsafe { AccountView::new_unchecked(core::ptr::addr_of_mut!(account.header)) };
+
+	assert_eq!(
+		view.assert_type::<ValidatedAccount>(&VALIDATION_OWNER),
+		Err(ProgramError::InvalidAccountData)
+	);
+}
+
+#[repr(C)]
+struct TestAccount {
+	header: RuntimeAccount,
+	data: [u8; ValidatedAccount::SIZE],
 }

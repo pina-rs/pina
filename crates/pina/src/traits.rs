@@ -49,6 +49,7 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 	///
 	/// Manual `PinaAccount` implementations inherit a no-op hook. The
 	/// `#[account]` macro overrides it when the `validation` feature is enabled.
+	#[cfg(feature = "validation")]
 	#[doc(hidden)]
 	fn validate_account_value(_value: &Self::Zc) -> ProgramResult {
 		Ok(())
@@ -64,15 +65,27 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 	where
 		F: FnOnce(&mut Self::Zc) -> Result<(), crate::PinaPodError>,
 	{
-		let value = <Self as PinaPodFixed>::initialize(data, |value| {
-			Self::write_zc_discriminator(value);
-			initialize(value)
-		})
-		.map_err(|_| ProgramError::InvalidAccountData)?;
+		#[cfg(not(feature = "validation"))]
+		{
+			return <Self as PinaPodFixed>::initialize(data, |value| {
+				Self::write_zc_discriminator(value);
+				initialize(value)
+			})
+			.map_err(|_| ProgramError::InvalidAccountData);
+		}
 
-		Self::validate_account_value(value)?;
+		#[cfg(feature = "validation")]
+		{
+			let value = <Self as PinaPodFixed>::initialize(data, |value| {
+				Self::write_zc_discriminator(value);
+				initialize(value)
+			})
+			.map_err(|_| ProgramError::InvalidAccountData)?;
 
-		Ok(value)
+			Self::validate_account_value(value)?;
+
+			Ok(value)
+		}
 	}
 
 	/// Validate the discriminator and content of `data`.
@@ -81,10 +94,19 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 			return Err(ProgramError::InvalidAccountData);
 		}
 
-		let value = <Self as PinaPodFixed>::read_exact(data)
-			.map_err(|_| ProgramError::InvalidAccountData)?;
+		#[cfg(not(feature = "validation"))]
+		{
+			return <Self as PinaPodFixed>::validate_exact(data)
+				.map_err(|_| ProgramError::InvalidAccountData);
+		}
 
-		Self::validate_account_value(value)
+		#[cfg(feature = "validation")]
+		{
+			let value = <Self as PinaPodFixed>::read_exact(data)
+				.map_err(|_| ProgramError::InvalidAccountData)?;
+
+			Self::validate_account_value(value)
+		}
 	}
 
 	/// Validate `data`, then borrow `PinaPod`'s immutable zero-copy companion.
@@ -93,11 +115,20 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 			return Err(ProgramError::InvalidAccountData);
 		}
 
-		let value = <Self as PinaPodFixed>::read_exact(data)
-			.map_err(|_| ProgramError::InvalidAccountData)?;
-		Self::validate_account_value(value)?;
+		#[cfg(not(feature = "validation"))]
+		{
+			return <Self as PinaPodFixed>::read_exact(data)
+				.map_err(|_| ProgramError::InvalidAccountData);
+		}
 
-		Ok(value)
+		#[cfg(feature = "validation")]
+		{
+			let value = <Self as PinaPodFixed>::read_exact(data)
+				.map_err(|_| ProgramError::InvalidAccountData)?;
+			Self::validate_account_value(value)?;
+
+			Ok(value)
+		}
 	}
 
 	/// Validate `data`, then borrow `PinaPod`'s mutable zero-copy companion.
@@ -106,11 +137,20 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 			return Err(ProgramError::InvalidAccountData);
 		}
 
-		let value = <Self as PinaPodFixed>::read_exact_mut(data)
-			.map_err(|_| ProgramError::InvalidAccountData)?;
-		Self::validate_account_value(value)?;
+		#[cfg(not(feature = "validation"))]
+		{
+			return <Self as PinaPodFixed>::read_exact_mut(data)
+				.map_err(|_| ProgramError::InvalidAccountData);
+		}
 
-		Ok(value)
+		#[cfg(feature = "validation")]
+		{
+			let value = <Self as PinaPodFixed>::read_exact_mut(data)
+				.map_err(|_| ProgramError::InvalidAccountData)?;
+			Self::validate_account_value(value)?;
+
+			Ok(value)
+		}
 	}
 }
 
