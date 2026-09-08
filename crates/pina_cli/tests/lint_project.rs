@@ -377,7 +377,7 @@ fn fingerprintless_rustc_surfaces_as_a_driver_error() {
 	assert!(
 		error
 			.to_string()
-			.contains("Could not parse a release or host target"),
+			.contains("Could not parse a release, commit hash, or host target"),
 		"unexpected error: {error}",
 	);
 }

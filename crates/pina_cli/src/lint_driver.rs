@@ -40,7 +40,7 @@ pub enum DriverError {
 	)]
 	RustcFailed { status: String },
 
-	#[error("Could not parse a release or host target from rustc -vV")]
+	#[error("Could not parse a release, commit hash, or host target from rustc -vV")]
 	MissingRustcFingerprint,
 
 	#[error("`PINA_LINT_DRIVER_PATH` does not point at an executable: {path}")]
@@ -60,8 +60,8 @@ pub enum DriverError {
 ///
 /// The driver is installed below `cargo_home` at
 /// `pina/lint-driver/<pina-version>/<toolchain>/bin/pina_lint_driver`, where
-/// the toolchain component is the `release-host` fingerprint reported by the
-/// Rust compiler that builds the project.
+/// the toolchain component is the `release-commit-host` fingerprint reported
+/// by the Rust compiler that builds the project.
 pub fn prepare_driver(
 	cargo_home: &Path,
 	project_root: &Path,
@@ -148,7 +148,7 @@ fn is_executable(path: &Path) -> bool {
 	path.is_file()
 }
 
-/// Return the `release-host` fingerprint of the Rust compiler used for
+/// Return the `release-commit-host` fingerprint of the Rust compiler used for
 /// `project_root`.
 fn rustc_fingerprint(project_root: &Path) -> Result<String, DriverError> {
 	let output = Command::new("rustc")
@@ -166,23 +166,22 @@ fn rustc_fingerprint(project_root: &Path) -> Result<String, DriverError> {
 	parse_rustc_fingerprint(&output.stdout).ok_or(DriverError::MissingRustcFingerprint)
 }
 
-/// Parse the release and host from verbose rustc version output.
+/// Parse the release, commit hash, and host from verbose rustc version output.
 fn parse_rustc_fingerprint(output: &[u8]) -> Option<String> {
-	let release = String::from_utf8_lossy(output)
-		.lines()
-		.find_map(|line| line.strip_prefix("release: "))?
-		.split_whitespace()
-		.next()?
-		.to_owned();
-	let host = String::from_utf8_lossy(output)
-		.lines()
-		.find_map(|line| line.strip_prefix("host: "))?
-		.split_whitespace()
-		.next()?
-		.to_owned();
+	let output = String::from_utf8_lossy(output);
+	let field = |prefix| {
+		output
+			.lines()
+			.find_map(|line| line.strip_prefix(prefix))?
+			.split_whitespace()
+			.next()
+	};
+	let release = field("release: ")?;
+	let commit_hash = field("commit-hash: ")?;
+	let host = field("host: ")?;
 
-	let fingerprint = format!("{release}-{host}");
-	// The release and host prefixes were parsed above, so the leftover
+	let fingerprint = format!("{release}-{commit_hash}-{host}");
+	// The required fields were parsed above, so the leftover
 	// replacements cannot blank the name out.
 	Some(
 		fingerprint
@@ -313,25 +312,36 @@ mod tests {
 	#[test]
 	fn parses_rustc_fingerprint_from_verbose_version_output() {
 		let output = b"rustc 1.95.0-nightly (abc 2026-02-20)\nbinary: rustc\nrelease: \
-		               1.95.0-nightly\nhost: x86_64-unknown-linux-gnu\n";
+		               1.95.0-nightly\ncommit-hash: abc123\nhost: x86_64-unknown-linux-gnu\n";
 
 		assert_eq!(
 			parse_rustc_fingerprint(output).as_deref(),
-			Some("1.95.0-nightly-x86_64-unknown-linux-gnu")
+			Some("1.95.0-nightly-abc123-x86_64-unknown-linux-gnu")
 		);
 		assert!(parse_rustc_fingerprint(b"rustc without fingerprint lines\n").is_none());
 	}
 
 	#[test]
+	fn distinguishes_nightly_compiler_revisions() {
+		let first = b"release: 1.95.0-nightly\ncommit-hash: abc123\nhost: aarch64-apple-darwin\n";
+		let second = b"release: 1.95.0-nightly\ncommit-hash: def456\nhost: aarch64-apple-darwin\n";
+
+		assert_ne!(
+			parse_rustc_fingerprint(first),
+			parse_rustc_fingerprint(second)
+		);
+	}
+
+	#[test]
 	fn sanitizes_unexpected_characters_out_of_the_toolchain_fingerprint() {
 		let output = b"rustc 1.95.0 nightly\nbinary: rustc\nrelease: \
-		               1.95.0~rolling\nhost: aarch64 unknown linux\n";
+		               1.95.0~rolling\ncommit-hash: abc/123\nhost: aarch64 unknown linux\n";
 
 		// The tilde is not allowed in a cargo target fingerprint, so the
 		// sanitizer must replace it with the safe placeholder. The host token
 		// is the first whitespace-separated word of the host line.
 		let parsed = parse_rustc_fingerprint(output).expect("the crafted output should parse");
-		assert_eq!(parsed, "1.95.0-rolling-aarch64");
+		assert_eq!(parsed, "1.95.0-rolling-abc-123-aarch64");
 	}
 
 	#[test]
