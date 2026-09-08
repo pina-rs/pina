@@ -23,11 +23,7 @@ crate::declare_late_lint! {
 	"Token-2022-capable mint loads require an explicit extension allow-list"
 }
 
-const TARGET_METHODS: &[&str] = &[
-	"as_token_mint_for_program",
-	"as_token_2022_mint",
-	"as_token_2022_mint_checked",
-];
+const TARGET_METHODS: &[&str] = &["as_token_mint_for_program", "as_token_2022_mint"];
 const POLICY_METHODS: &[&str] = &["assert_extensions_allowed", "assert_no_extensions"];
 
 fn is_explicit_legacy_load(call: &shared::CallInfo) -> bool {

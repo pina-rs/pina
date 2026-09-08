@@ -28,9 +28,7 @@ crate::declare_late_lint! {
 fn program_argument(call: &shared::CallInfo) -> Option<(usize, &str)> {
 	let index = match call.method.as_str() {
 		"as_token_mint_for_program" | "as_token_account_for_program" => 0,
-		"as_associated_token_account"
-		| "as_associated_token_account_checked"
-		| "assert_associated_token_address" => 2,
+		"as_associated_token_account" | "assert_associated_token_address" => 2,
 		"invoke_with_program" => 0,
 		"invoke_signed_with_program" => 1,
 		_ => return None,

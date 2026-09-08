@@ -173,14 +173,23 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 
 		// Validate all accounts before mutating anything.
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
+		let token_program = *self.token_program.address();
 		self.maker.assert_signer()?;
-		self.mint_a.assert_owners(&SPL_PROGRAM_IDS)?;
-		self.mint_b.assert_owners(&SPL_PROGRAM_IDS)?;
-		self.maker_ata_a.assert_associated_token_address(
+		drop(
+			self.mint_a
+				.as_token_mint_for_program(&token_program)?
+				.assert_no_extensions()?,
+		);
+		drop(
+			self.mint_b
+				.as_token_mint_for_program(&token_program)?
+				.assert_no_extensions()?,
+		);
+		drop(self.maker_ata_a.as_associated_token_account(
 			self.maker.address(),
 			self.mint_a.address(),
-			self.token_program.address(),
-		)?;
+			&token_program,
+		)?);
 		self.escrow
 			.assert_empty()?
 			.assert_writable()?
@@ -204,8 +213,8 @@ Key validation patterns:
 
 - `assert_addresses` checks that the token program is either SPL Token or Token-2022.
 - `assert_signer` ensures the maker signed the transaction.
-- `assert_owners` verifies mint accounts are owned by a token program.
-- `assert_associated_token_address` derives the expected ATA address and compares.
+- `as_token_mint_for_program` accepts only a canonical token program, checks the mint owner, and parses its concrete layout.
+- `as_associated_token_account` checks the canonical token-program owner, derived address, stored wallet, and stored mint.
 - `assert_empty` + `assert_writable` + `assert_seeds_with_bump` validates the PDA is fresh and derivable.
 
 Validation methods return the same reference type they receive, so mutable chains stay mutable all the way to `as_account_mut()`.
@@ -264,7 +273,7 @@ drop(
 	self.mint_b
 		.as_token_mint_for_program(&token_program)?,
 );
-drop(self.maker_ata_a.as_associated_token_account_checked(
+drop(self.maker_ata_a.as_associated_token_account(
 	self.maker.address(),
 	self.mint_a.address(),
 	&token_program,
@@ -338,7 +347,7 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 
 		let vault_amount = self
 			.vault
-			.as_associated_token_account_checked(
+			.as_associated_token_account(
 				self.escrow.address(),
 				self.mint_a.address(),
 				&token_program,

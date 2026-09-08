@@ -672,13 +672,8 @@ impl_account_validation!(
 impl AsTokenAccount for AccountView {
 	#[track_caller]
 	fn as_token_mint(&self) -> Result<Ref<'_, crate::token::state::Mint>, ProgramError> {
-		crate::token::state::Mint::from_account_view(self)
-	}
-
-	#[track_caller]
-	fn as_token_mint_checked(&self) -> Result<Ref<'_, crate::token::state::Mint>, ProgramError> {
 		self.assert_owner(&crate::token::ID)?;
-		self.as_token_mint()
+		crate::token::state::Mint::from_account_view(self)
 	}
 
 	#[track_caller]
@@ -691,15 +686,8 @@ impl AsTokenAccount for AccountView {
 
 	#[track_caller]
 	fn as_token_account(&self) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError> {
-		crate::token::state::TokenAccount::from_account_view(self)
-	}
-
-	#[track_caller]
-	fn as_token_account_checked(
-		&self,
-	) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError> {
 		self.assert_owner(&crate::token::ID)?;
-		self.as_token_account()
+		crate::token::state::TokenAccount::from_account_view(self)
 	}
 
 	#[track_caller]
@@ -717,18 +705,8 @@ impl AsTokenAccount for AccountView {
 		Ref<'_, crate::token_2022::state::StateWithExtensions<crate::token_2022::state::Mint>>,
 		ProgramError,
 	> {
-		crate::token_2022::state::StateWithExtensions::<crate::token_2022::state::Mint>::from_account_view(self)
-	}
-
-	#[track_caller]
-	fn as_token_2022_mint_checked(
-		&self,
-	) -> Result<
-		Ref<'_, crate::token_2022::state::StateWithExtensions<crate::token_2022::state::Mint>>,
-		ProgramError,
-	> {
 		self.assert_owner(&crate::token_2022::ID)?;
-		self.as_token_2022_mint()
+		crate::token_2022::state::StateWithExtensions::<crate::token_2022::state::Mint>::from_account_view(self)
 	}
 
 	#[track_caller]
@@ -741,47 +719,31 @@ impl AsTokenAccount for AccountView {
 		>,
 		ProgramError,
 	> {
+		self.assert_owner(&crate::token_2022::ID)?;
 		crate::token_2022::state::StateWithExtensions::<
 			crate::token_2022::state::TokenAccount,
 		>::from_account_view(self)
 	}
 
 	#[track_caller]
-	fn as_token_2022_account_checked(
-		&self,
-	) -> Result<
-		Ref<
-			'_,
-			crate::token_2022::state::StateWithExtensions<crate::token_2022::state::TokenAccount>,
-		>,
-		ProgramError,
-	> {
-		self.assert_owner(&crate::token_2022::ID)?;
-		self.as_token_2022_account()
-	}
-
-	#[track_caller]
 	#[inline(always)]
 	fn as_associated_token_account(
 		&self,
-		owner: &Address,
+		wallet: &Address,
 		mint: &Address,
 		token_program: &Address,
 	) -> Result<crate::token::TokenAccountRef<'_>, ProgramError> {
-		let account = self.assert_associated_token_address(owner, mint, token_program)?;
+		let token_account = crate::token::TokenAccountRef::from_account_view(self, token_program)?;
+		self.assert_associated_token_address(wallet, mint, token_program)?;
 
-		crate::token::TokenAccountRef::from_account_view(account, token_program)
-	}
+		if token_account.owner() != wallet || token_account.mint() != mint {
+			log!("Could not load associated token account: stored owner or mint does not match");
+			log_caller();
 
-	#[track_caller]
-	#[inline(always)]
-	fn as_associated_token_account_checked(
-		&self,
-		owner: &Address,
-		mint: &Address,
-		token_program: &Address,
-	) -> Result<crate::token::TokenAccountRef<'_>, ProgramError> {
-		self.as_associated_token_account(owner, mint, token_program)
+			return Err(ProgramError::InvalidAccountData);
+		}
+
+		Ok(token_account)
 	}
 }
 

@@ -3,8 +3,8 @@
 //! Every lint is public and importable:
 //!
 //! ```rust,ignore
-//! use pina_lints::lints::require_owner_before_token_cast::{
-//!     REQUIRE_OWNER_BEFORE_TOKEN_CAST, RequireOwnerBeforeTokenCast,
+//! use pina_lints::lints::require_consistent_token_program::{
+//!     REQUIRE_CONSISTENT_TOKEN_PROGRAM, RequireConsistentTokenProgram,
 //! };
 //! ```
 //!
@@ -13,7 +13,6 @@
 pub mod deny_account_borrows_across_cpi;
 pub mod deny_heap_allocations_in_onchain_instruction_handlers;
 pub mod deny_unused_account_borrow_guards;
-pub mod require_associated_token_address_before_ata_cast;
 pub mod require_bounded_remaining_accounts;
 pub mod require_canonical_bump_before_pda_write;
 pub mod require_canonical_instruction_dispatch_for_idl;
@@ -23,7 +22,6 @@ pub mod require_empty_before_init;
 pub mod require_explicit_discriminators_and_seed_namespaces;
 pub mod require_explicit_token_2022_extension_policy;
 pub mod require_idl_root_to_define_one_program_id;
-pub mod require_owner_before_token_cast;
 pub mod require_post_cpi_balance_reload;
 pub mod require_program_check_before_cpi;
 pub mod require_reason_for_duplicate_remaining_accounts;

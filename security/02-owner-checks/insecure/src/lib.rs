@@ -38,10 +38,9 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 
 		self.depositor.assert_signer()?;
 
-		// BUG: No owner check before deserializing as a token account!
-		// An attacker can create a fake account with arbitrary token data
-		// owned by any program.
-		let token = self.token_account.as_token_account()?;
+		// BUG: Calling the upstream layout parser directly bypasses Pina's
+		// canonical token-program owner check.
+		let token = token::state::TokenAccount::from_account_view(self.token_account)?;
 		let balance = token.amount();
 
 		let amount = args.amount.get();

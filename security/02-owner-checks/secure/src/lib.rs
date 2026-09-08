@@ -33,12 +33,9 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 
 		self.depositor.assert_signer()?;
 
-		// SECURE: The multi-program loader accepts only SPL Token or Token-2022
-		// and delegates both ownership and layout validation to that program's
-		// concrete upstream state type.
-		let token = self
-			.token_account
-			.as_token_account_for_program(self.token_account.owner())?;
+		// SECURE: The loader checks the canonical SPL Token owner before it
+		// returns typed account data.
+		let token = self.token_account.as_token_account()?;
 		let balance = token.amount();
 
 		let amount = args.amount.get();

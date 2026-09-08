@@ -136,10 +136,12 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			.assert_no_extensions()?;
 		let decimals = mint_a.decimals();
 		drop(mint_a);
-		self.mint_b
-			.as_token_mint_for_program(&token_program)?
-			.assert_no_extensions()?;
-		drop(self.maker_ata_a.as_associated_token_account_checked(
+		drop(
+			self.mint_b
+				.as_token_mint_for_program(&token_program)?
+				.assert_no_extensions()?,
+		);
+		drop(self.maker_ata_a.as_associated_token_account(
 			self.maker.address(),
 			self.mint_a.address(),
 			&token_program,
@@ -196,7 +198,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		.invoke()?;
 		let vault_before = self
 			.vault
-			.as_associated_token_account_checked(
+			.as_associated_token_account(
 				self.escrow.address(),
 				self.mint_a.address(),
 				&token_program,
@@ -216,7 +218,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 
 		let vault_after = self
 			.vault
-			.as_associated_token_account_checked(
+			.as_associated_token_account(
 				self.escrow.address(),
 				self.mint_a.address(),
 				&token_program,
@@ -264,13 +266,13 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		// Validate taker accounts
 		self.taker.assert_signer()?.assert_writable()?;
 		self.taker_ata_a.assert_writable()?;
-		drop(self.taker_ata_a.as_associated_token_account_checked(
+		drop(self.taker_ata_a.as_associated_token_account(
 			self.taker.address(),
 			self.mint_a.address(),
 			&token_program,
 		)?);
 		self.taker_ata_b.assert_writable()?;
-		drop(self.taker_ata_b.as_associated_token_account_checked(
+		drop(self.taker_ata_b.as_associated_token_account(
 			self.taker.address(),
 			self.mint_b.address(),
 			&token_program,
@@ -318,7 +320,7 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		self.vault.assert_not_empty()?.assert_writable()?;
 		let vault_amount = self
 			.vault
-			.as_associated_token_account_checked(
+			.as_associated_token_account(
 				self.escrow.address(),
 				self.mint_a.address(),
 				&token_program,

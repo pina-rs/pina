@@ -141,6 +141,21 @@ See `examples/compact_accounts` for a complete lifecycle with unit and Surfpool 
 
 `CreateCompactProgramAccount` and `CreateCompactProgramAccountWithBump` require a generated `patch` field. Pass the account's generated patch, such as `JournalPatch::new()`, for an all-zero, empty-tail default, or set the initial header and tail values in that patch.
 
+## Token account loaders
+
+Enable the `token` feature to load SPL Token and Token-2022 state. The loader name selects the canonical owner that Pina requires:
+
+```rust
+let legacy_mint = mint.as_token_mint()?;
+let legacy_account = account.as_token_account()?;
+let token_2022_mint = mint_2022.as_token_2022_mint()?;
+let token_2022_account = account_2022.as_token_2022_account()?;
+```
+
+Use `as_token_mint_for_program()` and `as_token_account_for_program()` when the instruction accepts either canonical token program at runtime. These methods reject every other program ID and require the account owner to match the selected program.
+
+Load an existing ATA with `as_associated_token_account()`. This method verifies the runtime owner, derived ATA address, stored wallet, and stored mint before returning a guard-backed token view. Use `assert_associated_token_address()` only when a validation-only path does not need token data.
+
 ## Feature Flags
 
 <br>

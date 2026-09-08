@@ -1939,7 +1939,7 @@ fn token_account_extension_policy_requires_an_explicit_allow_list() {
 
 #[cfg(feature = "token")]
 #[test]
-fn as_associated_token_account_checked_accepts_token_2022_owner() {
+fn as_associated_token_account_accepts_token_2022_owner() {
 	let wallet: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
 	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
 	let (ata_address, _bump) = try_get_associated_token_address(&wallet, &mint, &token_2022::ID)
@@ -1961,7 +1961,7 @@ fn as_associated_token_account_checked_accepts_token_2022_owner() {
 	let account = account_views[0];
 	let mut shadow = account_views[0];
 	let token_account = account
-		.as_associated_token_account_checked(&wallet, &mint, &token_2022::ID)
+		.as_associated_token_account(&wallet, &mint, &token_2022::ID)
 		.unwrap_or_else(|e| panic!("associated token account load failed: {e:?}"));
 	assert_eq!(token_account.amount(), 99);
 	assert_eq!(token_account.owner(), &wallet);
@@ -1978,7 +1978,7 @@ fn as_associated_token_account_checked_accepts_token_2022_owner() {
 
 #[cfg(feature = "token")]
 #[test]
-fn as_token_account_checked_rejects_overlong_account() {
+fn as_token_account_rejects_overlong_account() {
 	let token_account_key: Address = address!("6QWeT6FpJrm8AF1btu6WH2k2Xhq6t5vbheKVfQavmeoZ");
 	let mint: Address = address!("4hT5gDpr9HMmXzttW2Kz7LxyzKDn5XxhxL7sRKqGZo4x");
 	let owner: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
@@ -2000,14 +2000,14 @@ fn as_token_account_checked_rejects_overlong_account() {
 
 	let account = account_views[0];
 	assert!(matches!(
-		account.as_token_account_checked(),
+		account.as_token_account(),
 		Err(ProgramError::InvalidAccountData)
 	));
 }
 
 #[cfg(feature = "token")]
 #[test]
-fn as_token_account_checked_rejects_short_account() {
+fn as_token_account_rejects_short_account() {
 	let token_account_key: Address = address!("6QWeT6FpJrm8AF1btu6WH2k2Xhq6t5vbheKVfQavmeoZ");
 	let mint: Address = address!("4hT5gDpr9HMmXzttW2Kz7LxyzKDn5XxhxL7sRKqGZo4x");
 	let owner: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
@@ -2028,14 +2028,14 @@ fn as_token_account_checked_rejects_short_account() {
 
 	let account = account_views[0];
 	assert!(matches!(
-		account.as_token_account_checked(),
+		account.as_token_account(),
 		Err(ProgramError::InvalidAccountData)
 	));
 }
 
 #[cfg(feature = "token")]
 #[test]
-fn as_token_mint_checked_rejects_overlong_mint() {
+fn as_token_mint_rejects_overlong_mint() {
 	let mint_key: Address = address!("8qbHbw2BbbTHBW1sK7d7Yx4Z4DccnE9vrFica8FWHQrP");
 	let mut mint_data = build_token_mint_bytes(9, 42);
 	// SPL token mints are fixed-size; extra bytes are rejected.
@@ -2055,14 +2055,14 @@ fn as_token_mint_checked_rejects_overlong_mint() {
 
 	let account = account_views[0];
 	assert!(matches!(
-		account.as_token_mint_checked(),
+		account.as_token_mint(),
 		Err(ProgramError::InvalidAccountData)
 	));
 }
 
 #[cfg(feature = "token")]
 #[test]
-fn as_token_2022_account_checked_accepts_extension_data() {
+fn as_token_2022_account_accepts_extension_data() {
 	let token_account_key: Address = address!("4vJ9JU1bJJE96FWSJKv9J5xBqHkM7SspGq2pZ7uS5k4x");
 	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
 	let owner: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
@@ -2086,7 +2086,7 @@ fn as_token_2022_account_checked_accepts_extension_data() {
 
 	let account = account_views[0];
 	let token_account = account
-		.as_token_2022_account_checked()
+		.as_token_2022_account()
 		.unwrap_or_else(|e| panic!("token-2022 account load failed: {e:?}"));
 	assert_eq!(token_account.base.amount(), 123);
 	assert_eq!(token_account.base.mint(), &mint);
@@ -2095,7 +2095,7 @@ fn as_token_2022_account_checked_accepts_extension_data() {
 
 #[cfg(feature = "token")]
 #[test]
-fn as_token_2022_account_checked_rejects_wrong_account_type() {
+fn as_token_2022_account_rejects_wrong_account_type() {
 	let token_account_key: Address = address!("4vJ9JU1bJJE96FWSJKv9J5xBqHkM7SspGq2pZ7uS5k4x");
 	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
 	let owner: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
@@ -2118,14 +2118,14 @@ fn as_token_2022_account_checked_rejects_wrong_account_type() {
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
 	assert!(matches!(
-		account_views[0].as_token_2022_account_checked(),
+		account_views[0].as_token_2022_account(),
 		Err(ProgramError::InvalidAccountData)
 	));
 }
 
 #[cfg(feature = "token")]
 #[test]
-fn as_token_2022_account_checked_rejects_short_account() {
+fn as_token_2022_account_rejects_short_account() {
 	let token_account_key: Address = address!("4vJ9JU1bJJE96FWSJKv9J5xBqHkM7SspGq2pZ7uS5k4x");
 	let mint: Address = address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
 	let owner: Address = address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
@@ -2146,7 +2146,7 @@ fn as_token_2022_account_checked_rejects_short_account() {
 
 	let account = account_views[0];
 	assert!(matches!(
-		account.as_token_2022_account_checked(),
+		account.as_token_2022_account(),
 		Err(ProgramError::InvalidAccountData)
 	));
 }
@@ -2178,7 +2178,7 @@ fn as_associated_token_account_accepts_overlong_data() {
 
 	let account = account_views[0];
 	let token_account = account
-		.as_associated_token_account_checked(&wallet, &mint, &token_2022::ID)
+		.as_associated_token_account(&wallet, &mint, &token_2022::ID)
 		.unwrap_or_else(|e| panic!("associated token account load failed: {e:?}"));
 	assert_eq!(token_account.amount(), 99);
 	assert_eq!(token_account.owner(), &wallet);
@@ -2207,7 +2207,7 @@ fn as_associated_token_account_rejects_overlong_legacy_data() {
 	let (_, account_views, ..) = unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
 
 	assert!(matches!(
-		account_views[0].as_associated_token_account_checked(&wallet, &mint, &token::ID),
+		account_views[0].as_associated_token_account(&wallet, &mint, &token::ID),
 		Err(ProgramError::InvalidAccountData)
 	));
 }

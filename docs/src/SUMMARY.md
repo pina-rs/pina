@@ -26,6 +26,7 @@
 - [Core Concepts](./core-concepts.md)
 - [Migrate to PinaPod v0.2](./migrations/pinapod-v0.2.md)
 - [Migrate lamport mutation calls](./migrations/lamport-mutation-ownership.md)
+- [Migrate to safe token loaders](./migrations/safe-token-loaders.md)
 - [Architecture Decisions](./adrs/index.md)
   - [ADR 0001: Keep discriminator-first typed layouts](./adrs/0001-discriminator-first-layout.md)
   - [ADR 0002: Keep zero-copy behind explicit validation](./adrs/0002-zero-copy-account-model.md)

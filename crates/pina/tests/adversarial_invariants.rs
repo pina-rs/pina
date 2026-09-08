@@ -339,6 +339,17 @@ fn build_token_account_bytes(mint: &Address, owner: &Address, amount: u64) -> Ve
 	data
 }
 
+#[cfg(feature = "token")]
+fn build_token_mint_bytes(decimals: u8, supply: u64) -> Vec<u8> {
+	let mut data = vec![0u8; token::state::Mint::LEN];
+	data[0] = 1;
+	write_address_bytes(&mut data, 4, &system::ID);
+	data[36..44].copy_from_slice(&supply.to_le_bytes());
+	data[44] = decimals;
+	data[45] = 1;
+	data
+}
+
 #[test]
 fn duplicate_mutable_accounts_are_rejected_by_cursor_runtime() {
 	let shared_key = fake_address(11);
@@ -779,28 +790,61 @@ fn non_canonical_pda_requires_explicit_bump_verification() {
 // Pina itself owns: token account identity, owner allowlists, and ATA checks.
 #[cfg(feature = "token")]
 #[test]
-fn token_checked_loader_rejects_wrong_owner() {
+fn token_loaders_reject_spoofed_program_owners() {
 	let mint = fake_address(25);
 	let owner = fake_address(26);
-	let unique_accounts = [AccountBuilder::new()
-		.address(fake_address(27))
-		.owner(system::ID)
-		.lamports(1)
-		.data(&build_token_account_bytes(&mint, &owner, 55))
-		.is_writable(true)];
+	let mint_data = build_token_mint_bytes(6, 1_000);
+	let account_data = build_token_account_bytes(&mint, &owner, 55);
+	let unique_accounts = [
+		AccountBuilder::new()
+			.address(fake_address(27))
+			.owner(system::ID)
+			.lamports(1)
+			.data(&mint_data),
+		AccountBuilder::new()
+			.address(fake_address(28))
+			.owner(system::ID)
+			.lamports(1)
+			.data(&account_data),
+		AccountBuilder::new()
+			.address(fake_address(29))
+			.owner(token::ID)
+			.lamports(1)
+			.data(&mint_data),
+		AccountBuilder::new()
+			.address(fake_address(30))
+			.owner(token::ID)
+			.lamports(1)
+			.data(&account_data),
+	];
 
-	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 8);
 	let account_views = initialized_account_views(&mut accounts, count);
-	let result = account_views[0].as_token_account_checked();
-	assert!(matches!(result, Err(ProgramError::InvalidAccountOwner)));
+
+	assert!(matches!(
+		account_views[0].as_token_mint(),
+		Err(ProgramError::InvalidAccountOwner)
+	));
+	assert!(matches!(
+		account_views[1].as_token_account(),
+		Err(ProgramError::InvalidAccountOwner)
+	));
+	assert!(matches!(
+		account_views[2].as_token_2022_mint(),
+		Err(ProgramError::InvalidAccountOwner)
+	));
+	assert!(matches!(
+		account_views[3].as_token_2022_account(),
+		Err(ProgramError::InvalidAccountOwner)
+	));
 }
 
 #[cfg(feature = "token")]
 #[test]
 fn associated_token_loader_rejects_wrong_ata_address() {
-	let wallet = fake_address(28);
-	let mint = fake_address(29);
-	let wrong_ata = fake_address(30);
+	let wallet = fake_address(31);
+	let mint = fake_address(32);
+	let wrong_ata = fake_address(33);
 	let unique_accounts = [AccountBuilder::new()
 		.address(wrong_ata)
 		.owner(token::ID)
@@ -810,6 +854,68 @@ fn associated_token_loader_rejects_wrong_ata_address() {
 
 	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
 	let account_views = initialized_account_views(&mut accounts, count);
-	let result = account_views[0].as_associated_token_account_checked(&wallet, &mint, &token::ID);
+	let result = account_views[0].as_associated_token_account(&wallet, &mint, &token::ID);
 	assert!(matches!(result, Err(ProgramError::InvalidSeeds)));
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn associated_token_loader_rejects_spoofed_program_owner() {
+	let wallet = fake_address(34);
+	let mint = fake_address(35);
+	let (ata, _) = try_get_associated_token_address(&wallet, &mint, &token::ID)
+		.unwrap_or_else(|| panic!("failed to derive ATA"));
+	let unique_accounts = [AccountBuilder::new()
+		.address(ata)
+		.owner(system::ID)
+		.lamports(1)
+		.data(&build_token_account_bytes(&mint, &wallet, 99))];
+
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+	let result = account_views[0].as_associated_token_account(&wallet, &mint, &token::ID);
+
+	assert!(matches!(result, Err(ProgramError::InvalidAccountOwner)));
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn associated_token_loader_rejects_spoofed_wallet_in_data() {
+	let wallet = fake_address(36);
+	let spoofed_wallet = fake_address(37);
+	let mint = fake_address(38);
+	let (ata, _) = try_get_associated_token_address(&wallet, &mint, &token::ID)
+		.unwrap_or_else(|| panic!("failed to derive ATA"));
+	let unique_accounts = [AccountBuilder::new()
+		.address(ata)
+		.owner(token::ID)
+		.lamports(1)
+		.data(&build_token_account_bytes(&mint, &spoofed_wallet, 99))];
+
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+	let result = account_views[0].as_associated_token_account(&wallet, &mint, &token::ID);
+
+	assert!(matches!(result, Err(ProgramError::InvalidAccountData)));
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn associated_token_loader_rejects_spoofed_mint_in_data() {
+	let wallet = fake_address(39);
+	let mint = fake_address(40);
+	let spoofed_mint = fake_address(41);
+	let (ata, _) = try_get_associated_token_address(&wallet, &mint, &token_2022::ID)
+		.unwrap_or_else(|| panic!("failed to derive ATA"));
+	let unique_accounts = [AccountBuilder::new()
+		.address(ata)
+		.owner(token_2022::ID)
+		.lamports(1)
+		.data(&build_token_account_bytes(&spoofed_mint, &wallet, 99))];
+
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+	let result = account_views[0].as_associated_token_account(&wallet, &mint, &token_2022::ID);
+
+	assert!(matches!(result, Err(ProgramError::InvalidAccountData)));
 }

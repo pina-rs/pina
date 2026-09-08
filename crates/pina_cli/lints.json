@@ -10,10 +10,6 @@
 			"name": "deny_unused_account_borrow_guards",
 			"level": "warn"
 		},
-		{
-			"name": "require_associated_token_address_before_ata_cast",
-			"level": "deny"
-		},
 		{ "name": "require_bounded_remaining_accounts", "level": "deny" },
 		{ "name": "require_canonical_bump_before_pda_write", "level": "deny" },
 		{
@@ -29,7 +25,6 @@
 		},
 		{ "name": "require_explicit_token_2022_extension_policy", "level": "deny" },
 		{ "name": "require_idl_root_to_define_one_program_id", "level": "warn" },
-		{ "name": "require_owner_before_token_cast", "level": "deny" },
 		{ "name": "require_post_cpi_balance_reload", "level": "deny" },
 		{ "name": "require_program_check_before_cpi", "level": "deny" },
 		{
