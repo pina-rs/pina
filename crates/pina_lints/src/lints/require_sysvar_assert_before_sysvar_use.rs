@@ -90,23 +90,38 @@ fn is_sysvar_receiver(name: &str) -> bool {
 		|| terminal.ends_with("_instructions")
 }
 
-fn trusted_sysvar_type(
-	definition_crate: Option<&str>,
-	definition_path: Option<&str>,
-) -> Option<&'static str> {
-	if definition_crate != Some("pinocchio") {
-		return None;
+fn trusted_definition(definition: &shared::TypeDefinition) -> Option<&'static str> {
+	(definition.crate_name == "pinocchio")
+		.then(|| {
+			TRUSTED_SYSVAR_TYPES
+				.iter()
+				.find_map(|trusted| (definition.path == *trusted).then_some(*trusted))
+		})
+		.flatten()
+}
+
+fn trusted_sysvar_receiver_type(definitions: &[shared::TypeDefinition]) -> Option<&'static str> {
+	let outer = definitions.first()?;
+	if let Some(trusted) = trusted_definition(outer) {
+		return Some(trusted);
 	}
 
-	definition_path.and_then(|path| {
-		TRUSTED_SYSVAR_TYPES.iter().find_map(|trusted| {
-			(path == *trusted
-				|| path
-					.strip_prefix(trusted)
-					.is_some_and(|suffix| suffix.starts_with("::")))
-			.then_some(*trusted)
-		})
-	})
+	// `Clock::from_account_view` returns Pinocchio's account borrow wrapper,
+	// whose `Deref` target is the trusted `Clock`. Do not generally search
+	// generic arguments: doing so would misclassify `Result<Clock, _>` methods
+	// such as `.unwrap()` as sysvar operations.
+	let is_pinocchio_borrow = outer.crate_name == "solana_account_view"
+		&& matches!(
+			terminal_identifier(&outer.path),
+			"Ref" | "RefMut" | "MappedRef" | "MappedRefMut"
+		);
+	is_pinocchio_borrow
+		.then(|| definitions[1..].iter().find_map(trusted_definition))
+		.flatten()
+}
+
+fn trusted_projected_value_type(definitions: &[shared::TypeDefinition]) -> Option<&'static str> {
+	trusted_sysvar_receiver_type(definitions)
 }
 
 fn is_checked_loader_for(call: &shared::CallInfo, trusted_type: &str) -> bool {
@@ -127,6 +142,15 @@ fn is_checked_loader_for(call: &shared::CallInfo, trusted_type: &str) -> bool {
 			.is_some_and(|path| path.starts_with(trusted_type))
 }
 
+fn is_typed_loader_for(call: &shared::CallInfo, trusted_type: &str) -> bool {
+	is_checked_loader_for(call, trusted_type)
+		|| (call.def_crate.as_deref() == Some("pinocchio")
+			&& call
+				.def_path
+				.as_deref()
+				.is_some_and(|path| path.starts_with(trusted_type)))
+}
+
 fn is_transparent_result_adapter(call: &shared::CallInfo) -> bool {
 	matches!(call.def_crate.as_deref(), Some("core" | "std"))
 		&& matches!(
@@ -143,16 +167,20 @@ fn has_checked_typed_loader_at(
 	use_span: rustc_span::Span,
 ) -> bool {
 	let named_loader = receiver_binding.is_some_and(|receiver_binding| {
-		facts.calls.iter().rev().any(|prior| {
+		let mut producers = facts.calls.iter().filter(|prior| {
 			prior.span.lo() < use_span.lo()
 				&& prior.result_binding_id == Some(receiver_binding)
-				&& is_checked_loader_for(prior, trusted_type)
-				&& !facts.assignments.iter().any(|assignment| {
-					assignment.binding == Some(receiver_binding)
-						&& assignment.span.lo() > prior.span.lo()
-						&& assignment.span.lo() < use_span.lo()
-				})
-		})
+				&& is_typed_loader_for(prior, trusted_type)
+		});
+		let Some(first) = producers.next() else {
+			return false;
+		};
+
+		is_checked_loader_for(first, trusted_type)
+			&& producers.all(|producer| is_checked_loader_for(producer, trusted_type))
+			&& !facts.assignments.iter().any(|assignment| {
+				assignment.binding == Some(receiver_binding) && assignment.span.lo() < use_span.lo()
+			})
 	});
 	if named_loader {
 		return true;
@@ -171,9 +199,7 @@ fn has_checked_typed_loader_at(
 }
 
 fn has_checked_typed_loader(facts: &shared::FunctionFacts, call: &shared::CallInfo) -> bool {
-	let Some(trusted_type) =
-		trusted_sysvar_type(call.def_crate.as_deref(), call.def_path.as_deref())
-	else {
+	let Some(trusted_type) = trusted_sysvar_receiver_type(&call.receiver_type_definitions) else {
 		return false;
 	};
 	let Some(receiver_span) = call.receiver_span else {
@@ -221,9 +247,17 @@ impl<'tcx> LateLintPass<'tcx> for RequireSysvarAssertBeforeSysvarUse {
 
 		let facts = shared::collect_function_facts(cx, body);
 		for (index, call) in facts.calls.iter().enumerate() {
-			if call.method == "assert_sysvar" || has_checked_typed_loader(&facts, call) {
+			if call.method == "assert_sysvar" {
 				continue;
 			}
+
+			if trusted_sysvar_receiver_type(&call.receiver_type_definitions).is_some() {
+				if !has_checked_typed_loader(&facts, call) {
+					emit_unchecked_sysvar(cx, call.span);
+				}
+				continue;
+			}
+
 			if matches!(call.def_crate.as_deref(), Some("alloc" | "core" | "std")) {
 				continue;
 			}
@@ -260,10 +294,8 @@ impl<'tcx> LateLintPass<'tcx> for RequireSysvarAssertBeforeSysvarUse {
 		}
 
 		for field in &facts.field_accesses {
-			let Some(trusted_type) = trusted_sysvar_type(
-				field.receiver_type_crate.as_deref(),
-				field.receiver_type_path.as_deref(),
-			) else {
+			let Some(trusted_type) = trusted_sysvar_receiver_type(&field.receiver_type_definitions)
+			else {
 				continue;
 			};
 			if !has_checked_typed_loader_at(
@@ -274,6 +306,23 @@ impl<'tcx> LateLintPass<'tcx> for RequireSysvarAssertBeforeSysvarUse {
 				field.span,
 			) {
 				emit_unchecked_sysvar(cx, field.span);
+			}
+		}
+
+		for projection in &facts.pattern_projections {
+			let Some(trusted_type) =
+				trusted_projected_value_type(&projection.value_type_definitions)
+			else {
+				continue;
+			};
+			if !has_checked_typed_loader_at(
+				&facts,
+				trusted_type,
+				None,
+				projection.value_span,
+				projection.span,
+			) {
+				emit_unchecked_sysvar(cx, projection.span);
 			}
 		}
 	}

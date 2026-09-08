@@ -17,8 +17,9 @@ use rustc_lint::LintContext;
 crate::declare_late_lint! {
 	/// ### What it does
 	///
-	/// Warns when `.invoke_with_program()` or `.invoke_signed_with_program()` is
-	/// called with a dynamic program address that has not passed
+	/// Warns when `.invoke_with_unverified_program()` or
+	/// `.invoke_signed_with_unverified_program()` is called with a dynamic
+	/// program address that has not passed
 	/// `assert_address()`, `assert_addresses()`, or `assert_program()` on the
 	/// same account within the same function.
 	///
@@ -33,20 +34,25 @@ crate::declare_late_lint! {
 	///
 	/// Bad:
 	/// ```ignore
-	/// transfer.invoke_with_program(token_program.address())?;
+	/// transfer.invoke_with_unverified_program(token_program.address())?;
 	/// ```
 	///
 	/// Good:
 	/// ```ignore
-	/// token_program.assert_program(&token::ID)?;
 	/// transfer.invoke_with_program(token_program.address())?;
+	/// // Or, when deliberately using the unchecked API:
+	/// token_program.assert_program(&token::ID)?;
+	/// transfer.invoke_with_unverified_program(token_program.address())?;
 	/// ```
 	pub REQUIRE_PROGRAM_CHECK_BEFORE_CPI,
 	Deny,
 	"dynamic CPI targets should be validated before invocation"
 }
 
-const DYNAMIC_CPI_METHODS: &[&str] = &["invoke_with_program", "invoke_signed_with_program"];
+const DYNAMIC_CPI_METHODS: &[&str] = &[
+	"invoke_with_unverified_program",
+	"invoke_signed_with_unverified_program",
+];
 
 const PROGRAM_CHECK_METHODS: &[&str] = &["assert_address", "assert_addresses", "assert_program"];
 
@@ -75,8 +81,8 @@ enum DynamicCpiMethod {
 impl DynamicCpiMethod {
 	const fn name(self) -> &'static str {
 		match self {
-			Self::Invoke => "invoke_with_program",
-			Self::InvokeSigned => "invoke_signed_with_program",
+			Self::Invoke => "invoke_with_unverified_program",
+			Self::InvokeSigned => "invoke_signed_with_unverified_program",
 		}
 	}
 
@@ -135,12 +141,34 @@ fn place_identity(expr: &Expr<'_>) -> Option<Place> {
 
 fn program_argument<'a>(method: &str, args: &'a [Expr<'a>]) -> Option<&'a Expr<'a>> {
 	let index = match method {
-		"invoke_with_program" => 0,
-		"invoke_signed_with_program" => 1,
+		"invoke_with_unverified_program" => 0,
+		"invoke_signed_with_unverified_program" => 1,
 		_ => return None,
 	};
 
 	args.get(index)
+}
+
+fn is_pinocchio_token_crate(cx: &LateContext<'_>, definition: rustc_hir::def_id::DefId) -> bool {
+	matches!(
+		cx.tcx.crate_name(definition.krate).as_str(),
+		"pinocchio_token" | "pinocchio_token_2022"
+	)
+}
+
+fn dynamic_cpi_method_from_definition(
+	cx: &LateContext<'_>,
+	definition: rustc_hir::def_id::DefId,
+) -> Option<DynamicCpiMethod> {
+	if !is_pinocchio_token_crate(cx, definition) {
+		return None;
+	}
+
+	match cx.tcx.item_name(definition).as_str() {
+		"invoke_with_unverified_program" => Some(DynamicCpiMethod::Invoke),
+		"invoke_signed_with_unverified_program" => Some(DynamicCpiMethod::InvokeSigned),
+		_ => None,
+	}
 }
 
 fn dynamic_cpi_method(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<DynamicCpiMethod> {
@@ -150,12 +178,7 @@ fn dynamic_cpi_method(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<DynamicCp
 	let Res::Def(DefKind::AssocFn, definition) = cx.qpath_res(path, expr.hir_id) else {
 		return None;
 	};
-	let method = cx.tcx.item_name(definition);
-	match method.as_str() {
-		"invoke_with_program" => Some(DynamicCpiMethod::Invoke),
-		"invoke_signed_with_program" => Some(DynamicCpiMethod::InvokeSigned),
-		_ => None,
-	}
+	dynamic_cpi_method_from_definition(cx, definition)
 }
 
 fn is_static_address(expr: &Expr<'_>) -> bool {
@@ -199,6 +222,50 @@ struct Analyzer<'cx, 'tcx> {
 }
 
 impl<'tcx> Analyzer<'_, 'tcx> {
+	fn resolve_cpi_alias(
+		&self,
+		expr: &'tcx Expr<'tcx>,
+		state: &ValidationState,
+	) -> Option<DynamicCpiMethod> {
+		if let Some(method) = dynamic_cpi_method(self.cx, expr) {
+			return Some(method);
+		}
+
+		match &expr.kind {
+			ExprKind::Path(path) => {
+				let Res::Local(binding) = self.cx.qpath_res(path, expr.hir_id) else {
+					return None;
+				};
+				state.cpi_aliases.get(&binding).copied()
+			}
+			ExprKind::Unary(_, inner)
+			| ExprKind::Use(inner, _)
+			| ExprKind::Cast(inner, _)
+			| ExprKind::Type(inner, _)
+			| ExprKind::DropTemps(inner)
+			| ExprKind::AddrOf(_, _, inner)
+			| ExprKind::UnsafeBinderCast(_, inner, _) => self.resolve_cpi_alias(inner, state),
+			ExprKind::Block(block, _) => {
+				block
+					.expr
+					.and_then(|tail| self.resolve_cpi_alias(tail, state))
+			}
+			ExprKind::If(_, then, Some(otherwise)) => {
+				let then_method = self.resolve_cpi_alias(then, state)?;
+				(self.resolve_cpi_alias(otherwise, state) == Some(then_method))
+					.then_some(then_method)
+			}
+			ExprKind::Match(_, arms, _) => {
+				let mut methods = arms
+					.iter()
+					.map(|arm| self.resolve_cpi_alias(arm.body, state));
+				let first = methods.next()??;
+				methods.all(|method| method == Some(first)).then_some(first)
+			}
+			_ => None,
+		}
+	}
+
 	fn invalidate(&self, state: &mut ValidationState, assigned: &Place) {
 		state
 			.places
@@ -216,8 +283,9 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				method
 			));
 			diag.help(
-				"add `program_account.assert_address(&expected_id)?` or \
-				 `program_account.assert_program(&expected_id)?` before the CPI invocation",
+				"use the verified `invoke_with_program` variant, or call \
+				 `program_account.assert_program(&expected_id)?` before the unverified CPI \
+				 invocation",
 			);
 		});
 	}
@@ -242,12 +310,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 								state.insert(Place::Local(binding));
 							}
 
-							let cpi_method = dynamic_cpi_method(self.cx, init).or_else(|| {
-								let Place::Local(source) = place_identity(init)? else {
-									return None;
-								};
-								state.cpi_aliases.get(&source).copied()
-							});
+							let cpi_method = self.resolve_cpi_alias(init, state);
 							if let Some(method) = cpi_method {
 								state.cpi_aliases.insert(binding, method);
 							}
@@ -289,6 +352,13 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				if !DYNAMIC_CPI_METHODS.contains(&method) {
 					return;
 				}
+				let Some(definition) = self.cx.typeck_results().type_dependent_def_id(expr.hir_id)
+				else {
+					return;
+				};
+				if dynamic_cpi_method_from_definition(self.cx, definition).is_none() {
+					return;
+				}
 
 				let validated = program_argument(method, args).is_some_and(|target| {
 					is_static_address(target)
@@ -305,15 +375,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					self.visit_expr(argument, state);
 				}
 
-				let method = dynamic_cpi_method(self.cx, callee).or_else(|| {
-					let ExprKind::Path(path) = &callee.kind else {
-						return None;
-					};
-					let Res::Local(binding) = self.cx.qpath_res(path, callee.hir_id) else {
-						return None;
-					};
-					state.cpi_aliases.get(&binding).copied()
-				});
+				let method = self.resolve_cpi_alias(callee, state);
 				let Some(method) = method else {
 					return;
 				};
@@ -381,8 +443,16 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			ExprKind::Assign(lhs, rhs, _) | ExprKind::AssignOp(_, lhs, rhs) => {
 				self.visit_expr(lhs, state);
 				self.visit_expr(rhs, state);
+				let cpi_method = self.resolve_cpi_alias(rhs, state);
 				if let Some(place) = place_identity(lhs) {
+					let binding = match &place {
+						Place::Local(binding) => Some(*binding),
+						Place::Field(..) => None,
+					};
 					self.invalidate(state, &place);
+					if let (Some(binding), Some(method)) = (binding, cpi_method) {
+						state.cpi_aliases.insert(binding, method);
+					}
 				}
 			}
 			ExprKind::AddrOf(_, rustc_hir::Mutability::Mut, inner) => {

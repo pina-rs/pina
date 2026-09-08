@@ -7,6 +7,7 @@
 extern crate rustc_ast;
 extern crate rustc_hir;
 extern crate rustc_lint;
+extern crate rustc_middle;
 extern crate rustc_span;
 
 use std::collections::HashMap;
@@ -26,6 +27,7 @@ pub struct CallInfo {
 	pub receiver: Option<String>,
 	pub receiver_binding: Option<HirId>,
 	pub receiver_span: Option<Span>,
+	pub receiver_type_definitions: Vec<TypeDefinition>,
 	pub path: Option<String>,
 	pub def_path: Option<String>,
 	pub def_crate: Option<String>,
@@ -56,8 +58,20 @@ pub struct FieldAccessInfo {
 	pub span: Span,
 	pub receiver_binding: Option<HirId>,
 	pub receiver_span: Span,
-	pub receiver_type_path: Option<String>,
-	pub receiver_type_crate: Option<String>,
+	pub receiver_type_definitions: Vec<TypeDefinition>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct TypeDefinition {
+	pub path: String,
+	pub crate_name: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct PatternProjectionInfo {
+	pub span: Span,
+	pub value_span: Span,
+	pub value_type_definitions: Vec<TypeDefinition>,
 }
 
 type ResultBinding<'a> = (HirId, &'a str);
@@ -71,6 +85,7 @@ pub struct FunctionFacts {
 	pub assignments: Vec<AssignmentInfo>,
 	pub aliases: HashMap<HirId, AliasInfo>,
 	pub field_accesses: Vec<FieldAccessInfo>,
+	pub pattern_projections: Vec<PatternProjectionInfo>,
 }
 
 pub fn collect_function_facts(cx: &LateContext<'_>, body: &Body<'_>) -> FunctionFacts {
@@ -80,9 +95,16 @@ pub fn collect_function_facts(cx: &LateContext<'_>, body: &Body<'_>) -> Function
 }
 
 fn definition_identity(cx: &LateContext<'_>, def_id: rustc_hir::def_id::DefId) -> (String, String) {
+	definition_identity_from_tcx(cx.tcx, def_id)
+}
+
+fn definition_identity_from_tcx(
+	tcx: rustc_middle::ty::TyCtxt<'_>,
+	def_id: rustc_hir::def_id::DefId,
+) -> (String, String) {
 	(
-		cx.tcx.def_path_str(def_id),
-		cx.tcx.crate_name(def_id.krate).as_str().to_string(),
+		tcx.def_path_str(def_id),
+		tcx.crate_name(def_id.krate).as_str().to_string(),
 	)
 }
 
@@ -102,9 +124,85 @@ fn expression_definition(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<(Strin
 	}
 }
 
-fn expression_type_definition(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<(String, String)> {
-	let definition = cx.typeck_results().expr_ty(expr).peel_refs().ty_adt_def()?;
-	Some(definition_identity(cx, definition.did()))
+fn collect_type_definitions(
+	tcx: rustc_middle::ty::TyCtxt<'_>,
+	type_: rustc_middle::ty::Ty<'_>,
+	definitions: &mut Vec<TypeDefinition>,
+) {
+	let type_ = type_.peel_refs();
+	if let Some(definition) = type_.ty_adt_def() {
+		let (path, crate_name) = definition_identity_from_tcx(tcx, definition.did());
+		let type_definition = TypeDefinition { path, crate_name };
+		if !definitions.contains(&type_definition) {
+			definitions.push(type_definition);
+		}
+	}
+
+	if let rustc_middle::ty::TyKind::Adt(_, arguments) = type_.kind() {
+		for argument in arguments.iter() {
+			if let Some(inner) = argument.as_type() {
+				collect_type_definitions(tcx, inner, definitions);
+			}
+		}
+	}
+}
+
+fn expression_type_definitions(cx: &LateContext<'_>, expr: &Expr<'_>) -> Vec<TypeDefinition> {
+	let mut definitions = Vec::new();
+	collect_type_definitions(cx.tcx, cx.typeck_results().expr_ty(expr), &mut definitions);
+	definitions
+}
+
+fn collect_pattern_projection(
+	cx: &LateContext<'_>,
+	pattern: &rustc_hir::Pat<'_>,
+	value: &Expr<'_>,
+	facts: &mut FunctionFacts,
+) {
+	match &pattern.kind {
+		rustc_hir::PatKind::Struct(_, fields, _) => {
+			let mut definitions = Vec::new();
+			collect_type_definitions(
+				cx.tcx,
+				cx.typeck_results().pat_ty(pattern),
+				&mut definitions,
+			);
+			facts.pattern_projections.push(PatternProjectionInfo {
+				span: pattern.span,
+				value_span: value.span,
+				value_type_definitions: definitions,
+			});
+			for field in *fields {
+				collect_pattern_projection(cx, field.pat, value, facts);
+			}
+		}
+		rustc_hir::PatKind::Binding(_, _, _, Some(inner))
+		| rustc_hir::PatKind::Box(inner)
+		| rustc_hir::PatKind::Deref(inner)
+		| rustc_hir::PatKind::Ref(inner, ..)
+		| rustc_hir::PatKind::Guard(inner, _) => {
+			collect_pattern_projection(cx, inner, value, facts);
+		}
+		rustc_hir::PatKind::TupleStruct(_, patterns, _)
+		| rustc_hir::PatKind::Tuple(patterns, _)
+		| rustc_hir::PatKind::Or(patterns) => {
+			for pattern in *patterns {
+				collect_pattern_projection(cx, pattern, value, facts);
+			}
+		}
+		rustc_hir::PatKind::Slice(before, middle, after) => {
+			for pattern in *before {
+				collect_pattern_projection(cx, pattern, value, facts);
+			}
+			if let Some(pattern) = middle {
+				collect_pattern_projection(cx, pattern, value, facts);
+			}
+			for pattern in *after {
+				collect_pattern_projection(cx, pattern, value, facts);
+			}
+		}
+		_ => {}
+	}
 }
 
 pub fn receiver_name(expr: &Expr<'_>) -> Option<String> {
@@ -206,6 +304,7 @@ fn collect_from_block(
 		match &stmt.kind {
 			rustc_hir::StmtKind::Let(local) => {
 				if let Some(init) = local.init {
+					collect_pattern_projection(cx, local.pat, init, facts);
 					let binding = match local.pat.kind {
 						rustc_hir::PatKind::Binding(_, binding, ident, _) => {
 							Some((binding, ident.name.as_str().to_string()))
@@ -283,6 +382,7 @@ fn collect_from_expr_inner(
 				receiver: expression_identity(receiver),
 				receiver_binding: expression_local_binding(receiver),
 				receiver_span: Some(receiver.span),
+				receiver_type_definitions: expression_type_definitions(cx, receiver),
 				path: None,
 				def_path: definition.as_ref().map(|(path, _)| path.clone()),
 				def_crate: definition.map(|(_, crate_name)| crate_name),
@@ -341,6 +441,7 @@ fn collect_from_expr_inner(
 					receiver: None,
 					receiver_binding: None,
 					receiver_span: None,
+					receiver_type_definitions: Vec::new(),
 					path: Some(path_name),
 					def_path: definition.as_ref().map(|(path, _)| path.clone()),
 					def_crate: definition.map(|(_, crate_name)| crate_name),
@@ -375,6 +476,7 @@ fn collect_from_expr_inner(
 				matches!(source, rustc_hir::MatchSource::TryDesugar(_)),
 			);
 			for arm in *arms {
+				collect_pattern_projection(cx, arm.pat, scrutinee, facts);
 				collect_from_expr(cx, arm.body, facts, result_binding);
 			}
 		}
@@ -386,13 +488,11 @@ fn collect_from_expr_inner(
 			}
 		}
 		ExprKind::Field(receiver, _) => {
-			let definition = expression_type_definition(cx, receiver);
 			facts.field_accesses.push(FieldAccessInfo {
 				span: expr.span,
 				receiver_binding: expression_local_binding(receiver),
 				receiver_span: receiver.span,
-				receiver_type_path: definition.as_ref().map(|(path, _)| path.clone()),
-				receiver_type_crate: definition.map(|(_, crate_name)| crate_name),
+				receiver_type_definitions: expression_type_definitions(cx, receiver),
 			});
 			collect_from_expr(cx, receiver, facts, result_binding);
 		}
@@ -428,6 +528,7 @@ fn collect_from_expr_inner(
 			collect_from_expr(cx, index, facts, None);
 		}
 		ExprKind::Let(let_expr) => {
+			collect_pattern_projection(cx, let_expr.pat, let_expr.init, facts);
 			collect_from_expr(cx, let_expr.init, facts, result_binding);
 		}
 		ExprKind::Tup(exprs) | ExprKind::Array(exprs) => {

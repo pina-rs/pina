@@ -144,6 +144,88 @@ fn process_unchecked_typed_sysvar(data: &[u8]) -> Result<(), ()> {
 	Ok(())
 }
 
+fn process_unchecked_typed_method_with_neutral_name(data: &[u8]) -> Result<(), ()> {
+	let parsed = Rent::from_bytes(data)?;
+	let _ = parsed.minimum_balance(8);
+	//~^ ERROR: sysvar access should be preceded by
+	Ok(())
+}
+
+fn process_inline_unchecked_typed_method(data: &[u8]) -> Result<(), ()> {
+	let _ = Rent::from_bytes(data)?.minimum_balance(8);
+	//~^ ERROR: sysvar access should be preceded by
+	Ok(())
+}
+
+fn process_conditionally_unchecked_typed_method(
+	rent_account: &AccountView,
+	data: &[u8],
+	condition: bool,
+) -> Result<(), ()> {
+	let parsed = if condition {
+		Rent::from_account_view(rent_account)?
+	} else {
+		Rent::from_bytes(data)?
+	};
+	let _ = parsed.minimum_balance(8);
+	//~^ ERROR: sysvar access should be preceded by
+	Ok(())
+}
+
+fn process_conditionally_checked_typed_method(
+	first: &AccountView,
+	second: &AccountView,
+	condition: bool,
+) -> Result<(), ()> {
+	let parsed = if condition {
+		Rent::from_account_view(first)?
+	} else {
+		Rent::from_account_view(second)?
+	};
+	let _ = parsed.minimum_balance(8);
+	Ok(())
+}
+
+fn process_unchecked_typed_destructure(data: &[u8]) -> Result<(), ()> {
+	let Clock { slot, .. } = Clock::from_bytes(data)?;
+	//~^ ERROR: sysvar access should be preceded by
+	let _ = slot;
+	Ok(())
+}
+
+fn process_checked_typed_destructure(clock_account: &AccountView) -> Result<(), ()> {
+	let Clock { slot, .. } = Clock::from_account_view(clock_account)?;
+	let _ = slot;
+	Ok(())
+}
+
+fn process_unchecked_typed_match(data: &[u8]) -> Result<(), ()> {
+	match Clock::from_bytes(data)? {
+		Clock { slot, .. } => {
+			//~^ ERROR: sysvar access should be preceded by
+			let _ = slot;
+		}
+	}
+	Ok(())
+}
+
+fn process_checked_typed_match(clock_account: &AccountView) -> Result<(), ()> {
+	match Clock::from_account_view(clock_account)? {
+		Clock { slot, .. } => {
+			let _ = slot;
+		}
+	}
+	Ok(())
+}
+
+fn process_unchecked_nested_pattern(data: &[u8]) -> Result<(), ()> {
+	if let Some(Clock { slot, .. }) = Some(Clock::from_bytes(data)?) {
+		//~^ ERROR: sysvar access should be preceded by
+		let _ = slot;
+	}
+	Ok(())
+}
+
 fn process_shadowed_unchecked_typed_sysvar(
 	clock_account: &AccountView,
 	data: &[u8],

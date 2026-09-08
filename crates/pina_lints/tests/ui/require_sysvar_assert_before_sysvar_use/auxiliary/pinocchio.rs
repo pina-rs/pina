@@ -53,6 +53,10 @@ pub mod sysvars {
 				Ok(Self)
 			}
 
+			pub fn from_bytes(_data: &[u8]) -> Result<Self, ()> {
+				Ok(Self)
+			}
+
 			pub fn minimum_balance(&self, _data_len: usize) -> u64 {
 				0
 			}

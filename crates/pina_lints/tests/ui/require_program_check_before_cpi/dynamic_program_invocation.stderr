@@ -1,90 +1,138 @@
-error: `.invoke_with_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:68:2
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:67:2
    |
-LL |     Instruction.invoke_with_program(token_program.address())?;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     Instruction.invoke_with_unverified_program(token_program.address())?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: add `program_account.assert_address(&expected_id)?` or `program_account.assert_program(&expected_id)?` before the CPI invocation
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
    = note: `#[deny(require_program_check_before_cpi)]` on by default
 
-error: `.invoke_signed_with_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:71:2
+error: `.invoke_signed_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:70:2
    |
-LL |     Instruction.invoke_signed_with_program(&[], token_program.address())
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     Instruction.invoke_signed_with_unverified_program(&[], token_program.address())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: add `program_account.assert_address(&expected_id)?` or `program_account.assert_program(&expected_id)?` before the CPI invocation
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
-error: `.invoke_with_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:76:2
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:75:2
    |
-LL |     Instruction::invoke_with_program(&Instruction, token_program.address())?;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     Instruction::invoke_with_unverified_program(&Instruction, token_program.address())?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: add `program_account.assert_address(&expected_id)?` or `program_account.assert_program(&expected_id)?` before the CPI invocation
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
-error: `.invoke_signed_with_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:79:2
+error: `.invoke_signed_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:78:2
    |
-LL |     Instruction::invoke_signed_with_program(&Instruction, &[], token_program.address())
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     Instruction::invoke_signed_with_unverified_program(&Instruction, &[], token_program.address())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: add `program_account.assert_address(&expected_id)?` or `program_account.assert_program(&expected_id)?` before the CPI invocation
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
-error: `.invoke_with_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:85:2
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:84:2
    |
 LL |     invoke(&Instruction, token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: add `program_account.assert_address(&expected_id)?` or `program_account.assert_program(&expected_id)?` before the CPI invocation
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
-error: `.invoke_with_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:102:2
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:90:2
    |
-LL |     Instruction.invoke_with_program(token_program.address())
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     invoke(&Instruction, token_program.address())?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: add `program_account.assert_address(&expected_id)?` or `program_account.assert_program(&expected_id)?` before the CPI invocation
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
-error: `.invoke_with_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:112:2
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:93:2
    |
-LL |     Instruction.invoke_with_program(second.token_program.address())
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     (Instruction::invoke_with_unverified_program as InvokeFn)(&Instruction, token_program.address())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: add `program_account.assert_address(&expected_id)?` or `program_account.assert_program(&expected_id)?` before the CPI invocation
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
-error: `.invoke_with_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:126:3
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:100:2
    |
-LL |         Instruction.invoke_with_program(token_program.address())?;
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     invoke(&Instruction, token_program.address())?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: add `program_account.assert_address(&expected_id)?` or `program_account.assert_program(&expected_id)?` before the CPI invocation
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
-error: `.invoke_with_program()` called without a preceding program address verification
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:113:2
+   |
+LL |     invoke(&Instruction, token_program.address())?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:120:2
+   |
+LL |     invoke(&Instruction, token_program.address())?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
   --> $DIR/dynamic_program_invocation.rs:141:2
    |
-LL |     Instruction.invoke_with_program(token_program.address())
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     invoke(&Instruction, token_program.address())?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: add `program_account.assert_address(&expected_id)?` or `program_account.assert_program(&expected_id)?` before the CPI invocation
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
-error: `.invoke_with_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:154:2
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:163:2
    |
-LL |     Instruction.invoke_with_program(token_program.address())
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     Instruction.invoke_with_unverified_program(token_program.address())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: add `program_account.assert_address(&expected_id)?` or `program_account.assert_program(&expected_id)?` before the CPI invocation
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
-error: `.invoke_with_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:168:2
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:173:2
    |
-LL |     Instruction.invoke_with_program(token_program.address())
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     Instruction.invoke_with_unverified_program(second.token_program.address())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: add `program_account.assert_address(&expected_id)?` or `program_account.assert_program(&expected_id)?` before the CPI invocation
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
-error: aborting due to 11 previous errors
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:187:3
+   |
+LL |         Instruction.invoke_with_unverified_program(token_program.address())?;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:202:2
+   |
+LL |     Instruction.invoke_with_unverified_program(token_program.address())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:215:2
+   |
+LL |     Instruction.invoke_with_unverified_program(token_program.address())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:229:2
+   |
+LL |     Instruction.invoke_with_unverified_program(token_program.address())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
+
+error: aborting due to 17 previous errors

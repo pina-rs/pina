@@ -1,8 +1,11 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused_assignments)]
 // normalize-stderr-test: "\n$" -> ""
+// aux-build: pinocchio_token.rs
 
-struct Address;
-struct Signer;
+extern crate pinocchio_token;
+
+use pinocchio_token::Address;
+use pinocchio_token::Instruction;
 
 static TOKEN_PROGRAM_ID: Address = Address;
 
@@ -32,28 +35,18 @@ impl ProgramAccount {
 	}
 }
 
-struct Instruction;
+struct UnrelatedInstruction;
 
-impl Instruction {
-	fn invoke(&self) -> Result<(), ()> {
+impl UnrelatedInstruction {
+	fn invoke_with_unverified_program(&self, _program: &Address) -> Result<(), ()> {
 		Ok(())
 	}
+}
 
-	fn invoke_signed(&self, _signers: &[Signer]) -> Result<(), ()> {
-		Ok(())
-	}
+type InvokeFn = fn(&Instruction, &Address) -> Result<(), ()>;
 
-	fn invoke_with_program(&self, _program: &Address) -> Result<(), ()> {
-		Ok(())
-	}
-
-	fn invoke_signed_with_program(
-		&self,
-		_signers: &[Signer],
-		_program: &Address,
-	) -> Result<(), ()> {
-		Ok(())
-	}
+fn unrelated_invoke(_instruction: &Instruction, _program: &Address) -> Result<(), ()> {
+	Ok(())
 }
 
 fn static_program_invocation_does_not_need_account_validation() -> Result<(), ()> {
@@ -64,33 +57,101 @@ fn static_program_invocation_does_not_need_account_validation() -> Result<(), ()
 	Instruction.invoke_with_program(target)
 }
 
-fn missing_dynamic_program_check(token_program: &ProgramAccount) -> Result<(), ()> {
+fn verified_program_methods_self_validate(token_program: &ProgramAccount) -> Result<(), ()> {
 	Instruction.invoke_with_program(token_program.address())?;
-	//~^ ERROR: `.invoke_with_program()` called without a preceding program address verification
+	Instruction.invoke_signed_with_program(&[], token_program.address())?;
+	UnrelatedInstruction.invoke_with_unverified_program(token_program.address())
+}
 
-	Instruction.invoke_signed_with_program(&[], token_program.address())
-	//~^ ERROR: `.invoke_signed_with_program()` called without a preceding program address verification
+fn missing_dynamic_program_check(token_program: &ProgramAccount) -> Result<(), ()> {
+	Instruction.invoke_with_unverified_program(token_program.address())?;
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+
+	Instruction.invoke_signed_with_unverified_program(&[], token_program.address())
+	//~^ ERROR: `.invoke_signed_with_unverified_program()` called without a preceding program address verification
 }
 
 fn missing_dynamic_program_check_ufcs(token_program: &ProgramAccount) -> Result<(), ()> {
-	Instruction::invoke_with_program(&Instruction, token_program.address())?;
-	//~^ ERROR: `.invoke_with_program()` called without a preceding program address verification
+	Instruction::invoke_with_unverified_program(&Instruction, token_program.address())?;
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
 
-	Instruction::invoke_signed_with_program(&Instruction, &[], token_program.address())
-	//~^ ERROR: `.invoke_signed_with_program()` called without a preceding program address verification
+	Instruction::invoke_signed_with_unverified_program(&Instruction, &[], token_program.address())
+	//~^ ERROR: `.invoke_signed_with_unverified_program()` called without a preceding program address verification
 }
 
 fn missing_dynamic_program_check_function_item(token_program: &ProgramAccount) -> Result<(), ()> {
-	let invoke = Instruction::invoke_with_program;
+	let invoke = Instruction::invoke_with_unverified_program;
 	invoke(&Instruction, token_program.address())
-	//~^ ERROR: `.invoke_with_program()` called without a preceding program address verification
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+}
+
+fn missing_dynamic_program_check_cast(token_program: &ProgramAccount) -> Result<(), ()> {
+	let invoke = Instruction::invoke_with_unverified_program as InvokeFn;
+	invoke(&Instruction, token_program.address())?;
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+
+	(Instruction::invoke_with_unverified_program as InvokeFn)(&Instruction, token_program.address())
+	//~^^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+}
+
+fn assignment_tracks_and_invalidates_aliases(token_program: &ProgramAccount) -> Result<(), ()> {
+	let mut invoke = unrelated_invoke as InvokeFn;
+	invoke = Instruction::invoke_with_unverified_program as InvokeFn;
+	invoke(&Instruction, token_program.address())?;
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+
+	invoke = unrelated_invoke;
+	invoke(&Instruction, token_program.address())
+}
+
+fn conditional_function_items(token_program: &ProgramAccount, condition: bool) -> Result<(), ()> {
+	let invoke: InvokeFn = if condition {
+		Instruction::invoke_with_unverified_program
+	} else {
+		Instruction::invoke_with_unverified_program
+	};
+	invoke(&Instruction, token_program.address())?;
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+
+	let invoke: InvokeFn = match condition {
+		true => Instruction::invoke_with_unverified_program,
+		false => Instruction::invoke_with_unverified_program,
+	};
+	invoke(&Instruction, token_program.address())?;
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+
+	let invoke: InvokeFn = if condition {
+		Instruction::invoke_with_unverified_program
+	} else {
+		unrelated_invoke
+	};
+	invoke(&Instruction, token_program.address())
+}
+
+fn branch_assignments_join_aliases(
+	token_program: &ProgramAccount,
+	condition: bool,
+) -> Result<(), ()> {
+	let mut invoke = unrelated_invoke as InvokeFn;
+	if condition {
+		invoke = Instruction::invoke_with_unverified_program;
+	} else {
+		invoke = Instruction::invoke_with_unverified_program;
+	}
+	invoke(&Instruction, token_program.address())?;
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+
+	if condition {
+		invoke = unrelated_invoke;
+	}
+	invoke(&Instruction, token_program.address())
 }
 
 fn checked_dynamic_program(token_program: &ProgramAccount, expected: &Address) -> Result<(), ()> {
 	token_program.assert_program(expected)?;
-	Instruction.invoke_with_program(token_program.address())?;
-	Instruction.invoke_signed_with_program(&[], token_program.address())?;
-	Instruction::invoke_with_program(&Instruction, token_program.address())
+	Instruction.invoke_with_unverified_program(token_program.address())?;
+	Instruction.invoke_signed_with_unverified_program(&[], token_program.address())?;
+	Instruction::invoke_with_unverified_program(&Instruction, token_program.address())
 }
 
 fn unrelated_program_check_does_not_authorize_dynamic_target(
@@ -99,8 +160,8 @@ fn unrelated_program_check_does_not_authorize_dynamic_target(
 	expected: &Address,
 ) -> Result<(), ()> {
 	system_program.assert_address(expected)?;
-	Instruction.invoke_with_program(token_program.address())
-	//~^ ERROR: `.invoke_with_program()` called without a preceding program address verification
+	Instruction.invoke_with_unverified_program(token_program.address())
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
 }
 
 fn same_terminal_field_name_does_not_alias(
@@ -109,8 +170,8 @@ fn same_terminal_field_name_does_not_alias(
 	expected: &Address,
 ) -> Result<(), ()> {
 	first.token_program.assert_address(expected)?;
-	Instruction.invoke_with_program(second.token_program.address())
-	//~^ ERROR: `.invoke_with_program()` called without a preceding program address verification
+	Instruction.invoke_with_unverified_program(second.token_program.address())
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
 }
 
 fn shadowed_binding_does_not_inherit_validation(
@@ -123,8 +184,8 @@ fn shadowed_binding_does_not_inherit_validation(
 
 	{
 		let token_program = second;
-		Instruction.invoke_with_program(token_program.address())?;
-		//~^ ERROR: `.invoke_with_program()` called without a preceding program address verification
+		Instruction.invoke_with_unverified_program(token_program.address())?;
+		//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
 	}
 
 	Ok(())
@@ -138,8 +199,8 @@ fn reassignment_invalidates_validation(
 	let mut token_program = first;
 	token_program.assert_address(expected)?;
 	token_program = second;
-	Instruction.invoke_with_program(token_program.address())
-	//~^ ERROR: `.invoke_with_program()` called without a preceding program address verification
+	Instruction.invoke_with_unverified_program(token_program.address())
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
 }
 
 fn conditional_check_does_not_dominate(
@@ -151,8 +212,8 @@ fn conditional_check_does_not_dominate(
 		token_program.assert_address(expected)?;
 	}
 
-	Instruction.invoke_with_program(token_program.address())
-	//~^ ERROR: `.invoke_with_program()` called without a preceding program address verification
+	Instruction.invoke_with_unverified_program(token_program.address())
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
 }
 
 fn match_check_does_not_dominate(
@@ -165,8 +226,8 @@ fn match_check_does_not_dominate(
 		false => (),
 	}
 
-	Instruction.invoke_with_program(token_program.address())
-	//~^ ERROR: `.invoke_with_program()` called without a preceding program address verification
+	Instruction.invoke_with_unverified_program(token_program.address())
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
 }
 
 fn checks_on_every_path_dominate(
@@ -185,7 +246,7 @@ fn checks_on_every_path_dominate(
 		false => token_program.assert_addresses(&[])?,
 	}
 
-	Instruction.invoke_with_program(token_program.address())
+	Instruction.invoke_with_unverified_program(token_program.address())
 }
 
 fn branch_local_check_dominates_branch_cpi(
@@ -195,7 +256,7 @@ fn branch_local_check_dominates_branch_cpi(
 ) -> Result<(), ()> {
 	if condition {
 		token_program.assert_address(expected)?;
-		Instruction.invoke_signed_with_program(&[], token_program.address())?;
+		Instruction.invoke_signed_with_unverified_program(&[], token_program.address())?;
 	}
 
 	Ok(())
@@ -207,7 +268,7 @@ fn validated_address_alias_passes(
 ) -> Result<(), ()> {
 	token_program.assert_address(expected)?;
 	let token_program = token_program.address();
-	Instruction.invoke_with_program(token_program)
+	Instruction.invoke_with_unverified_program(token_program)
 }
 
 fn main() {}

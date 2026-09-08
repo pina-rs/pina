@@ -101,18 +101,18 @@ The analysis tracks concrete local/field places and builder bindings within one 
 
 ### `require_program_check_before_cpi`
 
-Detects unchecked `invoke_with_program()` and `invoke_signed_with_program()` calls. The exact dynamic CPI program argument must first pass `assert_program()`, `assert_address()`, or `assert_addresses()` on every path to the invocation. Prefer `assert_program()` when the handler receives an explicit program account because it checks both the address and the executable flag.
+Detects `invoke_with_unverified_program()` and `invoke_signed_with_unverified_program()` calls whose exact dynamic CPI program argument has not first passed `assert_program()`, `assert_address()`, or `assert_addresses()` on every path to the invocation. Prefer `assert_program()` when the handler receives an explicit program account because it checks both the address and the executable flag.
 
 ```rust
 token_program.assert_program(&token::ID)?;
-transfer.invoke_with_program(token_program.address())?;
+transfer.invoke_with_unverified_program(token_program.address())?;
 ```
 
-Static `.invoke()` and `.invoke_signed()` builders encode their target program and do not need a separate program account assertion. Passing a constant such as `&token::ID` to a dynamic invocation is also accepted because the caller cannot substitute the value.
+Pinocchio Token's `.invoke_with_program()` and `.invoke_signed_with_program()` methods call `Program::verify()` themselves, so they do not need a separate assertion. Prefer those verified methods unless the handler has already validated the program account and deliberately needs the lower-overhead unverified variant. Static `.invoke()` and `.invoke_signed()` builders encode their target program and also need no separate program account assertion. Passing a constant such as `&token::ID` to an unverified invocation is accepted because the caller cannot substitute the value.
 
-The analyzer tracks concrete local variables and fields. It intersects validation state across `if` and `match` branches and invalidates proof after assignment or mutable aliasing. Checking an unrelated account does not authorize the dynamic target.
+The analyzer tracks concrete local variables, fields, and function-item aliases, including casts, assignments, and conditional expressions. It intersects validation and alias state across `if` and `match` branches and invalidates proof after assignment or mutable aliasing. Checking an unrelated account does not authorize the dynamic target, and checking one branch does not authorize a later call unless every branch establishes the same proof.
 
-To migrate existing code, remove program account assertions that exist only to satisfy the lint before a static `.invoke()` or `.invoke_signed()` call. Keep validation for dynamic calls, and validate the account whose address you pass to the invocation.
+To migrate existing code, remove assertions that exist only before `.invoke()`, `.invoke_signed()`, `.invoke_with_program()`, or `.invoke_signed_with_program()`. Keep exact-target validation before the explicitly unverified methods. Existing code that used a verified method only to satisfy this lint needs no API change; this release corrects the false positive.
 
 ### `require_writable_before_account_resize`
 
@@ -153,7 +153,7 @@ let rent = Rent::from_account_view(rent_account)?;
 let instructions = Instructions::try_from(instructions_account)?;
 ```
 
-Keep `assert_sysvar()` when code only validates identity or deliberately borrows the raw account data. The lint recognizes typed `Clock`, `Rent`, `Instructions`, and `SlotHashes` values from the `pinocchio::sysvars` modules.
+Keep `assert_sysvar()` when code only validates identity or deliberately borrows the raw account data. The lint recognizes typed `Clock`, `Rent`, `Instructions`, and `SlotHashes` values from the `pinocchio::sysvars` modules by their resolved Rust type, not their local variable name. Unchecked byte loaders remain rejected for method calls, field reads, inline expressions, and destructuring patterns.
 
 To migrate existing code, replace `assert_sysvar()` followed by manual parsing with the matching checked typed loader. No change is needed for identity-only checks or raw data access. The lint still uses standard Solana sysvar account names to identify raw reads, so unusually named raw accounts may require a direct, local assertion.
 

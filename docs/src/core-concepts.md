@@ -120,7 +120,7 @@ account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?;
 
 A chain that starts with `&AccountView` stays shared, while a chain that starts with `&mut AccountView` stays mutable. This keeps writability explicit without losing access to `as_account_mut()` later.
 
-Use `assert_program()` when you validate an explicit program account. Static CPI builders that call `.invoke()` or `.invoke_signed()` encode their program ID and do not need a separate program account assertion. For `.invoke_with_program()` and `.invoke_signed_with_program()`, validate the account whose address you pass to the builder.
+Use `assert_program()` when you explicitly validate a program account. Static `.invoke()` / `.invoke_signed()` builders encode their program ID, while Pinocchio Token's `.invoke_with_program()` / `.invoke_signed_with_program()` methods validate their supplied ID with `Program::verify()`; neither form needs a preceding account assertion. If you deliberately call `.invoke_with_unverified_program()` or `.invoke_signed_with_unverified_program()`, validate the exact supplied account first, preferably with `assert_program()`.
 
 When you need sysvar data, prefer Pinocchio's checked typed loaders:
 
