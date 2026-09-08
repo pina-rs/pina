@@ -194,42 +194,32 @@ This is **not** the part of `loaders.rs` I would prioritize changing.
 
 ---
 
-## F4. Lamport mutation helpers rely on caller-enforced ownership preconditions
+## F4. Lamport mutation helpers bind ownership checks to mutation
 
 **Affected code**
 
-- `crates/pina/src/loaders.rs:614-645` — `LamportTransfer::send`
-- `crates/pina/src/loaders.rs:662-680` — `CloseAccountWithRecipient::close_with_recipient`
+- `crates/pina/src/impls.rs` — `LamportTransfer::send_owned`
+- `crates/pina/src/impls.rs` — `CloseAccountWithRecipient`
 
 ### Assessment
 
-These helpers do several good things:
+These helpers:
 
+- verify that the supplied program ID owns the debited account,
 - require writable accounts,
 - reject self-send / self-close,
 - use checked arithmetic,
 - log before returning failures.
 
-However, they do not themselves enforce the full set of safety/security preconditions implied by direct lamport and account-state mutation.
-
-Examples:
-
-- `send` checks writability, but not that the debited account is owned by the executing program.
-- `close_with_recipient` checks writability, but also relies on the broader runtime/account model for correctness.
-
-This is not the same class of issue as F1/F2. It is more of a public API footgun: the helpers are safe only if callers have already established the expected ownership and account-role invariants.
+`send_owned`, `close_with_recipient`, and `close_account_zeroed` perform the owner comparison before changing lamports or data. `CloseAccount` and `CloseAccountZeroed` require the same `program_id` field and delegate to these checked methods.
 
 ### Recommendation
 
-At minimum:
-
-- keep the doc comments explicit about caller preconditions,
-- consider adding checked variants that also assert owner/program expectations,
-- consider a custom lint for this misuse pattern.
+Keep ownership validation inside every public helper that directly debits lamports. Internal callers may reuse a prevalidated transfer implementation when they already checked the same owner at their mutation boundary.
 
 ### Suggested priority
 
-Lower than F1/F2.
+Resolved.
 
 ---
 
@@ -257,9 +247,9 @@ Unlike the loader functions, `assert_type` keeps the borrowed data in a local bi
 
 ### Arithmetic helpers are well-contained and tested
 
-- `checked_send_balances` — `crates/pina/src/loaders.rs:588-600`
-- `checked_close_balance` — `crates/pina/src/loaders.rs:603-607`
-- tests — `crates/pina/src/loaders.rs:684+`
+- `checked_send_balances` — `crates/pina/src/impls.rs`
+- `checked_close_balance` — `crates/pina/src/impls.rs`
+- tests — `crates/pina/src/impls.rs` and `crates/pina/tests/adversarial_invariants.rs`
 
 These functions use checked arithmetic and have targeted unit tests for edge cases.
 
@@ -268,13 +258,11 @@ These functions use checked arithmetic and have targeted unit tests for edge cas
 1. **Redesign the loader APIs** to return guard-backed wrapper types instead of bare references.
 2. Apply the same design to token and token-2022 loaders.
 3. Add regression tests around overlapping borrow attempts once the guard-backed API exists.
-4. Optionally add stricter checked lamport-helper variants or a custom lint for program-owned lamport mutation preconditions.
 
 ## Suggested future security lints
 
 These would complement the existing Solana-focused lints well:
 
-- `require_program_owned_before_lamport_mutation`
 - `require_canonical_bump_before_pda_write`
 - `require_sysvar_check_before_sysvar_use`
 - `require_close_zeroization_before_close`
