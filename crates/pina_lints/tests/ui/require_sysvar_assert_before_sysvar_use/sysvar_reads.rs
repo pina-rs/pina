@@ -165,6 +165,33 @@ fn process_unsafe_unchecked_typed_sysvar(data: &[u8]) {
 	let _ = clock.slot;
 }
 
+fn process_unchecked_constructor_function_value(data: &[u8]) -> Result<(), ()> {
+	let parse = Clock::from_bytes;
+	//~^ ERROR: `Clock::from_bytes` cannot be used as a function value
+	let clock = parse(data)?;
+	let _ = clock.slot;
+
+	let parse = Clock::from_bytes as fn(&[u8]) -> Result<Clock, ()>;
+	//~^ ERROR: `Clock::from_bytes` cannot be used as a function value
+	let _ = parse(data)?;
+
+	let (parse,) = (Rent::from_bytes,);
+	//~^ ERROR: `Rent::from_bytes` cannot be used as a function value
+	let rent = parse(data)?;
+	let _ = rent.minimum_balance(8);
+	Ok(())
+}
+
+fn process_other_identity_unchecked_constructors(data: &[u8]) -> Result<(), ()> {
+	let _ = unsafe { Instructions::new_unchecked(data) };
+	//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
+	let _ = SlotHashes::new(data)?;
+	//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
+	let _ = unsafe { SlotHashes::new_unchecked(data) };
+	//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
+	Ok(())
+}
+
 fn process_unchecked_typed_method_with_neutral_name(data: &[u8]) -> Result<(), ()> {
 	let parsed = Rent::from_bytes(data)?;
 	//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
@@ -450,6 +477,13 @@ fn process_aliased_raw_source_needs_narrow_allow(rent_account: &AccountView) -> 
 
 fn process_direct_checked_sysvar(rent_account: &AccountView) -> Result<(), ()> {
 	let _ = Rent::from_account_view(rent_account)?.minimum_balance(8);
+	Ok(())
+}
+
+fn process_checked_constructor_function_value(clock_account: &AccountView) -> Result<(), ()> {
+	let parse = Clock::from_account_view;
+	let clock = parse(clock_account)?;
+	let _ = clock.slot;
 	Ok(())
 }
 

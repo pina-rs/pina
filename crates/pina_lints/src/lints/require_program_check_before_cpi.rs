@@ -226,31 +226,39 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 	}
 
 	fn lint_unchecked_cpi(&self, expr: &Expr<'_>, method: &str) {
+		let verified_method = match method {
+			"invoke_signed_with_unverified_program" => "invoke_signed_with_program",
+			_ => "invoke_with_program",
+		};
 		self.cx.lint(REQUIRE_PROGRAM_CHECK_BEFORE_CPI, |diag| {
 			diag.span(expr.span);
 			diag.primary_message(format!(
 				"`.{}()` called without a preceding program address verification",
 				method
 			));
-			diag.help(
-				"use the verified `invoke_with_program` variant, or call \
+			diag.help(format!(
+				"use the verified `{verified_method}` variant, or call \
 				 `program_account.assert_program(&expected_id)?` before the unverified CPI \
-				 invocation",
-			);
+				 invocation"
+			));
 		});
 	}
 
 	fn lint_unverified_function_value(&self, expr: &Expr<'_>, method: DynamicCpiMethod) {
+		let verified_method = match method {
+			DynamicCpiMethod::Invoke => "invoke_with_program",
+			DynamicCpiMethod::InvokeSigned => "invoke_signed_with_program",
+		};
 		self.cx.lint(REQUIRE_PROGRAM_CHECK_BEFORE_CPI, |diag| {
 			diag.span(expr.span);
 			diag.primary_message(format!(
 				"`{}` cannot be used as a function value",
 				method.name()
 			));
-			diag.help(
+			diag.help(format!(
 				"invoke the unverified CPI function directly so the lint can prove its exact \
-				 program target, or use the verified `invoke_with_program` variant",
-			);
+				 program target, or use the verified `{verified_method}` variant"
+			));
 		});
 	}
 

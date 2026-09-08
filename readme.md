@@ -616,7 +616,7 @@ Available assertions:
 
 Use `assert_program()` when you explicitly validate a program account. Static `.invoke()` / `.invoke_signed()` builders encode their program ID, while Pinocchio Token's `.invoke_with_program()` / `.invoke_signed_with_program()` methods validate their supplied ID with `Program::verify()`; neither form needs a preceding account assertion. If you deliberately call `.invoke_with_unverified_program()` or `.invoke_signed_with_unverified_program()`, validate the exact supplied account first, preferably with `assert_program()`, and call it directly rather than storing the method as a function value.
 
-When you need sysvar data, prefer Pinocchio's checked typed loaders such as `Clock::from_account_view()`, `Rent::from_account_view()`, and `Instructions::try_from()`. Pina rejects known unchecked byte constructors at their call site. Keep `assert_sysvar()` for identity-only checks and deliberate raw data access; reviewed manual parsing also needs a narrow lint allowance on its unchecked constructor.
+When you need sysvar data, prefer Pinocchio's checked typed loaders such as `Clock::from_account_view()`, `Rent::from_account_view()`, and `Instructions::try_from()`. The sysvar lint rejects `Clock` and `Rent` byte constructors, `Instructions::new_unchecked`, and `SlotHashes::new` / `new_unchecked` because they do not validate sysvar identity. Call a reviewed exception directly after `assert_sysvar()` and place a narrow lint allowance on that constructor; identity-unchecked constructors cannot be hidden in function values.
 
 When you need token data, use the checked loader instead of an assertion followed by a second parse:
 

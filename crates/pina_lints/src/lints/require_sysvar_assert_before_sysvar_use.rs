@@ -3,6 +3,8 @@ extern crate rustc_span;
 
 use rustc_hir::Expr;
 use rustc_hir::ExprKind;
+use rustc_hir::Node;
+use rustc_hir::def::DefKind;
 use rustc_hir::def::Res;
 use rustc_hir::intravisit::FnKind;
 use rustc_lint::LateContext;
@@ -116,28 +118,47 @@ fn has_trusted_sysvar_receiver(definitions: &[shared::TypeDefinition]) -> bool {
 		) && definitions[1..].iter().any(trusted_definition)
 }
 
-fn is_unchecked_typed_constructor(cx: &LateContext<'_>, expression: &Expr<'_>) -> bool {
-	let ExprKind::Call(callee, _) = &expression.kind else {
-		return false;
+#[derive(Clone, Copy)]
+struct UncheckedTypedConstructor {
+	method: &'static str,
+	type_name: &'static str,
+}
+
+fn unchecked_typed_constructor(
+	cx: &LateContext<'_>,
+	expression: &Expr<'_>,
+) -> Option<UncheckedTypedConstructor> {
+	let ExprKind::Path(path) = &expression.kind else {
+		return None;
 	};
-	let ExprKind::Path(path) = &callee.kind else {
-		return false;
+	let Res::Def(DefKind::AssocFn, definition) = cx.qpath_res(path, expression.hir_id) else {
+		return None;
 	};
-	let Res::Def(_, definition) = cx.qpath_res(path, callee.hir_id) else {
-		return false;
-	};
-	if cx.tcx.crate_name(definition.krate).as_str() != "pinocchio"
-		|| !matches!(
-			cx.tcx.item_name(definition).as_str(),
-			"from_bytes" | "from_bytes_unchecked"
-		) {
-		return false;
+	if cx.tcx.crate_name(definition.krate).as_str() != "pinocchio" {
+		return None;
 	}
 
-	let path = cx.tcx.def_path_str(definition);
-	TRUSTED_SYSVAR_TYPES
+	let definition_path = cx.tcx.def_path_str(definition);
+	let method = match cx.tcx.item_name(definition).as_str() {
+		"from_bytes" => "from_bytes",
+		"from_bytes_unchecked" => "from_bytes_unchecked",
+		"new" => "new",
+		"new_unchecked" => "new_unchecked",
+		_ => return None,
+	};
+	let type_name = TRUSTED_SYSVAR_TYPES
 		.iter()
-		.any(|trusted| path.starts_with(trusted))
+		.find(|trusted| definition_path.starts_with(**trusted))?
+		.rsplit("::")
+		.next()?;
+	let is_unchecked = match type_name {
+		"Clock" | "Rent" => matches!(method, "from_bytes" | "from_bytes_unchecked"),
+		"Instructions" => method == "new_unchecked",
+		"SlotHashes" => matches!(method, "new" | "new_unchecked"),
+		_ => false,
+	};
+
+	is_unchecked.then_some(UncheckedTypedConstructor { method, type_name })
 }
 
 fn emit_unchecked_typed_constructor(cx: &LateContext<'_>, span: rustc_span::Span) {
@@ -149,6 +170,24 @@ fn emit_unchecked_typed_constructor(cx: &LateContext<'_>, span: rustc_span::Span
 		diag.help(
 			"prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after \
 			 reviewing deliberate raw parsing, use a narrow lint allowance at this constructor",
+		);
+	});
+}
+
+fn emit_unchecked_typed_constructor_value(
+	cx: &LateContext<'_>,
+	span: rustc_span::Span,
+	constructor: UncheckedTypedConstructor,
+) {
+	cx.lint(REQUIRE_SYSVAR_ASSERT_BEFORE_SYSVAR_USE, |diag| {
+		diag.span(span);
+		diag.primary_message(format!(
+			"`{}::{}` cannot be used as a function value",
+			constructor.type_name, constructor.method
+		));
+		diag.help(
+			"call the constructor directly so its unvalidated source is visible, or prefer the \
+			 sysvar type's checked account-view loader",
 		);
 	});
 }
@@ -168,8 +207,19 @@ fn emit_unchecked_sysvar(cx: &LateContext<'_>, span: rustc_span::Span) {
 
 impl<'tcx> LateLintPass<'tcx> for RequireSysvarAssertBeforeSysvarUse {
 	fn check_expr(&mut self, cx: &LateContext<'tcx>, expression: &'tcx Expr<'tcx>) {
-		if is_unchecked_typed_constructor(cx, expression) {
-			emit_unchecked_typed_constructor(cx, expression.span);
+		let Some(constructor) = unchecked_typed_constructor(cx, expression) else {
+			return;
+		};
+		match cx.tcx.parent_hir_node(expression.hir_id) {
+			Node::Expr(
+				parent @ Expr {
+					kind: ExprKind::Call(callee, _),
+					..
+				},
+			) if callee.hir_id == expression.hir_id => {
+				emit_unchecked_typed_constructor(cx, parent.span);
+			}
+			_ => emit_unchecked_typed_constructor_value(cx, expression.span, constructor),
 		}
 	}
 

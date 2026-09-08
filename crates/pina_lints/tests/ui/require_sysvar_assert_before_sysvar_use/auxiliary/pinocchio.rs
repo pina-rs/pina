@@ -41,6 +41,10 @@ pub mod sysvars {
 		}
 
 		impl Instructions {
+			pub unsafe fn new_unchecked(_data: &[u8]) -> Self {
+				Self
+			}
+
 			pub fn load_current_index(&self) -> usize {
 				0
 			}
@@ -73,6 +77,14 @@ pub mod sysvars {
 		pub struct SlotHashes;
 
 		impl SlotHashes {
+			pub fn new(_data: &[u8]) -> Result<Self, ()> {
+				Ok(Self)
+			}
+
+			pub unsafe fn new_unchecked(_data: &[u8]) -> Self {
+				Self
+			}
+
 			pub fn from_account_view(_account: &AccountView) -> Result<Self, ()> {
 				Ok(Self)
 			}

@@ -47,8 +47,56 @@ LL |     let clock = unsafe { Clock::from_bytes_unchecked(data) };
    |
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
+error: `Clock::from_bytes` cannot be used as a function value
+  --> $DIR/sysvar_reads.rs:169:14
+   |
+LL |     let parse = Clock::from_bytes;
+   |                 ^^^^^^^^^^^^^^^^^
+   |
+   = help: call the constructor directly so its unvalidated source is visible, or prefer the sysvar type's checked account-view loader
+
+error: `Clock::from_bytes` cannot be used as a function value
+  --> $DIR/sysvar_reads.rs:174:14
+   |
+LL |     let parse = Clock::from_bytes as fn(&[u8]) -> Result<Clock, ()>;
+   |                 ^^^^^^^^^^^^^^^^^
+   |
+   = help: call the constructor directly so its unvalidated source is visible, or prefer the sysvar type's checked account-view loader
+
+error: `Rent::from_bytes` cannot be used as a function value
+  --> $DIR/sysvar_reads.rs:178:18
+   |
+LL |     let (parse,) = (Rent::from_bytes,);
+   |                     ^^^^^^^^^^^^^^^^
+   |
+   = help: call the constructor directly so its unvalidated source is visible, or prefer the sysvar type's checked account-view loader
+
 error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:169:15
+  --> $DIR/sysvar_reads.rs:186:19
+   |
+LL |     let _ = unsafe { Instructions::new_unchecked(data) };
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:188:10
+   |
+LL |     let _ = SlotHashes::new(data)?;
+   |             ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:190:19
+   |
+LL |     let _ = unsafe { SlotHashes::new_unchecked(data) };
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:196:15
    |
 LL |     let parsed = Rent::from_bytes(data)?;
    |                  ^^^^^^^^^^^^^^^^^^^^^^
@@ -56,18 +104,10 @@ LL |     let parsed = Rent::from_bytes(data)?;
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
 error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:176:10
+  --> $DIR/sysvar_reads.rs:203:10
    |
 LL |     let _ = Rent::from_bytes(data)?.minimum_balance(8);
    |             ^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
-
-error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:189:3
-   |
-LL |         Rent::from_bytes(data)?
-   |         ^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
@@ -80,7 +120,15 @@ LL |         Rent::from_bytes(data)?
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
 error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:224:11
+  --> $DIR/sysvar_reads.rs:243:3
+   |
+LL |         Rent::from_bytes(data)?
+   |         ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
+
+error: unchecked typed sysvar constructor requires a validated source account
+  --> $DIR/sysvar_reads.rs:251:11
    |
 LL |         true => Rent::from_bytes(data)?,
    |                 ^^^^^^^^^^^^^^^^^^^^^^
@@ -88,7 +136,7 @@ LL |         true => Rent::from_bytes(data)?,
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
 error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:233:27
+  --> $DIR/sysvar_reads.rs:260:27
    |
 LL |     let Clock { slot, .. } = Clock::from_bytes(data)?;
    |                              ^^^^^^^^^^^^^^^^^^^^^^^
@@ -96,7 +144,7 @@ LL |     let Clock { slot, .. } = Clock::from_bytes(data)?;
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
 error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:246:8
+  --> $DIR/sysvar_reads.rs:273:8
    |
 LL |     match Clock::from_bytes(data)? {
    |           ^^^^^^^^^^^^^^^^^^^^^^^
@@ -104,7 +152,7 @@ LL |     match Clock::from_bytes(data)? {
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
 error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:296:14
+  --> $DIR/sysvar_reads.rs:323:14
    |
 LL |     let clock = Clock::from_bytes(data)?;
    |                 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -112,7 +160,7 @@ LL |     let clock = Clock::from_bytes(data)?;
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
 error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:304:41
+  --> $DIR/sysvar_reads.rs:331:41
    |
 LL |     if let Some(Clock { slot, .. }) = Some(Clock::from_bytes(data)?) {
    |                                            ^^^^^^^^^^^^^^^^^^^^^^^
@@ -120,7 +168,7 @@ LL |     if let Some(Clock { slot, .. }) = Some(Clock::from_bytes(data)?) {
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
 error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:319:15
+  --> $DIR/sysvar_reads.rs:346:15
    |
 LL |         let clock = Clock::from_bytes(data)?;
    |                     ^^^^^^^^^^^^^^^^^^^^^^^
@@ -128,7 +176,7 @@ LL |         let clock = Clock::from_bytes(data)?;
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
 error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:332:51
+  --> $DIR/sysvar_reads.rs:359:51
    |
 LL |         Clock::from_account_view(clock_account).map(|_| Clock::from_bytes(data).unwrap())?;
    |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
@@ -136,7 +184,7 @@ LL |         Clock::from_account_view(clock_account).map(|_| Clock::from_bytes(d
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
 error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:342:67
+  --> $DIR/sysvar_reads.rs:369:67
    |
 LL |     let clock = Clock::from_account_view(clock_account).and_then(|_| Clock::from_bytes(data))?;
    |                                                                      ^^^^^^^^^^^^^^^^^^^^^^^
@@ -144,7 +192,7 @@ LL |     let clock = Clock::from_account_view(clock_account).and_then(|_| Clock:
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
 error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:372:18
+  --> $DIR/sysvar_reads.rs:399:18
    |
 LL |     let unchecked = Clock::from_bytes(data)?;
    |                     ^^^^^^^^^^^^^^^^^^^^^^^
@@ -152,7 +200,7 @@ LL |     let unchecked = Clock::from_bytes(data)?;
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
 error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:385:10
+  --> $DIR/sysvar_reads.rs:409:10
    |
 LL |         rent = Rent::from_bytes(data).unwrap();
    |                ^^^^^^^^^^^^^^^^^^^^^^
@@ -160,7 +208,7 @@ LL |         rent = Rent::from_bytes(data).unwrap();
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
 error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:392:10
+  --> $DIR/sysvar_reads.rs:416:10
    |
 LL |         rent = Rent::from_bytes(data)?;
    |                ^^^^^^^^^^^^^^^^^^^^^^
@@ -168,7 +216,7 @@ LL |         rent = Rent::from_bytes(data)?;
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
 error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:401:2
+  --> $DIR/sysvar_reads.rs:425:2
    |
 LL |     Rent::from_bytes(&[])
    |     ^^^^^^^^^^^^^^^^^^^^^
@@ -176,7 +224,7 @@ LL |     Rent::from_bytes(&[])
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
 error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:413:40
+  --> $DIR/sysvar_reads.rs:437:40
    |
 LL |     let _ = core::mem::replace(&mut rent, Rent::from_bytes(data)?);
    |                                           ^^^^^^^^^^^^^^^^^^^^^^
@@ -184,11 +232,11 @@ LL |     let _ = core::mem::replace(&mut rent, Rent::from_bytes(data)?);
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
 error: unchecked typed sysvar constructor requires a validated source account
-  --> $DIR/sysvar_reads.rs:448:13
+  --> $DIR/sysvar_reads.rs:472:13
    |
 LL |     let rent = Rent::from_bytes(data)?;
    |                ^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: prefer the sysvar type's checked `from_account_view()` or `try_from()` loader; after reviewing deliberate raw parsing, use a narrow lint allowance at this constructor
 
-error: aborting due to 24 previous errors
+error: aborting due to 30 previous errors

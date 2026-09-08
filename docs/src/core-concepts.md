@@ -130,7 +130,7 @@ let rent = Rent::from_account_view(rent_account)?;
 let instructions = Instructions::try_from(instructions_account)?;
 ```
 
-These loaders validate the sysvar address while parsing. Their results can flow through normal Rust extraction, adapters, tuples, patterns, and control flow without extra assertions. Pina instead rejects known unchecked `from_bytes` and `from_bytes_unchecked` constructors where they are called. Keep `assert_sysvar()` for identity-only checks and deliberate raw data access; reviewed manual parsing also needs a narrow lint allowance on its unchecked constructor.
+These loaders validate the sysvar address while parsing. Their results can flow through normal Rust extraction, adapters, tuples, patterns, and control flow without extra assertions. Pina instead rejects constructors that do not validate identity: `Clock` and `Rent` byte constructors, `Instructions::new_unchecked`, and `SlotHashes::new` / `new_unchecked`. Call these constructors directly; storing one as a function value is also rejected so the unvalidated source remains visible. Keep `assert_sysvar()` for identity-only checks and deliberate raw data access; reviewed manual parsing also needs a narrow lint allowance on its constructor.
 
 ## Typed account conversions
 
