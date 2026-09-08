@@ -29,7 +29,7 @@ import { describe, expect, test } from "vitest";
 import { getStoreStateCodec } from "../../../clients/js/optional_accounts_program/src/generated/accounts";
 
 import {
-	getInitInstructionAsync,
+	getInitInstruction,
 	getInspectInstruction,
 	getNoteInstruction,
 	getTouchInstruction,
@@ -69,7 +69,7 @@ function initInstruction(
 	storePda: Address,
 	storeBump: number,
 ) {
-	return getInitInstructionAsync({
+	return getInitInstruction({
 		authority,
 		store: storePda,
 		bump: storeBump,
@@ -98,7 +98,7 @@ describe("optional_accounts_program e2e", () => {
 		airdrop(svm, authority.address);
 		const [storePda, storeBump] = await deriveStorePda(authority.address);
 
-		const initIx = await initInstruction(authority, storePda, storeBump);
+		const initIx = initInstruction(authority, storePda, storeBump);
 		expect(initIx.accounts).toHaveLength(3);
 
 		const tx = await buildAndSignTransaction(svm, authority, [initIx]);
@@ -119,7 +119,7 @@ describe("optional_accounts_program e2e", () => {
 
 		svm.sendTransaction(
 			await buildAndSignTransaction(svm, authority, [
-				await initInstruction(authority, storePda, storeBump),
+				initInstruction(authority, storePda, storeBump),
 			]),
 		);
 
@@ -159,7 +159,7 @@ describe("optional_accounts_program e2e", () => {
 
 		svm.sendTransaction(
 			await buildAndSignTransaction(svm, authority, [
-				await initInstruction(authority, storePda, storeBump),
+				initInstruction(authority, storePda, storeBump),
 			]),
 		);
 
