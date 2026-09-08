@@ -77,7 +77,18 @@ pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 	command
 		.current_dir(&project.root)
 		.env("CARGO_INCREMENTAL", "0")
-		.env("RUSTC_WRAPPER", &driver.path)
+		// `cargo fix` runs primary units through a cargo-as-rustc proxy that
+		// applies `RUSTC_WORKSPACE_WRAPPER` but bypasses `RUSTC_WRAPPER`, so the
+		// wrapper must be attached through the workspace variable for the fix
+		// flow to see the lints on the crates being fixed.
+		.env(
+			if options.fix {
+				"RUSTC_WORKSPACE_WRAPPER"
+			} else {
+				"RUSTC_WRAPPER"
+			},
+			&driver.path,
+		)
 		.env("PINA_LINT_NO_DEPS", "1");
 	if !levels.is_empty() {
 		command.env("PINA_LINT_LEVELS", format_lint_levels(levels));

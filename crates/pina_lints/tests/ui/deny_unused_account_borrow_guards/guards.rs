@@ -51,6 +51,22 @@ impl State {
 	}
 }
 
+macro_rules! bind_guard {
+	($account:expr) => {
+		let guard = $account.try_borrow()?;
+	};
+}
+
+const UNRELATED_CONSTANT: u8 = 7;
+
+struct Loader;
+
+impl Loader {
+	fn load(&self) -> fn(&AccountView) -> Result<Guard, ()> {
+		State::load_pda
+	}
+}
+
 fn dropped_without_reading(account: &mut AccountView) -> Result<(), ()> {
 	let guard = account.try_borrow_mut()?;
 	//~^ ERROR: account borrow guard `guard` is never read
@@ -78,6 +94,26 @@ fn block_scoped_without_reading(account: &AccountView) -> Result<(), ()> {
 	Ok(())
 }
 
+fn block_tail_initializer(account: &AccountView) -> Result<(), ()> {
+	let guard = { account.try_borrow()? };
+	//~^ ERROR: account borrow guard `guard` is never read
+	Ok(())
+}
+
+fn macro_expansion_gets_no_suggestion(account: &AccountView) -> Result<(), ()> {
+	bind_guard!(account);
+	//~^ ERROR: account borrow guard `guard` is never read
+	Ok(())
+}
+
+fn drop_inside_closure_gets_no_suggestion(account: &AccountView) -> Result<(), ()> {
+	let guard = account.try_borrow()?;
+	//~^ ERROR: account borrow guard `guard` is never read
+	let read = || drop(guard);
+	read();
+	Ok(())
+}
+
 fn read_guard(account: &AccountView) -> Result<u8, ()> {
 	let guard = account.try_borrow()?;
 	Ok(guard.value())
@@ -88,6 +124,25 @@ fn read_then_drop(account: &AccountView) -> Result<u8, ()> {
 	let value = guard.value();
 	drop(guard);
 	Ok(value)
+}
+
+fn drop_of_read_value(account: &AccountView) -> Result<(), ()> {
+	let guard = account.try_borrow()?;
+	drop(guard.value());
+	Ok(())
+}
+
+fn drop_of_constant_is_never_a_guard() {
+	drop(UNRELATED_CONSTANT);
+}
+
+fn call_through_field_is_not_a_guard_construction(
+	loader: &Loader,
+	account: &AccountView,
+) -> Result<(), ()> {
+	let guard = loader.load()(account)?;
+	drop(guard);
+	Ok(())
 }
 
 fn read_in_nested_block(account: &AccountView) -> Result<u8, ()> {

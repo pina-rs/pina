@@ -43,6 +43,7 @@
 // `rustc_private` crates. Enabling that requires nightly features, so the
 // workspace-wide `unstable_features = "deny"` lint is waived for this crate.
 #![feature(rustc_private)]
+#![feature(coverage_attribute)]
 #![allow(unstable_features)]
 #![allow(clippy::useless_attribute)]
 

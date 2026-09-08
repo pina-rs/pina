@@ -234,6 +234,8 @@ mint.as_token_mint_for_program(&token_program)?;
 
 Assertion-style guards exist only for their `?` validation. Binding them without reading keeps the borrow open to the end of the scope, which obscures the borrow boundary and can turn a later borrow of the same account data into a runtime panic. Discard immediately by calling the validation as a `?` statement, binding with `let _ = ...`, or passing the guard to `drop`; when the value matters, read it. The lint recognizes `try_borrow`, `as_account`, the token guard loaders, and generated `load_pda` helpers, and it counts any use of the binding — method calls, field access, `&` borrows, and closure captures — as a read. Guards constructed behind opaque helper functions are outside its model, and a direct `drop(local)` call is treated as a discard rather than a read.
 
+The warning carries a machine-applicable suggestion: `pina lint --fix` rewrites the binding into the immediate `?` statement and removes the orphaned `drop(local);` in the same edit. Suggestions are withheld when the guard binding originates inside a macro expansion or when a `drop` appears outside a statement (for example inside a closure tail), because the rewrite could not be applied safely there.
+
 ### `require_consistent_token_program`
 
 Detects token parsing, ATA derivation, and dynamic token CPI calls that use different program identities within one instruction function.
