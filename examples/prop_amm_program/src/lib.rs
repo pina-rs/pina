@@ -152,7 +152,6 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 
 		self.authority.assert_signer()?;
 		assert_update_authority(*self.authority)?;
-		self.oracle.assert_type::<OracleState>(&ID)?;
 
 		let mut oracle = self.oracle.as_account_mut::<OracleState>(&ID)?;
 		oracle.price = args.new_price;
@@ -166,7 +165,6 @@ impl<'a> ProcessAccountInfos<'a> for RotateAuthorityAccounts<'a> {
 		let args = RotateAuthorityInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
-		self.oracle.assert_type::<OracleState>(&ID)?;
 
 		{
 			let oracle = self.oracle.as_account::<OracleState>(&ID)?;

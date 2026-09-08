@@ -50,9 +50,7 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 		// BUG: No `assert_signer()` check on authority!
 		// Anyone can pass any address as authority and withdraw funds.
 
-		self.vault
-			.assert_writable()?
-			.assert_type::<VaultState>(&ID)?;
+		self.vault.assert_writable()?;
 
 		let mut vault = self.vault.as_account_mut::<VaultState>(&ID)?;
 		let current = vault.balance.get();

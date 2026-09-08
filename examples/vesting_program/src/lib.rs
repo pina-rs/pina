@@ -245,9 +245,7 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
-		self.vesting_state
-			.assert_not_empty()?
-			.assert_type::<VestingState>(&ID)?;
+		self.vesting_state.assert_not_empty()?;
 		self.vault
 			.assert_not_empty()?
 			.assert_writable()?
@@ -320,9 +318,7 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		self.admin.assert_signer()?;
 		self.mint.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
-		self.vesting_state
-			.assert_not_empty()?
-			.assert_type::<VestingState>(&ID)?;
+		self.vesting_state.assert_not_empty()?;
 		self.vault
 			.assert_not_empty()?
 			.assert_writable()?

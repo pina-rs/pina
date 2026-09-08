@@ -47,10 +47,7 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAndCloseAccounts<'a> {
 		let _ = ClaimAndCloseInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
-		self.reward
-			.assert_not_empty()?
-			.assert_writable()?
-			.assert_type::<RewardState>(&ID)?;
+		self.reward.assert_not_empty()?.assert_writable()?;
 
 		let reward = self.reward.as_account::<RewardState>(&ID)?;
 		self.authority.assert_address(&reward.authority)?;

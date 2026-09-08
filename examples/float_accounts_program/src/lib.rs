@@ -131,7 +131,6 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 		let data_f64 = f64::from_bits(args.data_f64.get());
 
 		self.authority.assert_signer()?;
-		self.account.assert_type::<FloatDataAccount>(&ID)?;
 
 		let mut account = self.account.as_account_mut::<FloatDataAccount>(&ID)?;
 		apply_update(&mut account, self.authority.address(), data_f32, data_f64)

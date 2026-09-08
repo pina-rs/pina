@@ -52,9 +52,7 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 		// SECURE: Verify the authority signed this transaction.
 		self.authority.assert_signer()?;
 
-		self.vault
-			.assert_writable()?
-			.assert_type::<VaultState>(&ID)?;
+		self.vault.assert_writable()?;
 
 		let current = {
 			let vault = self.vault.as_account::<VaultState>(&ID)?;

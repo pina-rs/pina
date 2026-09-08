@@ -49,8 +49,8 @@ impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
 		let args = TransferInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
-		self.source.assert_writable()?.assert_type::<Balance>(&ID)?;
-		self.dest.assert_writable()?.assert_type::<Balance>(&ID)?;
+		self.source.assert_writable()?;
+		self.dest.assert_writable()?;
 
 		// BUG: No check that source != dest!
 		// If the same account is passed for both, the debit and credit
