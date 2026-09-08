@@ -329,7 +329,7 @@ pub trait AccountInfoValidation {
 	/// Validate a fixed account without loading it.
 	///
 	/// Checks the program owner, discriminator, exact representation size, and
-	/// every active nested PinaPod value. Prefer [`AsAccount::as_account`],
+	/// every active nested `PinaPod` value. Prefer [`AsAccount::as_account`],
 	/// [`AsAccount::as_account_mut`], or a generated `load_pda*` method when the
 	/// caller needs typed account data. Those methods perform the same validation
 	/// while returning a guard, so a preceding `assert_type` would duplicate the
@@ -684,6 +684,12 @@ pub type LoadedAccountMut<'a, T> = RefMut<'a, T>;
 ///     Status::Closed => { /* ... */ }
 /// }
 /// ```
+/// Guard-backed loading for fixed account data.
+///
+/// These methods perform the complete type-boundary validation before returning
+/// a borrow guard. Do not call [`AccountInfoValidation::assert_type`] first;
+/// doing so repeats the same owner, discriminator, exact-size, and nested-value
+/// checks without strengthening the returned guard.
 pub trait AsAccount {
 	/// Validate ownership and deserialize the account data into an immutable
 	/// borrow guard of type `T`. Returns `InvalidAccountData` if the

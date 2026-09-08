@@ -589,7 +589,7 @@ escrow.assert_seeds_with_bump(&[b"escrow", maker_key], &program_id)?;
 // Validate an associated token account.
 vault.assert_associated_token_address(wallet, mint, token_program)?;
 
-// Validate account data matches a typed account.
+// Validate a fixed account without loading its fields.
 state.assert_type::<Config>(&program_id)?;
 ```
 
@@ -600,7 +600,7 @@ Available assertions:
 - `assert_executable()` — account is executable
 - `assert_data_len(len)` — data length check
 - `assert_empty()` / `assert_not_empty()` — data emptiness
-- `assert_type::<T>(program_id)` — discriminator + owner check
+- `assert_type::<T>(program_id)` — validation-only owner, discriminator, exact-size, and nested-value check
 - `assert_program(program_id)` — is a program account
 - `assert_sysvar(sysvar_id)` — is a system variable
 - `assert_address(address)` — exact address match
@@ -623,11 +623,11 @@ let ata = vault.as_associated_token_account(wallet, mint, token_program)?;
 
 The unqualified loaders delegate owner and layout validation to their canonical program's checked upstream parser. The `*_for_program()` loaders accept only SPL Token or Token-2022 and select the corresponding checked parser. `as_associated_token_account()` also verifies the derived address and the current authority and mint stored in account data; initialization, frozen state, delegates, close authority, and Token-2022 extension policy remain explicit caller checks.
 
-### Typed account assertion
+### Typed account loading
 
 <br>
 
-On deserialized account data, chain assertions using the `AccountValidation` trait. `as_account()` returns a guard-backed `Ref<T>` (also available as the `LoadedAccount<T>` alias) and `as_account_mut()` returns `RefMut<T>` (also available as the `LoadedAccountMut<T>` alias):
+When code needs account fields, load the account directly instead of calling `assert_type` first. `as_account()` performs the same fixed-account validation and returns a guard-backed `Ref<T>` (also available as the `LoadedAccount<T>` alias). `as_account_mut()` also checks writability and returns `RefMut<T>` (also available as the `LoadedAccountMut<T>` alias):
 
 ```rust
 let state = account.as_account::<Config>(&program_id)?;
@@ -643,6 +643,8 @@ state.value.set(42);
 ```
 
 `load_pda` and `load_pda_mut` validate the typed representation and stored-bump PDA address before returning a guard. The mutable form also enforces writability. This avoids repeating recursive `String`, `Vec`, and `Option` validation through separate `assert_type`, `assert_seeds`, and `as_account_mut` calls.
+
+Use `assert_type::<T>()` only when the handler needs to validate an existing fixed account but will not read or write its typed fields, such as a validation-only close path. The check releases its data borrow before returning, so it is not a persistent proof for a later raw cast. Never follow it with `as_account*` or `load_pda*`; that only repeats the same validation.
 
 ### `#[derive(Accounts)]`
 
@@ -686,6 +688,7 @@ Remaining-account fields preserve account order. Mutable `#[pina(remaining)]` fi
 - Use `&AccountView` for read-only accounts and `&mut AccountView` only when you need mutable loaders, direct lamport mutation, `close_*` helpers, or writable IDL inference.
 - `&mut AccountView` declares and enforces a writable slot. Use `assert_writable()` or `#[pina(validate(writable))]` only when a shared `&AccountView` must arrive writable.
 - `as_account()` / `as_account_mut()` return `Ref<T>` / `RefMut<T>` borrow guards. Copy out the fields you need and `drop(...)` the guard before CPIs or later mutable borrows.
+- Prefer generated `load_pda*` methods for stored-bump fixed PDAs, then `as_account*` for other fixed accounts. Use `assert_type` only when no typed fields are needed; do not call it before a typed loader.
 - Keep validation chains direct inside `process(self, ...)` when possible. That makes audits easier and gives `pina idl` the clearest signal for signer, writable, PDA, and default-account inference.
 
 <!-- {/pinaInstructionAuthoringTips} -->
@@ -1019,7 +1022,8 @@ Pina provides strong built-in protections against common Solana vulnerabilities 
 - **Use generated `load_pda` or `load_pda_mut`** when a fixed stored-bump PDA handler needs a typed guard, so recursive content and the PDA address are validated once
 - **Use generated `with_pda`** when a compact stored-bump PDA handler needs a compact view, so the layout, canonical bump, and PDA address are validated during the same borrow
 - **Always verify program accounts** with `assert_address()` / `assert_program()` before CPI invocations
-- **Use `assert_type::<T>()`** to prevent type cosplay: it checks discriminator, owner, and data size
+- **Use `as_account::<T>()` or `as_account_mut::<T>()`** when a handler needs fixed-account fields; these guard-backed loaders check the owner, discriminator, exact size, and nested values
+- **Reserve `assert_type::<T>()` for validation-only paths** that do not need typed fields, and never treat it as proof for a later raw cast
 - **Use `send_owned(&ID, amount, recipient)`** for direct lamport debits; it verifies that the program owns the sender before mutation
 - **Use `CloseAccountZeroed { account, recipient, program_id: &ID }.invoke()` or `zeroed()` + `close_with_recipient(&ID, recipient)`** when stale account bytes must be invalidated before close
 - **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
