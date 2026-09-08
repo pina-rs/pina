@@ -126,7 +126,8 @@ export type WriteAsyncInput<
 export async function getWriteInstructionAsync<
 	TAccountAuthority extends string,
 	TAccountJournal extends string,
-	TProgramAddress extends Address = typeof COMPACT_ACCOUNTS_PROGRAM_ADDRESS,
+	TProgramAddress extends Address =
+		typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: WriteAsyncInput<TAccountAuthority, TAccountJournal>,
 	config?: { programAddress?: TProgramAddress },
@@ -135,7 +136,7 @@ export async function getWriteInstructionAsync<
 > {
 	// Program address.
 	const programAddress = config?.programAddress ??
-		COMPACT_ACCOUNTS_PROGRAM_ADDRESS;
+		COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
 
 	// Original accounts.
 	const originalAccounts = {
