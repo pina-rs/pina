@@ -1,6 +1,8 @@
 ---
 pina_cli: feat
+pina_codama_renderer: none
 pina_cpi_renderer: feat
+pina_lints: none
 ---
 
 # Generated CPI crates follow the source naming convention
