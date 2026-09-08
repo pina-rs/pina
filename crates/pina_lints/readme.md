@@ -69,7 +69,6 @@ Deny-level security lints should not be disabled at crate scope; see the [suppre
 | `require_empty_before_init`                             | deny  | Program accounts cannot be reinitialized            |
 | `require_program_check_before_cpi`                      | deny  | CPI targets are authenticated                       |
 | `deny_heap_allocations_in_onchain_instruction_handlers` | warn  | On-chain handlers avoid unbounded allocation cost   |
-| `require_program_owned_before_lamport_mutation`         | deny  | Direct lamport debits affect program-owned accounts |
 | `require_writable_before_account_resize`                | deny  | Resize targets are writable                         |
 | `require_zeroed_before_close`                           | deny  | Closed account data is invalidated                  |
 | `require_sysvar_assert_before_sysvar_use`               | deny  | Sysvar accounts cannot be substituted               |
@@ -124,17 +123,6 @@ transfer.invoke_with_program(token_program.address())?;
 
 The analyzer intersects validation state across `if` and `match` branches and invalidates proof after assignment or mutable aliasing. A check performed on only one branch is therefore insufficient.
 
-### `require_program_owned_before_lamport_mutation`
-
-Detects direct `send()` calls without an earlier ownership or typed-account check on the debited account.
-
-```rust
-vault.assert_owner(&ID)?;
-vault.send(amount, recipient)?;
-```
-
-Direct lamport mutation is not a system-program transfer: the executing program must own the debited account. The lint uses lexical receiver matching, so keep the validation close to the mutation.
-
 ### `require_writable_before_account_resize`
 
 Detects `resize()` without a preceding `assert_writable()` on the same account.
@@ -152,7 +140,7 @@ Detects `close()` or `close_with_recipient()` without an earlier `zeroed()` on t
 
 ```rust
 state.zeroed()?;
-state.close_with_recipient(recipient)?;
+state.close_with_recipient(&ID, recipient)?;
 ```
 
 This protects against stale bytes remaining observable during the transaction. The lint intentionally does not flag the combined zeroing close helper.

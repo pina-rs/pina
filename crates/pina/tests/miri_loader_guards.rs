@@ -341,7 +341,7 @@ fn close_with_recipient_rejects_an_active_alias_borrow_under_miri() {
 		.unwrap_or_else(|error| panic!("borrow source alias: {error:?}"));
 	let (source, recipient) = account_views.split_at_mut(1);
 
-	let result = source[0].close_with_recipient(&mut recipient[0]);
+	let result = source[0].close_with_recipient(&TEST_PROGRAM_ID, &mut recipient[0]);
 
 	assert_eq!(result, Err(ProgramError::AccountBorrowFailed));
 	assert_eq!(source[0].lamports(), source_lamports);

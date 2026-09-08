@@ -278,6 +278,7 @@ impl StoredAccount {
 #[kani::proof]
 fn quick_direct_self_transfer_is_rejected_without_mutation() {
 	let address = Address::new_from_array(kani::any());
+	let program_id = Address::new_from_array([0; 32]);
 	let sender_lamports: u64 = kani::any();
 	let recipient_lamports: u64 = kani::any();
 	let lamports: u64 = kani::any();
@@ -289,7 +290,7 @@ fn quick_direct_self_transfer_is_rejected_without_mutation() {
 	let mut recipient_view = recipient.view();
 
 	assert_eq!(
-		sender_view.send(lamports, &mut recipient_view),
+		sender_view.send_owned(&program_id, lamports, &mut recipient_view),
 		Err(ProgramError::InvalidArgument)
 	);
 	assert_eq!(sender_view.lamports(), sender_lamports);
@@ -299,6 +300,7 @@ fn quick_direct_self_transfer_is_rejected_without_mutation() {
 #[kani::proof]
 fn quick_close_to_self_is_rejected_without_mutation() {
 	let address = Address::new_from_array(kani::any());
+	let program_id = Address::new_from_array([0; 32]);
 	let sender_lamports: u64 = kani::any();
 	let recipient_lamports: u64 = kani::any();
 	let mut sender = StoredAccount::new(address);
@@ -309,7 +311,7 @@ fn quick_close_to_self_is_rejected_without_mutation() {
 	let mut recipient_view = recipient.view();
 
 	assert_eq!(
-		sender_view.close_with_recipient(&mut recipient_view),
+		sender_view.close_with_recipient(&program_id, &mut recipient_view),
 		Err(ProgramError::InvalidArgument)
 	);
 	assert_eq!(sender_view.lamports(), sender_lamports);

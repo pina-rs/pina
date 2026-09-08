@@ -168,7 +168,8 @@ impl<'a> ProcessAccountInfos<'a> for CloseAccounts<'a> {
 		// Transfer lamports back to authority (simulated via direct lamport
 		// manipulation).
 		let lamports = self.state_account.lamports();
-		self.state_account.send(lamports, self.authority)?;
+		self.state_account
+			.send_owned(&TEST_PROGRAM_ID, lamports, self.authority)?;
 
 		Ok(())
 	}
@@ -1163,10 +1164,10 @@ fn error_empty_account_rejected_for_update() {
 // Test: CPI helpers (system_program transfer simulation)
 // ---------------------------------------------------------------------------
 
-/// Tests the lamport transfer trait (`send`) on AccountView: debit sender,
-/// credit recipient.
+/// Tests the lamport transfer trait (`send_owned`) on AccountView: debit
+/// sender, credit recipient.
 #[test]
-fn lamport_transfer_send() {
+fn lamport_transfer_send_owned() {
 	let sender_key: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
 	let recipient_key: Address = address!("3Jiy8N6ZGv3ueH9k3svLRaHscmQbE6v7W9FHJaGH2mki");
 
@@ -1192,7 +1193,7 @@ fn lamport_transfer_send() {
 	let recipient = &mut recipient_accounts[0];
 
 	// Transfer 300_000 lamports from sender to recipient.
-	let result = sender.send(300_000, recipient);
+	let result = sender.send_owned(&TEST_PROGRAM_ID, 300_000, recipient);
 	assert!(result.is_ok(), "send should succeed: {result:?}");
 
 	assert_eq!(sender.lamports(), 700_000, "sender should have 700_000");
@@ -1231,7 +1232,7 @@ fn lamport_transfer_insufficient_funds() {
 	let sender = &mut sender_accounts[0];
 	let recipient = &mut recipient_accounts[0];
 
-	let result = sender.send(101, recipient);
+	let result = sender.send_owned(&TEST_PROGRAM_ID, 101, recipient);
 	assert!(result.is_err(), "should fail with insufficient funds");
 	assert_eq!(
 		result.unwrap_err(),
@@ -1262,7 +1263,7 @@ fn lamport_transfer_same_account_rejected() {
 	let mut sender = account_views[0];
 	let mut recipient = account_views[0];
 
-	let result = sender.send(500, &mut recipient);
+	let result = sender.send_owned(&TEST_PROGRAM_ID, 500, &mut recipient);
 	assert!(result.is_err(), "should fail sending to self");
 	assert_eq!(
 		result.unwrap_err(),
@@ -1271,7 +1272,7 @@ fn lamport_transfer_same_account_rejected() {
 	);
 }
 
-/// Tests close_with_recipient: zero lamports + data clearing.
+/// Tests `close_with_recipient`: zero lamports and close the account view.
 #[test]
 fn close_account_with_recipient() {
 	let account_key: Address = address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
@@ -1301,7 +1302,7 @@ fn close_account_with_recipient() {
 	let closed_account = &mut closed_accounts[0];
 	let recipient = &mut recipient_accounts[0];
 
-	let result = closed_account.close_with_recipient(recipient);
+	let result = closed_account.close_with_recipient(&TEST_PROGRAM_ID, recipient);
 	assert!(result.is_ok(), "close should succeed: {result:?}");
 
 	assert_eq!(
@@ -1346,7 +1347,7 @@ fn close_account_zeroed_clears_source_bytes_before_close() {
 	let source_len = closed_account.data_len();
 	let source_ptr = closed_account.data_ptr();
 
-	let result = closed_account.close_account_zeroed(recipient);
+	let result = closed_account.close_account_zeroed(&TEST_PROGRAM_ID, recipient);
 	assert!(result.is_ok(), "close should succeed: {result:?}");
 
 	let source_bytes = unsafe {

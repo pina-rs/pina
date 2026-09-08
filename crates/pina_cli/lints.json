@@ -29,10 +29,6 @@
 		{ "name": "require_post_cpi_balance_reload", "level": "deny" },
 		{ "name": "require_program_check_before_cpi", "level": "deny" },
 		{
-			"name": "require_program_owned_before_lamport_mutation",
-			"level": "deny"
-		},
-		{
 			"name": "require_reason_for_duplicate_remaining_accounts",
 			"level": "deny"
 		},

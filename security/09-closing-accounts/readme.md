@@ -38,8 +38,8 @@ See [`secure/src/lib.rs`](secure/src/lib.rs). The program invalidates the accoun
 
 Closing guidance under Pinocchio 0.11:
 
-- `close_with_recipient()` transfers lamports and closes the account handle, but it does not zero or resize account data for you.
-- When stale bytes must be invalidated, use `CloseAccountZeroed { account, recipient }.invoke()` or manually call `zeroed()` before `close_with_recipient()`.
+- `close_with_recipient(&ID, recipient)` verifies that `ID` owns the account, transfers its lamports, and closes the account handle. It does not zero or resize account data.
+- When stale bytes must be invalidated, use `CloseAccountZeroed { account, recipient, program_id: &ID }.invoke()` or manually call `zeroed()` before `close_with_recipient(&ID, recipient)`.
 - The `account-resize` feature only affects realloc helpers; it does not change close semantics.
 
 <!-- {/pinaCloseAccountGuidance} -->
@@ -48,6 +48,6 @@ Closing guidance under Pinocchio 0.11:
 
 <br>
 
-- `CloseAccountWithRecipient::close_with_recipient()` — close after you have already invalidated any sensitive or authority-bearing state
-- `CloseAccountWithRecipient::close_account_zeroed()` — zero the current raw account bytes, then close and return rent to the recipient
-- Account data `zeroed()` method — explicit typed/raw-state invalidation before `close_with_recipient()` when you need custom close sequencing
+- `CloseAccountWithRecipient::close_with_recipient(&ID, recipient)` — verify ownership and close after you have already invalidated any sensitive or authority-bearing state
+- `CloseAccountWithRecipient::close_account_zeroed(&ID, recipient)` — verify ownership, zero the current raw account bytes, then close and return rent to the recipient
+- Account data `zeroed()` method — explicit typed/raw-state invalidation before `close_with_recipient(&ID, recipient)` when you need custom close sequencing

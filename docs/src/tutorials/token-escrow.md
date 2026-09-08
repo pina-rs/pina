@@ -359,14 +359,14 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			.invoke_signed_with_program(&signers, &token_program)?;
 
 		self.escrow.as_account_mut::<EscrowState>(&ID)?.zeroed();
-		self.escrow.close_with_recipient(self.maker)
+		self.escrow.close_with_recipient(&ID, self.maker)
 	}
 }
 ```
 
 The PDA signer is constructed from the same seeds used to derive the escrow address. `invoke_signed_with_program` passes these seeds to the selected SPL Token program so the runtime can verify the PDA signature.
 
-`close_with_recipient` transfers the remaining lamports to the maker and closes the account. Use `zeroed()` first when the account data must be wiped before close.
+`close_with_recipient` verifies that `ID` owns the escrow, transfers the remaining lamports to the maker, and closes the account. Use `zeroed()` first when the account data must be wiped before close.
 
 ## Entrypoint
 
