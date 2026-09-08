@@ -152,6 +152,14 @@ pub(crate) fn expand(
 	});
 	#[cfg(not(feature = "validation"))]
 	let application_validation_hook: Option<proc_macro2::TokenStream> = None;
+	#[cfg(feature = "validation")]
+	let compact_validation_hook = quote! {
+		fn validate_account_data(data: &[u8]) -> Result<(), #crate_path::ProgramError> {
+			Self::try_from_bytes(data).map(|_| ())
+		}
+	};
+	#[cfg(not(feature = "validation"))]
+	let compact_validation_hook = quote! {};
 	let account_impl = if compact {
 		quote! {
 			impl #crate_path::PinaCompactAccount for #struct_name {
@@ -164,9 +172,7 @@ pub(crate) fn expand(
 					Self::try_from_bytes(data)
 				}
 
-				fn validate_account_data(data: &[u8]) -> Result<(), #crate_path::ProgramError> {
-					Self::try_from_bytes(data).map(|_| ())
-				}
+				#compact_validation_hook
 
 				fn updated_len(
 					data: &[u8],
@@ -312,11 +318,16 @@ fn generate_compact_view_helpers(
 	schema: &schema::CompactSchema,
 ) -> proc_macro2::TokenStream {
 	#[cfg(feature = "validation")]
-	let validate_value = quote! {
+	let read_value = quote! {
+		let value = #ref_name::new(data).map_err(|_| #error)?;
 		<#ref_name<'_> as #crate_path::PinaValidate>::validate(&value)?;
+
+		Ok(value)
 	};
 	#[cfg(not(feature = "validation"))]
-	let validate_value = quote! {};
+	let read_value = quote! {
+		#ref_name::new(data).map_err(|_| #error)
+	};
 	#[cfg(feature = "validation")]
 	let validate_initialized = quote! {
 		let value = #ref_name::new(&data[..encoded_len]).map_err(|_| #error)?;
@@ -421,10 +432,7 @@ fn generate_compact_view_helpers(
 				return Err(#error);
 			}
 
-			let value = #ref_name::new(data).map_err(|_| #error)?;
-			#validate_value
-
-			Ok(value)
+			#read_value
 		}
 
 		/// Calculate the encoded length after applying `patch` without changing `data`.
