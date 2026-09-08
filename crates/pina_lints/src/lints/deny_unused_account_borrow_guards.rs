@@ -108,15 +108,23 @@ fn contains_guard_construction(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
 	}
 }
 
-fn is_drop_callee(callee: &Expr<'_>) -> bool {
-	matches!(
-		&callee.kind,
-		ExprKind::Path(rustc_hir::QPath::Resolved(_, path))
-			if path
-				.segments
-				.last()
-				.is_some_and(|segment| segment.ident.name.as_str() == "drop")
-	)
+fn is_drop_callee(cx: &LateContext<'_>, callee: &Expr<'_>) -> bool {
+	let ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) = &callee.kind else {
+		return false;
+	};
+
+	// Resolve the callee definition: only `std::mem::drop` counts as disposal.
+	// A local or imported function named `drop` is an ordinary use of its
+	// argument, and removing it would delete the user's side effects.
+	match path.res {
+		rustc_hir::def::Res::Def(_, def_id) => {
+			matches!(
+				cx.tcx.def_path_str(def_id).as_str(),
+				"std::mem::drop" | "core::mem::drop"
+			)
+		}
+		_ => false,
+	}
 }
 
 // Always inlined at its call sites; the out-of-line copy never runs, which
@@ -191,7 +199,7 @@ impl<'tcx> Visitor<'tcx> for Analyzer<'_, 'tcx> {
 
 		if let StmtKind::Semi(expr) = statement.kind
 			&& let ExprKind::Call(callee, args) = &expr.kind
-			&& is_drop_callee(callee)
+			&& is_drop_callee(self.cx, callee)
 			&& let Some(binding) = args.first().and_then(local_binding)
 		{
 			self.statement_drops
@@ -205,7 +213,7 @@ impl<'tcx> Visitor<'tcx> for Analyzer<'_, 'tcx> {
 
 	fn visit_expr(&mut self, expr: &'tcx Expr<'tcx>) {
 		if let ExprKind::Call(callee, args) = &expr.kind
-			&& is_drop_callee(callee)
+			&& is_drop_callee(self.cx, callee)
 		{
 			// A bare local passed to `drop` releases the guard without reading it,
 			// so it is neither a use nor worth descending into.
@@ -276,23 +284,28 @@ impl<'tcx> LateLintPass<'tcx> for DenyUnusedAccountBorrowGuards {
 					analyzer.all_drops.get(&guard.hir_id).copied().unwrap_or(0),
 					analyzer.statement_drops.get(&guard.hir_id),
 				);
-				match fix {
-					Some(suggestion::Fix::Replace(span, replacement)) => {
-						diag.span_suggestion(
-							span,
-							"discard this guard immediately",
-							replacement,
-							rustc_errors::Applicability::MachineApplicable,
-						);
+				if let Some(suggestion::Fix {
+					replacement,
+					applicability,
+				}) = fix
+				{
+					match replacement {
+						suggestion::Replacement::Single(span, snippet) => {
+							diag.span_suggestion(
+								span,
+								"discard this guard immediately",
+								snippet,
+								applicability,
+							);
+						}
+						suggestion::Replacement::Many(parts) => {
+							diag.multipart_suggestion(
+								"discard this guard immediately",
+								parts,
+								applicability,
+							);
+						}
 					}
-					Some(suggestion::Fix::ReplaceMany(replacements)) => {
-						diag.multipart_suggestion(
-							"discard this guard immediately",
-							replacements,
-							rustc_errors::Applicability::MachineApplicable,
-						);
-					}
-					None => {}
 				}
 			});
 		}
@@ -314,9 +327,14 @@ mod suggestion {
 
 	use super::GuardBinding;
 
-	pub enum Fix {
-		Replace(Span, String),
-		ReplaceMany(Vec<(Span, String)>),
+	pub enum Replacement {
+		Single(Span, String),
+		Many(Vec<(Span, String)>),
+	}
+
+	pub struct Fix {
+		pub replacement: Replacement,
+		pub applicability: rustc_errors::Applicability,
 	}
 
 	pub fn for_binding(
@@ -334,9 +352,13 @@ mod suggestion {
 		let initializer = source_map.span_to_snippet(guard.span).ok()? + ";";
 
 		// No `drop(local)` calls: replacing the binding with the initializer
-		// expression is always safe.
+		// expression only releases the never-read borrow sooner, so the
+		// rewrite is exact.
 		if all_drops == 0 {
-			return Some(Fix::Replace(guard.statement_span, initializer));
+			return Some(Fix {
+				replacement: Replacement::Single(guard.statement_span, initializer),
+				applicability: rustc_errors::Applicability::MachineApplicable,
+			});
 		}
 
 		let drop_spans = statement_drops.map_or(0, Vec::len);
@@ -349,8 +371,15 @@ mod suggestion {
 			.filter(|spans| !spans.is_empty())
 			.expect("all drops are statements");
 
+		// Removing a later `drop(local);` releases the borrow earlier than the
+		// user wrote it. Code between the binding and the drop can observe the
+		// held borrow (a later `try_borrow_mut` flips from panic to success),
+		// so the rewrite is only a suggestion for the user to review.
 		let mut replacements = vec![(guard.statement_span, initializer)];
 		replacements.extend(statement_drops.iter().map(|span| (*span, String::new())));
-		Some(Fix::ReplaceMany(replacements))
+		Some(Fix {
+			replacement: Replacement::Many(replacements),
+			applicability: rustc_errors::Applicability::MaybeIncorrect,
+		})
 	}
 }

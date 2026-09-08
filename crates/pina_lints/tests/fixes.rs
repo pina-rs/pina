@@ -63,10 +63,12 @@ impl Guard {
 
 /// The exact source expected after `cargo fix`.
 ///
-/// The dropped binding becomes a `?` statement and the orphaned `drop`
-/// statement disappears (its indentation remains as a whitespace-only line,
-/// exactly as the span rewrite leaves it); the underscore binding is replaced
-/// by its initializer; the read guard is untouched.
+/// The underscore binding is rewritten into its initializer expression — the
+/// only machine-applicable suggestion for this fixture. The drop-removal
+/// suggestion is `MaybeIncorrect` (removing a later `drop(local);` releases
+/// the borrow earlier than the user wrote it, and intervening code can observe
+/// the held borrow), so cargo fix leaves `dropped_after_binding` untouched and
+/// its warning remains for manual review. The read guard is untouched.
 const FIXED_SOURCE: &str = r#"#![allow(dead_code, unused_variables, private_interfaces)]
 
 struct AccountView;
@@ -94,8 +96,8 @@ impl AsTokenAccount for MintView {
 }
 
 pub fn dropped_after_binding(account: &mut AccountView) -> Result<u8, ()> {
-	account.try_borrow_mut()?;
-	
+	let guard = account.try_borrow_mut()?;
+	drop(guard);
 	Ok(0)
 }
 
@@ -293,10 +295,12 @@ fn machine_applicable_fixes_recompile_without_mangling() {
 		"the applied fix mangled the scratch crate"
 	);
 
-	// The fixed source compiles and no longer triggers the lint.
+	// The fixed source still compiles. The machine-applicable fix is gone;
+	// the MaybeIncorrect drop-removal warning intentionally remains for the
+	// user to review by hand.
 	assert_eq!(
 		scratch.lint_warnings(),
-		0,
-		"the fixed source must not trigger the lint anymore"
+		1,
+		"only the MaybeIncorrect drop-removal warning should remain"
 	);
 }

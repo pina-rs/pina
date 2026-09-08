@@ -59,6 +59,10 @@ macro_rules! bind_guard {
 
 const UNRELATED_CONSTANT: u8 = 7;
 
+mod shadowed {
+	pub fn drop<T>(_: T) {}
+}
+
 struct Loader;
 
 impl Loader {
@@ -134,6 +138,12 @@ fn drop_of_read_value(account: &AccountView) -> Result<(), ()> {
 
 fn drop_of_constant_is_never_a_guard() {
 	drop(UNRELATED_CONSTANT);
+}
+
+fn shadowed_drop_is_a_use(account: &AccountView) -> Result<(), ()> {
+	let guard = account.try_borrow()?;
+	shadowed::drop(guard);
+	Ok(())
 }
 
 fn call_through_field_is_not_a_guard_construction(
