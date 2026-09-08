@@ -204,7 +204,8 @@ fn rejects_missing_or_malformed_capacity_markers_instead_of_reading_docs() {
 
 #[test]
 fn renders_compact_account_fixture_with_dynamic_helpers() {
-	let crate_dir = render_fixture_program("compact_accounts", "pina-codama-render-compact");
+	let crate_dir =
+		render_fixture_program("compact_accounts_program", "pina-codama-render-compact");
 	let content = read_generated_file(&crate_dir, "accounts/journal.rs");
 	let manifest = fs::read_to_string(crate_dir.join("Cargo.toml"))
 		.unwrap_or_else(|error| panic!("read compact client manifest: {error}"));
@@ -1035,7 +1036,7 @@ fn rejects_missing_instruction_discriminators() {
 
 #[test]
 fn writes_scaffold_with_pinapod_dependency() {
-	let root = load_fixture_root("hello_solana");
+	let root = load_fixture_root("hello_solana_program");
 	let output_dir = unique_temp_dir("pina-codama-render-scaffold");
 	let crate_dir = output_dir.join("hello_solana");
 
@@ -1055,7 +1056,7 @@ fn writes_scaffold_with_pinapod_dependency() {
 
 #[test]
 fn generation_modes_preserve_or_replace_scaffolds() {
-	let root = load_fixture_root("hello_solana");
+	let root = load_fixture_root("hello_solana_program");
 	let crate_dir = unique_temp_dir("pina-codama-render-modes");
 	let create = RenderConfig {
 		mode: RenderMode::Create,
@@ -1109,7 +1110,7 @@ fn generation_modes_preserve_or_replace_scaffolds() {
 
 #[test]
 fn source_only_generation_and_strict_update_are_explicit() {
-	let root = load_fixture_root("hello_solana");
+	let root = load_fixture_root("hello_solana_program");
 	let crate_dir = unique_temp_dir("pina-codama-render-source-only");
 	let update = RenderConfig {
 		mode: RenderMode::Update,
@@ -1155,7 +1156,7 @@ fn generation_modes_reject_unsafe_destination_trees_and_unreadable_paths() {
 	use std::os::unix::fs::PermissionsExt;
 	use std::os::unix::fs::symlink;
 
-	let root = load_fixture_root("hello_solana");
+	let root = load_fixture_root("hello_solana_program");
 	let output = unique_temp_dir("pina-codama-render-mode-safety");
 	fs::create_dir_all(&output)
 		.unwrap_or_else(|error| panic!("failed to create safety fixture: {error}"));
