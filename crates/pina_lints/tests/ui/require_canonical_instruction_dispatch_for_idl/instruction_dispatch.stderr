@@ -1,6 +1,41 @@
 warning: IDL-friendly instruction dispatch should be a direct `match` over the parsed instruction enum
+  --> $DIR/instruction_dispatch.rs:47:1
+   |
+LL | / fn entrypoint_helper(data: &[u8]) -> Result<(), ()> {
+LL | |     // The match hides behind an opaque helper, so the entrypoint stays IDL
+LL | |     // opaque and is reported.
+LL | |     if data.len() > 8 {
+...  |
+LL | | }
+   | |_^
    |
    = help: keep the dispatch in the entrypoint itself so `pina idl` can follow the instruction routing
    = note: `#[warn(require_canonical_instruction_dispatch_for_idl)]` on by default
 
-warning: 1 warning emitted
+warning: IDL-friendly instruction dispatch should be a direct `match` over the parsed instruction enum
+  --> $DIR/instruction_dispatch.rs:57:1
+   |
+LL | / fn entrypoint_unrelated_match(data: &[u8]) -> Result<(), ()> {
+LL | |     match data.first() {
+LL | |         Some(_) => process_a(),
+LL | |         None => process_b(),
+LL | |     }
+LL | | }
+   | |_^
+   |
+   = help: keep the dispatch in the entrypoint itself so `pina idl` can follow the instruction routing
+
+warning: IDL-friendly instruction dispatch should be a direct `match` over the parsed instruction enum
+  --> $DIR/instruction_dispatch.rs:64:1
+   |
+LL | / fn entrypoint_unrelated_enum(mode: Mode) -> Result<(), ()> {
+LL | |     match mode {
+LL | |         Mode::Fast => process_a(),
+LL | |         Mode::Safe => process_b(),
+LL | |     }
+LL | | }
+   | |_^
+   |
+   = help: keep the dispatch in the entrypoint itself so `pina idl` can follow the instruction routing
+
+warning: 3 warnings emitted
