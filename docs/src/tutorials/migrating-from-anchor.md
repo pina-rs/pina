@@ -4,7 +4,7 @@
 
 This guide maps common Anchor patterns to their Pina equivalents. If you have an existing Anchor program and want to rewrite it with Pina for lower compute usage and smaller binaries, this is the reference to follow.
 
-The repository includes several `anchor_*` example programs that demonstrate direct parity with Anchor's own test suite. These are referenced throughout this guide.
+The repository includes several Anchor parity example programs (ports of Anchor's own test suite, without the `anchor_` prefix) that demonstrate direct parity with Anchor's behavior. These are referenced throughout this guide.
 
 ## Program structure
 
@@ -103,7 +103,7 @@ self.counter
 	.assert_type::<CounterState>(&ID)?;
 ```
 
-See `examples/counter_program` for a complete PDA creation and validation example, and `examples/anchor_duplicate_mutable_accounts` for explicit duplicate-account safety checks.
+See `examples/counter_program` for a complete PDA creation and validation example, and `examples/duplicate_mutable_accounts` for explicit duplicate-account safety checks.
 
 ## Account data: Borsh to Pod
 
@@ -330,7 +330,7 @@ Pina's `#[error]` macro generates `From<MyError> for ProgramError` using `Progra
 return Err(MyError::ValueTooLarge.into());
 ```
 
-See `examples/anchor_errors` for a complete parity port of Anchor's error handling, including guard helpers like `require_eq` and `require_gt`.
+See `examples/custom_errors` for a complete parity port of Anchor's error handling, including guard helpers like `require_eq` and `require_gt`.
 
 ## Events
 
@@ -369,7 +369,7 @@ pub struct MyEvent {
 
 Pina events are native PinaPod schemas with explicit discriminators, like accounts and instructions. The macro generates a validated `MyEventZc` storage view. Pina does not expose an object-representation `to_bytes()` method; event transport must use an API that owns and initializes its output buffer.
 
-See `examples/anchor_events` for the full parity port.
+See `examples/events` for the full parity port.
 
 ## CPI (Cross-Program Invocation)
 

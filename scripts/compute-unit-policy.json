@@ -1,20 +1,20 @@
 {
 	"trackedPrograms": [
 		"hello_solana",
-		"anchor_duplicate_mutable_accounts",
-		"anchor_events",
-		"anchor_sysvars",
-		"anchor_system_accounts",
-		"anchor_realloc",
+		"duplicate_mutable_accounts",
+		"events",
+		"sysvar_checks",
+		"system_accounts",
+		"account_realloc",
 		"compact_accounts",
 		"counter_program",
 		"profile_program"
 	],
 	"runtimeCases": [
-		"anchor_realloc/grow_0_to_8",
-		"anchor_realloc/initialize",
-		"anchor_realloc/rewrite_8_to_8",
-		"anchor_realloc/shrink_8_to_0",
+		"account_realloc/grow_0_to_8",
+		"account_realloc/initialize",
+		"account_realloc/rewrite_8_to_8",
+		"account_realloc/shrink_8_to_0",
 		"counter_program/increment",
 		"counter_program/initialize",
 		"profile_program/add_tag",
@@ -32,7 +32,7 @@
 	},
 	"approvedTotals": {},
 	"runtimeApprovedTotals": {
-		"anchor_realloc/initialize": 9782,
+		"account_realloc/initialize": 9782,
 		"profile_program/add_tag": 2271,
 		"profile_program/initialize": 7392
 	}

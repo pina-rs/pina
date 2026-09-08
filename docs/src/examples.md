@@ -13,15 +13,15 @@ The `examples/` workspace members demonstrate focused usage patterns. They are n
 - `profile_program`: user profile registry with fully initialized bounded UTF-8 and tag fields plus checked semantic accessors.
 - `pina_bpf`: minimal pina-native BPF hello world with nightly `build-std=core,alloc`.
 - `prop_amm_program`: Pina-native semantic port of Anchor `anchor-next` benchmark `prop-amm`, focused on authority-controlled oracle updates without the upstream asm fast path.
-- `anchor_declare_id`: first Anchor test parity port, focused on program-id mismatch checks.
-- `anchor_declare_program`: Anchor `declare-program` parity for external-program ID checks.
-- `anchor_duplicate_mutable_accounts`: explicit duplicate mutable account validation pattern.
-- `anchor_errors`: Anchor-style custom error code and guard helper parity.
-- `anchor_events`: event schema parity through deterministic serialization checks.
-- `anchor_floats`: float data account create/update flow with authority validation.
-- `anchor_system_accounts`: system-program owner validation parity.
-- `anchor_sysvars`: clock/rent/stake-history sysvar validation parity.
-- `anchor_realloc`: authority-bound PDA realloc lifecycle, growth limits, and duplicate-target safety checks.
+- `declare_id`: first Anchor test parity port, focused on program-id mismatch checks.
+- `declare_program`: Anchor `declare-program` parity for external-program ID checks.
+- `duplicate_mutable_accounts`: explicit duplicate mutable account validation pattern.
+- `custom_errors`: Anchor-style custom error code and guard helper parity.
+- `events`: event schema parity through deterministic serialization checks.
+- `float_accounts`: float data account create/update flow with authority validation.
+- `system_accounts`: system-program owner validation parity.
+- `sysvar_checks`: clock/rent/stake-history sysvar validation parity.
+- `account_realloc`: authority-bound PDA realloc lifecycle, growth limits, and duplicate-target safety checks.
 - `compact_accounts`: generated compact patches across create, grow, same-size update, shrink, clear, rent adjustment, and rejected boundary cases.
 - `optional_accounts_program`: optional-account slots with explicit presence handling and count tracking.
 

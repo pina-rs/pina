@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:pina_codama_clients/anchor_realloc.dart'
+import 'package:pina_codama_clients/account_realloc.dart'
     show Sample, getSampleDecoder, getSampleEncoder;
 import 'package:pina_codama_clients/compact_accounts.dart'
     show Journal, getJournalDecoder, getJournalEncoder;
@@ -431,18 +431,16 @@ Uint8List _decodeHex(String value) {
 }
 
 const expectedPrograms = <String>[
-  'anchor_declare_id',
-  'anchor_declare_program',
-  'anchor_duplicate_mutable_accounts',
-  'anchor_errors',
-  'anchor_events',
-  'anchor_floats',
-  'anchor_realloc',
-  'anchor_system_accounts',
-  'anchor_sysvars',
+  'account_realloc',
   'compact_accounts',
   'counter_program',
+  'custom_errors',
+  'declare_id',
+  'declare_program',
+  'duplicate_mutable_accounts',
   'escrow_program',
+  'events',
+  'float_accounts',
   'hello_solana',
   'optional_accounts_program',
   'pina_bpf',
@@ -450,6 +448,8 @@ const expectedPrograms = <String>[
   'prop_amm_program',
   'role_registry_program',
   'staking_rewards_program',
+  'system_accounts',
+  'sysvar_checks',
   'todo_program',
   'transfer_sol',
   'vesting_program',

@@ -11,9 +11,9 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-use anchor_realloc::InitializeIx as ReallocInitializeIx;
-use anchor_realloc::ReallocIx;
-use anchor_realloc::Sample;
+use account_realloc::InitializeIx as ReallocInitializeIx;
+use account_realloc::ReallocIx;
+use account_realloc::Sample;
 use counter_program::CounterInstruction;
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
@@ -262,7 +262,7 @@ fn realloc_initialize_data(bump: u8) -> Vec<u8> {
 		instruction.bump = bump;
 		Ok(())
 	})
-	.unwrap_or_else(|error| panic!("encode realloc initialize: {error:?}"));
+	.unwrap_or_else(|error| panic!("encode account_realloc initialize: {error:?}"));
 	data
 }
 
@@ -273,13 +273,13 @@ fn realloc_data(len: usize) -> Vec<u8> {
 		instruction.len.set(len);
 		Ok(())
 	})
-	.unwrap_or_else(|error| panic!("encode realloc instruction: {error:?}"));
+	.unwrap_or_else(|error| panic!("encode account_realloc instruction: {error:?}"));
 	data
 }
 
 fn realloc_measurements(elf_dir: &Path) -> BTreeMap<String, u64> {
-	let program_id = as_pubkey(anchor_realloc::ID);
-	let mollusk = load_program(elf_dir, "anchor_realloc", &program_id);
+	let program_id = as_pubkey(account_realloc::ID);
+	let mollusk = load_program(elf_dir, "account_realloc", &program_id);
 	let authority = Pubkey::new_from_array([3; 32]);
 	let (sample, bump) =
 		Pubkey::find_program_address(&[b"sample", authority.as_ref()], &program_id);
@@ -295,7 +295,7 @@ fn realloc_measurements(elf_dir: &Path) -> BTreeMap<String, u64> {
 	);
 	let initialize_result = process_success(
 		&mollusk,
-		"anchor_realloc/initialize",
+		"account_realloc/initialize",
 		&initialize,
 		&[
 			(authority, system_account(1_000_000_000)),
@@ -317,7 +317,7 @@ fn realloc_measurements(elf_dir: &Path) -> BTreeMap<String, u64> {
 		Instruction::new_with_bytes(program_id, &realloc_data(grown_size), resize_accounts());
 	let grow_result = process_success(
 		&mollusk,
-		"anchor_realloc/grow_0_to_8",
+		"account_realloc/grow_0_to_8",
 		&grow,
 		&initialize_result.resulting_accounts,
 	);
@@ -325,7 +325,7 @@ fn realloc_measurements(elf_dir: &Path) -> BTreeMap<String, u64> {
 		Instruction::new_with_bytes(program_id, &realloc_data(grown_size), resize_accounts());
 	let rewrite_result = process_success(
 		&mollusk,
-		"anchor_realloc/rewrite_8_to_8",
+		"account_realloc/rewrite_8_to_8",
 		&rewrite,
 		&grow_result.resulting_accounts,
 	);
@@ -336,26 +336,26 @@ fn realloc_measurements(elf_dir: &Path) -> BTreeMap<String, u64> {
 	);
 	let shrink_result = process_success(
 		&mollusk,
-		"anchor_realloc/shrink_8_to_0",
+		"account_realloc/shrink_8_to_0",
 		&shrink,
 		&rewrite_result.resulting_accounts,
 	);
 
 	BTreeMap::from([
 		(
-			"anchor_realloc/grow_0_to_8".to_owned(),
+			"account_realloc/grow_0_to_8".to_owned(),
 			grow_result.compute_units_consumed,
 		),
 		(
-			"anchor_realloc/initialize".to_owned(),
+			"account_realloc/initialize".to_owned(),
 			initialize_result.compute_units_consumed,
 		),
 		(
-			"anchor_realloc/rewrite_8_to_8".to_owned(),
+			"account_realloc/rewrite_8_to_8".to_owned(),
 			rewrite_result.compute_units_consumed,
 		),
 		(
-			"anchor_realloc/shrink_8_to_0".to_owned(),
+			"account_realloc/shrink_8_to_0".to_owned(),
 			shrink_result.compute_units_consumed,
 		),
 	])
@@ -399,7 +399,7 @@ fn measure_runtime_compute_units() {
 		.into_iter()
 		.map(|(id, compute_units)| json!({ "id": id, "computeUnits": compute_units }))
 		.collect::<Vec<_>>();
-	let artifacts = ["anchor_realloc", "counter_program", "profile_program"]
+	let artifacts = ["account_realloc", "counter_program", "profile_program"]
 		.into_iter()
 		.map(|program| {
 			let path = elf_dir.join(format!("{program}.so"));

@@ -53,7 +53,7 @@ function main(): number {
 	const elfDirectory = resolve(elfArgument);
 	const outputFile = resolve(outputArgument);
 	for (
-		const program of ["anchor_realloc", "counter_program", "profile_program"]
+		const program of ["account_realloc", "counter_program", "profile_program"]
 	) {
 		const path = resolve(elfDirectory, `${program}.so`);
 		if (!existsSync(path)) {

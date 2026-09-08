@@ -435,7 +435,7 @@ How to deepen it further:
 - add a dispute or timeout path
 - split the code into more modules to demonstrate maintainable scale
 
-### `anchor_events`
+### `events`
 
 Status: useful parity test, but the current shape is synthetic.
 
@@ -445,7 +445,7 @@ How to deepen it:
 - connect event emission to a user-facing flow like create/update/close
 - keep the serialization tests, but make the example tell a product story
 
-### `anchor_realloc`
+### `account_realloc`
 
 Status: narrow by design, but more technical than user-facing.
 
@@ -455,7 +455,7 @@ How to deepen it:
 - keep the realloc guards, but embed them in a useful lifecycle
 - add tests that show how growth affects serialization and validation
 
-### `anchor_*` parity examples in general
+### Anchor parity examples in general
 
 Status: valuable, but their purpose is niche.
 

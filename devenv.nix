@@ -597,16 +597,16 @@ in
 
         # Run unit and parity tests for all example programs.
         cargo test --locked \
-          -p anchor_declare_id \
-          -p anchor_declare_program \
-          -p anchor_duplicate_mutable_accounts \
-          -p anchor_errors \
-          -p anchor_events \
-          -p anchor_floats \
-          -p anchor_realloc \
+          -p declare_id \
+          -p declare_program \
+          -p duplicate_mutable_accounts \
+          -p custom_errors \
+          -p events \
+          -p float_accounts \
+          -p account_realloc \
           -p compact_accounts \
-          -p anchor_system_accounts \
-          -p anchor_sysvars \
+          -p system_accounts \
+          -p sysvar_checks \
           -p escrow_program \
           -p optional_accounts_program \
           -p pina_bpf \

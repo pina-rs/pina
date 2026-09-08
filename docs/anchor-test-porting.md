@@ -17,13 +17,13 @@ This page tracks sequential parity ports from `solana-foundation/anchor/tests` i
 - [ ] `custom-coder`
 - [ ] `custom-discriminator`
 - [ ] `custom-program`
-- [x] `declare-id` -> `examples/anchor_declare_id`
-- [x] `declare-program` -> `examples/anchor_declare_program` (adapted)
-- [x] `duplicate-mutable-accounts` -> `examples/anchor_duplicate_mutable_accounts` (adapted)
-- [x] `errors` -> `examples/anchor_errors` (adapted)
+- [x] `declare-id` -> `examples/declare_id`
+- [x] `declare-program` -> `examples/declare_program` (adapted)
+- [x] `duplicate-mutable-accounts` -> `examples/duplicate_mutable_accounts` (adapted)
+- [x] `errors` -> `examples/custom_errors` (adapted)
 - [x] `escrow` -> `examples/escrow_program` (adapted with parity-focused tests)
-- [x] `events` -> `examples/anchor_events` (adapted event schema parity)
-- [x] `floats` -> `examples/anchor_floats`
+- [x] `events` -> `examples/events` (adapted event schema parity)
+- [x] `floats` -> `examples/float_accounts`
 - [ ] `idl`
 - [ ] `ido-pool`
 - [ ] `interface-account`
@@ -36,13 +36,13 @@ This page tracks sequential parity ports from `solana-foundation/anchor/tests` i
 - [ ] `optional`
 - [ ] `pda-derivation`
 - [ ] `pyth`
-- [x] `realloc` -> `examples/anchor_realloc` (security-adapted: per-authority PDA instead of Anchor's global test fixture)
+- [x] `realloc` -> `examples/account_realloc` (security-adapted: per-authority PDA instead of Anchor's global test fixture)
 - [ ] `relations-derivation`
 - [ ] `safety-checks`
 - [ ] `spl`
 - [ ] `swap`
-- [x] `system-accounts` -> `examples/anchor_system_accounts` (adapted)
-- [x] `sysvars` -> `examples/anchor_sysvars` (adapted)
+- [x] `system-accounts` -> `examples/system_accounts` (adapted)
+- [x] `sysvars` -> `examples/sysvar_checks` (adapted)
 - [ ] `test-instruction-validation`
 - [ ] `tictactoe`
 - [ ] `typescript`

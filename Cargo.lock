@@ -13,6 +13,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "account-realloc-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "account_realloc",
+ "pina_test",
+]
+
+[[package]]
+name = "account_realloc"
+version = "0.0.0"
+dependencies = [
+ "mollusk-svm",
+ "pina",
+ "solana-account 4.3.2",
+ "solana-instruction 3.4.1",
+ "solana-pubkey 4.2.1",
+ "solana-sdk-ids 3.1.0",
+]
+
+[[package]]
+name = "account_realloc-client"
+version = "0.0.0"
+
+[[package]]
+name = "account_realloc-cpi"
+version = "0.0.0"
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -320,186 +348,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9d4ee0d472d1cd2e28c97dfa124b3d8d992e10eb0a035f33f5d12e3a177ba3b"
 
 [[package]]
-name = "anchor-declare-id-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-declare-id-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-declare-id-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_declare_id",
- "pina_test",
-]
-
-[[package]]
-name = "anchor-declare-program-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-declare-program-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-declare-program-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_declare_program",
- "pina_test",
-]
-
-[[package]]
-name = "anchor-duplicate-mutable-accounts-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-duplicate-mutable-accounts-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-duplicate-mutable-accounts-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_duplicate_mutable_accounts",
- "pina_test",
-]
-
-[[package]]
-name = "anchor-errors-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-errors-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-errors-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_errors",
- "pina_test",
-]
-
-[[package]]
-name = "anchor-events-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-events-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-events-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_events",
- "pina_test",
-]
-
-[[package]]
-name = "anchor-floats-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-floats-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-floats-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_floats",
- "pina_test",
-]
-
-[[package]]
 name = "anchor-lang-idl"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -521,164 +369,6 @@ checksum = "2bdf143115440fe621bdac3a29a1f7472e09f6cd82b2aa569429a0c13f103838"
 dependencies = [
  "anyhow",
  "serde",
-]
-
-[[package]]
-name = "anchor-realloc-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-realloc-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-realloc-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_realloc",
- "pina_test",
-]
-
-[[package]]
-name = "anchor-system-accounts-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-system-accounts-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-system-accounts-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_system_accounts",
- "pina_test",
-]
-
-[[package]]
-name = "anchor-sysvars-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "anchor-sysvars-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor-sysvars-surfpool-tests"
-version = "0.0.0"
-dependencies = [
- "anchor_sysvars",
- "pina_test",
-]
-
-[[package]]
-name = "anchor_declare_id"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor_declare_program"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor_duplicate_mutable_accounts"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor_errors"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor_events"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor_floats"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor_realloc"
-version = "0.0.0"
-dependencies = [
- "mollusk-svm",
- "pina",
- "solana-account 4.3.2",
- "solana-instruction 3.4.1",
- "solana-pubkey 4.2.1",
- "solana-sdk-ids 3.1.0",
-]
-
-[[package]]
-name = "anchor_system_accounts"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
-name = "anchor_sysvars"
-version = "0.0.0"
-dependencies = [
- "pina",
 ]
 
 [[package]]
@@ -2482,6 +2172,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "custom-errors-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "custom_errors",
+ "pina_test",
+]
+
+[[package]]
+name = "custom_errors"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "custom_errors-client"
+version = "0.0.0"
+
+[[package]]
+name = "custom_errors-cpi"
+version = "0.0.0"
+
+[[package]]
 name = "darling"
 version = "0.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2604,6 +2317,52 @@ name = "data-encoding"
 version = "2.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4583a4551df46e2792f82ceeac45e850d2e2d5debba0b91f102385cda5b11f06"
+
+[[package]]
+name = "declare-id-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "declare_id",
+ "pina_test",
+]
+
+[[package]]
+name = "declare-program-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "declare_program",
+ "pina_test",
+]
+
+[[package]]
+name = "declare_id"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "declare_id-client"
+version = "0.0.0"
+
+[[package]]
+name = "declare_id-cpi"
+version = "0.0.0"
+
+[[package]]
+name = "declare_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "declare_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "declare_program-cpi"
+version = "0.0.0"
 
 [[package]]
 name = "defmt"
@@ -2923,6 +2682,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "duplicate-mutable-accounts-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "duplicate_mutable_accounts",
+ "pina_test",
+]
+
+[[package]]
+name = "duplicate_mutable_accounts"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "duplicate_mutable_accounts-client"
+version = "0.0.0"
+
+[[package]]
+name = "duplicate_mutable_accounts-cpi"
+version = "0.0.0"
+
+[[package]]
 name = "dyn-clone"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3221,6 +3003,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "events"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "events-client"
+version = "0.0.0"
+
+[[package]]
+name = "events-cpi"
+version = "0.0.0"
+
+[[package]]
+name = "events-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "events",
+ "pina_test",
+]
+
+[[package]]
 name = "fake-simd"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3365,6 +3170,29 @@ dependencies = [
  "miniz_oxide",
  "zlib-rs",
 ]
+
+[[package]]
+name = "float-accounts-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "float_accounts",
+ "pina_test",
+]
+
+[[package]]
+name = "float_accounts"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "float_accounts-client"
+version = "0.0.0"
+
+[[package]]
+name = "float_accounts-cpi"
+version = "0.0.0"
 
 [[package]]
 name = "fnv"
@@ -6111,7 +5939,7 @@ dependencies = [
 name = "pina_root"
 version = "0.0.5"
 dependencies = [
- "anchor_realloc",
+ "account_realloc",
  "counter_program",
  "insta",
  "macrotest",
@@ -12178,6 +12006,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "system-accounts-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "pina_test",
+ "system_accounts",
+]
+
+[[package]]
 name = "system-configuration"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12197,6 +12033,44 @@ dependencies = [
  "core-foundation-sys",
  "libc",
 ]
+
+[[package]]
+name = "system_accounts"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "system_accounts-client"
+version = "0.0.0"
+
+[[package]]
+name = "system_accounts-cpi"
+version = "0.0.0"
+
+[[package]]
+name = "sysvar-checks-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "pina_test",
+ "sysvar_checks",
+]
+
+[[package]]
+name = "sysvar_checks"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
+name = "sysvar_checks-client"
+version = "0.0.0"
+
+[[package]]
+name = "sysvar_checks-cpi"
+version = "0.0.0"
 
 [[package]]
 name = "tap"
