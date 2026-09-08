@@ -71,8 +71,8 @@ Closing guidance under Pinocchio 0.11:
 <!-- {=pinaSecurityBestPractices} -->
 
 - **Always call `assert_signer()`** before trusting authority accounts
-- **Use Pina's token loaders directly** because they validate canonical token-program ownership before returning typed state
-- **Use `as_associated_token_account()`** when reading an ATA because it validates the runtime owner, derived address, stored wallet, and stored mint together
+- **Use Pina's token loaders directly** because they delegate canonical owner and layout validation to the corresponding checked upstream parser before returning typed state
+- **Use `as_associated_token_account()`** when reading a canonical ATA because it validates the runtime owner, derived address, stored current authority, and stored mint together; enforce state, delegate, close-authority, and extension policy separately
 - **Always call `assert_empty()`** before account initialization to prevent reinitialization attacks
 - **Use `invoke_with` or `invoke_signed_with`** when fixed-account creation must establish nonzero values before final PinaPod validation
 - **Use generated `load_pda` or `load_pda_mut`** when a fixed stored-bump PDA handler needs a typed guard, so recursive content and the PDA address are validated once

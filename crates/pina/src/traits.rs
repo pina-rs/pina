@@ -639,11 +639,11 @@ pub trait AsCompactAccount {
 /// All token loaders return guard-backed typed access so the runtime borrow
 /// stays active for the full lifetime of the token view.
 ///
-/// Every loader verifies that the runtime account owner matches the selected
-/// canonical token program before parsing data. Program-specific methods retain
-/// the exact upstream type that validated the account. The `*_for_program`
-/// methods return a small enum for code that works with either SPL Token program
-/// without reinterpreting one program's state as the other's.
+/// Every loader uses the selected token program's checked upstream account-view
+/// parser, which verifies runtime ownership and layout together. Program-specific
+/// methods retain the exact upstream type that validated the account. The
+/// `*_for_program` methods return a small enum for code that works with either SPL
+/// Token program without reinterpreting one program's state as the other's.
 ///
 /// <!-- {=pinaTokenFeatureGateContract|trim|linePrefix:"/// ":true} -->
 /// This API is gated behind the `token` feature. Keep token-specific code behind `#[cfg(feature = "token")]` so on-chain programs that do not use SPL token interfaces can avoid extra dependencies.<!-- {/pinaTokenFeatureGateContract} -->
@@ -686,8 +686,14 @@ pub trait AsTokenAccount {
 	>;
 	/// Validate and interpret an associated token account.
 	///
-	/// This verifies the account's runtime owner, its derived ATA address, and
-	/// the mint and wallet stored in its token-account data.
+	/// This verifies the selected canonical token program, derived ATA address,
+	/// runtime owner, and the mint and current token authority stored in account
+	/// data. An account whose authority was reassigned remains at its original ATA
+	/// address but is not accepted as canonical for the original wallet.
+	///
+	/// This loader does not require the account to be initialized or unfrozen and
+	/// does not restrict delegates, close authority, or Token-2022 extensions.
+	/// Callers must enforce those protocol-specific policies separately.
 	fn as_associated_token_account(
 		&self,
 		wallet: &Address,

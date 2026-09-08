@@ -214,7 +214,7 @@ Key validation patterns:
 - `assert_addresses` checks that the token program is either SPL Token or Token-2022.
 - `assert_signer` ensures the maker signed the transaction.
 - `as_token_mint_for_program` accepts only a canonical token program, checks the mint owner, and parses its concrete layout.
-- `as_associated_token_account` checks the canonical token-program owner, derived address, stored wallet, and stored mint.
+- `as_associated_token_account` checks the canonical token-program owner, derived address, stored current authority, and stored mint. The escrow separately owns any required state, delegate, close-authority, and Token-2022 extension policy.
 - `assert_empty` + `assert_writable` + `assert_seeds_with_bump` validates the PDA is fresh and derivable.
 
 Validation methods return the same reference type they receive, so mutable chains stay mutable all the way to `as_account_mut()`.

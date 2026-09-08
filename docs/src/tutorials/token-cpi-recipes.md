@@ -20,7 +20,7 @@ Keep the same runtime rules explicit in Pina:
 - validate the token program account explicitly when it is passed in
 - call `assert_writable()` on every account your instruction expects to mutate
 - call `assert_signer()` on every authority that must authorize the CPI
-- load existing ATAs with `as_associated_token_account()`, which validates the token-program owner, derived address, stored wallet, and stored mint together
+- load existing canonical ATAs with `as_associated_token_account()`, which validates the token-program owner, derived address, stored current authority, and stored mint together
 - if you loaded account state with `.as_account()` or `.as_account_mut()`, copy out the fields you need and drop the guard before the CPI
 
 That last point matters more now that `as_account()` and `as_account_mut()` return borrow guards instead of bare references.

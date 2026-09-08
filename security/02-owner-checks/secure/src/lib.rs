@@ -1,6 +1,6 @@
-//! SECURE: Owner check enforced before token deserialization.
+//! SECURE: Owner check enforced while loading Token-2022 data.
 //!
-//! This program verifies account ownership before deserializing token data.
+//! This program keeps ownership and byte-layout validation in one loader.
 
 #![no_std]
 
@@ -33,10 +33,10 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 
 		self.depositor.assert_signer()?;
 
-		// SECURE: The loader checks the canonical SPL Token owner before it
-		// returns typed account data.
-		let token = self.token_account.as_token_account()?;
-		let balance = token.amount();
+		// SECURE: The checked upstream account-view parser verifies Token-2022
+		// ownership and layout while it creates the guard-backed view.
+		let token = self.token_account.as_token_2022_account()?;
+		let balance = token.base.amount();
 
 		let amount = args.amount.get();
 

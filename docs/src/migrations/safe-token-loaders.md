@@ -1,6 +1,6 @@
 # Migrate to safe token loaders
 
-Pina token loaders now validate canonical program ownership before they parse account data. The ATA loader also validates the derived address and the wallet and mint stored in token-account data. This change removes the separate checked method names and the lints that required preceding assertions.
+Pina now exposes one clearly checked name for each token loader. The previous unsuffixed loaders were already owner-safe because the pinned `pinocchio-token` and `pinocchio-token-2022` account-view parsers validate ownership and layout together. Pina continues to delegate to those parsers without a duplicate owner comparison. The ATA loader additionally validates the derived address and the current authority and mint stored in token-account data. This change removes the redundant checked method names and the lints that required preceding assertions.
 
 ## Remove checked suffixes
 
@@ -14,7 +14,7 @@ Replace each removed method with its shorter equivalent:
 | `as_token_2022_account_checked()`          | `as_token_2022_account()`          |
 | `as_associated_token_account_checked(...)` | `as_associated_token_account(...)` |
 
-The replacement methods enforce the same owner checks. They preserve guard-backed lifetimes and return the same typed views as the removed methods.
+The replacement methods enforce the same owner checks through the same checked upstream parsers. They preserve guard-backed lifetimes and return the same typed views as the removed methods.
 
 ## Remove duplicate assertions
 
@@ -73,8 +73,14 @@ require_owner_before_token_cast = "deny"
 require_associated_token_address_before_ata_cast = "deny"
 ```
 
-Pina no longer needs lexical checks for these conditions because the loaders enforce them at runtime. `require_consistent_token_program` and `require_explicit_token_2022_extension_policy` remain active.
+Pina no longer needs lexical checks for these conditions because the loader boundary enforces them at runtime. `require_consistent_token_program` and `require_explicit_token_2022_extension_policy` remain active.
 
 ## Check ATA assumptions
 
-`as_associated_token_account()` now rejects a token account when its stored wallet or mint differs from the values used to derive the ATA address. This catches an ATA whose token authority was reassigned, as well as malformed or spoofed account data. If a program intentionally accepts a token account with a different current authority, load it with `as_token_account_for_program()` and validate the program-specific relationship explicitly.
+`as_associated_token_account()` is a canonical ATA loader. It rejects the address before parsing when it is not the ATA derived from `wallet`, `mint`, and `token_program`. It then rejects a token account when its stored current authority or mint differs from those inputs. A token account whose authority was reassigned remains at its original associated address, but it is no longer canonical for the original wallet under this loader. If a program intentionally accepts that state, load it with `as_token_account_for_program()` and validate the program-specific relationship explicitly.
+
+The loader does not require the account to be initialized or unfrozen, and it does not restrict delegates, close authority, or Token-2022 extensions. Apply those protocol-specific checks after loading. For Token-2022, use `assert_extensions_allowed()` or `assert_no_extensions()` where the protocol has an extension policy.
+
+## Check error-code expectations
+
+The checked upstream parsers preserve their own precise errors. In particular, the legacy and Token-2022 token-account parsers currently report a wrong owner as `InvalidAccountData`, while their mint parsers and Token-2022 extension-aware wrapper report `InvalidAccountOwner`. Code should normally propagate these errors rather than branching on them. Tests that asserted an exact error from a removed `*_checked` wrapper may need to be updated.

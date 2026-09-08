@@ -827,7 +827,7 @@ fn token_loaders_reject_spoofed_program_owners() {
 	));
 	assert!(matches!(
 		account_views[1].as_token_account(),
-		Err(ProgramError::InvalidAccountOwner)
+		Err(ProgramError::InvalidAccountData)
 	));
 	assert!(matches!(
 		account_views[2].as_token_2022_mint(),
@@ -836,6 +836,39 @@ fn token_loaders_reject_spoofed_program_owners() {
 	assert!(matches!(
 		account_views[3].as_token_2022_account(),
 		Err(ProgramError::InvalidAccountOwner)
+	));
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn upstream_account_view_token_parsers_reject_spoofed_owners() {
+	let mint = fake_address(42);
+	let wallet = fake_address(43);
+	let mint_data = build_token_mint_bytes(6, 1_000);
+	let account_data = build_token_account_bytes(&mint, &wallet, 55);
+	let unique_accounts = [
+		AccountBuilder::new()
+			.address(fake_address(44))
+			.owner(system::ID)
+			.lamports(1)
+			.data(&mint_data),
+		AccountBuilder::new()
+			.address(fake_address(45))
+			.owner(system::ID)
+			.lamports(1)
+			.data(&account_data),
+	];
+
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+
+	assert!(matches!(
+		token::state::Mint::from_account_view(&account_views[0]),
+		Err(ProgramError::InvalidAccountOwner)
+	));
+	assert!(matches!(
+		token::state::TokenAccount::from_account_view(&account_views[1]),
+		Err(ProgramError::InvalidAccountData)
 	));
 }
 
@@ -875,7 +908,7 @@ fn associated_token_loader_rejects_spoofed_program_owner() {
 	let account_views = initialized_account_views(&mut accounts, count);
 	let result = account_views[0].as_associated_token_account(&wallet, &mint, &token::ID);
 
-	assert!(matches!(result, Err(ProgramError::InvalidAccountOwner)));
+	assert!(matches!(result, Err(ProgramError::InvalidAccountData)));
 }
 
 #[cfg(feature = "token")]

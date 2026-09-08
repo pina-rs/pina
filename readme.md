@@ -619,7 +619,7 @@ let selected = account.as_token_account_for_program(token_program)?;
 let ata = vault.as_associated_token_account(wallet, mint, token_program)?;
 ```
 
-The unqualified loaders require their canonical program owner. The `*_for_program()` loaders accept only SPL Token or Token-2022 and require the account owner to match. `as_associated_token_account()` also verifies the derived address and the wallet and mint stored in account data.
+The unqualified loaders delegate owner and layout validation to their canonical program's checked upstream parser. The `*_for_program()` loaders accept only SPL Token or Token-2022 and select the corresponding checked parser. `as_associated_token_account()` also verifies the derived address and the current authority and mint stored in account data; initialization, frozen state, delegates, close authority, and Token-2022 extension policy remain explicit caller checks.
 
 ### Typed account assertion
 
@@ -1010,8 +1010,8 @@ Pina provides strong built-in protections against common Solana vulnerabilities 
 <!-- {=pinaSecurityBestPractices} -->
 
 - **Always call `assert_signer()`** before trusting authority accounts
-- **Use Pina's token loaders directly** because they validate canonical token-program ownership before returning typed state
-- **Use `as_associated_token_account()`** when reading an ATA because it validates the runtime owner, derived address, stored wallet, and stored mint together
+- **Use Pina's token loaders directly** because they delegate canonical owner and layout validation to the corresponding checked upstream parser before returning typed state
+- **Use `as_associated_token_account()`** when reading a canonical ATA because it validates the runtime owner, derived address, stored current authority, and stored mint together; enforce state, delegate, close-authority, and extension policy separately
 - **Always call `assert_empty()`** before account initialization to prevent reinitialization attacks
 - **Use `invoke_with` or `invoke_signed_with`** when fixed-account creation must establish nonzero values before final PinaPod validation
 - **Use generated `load_pda` or `load_pda_mut`** when a fixed stored-bump PDA handler needs a typed guard, so recursive content and the PDA address are validated once
