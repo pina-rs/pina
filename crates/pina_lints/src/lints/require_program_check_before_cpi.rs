@@ -23,9 +23,10 @@ crate::declare_late_lint! {
 	/// `.invoke_signed_with_unverified_program()` is called with a dynamic
 	/// program address that has not passed
 	/// `assert_address()`, `assert_addresses()`, or `assert_program()` on the
-	/// same account within the same function. The resolved Pina assertion must
-	/// succeed on every continuing path without a success-side callback. The
-	/// lint also rejects taking either unverified CPI method as a function value.
+	/// same account within the same function against a compile-time program ID.
+	/// The resolved Pina assertion must succeed on every continuing path without
+	/// a success-side callback. The lint also rejects taking either unverified CPI
+	/// method as a function value.
 	///
 	/// ### Why is this bad?
 	///
@@ -35,7 +36,8 @@ crate::declare_late_lint! {
 	/// one branch does not establish a proof. Success-side adapters such as
 	/// `map()`, `and_then()`, and `inspect()` do not establish a proof because
 	/// their callbacks can replace the validated binding before execution
-	/// continues.
+	/// continues. An instruction argument is not a trusted expected ID: comparing
+	/// two attacker-controlled values proves consistency, not authenticity.
 	/// Static `.invoke()` and `.invoke_signed()` builders encode their target in
 	/// the builder and do not accept a replaceable program argument. Restricting
 	/// unverified calls to direct method or UFCS syntax keeps the target proof
@@ -108,6 +110,7 @@ impl DynamicCpiMethod {
 #[derive(Clone, Debug, Default)]
 struct ValidationState {
 	places: HashSet<Place>,
+	trusted_ids: HashSet<Place>,
 }
 
 impl ValidationState {
@@ -117,6 +120,14 @@ impl ValidationState {
 
 	fn insert(&mut self, place: Place) {
 		self.places.insert(place);
+	}
+
+	fn contains_trusted_id(&self, place: &Place) -> bool {
+		self.trusted_ids.contains(place)
+	}
+
+	fn insert_trusted_id(&mut self, place: Place) {
+		self.trusted_ids.insert(place);
 	}
 
 	fn new() -> Self {
@@ -194,6 +205,11 @@ fn intersect_states(states: &[ValidationState]) -> ValidationState {
 	intersection
 		.places
 		.retain(|place| states[1..].iter().all(|state| state.contains(place)));
+	intersection.trusted_ids.retain(|place| {
+		states[1..]
+			.iter()
+			.all(|state| state.contains_trusted_id(place))
+	});
 	intersection
 }
 
@@ -245,6 +261,40 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		state
 			.places
 			.retain(|place| !place.is_same_or_descendant_of(assigned));
+		state
+			.trusted_ids
+			.retain(|place| !place.is_same_or_descendant_of(assigned));
+	}
+
+	fn is_trusted_program_id(&self, expression: &Expr<'_>, state: &ValidationState) -> bool {
+		if is_static_address(expression)
+			|| self
+				.place_identity(expression)
+				.is_some_and(|place| state.contains_trusted_id(&place))
+		{
+			return true;
+		}
+
+		match &expression.kind {
+			ExprKind::Array(expressions) => {
+				expressions
+					.iter()
+					.all(|expression| self.is_trusted_program_id(expression, state))
+			}
+			ExprKind::Repeat(inner, _) => self.is_trusted_program_id(inner, state),
+			ExprKind::Unary(_, inner)
+			| ExprKind::Use(inner, _)
+			| ExprKind::Type(inner, _)
+			| ExprKind::DropTemps(inner)
+			| ExprKind::AddrOf(_, _, inner) => self.is_trusted_program_id(inner, state),
+			_ => false,
+		}
+	}
+
+	fn assertion_uses_trusted_id(&self, arguments: &[Expr<'_>], state: &ValidationState) -> bool {
+		arguments
+			.first()
+			.is_some_and(|expected| self.is_trusted_program_id(expected, state))
 	}
 
 	fn lint_unchecked_cpi(&self, expr: &Expr<'_>, method: &str) {
@@ -260,8 +310,8 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			));
 			diag.help(format!(
 				"use the verified `{verified_method}` variant, or call \
-				 `program_account.assert_program(&expected_id)?` before the unverified CPI \
-				 invocation"
+				 `program_account.assert_program(&trusted_program_id)?` before the unverified CPI \
+				 invocation; the expected ID must come from a const or immutable static"
 			));
 		});
 	}
@@ -295,18 +345,18 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					if let Some(init) = local.init {
 						self.visit_expr(init, state);
 
-						// Preserve a proven program identity when an immutable local is
-						// derived from the checked account (for example,
-						// `let token_program = *account.address()`). The new HIR binding
-						// remains independent, so a later assignment invalidates it
-						// without affecting the source account's validation.
+						// Preserve authenticated account aliases separately from aliases
+						// whose values originate at compile time. Conflating the two would
+						// let an authenticated account become trusted expected-ID provenance.
 						if let rustc_hir::PatKind::Binding(_, binding, _, None) = local.pat.kind {
+							let source = self.place_identity(init);
 							let inherits_identity = is_static_address(init)
-								|| self
-									.place_identity(init)
-									.is_some_and(|source| state.contains(&source));
+								|| source.as_ref().is_some_and(|source| state.contains(source));
 							if inherits_identity {
 								state.insert(Place::Local(binding));
+							}
+							if self.is_trusted_program_id(init, state) {
+								state.insert_trusted_id(Place::Local(binding));
 							}
 						}
 					}
@@ -339,6 +389,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				if PROGRAM_CHECK_METHODS.contains(&method) {
 					if shared::is_pina_method(self.cx, expr, PROGRAM_CHECK_METHODS)
 						&& shared::result_success_is_required(self.cx, expr)
+						&& self.assertion_uses_trusted_id(args, state)
 						&& let Some(place) = self.place_identity(receiver)
 					{
 						state.insert(place);
@@ -441,6 +492,16 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				let entry = state.clone();
 				let mut body_state = entry.clone();
 				self.visit_block(block, &mut body_state);
+				*state = intersect_states(&[entry, body_state]);
+			}
+			ExprKind::Closure(closure) => {
+				// A closure can run after this point and replace a captured binding.
+				// Keep only proofs that survive both the no-call and called paths;
+				// proofs established inside the closure cannot escape either.
+				let entry = state.clone();
+				let mut body_state = entry.clone();
+				let body = self.cx.tcx.hir_body(closure.body);
+				self.visit_expr(body.value, &mut body_state);
 				*state = intersect_states(&[entry, body_state]);
 			}
 			ExprKind::Binary(operation, lhs, rhs) => {

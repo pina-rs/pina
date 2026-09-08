@@ -340,9 +340,12 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		// Security: matching source spelling would let a local method or ID
 		// constant forge a sysvar proof.
 		let receiver_name = shared::receiver_name(receiver)?;
-		let expected = receiver_sysvar_name(&receiver_name)?;
 		let asserted = canonical_sysvar_name(self.cx, arguments.first()?)?;
-		(expected == asserted)
+		let matches_receiver = receiver_sysvar_name(&receiver_name).map_or_else(
+			|| is_sysvar_receiver(&receiver_name),
+			|expected| expected == asserted,
+		);
+		matches_receiver
 			.then(|| self.place_identity(receiver))
 			.flatten()
 	}
@@ -510,6 +513,16 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				let entry = state.clone();
 				let mut body_state = entry.clone();
 				self.visit_block(block, &mut body_state);
+				*state = intersect_states(&[entry, body_state]);
+			}
+			ExprKind::Closure(closure) => {
+				// A closure can run after this point and replace a captured binding.
+				// Keep only proofs that survive both the no-call and called paths;
+				// proofs established inside the closure cannot escape either.
+				let entry = state.clone();
+				let mut body_state = entry.clone();
+				let body = self.cx.tcx.hir_body(closure.body);
+				self.visit_expr(body.value, &mut body_state);
 				*state = intersect_states(&[entry, body_state]);
 			}
 			ExprKind::Binary(operation, left, right) => {
