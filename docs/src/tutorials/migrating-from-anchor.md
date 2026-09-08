@@ -83,16 +83,16 @@ Key differences:
 
 Anchor expresses constraints as attributes on account fields. Pina uses explicit method calls on `AccountView` references.
 
-| Anchor attribute                  | Pina equivalent                                                                          |
-| --------------------------------- | ---------------------------------------------------------------------------------------- |
-| `Signer<'info>`                   | `account.assert_signer()?`                                                               |
-| `#[account(mut)]`                 | `account.assert_writable()?`                                                             |
-| `#[account(owner = program)]`     | `account.assert_owner(&program_id)?`                                                     |
-| `#[account(address = KEY)]`       | `account.assert_address(&KEY)?`                                                          |
-| `#[account(seeds = [...], bump)]` | `account.assert_seeds_with_bump(seeds, &ID)?`                                            |
-| `#[account(init, ...)]`           | `account.assert_empty()?` then `CreateProgramAccountWithBump { ... }.invoke::<MyData>()` |
-| `#[account(constraint = expr)]`   | Write the check directly in `process` and return an error                                |
-| `Account<'info, T>`               | `account.as_account::<T>(&owner)?` or `account.as_account_mut::<T>(&owner)?`             |
+| Anchor attribute                  | Pina equivalent                                                                            |
+| --------------------------------- | ------------------------------------------------------------------------------------------ |
+| `Signer<'info>`                   | `account.assert_signer()?`                                                                 |
+| `#[account(mut)]`                 | `account.assert_writable()?`                                                               |
+| `#[account(owner = program)]`     | `account.assert_owner(&program_id)?`                                                       |
+| `#[account(address = KEY)]`       | `account.assert_address(&KEY)?`                                                            |
+| `#[account(seeds = [...], bump)]` | `account.assert_seeds_with_bump(seeds, &ID)?`                                              |
+| `#[account(init, ...)]`           | `account.assert_empty()?` then canonical `CreateProgramAccount { ... }.invoke::<MyData>()` |
+| `#[account(constraint = expr)]`   | Write the check directly in `process` and return an error                                  |
+| `Account<'info, T>`               | `account.as_account::<T>(&owner)?` or `account.as_account_mut::<T>(&owner)?`               |
 
 Pina's assertion methods return the same reference type they receive, so shared chains stay shared and mutable chains stay mutable. Typed loaders perform their own validation; do not precede them with `assert_type`:
 

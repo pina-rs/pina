@@ -141,7 +141,7 @@ The generated patch owns the update plan, so callers do not coordinate `set_*`, 
 
 See `examples/compact_accounts` for a complete lifecycle with unit and Surfpool coverage.
 
-`CreateCompactProgramAccount` and `CreateCompactProgramAccountWithBump` require a generated `patch` field. Pass the account's generated patch, such as `JournalPatch::new()`, for an all-zero, empty-tail default, or set the initial header and tail values in that patch.
+`CreateCompactProgramAccount::invoke` accepts a generated patch such as `JournalPatch::new()`. Use `invoke_with_bump` to construct the patch from the derived canonical bump. `CreateCompactProgramAccountWithBump` retains a `patch` field and rejects a supplied bump that is not canonical.
 
 ## Token account loaders
 

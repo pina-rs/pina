@@ -29,6 +29,7 @@
 - [Migrate lamport mutation calls](./migrations/lamport-mutation-ownership.md)
 - [Migrate to safe token loaders](./migrations/safe-token-loaders.md)
 - [Migrate to hardened security lints](./migrations/lint-reliability.md)
+- [Migrate to canonical PDA builders](./migrations/canonical-pda-builders.md)
 - [Architecture Decisions](./adrs/index.md)
   - [ADR 0001: Keep discriminator-first typed layouts](./adrs/0001-discriminator-first-layout.md)
   - [ADR 0002: Keep zero-copy behind explicit validation](./adrs/0002-zero-copy-account-model.md)
