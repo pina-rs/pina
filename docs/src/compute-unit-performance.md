@@ -1,11 +1,15 @@
 # Compute-unit performance
 
-Pina tracks two complementary SBF performance signals on every pull request:
+Pina tracks four performance signals on every pull request:
 
-- An exact Mollusk harness executes representative instructions against copied base and head ELF files. Every case runs twice and must return the same compute-unit count.
-- `pina profile` records static whole-program estimates, binary size, text size, and syscall counts for a broader example set.
+- The ignored Surfpool suite records compute units for every exercised instruction against copied base and head ELFs.
+- `pina profile` records static whole-program estimates, binary size, text size, and syscall counts for every top-level example program.
+- Hyperfine compares representative base and head CLI commands.
+- The existing host benchmark suite compares medians for performance-sensitive core operations.
 
 The comparison uses `base - head`. A positive score is an improvement because the head consumes fewer compute units. A negative score is a regression.
+
+The jobs run in parallel and update one sticky pull-request comment. CLI and host timings are advisory because hosted-runner timing is noisy. Instruction-CU regressions enforce the configured policy.
 
 ## PinaPod v0.2 migration results
 
@@ -26,7 +30,7 @@ The following exact results compare Pina v0.14.0 (`eeaeb1ec`) with the PinaPod v
 
 Seven of ten instruction cases improve. Compact realloc operations improve by 19.4% to 23.4% after removing duplicate account and PDA validation. The generated `load_pda_mut` helper makes the counter mutation 10.3% faster and prevents recursively validating a fixed representation several times at one boundary.
 
-Three reviewed increases remain. Compact initialization adds 24 CU, fixed profile tag insertion adds 4 CU, and fixed profile creation adds 168 CU. Profile creation deliberately validates the completed `String`, `Vec`, and `Option` representation after its initializer runs. That final check prevents a closure from committing malformed state. `scripts/compute-unit-policy.json` records these three head totals as absolute ceilings; it does not convert their negative scores into improvements.
+Three reviewed increases remained in that historical comparison. Compact initialization added 24 CU, fixed profile tag insertion added 4 CU, and fixed profile creation added 168 CU. Profile creation deliberately validated the completed `String`, `Vec`, and `Option` representation after its initializer ran. That final check prevented a closure from committing malformed state.
 
 ## Static SBF profile results
 
@@ -44,15 +48,15 @@ The broader static profile agrees with the instruction-level measurements. Unaff
 | `counter_program`                    | 4,079   | 3,056   | +1,023             | +25.1% |
 | `profile_program`                    | 4,930   | 3,588   | +1,342             | +27.2% |
 
-The four changed binaries also shrink: `account_realloc_program` by 2,872 bytes, `compact_accounts_program` by 3,560 bytes, `counter_program` by 8,584 bytes, and `profile_program` by 11,464 bytes. Static estimates are useful for broad regression detection, but the exact Mollusk cases above remain the authoritative instruction-level signal.
+The four changed binaries also shrink: `account_realloc_program` by 2,872 bytes, `compact_accounts_program` by 3,560 bytes, `counter_program` by 8,584 bytes, and `profile_program` by 11,464 bytes. These are historical migration results; the pull-request report now measures all examples automatically.
 
 ## Pull request policy
 
-Exact runtime cases fail on every unapproved increase. A reviewed redesign can add an absolute ceiling to `runtimeApprovedTotals`. The allowance applies only when the base is below that ceiling and the head does not exceed it, so a later increase fails again.
+Instruction cases fail on every unapproved increase. A reviewed redesign can add an absolute ceiling to `runtimeApprovedTotals`. The allowance applies only when the base is below that ceiling and the head does not exceed it, so a later increase fails again.
 
-Static profiles warn when both the absolute and percentage warning thresholds are reached, and fail when both failure thresholds are reached. Smaller static increases stay visible as regressions. The tracked program and instruction inventories are closed: a missing head result or an unexpected runtime case fails the comparison.
+Static profiles warn when both the absolute and percentage warning thresholds are reached, and fail when both failure thresholds are reached. Smaller static increases stay visible as regressions. Programs and instructions are discovered from the head checkout. Head-only items create baselines; missing head measurements fail.
 
-The workflow uploads the reports, manifests, copied ELF files, and SHA-256 hashes as a CI artifact. This provenance prevents a successful report from silently describing a stale or different binary.
+The workflow uploads the reports, manifests, copied ELF files, and SHA-256 hashes as CI artifacts. This provenance prevents a successful report from silently describing a stale or different binary.
 
 ## Run the comparison locally
 
@@ -62,7 +66,7 @@ Run the complete base-versus-head comparison from the repository root:
 devenv shell -- report:cu:compare:main
 ```
 
-Run only the current static profile set:
+Run only the current all-example static profile set:
 
 ```sh
 devenv shell -- profile:cu:tracked

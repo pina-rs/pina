@@ -97,6 +97,28 @@ fn gated_instructions_report_invalid_instructions_without_the_feature() {
 			.expect_err("forwarded CPI is feature-gated off");
 		assert_eq!(error.operation(), "execute program instruction");
 
+		let (_, authority_bump) = Pubkey::find_program_address(
+			&[program_under_test::SEED_CPI_AUTHORITY_PREFIX],
+			&program_id,
+		);
+		let mut data = vec![
+			PinaBpfInstruction::ForwardRotateWithPda as u8,
+			authority_bump,
+		];
+		data.extend_from_slice(Pubkey::default().as_ref());
+		let instruction = program.instruction(
+			&data,
+			vec![
+				AccountMeta::new(foreign_oracle, false),
+				AccountMeta::new_readonly(program.payer(), false),
+				AccountMeta::new_readonly(Pubkey::default(), false),
+			],
+		);
+		let error = program
+			.send_instruction(instruction)
+			.expect_err("PDA-forwarded CPI is feature-gated off");
+		assert_eq!(error.operation(), "execute program instruction");
+
 		program.stop().expect("stop isolated program test");
 	});
 }

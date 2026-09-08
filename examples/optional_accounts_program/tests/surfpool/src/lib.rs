@@ -216,6 +216,17 @@ fn inspect_enforces_the_witness_signer_when_provided() {
 		assert_eq!(error.operation(), "execute program instruction");
 		eprintln!("unsigned witness error: {}", error.message());
 
+		let note = program.instruction(
+			&[OptionalInstruction::Note as u8],
+			vec![
+				AccountMeta::new_readonly(authority, true),
+				AccountMeta::new_readonly(program_id, false),
+			],
+		);
+		program
+			.send_instruction(note)
+			.expect("Note with its optional account omitted");
+
 		program.stop().expect("stop isolated program test");
 	});
 }

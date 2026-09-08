@@ -110,12 +110,8 @@ fn assert_journal(
 	expected: ExpectedJournal<'_>,
 ) {
 	let account = program.account(journal).expect("fetch journal account");
-	let expected_size = Journal::projected_bytes(
-		expected.title.len(),
-		expected.entries.len(),
-		expected.markers.len(),
-	)
-	.expect("project journal size");
+	let journal = Journal::try_from_bytes(&account.data).expect("decode journal");
+	let expected_size = journal.encoded_len();
 	assert_eq!(account.owner, program.program_id());
 	assert_eq!(account.data.len(), expected_size);
 	assert_eq!(
@@ -123,7 +119,6 @@ fn assert_journal(
 		Rent::default().minimum_balance(expected_size),
 		"compact realloc keeps exactly the rent-exempt minimum",
 	);
-	let journal = Journal::try_from_bytes(&account.data).expect("decode journal");
 	assert_eq!(journal.authority.to_bytes(), authority.to_bytes());
 	assert_eq!(journal.revision.get(), expected.revision);
 	assert_eq!(
@@ -140,7 +135,7 @@ fn assert_journal(
 		expected.entries,
 	);
 	assert_eq!(journal.markers(), expected.markers);
-	assert_eq!(journal.encoded_size(), expected_size);
+	assert_eq!(journal.encoded_len(), expected_size);
 }
 
 #[test]

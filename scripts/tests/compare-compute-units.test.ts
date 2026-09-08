@@ -89,6 +89,14 @@ test("static reports use the same performance-score direction", () => {
 		total_syscalls: 1,
 	});
 	writeFileSync(join(root, "policy.json"), JSON.stringify(staticPolicy));
+	const manifest = {
+		results: {
+			faster: { status: "ok" },
+			slower: { status: "ok" },
+		},
+	};
+	writeFileSync(join(base, "manifest.json"), JSON.stringify(manifest));
+	writeFileSync(join(head, "manifest.json"), JSON.stringify(manifest));
 	writeFileSync(join(base, "faster.json"), JSON.stringify(profile(1_000)));
 	writeFileSync(join(head, "faster.json"), JSON.stringify(profile(900)));
 	writeFileSync(join(base, "slower.json"), JSON.stringify(profile(1_000)));
@@ -119,4 +127,47 @@ test("static reports use the same performance-score direction", () => {
 		],
 	);
 	assert.equal(performancePercent(1_000, 900), 10);
+});
+
+test("a new program reports its current compute units and build size", () => {
+	const root = mkdtempSync(join(tmpdir(), "pina-cu-baseline-"));
+	const base = join(root, "base");
+	const head = join(root, "head");
+	mkdirSync(base);
+	mkdirSync(head);
+	writeFileSync(
+		join(root, "policy.json"),
+		JSON.stringify({
+			warn: { deltaCu: 250, deltaPercent: 5 },
+			fail: { deltaCu: 500, deltaPercent: 10 },
+		}),
+	);
+	writeFileSync(join(base, "manifest.json"), JSON.stringify({ results: {} }));
+	writeFileSync(
+		join(head, "manifest.json"),
+		JSON.stringify({
+			results: { new_example: { status: "ok" } },
+		}),
+	);
+	writeFileSync(
+		join(head, "new_example.json"),
+		JSON.stringify({
+			total_cu: 1_234,
+			binary_size: 56_789,
+			text_size: 5,
+			total_syscalls: 1,
+		}),
+	);
+
+	const status = run({
+		policyFile: join(root, "policy.json"),
+		baseDir: base,
+		headDir: head,
+		markdownOutput: join(root, "comparison.md"),
+		jsonOutput: join(root, "comparison.json"),
+	});
+	assert.equal(status, 0);
+	const markdown = readFileSync(join(root, "comparison.md"), "utf8");
+	assert.match(markdown, /new_example/u);
+	assert.match(markdown, /56,789 B/u);
 });

@@ -2,46 +2,76 @@
 
 import { spawnSync } from "node:child_process";
 import {
+	copyFileSync,
 	existsSync,
 	lstatSync,
 	mkdirSync,
-	readFileSync,
 	readlinkSync,
 	realpathSync,
-	renameSync,
 	rmSync,
 	unlinkSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { findExecutable } from "./find-executable.ts";
 
 const TOOLS_VERSION = "v1.54";
-const PROGRAMS = [
-	"account_realloc_program",
-	"counter_program",
-	"profile_program",
-] as const;
-
-// Baseline ELF builds may run against an older revision where a tracked
-// example was renamed. The alias map records the historical package name so
-// the base workspace can still be built; artifacts are always emitted under
-// the canonical (head) program name.
-const BASELINE_ALIASES: Record<string, string> = (() => {
-	const policyPath = join(
-		dirname(fileURLToPath(import.meta.url)),
-		"compute-unit-policy.json",
-	);
-	const policy = JSON.parse(readFileSync(policyPath, "utf8")) as {
-		baselineProgramAliases?: Record<string, string>;
-	};
-	return policy.baselineProgramAliases ?? {};
-})();
-
 interface CommandOptions {
 	cwd?: string;
 	env: NodeJS.ProcessEnv;
+}
+
+interface ExampleProgram {
+	manifest: string;
+	name: string;
+}
+
+interface CargoMetadata {
+	packages: Array<{
+		features: Record<string, string[]>;
+		manifest_path: string;
+		name: string;
+	}>;
+}
+
+function discoverPrograms(
+	workspace: string,
+	env: NodeJS.ProcessEnv,
+): ExampleProgram[] {
+	const result = spawnSync(
+		"cargo",
+		["metadata", "--format-version", "1", "--no-deps", "--locked"],
+		{
+			cwd: workspace,
+			env,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "inherit"],
+		},
+	);
+
+	if (result.error !== undefined) {
+		throw result.error;
+	}
+
+	if (result.status !== 0) {
+		throw new Error(`cargo metadata failed with status ${result.status ?? 1}`);
+	}
+
+	const metadata = JSON.parse(result.stdout ?? "") as CargoMetadata;
+
+	return metadata.packages
+		.filter((package_) => {
+			const parts = relative(workspace, package_.manifest_path).split(sep);
+
+			return parts.length === 3 && parts[0] === "examples" &&
+				parts[2] === "Cargo.toml" &&
+				Object.hasOwn(package_.features, "bpf-entrypoint");
+		})
+		.map((package_) => ({
+			manifest: package_.manifest_path,
+			name: package_.name,
+		}))
+		.toSorted((left, right) => left.name.localeCompare(right.name));
 }
 
 function command(
@@ -133,41 +163,27 @@ function buildProgram(
 	executable: string,
 	workspace: string,
 	output: string,
-	program: (typeof PROGRAMS)[number],
+	program: ExampleProgram,
 	env: NodeJS.ProcessEnv,
 	linux: boolean,
 ): number {
-	// Resolve the example directory for this workspace, falling back to the
-	// historical (aliased) name when the revision predates a rename.
-	const manifestDirectory = existsSync(join(workspace, "examples", program))
-		? program
-		: BASELINE_ALIASES[program] ?? program;
+	const features = ["bpf-entrypoint"];
 	const args = [
 		...(linux
 			? ["--skip-tools-install", "--tools-version", TOOLS_VERSION]
 			: []),
 		"--manifest-path",
-		join(workspace, "examples", manifestDirectory, "Cargo.toml"),
+		program.manifest,
 		"--sbf-out-dir",
 		output,
 		"--features",
-		"bpf-entrypoint",
+		features.join(","),
 		"--",
 		"--locked",
 	];
-	const status = linux
+	return linux
 		? command(executable, args, { cwd: workspace, env })
 		: command("cargo", ["build-sbf", ...args], { cwd: workspace, env });
-	if (status !== 0) {
-		return status;
-	}
-	if (manifestDirectory !== program) {
-		const built = join(output, `${manifestDirectory}.so`);
-		const canonical = join(output, `${program}.so`);
-		rmSync(canonical, { force: true });
-		renameSync(built, canonical);
-	}
-	return 0;
 }
 
 function main(): number {
@@ -192,11 +208,13 @@ function main(): number {
 		const workspace = realpathSync(values[index] ?? ".");
 		const output = resolve(values[index + 1] ?? ".");
 		mkdirSync(output, { recursive: true });
-		for (const program of PROGRAMS) {
-			const artifact = join(output, `${program}.so`);
+		for (const program of discoverPrograms(workspace, env)) {
+			const artifact = join(output, `${program.name}.so`);
+			const libraryArtifact = join(output, `lib${program.name}.so`);
 			rmSync(artifact, { force: true });
+			rmSync(libraryArtifact, { force: true });
 			process.stdout.write(
-				`Building runtime CU ELF for ${program} at ${workspace}\n`,
+				`Building runtime CU ELF for ${program.name} at ${workspace}\n`,
 			);
 			const status = buildProgram(
 				executable,
@@ -208,6 +226,9 @@ function main(): number {
 			);
 			if (status !== 0) {
 				return status;
+			}
+			if (!existsSync(artifact) && existsSync(libraryArtifact)) {
+				copyFileSync(libraryArtifact, artifact);
 			}
 			if (!existsSync(artifact)) {
 				throw new Error(`cargo-build-sbf did not produce ${artifact}`);

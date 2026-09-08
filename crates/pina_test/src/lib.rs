@@ -5,9 +5,12 @@
 //! Surfnet also requests shutdown from `Drop`, including during a panic.
 
 use std::ffi::OsString;
+use std::fs::OpenOptions;
 use std::future::Future;
+use std::io::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Mutex;
 
 pub use solana_account::Account;
 pub use solana_instruction::AccountMeta;
@@ -21,6 +24,8 @@ pub use solana_signer::Signer;
 use solana_transaction::Transaction;
 use surfpool_sdk::Surfnet;
 use surfpool_sdk::cheatcodes::builders::DeployProgram;
+
+static BENCHMARK_RECORD_LOCK: Mutex<()> = Mutex::new(());
 
 /// Run an async integration-test body on a dedicated Tokio runtime.
 ///
@@ -73,9 +78,11 @@ impl TestError {
 /// A deployed Pina program running in its own isolated Surfpool instance.
 ///
 /// `pina test` sets `PINA_SBF_ARTIFACT` before it runs the dedicated Surfpool
-/// test package. [`ProgramTest::start`] consumes that artifact path, deploys the
-/// program, and leaves tests to focus on instructions and state assertions.
+/// test package. The performance harness can instead supply a program manifest.
+/// [`ProgramTest::start`] resolves the artifact, deploys the program, and leaves
+/// tests to focus on instructions and state assertions.
 pub struct ProgramTest {
+	benchmark_program: Option<String>,
 	program_id: Pubkey,
 	surfnet: OfflineSurfnet,
 }
@@ -85,12 +92,14 @@ impl ProgramTest {
 	///
 	/// # Errors
 	///
-	/// Returns an error when `PINA_SBF_ARTIFACT` is missing, does not name a file,
-	/// or the Surfnet cannot start and deploy the program.
+	/// Returns an error when no supplied artifact names a file, or the Surfnet
+	/// cannot start and deploy the program.
 	pub async fn start(program_id: Pubkey) -> Result<Self, TestError> {
-		let artifact = artifact_from_env()?;
+		let (artifact, benchmark_program) = artifact_from_env(&program_id)?;
+		let mut test = Self::start_with_artifact(program_id, &artifact).await?;
+		test.benchmark_program = benchmark_program;
 
-		Self::start_with_artifact(program_id, &artifact).await
+		Ok(test)
 	}
 
 	/// Start an offline Surfnet and deploy an explicit SBF artifact.
@@ -114,6 +123,7 @@ impl ProgramTest {
 		surfnet.deploy_program(program_id, artifact)?;
 
 		Ok(Self {
+			benchmark_program: None,
 			program_id,
 			surfnet,
 		})
@@ -152,7 +162,11 @@ impl ProgramTest {
 	///
 	/// Returns an error when blockhash retrieval, submission, or confirmation fails.
 	pub fn send_instruction(&self, instruction: Instruction) -> Result<Signature, TestError> {
-		self.surfnet.send_instruction(instruction)
+		self.surfnet.send_program_instruction(
+			self.program_id,
+			self.benchmark_program.as_deref(),
+			instruction,
+		)
 	}
 
 	/// Submit and confirm one instruction with the payer and additional signers.
@@ -169,8 +183,12 @@ impl ProgramTest {
 		instruction: Instruction,
 		signers: &[&dyn Signer],
 	) -> Result<Signature, TestError> {
-		self.surfnet
-			.send_instruction_with_signers(instruction, signers)
+		self.surfnet.send_program_instruction_with_signers(
+			self.program_id,
+			self.benchmark_program.as_deref(),
+			instruction,
+			signers,
+		)
 	}
 
 	/// Fund an address inside the isolated Surfnet.
@@ -304,7 +322,7 @@ impl OfflineSurfnet {
 	///
 	/// Returns an error when blockhash retrieval, submission, or confirmation fails.
 	pub fn send_instruction(&self, instruction: Instruction) -> Result<Signature, TestError> {
-		self.send_instruction_with_signers(instruction, &[])
+		self.send_instruction_with_signers_inner(instruction, &[], None)
 	}
 
 	/// Sign, submit, and confirm one instruction with additional signers.
@@ -320,8 +338,45 @@ impl OfflineSurfnet {
 		instruction: Instruction,
 		signers: &[&dyn Signer],
 	) -> Result<Signature, TestError> {
+		self.send_instruction_with_signers_inner(instruction, signers, None)
+	}
+
+	fn send_program_instruction(
+		&self,
+		program_id: Pubkey,
+		benchmark_program: Option<&str>,
+		instruction: Instruction,
+	) -> Result<Signature, TestError> {
+		let record = (instruction.program_id == program_id)
+			.then_some(benchmark_program)
+			.flatten();
+
+		self.send_instruction_with_signers_inner(instruction, &[], record)
+	}
+
+	fn send_program_instruction_with_signers(
+		&self,
+		program_id: Pubkey,
+		benchmark_program: Option<&str>,
+		instruction: Instruction,
+		signers: &[&dyn Signer],
+	) -> Result<Signature, TestError> {
+		let record = (instruction.program_id == program_id)
+			.then_some(benchmark_program)
+			.flatten();
+
+		self.send_instruction_with_signers_inner(instruction, signers, record)
+	}
+
+	fn send_instruction_with_signers_inner(
+		&self,
+		instruction: Instruction,
+		signers: &[&dyn Signer],
+		record_program: Option<&str>,
+	) -> Result<Signature, TestError> {
 		let rpc = self.inner.rpc_client();
 		let payer = self.inner.payer();
+		let benchmark_discriminator = instruction.data.first().copied();
 		let mut transaction_signers: Vec<&dyn Signer> = Vec::with_capacity(signers.len() + 1);
 		transaction_signers.push(payer);
 		transaction_signers.extend_from_slice(signers);
@@ -333,6 +388,10 @@ impl OfflineSurfnet {
 		transaction
 			.try_sign(&transaction_signers, blockhash)
 			.map_err(|error| test_error("sign program transaction", error))?;
+
+		if let (Some(program), Some(discriminator)) = (record_program, benchmark_discriminator) {
+			record_compute_units(&rpc, &transaction, program, discriminator)?;
+		}
 
 		rpc.send_and_confirm_transaction(&transaction)
 			.map_err(|error| test_error("execute program instruction", error))
@@ -391,6 +450,42 @@ impl OfflineSurfnet {
 	}
 }
 
+fn record_compute_units(
+	rpc: &solana_rpc_client::rpc_client::RpcClient,
+	transaction: &Transaction,
+	program: &str,
+	discriminator: u8,
+) -> Result<(), TestError> {
+	let Some(output) = std::env::var_os("PINA_CU_RECORD_FILE") else {
+		return Ok(());
+	};
+	let simulation = rpc
+		.simulate_transaction(transaction)
+		.map_err(|error| test_error("simulate program instruction", error))?;
+	let compute_units = simulation
+		.value
+		.units_consumed
+		.ok_or_else(|| test_error("record compute units", "simulation omitted compute units"))?;
+	let record = serde_json::json!({
+		"program": program,
+		"discriminator": discriminator,
+		"computeUnits": compute_units,
+	});
+	let _guard = BENCHMARK_RECORD_LOCK
+		.lock()
+		.unwrap_or_else(std::sync::PoisonError::into_inner);
+	let mut file = OpenOptions::new()
+		.create(true)
+		.append(true)
+		.open(output)
+		.map_err(|error| test_error("open compute-unit record", error))?;
+	serde_json::to_writer(&mut file, &record)
+		.map_err(|error| test_error("write compute-unit record", error))?;
+	writeln!(file).map_err(|error| test_error("write compute-unit record", error))?;
+
+	Ok(())
+}
+
 fn test_error(operation: &'static str, error: impl std::fmt::Display) -> TestError {
 	TestError {
 		operation,
@@ -403,7 +498,31 @@ fn system_program_id() -> Pubkey {
 	Pubkey::default()
 }
 
-fn artifact_from_env() -> Result<PathBuf, TestError> {
+fn artifact_from_env(program_id: &Pubkey) -> Result<(PathBuf, Option<String>), TestError> {
+	if let Some(manifest_path) = std::env::var_os("PINA_CU_MANIFEST") {
+		let manifest = std::fs::read_to_string(manifest_path)
+			.map_err(|error| test_error("read compute-unit manifest", error))?;
+		let manifest: serde_json::Value = serde_json::from_str(&manifest)
+			.map_err(|error| test_error("parse compute-unit manifest", error))?;
+		let entry = manifest.get(program_id.to_string()).ok_or_else(|| {
+			test_error(
+				"locate SBF program artifact",
+				format_args!("benchmark manifest has no entry for {program_id}"),
+			)
+		})?;
+		let artifact = entry
+			.get("artifact")
+			.and_then(serde_json::Value::as_str)
+			.ok_or_else(|| test_error("locate SBF program artifact", "invalid artifact entry"))?;
+		let program = entry
+			.get("program")
+			.and_then(serde_json::Value::as_str)
+			.ok_or_else(|| test_error("locate SBF program artifact", "invalid program entry"))?;
+
+		return artifact_path(OsString::from(artifact))
+			.map(|path| (path, Some(program.to_owned())));
+	}
+
 	let artifact = std::env::var_os("PINA_SBF_ARTIFACT").ok_or_else(|| {
 		test_error(
 			"locate SBF program artifact",
@@ -411,7 +530,7 @@ fn artifact_from_env() -> Result<PathBuf, TestError> {
 		)
 	})?;
 
-	artifact_path(artifact)
+	artifact_path(artifact).map(|path| (path, std::env::var("PINA_CU_PROGRAM").ok()))
 }
 
 fn artifact_path(artifact: OsString) -> Result<PathBuf, TestError> {

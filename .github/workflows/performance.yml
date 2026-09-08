@@ -1,0 +1,388 @@
+name: "performance"
+permissions:
+  contents: read
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  program-profiles:
+    name: program compute units and sizes
+    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target/performance-build/programs
+      XDG_CACHE_HOME: ${{ github.workspace }}/.cache
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: create base worktree
+        run: git worktree add --detach ../pina-performance-base ${{ github.event.pull_request.base.sha }}
+        shell: bash
+
+      - name: profile base programs
+        run: |
+          node ./scripts/profile-tracked-examples.ts \
+            "${{ github.workspace }}/../pina-performance-base" \
+            "${{ github.workspace }}/target/performance/programs/base"
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: profile head programs
+        run: |
+          node ./scripts/profile-tracked-examples.ts \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}/target/performance/programs/head"
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: compare program reports
+        run: |
+          set +e
+          node ./scripts/compare-compute-units.ts \
+            --policy-file ./scripts/compute-unit-policy.json \
+            --base-dir ./target/performance/programs/base \
+            --head-dir ./target/performance/programs/head \
+            --markdown-output ./target/performance/programs/report.md \
+            --json-output ./target/performance/programs/report.json \
+            --static-only
+          status=$?
+          set -e
+
+          printf '%s\n' "$status" > ./target/performance/programs/compare.status
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: prepare program report
+        id: program-report
+        if: always()
+        run: |
+          mkdir -p ./target/performance/programs
+          if [ ! -f ./target/performance/programs/report.md ]; then
+            printf '## Program compute units and build sizes\n\n⚠️ The benchmark did not finish. See the job log.\n' \
+              > ./target/performance/programs/report.md
+          fi
+
+          status=''
+          if [ -f ./target/performance/programs/compare.status ]; then
+            status="$(tr -d '\n' < ./target/performance/programs/compare.status)"
+          fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat ./target/performance/programs/report.md >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
+
+      - name: upload program report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: performance-programs
+          path: target/performance/programs
+          if-no-files-found: error
+
+      - name: enforce program compute-unit threshold
+        if: always()
+        env:
+          COMPARE_STATUS: ${{ steps.program-report.outputs.status }}
+        run: |
+          if [ -z "$COMPARE_STATUS" ]; then
+            echo "compute-unit comparison did not finish" >&2
+            exit 1
+          fi
+
+          exit "$COMPARE_STATUS"
+        shell: bash
+
+  instruction-compute:
+    name: instruction compute units
+    timeout-minutes: 25
+    runs-on: ubuntu-24.04
+    env:
+      XDG_CACHE_HOME: ${{ github.workspace }}/.cache
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: create base worktree
+        run: git worktree add --detach ../pina-performance-base ${{ github.event.pull_request.base.sha }}
+        shell: bash
+
+      - name: build base and head runtime programs
+        run: |
+          node ./scripts/build-runtime-compute-units.ts \
+            "${{ github.workspace }}/../pina-performance-base" \
+            "${{ github.workspace }}/target/performance-build/instructions/base" \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}/target/performance-build/instructions/head"
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: measure base instructions
+        run: |
+          node ./scripts/measure-example-compute-units.ts \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}/../pina-performance-base" \
+            "${{ github.workspace }}/target/performance-build/instructions/base" \
+            "${{ github.workspace }}/target/performance/instructions/runtime-base.json" \
+            --allow-incomplete
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: measure head instructions
+        run: |
+          node ./scripts/measure-example-compute-units.ts \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}/target/performance-build/instructions/head" \
+            "${{ github.workspace }}/target/performance/instructions/runtime-head.json"
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: compare instruction reports
+        run: |
+          set +e
+          mkdir -p ./target/performance/instructions/empty-base \
+            ./target/performance/instructions/empty-head
+          node ./scripts/compare-compute-units.ts \
+            --policy-file ./scripts/compute-unit-policy.json \
+            --base-dir ./target/performance/instructions/empty-base \
+            --head-dir ./target/performance/instructions/empty-head \
+            --base-runtime ./target/performance/instructions/runtime-base.json \
+            --head-runtime ./target/performance/instructions/runtime-head.json \
+            --markdown-output ./target/performance/instructions/report.md \
+            --json-output ./target/performance/instructions/report.json \
+            --runtime-only
+          status=$?
+          set -e
+
+          printf '%s\n' "$status" > ./target/performance/instructions/compare.status
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: prepare instruction report
+        id: instruction-report
+        if: always()
+        run: |
+          mkdir -p ./target/performance/instructions
+          if [ ! -f ./target/performance/instructions/report.md ]; then
+            printf '## Instruction compute units\n\n⚠️ The benchmark did not finish. See the job log.\n' \
+              > ./target/performance/instructions/report.md
+          fi
+
+          status=''
+          if [ -f ./target/performance/instructions/compare.status ]; then
+            status="$(tr -d '\n' < ./target/performance/instructions/compare.status)"
+          fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat ./target/performance/instructions/report.md >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
+
+      - name: upload instruction report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: performance-instructions
+          path: target/performance/instructions
+          if-no-files-found: error
+
+      - name: enforce instruction compute-unit threshold
+        if: always()
+        env:
+          COMPARE_STATUS: ${{ steps.instruction-report.outputs.status }}
+        run: |
+          if [ -z "$COMPARE_STATUS" ]; then
+            echo "instruction compute-unit comparison did not finish" >&2
+            exit 1
+          fi
+
+          exit "$COMPARE_STATUS"
+        shell: bash
+
+  cli:
+    name: CLI performance
+    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: create base worktree
+        run: git worktree add --detach ../pina-performance-base ${{ github.event.pull_request.base.sha }}
+        shell: bash
+
+      - name: build base and head CLIs
+        run: |
+          mkdir -p ./target/performance-build/cli/base-bin ./target/performance-build/cli/head-bin
+          CARGO_TARGET_DIR="${{ github.workspace }}/target/performance-build/cli/target" \
+            cargo build --release --locked -p pina_cli \
+            --manifest-path "${{ github.workspace }}/../pina-performance-base/Cargo.toml"
+          cp ./target/performance-build/cli/target/release/pina \
+            ./target/performance-build/cli/base-bin/pina
+          CARGO_TARGET_DIR="${{ github.workspace }}/target/performance-build/cli/target" \
+            cargo build --release --locked -p pina_cli
+          cp ./target/performance-build/cli/target/release/pina \
+            ./target/performance-build/cli/head-bin/pina
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: benchmark CLI
+        run: |
+          node ./scripts/benchmark-cli.ts \
+            --base-bin ./target/performance-build/cli/base-bin/pina \
+            --head-bin ./target/performance-build/cli/head-bin/pina \
+            --markdown-output ./target/performance/cli/report.md \
+            --json-output ./target/performance/cli/report.json
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: prepare CLI report
+        if: always()
+        run: |
+          mkdir -p ./target/performance/cli
+          if [ ! -f ./target/performance/cli/report.md ]; then
+            printf '## CLI performance\n\n⚠️ The benchmark did not finish. See the job log.\n' \
+              > ./target/performance/cli/report.md
+          fi
+          cat ./target/performance/cli/report.md >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
+
+      - name: upload CLI report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: performance-cli
+          path: target/performance/cli
+          if-no-files-found: error
+
+  core:
+    name: core host performance
+    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: create base worktree
+        run: git worktree add --detach ../pina-performance-base ${{ github.event.pull_request.base.sha }}
+        shell: bash
+
+      - name: benchmark core code
+        run: |
+          node ./scripts/benchmark-core.ts \
+            "${{ github.workspace }}/../pina-performance-base" \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}/target/performance/core" \
+            "${{ github.workspace }}/target/performance-build/core"
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: prepare core report
+        if: always()
+        run: |
+          mkdir -p ./target/performance/core
+          if [ ! -f ./target/performance/core/core.md ]; then
+            printf '## Core host performance\n\n⚠️ The benchmark did not finish. See the job log.\n' \
+              > ./target/performance/core/core.md
+          fi
+          cat ./target/performance/core/core.md >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
+
+      - name: upload core report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: performance-core
+          path: target/performance/core
+          if-no-files-found: error
+
+  comment:
+    name: PR performance comment
+    if: always()
+    needs:
+      - instruction-compute
+      - program-profiles
+      - cli
+      - core
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: download benchmark reports
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: performance-*
+          path: target/performance/reports
+
+      - name: assemble PR comment
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          latest_tag="$(git describe --tags --abbrev=0 "$BASE_SHA" 2>/dev/null || true)"
+          base_short="${BASE_SHA:0:8}"
+          head_short="${HEAD_SHA:0:8}"
+
+          {
+            echo "# Performance report"
+            echo
+            echo "Comparing head \`$head_short\` with the pull request base \`$base_short\`."
+            if [ -n "$latest_tag" ]; then
+              latest_sha="$(git rev-list -n 1 "$latest_tag")"
+              if [ "$latest_sha" = "$BASE_SHA" ]; then
+                echo "The base is also the latest release, \`$latest_tag\`."
+              else
+                echo "Latest release: \`$latest_tag\` at \`${latest_sha:0:8}\` (shown for context; timings compare against the PR base)."
+              fi
+            fi
+            echo
+            cat ./target/performance/reports/performance-instructions/report.md
+            echo
+            cat ./target/performance/reports/performance-programs/report.md
+            echo
+            cat ./target/performance/reports/performance-cli/report.md
+            echo
+            cat ./target/performance/reports/performance-core/core.md
+            echo
+            echo "CLI and host timings are advisory; instruction-CU regressions enforce the configured policy."
+          } > ./target/performance/comment.md
+        shell: bash
+
+      - name: post performance comment
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        with:
+          header: performance-benchmarks
+          path: target/performance/comment.md

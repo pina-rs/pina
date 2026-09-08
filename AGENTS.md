@@ -18,6 +18,13 @@ Pina is a Rust workspace for building performant, `no_std` Solana programs on to
 - Pull request titles must follow Conventional Commits (e.g. `feat(loaders): preserve borrow guard lifetime`).
 - Never merge a `chore(release): prepare release` pull request. Release pull requests must remain open until Ifiok Jr. (`@ifiokjr`) explicitly decides to merge them himself.
 
+## Benchmark maintenance
+
+- Every top-level example crate with a `bpf-entrypoint` feature is part of the performance inventory. Do not maintain a second allowlist for new examples.
+- When an example gains an instruction, exercise that instruction through its ignored `tests/surfpool` suite with `pina_test::ProgramTest::send`, `send_instruction`, or `send_with_signers`. The PR benchmark records those calls automatically.
+- A program or instruction that does not exist at the PR base is a new baseline, not an error. Missing measurements for code that does exist at the head are errors.
+- Add a focused case to `crates/pina/tests/benchmarks.rs` when changing a performance-sensitive host operation. Add a command to `scripts/benchmark-cli.ts` when introducing a representative CLI hot path.
+
 ## Common commands
 
 - `devenv shell` — enter the dev environment
