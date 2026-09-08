@@ -79,6 +79,7 @@ type ValidationState = HashMap<Place, String>;
 const TRUSTED_PINA_CPI_TYPES: &[&str] = &[
 	"AllocateAccount",
 	"AllocateAccountWithBump",
+	"AllocateAccountWithNonCanonicalBump",
 	"CloseAccount",
 	"CloseAccountZeroed",
 	"CpiContext",

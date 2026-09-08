@@ -215,19 +215,9 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		let entries = initialized_entries(entry_count);
 		let markers = initialized_markers(marker_count);
 		let seeds = Journal::seeds(&authority_key);
-		let seeds_with_bump = seeds.with_bump(args.bump);
 
 		self.authority.assert_signer()?.assert_writable()?;
-		let canonical_bump = self
-			.journal
-			.assert_canonical_bump(&seeds.as_slices(), &ID)?;
-		if args.bump != canonical_bump {
-			return Err(ProgramError::InvalidSeeds);
-		}
-		self.journal
-			.assert_empty()?
-			.assert_writable()?
-			.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
+		self.journal.assert_empty()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
 
 		CreateCompactProgramAccountWithBump {

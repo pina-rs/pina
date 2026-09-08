@@ -5,7 +5,7 @@ use core::mem::size_of;
 
 use pina::Address;
 use pina::AllocateAccount;
-use pina::AllocateAccountWithBump;
+use pina::AllocateAccountWithNonCanonicalBump;
 use pina::CloseAccount;
 use pina::CloseAccountZeroed;
 use pina::CpiContext;
@@ -34,6 +34,7 @@ use pina::ToCpiAccounts;
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 use pina::UpdateResizableAccount;
 use pina::combine_seeds_with_bump;
+use pina::create_program_address;
 use pina::try_find_program_address;
 use pinocchio::AccountView;
 #[cfg(feature = "account-resize")]
@@ -218,6 +219,42 @@ fn program_account_builders_validate_the_target_before_rent_lookup() {
 }
 
 #[test]
+fn explicit_bump_creation_rejects_a_valid_noncanonical_pda() {
+	let owner = Address::new_from_array([5u8; 32]);
+	let seeds: &[&[u8]] = &[b"builder"];
+	let (_, canonical_bump) =
+		try_find_program_address(seeds, &owner).unwrap_or_else(|| panic!("expected builder PDA"));
+	let (address, bump) = (0..=u8::MAX)
+		.find_map(|bump| {
+			if bump == canonical_bump {
+				return None;
+			}
+
+			let bump_seed = [bump];
+			create_program_address(&[b"builder", &bump_seed], &owner)
+				.ok()
+				.map(|address| (address, bump))
+		})
+		.unwrap_or_else(|| panic!("expected a valid noncanonical PDA"));
+	let mut stored_target = TestAccount::<0>::new(address, false, true);
+	stored_target.header.lamports = 0;
+	let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([6u8; 32]), true, true);
+	let mut target = stored_target.view();
+	let payer = stored_payer.view();
+
+	let result = CreateProgramAccountWithBump {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+		bump,
+	}
+	.invoke::<BuilderState>();
+
+	assert_eq!(result, Err(ProgramError::InvalidSeeds));
+}
+
+#[test]
 fn close_account_builders_transfer_lamports_and_optionally_clear_data() {
 	let program_id = Address::new_from_array([9u8; 32]);
 	let mut stored_plain = TestAccount::<8>::new(Address::new_from_array([1u8; 32]), false, true);
@@ -304,17 +341,7 @@ fn realloc_builders_are_exported() {
 #[test]
 fn compact_resize_builders_are_exported() {
 	assert!(size_of::<ReallocCompactAccount<'static, 'static, 'static>>() > 0);
-	assert!(
-		size_of::<
-			CreateCompactProgramAccount<
-				'static,
-				'static,
-				'static,
-				'static,
-				CompactBuilderStatePatch<'static>,
-			>,
-		>() > 0
-	);
+	assert!(size_of::<CreateCompactProgramAccount<'static, 'static, 'static, 'static>>() > 0);
 	assert!(
 		size_of::<
 			CreateCompactProgramAccountWithBump<
@@ -352,10 +379,9 @@ fn compact_creation_rejects_invalid_sizes_before_cpi() {
 		payer: &payer,
 		owner: &owner,
 		seeds,
-		patch: CompactBuilderStatePatch::new(),
 		space: split_element,
 	}
-	.invoke::<CompactBuilderState>();
+	.invoke::<CompactBuilderState>(CompactBuilderStatePatch::new());
 	assert_eq!(canonical, Err(ProgramError::InvalidAccountData));
 
 	let explicit = CreateCompactProgramAccountWithBump {
@@ -387,10 +413,9 @@ fn canonical_compact_creation_rejects_seed_lists_that_cannot_form_a_pda() {
 		payer: &payer,
 		owner: &owner,
 		seeds: &seeds,
-		patch: CompactBuilderStatePatch::new(),
 		space: CompactBuilderState::HEADER_SIZE,
 	}
-	.invoke::<CompactBuilderState>();
+	.invoke::<CompactBuilderState>(CompactBuilderStatePatch::new());
 
 	assert_eq!(result, Err(ProgramError::InvalidSeeds));
 }
@@ -413,12 +438,50 @@ fn compact_creation_accepts_a_valid_header_before_rent_lookup() {
 		payer: &payer,
 		owner: &owner,
 		seeds,
+		space: CompactBuilderState::HEADER_SIZE,
+	}
+	.invoke::<CompactBuilderState>(CompactBuilderStatePatch::new());
+
+	assert_eq!(result, Err(ProgramError::UnsupportedSysvar));
+}
+
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+#[test]
+fn explicit_bump_compact_creation_rejects_a_valid_noncanonical_pda() {
+	let owner = Address::new_from_array([5u8; 32]);
+	let seeds: &[&[u8]] = &[b"compact"];
+	let (_, canonical_bump) =
+		try_find_program_address(seeds, &owner).unwrap_or_else(|| panic!("expected compact PDA"));
+	let (address, bump) = (0..=u8::MAX)
+		.find_map(|bump| {
+			if bump == canonical_bump {
+				return None;
+			}
+
+			let bump_seed = [bump];
+			create_program_address(&[b"compact", &bump_seed], &owner)
+				.ok()
+				.map(|address| (address, bump))
+		})
+		.unwrap_or_else(|| panic!("expected a valid noncanonical compact PDA"));
+	let mut stored_target = TestAccount::<0>::new(address, false, true);
+	stored_target.header.lamports = 0;
+	let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([6u8; 32]), true, true);
+	let mut target = stored_target.view();
+	let payer = stored_payer.view();
+
+	let result = CreateCompactProgramAccountWithBump {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+		bump,
 		patch: CompactBuilderStatePatch::new(),
 		space: CompactBuilderState::HEADER_SIZE,
 	}
 	.invoke::<CompactBuilderState>();
 
-	assert_eq!(result, Err(ProgramError::UnsupportedSysvar));
+	assert_eq!(result, Err(ProgramError::InvalidSeeds));
 }
 
 #[cfg(all(feature = "account-resize", feature = "compact"))]
@@ -512,10 +575,9 @@ fn compact_creation_rejects_readonly_target_or_payer_before_cpi() {
 			payer: &payer,
 			owner: &owner,
 			seeds,
-			patch: CompactBuilderStatePatch::new(),
 			space: CompactBuilderState::HEADER_SIZE,
 		}
-		.invoke::<CompactBuilderState>();
+		.invoke::<CompactBuilderState>(CompactBuilderStatePatch::new());
 
 		assert_eq!(result, Err(ProgramError::InvalidAccountData));
 	}
@@ -851,7 +913,7 @@ fn assert_noncanonical_allocation_rejected(lamports: u64) {
 	let target_view = target.view();
 	let payer_view = payer.view();
 
-	let result = AllocateAccountWithBump {
+	let result = AllocateAccountWithNonCanonicalBump {
 		account: &target_view,
 		payer: &payer_view,
 		space: 8,
@@ -885,7 +947,7 @@ fn allocation_accepts_canonical_target_before_rent_lookup() {
 	let target_view = target.view();
 	let payer_view = payer.view();
 
-	let result = AllocateAccountWithBump {
+	let result = AllocateAccountWithNonCanonicalBump {
 		account: &target_view,
 		payer: &payer_view,
 		space: 8,
@@ -963,7 +1025,7 @@ fn allocation_rejects_more_signers_than_the_runtime_accepts() {
 	let signer = Signer::from(&empty_seeds);
 	let signers: [Signer<'_, '_>; 16] = core::array::from_fn(|_| signer.clone());
 
-	let result = AllocateAccountWithBump {
+	let result = AllocateAccountWithNonCanonicalBump {
 		account: &target_view,
 		payer: &payer_view,
 		space: 8,

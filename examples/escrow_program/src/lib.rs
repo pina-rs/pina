@@ -121,7 +121,6 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		let args = MakeInstruction::try_from_bytes(data)?;
 		let maker_address = *self.maker.address();
 		let escrow_seeds = EscrowState::seeds(&maker_address, args.seed.get());
-		let escrow_seeds_with_bump = escrow_seeds.with_bump(args.bump);
 
 		// Validate accounts
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
@@ -146,15 +145,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			self.mint_a.address(),
 			&token_program,
 		)?);
-		let canonical_bump = self
-			.escrow
-			.assert_canonical_bump(&escrow_seeds.as_slices(), &ID)?;
-		if canonical_bump != args.bump {
-			return Err(ProgramError::InvalidSeeds);
-		}
-		self.escrow
-			.assert_empty()?
-			.assert_seeds_with_bump(&escrow_seeds_with_bump.as_slices(), &ID)?;
+		self.escrow.assert_empty()?;
 		self.vault
 			.assert_empty()?
 			.assert_writable()?
