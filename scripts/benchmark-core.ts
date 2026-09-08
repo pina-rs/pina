@@ -21,6 +21,13 @@ interface Comparison {
 	performancePercent?: number;
 }
 
+type PerformanceStatus =
+	| "improved"
+	| "new-baseline"
+	| "regressed"
+	| "removed"
+	| "within-noise";
+
 function parseArguments(values: string[]): Arguments {
 	if (values.length !== 4) {
 		throw new Error(
@@ -155,9 +162,9 @@ function compare(
 	});
 }
 
-function status(item: Comparison): string {
+function classify(item: Comparison): PerformanceStatus {
 	if (item.baseNanoseconds === undefined) {
-		return "🆕 new baseline";
+		return "new-baseline";
 	}
 
 	if (item.headNanoseconds === undefined) {
@@ -167,14 +174,28 @@ function status(item: Comparison): string {
 	const percent = item.performancePercent ?? 0;
 
 	if (percent >= 5) {
-		return "✅ improved";
+		return "improved";
 	}
 
 	if (percent <= -5) {
-		return "⚠️ regressed";
+		return "regressed";
 	}
 
-	return "➖ within noise";
+	return "within-noise";
+}
+
+function statusLabel(status: PerformanceStatus): string {
+	return {
+		improved: "🚀 improved",
+		"new-baseline": "🆕 new baseline",
+		regressed: "⚠️ regressed",
+		removed: "removed",
+		"within-noise": "➖ within noise",
+	}[status];
+}
+
+function formatCount(count: number, singular: string): string {
+	return `${count} ${singular}${count === 1 ? "" : "s"}`;
 }
 
 function formatNanoseconds(value: number | undefined): string {
@@ -195,27 +216,53 @@ function run(arguments_: Arguments): void {
 		arguments_.targetDirectory,
 	);
 	const comparisons = compare(baseMeasurements, measure(headExecutable));
+	const statuses = comparisons.map(classify);
+	const regressions = statuses.filter((item) => item === "regressed").length;
+	const improvements = statuses.filter((item) => item === "improved").length;
+	const withinNoise = statuses.filter((item) => item === "within-noise").length;
+	const newBaselines =
+		statuses.filter((item) => item === "new-baseline").length;
+	const removed = statuses.filter((item) => item === "removed").length;
+	const summary = [
+		regressions === 0
+			? "✅ No advisory regressions"
+			: `⚠️ ${formatCount(regressions, "advisory regression")}`,
+		`🚀 ${formatCount(improvements, "improvement")}`,
+		`➖ ${withinNoise} within noise`,
+		...(newBaselines > 0
+			? [`🆕 ${formatCount(newBaselines, "new baseline")}`]
+			: []),
+		...(removed > 0 ? [`🗂️ ${formatCount(removed, "removed benchmark")}`] : []),
+	].join(" · ");
 	const lines = [
 		"## Core host performance",
+		"",
+		summary,
+		"",
+		"<details>",
+		"<summary>View core benchmark details</summary>",
 		"",
 		`Median of ${SAMPLE_RUNS} runs. Positive change means the pull request is faster.`,
 		"",
 		"| Operation | Base | Head | Performance change | Status |",
 		"| --------- | ---: | ---: | -----------------: | ------ |",
-		...comparisons.map((item) => {
+		...comparisons.map((item, index) => {
 			const percent = item.performancePercent;
 			const formattedPercent = percent === undefined
 				? "n/a"
 				: `${percent >= 0 ? "+" : ""}${percent.toFixed(1)}%`;
+			const comparisonStatus = statuses[index] ?? "within-noise";
 
 			return `| \`${item.id}\` | ${
 				formatNanoseconds(item.baseNanoseconds)
 			} ns | ${
 				formatNanoseconds(item.headNanoseconds)
-			} ns | ${formattedPercent} | ${status(item)} |`;
+			} ns | ${formattedPercent} | ${statusLabel(comparisonStatus)} |`;
 		}),
 		"",
 		"Core timings are advisory. Compute-unit measurements remain the on-chain regression gate.",
+		"",
+		"</details>",
 		"",
 	];
 	writeFileSync(

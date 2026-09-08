@@ -399,6 +399,60 @@ function statusLabel(status: ComparisonStatus): string {
 	}[status];
 }
 
+interface BenchmarkSummaryCounts {
+	advisoryRegressions: number;
+	blockingRegressions: number;
+	errors: number;
+	improvements: number;
+	newBaselines: number;
+	unchanged: number;
+}
+
+function formatCount(
+	count: number,
+	singular: string,
+	plural = `${singular}s`,
+): string {
+	return `${formatInt(count)} ${count === 1 ? singular : plural}`;
+}
+
+function benchmarkSummary(
+	counts: BenchmarkSummaryCounts,
+	extra: string[] = [],
+): string {
+	const health: string[] = [];
+
+	if (counts.errors > 0) {
+		health.push(`❌ ${formatCount(counts.errors, "measurement error")}`);
+	}
+
+	if (counts.blockingRegressions > 0) {
+		health.push(
+			`❌ ${formatCount(counts.blockingRegressions, "blocking regression")}`,
+		);
+	}
+
+	if (counts.advisoryRegressions > 0) {
+		health.push(
+			`⚠️ ${formatCount(counts.advisoryRegressions, "advisory regression")}`,
+		);
+	}
+
+	if (health.length === 0) {
+		health.push("✅ No regressions or measurement errors");
+	}
+
+	return [
+		...health,
+		`🚀 ${formatCount(counts.improvements, "improvement")}`,
+		`➖ ${formatCount(counts.unchanged, "unchanged result")}`,
+		...(counts.newBaselines > 0
+			? [`🆕 ${formatCount(counts.newBaselines, "new baseline")}`]
+			: []),
+		...extra,
+	].join(" · ");
+}
+
 function compareStaticReports(
 	policy: ComputeUnitPolicy,
 	baseDir: string,
@@ -507,16 +561,85 @@ function renderMarkdown(
 	runtimeOnly: boolean,
 	staticOnly: boolean,
 ): string {
+	const runtimeBlockingRegressions = runtime.comparisons.filter(
+		(item) => item.status === "fail",
+	).length;
+	const runtimeAdvisoryRegressions = runtime.comparisons.filter(
+		(item) => item.status === "approved-regression",
+	).length;
+	const runtimeImprovements = runtime.comparisons.filter(
+		(item) => item.status === "improved",
+	).length;
+	const runtimeUnchanged = runtime.comparisons.filter(
+		(item) => item.status === "unchanged",
+	).length;
+	const runtimeSummary = benchmarkSummary({
+		advisoryRegressions: runtimeAdvisoryRegressions,
+		blockingRegressions: runtimeBlockingRegressions,
+		errors: runtime.hardErrors.length,
+		improvements: runtimeImprovements,
+		newBaselines: runtime.newBaselines.length,
+		unchanged: runtimeUnchanged,
+	});
+	const staticBlockingRegressions = staticComparisons.filter(
+		(item) => item.status === "fail",
+	).length;
+	const staticAdvisoryRegressions =
+		staticComparisons.filter((item) =>
+			["warn", "small-regression", "approved-regression"].includes(item.status)
+		).length;
+	const staticImprovements = staticComparisons.filter(
+		(item) => item.status === "improved",
+	).length;
+	const staticUnchanged = staticComparisons.filter(
+		(item) => item.status === "unchanged",
+	).length;
+	const smallerPrograms = staticComparisons.filter(
+		(item) => item.deltaBinarySize < 0,
+	).length;
+	const largerPrograms = staticComparisons.filter(
+		(item) => item.deltaBinarySize > 0,
+	).length;
+	const staticSummary = benchmarkSummary(
+		{
+			advisoryRegressions: staticAdvisoryRegressions,
+			blockingRegressions: staticBlockingRegressions,
+			errors: staticErrors.length,
+			improvements: staticImprovements,
+			newBaselines: newStaticBaselines.length,
+			unchanged: staticUnchanged,
+		},
+		[
+			`📦 ${formatCount(smallerPrograms, "smaller program")}`,
+			`📦 ${formatCount(largerPrograms, "larger program")}`,
+			...(removedPrograms.length > 0
+				? [`🗂️ ${formatCount(removedPrograms.length, "removed program")}`]
+				: []),
+		],
+	);
 	const lines = staticOnly
-		? ["## Program compute units and build sizes", ""]
+		? [
+			"## Program compute units and build sizes",
+			"",
+			staticSummary,
+			"",
+			"<details>",
+			"<summary>View program benchmark details</summary>",
+			"",
+		]
 		: [
 			runtimeOnly
 				? "## Instruction compute units"
 				: "## Compute-unit regression report",
 			"",
+			...(runtimeOnly ? [] : ["### Instruction compute units", ""]),
+			runtimeSummary,
+			"",
+			"<details>",
+			"<summary>View instruction benchmark details</summary>",
+			"",
 			"A positive performance change means the head uses fewer compute units. A negative change means it uses more.",
 			"",
-			...(runtimeOnly ? [] : ["### Instruction compute units", ""]),
 			"Every instruction exercised by the example Surfpool suites is simulated against the exact base and head ELFs. The maximum observed CU per instruction is compared, and any unapproved increase fails CI.",
 			"",
 		];
@@ -555,15 +678,24 @@ function renderMarkdown(
 		);
 	}
 	if (runtimeOnly) {
-		lines.push("");
+		lines.push("", "</details>", "");
 		return lines.join("\n");
 	}
 
 	lines.push(
-		...(staticOnly ? [] : [""]),
-		staticOnly
-			? "Static SBF estimates and ELF build sizes."
-			: "### Static SBF estimates",
+		...(staticOnly ? [] : [
+			"",
+			"</details>",
+			"",
+			"### Static SBF estimates",
+			"",
+			staticSummary,
+			"",
+			"<details>",
+			"<summary>View program benchmark details</summary>",
+			"",
+		]),
+		"Static SBF estimates and ELF build sizes.",
 		"",
 		"Policy:",
 		`- warn when \`total_cu\` increases by at least +${policy.warn.deltaCu} CU and +${
@@ -576,21 +708,6 @@ function renderMarkdown(
 		"- savings are positive; increases are negative and visibly marked as regressions",
 		"- smaller increases pass the threshold gate but are not labeled as improvements",
 		"- values come from `pina profile` static SBF estimates, not runtime validator traces",
-		"",
-		"Summary:",
-		`- compared programs: ${staticComparisons.length}`,
-		`- failures: ${
-			staticComparisons.filter((item) => item.status === "fail").length
-		}`,
-		`- warnings: ${
-			staticComparisons.filter((item) => item.status === "warn").length
-		}`,
-		`- improvements: ${
-			staticComparisons.filter((item) => item.status === "improved").length
-		}`,
-		`- new program baselines: ${newStaticBaselines.length}`,
-		`- removed programs: ${removedPrograms.length}`,
-		`- availability errors: ${staticErrors.length}`,
 		"",
 	);
 	if (staticComparisons.length > 0) {
@@ -646,6 +763,8 @@ function renderMarkdown(
 	lines.push(
 		"",
 		"Program CU and build sizes come from `pina profile`. The JSON artifact also includes instruction-runtime provenance, text-section sizes, and syscall deltas.",
+		"",
+		"</details>",
 		"",
 	);
 	return lines.join("\n");

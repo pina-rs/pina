@@ -368,6 +368,7 @@ jobs:
                 echo "Latest release: \`$latest_tag\` at \`${latest_sha:0:8}\` (shown for context; timings compare against the PR base)."
               fi
             fi
+            echo "Each section shows its result at a glance. Expand the details to inspect the full table."
             echo
             cat ./target/performance/reports/performance-instructions/report.md
             echo

@@ -127,6 +127,74 @@ test("static reports use the same performance-score direction", () => {
 		],
 	);
 	assert.equal(performancePercent(1_000, 900), 10);
+	const markdown = readFileSync(join(root, "comparison.md"), "utf8");
+	assert.match(markdown, /⚠️ 1 advisory regression/u);
+	assert.match(markdown, /🚀 1 improvement/u);
+	assert.match(markdown, /<details>/u);
+	assert.match(
+		markdown,
+		/<summary>View program benchmark details<\/summary>/u,
+	);
+	assert.ok(
+		markdown.indexOf("<details>") < markdown.indexOf("| Program |"),
+		"program table should follow the details opener",
+	);
+	assert.ok(
+		markdown.indexOf("| Program |") < markdown.lastIndexOf("</details>"),
+		"program table should precede the details closer",
+	);
+});
+
+test("runtime report keeps its summary visible and table collapsed", () => {
+	const root = mkdtempSync(join(tmpdir(), "pina-runtime-summary-"));
+	const base = join(root, "base");
+	const head = join(root, "head");
+	const baseRuntime = join(root, "runtime-base.json");
+	const headRuntime = join(root, "runtime-head.json");
+	mkdirSync(base);
+	mkdirSync(head);
+	writeFileSync(join(base, "manifest.json"), JSON.stringify({ results: {} }));
+	writeFileSync(join(head, "manifest.json"), JSON.stringify({ results: {} }));
+	writeFileSync(join(root, "policy.json"), JSON.stringify(policy));
+	writeFileSync(
+		baseRuntime,
+		JSON.stringify({
+			cases: [{ id: "example/instruction", computeUnits: 1_000 }],
+		}),
+	);
+	writeFileSync(
+		headRuntime,
+		JSON.stringify({
+			cases: [{ id: "example/instruction", computeUnits: 900 }],
+		}),
+	);
+
+	const status = run({
+		policyFile: join(root, "policy.json"),
+		baseDir: base,
+		headDir: head,
+		baseRuntime,
+		headRuntime,
+		runtimeOnly: true,
+		markdownOutput: join(root, "comparison.md"),
+		jsonOutput: join(root, "comparison.json"),
+	});
+	assert.equal(status, 0);
+	const markdown = readFileSync(join(root, "comparison.md"), "utf8");
+	assert.match(markdown, /✅ No regressions or measurement errors/u);
+	assert.match(markdown, /🚀 1 improvement/u);
+	assert.match(
+		markdown,
+		/<summary>View instruction benchmark details<\/summary>/u,
+	);
+	assert.ok(
+		markdown.indexOf("<details>") < markdown.indexOf("| Instruction case |"),
+		"instruction table should follow the details opener",
+	);
+	assert.ok(
+		markdown.indexOf("| Instruction case |") < markdown.indexOf("</details>"),
+		"instruction table should precede the details closer",
+	);
 });
 
 test("a new program reports its current compute units and build size", () => {

@@ -9,7 +9,7 @@ Pina tracks four performance signals on every pull request:
 
 The comparison uses `base - head`. A positive score is an improvement because the head consumes fewer compute units. A negative score is a regression.
 
-The jobs run in parallel and update one sticky pull-request comment. CLI and host timings are advisory because hosted-runner timing is noisy. Instruction-CU regressions enforce the configured policy.
+The jobs run in parallel and update one sticky pull-request comment. Each section keeps its emoji summary visible and collapses the full table in a details block. CLI and host timings are advisory because hosted-runner timing is noisy. Instruction-CU regressions enforce the configured policy.
 
 ## PinaPod v0.2 migration results
 

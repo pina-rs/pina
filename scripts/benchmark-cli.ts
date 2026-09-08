@@ -32,6 +32,8 @@ interface Arguments {
 	jsonOutput: string;
 }
 
+type PerformanceStatus = "improved" | "regressed" | "within-noise";
+
 function requireValue(values: string[], index: number, option: string): string {
 	const value = values[index + 1];
 
@@ -98,16 +100,28 @@ function performancePercent(baseSeconds: number, headSeconds: number): number {
 	return ((baseSeconds - headSeconds) / baseSeconds) * 100;
 }
 
-function status(percent: number): string {
+function classify(percent: number): PerformanceStatus {
 	if (percent >= 3) {
-		return "✅ improved";
+		return "improved";
 	}
 
 	if (percent <= -3) {
-		return "⚠️ regressed";
+		return "regressed";
 	}
 
-	return "➖ within noise";
+	return "within-noise";
+}
+
+function statusLabel(status: PerformanceStatus): string {
+	return {
+		improved: "🚀 improved",
+		regressed: "⚠️ regressed",
+		"within-noise": "➖ within noise",
+	}[status];
+}
+
+function formatCount(count: number, singular: string): string {
+	return `${count} ${singular}${count === 1 ? "" : "s"}`;
 }
 
 function run(arguments_: Arguments): void {
@@ -158,14 +172,8 @@ function run(arguments_: Arguments): void {
 		readFileSync(arguments_.jsonOutput, "utf8"),
 	) as HyperfineReport;
 	const results = new Map(report.results.map((item) => [item.command, item]));
-	const lines = [
-		"## CLI performance",
-		"",
-		`Measured with hyperfine --shell=none --warmup ${WARMUP_RUNS} --runs ${BENCHMARK_RUNS}. Positive change means the pull request is faster.`,
-		"",
-		"| Command | Base | Head | Performance change | Status |",
-		"| ------- | ---: | ---: | -----------------: | ------ |",
-	];
+	const rows: string[] = [];
+	const statuses: PerformanceStatus[] = [];
 
 	for (const command of COMMANDS) {
 		const base = results.get(`base/${command.id}`);
@@ -176,20 +184,46 @@ function run(arguments_: Arguments): void {
 		}
 
 		const percent = performancePercent(base.mean, head.mean);
-		lines.push(
+		const comparisonStatus = classify(percent);
+		statuses.push(comparisonStatus);
+		rows.push(
 			`| \`pina ${command.args.join(" ")}\` | ${
 				(base.mean * 1_000).toFixed(2)
 			} ms | ${(head.mean * 1_000).toFixed(2)} ms | ${percent >= 0 ? "+" : ""}${
 				percent.toFixed(1)
-			}% | ${status(percent)} |`,
+			}% | ${statusLabel(comparisonStatus)} |`,
 		);
 	}
 
-	lines.push(
+	const regressions = statuses.filter((item) => item === "regressed").length;
+	const improvements = statuses.filter((item) => item === "improved").length;
+	const withinNoise = statuses.filter((item) => item === "within-noise").length;
+	const summary = [
+		regressions === 0
+			? "✅ No advisory regressions"
+			: `⚠️ ${formatCount(regressions, "advisory regression")}`,
+		`🚀 ${formatCount(improvements, "improvement")}`,
+		`➖ ${withinNoise} within noise`,
+	].join(" · ");
+	const lines = [
+		"## CLI performance",
+		"",
+		summary,
+		"",
+		"<details>",
+		"<summary>View CLI benchmark details</summary>",
+		"",
+		`Measured with hyperfine --shell=none --warmup ${WARMUP_RUNS} --runs ${BENCHMARK_RUNS}. Positive change means the pull request is faster.`,
+		"",
+		"| Command | Base | Head | Performance change | Status |",
+		"| ------- | ---: | ---: | -----------------: | ------ |",
+		...rows,
 		"",
 		"CLI timing changes are advisory because hosted-runner timing is noisy.",
 		"",
-	);
+		"</details>",
+		"",
+	];
 	mkdirSync(dirname(arguments_.markdownOutput), { recursive: true });
 	writeFileSync(arguments_.markdownOutput, lines.join("\n"), "utf8");
 }
