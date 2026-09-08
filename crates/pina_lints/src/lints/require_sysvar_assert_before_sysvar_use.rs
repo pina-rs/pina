@@ -1,8 +1,11 @@
 extern crate rustc_hir;
 extern crate rustc_span;
 
+use std::collections::HashSet;
+
 use rustc_hir::Expr;
 use rustc_hir::ExprKind;
+use rustc_hir::HirId;
 use rustc_hir::Node;
 use rustc_hir::def::DefKind;
 use rustc_hir::def::Res;
@@ -16,8 +19,9 @@ use crate::shared;
 crate::declare_late_lint! {
 	/// ### What it does
 	///
-	/// Warns when raw sysvar-like accounts are read without asserting their
-	/// sysvar identity first.
+	/// Warns when raw sysvar-like accounts are read without successfully
+	/// asserting their identity through Pina and the matching canonical sysvar
+	/// ID first.
 	///
 	/// ### Why is this bad?
 	///
@@ -65,29 +69,19 @@ fn terminal_identifier(value: &str) -> &str {
 }
 
 fn sysvar_identifier(value: &str) -> &str {
-	let terminal = terminal_identifier(value);
-	terminal.strip_suffix("_account").unwrap_or(terminal)
-}
-
-fn normalized_tokens(value: &str) -> Vec<String> {
-	value
-		.split(|c: char| !c.is_ascii_alphanumeric())
-		.filter(|token| !token.is_empty())
-		.map(|token| token.to_ascii_lowercase())
-		.collect()
-}
-
-fn matches_sysvar_id(receiver: &str, asserted_id: &str) -> bool {
-	let expected_tokens = normalized_tokens(sysvar_identifier(receiver));
-	let asserted_tokens = normalized_tokens(asserted_id);
-	if expected_tokens.is_empty() || asserted_tokens.is_empty() {
-		return false;
+	let mut terminal = terminal_identifier(value);
+	for suffix in ["_account", "_sysvar", "_instructions"] {
+		terminal = terminal.strip_suffix(suffix).unwrap_or(terminal);
 	}
+	terminal
+}
 
-	let mut asserted_iter = asserted_tokens.iter();
-	expected_tokens
+fn receiver_sysvar_name(receiver: &str) -> Option<&'static str> {
+	let name = sysvar_identifier(receiver);
+	KNOWN_SYSVAR_NAMES
 		.iter()
-		.all(|token| asserted_iter.by_ref().any(|candidate| candidate == token))
+		.copied()
+		.find(|known| name.eq_ignore_ascii_case(known))
 }
 
 fn is_sysvar_receiver(name: &str) -> bool {
@@ -97,13 +91,53 @@ fn is_sysvar_receiver(name: &str) -> bool {
 		|| terminal.ends_with("_instructions")
 }
 
-fn is_trusted_sysvar_method(call: &shared::CallInfo) -> bool {
-	call.def_crate.as_deref() == Some("pinocchio")
-		&& call.def_path.as_deref().is_some_and(|path| {
-			TRUSTED_SYSVAR_TYPES
-				.iter()
-				.any(|trusted| path.starts_with(trusted))
-		})
+fn expression_definition(
+	cx: &LateContext<'_>,
+	expression: &Expr<'_>,
+) -> Option<rustc_hir::def_id::DefId> {
+	match &expression.kind {
+		ExprKind::Path(path) => {
+			let Res::Def(_, definition) = cx.qpath_res(path, expression.hir_id) else {
+				return None;
+			};
+			Some(definition)
+		}
+		ExprKind::Unary(_, inner)
+		| ExprKind::Use(inner, _)
+		| ExprKind::Type(inner, _)
+		| ExprKind::DropTemps(inner)
+		| ExprKind::AddrOf(_, _, inner) => expression_definition(cx, inner),
+		_ => None,
+	}
+}
+
+fn is_trusted_sysvar_definition(
+	cx: &LateContext<'_>,
+	definition: rustc_hir::def_id::DefId,
+) -> bool {
+	cx.tcx.crate_name(definition.krate).as_str() == "pinocchio"
+		&& TRUSTED_SYSVAR_TYPES
+			.iter()
+			.any(|trusted| cx.tcx.def_path_str(definition).starts_with(trusted))
+}
+
+fn canonical_sysvar_name(cx: &LateContext<'_>, expression: &Expr<'_>) -> Option<&'static str> {
+	let definition = expression_definition(cx, expression)?;
+	if cx.tcx.crate_name(definition.krate).as_str() != "pina_sdk_ids" {
+		return None;
+	}
+
+	let path = cx.tcx.def_path_str(definition);
+	let path = path.strip_prefix("pina_sdk_ids::sysvar::")?;
+	let (name, item) = path.rsplit_once("::")?;
+	if item != "ID" {
+		return None;
+	}
+
+	KNOWN_SYSVAR_NAMES
+		.iter()
+		.copied()
+		.find(|known| *known == name)
 }
 
 #[derive(Clone, Copy)]
@@ -193,6 +227,337 @@ fn emit_unchecked_sysvar(cx: &LateContext<'_>, span: rustc_span::Span) {
 	});
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum Place {
+	Local(HirId),
+	Field(Box<Self>, rustc_span::Symbol),
+}
+
+impl Place {
+	fn is_same_or_descendant_of(&self, other: &Self) -> bool {
+		self == other
+			|| match self {
+				Self::Field(base, _) => base.is_same_or_descendant_of(other),
+				Self::Local(_) => false,
+			}
+	}
+}
+
+fn place_identity(expression: &Expr<'_>) -> Option<Place> {
+	match &expression.kind {
+		ExprKind::Field(base, identifier) => {
+			Some(Place::Field(
+				Box::new(place_identity(base)?),
+				identifier.name,
+			))
+		}
+		ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) => {
+			let Res::Local(binding) = path.res else {
+				return None;
+			};
+			Some(Place::Local(binding))
+		}
+		ExprKind::Match(scrutinee, ..)
+		| ExprKind::Unary(_, scrutinee)
+		| ExprKind::Use(scrutinee, _)
+		| ExprKind::Type(scrutinee, _)
+		| ExprKind::DropTemps(scrutinee)
+		| ExprKind::AddrOf(_, _, scrutinee) => place_identity(scrutinee),
+		_ => None,
+	}
+}
+
+#[derive(Clone, Debug, Default)]
+struct ValidationState {
+	places: HashSet<Place>,
+}
+
+impl ValidationState {
+	fn contains(&self, place: &Place) -> bool {
+		self.places.contains(place)
+	}
+
+	fn insert(&mut self, place: Place) {
+		self.places.insert(place);
+	}
+}
+
+fn intersect_states(states: &[ValidationState]) -> ValidationState {
+	let Some(first) = states.first() else {
+		return ValidationState::default();
+	};
+	let mut intersection = first.clone();
+	intersection
+		.places
+		.retain(|place| states[1..].iter().all(|state| state.contains(place)));
+	intersection
+}
+
+struct Analyzer<'cx, 'tcx> {
+	cx: &'cx LateContext<'tcx>,
+}
+
+impl<'tcx> Analyzer<'_, 'tcx> {
+	fn expression_can_continue(&self, expression: &Expr<'_>) -> bool {
+		!self.cx.typeck_results().expr_ty(expression).is_never()
+	}
+
+	fn invalidate(&self, state: &mut ValidationState, assigned: &Place) {
+		state
+			.places
+			.retain(|place| !place.is_same_or_descendant_of(assigned));
+	}
+
+	fn checked_sysvar_guard(
+		&self,
+		expression: &Expr<'_>,
+		receiver: &Expr<'_>,
+		arguments: &[Expr<'_>],
+	) -> Option<Place> {
+		if !shared::is_pina_method(self.cx, expression, &["assert_sysvar"])
+			|| !shared::result_success_is_required(self.cx, expression)
+		{
+			return None;
+		}
+
+		// Security: matching source spelling would let a local method or ID
+		// constant forge a sysvar proof.
+		let receiver_name = shared::receiver_name(receiver)?;
+		let expected = receiver_sysvar_name(&receiver_name)?;
+		let asserted = canonical_sysvar_name(self.cx, arguments.first()?)?;
+		(expected == asserted)
+			.then(|| place_identity(receiver))
+			.flatten()
+	}
+
+	fn method_is_trusted(&self, expression: &Expr<'_>) -> bool {
+		self.cx
+			.typeck_results()
+			.type_dependent_def_id(expression.hir_id)
+			.is_some_and(|definition| is_trusted_sysvar_definition(self.cx, definition))
+	}
+
+	fn definition_is_ignored(&self, definition: rustc_hir::def_id::DefId) -> bool {
+		matches!(
+			self.cx.tcx.crate_name(definition.krate).as_str(),
+			"alloc" | "core" | "std"
+		)
+	}
+
+	fn visit_block(&self, block: &'tcx rustc_hir::Block<'tcx>, state: &mut ValidationState) {
+		for statement in block.stmts {
+			match &statement.kind {
+				rustc_hir::StmtKind::Let(local) => {
+					if let Some(initializer) = local.init {
+						self.visit_expr(initializer, state);
+						if let rustc_hir::PatKind::Binding(_, binding, _, None) = local.pat.kind
+							&& place_identity(initializer)
+								.is_some_and(|source| state.contains(&source))
+						{
+							state.insert(Place::Local(binding));
+						}
+					}
+					if let Some(else_block) = local.els {
+						let mut else_state = state.clone();
+						self.visit_block(else_block, &mut else_state);
+					}
+				}
+				rustc_hir::StmtKind::Expr(expression) | rustc_hir::StmtKind::Semi(expression) => {
+					self.visit_expr(expression, state)
+				}
+				_ => {}
+			}
+		}
+
+		if let Some(expression) = block.expr {
+			self.visit_expr(expression, state);
+		}
+	}
+
+	fn visit_expr(&self, expression: &'tcx Expr<'tcx>, state: &mut ValidationState) {
+		match &expression.kind {
+			ExprKind::MethodCall(segment, receiver, arguments, _) => {
+				self.visit_expr(receiver, state);
+				for argument in *arguments {
+					self.visit_expr(argument, state);
+				}
+
+				let method = segment.ident.name.as_str();
+				if method == "assert_sysvar" {
+					if let Some(place) = self.checked_sysvar_guard(expression, receiver, arguments)
+					{
+						state.insert(place);
+					}
+					return;
+				}
+				if self.method_is_trusted(expression) {
+					return;
+				}
+				if self
+					.cx
+					.typeck_results()
+					.type_dependent_def_id(expression.hir_id)
+					.is_some_and(|definition| self.definition_is_ignored(definition))
+				{
+					return;
+				}
+
+				let Some(receiver_name) = shared::receiver_name(receiver) else {
+					return;
+				};
+				if is_sysvar_receiver(&receiver_name)
+					&& !place_identity(receiver).is_some_and(|place| state.contains(&place))
+				{
+					emit_unchecked_sysvar(self.cx, expression.span);
+				}
+			}
+			ExprKind::Call(callee, arguments) => {
+				self.visit_expr(callee, state);
+				for argument in *arguments {
+					self.visit_expr(argument, state);
+				}
+
+				let Some(definition) = expression_definition(self.cx, callee) else {
+					return;
+				};
+				if is_trusted_sysvar_definition(self.cx, definition)
+					|| self.definition_is_ignored(definition)
+				{
+					return;
+				}
+				let method_name = self.cx.tcx.item_name(definition);
+				let method = method_name.as_str();
+				let looks_like_raw_access =
+					matches!(method, "load_current_index" | "load_instruction_at")
+						|| KNOWN_SYSVAR_NAMES.contains(&method)
+						|| method.ends_with("_sysvar")
+						|| method.ends_with("_instructions");
+				if looks_like_raw_access
+					&& !arguments
+						.first()
+						.and_then(place_identity)
+						.is_some_and(|place| state.contains(&place))
+				{
+					emit_unchecked_sysvar(self.cx, expression.span);
+				}
+			}
+			ExprKind::Block(block, _) => self.visit_block(block, state),
+			ExprKind::Match(scrutinee, arms, _) => {
+				self.visit_expr(scrutinee, state);
+				let base = state.clone();
+				let mut branches = Vec::with_capacity(arms.len());
+				for arm in *arms {
+					let mut branch = base.clone();
+					if let Some(guard) = arm.guard {
+						self.visit_expr(guard, &mut branch);
+					}
+					self.visit_expr(arm.body, &mut branch);
+					if self.expression_can_continue(arm.body) {
+						branches.push(branch);
+					}
+				}
+				*state = if branches.is_empty() {
+					base
+				} else {
+					intersect_states(&branches)
+				};
+			}
+			ExprKind::If(condition, then, else_expression) => {
+				self.visit_expr(condition, state);
+				let base = state.clone();
+				let mut branches = Vec::with_capacity(2);
+				let mut then_state = base.clone();
+				self.visit_expr(then, &mut then_state);
+				if self.expression_can_continue(then) {
+					branches.push(then_state);
+				}
+
+				if let Some(else_expression) = else_expression {
+					let mut else_state = base;
+					self.visit_expr(else_expression, &mut else_state);
+					if self.expression_can_continue(else_expression) {
+						branches.push(else_state);
+					}
+				} else {
+					branches.push(base);
+				}
+
+				if !branches.is_empty() {
+					*state = intersect_states(&branches);
+				}
+			}
+			ExprKind::Loop(block, ..) => {
+				let entry = state.clone();
+				let mut body_state = entry.clone();
+				self.visit_block(block, &mut body_state);
+				*state = intersect_states(&[entry, body_state]);
+			}
+			ExprKind::Binary(operation, left, right) => {
+				self.visit_expr(left, state);
+				if matches!(
+					operation.node,
+					rustc_hir::BinOpKind::And | rustc_hir::BinOpKind::Or
+				) {
+					let base = state.clone();
+					let mut conditional = state.clone();
+					self.visit_expr(right, &mut conditional);
+					*state = intersect_states(&[base, conditional]);
+				} else {
+					self.visit_expr(right, state);
+				}
+			}
+			ExprKind::Assign(left, right, _) | ExprKind::AssignOp(_, left, right) => {
+				self.visit_expr(left, state);
+				self.visit_expr(right, state);
+				if let Some(place) = place_identity(left) {
+					self.invalidate(state, &place);
+				}
+			}
+			ExprKind::AddrOf(_, rustc_hir::Mutability::Mut, inner) => {
+				self.visit_expr(inner, state);
+				if let Some(place) = place_identity(inner) {
+					self.invalidate(state, &place);
+				}
+			}
+			ExprKind::Unary(_, inner)
+			| ExprKind::Use(inner, _)
+			| ExprKind::Cast(inner, _)
+			| ExprKind::Type(inner, _)
+			| ExprKind::DropTemps(inner)
+			| ExprKind::AddrOf(_, _, inner)
+			| ExprKind::Field(inner, _)
+			| ExprKind::Repeat(inner, _)
+			| ExprKind::Yield(inner, _)
+			| ExprKind::Become(inner)
+			| ExprKind::UnsafeBinderCast(_, inner, _) => self.visit_expr(inner, state),
+			ExprKind::Index(base, index, _) => {
+				self.visit_expr(base, state);
+				self.visit_expr(index, state);
+			}
+			ExprKind::Let(let_expression) => self.visit_expr(let_expression.init, state),
+			ExprKind::Tup(expressions) | ExprKind::Array(expressions) => {
+				for expression in *expressions {
+					self.visit_expr(expression, state);
+				}
+			}
+			ExprKind::Struct(_, fields, tail) => {
+				for field in *fields {
+					self.visit_expr(field.expr, state);
+				}
+				if let rustc_hir::StructTailExpr::Base(base) = tail {
+					self.visit_expr(base, state);
+				}
+			}
+			ExprKind::Break(_, value) | ExprKind::Ret(value) => {
+				if let Some(value) = value {
+					self.visit_expr(value, state);
+				}
+			}
+			_ => {}
+		}
+	}
+}
+
 impl<'tcx> LateLintPass<'tcx> for RequireSysvarAssertBeforeSysvarUse {
 	fn check_expr(&mut self, cx: &LateContext<'tcx>, expression: &'tcx Expr<'tcx>) {
 		let Some(constructor) = unchecked_typed_constructor(cx, expression) else {
@@ -225,52 +590,10 @@ impl<'tcx> LateLintPass<'tcx> for RequireSysvarAssertBeforeSysvarUse {
 			return;
 		}
 
-		let facts = shared::collect_function_facts(cx, body);
 		if !shared::def_path_matches(&def_path, TARGET_NEEDLES) {
 			return;
 		}
 
-		for (index, call) in facts.calls.iter().enumerate() {
-			if call.method == "assert_sysvar" {
-				continue;
-			}
-			if is_trusted_sysvar_method(call) {
-				continue;
-			}
-
-			if matches!(call.def_crate.as_deref(), Some("alloc" | "core" | "std")) {
-				continue;
-			}
-
-			let looks_like_sysvar_use = call.receiver.as_deref().is_some_and(is_sysvar_receiver)
-				|| call.path.as_deref().is_some_and(|path| {
-					let terminal = terminal_identifier(path).to_ascii_lowercase();
-					matches!(
-						terminal.as_str(),
-						"load_current_index" | "load_instruction_at"
-					) || KNOWN_SYSVAR_NAMES.contains(&terminal.as_str())
-						|| terminal.ends_with("_sysvar")
-						|| terminal.ends_with("_instructions")
-				});
-
-			if !looks_like_sysvar_use {
-				continue;
-			}
-
-			let has_guard = call.receiver.as_deref().is_some_and(|receiver| {
-				facts.calls[..index].iter().any(|prior| {
-					prior.method == "assert_sysvar"
-						&& prior.receiver.as_deref() == Some(receiver)
-						&& prior
-							.args
-							.first()
-							.and_then(Option::as_deref)
-							.is_some_and(|arg| matches_sysvar_id(receiver, arg))
-				})
-			});
-			if !has_guard {
-				emit_unchecked_sysvar(cx, call.span);
-			}
-		}
+		Analyzer { cx }.visit_expr(body.value, &mut ValidationState::default());
 	}
 }

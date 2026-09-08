@@ -1,41 +1,37 @@
 #![allow(dead_code, unused_assignments)]
 // normalize-stderr-test: "\n$" -> ""
 // aux-build: pinocchio_token.rs
+// aux-build: pina.rs
 
+extern crate pina;
 extern crate pinocchio_token;
 
+use pina::AccountInfoValidation;
+use pina::ProgramAccount as PinaProgramAccount;
 use pinocchio_token::Address;
 use pinocchio_token::Instruction;
 
 static TOKEN_PROGRAM_ID: Address = Address;
 
-struct ProgramAccount {
-	address: Address,
-}
+type ProgramAccount = PinaProgramAccount<Address>;
 
 struct Programs<'a> {
 	token_program: &'a ProgramAccount,
 }
 
-impl ProgramAccount {
+struct UnrelatedInstruction;
+
+struct UnrelatedProgramAccount;
+
+impl UnrelatedProgramAccount {
 	fn address(&self) -> &Address {
-		&self.address
-	}
-
-	fn assert_address(&self, _expected: &Address) -> Result<(), ()> {
-		Ok(())
-	}
-
-	fn assert_addresses(&self, _expected: &[Address]) -> Result<(), ()> {
-		Ok(())
+		&TOKEN_PROGRAM_ID
 	}
 
 	fn assert_program(&self, _expected: &Address) -> Result<(), ()> {
 		Ok(())
 	}
 }
-
-struct UnrelatedInstruction;
 
 impl UnrelatedInstruction {
 	fn invoke_with_unverified_program(&self, _program: &Address) -> Result<(), ()> {
@@ -144,6 +140,33 @@ fn checked_dynamic_program(token_program: &ProgramAccount, expected: &Address) -
 	Instruction::invoke_with_unverified_program(&Instruction, token_program.address())
 }
 
+fn ignored_program_check_does_not_authorize_dynamic_target(
+	token_program: &ProgramAccount,
+	expected: &Address,
+) -> Result<(), ()> {
+	let _ = token_program.assert_program(expected);
+	Instruction.invoke_with_unverified_program(token_program.address())
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+}
+
+fn observed_program_check_failure_does_not_authorize_dynamic_target(
+	token_program: &ProgramAccount,
+	expected: &Address,
+) -> Result<(), ()> {
+	let _failed = token_program.assert_program(expected).is_err();
+	Instruction.invoke_with_unverified_program(token_program.address())
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+}
+
+fn same_named_method_does_not_authorize_dynamic_target(
+	token_program: &UnrelatedProgramAccount,
+	expected: &Address,
+) -> Result<(), ()> {
+	token_program.assert_program(expected)?;
+	Instruction.invoke_with_unverified_program(token_program.address())
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+}
+
 fn unrelated_program_check_does_not_authorize_dynamic_target(
 	token_program: &ProgramAccount,
 	system_program: &ProgramAccount,
@@ -212,7 +235,7 @@ fn match_check_does_not_dominate(
 	condition: bool,
 ) -> Result<(), ()> {
 	match condition {
-		true => token_program.assert_address(expected)?,
+		true => token_program.assert_address(expected).map(|_| ())?,
 		false => (),
 	}
 
@@ -232,8 +255,8 @@ fn checks_on_every_path_dominate(
 	}
 
 	match condition {
-		true => token_program.assert_address(expected)?,
-		false => token_program.assert_addresses(&[])?,
+		true => token_program.assert_address(expected).map(|_| ())?,
+		false => token_program.assert_addresses(&[]).map(|_| ())?,
 	}
 
 	Instruction.invoke_with_unverified_program(token_program.address())
@@ -246,7 +269,7 @@ fn diverging_paths_do_not_erase_program_proofs(
 ) -> Result<(), ()> {
 	match condition {
 		true => return Ok(()),
-		false => token_program.assert_program(expected)?,
+		false => token_program.assert_program(expected).map(|_| ())?,
 	}
 
 	Instruction.invoke_with_unverified_program(token_program.address())
@@ -272,6 +295,19 @@ fn validated_address_alias_passes(
 	token_program.assert_address(expected)?;
 	let token_program = token_program.address();
 	Instruction.invoke_with_unverified_program(token_program)
+}
+
+fn enforced_result_extractors_establish_program_proof(
+	token_program: &ProgramAccount,
+	expected: &Address,
+) -> Result<(), ()> {
+	token_program.assert_address(expected).unwrap();
+	Instruction.invoke_with_unverified_program(token_program.address())?;
+
+	token_program
+		.assert_program(expected)
+		.expect("program validation");
+	Instruction.invoke_with_unverified_program(token_program.address())
 }
 
 fn main() {}

@@ -120,7 +120,9 @@ account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?;
 
 A chain that starts with `&AccountView` stays shared, while a chain that starts with `&mut AccountView` stays mutable. This keeps writability explicit without losing access to `as_account_mut()` later.
 
-Use `assert_program()` when you explicitly validate a program account. Static `.invoke()` / `.invoke_signed()` builders encode their program ID, while Pinocchio Token's `.invoke_with_program()` / `.invoke_signed_with_program()` methods validate their supplied ID with `Program::verify()`; neither form needs a preceding account assertion. If you deliberately call `.invoke_with_unverified_program()` or `.invoke_signed_with_unverified_program()`, validate the exact supplied account first, preferably with `assert_program()`, and call the method directly. The lint rejects storing an unverified CPI method as a function value because doing so hides the target argument from its local proof.
+Use `assert_program()` when you explicitly validate a program account. Static `.invoke()` and `.invoke_signed()` builders encode their program ID. Pinocchio Token's `.invoke_with_program()` and `.invoke_signed_with_program()` methods validate their supplied ID with `Program::verify()`. Neither form needs a preceding account assertion.
+
+If you call `.invoke_with_unverified_program()` or `.invoke_signed_with_unverified_program()`, validate the exact supplied account first. Prefer Pina's `assert_program()`, propagate assertion failure, and call the method directly. The lint requires validation on every continuing path. It rejects storing an unverified CPI method as a function value because doing so hides the target argument from its local proof.
 
 When you need sysvar data, prefer Pinocchio's checked typed loaders:
 
@@ -130,7 +132,9 @@ let rent = Rent::from_account_view(rent_account)?;
 let instructions = Instructions::try_from(instructions_account)?;
 ```
 
-These loaders validate the sysvar address while parsing. Their results can flow through normal Rust extraction, adapters, tuples, patterns, and control flow without extra assertions. Pina instead rejects constructors that do not validate identity: `Clock` and `Rent` byte constructors, `Instructions::new_unchecked`, and `SlotHashes::new` / `new_unchecked`. Call these constructors directly; storing one as a function value is also rejected so the unvalidated source remains visible. Keep `assert_sysvar()` for identity-only checks and deliberate raw data access; reviewed manual parsing also needs a narrow lint allowance on its constructor.
+These loaders validate the sysvar address while parsing. Their results can flow through normal Rust extraction, adapters, tuples, patterns, and control flow without extra assertions. Pina instead rejects constructors that do not validate identity. These include the `Clock` and `Rent` byte constructors, `Instructions::new_unchecked`, and `SlotHashes::new` or `new_unchecked`. Call these constructors directly. Storing one as a function value is also rejected so the unvalidated source remains visible.
+
+Keep `assert_sysvar()` for identity-only checks and deliberate raw data access. A raw-access proof must call Pina's method with the matching `pina_sdk_ids::sysvar::<name>::ID`. Enforce its `Result` on every continuing path. Reviewed manual parsing also needs a narrow lint allowance on its constructor.
 
 ## Typed account conversions
 

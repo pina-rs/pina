@@ -1,5 +1,5 @@
 error: `invoke_with_unverified_program` cannot be used as a function value
-  --> $DIR/dynamic_program_invocation.rs:48:37
+  --> $DIR/dynamic_program_invocation.rs:44:37
    |
 LL | const UNVERIFIED_INVOKE: InvokeFn = Instruction::invoke_with_unverified_program;
    |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -8,7 +8,7 @@ LL | const UNVERIFIED_INVOKE: InvokeFn = Instruction::invoke_with_unverified_pro
    = note: `#[deny(require_program_check_before_cpi)]` on by default
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:70:2
+  --> $DIR/dynamic_program_invocation.rs:66:2
    |
 LL |     Instruction.invoke_with_unverified_program(token_program.address())?;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -16,7 +16,7 @@ LL |     Instruction.invoke_with_unverified_program(token_program.address())?;
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `.invoke_signed_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:73:2
+  --> $DIR/dynamic_program_invocation.rs:69:2
    |
 LL |     Instruction.invoke_signed_with_unverified_program(&[], token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -24,7 +24,7 @@ LL |     Instruction.invoke_signed_with_unverified_program(&[], token_program.ad
    = help: use the verified `invoke_signed_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:78:2
+  --> $DIR/dynamic_program_invocation.rs:74:2
    |
 LL |     Instruction::invoke_with_unverified_program(&Instruction, token_program.address())?;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -32,7 +32,7 @@ LL |     Instruction::invoke_with_unverified_program(&Instruction, token_program
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `.invoke_signed_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:81:2
+  --> $DIR/dynamic_program_invocation.rs:77:2
    |
 LL |     Instruction::invoke_signed_with_unverified_program(&Instruction, &[], token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -40,7 +40,7 @@ LL |     Instruction::invoke_signed_with_unverified_program(&Instruction, &[], t
    = help: use the verified `invoke_signed_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `invoke_with_unverified_program` cannot be used as a function value
-  --> $DIR/dynamic_program_invocation.rs:86:15
+  --> $DIR/dynamic_program_invocation.rs:82:15
    |
 LL |     let invoke = Instruction::invoke_with_unverified_program;
    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -48,7 +48,7 @@ LL |     let invoke = Instruction::invoke_with_unverified_program;
    = help: invoke the unverified CPI function directly so the lint can prove its exact program target, or use the verified `invoke_with_program` variant
 
 error: `invoke_with_unverified_program` cannot be used as a function value
-  --> $DIR/dynamic_program_invocation.rs:92:15
+  --> $DIR/dynamic_program_invocation.rs:88:15
    |
 LL |     let invoke = Instruction::invoke_with_unverified_program as InvokeFn;
    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -56,7 +56,7 @@ LL |     let invoke = Instruction::invoke_with_unverified_program as InvokeFn;
    = help: invoke the unverified CPI function directly so the lint can prove its exact program target, or use the verified `invoke_with_program` variant
 
 error: `invoke_with_unverified_program` cannot be used as a function value
-  --> $DIR/dynamic_program_invocation.rs:96:3
+  --> $DIR/dynamic_program_invocation.rs:92:3
    |
 LL |     (Instruction::invoke_with_unverified_program as InvokeFn)(&Instruction, token_program.address())
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -64,7 +64,7 @@ LL |     (Instruction::invoke_with_unverified_program as InvokeFn)(&Instruction,
    = help: invoke the unverified CPI function directly so the lint can prove its exact program target, or use the verified `invoke_with_program` variant
 
 error: `invoke_with_unverified_program` cannot be used as a function value
-  --> $DIR/dynamic_program_invocation.rs:101:25
+  --> $DIR/dynamic_program_invocation.rs:97:25
    |
 LL |     let (tuple_invoke,) = (Instruction::invoke_with_unverified_program,);
    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -72,7 +72,7 @@ LL |     let (tuple_invoke,) = (Instruction::invoke_with_unverified_program,);
    = help: invoke the unverified CPI function directly so the lint can prove its exact program target, or use the verified `invoke_with_program` variant
 
 error: `invoke_with_unverified_program` cannot be used as a function value
-  --> $DIR/dynamic_program_invocation.rs:103:33
+  --> $DIR/dynamic_program_invocation.rs:99:33
    |
 LL |     let Some(option_invoke) = Some(Instruction::invoke_with_unverified_program) else {
    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -80,7 +80,7 @@ LL |     let Some(option_invoke) = Some(Instruction::invoke_with_unverified_prog
    = help: invoke the unverified CPI function directly so the lint can prove its exact program target, or use the verified `invoke_with_program` variant
 
 error: `invoke_with_unverified_program` cannot be used as a function value
-  --> $DIR/dynamic_program_invocation.rs:107:22
+  --> $DIR/dynamic_program_invocation.rs:103:22
    |
 LL |     let immediate = (|| Instruction::invoke_with_unverified_program)();
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -88,7 +88,7 @@ LL |     let immediate = (|| Instruction::invoke_with_unverified_program)();
    = help: invoke the unverified CPI function directly so the lint can prove its exact program target, or use the verified `invoke_with_program` variant
 
 error: `invoke_with_unverified_program` cannot be used as a function value
-  --> $DIR/dynamic_program_invocation.rs:109:22
+  --> $DIR/dynamic_program_invocation.rs:105:22
    |
 LL |     let captured_item = Instruction::invoke_with_unverified_program;
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -96,7 +96,7 @@ LL |     let captured_item = Instruction::invoke_with_unverified_program;
    = help: invoke the unverified CPI function directly so the lint can prove its exact program target, or use the verified `invoke_with_program` variant
 
 error: `invoke_with_unverified_program` cannot be used as a function value
-  --> $DIR/dynamic_program_invocation.rs:115:19
+  --> $DIR/dynamic_program_invocation.rs:111:19
    |
 LL |         short_circuit = Instruction::invoke_with_unverified_program;
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -104,7 +104,7 @@ LL |         short_circuit = Instruction::invoke_with_unverified_program;
    = help: invoke the unverified CPI function directly so the lint can prove its exact program target, or use the verified `invoke_with_program` variant
 
 error: `invoke_with_unverified_program` cannot be used as a function value
-  --> $DIR/dynamic_program_invocation.rs:132:3
+  --> $DIR/dynamic_program_invocation.rs:128:3
    |
 LL |         Instruction::invoke_with_unverified_program
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -112,7 +112,7 @@ LL |         Instruction::invoke_with_unverified_program
    = help: invoke the unverified CPI function directly so the lint can prove its exact program target, or use the verified `invoke_with_program` variant
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:153:2
+  --> $DIR/dynamic_program_invocation.rs:148:2
    |
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -120,7 +120,31 @@ LL |     Instruction.invoke_with_unverified_program(token_program.address())
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:163:2
+  --> $DIR/dynamic_program_invocation.rs:157:2
+   |
+LL |     Instruction.invoke_with_unverified_program(token_program.address())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:166:2
+   |
+LL |     Instruction.invoke_with_unverified_program(token_program.address())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:176:2
+   |
+LL |     Instruction.invoke_with_unverified_program(token_program.address())
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
+
+error: `.invoke_with_unverified_program()` called without a preceding program address verification
+  --> $DIR/dynamic_program_invocation.rs:186:2
    |
 LL |     Instruction.invoke_with_unverified_program(second.token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -128,7 +152,7 @@ LL |     Instruction.invoke_with_unverified_program(second.token_program.address
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:177:3
+  --> $DIR/dynamic_program_invocation.rs:200:3
    |
 LL |         Instruction.invoke_with_unverified_program(token_program.address())?;
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -136,7 +160,7 @@ LL |         Instruction.invoke_with_unverified_program(token_program.address())
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:192:2
+  --> $DIR/dynamic_program_invocation.rs:215:2
    |
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -144,7 +168,7 @@ LL |     Instruction.invoke_with_unverified_program(token_program.address())
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:205:2
+  --> $DIR/dynamic_program_invocation.rs:228:2
    |
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -152,11 +176,11 @@ LL |     Instruction.invoke_with_unverified_program(token_program.address())
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
 error: `.invoke_with_unverified_program()` called without a preceding program address verification
-  --> $DIR/dynamic_program_invocation.rs:219:2
+  --> $DIR/dynamic_program_invocation.rs:242:2
    |
 LL |     Instruction.invoke_with_unverified_program(token_program.address())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: use the verified `invoke_with_program` variant, or call `program_account.assert_program(&expected_id)?` before the unverified CPI invocation
 
-error: aborting due to 20 previous errors
+error: aborting due to 23 previous errors

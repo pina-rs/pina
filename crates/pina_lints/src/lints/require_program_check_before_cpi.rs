@@ -14,6 +14,8 @@ use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
 use rustc_lint::LintContext;
 
+use crate::shared;
+
 crate::declare_late_lint! {
 	/// ### What it does
 	///
@@ -21,13 +23,16 @@ crate::declare_late_lint! {
 	/// `.invoke_signed_with_unverified_program()` is called with a dynamic
 	/// program address that has not passed
 	/// `assert_address()`, `assert_addresses()`, or `assert_program()` on the
-	/// same account within the same function. It also rejects taking either
+	/// same account within the same function. The resolved Pina assertion must
+	/// succeed on every continuing path. The lint also rejects taking either
 	/// unverified CPI method as a function value.
 	///
 	/// ### Why is this bad?
 	///
 	/// A dynamic program argument controls the CPI target. Without verifying
 	/// that exact argument, an attacker can substitute a malicious program.
+	/// Discarding the assertion `Result`, inspecting failure, or checking only
+	/// one branch does not establish a proof.
 	/// Static `.invoke()` and `.invoke_signed()` builders encode their target in
 	/// the builder and do not accept a replaceable program argument. Restricting
 	/// unverified calls to direct method or UFCS syntax keeps the target proof
@@ -314,7 +319,10 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 
 				let method = segment.ident.name.as_str();
 				if PROGRAM_CHECK_METHODS.contains(&method) {
-					if let Some(place) = place_identity(receiver) {
+					if shared::is_pina_method(self.cx, expr, PROGRAM_CHECK_METHODS)
+						&& shared::result_success_is_required(self.cx, expr)
+						&& let Some(place) = place_identity(receiver)
+					{
 						state.insert(place);
 					}
 					return;

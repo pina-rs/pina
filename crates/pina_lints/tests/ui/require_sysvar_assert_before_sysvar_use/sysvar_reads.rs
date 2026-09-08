@@ -1,70 +1,40 @@
 // normalize-stderr-test: "\n$" -> ""
 // aux-build: pinocchio.rs
+// aux-build: pina.rs
+// aux-build: pina_sdk_ids.rs
 
 #![allow(dead_code, unused_assignments)]
 
+extern crate pina;
+extern crate pina_sdk_ids;
 extern crate pinocchio;
 
+use pina::AccountInfoValidation;
+use pina::ClockView;
+use pina::OtherView;
+use pina::RentView;
+use pina_sdk_ids::sysvar;
 use pinocchio::account::AccountView;
 use pinocchio::sysvars::clock::Clock;
 use pinocchio::sysvars::instructions::Instructions;
 use pinocchio::sysvars::rent::Rent;
 use pinocchio::sysvars::slot_hashes::SlotHashes;
 
-struct ClockView;
-struct RentView;
-struct OtherView;
+struct FakeClockView;
 
-trait RawSysvarAccount {
-	fn assert_sysvar(&self, id: &()) -> Result<(), ()>;
-	fn data(&self) -> &[u8];
-}
-
-impl RawSysvarAccount for AccountView {
+impl FakeClockView {
 	fn assert_sysvar(&self, _id: &()) -> Result<(), ()> {
 		Ok(())
 	}
 
-	fn data(&self) -> &[u8] {
-		&[]
+	fn try_borrow(&self) -> Result<(), ()> {
+		Ok(())
 	}
 }
 
-mod sysvar {
+mod attacker {
 	pub mod clock {
 		pub static ID: () = ();
-	}
-
-	pub mod rent {
-		pub static ID: () = ();
-	}
-}
-
-impl ClockView {
-	fn assert_sysvar(&self, _id: &()) -> Result<(), ()> {
-		Ok(())
-	}
-
-	fn try_borrow(&self) -> Result<ClockView, ()> {
-		Ok(ClockView)
-	}
-
-	fn slot(&self) -> u64 {
-		0
-	}
-
-	fn unix_timestamp(&self) -> i64 {
-		0
-	}
-}
-
-impl RentView {
-	fn try_borrow(&self) -> Result<RentView, ()> {
-		Ok(RentView)
-	}
-
-	fn lamports_per_byte(&self) -> u64 {
-		0
 	}
 }
 
@@ -86,6 +56,76 @@ fn process_asserted(clock: &ClockView) -> Result<(), ()> {
 	clock.assert_sysvar(&sysvar::clock::ID)?;
 	let view = clock.try_borrow()?;
 	let _ = view.unix_timestamp();
+	Ok(())
+}
+
+fn process_ignored_assertion(clock: &ClockView) -> Result<(), ()> {
+	let _ = clock.assert_sysvar(&sysvar::clock::ID);
+	let _ = clock.try_borrow()?;
+	//~^ ERROR: raw sysvar access should be preceded by
+	Ok(())
+}
+
+fn process_observed_assertion_failure(clock: &ClockView) -> Result<(), ()> {
+	let _failed = clock.assert_sysvar(&sysvar::clock::ID).is_err();
+	let _ = clock.try_borrow()?;
+	//~^ ERROR: raw sysvar access should be preceded by
+	Ok(())
+}
+
+fn process_conditional_assertion(clock: &ClockView, condition: bool) -> Result<(), ()> {
+	if condition {
+		clock.assert_sysvar(&sysvar::clock::ID)?;
+	}
+	let _ = clock.try_borrow()?;
+	//~^ ERROR: raw sysvar access should be preceded by
+	Ok(())
+}
+
+fn process_match_assertion(clock: &ClockView, condition: bool) -> Result<(), ()> {
+	match condition {
+		true => {
+			clock.assert_sysvar(&sysvar::clock::ID)?;
+		}
+		false => {}
+	}
+	let _ = clock.try_borrow()?;
+	//~^ ERROR: raw sysvar access should be preceded by
+	Ok(())
+}
+
+fn process_assertion_on_every_path(clock: &ClockView, condition: bool) -> Result<(), ()> {
+	if condition {
+		clock.assert_sysvar(&sysvar::clock::ID)?;
+	} else {
+		clock.assert_sysvar(&sysvar::clock::ID)?;
+	}
+	let _ = clock.try_borrow()?;
+	Ok(())
+}
+
+fn process_assertion_after_diverging_path(clock: &ClockView, condition: bool) -> Result<(), ()> {
+	match condition {
+		true => return Ok(()),
+		false => {
+			clock.assert_sysvar(&sysvar::clock::ID)?;
+		}
+	}
+	let _ = clock.try_borrow()?;
+	Ok(())
+}
+
+fn process_same_named_assertion(clock: &FakeClockView) -> Result<(), ()> {
+	clock.assert_sysvar(&sysvar::clock::ID)?;
+	let _ = clock.try_borrow()?;
+	//~^ ERROR: raw sysvar access should be preceded by
+	Ok(())
+}
+
+fn process_same_named_id(clock: &ClockView) -> Result<(), ()> {
+	clock.assert_sysvar(&attacker::clock::ID)?;
+	let _ = clock.try_borrow()?;
+	//~^ ERROR: raw sysvar access should be preceded by
 	Ok(())
 }
 
@@ -115,12 +155,6 @@ fn process_asserted_suffixed_account(clock_account: &ClockView) -> Result<(), ()
 	clock_account.assert_sysvar(&sysvar::clock::ID)?;
 	let _ = clock_account.try_borrow()?;
 	Ok(())
-}
-
-impl OtherView {
-	fn try_borrow(&self) -> Result<(), ()> {
-		Ok(())
-	}
 }
 
 fn process_plain(other: &OtherView) -> Result<(), ()> {
@@ -458,7 +492,7 @@ fn process_checked_extraction_forms(rent_account: &AccountView) -> Result<(), ()
 	Ok(())
 }
 
-fn process_direct_asserted_raw_source(rent_account: &AccountView) -> Result<(), ()> {
+fn process_direct_asserted_raw_source(rent_account: &RentView) -> Result<(), ()> {
 	rent_account.assert_sysvar(&sysvar::rent::ID)?;
 	#[allow(require_sysvar_assert_before_sysvar_use)]
 	let rent = Rent::from_bytes(rent_account.data())?;
@@ -466,7 +500,7 @@ fn process_direct_asserted_raw_source(rent_account: &AccountView) -> Result<(), 
 	Ok(())
 }
 
-fn process_aliased_raw_source_needs_narrow_allow(rent_account: &AccountView) -> Result<(), ()> {
+fn process_aliased_raw_source_needs_narrow_allow(rent_account: &RentView) -> Result<(), ()> {
 	rent_account.assert_sysvar(&sysvar::rent::ID)?;
 	let data = rent_account.data();
 	let rent = Rent::from_bytes(data)?;
@@ -484,6 +518,17 @@ fn process_checked_constructor_function_value(clock_account: &AccountView) -> Re
 	let parse = Clock::from_account_view;
 	let clock = parse(clock_account)?;
 	let _ = clock.slot;
+	Ok(())
+}
+
+fn process_enforced_raw_sysvar_assertions(clock: &ClockView) -> Result<(), ()> {
+	clock.assert_sysvar(&sysvar::clock::ID).unwrap();
+	let _ = clock.try_borrow()?;
+
+	clock
+		.assert_sysvar(&sysvar::clock::ID)
+		.expect("sysvar validation");
+	let _ = clock.try_borrow()?;
 	Ok(())
 }
 
