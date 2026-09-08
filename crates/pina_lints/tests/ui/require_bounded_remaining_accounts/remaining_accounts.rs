@@ -95,6 +95,13 @@ fn process_break_payload(remaining: &[u8]) {
 	}
 }
 
+fn process_runtime_take(remaining: &[u8], limit: usize) {
+	for account in remaining.iter().take(limit) {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+}
+
 fn main() {}
 
 // compile-fail

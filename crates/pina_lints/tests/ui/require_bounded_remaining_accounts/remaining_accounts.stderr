@@ -67,4 +67,15 @@ LL | |         };
    |
    = help: reject `remaining.len() > MAX_REMAINING_ACCOUNTS` before the loop, or iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
 
-error: aborting due to 6 previous errors
+error: remaining accounts are processed without an explicit bound
+  --> $DIR/remaining_accounts.rs:99:2
+   |
+LL | /     for account in remaining.iter().take(limit) {
+LL | |         //~^ ERROR: remaining accounts are processed without an explicit bound
+LL | |         let _ = account;
+LL | |     }
+   | |_____^
+   |
+   = help: reject `remaining.len() > MAX_REMAINING_ACCOUNTS` before the loop, or iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
+
+error: aborting due to 7 previous errors

@@ -6,9 +6,14 @@ use std::collections::HashSet;
 use rustc_hir::BinOpKind;
 use rustc_hir::Expr;
 use rustc_hir::ExprKind;
+use rustc_hir::LoopSource;
+use rustc_hir::MatchSource;
+use rustc_hir::Node;
 use rustc_hir::def::DefKind;
 use rustc_hir::def::Res;
 use rustc_hir::intravisit::FnKind;
+use rustc_hir::intravisit::Visitor;
+use rustc_hir::intravisit::walk_expr;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
 use rustc_lint::LintContext;
@@ -43,6 +48,51 @@ fn is_constant_bound(expr: &Expr<'_>) -> bool {
 		| ExprKind::AddrOf(_, _, inner) => is_constant_bound(inner),
 		_ => false,
 	}
+}
+
+struct ConstantTakeVisitor {
+	found: bool,
+}
+
+impl<'tcx> Visitor<'tcx> for ConstantTakeVisitor {
+	fn visit_expr(&mut self, expr: &'tcx Expr<'tcx>) {
+		if self.found {
+			return;
+		}
+		if let ExprKind::MethodCall(segment, _, arguments, _) = &expr.kind
+			&& segment.ident.name.as_str() == "take"
+			&& arguments.len() == 1
+			&& is_constant_bound(&arguments[0])
+		{
+			self.found = true;
+			return;
+		}
+
+		walk_expr(self, expr);
+	}
+}
+
+fn expression_has_constant_take(expr: &Expr<'_>) -> bool {
+	let mut visitor = ConstantTakeVisitor { found: false };
+	visitor.visit_expr(expr);
+
+	visitor.found
+}
+
+fn for_loop_has_constant_take(cx: &LateContext<'_>, loop_expr: &Expr<'_>) -> bool {
+	for (_, node) in cx.tcx.hir_parent_iter(loop_expr.hir_id) {
+		match node {
+			Node::Expr(expr)
+				if let ExprKind::Match(scrutinee, _, MatchSource::ForLoopDesugar) = expr.kind =>
+			{
+				return expression_has_constant_take(scrutinee);
+			}
+			Node::Item(_) => break,
+			_ => {}
+		}
+	}
+
+	false
 }
 
 fn remaining_len_identity(expr: &Expr<'_>) -> Option<String> {
@@ -129,7 +179,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 
 	fn visit_expr(&self, expr: &'tcx Expr<'tcx>, bounded: &mut HashSet<String>) {
 		match &expr.kind {
-			ExprKind::Loop(block, ..) => {
+			ExprKind::Loop(block, _, source, _) => {
 				let snippet = self
 					.cx
 					.sess()
@@ -143,7 +193,10 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				let has_validated_bound = bounded
 					.iter()
 					.any(|identity| header_contains_identity(loop_header, identity));
-				if mentions_remaining && !loop_header.contains(".take(") && !has_validated_bound {
+				let has_constant_take = matches!(source, LoopSource::ForLoop)
+					&& for_loop_has_constant_take(self.cx, expr);
+
+				if mentions_remaining && !has_constant_take && !has_validated_bound {
 					self.cx.lint(REQUIRE_BOUNDED_REMAINING_ACCOUNTS, |diag| {
 						diag.span(expr.span);
 						diag.primary_message(
