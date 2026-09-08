@@ -614,6 +614,10 @@ Available assertions:
 - `assert_canonical_bump(seeds, program_id)` — returns the canonical bump
 - `assert_associated_token_address(wallet, mint, token_program)` — ATA check (requires `token` feature)
 
+Use `assert_program()` when you validate an explicit program account. Static CPI builders that call `.invoke()` or `.invoke_signed()` encode their program ID and do not need a separate program account assertion. For `.invoke_with_program()` and `.invoke_signed_with_program()`, validate the account whose address you pass to the builder.
+
+When you need sysvar data, prefer Pinocchio's checked typed loaders such as `Clock::from_account_view()`, `Rent::from_account_view()`, and `Instructions::try_from()`. Keep `assert_sysvar()` for identity-only checks and deliberate raw data access.
+
 When you need token data, use the checked loader instead of an assertion followed by a second parse:
 
 ```rust

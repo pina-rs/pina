@@ -24,6 +24,7 @@ pub struct CallInfo {
 	pub span: Span,
 	pub method: String,
 	pub receiver: Option<String>,
+	pub receiver_binding: Option<HirId>,
 	pub receiver_span: Option<Span>,
 	pub path: Option<String>,
 	pub def_path: Option<String>,
@@ -34,6 +35,7 @@ pub struct CallInfo {
 	pub arg_def_crates: Vec<Option<String>>,
 	pub arg_bindings: Vec<Option<HirId>>,
 	pub result_binding: Option<String>,
+	pub result_binding_id: Option<HirId>,
 }
 
 #[derive(Debug, Clone)]
@@ -46,7 +48,19 @@ pub struct AliasInfo {
 pub struct AssignmentInfo {
 	pub span: Span,
 	pub identity: String,
+	pub binding: Option<HirId>,
 }
+
+#[derive(Debug, Clone)]
+pub struct FieldAccessInfo {
+	pub span: Span,
+	pub receiver_binding: Option<HirId>,
+	pub receiver_span: Span,
+	pub receiver_type_path: Option<String>,
+	pub receiver_type_crate: Option<String>,
+}
+
+type ResultBinding<'a> = (HirId, &'a str);
 
 #[derive(Debug, Default)]
 pub struct FunctionFacts {
@@ -56,6 +70,7 @@ pub struct FunctionFacts {
 	pub paths: Vec<String>,
 	pub assignments: Vec<AssignmentInfo>,
 	pub aliases: HashMap<HirId, AliasInfo>,
+	pub field_accesses: Vec<FieldAccessInfo>,
 }
 
 pub fn collect_function_facts(cx: &LateContext<'_>, body: &Body<'_>) -> FunctionFacts {
@@ -85,6 +100,11 @@ fn expression_definition(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<(Strin
 		| ExprKind::AddrOf(_, _, inner) => expression_definition(cx, inner),
 		_ => None,
 	}
+}
+
+fn expression_type_definition(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<(String, String)> {
+	let definition = cx.typeck_results().expr_ty(expr).peel_refs().ty_adt_def()?;
+	Some(definition_identity(cx, definition.did()))
 }
 
 pub fn receiver_name(expr: &Expr<'_>) -> Option<String> {
@@ -180,7 +200,7 @@ fn collect_from_block(
 	cx: &LateContext<'_>,
 	block: &rustc_hir::Block<'_>,
 	facts: &mut FunctionFacts,
-	result_binding: Option<&str>,
+	result_binding: Option<ResultBinding<'_>>,
 ) {
 	for stmt in block.stmts {
 		match &stmt.kind {
@@ -207,7 +227,7 @@ fn collect_from_block(
 						cx,
 						init,
 						facts,
-						binding.as_ref().map(|(_, name)| name.as_str()),
+						binding.as_ref().map(|(id, name)| (*id, name.as_str())),
 					);
 				}
 			}
@@ -226,7 +246,7 @@ fn collect_from_expr(
 	cx: &LateContext<'_>,
 	expr: &Expr<'_>,
 	facts: &mut FunctionFacts,
-	result_binding: Option<&str>,
+	result_binding: Option<ResultBinding<'_>>,
 ) {
 	collect_from_expr_inner(cx, expr, facts, result_binding, false);
 }
@@ -235,12 +255,21 @@ fn collect_from_expr_inner(
 	cx: &LateContext<'_>,
 	expr: &Expr<'_>,
 	facts: &mut FunctionFacts,
-	result_binding: Option<&str>,
+	result_binding: Option<ResultBinding<'_>>,
 	forward_call_argument_binding: bool,
 ) {
 	match &expr.kind {
 		ExprKind::MethodCall(path_segment, receiver, args, _) => {
-			collect_from_expr(cx, receiver, facts, result_binding);
+			let method = path_segment.ident.name.as_str();
+			let receiver_result_binding = matches!(method, "inspect" | "inspect_err" | "map_err")
+				.then_some(result_binding)
+				.flatten();
+			// A chained receiver contributes to the method result but is not itself
+			// the value assigned to `result_binding`. Associating both calls with
+			// the same binding would let a discarded checked loader grant provenance
+			// to an unchecked value returned by a later combinator. The listed
+			// Result inspectors preserve the successful value unchanged.
+			collect_from_expr(cx, receiver, facts, receiver_result_binding);
 			for arg in *args {
 				collect_from_expr(cx, arg, facts, None);
 			}
@@ -250,8 +279,9 @@ fn collect_from_expr_inner(
 				.map(|def_id| definition_identity(cx, def_id));
 			facts.calls.push(CallInfo {
 				span: expr.span,
-				method: path_segment.ident.name.as_str().to_string(),
+				method: method.to_string(),
 				receiver: expression_identity(receiver),
+				receiver_binding: expression_local_binding(receiver),
 				receiver_span: Some(receiver.span),
 				path: None,
 				def_path: definition.as_ref().map(|(path, _)| path.clone()),
@@ -269,7 +299,8 @@ fn collect_from_expr_inner(
 					})
 					.collect(),
 				arg_bindings: args.iter().map(expression_local_binding).collect(),
-				result_binding: result_binding.map(str::to_string),
+				result_binding: result_binding.map(|(_, name)| name.to_string()),
+				result_binding_id: result_binding.map(|(id, _)| id),
 			});
 		}
 		ExprKind::Call(callee, args) => {
@@ -308,6 +339,7 @@ fn collect_from_expr_inner(
 					span: expr.span,
 					method,
 					receiver: None,
+					receiver_binding: None,
 					receiver_span: None,
 					path: Some(path_name),
 					def_path: definition.as_ref().map(|(path, _)| path.clone()),
@@ -325,7 +357,8 @@ fn collect_from_expr_inner(
 						})
 						.collect(),
 					arg_bindings: args.iter().map(expression_local_binding).collect(),
-					result_binding: result_binding.map(str::to_string),
+					result_binding: result_binding.map(|(_, name)| name.to_string()),
+					result_binding_id: result_binding.map(|(id, _)| id),
 				});
 			}
 		}
@@ -352,13 +385,23 @@ fn collect_from_expr_inner(
 				collect_from_expr(cx, el, facts, result_binding);
 			}
 		}
+		ExprKind::Field(receiver, _) => {
+			let definition = expression_type_definition(cx, receiver);
+			facts.field_accesses.push(FieldAccessInfo {
+				span: expr.span,
+				receiver_binding: expression_local_binding(receiver),
+				receiver_span: receiver.span,
+				receiver_type_path: definition.as_ref().map(|(path, _)| path.clone()),
+				receiver_type_crate: definition.map(|(_, crate_name)| crate_name),
+			});
+			collect_from_expr(cx, receiver, facts, result_binding);
+		}
 		ExprKind::Unary(_, expr)
 		| ExprKind::Use(expr, _)
 		| ExprKind::Cast(expr, _)
 		| ExprKind::Type(expr, _)
 		| ExprKind::DropTemps(expr)
 		| ExprKind::AddrOf(_, _, expr)
-		| ExprKind::Field(expr, _)
 		| ExprKind::Repeat(expr, _)
 		| ExprKind::Yield(expr, _)
 		| ExprKind::Become(expr)
@@ -374,6 +417,7 @@ fn collect_from_expr_inner(
 				facts.assignments.push(AssignmentInfo {
 					span: expr.span,
 					identity,
+					binding: expression_local_binding(lhs),
 				});
 			}
 			collect_from_expr(cx, lhs, facts, None);

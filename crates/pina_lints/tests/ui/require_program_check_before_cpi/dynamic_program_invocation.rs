@@ -4,6 +4,8 @@
 struct Address;
 struct Signer;
 
+static TOKEN_PROGRAM_ID: Address = Address;
+
 struct ProgramAccount {
 	address: Address,
 }
@@ -24,11 +26,23 @@ impl ProgramAccount {
 	fn assert_addresses(&self, _expected: &[Address]) -> Result<(), ()> {
 		Ok(())
 	}
+
+	fn assert_program(&self, _expected: &Address) -> Result<(), ()> {
+		Ok(())
+	}
 }
 
 struct Instruction;
 
 impl Instruction {
+	fn invoke(&self) -> Result<(), ()> {
+		Ok(())
+	}
+
+	fn invoke_signed(&self, _signers: &[Signer]) -> Result<(), ()> {
+		Ok(())
+	}
+
 	fn invoke_with_program(&self, _program: &Address) -> Result<(), ()> {
 		Ok(())
 	}
@@ -42,6 +56,14 @@ impl Instruction {
 	}
 }
 
+fn static_program_invocation_does_not_need_account_validation() -> Result<(), ()> {
+	Instruction.invoke()?;
+	Instruction.invoke_signed(&[])?;
+	Instruction.invoke_with_program(&TOKEN_PROGRAM_ID)?;
+	let target = &TOKEN_PROGRAM_ID;
+	Instruction.invoke_with_program(target)
+}
+
 fn missing_dynamic_program_check(token_program: &ProgramAccount) -> Result<(), ()> {
 	Instruction.invoke_with_program(token_program.address())?;
 	//~^ ERROR: `.invoke_with_program()` called without a preceding program address verification
@@ -50,10 +72,25 @@ fn missing_dynamic_program_check(token_program: &ProgramAccount) -> Result<(), (
 	//~^ ERROR: `.invoke_signed_with_program()` called without a preceding program address verification
 }
 
+fn missing_dynamic_program_check_ufcs(token_program: &ProgramAccount) -> Result<(), ()> {
+	Instruction::invoke_with_program(&Instruction, token_program.address())?;
+	//~^ ERROR: `.invoke_with_program()` called without a preceding program address verification
+
+	Instruction::invoke_signed_with_program(&Instruction, &[], token_program.address())
+	//~^ ERROR: `.invoke_signed_with_program()` called without a preceding program address verification
+}
+
+fn missing_dynamic_program_check_function_item(token_program: &ProgramAccount) -> Result<(), ()> {
+	let invoke = Instruction::invoke_with_program;
+	invoke(&Instruction, token_program.address())
+	//~^ ERROR: `.invoke_with_program()` called without a preceding program address verification
+}
+
 fn checked_dynamic_program(token_program: &ProgramAccount, expected: &Address) -> Result<(), ()> {
-	token_program.assert_address(expected)?;
+	token_program.assert_program(expected)?;
 	Instruction.invoke_with_program(token_program.address())?;
-	Instruction.invoke_signed_with_program(&[], token_program.address())
+	Instruction.invoke_signed_with_program(&[], token_program.address())?;
+	Instruction::invoke_with_program(&Instruction, token_program.address())
 }
 
 fn unrelated_program_check_does_not_authorize_dynamic_target(

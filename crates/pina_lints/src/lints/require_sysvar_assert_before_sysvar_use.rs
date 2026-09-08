@@ -11,11 +11,15 @@ use crate::shared;
 crate::declare_late_lint! {
 	/// ### What it does
 	///
-	/// Warns when sysvar-like accounts are used without asserting their sysvar identity first.
+	/// Warns when raw sysvar-like accounts are read without asserting their
+	/// sysvar identity first.
 	///
 	/// ### Why is this bad?
 	///
-	/// Spoofed sysvar accounts can distort rent, clock, and instruction-data logic.
+	/// Spoofed sysvar accounts can distort rent, clock, and instruction-data
+	/// logic. Pinocchio's checked `from_account_view()` and `try_from()` sysvar
+	/// loaders perform the identity check while they parse the account, so they
+	/// do not require a separate assertion.
 	///
 	/// ### Example
 	///
@@ -24,7 +28,7 @@ crate::declare_late_lint! {
 	/// ```
 	pub REQUIRE_SYSVAR_ASSERT_BEFORE_SYSVAR_USE,
 	Deny,
-	"sysvar access should be preceded by `assert_sysvar()` on the same account"
+	"raw sysvar access should be preceded by `assert_sysvar()` on the same account"
 }
 
 const TARGET_NEEDLES: &[&str] = &["process", "process_instruction", "instruction", "sysvar"];
@@ -42,9 +46,20 @@ const KNOWN_SYSVAR_NAMES: &[&str] = &[
 	"slot_history",
 	"stake_history",
 ];
+const TRUSTED_SYSVAR_TYPES: &[&str] = &[
+	"pinocchio::sysvars::clock::Clock",
+	"pinocchio::sysvars::instructions::Instructions",
+	"pinocchio::sysvars::rent::Rent",
+	"pinocchio::sysvars::slot_hashes::SlotHashes",
+];
 
 fn terminal_identifier(value: &str) -> &str {
 	value.rsplit(['.', ':']).next().unwrap_or(value)
+}
+
+fn sysvar_identifier(value: &str) -> &str {
+	let terminal = terminal_identifier(value);
+	terminal.strip_suffix("_account").unwrap_or(terminal)
 }
 
 fn normalized_tokens(value: &str) -> Vec<String> {
@@ -56,7 +71,7 @@ fn normalized_tokens(value: &str) -> Vec<String> {
 }
 
 fn matches_sysvar_id(receiver: &str, asserted_id: &str) -> bool {
-	let expected_tokens = normalized_tokens(terminal_identifier(receiver));
+	let expected_tokens = normalized_tokens(sysvar_identifier(receiver));
 	let asserted_tokens = normalized_tokens(asserted_id);
 	if expected_tokens.is_empty() || asserted_tokens.is_empty() {
 		return false;
@@ -69,10 +84,122 @@ fn matches_sysvar_id(receiver: &str, asserted_id: &str) -> bool {
 }
 
 fn is_sysvar_receiver(name: &str) -> bool {
-	let terminal = terminal_identifier(name).to_ascii_lowercase();
+	let terminal = sysvar_identifier(name).to_ascii_lowercase();
 	KNOWN_SYSVAR_NAMES.contains(&terminal.as_str())
 		|| terminal.ends_with("_sysvar")
 		|| terminal.ends_with("_instructions")
+}
+
+fn trusted_sysvar_type(
+	definition_crate: Option<&str>,
+	definition_path: Option<&str>,
+) -> Option<&'static str> {
+	if definition_crate != Some("pinocchio") {
+		return None;
+	}
+
+	definition_path.and_then(|path| {
+		TRUSTED_SYSVAR_TYPES.iter().find_map(|trusted| {
+			(path == *trusted
+				|| path
+					.strip_prefix(trusted)
+					.is_some_and(|suffix| suffix.starts_with("::")))
+			.then_some(*trusted)
+		})
+	})
+}
+
+fn is_checked_loader_for(call: &shared::CallInfo, trusted_type: &str) -> bool {
+	if trusted_type.ends_with("::Instructions") {
+		return call.method == "try_from"
+			&& call.is_type_relative
+			&& call
+				.def_path
+				.as_deref()
+				.is_some_and(|path| path.ends_with("TryFrom::try_from"));
+	}
+
+	call.method == "from_account_view"
+		&& call.def_crate.as_deref() == Some("pinocchio")
+		&& call
+			.def_path
+			.as_deref()
+			.is_some_and(|path| path.starts_with(trusted_type))
+}
+
+fn is_transparent_result_adapter(call: &shared::CallInfo) -> bool {
+	matches!(call.def_crate.as_deref(), Some("core" | "std"))
+		&& matches!(
+			call.method.as_str(),
+			"branch" | "from_output" | "inspect" | "inspect_err" | "map_err"
+		)
+}
+
+fn has_checked_typed_loader_at(
+	facts: &shared::FunctionFacts,
+	trusted_type: &str,
+	receiver_binding: Option<rustc_hir::HirId>,
+	receiver_span: rustc_span::Span,
+	use_span: rustc_span::Span,
+) -> bool {
+	let named_loader = receiver_binding.is_some_and(|receiver_binding| {
+		facts.calls.iter().rev().any(|prior| {
+			prior.span.lo() < use_span.lo()
+				&& prior.result_binding_id == Some(receiver_binding)
+				&& is_checked_loader_for(prior, trusted_type)
+				&& !facts.assignments.iter().any(|assignment| {
+					assignment.binding == Some(receiver_binding)
+						&& assignment.span.lo() > prior.span.lo()
+						&& assignment.span.lo() < use_span.lo()
+				})
+		})
+	});
+	if named_loader {
+		return true;
+	}
+
+	facts.calls.iter().rev().any(|prior| {
+		prior.span.lo() >= receiver_span.lo()
+			&& prior.span.hi() <= receiver_span.hi()
+			&& is_checked_loader_for(prior, trusted_type)
+			&& !facts.calls.iter().any(|later| {
+				later.span.lo() > prior.span.lo()
+					&& later.span.hi() <= receiver_span.hi()
+					&& !is_transparent_result_adapter(later)
+			})
+	})
+}
+
+fn has_checked_typed_loader(facts: &shared::FunctionFacts, call: &shared::CallInfo) -> bool {
+	let Some(trusted_type) =
+		trusted_sysvar_type(call.def_crate.as_deref(), call.def_path.as_deref())
+	else {
+		return false;
+	};
+	let Some(receiver_span) = call.receiver_span else {
+		return false;
+	};
+
+	has_checked_typed_loader_at(
+		facts,
+		trusted_type,
+		call.receiver_binding,
+		receiver_span,
+		call.span,
+	)
+}
+
+fn emit_unchecked_sysvar(cx: &LateContext<'_>, span: rustc_span::Span) {
+	cx.lint(REQUIRE_SYSVAR_ASSERT_BEFORE_SYSVAR_USE, |diag| {
+		diag.span(span);
+		diag.primary_message(
+			"raw sysvar access should be preceded by `assert_sysvar()` on the same account",
+		);
+		diag.help(
+			"use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call \
+			 `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data",
+		);
+	});
 }
 
 impl<'tcx> LateLintPass<'tcx> for RequireSysvarAssertBeforeSysvarUse {
@@ -94,7 +221,10 @@ impl<'tcx> LateLintPass<'tcx> for RequireSysvarAssertBeforeSysvarUse {
 
 		let facts = shared::collect_function_facts(cx, body);
 		for (index, call) in facts.calls.iter().enumerate() {
-			if call.method == "assert_sysvar" {
+			if call.method == "assert_sysvar" || has_checked_typed_loader(&facts, call) {
+				continue;
+			}
+			if matches!(call.def_crate.as_deref(), Some("alloc" | "core" | "std")) {
 				continue;
 			}
 
@@ -125,16 +255,25 @@ impl<'tcx> LateLintPass<'tcx> for RequireSysvarAssertBeforeSysvarUse {
 				})
 			});
 			if !has_guard {
-				cx.lint(REQUIRE_SYSVAR_ASSERT_BEFORE_SYSVAR_USE, |diag| {
-					diag.span(call.span);
-					diag.primary_message(
-						"sysvar access should be preceded by `assert_sysvar()` on the same account",
-					);
-					diag.help(
-						"call `sysvar_account.assert_sysvar(&sysvar::ID)?` before reading time or \
-						 rent information",
-					);
-				});
+				emit_unchecked_sysvar(cx, call.span);
+			}
+		}
+
+		for field in &facts.field_accesses {
+			let Some(trusted_type) = trusted_sysvar_type(
+				field.receiver_type_crate.as_deref(),
+				field.receiver_type_path.as_deref(),
+			) else {
+				continue;
+			};
+			if !has_checked_typed_loader_at(
+				&facts,
+				trusted_type,
+				field.receiver_binding,
+				field.receiver_span,
+				field.span,
+			) {
+				emit_unchecked_sysvar(cx, field.span);
 			}
 		}
 	}

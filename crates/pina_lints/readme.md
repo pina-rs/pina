@@ -101,14 +101,18 @@ The analysis tracks concrete local/field places and builder bindings within one 
 
 ### `require_program_check_before_cpi`
 
-Detects unchecked `invoke*()` calls. Dynamic CPI program arguments must be dominated by `assert_address()`, `assert_addresses()`, or `assert_program()`. Pina CPI builders whose program identity is fixed by their concrete type are recognized as trusted.
+Detects unchecked `invoke_with_program()` and `invoke_signed_with_program()` calls. The exact dynamic CPI program argument must first pass `assert_program()`, `assert_address()`, or `assert_addresses()` on every path to the invocation. Prefer `assert_program()` when the handler receives an explicit program account because it checks both the address and the executable flag.
 
 ```rust
-token_program.assert_address(&token::ID)?;
+token_program.assert_program(&token::ID)?;
 transfer.invoke_with_program(token_program.address())?;
 ```
 
-The analyzer intersects validation state across `if` and `match` branches and invalidates proof after assignment or mutable aliasing. A check performed on only one branch is therefore insufficient.
+Static `.invoke()` and `.invoke_signed()` builders encode their target program and do not need a separate program account assertion. Passing a constant such as `&token::ID` to a dynamic invocation is also accepted because the caller cannot substitute the value.
+
+The analyzer tracks concrete local variables and fields. It intersects validation state across `if` and `match` branches and invalidates proof after assignment or mutable aliasing. Checking an unrelated account does not authorize the dynamic target.
+
+To migrate existing code, remove program account assertions that exist only to satisfy the lint before a static `.invoke()` or `.invoke_signed()` call. Keep validation for dynamic calls, and validate the account whose address you pass to the invocation.
 
 ### `require_writable_before_account_resize`
 
@@ -134,14 +138,24 @@ This protects against stale bytes remaining observable during the transaction. T
 
 ### `require_sysvar_assert_before_sysvar_use`
 
-Detects reads from accounts whose names identify known sysvars without a matching `assert_sysvar()` and expected sysvar ID.
+Detects raw reads from accounts whose names identify known sysvars without a matching `assert_sysvar()` and expected sysvar ID.
 
 ```rust
 clock.assert_sysvar(&sysvar::clock::ID)?;
 let data = clock.try_borrow()?;
 ```
 
-The lint recognizes standard Solana sysvar names and instruction-sysvar loader functions. Unusually named sysvar wrappers may require an explicit, local code shape for the heuristic to recognize them.
+Prefer Pinocchio's checked typed loaders when you need the sysvar value. They validate the account address while parsing, so a separate `assert_sysvar()` call would repeat the same check:
+
+```rust
+let clock = Clock::from_account_view(clock_account)?;
+let rent = Rent::from_account_view(rent_account)?;
+let instructions = Instructions::try_from(instructions_account)?;
+```
+
+Keep `assert_sysvar()` when code only validates identity or deliberately borrows the raw account data. The lint recognizes typed `Clock`, `Rent`, `Instructions`, and `SlotHashes` values from the `pinocchio::sysvars` modules.
+
+To migrate existing code, replace `assert_sysvar()` followed by manual parsing with the matching checked typed loader. No change is needed for identity-only checks or raw data access. The lint still uses standard Solana sysvar account names to identify raw reads, so unusually named raw accounts may require a direct, local assertion.
 
 ### `require_type_assert_before_zero_copy_cast`
 

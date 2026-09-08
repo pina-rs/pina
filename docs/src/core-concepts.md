@@ -120,6 +120,18 @@ account.assert_signer()?.assert_writable()?.assert_owner(&program_id)?;
 
 A chain that starts with `&AccountView` stays shared, while a chain that starts with `&mut AccountView` stays mutable. This keeps writability explicit without losing access to `as_account_mut()` later.
 
+Use `assert_program()` when you validate an explicit program account. Static CPI builders that call `.invoke()` or `.invoke_signed()` encode their program ID and do not need a separate program account assertion. For `.invoke_with_program()` and `.invoke_signed_with_program()`, validate the account whose address you pass to the builder.
+
+When you need sysvar data, prefer Pinocchio's checked typed loaders:
+
+```rust
+let clock = Clock::from_account_view(clock_account)?;
+let rent = Rent::from_account_view(rent_account)?;
+let instructions = Instructions::try_from(instructions_account)?;
+```
+
+These loaders validate the sysvar address while parsing. Keep `assert_sysvar()` for identity-only checks and deliberate raw data access.
+
 ## Typed account conversions
 
 Traits in `crates/pina/src/impls.rs` provide typed conversion paths from raw `AccountView` values into strongly typed account states. `as_account()` returns `Ref<T>` and `as_account_mut()` returns `RefMut<T>` borrow guards. The type aliases `LoadedAccount<'a, T>` and `LoadedAccountMut<'a, T>` are provided for `Ref<'a, T>` and `RefMut<'a, T>` respectively, offering a more descriptive name for guard-backed typed account access.
