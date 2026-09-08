@@ -236,7 +236,7 @@ mod tests {
 
 	fn bpf_binary_path() -> String {
 		format!(
-			"{}/../../target/bpfel-unknown-none/release/libpina_bpf.so",
+			"{}/../../target/bpfel-unknown-none/release/libpina_bpf_program.so",
 			env!("CARGO_MANIFEST_DIR")
 		)
 	}
