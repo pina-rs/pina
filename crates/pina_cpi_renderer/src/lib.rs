@@ -26,7 +26,7 @@
 //!
 //! render_idl_file(
 //! 	Path::new("codama/idls/vesting_program.json"),
-//! 	Path::new("clients/vesting-cpi"),
+//! 	Path::new("clients/vesting_program_cpi"),
 //! 	&RenderConfig::default(),
 //! )
 //! .unwrap_or_else(|error| panic!("render failed: {error}"));
@@ -67,6 +67,13 @@ mod __tests;
 pub struct RenderConfig {
 	pub delete_folder_before_rendering: bool,
 	pub generated_folder: PathBuf,
+	/// Package name used for the generated CPI crate.
+	///
+	/// When set, the scaffold names the crate `<package_name>_cpi` for
+	/// underscore-separated names and `<package_name>-cpi` for
+	/// hyphen-separated names. When unset, the crate falls back to the
+	/// snake-cased IDL program name plus `_cpi`.
+	pub package_name: Option<String>,
 	pub mode: RenderMode,
 	pub scaffold: bool,
 }
@@ -76,6 +83,7 @@ impl Default for RenderConfig {
 		Self {
 			delete_folder_before_rendering: true,
 			generated_folder: PathBuf::from("src/generated"),
+			package_name: None,
 			mode: RenderMode::Auto,
 			scaffold: true,
 		}
@@ -140,6 +148,7 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 			&crate_handle,
 			crate_dir,
 			root.program.name.as_ref(),
+			config.package_name.as_deref(),
 			&config.generated_folder,
 		)?;
 	}
