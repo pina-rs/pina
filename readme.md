@@ -614,9 +614,9 @@ Available assertions:
 - `assert_canonical_bump(seeds, program_id)` — returns the canonical bump
 - `assert_associated_token_address(wallet, mint, token_program)` — ATA check (requires `token` feature)
 
-Use `assert_program()` when you explicitly validate a program account. Static `.invoke()` / `.invoke_signed()` builders encode their program ID, while Pinocchio Token's `.invoke_with_program()` / `.invoke_signed_with_program()` methods validate their supplied ID with `Program::verify()`; neither form needs a preceding account assertion. If you deliberately call `.invoke_with_unverified_program()` or `.invoke_signed_with_unverified_program()`, validate the exact supplied account first, preferably with `assert_program()`.
+Use `assert_program()` when you explicitly validate a program account. Static `.invoke()` / `.invoke_signed()` builders encode their program ID, while Pinocchio Token's `.invoke_with_program()` / `.invoke_signed_with_program()` methods validate their supplied ID with `Program::verify()`; neither form needs a preceding account assertion. If you deliberately call `.invoke_with_unverified_program()` or `.invoke_signed_with_unverified_program()`, validate the exact supplied account first, preferably with `assert_program()`, and call it directly rather than storing the method as a function value.
 
-When you need sysvar data, prefer Pinocchio's checked typed loaders such as `Clock::from_account_view()`, `Rent::from_account_view()`, and `Instructions::try_from()`. Keep `assert_sysvar()` for identity-only checks and deliberate raw data access.
+When you need sysvar data, prefer Pinocchio's checked typed loaders such as `Clock::from_account_view()`, `Rent::from_account_view()`, and `Instructions::try_from()`. Pina rejects known unchecked byte constructors at their call site. Keep `assert_sysvar()` for identity-only checks and deliberate raw data access; reviewed manual parsing also needs a narrow lint allowance on its unchecked constructor.
 
 When you need token data, use the checked loader instead of an assertion followed by a second parse:
 

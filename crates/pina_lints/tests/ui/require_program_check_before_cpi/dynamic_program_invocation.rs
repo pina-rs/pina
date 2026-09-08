@@ -45,6 +45,9 @@ impl UnrelatedInstruction {
 
 type InvokeFn = fn(&Instruction, &Address) -> Result<(), ()>;
 
+const UNVERIFIED_INVOKE: InvokeFn = Instruction::invoke_with_unverified_program;
+//~^ ERROR: `invoke_with_unverified_program` cannot be used as a function value
+
 fn unrelated_invoke(_instruction: &Instruction, _program: &Address) -> Result<(), ()> {
 	Ok(())
 }
@@ -81,105 +84,57 @@ fn missing_dynamic_program_check_ufcs(token_program: &ProgramAccount) -> Result<
 
 fn missing_dynamic_program_check_function_item(token_program: &ProgramAccount) -> Result<(), ()> {
 	let invoke = Instruction::invoke_with_unverified_program;
+	//~^ ERROR: `invoke_with_unverified_program` cannot be used as a function value
 	invoke(&Instruction, token_program.address())
-	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
 }
 
 fn missing_dynamic_program_check_cast(token_program: &ProgramAccount) -> Result<(), ()> {
 	let invoke = Instruction::invoke_with_unverified_program as InvokeFn;
+	//~^ ERROR: `invoke_with_unverified_program` cannot be used as a function value
 	invoke(&Instruction, token_program.address())?;
-	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
 
 	(Instruction::invoke_with_unverified_program as InvokeFn)(&Instruction, token_program.address())
-	//~^^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+	//~^ ERROR: `invoke_with_unverified_program` cannot be used as a function value
 }
 
-fn assignment_tracks_and_invalidates_aliases(token_program: &ProgramAccount) -> Result<(), ()> {
-	let mut invoke = unrelated_invoke as InvokeFn;
-	invoke = Instruction::invoke_with_unverified_program as InvokeFn;
-	invoke(&Instruction, token_program.address())?;
-	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+fn unverified_function_value_escapes_are_rejected(condition: bool) -> Result<(), ()> {
+	let (tuple_invoke,) = (Instruction::invoke_with_unverified_program,);
+	//~^ ERROR: `invoke_with_unverified_program` cannot be used as a function value
+	let Some(option_invoke) = Some(Instruction::invoke_with_unverified_program) else {
+		//~^ ERROR: `invoke_with_unverified_program` cannot be used as a function value
+		return Ok(());
+	};
+	let immediate = (|| Instruction::invoke_with_unverified_program)();
+	//~^ ERROR: `invoke_with_unverified_program` cannot be used as a function value
+	let captured_item = Instruction::invoke_with_unverified_program;
+	//~^ ERROR: `invoke_with_unverified_program` cannot be used as a function value
+	let capture = move || captured_item;
 
-	invoke = unrelated_invoke;
-	invoke(&Instruction, token_program.address())
+	let mut short_circuit = unrelated_invoke as InvokeFn;
+	let _ = condition && {
+		short_circuit = Instruction::invoke_with_unverified_program;
+		//~^ ERROR: `invoke_with_unverified_program` cannot be used as a function value
+		true
+	};
+
+	let _ = (
+		tuple_invoke,
+		option_invoke,
+		immediate,
+		capture,
+		short_circuit,
+	);
+	Ok(())
 }
 
-fn conditional_function_items(token_program: &ProgramAccount, condition: bool) -> Result<(), ()> {
-	let invoke: InvokeFn = if condition {
+fn function_value_policy_is_independent_of_reachability(condition: bool) -> Result<(), ()> {
+	let _invoke: InvokeFn = if condition {
 		Instruction::invoke_with_unverified_program
+		//~^ ERROR: `invoke_with_unverified_program` cannot be used as a function value
 	} else {
-		Instruction::invoke_with_unverified_program
+		return Ok(());
 	};
-	invoke(&Instruction, token_program.address())?;
-	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
-
-	let invoke: InvokeFn = match condition {
-		true => Instruction::invoke_with_unverified_program,
-		false => Instruction::invoke_with_unverified_program,
-	};
-	invoke(&Instruction, token_program.address())?;
-	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
-
-	let invoke: InvokeFn = if condition {
-		Instruction::invoke_with_unverified_program
-	} else {
-		unrelated_invoke
-	};
-	invoke(&Instruction, token_program.address())?;
-	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
-
-	let invoke: InvokeFn = match condition {
-		true => unrelated_invoke,
-		false => Instruction::invoke_with_unverified_program,
-	};
-	invoke(&Instruction, token_program.address())
-	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
-}
-
-fn branch_assignments_join_aliases(
-	token_program: &ProgramAccount,
-	condition: bool,
-) -> Result<(), ()> {
-	let mut invoke = unrelated_invoke as InvokeFn;
-	if condition {
-		invoke = Instruction::invoke_with_unverified_program;
-	} else {
-		invoke = Instruction::invoke_with_unverified_program;
-	}
-	invoke(&Instruction, token_program.address())?;
-	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
-
-	if condition {
-		invoke = unrelated_invoke;
-	}
-	invoke(&Instruction, token_program.address())
-	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
-}
-
-fn partial_match_assignment_tracks_reachable_unverified_alias(
-	token_program: &ProgramAccount,
-	condition: bool,
-) -> Result<(), ()> {
-	let mut invoke = unrelated_invoke as InvokeFn;
-	match condition {
-		true => invoke = Instruction::invoke_with_unverified_program,
-		false => (),
-	}
-	invoke(&Instruction, token_program.address())
-	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
-}
-
-fn every_branch_can_invalidate_an_unverified_alias(
-	token_program: &ProgramAccount,
-	condition: bool,
-) -> Result<(), ()> {
-	let mut invoke = Instruction::invoke_with_unverified_program as InvokeFn;
-	if condition {
-		invoke = unrelated_invoke;
-	} else {
-		invoke = unrelated_invoke;
-	}
-	invoke(&Instruction, token_program.address())
+	Ok(())
 }
 
 fn checked_dynamic_program(token_program: &ProgramAccount, expected: &Address) -> Result<(), ()> {
@@ -279,6 +234,19 @@ fn checks_on_every_path_dominate(
 	match condition {
 		true => token_program.assert_address(expected)?,
 		false => token_program.assert_addresses(&[])?,
+	}
+
+	Instruction.invoke_with_unverified_program(token_program.address())
+}
+
+fn diverging_paths_do_not_erase_program_proofs(
+	token_program: &ProgramAccount,
+	expected: &Address,
+	condition: bool,
+) -> Result<(), ()> {
+	match condition {
+		true => return Ok(()),
+		false => token_program.assert_program(expected)?,
 	}
 
 	Instruction.invoke_with_unverified_program(token_program.address())

@@ -110,7 +110,9 @@ transfer.invoke_with_unverified_program(token_program.address())?;
 
 Pinocchio Token's `.invoke_with_program()` and `.invoke_signed_with_program()` methods call `Program::verify()` themselves, so they do not need a separate assertion. Prefer those verified methods unless the handler has already validated the program account and deliberately needs the lower-overhead unverified variant. Static `.invoke()` and `.invoke_signed()` builders encode their target program and also need no separate program account assertion. Passing a constant such as `&token::ID` to an unverified invocation is accepted because the caller cannot substitute the value.
 
-The analyzer tracks concrete local variables, fields, and function-item aliases, including casts, assignments, and conditional expressions. It intersects validation state across `if` and `match` branches and retains every unverified function target that remains reachable after a branch join. Assignment invalidates the previous target before recording the replacement. Checking an unrelated account does not authorize the dynamic target, and checking one branch does not authorize a later call unless every branch establishes the same proof.
+The analyzer tracks concrete local variables and fields and intersects validation state across continuing `if` and `match` branches. Checking an unrelated account does not authorize the dynamic target, and checking one branch does not authorize a later call unless every path that continues establishes the same proof.
+
+Call unverified CPI methods directly with method or UFCS syntax. Taking one as a function value is denied at the function item, including casts, assignments, containers, closures, and conditional expressions. This deliberate boundary keeps the exact target argument visible to the lint instead of approximating Rust's full value and closure data flow. If a reviewed abstraction must store one of these functions, use a narrowly scoped lint allowance and document how it authenticates the supplied program.
 
 To migrate existing code, remove assertions that exist only before `.invoke()`, `.invoke_signed()`, `.invoke_with_program()`, or `.invoke_signed_with_program()`. Keep exact-target validation before the explicitly unverified methods. Existing code that used a verified method only to satisfy this lint needs no API change; this release corrects the false positive.
 
@@ -153,9 +155,17 @@ let rent = Rent::from_account_view(rent_account)?;
 let instructions = Instructions::try_from(instructions_account)?;
 ```
 
-Keep `assert_sysvar()` when code only validates identity or deliberately borrows the raw account data. The lint recognizes typed `Clock`, `Rent`, `Instructions`, and `SlotHashes` values from the `pinocchio::sysvars` modules by their resolved Rust type, not their local variable name. Checked provenance follows `let`-`else`, `if let`, `match`, nested and prebound destructuring, and value-preserving `Result` adapters such as `inspect`, identity `map`, and identity `and_then`. Every possible `if` or `match` result must come from a checked loader. Unchecked byte loaders and adapters that replace the successful value remain rejected for method calls, field reads, inline expressions, and destructuring patterns.
+Keep `assert_sysvar()` when code only validates identity or deliberately borrows the raw account data. The lint identifies Pinocchio's known unchecked `from_bytes` and `from_bytes_unchecked` constructors by their resolved definition and reports them where they are called. This source boundary catches replacement through adapters, helper calls, mutable borrows, and destructuring without attempting to reconstruct arbitrary downstream value provenance.
 
-To migrate existing code, replace `assert_sysvar()` followed by manual parsing with the matching checked typed loader. Existing checked values may stay inside ordinary `Result` extraction and value-preserving adapter chains; no temporary assertion is needed to satisfy the lint. If a conditional can produce a value from `from_bytes`, validate that source account and use the checked constructor on every branch instead. No change is needed for identity-only checks or raw data access. The lint still uses standard Solana sysvar account names to identify raw reads, so unusually named raw accounts may require a direct, local assertion.
+To migrate existing code, replace manual byte parsing with the matching checked typed loader. Checked results can use ordinary Rust extraction, adapters, tuples, patterns, and control flow without special lint knowledge. For deliberate raw parsing, call `assert_sysvar()` before borrowing the data, then place a narrow lint allowance directly on the reviewed unchecked constructor. No change is needed for identity-only checks or asserted raw account access. The separate raw-read heuristic still uses standard Solana sysvar account names, so unusually named raw accounts may require a direct, local assertion.
+
+```rust,ignore
+rent_account.assert_sysvar(&sysvar::rent::ID)?;
+let data = rent_account.try_borrow()?;
+// Reviewed exception: the preceding assertion fixes the raw data's identity.
+#[allow(require_sysvar_assert_before_sysvar_use)]
+let rent = Rent::from_bytes(&data)?;
+```
 
 ### `require_type_assert_before_zero_copy_cast`
 

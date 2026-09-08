@@ -1,7 +1,7 @@
 // normalize-stderr-test: "\n$" -> ""
 // aux-build: pinocchio.rs
 
-#![allow(dead_code)]
+#![allow(dead_code, unused_assignments)]
 
 extern crate pinocchio;
 
@@ -14,6 +14,21 @@ use pinocchio::sysvars::slot_hashes::SlotHashes;
 struct ClockView;
 struct RentView;
 struct OtherView;
+
+trait RawSysvarAccount {
+	fn assert_sysvar(&self, id: &()) -> Result<(), ()>;
+	fn data(&self) -> &[u8];
+}
+
+impl RawSysvarAccount for AccountView {
+	fn assert_sysvar(&self, _id: &()) -> Result<(), ()> {
+		Ok(())
+	}
+
+	fn data(&self) -> &[u8] {
+		&[]
+	}
+}
 
 mod sysvar {
 	pub mod clock {
@@ -139,21 +154,27 @@ fn process_typed_sysvars(
 
 fn process_unchecked_typed_sysvar(data: &[u8]) -> Result<(), ()> {
 	let clock = Clock::from_bytes(data)?;
+	//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
 	let _ = clock.slot;
-	//~^ ERROR: sysvar access should be preceded by
 	Ok(())
+}
+
+fn process_unsafe_unchecked_typed_sysvar(data: &[u8]) {
+	let clock = unsafe { Clock::from_bytes_unchecked(data) };
+	//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
+	let _ = clock.slot;
 }
 
 fn process_unchecked_typed_method_with_neutral_name(data: &[u8]) -> Result<(), ()> {
 	let parsed = Rent::from_bytes(data)?;
+	//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
 	let _ = parsed.minimum_balance(8);
-	//~^ ERROR: sysvar access should be preceded by
 	Ok(())
 }
 
 fn process_inline_unchecked_typed_method(data: &[u8]) -> Result<(), ()> {
 	let _ = Rent::from_bytes(data)?.minimum_balance(8);
-	//~^ ERROR: sysvar access should be preceded by
+	//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
 	Ok(())
 }
 
@@ -166,9 +187,9 @@ fn process_conditionally_unchecked_typed_method(
 		Rent::from_account_view(rent_account)?
 	} else {
 		Rent::from_bytes(data)?
+		//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
 	};
 	let _ = parsed.minimum_balance(8);
-	//~^ ERROR: sysvar access should be preceded by
 	Ok(())
 }
 
@@ -193,24 +214,24 @@ fn process_unchecked_first_conditional_typed_method(
 ) -> Result<(), ()> {
 	let parsed = if condition {
 		Rent::from_bytes(data)?
+		//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
 	} else {
 		Rent::from_account_view(rent_account)?
 	};
 	let _ = parsed.minimum_balance(8);
-	//~^ ERROR: sysvar access should be preceded by
 
 	let parsed = match condition {
 		true => Rent::from_bytes(data)?,
+		//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
 		false => Rent::from_account_view(rent_account)?,
 	};
 	let _ = parsed.minimum_balance(16);
-	//~^ ERROR: sysvar access should be preceded by
 	Ok(())
 }
 
 fn process_unchecked_typed_destructure(data: &[u8]) -> Result<(), ()> {
 	let Clock { slot, .. } = Clock::from_bytes(data)?;
-	//~^ ERROR: sysvar access should be preceded by
+	//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
 	let _ = slot;
 	Ok(())
 }
@@ -223,8 +244,8 @@ fn process_checked_typed_destructure(clock_account: &AccountView) -> Result<(), 
 
 fn process_unchecked_typed_match(data: &[u8]) -> Result<(), ()> {
 	match Clock::from_bytes(data)? {
+		//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
 		Clock { slot, .. } => {
-			//~^ ERROR: sysvar access should be preceded by
 			let _ = slot;
 		}
 	}
@@ -273,15 +294,15 @@ fn process_checked_prebound_destructure(clock_account: &AccountView) -> Result<(
 
 fn process_unchecked_prebound_destructure(data: &[u8]) -> Result<(), ()> {
 	let clock = Clock::from_bytes(data)?;
+	//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
 	let Clock { slot, .. } = clock;
-	//~^ ERROR: sysvar access should be preceded by
 	let _ = slot;
 	Ok(())
 }
 
 fn process_unchecked_nested_pattern(data: &[u8]) -> Result<(), ()> {
 	if let Some(Clock { slot, .. }) = Some(Clock::from_bytes(data)?) {
-		//~^ ERROR: sysvar access should be preceded by
+		//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
 		let _ = slot;
 	}
 	Ok(())
@@ -296,8 +317,8 @@ fn process_shadowed_unchecked_typed_sysvar(
 
 	{
 		let clock = Clock::from_bytes(data)?;
+		//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
 		let _ = clock.slot;
-		//~^ ERROR: sysvar access should be preceded by
 	}
 
 	Ok(())
@@ -309,8 +330,8 @@ fn process_discarded_checked_typed_sysvar(
 ) -> Result<(), ()> {
 	let clock =
 		Clock::from_account_view(clock_account).map(|_| Clock::from_bytes(data).unwrap())?;
+	//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
 	let _ = clock.slot;
-	//~^ ERROR: sysvar access should be preceded by
 	Ok(())
 }
 
@@ -319,8 +340,8 @@ fn process_replaced_and_then_typed_sysvar(
 	data: &[u8],
 ) -> Result<(), ()> {
 	let clock = Clock::from_account_view(clock_account).and_then(|_| Clock::from_bytes(data))?;
+	//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
 	let _ = clock.slot;
-	//~^ ERROR: sysvar access should be preceded by
 	Ok(())
 }
 
@@ -349,10 +370,81 @@ fn process_adapter_does_not_validate_captured_value(
 	data: &[u8],
 ) -> Result<(), ()> {
 	let unchecked = Clock::from_bytes(data)?;
+	//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
 	Clock::from_account_view(clock_account).inspect(|_| {
 		let _ = unchecked.slot;
-		//~^ ERROR: sysvar access should be preceded by
 	})?;
+	Ok(())
+}
+
+fn process_mutated_result_adapters(rent_account: &AccountView, data: &[u8]) -> Result<(), ()> {
+	let rent = Rent::from_account_view(rent_account).map(|mut rent| {
+		rent = Rent::from_bytes(data).unwrap();
+		//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
+		rent
+	})?;
+	let _ = rent.minimum_balance(8);
+
+	let rent = Rent::from_account_view(rent_account).and_then(|mut rent| {
+		rent = Rent::from_bytes(data)?;
+		//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
+		Ok(rent)
+	})?;
+	let _ = rent.minimum_balance(16);
+	Ok(())
+}
+
+fn replacer_that_ignores_input(_rent: Rent) -> Result<Rent, ()> {
+	Rent::from_bytes(&[])
+	//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
+}
+
+fn process_arbitrary_result_replacer(rent_account: &AccountView) -> Result<(), ()> {
+	let rent = Rent::from_account_view(rent_account).and_then(replacer_that_ignores_input)?;
+	let _ = rent.minimum_balance(8);
+	Ok(())
+}
+
+fn process_mutable_replacement(rent_account: &AccountView, data: &[u8]) -> Result<(), ()> {
+	let mut rent = Rent::from_account_view(rent_account)?;
+	let _ = core::mem::replace(&mut rent, Rent::from_bytes(data)?);
+	//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
+	let _ = rent.minimum_balance(8);
+	Ok(())
+}
+
+fn process_checked_extraction_forms(rent_account: &AccountView) -> Result<(), ()> {
+	let rent = Rent::from_account_view(rent_account).unwrap();
+	let _ = rent.minimum_balance(8);
+
+	let rent = Rent::from_account_view(rent_account).expect("checked loader");
+	let _ = rent.minimum_balance(16);
+
+	let (rent, number) = (Rent::from_account_view(rent_account)?, 1_u64);
+	let _ = (rent.minimum_balance(32), number);
+
+	let rent = match Rent::from_account_view(rent_account) {
+		Ok(rent) => rent,
+		Err(()) => return Err(()),
+	};
+	let _ = rent.minimum_balance(64);
+	Ok(())
+}
+
+fn process_direct_asserted_raw_source(rent_account: &AccountView) -> Result<(), ()> {
+	rent_account.assert_sysvar(&sysvar::rent::ID)?;
+	#[allow(require_sysvar_assert_before_sysvar_use)]
+	let rent = Rent::from_bytes(rent_account.data())?;
+	let _ = rent.minimum_balance(8);
+	Ok(())
+}
+
+fn process_aliased_raw_source_needs_narrow_allow(rent_account: &AccountView) -> Result<(), ()> {
+	rent_account.assert_sysvar(&sysvar::rent::ID)?;
+	let data = rent_account.data();
+	let rent = Rent::from_bytes(data)?;
+	//~^ ERROR: unchecked typed sysvar constructor requires a validated source account
+	let _ = rent.minimum_balance(8);
 	Ok(())
 }
 

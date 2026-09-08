@@ -1,12 +1,12 @@
 extern crate rustc_hir;
 extern crate rustc_span;
 
-use std::collections::HashMap;
 use std::collections::HashSet;
 
 use rustc_hir::Expr;
 use rustc_hir::ExprKind;
 use rustc_hir::HirId;
+use rustc_hir::Node;
 use rustc_hir::def::DefKind;
 use rustc_hir::def::Res;
 use rustc_hir::intravisit::FnKind;
@@ -21,14 +21,17 @@ crate::declare_late_lint! {
 	/// `.invoke_signed_with_unverified_program()` is called with a dynamic
 	/// program address that has not passed
 	/// `assert_address()`, `assert_addresses()`, or `assert_program()` on the
-	/// same account within the same function.
+	/// same account within the same function. It also rejects taking either
+	/// unverified CPI method as a function value.
 	///
 	/// ### Why is this bad?
 	///
 	/// A dynamic program argument controls the CPI target. Without verifying
 	/// that exact argument, an attacker can substitute a malicious program.
 	/// Static `.invoke()` and `.invoke_signed()` builders encode their target in
-	/// the builder and do not accept a replaceable program argument.
+	/// the builder and do not accept a replaceable program argument. Restricting
+	/// unverified calls to direct method or UFCS syntax keeps the target proof
+	/// local and reviewable.
 	///
 	/// ### Example
 	///
@@ -94,47 +97,9 @@ impl DynamicCpiMethod {
 	}
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-struct DynamicCpiMethods(u8);
-
-impl DynamicCpiMethods {
-	const INVOKE: u8 = 1;
-	const INVOKE_SIGNED: u8 = 2;
-
-	const fn contains(self, method: DynamicCpiMethod) -> bool {
-		let bit = match method {
-			DynamicCpiMethod::Invoke => Self::INVOKE,
-			DynamicCpiMethod::InvokeSigned => Self::INVOKE_SIGNED,
-		};
-		self.0 & bit != 0
-	}
-
-	const fn from_method(method: DynamicCpiMethod) -> Self {
-		match method {
-			DynamicCpiMethod::Invoke => Self(Self::INVOKE),
-			DynamicCpiMethod::InvokeSigned => Self(Self::INVOKE_SIGNED),
-		}
-	}
-
-	const fn is_empty(self) -> bool {
-		self.0 == 0
-	}
-
-	const fn union(self, other: Self) -> Self {
-		Self(self.0 | other.0)
-	}
-
-	fn iter(self) -> impl Iterator<Item = DynamicCpiMethod> {
-		[DynamicCpiMethod::Invoke, DynamicCpiMethod::InvokeSigned]
-			.into_iter()
-			.filter(move |method| self.contains(*method))
-	}
-}
-
 #[derive(Clone, Debug, Default)]
 struct ValidationState {
 	places: HashSet<Place>,
-	cpi_aliases: HashMap<HirId, DynamicCpiMethods>,
 }
 
 impl ValidationState {
@@ -246,16 +211,6 @@ fn intersect_states(states: &[ValidationState]) -> ValidationState {
 	intersection
 		.places
 		.retain(|place| states[1..].iter().all(|state| state.contains(place)));
-	intersection.cpi_aliases.clear();
-	for state in states {
-		for (binding, methods) in &state.cpi_aliases {
-			intersection
-				.cpi_aliases
-				.entry(*binding)
-				.and_modify(|current| *current = current.union(*methods))
-				.or_insert(*methods);
-		}
-	}
 	intersection
 }
 
@@ -264,55 +219,10 @@ struct Analyzer<'cx, 'tcx> {
 }
 
 impl<'tcx> Analyzer<'_, 'tcx> {
-	fn resolve_cpi_alias(
-		&self,
-		expr: &'tcx Expr<'tcx>,
-		state: &ValidationState,
-	) -> DynamicCpiMethods {
-		if let Some(method) = dynamic_cpi_method(self.cx, expr) {
-			return DynamicCpiMethods::from_method(method);
-		}
-
-		match &expr.kind {
-			ExprKind::Path(path) => {
-				let Res::Local(binding) = self.cx.qpath_res(path, expr.hir_id) else {
-					return DynamicCpiMethods::default();
-				};
-				state.cpi_aliases.get(&binding).copied().unwrap_or_default()
-			}
-			ExprKind::Unary(_, inner)
-			| ExprKind::Use(inner, _)
-			| ExprKind::Cast(inner, _)
-			| ExprKind::Type(inner, _)
-			| ExprKind::DropTemps(inner)
-			| ExprKind::AddrOf(_, _, inner)
-			| ExprKind::UnsafeBinderCast(_, inner, _) => self.resolve_cpi_alias(inner, state),
-			ExprKind::Block(block, _) => {
-				block.expr.map_or_else(DynamicCpiMethods::default, |tail| {
-					self.resolve_cpi_alias(tail, state)
-				})
-			}
-			ExprKind::If(_, then, Some(otherwise)) => {
-				self.resolve_cpi_alias(then, state)
-					.union(self.resolve_cpi_alias(otherwise, state))
-			}
-			ExprKind::Match(_, arms, _) => {
-				arms.iter()
-					.fold(DynamicCpiMethods::default(), |methods, arm| {
-						methods.union(self.resolve_cpi_alias(arm.body, state))
-					})
-			}
-			_ => DynamicCpiMethods::default(),
-		}
-	}
-
 	fn invalidate(&self, state: &mut ValidationState, assigned: &Place) {
 		state
 			.places
 			.retain(|place| !place.is_same_or_descendant_of(assigned));
-		if let Place::Local(binding) = assigned {
-			state.cpi_aliases.remove(binding);
-		}
 	}
 
 	fn lint_unchecked_cpi(&self, expr: &Expr<'_>, method: &str) {
@@ -328,6 +238,24 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				 invocation",
 			);
 		});
+	}
+
+	fn lint_unverified_function_value(&self, expr: &Expr<'_>, method: DynamicCpiMethod) {
+		self.cx.lint(REQUIRE_PROGRAM_CHECK_BEFORE_CPI, |diag| {
+			diag.span(expr.span);
+			diag.primary_message(format!(
+				"`{}` cannot be used as a function value",
+				method.name()
+			));
+			diag.help(
+				"invoke the unverified CPI function directly so the lint can prove its exact \
+				 program target, or use the verified `invoke_with_program` variant",
+			);
+		});
+	}
+
+	fn expression_can_continue(&self, expr: &Expr<'_>) -> bool {
+		!self.cx.typeck_results().expr_ty(expr).is_never()
 	}
 
 	fn visit_block(&self, block: &'tcx rustc_hir::Block<'tcx>, state: &mut ValidationState) {
@@ -348,11 +276,6 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 									.is_some_and(|source| state.contains(&source));
 							if inherits_identity {
 								state.insert(Place::Local(binding));
-							}
-
-							let cpi_method = self.resolve_cpi_alias(init, state);
-							if !cpi_method.is_empty() {
-								state.cpi_aliases.insert(binding, cpi_method);
 							}
 						}
 					}
@@ -410,21 +333,24 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				}
 			}
 			ExprKind::Call(callee, args) => {
-				self.visit_expr(callee, state);
+				let direct_method = dynamic_cpi_method(self.cx, callee);
+				if direct_method.is_none() {
+					self.visit_expr(callee, state);
+				}
 				for argument in *args {
 					self.visit_expr(argument, state);
 				}
 
-				let methods = self.resolve_cpi_alias(callee, state);
-				let Some(method) = methods.iter().find(|method| {
-					!args.get(method.program_index()).is_some_and(|target| {
-						is_static_address(target)
-							|| place_identity(target).is_some_and(|place| state.contains(&place))
-					})
-				}) else {
+				let Some(method) = direct_method else {
 					return;
 				};
-				self.lint_unchecked_cpi(expr, method.name());
+				let validated = args.get(method.program_index()).is_some_and(|target| {
+					is_static_address(target)
+						|| place_identity(target).is_some_and(|place| state.contains(&place))
+				});
+				if !validated {
+					self.lint_unchecked_cpi(expr, method.name());
+				}
 			}
 			ExprKind::Block(block, _) => self.visit_block(block, state),
 			ExprKind::Match(scrutinee, arms, _) => {
@@ -438,7 +364,9 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 						self.visit_expr(guard, &mut branch);
 					}
 					self.visit_expr(arm.body, &mut branch);
-					branches.push(branch);
+					if self.expression_can_continue(arm.body) {
+						branches.push(branch);
+					}
 				}
 
 				*state = if branches.is_empty() {
@@ -450,15 +378,26 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			ExprKind::If(condition, then, else_opt) => {
 				self.visit_expr(condition, state);
 				let base = state.clone();
+				let mut branches = Vec::with_capacity(2);
 				let mut then_state = base.clone();
 				self.visit_expr(then, &mut then_state);
-
-				let mut else_state = base;
-				if let Some(else_expr) = else_opt {
-					self.visit_expr(else_expr, &mut else_state);
+				if self.expression_can_continue(then) {
+					branches.push(then_state);
 				}
 
-				*state = intersect_states(&[then_state, else_state]);
+				if let Some(else_expr) = else_opt {
+					let mut else_state = base;
+					self.visit_expr(else_expr, &mut else_state);
+					if self.expression_can_continue(else_expr) {
+						branches.push(else_state);
+					}
+				} else {
+					branches.push(base);
+				}
+
+				if !branches.is_empty() {
+					*state = intersect_states(&branches);
+				}
 			}
 			ExprKind::Loop(block, ..) => {
 				let entry = state.clone();
@@ -472,8 +411,10 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					operation.node,
 					rustc_hir::BinOpKind::And | rustc_hir::BinOpKind::Or
 				) {
+					let base = state.clone();
 					let mut conditional = state.clone();
 					self.visit_expr(rhs, &mut conditional);
+					*state = intersect_states(&[base, conditional]);
 				} else {
 					self.visit_expr(rhs, state);
 				}
@@ -481,16 +422,8 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			ExprKind::Assign(lhs, rhs, _) | ExprKind::AssignOp(_, lhs, rhs) => {
 				self.visit_expr(lhs, state);
 				self.visit_expr(rhs, state);
-				let cpi_methods = self.resolve_cpi_alias(rhs, state);
 				if let Some(place) = place_identity(lhs) {
-					let binding = match &place {
-						Place::Local(binding) => Some(*binding),
-						Place::Field(..) => None,
-					};
 					self.invalidate(state, &place);
-					if let Some(binding) = binding.filter(|_| !cpi_methods.is_empty()) {
-						state.cpi_aliases.insert(binding, cpi_methods);
-					}
 				}
 			}
 			ExprKind::AddrOf(_, rustc_hir::Mutability::Mut, inner) => {
@@ -539,6 +472,22 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 }
 
 impl<'tcx> LateLintPass<'tcx> for RequireProgramCheckBeforeCpi {
+	fn check_expr(&mut self, cx: &LateContext<'tcx>, expr: &'tcx Expr<'tcx>) {
+		let Some(method) = dynamic_cpi_method(cx, expr) else {
+			return;
+		};
+		let is_direct_callee = matches!(
+			cx.tcx.parent_hir_node(expr.hir_id),
+			Node::Expr(Expr {
+				kind: ExprKind::Call(callee, _),
+				..
+			}) if callee.hir_id == expr.hir_id
+		);
+		if !is_direct_callee {
+			Analyzer { cx }.lint_unverified_function_value(expr, method);
+		}
+	}
+
 	fn check_fn(
 		&mut self,
 		cx: &LateContext<'tcx>,

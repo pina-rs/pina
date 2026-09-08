@@ -20,6 +20,10 @@ pub mod sysvars {
 			pub fn from_bytes(_data: &[u8]) -> Result<Self, ()> {
 				Ok(Self { slot: 0 })
 			}
+
+			pub unsafe fn from_bytes_unchecked(_data: &[u8]) -> Self {
+				Self { slot: 0 }
+			}
 		}
 	}
 

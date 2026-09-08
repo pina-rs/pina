@@ -25,8 +25,6 @@ pub struct CallInfo {
 	pub span: Span,
 	pub method: String,
 	pub receiver: Option<String>,
-	pub receiver_binding: Option<HirId>,
-	pub receiver_hir_id: Option<HirId>,
 	pub receiver_span: Option<Span>,
 	pub receiver_type_definitions: Vec<TypeDefinition>,
 	pub path: Option<String>,
@@ -54,26 +52,10 @@ pub struct AssignmentInfo {
 	pub binding: Option<HirId>,
 }
 
-#[derive(Debug, Clone)]
-pub struct FieldAccessInfo {
-	pub span: Span,
-	pub receiver_binding: Option<HirId>,
-	pub receiver_hir_id: HirId,
-	pub receiver_span: Span,
-	pub receiver_type_definitions: Vec<TypeDefinition>,
-}
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TypeDefinition {
 	pub path: String,
 	pub crate_name: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct PatternProjectionInfo {
-	pub span: Span,
-	pub value_hir_id: HirId,
-	pub value_type_definitions: Vec<TypeDefinition>,
 }
 
 type ResultBinding<'a> = (HirId, &'a str);
@@ -86,8 +68,6 @@ pub struct FunctionFacts {
 	pub paths: Vec<String>,
 	pub assignments: Vec<AssignmentInfo>,
 	pub aliases: HashMap<HirId, AliasInfo>,
-	pub field_accesses: Vec<FieldAccessInfo>,
-	pub pattern_projections: Vec<PatternProjectionInfo>,
 }
 
 pub fn collect_function_facts(cx: &LateContext<'_>, body: &Body<'_>) -> FunctionFacts {
@@ -153,58 +133,6 @@ fn expression_type_definitions(cx: &LateContext<'_>, expr: &Expr<'_>) -> Vec<Typ
 	let mut definitions = Vec::new();
 	collect_type_definitions(cx.tcx, cx.typeck_results().expr_ty(expr), &mut definitions);
 	definitions
-}
-
-fn collect_pattern_projection(
-	cx: &LateContext<'_>,
-	pattern: &rustc_hir::Pat<'_>,
-	value: &Expr<'_>,
-	facts: &mut FunctionFacts,
-) {
-	match &pattern.kind {
-		rustc_hir::PatKind::Struct(_, fields, _) => {
-			let mut definitions = Vec::new();
-			collect_type_definitions(
-				cx.tcx,
-				cx.typeck_results().pat_ty(pattern),
-				&mut definitions,
-			);
-			facts.pattern_projections.push(PatternProjectionInfo {
-				span: pattern.span,
-				value_hir_id: value.hir_id,
-				value_type_definitions: definitions,
-			});
-			for field in *fields {
-				collect_pattern_projection(cx, field.pat, value, facts);
-			}
-		}
-		rustc_hir::PatKind::Binding(_, _, _, Some(inner))
-		| rustc_hir::PatKind::Box(inner)
-		| rustc_hir::PatKind::Deref(inner)
-		| rustc_hir::PatKind::Ref(inner, ..)
-		| rustc_hir::PatKind::Guard(inner, _) => {
-			collect_pattern_projection(cx, inner, value, facts);
-		}
-		rustc_hir::PatKind::TupleStruct(_, patterns, _)
-		| rustc_hir::PatKind::Tuple(patterns, _)
-		| rustc_hir::PatKind::Or(patterns) => {
-			for pattern in *patterns {
-				collect_pattern_projection(cx, pattern, value, facts);
-			}
-		}
-		rustc_hir::PatKind::Slice(before, middle, after) => {
-			for pattern in *before {
-				collect_pattern_projection(cx, pattern, value, facts);
-			}
-			if let Some(pattern) = middle {
-				collect_pattern_projection(cx, pattern, value, facts);
-			}
-			for pattern in *after {
-				collect_pattern_projection(cx, pattern, value, facts);
-			}
-		}
-		_ => {}
-	}
 }
 
 pub fn receiver_name(expr: &Expr<'_>) -> Option<String> {
@@ -306,7 +234,6 @@ fn collect_from_block(
 		match &stmt.kind {
 			rustc_hir::StmtKind::Let(local) => {
 				if let Some(init) = local.init {
-					collect_pattern_projection(cx, local.pat, init, facts);
 					let binding = match local.pat.kind {
 						rustc_hir::PatKind::Binding(_, binding, ident, _) => {
 							Some((binding, ident.name.as_str().to_string()))
@@ -382,8 +309,6 @@ fn collect_from_expr_inner(
 				span: expr.span,
 				method: method.to_string(),
 				receiver: expression_identity(receiver),
-				receiver_binding: expression_local_binding(receiver),
-				receiver_hir_id: Some(receiver.hir_id),
 				receiver_span: Some(receiver.span),
 				receiver_type_definitions: expression_type_definitions(cx, receiver),
 				path: None,
@@ -442,8 +367,6 @@ fn collect_from_expr_inner(
 					span: expr.span,
 					method,
 					receiver: None,
-					receiver_binding: None,
-					receiver_hir_id: None,
 					receiver_span: None,
 					receiver_type_definitions: Vec::new(),
 					path: Some(path_name),
@@ -480,7 +403,6 @@ fn collect_from_expr_inner(
 				matches!(source, rustc_hir::MatchSource::TryDesugar(_)),
 			);
 			for arm in *arms {
-				collect_pattern_projection(cx, arm.pat, scrutinee, facts);
 				collect_from_expr(cx, arm.body, facts, result_binding);
 			}
 		}
@@ -492,13 +414,6 @@ fn collect_from_expr_inner(
 			}
 		}
 		ExprKind::Field(receiver, _) => {
-			facts.field_accesses.push(FieldAccessInfo {
-				span: expr.span,
-				receiver_binding: expression_local_binding(receiver),
-				receiver_hir_id: receiver.hir_id,
-				receiver_span: receiver.span,
-				receiver_type_definitions: expression_type_definitions(cx, receiver),
-			});
 			collect_from_expr(cx, receiver, facts, result_binding);
 		}
 		ExprKind::Unary(_, expr)
@@ -533,7 +448,6 @@ fn collect_from_expr_inner(
 			collect_from_expr(cx, index, facts, None);
 		}
 		ExprKind::Let(let_expr) => {
-			collect_pattern_projection(cx, let_expr.pat, let_expr.init, facts);
 			collect_from_expr(cx, let_expr.init, facts, result_binding);
 		}
 		ExprKind::Tup(exprs) | ExprKind::Array(exprs) => {
