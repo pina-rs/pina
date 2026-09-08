@@ -406,7 +406,7 @@ fn codama_generate_help_snapshot() {
 fn idl_stdout_is_machine_readable_json() {
 	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.current_dir(workspace_root())
-		.args(["idl", "--path", "examples/declare_id", "--compact"])
+		.args(["idl", "--path", "examples/declare_id_program", "--compact"])
 		.output()
 		.unwrap_or_else(|error| panic!("failed to run pina idl: {error}"));
 
@@ -419,13 +419,13 @@ fn idl_stdout_is_machine_readable_json() {
 #[test]
 fn idl_output_file_is_machine_readable_json() {
 	let temp_dir = reset_snapshot_dir("idl_output_file");
-	let output_path = temp_dir.join("declare_id.json");
+	let output_path = temp_dir.join("declare_id_program.json");
 	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.current_dir(workspace_root())
 		.args([
 			"idl",
 			"--path",
-			"examples/declare_id",
+			"examples/declare_id_program",
 			"--output",
 			&workspace_relative(&output_path),
 		])
@@ -461,7 +461,7 @@ fn idl_reports_generation_and_output_write_failures() {
 		.args([
 			"idl",
 			"--path",
-			"examples/declare_id",
+			"examples/declare_id_program",
 			"--output",
 			&workspace_relative(&output_dir),
 		])
@@ -475,7 +475,7 @@ fn idl_reports_generation_and_output_write_failures() {
 fn idl_legacy_pretty_flag_remains_accepted() {
 	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.current_dir(workspace_root())
-		.args(["idl", "--path", "examples/declare_id", "--pretty"])
+		.args(["idl", "--path", "examples/declare_id_program", "--pretty"])
 		.output()
 		.unwrap_or_else(|error| panic!("failed to run pina idl: {error}"));
 
@@ -488,7 +488,7 @@ fn idl_legacy_pretty_flag_remains_accepted() {
 fn explicit_idl_generate_matches_bare_idl() {
 	let bare = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.current_dir(workspace_root())
-		.args(["idl", "--path", "examples/declare_id", "--compact"])
+		.args(["idl", "--path", "examples/declare_id_program", "--compact"])
 		.output()
 		.unwrap_or_else(|error| panic!("failed to run bare pina idl: {error}"));
 	let explicit = Command::new(env!("CARGO_BIN_EXE_pina"))
@@ -497,7 +497,7 @@ fn explicit_idl_generate_matches_bare_idl() {
 			"idl",
 			"generate",
 			"--path",
-			"examples/declare_id",
+			"examples/declare_id_program",
 			"--compact",
 		])
 		.output()
@@ -513,7 +513,7 @@ fn idl_success_output_snapshot() {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command
 		.current_dir(workspace_root())
-		.args(["idl", "--path", "examples/declare_id"]);
+		.args(["idl", "--path", "examples/declare_id_program"]);
 	assert_cmd_snapshot!("idl_success_output", command);
 }
 

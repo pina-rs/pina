@@ -1,0 +1,5 @@
+[package]
+name = "pina_bpf_program-cpi"
+version = "0.0.0"
+edition = "2021"
+publish = false

@@ -1,0 +1,715 @@
+{
+	"kind": "rootNode",
+	"standard": "codama",
+	"version": "1.8.0",
+	"program": {
+		"kind": "programNode",
+		"name": "compactAccountsProgram",
+		"publicKey": "85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn",
+		"version": "0.0.0",
+		"accounts": [
+			{
+				"kind": "accountNode",
+				"name": "journal",
+				"docs": [
+					"A compact account with four independently encoded dynamic fields.",
+					"",
+					"The fixed header includes a semantic `Option<u64>` encoded as",
+					"`PodOption<PodU64>`. The title and optional note use compact strings, while",
+					"entries and markers use vectors; only their active bytes are allocated."
+				],
+				"data": {
+					"kind": "structTypeNode",
+					"fields": [
+						{
+							"kind": "structFieldTypeNode",
+							"name": "discriminator",
+							"defaultValueStrategy": "omitted",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"defaultValue": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "bump",
+							"docs": [
+								"Canonical PDA bump."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "authority",
+							"docs": [
+								"Signer permitted to mutate and fund this journal."
+							],
+							"type": {
+								"kind": "publicKeyTypeNode"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "revision",
+							"docs": [
+								"Number of successful resize or write operations."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u32",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "featuredEntry",
+							"docs": [
+								"Most recently written entry value, stored as `PodOption<PodU64>`."
+							],
+							"type": {
+								"kind": "optionTypeNode",
+								"fixed": true,
+								"item": {
+									"kind": "numberTypeNode",
+									"format": "u64",
+									"endian": "le"
+								},
+								"prefix": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "title",
+							"docs": [
+								"Human-readable title stored as active UTF-8 bytes."
+							],
+							"type": {
+								"kind": "preOffsetTypeNode",
+								"offset": 12,
+								"strategy": "relative",
+								"type": {
+									"kind": "sizePrefixTypeNode",
+									"type": {
+										"kind": "stringTypeNode",
+										"encoding": "utf8"
+									},
+									"prefix": {
+										"kind": "postOffsetTypeNode",
+										"offset": 0,
+										"strategy": "preOffset",
+										"type": {
+											"kind": "preOffsetTypeNode",
+											"offset": 47,
+											"strategy": "absolute",
+											"type": {
+												"kind": "numberTypeNode",
+												"format": "u8",
+												"endian": "le"
+											}
+										}
+									}
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "entries",
+							"docs": [
+								"Active entries. Unused capacity consumes no account bytes."
+							],
+							"type": {
+								"kind": "arrayTypeNode",
+								"item": {
+									"kind": "numberTypeNode",
+									"format": "u64",
+									"endian": "le"
+								},
+								"count": {
+									"kind": "prefixedCountNode",
+									"prefix": {
+										"kind": "postOffsetTypeNode",
+										"offset": 0,
+										"strategy": "preOffset",
+										"type": {
+											"kind": "preOffsetTypeNode",
+											"offset": 48,
+											"strategy": "absolute",
+											"type": {
+												"kind": "numberTypeNode",
+												"format": "u16",
+												"endian": "le"
+											}
+										}
+									}
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "markers",
+							"docs": [
+								"Independently sized markers stored as a second compact tail."
+							],
+							"type": {
+								"kind": "arrayTypeNode",
+								"item": {
+									"kind": "numberTypeNode",
+									"format": "u8",
+									"endian": "le"
+								},
+								"count": {
+									"kind": "prefixedCountNode",
+									"prefix": {
+										"kind": "postOffsetTypeNode",
+										"offset": 0,
+										"strategy": "preOffset",
+										"type": {
+											"kind": "preOffsetTypeNode",
+											"offset": 50,
+											"strategy": "absolute",
+											"type": {
+												"kind": "numberTypeNode",
+												"format": "u64",
+												"endian": "le"
+											}
+										}
+									}
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "note",
+							"docs": [
+								"Optional human-readable status attached to the latest resize."
+							],
+							"type": {
+								"kind": "optionTypeNode",
+								"item": {
+									"kind": "sizePrefixTypeNode",
+									"type": {
+										"kind": "stringTypeNode",
+										"encoding": "utf8"
+									},
+									"prefix": {
+										"kind": "numberTypeNode",
+										"format": "u8",
+										"endian": "le"
+									}
+								},
+								"prefix": {
+									"kind": "postOffsetTypeNode",
+									"offset": 0,
+									"strategy": "preOffset",
+									"type": {
+										"kind": "preOffsetTypeNode",
+										"offset": 58,
+										"strategy": "absolute",
+										"type": {
+											"kind": "numberTypeNode",
+											"format": "u8",
+											"endian": "le"
+										}
+									}
+								}
+							}
+						}
+					]
+				},
+				"pda": {
+					"kind": "pdaLinkNode",
+					"name": "journal"
+				},
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			}
+		],
+		"instructions": [
+			{
+				"kind": "instructionNode",
+				"name": "initialize",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": true,
+						"isSigner": true,
+						"isOptional": false,
+						"docs": [
+							"Funds rent and becomes the journal authority."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "journal",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"Empty canonical journal PDA."
+						],
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "journal"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 0
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "bump",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "entryCount",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "markerCount",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 0
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "resize",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": true,
+						"isSigner": true,
+						"isOptional": false,
+						"docs": [
+							"Funds growth and receives the rent refund from shrinking."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "journal",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 1
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "entryCount",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "markerCount",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "write",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": true,
+						"isSigner": true,
+						"isOptional": false,
+						"docs": [
+							"Funds growth if a future write patch changes the encoded length."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "journal",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 2
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "index",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "value",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u64",
+							"endian": "le"
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 2
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "instructionNode",
+				"name": "rename",
+				"accounts": [
+					{
+						"kind": "instructionAccountNode",
+						"name": "authority",
+						"isWritable": true,
+						"isSigner": true,
+						"isOptional": false,
+						"docs": [
+							"Funds title growth and receives rent refunded by title shrinkage."
+						]
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "journal",
+						"isWritable": true,
+						"isSigner": false,
+						"isOptional": false
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "systemProgram",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "publicKeyValueNode",
+							"publicKey": "11111111111111111111111111111111"
+						}
+					}
+				],
+				"arguments": [
+					{
+						"kind": "instructionArgumentNode",
+						"name": "discriminator",
+						"defaultValueStrategy": "omitted",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						},
+						"defaultValue": {
+							"kind": "numberValueNode",
+							"number": 3
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "titleLen",
+						"type": {
+							"kind": "numberTypeNode",
+							"format": "u8",
+							"endian": "le"
+						}
+					},
+					{
+						"kind": "instructionArgumentNode",
+						"name": "title",
+						"type": {
+							"kind": "fixedSizeTypeNode",
+							"size": 24,
+							"type": {
+								"kind": "bytesTypeNode"
+							}
+						}
+					}
+				],
+				"discriminators": [
+					{
+						"kind": "constantDiscriminatorNode",
+						"offset": 0,
+						"constant": {
+							"kind": "constantValueNode",
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u8",
+								"endian": "le"
+							},
+							"value": {
+								"kind": "numberValueNode",
+								"number": 3
+							}
+						}
+					}
+				]
+			}
+		],
+		"definedTypes": [
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA7JournalF5Title",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 24,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
+			},
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA7JournalF7Entries",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 8,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
+			},
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA7JournalF7Markers",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 8,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
+			},
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA7JournalF4Note",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 64,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
+			}
+		],
+		"pdas": [
+			{
+				"kind": "pdaNode",
+				"name": "journal",
+				"seeds": [
+					{
+						"kind": "constantPdaSeedNode",
+						"type": {
+							"kind": "stringTypeNode",
+							"encoding": "utf8"
+						},
+						"value": {
+							"kind": "stringValueNode",
+							"string": "compact-journal"
+						}
+					},
+					{
+						"kind": "variablePdaSeedNode",
+						"name": "authority",
+						"type": {
+							"kind": "publicKeyTypeNode"
+						}
+					}
+				]
+			}
+		],
+		"errors": [
+			{
+				"kind": "errorNode",
+				"name": "capacityExceeded",
+				"code": 7000,
+				"message": ""
+			},
+			{
+				"kind": "errorNode",
+				"name": "indexOutOfBounds",
+				"code": 7001,
+				"message": ""
+			},
+			{
+				"kind": "errorNode",
+				"name": "authorityMismatch",
+				"code": 7002,
+				"message": ""
+			}
+		]
+	}
+}

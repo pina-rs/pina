@@ -24,7 +24,7 @@ fn workspace_root() -> PathBuf {
 fn npx_cmd_receives_the_exact_pinned_raw_fetch_arguments() {
 	let directory =
 		tempfile::tempdir().unwrap_or_else(|error| panic!("temporary directory failed: {error}"));
-	let root = pina_cli::generate_idl(&workspace_root().join("examples/declare_id"), None)
+	let root = pina_cli::generate_idl(&workspace_root().join("examples/declare_id_program"), None)
 		.unwrap_or_else(|error| panic!("fixture generation failed: {error}"));
 	let source = serde_json::to_vec(&root)
 		.unwrap_or_else(|error| panic!("fixture serialization failed: {error}"));

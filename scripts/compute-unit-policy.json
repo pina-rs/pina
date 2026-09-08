@@ -1,31 +1,31 @@
 {
 	"trackedPrograms": [
-		"hello_solana",
-		"duplicate_mutable_accounts",
-		"events",
-		"sysvar_checks",
-		"system_accounts",
-		"account_realloc",
-		"compact_accounts",
+		"hello_solana_program",
+		"duplicate_mutable_accounts_program",
+		"events_program",
+		"sysvar_checks_program",
+		"system_accounts_program",
+		"account_realloc_program",
+		"compact_accounts_program",
 		"counter_program",
 		"profile_program"
 	],
 	"baselineProgramAliases": {
-		"account_realloc": "anchor_realloc",
-		"custom_errors": "anchor_errors",
-		"declare_id": "anchor_declare_id",
+		"account_realloc_program": "anchor_realloc",
+		"custom_errors_program": "anchor_errors",
+		"declare_id_program": "anchor_declare_id",
 		"declare_program": "anchor_declare_program",
-		"duplicate_mutable_accounts": "anchor_duplicate_mutable_accounts",
-		"events": "anchor_events",
-		"float_accounts": "anchor_floats",
-		"system_accounts": "anchor_system_accounts",
-		"sysvar_checks": "anchor_sysvars"
+		"duplicate_mutable_accounts_program": "anchor_duplicate_mutable_accounts",
+		"events_program": "anchor_events",
+		"float_accounts_program": "anchor_floats",
+		"system_accounts_program": "anchor_system_accounts",
+		"sysvar_checks_program": "anchor_sysvars"
 	},
 	"runtimeCases": [
-		"account_realloc/grow_0_to_8",
-		"account_realloc/initialize",
-		"account_realloc/rewrite_8_to_8",
-		"account_realloc/shrink_8_to_0",
+		"account_realloc_program/grow_0_to_8",
+		"account_realloc_program/initialize",
+		"account_realloc_program/rewrite_8_to_8",
+		"account_realloc_program/shrink_8_to_0",
 		"counter_program/increment",
 		"counter_program/initialize",
 		"profile_program/add_tag",
@@ -43,7 +43,7 @@
 	},
 	"approvedTotals": {},
 	"runtimeApprovedTotals": {
-		"account_realloc/initialize": 9782,
+		"account_realloc_program/initialize": 9782,
 		"profile_program/add_tag": 2271,
 		"profile_program/initialize": 7392
 	}

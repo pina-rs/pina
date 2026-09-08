@@ -166,7 +166,7 @@ async function fetchAccountData(
 function deployCpiPrograms(surfnet: Surfnet): void {
 	surfnet.deploy({
 		programId: PINA_BPF_PROGRAM_ID,
-		soPath: artifactPath("pina_bpf"),
+		soPath: artifactPath("pina_bpf_program"),
 	});
 	surfnet.deploy({
 		programId: PROP_AMM_PROGRAM_ID,

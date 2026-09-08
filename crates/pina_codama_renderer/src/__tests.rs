@@ -516,7 +516,7 @@ fn renders_instruction_data_with_discriminator_prefix() {
 
 #[test]
 fn renders_root_mod_with_unused_program_reexport_allowance() {
-	let crate_dir = render_fixture_program("declare_id", "pina-codama-render-root-mod");
+	let crate_dir = render_fixture_program("declare_id_program", "pina-codama-render-root-mod");
 	let content = read_generated_file(&crate_dir, "mod.rs");
 
 	insta::assert_snapshot!("root_mod_with_unused_program_reexport_allowance", content);
@@ -1279,7 +1279,7 @@ fn renders_untrusted_multiline_text_as_valid_rust() {
 	syn::parse_file(account_source)
 		.unwrap_or_else(|error| panic!("generated account source is invalid: {error}"));
 
-	let mut error_root = load_fixture_root("custom_errors");
+	let mut error_root = load_fixture_root("custom_errors_program");
 	error_root.program.errors[0].message =
 		"bad message\n)]\npub const INJECTED: bool = true;".to_string();
 	let error_files = render_program_to_files(&error_root)

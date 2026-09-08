@@ -1,5 +1,0 @@
-[package]
-name = "duplicate_mutable_accounts-client"
-version = "0.0.0"
-edition = "2021"
-publish = false

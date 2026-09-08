@@ -5,7 +5,7 @@ info:
   args:
     - idl
     - "--path"
-    - examples/declare_id
+    - examples/declare_id_program
 ---
 success: true
 exit_code: 0
@@ -16,7 +16,7 @@ exit_code: 0
   "version": "1.8.0",
   "program": {
     "kind": "programNode",
-    "name": "declareId",
+    "name": "declareIdProgram",
     "publicKey": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
     "version": "0.0.0",
     "instructions": [

@@ -1,0 +1,9 @@
+[package]
+name = "sysvar-checks-surfpool-tests"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+pina_test = { workspace = true }
+program_under_test = { package = "sysvar_checks_program", path = "../.." }

@@ -19,7 +19,7 @@ import { findExecutable } from "./find-executable.ts";
 
 const TOOLS_VERSION = "v1.54";
 const PROGRAMS = [
-	"account_realloc",
+	"account_realloc_program",
 	"counter_program",
 	"profile_program",
 ] as const;

@@ -263,7 +263,7 @@ Or add Pina to an existing crate:
 use pina::*;
 
 // 1. Declare your program ID.
-declare_id!("YourProgramId11111111111111111111111111111111");
+declare_id_program!("YourProgramId11111111111111111111111111111111");
 
 // 2. Define a discriminator enum for your instructions.
 #[discriminator]
@@ -963,30 +963,30 @@ The `pina docs` subcommand renders built-in reference topics. Set the `PINA_TEMP
 
 <br>
 
-| Example                                                             | Description                                                                                   |
-| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| [`hello_solana`](examples/hello_solana)                             | Minimal program — entrypoint, accounts, logging                                               |
-| [`counter_program`](examples/counter_program)                       | PDA state management with initialize and increment                                            |
-| [`transfer_sol`](examples/transfer_sol)                             | CPI and direct lamport transfers                                                              |
-| [`escrow_program`](examples/escrow_program)                         | Full token escrow with SPL token operations                                                   |
-| [`vesting_program`](examples/vesting_program)                       | Schedule-state and vault-ATA scaffold; does not transfer tokens or enforce time-based vesting |
-| [`role_registry_program`](examples/role_registry_program)           | Role-based configuration and registry PDAs                                                    |
-| [`staking_rewards_program`](examples/staking_rewards_program)       | Staking pool and user-position accounting scaffold                                            |
-| [`pina_bpf`](examples/pina_bpf)                                     | Minimal pina-native BPF hello world (nightly + `build-std=core,alloc`)                        |
-| [`declare_id`](examples/declare_id)                                 | Anchor `declare-id` test parity port for program-id mismatch                                  |
-| [`declare_program`](examples/declare_program)                       | Anchor `declare-program` parity port for external-program ID checks                           |
-| [`duplicate_mutable_accounts`](examples/duplicate_mutable_accounts) | Anchor duplicate mutable account checks adapted to explicit pina validation                   |
-| [`custom_errors`](examples/custom_errors)                           | Anchor custom error-code parity and guard helper checks                                       |
-| [`events`](examples/events)                                         | Anchor event schema parity via deterministic event serialization                              |
-| [`float_accounts`](examples/float_accounts)                         | Anchor float account/update behavior with authority checks                                    |
-| [`system_accounts`](examples/system_accounts)                       | Anchor system-owned account constraint parity                                                 |
-| [`sysvar_checks`](examples/sysvar_checks)                           | Anchor sysvar account validation parity                                                       |
-| [`account_realloc`](examples/account_realloc)                       | Dynamic compact account lifecycle with typed, rent-adjusted patches                           |
-| [`compact_accounts`](examples/compact_accounts)                     | Atomic compact patches, rent adjustment, and generated clients                                |
-| [`todo_program`](examples/todo_program)                             | PDA-backed state with boolean and digest updates                                              |
-| [`profile_program`](examples/profile_program)                       | User profile registry with bounded UTF-8 and tag fields                                       |
-| [`prop_amm_program`](examples/prop_amm_program)                     | Anchor `prop-amm` port focused on authority-controlled oracle updates                         |
-| [`optional_accounts_program`](examples/optional_accounts_program)   | Optional-account slots with explicit presence handling                                        |
+| Example                                                                             | Description                                                                                   |
+| ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| [`hello_solana_program`](examples/hello_solana_program)                             | Minimal program — entrypoint, accounts, logging                                               |
+| [`counter_program`](examples/counter_program)                                       | PDA state management with initialize and increment                                            |
+| [`transfer_sol_program`](examples/transfer_sol_program)                             | CPI and direct lamport transfers                                                              |
+| [`escrow_program`](examples/escrow_program)                                         | Full token escrow with SPL token operations                                                   |
+| [`vesting_program`](examples/vesting_program)                                       | Schedule-state and vault-ATA scaffold; does not transfer tokens or enforce time-based vesting |
+| [`role_registry_program`](examples/role_registry_program)                           | Role-based configuration and registry PDAs                                                    |
+| [`staking_rewards_program`](examples/staking_rewards_program)                       | Staking pool and user-position accounting scaffold                                            |
+| [`pina_bpf_program`](examples/pina_bpf_program)                                     | Minimal pina-native BPF hello world (nightly + `build-std=core,alloc`)                        |
+| [`declare_id_program`](examples/declare_id_program)                                 | Anchor `declare-id` test parity port for program-id mismatch                                  |
+| [`declare_program`](examples/declare_program)                                       | Anchor `declare-program` parity port for external-program ID checks                           |
+| [`duplicate_mutable_accounts_program`](examples/duplicate_mutable_accounts_program) | Anchor duplicate mutable account checks adapted to explicit pina validation                   |
+| [`custom_errors_program`](examples/custom_errors_program)                           | Anchor custom error-code parity and guard helper checks                                       |
+| [`events_program`](examples/events_program)                                         | Anchor event schema parity via deterministic event serialization                              |
+| [`float_accounts_program`](examples/float_accounts_program)                         | Anchor float account/update behavior with authority checks                                    |
+| [`system_accounts_program`](examples/system_accounts_program)                       | Anchor system-owned account constraint parity                                                 |
+| [`sysvar_checks_program`](examples/sysvar_checks_program)                           | Anchor sysvar account validation parity                                                       |
+| [`account_realloc_program`](examples/account_realloc_program)                       | Dynamic compact account lifecycle with typed, rent-adjusted patches                           |
+| [`compact_accounts_program`](examples/compact_accounts_program)                     | Atomic compact patches, rent adjustment, and generated clients                                |
+| [`todo_program`](examples/todo_program)                                             | PDA-backed state with boolean and digest updates                                              |
+| [`profile_program`](examples/profile_program)                                       | User profile registry with bounded UTF-8 and tag fields                                       |
+| [`prop_amm_program`](examples/prop_amm_program)                                     | Anchor `prop-amm` port focused on authority-controlled oracle updates                         |
+| [`optional_accounts_program`](examples/optional_accounts_program)                   | Optional-account slots with explicit presence handling                                        |
 
 ## Security
 

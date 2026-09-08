@@ -1487,11 +1487,12 @@ mod tests {
 			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 		let temp_root = std::fs::canonicalize(temp.path())
 			.unwrap_or_else(|error| panic!("failed to canonicalize temp dir: {error}"));
-		let program = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello_solana");
+		let program =
+			Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello_solana_program");
 		let mut plan = empty_plan("npx");
 		plan.idls_dir = temp_root.join("idls");
-		plan.programs = vec![("hello_solana".to_owned(), program)];
-		std::fs::create_dir_all(plan.idls_dir.join("hello_solana.json"))
+		plan.programs = vec![("hello_solana_program".to_owned(), program)];
+		std::fs::create_dir_all(plan.idls_dir.join("hello_solana_program.json"))
 			.unwrap_or_else(|error| panic!("failed to block IDL output: {error}"));
 		assert!(matches!(
 			generate_plan(&plan),

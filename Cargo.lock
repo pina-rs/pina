@@ -16,12 +16,12 @@ dependencies = [
 name = "account-realloc-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "account_realloc",
+ "account_realloc_program",
  "pina_test",
 ]
 
 [[package]]
-name = "account_realloc"
+name = "account_realloc_program"
 version = "0.0.0"
 dependencies = [
  "mollusk-svm",
@@ -33,11 +33,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "account_realloc-client"
+name = "account_realloc_program-client"
 version = "0.0.0"
 
 [[package]]
-name = "account_realloc-cpi"
+name = "account_realloc_program-cpi"
 version = "0.0.0"
 
 [[package]]
@@ -1647,41 +1647,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "compact-accounts-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "compact-accounts-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
 name = "compact-accounts-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "compact_accounts",
+ "compact_accounts_program",
  "pina_test",
 ]
 
 [[package]]
-name = "compact_accounts"
+name = "compact_accounts_program"
 version = "0.0.0"
 dependencies = [
  "pina",
 ]
+
+[[package]]
+name = "compact_accounts_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "compact_accounts_program-cpi"
+version = "0.0.0"
 
 [[package]]
 name = "compression-codecs"
@@ -2175,23 +2161,23 @@ dependencies = [
 name = "custom-errors-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "custom_errors",
+ "custom_errors_program",
  "pina_test",
 ]
 
 [[package]]
-name = "custom_errors"
+name = "custom_errors_program"
 version = "0.0.0"
 dependencies = [
  "pina",
 ]
 
 [[package]]
-name = "custom_errors-client"
+name = "custom_errors_program-client"
 version = "0.0.0"
 
 [[package]]
-name = "custom_errors-cpi"
+name = "custom_errors_program-cpi"
 version = "0.0.0"
 
 [[package]]
@@ -2322,7 +2308,7 @@ checksum = "4583a4551df46e2792f82ceeac45e850d2e2d5debba0b91f102385cda5b11f06"
 name = "declare-id-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "declare_id",
+ "declare_id_program",
  "pina_test",
 ]
 
@@ -2335,18 +2321,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "declare_id"
+name = "declare_id_program"
 version = "0.0.0"
 dependencies = [
  "pina",
 ]
 
 [[package]]
-name = "declare_id-client"
+name = "declare_id_program-client"
 version = "0.0.0"
 
 [[package]]
-name = "declare_id-cpi"
+name = "declare_id_program-cpi"
 version = "0.0.0"
 
 [[package]]
@@ -2685,23 +2671,23 @@ dependencies = [
 name = "duplicate-mutable-accounts-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "duplicate_mutable_accounts",
+ "duplicate_mutable_accounts_program",
  "pina_test",
 ]
 
 [[package]]
-name = "duplicate_mutable_accounts"
+name = "duplicate_mutable_accounts_program"
 version = "0.0.0"
 dependencies = [
  "pina",
 ]
 
 [[package]]
-name = "duplicate_mutable_accounts-client"
+name = "duplicate_mutable_accounts_program-client"
 version = "0.0.0"
 
 [[package]]
-name = "duplicate_mutable_accounts-cpi"
+name = "duplicate_mutable_accounts_program-cpi"
 version = "0.0.0"
 
 [[package]]
@@ -3003,25 +2989,25 @@ dependencies = [
 ]
 
 [[package]]
-name = "events"
+name = "events_program"
 version = "0.0.0"
 dependencies = [
  "pina",
 ]
 
 [[package]]
-name = "events-client"
+name = "events_program-client"
 version = "0.0.0"
 
 [[package]]
-name = "events-cpi"
+name = "events_program-cpi"
 version = "0.0.0"
 
 [[package]]
-name = "events-surfpool-tests"
+name = "events_program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "events",
+ "events_program",
  "pina_test",
 ]
 
@@ -3175,23 +3161,23 @@ dependencies = [
 name = "float-accounts-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "float_accounts",
+ "float_accounts_program",
  "pina_test",
 ]
 
 [[package]]
-name = "float_accounts"
+name = "float_accounts_program"
 version = "0.0.0"
 dependencies = [
  "pina",
 ]
 
 [[package]]
-name = "float_accounts-client"
+name = "float_accounts_program-client"
 version = "0.0.0"
 
 [[package]]
-name = "float_accounts-cpi"
+name = "float_accounts_program-cpi"
 version = "0.0.0"
 
 [[package]]
@@ -3601,41 +3587,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
-name = "hello-solana-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "hello-solana-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
 name = "hello-solana-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "hello_solana",
+ "hello_solana_program",
  "pina_test",
 ]
 
 [[package]]
-name = "hello_solana"
+name = "hello_solana_program"
 version = "0.0.0"
 dependencies = [
  "pina",
 ]
+
+[[package]]
+name = "hello_solana_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "hello_solana_program-cpi"
+version = "0.0.0"
 
 [[package]]
 name = "hermit-abi"
@@ -5792,42 +5764,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "pina-bpf-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "pina-bpf-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
 name = "pina-bpf-surfpool-tests"
 version = "0.0.0"
 dependencies = [
- "pina_bpf",
+ "pina_bpf_program",
  "pina_test",
 ]
 
 [[package]]
-name = "pina_bpf"
+name = "pina_bpf_program"
 version = "0.0.0"
 dependencies = [
  "pina",
  "prop-amm-program-cpi",
 ]
+
+[[package]]
+name = "pina_bpf_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "pina_bpf_program-cpi"
+version = "0.0.0"
 
 [[package]]
 name = "pina_cli"
@@ -5939,7 +5897,7 @@ dependencies = [
 name = "pina_root"
 version = "0.0.5"
 dependencies = [
- "account_realloc",
+ "account_realloc_program",
  "counter_program",
  "insta",
  "macrotest",
@@ -12010,7 +11968,7 @@ name = "system-accounts-surfpool-tests"
 version = "0.0.0"
 dependencies = [
  "pina_test",
- "system_accounts",
+ "system_accounts_program",
 ]
 
 [[package]]
@@ -12035,18 +11993,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "system_accounts"
+name = "system_accounts_program"
 version = "0.0.0"
 dependencies = [
  "pina",
 ]
 
 [[package]]
-name = "system_accounts-client"
+name = "system_accounts_program-client"
 version = "0.0.0"
 
 [[package]]
-name = "system_accounts-cpi"
+name = "system_accounts_program-cpi"
 version = "0.0.0"
 
 [[package]]
@@ -12054,22 +12012,22 @@ name = "sysvar-checks-surfpool-tests"
 version = "0.0.0"
 dependencies = [
  "pina_test",
- "sysvar_checks",
+ "sysvar_checks_program",
 ]
 
 [[package]]
-name = "sysvar_checks"
+name = "sysvar_checks_program"
 version = "0.0.0"
 dependencies = [
  "pina",
 ]
 
 [[package]]
-name = "sysvar_checks-client"
+name = "sysvar_checks_program-client"
 version = "0.0.0"
 
 [[package]]
-name = "sysvar_checks-cpi"
+name = "sysvar_checks_program-cpi"
 version = "0.0.0"
 
 [[package]]
@@ -12584,41 +12542,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "transfer-sol-client"
-version = "0.0.0"
-dependencies = [
- "num-derive 0.5.1",
- "num-traits",
- "pina",
- "solana-account-info 3.1.1",
- "solana-cpi 3.1.0",
- "solana-instruction 3.4.1",
- "solana-program-error 3.0.1",
- "solana-pubkey 4.2.1",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "transfer-sol-cpi"
-version = "0.0.0"
-dependencies = [
- "pina",
-]
-
-[[package]]
 name = "transfer-sol-surfpool-tests"
 version = "0.0.0"
 dependencies = [
  "pina_test",
- "transfer_sol",
+ "transfer_sol_program",
 ]
 
 [[package]]
-name = "transfer_sol"
+name = "transfer_sol_program"
 version = "0.0.0"
 dependencies = [
  "pina",
 ]
+
+[[package]]
+name = "transfer_sol_program-client"
+version = "0.0.0"
+
+[[package]]
+name = "transfer_sol_program-cpi"
+version = "0.0.0"
 
 [[package]]
 name = "try-lock"

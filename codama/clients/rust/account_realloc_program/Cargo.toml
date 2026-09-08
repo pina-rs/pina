@@ -1,0 +1,5 @@
+[package]
+name = "account_realloc_program-client"
+version = "0.0.0"
+edition = "2021"
+publish = false

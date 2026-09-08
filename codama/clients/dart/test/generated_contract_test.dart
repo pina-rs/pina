@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:pina_codama_clients/account_realloc.dart'
+import 'package:pina_codama_clients/account_realloc_program.dart'
     show Sample, getSampleDecoder, getSampleEncoder;
-import 'package:pina_codama_clients/compact_accounts.dart'
+import 'package:pina_codama_clients/compact_accounts_program.dart'
     show Journal, getJournalDecoder, getJournalEncoder;
 import 'package:pina_codama_clients/profile_program.dart';
 import 'package:solana_kit_accounts/solana_kit_accounts.dart';
@@ -431,26 +431,26 @@ Uint8List _decodeHex(String value) {
 }
 
 const expectedPrograms = <String>[
-  'account_realloc',
-  'compact_accounts',
+  'account_realloc_program',
+  'compact_accounts_program',
   'counter_program',
-  'custom_errors',
-  'declare_id',
+  'custom_errors_program',
+  'declare_id_program',
   'declare_program',
-  'duplicate_mutable_accounts',
+  'duplicate_mutable_accounts_program',
   'escrow_program',
-  'events',
-  'float_accounts',
-  'hello_solana',
+  'events_program',
+  'float_accounts_program',
+  'hello_solana_program',
   'optional_accounts_program',
-  'pina_bpf',
+  'pina_bpf_program',
   'profile_program',
   'prop_amm_program',
   'role_registry_program',
   'staking_rewards_program',
-  'system_accounts',
-  'sysvar_checks',
+  'system_accounts_program',
+  'sysvar_checks_program',
   'todo_program',
-  'transfer_sol',
+  'transfer_sol_program',
   'vesting_program',
 ];

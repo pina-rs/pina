@@ -25,4 +25,4 @@ exit_code: 1
 ----- stdout -----
 
 ----- stderr -----
-[1m[31mError[39m[0m Unknown example `does_not_exist`. Available examples: account_realloc, compact_accounts, counter_program, custom_errors, declare_id, declare_program, duplicate_mutable_accounts, escrow_program, events, float_accounts, hello_solana, optional_accounts_program, pina_bpf, profile_program, prop_amm_program, role_registry_program, staking_rewards_program, system_accounts, sysvar_checks, todo_program, transfer_sol, vesting_program
+[1m[31mError[39m[0m Unknown example `does_not_exist`. Available examples: account_realloc_program, compact_accounts_program, counter_program, custom_errors_program, declare_id_program, declare_program, duplicate_mutable_accounts_program, escrow_program, events_program, float_accounts_program, hello_solana_program, optional_accounts_program, pina_bpf_program, profile_program, prop_amm_program, role_registry_program, staking_rewards_program, system_accounts_program, sysvar_checks_program, todo_program, transfer_sol_program, vesting_program
