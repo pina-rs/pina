@@ -76,7 +76,7 @@ impl<'argument> CheckPolicyIx<'argument> {
 		}
 		data[74..74 + 2].copy_from_slice(&(self.approvals.len() as u16).to_le_bytes());
 		for (index, value) in self.approvals.iter().enumerate() {
-			let item_offset = 74 + 2 + index * 1;
+			let item_offset = 74 + 2 + index;
 			data[item_offset..item_offset + 1].copy_from_slice(&value.to_le_bytes());
 		}
 
