@@ -24,6 +24,16 @@ fn process_saturating(balance: u64, amount: u64) -> u64 {
 	//~^ ERROR: asset arithmetic can overflow, underflow, or silently saturate
 }
 
+fn process_saturating_alias(current: u64, amount: u64) -> u64 {
+	current.saturating_sub(amount)
+	//~^ ERROR: asset arithmetic can overflow, underflow, or silently saturate
+}
+
+fn process_assignment(balance: &mut u64, amount: u64) {
+	*balance += amount;
+	//~^ ERROR: asset arithmetic can overflow, underflow, or silently saturate
+}
+
 fn process_return_payload(balance: u64, amount: u64) -> u64 {
 	return balance - amount;
 	//~^ ERROR: asset arithmetic can overflow, underflow, or silently saturate
@@ -42,6 +52,14 @@ fn process_break_payload(balance: u64, amount: u64) -> u64 {
 		break balance - amount;
 		//~^ ERROR: asset arithmetic can overflow, underflow, or silently saturate
 	}
+}
+
+fn process_non_asset_saturating(raw_value: u64, offset: u64) -> u64 {
+	raw_value.saturating_add(offset)
+}
+
+fn process_non_asset_assignment(raw_value: &mut u64, offset: u64) {
+	*raw_value += offset;
 }
 
 fn main() {}

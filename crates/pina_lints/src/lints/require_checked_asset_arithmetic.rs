@@ -87,7 +87,8 @@ fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 				visit_expr(cx, argument);
 			}
 			if UNCHECKED_METHODS.contains(&segment.ident.name.as_str())
-				&& looks_like_asset(receiver)
+				&& (looks_like_asset(receiver)
+					|| args.iter().any(|argument| looks_like_asset(argument)))
 			{
 				lint(cx, expr.span);
 			}
@@ -137,9 +138,23 @@ fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 		| ExprKind::Yield(inner, _)
 		| ExprKind::Become(inner)
 		| ExprKind::UnsafeBinderCast(_, inner, _) => visit_expr(cx, inner),
-		ExprKind::Assign(left, right, _) | ExprKind::AssignOp(_, left, right) => {
+		ExprKind::Assign(left, right, _) => {
 			visit_expr(cx, left);
 			visit_expr(cx, right);
+		}
+		ExprKind::AssignOp(operation, left, right) => {
+			visit_expr(cx, left);
+			visit_expr(cx, right);
+			if matches!(
+				operation.node,
+				rustc_hir::AssignOpKind::AddAssign
+					| rustc_hir::AssignOpKind::SubAssign
+					| rustc_hir::AssignOpKind::MulAssign
+					| rustc_hir::AssignOpKind::DivAssign
+			) && (looks_like_asset(left) || looks_like_asset(right))
+			{
+				lint(cx, expr.span);
+			}
 		}
 		ExprKind::Index(base, index, _) => {
 			visit_expr(cx, base);
