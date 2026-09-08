@@ -50,8 +50,13 @@ fn ui_deny_heap_allocations_in_onchain_instruction_handlers() {
 	run_ui_tests("deny_heap_allocations_in_onchain_instruction_handlers");
 }
 
-#[test]
-fn ui_require_canonical_instruction_dispatch_for_idl() {
+	#[test]
+	fn ui_deny_unchecked_remaining_mut() {
+		run_ui_tests("deny_unchecked_remaining_mut");
+	}
+
+	#[test]
+	fn ui_require_canonical_instruction_dispatch_for_idl() {
 	run_ui_tests("require_canonical_instruction_dispatch_for_idl");
 }
 

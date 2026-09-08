@@ -73,6 +73,7 @@ Deny-level security lints should not be disabled at crate scope; see the [suppre
 | `require_sysvar_assert_before_sysvar_use`               | deny  | Sysvar accounts cannot be substituted               |
 | `require_type_assert_before_zero_copy_cast`             | deny  | Raw account casts use guard-backed typed loading    |
 | `require_reason_for_duplicate_remaining_accounts`       | deny  | Duplicate mutable remaining accounts are justified  |
+| `deny_unchecked_remaining_mut`                          | deny  | Direct mutable remaining accounts reject aliases    |
 | `require_canonical_bump_before_pda_write`               | deny  | PDA namespaces use canonical bumps                  |
 | `deny_account_borrows_across_cpi`                       | deny  | Mutable data guards end before CPI                  |
 | `deny_unused_account_borrow_guards`                     | warn  | Unread borrow guards are discarded immediately      |
@@ -163,6 +164,16 @@ pub votes: &'a mut [AccountView],
 ```
 
 `#[pina(remaining)]` is distinct by default. The word threshold only rejects missing or placeholder explanations; reviewers must still verify the stated invariant.
+
+### `deny_unchecked_remaining_mut`
+
+Detects direct calls to Pina's `AccountsCursor::remaining_mut()`. The method validates writability but preserves duplicate addresses, so one logical account can appear more than once in the returned mutable slice.
+
+```rust
+let remaining = cursor.remaining_mut_distinct()?;
+```
+
+The lint resolves both the method and `AccountsCursor` type before reporting, so same-named methods from other crates are ignored. `#[derive(Accounts)]` expansions are also ignored: the macro uses `remaining_mut()` only for the explicit, documented `#[pina(remaining, distinct = false)]` escape hatch, which is checked separately by `require_reason_for_duplicate_remaining_accounts`.
 
 ### `require_canonical_bump_before_pda_write`
 

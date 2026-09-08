@@ -12,6 +12,7 @@
 
 pub mod deny_account_borrows_across_cpi;
 pub mod deny_heap_allocations_in_onchain_instruction_handlers;
+pub mod deny_unchecked_remaining_mut;
 pub mod deny_unused_account_borrow_guards;
 pub mod require_bounded_remaining_accounts;
 pub mod require_canonical_bump_before_pda_write;
