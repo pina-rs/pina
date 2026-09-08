@@ -36,12 +36,17 @@ const TARGET_METHODS: &[&str] = &[
 	"cast_mut",
 ];
 const TARGET_NEEDLES: &[&str] = &["process", "process_instruction", "instruction", "account"];
-const TARGET_PATHS: &[&str] = &[
-	"bytemuck::try_from_bytes",
-	"bytemuck::try_from_bytes_mut",
-	"bytemuck::cast_ref",
-	"bytemuck::cast_mut",
-];
+fn is_bytemuck_cast(call: &shared::CallInfo) -> bool {
+	let Some(def_path) = call.def_path.as_deref() else {
+		return false;
+	};
+	let Some(method) = def_path.rsplit("::").next() else {
+		return false;
+	};
+
+	call.def_crate.as_deref() == Some("bytemuck") && TARGET_METHODS.contains(&method)
+}
+
 impl<'tcx> LateLintPass<'tcx> for RequireTypeAssertBeforeZeroCopyCast {
 	fn check_fn(
 		&mut self,
@@ -61,13 +66,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireTypeAssertBeforeZeroCopyCast {
 
 		let facts = shared::collect_function_facts(cx, body);
 		for call in &facts.calls {
-			let is_cast_method =
-				call.receiver.is_some() && TARGET_METHODS.contains(&call.method.as_str());
-			let is_cast_path = call
-				.path
-				.as_deref()
-				.is_some_and(|path| TARGET_PATHS.iter().any(|needle| path.contains(needle)));
-			if !is_cast_method && !is_cast_path {
+			if !is_bytemuck_cast(call) {
 				continue;
 			}
 

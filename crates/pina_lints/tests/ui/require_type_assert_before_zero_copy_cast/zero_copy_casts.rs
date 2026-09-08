@@ -1,6 +1,11 @@
+// aux-build: bytemuck.rs
 // normalize-stderr-test: "\n$" -> ""
 
 #![allow(dead_code)]
+
+extern crate bytemuck;
+
+use bytemuck::try_from_bytes as parse_bytes;
 
 #[repr(C)]
 struct VaultData {
@@ -9,16 +14,6 @@ struct VaultData {
 
 struct AccountView;
 struct BorrowedView;
-
-mod bytemuck {
-	pub unsafe fn try_from_bytes<T>(bytes: &[u8]) -> Result<&'static T, ()> {
-		unsafe { Ok(&*(bytes.as_ptr() as *const T)) }
-	}
-
-	pub unsafe fn cast_ref<T>(value: &T) -> Result<&T, ()> {
-		Ok(value)
-	}
-}
 
 const OWNER: () = ();
 
@@ -50,8 +45,7 @@ impl BorrowedView {
 
 fn process_cast_without_guard(data: &AccountView, bytes: &[u8]) -> Result<(), ()> {
 	let view = data.cast_ref()?;
-	//~^ ERROR: raw zero-copy casts should be preceded by
-	let parsed = unsafe { bytemuck::try_from_bytes::<VaultData>(bytes) }?;
+	let parsed = bytemuck::try_from_bytes::<VaultData>(bytes)?;
 	//~^ ERROR: raw zero-copy casts should be preceded by
 	let _ = (view.amount, parsed.amount);
 	Ok(())
@@ -60,8 +54,7 @@ fn process_cast_without_guard(data: &AccountView, bytes: &[u8]) -> Result<(), ()
 fn process_borrowed_cast(data: &AccountView, bytes: &[u8]) -> Result<(), ()> {
 	let guard = data.try_borrow()?;
 	let view = guard.cast_ref()?;
-	//~^ ERROR: raw zero-copy casts should be preceded by
-	let parsed = unsafe { bytemuck::try_from_bytes::<VaultData>(bytes) }?;
+	let parsed = parse_bytes::<VaultData>(bytes)?;
 	//~^ ERROR: raw zero-copy casts should be preceded by
 	let _ = (view.amount, parsed.amount);
 	Ok(())
@@ -72,7 +65,7 @@ fn process_assertion_does_not_guard_cast(data: &AccountView) -> Result<(), ()> {
 	let guard = data.try_borrow()?;
 	let _ = guard;
 	// Validation does not bind this unrelated raw cast to the checked account.
-	let view = unsafe { bytemuck::cast_ref::<VaultData>(&VaultData { amount: 0 }) }?;
+	let view = bytemuck::cast_ref::<VaultData>(&VaultData { amount: 0 })?;
 	//~^ ERROR: raw zero-copy account casts bypass guard-backed account validation
 	let _ = view.amount;
 	Ok(())

@@ -1,47 +1,29 @@
 error: raw zero-copy account casts bypass guard-backed account validation
-  --> $DIR/zero_copy_casts.rs:52:13
+  --> $DIR/zero_copy_casts.rs:48:15
    |
-LL |     let view = data.cast_ref()?;
-   |                ^^^^^^^^^^^^^^^
+LL |     let parsed = bytemuck::try_from_bytes::<VaultData>(bytes)?;
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: replace the cast with `as_account::<T>()`, `as_account_mut::<T>()`, or a generated `load_pda*` method
    = help: `assert_type::<T>()` is validation-only and does not make a later raw cast safe
    = note: `#[deny(require_type_assert_before_zero_copy_cast)]` on by default
 
 error: raw zero-copy account casts bypass guard-backed account validation
-  --> $DIR/zero_copy_casts.rs:54:24
+  --> $DIR/zero_copy_casts.rs:57:15
    |
-LL |     let parsed = unsafe { bytemuck::try_from_bytes::<VaultData>(bytes) }?;
-   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = help: replace the cast with `as_account::<T>()`, `as_account_mut::<T>()`, or a generated `load_pda*` method
-   = help: `assert_type::<T>()` is validation-only and does not make a later raw cast safe
-
-error: raw zero-copy account casts bypass guard-backed account validation
-  --> $DIR/zero_copy_casts.rs:62:13
-   |
-LL |     let view = guard.cast_ref()?;
-   |                ^^^^^^^^^^^^^^^^
+LL |     let parsed = parse_bytes::<VaultData>(bytes)?;
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: replace the cast with `as_account::<T>()`, `as_account_mut::<T>()`, or a generated `load_pda*` method
    = help: `assert_type::<T>()` is validation-only and does not make a later raw cast safe
 
 error: raw zero-copy account casts bypass guard-backed account validation
-  --> $DIR/zero_copy_casts.rs:64:24
+  --> $DIR/zero_copy_casts.rs:68:13
    |
-LL |     let parsed = unsafe { bytemuck::try_from_bytes::<VaultData>(bytes) }?;
-   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = help: replace the cast with `as_account::<T>()`, `as_account_mut::<T>()`, or a generated `load_pda*` method
-   = help: `assert_type::<T>()` is validation-only and does not make a later raw cast safe
-
-error: raw zero-copy account casts bypass guard-backed account validation
-  --> $DIR/zero_copy_casts.rs:75:22
-   |
-LL |     let view = unsafe { bytemuck::cast_ref::<VaultData>(&VaultData { amount: 0 }) }?;
-   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+LL |     let view = bytemuck::cast_ref::<VaultData>(&VaultData { amount: 0 })?;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: replace the cast with `as_account::<T>()`, `as_account_mut::<T>()`, or a generated `load_pda*` method
    = help: `assert_type::<T>()` is validation-only and does not make a later raw cast safe
 
-error: aborting due to 5 previous errors
+error: aborting due to 3 previous errors
