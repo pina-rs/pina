@@ -6,6 +6,7 @@ use std::process::Command;
 
 use crate::lint_driver::DriverError;
 use crate::lint_driver::cargo_home;
+use crate::lint_driver::driver_build_identity;
 use crate::lint_driver::format_lint_levels;
 use crate::lint_driver::prepare_driver;
 use crate::project::Project;
@@ -53,8 +54,8 @@ pub enum LintError {
 /// into the `pina_lint_driver` binary. This command prepares the driver for
 /// the active toolchain (see [`crate::lint_driver`]), then runs
 /// `cargo check` — or `cargo fix` with `--fix` — with the driver as
-/// `RUSTC_WRAPPER`. Level overrides from the project's `pina.toml` `[lints]`
-/// table are forwarded through `PINA_LINT_LEVELS`.
+/// `RUSTC_WORKSPACE_WRAPPER`. Level overrides from the project's `pina.toml`
+/// `[lints]` table are forwarded through `PINA_LINT_LEVELS`.
 ///
 /// # Errors
 ///
@@ -64,6 +65,7 @@ pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 	let project = Project::discover(&options.project)?;
 	let cargo_home = cargo_home()?;
 	let driver = prepare_driver(&cargo_home, &project.root)?;
+	let driver_build = driver_build_identity(&driver.path)?;
 	let manifest = project.program_dir.join("Cargo.toml");
 
 	let levels = project
@@ -76,19 +78,8 @@ pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 	let mut command = Command::new(&cargo);
 	command
 		.current_dir(&project.root)
-		.env("CARGO_INCREMENTAL", "0")
-		// `cargo fix` runs primary units through a cargo-as-rustc proxy that
-		// applies `RUSTC_WORKSPACE_WRAPPER` but bypasses `RUSTC_WRAPPER`, so the
-		// wrapper must be attached through the workspace variable for the fix
-		// flow to see the lints on the crates being fixed.
-		.env(
-			if options.fix {
-				"RUSTC_WORKSPACE_WRAPPER"
-			} else {
-				"RUSTC_WRAPPER"
-			},
-			&driver.path,
-		)
+		.env("RUSTC_WORKSPACE_WRAPPER", &driver.path)
+		.env("PINA_LINT_DRIVER_BUILD", driver_build)
 		.env("PINA_LINT_NO_DEPS", "1");
 	if !levels.is_empty() {
 		command.env("PINA_LINT_LEVELS", format_lint_levels(levels));

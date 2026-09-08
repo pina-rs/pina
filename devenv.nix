@@ -1086,13 +1086,14 @@ in
         fi
 
         # Run every library fixture through the driver exactly the way
-        # `pina lint` does: cargo check with the driver as RUSTC_WRAPPER and
+        # `pina lint` does: cargo check with the driver as a workspace wrapper and
         # linting restricted to the primary package. Insecure fixtures are
         # intentionally excluded because they demonstrate rejected patterns.
         export PINA_LINT_NO_DEPS=1
-        export RUSTC_WRAPPER="$driver"
+        export PINA_LINT_DRIVER_BUILD="$(sha256sum "$driver" | cut -d ' ' -f 1)"
+        export RUSTC_WORKSPACE_WRAPPER="$driver"
 
-        CARGO_INCREMENTAL=0 cargo check --locked "''${package_args[@]}"
+        cargo check --locked "''${package_args[@]}"
       '';
       description = "Run Pina's security lints (pina_lint_driver) against the example and security program crates.";
       binary = "bash";

@@ -23,8 +23,9 @@ fi
 printf 'cargo' >> "$PINA_LINT_LOG"
 printf ' %q' "$@" >> "$PINA_LINT_LOG"
 printf '\n' >> "$PINA_LINT_LOG"
-printf 'rustc_wrapper=%s no_deps=%s levels=%s\n' \
-  "$(basename "$RUSTC_WRAPPER")" \
+printf 'workspace_wrapper=%s driver_build=%s no_deps=%s levels=%s\n' \
+  "$(basename "$RUSTC_WORKSPACE_WRAPPER")" \
+  "${PINA_LINT_DRIVER_BUILD:-}" \
   "${PINA_LINT_NO_DEPS:-}" \
   "${PINA_LINT_LEVELS:-}" >> "$PINA_LINT_LOG"
 if [[ "${FAKE_LINT_FAIL:-0}" == "1" ]]; then
@@ -145,9 +146,10 @@ fn lint_runs_cargo_check_with_the_bundled_driver() {
 	assert!(log.contains("--package lint-fixture"), "log: {log}");
 	assert!(log.contains("--manifest-path"), "log: {log}");
 	assert!(
-		log.contains(&format!("rustc_wrapper={FAKE_DRIVER} no_deps=1 levels=")),
+		log.contains(&format!("workspace_wrapper={FAKE_DRIVER} driver_build=")),
 		"log: {log}"
 	);
+	assert!(log.contains(" no_deps=1 levels="), "log: {log}");
 }
 
 #[test]

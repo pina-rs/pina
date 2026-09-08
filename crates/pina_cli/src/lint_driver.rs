@@ -9,6 +9,9 @@
 //! own tasks and tests use it to run the workspace driver.
 
 use std::ffi::OsString;
+use std::fs::File;
+use std::io::BufReader;
+use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -54,6 +57,12 @@ pub enum DriverError {
 
 	#[error("The lint driver install finished without producing {path}")]
 	MissingDriver { path: PathBuf },
+
+	#[error("Could not fingerprint the lint driver at {path}: {source}")]
+	FingerprintDriver {
+		path: PathBuf,
+		source: std::io::Error,
+	},
 }
 
 /// Resolve the driver for the given project root.
@@ -146,6 +155,40 @@ fn is_executable(path: &Path) -> bool {
 #[cfg(not(unix))]
 fn is_executable(path: &Path) -> bool {
 	path.is_file()
+}
+
+/// Return a deterministic content identity for the prepared driver.
+///
+/// The identity is forwarded into rustc dep-info so Cargo invalidates a prior
+/// lint result when a rebuilt driver occupies the same path.
+pub fn driver_build_identity(path: &Path) -> Result<String, DriverError> {
+	let file = File::open(path).map_err(|source| {
+		DriverError::FingerprintDriver {
+			path: path.to_owned(),
+			source,
+		}
+	})?;
+	let mut reader = BufReader::new(file);
+	let mut buffer = [0u8; 16 * 1024];
+	let mut hash = 0xcbf2_9ce4_8422_2325u64;
+
+	loop {
+		let read = reader.read(&mut buffer).map_err(|source| {
+			DriverError::FingerprintDriver {
+				path: path.to_owned(),
+				source,
+			}
+		})?;
+		if read == 0 {
+			break;
+		}
+		for byte in &buffer[..read] {
+			hash ^= u64::from(*byte);
+			hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+		}
+	}
+
+	Ok(format!("{hash:016x}"))
 }
 
 /// Return the `release-commit-host` fingerprint of the Rust compiler used for
@@ -366,5 +409,23 @@ mod tests {
 		std::fs::set_permissions(file.path(), std::fs::Permissions::from_mode(0o644))
 			.expect("permissions");
 		assert!(!is_executable(file.path()));
+	}
+
+	#[test]
+	fn driver_build_identity_tracks_binary_contents() {
+		let first = tempfile::NamedTempFile::new().expect("first temp file");
+		std::fs::write(first.path(), b"first driver").expect("write first driver");
+		let second = tempfile::NamedTempFile::new().expect("second temp file");
+		std::fs::write(second.path(), b"second driver").expect("write second driver");
+
+		let first_identity = driver_build_identity(first.path()).expect("fingerprint first driver");
+		assert_eq!(
+			first_identity,
+			driver_build_identity(first.path()).expect("fingerprint first driver again")
+		);
+		assert_ne!(
+			first_identity,
+			driver_build_identity(second.path()).expect("fingerprint second driver")
+		);
 	}
 }
