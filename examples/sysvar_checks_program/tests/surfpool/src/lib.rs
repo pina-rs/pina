@@ -57,7 +57,7 @@ fn rejects_a_bogus_clock_account() {
 			.await
 			.expect("start isolated program test");
 
-		let impostor = Pubkey::new_unique();
+		let impostor = Pubkey::new_from_array([2; 32]);
 		program
 			.fund(&impostor, 1_000_000_000)
 			.expect("fund impostor");

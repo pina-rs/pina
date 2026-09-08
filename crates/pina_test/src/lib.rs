@@ -26,6 +26,7 @@ use surfpool_sdk::Surfnet;
 use surfpool_sdk::cheatcodes::builders::DeployProgram;
 
 static BENCHMARK_RECORD_LOCK: Mutex<()> = Mutex::new(());
+const TEST_PAYER_SEED: [u8; 32] = [0xA5; 32];
 
 /// Run an async integration-test body on a dedicated Tokio runtime.
 ///
@@ -277,6 +278,7 @@ impl OfflineSurfnet {
 	pub async fn start() -> Result<Self, TestError> {
 		let inner = Surfnet::builder()
 			.offline(true)
+			.payer(Keypair::new_from_array(TEST_PAYER_SEED))
 			.start()
 			.await
 			.map_err(|error| test_error("start offline Surfpool", error))?;
@@ -565,7 +567,10 @@ mod tests {
 			let mut surfnet = OfflineSurfnet::start()
 				.await
 				.unwrap_or_else(|error| panic!("start offline Surfpool test instance: {error}"));
-			assert_ne!(surfnet.payer(), Pubkey::default());
+			assert_eq!(
+				surfnet.payer(),
+				Keypair::new_from_array(TEST_PAYER_SEED).pubkey(),
+			);
 
 			let missing = std::env::temp_dir().join("pina-test-missing-program.so");
 			let program_id = Pubkey::new_unique();

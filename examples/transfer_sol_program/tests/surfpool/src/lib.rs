@@ -46,13 +46,13 @@ fn cpi_transfer_moves_lamports() {
 			.expect("start isolated program test");
 
 		// Use a dedicated funded sender so fees do not blur the math.
-		let sender = pina_test::Keypair::new();
+		let sender = pina_test::Keypair::new_from_array([2; 32]);
 		program
 			.fund(&sender.pubkey(), EPOCH_FUND)
 			.expect("fund sender");
 		let sender_before = program.balance(&sender.pubkey()).expect("sender balance");
 
-		let recipient = Pubkey::new_unique();
+		let recipient = Pubkey::new_from_array([3; 32]);
 		let data = {
 			let mut bytes = vec![TRANSFER];
 			bytes.extend_from_slice(&500_000_000u64.to_le_bytes());
@@ -98,12 +98,12 @@ fn cpi_transfer_rejects_overdrafts() {
 			.await
 			.expect("start isolated program test");
 
-		let sender = pina_test::Keypair::new();
+		let sender = pina_test::Keypair::new_from_array([2; 32]);
 		program
 			.fund(&sender.pubkey(), EPOCH_FUND)
 			.expect("fund sender");
 		let balance = program.balance(&sender.pubkey()).expect("sender balance");
-		let recipient = Pubkey::new_unique();
+		let recipient = Pubkey::new_from_array([3; 32]);
 		let data = {
 			let mut bytes = vec![TRANSFER];
 			bytes.extend_from_slice(&(balance + 1).to_le_bytes());
@@ -143,7 +143,7 @@ fn direct_transfer_moves_lamports_between_program_accounts() {
 			.expect("start isolated program test");
 
 		// Create a program-owned account the caller controls end to end.
-		let sender = pina_test::Keypair::new();
+		let sender = pina_test::Keypair::new_from_array([2; 32]);
 		let space = 0u64;
 		let create = {
 			let mut data = vec![0u8, 0, 0, 0];
@@ -168,7 +168,7 @@ fn direct_transfer_moves_lamports_between_program_accounts() {
 			.send_with_signers(create, &[&sender])
 			.expect("create program-owned sender account");
 
-		let recipient = Pubkey::new_unique();
+		let recipient = Pubkey::new_from_array([3; 32]);
 		program
 			.fund(&recipient, EPOCH_FUND)
 			.expect("fund recipient");
@@ -201,9 +201,9 @@ fn direct_transfer_rejects_non_program_owners() {
 			.await
 			.expect("start isolated program test");
 
-		let outsider = Pubkey::new_unique();
+		let outsider = Pubkey::new_from_array([2; 32]);
 		program.fund(&outsider, EPOCH_FUND).expect("fund outsider");
-		let recipient = Pubkey::new_unique();
+		let recipient = Pubkey::new_from_array([3; 32]);
 		program
 			.fund(&recipient, EPOCH_FUND)
 			.expect("fund recipient");

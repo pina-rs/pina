@@ -67,7 +67,7 @@ fn accepts_extra_signers() {
 			.await
 			.expect("start isolated program test");
 
-		let bystander = Keypair::new();
+		let bystander = Keypair::new_from_array([2; 32]);
 		program
 			.fund(&bystander.pubkey(), 1_000_000_000)
 			.expect("fund bystander");

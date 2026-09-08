@@ -304,7 +304,7 @@ fn a_stranger_cannot_touch_someone_elses_profile() {
 			))
 			.expect("execute Initialize");
 
-		let stranger = Keypair::new();
+		let stranger = Keypair::new_from_array([2; 32]);
 		program
 			.fund(&stranger.pubkey(), 1_000_000_000)
 			.expect("fund stranger");

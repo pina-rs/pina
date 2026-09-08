@@ -167,7 +167,7 @@ fn initializes_at_header_only_and_at_a_nonempty_size() {
 			},
 		);
 
-		let second_authority = Keypair::new();
+		let second_authority = Keypair::new_from_array([2; 32]);
 		program
 			.fund(&second_authority.pubkey(), 1_000_000_000)
 			.expect("fund second authority");
@@ -556,7 +556,7 @@ fn foreign_signer_cannot_resize_another_authoritys_journal() {
 			))
 			.expect("initialize journal");
 		let before = program.account(&journal).expect("journal before attack");
-		let attacker = Keypair::new();
+		let attacker = Keypair::new_from_array([2; 32]);
 		program
 			.fund(&attacker.pubkey(), 1_000_000_000)
 			.expect("fund attacker");
@@ -637,7 +637,7 @@ fn signer_and_system_program_constraints_are_enforced() {
 		let mut program = ProgramTest::start(program_id)
 			.await
 			.expect("start isolated program test");
-		let unsigned_authority = Keypair::new().pubkey();
+		let unsigned_authority = Keypair::new_from_array([2; 32]).pubkey();
 		program
 			.fund(&unsigned_authority, 1_000_000_000)
 			.expect("fund unsigned authority");

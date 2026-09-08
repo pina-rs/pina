@@ -84,8 +84,9 @@ fn provision_mint(
 	program: &ProgramTest,
 	payer: &Pubkey,
 	authority: &Keypair,
+	seed: u8,
 ) -> Result<Pubkey, TestError> {
-	let mint = Keypair::new();
+	let mint = Keypair::new_from_array([seed; 32]);
 	let create = create_account_instruction(
 		program,
 		payer,
@@ -270,18 +271,18 @@ fn full_escrow_round_trip() {
 			.await
 			.expect("start isolated program test");
 
-		let mint_authority = Keypair::new();
+		let mint_authority = Keypair::new_from_array([2; 32]);
 		program
 			.fund(&mint_authority.pubkey(), FUND)
 			.expect("fund mint authority");
 
 		let maker = program.payer();
 		let mint_a_pubkey =
-			provision_mint(&program, &maker, &mint_authority).expect("provision mint A");
+			provision_mint(&program, &maker, &mint_authority, 3).expect("provision mint A");
 		let mint_b_pubkey =
-			provision_mint(&program, &maker, &mint_authority).expect("provision mint B");
+			provision_mint(&program, &maker, &mint_authority, 4).expect("provision mint B");
 
-		let taker = Keypair::new();
+		let taker = Keypair::new_from_array([5; 32]);
 		program.fund(&taker.pubkey(), FUND).expect("fund taker");
 
 		let maker_ata_a = ata_of(&maker, &mint_a_pubkey);

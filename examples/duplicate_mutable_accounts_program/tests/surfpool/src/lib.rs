@@ -32,7 +32,7 @@ fn fails_duplicate_mutable_accepts_distinct_accounts() {
 			.expect("start isolated program test");
 
 		let first = program.payer();
-		let second = Pubkey::new_unique();
+		let second = Pubkey::new_from_array([2; 32]);
 		program.fund(&second, 1_000_000_000).expect("fund second");
 
 		program
@@ -74,7 +74,7 @@ fn fails_duplicate_mutable_rejects_the_same_account() {
 
 		// Sanity: nothing about the explicit guard is broken — distinct
 		// accounts still work on the same instance.
-		let other = Pubkey::new_unique();
+		let other = Pubkey::new_from_array([2; 32]);
 		program.fund(&other, 1_000_000_000).expect("fund other");
 		program
 			.send(

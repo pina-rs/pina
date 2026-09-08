@@ -127,22 +127,24 @@ function run(arguments_: Arguments): void {
 	}
 
 	mkdirSync(dirname(arguments_.jsonOutput), { recursive: true });
-	const hyperfine = spawnSync(
-		process.env.PINA_HYPERFINE_BIN ?? "hyperfine",
-		[
-			"--warmup",
-			String(WARMUP_RUNS),
-			"--runs",
-			String(BENCHMARK_RUNS),
-			"--style",
-			"basic",
-			"--shell=none",
-			"--export-json",
-			arguments_.jsonOutput,
-			...commands,
-		],
-		{ stdio: "inherit" },
-	);
+	const hyperfineArguments = [
+		"--warmup",
+		String(WARMUP_RUNS),
+		"--runs",
+		String(BENCHMARK_RUNS),
+		"--style",
+		"basic",
+		"--shell=none",
+		"--export-json",
+		arguments_.jsonOutput,
+		...commands,
+	];
+	const hyperfineBinary = process.env.PINA_HYPERFINE_BIN;
+	const hyperfine = hyperfineBinary === undefined
+		? spawnSync("cargo", ["hyperfine", ...hyperfineArguments], {
+			stdio: "inherit",
+		})
+		: spawnSync(hyperfineBinary, hyperfineArguments, { stdio: "inherit" });
 
 	if (hyperfine.error !== undefined) {
 		throw hyperfine.error;

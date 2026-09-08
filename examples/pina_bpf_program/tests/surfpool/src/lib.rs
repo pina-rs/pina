@@ -78,7 +78,7 @@ fn gated_instructions_report_invalid_instructions_without_the_feature() {
 		);
 
 		// The forwarded CPI path is gated too.
-		let foreign_oracle = Pubkey::new_unique();
+		let foreign_oracle = Pubkey::new_from_array([2; 32]);
 		program
 			.fund(&foreign_oracle, 1_000_000_000)
 			.expect("fund oracle stub");
