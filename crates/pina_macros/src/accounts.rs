@@ -193,6 +193,15 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 	};
 	#[cfg(not(feature = "validation"))]
 	let validate_parsed = quote! {};
+	#[cfg(feature = "validation")]
+	let validate_accounts = quote! {
+		#[inline]
+		fn validate_accounts(&self) -> #crate_path::ProgramResult {
+			<Self as #crate_path::PinaValidate>::validate(self)
+		}
+	};
+	#[cfg(not(feature = "validation"))]
+	let validate_accounts = quote! {};
 
 	let finish_exact = remaining_field.is_none().then(|| {
 		quote! {
@@ -223,6 +232,8 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 					#remaining_field_ident
 				})
 			}
+
+			#validate_accounts
 		}
 
 		impl #impl_generics #crate_path::TryFromAccountInfos #ty_generics for #struct_name #ty_generics #where_clause {
@@ -287,7 +298,7 @@ fn generate_validation_impl(
 
 			let ty = &field.ty;
 			nested_checks.push(quote! {
-				<#ty as #crate_path::PinaValidate>::validate(&self.#ident)?;
+				<#ty as #crate_path::ParseAccounts>::validate_accounts(&self.#ident)?;
 			});
 			continue;
 		}

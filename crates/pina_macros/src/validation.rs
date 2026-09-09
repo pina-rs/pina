@@ -232,14 +232,6 @@ fn validate_value_groups(field: &Ident, ty: &Type, groups: &[ValueValidation]) -
 			));
 		}
 
-		if group.exact_len.is_some() && (group.min_len.is_some() || group.max_len.is_some()) {
-			return Err(syn::Error::new_spanned(
-				field,
-				"`exact_len` cannot be combined with `min_len` or `max_len` in the same \
-				 validation group; use only `exact_len` for an exact-size rule",
-			));
-		}
-
 		check_duplicate(&mut seen_min, group.min.as_ref(), "min", field)?;
 		check_duplicate(&mut seen_max, group.max.as_ref(), "max", field)?;
 		check_duplicate(&mut seen_min_len, group.min_len.as_ref(), "min_len", field)?;
@@ -250,6 +242,17 @@ fn validate_value_groups(field: &Ident, ty: &Type, groups: &[ValueValidation]) -
 			"exact_len",
 			field,
 		)?;
+	}
+
+	if seen_exact_len && (seen_min_len || seen_max_len) {
+		return Err(syn::Error::new_spanned(
+			field,
+			format!(
+				"`exact_len` on field `{field}` cannot be combined with `min_len` or `max_len`, \
+				 even across separate `validate(...)` annotations; use only `exact_len` for an \
+				 exact-size rule"
+			),
+		));
 	}
 
 	Ok(())

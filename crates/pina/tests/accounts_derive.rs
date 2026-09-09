@@ -49,6 +49,42 @@ struct ParentAccounts<'a> {
 }
 
 #[cfg(feature = "validation")]
+struct HandWrittenNestedAccounts<'a> {
+	pub account: &'a AccountView,
+}
+
+#[cfg(feature = "validation")]
+impl<'a> ParseAccounts<'a> for HandWrittenNestedAccounts<'a> {
+	fn parse_accounts(cursor: &mut AccountsCursor<'a>) -> Result<Self, ProgramError> {
+		Ok(Self {
+			account: cursor.next()?,
+		})
+	}
+}
+
+#[cfg(feature = "validation")]
+#[derive(Accounts)]
+#[pina(crate = pina)]
+struct ParentWithHandWrittenNestedAccounts<'a> {
+	pub nested: HandWrittenNestedAccounts<'a>,
+}
+
+#[cfg(feature = "validation")]
+#[derive(Accounts)]
+#[pina(crate = pina)]
+struct ValidatedNestedAccounts<'a> {
+	#[pina(validate(signer))]
+	pub authority: &'a AccountView,
+}
+
+#[cfg(feature = "validation")]
+#[derive(Accounts)]
+#[pina(crate = pina)]
+struct ParentWithValidatedNestedAccounts<'a> {
+	pub nested: ValidatedNestedAccounts<'a>,
+}
+
+#[cfg(feature = "validation")]
 #[derive(Accounts)]
 #[pina(crate = pina, validate(with = validate_accounts_hook))]
 struct ValidatedAccounts<'a> {
@@ -318,6 +354,36 @@ fn test_accounts_derive_nested_loader_order() {
 	assert_eq!(test_accounts.one as *const AccountView, one_ptr);
 	assert_eq!(test_accounts.nested.two as *const AccountView, two_ptr);
 	assert_eq!(test_accounts.nested.three as *mut AccountView, three_ptr);
+}
+
+#[cfg(feature = "validation")]
+#[test]
+fn nested_validation_accepts_a_hand_written_parser_without_pina_validate() {
+	let mut input = create_input_with_layout(1, &[], |_| false, |_| false, unique_keys);
+	let mut accounts = [UNINIT; 1];
+	// SAFETY: the buffer encodes exactly one account.
+	let accounts = unsafe { slice_input(&mut input, &mut accounts) };
+
+	let parsed =
+		ParentWithHandWrittenNestedAccounts::try_from_account_infos(&MOCK_PROGRAM_ID, accounts)
+			.unwrap();
+	assert_eq!(parsed.nested.account.address(), &key_from_byte(1));
+}
+
+#[cfg(feature = "validation")]
+#[test]
+fn nested_validation_delegates_to_generated_account_rules() {
+	let mut input = create_input_with_layout(1, &[], |_| false, |_| false, unique_keys);
+	let mut accounts = [UNINIT; 1];
+	// SAFETY: the buffer encodes exactly one account.
+	let accounts = unsafe { slice_input(&mut input, &mut accounts) };
+
+	let result =
+		ParentWithValidatedNestedAccounts::try_from_account_infos(&MOCK_PROGRAM_ID, accounts);
+	assert!(matches!(
+		result,
+		Err(ProgramError::MissingRequiredSignature)
+	));
 }
 
 /// The mock program ID used for testing.

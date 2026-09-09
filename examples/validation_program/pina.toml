@@ -3,4 +3,4 @@ program = "."
 
 [clients]
 output = "clients"
-languages = ["cpi", "rust", "typescript"]
+languages = ["cpi", "dart", "rust", "typescript"]
