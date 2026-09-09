@@ -292,7 +292,7 @@ for account in remaining {
 }
 ```
 
-Remaining accounts are caller-controlled; an explicit bound keeps worst-case compute auditable. Rejecting an oversized list is preferred when every supplied account must be processed, while `.take(MAX)` is suitable only when ignoring surplus accounts is intentional. The guard must compare `remaining.len()` against an integer literal or resolved constant, return early on the oversized path, and dominate the loop. The analysis follows local aliases. Reassignment, mutable borrows, `&mut self` calls, and closures that may replace a checked binding invalidate its bound. A runtime limit, branch-local check, late check, or opaque helper does not satisfy the rule because it does not establish a source-visible protocol maximum on every path.
+Remaining accounts are caller-controlled; an explicit bound keeps worst-case compute auditable. Rejecting an oversized list is preferred when every supplied account must be processed, while `.take(MAX)` is suitable only when ignoring surplus accounts is intentional. Standard adapters that cannot increase cardinality, such as `filter`, `map`, and `enumerate`, preserve a preceding `take`; expanding adapters such as `flat_map` must be bounded afterward. The guard must compare `remaining.len()` against an integer literal or resolved constant, return early on the oversized path, and dominate the loop. The analysis follows local aliases. Reassignment, mutable borrows, `&mut self` calls, and closures that may replace a checked binding invalidate its bound. A runtime limit, branch-local check, late check, or opaque helper does not satisfy the rule because it does not establish a source-visible protocol maximum on every path.
 
 ## Performance reference
 

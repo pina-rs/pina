@@ -165,6 +165,25 @@ fn process_take_before_into_iter_chain(remaining: &[u8]) {
 	}
 }
 
+fn process_non_expanding_adapters_after_take(remaining: &[u8]) {
+	for (index, account) in remaining.iter().take(8).filter(|_| true).enumerate() {
+		let _ = (index, account);
+	}
+}
+
+fn process_zip_with_bounded_side(remaining: &[u8]) {
+	for account in remaining.iter().zip([0_u8; 8]) {
+		let _ = account;
+	}
+}
+
+fn process_expanding_adapter_after_take(remaining: &[u8]) {
+	for account in remaining.iter().take(8).flat_map(|account| [account; 2]) {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+}
+
 fn process_take_on_other_iterator(remaining: &[u8], other: &[u8]) {
 	for account in remaining.iter().chain(other.iter().take(8)) {
 		//~^ ERROR: remaining accounts are processed without an explicit bound

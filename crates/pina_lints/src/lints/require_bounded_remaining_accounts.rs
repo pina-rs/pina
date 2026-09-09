@@ -79,6 +79,7 @@ fn is_array_iteration_method(cx: &LateContext<'_>, expr: &Expr<'_>, expected: &s
 
 fn expression_has_static_bound(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
 	match &expr.kind {
+		ExprKind::Array(_) | ExprKind::Repeat(..) => true,
 		ExprKind::MethodCall(segment, receiver, arguments, _) => {
 			let method = segment.ident.name.as_str();
 			if method == "take" {
@@ -91,6 +92,30 @@ fn expression_has_static_bound(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
 					&& is_iterator_method(cx, expr, "chain")
 					&& expression_has_static_bound(cx, receiver)
 					&& expression_has_static_bound(cx, &arguments[0]);
+			}
+			if method == "zip" {
+				return arguments.len() == 1
+					&& is_iterator_method(cx, expr, "zip")
+					&& (expression_has_static_bound(cx, receiver)
+						|| expression_has_static_bound(cx, &arguments[0]));
+			}
+			if matches!(
+				method,
+				"by_ref"
+					| "cloned" | "copied"
+					| "enumerate" | "filter"
+					| "filter_map" | "fuse"
+					| "inspect" | "map"
+					| "map_while" | "peekable"
+					| "rev" | "scan"
+					| "skip" | "skip_while"
+					| "step_by" | "take_while"
+			) && is_iterator_method(cx, expr, method)
+			{
+				// These standard adapters emit at most one item for each item
+				// consumed from the receiver. In particular, do not apply this
+				// rule to `flat_map`, `flatten`, `cycle`, or `chain`.
+				return expression_has_static_bound(cx, receiver);
 			}
 
 			matches!(method, "iter" | "into_iter")

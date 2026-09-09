@@ -48,6 +48,8 @@ for account in bounded {
 }
 ```
 
+Adapters that cannot increase the number of items, such as `filter`, `map`, and `enumerate`, preserve the bound. Apply `take` after `flat_map`, `flatten`, `cycle`, or another adapter that can expand its input.
+
 Every remaining-account source in a chained iterator needs its own dominating length check. The lint only accepts the built-in length of a slice or array as evidence; a custom method named `len` cannot establish a security bound.
 
 ## Review unused borrow-guard warnings
