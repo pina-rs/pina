@@ -298,6 +298,72 @@ fn process_mutable_receiver_after_guard(remaining: &[u8], attacker: &[u8]) -> Re
 	Ok(())
 }
 
+fn process_branch_replacement_after_guard<'a>(
+	mut remaining: &'a [u8],
+	attacker: &'a [u8],
+	replace: bool,
+) -> Result<(), ()> {
+	if remaining.len() > MAX_REMAINING_ACCOUNTS {
+		return Err(());
+	}
+
+	if replace {
+		remaining = attacker;
+	} else {
+		let _ = remaining.first();
+	}
+
+	for account in remaining {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+
+	Ok(())
+}
+
+fn process_bounded_assignment<'a>(remaining: &'a [u8], attacker: &'a [u8]) -> Result<(), ()> {
+	if remaining.len() > MAX_REMAINING_ACCOUNTS {
+		return Err(());
+	}
+
+	let mut accounts = attacker;
+	let _ = accounts.len();
+	accounts = remaining;
+	for account in accounts {
+		let _ = account;
+	}
+
+	Ok(())
+}
+
+struct AnalysisShapes<'a> {
+	accounts: &'a [u8],
+	count: usize,
+}
+
+fn exercise_analysis_shapes(remaining: &[u8]) {
+	let mut count = 0;
+	count += remaining.len();
+	let _ = remaining[0];
+	let _ = (remaining, count);
+	if let Some(account) = remaining.first() {
+		let _ = account;
+	}
+	match remaining.first() {
+		Some(account) if *account == 0 => {}
+		_ => {}
+	}
+
+	let base = AnalysisShapes {
+		accounts: &[],
+		count,
+	};
+	let _ = AnalysisShapes {
+		accounts: remaining,
+		..base
+	};
+}
+
 fn main() {}
 
 // compile-fail

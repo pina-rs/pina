@@ -82,6 +82,10 @@ fn process_primitive(cursor: &mut u64) {
 	cursor.remaining_mut();
 }
 
+fn process_unrelated_closure_call() {
+	let _ = (|| 1)();
+}
+
 fn main() {}
 
 // compile-fail

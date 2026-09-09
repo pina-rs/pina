@@ -196,9 +196,9 @@ fn same_or_descendant(candidate: &str, identity: &str) -> bool {
 }
 
 fn intersect_states(states: &[AnalysisState]) -> AnalysisState {
-	let Some(first) = states.first() else {
-		return AnalysisState::default();
-	};
+	let first = states
+		.first()
+		.expect("state intersections always contain at least one control-flow path");
 	let mut bounded = first.bounded.clone();
 	let mut remaining = HashSet::new();
 
@@ -235,23 +235,20 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 	}
 
 	fn method_mutably_borrows_receiver(&self, expression: &Expr<'_>) -> bool {
-		let Some(definition) = self
-			.cx
+		self.cx
 			.typeck_results()
 			.type_dependent_def_id(expression.hir_id)
-		else {
-			return false;
-		};
-
-		self.cx
-			.tcx
-			.fn_sig(definition)
-			.instantiate_identity()
-			.skip_binder()
-			.inputs()
-			.first()
-			.and_then(|receiver| receiver.ref_mutability())
-			== Some(rustc_hir::Mutability::Mut)
+			.is_some_and(|definition| {
+				self.cx
+					.tcx
+					.fn_sig(definition)
+					.instantiate_identity()
+					.skip_binder()
+					.inputs()
+					.first()
+					.and_then(|receiver| receiver.ref_mutability())
+					== Some(rustc_hir::Mutability::Mut)
+			})
 	}
 
 	fn invalidate_mutable_reference_argument(
@@ -466,15 +463,15 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					|| expression_has_static_bound(self.cx, right);
 				self.visit_expr(left, state);
 				self.visit_expr(right, state);
-				if let Some(identity) = self.expression_identity(left) {
-					self.invalidate(state, &identity);
+				let _ = self.expression_identity(left).inspect(|identity| {
+					self.invalidate(state, identity);
 					if right_is_remaining {
-						state.remaining.insert(identity.clone());
+						state.remaining.insert((*identity).clone());
 					}
 					if right_is_bounded {
-						state.bounded.insert(identity);
+						state.bounded.insert((*identity).clone());
 					}
-				}
+				});
 			}
 			ExprKind::AssignOp(_, left, right) => {
 				self.visit_expr(left, state);
