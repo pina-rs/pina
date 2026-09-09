@@ -516,6 +516,22 @@ fn renders_instruction_data_with_discriminator_prefix() {
 }
 
 #[test]
+fn framework_owned_migration_versions_are_written_and_validated() {
+	let crate_dir = render_fixture_program("migrations_program", "pina-codama-render-migrations");
+	let update = read_generated_file(&crate_dir, "instructions/update.rs");
+	let state = read_generated_file(&crate_dir, "accounts/state.rs");
+	let compact = read_generated_file(&crate_dir, "accounts/compact_state.rs");
+
+	assert!(update.contains("pub const UPDATE_MIGRATION_VERSION: u8 = 1u8;"));
+	assert!(update.contains("data.migration_version = UPDATE_MIGRATION_VERSION;"));
+	assert!(state.contains("pub const STATE_MIGRATION_VERSION: u8 = 1u8;"));
+	assert!(state.contains("account.migration_version = STATE_MIGRATION_VERSION;"));
+	assert!(state.contains("if account.migration_version != STATE_MIGRATION_VERSION"));
+	assert!(compact.contains(".migration_version(COMPACT_STATE_MIGRATION_VERSION)"));
+	assert!(compact.contains("if account.migration_version != COMPACT_STATE_MIGRATION_VERSION"));
+}
+
+#[test]
 fn renders_root_mod_with_unused_program_reexport_allowance() {
 	let crate_dir = render_fixture_program("declare_id_program", "pina-codama-render-root-mod");
 	let content = read_generated_file(&crate_dir, "mod.rs");

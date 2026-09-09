@@ -4986,6 +4986,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "migrations-program-client"
+version = "0.0.0"
+dependencies = [
+ "num-derive 0.5.1",
+ "num-traits",
+ "pina",
+ "solana-account-info 3.1.1",
+ "solana-cpi 3.1.0",
+ "solana-instruction 3.4.1",
+ "solana-program-error 3.0.1",
+ "solana-pubkey 4.2.1",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "migrations-surfpool-tests"
+version = "0.0.0"
+dependencies = [
+ "migrations-program-client",
+ "migrations_program",
+ "pina_test",
+]
+
+[[package]]
 name = "migrations_program"
 version = "0.0.0"
 dependencies = [
@@ -4995,6 +5019,13 @@ dependencies = [
  "solana-instruction 3.4.1",
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
+]
+
+[[package]]
+name = "migrations_program_cpi"
+version = "0.0.0"
+dependencies = [
+ "pina",
 ]
 
 [[package]]

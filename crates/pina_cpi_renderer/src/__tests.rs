@@ -124,6 +124,17 @@ fn vesting_cancel_instruction_snapshot() {
 }
 
 #[test]
+fn migration_version_is_part_of_the_framework_owned_cpi_prefix() {
+	let content = render_fixture_instruction("migrations_program", "update");
+
+	assert!(content.contains("pub const LEN: usize = 12;"));
+	assert!(content.contains("data[..2].copy_from_slice(&UPDATE_DISCRIMINATOR);"));
+	assert!(content.contains("data[2..10].copy_from_slice(&self.value.to_le_bytes());"));
+	assert!(content.contains("data[10..12].copy_from_slice(&self.memo.to_le_bytes());"));
+	assert!(content.contains("const UPDATE_DISCRIMINATOR: [u8; 2] = [0, 1];"));
+}
+
+#[test]
 fn renders_vesting_fixture_to_disk() {
 	let root = load_fixture_root("vesting_program");
 	let crate_dir = unique_temp_dir("pina-cpi-renderer-vesting");

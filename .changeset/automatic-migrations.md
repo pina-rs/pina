@@ -2,6 +2,8 @@
 pina: feat
 pina_abi: feat
 pina_cli: feat
+pina_codama_renderer: feat
+pina_cpi_renderer: feat
 pina_lints: fix
 pina_macros: feat
 pina_test: feat

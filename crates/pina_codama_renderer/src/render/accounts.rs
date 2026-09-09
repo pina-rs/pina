@@ -1,10 +1,12 @@
 use codama_nodes::AccountNode;
+use codama_nodes::DefaultValueStrategy;
 use codama_nodes::NestedTypeNodeTrait;
 use codama_nodes::PdaNode;
 use codama_nodes::PdaSeedNode;
 
 use super::capacity::CompactCapacityIndex;
 use super::discriminator::render_constant_discriminator;
+use super::discriminator::render_omitted_value_constant;
 use super::helpers::pascal;
 use super::helpers::render_docs;
 use super::helpers::snake;
@@ -59,6 +61,26 @@ pub(crate) fn render_account_page(
 		render_constant_discriminator(account.name.as_ref(), &account.discriminators, &context)?;
 
 	let data_type = account.data.get_nested_type_node();
+	let omitted_constants = data_type
+		.fields
+		.iter()
+		.filter(|field| {
+			field.name.as_ref() != "discriminator"
+				&& matches!(
+					field.default_value_strategy,
+					Some(DefaultValueStrategy::Omitted)
+				)
+		})
+		.map(|field| {
+			render_omitted_value_constant(
+				account.name.as_ref(),
+				field.name.as_ref(),
+				&field.r#type,
+				field.default_value.as_ref().as_ref(),
+				&context,
+			)
+		})
+		.collect::<Result<Vec<_>>>()?;
 	let first_compact_tail = data_type
 		.fields
 		.iter()
@@ -108,17 +130,28 @@ pub(crate) fn render_account_page(
 		));
 		lines.push(String::new());
 	}
+	for constant in &omitted_constants {
+		lines.push(format!(
+			"pub const {}: {} = {};",
+			constant.name, constant.ty, constant.value
+		));
+	}
+	if !omitted_constants.is_empty() {
+		lines.push(String::new());
+	}
 
 	lines.push(format!("impl {account_name} {{"));
 	if compact_account {
 		lines.extend(render_compact_account_helpers(
 			&account_name,
 			discriminator.as_ref(),
+			&omitted_constants,
 		));
 	} else {
 		lines.extend(render_fixed_account_helpers(
 			&zc_name,
 			discriminator.as_ref(),
+			&omitted_constants,
 		));
 	}
 	lines.push("}".to_string());
@@ -136,6 +169,7 @@ pub(crate) fn render_account_page(
 fn render_fixed_account_helpers(
 	zc_name: &str,
 	discriminator: Option<&super::discriminator::DiscriminatorInfo>,
+	omitted_constants: &[super::discriminator::OmittedConstantInfo],
 ) -> Vec<String> {
 	let mut lines = Vec::new();
 	lines.push(format!(
@@ -157,6 +191,12 @@ fn render_fixed_account_helpers(
 		lines.push(format!(
 			"\t\t\taccount.discriminator = {};",
 			discriminator.name
+		));
+	}
+	for constant in omitted_constants {
+		lines.push(format!(
+			"\t\t\taccount.{} = {};",
+			constant.field, constant.name
 		));
 	}
 	lines.push("\t\t\tOk(())".to_string());
@@ -185,6 +225,16 @@ fn render_fixed_account_helpers(
 		);
 		lines.push("\t\t}".to_string());
 	}
+	for constant in omitted_constants {
+		lines.push(format!(
+			"\t\tif account.{} != {} {{",
+			constant.field, constant.name
+		));
+		lines.push(
+			"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+		);
+		lines.push("\t\t}".to_string());
+	}
 	lines.push("\t\tOk(account)".to_string());
 	lines.push("\t}".to_string());
 	lines.push(String::new());
@@ -207,6 +257,16 @@ fn render_fixed_account_helpers(
 		);
 		lines.push("\t\t}".to_string());
 	}
+	for constant in omitted_constants {
+		lines.push(format!(
+			"\t\tif account.{} != {} {{",
+			constant.field, constant.name
+		));
+		lines.push(
+			"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+		);
+		lines.push("\t\t}".to_string());
+	}
 	lines.push("\t\tOk(account)".to_string());
 	lines.push("\t}".to_string());
 	lines
@@ -215,6 +275,7 @@ fn render_fixed_account_helpers(
 fn render_compact_account_helpers(
 	account_name: &str,
 	discriminator: Option<&super::discriminator::DiscriminatorInfo>,
+	omitted_constants: &[super::discriminator::OmittedConstantInfo],
 ) -> Vec<String> {
 	let ref_name = format!("{account_name}Ref");
 	let patch_name = format!("{account_name}Patch");
@@ -226,14 +287,14 @@ fn render_compact_account_helpers(
 			 solana_program_error::ProgramError> {{"
 		),
 	];
+	let mut patch = "\t\tpatch".to_string();
 	if let Some(discriminator) = discriminator {
-		lines.push(format!(
-			"\t\tpatch.discriminator({}).initialize(data)",
-			discriminator.name
-		));
-	} else {
-		lines.push("\t\tpatch.initialize(data)".to_string());
+		patch.push_str(&format!(".discriminator({})", discriminator.name));
 	}
+	for constant in omitted_constants {
+		patch.push_str(&format!(".{}({})", constant.field, constant.name));
+	}
+	lines.push(format!("{patch}.initialize(data)"));
 	lines.extend([
 		"\t\t\t.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)".to_string(),
 		"\t}".to_string(),
@@ -249,6 +310,16 @@ fn render_compact_account_helpers(
 		lines.push(format!(
 			"\t\tif account.discriminator != {} {{",
 			discriminator.name
+		));
+		lines.push(
+			"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),
+		);
+		lines.push("\t\t}".to_string());
+	}
+	for constant in omitted_constants {
+		lines.push(format!(
+			"\t\tif account.{} != {} {{",
+			constant.field, constant.name
 		));
 		lines.push(
 			"\t\t\treturn Err(solana_program_error::ProgramError::InvalidAccountData);".to_string(),

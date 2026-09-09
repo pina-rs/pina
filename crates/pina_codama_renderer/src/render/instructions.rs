@@ -1,3 +1,4 @@
+use codama_nodes::DefaultValueStrategy;
 use codama_nodes::HasKind;
 use codama_nodes::InstructionAccountNode;
 use codama_nodes::InstructionInputValueNode;
@@ -12,6 +13,7 @@ use codama_nodes::PdaValuePda;
 use codama_nodes::ProgramNode;
 
 use super::discriminator::render_constant_discriminator;
+use super::discriminator::render_omitted_instruction_constant;
 use super::helpers::canonical_pubkey;
 use super::helpers::pascal;
 use super::helpers::program_id_const_name;
@@ -64,6 +66,26 @@ pub(crate) fn render_instruction_page(
 			context: context.clone(),
 		}
 	})?;
+	let omitted_constants = instruction
+		.arguments
+		.iter()
+		.filter(|argument| {
+			argument.name.as_ref() != "discriminator"
+				&& matches!(
+					argument.default_value_strategy,
+					Some(DefaultValueStrategy::Omitted)
+				)
+		})
+		.map(|argument| {
+			render_omitted_instruction_constant(
+				instruction.name.as_ref(),
+				argument.name.as_ref(),
+				&argument.r#type,
+				argument.default_value.as_ref().as_ref(),
+				&context,
+			)
+		})
+		.collect::<Result<Vec<_>>>()?;
 
 	let mut lines = Vec::new();
 	for doc_line in render_docs(&instruction.docs, 0) {
@@ -73,6 +95,12 @@ pub(crate) fn render_instruction_page(
 		"pub const {}: {} = {};",
 		discriminator.name, discriminator.ty, discriminator.value
 	));
+	for constant in &omitted_constants {
+		lines.push(format!(
+			"pub const {}: {} = {};",
+			constant.name, constant.ty, constant.value
+		));
+	}
 	lines.push(String::new());
 	lines.push("/// Accounts.".to_string());
 	lines.push("#[derive(Clone, Debug)]".to_string());
@@ -168,13 +196,19 @@ pub(crate) fn render_instruction_page(
 		"\t\t<{wire_name} as pina::PinaPodFixed>::initialize(&mut bytes, |data| {{"
 	));
 	lines.push("\t\t\tconfigure(data);".to_string());
-	// Security: The discriminator is framework-owned metadata. Writing it after
-	// the callback prevents otherwise valid user configuration from changing
-	// which on-chain instruction will receive the payload.
+	// Security: Discriminators and omitted constants are framework-owned
+	// metadata. Writing them after the callback prevents otherwise valid user
+	// configuration from changing instruction identity or ABI version.
 	lines.push(format!(
 		"\t\t\tdata.discriminator = {};",
 		discriminator.name
 	));
+	for constant in &omitted_constants {
+		lines.push(format!(
+			"\t\t\tdata.{} = {};",
+			constant.field, constant.name
+		));
+	}
 	lines.push("\t\t\tOk(())".to_string());
 	lines.push("\t\t})".to_string());
 	lines.push(
