@@ -134,6 +134,8 @@ pub trait MigratableAccount: private::Sealed {
 
 Planning validates the exact source schema and returns owned, detached state plus the final target length. The plan cannot borrow account data. This lets the dispatcher drop every old borrow before funding, resize, mutation, or CPI. Applying a preflighted plan is infallible; the executor writes the new version only after the destination representation validates.
 
+The executor has a one-way mutation boundary. Ownership, writability, historical decoding, step limits, size arithmetic, rent, funding authorization, and borrow availability fail with ordinary `ProgramError` values before that boundary. Once a funding CPI, resize, or byte rewrite succeeds, a later framework invariant failure aborts the instruction instead of returning a catchable error. This prevents application code from swallowing a migration error and committing partially rewritten bytes; Solana rolls every transaction effect back on the abort.
+
 Generated structural changes include exact field copies, safe reordering, supported widening, and defaults whose value is unambiguous. Renames, narrowing, semantic splits or merges, authority changes, and other ambiguous changes generate a typed unresolved transition. The build remains blocked until the developer implements it and provides semantic fixtures or invariants.
 
 The default migration path retains every surplus lamport. It never uses the ordinary reallocation helper's shrink-refund policy. Growth may charge only an explicitly declared, writable signer or a fixed program treasury policy, subject to a generated maximum. The target and payer must not alias.

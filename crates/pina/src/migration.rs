@@ -444,6 +444,19 @@ mod executor {
 	use crate::ProgramError;
 	use crate::ProgramResult;
 
+	#[cold]
+	#[inline(never)]
+	fn abort_after_mutation(error: ProgramError) -> ! {
+		panic!("account migration invariant failed after mutation: {error:?}")
+	}
+
+	fn finish_after_mutation<T>(result: Result<T, ProgramError>) -> T {
+		match result {
+			Ok(value) => value,
+			Err(error) => abort_after_mutation(error),
+		}
+	}
+
 	pub(super) fn validate_funding_payer(
 		payer: &AccountView,
 		account: &AccountView,
@@ -465,7 +478,10 @@ mod executor {
 	/// The planner validates historical bytes while they are immutably borrowed.
 	/// The borrow ends before funding, resize, and rewrite. Growth uses `payer`
 	/// only for the rent deficit and never charges more than `max_lamports`.
-	/// Shrinkage retains every lamport in the migrated account.
+	/// Shrinkage retains every lamport in the migrated account. Preflight failures
+	/// return normally. An invariant failure after the first successful mutation
+	/// aborts the instruction so application code cannot catch it and commit a
+	/// partial migration.
 	#[must_use = "account migration has no effect until invoke or invoke_signed is called"]
 	pub struct MigrateAccount<'account, 'payer, 'address> {
 		/// Program-owned account to inspect and, when stale, migrate.
@@ -579,6 +595,12 @@ mod executor {
 				return Err(PinaProgramError::MigrationBudgetExceeded.into());
 			}
 
+			// Application code can catch a returned `ProgramError` and continue.
+			// Preflight the account-data borrow before funding, then abort the whole
+			// instruction if any invariant fails after the first successful effect.
+			self.account.check_borrow_mut()?;
+			let mut mutation_started = false;
+
 			if funding > 0 {
 				let payer = self.payer.ok_or(PinaProgramError::MigrationRequired)?;
 				validate_funding_payer(payer, self.account, !signers.is_empty())?;
@@ -589,29 +611,36 @@ mod executor {
 					lamports: funding,
 				}
 				.invoke_signed(signers)?;
+				mutation_started = true;
 			}
 
 			if working_size > current_size {
-				self.account.check_borrow_mut()?;
-				self.account.resize(working_size)?;
+				match self.account.resize(working_size) {
+					Ok(()) => mutation_started = true,
+					Err(error) if mutation_started => abort_after_mutation(error),
+					Err(error) => return Err(error),
+				}
 			}
 
 			let steps = plan.steps();
 			{
-				let mut data = self.account.try_borrow_mut()?;
+				let mut data = match self.account.try_borrow_mut() {
+					Ok(data) => data,
+					Err(error) if mutation_started => abort_after_mutation(error),
+					Err(error) => return Err(error),
+				};
 				T::apply_migration(plan.into_payload(), &mut data);
 			}
 
 			if target_size < allocated_working_size {
-				self.account.check_borrow_mut()?;
-				self.account.resize(target_size)?;
+				finish_after_mutation(self.account.resize(target_size));
 			}
 
 			{
-				let mut data = self.account.try_borrow_mut()?;
-				T::validate_migration_destination(&data)?;
-				T::write_current_migration_version(&mut data)?;
-				T::validate_current_migration(&data)?;
+				let mut data = finish_after_mutation(self.account.try_borrow_mut());
+				finish_after_mutation(T::validate_migration_destination(&data));
+				finish_after_mutation(T::write_current_migration_version(&mut data));
+				finish_after_mutation(T::validate_current_migration(&data));
 			}
 
 			Ok(AccountMigrationOutcome::Migrated {
@@ -629,6 +658,8 @@ pub use executor::MigrateAccount;
 #[cfg(test)]
 #[allow(unsafe_code)]
 mod tests {
+	extern crate std;
+
 	#[cfg(feature = "account-resize")]
 	use pinocchio::AccountView;
 	#[cfg(feature = "account-resize")]
@@ -1019,6 +1050,50 @@ mod tests {
 	}
 
 	#[cfg(feature = "account-resize")]
+	struct InvalidDestinationAccount;
+
+	#[cfg(feature = "account-resize")]
+	impl HasDiscriminator for InvalidDestinationAccount {
+		type Type = u8;
+
+		const VALUE: Self::Type = 10;
+	}
+
+	#[cfg(feature = "account-resize")]
+	impl HasMigrationVersion for InvalidDestinationAccount {
+		type Version = u8;
+
+		const CURRENT_VERSION: Self::Version = 1;
+	}
+
+	#[cfg(feature = "account-resize")]
+	impl MigratableAccount for InvalidDestinationAccount {
+		type Plan = ();
+
+		const MAX_INLINE_STEPS: u16 = 1;
+
+		fn plan_migration(data: &[u8]) -> Result<AccountMigrationPlan<Self::Plan>, ProgramError> {
+			if data != [Self::VALUE, 0, 42] {
+				return Err(ProgramError::InvalidAccountData);
+			}
+
+			AccountMigrationPlan::try_new(0, 1, 3, 1, ())
+		}
+
+		fn apply_migration(_: Self::Plan, destination: &mut [u8]) {
+			destination[2] = 99;
+		}
+
+		fn validate_migration_destination(data: &[u8]) -> ProgramResult {
+			if data != [Self::VALUE, 0, 42] && data != [Self::VALUE, 1, 42] {
+				return Err(ProgramError::InvalidAccountData);
+			}
+
+			Ok(())
+		}
+	}
+
+	#[cfg(feature = "account-resize")]
 	fn test_rent() -> Rent {
 		Rent::from_bytes(&1_u64.to_le_bytes())
 			.unwrap_or_else(|error| panic!("create test rent: {error:?}"))
@@ -1251,6 +1326,52 @@ mod tests {
 			));
 			assert_eq!(&*account.try_borrow().unwrap(), &source);
 		}
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn executor_aborts_instead_of_returning_an_error_after_mutation() {
+		const RETURNED_EXIT_CODE: i32 = 86;
+		let output = std::process::Command::new(
+			std::env::current_exe().unwrap_or_else(|error| panic!("locate test binary: {error}")),
+		)
+		.arg("--exact")
+		.arg("migration::tests::post_mutation_invariant_failure_child")
+		.arg("--nocapture")
+		.env("PINA_TEST_POST_MUTATION_ABORT_CHILD", "1")
+		.output()
+		.unwrap_or_else(|error| panic!("run abort probe: {error}"));
+
+		assert!(!output.status.success());
+		assert_ne!(
+			output.status.code(),
+			Some(RETURNED_EXIT_CODE),
+			"migration returned after mutation: {}",
+			std::string::String::from_utf8_lossy(&output.stderr),
+		);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn post_mutation_invariant_failure_child() {
+		const RETURNED_EXIT_CODE: i32 = 86;
+		if std::env::var_os("PINA_TEST_POST_MUTATION_ABORT_CHILD").is_none() {
+			return;
+		}
+
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 1_000, &[10, 0, 42]);
+		let mut account = stored.view();
+		let _result = MigrateAccount {
+			account: &mut account,
+			payer: None,
+			program_id: &owner,
+			max_lamports: 0,
+		}
+		.invoke_with_rent::<InvalidDestinationAccount>(test_rent());
+
+		std::process::exit(RETURNED_EXIT_CODE);
 	}
 
 	#[cfg(feature = "account-resize")]
