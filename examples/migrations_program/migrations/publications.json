@@ -11,6 +11,7 @@
 			"versions": {
 				"account:1:01": 0,
 				"account:1:02": 0,
+				"account:1:03": 0,
 				"instruction:1:00": 0
 			},
 			"previousReceiptSha256": null

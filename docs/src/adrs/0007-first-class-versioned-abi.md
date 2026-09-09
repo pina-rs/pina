@@ -115,7 +115,7 @@ The current-version hot path reads one version value and compares it with a gene
 
 ### Account migration runtime
 
-Generated account migrations use two phases:
+Each generated adjacent account migration uses two phases:
 
 ```rust
 pub trait MigratableAccount: private::Sealed {
@@ -132,7 +132,9 @@ pub trait MigratableAccount: private::Sealed {
 }
 ```
 
-Planning validates the exact source schema and returns owned, detached state plus the final target length. The plan cannot borrow account data. This lets the dispatcher drop every old borrow before funding, resize, mutation, or CPI. Applying a preflighted plan is infallible; the executor writes the new version only after the destination representation validates.
+Planning validates the exact source schema and returns owned, detached state plus that step's target and working lengths. The plan cannot borrow account data. This lets the dispatcher drop every old borrow before funding, resize, mutation, or CPI. Applying a preflighted plan is infallible; the executor writes the adjacent destination version only after that representation validates.
+
+The executor repeats this pair for each adjacent version in the bounded inline path. That sequencing is required for compact schemas: the allocation needed by `v2 -> v3` can depend on the active tails produced by `v1 -> v2`, and copying a maximum-size account into stack scratch space is not viable on SBF. The first step may return a normal preflight error. Once any step mutates lamports, length, or bytes, a later planning, resize, or validation failure aborts the instruction and rolls back the complete transaction.
 
 The executor has a one-way mutation boundary. Ownership, writability, historical decoding, step limits, size arithmetic, rent, funding authorization, and borrow availability fail with ordinary `ProgramError` values before that boundary. Once a funding CPI, resize, or byte rewrite succeeds, a later framework invariant failure aborts the instruction instead of returning a catchable error. This prevents application code from swallowing a migration error and committing partially rewritten bytes; Solana rolls every transaction effect back on the abort.
 

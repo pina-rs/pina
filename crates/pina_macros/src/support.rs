@@ -54,7 +54,7 @@ pub(crate) fn generate_view_helpers(
 	account_boundary: bool,
 	migration: Option<&MigrationExpansion>,
 ) -> proc_macro2::TokenStream {
-	let require_current = migration.map(|migration| migration.require_current(crate_path));
+	let require_current = migration.map(|_| MigrationExpansion::require_current(crate_path));
 	let write_version = migration.map(MigrationExpansion::write_zc_version);
 	let initialize = if account_boundary {
 		quote! {

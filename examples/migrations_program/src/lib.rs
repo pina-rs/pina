@@ -13,6 +13,7 @@ pub enum MigrationInstruction {
 pub enum MigrationAccount {
 	State = 1,
 	ManualState = 2,
+	CompactState = 3,
 }
 
 #[account(discriminator = MigrationAccount::State, migrations)]
@@ -25,6 +26,12 @@ pub struct State {
 #[account(discriminator = MigrationAccount::ManualState, migrations)]
 pub struct ManualState {
 	pub amount: u16,
+}
+
+#[account(discriminator = MigrationAccount::CompactState, compact, migrations)]
+pub struct CompactState {
+	pub name: String<4>,
+	pub tags: Vec<u16, 2>,
 }
 
 #[instruction(discriminator = MigrationInstruction::Update, migrations)]
@@ -124,7 +131,7 @@ mod tests {
 		let mut destination = [0xaa; 43];
 		destination[..old.len()].copy_from_slice(&old);
 		State::apply_migration(plan.into_payload(), &mut destination);
-		State::validate_migration_destination(&destination)
+		State::validate_migration_destination(1, &destination)
 			.unwrap_or_else(|error| panic!("validate destination: {error:?}"));
 		State::write_current_migration_version(&mut destination)
 			.unwrap_or_else(|error| panic!("write version: {error:?}"));
@@ -144,12 +151,53 @@ mod tests {
 		let mut destination = [0xaa; 4];
 		destination[..old.len()].copy_from_slice(&old);
 		ManualState::apply_migration(plan.into_payload(), &mut destination);
-		ManualState::validate_migration_destination(&destination)
+		ManualState::validate_migration_destination(1, &destination)
 			.unwrap_or_else(|error| panic!("validate manual destination: {error:?}"));
 		ManualState::write_current_migration_version(&mut destination)
 			.unwrap_or_else(|error| panic!("write manual version: {error:?}"));
 
 		assert_eq!(destination[..2], [MigrationAccount::ManualState as u8, 1]);
 		assert_eq!(u16::from_le_bytes([destination[2], destination[3]]), 255);
+	}
+
+	#[test]
+	fn compact_account_migration_preserves_active_data_and_discards_spare_bytes() {
+		let old = [
+			MigrationAccount::CompactState as u8,
+			0,
+			3,
+			b'A',
+			b'd',
+			b'a',
+			0xee,
+		];
+		let plan = CompactState::plan_migration(&old)
+			.unwrap_or_else(|error| panic!("plan compact account migration: {error:?}"));
+		assert_eq!(plan.target_size(), 8);
+		assert_eq!(plan.working_size(), 8);
+
+		let mut destination = [0xaa; 8];
+		destination[..old.len()].copy_from_slice(&old);
+		CompactState::apply_migration(plan.into_payload(), &mut destination);
+		CompactState::validate_migration_destination(1, &destination)
+			.unwrap_or_else(|error| panic!("validate compact destination: {error:?}"));
+		CompactState::write_current_migration_version(&mut destination)
+			.unwrap_or_else(|error| panic!("write compact version: {error:?}"));
+		let state = CompactState::try_from_bytes(&destination)
+			.unwrap_or_else(|error| panic!("read compact destination: {error:?}"));
+
+		assert_eq!(state.name(), "Ada");
+		assert!(state.tags().is_empty());
+		assert!(!destination.contains(&0xee));
+	}
+
+	#[test]
+	fn compact_account_planner_rejects_forged_historical_lengths() {
+		let forged = [MigrationAccount::CompactState as u8, 0, 5, b'A', b'd', b'a'];
+
+		assert_eq!(
+			CompactState::plan_migration(&forged),
+			Err(ProgramError::InvalidAccountData),
+		);
 	}
 }

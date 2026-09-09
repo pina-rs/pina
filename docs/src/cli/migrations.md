@@ -38,7 +38,9 @@ Commit the manifest, publication ledger, and transition files. Do not generate t
 
 Pina generates automatic transitions only for direction-safe fixed-layout changes. A type change, compact layout, or ambiguous field move creates a manual Rust file with `TODO(pina-manual-migration)`.
 
-Replace the generated body. Pina preflights the exact historical shape for fixed accounts, so an account conversion must be total for every valid source and fully initialize the destination bytes. It cannot return an error after mutation starts. A manual instruction conversion runs in scratch space and may reject invalid semantic values before dispatch. Then run:
+Replace the generated body. Pina preflights the exact historical shape for every account. Fixed transitions have generated size constants. A transition involving compact data also has `target_size` and `working_size` functions. They inspect already-validated historical bytes and must return a valid destination allocation without mutating the account. The `migrate` function is then total for that accepted source and must fully initialize every active destination byte.
+
+Pina runs adjacent account transitions one at a time inside one invocation. It validates and commits each intermediate version before planning the next, which lets a later compact allocation depend on the prior compact result without allocating a copy of the account on the SBF stack. If any later step fails, Pina aborts the instruction so Solana rolls back all earlier resizes, lamport transfers, and byte writes. A manual instruction conversion instead runs in scratch space and may reject invalid semantic values before dispatch. Then run:
 
 ```bash
 pina migrations check

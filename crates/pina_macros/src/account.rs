@@ -268,7 +268,7 @@ pub(crate) fn expand(
 	});
 	let account_migration = match migration.as_ref() {
 		Some(migration) => {
-			match migration.fixed_account_implementation(&crate_path, &struct_name) {
+			match migration.account_implementation(&crate_path, &struct_name) {
 				Ok(implementation) => implementation,
 				Err(error) => return error.to_compile_error(),
 			}
@@ -384,8 +384,8 @@ fn generate_compact_view_helpers(
 	schema: &schema::CompactSchema,
 	migration: Option<&MigrationExpansion>,
 ) -> proc_macro2::TokenStream {
-	let require_current = migration.map(|migration| migration.require_current(crate_path));
-	let write_current = migration.map(|migration| migration.write_current(crate_path));
+	let require_current = migration.map(|_| MigrationExpansion::require_current(crate_path));
+	let write_current = migration.map(|_| MigrationExpansion::write_current(crate_path));
 	#[cfg(feature = "validation")]
 	let read_value = quote! {
 		let value = #ref_name::new(data).map_err(|_| #error)?;

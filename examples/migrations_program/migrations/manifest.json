@@ -105,6 +105,55 @@
 				}
 			]
 		},
+		"account:1:03": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "03"
+			},
+			"rustName": "CompactState",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "edbfd93cfd17a6328cd549acb46517789780821cb32ea14b361d24c44acc3c37",
+					"schema": {
+						"layout": "compact",
+						"fields": [
+							{
+								"name": "name",
+								"rustType": "String<4>"
+							}
+						]
+					},
+					"transition": null
+				},
+				{
+					"version": 1,
+					"schemaSha256": "1c0b3df705eea0b93a319bd13485e0326949c7709c7ff9200b57a6d3e5ada5a2",
+					"schema": {
+						"layout": "compact",
+						"fields": [
+							{
+								"name": "name",
+								"rustType": "String<4>"
+							},
+							{
+								"name": "tags",
+								"rustType": "Vec<u16, 2>"
+							}
+						]
+					},
+					"transition": {
+						"from": 0,
+						"to": 1,
+						"mode": "manual",
+						"sourceSchemaSha256": "edbfd93cfd17a6328cd549acb46517789780821cb32ea14b361d24c44acc3c37",
+						"destinationSchemaSha256": "1c0b3df705eea0b93a319bd13485e0326949c7709c7ff9200b57a6d3e5ada5a2",
+						"implementationSha256": "64fc31e90adcf2456cd59db1961767a8cf9eeff12be1134343bdaa68632f876a"
+					}
+				}
+			]
+		},
 		"instruction:1:00": {
 			"identity": {
 				"kind": "instruction",

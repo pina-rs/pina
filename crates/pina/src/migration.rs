@@ -76,7 +76,7 @@ macro_rules! impl_migration_version {
 
 			#[inline(always)]
 			fn into_u32(self) -> u32 {
-				self as u32
+				u32::from(self)
 			}
 
 			#[inline(always)]
@@ -161,11 +161,22 @@ pub trait HasMigrationVersion: HasDiscriminator {
 	/// Write the generated current version into an initialized envelope.
 	#[inline(always)]
 	fn write_current_migration_version(data: &mut [u8]) -> ProgramResult {
+		Self::write_migration_version(Self::CURRENT_VERSION, data)
+	}
+
+	/// Write one generated historical or current version into an initialized
+	/// envelope.
+	///
+	/// Account migrations use this only after the destination for that exact
+	/// adjacent version has validated. Application code should write only the
+	/// current version through [`Self::write_current_migration_version`].
+	#[inline(always)]
+	fn write_migration_version(version: Self::Version, data: &mut [u8]) -> ProgramResult {
 		let bytes = data
 			.get_mut(Self::VERSION_OFFSET..Self::MIGRATION_HEADER_SIZE)
 			.ok_or(PinaProgramError::DataTooShort)?;
 
-		Self::CURRENT_VERSION.write_le(bytes)
+		version.write_le(bytes)
 	}
 
 	/// Require bytes that already use the current representation.
@@ -197,8 +208,7 @@ impl CurrentInstructionData<'_, '_> {
 	#[must_use]
 	pub const fn as_bytes(&self) -> &[u8] {
 		match self {
-			Self::Current(data) => data,
-			Self::Migrated(data) => data,
+			Self::Current(data) | Self::Migrated(data) => data,
 		}
 	}
 
@@ -271,12 +281,14 @@ where
 	}
 }
 
-/// Pure plan for one complete account migration to the current representation.
+/// Pure plan for one adjacent account migration.
 ///
 /// Generated planning code validates the exact historical source and owns
 /// `payload`. The payload cannot borrow account data because this type has no
 /// source lifetime. The executor can therefore release every account borrow
-/// before rent adjustment or resize.
+/// before rent adjustment or resize. Multi-version histories execute one plan
+/// at a time inside one atomic instruction; any failure after the first
+/// mutation aborts the instruction and rolls every preceding step back.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AccountMigrationPlan<P> {
 	from_version: u32,
@@ -344,7 +356,7 @@ impl<P> AccountMigrationPlan<P> {
 		self.from_version
 	}
 
-	/// Destination version. Generated automatic plans target the current version.
+	/// Adjacent destination version.
 	#[must_use]
 	pub const fn to_version(&self) -> u32 {
 		self.to_version
@@ -388,22 +400,23 @@ pub trait MigratableAccount: HasMigrationVersion {
 	/// Maximum number of adjacent transitions allowed during ordinary dispatch.
 	const MAX_INLINE_STEPS: u16;
 
-	/// Validate the selected historical representation and build a detached plan.
+	/// Validate the selected historical representation and build a detached plan
+	/// for its immediate successor.
 	fn plan_migration(data: &[u8]) -> Result<AccountMigrationPlan<Self::Plan>, ProgramError>;
 
 	/// Rewrite `destination` according to a successfully preflighted plan.
 	fn apply_migration(plan: Self::Plan, destination: &mut [u8]);
 
-	/// Validate the destination representation without requiring its version
-	/// bytes to have been committed yet.
-	fn validate_migration_destination(data: &[u8]) -> ProgramResult;
+	/// Validate an exact generated destination representation without requiring
+	/// its version bytes to have been committed yet.
+	fn validate_migration_destination(version: u32, data: &[u8]) -> ProgramResult;
 
 	/// Validate the complete current representation, including the committed
 	/// version envelope.
 	#[inline(always)]
 	fn validate_current_migration(data: &[u8]) -> ProgramResult {
 		Self::require_current_migration_version(data)?;
-		Self::validate_migration_destination(data)
+		Self::validate_migration_destination(Self::CURRENT_VERSION.into_u32(), data)
 	}
 }
 
@@ -540,7 +553,7 @@ mod executor {
 				.assert_writable()?
 				.assert_owner(self.program_id)?;
 
-			let (stored, plan) = {
+			let stored = {
 				let data = self.account.try_borrow()?;
 				if !T::matches_discriminator(&data) {
 					return Err(ProgramError::InvalidAccountData);
@@ -555,98 +568,185 @@ mod executor {
 					StoredVersion::Future { .. } => {
 						return Err(PinaProgramError::InvalidMigrationVersion.into());
 					}
-					StoredVersion::Stale { stored, .. } => {
-						let plan = T::plan_migration(&data)?;
-
-						(stored, plan)
-					}
+					StoredVersion::Stale { stored, .. } => stored,
 				}
 			};
 
 			let current = T::CURRENT_VERSION;
-			if plan.from_version() != stored.into_u32()
-				|| plan.to_version() != current.into_u32()
-				|| plan.steps() > T::MAX_INLINE_STEPS
-				|| plan.target_size() < T::MIGRATION_HEADER_SIZE
-				|| plan.working_size() < plan.target_size()
-			{
+			let total_steps = current.into_u32().saturating_sub(stored.into_u32());
+			if total_steps == 0 || total_steps > u32::from(T::MAX_INLINE_STEPS) {
 				return Err(PinaProgramError::MigrationUnavailable.into());
 			}
 
-			let current_size = self.account.data_len();
-			let target_size = plan.target_size();
-			let working_size = plan.working_size();
-			let allocated_working_size = current_size.max(working_size);
-			if working_size
-				.checked_sub(current_size)
-				.is_some_and(|growth| growth > MAX_PERMITTED_DATA_INCREASE)
-			{
-				return Err(PinaProgramError::MigrationBudgetExceeded.into());
-			}
-
-			let funding = if working_size > current_size {
-				let rent = rent.map_or_else(Rent::get, Ok)?;
-				let target_minimum = rent.try_minimum_balance(working_size)?;
-				target_minimum.saturating_sub(self.account.lamports())
-			} else {
-				0
-			};
-			if funding > self.max_lamports {
-				return Err(PinaProgramError::MigrationBudgetExceeded.into());
-			}
-
 			// Application code can catch a returned `ProgramError` and continue.
-			// Preflight the account-data borrow before funding, then abort the whole
-			// instruction if any invariant fails after the first successful effect.
+			// Preflight the mutable borrow before funding, then abort the whole
+			// instruction if any adjacent planner or invariant fails after the first
+			// successful effect. This lets variable-length migrations derive each next
+			// allocation from the representation produced by the preceding step without
+			// exposing a catchable partial migration.
 			self.account.check_borrow_mut()?;
+			let original_size = self.account.data_len();
+			let mut transferred = 0_u64;
 			let mut mutation_started = false;
+			let mut from = stored.into_u32();
+			let mut completed_steps = 0_u16;
 
-			if funding > 0 {
-				let payer = self.payer.ok_or(PinaProgramError::MigrationRequired)?;
-				validate_funding_payer(payer, self.account, !signers.is_empty())?;
-
-				SystemTransfer {
-					from: payer,
-					to: self.account,
-					lamports: funding,
-				}
-				.invoke_signed(signers)?;
-				mutation_started = true;
-			}
-
-			if working_size > current_size {
-				match self.account.resize(working_size) {
-					Ok(()) => mutation_started = true,
-					Err(error) if mutation_started => abort_after_mutation(error),
-					Err(error) => return Err(error),
-				}
-			}
-
-			let steps = plan.steps();
-			{
-				let mut data = match self.account.try_borrow_mut() {
-					Ok(data) => data,
-					Err(error) if mutation_started => abort_after_mutation(error),
-					Err(error) => return Err(error),
+			while from < current.into_u32() {
+				let plan = {
+					let data = match self.account.try_borrow() {
+						Ok(data) => data,
+						Err(error) if mutation_started => abort_after_mutation(error),
+						Err(error) => return Err(error),
+					};
+					match T::plan_migration(&data) {
+						Ok(plan) => plan,
+						Err(error) if mutation_started => abort_after_mutation(error),
+						Err(error) => return Err(error),
+					}
 				};
-				T::apply_migration(plan.into_payload(), &mut data);
-			}
 
-			if target_size < allocated_working_size {
-				finish_after_mutation(self.account.resize(target_size));
+				let to = match from.checked_add(1) {
+					Some(to) => to,
+					None if mutation_started => {
+						abort_after_mutation(PinaProgramError::InvalidMigrationVersion.into())
+					}
+					None => return Err(PinaProgramError::InvalidMigrationVersion.into()),
+				};
+				if plan.from_version() != from
+					|| plan.to_version() != to
+					|| plan.steps() != 1
+					|| plan.target_size() < T::MIGRATION_HEADER_SIZE
+					|| plan.working_size() < plan.target_size()
+				{
+					let error = PinaProgramError::MigrationUnavailable.into();
+					if mutation_started {
+						abort_after_mutation(error);
+					}
+					return Err(error);
+				}
+
+				let current_size = self.account.data_len();
+				let target_size = plan.target_size();
+				let working_size = plan.working_size();
+				let allocated_working_size = current_size.max(working_size);
+				if allocated_working_size
+					.checked_sub(original_size)
+					.is_some_and(|growth| growth > MAX_PERMITTED_DATA_INCREASE)
+				{
+					let error = PinaProgramError::MigrationBudgetExceeded.into();
+					if mutation_started {
+						abort_after_mutation(error);
+					}
+					return Err(error);
+				}
+
+				let funding = if working_size > current_size {
+					let rent = match rent {
+						Some(rent) => rent,
+						None => {
+							match Rent::get() {
+								Ok(rent) => rent,
+								Err(error) if mutation_started => abort_after_mutation(error),
+								Err(error) => return Err(error),
+							}
+						}
+					};
+					let target_minimum = match rent.try_minimum_balance(working_size) {
+						Ok(minimum) => minimum,
+						Err(error) if mutation_started => abort_after_mutation(error),
+						Err(error) => return Err(error),
+					};
+					target_minimum.saturating_sub(self.account.lamports())
+				} else {
+					0
+				};
+				let next_transferred = transferred.checked_add(funding);
+				if next_transferred.is_none_or(|total| total > self.max_lamports) {
+					let error = PinaProgramError::MigrationBudgetExceeded.into();
+					if mutation_started {
+						abort_after_mutation(error);
+					}
+					return Err(error);
+				}
+
+				if funding > 0 {
+					let payer = match self.payer {
+						Some(payer) => payer,
+						None if mutation_started => {
+							abort_after_mutation(PinaProgramError::MigrationRequired.into())
+						}
+						None => return Err(PinaProgramError::MigrationRequired.into()),
+					};
+					if let Err(error) =
+						validate_funding_payer(payer, self.account, !signers.is_empty())
+					{
+						if mutation_started {
+							abort_after_mutation(error);
+						}
+						return Err(error);
+					}
+
+					let result = SystemTransfer {
+						from: payer,
+						to: self.account,
+						lamports: funding,
+					}
+					.invoke_signed(signers);
+					match result {
+						Ok(()) => {
+							transferred = next_transferred.unwrap_or(u64::MAX);
+							mutation_started = true;
+						}
+						Err(error) if mutation_started => abort_after_mutation(error),
+						Err(error) => return Err(error),
+					}
+				}
+
+				if working_size > current_size {
+					match self.account.resize(working_size) {
+						Ok(()) => mutation_started = true,
+						Err(error) if mutation_started => abort_after_mutation(error),
+						Err(error) => return Err(error),
+					}
+				}
+
+				{
+					let mut data = match self.account.try_borrow_mut() {
+						Ok(data) => data,
+						Err(error) if mutation_started => abort_after_mutation(error),
+						Err(error) => return Err(error),
+					};
+					T::apply_migration(plan.into_payload(), &mut data);
+					mutation_started = true;
+				}
+
+				if target_size < allocated_working_size {
+					finish_after_mutation(self.account.resize(target_size));
+				}
+
+				{
+					let mut data = finish_after_mutation(self.account.try_borrow_mut());
+					finish_after_mutation(T::validate_migration_destination(to, &data));
+					let version = finish_after_mutation(T::Version::try_from_u32(to));
+					finish_after_mutation(T::write_migration_version(version, &mut data));
+					finish_after_mutation(T::validate_migration_destination(to, &data));
+				}
+
+				from = to;
+				completed_steps = completed_steps.checked_add(1).unwrap_or_else(|| {
+					abort_after_mutation(PinaProgramError::MigrationBudgetExceeded.into())
+				});
 			}
 
 			{
-				let mut data = finish_after_mutation(self.account.try_borrow_mut());
-				finish_after_mutation(T::validate_migration_destination(&data));
-				finish_after_mutation(T::write_current_migration_version(&mut data));
+				let data = finish_after_mutation(self.account.try_borrow());
 				finish_after_mutation(T::validate_current_migration(&data));
 			}
 
 			Ok(AccountMigrationOutcome::Migrated {
 				from: stored,
 				to: current,
-				steps,
+				steps: completed_steps,
 			})
 		}
 	}
@@ -948,7 +1048,7 @@ mod tests {
 			destination[3] = 99;
 		}
 
-		fn validate_migration_destination(data: &[u8]) -> ProgramResult {
+		fn validate_migration_destination(_: u32, data: &[u8]) -> ProgramResult {
 			if data.len() != 4 || data[0] != Self::VALUE || data[3] != 99 {
 				return Err(ProgramError::InvalidAccountData);
 			}
@@ -992,7 +1092,7 @@ mod tests {
 			destination[2] = plan;
 		}
 
-		fn validate_migration_destination(data: &[u8]) -> ProgramResult {
+		fn validate_migration_destination(_: u32, data: &[u8]) -> ProgramResult {
 			if data.len() != 3 || data[0] != Self::VALUE {
 				return Err(ProgramError::InvalidAccountData);
 			}
@@ -1044,7 +1144,7 @@ mod tests {
 
 		fn apply_migration(_: Self::Plan, _: &mut [u8]) {}
 
-		fn validate_migration_destination(_: &[u8]) -> ProgramResult {
+		fn validate_migration_destination(_: u32, _: &[u8]) -> ProgramResult {
 			Ok(())
 		}
 	}
@@ -1084,12 +1184,59 @@ mod tests {
 			destination[2] = 99;
 		}
 
-		fn validate_migration_destination(data: &[u8]) -> ProgramResult {
+		fn validate_migration_destination(_: u32, data: &[u8]) -> ProgramResult {
 			if data != [Self::VALUE, 0, 42] && data != [Self::VALUE, 1, 42] {
 				return Err(ProgramError::InvalidAccountData);
 			}
 
 			Ok(())
+		}
+	}
+
+	#[cfg(feature = "account-resize")]
+	struct TwoStepAccount;
+
+	#[cfg(feature = "account-resize")]
+	impl HasDiscriminator for TwoStepAccount {
+		type Type = u8;
+
+		const VALUE: Self::Type = 11;
+	}
+
+	#[cfg(feature = "account-resize")]
+	impl HasMigrationVersion for TwoStepAccount {
+		type Version = u8;
+
+		const CURRENT_VERSION: Self::Version = 2;
+	}
+
+	#[cfg(feature = "account-resize")]
+	impl MigratableAccount for TwoStepAccount {
+		type Plan = u32;
+
+		const MAX_INLINE_STEPS: u16 = 2;
+
+		fn plan_migration(data: &[u8]) -> Result<AccountMigrationPlan<Self::Plan>, ProgramError> {
+			match data {
+				[Self::VALUE, 0, 5] => AccountMigrationPlan::try_new(0, 1, 4, 1, 0),
+				[Self::VALUE, 1, 5, 9] => AccountMigrationPlan::try_new(1, 2, 5, 1, 1),
+				_ => Err(ProgramError::InvalidAccountData),
+			}
+		}
+
+		fn apply_migration(plan: Self::Plan, destination: &mut [u8]) {
+			match plan {
+				0 => destination[3] = 9,
+				1 => destination[4] = 7,
+				_ => {}
+			}
+		}
+
+		fn validate_migration_destination(version: u32, data: &[u8]) -> ProgramResult {
+			match (version, data) {
+				(1, [Self::VALUE, _, 5, 9]) | (2, [Self::VALUE, _, 5, 9, 7]) => Ok(()),
+				_ => Err(ProgramError::InvalidAccountData),
+			}
 		}
 	}
 
@@ -1165,6 +1312,34 @@ mod tests {
 				.as_ref(),
 			[7, 1, 42, 99]
 		);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn executor_replans_each_adjacent_variable_length_step_atomically() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored =
+			TestAccount::<32>::new(Address::new_from_array([1; 32]), owner, 10_000, &[11, 0, 5]);
+		let mut account = stored.view();
+		let outcome = MigrateAccount {
+			account: &mut account,
+			payer: None,
+			program_id: &owner,
+			max_lamports: 0,
+		}
+		.invoke_with_rent::<TwoStepAccount>(test_rent())
+		.unwrap_or_else(|error| panic!("migrate two-step account: {error:?}"));
+
+		assert_eq!(
+			outcome,
+			AccountMigrationOutcome::Migrated {
+				from: 0,
+				to: 2,
+				steps: 2,
+			}
+		);
+		assert_eq!(account.data_len(), 5);
+		assert_eq!(&*account.try_borrow().unwrap(), &[11, 2, 5, 9, 7]);
 	}
 
 	#[cfg(feature = "account-resize")]

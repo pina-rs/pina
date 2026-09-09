@@ -152,13 +152,13 @@ impl MigrationExpansion {
 		}
 	}
 
-	pub(crate) fn require_current(&self, crate_path: &syn::Path) -> proc_macro2::TokenStream {
+	pub(crate) fn require_current(crate_path: &syn::Path) -> proc_macro2::TokenStream {
 		quote! {
 			<Self as #crate_path::HasMigrationVersion>::require_current_migration_version(data)?;
 		}
 	}
 
-	pub(crate) fn write_current(&self, crate_path: &syn::Path) -> proc_macro2::TokenStream {
+	pub(crate) fn write_current(crate_path: &syn::Path) -> proc_macro2::TokenStream {
 		quote! {
 			<Self as #crate_path::HasMigrationVersion>::write_current_migration_version(data)?;
 		}
@@ -375,10 +375,10 @@ impl MigrationExpansion {
 		})
 	}
 
-	/// Generate an allocator-free in-place implementation for a fixed-layout
-	/// account history. Manual transitions use the same preflighted, infallible
-	/// runtime boundary as generated transitions.
-	pub(crate) fn fixed_account_implementation(
+	/// Generate an allocator-free in-place implementation for an account history.
+	/// Manual transitions use the same preflighted, infallible runtime boundary
+	/// as generated transitions.
+	pub(crate) fn account_implementation(
 		&self,
 		crate_path: &syn::Path,
 		struct_name: &syn::Ident,
@@ -389,7 +389,9 @@ impl MigrationExpansion {
 			.iter()
 			.any(|version| version.schema.layout != LayoutKind::Fixed)
 		{
-			return Ok(None);
+			return self
+				.variable_account_implementation(crate_path, struct_name)
+				.map(Some);
 		}
 
 		let header_size = usize::from(self.discriminator_bytes) + self.version_bytes();
@@ -414,7 +416,6 @@ impl MigrationExpansion {
 			.ok_or_else(|| {
 				syn::Error::new_spanned(struct_name, "historical fixed migration size overflowed")
 			})?;
-		let working_size = sizes.into_iter().max().unwrap_or(current_size);
 		let module_name = format_ident!(
 			"__pina_{}_account_migrations",
 			struct_name.to_string().to_snake_case(),
@@ -455,23 +456,20 @@ impl MigrationExpansion {
 			.take(versions.len().saturating_sub(1))
 			.map(|version| {
 				let number = version.version;
+				let destination = number + 1;
 				let historical = historical_struct_name(struct_name, number);
-				let steps = current - number;
-				if steps > u32::from(MAX_INLINE_STEPS) {
-					return quote! {
-						#number => return Err(#crate_path::PinaProgramError::MigrationRequired.into()),
-					};
-				}
+				let destination_size = sizes[destination as usize];
+				let transition_working_size = sizes[number as usize].max(destination_size);
 				quote! {
 					#number => {
 						<#historical as #crate_path::PinaPodFixed>::read_exact(data)
 							.map_err(|_| #crate_path::ProgramError::InvalidAccountData)?;
 						#crate_path::AccountMigrationPlan::try_with_working_size(
 							#number,
-							#current,
-							#current_size,
-							#working_size,
-							#steps as u16,
+							#destination,
+							#destination_size,
+							#transition_working_size,
+							1,
 							#number,
 						)
 					}
@@ -480,15 +478,29 @@ impl MigrationExpansion {
 		let apply_arms = versions
 			.iter()
 			.take(versions.len().saturating_sub(1))
-			.filter(|version| current - version.version <= u32::from(MAX_INLINE_STEPS))
 			.map(|version| {
 				let number = version.version;
-				let calls = ((number + 1)..=current).map(|to| {
-					let transition_name = format_ident!("v{}_to_v{}", to - 1, to);
-					quote!(#module_name::#transition_name::migrate(destination);)
-				});
+				let transition_name = format_ident!("v{}_to_v{}", number, number + 1);
 				quote! {
-					#number => { #(#calls)* }
+					#number => #module_name::#transition_name::migrate(destination),
+				}
+			});
+		let historical_validation_arms = versions
+			.iter()
+			.skip(1)
+			.take(versions.len().saturating_sub(2))
+			.map(|version| {
+				let number = version.version;
+				let size = sizes[number as usize];
+				let historical = historical_struct_name(struct_name, number);
+				quote! {
+					#number => {
+						if data.len() != #size {
+							return Err(#crate_path::ProgramError::InvalidAccountData);
+						}
+						<#historical as #crate_path::PinaPodFixed>::validate_exact(data)
+							.map_err(|_| #crate_path::ProgramError::InvalidAccountData)
+					}
 				}
 			});
 		let max_inline = current.min(u32::from(MAX_INLINE_STEPS)) as u16;
@@ -525,17 +537,268 @@ impl MigrationExpansion {
 				}
 
 				fn validate_migration_destination(
+					version: u32,
 					data: &[u8],
 				) -> #crate_path::ProgramResult {
-					if data.len() != #current_size
-						|| !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data)
-					{
+					if !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data) {
 						return Err(#crate_path::ProgramError::InvalidAccountData);
 					}
-					<Self as #crate_path::PinaAccount>::validate_account_data(data)
+					match version {
+						#(#historical_validation_arms)*
+						#current => {
+							if data.len() != #current_size {
+								return Err(#crate_path::ProgramError::InvalidAccountData);
+							}
+							<Self as #crate_path::PinaAccount>::validate_account_data(data)
+						}
+						_ => Err(#crate_path::PinaProgramError::InvalidMigrationVersion.into()),
+					}
 				}
 			}
 		}))
+	}
+
+	/// Generate one adjacent, allocator-free migration step at a time when any
+	/// historical representation is compact. The executor repeats this contract
+	/// atomically until it reaches the current version.
+	fn variable_account_implementation(
+		&self,
+		crate_path: &syn::Path,
+		struct_name: &syn::Ident,
+	) -> syn::Result<proc_macro2::TokenStream> {
+		let versions = &self.history.versions;
+		let current = self.current_version;
+		let module_name = format_ident!(
+			"__pina_{}_account_migrations",
+			struct_name.to_string().to_snake_case(),
+		);
+		let transition_modules = versions.iter().skip(1).map(|version| {
+			let transition = version
+				.transition
+				.as_ref()
+				.expect("validated account history has adjacent transitions");
+			let name = format_ident!("v{}_to_v{}", transition.from, transition.to);
+			let relative =
+				pina_abi::transition_path(&self.history.identity, transition.from, transition.to)
+					.to_string_lossy()
+					.replace('\\', "/");
+			let include_path = format!("/{relative}");
+
+			quote! {
+				pub(crate) mod #name {
+					include!(concat!(env!("CARGO_MANIFEST_DIR"), #include_path));
+				}
+			}
+		});
+		let historical_structs = versions
+			.iter()
+			.take(versions.len().saturating_sub(1))
+			.map(|version| {
+				historical_struct(
+					crate_path,
+					struct_name,
+					version,
+					self.discriminator_bytes,
+					self.version_bytes(),
+				)
+			})
+			.collect::<syn::Result<Vec<_>>>()?;
+
+		let mut planner_arms = Vec::with_capacity(versions.len().saturating_sub(1));
+		let mut apply_arms = Vec::with_capacity(versions.len().saturating_sub(1));
+		for (index, source) in versions
+			.iter()
+			.take(versions.len().saturating_sub(1))
+			.enumerate()
+		{
+			let destination = &versions[index + 1];
+			let from = source.version;
+			let to = destination.version;
+			let source_type = historical_struct_name(struct_name, from);
+			let destination_type = (to != current).then(|| historical_struct_name(struct_name, to));
+			let transition_name = format_ident!("v{from}_to_v{to}");
+			let validate_source = match source.schema.layout {
+				LayoutKind::Fixed => {
+					quote! {
+						<#source_type as #crate_path::PinaPodFixed>::read_exact(data)
+							.map_err(|_| #crate_path::ProgramError::InvalidAccountData)?;
+					}
+				}
+				LayoutKind::Compact => {
+					quote! {
+						<#source_type as #crate_path::PinaPodCompact>::validate(data)
+							.map_err(|_| #crate_path::ProgramError::InvalidAccountData)?;
+					}
+				}
+			};
+			let dynamic = source.schema.layout == LayoutKind::Compact
+				|| destination.schema.layout == LayoutKind::Compact;
+			let sizes = if dynamic {
+				quote! {
+					let target_size = #module_name::#transition_name::target_size(data)
+						.ok_or(#crate_path::PinaProgramError::MigrationUnavailable)?;
+					let working_size = #module_name::#transition_name::working_size(
+						data,
+						target_size,
+					)
+					.ok_or(#crate_path::PinaProgramError::MigrationUnavailable)?;
+				}
+			} else {
+				quote! {
+					let target_size = #module_name::#transition_name::DESTINATION_SIZE;
+					let working_size = #module_name::#transition_name::WORKING_SIZE;
+				}
+			};
+			let validate_size = match (&destination.schema.layout, destination_type) {
+				(LayoutKind::Fixed, None) => {
+					quote! {
+						if target_size
+							!= ::core::mem::size_of::<<#struct_name as #crate_path::PinaPodFixed>::Zc>()
+						{
+							return Err(#crate_path::ProgramError::InvalidAccountData);
+						}
+					}
+				}
+				(LayoutKind::Fixed, Some(destination_type)) => {
+					quote! {
+						if target_size
+							!= ::core::mem::size_of::<<#destination_type as #crate_path::PinaPodFixed>::Zc>()
+						{
+							return Err(#crate_path::ProgramError::InvalidAccountData);
+						}
+					}
+				}
+				(LayoutKind::Compact, None) => {
+					quote! {
+						<#struct_name as #crate_path::PinaPodCompact>::validate_storage_len(target_size)
+							.map_err(|_| #crate_path::ProgramError::InvalidAccountData)?;
+					}
+				}
+				(LayoutKind::Compact, Some(destination_type)) => {
+					quote! {
+						<#destination_type as #crate_path::PinaPodCompact>::validate_storage_len(target_size)
+							.map_err(|_| #crate_path::ProgramError::InvalidAccountData)?;
+					}
+				}
+			};
+			planner_arms.push(quote! {
+				#from => {
+					#validate_source
+					#sizes
+					#validate_size
+					#crate_path::AccountMigrationPlan::try_with_working_size(
+						#from,
+						#to,
+						target_size,
+						working_size,
+						1,
+						#from,
+					)
+				}
+			});
+			apply_arms.push(quote! {
+				#from => #module_name::#transition_name::migrate(destination),
+			});
+		}
+
+		let mut destination_validation_arms = Vec::with_capacity(versions.len().saturating_sub(1));
+		for version in versions.iter().skip(1) {
+			let number = version.version;
+			let validation = if number == current {
+				match version.schema.layout {
+					LayoutKind::Fixed => {
+						quote! {
+							<Self as #crate_path::PinaAccount>::validate_account_data(data)
+						}
+					}
+					LayoutKind::Compact => {
+						quote! {
+							<Self as #crate_path::PinaPodCompact>::validate(data)
+								.map_err(|_| #crate_path::ProgramError::InvalidAccountData)
+						}
+					}
+				}
+			} else {
+				let historical = historical_struct_name(struct_name, number);
+				match version.schema.layout {
+					LayoutKind::Fixed => {
+						quote! {
+							<#historical as #crate_path::PinaPodFixed>::validate_exact(data)
+								.map_err(|_| #crate_path::ProgramError::InvalidAccountData)
+						}
+					}
+					LayoutKind::Compact => {
+						quote! {
+							<#historical as #crate_path::PinaPodCompact>::validate(data)
+								.map_err(|_| #crate_path::ProgramError::InvalidAccountData)
+						}
+					}
+				}
+			};
+			destination_validation_arms.push(quote! {
+				#number => #validation,
+			});
+		}
+		let validate_current = (versions
+			.last()
+			.is_some_and(|version| version.schema.layout == LayoutKind::Compact))
+		.then(|| {
+			quote! {
+				fn validate_current_migration(data: &[u8]) -> #crate_path::ProgramResult {
+					<Self as #crate_path::HasMigrationVersion>::require_current_migration_version(data)?;
+					<Self as #crate_path::PinaCompactAccount>::validate_account_data(data)
+				}
+			}
+		});
+		let max_inline = current.min(u32::from(MAX_INLINE_STEPS)) as u16;
+
+		Ok(quote! {
+			#[allow(dead_code)]
+			mod #module_name {
+				#(#transition_modules)*
+			}
+
+			#(#historical_structs)*
+
+			impl #crate_path::MigratableAccount for #struct_name {
+				type Plan = u32;
+
+				const MAX_INLINE_STEPS: u16 = #max_inline;
+
+				fn plan_migration(
+					data: &[u8],
+				) -> Result<#crate_path::AccountMigrationPlan<Self::Plan>, #crate_path::ProgramError> {
+					let stored = <Self as #crate_path::HasMigrationVersion>::read_migration_version(data)?;
+					let stored = <<Self as #crate_path::HasMigrationVersion>::Version as #crate_path::MigrationVersion>::into_u32(stored);
+					match stored {
+						#(#planner_arms)*
+						_ => Err(#crate_path::PinaProgramError::InvalidMigrationVersion.into()),
+					}
+				}
+
+				fn apply_migration(plan: Self::Plan, destination: &mut [u8]) {
+					match plan {
+						#(#apply_arms)*
+						_ => {}
+					}
+				}
+
+				fn validate_migration_destination(
+					version: u32,
+					data: &[u8],
+				) -> #crate_path::ProgramResult {
+					if !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data) {
+						return Err(#crate_path::ProgramError::InvalidAccountData);
+					}
+					match version {
+						#(#destination_validation_arms)*
+						_ => Err(#crate_path::PinaProgramError::InvalidMigrationVersion.into()),
+					}
+				}
+
+				#validate_current
+			}
+		})
 	}
 }
 
@@ -623,29 +886,47 @@ fn historical_struct(
 			Ok(quote!(#name: #ty))
 		})
 		.collect::<syn::Result<Vec<_>>>()?;
-	let expected_size = usize::from(discriminator_bytes)
-		.checked_add(version_bytes)
-		.and_then(|header| {
-			version
-				.schema
-				.fixed_payload_size()
-				.and_then(|payload| header.checked_add(payload))
-		})
-		.ok_or_else(|| syn::Error::new_spanned(struct_name, "historical schema size overflowed"))?;
+	let (attribute, proof) = match version.schema.layout {
+		LayoutKind::Fixed => {
+			let expected_size = discriminator_bytes
+				.checked_add(version_bytes)
+				.and_then(|header| {
+					version
+						.schema
+						.fixed_payload_size()
+						.and_then(|payload| header.checked_add(payload))
+				})
+				.ok_or_else(|| {
+					syn::Error::new_spanned(struct_name, "historical schema size overflowed")
+				})?;
+			(
+				quote!(#[pinapod(crate = #crate_path::pinapod, no_inherent)]),
+				quote! {
+					const _: () = {
+						::core::assert!(::core::mem::size_of::<<#name as #crate_path::PinaPodFixed>::Zc>() == #expected_size);
+					};
+				},
+			)
+		}
+		LayoutKind::Compact => {
+			(
+				quote!(#[pinapod(crate = #crate_path::pinapod, compact, no_inherent)]),
+				quote!(),
+			)
+		}
+	};
 
 	Ok(quote! {
 		#[allow(dead_code)]
 		#[derive(#crate_path::pinapod::PinaPod)]
-		#[pinapod(crate = #crate_path::pinapod, no_inherent)]
+		#attribute
 		struct #name {
 			discriminator: [u8; #discriminator_bytes],
 			migration_version: [u8; #version_bytes],
 			#(#fields,)*
 		}
 
-		const _: () = {
-			::core::assert!(::core::mem::size_of::<<#name as #crate_path::PinaPodFixed>::Zc>() == #expected_size);
-		};
+		#proof
 	})
 }
 
