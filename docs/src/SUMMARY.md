@@ -35,6 +35,7 @@
   - [ADR 0004: Preserve the `no_std` and no-allocator boundary](./adrs/0004-no-std-and-no-allocator-boundary.md)
   - [ADR 0005: Keep token support optional and feature-gated](./adrs/0005-token-feature-boundaries.md)
   - [ADR 0006: Use layered verification in CI](./adrs/0006-verification-layers-in-ci.md)
+  - [ADR 0007: Make ABI migrations first-class](./adrs/0007-first-class-versioned-abi.md)
 - [Crates and Features](./crates-and-features.md)
 - [Codama Workflow](./codama-workflow.md)
 - [Examples](./examples.md)

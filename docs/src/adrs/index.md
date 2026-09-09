@@ -19,6 +19,7 @@ This section captures the durable architectural decisions behind Pina's public m
 | [ADR 0004](./0004-no-std-and-no-allocator-boundary.md)   | Accepted | Preserve `no_std` / no-allocator constraints for on-chain code paths.           |
 | [ADR 0005](./0005-token-feature-boundaries.md)           | Accepted | Keep SPL token support optional and feature-gated.                              |
 | [ADR 0006](./0006-verification-layers-in-ci.md)          | Accepted | Treat CI as layered verification, not a single all-purpose test lane.           |
+| [ADR 0007](./0007-first-class-versioned-abi.md)          | Proposed | Make migrations a generated, on-demand, versioned ABI compatibility boundary.   |
 
 ## How to use this section
 
