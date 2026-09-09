@@ -1,4 +1,5 @@
 extern crate rustc_hir;
+extern crate rustc_middle;
 extern crate rustc_span;
 
 use std::collections::HashMap;
@@ -6,7 +7,9 @@ use std::collections::HashMap;
 use rustc_hir::Expr;
 use rustc_hir::ExprKind;
 use rustc_hir::HirId;
+use rustc_hir::Pat;
 use rustc_hir::intravisit::FnKind;
+use rustc_hir::intravisit::Visitor;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
 use rustc_lint::LintContext;
@@ -26,7 +29,6 @@ crate::declare_late_lint! {
 	"mutable account-data borrows must be dropped before CPI"
 }
 
-const BORROW_METHODS: &[&str] = &["try_borrow_mut", "as_account_mut"];
 const CPI_METHODS: &[&str] = &[
 	"invoke",
 	"invoke_signed",
@@ -38,21 +40,6 @@ fn method_def_path(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<String> {
 	cx.typeck_results()
 		.type_dependent_def_id(expr.hir_id)
 		.map(|def_id| cx.tcx.def_path_str(def_id))
-}
-
-fn is_account_borrow(cx: &LateContext<'_>, expr: &Expr<'_>, method: &str) -> bool {
-	if !BORROW_METHODS.contains(&method) {
-		return false;
-	}
-
-	method_def_path(cx, expr).is_some_and(|path| {
-		let path = path.to_ascii_lowercase();
-		match method {
-			"try_borrow_mut" => path.contains("accountview::try_borrow_mut"),
-			"as_account_mut" => path.contains("asaccount::as_account_mut"),
-			_ => false,
-		}
-	})
 }
 
 fn is_cpi_invocation(cx: &LateContext<'_>, expr: &Expr<'_>, method: &str) -> bool {
@@ -74,40 +61,30 @@ fn is_cpi_invocation(cx: &LateContext<'_>, expr: &Expr<'_>, method: &str) -> boo
 	})
 }
 
-fn is_generated_pda_mut_borrow(callee: &Expr<'_>) -> bool {
-	let ExprKind::Path(path) = &callee.kind else {
+fn is_mutable_account_borrow_guard(cx: &LateContext<'_>, ty: rustc_middle::ty::Ty<'_>) -> bool {
+	let Some(definition) = ty.peel_refs().ty_adt_def() else {
 		return false;
 	};
-	let method = match path {
-		rustc_hir::QPath::Resolved(_, path) => path.segments.last().map(|segment| segment.ident),
-		rustc_hir::QPath::TypeRelative(_, segment) => Some(segment.ident),
-	};
+	let definition = definition.did();
 
-	method.is_some_and(|method| method.name.as_str() == "load_pda_mut")
+	cx.tcx.crate_name(definition.krate).as_str() == "solana_account_view"
+		&& cx.tcx.item_name(definition).as_str() == "RefMut"
 }
 
-fn contains_mutable_borrow(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
-	match &expr.kind {
-		ExprKind::MethodCall(segment, receiver, args, _) => {
-			is_account_borrow(cx, expr, segment.ident.name.as_str())
-				|| contains_mutable_borrow(cx, receiver)
-				|| args
-					.iter()
-					.any(|argument| contains_mutable_borrow(cx, argument))
+struct GuardPatternCollector<'cx, 'tcx, 'bindings> {
+	cx: &'cx LateContext<'tcx>,
+	bindings: &'bindings mut Vec<HirId>,
+}
+
+impl<'tcx> Visitor<'tcx> for GuardPatternCollector<'_, 'tcx, '_> {
+	fn visit_pat(&mut self, pattern: &'tcx Pat<'tcx>) {
+		if let rustc_hir::PatKind::Binding(_, binding, ..) = pattern.kind
+			&& is_mutable_account_borrow_guard(self.cx, self.cx.typeck_results().pat_ty(pattern))
+		{
+			self.bindings.push(binding);
 		}
-		ExprKind::Match(scrutinee, ..)
-		| ExprKind::DropTemps(scrutinee)
-		| ExprKind::Use(scrutinee, _)
-		| ExprKind::Type(scrutinee, _)
-		| ExprKind::UnsafeBinderCast(_, scrutinee, _) => contains_mutable_borrow(cx, scrutinee),
-		ExprKind::Call(callee, args) => {
-			is_generated_pda_mut_borrow(callee)
-				|| contains_mutable_borrow(cx, callee)
-				|| args
-					.iter()
-					.any(|argument| contains_mutable_borrow(cx, argument))
-		}
-		_ => false,
+
+		rustc_hir::intravisit::walk_pat(self, pattern);
 	}
 }
 
@@ -120,6 +97,22 @@ fn local_binding(expr: &Expr<'_>) -> Option<HirId> {
 	};
 
 	Some(binding)
+}
+
+fn is_drop_callee(cx: &LateContext<'_>, callee: &Expr<'_>) -> bool {
+	let ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) = &callee.kind else {
+		return false;
+	};
+
+	match path.res {
+		rustc_hir::def::Res::Def(_, definition) => {
+			matches!(
+				cx.tcx.def_path_str(definition).as_str(),
+				"std::mem::drop" | "core::mem::drop"
+			)
+		}
+		_ => false,
+	}
 }
 
 struct Analyzer<'cx, 'tcx> {
@@ -139,9 +132,13 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				rustc_hir::StmtKind::Let(local) => {
 					if let Some(initializer) = local.init {
 						self.visit_expr(initializer, active);
-						if contains_mutable_borrow(self.cx, initializer)
-							&& let rustc_hir::PatKind::Binding(_, binding, ..) = local.pat.kind
-						{
+						let mut bindings = Vec::new();
+						GuardPatternCollector {
+							cx: self.cx,
+							bindings: &mut bindings,
+						}
+						.visit_pat(local.pat);
+						for binding in bindings {
 							active.insert(binding, initializer.span);
 							block_bindings.push(binding);
 						}
@@ -191,11 +188,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					self.visit_expr(argument, active);
 				}
 
-				if let ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) = &callee.kind
-					&& path
-						.segments
-						.last()
-						.is_some_and(|segment| segment.ident.name.as_str() == "drop")
+				if is_drop_callee(self.cx, callee)
 					&& let Some(binding) = args.first().and_then(|argument| local_binding(argument))
 				{
 					active.remove(&binding);
@@ -206,8 +199,18 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				self.visit_expr(scrutinee, active);
 				for arm in *arms {
 					let mut branch = active.clone();
+					if let Some(guard) = arm.guard {
+						self.visit_expr(guard, &mut branch);
+					}
 					self.visit_expr(arm.body, &mut branch);
 				}
+			}
+			ExprKind::Closure(closure) => {
+				let mut closure_active = active.clone();
+				self.visit_expr(
+					self.cx.tcx.hir_body(closure.body).value,
+					&mut closure_active,
+				);
 			}
 			ExprKind::If(condition, then, otherwise) => {
 				self.visit_expr(condition, active);

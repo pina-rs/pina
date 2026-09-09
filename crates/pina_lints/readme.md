@@ -201,7 +201,7 @@ let amount = {
 transfer.invoke()?;
 ```
 
-An explicit `drop(guard)` or the end of a nested block releases the guard. The analysis follows block scope and explicit drops. It resolves method definitions before classifying a borrow or CPI, so an unrelated type that happens to define `try_borrow_mut()` or `invoke()` does not trigger the lint. Account borrows hidden inside custom wrapper constructors and CPIs hidden behind opaque helpers are outside its current model.
+An explicit `drop(guard)` or the end of a nested block releases the guard. The analysis follows block scope, closures, match guards, nested binding patterns, guard-returning aliases, and calls to the real `std::mem::drop`. It resolves method and guard types before classifying a borrow or CPI, so unrelated same-named operations do not create or discharge a proof. Account borrows hidden inside custom wrapper constructors and CPIs hidden behind opaque helpers are outside its current model.
 
 ### `deny_unused_account_borrow_guards`
 
