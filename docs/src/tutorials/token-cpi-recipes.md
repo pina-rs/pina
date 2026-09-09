@@ -20,7 +20,7 @@ Keep the same runtime rules explicit in Pina:
 - validate the token program account explicitly when it is passed in
 - call `assert_writable()` on every account your instruction expects to mutate
 - call `assert_signer()` on every authority that must authorize the CPI
-- validate ATA addresses explicitly when the CPI expects a specific associated token account
+- load existing canonical ATAs with `as_associated_token_account()`, which validates the token-program owner, derived address, stored current authority, and stored mint together
 - if you loaded account state with `.as_account()` or `.as_account_mut()`, copy out the fields you need and drop the guard before the CPI
 
 That last point matters more now that `as_account()` and `as_account_mut()` return borrow guards instead of bare references.
@@ -169,6 +169,9 @@ When porting older code to the current Pina API, keep these patterns in mind:
 - `&mut [AccountView]` entrypoints do **not** make writability checks implicit
 - mutable account fields in `#[derive(Accounts)]` help the type system and IDL, but `assert_writable()` should still appear in the runtime validation chain
 - borrow guards should stay short-lived around token CPIs
-- token and token-2022 state loaders still work through `pina::token::state` and `pina::token_2022::state`, including the `TokenAccount` compatibility alias
+- `as_token_mint()` and `as_token_account()` require the original SPL Token owner
+- `as_token_2022_mint()` and `as_token_2022_account()` require the Token-2022 owner
+- use `*_for_program()` when the instruction accepts either canonical token program at runtime
+- use `assert_owner()` or `assert_associated_token_address()` only for validation-only paths that do not need typed token state
 
 For a larger end-to-end token flow, see the [`token-escrow` tutorial](./token-escrow.md).

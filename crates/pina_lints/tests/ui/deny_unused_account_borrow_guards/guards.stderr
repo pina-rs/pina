@@ -24,8 +24,8 @@ LL |     let _guard = mint.as_token_mint_for_program(&0)?;
 warning: account borrow guard `guard` is never read
   --> $DIR/guards.rs:88:14
    |
-LL |     let guard = mint.as_associated_token_account_checked(&0)?;
-   |     ------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^- help: discard this guard immediately: `mint.as_associated_token_account_checked(&0)?;`
+LL |     let guard = mint.as_associated_token_account(&0)?;
+   |     ------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^- help: discard this guard immediately: `mint.as_associated_token_account(&0)?;`
    |
    = help: the guard holds the account data borrow until the end of its scope; discard the validation value immediately by calling it as a `?` statement, binding it with `let _ = ...`, or reading it before the scope ends
 

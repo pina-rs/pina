@@ -1,0 +1,16 @@
+[workspace]
+
+[package]
+name = "token_loader_cu_program"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+bpf-entrypoint = []
+
+[dependencies]
+pina = { path = __PINA_PATH__, default-features = false, features = ["token"] }

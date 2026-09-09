@@ -35,7 +35,20 @@
 		"profile_program/add_tag",
 		"profile_program/initialize",
 		"profile_program/remove_tag",
-		"profile_program/update_profile"
+		"profile_program/update_profile",
+		"token_loader_cu_program/explicit_owner_assert_then_load",
+		"token_loader_cu_program/legacy_account_success",
+		"token_loader_cu_program/legacy_account_wrong_owner",
+		"token_loader_cu_program/legacy_ata_success",
+		"token_loader_cu_program/legacy_ata_wrong_address",
+		"token_loader_cu_program/legacy_ata_wrong_stored_authority",
+		"token_loader_cu_program/legacy_mint_success",
+		"token_loader_cu_program/legacy_mint_wrong_owner",
+		"token_loader_cu_program/token_2022_account_success",
+		"token_loader_cu_program/token_2022_account_wrong_owner",
+		"token_loader_cu_program/token_2022_ata_success",
+		"token_loader_cu_program/token_2022_mint_success",
+		"token_loader_cu_program/token_2022_mint_wrong_owner"
 	],
 	"warn": {
 		"deltaCu": 250,
@@ -49,6 +62,24 @@
 	"runtimeApprovedTotals": {
 		"account_realloc_program/initialize": 9782,
 		"profile_program/add_tag": 2271,
-		"profile_program/initialize": 7392
+		"profile_program/initialize": 7392,
+		"token_loader_cu_program/legacy_ata_success": 7723,
+		"token_loader_cu_program/legacy_ata_wrong_address": 7638,
+		"token_loader_cu_program/token_2022_ata_success": 3224
+	},
+	"runtimeExpectedOutcomes": {
+		"token_loader_cu_program/explicit_owner_assert_then_load": true,
+		"token_loader_cu_program/legacy_account_success": true,
+		"token_loader_cu_program/legacy_account_wrong_owner": false,
+		"token_loader_cu_program/legacy_ata_success": true,
+		"token_loader_cu_program/legacy_ata_wrong_address": false,
+		"token_loader_cu_program/legacy_ata_wrong_stored_authority": false,
+		"token_loader_cu_program/legacy_mint_success": true,
+		"token_loader_cu_program/legacy_mint_wrong_owner": false,
+		"token_loader_cu_program/token_2022_account_success": true,
+		"token_loader_cu_program/token_2022_account_wrong_owner": false,
+		"token_loader_cu_program/token_2022_ata_success": true,
+		"token_loader_cu_program/token_2022_mint_success": true,
+		"token_loader_cu_program/token_2022_mint_wrong_owner": false
 	}
 }

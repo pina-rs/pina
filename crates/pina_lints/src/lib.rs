@@ -25,7 +25,7 @@
 //! Every lint constant and pass is public:
 //!
 //! ```rust,ignore
-//! use pina_lints::lints::require_owner_before_token_cast;
+//! use pina_lints::lints::require_consistent_token_program;
 //! ```
 //!
 //! The full catalog is available through [`LINTS`] for tooling that wants to
@@ -76,7 +76,6 @@ pub static LINTS: &[&rustc_lint::Lint] = &[
 	lints::deny_account_borrows_across_cpi::DENY_ACCOUNT_BORROWS_ACROSS_CPI,
 	lints::deny_heap_allocations_in_onchain_instruction_handlers::DENY_HEAP_ALLOCATIONS_IN_ONCHAIN_INSTRUCTION_HANDLERS,
 	lints::deny_unused_account_borrow_guards::DENY_UNUSED_ACCOUNT_BORROW_GUARDS,
-	lints::require_associated_token_address_before_ata_cast::REQUIRE_ASSOCIATED_TOKEN_ADDRESS_BEFORE_ATA_CAST,
 	lints::require_bounded_remaining_accounts::REQUIRE_BOUNDED_REMAINING_ACCOUNTS,
 	lints::require_canonical_bump_before_pda_write::REQUIRE_CANONICAL_BUMP_BEFORE_PDA_WRITE,
 	lints::require_canonical_instruction_dispatch_for_idl::REQUIRE_CANONICAL_INSTRUCTION_DISPATCH_FOR_IDL,
@@ -86,7 +85,6 @@ pub static LINTS: &[&rustc_lint::Lint] = &[
 	lints::require_explicit_discriminators_and_seed_namespaces::REQUIRE_EXPLICIT_DISCRIMINATORS_AND_SEED_NAMESPACES,
 	lints::require_explicit_token_2022_extension_policy::REQUIRE_EXPLICIT_TOKEN_2022_EXTENSION_POLICY,
 	lints::require_idl_root_to_define_one_program_id::REQUIRE_IDL_ROOT_TO_DEFINE_ONE_PROGRAM_ID,
-	lints::require_owner_before_token_cast::REQUIRE_OWNER_BEFORE_TOKEN_CAST,
 	lints::require_post_cpi_balance_reload::REQUIRE_POST_CPI_BALANCE_RELOAD,
 	lints::require_program_check_before_cpi::REQUIRE_PROGRAM_CHECK_BEFORE_CPI,
 	lints::require_reason_for_duplicate_remaining_accounts::REQUIRE_REASON_FOR_DUPLICATE_REMAINING_ACCOUNTS,
@@ -101,7 +99,6 @@ pub const LINT_NAMES: &[&str] = &[
 	"deny_account_borrows_across_cpi",
 	"deny_heap_allocations_in_onchain_instruction_handlers",
 	"deny_unused_account_borrow_guards",
-	"require_associated_token_address_before_ata_cast",
 	"require_bounded_remaining_accounts",
 	"require_canonical_bump_before_pda_write",
 	"require_canonical_instruction_dispatch_for_idl",
@@ -111,7 +108,6 @@ pub const LINT_NAMES: &[&str] = &[
 	"require_explicit_discriminators_and_seed_namespaces",
 	"require_explicit_token_2022_extension_policy",
 	"require_idl_root_to_define_one_program_id",
-	"require_owner_before_token_cast",
 	"require_post_cpi_balance_reload",
 	"require_program_check_before_cpi",
 	"require_reason_for_duplicate_remaining_accounts",
@@ -200,16 +196,6 @@ fn register_one_lint(name: &str, lint_store: &mut rustc_lint::LintStore) {
 				Box::new(lints::deny_unused_account_borrow_guards::DenyUnusedAccountBorrowGuards)
 			});
 		}
-		"require_associated_token_address_before_ata_cast" => {
-			lint_store.register_lints(&[
-				lints::require_associated_token_address_before_ata_cast::REQUIRE_ASSOCIATED_TOKEN_ADDRESS_BEFORE_ATA_CAST,
-			]);
-			lint_store.register_late_pass(|_| {
-				Box::new(
-					lints::require_associated_token_address_before_ata_cast::RequireAssociatedTokenAddressBeforeAtaCast,
-				)
-			});
-		}
 		"require_bounded_remaining_accounts" => {
 			lint_store.register_lints(&[
 				lints::require_bounded_remaining_accounts::REQUIRE_BOUNDED_REMAINING_ACCOUNTS,
@@ -289,14 +275,6 @@ fn register_one_lint(name: &str, lint_store: &mut rustc_lint::LintStore) {
 				Box::new(
 					lints::require_idl_root_to_define_one_program_id::RequireIdlRootToDefineOneProgramId,
 				)
-			});
-		}
-		"require_owner_before_token_cast" => {
-			lint_store.register_lints(&[
-				lints::require_owner_before_token_cast::REQUIRE_OWNER_BEFORE_TOKEN_CAST,
-			]);
-			lint_store.register_late_pass(|_| {
-				Box::new(lints::require_owner_before_token_cast::RequireOwnerBeforeTokenCast)
 			});
 		}
 		"require_post_cpi_balance_reload" => {

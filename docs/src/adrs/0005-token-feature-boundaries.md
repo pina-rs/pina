@@ -19,7 +19,8 @@ From that decision follow a few rules:
 
 - core account validation and zero-copy APIs must compile and remain useful without `token`
 - SPL token, Token-2022, and ATA helpers live behind the feature gate
-- checked token loaders must validate owner and account-identity constraints before typed access
+- every token loader must guarantee canonical program ownership by using the selected program's checked upstream account-view parser
+- the ATA loader must also validate the derived address, stored current authority, and stored mint
 - feature-matrix CI must continue to cover at least default, no-default, token-only, and all-features configurations
 
 ## Consequences

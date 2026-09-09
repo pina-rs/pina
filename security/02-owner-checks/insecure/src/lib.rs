@@ -1,7 +1,7 @@
-//! INSECURE: Missing owner check before token deserialization.
+//! INSECURE: Missing owner check before Token-2022 byte parsing.
 //!
-//! This program deserializes a token account without verifying that it is
-//! owned by the SPL Token program.
+//! This program parses token-account bytes without verifying that the runtime
+//! account is owned by Token-2022.
 
 #![no_std]
 
@@ -38,11 +38,14 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 
 		self.depositor.assert_signer()?;
 
-		// BUG: No owner check before deserializing as a token account!
-		// An attacker can create a fake account with arbitrary token data
-		// owned by any program.
-		let token = self.token_account.as_token_account()?;
-		let balance = token.amount();
+		// BUG: This parser validates only the byte layout. It has no AccountView
+		// and therefore cannot validate the runtime account owner.
+		let data = self.token_account.try_borrow()?;
+		let token =
+			token_2022::state::StateWithExtensions::<token_2022::state::TokenAccount>::from_bytes(
+				&data,
+			)?;
+		let balance = token.base.amount();
 
 		let amount = args.amount.get();
 

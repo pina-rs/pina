@@ -32,7 +32,7 @@ impl Unrelated {
 
 trait AsTokenAccount {
 	fn as_token_mint_for_program(&self, program: &u8) -> Result<Guard, ()>;
-	fn as_associated_token_account_checked(&self, owner: &u8) -> Result<Guard, ()>;
+	fn as_associated_token_account(&self, owner: &u8) -> Result<Guard, ()>;
 }
 
 impl AsTokenAccount for MintView {
@@ -40,7 +40,7 @@ impl AsTokenAccount for MintView {
 		Ok(Guard)
 	}
 
-	fn as_associated_token_account_checked(&self, _owner: &u8) -> Result<Guard, ()> {
+	fn as_associated_token_account(&self, _owner: &u8) -> Result<Guard, ()> {
 		Ok(Guard)
 	}
 }
@@ -85,7 +85,7 @@ fn underscore_prefix_is_still_unused(mint: &MintView) -> Result<(), ()> {
 }
 
 fn never_read(mint: &MintView) -> Result<(), ()> {
-	let guard = mint.as_associated_token_account_checked(&0)?;
+	let guard = mint.as_associated_token_account(&0)?;
 	//~^ ERROR: account borrow guard `guard` is never read
 	Ok(())
 }
