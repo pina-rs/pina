@@ -28,6 +28,8 @@ pub(crate) struct AccountArgs {
 	/// Use `PinaPod`'s compact, variable-length layout when the feature is enabled.
 	#[darling(default)]
 	pub(crate) compact: Flag,
+	/// Validate the generated account view after structural decoding.
+	pub(crate) validate: Option<ValidationHook>,
 }
 
 /// Arguments for the `#[instruction(...)]` attribute macro.
@@ -40,6 +42,8 @@ pub(crate) struct InstructionArgs {
 	pub(crate) discriminator: Path,
 	/// Set the variant of the discriminator enum.
 	pub(crate) variant: Option<Ident>,
+	/// Validate the generated instruction view after structural decoding.
+	pub(crate) validate: Option<ValidationHook>,
 }
 
 /// Arguments for the `#[event(...)]` attribute macro.
@@ -52,6 +56,16 @@ pub(crate) struct EventArgs {
 	pub(crate) discriminator: Path,
 	/// Set the variant of the discriminator enum.
 	pub(crate) variant: Option<Ident>,
+	/// Validate the generated event view after structural decoding.
+	pub(crate) validate: Option<ValidationHook>,
+}
+
+/// A type-level `validate(with = path)` hook.
+#[derive(Debug, FromMeta)]
+#[cfg_attr(not(feature = "validation"), allow(dead_code))]
+pub(crate) struct ValidationHook {
+	/// Function called after generated field checks.
+	pub(crate) with: Path,
 }
 
 /// Arguments for the `#[error(...)]` attribute macro.
@@ -451,6 +465,7 @@ pub(crate) struct AccountsInput {
 	pub(crate) data: Data<Ignored, AccountsField>,
 	#[darling(default = "default_crate_path", rename = "crate")]
 	pub(crate) crate_path: Path,
+	pub(crate) validate: Option<ValidationHook>,
 }
 
 #[derive(Debug, FromField)]
@@ -462,4 +477,31 @@ pub(crate) struct AccountsField {
 	pub(crate) remaining: Flag,
 	#[darling(default)]
 	pub(crate) distinct: Option<bool>,
+	#[darling(multiple)]
+	pub(crate) validate: Vec<AccountsValidation>,
+}
+
+/// One `#[pina(validate(...))]` group on an `Accounts` field.
+#[derive(Debug, FromMeta)]
+#[cfg_attr(not(feature = "validation"), allow(dead_code))]
+pub(crate) struct AccountsValidation {
+	#[darling(default)]
+	pub(crate) signer: Flag,
+	#[darling(default)]
+	pub(crate) writable: Flag,
+	#[darling(default)]
+	pub(crate) executable: Flag,
+	pub(crate) address: Option<Expr>,
+	pub(crate) addresses: Option<Expr>,
+	pub(crate) owner: Option<Expr>,
+	pub(crate) owners: Option<Expr>,
+	pub(crate) program: Option<Expr>,
+	pub(crate) sysvar: Option<Expr>,
+	#[darling(default)]
+	pub(crate) empty: Flag,
+	#[darling(default)]
+	pub(crate) not_empty: Flag,
+	pub(crate) data_len: Option<Expr>,
+	pub(crate) distinct_from: Option<Ident>,
+	pub(crate) error: Option<Expr>,
 }

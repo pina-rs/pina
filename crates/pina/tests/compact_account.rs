@@ -17,6 +17,7 @@ enum CompactKind {
 	StringState = 10,
 	StringPrefixState = 11,
 	CompactPda = 12,
+	ValidatedCompactState = 13,
 }
 
 #[account(crate = ::pina, discriminator = CompactKind, compact)]
@@ -80,6 +81,68 @@ struct CompactPdaState {
 	pub bump: u8,
 	pub authority: Address,
 	pub values: Vec<u64, 4>,
+}
+
+#[cfg(feature = "validation")]
+#[account(
+	crate = ::pina,
+	discriminator = CompactKind,
+	variant = ValidatedCompactState,
+	compact,
+	validate(with = validate_compact_state)
+)]
+struct ValidatedCompactState {
+	#[pina(validate(min = 1, max = 3))]
+	pub level: u16,
+	#[pina(validate(min_len = 2, max_len = 4))]
+	pub values: Vec<u16, 4>,
+}
+
+#[cfg(feature = "validation")]
+fn validate_compact_state(value: &ValidatedCompactStateRef<'_>) -> ProgramResult {
+	if value.level.get() == value.values().len() as u16 {
+		return Err(ProgramError::Custom(61));
+	}
+
+	Ok(())
+}
+
+#[cfg(feature = "validation")]
+#[test]
+fn compact_account_validation_covers_inline_fields_tails_and_hooks() {
+	let values = [PodU16::from(7), PodU16::from(11)];
+	let mut data = [0u8; ValidatedCompactState::MAX_SIZE];
+	let encoded_len = ValidatedCompactState::initialize(
+		&mut data,
+		&ValidatedCompactStatePatch::new()
+			.level(3)
+			.replace_values(&values),
+	)
+	.unwrap();
+
+	let value = ValidatedCompactState::try_from_bytes(&data[..encoded_len]).unwrap();
+	value.validate().unwrap();
+
+	let hook_error = ValidatedCompactState::initialize(
+		&mut data,
+		&ValidatedCompactStatePatch::new()
+			.level(2)
+			.replace_values(&values),
+	)
+	.err()
+	.unwrap();
+	assert_eq!(hook_error, ProgramError::Custom(61));
+
+	let short_values = [PodU16::from(7)];
+	let length_error = ValidatedCompactState::initialize(
+		&mut data,
+		&ValidatedCompactStatePatch::new()
+			.level(3)
+			.replace_values(&short_values),
+	)
+	.err()
+	.unwrap();
+	assert_eq!(length_error, ProgramError::InvalidAccountData);
 }
 
 #[test]

@@ -1,0 +1,5 @@
+error: `exact_len` on field `label` cannot be combined with `min_len` or `max_len`, even across separate `validate(...)` annotations; use only `exact_len` for an exact-size rule
+  --> tests/ui/validation_rejects_split_exact_len.rs:12:2
+   |
+12 |     label: String<32>,
+   |     ^^^^^

@@ -24,6 +24,7 @@
   - [Automation and Agent Usage](./cli/automation.md)
 - [Agent Skill](./agent-skill.md)
 - [Core Concepts](./core-concepts.md)
+- [Declarative Validation](./validation.md)
 - [Migrate to PinaPod v0.2](./migrations/pinapod-v0.2.md)
 - [Migrate lamport mutation calls](./migrations/lamport-mutation-ownership.md)
 - [Migrate to safe token loaders](./migrations/safe-token-loaders.md)

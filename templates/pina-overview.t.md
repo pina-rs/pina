@@ -5,6 +5,7 @@
 | `derive`         | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.)   |
 | `logs`           | Yes     | Enables on-chain logging via `solana-program-log`            |
 | `compact`        | No      | Enables compact schemas, checked loaders, and typed APIs     |
+| `validation`     | No      | Enables declarative, allocation-free application validation  |
 | `token`          | No      | Enables SPL token / token-2022 helpers and ATA utilities     |
 | `memo`           | No      | Enables memo program helpers via `pina::memo`                |
 | `account-resize` | No      | Enables raw account reallocation and safe Pinocchio resizing |
@@ -15,6 +16,7 @@
 
 - `derive` is the normal choice for program crates; disable it only when you want the low-level runtime traits without the proc macros.
 - `compact` enables `#[account(compact)]`, `PinaCompactAccount`, generated patch types, checked compact loaders, and `pina::String` and `pina::Vec`. It also enables `derive`.
+- `validation` enables `PinaValidate` and `#[pina(validate(...))]` rules on accounts, instructions, events, and derived account lists. It also enables `derive`.
 - `logs` is useful during **initial development and debugging**, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
 - `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
 - `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.
@@ -125,7 +127,7 @@ Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 
 - Entry points should accept `&mut [AccountView]` and dispatch with `Accounts::try_from((program_id, accounts))?.process(data)`.
 - Use `&AccountView` for read-only accounts and `&mut AccountView` only when you need mutable loaders, direct lamport mutation, `close_*` helpers, or writable IDL inference.
-- Keep `assert_writable()` explicit even on `&mut AccountView`. Type-level mutability enables mutable APIs, but the runtime still decides whether the account is writable for the current instruction.
+- `&mut AccountView` declares and enforces a writable slot. Use `assert_writable()` or `#[pina(validate(writable))]` only when a shared `&AccountView` must arrive writable.
 - `as_account()` / `as_account_mut()` return `Ref<T>` / `RefMut<T>` borrow guards. Copy out the fields you need and `drop(...)` the guard before CPIs or later mutable borrows.
 - Keep validation chains direct inside `process(self, ...)` when possible. That makes audits easier and gives `pina idl` the clearest signal for signer, writable, PDA, and default-account inference.
 

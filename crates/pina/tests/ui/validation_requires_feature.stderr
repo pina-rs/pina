@@ -1,0 +1,5 @@
+error: validation annotations require Pina's `validation` feature; enable it with `pina = { version = "...", features = ["validation"] }` (or enable `pina_macros/validation` when using the proc-macro crate directly)
+ --> tests/ui/validation_requires_feature.rs:9:8
+  |
+9 | struct InvalidInstruction {
+  |        ^^^^^^^^^^^^^^^^^^

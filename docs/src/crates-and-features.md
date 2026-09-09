@@ -41,6 +41,7 @@ Feature flags:
 | `derive`         | Yes     | Enables proc macros (`#[account]`, `#[instruction]`, etc.)   |
 | `logs`           | Yes     | Enables on-chain logging via `solana-program-log`            |
 | `compact`        | No      | Enables compact schemas, checked loaders, and typed APIs     |
+| `validation`     | No      | Enables declarative, allocation-free application validation  |
 | `token`          | No      | Enables SPL token / token-2022 helpers and ATA utilities     |
 | `memo`           | No      | Enables memo program helpers via `pina::memo`                |
 | `account-resize` | No      | Enables raw account reallocation and safe Pinocchio resizing |
@@ -53,6 +54,7 @@ Feature flags:
 
 - `derive` is the normal choice for program crates; disable it only when you want the low-level runtime traits without the proc macros.
 - `compact` enables `#[account(compact)]`, `PinaCompactAccount`, generated patch types, checked compact loaders, and `pina::String` and `pina::Vec`. It also enables `derive`.
+- `validation` enables `PinaValidate` and `#[pina(validate(...))]` rules on accounts, instructions, events, and derived account lists. It also enables `derive`.
 - `logs` is useful during **initial development and debugging**, testing, and audits. Disable it when you want the smallest possible binary or completely silent runtime failures.
 - `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
 - `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.

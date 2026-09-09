@@ -12,6 +12,9 @@ use crate::schema;
 use crate::support::add_derives;
 use crate::support::generate_view_helpers;
 use crate::support::resolve_discriminator_variant;
+use crate::validation;
+#[cfg(feature = "validation")]
+use crate::validation::ValueTarget;
 
 pub(crate) fn expand(
 	args: proc_macro2::TokenStream,
@@ -25,13 +28,17 @@ pub(crate) fn expand(
 
 	let args = match InstructionArgs::from_list(&nested_metas) {
 		Ok(v) => v,
-		Err(e) => return e.write_errors(),
+		Err(error) => return validation::attribute_error(&error, "instruction"),
 	};
 
 	// Parse input struct
 	let mut item_struct: ItemStruct = match syn::parse2(input) {
 		Ok(v) => v,
 		Err(e) => return e.to_compile_error(),
+	};
+	let field_validations = match validation::take_value_validations(&mut item_struct) {
+		Ok(value) => value,
+		Err(error) => return error.to_compile_error(),
 	};
 
 	// Extract configuration
@@ -42,7 +49,12 @@ pub(crate) fn expand(
 		crate_path,
 		discriminator,
 		variant,
+		validate,
 	} = args;
+	#[cfg(not(feature = "validation"))]
+	if validation::validation_requested(&field_validations, validate.as_ref()) {
+		return validation::feature_error(&item_struct);
+	}
 	let (discriminator, variant) =
 		match resolve_discriminator_variant(&discriminator, variant, struct_name) {
 			Ok(v) => v,
@@ -80,6 +92,16 @@ pub(crate) fn expand(
 		&quote!(#crate_path::ProgramError::InvalidInstructionData),
 		false,
 	);
+	#[cfg(feature = "validation")]
+	let value_validation_impl = validation::generate_value_validation(
+		&crate_path,
+		ValueTarget::Fixed(&zc_name),
+		&field_validations,
+		validate.as_ref(),
+		&quote!(#crate_path::ProgramError::InvalidInstructionData),
+	);
+	#[cfg(not(feature = "validation"))]
+	let value_validation_impl = quote! {};
 
 	let implementations = quote! {
 		impl #struct_name {
@@ -91,6 +113,8 @@ pub(crate) fn expand(
 
 			const VALUE: Self::Type = #discriminator::#variant;
 		}
+
+		#value_validation_impl
 	};
 
 	quote! {

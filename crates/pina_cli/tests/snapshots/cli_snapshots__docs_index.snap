@@ -9,8 +9,9 @@ success: true
 exit_code: 0
 ----- stdout -----
 Bundled documentation topics:
-  pina-idl       IDL extraction rules and supported Rust shapes
-  pina-overview  framework concepts, crates, features, and workflows
+  pina-idl         IDL extraction rules and supported Rust shapes
+  pina-overview    framework concepts, crates, features, and workflows
+  pina-validation  declarative rules, manual alternatives, and code generation
 
 Run `pina docs <topic>` to open a topic.
 Set PINA_TEMPLATES_DIR to load additional `<topic>.t.md` files.

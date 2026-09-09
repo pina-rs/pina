@@ -610,7 +610,8 @@ in
           -p escrow_program \
           -p optional_accounts_program \
           -p pina_bpf_program \
-          -p profile_program
+          -p profile_program \
+          -p validation_program
 
         # Blueshift's upstream-gallery-21 linker is LLVM 21-based.
         # Build the BPF artifact with a Rust toolchain that also uses LLVM 21

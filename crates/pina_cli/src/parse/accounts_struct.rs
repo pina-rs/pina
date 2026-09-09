@@ -47,7 +47,7 @@ pub fn extract_accounts_structs(file: &File) -> Result<Vec<AccountsStruct>, syn:
 	Ok(result)
 }
 
-fn has_accounts_derive(attrs: &[syn::Attribute]) -> bool {
+pub(crate) fn has_accounts_derive(attrs: &[syn::Attribute]) -> bool {
 	for attr in attrs {
 		if !attr.path().is_ident("derive") {
 			continue;
@@ -86,6 +86,9 @@ fn extract_account_fields(fields: &syn::Fields) -> Result<Vec<AccountsField>, sy
 			// An optional mutable account (`Option<&mut AccountView>`) still
 			// declares a writable slot for provided values.
 			let is_mutable = is_mutable || inner_is_mutable == Some(true);
+			// Parse helper attributes here as well as during IR assembly so callers
+			// of this parser receive the same precise diagnostics.
+			let _ = super::validation::extract_attribute_properties(&field.attrs)?;
 
 			Ok(AccountsField {
 				name,
@@ -294,5 +297,23 @@ mod tests {
 		let structs = extract_accounts_structs(&file).expect("qualified AccountView");
 		assert!(structs[0].fields[0].is_optional);
 		assert!(!structs[0].fields[0].is_mutable);
+	}
+
+	#[test]
+	fn rejects_misspelled_validation_rules_with_available_options() {
+		let source = r#"
+			#[derive(Accounts)]
+			struct ValidateAccounts<'a> {
+				#[pina(validate(singner))]
+				authority: &'a AccountView,
+			}
+		"#;
+		let file = syn::parse_file(source).expect("valid Rust");
+		let error = extract_accounts_structs(&file).expect_err("misspelled rule must fail");
+		let message = error.to_string();
+
+		assert!(message.contains("unknown account validation rule"));
+		assert!(message.contains("`signer`"));
+		assert!(message.contains("`distinct_from`"));
 	}
 }

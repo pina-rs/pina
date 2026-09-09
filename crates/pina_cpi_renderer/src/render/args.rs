@@ -245,14 +245,18 @@ fn render_pinapod_vec_argument(
 		.replace("{item}", "value")
 		.replace("{item_offset}", "item_offset")
 		.replace("{item_end}", &format!("item_offset + {}", item.wire_size));
+	let item_offset = if item.wire_size == 1 {
+		format!("{{offset}} + {prefix_size} + index")
+	} else {
+		format!("{{offset}} + {prefix_size} + index * {}", item.wire_size)
+	};
 	let write = format!(
 		"if self.{field}.len() > {capacity} {{\n\t\t\treturn \
 		 Err(ProgramError::InvalidInstructionData);\n\t\t}}\n\t\tdata[{{offset}}..{{offset}} + \
 		 {prefix_size}].copy_from_slice(&(self.{field}.len() as \
 		 {prefix_type}).to_le_bytes());\n\t\tfor (index, value) in \
-		 self.{field}.iter().enumerate() {{\n\t\t\tlet item_offset = {{offset}} + {prefix_size} + \
-		 index * {};\n\t\t\t{item_write}\n\t\t}}",
-		item.wire_size,
+		 self.{field}.iter().enumerate() {{\n\t\t\tlet item_offset = \
+		 {item_offset};\n\t\t\t{item_write}\n\t\t}}",
 	);
 
 	Ok(RenderedArgument {
@@ -518,6 +522,13 @@ mod tests {
 		assert_eq!(rendered.wire_size, 66);
 		assert!(rendered.write.contains("self.tags.len() > 8"));
 		assert!(rendered.write.contains("value.to_le_bytes()"));
+
+		let bytes = ArrayTypeNode::prefixed(NumberTypeNode::le(U8), NumberTypeNode::le(U16));
+		let bytes = codama_nodes::FixedSizeTypeNode::new(bytes, 6);
+		let rendered = render_argument("approvals", &bytes.into(), "test")
+			.unwrap_or_else(|error| panic!("PinaPod Vec<u8> should render: {error}"));
+		assert!(rendered.write.contains("{offset} + 2 + index"));
+		assert!(!rendered.write.contains("index * 1"));
 	}
 
 	#[test]

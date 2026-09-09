@@ -141,17 +141,35 @@ fn validate_type<T: PinaAccount>(account: AccountView, program_id: &Address) -> 
 		return Err(ProgramError::AccountDataTooSmall);
 	}
 
-	if <T as crate::PinaPodFixed>::validate_exact(&data).is_err() {
-		log!(
-			"address: {} contains invalid zero-copy account data",
-			account.address().as_ref()
-		);
-		log_caller();
+	#[cfg(not(feature = "validation"))]
+	{
+		if <T as crate::PinaPodFixed>::validate_exact(&data).is_err() {
+			log!(
+				"address: {} contains invalid zero-copy account data",
+				account.address().as_ref()
+			);
+			log_caller();
 
-		return Err(ProgramError::InvalidAccountData);
+			return Err(ProgramError::InvalidAccountData);
+		}
+
+		return Ok(());
 	}
 
-	Ok(())
+	#[cfg(feature = "validation")]
+	{
+		let value = <T as crate::PinaPodFixed>::read_exact(&data).map_err(|_| {
+			log!(
+				"address: {} contains invalid zero-copy account data",
+				account.address().as_ref()
+			);
+			log_caller();
+
+			ProgramError::InvalidAccountData
+		})?;
+
+		T::validate_account_value(value)
+	}
 }
 
 #[track_caller]
