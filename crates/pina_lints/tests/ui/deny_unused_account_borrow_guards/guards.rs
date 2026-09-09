@@ -95,6 +95,21 @@ fn block_tail_initializer(account: &AccountView) -> Result<(), ()> {
 	Ok(())
 }
 
+fn tuple_destructuring_keeps_each_guard_visible(account: &AccountView) -> Result<(), ()> {
+	let (guard, value) = (account.try_borrow()?, 7);
+	//~^ ERROR: account borrow guard `guard` is never read
+	let _ = value;
+	Ok(())
+}
+
+fn let_else_keeps_nested_guard_visible(account: &AccountView) -> Result<(), ()> {
+	let Ok(guard) = account.try_borrow() else {
+		return Err(());
+	};
+	//~^ ERROR: account borrow guard `guard` is never read
+	Ok(())
+}
+
 fn macro_expansion_gets_no_suggestion(account: &AccountView) -> Result<(), ()> {
 	bind_guard!(account);
 	//~^ ERROR: account borrow guard `guard` is never read

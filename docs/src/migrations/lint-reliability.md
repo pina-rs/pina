@@ -52,7 +52,7 @@ Every remaining-account source in a chained iterator needs its own dominating le
 
 ## Review unused borrow-guard warnings
 
-The unused-borrow-guard lint now classifies the completed initializer type instead of matching loader names inside an expression. It therefore catches direct `Ref` and `RefMut` results returned through aliases or function pointers, while no longer treating an unrelated wrapper result as a guard merely because the wrapper consumed one. If code intentionally stores a guard, read through the binding; otherwise discard the loader result immediately with `?` so the runtime borrow ends at the statement boundary.
+The unused-borrow-guard lint now classifies each binding's inferred type instead of matching loader names inside an expression. It therefore catches `Ref` and `RefMut` results returned through aliases or function pointers, including guards nested in tuple and `let ... else` patterns, while no longer treating an unrelated wrapper result as a guard merely because the wrapper consumed one. If code intentionally stores a guard, read through the binding; otherwise discard the loader result immediately with `?` so the runtime borrow ends at the statement boundary.
 
 ## Refresh the managed lint driver
 

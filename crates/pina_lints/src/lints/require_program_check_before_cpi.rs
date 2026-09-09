@@ -108,37 +108,6 @@ fn is_trusted_pina_cpi_type_path(path: &str) -> bool {
 		.is_some_and(|name| TRUSTED_PINA_CPI_TYPES.contains(&name))
 }
 
-#[cfg(test)]
-mod tests {
-	use super::is_trusted_pina_cpi_type_path;
-
-	#[test]
-	fn trusts_every_typed_compact_account_builder() {
-		for name in [
-			"CreateCompactProgramAccount",
-			"CreateCompactProgramAccountWithBump",
-			"ReallocCompactAccount",
-			"UpdateResizableAccount",
-		] {
-			assert!(is_trusted_pina_cpi_type_path(&format!("pina::{name}")));
-			assert!(is_trusted_pina_cpi_type_path(&format!("pina::cpi::{name}")));
-		}
-	}
-
-	#[test]
-	fn rejects_similarly_named_or_external_builders() {
-		assert!(!is_trusted_pina_cpi_type_path(
-			"attacker::cpi::UpdateResizableAccount",
-		));
-		assert!(!is_trusted_pina_cpi_type_path(
-			"pina::cpi::UpdateResizableAccountUnchecked",
-		));
-		assert!(!is_trusted_pina_cpi_type_path(
-			"pina::external::UpdateResizableAccount",
-		));
-	}
-}
-
 fn place_identity(expr: &Expr<'_>) -> Option<PlaceIdentity> {
 	match &expr.kind {
 		ExprKind::Field(base, ident) => {
@@ -406,5 +375,36 @@ impl<'tcx> LateLintPass<'tcx> for RequireProgramCheckBeforeCpi {
 		_: rustc_hir::def_id::LocalDefId,
 	) {
 		Analyzer { cx }.visit_expr(body.value, &mut ValidationState::new());
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::is_trusted_pina_cpi_type_path;
+
+	#[test]
+	fn trusts_every_typed_compact_account_builder() {
+		for name in [
+			"CreateCompactProgramAccount",
+			"CreateCompactProgramAccountWithBump",
+			"ReallocCompactAccount",
+			"UpdateResizableAccount",
+		] {
+			assert!(is_trusted_pina_cpi_type_path(&format!("pina::{name}")));
+			assert!(is_trusted_pina_cpi_type_path(&format!("pina::cpi::{name}")));
+		}
+	}
+
+	#[test]
+	fn rejects_similarly_named_or_external_builders() {
+		assert!(!is_trusted_pina_cpi_type_path(
+			"attacker::cpi::UpdateResizableAccount",
+		));
+		assert!(!is_trusted_pina_cpi_type_path(
+			"pina::cpi::UpdateResizableAccountUnchecked",
+		));
+		assert!(!is_trusted_pina_cpi_type_path(
+			"pina::external::UpdateResizableAccount",
+		));
 	}
 }

@@ -7,6 +7,7 @@ use std::collections::HashSet;
 
 use rustc_hir::Expr;
 use rustc_hir::ExprKind;
+use rustc_hir::Pat;
 use rustc_hir::StmtKind;
 use rustc_hir::intravisit::Visitor;
 use rustc_lint::LateContext;
@@ -31,19 +32,16 @@ crate::declare_late_lint! {
 	"account borrow guards bound to locals must be read or discarded immediately"
 }
 
-/// Whether an initializer's completed value is one of the runtime account-data
-/// guards re-exported by Pinocchio and Pina.
+/// Whether a pattern binds one of the runtime account-data guards re-exported
+/// by Pinocchio and Pina.
 ///
 /// Classifying the result type avoids two syntax-based failures: an unrelated
 /// function named `load_pda` no longer looks like a guard, and consuming a
 /// guard inside a wrapper expression no longer makes the wrapper result look
 /// like one. Type aliases retain the underlying ADT definition, so Pina's
 /// `LoadedAccount` aliases continue to work without special cases.
-fn is_account_borrow_guard(cx: &LateContext<'_>, initializer: &Expr<'_>) -> bool {
-	let ty = cx
-		.typeck_results()
-		.expr_ty_adjusted(initializer)
-		.peel_refs();
+fn is_account_borrow_guard(cx: &LateContext<'_>, pattern: &Pat<'_>) -> bool {
+	let ty = cx.typeck_results().pat_ty(pattern).peel_refs();
 	let Some(definition) = ty.ty_adt_def() else {
 		return false;
 	};
@@ -93,6 +91,40 @@ struct GuardBinding {
 	name: String,
 	span: Span,
 	statement_span: Span,
+	initializer_span: Option<Span>,
+}
+
+/// Finds every guard binding in a `let` pattern, including bindings nested in
+/// tuples, structs, and `let ... else` patterns.
+struct GuardPatternCollector<'cx, 'tcx, 'guards> {
+	cx: &'cx LateContext<'tcx>,
+	guards: &'guards mut Vec<GuardBinding>,
+	root_pattern: rustc_hir::hir_id::HirId,
+	statement_span: Span,
+	initializer_span: Span,
+}
+
+impl<'tcx> Visitor<'tcx> for GuardPatternCollector<'_, 'tcx, '_> {
+	fn visit_pat(&mut self, pattern: &'tcx Pat<'tcx>) {
+		if let rustc_hir::PatKind::Binding(_, binding, ident, subpattern) = pattern.kind
+			&& is_account_borrow_guard(self.cx, pattern)
+		{
+			let is_plain_root_binding = pattern.hir_id == self.root_pattern && subpattern.is_none();
+			self.guards.push(GuardBinding {
+				hir_id: binding,
+				name: ident.name.to_string(),
+				span: if is_plain_root_binding {
+					self.initializer_span
+				} else {
+					pattern.span
+				},
+				statement_span: self.statement_span,
+				initializer_span: is_plain_root_binding.then_some(self.initializer_span),
+			});
+		}
+
+		rustc_hir::intravisit::walk_pat(self, pattern);
+	}
 }
 
 /// Collects guard bindings and local references in one pass over the body.
@@ -131,15 +163,15 @@ impl<'tcx> Visitor<'tcx> for Analyzer<'_, 'tcx> {
 	fn visit_stmt(&mut self, statement: &'tcx rustc_hir::Stmt<'tcx>) {
 		if let StmtKind::Let(local) = statement.kind
 			&& let Some(initializer) = local.init
-			&& is_account_borrow_guard(self.cx, initializer)
-			&& let rustc_hir::PatKind::Binding(_, binding, ident, ..) = local.pat.kind
 		{
-			self.guards.push(GuardBinding {
-				hir_id: binding,
-				name: ident.name.to_string(),
-				span: initializer.span,
+			let mut collector = GuardPatternCollector {
+				cx: self.cx,
+				guards: &mut self.guards,
+				root_pattern: local.pat.hir_id,
 				statement_span: local.span,
-			});
+				initializer_span: initializer.span,
+			};
+			collector.visit_pat(local.pat);
 		}
 
 		if let StmtKind::Semi(expr) = statement.kind
@@ -294,7 +326,8 @@ mod suggestion {
 			return None;
 		}
 
-		let initializer = source_map.span_to_snippet(guard.span).ok()? + ";";
+		let initializer_span = guard.initializer_span?;
+		let initializer = source_map.span_to_snippet(initializer_span).ok()? + ";";
 
 		// No `drop(local)` calls: replacing the binding with the initializer
 		// expression only releases the never-read borrow sooner, so the
