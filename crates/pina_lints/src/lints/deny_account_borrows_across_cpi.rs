@@ -1,4 +1,5 @@
 extern crate rustc_hir;
+extern crate rustc_middle;
 extern crate rustc_span;
 
 use std::collections::HashMap;
@@ -6,7 +7,9 @@ use std::collections::HashMap;
 use rustc_hir::Expr;
 use rustc_hir::ExprKind;
 use rustc_hir::HirId;
+use rustc_hir::Pat;
 use rustc_hir::intravisit::FnKind;
+use rustc_hir::intravisit::Visitor;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
 use rustc_lint::LintContext;
@@ -26,7 +29,6 @@ crate::declare_late_lint! {
 	"mutable account-data borrows must be dropped before CPI"
 }
 
-const BORROW_METHODS: &[&str] = &["try_borrow_mut", "as_account_mut"];
 const CPI_METHODS: &[&str] = &[
 	"invoke",
 	"invoke_signed",
@@ -38,21 +40,6 @@ fn method_def_path(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<String> {
 	cx.typeck_results()
 		.type_dependent_def_id(expr.hir_id)
 		.map(|def_id| cx.tcx.def_path_str(def_id))
-}
-
-fn is_account_borrow(cx: &LateContext<'_>, expr: &Expr<'_>, method: &str) -> bool {
-	if !BORROW_METHODS.contains(&method) {
-		return false;
-	}
-
-	method_def_path(cx, expr).is_some_and(|path| {
-		let path = path.to_ascii_lowercase();
-		match method {
-			"try_borrow_mut" => path.contains("accountview::try_borrow_mut"),
-			"as_account_mut" => path.contains("asaccount::as_account_mut"),
-			_ => false,
-		}
-	})
 }
 
 fn is_cpi_invocation(cx: &LateContext<'_>, expr: &Expr<'_>, method: &str) -> bool {
@@ -74,40 +61,30 @@ fn is_cpi_invocation(cx: &LateContext<'_>, expr: &Expr<'_>, method: &str) -> boo
 	})
 }
 
-fn is_generated_pda_mut_borrow(callee: &Expr<'_>) -> bool {
-	let ExprKind::Path(path) = &callee.kind else {
+fn is_mutable_account_borrow_guard(cx: &LateContext<'_>, ty: rustc_middle::ty::Ty<'_>) -> bool {
+	let Some(definition) = ty.peel_refs().ty_adt_def() else {
 		return false;
 	};
-	let method = match path {
-		rustc_hir::QPath::Resolved(_, path) => path.segments.last().map(|segment| segment.ident),
-		rustc_hir::QPath::TypeRelative(_, segment) => Some(segment.ident),
-	};
+	let definition = definition.did();
 
-	method.is_some_and(|method| method.name.as_str() == "load_pda_mut")
+	cx.tcx.crate_name(definition.krate).as_str() == "solana_account_view"
+		&& cx.tcx.item_name(definition).as_str() == "RefMut"
 }
 
-fn contains_mutable_borrow(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
-	match &expr.kind {
-		ExprKind::MethodCall(segment, receiver, args, _) => {
-			is_account_borrow(cx, expr, segment.ident.name.as_str())
-				|| contains_mutable_borrow(cx, receiver)
-				|| args
-					.iter()
-					.any(|argument| contains_mutable_borrow(cx, argument))
+struct GuardPatternCollector<'cx, 'tcx, 'bindings> {
+	cx: &'cx LateContext<'tcx>,
+	bindings: &'bindings mut Vec<HirId>,
+}
+
+impl<'tcx> Visitor<'tcx> for GuardPatternCollector<'_, 'tcx, '_> {
+	fn visit_pat(&mut self, pattern: &'tcx Pat<'tcx>) {
+		if let rustc_hir::PatKind::Binding(_, binding, ..) = pattern.kind
+			&& is_mutable_account_borrow_guard(self.cx, self.cx.typeck_results().pat_ty(pattern))
+		{
+			self.bindings.push(binding);
 		}
-		ExprKind::Match(scrutinee, ..)
-		| ExprKind::DropTemps(scrutinee)
-		| ExprKind::Use(scrutinee, _)
-		| ExprKind::Type(scrutinee, _)
-		| ExprKind::UnsafeBinderCast(_, scrutinee, _) => contains_mutable_borrow(cx, scrutinee),
-		ExprKind::Call(callee, args) => {
-			is_generated_pda_mut_borrow(callee)
-				|| contains_mutable_borrow(cx, callee)
-				|| args
-					.iter()
-					.any(|argument| contains_mutable_borrow(cx, argument))
-		}
-		_ => false,
+
+		rustc_hir::intravisit::walk_pat(self, pattern);
 	}
 }
 
@@ -122,28 +99,68 @@ fn local_binding(expr: &Expr<'_>) -> Option<HirId> {
 	Some(binding)
 }
 
+fn is_drop_callee(cx: &LateContext<'_>, callee: &Expr<'_>) -> bool {
+	let ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) = &callee.kind else {
+		return false;
+	};
+
+	match path.res {
+		rustc_hir::def::Res::Def(_, definition) => {
+			matches!(
+				cx.tcx.def_path_str(definition).as_str(),
+				"std::mem::drop" | "core::mem::drop"
+			)
+		}
+		_ => false,
+	}
+}
+
 struct Analyzer<'cx, 'tcx> {
 	cx: &'cx LateContext<'tcx>,
+	closures: HashMap<HirId, &'tcx Expr<'tcx>>,
 }
 
 impl<'tcx> Analyzer<'_, 'tcx> {
+	fn closure_body(&self, expr: &'tcx Expr<'tcx>) -> Option<&'tcx Expr<'tcx>> {
+		match &expr.kind {
+			ExprKind::Closure(closure) => Some(self.cx.tcx.hir_body(closure.body).value),
+			ExprKind::Path(_) => {
+				local_binding(expr).and_then(|binding| self.closures.get(&binding).copied())
+			}
+			ExprKind::Block(block, _) => block.expr.and_then(|tail| self.closure_body(tail)),
+			_ => None,
+		}
+	}
+
 	fn visit_block(
-		&self,
+		&mut self,
 		block: &'tcx rustc_hir::Block<'tcx>,
 		active: &mut HashMap<HirId, rustc_span::Span>,
 	) {
 		let mut block_bindings = Vec::new();
+		let mut block_closures = Vec::new();
 
 		for statement in block.stmts {
 			match &statement.kind {
 				rustc_hir::StmtKind::Let(local) => {
 					if let Some(initializer) = local.init {
 						self.visit_expr(initializer, active);
-						if contains_mutable_borrow(self.cx, initializer)
-							&& let rustc_hir::PatKind::Binding(_, binding, ..) = local.pat.kind
-						{
+						let mut bindings = Vec::new();
+						GuardPatternCollector {
+							cx: self.cx,
+							bindings: &mut bindings,
+						}
+						.visit_pat(local.pat);
+						for binding in bindings {
 							active.insert(binding, initializer.span);
 							block_bindings.push(binding);
+						}
+
+						if let rustc_hir::PatKind::Binding(_, binding, ..) = local.pat.kind
+							&& let Some(body) = self.closure_body(initializer)
+						{
+							self.closures.insert(binding, body);
+							block_closures.push(binding);
 						}
 					}
 				}
@@ -161,9 +178,16 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		for binding in block_bindings {
 			active.remove(&binding);
 		}
+		for binding in block_closures {
+			self.closures.remove(&binding);
+		}
 	}
 
-	fn visit_expr(&self, expr: &'tcx Expr<'tcx>, active: &mut HashMap<HirId, rustc_span::Span>) {
+	fn visit_expr(
+		&mut self,
+		expr: &'tcx Expr<'tcx>,
+		active: &mut HashMap<HirId, rustc_span::Span>,
+	) {
 		match &expr.kind {
 			ExprKind::MethodCall(segment, receiver, args, _) => {
 				self.visit_expr(receiver, active);
@@ -186,19 +210,18 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				}
 			}
 			ExprKind::Call(callee, args) => {
+				let closure_body = self.closure_body(callee);
 				self.visit_expr(callee, active);
 				for argument in *args {
 					self.visit_expr(argument, active);
 				}
 
-				if let ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) = &callee.kind
-					&& path
-						.segments
-						.last()
-						.is_some_and(|segment| segment.ident.name.as_str() == "drop")
+				if is_drop_callee(self.cx, callee)
 					&& let Some(binding) = args.first().and_then(|argument| local_binding(argument))
 				{
 					active.remove(&binding);
+				} else if let Some(body) = closure_body {
+					self.visit_expr(body, active);
 				}
 			}
 			ExprKind::Block(block, _) => self.visit_block(block, active),
@@ -206,9 +229,15 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				self.visit_expr(scrutinee, active);
 				for arm in *arms {
 					let mut branch = active.clone();
+					if let Some(guard) = arm.guard {
+						self.visit_expr(guard, &mut branch);
+					}
 					self.visit_expr(arm.body, &mut branch);
 				}
 			}
+			// A closure body runs when the closure is called, not when its value is
+			// created. Local closure calls are handled by `ExprKind::Call` above.
+			ExprKind::Closure(_) => {}
 			ExprKind::If(condition, then, otherwise) => {
 				self.visit_expr(condition, active);
 				let mut branch = active.clone();
@@ -230,11 +259,19 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			| ExprKind::Yield(inner, _)
 			| ExprKind::Become(inner)
 			| ExprKind::UnsafeBinderCast(_, inner, _) => self.visit_expr(inner, active),
-			ExprKind::Binary(_, left, right)
-			| ExprKind::Assign(left, right, _)
-			| ExprKind::AssignOp(_, left, right) => {
+			ExprKind::Binary(_, left, right) | ExprKind::AssignOp(_, left, right) => {
 				self.visit_expr(left, active);
 				self.visit_expr(right, active);
+			}
+			ExprKind::Assign(left, right, _) => {
+				let closure_body = self.closure_body(right);
+				self.visit_expr(left, active);
+				self.visit_expr(right, active);
+				if let Some(binding) = local_binding(left)
+					&& let Some(body) = closure_body
+				{
+					self.closures.insert(binding, body);
+				}
 			}
 			ExprKind::Index(base, index, _) => {
 				self.visit_expr(base, active);
@@ -272,6 +309,10 @@ impl<'tcx> LateLintPass<'tcx> for DenyAccountBorrowsAcrossCpi {
 		_: rustc_span::Span,
 		_: rustc_hir::def_id::LocalDefId,
 	) {
-		Analyzer { cx }.visit_expr(body.value, &mut HashMap::new());
+		Analyzer {
+			cx,
+			closures: HashMap::new(),
+		}
+		.visit_expr(body.value, &mut HashMap::new());
 	}
 }

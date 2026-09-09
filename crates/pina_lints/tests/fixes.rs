@@ -14,50 +14,21 @@ use std::process::Command;
 /// Unfixed fixture source: every construct the unused-guard fix handles.
 const UNFIXED_SOURCE: &str = r#"#![allow(dead_code, unused_variables, private_interfaces)]
 
-struct AccountView;
-struct Guard;
-struct MintView;
+use solana_account_view::AccountView;
 
-impl AccountView {
-	fn try_borrow_mut(&mut self) -> Result<Guard, ()> {
-		Ok(Guard)
-	}
-
-	fn try_borrow(&self) -> Result<Guard, ()> {
-		Ok(Guard)
-	}
-}
-
-trait AsTokenAccount {
-	fn as_token_mint_for_program(&self, program: &u8) -> Result<Guard, ()>;
-}
-
-impl AsTokenAccount for MintView {
-	fn as_token_mint_for_program(&self, _program: &u8) -> Result<Guard, ()> {
-		Ok(Guard)
-	}
-}
-
-pub fn dropped_after_binding(account: &mut AccountView) -> Result<u8, ()> {
-	let guard = account.try_borrow_mut()?;
+pub fn dropped_after_binding(account: &mut AccountView) -> u8 {
+	let guard = account.try_borrow_mut().unwrap();
 	drop(guard);
-	Ok(0)
+	0
 }
 
-pub fn underscore_binding(mint: &MintView) -> Result<(), ()> {
-	let _guard = mint.as_token_mint_for_program(&0)?;
-	Ok(())
+pub fn underscore_binding(account: &AccountView) {
+	let _guard = account.try_borrow().unwrap();
 }
 
-pub fn read_guard(account: &AccountView) -> Result<u8, ()> {
-	let guard = account.try_borrow()?;
-	Ok(guard.arity())
-}
-
-impl Guard {
-	pub fn arity(&self) -> u8 {
-		0
-	}
+pub fn read_guard(account: &AccountView) -> usize {
+	let guard = account.try_borrow().unwrap();
+	guard.len()
 }
 "#;
 
@@ -71,50 +42,21 @@ impl Guard {
 /// its warning remains for manual review. The read guard is untouched.
 const FIXED_SOURCE: &str = r#"#![allow(dead_code, unused_variables, private_interfaces)]
 
-struct AccountView;
-struct Guard;
-struct MintView;
+use solana_account_view::AccountView;
 
-impl AccountView {
-	fn try_borrow_mut(&mut self) -> Result<Guard, ()> {
-		Ok(Guard)
-	}
-
-	fn try_borrow(&self) -> Result<Guard, ()> {
-		Ok(Guard)
-	}
-}
-
-trait AsTokenAccount {
-	fn as_token_mint_for_program(&self, program: &u8) -> Result<Guard, ()>;
-}
-
-impl AsTokenAccount for MintView {
-	fn as_token_mint_for_program(&self, _program: &u8) -> Result<Guard, ()> {
-		Ok(Guard)
-	}
-}
-
-pub fn dropped_after_binding(account: &mut AccountView) -> Result<u8, ()> {
-	let guard = account.try_borrow_mut()?;
+pub fn dropped_after_binding(account: &mut AccountView) -> u8 {
+	let guard = account.try_borrow_mut().unwrap();
 	drop(guard);
-	Ok(0)
+	0
 }
 
-pub fn underscore_binding(mint: &MintView) -> Result<(), ()> {
-	mint.as_token_mint_for_program(&0)?;
-	Ok(())
+pub fn underscore_binding(account: &AccountView) {
+	account.try_borrow().unwrap();
 }
 
-pub fn read_guard(account: &AccountView) -> Result<u8, ()> {
-	let guard = account.try_borrow()?;
-	Ok(guard.arity())
-}
-
-impl Guard {
-	pub fn arity(&self) -> u8 {
-		0
-	}
+pub fn read_guard(account: &AccountView) -> usize {
+	let guard = account.try_borrow().unwrap();
+	guard.len()
 }
 "#;
 
@@ -200,6 +142,9 @@ name = "fix_fixture"
 version = "0.0.0"
 edition = "2021"
 publish = false
+
+[dependencies]
+solana-account-view = "=2.0.0"
 
 [workspace]
 "#,

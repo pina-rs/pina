@@ -182,3 +182,5 @@ fn framework_conversion(bytes: &[u8]) -> Result<(), ()> {
 }
 
 fn main() {}
+
+// compile-fail

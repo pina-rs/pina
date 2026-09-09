@@ -20,7 +20,7 @@ test:idl
 
 - Rust and markdown formatting are enforced through `dprint`.
 - Clippy runs with strict workspace lint settings, including the `pina_lints` crate that holds every Pina lint.
-- `security:pina-lint` runs every registered Pina lint over all example programs and secure security fixtures. It builds the workspace `pina_lint_driver` and runs cargo with it as `RUSTC_WRAPPER`.
+- `security:pina-lint` runs every registered Pina lint over all example programs and secure security fixtures. It builds the workspace `pina_lint_driver` and runs cargo with it as `RUSTC_WORKSPACE_WRAPPER`.
 - The [Security Lints](./security-lints.md) reference documents each rule, compliant patterns, and heuristic limitations.
 
 ## Reusable documentation blocks

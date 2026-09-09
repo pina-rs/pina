@@ -174,3 +174,5 @@ fn validated_address_alias_passes(
 }
 
 fn main() {}
+
+// compile-fail

@@ -1,0 +1,6 @@
+warning: IDL-oriented example crates should define exactly one `declare_id!` in the crate root
+   |
+   = help: add one `declare_id!(...)` invocation to the crate root
+   = note: `#[warn(require_idl_root_to_define_one_program_id)]` on by default
+
+warning: 1 warning emitted

@@ -136,3 +136,5 @@ fn process_wrapped_transfer(
 }
 
 fn main() {}
+
+// compile-fail

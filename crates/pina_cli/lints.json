@@ -6,6 +6,7 @@
 			"name": "deny_heap_allocations_in_onchain_instruction_handlers",
 			"level": "warn"
 		},
+		{ "name": "deny_unchecked_remaining_mut", "level": "deny" },
 		{
 			"name": "deny_unused_account_borrow_guards",
 			"level": "warn"

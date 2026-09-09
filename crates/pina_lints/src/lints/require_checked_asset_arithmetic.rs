@@ -86,8 +86,13 @@ fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 			for argument in *args {
 				visit_expr(cx, argument);
 			}
-			if UNCHECKED_METHODS.contains(&segment.ident.name.as_str())
-				&& looks_like_asset(receiver)
+
+			let receiver_is_integer = cx.typeck_results().expr_ty_adjusted(receiver).is_integral();
+
+			if receiver_is_integer
+				&& UNCHECKED_METHODS.contains(&segment.ident.name.as_str())
+				&& (looks_like_asset(receiver)
+					|| args.iter().any(|argument| looks_like_asset(argument)))
 			{
 				lint(cx, expr.span);
 			}
@@ -95,13 +100,14 @@ fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 		ExprKind::Binary(operation, left, right) => {
 			visit_expr(cx, left);
 			visit_expr(cx, right);
-			if matches!(
-				operation.node,
-				rustc_hir::BinOpKind::Add
-					| rustc_hir::BinOpKind::Sub
-					| rustc_hir::BinOpKind::Mul
-					| rustc_hir::BinOpKind::Div
-			) && (looks_like_asset(left) || looks_like_asset(right))
+			if cx.typeck_results().expr_ty_adjusted(left).is_integral()
+				&& matches!(
+					operation.node,
+					rustc_hir::BinOpKind::Add
+						| rustc_hir::BinOpKind::Sub
+						| rustc_hir::BinOpKind::Mul
+						| rustc_hir::BinOpKind::Div
+				) && (looks_like_asset(left) || looks_like_asset(right))
 			{
 				lint(cx, expr.span);
 			}
@@ -116,8 +122,14 @@ fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 		ExprKind::Match(scrutinee, arms, _) => {
 			visit_expr(cx, scrutinee);
 			for arm in *arms {
+				if let Some(guard) = arm.guard {
+					visit_expr(cx, guard);
+				}
 				visit_expr(cx, arm.body);
 			}
+		}
+		ExprKind::Closure(closure) => {
+			visit_expr(cx, cx.tcx.hir_body(closure.body).value);
 		}
 		ExprKind::If(condition, then, otherwise) => {
 			visit_expr(cx, condition);
@@ -137,9 +149,24 @@ fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 		| ExprKind::Yield(inner, _)
 		| ExprKind::Become(inner)
 		| ExprKind::UnsafeBinderCast(_, inner, _) => visit_expr(cx, inner),
-		ExprKind::Assign(left, right, _) | ExprKind::AssignOp(_, left, right) => {
+		ExprKind::Assign(left, right, _) => {
 			visit_expr(cx, left);
 			visit_expr(cx, right);
+		}
+		ExprKind::AssignOp(operation, left, right) => {
+			visit_expr(cx, left);
+			visit_expr(cx, right);
+			if cx.typeck_results().expr_ty_adjusted(left).is_integral()
+				&& matches!(
+					operation.node,
+					rustc_hir::AssignOpKind::AddAssign
+						| rustc_hir::AssignOpKind::SubAssign
+						| rustc_hir::AssignOpKind::MulAssign
+						| rustc_hir::AssignOpKind::DivAssign
+				) && (looks_like_asset(left) || looks_like_asset(right))
+			{
+				lint(cx, expr.span);
+			}
 		}
 		ExprKind::Index(base, index, _) => {
 			visit_expr(cx, base);
