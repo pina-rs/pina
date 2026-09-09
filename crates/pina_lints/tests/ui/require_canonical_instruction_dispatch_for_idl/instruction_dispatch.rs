@@ -68,7 +68,7 @@ fn entrypoint_unrelated_match(data: &[u8]) -> Result<(), ()> {
 }
 
 fn entrypoint_unrelated_enum(mode: Mode) -> Result<(), ()> {
-	match mode {
+	match (|mode| mode)(mode) {
 		Mode::Fast => process_a(),
 		Mode::Safe => process_b(),
 	}
@@ -104,9 +104,19 @@ fn entrypoint_with_unrelated_instruction_name(
 
 fn entrypoint_with_discarded_parse(data: &[u8]) -> Result<(), ()> {
 	let _: Instruction = parse_instruction(data)?;
-	let synthetic = Instruction::default();
-	match synthetic {
+	match synthetic_instruction(data) {
 		//~^ WARNING: IDL-friendly instruction dispatch should be a direct `match`
+		Instruction::Initialize => process_a(),
+		Instruction::Update => process_b(),
+	}
+}
+
+fn synthetic_instruction(_: &[u8]) -> Instruction {
+	Instruction::default()
+}
+
+fn entrypoint_with_block(data: &[u8]) -> Result<(), ()> {
+	match { parse_instruction::<Instruction>(data)? } {
 		Instruction::Initialize => process_a(),
 		Instruction::Update => process_b(),
 	}

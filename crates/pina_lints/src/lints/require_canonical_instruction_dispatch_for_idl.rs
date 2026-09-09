@@ -134,9 +134,6 @@ fn expression_is_parsed_instruction<'tcx>(
 				expression_is_parsed_instruction(cx, tail, parsed_instruction_bindings)
 			})
 		}
-		ExprKind::Use(inner, _) | ExprKind::Type(inner, _) | ExprKind::DropTemps(inner) => {
-			expression_is_parsed_instruction(cx, inner, parsed_instruction_bindings)
-		}
 		_ => false,
 	}
 }

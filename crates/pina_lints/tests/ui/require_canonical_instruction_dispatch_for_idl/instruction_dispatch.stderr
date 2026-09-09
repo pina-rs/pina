@@ -29,7 +29,7 @@ warning: IDL-friendly instruction dispatch should be a direct `match` over the p
   --> $DIR/instruction_dispatch.rs:70:1
    |
 LL | / fn entrypoint_unrelated_enum(mode: Mode) -> Result<(), ()> {
-LL | |     match mode {
+LL | |     match (|mode| mode)(mode) {
 LL | |         Mode::Fast => process_a(),
 LL | |         Mode::Safe => process_b(),
 LL | |     }
@@ -56,8 +56,7 @@ warning: IDL-friendly instruction dispatch should be a direct `match` over the p
    |
 LL | / fn entrypoint_with_discarded_parse(data: &[u8]) -> Result<(), ()> {
 LL | |     let _: Instruction = parse_instruction(data)?;
-LL | |     let synthetic = Instruction::default();
-LL | |     match synthetic {
+LL | |     match synthetic_instruction(data) {
 ...  |
 LL | | }
    | |_^

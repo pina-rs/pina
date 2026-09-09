@@ -121,6 +121,18 @@ fn process_two_bounded_iterators(remaining: &[u8], other: &[u8]) {
 	}
 }
 
+fn process_filter_after_guard(remaining: &[u8]) -> Result<(), ()> {
+	if remaining.len() > MAX_REMAINING_ACCOUNTS {
+		return Err(());
+	}
+
+	for account in remaining.iter().filter(|_| true) {
+		let _ = account;
+	}
+
+	Ok(())
+}
+
 fn main() {}
 
 // compile-fail

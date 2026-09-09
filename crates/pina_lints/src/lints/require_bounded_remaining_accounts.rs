@@ -55,23 +55,16 @@ fn expression_has_static_bound(expr: &Expr<'_>) -> bool {
 			if method == "take" {
 				return arguments.len() == 1 && is_constant_bound(&arguments[0]);
 			}
-
-			match method {
-				"chain" if arguments.len() == 1 => {
-					expression_has_static_bound(receiver)
-						&& expression_has_static_bound(&arguments[0])
-				}
-				"iter" | "into_iter" if arguments.is_empty() => {
-					matches!(receiver.kind, ExprKind::Array(_) | ExprKind::Repeat(_, _))
-				}
-				_ => false,
+			if method == "chain" {
+				return arguments.len() == 1
+					&& expression_has_static_bound(receiver)
+					&& expression_has_static_bound(&arguments[0]);
 			}
+
+			matches!(method, "iter" | "into_iter")
+				&& arguments.is_empty()
+				&& matches!(receiver.kind, ExprKind::Array(_) | ExprKind::Repeat(_, _))
 		}
-		ExprKind::Array(_) | ExprKind::Repeat(..) => true,
-		ExprKind::Unary(_, inner)
-		| ExprKind::Cast(inner, _)
-		| ExprKind::DropTemps(inner)
-		| ExprKind::AddrOf(_, _, inner) => expression_has_static_bound(inner),
 		_ => false,
 	}
 }
