@@ -1,33 +1,23 @@
 // check-warn
+// aux-build: solana_account_view.rs
 // normalize-stderr-test: "\n$" -> ""
 
 #![allow(dead_code, unused_variables)]
 
-struct AccountView;
-struct Guard;
+extern crate solana_account_view;
+
+use solana_account_view::AccountView;
+use solana_account_view::Ref as Guard;
+use solana_account_view::Value;
+
+struct UnrelatedGuard;
 struct Unrelated;
 struct MintView;
 struct State;
 
-impl AccountView {
-	fn try_borrow(&self) -> Result<Guard, ()> {
-		Ok(Guard)
-	}
-
-	fn try_borrow_mut(&mut self) -> Result<Guard, ()> {
-		Ok(Guard)
-	}
-}
-
-impl Guard {
-	fn value(&self) -> u8 {
-		0
-	}
-}
-
 impl Unrelated {
-	fn as_account(&self) -> Result<Guard, ()> {
-		Ok(Guard)
+	fn as_account(&self) -> Result<UnrelatedGuard, ()> {
+		Ok(UnrelatedGuard)
 	}
 }
 
@@ -147,12 +137,28 @@ fn shadowed_drop_is_a_use(account: &AccountView) -> Result<(), ()> {
 	Ok(())
 }
 
-fn call_through_field_is_not_a_guard_construction(
+fn guard_returned_through_function_pointer_is_detected(
 	loader: &Loader,
 	account: &AccountView,
 ) -> Result<(), ()> {
 	let guard = loader.load()(account)?;
-	drop(guard);
+	//~^ ERROR: account borrow guard `guard` is never read
+	Ok(())
+}
+
+fn consuming_guard_in_call_does_not_taint_result(account: &AccountView) -> Result<(), ()> {
+	fn consume(_guard: Guard) -> Value {
+		Value
+	}
+
+	let value = consume(account.try_borrow()?);
+	drop(value);
+	Ok(())
+}
+
+fn consuming_guard_in_method_does_not_taint_result(account: &AccountView) -> Result<(), ()> {
+	let value = account.try_borrow()?.into_value();
+	drop(value);
 	Ok(())
 }
 

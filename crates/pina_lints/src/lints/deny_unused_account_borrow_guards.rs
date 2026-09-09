@@ -31,81 +31,26 @@ crate::declare_late_lint! {
 	"account borrow guards bound to locals must be read or discarded immediately"
 }
 
-/// Definition-path fragments that confirm a guard-named method call resolves
-/// to Pina's account-view or token-view APIs.
-const GUARD_PATH_FRAGMENTS: &[&str] = &[
-	"accountview::try_borrow",
-	"asaccount::as_account",
-	"astokenaccount::as_token",
-	"astokenaccount::as_associated_token_account",
-];
-
-fn method_def_path(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<String> {
-	cx.typeck_results()
-		.type_dependent_def_id(expr.hir_id)
-		.map(|def_id| cx.tcx.def_path_str(def_id))
-}
-
-fn is_guard_method_name(method: &str) -> bool {
-	matches!(
-		method,
-		"try_borrow" | "try_borrow_mut" | "as_account" | "as_account_mut"
-	) || method.starts_with("as_token_")
-		|| method.starts_with("as_associated_token_account")
-}
-
-fn is_guard_method(cx: &LateContext<'_>, expr: &Expr<'_>, method: &str) -> bool {
-	if !is_guard_method_name(method) {
-		return false;
-	}
-
-	method_def_path(cx, expr).is_some_and(|path| {
-		let path = path.to_ascii_lowercase();
-		GUARD_PATH_FRAGMENTS
-			.iter()
-			.any(|fragment| path.contains(fragment))
-	})
-}
-
-fn is_generated_pda_guard(callee: &Expr<'_>) -> bool {
-	let ExprKind::Path(path) = &callee.kind else {
+/// Whether an initializer's completed value is one of the runtime account-data
+/// guards re-exported by Pinocchio and Pina.
+///
+/// Classifying the result type avoids two syntax-based failures: an unrelated
+/// function named `load_pda` no longer looks like a guard, and consuming a
+/// guard inside a wrapper expression no longer makes the wrapper result look
+/// like one. Type aliases retain the underlying ADT definition, so Pina's
+/// `LoadedAccount` aliases continue to work without special cases.
+fn is_account_borrow_guard(cx: &LateContext<'_>, initializer: &Expr<'_>) -> bool {
+	let ty = cx
+		.typeck_results()
+		.expr_ty_adjusted(initializer)
+		.peel_refs();
+	let Some(definition) = ty.ty_adt_def() else {
 		return false;
 	};
+	let definition = definition.did();
 
-	let method = match path {
-		rustc_hir::QPath::Resolved(_, path) => path.segments.last().map(|segment| segment.ident),
-		rustc_hir::QPath::TypeRelative(_, segment) => Some(segment.ident),
-	};
-
-	method.is_some_and(|method| matches!(method.name.as_str(), "load_pda" | "load_pda_mut"))
-}
-
-fn contains_guard_construction(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
-	match &expr.kind {
-		ExprKind::MethodCall(segment, receiver, args, _) => {
-			is_guard_method(cx, expr, segment.ident.name.as_str())
-				|| contains_guard_construction(cx, receiver)
-				|| args
-					.iter()
-					.any(|argument| contains_guard_construction(cx, argument))
-		}
-		// The `?` operator desugars into a match, which is the only wrapper
-		// expression observed around guard constructions in initializers.
-		ExprKind::Match(scrutinee, ..) => contains_guard_construction(cx, scrutinee),
-		ExprKind::Block(block, _) => {
-			block
-				.expr
-				.is_some_and(|tail| contains_guard_construction(cx, tail))
-		}
-		ExprKind::Call(callee, args) => {
-			is_generated_pda_guard(callee)
-				|| contains_guard_construction(cx, callee)
-				|| args
-					.iter()
-					.any(|argument| contains_guard_construction(cx, argument))
-		}
-		_ => false,
-	}
+	cx.tcx.crate_name(definition.krate).as_str() == "solana_account_view"
+		&& matches!(cx.tcx.item_name(definition).as_str(), "Ref" | "RefMut")
 }
 
 fn is_drop_callee(cx: &LateContext<'_>, callee: &Expr<'_>) -> bool {
@@ -186,7 +131,7 @@ impl<'tcx> Visitor<'tcx> for Analyzer<'_, 'tcx> {
 	fn visit_stmt(&mut self, statement: &'tcx rustc_hir::Stmt<'tcx>) {
 		if let StmtKind::Let(local) = statement.kind
 			&& let Some(initializer) = local.init
-			&& contains_guard_construction(self.cx, initializer)
+			&& is_account_borrow_guard(self.cx, initializer)
 			&& let rustc_hir::PatKind::Binding(_, binding, ident, ..) = local.pat.kind
 		{
 			self.guards.push(GuardBinding {
