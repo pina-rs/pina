@@ -21,7 +21,7 @@ Pina is a Rust workspace for building performant, `no_std` Solana programs on to
 ## Benchmark maintenance
 
 - Before merging any pull request, wait for and read the consolidated performance benchmark comment. Do not merge while the report is missing, incomplete, or contains measurement errors.
-- Treat glaring regressions in instruction compute units, program compute units or build size, CLI performance, or core host performance as blocking and fix them. If a regression is ambiguous, expected, or requires a trade-off, keep the pull request unmerged and ask Ifiok Jr. for explicit approval.
+- Treat every measured increase in instruction compute units, program compute units, build size, CLI time, or core host time as negative and investigate it. Rerun a measurement only with evidence that it is noise. Fix confirmed regressions or keep the pull request unmerged until Ifiok Jr. explicitly approves the trade-off.
 - Confirm that every new top-level example appears in the benchmark report. A current-only result is acceptable when the example has no base-branch baseline.
 - Every top-level example crate with a `bpf-entrypoint` feature is part of the performance inventory. Do not maintain a second allowlist for new examples.
 - When an example gains an instruction, exercise that instruction through its ignored `tests/surfpool` suite with `pina_test::ProgramTest::send`, `send_instruction`, or `send_with_signers`. The PR benchmark records those calls automatically.
