@@ -522,7 +522,7 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 	validation_program: {
 		instruction: "initializePolicy",
 		accounts: "none",
-		programError: { Custom: 2n },
+		programError: "NotEnoughAccountKeys",
 	},
 	vesting_program: {
 		instruction: "initialize",

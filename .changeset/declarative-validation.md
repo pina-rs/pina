@@ -2,6 +2,7 @@
 pina: feat
 pina_macros: feat
 pina_cli: feat
+pina_cpi_renderer: fix
 pina_skill: docs
 ---
 
