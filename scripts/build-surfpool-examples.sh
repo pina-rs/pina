@@ -15,7 +15,31 @@ require_bin() {
 
 require_bin cargo-build-sbf
 
+cargo_build_sbf="$(command -v cargo-build-sbf)"
+if [[ "$(uname -s)" == "Linux" ]]; then
+	cargo_build_sbf_resolved="$(readlink -f "$cargo_build_sbf")"
+	cargo_build_sbf_real="$(dirname "$cargo_build_sbf_resolved")/.cargo-build-sbf-wrapped"
+	if [[ -x "$cargo_build_sbf_real" ]]; then
+		cargo_build_sbf="$cargo_build_sbf_real"
+	fi
+
+	for platform_tools_link in \
+		"${HOME:?}/.cache/solana/$TOOLS_VERSION/platform-tools" \
+		"${XDG_CACHE_HOME:-$HOME/.cache}/solana/$TOOLS_VERSION/platform-tools"; do
+		[[ -L "$platform_tools_link" ]] || continue
+		platform_tools_target="$(readlink "$platform_tools_link")"
+		case "$platform_tools_target" in
+		/nix/store/*/lib/platform-tools) unlink "$platform_tools_link" ;;
+		*)
+			echo "refusing to replace unexpected platform-tools link: $platform_tools_target" >&2
+			exit 1
+			;;
+		esac
+	done
+fi
+
 mkdir -p "$OUT_DIR"
+tools_install=--force-tools-install
 
 # Build each example independently. This deliberately does not use a best-effort
 # loop: a missing or non-SBF example is a test failure, not a skipped test.
@@ -35,8 +59,8 @@ while IFS= read -r manifest; do
 	if [[ "$example_name" == "pina_bpf_program" ]]; then
 		features+=(cpi-runtime-tests)
 	fi
-	cargo-build-sbf \
-		--skip-tools-install \
+	"$cargo_build_sbf" \
+		"$tools_install" \
 		--tools-version "$TOOLS_VERSION" \
 		--manifest-path "$manifest" \
 		--features "$(
@@ -44,6 +68,7 @@ while IFS= read -r manifest; do
 			echo "${features[*]}"
 		)" \
 		--sbf-out-dir "$OUT_DIR"
+	tools_install=--skip-tools-install
 
 	if [[ ! -f "$direct_artifact" && ! -f "$library_artifact" ]]; then
 		echo "cargo-build-sbf did not produce an artifact for ${example_name}" >&2

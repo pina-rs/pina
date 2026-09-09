@@ -623,10 +623,10 @@ in
         mkdir -p "$HOME"
         if [ "$(uname -s)" = "Linux" ]; then
           # The Nix wrapper seeds cargo-build-sbf's cache with its bundled
-          # sysroot before forwarding arguments. Bypass that wrapper so
-          # --force-tools-install can fetch the complete pinned toolchain,
-          # including liballoc. cargo-build-sbf detects NixOS itself; forcing
-          # its Nix patcher on Ubuntu can fail before the program build starts.
+          # sysroot before forwarding arguments. Bypass that wrapper so the
+          # first real build can fetch the complete pinned toolchain, including
+          # liballoc. cargo-build-sbf detects NixOS itself; forcing its Nix
+          # patcher on Ubuntu can fail before the program build starts.
           cargo_build_sbf="$(command -v cargo-build-sbf)"
           cargo_build_sbf_resolved="$(${pkgs.coreutils}/bin/readlink -f "$cargo_build_sbf")"
           cargo_build_sbf_real="$(dirname "$cargo_build_sbf_resolved")/.cargo-build-sbf-wrapped"
@@ -656,10 +656,6 @@ in
 
           "$cargo_build_sbf_real" \
             --force-tools-install \
-            --install-only \
-            --tools-version v1.54
-          "$cargo_build_sbf_real" \
-            --skip-tools-install \
             --tools-version v1.54 \
             --manifest-path examples/escrow_program/Cargo.toml \
             --sbf-out-dir target/deploy \
@@ -848,13 +844,9 @@ in
         fi
         mkdir -p "$HOME"
 
-        # Install the pinned SDK once, then let the test script build every
-        # example with --skip-tools-install. A missing program artifact is a
-        # hard failure in both local runs and CI.
-        cargo-build-sbf \
-          --install-only \
-          --tools-version "$SBF_TOOLS_VERSION" \
-          --patch-binaries-for-nix false
+        # The test script installs the pinned SDK during its first real build,
+        # then reuses it for every other example. A missing program artifact is
+        # a hard failure in both local runs and CI.
         pnpm install --frozen-lockfile
         "$DEVENV_ROOT/scripts/build-surfpool-examples.sh"
         pnpm --dir "$DEVENV_ROOT/codama/tests/surfpool" run test:types

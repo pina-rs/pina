@@ -106,22 +106,15 @@ function prepareLinuxTools(env: NodeJS.ProcessEnv): string {
 		);
 	}
 
-	const installed = command(
-		executable,
-		[
-			"--force-tools-install",
-			"--install-only",
-			"--tools-version",
-			TOOLS_VERSION,
-		],
-		{ env },
-	);
-	if (installed !== 0) {
-		throw new Error(
-			`cargo-build-sbf tool installation failed with status ${installed}`,
-		);
-	}
 	return executable;
+}
+
+function linuxToolsArgs(installTools: boolean): string[] {
+	return [
+		installTools ? "--force-tools-install" : "--skip-tools-install",
+		"--tools-version",
+		TOOLS_VERSION,
+	];
 }
 
 function buildProgram(
@@ -131,12 +124,11 @@ function buildProgram(
 	program: ExampleProgram,
 	env: NodeJS.ProcessEnv,
 	linux: boolean,
+	installTools: boolean,
 ): number {
 	const features = ["bpf-entrypoint"];
 	const args = [
-		...(linux
-			? ["--skip-tools-install", "--tools-version", TOOLS_VERSION]
-			: []),
+		...(linux ? linuxToolsArgs(installTools) : []),
 		"--manifest-path",
 		program.manifest,
 		"--sbf-out-dir",
@@ -157,6 +149,7 @@ function buildTokenLoaderProgram(
 	output: string,
 	env: NodeJS.ProcessEnv,
 	linux: boolean,
+	installTools: boolean,
 ): number {
 	const generated = join(output, ".token-loader-cu-program");
 	rmSync(generated, { force: true, recursive: true });
@@ -176,9 +169,7 @@ function buildTokenLoaderProgram(
 	writeFileSync(join(generated, "Cargo.toml"), manifest);
 
 	const args = [
-		...(linux
-			? ["--skip-tools-install", "--tools-version", TOOLS_VERSION]
-			: []),
+		...(linux ? linuxToolsArgs(installTools) : []),
 		"--manifest-path",
 		join(generated, "Cargo.toml"),
 		"--sbf-out-dir",
@@ -226,6 +217,7 @@ function main(): number {
 	const env: NodeJS.ProcessEnv = { ...process.env, HOME: home };
 	const linux = process.platform === "linux";
 	const executable = linux ? prepareLinuxTools(env) : findCargoBuildSbf(env);
+	let installTools = linux;
 
 	for (let index = 0; index < values.length; index += 2) {
 		const workspace = realpathSync(values[index] ?? ".");
@@ -250,10 +242,12 @@ function main(): number {
 				program,
 				env,
 				linux,
+				installTools,
 			);
 			if (status !== 0) {
 				return status;
 			}
+			installTools = false;
 			if (!existsSync(cargoArtifact)) {
 				const outputFiles = readdirSync(output).toSorted().join(", ");
 				throw new Error(
@@ -283,11 +277,13 @@ function main(): number {
 			output,
 			env,
 			linux,
+			installTools,
 		);
 
 		if (tokenLoaderStatus !== 0) {
 			return tokenLoaderStatus;
 		}
+		installTools = false;
 
 		if (!existsSync(tokenLoaderArtifact)) {
 			const outputFiles = readdirSync(output).toSorted().join(", ");
