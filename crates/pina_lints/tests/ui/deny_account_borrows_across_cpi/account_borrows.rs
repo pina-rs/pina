@@ -71,6 +71,13 @@ fn process_generated_pda_borrow(account: &mut AccountView, cpi: &Cpi) -> Result<
 	//~^ ERROR: CPI invoked while a mutable account-data borrow is still alive
 }
 
+fn process_block_scoped(account: &mut AccountView, cpi: &Cpi) -> Result<(), ()> {
+	{
+		let _guard = account.try_borrow_mut()?;
+	}
+	cpi.invoke()
+}
+
 fn process_unrelated_borrow(cache: &mut Cache, cpi: &Cpi) -> Result<(), ()> {
 	let _guard = cache.try_borrow_mut()?;
 	cpi.invoke()

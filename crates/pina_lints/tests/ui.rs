@@ -79,6 +79,11 @@ fn ui_deny_account_borrows_across_cpi() {
 }
 
 #[test]
+fn ui_deny_unused_account_borrow_guards() {
+	run_ui_tests("deny_unused_account_borrow_guards");
+}
+
+#[test]
 fn ui_require_bounded_remaining_accounts() {
 	run_ui_tests("require_bounded_remaining_accounts");
 }
