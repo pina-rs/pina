@@ -4,9 +4,12 @@ use pina::*;
 
 declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 
+const MAX_INLINE_MIGRATION_LAMPORTS: u64 = 20_000;
+
 #[discriminator]
 pub enum MigrationInstruction {
 	Update = 0,
+	Relay = 1,
 }
 
 #[discriminator]
@@ -51,25 +54,106 @@ pub struct ValueChangedEvent {
 	pub memo: u16,
 }
 
+#[instruction(discriminator = MigrationInstruction::Relay)]
+pub struct RelayInstruction {
+	pub value: u64,
+}
+
+pub struct MigrationProgram;
+
+impl CpiProgramId for MigrationProgram {
+	const ID: Address = ID;
+}
+
 #[derive(Accounts)]
 pub struct UpdateAccounts<'a> {
 	#[pina(validate(signer))]
 	pub authority: &'a AccountView,
 	pub referrer: Option<&'a AccountView>,
+	pub state: Option<&'a mut AccountView>,
+	#[pina(validate(signer))]
+	pub migration_payer: Option<&'a mut AccountView>,
+	pub system_program: Option<&'a AccountView>,
+}
+
+#[derive(Accounts)]
+pub struct RelayAccounts<'a> {
+	#[pina(validate(signer))]
+	pub authority: &'a AccountView,
+	pub referrer: &'a AccountView,
+	pub state: &'a mut AccountView,
+	#[pina(validate(signer))]
+	pub migration_payer: &'a mut AccountView,
+	pub system_program: &'a AccountView,
+	pub migration_program: &'a AccountView,
 }
 
 impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		UpdateInstruction::with_current_instruction_data(data, |current| {
 			let instruction = UpdateInstruction::try_from_bytes(current)?;
-			let _ = (
-				self.authority,
-				self.referrer,
-				instruction.value.get(),
-				instruction.memo.get(),
-			);
+			let _ = self.referrer;
+
+			match (self.state, self.migration_payer, self.system_program) {
+				(None, None, None) => {}
+				(Some(state), payer, Some(system_program)) => {
+					system_program.assert_address(&system::ID)?;
+					let payer = payer.map(|account| &*account);
+					MigrateAccount {
+						account: state,
+						payer,
+						program_id: &ID,
+						max_lamports: MAX_INLINE_MIGRATION_LAMPORTS,
+					}
+					.invoke::<State>()?;
+
+					let mut state = state.as_account_mut::<State>(&ID)?;
+					if state.authority != *self.authority.address() {
+						return Err(ProgramError::InvalidAccountData);
+					}
+					state.value.set(instruction.value.get());
+					state.enabled = true.into();
+				}
+				_ => return Err(ProgramError::NotEnoughAccountKeys),
+			}
+
+			let _ = instruction.memo.get();
 			Ok(())
 		})
+	}
+}
+
+impl<'a> ProcessAccountInfos<'a> for RelayAccounts<'a> {
+	fn process(self, data: &[u8]) -> ProgramResult {
+		let instruction = RelayInstruction::try_from_bytes(data)?;
+		self.system_program.assert_address(&system::ID)?;
+		let program = Program::<MigrationProgram>::try_new(self.migration_program)?;
+
+		let mut historical = [0_u8; 10];
+		historical[0] = MigrationInstruction::Update as u8;
+		historical[1] = 0;
+		historical[2..].copy_from_slice(&instruction.value.get().to_le_bytes());
+
+		CpiContext::new(
+			program,
+			[
+				CpiHandle::readonly_signer(self.authority),
+				CpiHandle::readonly(self.referrer),
+				CpiHandle::writable(self.state)?,
+				CpiHandle::writable_signer(self.migration_payer)?,
+				CpiHandle::readonly(self.system_program),
+			],
+		)
+		.invoke(&historical)?;
+
+		// The writable CPI may have resized and rewritten this account. Construct a
+		// fresh typed guard instead of retaining any pre-CPI view.
+		let state = self.state.as_account::<State>(&ID)?;
+		if state.value.get() != instruction.value.get() || !bool::from(state.enabled) {
+			return Err(ProgramError::InvalidAccountData);
+		}
+
+		Ok(())
 	}
 }
 
@@ -89,6 +173,9 @@ pub mod entrypoint {
 		match instruction {
 			MigrationInstruction::Update => {
 				UpdateAccounts::try_from((program_id, accounts))?.process(data)
+			}
+			MigrationInstruction::Relay => {
+				RelayAccounts::try_from((program_id, accounts))?.process(data)
 			}
 		}
 	}

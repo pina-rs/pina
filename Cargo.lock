@@ -4989,7 +4989,12 @@ dependencies = [
 name = "migrations_program"
 version = "0.0.0"
 dependencies = [
+ "mollusk-svm",
  "pina",
+ "solana-account 4.3.2",
+ "solana-instruction 3.4.1",
+ "solana-pubkey 4.2.1",
+ "solana-sdk-ids 3.1.0",
 ]
 
 [[package]]

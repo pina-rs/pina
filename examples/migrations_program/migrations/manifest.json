@@ -458,10 +458,37 @@
 								"optional": true,
 								"defaultValue": null,
 								"pda": null
+							},
+							{
+								"name": "state",
+								"writable": true,
+								"signer": false,
+								"optional": true,
+								"defaultValue": null,
+								"pda": null
+							},
+							{
+								"name": "migration_payer",
+								"writable": true,
+								"signer": true,
+								"optional": true,
+								"defaultValue": null,
+								"pda": null,
+								"constraints": [
+									"signer"
+								]
+							},
+							{
+								"name": "system_program",
+								"writable": false,
+								"signer": false,
+								"optional": true,
+								"defaultValue": null,
+								"pda": null
 							}
 						]
 					},
-					"processSha256": "edee54def35a71c03f15d8c198244b6ebb97aa9c60024a6168fb6c1d385655f4",
+					"processSha256": "5736416a1dad9647c9d266e461c8f12af3210ef62b3326b5770ec94ce90ef7d4",
 					"transition": {
 						"from": 0,
 						"to": 1,
@@ -469,11 +496,11 @@
 						"sourceSchemaSha256": "f0753a6ecc27d4882c1c9e15ff0b7e72f7627cd8439ce435b17acfe28a02bf14",
 						"destinationSchemaSha256": "da6b8c31ca828ed662a00d27aae875cfd90f7a24af221024dace7a37db9dfa7a",
 						"sourceProcessSha256": "2e57b7563c550adb4fc9421ee058c4dccb1cdb1e44d2e258af8f7a8278a5f985",
-						"destinationProcessSha256": "edee54def35a71c03f15d8c198244b6ebb97aa9c60024a6168fb6c1d385655f4",
+						"destinationProcessSha256": "5736416a1dad9647c9d266e461c8f12af3210ef62b3326b5770ec94ce90ef7d4",
 						"process": {
 							"kind": "appendOptional",
 							"sourceAccounts": 1,
-							"destinationAccounts": 2
+							"destinationAccounts": 5
 						},
 						"implementationSha256": "3826a92c03ddcda22d78ac51cce2d71fe21bffc5effc13dc6656f2864b466336"
 					}

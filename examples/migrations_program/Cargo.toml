@@ -17,7 +17,14 @@ bpf-entrypoint = []
 fuzzing = []
 
 [dependencies]
-pina = { workspace = true, features = ["compact", "derive", "validation"] }
+pina = { workspace = true, features = ["account-resize", "compact", "derive", "validation"] }
+
+[dev-dependencies]
+mollusk-svm = { workspace = true, default-features = true }
+solana-account.workspace = true
+solana-instruction.workspace = true
+solana-pubkey.workspace = true
+solana-sdk-ids.workspace = true
 
 [lints]
 workspace = true

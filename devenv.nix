@@ -666,6 +666,12 @@ in
           "$cargo_build_sbf_real" \
             --skip-tools-install \
             --tools-version v1.54 \
+            --manifest-path examples/migrations_program/Cargo.toml \
+            --sbf-out-dir target/deploy \
+            --features bpf-entrypoint
+          "$cargo_build_sbf_real" \
+            --skip-tools-install \
+            --tools-version v1.54 \
             --manifest-path examples/optional_accounts_program/Cargo.toml \
             --sbf-out-dir target/deploy \
             --features bpf-entrypoint
@@ -695,6 +701,7 @@ in
             --features bpf-entrypoint
         else
           cargo build-escrow-program
+          cargo build-migrations-program
           cargo build-optional-accounts-program
           cargo build-profile-program
           cargo build-role-registry-program
@@ -708,6 +715,7 @@ in
         # that the on-chain programs accept and process correctly.
         SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
           cargo test --locked \
+            -p migrations_program --test e2e \
             -p profile_program --test e2e \
             -p role_registry_program --test e2e \
             -p staking_rewards_program --test e2e \
