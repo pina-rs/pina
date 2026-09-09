@@ -249,7 +249,9 @@ pina_profile = { default-features = false, path = "crates/pina_profile", version
 pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.15.0" }
 
 [workspace.metadata.bin]
-cargo-expand = { version = "1.0.111" }
+# `cargo-expand` is installed directly by `test:all`. The pinned release has no
+# quick-install artifact, and cargo-run-bin cannot combine its Cargo fallback
+# with the project-local install path.
 cargo-semver-checks = { version = "0.50.0" }
 cargo-workspaces = { version = "0.4.2" }
 hyperfine = { version = "1.19.0" }

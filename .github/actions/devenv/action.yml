@@ -55,12 +55,14 @@ runs:
 
           local attempt=1
           local delay=5
+          local exit_code=0
           while true; do
             if "$@"; then
               return 0
+            else
+              exit_code=$?
             fi
 
-            local exit_code=$?
             if [ "$attempt" -ge "$attempts" ]; then
               echo "Command failed after ${attempt} attempt(s): $*"
               return "$exit_code"
@@ -92,6 +94,7 @@ runs:
 
     - name: install dependencies
       env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
         SETUP_RETRIES: ${{ inputs.setup-retries }}
       run: |
         retry() {
@@ -105,12 +108,14 @@ runs:
 
           local attempt=1
           local delay=5
+          local exit_code=0
           while true; do
             if "$@"; then
               return 0
+            else
+              exit_code=$?
             fi
 
-            local exit_code=$?
             if [ "$attempt" -ge "$attempts" ]; then
               echo "Command failed after ${attempt} attempt(s): $*"
               return "$exit_code"
