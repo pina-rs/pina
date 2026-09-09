@@ -1,9 +1,15 @@
+// aux-build: pina.rs
 // normalize-stderr-test: "\n$" -> ""
 
 #![allow(dead_code)]
 
-#[derive(Debug)]
+extern crate pina;
+
+use pina::parse_instruction;
+
+#[derive(Debug, Default)]
 enum Instruction {
+	#[default]
 	Initialize,
 	Update,
 }
@@ -22,14 +28,14 @@ fn process_b() -> Result<(), ()> {
 }
 
 fn entrypoint(data: &[u8]) -> Result<(), ()> {
-	match Instruction::try_from_data(data)? {
+	match parse_instruction::<Instruction>(data)? {
 		Instruction::Initialize => process_a(),
 		Instruction::Update => process_b(),
 	}
 }
 
 fn entrypoint_with_local(data: &[u8]) -> Result<(), ()> {
-	let instruction = Instruction::try_from_data(data)?;
+	let instruction: Instruction = parse_instruction(data)?;
 	match instruction {
 		Instruction::Initialize => process_a(),
 		Instruction::Update => process_b(),
@@ -69,7 +75,7 @@ fn entrypoint_unrelated_enum(mode: Mode) -> Result<(), ()> {
 }
 
 fn entrypoint_with_trailing_expression(data: &[u8]) -> Result<(), ()> {
-	let result = match Instruction::try_from_data(data)? {
+	let result = match parse_instruction::<Instruction>(data)? {
 		Instruction::Initialize => process_a(),
 		Instruction::Update => process_b(),
 	};
@@ -77,9 +83,29 @@ fn entrypoint_with_trailing_expression(data: &[u8]) -> Result<(), ()> {
 	result
 }
 
-impl Instruction {
-	fn try_from_data(_data: &[u8]) -> Result<Self, ()> {
-		Ok(Self::Initialize)
+#[derive(Default)]
+enum FakeInstruction {
+	#[default]
+	Initialize,
+	Update,
+}
+
+fn entrypoint_with_unrelated_instruction_name(
+	data: &[u8],
+	fake: FakeInstruction,
+) -> Result<(), ()> {
+	let _: Instruction = parse_instruction(data)?;
+	match fake {
+		//~^ WARNING: IDL-friendly instruction dispatch should be a direct `match`
+		FakeInstruction::Initialize => process_a(),
+		FakeInstruction::Update => process_b(),
+	}
+}
+
+fn process_instruction_variant(mode: Mode) -> Result<(), ()> {
+	match mode {
+		Mode::Fast => process_a(),
+		Mode::Safe => process_b(),
 	}
 }
 

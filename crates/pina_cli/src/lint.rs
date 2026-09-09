@@ -79,6 +79,7 @@ pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 	let mut command = Command::new(&cargo);
 	command
 		.current_dir(&project.root)
+		.env("RUSTC_WRAPPER", "")
 		.env("RUSTC_WORKSPACE_WRAPPER", &driver.path)
 		.env("PINA_LINT_DRIVER_BUILD", driver_build)
 		.env("PINA_LINT_NO_DEPS", "1");

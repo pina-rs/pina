@@ -1,5 +1,5 @@
 warning: IDL-friendly instruction dispatch should be a direct `match` over the parsed instruction enum
-  --> $DIR/instruction_dispatch.rs:47:1
+  --> $DIR/instruction_dispatch.rs:53:1
    |
 LL | / fn entrypoint_helper(data: &[u8]) -> Result<(), ()> {
 LL | |     // The match hides behind an opaque helper, so the entrypoint stays IDL
@@ -13,7 +13,7 @@ LL | | }
    = note: `#[warn(require_canonical_instruction_dispatch_for_idl)]` on by default
 
 warning: IDL-friendly instruction dispatch should be a direct `match` over the parsed instruction enum
-  --> $DIR/instruction_dispatch.rs:57:1
+  --> $DIR/instruction_dispatch.rs:63:1
    |
 LL | / fn entrypoint_unrelated_match(data: &[u8]) -> Result<(), ()> {
 LL | |     match data.len() {
@@ -26,7 +26,7 @@ LL | | }
    = help: keep the dispatch in the entrypoint itself so `pina idl` can follow the instruction routing
 
 warning: IDL-friendly instruction dispatch should be a direct `match` over the parsed instruction enum
-  --> $DIR/instruction_dispatch.rs:64:1
+  --> $DIR/instruction_dispatch.rs:70:1
    |
 LL | / fn entrypoint_unrelated_enum(mode: Mode) -> Result<(), ()> {
 LL | |     match mode {
@@ -38,4 +38,17 @@ LL | | }
    |
    = help: keep the dispatch in the entrypoint itself so `pina idl` can follow the instruction routing
 
-warning: 3 warnings emitted
+warning: IDL-friendly instruction dispatch should be a direct `match` over the parsed instruction enum
+  --> $DIR/instruction_dispatch.rs:93:1
+   |
+LL | / fn entrypoint_with_unrelated_instruction_name(
+LL | |     data: &[u8],
+LL | |     fake: FakeInstruction,
+LL | | ) -> Result<(), ()> {
+...  |
+LL | | }
+   | |_^
+   |
+   = help: keep the dispatch in the entrypoint itself so `pina idl` can follow the instruction routing
+
+warning: 4 warnings emitted

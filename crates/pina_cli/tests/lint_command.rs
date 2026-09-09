@@ -23,7 +23,8 @@ fi
 printf 'cargo' >> "$PINA_LINT_LOG"
 printf ' %q' "$@" >> "$PINA_LINT_LOG"
 printf '\n' >> "$PINA_LINT_LOG"
-printf 'workspace_wrapper=%s driver_build=%s no_deps=%s levels=%s\n' \
+printf 'rustc_wrapper=%s workspace_wrapper=%s driver_build=%s no_deps=%s levels=%s\n' \
+  "${RUSTC_WRAPPER-unset}" \
   "$(basename "$RUSTC_WORKSPACE_WRAPPER")" \
   "${PINA_LINT_DRIVER_BUILD:-}" \
   "${PINA_LINT_NO_DEPS:-}" \
@@ -146,10 +147,41 @@ fn lint_runs_cargo_check_with_the_bundled_driver() {
 	assert!(log.contains("--package lint-fixture"), "log: {log}");
 	assert!(log.contains("--manifest-path"), "log: {log}");
 	assert!(
-		log.contains(&format!("workspace_wrapper={FAKE_DRIVER} driver_build=")),
+		log.contains(&format!(
+			"rustc_wrapper= workspace_wrapper={FAKE_DRIVER} driver_build="
+		)),
 		"log: {log}"
 	);
 	assert!(log.contains(" no_deps=1 levels="), "log: {log}");
+}
+
+#[test]
+fn lint_disables_an_inherited_rustc_wrapper() {
+	let fixture = Fixture::new("pina-lint-outer-wrapper", None);
+	let output = fixture
+		.command()
+		.env("RUSTC_WRAPPER", "outer-wrapper")
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina lint: {error}"));
+	assert!(
+		output.status.success(),
+		"pina lint failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+
+	let log = fixture.log();
+	let environment = log
+		.lines()
+		.find(|line| line.starts_with("rustc_wrapper="))
+		.unwrap_or_else(|| panic!("missing lint environment in log: {log}"));
+	assert!(
+		environment.starts_with("rustc_wrapper= workspace_wrapper="),
+		"environment: {environment}"
+	);
+	assert!(
+		!environment.contains("outer-wrapper"),
+		"environment: {environment}"
+	);
 }
 
 #[test]
