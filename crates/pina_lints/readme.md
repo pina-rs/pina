@@ -144,7 +144,7 @@ The lint recognizes standard Solana sysvar names and instruction-sysvar loader f
 
 ### `require_type_assert_before_zero_copy_cast`
 
-Detects raw zero-copy cast methods and known `bytemuck` cast functions in account-processing code. Use a Pina conversion that validates and borrows the account as one operation.
+Detects known `bytemuck` cast functions in `pina::ProcessAccountInfos::process` implementations and conventional `process_instruction` entrypoints. Unrelated functions or inherent methods named `process` remain outside the lint boundary. Use a Pina conversion that validates and borrows the account as one operation.
 
 ```rust
 let vault = account.as_account::<Vault>(&ID)?;

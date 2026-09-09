@@ -35,10 +35,22 @@ const TARGET_METHODS: &[&str] = &[
 	"cast_ref",
 	"cast_mut",
 ];
-fn is_instruction_handler(def_path: &str) -> bool {
-	def_path
-		.split("::")
-		.any(|segment| matches!(segment, "process" | "process_instruction"))
+fn is_instruction_handler(cx: &LateContext<'_>, def_id: rustc_hir::def_id::LocalDefId) -> bool {
+	let def_id = def_id.to_def_id();
+	if cx.tcx.item_name(def_id).as_str() == "process_instruction" {
+		return true;
+	}
+
+	let Some(trait_item) = cx.tcx.trait_item_of(def_id) else {
+		return false;
+	};
+	let Some(trait_id) = cx.tcx.trait_of_assoc(trait_item) else {
+		return false;
+	};
+
+	cx.tcx.crate_name(trait_id.krate).as_str() == "pina"
+		&& cx.tcx.item_name(trait_id).as_str() == "ProcessAccountInfos"
+		&& cx.tcx.item_name(trait_item).as_str() == "process"
 }
 
 fn is_bytemuck_cast(call: &shared::CallInfo) -> bool {
@@ -63,7 +75,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireTypeAssertBeforeZeroCopyCast {
 		def_id: rustc_hir::def_id::LocalDefId,
 	) {
 		let def_path = cx.tcx.def_path_str(def_id.to_def_id());
-		if shared::should_skip_def_path(&def_path) || !is_instruction_handler(&def_path) {
+		if shared::should_skip_def_path(&def_path) || !is_instruction_handler(cx, def_id) {
 			return;
 		}
 

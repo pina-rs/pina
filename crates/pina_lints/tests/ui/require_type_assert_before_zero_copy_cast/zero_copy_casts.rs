@@ -1,11 +1,14 @@
 // aux-build: bytemuck.rs
+// aux-build: pina.rs
 // normalize-stderr-test: "\n$" -> ""
 
 #![allow(dead_code)]
 
 extern crate bytemuck;
+extern crate pina;
 
 use bytemuck::try_from_bytes as parse_bytes;
+use pina::ProcessAccountInfos;
 
 #[repr(C)]
 struct VaultData {
@@ -49,7 +52,6 @@ mod direct_handler {
 	pub fn process(data: &AccountView, bytes: &[u8]) -> Result<(), ()> {
 		let view = data.cast_ref()?;
 		let parsed = bytemuck::try_from_bytes::<VaultData>(bytes)?;
-		//~^ ERROR: raw zero-copy account casts bypass guard-backed account validation
 		let _ = (view.amount, parsed.amount);
 		Ok(())
 	}
@@ -66,15 +68,23 @@ fn process_instruction(data: &AccountView, bytes: &[u8]) -> Result<(), ()> {
 
 struct Handler;
 
-impl Handler {
-	fn process(data: &AccountView) -> Result<(), ()> {
+impl ProcessAccountInfos for Handler {
+	fn process(self, bytes: &[u8]) -> Result<(), ()> {
+		let data = AccountView;
 		data.assert_type::<VaultData>(&OWNER)?;
 		let guard = data.try_borrow()?;
 		let _ = guard;
 		// Validation does not bind this unrelated raw cast to the checked account.
-		let view = bytemuck::cast_ref::<VaultData>(&VaultData { amount: 0 })?;
+		let view = bytemuck::try_from_bytes::<VaultData>(bytes)?;
 		//~^ ERROR: raw zero-copy account casts bypass guard-backed account validation
 		let _ = view.amount;
+		Ok(())
+	}
+}
+
+impl Handler {
+	fn process(_bytes: &[u8]) -> Result<(), ()> {
+		let _ = bytemuck::cast_ref::<VaultData>(&VaultData { amount: 0 })?;
 		Ok(())
 	}
 }
