@@ -692,8 +692,9 @@ pub type LoadedAccountMut<'a, T> = RefMut<'a, T>;
 /// checks without strengthening the returned guard.
 pub trait AsAccount {
 	/// Validate ownership and deserialize the account data into an immutable
-	/// borrow guard of type `T`. Returns `InvalidAccountData` if the
-	/// discriminator doesn't match or the data is the wrong size.
+	/// borrow guard of type `T`. A discriminator mismatch returns
+	/// `ProgramError::InvalidAccountData`; an undersized or oversized fixed
+	/// account returns `PinaProgramError::InvalidAccountSize`.
 	fn as_account<T>(&self, program_id: &Address) -> Result<Ref<'_, T::Zc>, ProgramError>
 	where
 		T: PinaAccount;
