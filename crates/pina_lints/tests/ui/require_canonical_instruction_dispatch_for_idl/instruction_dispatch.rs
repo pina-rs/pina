@@ -102,6 +102,16 @@ fn entrypoint_with_unrelated_instruction_name(
 	}
 }
 
+fn entrypoint_with_discarded_parse(data: &[u8]) -> Result<(), ()> {
+	let _: Instruction = parse_instruction(data)?;
+	let synthetic = Instruction::default();
+	match synthetic {
+		//~^ WARNING: IDL-friendly instruction dispatch should be a direct `match`
+		Instruction::Initialize => process_a(),
+		Instruction::Update => process_b(),
+	}
+}
+
 fn process_instruction_variant(mode: Mode) -> Result<(), ()> {
 	match mode {
 		Mode::Fast => process_a(),

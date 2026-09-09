@@ -48,13 +48,30 @@ fn is_constant_bound(expr: &Expr<'_>) -> bool {
 	}
 }
 
-fn expression_has_constant_take(expr: &Expr<'_>) -> bool {
+fn expression_has_static_bound(expr: &Expr<'_>) -> bool {
 	match &expr.kind {
-		ExprKind::MethodCall(segment, _, arguments, _) => {
-			segment.ident.name.as_str() == "take"
-				&& arguments.len() == 1
-				&& is_constant_bound(&arguments[0])
+		ExprKind::MethodCall(segment, receiver, arguments, _) => {
+			let method = segment.ident.name.as_str();
+			if method == "take" {
+				return arguments.len() == 1 && is_constant_bound(&arguments[0]);
+			}
+
+			match method {
+				"chain" if arguments.len() == 1 => {
+					expression_has_static_bound(receiver)
+						&& expression_has_static_bound(&arguments[0])
+				}
+				"iter" | "into_iter" if arguments.is_empty() => {
+					matches!(receiver.kind, ExprKind::Array(_) | ExprKind::Repeat(_, _))
+				}
+				_ => false,
+			}
 		}
+		ExprKind::Array(_) | ExprKind::Repeat(..) => true,
+		ExprKind::Unary(_, inner)
+		| ExprKind::Cast(inner, _)
+		| ExprKind::DropTemps(inner)
+		| ExprKind::AddrOf(_, _, inner) => expression_has_static_bound(inner),
 		_ => false,
 	}
 }
@@ -84,7 +101,7 @@ fn for_loop_has_constant_take(cx: &LateContext<'_>, loop_expr: &Expr<'_>) -> boo
 
 			Some(iterator)
 		})
-		.is_some_and(expression_has_constant_take)
+		.is_some_and(expression_has_static_bound)
 }
 
 fn remaining_len_identity(expr: &Expr<'_>) -> Option<String> {

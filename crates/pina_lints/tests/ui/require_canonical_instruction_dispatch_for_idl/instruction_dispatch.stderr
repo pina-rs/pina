@@ -51,4 +51,17 @@ LL | | }
    |
    = help: keep the dispatch in the entrypoint itself so `pina idl` can follow the instruction routing
 
-warning: 4 warnings emitted
+warning: IDL-friendly instruction dispatch should be a direct `match` over the parsed instruction enum
+  --> $DIR/instruction_dispatch.rs:105:1
+   |
+LL | / fn entrypoint_with_discarded_parse(data: &[u8]) -> Result<(), ()> {
+LL | |     let _: Instruction = parse_instruction(data)?;
+LL | |     let synthetic = Instruction::default();
+LL | |     match synthetic {
+...  |
+LL | | }
+   | |_^
+   |
+   = help: keep the dispatch in the entrypoint itself so `pina idl` can follow the instruction routing
+
+warning: 5 warnings emitted

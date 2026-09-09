@@ -104,7 +104,6 @@ fn process_runtime_take(remaining: &[u8], limit: usize) {
 
 fn process_take_before_chain(remaining: &[u8]) {
 	for account in remaining.iter().take(8).chain([].iter()) {
-		//~^ ERROR: remaining accounts are processed without an explicit bound
 		let _ = account;
 	}
 }
@@ -112,6 +111,12 @@ fn process_take_before_chain(remaining: &[u8]) {
 fn process_take_on_other_iterator(remaining: &[u8], other: &[u8]) {
 	for account in remaining.iter().chain(other.iter().take(8)) {
 		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+}
+
+fn process_two_bounded_iterators(remaining: &[u8], other: &[u8]) {
+	for account in remaining.iter().take(8).chain(other.iter().take(8)) {
 		let _ = account;
 	}
 }
