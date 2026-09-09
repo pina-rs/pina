@@ -91,8 +91,9 @@ fn lint_balance_reload(cx: &LateContext<'_>, span: rustc_span::Span, destination
 			"transfer into `{destination}` is not accounted from its observed balance delta"
 		));
 		diag.help(
-			"read the destination amount before CPI, drop the borrow, invoke the transfer, reload \
-			 the amount, and use `checked_sub` for the received value",
+			"read the destination amount before CPI, release the destination borrow (drop or \
+			 scope it), invoke the transfer, reload the amount, and use `checked_sub` for the \
+			 received value",
 		);
 	});
 }
