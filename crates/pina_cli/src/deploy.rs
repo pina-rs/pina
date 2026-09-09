@@ -210,6 +210,12 @@ impl DeploymentPlan {
 		&self.program
 	}
 
+	/// SHA-256 captured for the exact program artifact in this plan.
+	#[must_use]
+	pub const fn program_digest(&self) -> [u8; 32] {
+		self.input_fingerprint.program
+	}
+
 	/// Keypair defining the program address.
 	#[must_use]
 	pub fn program_keypair(&self) -> &str {
@@ -268,6 +274,14 @@ impl DeploymentPlan {
 			self.payer(),
 			self.rpc_url(),
 		)]
+	}
+
+	/// Recheck every planned deployment input against its captured digest.
+	///
+	/// Call this after a successful deployment before recording publication so
+	/// a concurrently replaced artifact cannot be bound to the receipt.
+	pub fn verify_inputs_unchanged(&self) -> Result<(), DeployError> {
+		self.revalidate()
 	}
 
 	fn serializable(&self) -> SerializableDeploymentPlan<'_> {

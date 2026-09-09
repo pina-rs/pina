@@ -1,12 +1,13 @@
 {
-	"formatVersion": 1,
+	"formatVersion": 2,
 	"receipts": [
 		{
 			"sequence": 0,
 			"cluster": "fixture",
+			"rpcUrl": "fixture",
 			"programId": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
-			"executableSha256": "fixture-v0",
-			"manifestSha256": "fixture-v0",
+			"executableSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+			"manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
 			"versions": {
 				"account:1:01": 0,
 				"instruction:1:00": 0

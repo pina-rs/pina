@@ -442,6 +442,23 @@ mod executor {
 	use crate::MAX_PERMITTED_DATA_INCREASE;
 	use crate::PinaProgramError;
 	use crate::ProgramError;
+	use crate::ProgramResult;
+
+	pub(super) fn validate_funding_payer(
+		payer: &AccountView,
+		account: &AccountView,
+		may_sign_as_pda: bool,
+	) -> ProgramResult {
+		payer.assert_writable()?;
+		if payer.address() == account.address() {
+			return Err(PinaProgramError::DuplicateMutableAccount.into());
+		}
+		if !may_sign_as_pda {
+			payer.assert_signer()?;
+		}
+
+		Ok(())
+	}
 
 	/// Execute a generated account migration without refunding surplus lamports.
 	///
@@ -564,10 +581,7 @@ mod executor {
 
 			if funding > 0 {
 				let payer = self.payer.ok_or(PinaProgramError::MigrationRequired)?;
-				payer.assert_signer()?.assert_writable()?;
-				if payer.address() == self.account.address() {
-					return Err(PinaProgramError::DuplicateMutableAccount.into());
-				}
+				validate_funding_payer(payer, self.account, !signers.is_empty())?;
 
 				SystemTransfer {
 					from: payer,
@@ -626,7 +640,11 @@ mod tests {
 	#[cfg(feature = "account-resize")]
 	use pinocchio::sysvars::rent::Rent;
 
+	#[cfg(feature = "account-resize")]
+	use super::executor::validate_funding_payer;
 	use super::*;
+	#[cfg(feature = "account-resize")]
+	use crate::MAX_PERMITTED_DATA_INCREASE;
 
 	struct U8Versioned;
 
@@ -953,9 +971,91 @@ mod tests {
 	}
 
 	#[cfg(feature = "account-resize")]
+	struct AdversarialPlanAccount;
+
+	#[cfg(feature = "account-resize")]
+	impl HasDiscriminator for AdversarialPlanAccount {
+		type Type = u8;
+
+		const VALUE: Self::Type = 9;
+	}
+
+	#[cfg(feature = "account-resize")]
+	impl HasMigrationVersion for AdversarialPlanAccount {
+		type Version = u8;
+
+		const CURRENT_VERSION: Self::Version = 1;
+	}
+
+	#[cfg(feature = "account-resize")]
+	impl MigratableAccount for AdversarialPlanAccount {
+		type Plan = ();
+
+		const MAX_INLINE_STEPS: u16 = 1;
+
+		fn plan_migration(data: &[u8]) -> Result<AccountMigrationPlan<Self::Plan>, ProgramError> {
+			match data {
+				[Self::VALUE, 0, 0] => AccountMigrationPlan::try_new(0, 1, 3, 2, ()),
+				[Self::VALUE, 0, 1] => AccountMigrationPlan::try_new(0, 1, 1, 1, ()),
+				[Self::VALUE, 0, 2] => {
+					AccountMigrationPlan::try_with_working_size(
+						0,
+						1,
+						3,
+						MAX_PERMITTED_DATA_INCREASE + 4,
+						1,
+						(),
+					)
+				}
+				_ => Err(ProgramError::InvalidAccountData),
+			}
+		}
+
+		fn apply_migration(_: Self::Plan, _: &mut [u8]) {}
+
+		fn validate_migration_destination(_: &[u8]) -> ProgramResult {
+			Ok(())
+		}
+	}
+
+	#[cfg(feature = "account-resize")]
 	fn test_rent() -> Rent {
 		Rent::from_bytes(&1_u64.to_le_bytes())
 			.unwrap_or_else(|error| panic!("create test rent: {error:?}"))
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn funding_payer_accepts_transaction_or_pda_authority_without_allowing_aliases() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored_account =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 0, &[7, 0, 42]);
+		let mut stored_payer =
+			TestAccount::<8>::new(Address::new_from_array([2; 32]), owner, 100, &[]);
+		stored_payer.header.is_signer = 0;
+		let account = stored_account.view();
+		let payer = stored_payer.view();
+
+		assert_eq!(
+			validate_funding_payer(&payer, &account, false),
+			Err(ProgramError::MissingRequiredSignature)
+		);
+		assert_eq!(validate_funding_payer(&payer, &account, true), Ok(()));
+
+		stored_payer.header.is_writable = 0;
+		let payer = stored_payer.view();
+		assert_eq!(
+			validate_funding_payer(&payer, &account, true),
+			Err(ProgramError::InvalidAccountData)
+		);
+
+		let mut duplicate =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 100, &[]);
+		let duplicate = duplicate.view();
+		assert_eq!(
+			validate_funding_payer(&duplicate, &account, true),
+			Err(PinaProgramError::DuplicateMutableAccount.into())
+		);
 	}
 
 	#[cfg(feature = "account-resize")]
@@ -1059,5 +1159,132 @@ mod tests {
 				.as_ref(),
 			original
 		);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn executor_rejects_untrusted_account_boundaries_before_mutation() {
+		let program_id = Address::new_from_array([9; 32]);
+
+		let mut wrong_owner = TestAccount::<8>::new(
+			Address::new_from_array([1; 32]),
+			Address::new_from_array([8; 32]),
+			1_000,
+			&[7, 0, 42],
+		);
+		let mut account = wrong_owner.view();
+		assert_eq!(
+			MigrateAccount {
+				account: &mut account,
+				payer: None,
+				program_id: &program_id,
+				max_lamports: 0,
+			}
+			.invoke_with_rent::<GrowingAccount>(test_rent()),
+			Err(ProgramError::InvalidAccountOwner)
+		);
+		assert_eq!(&*account.try_borrow().unwrap(), &[7, 0, 42]);
+
+		let mut readonly = TestAccount::<8>::new(
+			Address::new_from_array([2; 32]),
+			program_id,
+			1_000,
+			&[7, 0, 42],
+		);
+		readonly.header.is_writable = 0;
+		let mut account = readonly.view();
+		assert_eq!(
+			MigrateAccount {
+				account: &mut account,
+				payer: None,
+				program_id: &program_id,
+				max_lamports: 0,
+			}
+			.invoke_with_rent::<GrowingAccount>(test_rent()),
+			Err(ProgramError::InvalidAccountData)
+		);
+		assert_eq!(&*account.try_borrow().unwrap(), &[7, 0, 42]);
+
+		for rejected in [&[8, 0, 42][..], &[7, 0, 42, 13][..], &[7, 1, 42, 13][..]] {
+			let mut stored = TestAccount::<8>::new(
+				Address::new_from_array([3; 32]),
+				program_id,
+				1_000,
+				rejected,
+			);
+			let mut account = stored.view();
+			assert!(
+				MigrateAccount {
+					account: &mut account,
+					payer: None,
+					program_id: &program_id,
+					max_lamports: 0,
+				}
+				.invoke_with_rent::<GrowingAccount>(test_rent())
+				.is_err()
+			);
+			assert_eq!(&*account.try_borrow().unwrap(), rejected);
+		}
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn executor_enforces_plan_step_header_and_growth_budgets() {
+		let owner = Address::new_from_array([9; 32]);
+		for source in [[9, 0, 0], [9, 0, 1], [9, 0, 2]] {
+			let mut stored =
+				TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 1_000, &source);
+			let mut account = stored.view();
+			let result = MigrateAccount {
+				account: &mut account,
+				payer: None,
+				program_id: &owner,
+				max_lamports: u64::MAX,
+			}
+			.invoke_with_rent::<AdversarialPlanAccount>(test_rent());
+
+			assert!(matches!(
+				result,
+				Err(error)
+					if error == PinaProgramError::MigrationUnavailable.into()
+						|| error == PinaProgramError::MigrationBudgetExceeded.into()
+			));
+			assert_eq!(&*account.try_borrow().unwrap(), &source);
+		}
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn executor_requires_explicitly_capped_funding() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 0, &[7, 0, 42]);
+		let mut account = stored.view();
+		assert_eq!(
+			MigrateAccount {
+				account: &mut account,
+				payer: None,
+				program_id: &owner,
+				max_lamports: 0,
+			}
+			.invoke_with_rent::<GrowingAccount>(test_rent()),
+			Err(PinaProgramError::MigrationBudgetExceeded.into())
+		);
+
+		assert_eq!(account.lamports(), 0);
+		assert_eq!(account.data_len(), 3);
+		assert_eq!(&*account.try_borrow().unwrap(), &[7, 0, 42]);
+
+		assert_eq!(
+			MigrateAccount {
+				account: &mut account,
+				payer: None,
+				program_id: &owner,
+				max_lamports: u64::MAX,
+			}
+			.invoke_with_rent::<GrowingAccount>(test_rent()),
+			Err(PinaProgramError::MigrationRequired.into())
+		);
+		assert_eq!(&*account.try_borrow().unwrap(), &[7, 0, 42]);
 	}
 }

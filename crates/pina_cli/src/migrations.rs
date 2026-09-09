@@ -2,6 +2,9 @@
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
+use std::fs::File;
+use std::fs::OpenOptions;
+use std::io::Read as _;
 use std::io::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
@@ -20,10 +23,13 @@ use pina_abi::ProcessAccount;
 use pina_abi::ProcessContract;
 use pina_abi::ProcessTransition;
 use pina_abi::PublicationLedger;
+use pina_abi::PublicationReceipt;
 use pina_abi::SchemaVersion;
 use pina_abi::Transition;
 use pina_abi::TransitionMode;
 use serde::Serialize;
+use sha2::Digest as _;
+use sha2::Sha256;
 
 use crate::error::IdlError;
 use crate::ir::DefaultValueIr;
@@ -171,6 +177,24 @@ pub enum MigrationError {
 
 	#[error("Multiple migration-aware source contracts resolve to `{identity}`")]
 	DuplicateIdentity { identity: String },
+
+	#[error("Migration path is a symbolic link or reparse point: {path}")]
+	UnsafePath { path: PathBuf },
+
+	#[error("Could not lock migration history {path}: {source}")]
+	Lock {
+		path: PathBuf,
+		source: std::io::Error,
+	},
+
+	#[error("Deployment program ID {deployed} does not match migration history {manifest}")]
+	PublicationProgramMismatch { deployed: String, manifest: String },
+
+	#[error("Deployed artifact changed before its migration publication was recorded: {path}")]
+	PublicationArtifactChanged { path: PathBuf },
+
+	#[error("Publication receipt sequence exceeded u64")]
+	PublicationSequenceExhausted,
 }
 
 /// Create the initial ABI database or refresh its latest draft versions.
@@ -179,6 +203,7 @@ pub enum MigrationError {
 /// immutable and a source change appends one adjacent version.
 pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationError> {
 	let project = Project::discover(start)?;
+	let _lock = acquire_migration_lock(&project.program_dir)?;
 	let current = scan_current_contracts(&project)?;
 	let manifest_path = project.program_dir.join(MANIFEST_PATH);
 	let publication_path = project.program_dir.join(PUBLICATIONS_PATH);
@@ -187,7 +212,7 @@ pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationEr
 		MigrationManifest::new(current.program_id.clone(), project.migration_version_type)
 	});
 	validate_program_configuration(&project, &current.program_id, &manifest)?;
-	ledger.validate().map_err(MigrationError::InvalidHistory)?;
+	validate_ledger_for_manifest(&ledger, &manifest)?;
 
 	let mut output = MakeMigrationsOutput {
 		manifest: manifest_path.clone(),
@@ -326,9 +351,7 @@ pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationEr
 		.validate()
 		.map_err(MigrationError::InvalidHistory)?;
 	write_json_atomic(&manifest_path, &manifest)?;
-	if !publication_path.exists() {
-		write_json_atomic(&publication_path, &ledger)?;
-	}
+	write_json_atomic(&publication_path, &ledger)?;
 	Ok(output)
 }
 
@@ -353,7 +376,7 @@ pub fn check_migrations(start: &Path) -> Result<Vec<MigrationStatus>, MigrationE
 	manifest
 		.validate()
 		.map_err(MigrationError::InvalidHistory)?;
-	ledger.validate().map_err(MigrationError::InvalidHistory)?;
+	validate_ledger_for_manifest(&ledger, &manifest)?;
 
 	let mut seen = BTreeMap::new();
 	let mut statuses = Vec::new();
@@ -404,6 +427,101 @@ pub fn check_migrations(start: &Path) -> Result<Vec<MigrationStatus>, MigrationE
 /// Return migration status after applying every build-time compatibility check.
 pub fn migration_status(start: &Path) -> Result<Vec<MigrationStatus>, MigrationError> {
 	check_migrations(start)
+}
+
+/// Append one receipt after a successful persistent deployment.
+///
+/// Local deployments must not call this function. The expected digest comes
+/// from the immutable deployment plan and is compared with the artifact again
+/// before any version is marked published.
+pub fn record_publication(
+	start: &Path,
+	cluster: &str,
+	rpc_url: &str,
+	deployed_program_id: &str,
+	artifact: &Path,
+	expected_artifact_digest: [u8; 32],
+) -> Result<Option<PublicationReceipt>, MigrationError> {
+	let project = Project::discover(start)?;
+	let _lock = acquire_migration_lock(&project.program_dir)?;
+	let statuses = check_migrations(&project.program_dir)?;
+	if statuses.is_empty() {
+		return Ok(None);
+	}
+	let manifest_path = project.program_dir.join(MANIFEST_PATH);
+	let manifest = load_manifest(&manifest_path)?.ok_or_else(|| {
+		MigrationError::InvalidHistory(
+			"migration manifest disappeared during publication".to_owned(),
+		)
+	})?;
+	if manifest.program_id != deployed_program_id {
+		return Err(MigrationError::PublicationProgramMismatch {
+			deployed: deployed_program_id.to_owned(),
+			manifest: manifest.program_id,
+		});
+	}
+	let publication_path = project.program_dir.join(PUBLICATIONS_PATH);
+	let mut ledger = load_publication_ledger(&publication_path)?;
+	validate_ledger_for_manifest(&ledger, &manifest)?;
+	let artifact_digest = hash_regular_file(artifact)?;
+	if artifact_digest != expected_artifact_digest {
+		return Err(MigrationError::PublicationArtifactChanged {
+			path: artifact.to_path_buf(),
+		});
+	}
+	let versions = statuses
+		.into_iter()
+		.map(|status| (status.identity, status.current_version))
+		.collect();
+	let sequence = u64::try_from(ledger.receipts.len())
+		.map_err(|_| MigrationError::PublicationSequenceExhausted)?;
+	let receipt = PublicationReceipt {
+		sequence,
+		cluster: cluster.to_owned(),
+		rpc_url: rpc_url.to_owned(),
+		program_id: deployed_program_id.to_owned(),
+		executable_sha256: hex_digest(artifact_digest),
+		manifest_sha256: manifest.sha256(),
+		versions,
+		previous_receipt_sha256: ledger.receipts.last().map(PublicationReceipt::sha256),
+	};
+	ledger.receipts.push(receipt.clone());
+	validate_ledger_for_manifest(&ledger, &manifest)?;
+	write_json_atomic(&publication_path, &ledger)?;
+	Ok(Some(receipt))
+}
+
+fn validate_ledger_for_manifest(
+	ledger: &PublicationLedger,
+	manifest: &MigrationManifest,
+) -> Result<(), MigrationError> {
+	ledger.validate().map_err(MigrationError::InvalidHistory)?;
+	for receipt in &ledger.receipts {
+		if receipt.program_id != manifest.program_id {
+			return Err(MigrationError::InvalidHistory(format!(
+				"publication receipt {} belongs to program {}, expected {}",
+				receipt.sequence, receipt.program_id, manifest.program_id
+			)));
+		}
+		for (key, published) in &receipt.versions {
+			let history = manifest.contracts.get(key).ok_or_else(|| {
+				MigrationError::InvalidHistory(format!(
+					"publication receipt {} names unknown contract `{key}`",
+					receipt.sequence
+				))
+			})?;
+			let current = history.current().ok_or_else(|| {
+				MigrationError::InvalidHistory(format!("contract `{key}` has no versions"))
+			})?;
+			if *published > current.version {
+				return Err(MigrationError::InvalidHistory(format!(
+					"publication receipt {} claims future version {} for `{key}`",
+					receipt.sequence, published
+				)));
+			}
+		}
+	}
+	Ok(())
 }
 
 struct CurrentProgram {
@@ -662,6 +780,7 @@ fn load_publication_ledger(path: &Path) -> Result<PublicationLedger, MigrationEr
 }
 
 fn read_bytes(path: &Path) -> Result<Vec<u8>, MigrationError> {
+	ensure_safe_path(path)?;
 	std::fs::read(path).map_err(|source| {
 		MigrationError::Read {
 			path: path.to_path_buf(),
@@ -671,6 +790,7 @@ fn read_bytes(path: &Path) -> Result<Vec<u8>, MigrationError> {
 }
 
 fn write_json_atomic(path: &Path, value: &impl Serialize) -> Result<(), MigrationError> {
+	ensure_safe_path(path)?;
 	let parent = path.parent().ok_or_else(|| {
 		MigrationError::InvalidHistory(format!("{} has no parent directory", path.display()))
 	})?;
@@ -680,6 +800,7 @@ fn write_json_atomic(path: &Path, value: &impl Serialize) -> Result<(), Migratio
 			source,
 		}
 	})?;
+	ensure_safe_path(path)?;
 	let mut bytes = serde_json::to_vec_pretty(value).map_err(|source| {
 		MigrationError::SerializeJson {
 			path: path.to_path_buf(),
@@ -691,6 +812,7 @@ fn write_json_atomic(path: &Path, value: &impl Serialize) -> Result<(), Migratio
 }
 
 fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), MigrationError> {
+	ensure_safe_path(path)?;
 	let mut file = AtomicWriteFile::open(path).map_err(|source| {
 		MigrationError::Write {
 			path: path.to_path_buf(),
@@ -709,6 +831,101 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), MigrationError> {
 			source,
 		}
 	})
+}
+
+#[derive(Debug)]
+struct MigrationLock(File);
+
+impl Drop for MigrationLock {
+	fn drop(&mut self) {
+		let _ = fs2::FileExt::unlock(&self.0);
+	}
+}
+
+fn acquire_migration_lock(program_dir: &Path) -> Result<MigrationLock, MigrationError> {
+	let directory = program_dir.join("migrations");
+	ensure_safe_path(&directory)?;
+	std::fs::create_dir_all(&directory).map_err(|source| {
+		MigrationError::CreateDirectory {
+			path: directory.clone(),
+			source,
+		}
+	})?;
+	let path = directory.join(".lock");
+	ensure_safe_path(&path)?;
+	let file = OpenOptions::new()
+		.read(true)
+		.write(true)
+		.create(true)
+		.truncate(false)
+		.open(&path)
+		.map_err(|source| {
+			MigrationError::Lock {
+				path: path.clone(),
+				source,
+			}
+		})?;
+	fs2::FileExt::lock_exclusive(&file).map_err(|source| MigrationError::Lock { path, source })?;
+	Ok(MigrationLock(file))
+}
+
+fn ensure_safe_path(path: &Path) -> Result<(), MigrationError> {
+	if crate::path_security::has_link_like_component(path).map_err(|source| {
+		MigrationError::Read {
+			path: path.to_path_buf(),
+			source,
+		}
+	})? {
+		return Err(MigrationError::UnsafePath {
+			path: path.to_path_buf(),
+		});
+	}
+	Ok(())
+}
+
+fn hash_regular_file(path: &Path) -> Result<[u8; 32], MigrationError> {
+	ensure_safe_path(path)?;
+	let metadata = std::fs::symlink_metadata(path).map_err(|source| {
+		MigrationError::Read {
+			path: path.to_path_buf(),
+			source,
+		}
+	})?;
+	if !metadata.is_file() {
+		return Err(MigrationError::InvalidHistory(format!(
+			"publication artifact {} is not a regular file",
+			path.display()
+		)));
+	}
+	let mut file = File::open(path).map_err(|source| {
+		MigrationError::Read {
+			path: path.to_path_buf(),
+			source,
+		}
+	})?;
+	let mut digest = Sha256::new();
+	let mut buffer = [0_u8; 64 * 1024];
+	loop {
+		let read = file.read(&mut buffer).map_err(|source| {
+			MigrationError::Read {
+				path: path.to_path_buf(),
+				source,
+			}
+		})?;
+		if read == 0 {
+			break;
+		}
+		digest.update(&buffer[..read]);
+	}
+	Ok(digest.finalize().into())
+}
+
+fn hex_digest(digest: [u8; 32]) -> String {
+	let mut output = String::with_capacity(64);
+	for byte in digest {
+		let _ = write!(output, "{byte:02x}");
+	}
+	output
 }
 
 fn create_transition(
@@ -1084,6 +1301,8 @@ fn refresh_draft_transition_hash(
 
 #[cfg(test)]
 mod tests {
+	use tempfile::TempDir;
+
 	use super::*;
 
 	fn schema(layout: LayoutKind, fields: &[(&str, &str)]) -> DataSchema {
@@ -1165,6 +1384,119 @@ mod tests {
 			process_transition(&identity, "Transfer", Some(&source), Some(&escalated),),
 			Err(MigrationError::ProcessChanged { .. })
 		));
+	}
+
+	#[test]
+	fn publication_records_exact_artifact_and_freezes_current_versions() {
+		let fixture = publication_fixture();
+		let digest: [u8; 32] = Sha256::digest(b"artifact").into();
+		let receipt = record_publication(
+			&fixture.root,
+			"devnet",
+			"https://api.devnet.solana.com",
+			fixture.program_id,
+			&fixture.artifact,
+			digest,
+		)
+		.unwrap_or_else(|error| panic!("record publication: {error}"))
+		.expect("migration-aware fixture has a receipt");
+
+		assert_eq!(receipt.sequence, 0);
+		assert_eq!(receipt.executable_sha256, hex_digest(digest));
+		assert_eq!(receipt.versions.get("account:1:01"), Some(&0));
+		let ledger = load_publication_ledger(&fixture.root.join(PUBLICATIONS_PATH))
+			.unwrap_or_else(|error| panic!("reload publication: {error}"));
+		assert!(ledger.ever_published("account:1:01", 0));
+
+		let rejected = record_publication(
+			&fixture.root,
+			"devnet",
+			"https://api.devnet.solana.com",
+			fixture.program_id,
+			&fixture.artifact,
+			[9; 32],
+		);
+		assert!(matches!(
+			rejected,
+			Err(MigrationError::PublicationArtifactChanged { .. })
+		));
+		let ledger = load_publication_ledger(&fixture.root.join(PUBLICATIONS_PATH))
+			.unwrap_or_else(|error| panic!("reload rejected publication: {error}"));
+		assert_eq!(ledger.receipts.len(), 1);
+	}
+
+	struct PublicationFixture {
+		_temp: TempDir,
+		root: PathBuf,
+		artifact: PathBuf,
+		program_id: &'static str,
+	}
+
+	fn publication_fixture() -> PublicationFixture {
+		const PROGRAM_ID: &str = "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS";
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp fixture: {error}"));
+		let root = std::fs::canonicalize(temp.path())
+			.unwrap_or_else(|error| panic!("canonical fixture: {error}"));
+		std::fs::create_dir_all(root.join("src"))
+			.unwrap_or_else(|error| panic!("create source: {error}"));
+		std::fs::create_dir_all(root.join("migrations"))
+			.unwrap_or_else(|error| panic!("create migrations: {error}"));
+		std::fs::write(
+			root.join("Cargo.toml"),
+			"[package]\nname = \"publication_fixture\"\nversion = \"0.0.0\"\nedition = \
+			 \"2024\"\n[lib]\npath = \"src/lib.rs\"\n",
+		)
+		.unwrap_or_else(|error| panic!("write cargo manifest: {error}"));
+		std::fs::write(
+			root.join("src/lib.rs"),
+			format!(
+				"use pina::*;\ndeclare_id!(\"{PROGRAM_ID}\");\n#[discriminator]\nenum Kind {{ \
+				 State = 1 }}\n#[account(discriminator = Kind::State, migrations)]\nstruct State \
+				 {{ value: u64 }}\n"
+			),
+		)
+		.unwrap_or_else(|error| panic!("write source: {error}"));
+		let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
+		let schema = schema(LayoutKind::Fixed, &[("value", "u64")]);
+		let mut manifest =
+			MigrationManifest::new(PROGRAM_ID.to_owned(), pina_abi::MigrationVersionType::U8);
+		manifest.contracts.insert(
+			identity.key(),
+			ContractHistory {
+				identity,
+				rust_name: "State".to_owned(),
+				versions: vec![SchemaVersion {
+					version: 0,
+					schema_sha256: schema.sha256(),
+					schema,
+					process: None,
+					process_sha256: None,
+					transition: None,
+				}],
+			},
+		);
+		std::fs::write(
+			root.join(MANIFEST_PATH),
+			serde_json::to_vec_pretty(&manifest)
+				.unwrap_or_else(|error| panic!("serialize manifest: {error}")),
+		)
+		.unwrap_or_else(|error| panic!("write manifest: {error}"));
+		std::fs::write(
+			root.join(PUBLICATIONS_PATH),
+			serde_json::to_vec_pretty(&PublicationLedger::default())
+				.unwrap_or_else(|error| panic!("serialize publications: {error}")),
+		)
+		.unwrap_or_else(|error| panic!("write publications: {error}"));
+		let artifact = root.join("program.so");
+		std::fs::write(&artifact, b"artifact")
+			.unwrap_or_else(|error| panic!("write artifact: {error}"));
+
+		PublicationFixture {
+			_temp: temp,
+			root,
+			artifact,
+			program_id: PROGRAM_ID,
+		}
 	}
 
 	#[test]

@@ -26,7 +26,7 @@ pub const PUBLICATIONS_PATH: &str = "migrations/publications.json";
 pub const MANIFEST_FORMAT_VERSION: u32 = 2;
 
 /// Current serialization format for publication receipts.
-pub const PUBLICATION_FORMAT_VERSION: u32 = 1;
+pub const PUBLICATION_FORMAT_VERSION: u32 = 2;
 
 /// Stable relative path for one adjacent Rust transition.
 #[must_use]
@@ -672,19 +672,74 @@ pub fn decode_manifest(source: &[u8]) -> Result<MigrationManifest, String> {
 
 /// Decode and validate the publication ledger format.
 pub fn decode_publication_ledger(source: &[u8]) -> Result<PublicationLedger, String> {
-	let value: serde_json::Value = serde_json::from_slice(source)
+	let mut value: serde_json::Value = serde_json::from_slice(source)
 		.map_err(|error| format!("invalid publication ledger JSON: {error}"))?;
-	let version = document_format_version(&value, "publication ledger")?;
-	if version != PUBLICATION_FORMAT_VERSION {
+	let mut version = document_format_version(&value, "publication ledger")?;
+	if version > PUBLICATION_FORMAT_VERSION {
 		return Err(format!(
-			"unsupported publication ledger format {version}; expected \
+			"publication ledger format {version} is newer than supported format \
 			 {PUBLICATION_FORMAT_VERSION}"
 		));
+	}
+	while version < PUBLICATION_FORMAT_VERSION {
+		value = migrate_publication_document(version, value)?;
+		version += 1;
 	}
 	let ledger: PublicationLedger = serde_json::from_value(value)
 		.map_err(|error| format!("invalid publication ledger format {version}: {error}"))?;
 	ledger.validate()?;
 	Ok(ledger)
+}
+
+fn migrate_publication_document(
+	version: u32,
+	value: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+	match version {
+		1 => migrate_publication_v1_to_v2(value),
+		_ => {
+			Err(format!(
+				"no Pina ABI migration is available from publication format {version}"
+			))
+		}
+	}
+}
+
+fn migrate_publication_v1_to_v2(mut value: serde_json::Value) -> Result<serde_json::Value, String> {
+	let root = value
+		.as_object_mut()
+		.ok_or_else(|| "publication ledger must be a JSON object".to_owned())?;
+	let receipts = root
+		.get_mut("receipts")
+		.and_then(serde_json::Value::as_array_mut)
+		.ok_or_else(|| "publication ledger is missing its receipts array".to_owned())?;
+	for receipt_value in receipts {
+		let receipt = receipt_value
+			.as_object_mut()
+			.ok_or_else(|| "publication ledger contains a non-object receipt".to_owned())?;
+		let legacy_cluster = receipt
+			.get("cluster")
+			.and_then(serde_json::Value::as_str)
+			.ok_or_else(|| "publication receipt is missing its cluster".to_owned())?
+			.to_owned();
+		receipt.insert(
+			"rpcUrl".to_owned(),
+			serde_json::Value::String(legacy_cluster),
+		);
+	}
+	root.insert(
+		"formatVersion".to_owned(),
+		serde_json::Value::from(PUBLICATION_FORMAT_VERSION),
+	);
+	let mut ledger: PublicationLedger = serde_json::from_value(value)
+		.map_err(|error| format!("invalid publication ledger format 1: {error}"))?;
+	let mut previous = None;
+	for receipt in &mut ledger.receipts {
+		receipt.previous_receipt_sha256 = previous;
+		previous = Some(receipt.sha256());
+	}
+	serde_json::to_value(ledger)
+		.map_err(|error| format!("could not encode publication ledger format 2: {error}"))
 }
 
 fn document_format_version(value: &serde_json::Value, kind: &str) -> Result<u32, String> {
@@ -794,6 +849,8 @@ fn migrate_manifest_v1_to_v2(mut value: serde_json::Value) -> Result<serde_json:
 pub struct PublicationReceipt {
 	pub sequence: u64,
 	pub cluster: String,
+	/// Credential-free RPC endpoint used by the deployment plan.
+	pub rpc_url: String,
 	pub program_id: String,
 	pub executable_sha256: String,
 	pub manifest_sha256: String,
@@ -849,6 +906,7 @@ impl PublicationLedger {
 			));
 		}
 		let mut previous = None;
+		let mut published_versions = BTreeMap::<&str, u32>::new();
 		for (index, receipt) in self.receipts.iter().enumerate() {
 			if receipt.sequence != index as u64 {
 				return Err(format!(
@@ -862,10 +920,49 @@ impl PublicationLedger {
 					receipt.sequence
 				));
 			}
+			if receipt.cluster.is_empty()
+				|| receipt.cluster.chars().any(char::is_control)
+				|| receipt.rpc_url.is_empty()
+				|| receipt.rpc_url.chars().any(char::is_control)
+				|| receipt.program_id.is_empty()
+				|| !is_sha256(&receipt.executable_sha256)
+				|| !is_sha256(&receipt.manifest_sha256)
+				|| receipt.versions.is_empty()
+			{
+				return Err(format!(
+					"publication receipt {} contains invalid identity or hash fields",
+					receipt.sequence
+				));
+			}
+			for (contract, version) in &receipt.versions {
+				if contract.is_empty() || contract.chars().any(char::is_control) {
+					return Err(format!(
+						"publication receipt {} contains an invalid contract identity",
+						receipt.sequence
+					));
+				}
+				if published_versions
+					.get(contract.as_str())
+					.is_some_and(|published| version < published)
+				{
+					return Err(format!(
+						"publication receipt {} regresses `{contract}` to version {version}",
+						receipt.sequence
+					));
+				}
+				published_versions.insert(contract, *version);
+			}
 			previous = Some(receipt.sha256());
 		}
 		Ok(())
 	}
+}
+
+fn is_sha256(value: &str) -> bool {
+	value.len() == 64
+		&& value
+			.bytes()
+			.all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
 }
 
 /// Convert a closed-grammar Rust type into a stable source spelling.
@@ -1131,6 +1228,7 @@ mod tests {
 		let first = PublicationReceipt {
 			sequence: 0,
 			cluster: "devnet".to_owned(),
+			rpc_url: "https://api.devnet.solana.com".to_owned(),
 			program_id: "program".to_owned(),
 			executable_sha256: "a".repeat(64),
 			manifest_sha256: "b".repeat(64),
@@ -1140,6 +1238,7 @@ mod tests {
 		let second = PublicationReceipt {
 			sequence: 1,
 			cluster: "mainnet".to_owned(),
+			rpc_url: "https://api.mainnet-beta.solana.com".to_owned(),
 			program_id: "program".to_owned(),
 			executable_sha256: "c".repeat(64),
 			manifest_sha256: "d".repeat(64),
@@ -1254,6 +1353,84 @@ mod tests {
 	}
 
 	#[test]
+	fn publication_format_one_upgrades_rpc_identity_and_rebuilds_its_hash_chain() {
+		#[derive(Serialize)]
+		#[serde(rename_all = "camelCase")]
+		struct LegacyReceipt<'a> {
+			sequence: u64,
+			cluster: &'a str,
+			program_id: &'a str,
+			executable_sha256: String,
+			manifest_sha256: String,
+			versions: BTreeMap<&'a str, u32>,
+			previous_receipt_sha256: Option<String>,
+		}
+
+		let first = LegacyReceipt {
+			sequence: 0,
+			cluster: "devnet",
+			program_id: "program",
+			executable_sha256: "a".repeat(64),
+			manifest_sha256: "b".repeat(64),
+			versions: BTreeMap::from([("account:1:00", 0)]),
+			previous_receipt_sha256: None,
+		};
+		let second = LegacyReceipt {
+			sequence: 1,
+			cluster: "devnet",
+			program_id: "program",
+			executable_sha256: "c".repeat(64),
+			manifest_sha256: "d".repeat(64),
+			versions: BTreeMap::from([("account:1:00", 1)]),
+			previous_receipt_sha256: Some(hash_json(&first)),
+		};
+		let legacy = serde_json::json!({
+			"formatVersion": 1,
+			"receipts": [first, second]
+		});
+		let ledger = decode_publication_ledger(&serde_json::to_vec(&legacy).unwrap())
+			.unwrap_or_else(|error| panic!("decode publication ledger: {error}"));
+
+		assert_eq!(ledger.format_version, PUBLICATION_FORMAT_VERSION);
+		assert_eq!(ledger.receipts[0].rpc_url, "devnet");
+		assert_eq!(
+			ledger.receipts[1].previous_receipt_sha256,
+			Some(ledger.receipts[0].sha256())
+		);
+		assert_eq!(ledger.validate(), Ok(()));
+	}
+
+	#[test]
+	fn publication_ledger_rejects_version_regression() {
+		let first = PublicationReceipt {
+			sequence: 0,
+			cluster: "devnet".to_owned(),
+			rpc_url: "https://api.devnet.solana.com".to_owned(),
+			program_id: "program".to_owned(),
+			executable_sha256: "a".repeat(64),
+			manifest_sha256: "b".repeat(64),
+			versions: BTreeMap::from([("account:1:00".to_owned(), 1)]),
+			previous_receipt_sha256: None,
+		};
+		let second = PublicationReceipt {
+			sequence: 1,
+			cluster: "devnet".to_owned(),
+			rpc_url: "https://api.devnet.solana.com".to_owned(),
+			program_id: "program".to_owned(),
+			executable_sha256: "c".repeat(64),
+			manifest_sha256: "d".repeat(64),
+			versions: BTreeMap::from([("account:1:00".to_owned(), 0)]),
+			previous_receipt_sha256: Some(first.sha256()),
+		};
+		let ledger = PublicationLedger {
+			format_version: PUBLICATION_FORMAT_VERSION,
+			receipts: vec![first, second],
+		};
+
+		assert!(ledger.validate().unwrap_err().contains("regresses"));
+	}
+
+	#[test]
 	fn manifest_decoder_rejects_missing_and_future_format_versions() {
 		assert!(
 			decode_manifest(br#"{"contracts":{}}"#)
@@ -1269,5 +1446,20 @@ mod tests {
 				.unwrap_err()
 				.contains("newer than supported")
 		);
+	}
+
+	#[test]
+	fn current_manifest_rejects_unknown_fields() {
+		let mut value = serde_json::to_value(MigrationManifest::new(
+			"program".to_owned(),
+			MigrationVersionType::U8,
+		))
+		.unwrap();
+		value
+			.as_object_mut()
+			.unwrap()
+			.insert("injected".to_owned(), serde_json::Value::Bool(true));
+
+		assert!(decode_manifest(&serde_json::to_vec(&value).unwrap()).is_err());
 	}
 }

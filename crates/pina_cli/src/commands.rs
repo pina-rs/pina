@@ -794,6 +794,33 @@ fn run_deploy(
 		std::process::exit(1);
 	}
 
+	if !plan.is_local() {
+		if let Err(error) = plan.verify_inputs_unchanged() {
+			eprintln!(
+				"{} Deployment succeeded, but its inputs changed before migration publication \
+				 could be recorded: {}",
+				"Error".red().bold(),
+				error
+			);
+			std::process::exit(1);
+		}
+		if let Err(error) = pina_cli::migrations::record_publication(
+			Path::new(plan.project_root()),
+			plan.cluster(),
+			plan.rpc_url(),
+			plan.program_id(),
+			Path::new(plan.program()),
+			plan.program_digest(),
+		) {
+			eprintln!(
+				"{} Deployment succeeded, but migration publication could not be recorded: {}",
+				"Error".red().bold(),
+				error
+			);
+			std::process::exit(1);
+		}
+	}
+
 	println!("{} Deployment complete", "✔".green());
 }
 
