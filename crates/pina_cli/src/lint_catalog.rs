@@ -110,7 +110,7 @@ mod tests {
 	#[test]
 	fn catalog_has_exactly_one_entry_per_pina_lint() {
 		let catalog = LintCatalog::global();
-		assert_eq!(catalog.entries.len(), 21);
+		assert_eq!(catalog.entries.len(), 19);
 
 		let mut names = catalog.names();
 		names.sort_unstable();

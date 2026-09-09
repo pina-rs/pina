@@ -2,7 +2,6 @@
 
 pub use pinocchio_token::*;
 
-use crate::AccountInfoValidation;
 use crate::AccountView;
 use crate::Address;
 use crate::ProgramError;
@@ -68,12 +67,10 @@ impl<'a> TokenMintRef<'a> {
 		token_program: &Address,
 	) -> Result<Self, ProgramError> {
 		if token_program == &ID {
-			account.assert_owner(token_program)?;
 			return state::Mint::from_account_view(account).map(Self::Legacy);
 		}
 
 		if token_program == &crate::token_2022::ID {
-			account.assert_owner(token_program)?;
 			return crate::token_2022::state::StateWithExtensions::<
 				crate::token_2022::state::Mint,
 			>::from_account_view(account)
@@ -216,12 +213,10 @@ impl<'a> TokenAccountRef<'a> {
 		token_program: &Address,
 	) -> Result<Self, ProgramError> {
 		if token_program == &ID {
-			account.assert_owner(token_program)?;
 			return state::TokenAccount::from_account_view(account).map(Self::Legacy);
 		}
 
 		if token_program == &crate::token_2022::ID {
-			account.assert_owner(token_program)?;
 			return crate::token_2022::state::StateWithExtensions::<
 				crate::token_2022::state::TokenAccount,
 			>::from_account_view(account)

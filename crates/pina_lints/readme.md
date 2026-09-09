@@ -36,15 +36,15 @@ Pina contributors still run the in-workspace driver when changing a lint:
 devenv shell -- security:pina-lint
 ```
 
-`security:pina-lint` is the authoritative gate. It builds the workspace's `pina_lint_driver` binary and runs cargo with `RUSTC_WRAPPER` pointing at it, discovering every package under `examples/` and every `security/*/secure` fixture, then checks each one in the driver's no-deps mode with `--locked`. Insecure fixtures are intentionally excluded because they demonstrate rejected patterns.
+`security:pina-lint` is the authoritative gate. It builds the workspace's `pina_lint_driver` binary and runs cargo with `RUSTC_WRAPPER` pointing at it, discovering every package under `examples/` and every `security/*/secure` fixture, then checks each one in the driver's no-deps mode with `--locked`. Insecure fixtures are intentionally excluded because they preserve examples of unsafe patterns.
 
 ## Importing the lints
 
 Every lint constant and pass is public:
 
 ```rust,ignore
-use pina_lints::lints::require_owner_before_token_cast::REQUIRE_OWNER_BEFORE_TOKEN_CAST;
-use pina_lints::lints::require_owner_before_token_cast::RequireOwnerBeforeTokenCast;
+use pina_lints::lints::require_consistent_token_program::REQUIRE_CONSISTENT_TOKEN_PROGRAM;
+use pina_lints::lints::require_consistent_token_program::RequireConsistentTokenProgram;
 ```
 
 Tooling that needs to validate lint names or enumerate the catalog can read `pina_lints::LINT_NAMES`, which lists every lint in the crate in catalog (alphabetical) order.
@@ -65,7 +65,6 @@ Deny-level security lints should not be disabled at crate scope; see the [suppre
 
 | Lint                                                    | Level | Primary invariant                                   |
 | ------------------------------------------------------- | ----- | --------------------------------------------------- |
-| `require_owner_before_token_cast`                       | deny  | Token data is parsed only after owner validation    |
 | `require_empty_before_init`                             | deny  | Program accounts cannot be reinitialized            |
 | `require_program_check_before_cpi`                      | deny  | CPI targets are authenticated                       |
 | `deny_heap_allocations_in_onchain_instruction_handlers` | warn  | On-chain handlers avoid unbounded allocation cost   |
@@ -73,7 +72,6 @@ Deny-level security lints should not be disabled at crate scope; see the [suppre
 | `require_zeroed_before_close`                           | deny  | Closed account data is invalidated                  |
 | `require_sysvar_assert_before_sysvar_use`               | deny  | Sysvar accounts cannot be substituted               |
 | `require_type_assert_before_zero_copy_cast`             | deny  | Raw zero-copy casts follow type validation          |
-| `require_associated_token_address_before_ata_cast`      | deny  | ATA identity is derived and checked                 |
 | `require_reason_for_duplicate_remaining_accounts`       | deny  | Duplicate mutable remaining accounts are justified  |
 | `require_canonical_bump_before_pda_write`               | deny  | PDA namespaces use canonical bumps                  |
 | `deny_account_borrows_across_cpi`                       | deny  | Mutable data guards end before CPI                  |
@@ -88,19 +86,6 @@ Deny-level security lints should not be disabled at crate scope; see the [suppre
 | `require_explicit_discriminators_and_seed_namespaces`   | warn  | Examples expose type and PDA namespaces             |
 
 ## Security and correctness reference
-
-### `require_owner_before_token_cast`
-
-Detects calls to the unchecked `as_token_mint()`, `as_token_account()`, `as_token_2022_mint()`, and `as_token_2022_account()` loaders without an earlier `assert_owner()` or `assert_owners()` on the same account.
-
-An account can contain bytes shaped like token state while being owned by an attacker-controlled program. Parsing those bytes before checking ownership lets spoofed balances or authorities enter trusted logic.
-
-```rust
-mint.assert_owners(&[token::ID, token_2022::ID])?;
-let mint = mint.as_token_mint()?;
-```
-
-The lint tracks the root receiver identifier and lexical call order within one function. Prefer the checked loaders or `*_for_program()` APIs when possible.
 
 ### `require_empty_before_init`
 
@@ -167,17 +152,6 @@ let vault = account.as_account::<Vault>(&ID)?;
 ```
 
 Pina instruction and account `try_from_bytes()` associated functions are safe framework conversions and are not treated as raw casts. The analysis correlates the nearest account borrow and validation within one function.
-
-### `require_associated_token_address_before_ata_cast`
-
-Detects `as_associated_token_account()` without a prior `assert_associated_token_address()` on the same account.
-
-```rust
-vault.assert_associated_token_address(wallet, mint, token_program)?;
-let vault = vault.as_associated_token_account(wallet, mint, token_program)?;
-```
-
-Prefer `as_associated_token_account_checked()`, which performs owner and ATA derivation validation in one operation. The lint uses lexical receiver matching.
 
 ### `require_reason_for_duplicate_remaining_accounts`
 

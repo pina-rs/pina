@@ -235,7 +235,7 @@ That last count-parity check is important because it catches silent extraction r
 
 Project documentation lives in the mdBook under `docs/`.
 
-For repository-level security posture and reporting guidance, see [SECURITY.md](./SECURITY.md). For example-driven guidance, see [security/readme.md](./security/readme.md). Programs upgrading from PinaPod v0.1 can follow the [PinaPod v0.2 migration guide](./docs/src/migrations/pinapod-v0.2.md).
+For repository-level security posture and reporting guidance, see [SECURITY.md](./SECURITY.md). For example-driven guidance, see [security/readme.md](./security/readme.md). Programs upgrading from PinaPod v0.1 can follow the [PinaPod v0.2 migration guide](./docs/src/migrations/pinapod-v0.2.md). Programs updating token-loader calls can follow the [safe token loader migration guide](./docs/src/migrations/safe-token-loaders.md).
 
 <!-- {=docsBuildCommand} -->
 
@@ -609,6 +609,17 @@ Available assertions:
 - `assert_seeds_with_bump(seeds, program_id)` — PDA with explicit bump
 - `assert_canonical_bump(seeds, program_id)` — returns the canonical bump
 - `assert_associated_token_address(wallet, mint, token_program)` — ATA check (requires `token` feature)
+
+When you need token data, use the checked loader instead of an assertion followed by a second parse:
+
+```rust
+let legacy = account.as_token_account()?;
+let token_2022 = account_2022.as_token_2022_account()?;
+let selected = account.as_token_account_for_program(token_program)?;
+let ata = vault.as_associated_token_account(wallet, mint, token_program)?;
+```
+
+The unqualified loaders delegate owner and layout validation to their canonical program's checked upstream parser. The `*_for_program()` loaders accept only SPL Token or Token-2022 and select the corresponding checked parser. `as_associated_token_account()` also verifies the derived address and the current authority and mint stored in account data; initialization, frozen state, delegates, close authority, and Token-2022 extension policy remain explicit caller checks.
 
 ### Typed account assertion
 
@@ -999,7 +1010,8 @@ Pina provides strong built-in protections against common Solana vulnerabilities 
 <!-- {=pinaSecurityBestPractices} -->
 
 - **Always call `assert_signer()`** before trusting authority accounts
-- **Always call `assert_owner()` / `assert_owners()`** before `as_token_*()` methods
+- **Use Pina's token loaders directly** because they delegate canonical owner and layout validation to the corresponding checked upstream parser before returning typed state
+- **Use `as_associated_token_account()`** when reading a canonical ATA because it validates the runtime owner, derived address, stored current authority, and stored mint together; enforce state, delegate, close-authority, and extension policy separately
 - **Always call `assert_empty()`** before account initialization to prevent reinitialization attacks
 - **Use `invoke_with` or `invoke_signed_with`** when fixed-account creation must establish nonzero values before final PinaPod validation
 - **Use generated `load_pda` or `load_pda_mut`** when a fixed stored-bump PDA handler needs a typed guard, so recursive content and the PDA address are validated once

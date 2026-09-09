@@ -2,7 +2,7 @@
 
 Pina tracks four performance signals on every pull request:
 
-- The ignored Surfpool suite records compute units for every exercised instruction against copied base and head ELFs.
+- The ignored Surfpool suite records compute units for every exercised example instruction against copied base and head ELFs. Focused Mollusk fixtures cover security-sensitive behavior changes that need exact outcome checks.
 - `pina profile` records static whole-program estimates, binary size, text size, and syscall counts for every top-level example program.
 - Hyperfine compares representative base and head CLI commands.
 - The existing host benchmark suite compares medians for performance-sensitive core operations.
@@ -32,6 +32,28 @@ Seven of ten instruction cases improve. Compact realloc operations improve by 19
 
 Three reviewed increases remained in that historical comparison. Compact initialization added 24 CU, fixed profile tag insertion added 4 CU, and fixed profile creation added 168 CU. Profile creation deliberately validated the completed `String`, `Vec`, and `Option` representation after its initializer ran. That final check prevented a closure from committing malformed state.
 
+## Token loader consolidation results
+
+The focused token-loader fixture compares the former unsuffixed API with the consolidated checked API. Mint and ordinary token-account loading remain exactly unchanged because both versions use the same checked upstream account-view parsers. Canonical ATA loading pays for two additional stored-state comparisons:
+
+| Instruction case                      | Base CU | Head CU | Performance change | Outcome              |
+| ------------------------------------- | ------: | ------: | -----------------: | -------------------- |
+| Legacy mint, success                  |      84 |      84 |                 +0 | success -> success   |
+| Legacy token account, success         |      85 |      85 |                 +0 | success -> success   |
+| Token-2022 mint, success              |      89 |      89 |                 +0 | success -> success   |
+| Token-2022 token account, success     |      88 |      88 |                 +0 | success -> success   |
+| Explicit owner assertion, then load   |     112 |     112 |                 +0 | success -> success   |
+| Legacy mint, wrong owner              |      76 |      76 |                 +0 | rejected -> rejected |
+| Legacy token account, wrong owner     |      76 |      76 |                 +0 | rejected -> rejected |
+| Token-2022 mint, wrong owner          |      76 |      76 |                 +0 | rejected -> rejected |
+| Token-2022 token account, wrong owner |      75 |      75 |                 +0 | rejected -> rejected |
+| Legacy canonical ATA, success         |   7,689 |   7,723 |                -34 | success -> success   |
+| Token-2022 canonical ATA, success     |   3,190 |   3,224 |                -34 | success -> success   |
+| Legacy ATA, wrong address             |   7,636 |   7,638 |                 -2 | rejected -> rejected |
+| Legacy ATA, reassigned authority      |   7,689 |   7,704 |                -15 | success -> rejected  |
+
+The 34-CU ATA increase is 0.44% for legacy Token and 1.07% for Token-2022. It buys validation that the stored mint and current token authority agree with the inputs used to derive the ATA address. The reassigned-authority case is a deliberate semantic change, so CI labels it as a behavior change instead of claiming that the earlier rejection is a performance improvement. Reviewed absolute ceilings cover the three unchanged-outcome ATA increases; any later increase above those totals fails again.
+
 ## Static SBF profile results
 
 The broader static profile agrees with the instruction-level measurements. Unaffected examples remain byte-for-byte stable, while every example changed by the account migration has a lower whole-program CU estimate.
@@ -52,7 +74,7 @@ The four changed binaries also shrink: `account_realloc_program` by 2,872 bytes,
 
 ## Pull request policy
 
-Instruction cases fail on every unapproved increase. A reviewed redesign can add an absolute ceiling to `runtimeApprovedTotals`. The allowance applies only when the base is below that ceiling and the head does not exceed it, so a later increase fails again.
+Instruction cases with the same result fail on every unapproved increase. A reviewed redesign can add an absolute ceiling to `runtimeApprovedTotals`. The allowance applies only when the base is below that ceiling and the head does not exceed it, so a later increase fails again. When base and head have different success outcomes, the report labels the case as a behavior change rather than comparing unlike execution paths as a speedup or regression. Security-sensitive cases also declare their required head outcome in `runtimeExpectedOutcomes`, so an accidental rejection-to-success change fails CI.
 
 Static profiles warn when both the absolute and percentage warning thresholds are reached, and fail when both failure thresholds are reached. Smaller static increases stay visible as regressions. Programs and instructions are discovered from the head checkout. Head-only items create baselines; missing head measurements fail.
 

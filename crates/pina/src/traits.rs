@@ -633,56 +633,48 @@ pub trait AsCompactAccount {
 		T: PinaCompactAccount;
 }
 
-/// Convenience methods for interpreting `AccountView` as SPL token account
-/// types.
+/// Convenience methods for validating and interpreting [`AccountView`] as SPL
+/// token account types.
 ///
 /// All token loaders return guard-backed typed access so the runtime borrow
 /// stays active for the full lifetime of the token view.
 ///
-/// Program-specific methods retain the exact upstream type that validated the
-/// account. The `*_for_program` methods return a small enum for code that works
-/// with either SPL Token program without reinterpreting one program's state as
-/// the other's.
+/// Every loader uses the selected token program's checked upstream account-view
+/// parser, which verifies runtime ownership and layout together. Program-specific
+/// methods retain the exact upstream type that validated the account. The
+/// `*_for_program` methods return a small enum for code that works with either SPL
+/// Token program without reinterpreting one program's state as the other's.
 ///
 /// <!-- {=pinaTokenFeatureGateContract|trim|linePrefix:"/// ":true} -->
 /// This API is gated behind the `token` feature. Keep token-specific code behind `#[cfg(feature = "token")]` so on-chain programs that do not use SPL token interfaces can avoid extra dependencies.<!-- {/pinaTokenFeatureGateContract} -->
 #[cfg(feature = "token")]
 pub trait AsTokenAccount {
-	/// Interpret the account data as an SPL Token mint.
+	/// Validate and interpret an account owned by the original SPL Token program
+	/// as a mint.
 	fn as_token_mint(&self) -> Result<Ref<'_, crate::token::state::Mint>, ProgramError>;
-	/// Interpret the account data as an SPL Token mint, validating owner.
-	fn as_token_mint_checked(&self) -> Result<Ref<'_, crate::token::state::Mint>, ProgramError>;
-	/// Interpret a mint using the selected SPL Token program.
+	/// Validate and interpret a mint using the selected canonical SPL Token
+	/// program.
 	fn as_token_mint_for_program(
 		&self,
 		token_program: &Address,
 	) -> Result<crate::token::TokenMintRef<'_>, ProgramError>;
-	/// Interpret the account data as an SPL Token account.
+	/// Validate and interpret an account owned by the original SPL Token program
+	/// as a token account.
 	fn as_token_account(&self) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError>;
-	/// Interpret the account data as an SPL Token account, validating owner.
-	fn as_token_account_checked(
-		&self,
-	) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError>;
-	/// Interpret a token account using the selected SPL Token program.
+	/// Validate and interpret a token account using the selected canonical SPL
+	/// Token program.
 	fn as_token_account_for_program(
 		&self,
 		token_program: &Address,
 	) -> Result<crate::token::TokenAccountRef<'_>, ProgramError>;
-	/// Interpret the account data as a Token-2022 mint.
+	/// Validate and interpret an account owned by Token-2022 as a mint.
 	fn as_token_2022_mint(
 		&self,
 	) -> Result<
 		Ref<'_, crate::token_2022::state::StateWithExtensions<crate::token_2022::state::Mint>>,
 		ProgramError,
 	>;
-	/// Interpret the account data as a Token-2022 mint, validating owner.
-	fn as_token_2022_mint_checked(
-		&self,
-	) -> Result<
-		Ref<'_, crate::token_2022::state::StateWithExtensions<crate::token_2022::state::Mint>>,
-		ProgramError,
-	>;
-	/// Interpret the account data as a Token-2022 token account.
+	/// Validate and interpret an account owned by Token-2022 as a token account.
 	fn as_token_2022_account(
 		&self,
 	) -> Result<
@@ -692,31 +684,19 @@ pub trait AsTokenAccount {
 		>,
 		ProgramError,
 	>;
-	/// Interpret the account data as a Token-2022 token account, validating
-	/// owner.
-	fn as_token_2022_account_checked(
-		&self,
-	) -> Result<
-		Ref<
-			'_,
-			crate::token_2022::state::StateWithExtensions<crate::token_2022::state::TokenAccount>,
-		>,
-		ProgramError,
-	>;
-	/// Interpret the account data as an associated token account, verifying
-	/// the address matches the derived ATA for the given wallet, mint, and
-	/// token program.
+	/// Validate and interpret an associated token account.
+	///
+	/// This verifies the selected canonical token program, derived ATA address,
+	/// runtime owner, and the mint and current token authority stored in account
+	/// data. An account whose authority was reassigned remains at its original ATA
+	/// address but is not accepted as canonical for the original wallet.
+	///
+	/// This loader does not require the account to be initialized or unfrozen and
+	/// does not restrict delegates, close authority, or Token-2022 extensions.
+	/// Callers must enforce those protocol-specific policies separately.
 	fn as_associated_token_account(
 		&self,
-		owner: &Address,
-		mint: &Address,
-		token_program: &Address,
-	) -> Result<crate::token::TokenAccountRef<'_>, ProgramError>;
-	/// Interpret the account data as an associated token account, validating
-	/// both owner and ATA derivation.
-	fn as_associated_token_account_checked(
-		&self,
-		owner: &Address,
+		wallet: &Address,
 		mint: &Address,
 		token_program: &Address,
 	) -> Result<crate::token::TokenAccountRef<'_>, ProgramError>;

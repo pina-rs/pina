@@ -200,7 +200,8 @@ The profiler decodes each SBF instruction opcode and assigns costs: regular inst
 <!-- {@pinaSecurityBestPractices} -->
 
 - **Always call `assert_signer()`** before trusting authority accounts
-- **Always call `assert_owner()` / `assert_owners()`** before `as_token_*()` methods
+- **Use Pina's token loaders directly** because they validate canonical token-program ownership before returning typed state
+- **Use `as_associated_token_account()`** when reading an ATA because it validates the runtime owner, derived address, stored wallet, and stored mint together
 - **Always call `assert_empty()`** before account initialization to prevent reinitialization attacks
 - **Use `invoke_with` or `invoke_signed_with`** when fixed-account creation must establish nonzero values before final PinaPod validation
 - **Always verify program accounts** with `assert_address()` / `assert_program()` before CPI invocations

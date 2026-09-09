@@ -39,11 +39,6 @@ fn ui_deny_heap_allocations_in_onchain_instruction_handlers() {
 }
 
 #[test]
-fn ui_require_associated_token_address_before_ata_cast() {
-	run_ui_tests("require_associated_token_address_before_ata_cast");
-}
-
-#[test]
 fn ui_require_canonical_instruction_dispatch_for_idl() {
 	run_ui_tests("require_canonical_instruction_dispatch_for_idl");
 }
@@ -51,11 +46,6 @@ fn ui_require_canonical_instruction_dispatch_for_idl() {
 #[test]
 fn ui_require_idl_root_to_define_one_program_id() {
 	run_ui_tests("require_idl_root_to_define_one_program_id");
-}
-
-#[test]
-fn ui_require_owner_before_token_cast() {
-	run_ui_tests("require_owner_before_token_cast");
 }
 
 #[test]

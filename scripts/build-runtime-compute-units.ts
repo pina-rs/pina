@@ -3,16 +3,20 @@
 import { spawnSync } from "node:child_process";
 import {
 	copyFileSync,
+	cpSync,
 	existsSync,
 	lstatSync,
 	mkdirSync,
 	readdirSync,
+	readFileSync,
 	readlinkSync,
 	realpathSync,
 	rmSync,
 	unlinkSync,
+	writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
 	type ExampleProgram,
@@ -21,6 +25,15 @@ import {
 import { findExecutable } from "./find-executable.ts";
 
 const TOOLS_VERSION = "v1.54";
+const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
+const TOKEN_LOADER_FIXTURE = join(
+	SCRIPT_DIRECTORY,
+	"..",
+	"tests",
+	"fixtures",
+	"token_loader_cu_program",
+);
+
 interface CommandOptions {
 	cwd?: string;
 	env: NodeJS.ProcessEnv;
@@ -138,6 +151,47 @@ function buildProgram(
 		: command("cargo", ["build-sbf", ...args], { cwd: workspace, env });
 }
 
+function buildTokenLoaderProgram(
+	executable: string,
+	workspace: string,
+	output: string,
+	env: NodeJS.ProcessEnv,
+	linux: boolean,
+): number {
+	const generated = join(output, ".token-loader-cu-program");
+	rmSync(generated, { force: true, recursive: true });
+	mkdirSync(join(generated, "src"), { recursive: true });
+	cpSync(
+		join(TOKEN_LOADER_FIXTURE, "src", "lib.rs"),
+		join(generated, "src", "lib.rs"),
+	);
+
+	const manifest = readFileSync(
+		join(TOKEN_LOADER_FIXTURE, "Cargo.template.toml"),
+		"utf8",
+	).replace(
+		"__PINA_PATH__",
+		JSON.stringify(join(workspace, "crates", "pina")),
+	);
+	writeFileSync(join(generated, "Cargo.toml"), manifest);
+
+	const args = [
+		...(linux
+			? ["--skip-tools-install", "--tools-version", TOOLS_VERSION]
+			: []),
+		"--manifest-path",
+		join(generated, "Cargo.toml"),
+		"--sbf-out-dir",
+		output,
+		"--features",
+		"bpf-entrypoint",
+	];
+
+	return linux
+		? command(executable, args, { cwd: workspace, env })
+		: command("cargo", ["build-sbf", ...args], { cwd: workspace, env });
+}
+
 function main(): number {
 	const values = process.argv.slice(2);
 	if (values.length === 0 || values.length % 2 !== 0) {
@@ -193,6 +247,32 @@ function main(): number {
 			if (cargoArtifact !== artifact) {
 				copyFileSync(cargoArtifact, artifact);
 			}
+		}
+
+		const tokenLoaderArtifact = join(output, "token_loader_cu_program.so");
+		rmSync(tokenLoaderArtifact, { force: true });
+		process.stdout.write(
+			`Building runtime CU ELF for token_loader_cu_program at ${workspace}\n`,
+		);
+		const tokenLoaderStatus = buildTokenLoaderProgram(
+			executable,
+			workspace,
+			output,
+			env,
+			linux,
+		);
+
+		if (tokenLoaderStatus !== 0) {
+			return tokenLoaderStatus;
+		}
+
+		if (!existsSync(tokenLoaderArtifact)) {
+			const outputFiles = readdirSync(output).toSorted().join(", ");
+			throw new Error(
+				`cargo-build-sbf did not produce ${tokenLoaderArtifact}; output contains: ${
+					outputFiles.length === 0 ? "nothing" : outputFiles
+				}`,
+			);
 		}
 	}
 	return 0;

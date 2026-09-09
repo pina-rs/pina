@@ -53,6 +53,56 @@ test("an approved runtime regression retains its negative score", () => {
 	assert.equal(comparison?.status, "approved-regression");
 });
 
+test("a changed outcome is not misreported as a performance improvement", () => {
+	const comparison = compareRuntimeReports(
+		policy,
+		{
+			cases: [
+				{ id: "example/instruction", computeUnits: 1_000, succeeded: true },
+			],
+		},
+		{
+			cases: [
+				{ id: "example/instruction", computeUnits: 500, succeeded: false },
+			],
+		},
+	).comparisons[0];
+	assert.equal(comparison?.deltaCu, 500);
+	assert.equal(comparison?.status, "behavior-changed");
+	assert.equal(comparison?.baseSucceeded, true);
+	assert.equal(comparison?.headSucceeded, false);
+});
+
+test("an unexpected head outcome fails the runtime policy", () => {
+	const expectedRejectionPolicy = {
+		...policy,
+		runtimeExpectedOutcomes: { "example/instruction": false },
+	};
+	const unexpectedSuccess = compareRuntimeReports(
+		expectedRejectionPolicy,
+		{
+			cases: [
+				{ id: "example/instruction", computeUnits: 1_000, succeeded: false },
+			],
+		},
+		{
+			cases: [
+				{ id: "example/instruction", computeUnits: 500, succeeded: true },
+			],
+		},
+	);
+	assert.equal(unexpectedSuccess.hardErrors.length, 1);
+	assert.match(unexpectedSuccess.hardErrors[0] ?? "", /expected.*reject/);
+
+	const missingOutcome = compareRuntimeReports(
+		expectedRejectionPolicy,
+		{ cases: [{ id: "example/instruction", computeUnits: 1_000 }] },
+		{ cases: [{ id: "example/instruction", computeUnits: 500 }] },
+	);
+	assert.equal(missingOutcome.hardErrors.length, 1);
+	assert.match(missingOutcome.hardErrors[0] ?? "", /missing.*outcome/);
+});
+
 test("missing head cases fail while missing base cases establish a baseline", () => {
 	const missingHead = compareRuntimeReports(
 		policy,
@@ -213,6 +263,80 @@ test("runtime report keeps its summary visible and table collapsed", () => {
 	assert.ok(
 		markdown.indexOf("| Instruction case |") < markdown.indexOf("</details>"),
 		"instruction table should precede the details closer",
+	);
+});
+
+test("runtime comparison combines discovered and focused exact cases", () => {
+	const root = mkdtempSync(join(tmpdir(), "pina-runtime-sources-"));
+	const base = join(root, "base");
+	const head = join(root, "head");
+	const baseRuntime = join(root, "runtime-base.json");
+	const headRuntime = join(root, "runtime-head.json");
+	const baseExactRuntime = join(root, "exact-runtime-base.json");
+	const headExactRuntime = join(root, "exact-runtime-head.json");
+	mkdirSync(base);
+	mkdirSync(head);
+	writeFileSync(join(base, "manifest.json"), JSON.stringify({ results: {} }));
+	writeFileSync(join(head, "manifest.json"), JSON.stringify({ results: {} }));
+	writeFileSync(
+		join(root, "policy.json"),
+		JSON.stringify({
+			...policy,
+			runtimeCases: ["exact/instruction"],
+			runtimeExpectedOutcomes: { "exact/instruction": true },
+		}),
+	);
+	writeFileSync(
+		baseRuntime,
+		JSON.stringify({
+			cases: [{ id: "discovered/instruction", computeUnits: 1_000 }],
+		}),
+	);
+	writeFileSync(
+		headRuntime,
+		JSON.stringify({
+			cases: [{ id: "discovered/instruction", computeUnits: 900 }],
+		}),
+	);
+	writeFileSync(
+		baseExactRuntime,
+		JSON.stringify({
+			cases: [
+				{ id: "exact/instruction", computeUnits: 100, succeeded: true },
+				{ id: "discovered/instruction", computeUnits: 500, succeeded: true },
+			],
+		}),
+	);
+	writeFileSync(
+		headExactRuntime,
+		JSON.stringify({
+			cases: [
+				{ id: "exact/instruction", computeUnits: 100, succeeded: true },
+				{ id: "discovered/instruction", computeUnits: 400, succeeded: true },
+			],
+		}),
+	);
+
+	const status = run({
+		policyFile: join(root, "policy.json"),
+		baseDir: base,
+		headDir: head,
+		baseRuntime,
+		headRuntime,
+		baseExactRuntime,
+		headExactRuntime,
+		runtimeOnly: true,
+		markdownOutput: join(root, "comparison.md"),
+		jsonOutput: join(root, "comparison.json"),
+	});
+	assert.equal(status, 0);
+
+	const report = JSON.parse(
+		readFileSync(join(root, "comparison.json"), "utf8"),
+	) as { runtime: { cases: Array<{ id: string }> } };
+	assert.deepEqual(
+		report.runtime.cases.map((item) => item.id).toSorted(),
+		["discovered/instruction", "exact/instruction"],
 	);
 });
 

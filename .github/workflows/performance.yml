@@ -144,6 +144,15 @@ jobs:
             --allow-incomplete
         shell: devenv shell -c -- bash -e {0}
 
+      - name: measure exact base token-loader cases
+        run: |
+          node ./scripts/measure-runtime-compute-units.ts \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}/../pina-performance-base" \
+            "${{ github.workspace }}/target/performance-build/instructions/base" \
+            "${{ github.workspace }}/target/performance/instructions/exact-runtime-base.json"
+        shell: devenv shell -c -- bash -e {0}
+
       - name: measure head instructions
         run: |
           node ./scripts/measure-example-compute-units.ts \
@@ -151,6 +160,15 @@ jobs:
             "${{ github.workspace }}" \
             "${{ github.workspace }}/target/performance-build/instructions/head" \
             "${{ github.workspace }}/target/performance/instructions/runtime-head.json"
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: measure exact head token-loader cases
+        run: |
+          node ./scripts/measure-runtime-compute-units.ts \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}/target/performance-build/instructions/head" \
+            "${{ github.workspace }}/target/performance/instructions/exact-runtime-head.json"
         shell: devenv shell -c -- bash -e {0}
 
       - name: compare instruction reports
@@ -164,6 +182,8 @@ jobs:
             --head-dir ./target/performance/instructions/empty-head \
             --base-runtime ./target/performance/instructions/runtime-base.json \
             --head-runtime ./target/performance/instructions/runtime-head.json \
+            --base-exact-runtime ./target/performance/instructions/exact-runtime-base.json \
+            --head-exact-runtime ./target/performance/instructions/exact-runtime-head.json \
             --markdown-output ./target/performance/instructions/report.md \
             --json-output ./target/performance/instructions/report.json \
             --runtime-only

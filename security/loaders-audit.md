@@ -2,7 +2,7 @@
 
 _Audit date: 2026-03-23_
 
-_Status note (2026-08-18): the high-severity escaped-borrow findings in this audit are resolved. Generic loaders return guard-backed zeropod views, and token loaders retain the concrete guard-backed state returned by either `pinocchio-token` or `pinocchio-token-2022`; Pina no longer casts between their base-state representations. The implementation now lives in `crates/pina/src/impls.rs` rather than `crates/pina/src/loaders.rs`. Keep this document as historical context for the API redesign._
+_Status note (2026-09-08): the high-severity escaped-borrow findings in this audit are resolved. Generic loaders return guard-backed PinaPod views, and token loaders retain the concrete guard-backed state returned by either `pinocchio-token` or `pinocchio-token-2022`; Pina no longer casts between their base-state representations. Every public Pina token loader delegates canonical owner and layout validation to the corresponding checked upstream account-view parser. The ATA loader also validates its derived address and stored current authority and mint. The implementation now lives in `crates/pina/src/impls.rs` rather than `crates/pina/src/loaders.rs`. Keep this document as historical context for the API redesign._
 
 ## Scope
 
@@ -158,7 +158,7 @@ Use the same fix direction as F1:
 
 - return guard-backed token wrappers instead of bare `&Mint` / `&TokenAccount`
 - keep the runtime borrow object alive inside the wrapper
-- keep owner/address validation in the checked variants
+- keep the checked upstream account-view parser inside every token loader, and keep derived-address, current-authority, and mint validation inside the ATA loader
 
 ### Suggested priority
 

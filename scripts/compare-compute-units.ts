@@ -19,6 +19,7 @@ export interface ComputeUnitPolicy {
 	fail: Threshold;
 	approvedTotals?: Record<string, number>;
 	runtimeApprovedTotals?: Record<string, number>;
+	runtimeExpectedOutcomes?: Record<string, boolean>;
 }
 
 interface ProfileManifestResult {
@@ -40,6 +41,7 @@ interface StaticProfile {
 interface RuntimeCase {
 	id: string;
 	computeUnits: number;
+	succeeded?: boolean;
 }
 
 interface RuntimeReport {
@@ -56,7 +58,8 @@ type ComparisonStatus =
 	| "improved"
 	| "unchanged"
 	| "small-regression"
-	| "approved-regression";
+	| "approved-regression"
+	| "behavior-changed";
 
 interface StaticComparison {
 	program: string;
@@ -91,6 +94,8 @@ export interface RuntimeComparison {
 	deltaCu: number;
 	deltaPercent: number;
 	headMinusBaseCu: number;
+	baseSucceeded?: boolean;
+	headSucceeded?: boolean;
 }
 
 interface RuntimeComparisonResult {
@@ -108,6 +113,8 @@ interface Arguments {
 	jsonOutput: string;
 	baseRuntime?: string;
 	headRuntime?: string;
+	baseExactRuntime?: string;
+	headExactRuntime?: string;
 	runtimeOnly?: boolean;
 	staticOnly?: boolean;
 }
@@ -158,6 +165,12 @@ function parseArguments(values: string[]): Arguments {
 			case "--head-runtime":
 				parsed.headRuntime = value;
 				break;
+			case "--base-exact-runtime":
+				parsed.baseExactRuntime = value;
+				break;
+			case "--head-exact-runtime":
+				parsed.headExactRuntime = value;
+				break;
 			default:
 				throw new Error(`unknown option: ${option}`);
 		}
@@ -190,12 +203,43 @@ function parseArguments(values: string[]): Arguments {
 		);
 	}
 
+	if (
+		(parsed.baseExactRuntime === undefined) !==
+			(parsed.headExactRuntime === undefined)
+	) {
+		throw new Error(
+			"--base-exact-runtime and --head-exact-runtime must be provided together",
+		);
+	}
+
 	return parsed as Arguments;
 }
 
 function loadJson<T>(path: string): T {
 	const value: unknown = JSON.parse(readFileSync(path, "utf8"));
 	return value as T;
+}
+
+function selectRuntimeCases(
+	report: RuntimeReport,
+	requiredCases: ReadonlySet<string>,
+): RuntimeReport {
+	return {
+		...report,
+		cases: (report.cases ?? []).filter((item) => requiredCases.has(item.id)),
+	};
+}
+
+function mergeRuntimeReports(reports: RuntimeReport[]): RuntimeReport {
+	return {
+		provenance: reports.map((report) => report.provenance),
+		cases: reports.flatMap((report) => report.cases ?? []),
+		missingCases: reports.flatMap((report) => report.missingCases ?? []),
+		testFailures: reports.flatMap((report) => report.testFailures ?? []),
+		unavailablePrograms: reports.flatMap((report) =>
+			report.unavailablePrograms ?? []
+		),
+	};
 }
 
 function loadOptionalManifest(directory: string): ProfileManifest {
@@ -340,6 +384,23 @@ export function compareRuntimeReports(
 			}
 			continue;
 		}
+
+		const expectedHeadOutcome = policy.runtimeExpectedOutcomes?.[caseId];
+
+		if (expectedHeadOutcome !== undefined) {
+			if (head.succeeded === undefined) {
+				hardErrors.push(
+					`\`${caseId}\` is missing the head success/rejection outcome required by policy`,
+				);
+			} else if (head.succeeded !== expectedHeadOutcome) {
+				hardErrors.push(
+					`\`${caseId}\` expected the head to ${
+						expectedHeadOutcome ? "succeed" : "reject"
+					}, but it ${head.succeeded ? "succeeded" : "rejected"}`,
+				);
+			}
+		}
+
 		if (base === undefined) {
 			newBaselines.push(
 				`\`${caseId}\` established a new baseline at ${
@@ -350,9 +411,11 @@ export function compareRuntimeReports(
 		}
 
 		const deltaCu = base.computeUnits - head.computeUnits;
+		const behaviorChanged = base.succeeded !== head.succeeded &&
+			base.succeeded !== undefined && head.succeeded !== undefined;
 		comparisons.push({
 			id: caseId,
-			status: classifyRuntime(
+			status: behaviorChanged ? "behavior-changed" : classifyRuntime(
 				caseId,
 				base.computeUnits,
 				head.computeUnits,
@@ -364,6 +427,8 @@ export function compareRuntimeReports(
 			deltaCu,
 			deltaPercent: performancePercent(base.computeUnits, head.computeUnits),
 			headMinusBaseCu: head.computeUnits - base.computeUnits,
+			baseSucceeded: base.succeeded,
+			headSucceeded: head.succeeded,
 		});
 	}
 
@@ -405,7 +470,16 @@ function statusLabel(status: ComparisonStatus): string {
 		unchanged: "➖ unchanged",
 		"small-regression": "⚠️ small regression",
 		"approved-regression": "⚠️ approved regression",
+		"behavior-changed": "🔀 behavior changed",
 	}[status];
+}
+
+function outcomeLabel(succeeded: boolean | undefined): string {
+	if (succeeded === undefined) {
+		return "not recorded";
+	}
+
+	return succeeded ? "success" : "rejected";
 }
 
 interface BenchmarkSummaryCounts {
@@ -582,6 +656,9 @@ function renderMarkdown(
 	const runtimeUnchanged = runtime.comparisons.filter(
 		(item) => item.status === "unchanged",
 	).length;
+	const runtimeBehaviorChanges = runtime.comparisons.filter(
+		(item) => item.status === "behavior-changed",
+	).length;
 	const runtimeSummary = benchmarkSummary(
 		{
 			advisoryRegressions: runtimeAdvisoryRegressions,
@@ -591,11 +668,16 @@ function renderMarkdown(
 			newBaselines: runtime.newBaselines.length,
 			unchanged: runtimeUnchanged,
 		},
-		runtime.removedCases.length > 0
-			? [
-				`🗂️ ${formatCount(runtime.removedCases.length, "removed case")}`,
-			]
-			: [],
+		[
+			...(runtimeBehaviorChanges > 0
+				? [`🔀 ${formatCount(runtimeBehaviorChanges, "behavior change")}`]
+				: []),
+			...(runtime.removedCases.length > 0
+				? [
+					`🗂️ ${formatCount(runtime.removedCases.length, "removed case")}`,
+				]
+				: []),
+		],
 	);
 	const staticBlockingRegressions = staticComparisons.filter(
 		(item) => item.status === "fail",
@@ -656,19 +738,21 @@ function renderMarkdown(
 			"",
 			"A positive performance change means the head uses fewer compute units. A negative change means it uses more.",
 			"",
-			"Every instruction exercised by the example Surfpool suites is simulated against the exact base and head ELFs. The maximum observed CU per instruction is compared, and any unapproved increase fails CI.",
+			"Every instruction exercised by the example Surfpool suites is simulated against the exact base and head ELFs. Security-sensitive focused fixtures also run twice under Mollusk. Unapproved increases fail CI, while outcome changes are reported separately.",
 			"",
 		];
 
 	if (!staticOnly && runtime.comparisons.length > 0) {
 		lines.push(
-			"| Instruction case | Base CU | Head CU | Performance change | Change % | Status |",
-			"| ---------------- | ------: | ------: | -----------------: | -------: | ------ |",
+			"| Instruction case | Base CU | Head CU | Base outcome | Head outcome | Performance change | Change % | Status |",
+			"| ---------------- | ------: | ------: | ------------ | ------------ | -----------------: | -------: | ------ |",
 		);
 		for (const item of runtime.comparisons) {
 			lines.push(
 				`| \`${item.id}\` | ${formatInt(item.baseCu)} | ${
 					formatInt(item.headCu)
+				} | ${outcomeLabel(item.baseSucceeded)} | ${
+					outcomeLabel(item.headSucceeded)
 				} | ${formatSignedInt(item.deltaCu)} | ${
 					formatPercent(item.deltaPercent)
 				} | ${statusLabel(item.status)} |`,
@@ -796,6 +880,7 @@ function renderMarkdown(
 
 export function run(arguments_: Arguments): number {
 	const policy = loadJson<ComputeUnitPolicy>(arguments_.policyFile);
+	const requiredRuntimeCases = new Set(policy.runtimeCases ?? []);
 	const staticResult = compareStaticReports(
 		policy,
 		arguments_.baseDir,
@@ -809,11 +894,37 @@ export function run(arguments_: Arguments): number {
 		removedCases: [],
 		hardErrors: [],
 	};
+	const baseReports: RuntimeReport[] = [];
+	const headReports: RuntimeReport[] = [];
+
+	if (
+		arguments_.baseExactRuntime !== undefined &&
+		arguments_.headExactRuntime !== undefined
+	) {
+		baseReports.push(
+			selectRuntimeCases(
+				loadJson<RuntimeReport>(arguments_.baseExactRuntime),
+				requiredRuntimeCases,
+			),
+		);
+		headReports.push(
+			selectRuntimeCases(
+				loadJson<RuntimeReport>(arguments_.headExactRuntime),
+				requiredRuntimeCases,
+			),
+		);
+	}
+
 	if (
 		arguments_.baseRuntime !== undefined && arguments_.headRuntime !== undefined
 	) {
-		baseRuntime = loadJson<RuntimeReport>(arguments_.baseRuntime);
-		headRuntime = loadJson<RuntimeReport>(arguments_.headRuntime);
+		baseReports.push(loadJson<RuntimeReport>(arguments_.baseRuntime));
+		headReports.push(loadJson<RuntimeReport>(arguments_.headRuntime));
+	}
+
+	if (baseReports.length > 0) {
+		baseRuntime = mergeRuntimeReports(baseReports);
+		headRuntime = mergeRuntimeReports(headReports);
 		runtime = compareRuntimeReports(policy, baseRuntime, headRuntime);
 	}
 

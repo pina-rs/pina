@@ -532,7 +532,7 @@ fn as_token_account_for_program_supports_token_2022_under_miri() {
 
 #[cfg(feature = "token")]
 #[test]
-fn as_associated_token_account_checked_supports_token_2022_under_miri() {
+fn as_associated_token_account_supports_token_2022_under_miri() {
 	let wallet: Address = address!("6QWeT6FpJrm8AF1btu6WH2k2Xhq6t5vbheKVfQavmeoZ");
 	let mint: Address = address!("4hT5gDpr9HMmXzttW2Kz7LxyzKDn5XxhxL7sRKqGZo4x");
 	let (ata_address, _bump) = try_get_associated_token_address(&wallet, &mint, &token_2022::ID)
@@ -553,7 +553,7 @@ fn as_associated_token_account_checked_supports_token_2022_under_miri() {
 	let account = account_views[0];
 	let mut shadow = account_views[0];
 	let token_account = account
-		.as_associated_token_account_checked(&wallet, &mint, &token_2022::ID)
+		.as_associated_token_account(&wallet, &mint, &token_2022::ID)
 		.unwrap_or_else(|e| panic!("associated token account load failed: {e:?}"));
 	assert_eq!(token_account.amount(), 88);
 	assert_eq!(token_account.owner(), &wallet);
