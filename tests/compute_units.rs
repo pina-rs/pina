@@ -33,6 +33,28 @@ use solana_pubkey::Pubkey;
 
 const MOLLUSK_VERSION: &str = "0.14.0";
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct Measurement {
+	compute_units: u64,
+	succeeded: bool,
+}
+
+impl Measurement {
+	fn success(result: &InstructionResult) -> Self {
+		Self {
+			compute_units: result.compute_units_consumed,
+			succeeded: true,
+		}
+	}
+
+	fn from_result(result: &InstructionResult) -> Self {
+		Self {
+			compute_units: result.compute_units_consumed,
+			succeeded: result.program_result.is_ok(),
+		}
+	}
+}
+
 fn as_pubkey(address: impl AsRef<[u8]>) -> Pubkey {
 	let bytes: [u8; 32] = address
 		.as_ref()
@@ -70,7 +92,196 @@ fn process_success(
 	result
 }
 
-fn counter_measurements(elf_dir: &Path) -> BTreeMap<String, u64> {
+fn process_loader_case(
+	mollusk: &Mollusk,
+	operation: u8,
+	accounts: &[(Pubkey, Account)],
+) -> Measurement {
+	let instruction = Instruction::new_with_bytes(
+		Pubkey::new_from_array([77; 32]),
+		&[operation],
+		accounts
+			.iter()
+			.map(|(address, _)| AccountMeta::new_readonly(*address, false))
+			.collect(),
+	);
+	let result = mollusk.process_instruction(&instruction, accounts);
+	Measurement::from_result(&result)
+}
+
+fn token_mint_data() -> Vec<u8> {
+	let mut data = vec![0; 82];
+	data[44] = 6;
+	data[45] = 1;
+	data
+}
+
+fn token_account_data(mint: &Pubkey, owner: &Pubkey) -> Vec<u8> {
+	let mut data = vec![0; 165];
+	data[..32].copy_from_slice(mint.as_ref());
+	data[32..64].copy_from_slice(owner.as_ref());
+	data[64..72].copy_from_slice(&55_u64.to_le_bytes());
+	data[108] = 1;
+	data
+}
+
+fn readonly_account(owner: &Pubkey, data: Vec<u8>) -> Account {
+	Account {
+		lamports: 1,
+		data,
+		owner: *owner,
+		executable: false,
+		rent_epoch: 0,
+	}
+}
+
+fn token_loader_measurements(elf_dir: &Path) -> BTreeMap<String, Measurement> {
+	let program_id = Pubkey::new_from_array([77; 32]);
+	let mollusk = load_program(elf_dir, "token_loader_cu_program", &program_id);
+	let legacy_program = as_pubkey(pina::token::ID);
+	let token_2022_program = as_pubkey(pina::token_2022::ID);
+	let wallet = Pubkey::new_from_array([78; 32]);
+	let other_wallet = Pubkey::new_from_array([79; 32]);
+	let mint = Pubkey::new_from_array([80; 32]);
+	let wrong_address = Pubkey::new_from_array([81; 32]);
+	let wrong_owner = solana_sdk_ids::system_program::id();
+	let ata_program = as_pubkey(pina::associated_token_account::ID);
+	let (legacy_ata, _) = Pubkey::find_program_address(
+		&[wallet.as_ref(), legacy_program.as_ref(), mint.as_ref()],
+		&ata_program,
+	);
+	let (token_2022_ata, _) = Pubkey::find_program_address(
+		&[wallet.as_ref(), token_2022_program.as_ref(), mint.as_ref()],
+		&ata_program,
+	);
+	let mint_data = token_mint_data();
+	let account_data = token_account_data(&mint, &wallet);
+	let wallet_account = Account::default();
+	let mint_address_account = Account::default();
+
+	let mut measurements = BTreeMap::new();
+	let mut measure = |case: &str, operation: u8, accounts: Vec<(Pubkey, Account)>| {
+		let id = format!("token_loader_cu_program/{case}");
+		let measurement = process_loader_case(&mollusk, operation, &accounts);
+		measurements.insert(id, measurement);
+	};
+
+	measure(
+		"legacy_mint_success",
+		0,
+		vec![(mint, readonly_account(&legacy_program, mint_data.clone()))],
+	);
+	measure(
+		"legacy_account_success",
+		1,
+		vec![(
+			legacy_ata,
+			readonly_account(&legacy_program, account_data.clone()),
+		)],
+	);
+	measure(
+		"token_2022_mint_success",
+		2,
+		vec![(
+			mint,
+			readonly_account(&token_2022_program, mint_data.clone()),
+		)],
+	);
+	measure(
+		"token_2022_account_success",
+		3,
+		vec![(
+			token_2022_ata,
+			readonly_account(&token_2022_program, account_data.clone()),
+		)],
+	);
+	measure(
+		"legacy_ata_success",
+		4,
+		vec![
+			(
+				legacy_ata,
+				readonly_account(&legacy_program, account_data.clone()),
+			),
+			(wallet, wallet_account.clone()),
+			(mint, mint_address_account.clone()),
+		],
+	);
+	measure(
+		"token_2022_ata_success",
+		5,
+		vec![
+			(
+				token_2022_ata,
+				readonly_account(&token_2022_program, account_data.clone()),
+			),
+			(wallet, wallet_account.clone()),
+			(mint, mint_address_account.clone()),
+		],
+	);
+	measure(
+		"explicit_owner_assert_then_load",
+		6,
+		vec![(
+			legacy_ata,
+			readonly_account(&legacy_program, account_data.clone()),
+		)],
+	);
+	measure(
+		"legacy_mint_wrong_owner",
+		0,
+		vec![(mint, readonly_account(&wrong_owner, mint_data.clone()))],
+	);
+	measure(
+		"legacy_account_wrong_owner",
+		1,
+		vec![(
+			legacy_ata,
+			readonly_account(&wrong_owner, account_data.clone()),
+		)],
+	);
+	measure(
+		"token_2022_mint_wrong_owner",
+		2,
+		vec![(mint, readonly_account(&wrong_owner, mint_data.clone()))],
+	);
+	measure(
+		"token_2022_account_wrong_owner",
+		3,
+		vec![(
+			token_2022_ata,
+			readonly_account(&wrong_owner, account_data.clone()),
+		)],
+	);
+	measure(
+		"legacy_ata_wrong_address",
+		4,
+		vec![
+			(
+				wrong_address,
+				readonly_account(&legacy_program, account_data.clone()),
+			),
+			(wallet, wallet_account.clone()),
+			(mint, mint_address_account.clone()),
+		],
+	);
+	measure(
+		"legacy_ata_wrong_stored_authority",
+		4,
+		vec![
+			(
+				legacy_ata,
+				readonly_account(&legacy_program, token_account_data(&mint, &other_wallet)),
+			),
+			(wallet, wallet_account),
+			(mint, mint_address_account),
+		],
+	);
+
+	measurements
+}
+
+fn counter_measurements(elf_dir: &Path) -> BTreeMap<String, Measurement> {
 	let program_id = as_pubkey(counter_program::ID);
 	let mollusk = load_program(elf_dir, "counter_program", &program_id);
 	let authority = Pubkey::new_from_array([1; 32]);
@@ -123,11 +334,11 @@ fn counter_measurements(elf_dir: &Path) -> BTreeMap<String, u64> {
 	BTreeMap::from([
 		(
 			"counter_program/increment".to_owned(),
-			increment_result.compute_units_consumed,
+			Measurement::success(&increment_result),
 		),
 		(
 			"counter_program/initialize".to_owned(),
-			initialize_result.compute_units_consumed,
+			Measurement::success(&initialize_result),
 		),
 	])
 }
@@ -175,7 +386,7 @@ fn profile_remove_data(index: u64) -> Vec<u8> {
 	data
 }
 
-fn profile_measurements(elf_dir: &Path) -> BTreeMap<String, u64> {
+fn profile_measurements(elf_dir: &Path) -> BTreeMap<String, Measurement> {
 	let program_id = as_pubkey(profile_program::ID);
 	let mollusk = load_program(elf_dir, "profile_program", &program_id);
 	let authority = Pubkey::new_from_array([2; 32]);
@@ -239,19 +450,19 @@ fn profile_measurements(elf_dir: &Path) -> BTreeMap<String, u64> {
 	BTreeMap::from([
 		(
 			"profile_program/add_tag".to_owned(),
-			add_tag_result.compute_units_consumed,
+			Measurement::success(&add_tag_result),
 		),
 		(
 			"profile_program/initialize".to_owned(),
-			initialize_result.compute_units_consumed,
+			Measurement::success(&initialize_result),
 		),
 		(
 			"profile_program/remove_tag".to_owned(),
-			remove_tag_result.compute_units_consumed,
+			Measurement::success(&remove_tag_result),
 		),
 		(
 			"profile_program/update_profile".to_owned(),
-			update_result.compute_units_consumed,
+			Measurement::success(&update_result),
 		),
 	])
 }
@@ -277,7 +488,7 @@ fn realloc_data(len: usize) -> Vec<u8> {
 	data
 }
 
-fn realloc_measurements(elf_dir: &Path) -> BTreeMap<String, u64> {
+fn realloc_measurements(elf_dir: &Path) -> BTreeMap<String, Measurement> {
 	let program_id = as_pubkey(account_realloc_program::ID);
 	let mollusk = load_program(elf_dir, "account_realloc_program", &program_id);
 	let authority = Pubkey::new_from_array([3; 32]);
@@ -344,28 +555,29 @@ fn realloc_measurements(elf_dir: &Path) -> BTreeMap<String, u64> {
 	BTreeMap::from([
 		(
 			"account_realloc_program/grow_0_to_8".to_owned(),
-			grow_result.compute_units_consumed,
+			Measurement::success(&grow_result),
 		),
 		(
 			"account_realloc_program/initialize".to_owned(),
-			initialize_result.compute_units_consumed,
+			Measurement::success(&initialize_result),
 		),
 		(
 			"account_realloc_program/rewrite_8_to_8".to_owned(),
-			rewrite_result.compute_units_consumed,
+			Measurement::success(&rewrite_result),
 		),
 		(
 			"account_realloc_program/shrink_8_to_0".to_owned(),
-			shrink_result.compute_units_consumed,
+			Measurement::success(&shrink_result),
 		),
 	])
 }
 
-fn measure_all(elf_dir: &Path) -> BTreeMap<String, u64> {
+fn measure_all(elf_dir: &Path) -> BTreeMap<String, Measurement> {
 	let mut measurements = BTreeMap::new();
 	measurements.extend(counter_measurements(elf_dir));
 	measurements.extend(profile_measurements(elf_dir));
 	measurements.extend(realloc_measurements(elf_dir));
+	measurements.extend(token_loader_measurements(elf_dir));
 	measurements
 }
 
@@ -397,12 +609,19 @@ fn measure_runtime_compute_units() {
 
 	let cases = first
 		.into_iter()
-		.map(|(id, compute_units)| json!({ "id": id, "computeUnits": compute_units }))
+		.map(|(id, measurement)| {
+			json!({
+				"id": id,
+				"computeUnits": measurement.compute_units,
+				"succeeded": measurement.succeeded,
+			})
+		})
 		.collect::<Vec<_>>();
 	let artifacts = [
 		"account_realloc_program",
 		"counter_program",
 		"profile_program",
+		"token_loader_cu_program",
 	]
 	.into_iter()
 	.map(|program| {
@@ -420,7 +639,7 @@ fn measure_runtime_compute_units() {
 		.map(PathBuf::from)
 		.unwrap_or_else(|| panic!("PINA_CU_SOURCE_LOCK_FILE must be set"));
 	let report = json!({
-		"schemaVersion": 1,
+		"schemaVersion": 2,
 		"provenance": {
 			"artifacts": artifacts,
 			"bpfToolchain": std::env::var("PINA_CU_TOOLCHAIN").unwrap_or_else(|_| "unknown".to_owned()),

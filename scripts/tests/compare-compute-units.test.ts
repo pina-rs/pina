@@ -53,6 +53,56 @@ test("an approved runtime regression retains its negative score", () => {
 	assert.equal(comparison?.status, "approved-regression");
 });
 
+test("a changed outcome is not misreported as a performance improvement", () => {
+	const comparison = compareRuntimeReports(
+		policy,
+		{
+			cases: [
+				{ id: "example/instruction", computeUnits: 1_000, succeeded: true },
+			],
+		},
+		{
+			cases: [
+				{ id: "example/instruction", computeUnits: 500, succeeded: false },
+			],
+		},
+	).comparisons[0];
+	assert.equal(comparison?.deltaCu, 500);
+	assert.equal(comparison?.status, "behavior-changed");
+	assert.equal(comparison?.baseSucceeded, true);
+	assert.equal(comparison?.headSucceeded, false);
+});
+
+test("an unexpected head outcome fails the runtime policy", () => {
+	const expectedRejectionPolicy = {
+		...policy,
+		runtimeExpectedOutcomes: { "example/instruction": false },
+	};
+	const unexpectedSuccess = compareRuntimeReports(
+		expectedRejectionPolicy,
+		{
+			cases: [
+				{ id: "example/instruction", computeUnits: 1_000, succeeded: false },
+			],
+		},
+		{
+			cases: [
+				{ id: "example/instruction", computeUnits: 500, succeeded: true },
+			],
+		},
+	);
+	assert.equal(unexpectedSuccess.hardErrors.length, 1);
+	assert.match(unexpectedSuccess.hardErrors[0] ?? "", /expected.*reject/);
+
+	const missingOutcome = compareRuntimeReports(
+		expectedRejectionPolicy,
+		{ cases: [{ id: "example/instruction", computeUnits: 1_000 }] },
+		{ cases: [{ id: "example/instruction", computeUnits: 500 }] },
+	);
+	assert.equal(missingOutcome.hardErrors.length, 1);
+	assert.match(missingOutcome.hardErrors[0] ?? "", /missing.*outcome/);
+});
+
 test("missing head cases fail while missing base cases establish a baseline", () => {
 	const missingHead = compareRuntimeReports(
 		policy,

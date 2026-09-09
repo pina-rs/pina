@@ -2,6 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 import {
+	cpSync,
 	existsSync,
 	lstatSync,
 	mkdirSync,
@@ -11,6 +12,7 @@ import {
 	renameSync,
 	rmSync,
 	unlinkSync,
+	writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,7 +24,17 @@ const PROGRAMS = [
 	"account_realloc_program",
 	"counter_program",
 	"profile_program",
+	"token_loader_cu_program",
 ] as const;
+
+const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
+const TOKEN_LOADER_FIXTURE = join(
+	SCRIPT_DIRECTORY,
+	"..",
+	"tests",
+	"fixtures",
+	"token_loader_cu_program",
+);
 
 // Baseline ELF builds may run against an older revision where a tracked
 // example was renamed. The alias map records the historical package name so
@@ -137,6 +149,39 @@ function buildProgram(
 	env: NodeJS.ProcessEnv,
 	linux: boolean,
 ): number {
+	if (program === "token_loader_cu_program") {
+		const generated = join(output, ".token-loader-cu-program");
+		rmSync(generated, { force: true, recursive: true });
+		mkdirSync(join(generated, "src"), { recursive: true });
+		cpSync(
+			join(TOKEN_LOADER_FIXTURE, "src", "lib.rs"),
+			join(generated, "src", "lib.rs"),
+		);
+		const manifest = readFileSync(
+			join(TOKEN_LOADER_FIXTURE, "Cargo.template.toml"),
+			"utf8",
+		).replace(
+			"__PINA_PATH__",
+			JSON.stringify(join(workspace, "crates", "pina")),
+		);
+		writeFileSync(join(generated, "Cargo.toml"), manifest);
+
+		const args = [
+			...(linux
+				? ["--skip-tools-install", "--tools-version", TOOLS_VERSION]
+				: []),
+			"--manifest-path",
+			join(generated, "Cargo.toml"),
+			"--sbf-out-dir",
+			output,
+			"--features",
+			"bpf-entrypoint",
+		];
+		return linux
+			? command(executable, args, { cwd: workspace, env })
+			: command("cargo", ["build-sbf", ...args], { cwd: workspace, env });
+	}
+
 	// Resolve the example directory for this workspace, falling back to the
 	// historical (aliased) name when the revision predates a rename.
 	const manifestDirectory = existsSync(join(workspace, "examples", program))

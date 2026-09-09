@@ -18,6 +18,7 @@ export interface ComputeUnitPolicy {
 	fail: Threshold;
 	approvedTotals?: Record<string, number>;
 	runtimeApprovedTotals?: Record<string, number>;
+	runtimeExpectedOutcomes?: Record<string, boolean>;
 }
 
 interface ProfileManifestResult {
@@ -39,6 +40,7 @@ interface StaticProfile {
 interface RuntimeCase {
 	id: string;
 	computeUnits: number;
+	succeeded?: boolean;
 }
 
 interface RuntimeReport {
@@ -52,7 +54,8 @@ type ComparisonStatus =
 	| "improved"
 	| "unchanged"
 	| "small-regression"
-	| "approved-regression";
+	| "approved-regression"
+	| "behavior-changed";
 
 interface StaticComparison {
 	program: string;
@@ -81,6 +84,8 @@ export interface RuntimeComparison {
 	deltaCu: number;
 	deltaPercent: number;
 	headMinusBaseCu: number;
+	baseSucceeded?: boolean;
+	headSucceeded?: boolean;
 }
 
 interface RuntimeComparisonResult {
@@ -302,6 +307,20 @@ export function compareRuntimeReports(
 			hardErrors.push(`\`${caseId}\` is missing from the head runtime report`);
 			continue;
 		}
+		const expectedHeadOutcome = policy.runtimeExpectedOutcomes?.[caseId];
+		if (expectedHeadOutcome !== undefined) {
+			if (head.succeeded === undefined) {
+				hardErrors.push(
+					`\`${caseId}\` is missing the head success/rejection outcome required by policy`,
+				);
+			} else if (head.succeeded !== expectedHeadOutcome) {
+				hardErrors.push(
+					`\`${caseId}\` expected the head to ${
+						expectedHeadOutcome ? "succeed" : "reject"
+					}, but it ${head.succeeded ? "succeeded" : "rejected"}`,
+				);
+			}
+		}
 		if (base === undefined) {
 			newBaselines.push(
 				`\`${caseId}\` established a new baseline at ${
@@ -312,9 +331,11 @@ export function compareRuntimeReports(
 		}
 
 		const deltaCu = base.computeUnits - head.computeUnits;
+		const behaviorChanged = base.succeeded !== head.succeeded &&
+			base.succeeded !== undefined && head.succeeded !== undefined;
 		comparisons.push({
 			id: caseId,
-			status: classifyRuntime(
+			status: behaviorChanged ? "behavior-changed" : classifyRuntime(
 				caseId,
 				base.computeUnits,
 				head.computeUnits,
@@ -326,6 +347,8 @@ export function compareRuntimeReports(
 			deltaCu,
 			deltaPercent: performancePercent(base.computeUnits, head.computeUnits),
 			headMinusBaseCu: head.computeUnits - base.computeUnits,
+			baseSucceeded: base.succeeded,
+			headSucceeded: head.succeeded,
 		});
 	}
 
@@ -366,7 +389,15 @@ function statusLabel(status: ComparisonStatus): string {
 		unchanged: "➖ unchanged",
 		"small-regression": "⚠️ small regression",
 		"approved-regression": "⚠️ approved regression",
+		"behavior-changed": "🔀 behavior changed",
 	}[status];
+}
+
+function outcomeLabel(succeeded: boolean | undefined): string {
+	if (succeeded === undefined) {
+		return "unknown";
+	}
+	return succeeded ? "success" : "rejected";
 }
 
 function compareStaticReports(
@@ -456,19 +487,21 @@ function renderMarkdown(
 		"",
 		"### Exact Mollusk instruction CU",
 		"",
-		"Each case runs twice against the exact copied ELF and must produce the same count. Any unapproved increase fails CI.",
+		"Each case runs twice against the exact copied ELF and must produce the same count. When the outcome is unchanged, any unapproved increase fails CI. Outcome changes are shown separately so an earlier rejection is not mislabeled as a speedup.",
 		"",
 	];
 
 	if (runtime.comparisons.length > 0) {
 		lines.push(
-			"| Instruction case | Base CU | Head CU | Performance change | Change % | Status |",
-			"| ---------------- | ------: | ------: | -----------------: | -------: | ------ |",
+			"| Instruction case | Base CU | Head CU | Base outcome | Head outcome | Performance change | Change % | Status |",
+			"| ---------------- | ------: | ------: | ------------ | ------------ | -----------------: | -------: | ------ |",
 		);
 		for (const item of runtime.comparisons) {
 			lines.push(
 				`| \`${item.id}\` | ${formatInt(item.baseCu)} | ${
 					formatInt(item.headCu)
+				} | ${outcomeLabel(item.baseSucceeded)} | ${
+					outcomeLabel(item.headSucceeded)
 				} | ${formatSignedInt(item.deltaCu)} | ${
 					formatPercent(item.deltaPercent)
 				} | ${statusLabel(item.status)} |`,
