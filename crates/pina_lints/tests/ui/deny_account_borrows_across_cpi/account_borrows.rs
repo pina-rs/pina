@@ -173,6 +173,14 @@ fn process_opaque_reassigned_closure(account: &mut AccountView, cpi: &Cpi) -> Re
 	selected()
 }
 
+fn traverse_binary_and_assignment(account: &mut AccountView) -> Result<(), ()> {
+	let _guard = account.try_borrow_mut()?;
+	let mut value = 1;
+	value += 1;
+	let _combined = value + 1;
+	Ok(())
+}
+
 fn process_cpi_in_match_guard(account: &mut AccountView, cpi: &Cpi) -> Result<(), ()> {
 	let _guard = account.try_borrow_mut()?;
 	match () {
