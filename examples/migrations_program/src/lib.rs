@@ -348,4 +348,37 @@ mod tests {
 			Err(ProgramError::InvalidAccountData),
 		);
 	}
+
+	#[test]
+	fn generic_read_paths_reject_stale_version_envelopes() {
+		// A stale account whose physical size already matches the current
+		// layout (the shape produced by every same-size migration: reorders,
+		// semantic changes, field-type splits). The bytes carry a stale
+		// version envelope but otherwise validate as the current layout.
+		let mut stale = [0_u8; 43];
+		stale[0] = MigrationAccount::State as u8;
+		stale[1] = 0;
+		stale[2..34].copy_from_slice(&[7; 32]);
+		stale[34..42].copy_from_slice(&42_u64.to_le_bytes());
+		stale[42] = 1;
+
+		// The generated inherent reader already refuses the stale envelope.
+		assert_eq!(
+			State::try_from_bytes(&stale).map(|_| ()),
+			Err(PinaProgramError::MigrationRequired.into()),
+		);
+
+		// `AccountView::as_account` and `as_account_mut` resolve
+		// `T::try_from_bytes` through the `PinaAccount` trait bound, so this
+		// generic shim reproduces their method resolution exactly.
+		fn read_through_trait<T: PinaAccount>(data: &[u8]) -> Result<(), ProgramError> {
+			T::validate_account_data(data)?;
+			T::try_from_bytes(data).map(|_| ())
+		}
+
+		assert_eq!(
+			read_through_trait::<State>(&stale),
+			Err(PinaProgramError::MigrationRequired.into()),
+		);
+	}
 }

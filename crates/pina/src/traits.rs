@@ -106,11 +106,24 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 		}
 	}
 
+	/// Reject bytes whose migration version envelope is not current.
+	///
+	/// The default accepts every representation. The `#[account]` macro
+	/// overrides this hook for `migrations`-aware schemas so every generic
+	/// read path (`as_account`, `as_account_mut`, `validate_account_data`)
+	/// refuses stale bytes instead of misreading them as the current layout.
+	#[doc(hidden)]
+	fn require_current_migration_envelope(_data: &[u8]) -> ProgramResult {
+		Ok(())
+	}
+
 	/// Validate the discriminator and content of `data`.
 	fn validate_account_data(data: &[u8]) -> Result<(), ProgramError> {
 		if data.len() != size_of::<Self::Zc>() || !Self::matches_discriminator(data) {
 			return Err(ProgramError::InvalidAccountData);
 		}
+
+		Self::require_current_migration_envelope(data)?;
 
 		#[cfg(not(feature = "validation"))]
 		{
@@ -133,6 +146,8 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 			return Err(ProgramError::InvalidAccountData);
 		}
 
+		Self::require_current_migration_envelope(data)?;
+
 		#[cfg(not(feature = "validation"))]
 		{
 			return <Self as PinaPodFixed>::read_exact(data)
@@ -154,6 +169,8 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 		if data.len() != size_of::<Self::Zc>() || !Self::matches_discriminator(data) {
 			return Err(ProgramError::InvalidAccountData);
 		}
+
+		Self::require_current_migration_envelope(data)?;
 
 		#[cfg(not(feature = "validation"))]
 		{

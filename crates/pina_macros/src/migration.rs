@@ -577,6 +577,30 @@ impl MigrationExpansion {
 				}
 			});
 		let max_inline = current.min(u32::from(MAX_INLINE_STEPS)) as u16;
+		// Destination validation runs before the version marker is committed,
+		// so the current arm must validate structurally without the migration
+		// envelope check that `PinaAccount::validate_account_data` enforces.
+		#[cfg(feature = "validation")]
+		let current_destination_validation = quote! {
+			#current => {
+				if data.len() != #current_size {
+					return Err(#crate_path::ProgramError::InvalidAccountData);
+				}
+				let value = <Self as #crate_path::PinaPodFixed>::read_exact(data)
+					.map_err(|_| #crate_path::ProgramError::InvalidAccountData)?;
+				<Self as #crate_path::PinaAccount>::validate_account_value(value)
+			}
+		};
+		#[cfg(not(feature = "validation"))]
+		let current_destination_validation = quote! {
+			#current => {
+				if data.len() != #current_size {
+					return Err(#crate_path::ProgramError::InvalidAccountData);
+				}
+				<Self as #crate_path::PinaPodFixed>::validate_exact(data)
+					.map_err(|_| #crate_path::ProgramError::InvalidAccountData)
+			}
+		};
 
 		Ok(Some(quote! {
 			#[allow(dead_code)]
@@ -621,12 +645,7 @@ impl MigrationExpansion {
 					}
 					match version {
 						#(#historical_validation_arms)*
-						#current => {
-							if data.len() != #current_size {
-								return Err(#crate_path::ProgramError::InvalidAccountData);
-							}
-							<Self as #crate_path::PinaAccount>::validate_account_data(data)
-						}
+						#current_destination_validation
 						_ => Err(#crate_path::PinaProgramError::InvalidMigrationVersion.into()),
 					}
 				}
@@ -783,8 +802,29 @@ impl MigrationExpansion {
 			let validation = if number == current {
 				match version.schema.layout {
 					LayoutKind::Fixed => {
-						quote! {
-							<Self as #crate_path::PinaAccount>::validate_account_data(data)
+						// Destination validation runs before the version marker
+						// is committed, so validate structurally without the
+						// migration envelope check that the generic account
+						// validation path enforces.
+						#[cfg(feature = "validation")]
+						{
+							quote! {
+								if data.len() != ::core::mem::size_of::<
+									<Self as #crate_path::PinaPodFixed>::Zc,
+								>() {
+									return Err(#crate_path::ProgramError::InvalidAccountData);
+								}
+								let value = <Self as #crate_path::PinaPodFixed>::read_exact(data)
+									.map_err(|_| #crate_path::ProgramError::InvalidAccountData)?;
+								<Self as #crate_path::PinaAccount>::validate_account_value(value)
+							}
+						}
+						#[cfg(not(feature = "validation"))]
+						{
+							quote! {
+								<Self as #crate_path::PinaPodFixed>::validate_exact(data)
+									.map_err(|_| #crate_path::ProgramError::InvalidAccountData)
+							}
 						}
 					}
 					LayoutKind::Compact => {

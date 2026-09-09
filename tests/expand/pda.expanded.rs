@@ -2864,6 +2864,9 @@ impl pina::PinaCompactAccount for CompactState {
     fn try_from_bytes(data: &[u8]) -> Result<Self::Ref<'_>, pina::ProgramError> {
         Self::try_from_bytes(data)
     }
+    fn validate_account_data(data: &[u8]) -> Result<(), pina::ProgramError> {
+        Self::try_from_bytes(data).map(|_| ())
+    }
     fn updated_len(
         data: &[u8],
         patch: &Self::Patch<'_>,

@@ -190,14 +190,14 @@ pub(crate) fn expand(
 	});
 	#[cfg(not(feature = "validation"))]
 	let application_validation_hook: Option<proc_macro2::TokenStream> = None;
-	#[cfg(feature = "validation")]
+	// The compact validation hook must not depend on the `validation`
+	// feature: it routes the generic validate path through the generated
+	// reader, which enforces the migration version envelope.
 	let compact_validation_hook = quote! {
 		fn validate_account_data(data: &[u8]) -> Result<(), #crate_path::ProgramError> {
 			Self::try_from_bytes(data).map(|_| ())
 		}
 	};
-	#[cfg(not(feature = "validation"))]
-	let compact_validation_hook = quote! {};
 	let account_impl = if compact {
 		quote! {
 			impl #crate_path::PinaCompactAccount for #struct_name {
@@ -248,9 +248,24 @@ pub(crate) fn expand(
 		}
 	} else {
 		let write_version = migration.as_ref().map(MigrationExpansion::write_zc_version);
+		// Migration-aware fixed accounts override the envelope hook so the
+		// generic read paths (`as_account`, `as_account_mut`, and every
+		// `T: PinaAccount` caller) reject stale versions exactly like the
+		// generated inherent readers do.
+		let require_current_envelope = migration.as_ref().map(|_| {
+			let require_current = MigrationExpansion::require_current(&crate_path);
+			quote! {
+				fn require_current_migration_envelope(data: &[u8]) -> #crate_path::ProgramResult {
+					#require_current
+					Ok(())
+				}
+			}
+		});
 		quote! {
 			impl #crate_path::PinaAccount for #struct_name {
 				#application_validation_hook
+
+				#require_current_envelope
 
 				fn write_zc_discriminator(
 					value: &mut <Self as #crate_path::PinaPodFixed>::Zc,
