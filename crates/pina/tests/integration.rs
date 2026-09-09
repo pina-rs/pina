@@ -954,8 +954,8 @@ fn error_data_length_mismatch_rejected() {
 	assert!(result.is_err(), "should fail with data length mismatch");
 	assert_eq!(
 		result.unwrap_err(),
-		ProgramError::InvalidAccountData,
-		"typed loading should reject a size mismatch"
+		PinaProgramError::InvalidAccountSize.into(),
+		"typed loading should report the fixed-account size mismatch"
 	);
 }
 
