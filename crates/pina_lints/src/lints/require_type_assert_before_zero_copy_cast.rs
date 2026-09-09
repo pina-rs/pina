@@ -37,6 +37,13 @@ const TARGET_METHODS: &[&str] = &[
 ];
 fn is_instruction_handler(cx: &LateContext<'_>, def_id: rustc_hir::def_id::LocalDefId) -> bool {
 	let def_id = def_id.to_def_id();
+	if !matches!(
+		cx.tcx.def_kind(def_id),
+		rustc_hir::def::DefKind::Fn | rustc_hir::def::DefKind::AssocFn
+	) {
+		return false;
+	}
+
 	if cx.tcx.item_name(def_id).as_str() == "process_instruction" {
 		return true;
 	}

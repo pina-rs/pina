@@ -102,6 +102,14 @@ fn instruction_builder(bytes: &[u8]) -> Result<(), ()> {
 	Ok(())
 }
 
+// The late-lint callback also visits closure bodies. They are not named
+// instruction handlers and must be ignored without querying an item name.
+fn closure_conversion(bytes: &[u8]) -> Result<(), ()> {
+	let convert = || bytemuck::try_from_bytes::<VaultData>(bytes);
+	let _ = convert()?;
+	Ok(())
+}
+
 fn framework_conversion(bytes: &[u8]) -> Result<(), ()> {
 	// Path-call conversions like `AccountData::try_from_bytes()` are the
 	// framework's safe form and stay exempt, unlike receiver-shaped casts.
