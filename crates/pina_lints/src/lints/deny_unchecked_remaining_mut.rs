@@ -24,17 +24,17 @@ crate::declare_late_lint! {
 const ACCOUNTS_CURSOR_PATH: &str = "pina::traits::AccountsCursor";
 
 fn is_pina_remaining_mut(cx: &LateContext<'_>, expr: &Expr<'_>, receiver: &Expr<'_>) -> bool {
-	let Some(method) = cx.typeck_results().type_dependent_def_id(expr.hir_id) else {
-		return false;
-	};
+	let method = cx.typeck_results().type_dependent_def_id(expr.hir_id);
 	let receiver_type = cx.typeck_results().expr_ty(receiver).peel_refs();
-	let Some(receiver_definition) = receiver_type.ty_adt_def() else {
-		return false;
-	};
+	let receiver_definition = receiver_type.ty_adt_def();
 
-	cx.tcx.crate_name(method.krate).as_str() == "pina"
-		&& cx.tcx.item_name(method).as_str() == "remaining_mut"
-		&& cx.tcx.def_path_str(receiver_definition.did()) == ACCOUNTS_CURSOR_PATH
+	method
+		.zip(receiver_definition)
+		.is_some_and(|(method, receiver_definition)| {
+			cx.tcx.crate_name(method.krate).as_str() == "pina"
+				&& cx.tcx.item_name(method).as_str() == "remaining_mut"
+				&& cx.tcx.def_path_str(receiver_definition.did()) == ACCOUNTS_CURSOR_PATH
+		})
 }
 
 impl<'tcx> LateLintPass<'tcx> for DenyUncheckedRemainingMut {

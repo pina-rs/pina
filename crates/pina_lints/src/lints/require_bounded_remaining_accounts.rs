@@ -80,19 +80,20 @@ fn expression_has_constant_take(expr: &Expr<'_>) -> bool {
 }
 
 fn for_loop_has_constant_take(cx: &LateContext<'_>, loop_expr: &Expr<'_>) -> bool {
-	for (_, node) in cx.tcx.hir_parent_iter(loop_expr.hir_id) {
-		match node {
-			Node::Expr(expr)
-				if let ExprKind::Match(scrutinee, _, MatchSource::ForLoopDesugar) = expr.kind =>
-			{
-				return expression_has_constant_take(scrutinee);
-			}
-			Node::Item(_) => break,
-			_ => {}
-		}
-	}
+	cx.tcx
+		.hir_parent_iter(loop_expr.hir_id)
+		.find_map(|(_, node)| {
+			let Node::Expr(Expr {
+				kind: ExprKind::Match(scrutinee, _, MatchSource::ForLoopDesugar),
+				..
+			}) = node
+			else {
+				return None;
+			};
 
-	false
+			Some(*scrutinee)
+		})
+		.is_some_and(expression_has_constant_take)
 }
 
 fn remaining_len_identity(expr: &Expr<'_>) -> Option<String> {

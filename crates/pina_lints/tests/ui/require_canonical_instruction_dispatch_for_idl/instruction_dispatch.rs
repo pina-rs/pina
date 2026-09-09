@@ -55,9 +55,9 @@ fn entrypoint_helper(data: &[u8]) -> Result<(), ()> {
 }
 
 fn entrypoint_unrelated_match(data: &[u8]) -> Result<(), ()> {
-	match data.first() {
-		Some(_) => process_a(),
-		None => process_b(),
+	match data.len() {
+		0 => process_a(),
+		_ => process_b(),
 	}
 }
 
@@ -66,6 +66,15 @@ fn entrypoint_unrelated_enum(mode: Mode) -> Result<(), ()> {
 		Mode::Fast => process_a(),
 		Mode::Safe => process_b(),
 	}
+}
+
+fn entrypoint_with_trailing_expression(data: &[u8]) -> Result<(), ()> {
+	let result = match Instruction::try_from_data(data)? {
+		Instruction::Initialize => process_a(),
+		Instruction::Update => process_b(),
+	};
+
+	result
 }
 
 impl Instruction {

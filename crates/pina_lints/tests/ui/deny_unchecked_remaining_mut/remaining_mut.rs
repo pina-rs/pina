@@ -29,6 +29,18 @@ fn process_foreign(cursor: &mut ForeignCursor) -> Result<(), ()> {
 	Ok(())
 }
 
+trait PrimitiveCursor {
+	fn remaining_mut(&mut self);
+}
+
+impl PrimitiveCursor for u64 {
+	fn remaining_mut(&mut self) {}
+}
+
+fn process_primitive(cursor: &mut u64) {
+	cursor.remaining_mut();
+}
+
 fn main() {}
 
 // compile-fail

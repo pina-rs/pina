@@ -62,6 +62,14 @@ fn process_non_asset_assignment(raw_value: &mut u64, offset: u64) {
 	*raw_value += offset;
 }
 
+fn process_asset_replacement(balance: &mut u64, amount: u64) {
+	*balance = amount;
+}
+
+fn process_non_asset_remainder_assignment(raw_value: &mut u64, offset: u64) {
+	*raw_value %= offset;
+}
+
 fn main() {}
 
 // compile-fail

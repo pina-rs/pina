@@ -102,6 +102,12 @@ fn process_runtime_take(remaining: &[u8], limit: usize) {
 	}
 }
 
+fn process_composed_constant_take(remaining: &[u8]) {
+	for account in remaining.iter().take(8).chain([].iter()) {
+		let _ = account;
+	}
+}
+
 fn main() {}
 
 // compile-fail
