@@ -22,14 +22,17 @@ pub fn extract_migratable_events(file: &File) -> Result<Vec<EventStruct>, IdlErr
 		let Item::Struct(item_struct) = item else {
 			continue;
 		};
+		// Non-migratable events may use event-macro arguments that the ABI
+		// snapshot parser does not own (for example `validate(...)`). Ignore
+		// those declarations before parsing the narrower migration syntax.
+		if !has_migrations_flag(&item_struct.attrs, "event") {
+			continue;
+		}
 		let Some((discriminator_enum, variant)) =
 			extract_discriminator_and_variant(&item_struct.attrs, "event", &item_struct.ident)?
 		else {
 			continue;
 		};
-		if !has_migrations_flag(&item_struct.attrs, "event") {
-			continue;
-		}
 		let schema = pina_abi::data_schema(item_struct, pina_abi::LayoutKind::Fixed)
 			.map_err(IdlError::Other)?;
 		events.push(EventStruct {
@@ -77,5 +80,23 @@ mod tests {
 		assert_eq!(events.len(), 1);
 		assert_eq!(events[0].name, "Current");
 		assert_eq!(events[0].schema.fields[0].rust_type, "u64");
+	}
+
+	#[test]
+	fn ignores_non_migratable_event_arguments_owned_by_other_features() {
+		let file = syn::parse_file(
+			r#"
+				#[event(
+					discriminator = Events::Validated,
+					validate(with = validate_event)
+				)]
+				struct Validated { value: u64 }
+			"#,
+		)
+		.unwrap_or_else(|error| panic!("parse: {error}"));
+
+		let events =
+			extract_migratable_events(&file).unwrap_or_else(|error| panic!("extract: {error}"));
+		assert!(events.is_empty());
 	}
 }

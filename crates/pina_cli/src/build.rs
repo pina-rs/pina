@@ -155,7 +155,7 @@ pub fn build_project(start: &Path) -> Result<BuildOutput, BuildError> {
 /// [`build_project`].
 pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput, BuildError> {
 	let project = Project::discover(&options.project_dir)?;
-	crate::migrations::check_migrations(&project.program_dir)?;
+	check_migrations_for_build(&project)?;
 	let manifest_path = project.program_dir.join("Cargo.toml");
 	let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
 	let features = options
@@ -258,7 +258,7 @@ pub fn build_project_verified_with_options(
 	verify: &VerifyBuildOptions,
 ) -> Result<VerifiedBuildOutput, BuildError> {
 	let project = Project::discover(&options.project_dir)?;
-	crate::migrations::check_migrations(&project.program_dir)?;
+	check_migrations_for_build(&project)?;
 	let features = options
 		.features
 		.iter()
@@ -271,6 +271,19 @@ pub fn build_project_verified_with_options(
 	let verified =
 		crate::verifiable::build(&project, &features, options.no_default_features, verify)?;
 	publish_verified_build(&project, &verified)
+}
+
+fn check_migrations_for_build(project: &Project) -> Result<(), BuildError> {
+	match crate::migrations::check_project_migrations(project) {
+		Ok(_) => Ok(()),
+		Err(crate::migrations::MigrationError::Parse(source)) => {
+			Err(BuildError::GenerateIdl {
+				package: project.package_name.clone(),
+				source,
+			})
+		}
+		Err(error) => Err(BuildError::Migration(error)),
+	}
 }
 
 /// Read a Pina-local deterministic build record and verify its adjacent

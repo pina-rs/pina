@@ -49,6 +49,8 @@ pina test --compatibility
 
 `check` rejects a remaining marker. After publication, it also rejects any change to the transition file or either schema hash. Fix a published transition with another migration version.
 
+IDL generation runs the same check. The current IDL contains one omitted `migrationVersion` constant for each migration-aware account or instruction, so generated clients serialize the current envelope without asking the application developer for a version. Historical schemas and transition code remain exclusively in `migrations/manifest.json`.
+
 ## Change an instruction process
 
 Pina snapshots the instruction payload and its positional account list under the same instruction version. An old request remains compatible only when:

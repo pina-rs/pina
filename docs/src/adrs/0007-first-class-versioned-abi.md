@@ -52,7 +52,7 @@ Existing unversioned data is not silently treated as version zero. Its first pay
 
 ### Current IDL and ABI history
 
-The public IDL describes only the current program contract and includes the current generated version for opted-in types. It is not the migration database.
+The public IDL describes only the current program contract. For each opted-in account or instruction, it includes `migrationVersion` as an omitted constant and a constant discriminator at the byte immediately after the ordinary discriminator. Generated clients therefore write the current version without exposing it as an application argument, while an IDL captured from an older release continues to write its own frozen version. The IDL does not contain historical schemas or transition code; it is not the migration database.
 
 The checked-in Pina ABI history records the physical information needed to reconstruct every supported representation:
 

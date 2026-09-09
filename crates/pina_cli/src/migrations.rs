@@ -18,6 +18,7 @@ use pina_abi::FieldSchema;
 use pina_abi::LayoutKind;
 use pina_abi::MANIFEST_PATH;
 use pina_abi::MigrationManifest;
+use pina_abi::MigrationVersionType;
 use pina_abi::PUBLICATIONS_PATH;
 use pina_abi::ProcessAccount;
 use pina_abi::ProcessContract;
@@ -70,6 +71,12 @@ pub struct MigrationStatus {
 	pub current_version: u32,
 	pub published: bool,
 	pub schema_sha256: String,
+}
+
+/// Current version constants required to serialize the latest public IDL.
+pub(crate) struct IdlMigrationMetadata {
+	pub version_type: MigrationVersionType,
+	pub current_versions: BTreeMap<String, u32>,
 }
 
 /// Errors produced by migration snapshot and compatibility operations.
@@ -358,7 +365,13 @@ pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationEr
 /// Verify source, snapshots, process contracts, and frozen transition code.
 pub fn check_migrations(start: &Path) -> Result<Vec<MigrationStatus>, MigrationError> {
 	let project = Project::discover(start)?;
-	let current = scan_current_contracts(&project)?;
+	check_project_migrations(&project)
+}
+
+pub(crate) fn check_project_migrations(
+	project: &Project,
+) -> Result<Vec<MigrationStatus>, MigrationError> {
+	let current = scan_current_contracts(project)?;
 	let manifest_path = project.program_dir.join(MANIFEST_PATH);
 	let manifest = load_manifest(&manifest_path)?;
 	if current.contracts.is_empty() && manifest.is_none() {
@@ -372,7 +385,7 @@ pub fn check_migrations(start: &Path) -> Result<Vec<MigrationStatus>, MigrationE
 		}
 	})?;
 	let ledger = load_publication_ledger(&project.program_dir.join(PUBLICATIONS_PATH))?;
-	validate_program_configuration(&project, &current.program_id, &manifest)?;
+	validate_program_configuration(project, &current.program_id, &manifest)?;
 	manifest
 		.validate()
 		.map_err(MigrationError::InvalidHistory)?;
@@ -402,7 +415,7 @@ pub fn check_migrations(start: &Path) -> Result<Vec<MigrationStatus>, MigrationE
 				version: latest.version,
 			});
 		}
-		verify_transition_files(&project, &ledger, &key, history)?;
+		verify_transition_files(project, &ledger, &key, history)?;
 		statuses.push(MigrationStatus {
 			identity: key.clone(),
 			kind: source.identity.kind.to_string(),
@@ -427,6 +440,25 @@ pub fn check_migrations(start: &Path) -> Result<Vec<MigrationStatus>, MigrationE
 /// Return migration status after applying every build-time compatibility check.
 pub fn migration_status(start: &Path) -> Result<Vec<MigrationStatus>, MigrationError> {
 	check_migrations(start)
+}
+
+/// Verify history and return only the current constants needed by IDL codegen.
+pub(crate) fn idl_migration_metadata(
+	start: &Path,
+) -> Result<Option<IdlMigrationMetadata>, MigrationError> {
+	let project = Project::discover(start)?;
+	let statuses = check_project_migrations(&project)?;
+	if statuses.is_empty() {
+		return Ok(None);
+	}
+
+	Ok(Some(IdlMigrationMetadata {
+		version_type: project.migration_version_type,
+		current_versions: statuses
+			.into_iter()
+			.map(|status| (status.identity, status.current_version))
+			.collect(),
+	}))
 }
 
 /// Append one receipt after a successful persistent deployment.
@@ -1097,7 +1129,7 @@ fn automatic_direction(source: &DataSchema, destination: &DataSchema) -> Option<
 
 fn automatic_transition_source(
 	identity: &ContractIdentity,
-	version_type: pina_abi::MigrationVersionType,
+	version_type: MigrationVersionType,
 	source: &SchemaVersion,
 	destination_version: u32,
 	destination: &DataSchema,
@@ -1176,7 +1208,7 @@ fn automatic_transition_source(
 
 fn manual_transition_source(
 	identity: &ContractIdentity,
-	version_type: pina_abi::MigrationVersionType,
+	version_type: MigrationVersionType,
 	source: &SchemaVersion,
 	destination_version: u32,
 	destination: &DataSchema,
@@ -1404,20 +1436,15 @@ mod tests {
 		};
 		let destination = schema(LayoutKind::Fixed, &[("amount", "u16")]);
 
-		let account_source = manual_transition_source(
-			&account,
-			pina_abi::MigrationVersionType::U8,
-			&source,
-			1,
-			&destination,
-		);
+		let account_source =
+			manual_transition_source(&account, MigrationVersionType::U8, &source, 1, &destination);
 		assert!(account_source.contains("fn migrate(data: &mut [u8]) {"));
 		assert!(!account_source.contains("fn migrate(data: &mut [u8]) -> bool"));
 		assert!(account_source.contains("conversion must be total"));
 
 		let instruction_source = manual_transition_source(
 			&instruction,
-			pina_abi::MigrationVersionType::U8,
+			MigrationVersionType::U8,
 			&source,
 			1,
 			&destination,
@@ -1442,13 +1469,8 @@ mod tests {
 			&[("name", "String<4>"), ("tags", "Vec<u16, 2>")],
 		);
 
-		let generated = manual_transition_source(
-			&account,
-			pina_abi::MigrationVersionType::U8,
-			&source,
-			1,
-			&destination,
-		);
+		let generated =
+			manual_transition_source(&account, MigrationVersionType::U8, &source, 1, &destination);
 
 		assert!(generated.contains("Source version: 0 (variable bytes)"));
 		assert!(generated.contains("fn target_size(data: &[u8]) -> Option<usize>"));
@@ -1569,8 +1591,7 @@ mod tests {
 		.unwrap_or_else(|error| panic!("write source: {error}"));
 		let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
 		let schema = schema(LayoutKind::Fixed, &[("value", "u64")]);
-		let mut manifest =
-			MigrationManifest::new(PROGRAM_ID.to_owned(), pina_abi::MigrationVersionType::U8);
+		let mut manifest = MigrationManifest::new(PROGRAM_ID.to_owned(), MigrationVersionType::U8);
 		manifest.contracts.insert(
 			identity.key(),
 			ContractHistory {

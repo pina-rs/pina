@@ -196,17 +196,20 @@ fn assemble_from_extracted(
 				"account",
 			)
 			.map(|disc_value| {
+				let mut docs = acct.docs.clone();
+				if acct.migratable {
+					docs.push(crate::ir::MIGRATABLE_DOC_MARKER.to_owned());
+				}
 				debug_assert_eq!(
 					acct.is_compact(),
-					acct.docs
-						.iter()
+					docs.iter()
 						.any(|doc| doc == crate::ir::COMPACT_ACCOUNT_DOC_MARKER)
 				);
 				AccountIr {
 					name: acct.name.clone(),
 					fields: acct.fields.clone(),
 					discriminator: disc_value,
-					docs: acct.docs.clone(),
+					docs,
 					pda_name: acct.pda_name.clone(),
 				}
 			})
@@ -266,12 +269,16 @@ fn build_accountless_instructions_from_structs(
 				"instruction",
 			)
 			.map(|discriminator| {
+				let mut docs = ix_struct.docs.clone();
+				if ix_struct.migratable {
+					docs.push(crate::ir::MIGRATABLE_DOC_MARKER.to_owned());
+				}
 				InstructionIr {
 					name: ix_struct.variant.to_snake_case(),
 					accounts: Vec::new(),
 					arguments: ix_struct.fields.clone(),
 					discriminator,
-					docs: ix_struct.docs.clone(),
+					docs,
 				}
 			})
 		})
@@ -439,12 +446,16 @@ fn build_instructions_from_dispatch(
 			"instruction",
 		)?;
 
+		let mut docs = ix_struct.docs.clone();
+		if ix_struct.migratable {
+			docs.push(crate::ir::MIGRATABLE_DOC_MARKER.to_owned());
+		}
 		instructions.push(InstructionIr {
 			name: entry.variant.to_snake_case(),
 			accounts: instruction_accounts,
 			arguments: ix_struct.fields.clone(),
 			discriminator,
-			docs: ix_struct.docs.clone(),
+			docs,
 		});
 	}
 

@@ -45,6 +45,9 @@ pub struct AccountIr {
 // Keep compactness in the pre-existing docs field so this minor release does
 // not add a field to the public IR structs. Codegen always strips the sentinel.
 pub(crate) const COMPACT_ACCOUNT_DOC_MARKER: &str = "\0pina:compact";
+// Migration opt-in follows the same compatibility strategy. The checked-in
+// manifest supplies the current version and global width during IDL lowering.
+pub(crate) const MIGRATABLE_DOC_MARKER: &str = "\0pina:migratable";
 
 impl AccountIr {
 	pub(crate) fn is_compact(&self) -> bool {
@@ -56,9 +59,18 @@ impl AccountIr {
 	pub(crate) fn visible_docs(&self) -> Vec<String> {
 		self.docs
 			.iter()
-			.filter(|doc| doc.as_str() != COMPACT_ACCOUNT_DOC_MARKER)
+			.filter(|doc| {
+				!matches!(
+					doc.as_str(),
+					COMPACT_ACCOUNT_DOC_MARKER | MIGRATABLE_DOC_MARKER
+				)
+			})
 			.cloned()
 			.collect()
+	}
+
+	pub(crate) fn is_migratable(&self) -> bool {
+		self.docs.iter().any(|doc| doc == MIGRATABLE_DOC_MARKER)
 	}
 }
 
@@ -71,6 +83,20 @@ pub struct InstructionIr {
 	pub arguments: Vec<FieldIr>,
 	pub discriminator: DiscriminatorIr,
 	pub docs: Vec<String>,
+}
+
+impl InstructionIr {
+	pub(crate) fn visible_docs(&self) -> Vec<String> {
+		self.docs
+			.iter()
+			.filter(|doc| doc.as_str() != MIGRATABLE_DOC_MARKER)
+			.cloned()
+			.collect()
+	}
+
+	pub(crate) fn is_migratable(&self) -> bool {
+		self.docs.iter().any(|doc| doc == MIGRATABLE_DOC_MARKER)
+	}
 }
 
 /// A single account slot inside an instruction.

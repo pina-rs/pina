@@ -97,7 +97,7 @@ pub(crate) fn canonical_account_constraints(
 						let _: Expr = rule.value()?.parse()?;
 						return Ok(());
 					}
-					if rule.input.is_empty() {
+					if !rule.input.peek(syn::Token![=]) {
 						constraints.push(name);
 						return Ok(());
 					}
@@ -112,9 +112,13 @@ pub(crate) fn canonical_account_constraints(
 				return Ok(());
 			}
 			if meta.path.is_ident("distinct") {
-				let value: Expr = meta.value()?.parse()?;
-				let rendered = value.to_token_stream().to_string().replace(' ', "");
-				constraints.push(format!("distinct={rendered}"));
+				if meta.input.peek(syn::Token![=]) {
+					let value: Expr = meta.value()?.parse()?;
+					let rendered = value.to_token_stream().to_string().replace(' ', "");
+					constraints.push(format!("distinct={rendered}"));
+				} else {
+					constraints.push("distinct".to_owned());
+				}
 				return Ok(());
 			}
 			Err(meta.error(
@@ -710,6 +714,22 @@ mod tests {
 		));
 		assert!(!all.contains_key("TupleAccounts"));
 		assert!(!all.contains_key("PlainStruct"));
+	}
+
+	#[test]
+	fn canonicalizes_bare_and_valued_account_constraints() {
+		let field: syn::Field = syn::parse_quote! {
+			#[pina(validate(signer, writable, owner = ID, not_empty, error = Error::Denied))]
+			#[pina(distinct)]
+			account: &'static AccountView
+		};
+
+		let constraints =
+			canonical_account_constraints(&field.attrs).expect("supported declarative constraints");
+		assert_eq!(
+			constraints,
+			["distinct", "not_empty", "owner=ID", "signer", "writable"]
+		);
 	}
 
 	#[test]
