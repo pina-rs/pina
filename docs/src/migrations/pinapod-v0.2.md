@@ -130,6 +130,10 @@ profile.name.try_set("Alice")?;
 
 Keep `Type::assert_seeds` for a validation-only path that does not need a typed guard. The one-pass loaders are the preferred path when code reads or writes the account immediately afterward.
 
+Apply the same rule to non-PDA fixed accounts: replace `assert_type::<T>()` followed by `as_account::<T>()` or `as_account_mut::<T>()` with the typed loader alone. Both loaders perform the owner, discriminator, exact-size, and nested-value validation before returning their borrow guard. Keep `assert_type` only when validation is the final operation on typed data, such as a close path that never reads the fields. It releases the borrow before returning and must not be treated as proof for a later raw cast.
+
+Typed fixed-account boundaries now return `PinaProgramError::InvalidAccountSize` when the account is undersized or oversized. This applies to `assert_type`, `as_account`, `as_account_mut`, `load_pda`, and `load_pda_mut`. Update any precise error matching that previously expected `ProgramError::AccountDataTooSmall` or `ProgramError::InvalidAccountData` for these size failures. The generic `assert_data_len` check retains its existing `ProgramError::InvalidAccountData` contract.
+
 ## Load compact PDA accounts in one borrow
 
 Do not validate a compact PDA with `assert_compact_type`, load its bump through generated `assert_seeds`, and then parse it again with `with_compact_account`.

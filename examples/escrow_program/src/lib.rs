@@ -279,9 +279,7 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		)?);
 
 		// Validate escrow state
-		self.escrow
-			.assert_not_empty()?
-			.assert_type::<EscrowState>(&ID)?;
+		self.escrow.assert_not_empty()?;
 
 		let (maker, mint_a, mint_b, amount_b, seed, bump) = {
 			let escrow = self.escrow.as_account::<EscrowState>(&ID)?;

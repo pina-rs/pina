@@ -326,7 +326,14 @@ pub trait AccountInfoValidation {
 	fn assert_not_empty(self) -> Result<Self, ProgramError>
 	where
 		Self: Sized;
-	/// Assert that the account is of the type provided.
+	/// Validate a fixed account without loading it.
+	///
+	/// Checks the program owner, discriminator, exact representation size, and
+	/// every active nested `PinaPod` value. Prefer [`AsAccount::as_account`],
+	/// [`AsAccount::as_account_mut`], or a generated `load_pda*` method when the
+	/// caller needs typed account data. Those methods perform the same validation
+	/// while returning a guard, so a preceding `assert_type` would duplicate the
+	/// work.
 	fn assert_type<T: PinaAccount>(self, program_id: &Address) -> Result<Self, ProgramError>
 	where
 		Self: Sized;
@@ -677,10 +684,17 @@ pub type LoadedAccountMut<'a, T> = RefMut<'a, T>;
 ///     Status::Closed => { /* ... */ }
 /// }
 /// ```
+/// Guard-backed loading for fixed account data.
+///
+/// These methods perform the complete type-boundary validation before returning
+/// a borrow guard. Do not call [`AccountInfoValidation::assert_type`] first;
+/// doing so repeats the same owner, discriminator, exact-size, and nested-value
+/// checks without strengthening the returned guard.
 pub trait AsAccount {
 	/// Validate ownership and deserialize the account data into an immutable
-	/// borrow guard of type `T`. Returns `InvalidAccountData` if the
-	/// discriminator doesn't match or the data is the wrong size.
+	/// borrow guard of type `T`. A discriminator mismatch returns
+	/// `ProgramError::InvalidAccountData`; an undersized or oversized fixed
+	/// account returns `PinaProgramError::InvalidAccountSize`.
 	fn as_account<T>(&self, program_id: &Address) -> Result<Ref<'_, T::Zc>, ProgramError>
 	where
 		T: PinaAccount;

@@ -47,9 +47,7 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 		let _ = TakeInstruction::try_from_bytes(data)?;
 
 		self.taker.assert_signer()?;
-		self.escrow
-			.assert_not_empty()?
-			.assert_type::<EscrowState>(&ID)?;
+		self.escrow.assert_not_empty()?;
 
 		let _escrow = self.escrow.as_account::<EscrowState>(&ID)?;
 

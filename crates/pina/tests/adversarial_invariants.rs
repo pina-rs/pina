@@ -707,6 +707,107 @@ fn assert_type_rejects_wrong_discriminator() {
 }
 
 #[test]
+fn assert_type_rejects_short_fixed_account_data_with_an_exact_size_error() {
+	let mut short_bytes = build_balance_state_bytes(55);
+	short_bytes.pop();
+	let unique_accounts = [AccountBuilder::new()
+		.address(fake_address(24))
+		.owner(TEST_PROGRAM_ID)
+		.lamports(100)
+		.data(&short_bytes)
+		.is_writable(true)];
+
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+	let result = account_views[0].assert_type::<BalanceState>(&TEST_PROGRAM_ID);
+
+	assert_eq!(result, Err(PinaProgramError::InvalidAccountSize.into()));
+}
+
+#[test]
+fn assert_type_rejects_long_fixed_account_data_with_an_exact_size_error() {
+	let mut long_bytes = build_balance_state_bytes(55);
+	long_bytes.push(0);
+	let unique_accounts = [AccountBuilder::new()
+		.address(fake_address(25))
+		.owner(TEST_PROGRAM_ID)
+		.lamports(100)
+		.data(&long_bytes)
+		.is_writable(true)];
+
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+	let result = account_views[0].assert_type::<BalanceState>(&TEST_PROGRAM_ID);
+
+	assert_eq!(result, Err(PinaProgramError::InvalidAccountSize.into()));
+}
+
+#[test]
+fn fixed_account_loaders_reject_size_mismatches_with_the_exact_size_error() {
+	let mut short_bytes = build_balance_state_bytes(55);
+	short_bytes.pop();
+	let mut long_bytes = build_balance_state_bytes(55);
+	long_bytes.push(0);
+	let unique_accounts = [
+		AccountBuilder::new()
+			.address(fake_address(26))
+			.owner(TEST_PROGRAM_ID)
+			.lamports(100)
+			.data(&short_bytes)
+			.is_writable(true),
+		AccountBuilder::new()
+			.address(fake_address(27))
+			.owner(TEST_PROGRAM_ID)
+			.lamports(100)
+			.data(&long_bytes)
+			.is_writable(true),
+	];
+
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+	let short_error = account_views[0]
+		.as_account::<BalanceState>(&TEST_PROGRAM_ID)
+		.err();
+	let long_error = account_views[1]
+		.as_account::<BalanceState>(&TEST_PROGRAM_ID)
+		.err();
+
+	assert_eq!(
+		short_error,
+		Some(PinaProgramError::InvalidAccountSize.into())
+	);
+	assert_eq!(
+		long_error,
+		Some(PinaProgramError::InvalidAccountSize.into())
+	);
+}
+
+#[test]
+fn mutable_fixed_account_loader_rejects_size_mismatch_without_mutation() {
+	let mut short_bytes = build_balance_state_bytes(55);
+	short_bytes.pop();
+	let original = short_bytes.clone();
+	let unique_accounts = [AccountBuilder::new()
+		.address(fake_address(28))
+		.owner(TEST_PROGRAM_ID)
+		.lamports(100)
+		.data(&short_bytes)
+		.is_writable(true)];
+
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+	let error = account_views[0]
+		.as_account_mut::<BalanceState>(&TEST_PROGRAM_ID)
+		.err();
+
+	assert_eq!(error, Some(PinaProgramError::InvalidAccountSize.into()));
+	let data = account_views[0]
+		.try_borrow()
+		.unwrap_or_else(|error| panic!("borrow unchanged account data: {error:?}"));
+	assert_eq!(&*data, &original);
+}
+
+#[test]
 fn assert_program_rejects_wrong_identity_and_non_executable_targets() {
 	let unique_accounts = [
 		AccountBuilder::new()

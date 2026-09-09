@@ -92,16 +92,15 @@ Anchor expresses constraints as attributes on account fields. Pina uses explicit
 | `#[account(seeds = [...], bump)]` | `account.assert_seeds_with_bump(seeds, &ID)?`                                            |
 | `#[account(init, ...)]`           | `account.assert_empty()?` then `CreateProgramAccountWithBump { ... }.invoke::<MyData>()` |
 | `#[account(constraint = expr)]`   | Write the check directly in `process` and return an error                                |
-| `Account<'info, T>` (type check)  | `account.assert_type::<T>(&owner)?`                                                      |
+| `Account<'info, T>`               | `account.as_account::<T>(&owner)?` or `account.as_account_mut::<T>(&owner)?`             |
 
-Pina's assertion methods return the same reference type they receive, so shared chains stay shared and mutable chains stay mutable:
+Pina's assertion methods return the same reference type they receive, so shared chains stay shared and mutable chains stay mutable. Typed loaders perform their own validation; do not precede them with `assert_type`:
 
 ```rust
-self.counter
-	.assert_not_empty()?
-	.assert_writable()?
-	.assert_type::<CounterState>(&ID)?;
+let mut counter = self.counter.as_account_mut::<CounterState>(&ID)?;
 ```
+
+For a fixed account with a stored `#[pda(bump = ...)]`, prefer its generated `Type::load_pda` or `Type::load_pda_mut` method. These methods also validate the PDA address. Keep `assert_type` for the narrower case where the handler only validates an existing fixed account and never accesses typed fields.
 
 See `examples/counter_program` for a complete PDA creation and validation example, and `examples/duplicate_mutable_accounts` for explicit duplicate-account safety checks.
 

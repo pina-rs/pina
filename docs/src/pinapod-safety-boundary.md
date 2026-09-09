@@ -83,6 +83,8 @@ For a fixed account with a stored PDA bump, `Type::load_pda` and `Type::load_pda
 
 The loaded guard still owns the runtime account-data borrow. End its scope or call `drop` before a CPI that may access the same account. Pina's `deny_account_borrows_across_cpi` lint recognizes guards returned by `load_pda_mut`.
 
+For a non-PDA fixed account, use `as_account` or `as_account_mut` to establish the same guard-backed boundary. Keep `assert_type` for validation-only operations that never need typed fields. Because `assert_type` releases its borrow before returning, it is not proof that a later raw cast is safe.
+
 ### Compact PDA loading
 
 For a compact account with a stored PDA bump, `Type::with_pda` validates the owner, discriminator, size, every active tail, canonical bump, and derived account address before it runs the closure. The runtime borrow guard remains active for the closure and is released when the closure returns.

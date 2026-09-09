@@ -245,6 +245,8 @@ These functions are simple, defensive, and log failures clearly:
 
 Unlike the loader functions, `assert_type` keeps the borrowed data in a local binding and does not return a typed reference derived from it. That structure is much less concerning.
 
+Current guidance reserves this helper for validation-only paths. Code that needs fields should use `as_account*` or generated `load_pda*` methods directly so validation and the live borrow guard form one boundary. A completed `assert_type` call does not make a later raw cast safe.
+
 ### Arithmetic helpers are well-contained and tested
 
 - `checked_send_balances` — `crates/pina/src/impls.rs`

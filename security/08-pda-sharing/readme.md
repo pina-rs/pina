@@ -35,5 +35,5 @@ See [`secure/src/lib.rs`](secure/src/lib.rs). Each account type uses type-specif
 <br>
 
 - Use distinct seed prefixes for each account type (e.g. `b"config"`, `b"vault"`)
-- `AccountInfoValidation::assert_type::<T>()` — additional defense that checks the discriminator even if PDAs happen to collide
-- `AccountInfoValidation::assert_seeds()` — verify the PDA matches the expected seed derivation
+- Generated `Type::load_pda()` / `Type::load_pda_mut()` — validate the fixed account representation and expected stored-bump PDA address in one operation
+- `AccountInfoValidation::assert_seeds()` — use only for a validation-only PDA path that does not need typed fields

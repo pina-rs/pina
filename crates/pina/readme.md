@@ -60,7 +60,7 @@ PinaPod initializes the complete fixed representation and validates active neste
 
 Typed fixed-account creation uses `invoke::<T>()` when the discriminator plus otherwise zeroed fields is valid. Use `invoke_with::<T>(initialize)` to configure `&mut T::Zc` before final validation. The signed equivalents are `invoke_signed` and `invoke_signed_with`.
 
-Fixed accounts declared with `#[pda(bump = ...)]` also generate `load_pda` and `load_pda_mut`. Prefer these when a handler needs a typed guard: they check the account boundary and stored-bump PDA address in one pass.
+Fixed accounts declared with `#[pda(bump = ...)]` also generate `load_pda` and `load_pda_mut`. Prefer these when a handler needs a typed guard: they check the account boundary and stored-bump PDA address in one pass. For other fixed accounts, prefer `as_account` or `as_account_mut`. Reserve `assert_type` for validation-only paths that do not need typed fields, and do not call it before a typed loader.
 
 ## Compact accounts
 
@@ -250,16 +250,7 @@ impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 		let _ = IncrementInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
-		self.counter
-			.assert_not_empty()?
-			.assert_type::<CounterState>(&ID)?;
-
-		// Verify the account is the PDA for the authority, using the stored
-		// bump field (avoids re-deriving the canonical bump on-chain).
-		CounterState::assert_seeds(self.counter, self.authority.address(), &ID)?;
-
-		// Mutate state
-		let mut counter = self.counter.as_account_mut::<CounterState>(&ID)?;
+		let mut counter = CounterState::load_pda_mut(self.counter, self.authority.address(), &ID)?;
 		let next = counter
 			.count
 			.get()
@@ -284,6 +275,7 @@ For the complete program — `CreateProgramAccountWithBump`, `log!`, and the iso
 - Use `&AccountView` for read-only accounts and `&mut AccountView` only when you need mutable loaders, direct lamport mutation, `close_*` helpers, or writable IDL inference.
 - `&mut AccountView` declares and enforces a writable slot. Use `assert_writable()` or `#[pina(validate(writable))]` only when a shared `&AccountView` must arrive writable.
 - `as_account()` / `as_account_mut()` return `Ref<T>` / `RefMut<T>` borrow guards. Copy out the fields you need and `drop(...)` the guard before CPIs or later mutable borrows.
+- Prefer generated `load_pda*` methods for stored-bump fixed PDAs, then `as_account*` for other fixed accounts. Use `assert_type` only when no typed fields are needed; do not call it before a typed loader.
 - Keep validation chains direct inside `process(self, ...)` when possible. That makes audits easier and gives `pina idl` the clearest signal for signer, writable, PDA, and default-account inference.
 
 <!-- {/pinaInstructionAuthoringTips} -->

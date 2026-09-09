@@ -76,8 +76,8 @@ impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
 		let args = TransferInstruction::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?;
-		self.source.assert_writable()?.assert_type::<Balance>(&ID)?;
-		self.dest.assert_writable()?.assert_type::<Balance>(&ID)?;
+		self.source.assert_writable()?;
+		self.dest.assert_writable()?;
 
 		// SECURE: Verify source and destination are different accounts.
 		if self.source.address() == self.dest.address() {

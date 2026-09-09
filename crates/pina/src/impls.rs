@@ -18,6 +18,7 @@ use crate::LamportTransfer;
 use crate::PinaAccount;
 #[cfg(feature = "compact")]
 use crate::PinaCompactAccount;
+use crate::PinaProgramError;
 use crate::ProgramError;
 use crate::Ref;
 use crate::RefMut;
@@ -86,6 +87,21 @@ fn validate_data_len(account: AccountView, len: usize) -> ProgramResult {
 }
 
 #[track_caller]
+fn validate_fixed_account_size(account: AccountView, len: usize) -> ProgramResult {
+	if account.data_len() != len {
+		log!(
+			"address: {} has an invalid data length for the fixed account type",
+			account.address().as_ref()
+		);
+		log_caller();
+
+		return Err(PinaProgramError::InvalidAccountSize.into());
+	}
+
+	Ok(())
+}
+
+#[track_caller]
 fn validate_empty(account: AccountView) -> ProgramResult {
 	if !account.is_data_empty() {
 		log!("address: {} is not empty", account.address().as_ref());
@@ -118,6 +134,7 @@ fn validate_program(account: AccountView, program_id: &Address) -> ProgramResult
 #[track_caller]
 fn validate_type<T: PinaAccount>(account: AccountView, program_id: &Address) -> ProgramResult {
 	validate_owner(account, program_id)?;
+	validate_fixed_account_size(account, size_of::<T::Zc>())?;
 
 	let data = account.try_borrow()?;
 
@@ -129,16 +146,6 @@ fn validate_type<T: PinaAccount>(account: AccountView, program_id: &Address) -> 
 		log_caller();
 
 		return Err(ProgramError::InvalidAccountData);
-	}
-
-	if data.len() != size_of::<T::Zc>() {
-		log!(
-			"address: {} has invalid data length for the account type",
-			account.address().as_ref()
-		);
-		log_caller();
-
-		return Err(ProgramError::AccountDataTooSmall);
 	}
 
 	#[cfg(not(feature = "validation"))]
@@ -548,7 +555,7 @@ impl AsAccount for AccountView {
 		T: PinaAccount,
 	{
 		self.assert_owner(program_id)?;
-		self.assert_data_len(size_of::<T::Zc>())?;
+		validate_fixed_account_size(*self, size_of::<T::Zc>())?;
 
 		Ref::try_map(self.try_borrow()?, |data| T::try_from_bytes(data))
 			.map_err(|(_guard, error)| error)
@@ -560,7 +567,7 @@ impl AsAccount for AccountView {
 		T: PinaAccount,
 	{
 		self.assert_writable()?.assert_owner(program_id)?;
-		self.assert_data_len(size_of::<T::Zc>())?;
+		validate_fixed_account_size(*self, size_of::<T::Zc>())?;
 
 		RefMut::try_map(self.try_borrow_mut()?, |data| T::try_from_bytes_mut(data))
 			.map_err(|(_guard, error)| error)

@@ -135,10 +135,7 @@ impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 
 		// Validate accounts.
 		self.authority.assert_signer()?;
-		self.state_account
-			.assert_not_empty()?
-			.assert_writable()?
-			.assert_type::<TestState>(&TEST_PROGRAM_ID)?;
+		self.state_account.assert_not_empty()?.assert_writable()?;
 
 		// Update state.
 		let mut state = self
@@ -955,12 +952,10 @@ fn error_data_length_mismatch_rejected() {
 
 	let result = process_instruction(program_id, account_views, ix_data);
 	assert!(result.is_err(), "should fail with data length mismatch");
-	// assert_type checks both discriminator and size; with wrong size it
-	// returns AccountDataTooSmall.
 	assert_eq!(
 		result.unwrap_err(),
-		ProgramError::AccountDataTooSmall,
-		"error should be AccountDataTooSmall for size mismatch"
+		PinaProgramError::InvalidAccountSize.into(),
+		"typed loading should report the fixed-account size mismatch"
 	);
 }
 

@@ -52,12 +52,9 @@ impl<'a> ProcessAccountInfos<'a> for AdminActionAccounts<'a> {
 
 		self.authority.assert_signer()?;
 
-		// SECURE: assert_type checks discriminator + owner + size.
-		// A UserProfile account will be rejected because its discriminator
-		// (1) doesn't match AdminConfig's discriminator (2).
-		self.config.assert_type::<AdminConfig>(&ID)?;
-
 		let authority = {
+			// SECURE: The typed loader rejects a UserProfile because its
+			// discriminator does not match AdminConfig.
 			let config = self.config.as_account::<AdminConfig>(&ID)?;
 			config.authority
 		};

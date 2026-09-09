@@ -126,6 +126,14 @@ Traits in `crates/pina/src/impls.rs` provide typed conversion paths from raw `Ac
 
 A fixed account with a stored `#[pda(bump = ...)]` generates `Type::load_pda` and `Type::load_pda_mut`. These methods combine typed account validation with stored-bump address validation and return the same guard types. Prefer them over an `assert_type` → `Type::assert_seeds` → `as_account*` sequence when the handler immediately needs the state; the sequence recursively validates bounded fields more than once.
 
+Use this order for fixed accounts:
+
+1. Use generated `load_pda` or `load_pda_mut` for a stored-bump PDA when the handler needs typed fields.
+2. Use `as_account` or `as_account_mut` for another fixed account when the handler needs typed fields.
+3. Use `assert_type` only when the handler needs to validate an existing fixed account without loading its fields.
+
+All three paths validate the owner, discriminator, exact account size, and active nested values. `assert_type` releases its data borrow before returning. It is therefore a moment-in-time validation, not a guard for a later raw cast or mutation. Do not call it before either typed-loader path.
+
 A compact account with a stored bump generates `Type::with_pda`. The method validates ownership, the compact representation, the canonical bump, and the derived address before it runs the closure. The runtime data borrow remains active for the closure, so the compact view cannot outlive its validated bytes. Keep `assert_compact_type` and generated `assert_seeds` for validation-only paths that do not need the compact view.
 
 ## Account cursors
@@ -149,12 +157,12 @@ Only `Option<&'a AccountView>` and `Option<&'a mut AccountView>` are supported; 
 
 The absent convention is the executing program's own address. Generated Codama clients fill an omitted optional slot with a readonly account meta pointing at the program address, so transactions never change length, and on-chain parsing maps any slot whose address equals `program_id` back to `None`. Because the filler is readonly, provided values still enforce their declared writability through `next_mut_opt()`.
 
-Program logic branches on presence with plain pattern matching:
+Program logic branches on presence with plain pattern matching. Load the account directly when the branch needs its fields:
 
 ```rust
-match self.escrow {
-    Some(escrow) => escrow.assert_type::<EscrowState>(&ID)?,
-    None => {}
+if let Some(escrow) = self.escrow {
+	let escrow = escrow.as_account::<EscrowState>(&ID)?;
+	// Read validated fields through `escrow`.
 }
 ```
 
@@ -168,6 +176,7 @@ Optional signers are validated only when present (`if let Some(witness) = self.w
 - Use `&AccountView` for read-only accounts and `&mut AccountView` only when you need mutable loaders, direct lamport mutation, `close_*` helpers, or writable IDL inference.
 - `&mut AccountView` declares and enforces a writable slot. Use `assert_writable()` or `#[pina(validate(writable))]` only when a shared `&AccountView` must arrive writable.
 - `as_account()` / `as_account_mut()` return `Ref<T>` / `RefMut<T>` borrow guards. Copy out the fields you need and `drop(...)` the guard before CPIs or later mutable borrows.
+- Prefer generated `load_pda*` methods for stored-bump fixed PDAs, then `as_account*` for other fixed accounts. Use `assert_type` only when no typed fields are needed; do not call it before a typed loader.
 - Keep validation chains direct inside `process(self, ...)` when possible. That makes audits easier and gives `pina idl` the clearest signal for signer, writable, PDA, and default-account inference.
 
 <!-- {/pinaInstructionAuthoringTips} -->

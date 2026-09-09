@@ -30,11 +30,11 @@ An attacker can:
 
 <br>
 
-See [`secure/src/lib.rs`](secure/src/lib.rs). The program calls `assert_type::<T>(&ID)?` which checks the discriminator, owner, and data size before deserialization.
+See [`secure/src/lib.rs`](secure/src/lib.rs). The program loads the account with `as_account::<T>(&ID)?`, which checks the owner, discriminator, exact size, and active nested values before returning a borrow guard.
 
 ## Pina API Reference
 
 <br>
 
-- `AccountInfoValidation::assert_type::<T>(program_id)` — checks owner, discriminator, and data length in one call
-- `AsAccount::as_account::<T>(program_id)` — checks owner and discriminator during deserialization
+- `AsAccount::as_account::<T>(program_id)` — validates and borrows a fixed account in one operation
+- `AccountInfoValidation::assert_type::<T>(program_id)` — performs the same type-boundary checks without returning typed data; reserve it for validation-only paths

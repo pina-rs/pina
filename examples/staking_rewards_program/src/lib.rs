@@ -324,9 +324,7 @@ impl<'a> ProcessAccountInfos<'a> for OpenPositionAccounts<'a> {
 		// Validate accounts
 		self.user.assert_signer()?;
 		self.system_program.assert_address(&system::ID)?;
-		self.pool_state
-			.assert_not_empty()?
-			.assert_type::<PoolState>(&ID)?;
+		self.pool_state.assert_not_empty()?;
 		let canonical_bump = self
 			.position_state
 			.assert_canonical_bump(&position_seeds.as_slices(), &ID)?;
@@ -379,12 +377,8 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
-		self.pool_state
-			.assert_not_empty()?
-			.assert_type::<PoolState>(&ID)?;
-		self.position_state
-			.assert_not_empty()?
-			.assert_type::<PositionState>(&ID)?;
+		self.pool_state.assert_not_empty()?;
+		self.position_state.assert_not_empty()?;
 		self.user_stake_ata
 			.assert_writable()?
 			.assert_associated_token_address(
@@ -465,12 +459,8 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 		self.stake_mint.assert_owners(&SPL_PROGRAM_IDS)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
-		self.pool_state
-			.assert_not_empty()?
-			.assert_type::<PoolState>(&ID)?;
-		self.position_state
-			.assert_not_empty()?
-			.assert_type::<PositionState>(&ID)?;
+		self.pool_state.assert_not_empty()?;
+		self.position_state.assert_not_empty()?;
 		self.user_stake_ata
 			.assert_writable()?
 			.assert_associated_token_address(
@@ -534,12 +524,8 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
-		self.pool_state
-			.assert_not_empty()?
-			.assert_type::<PoolState>(&ID)?;
-		self.position_state
-			.assert_not_empty()?
-			.assert_type::<PositionState>(&ID)?;
+		self.pool_state.assert_not_empty()?;
+		self.position_state.assert_not_empty()?;
 		self.user_reward_ata
 			.assert_writable()?
 			.assert_associated_token_address(
