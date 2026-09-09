@@ -54,6 +54,23 @@ struct CompactState {
 	pub values: pina::Vec<u64, 4>,
 }
 
+#[cfg(feature = "validation")]
+#[discriminator(crate = ::pina)]
+enum ValidationAccountType {
+	ValidatedState = 9,
+}
+
+#[cfg(feature = "validation")]
+#[account(
+	crate = ::pina,
+	discriminator = ValidationAccountType,
+	variant = ValidatedState
+)]
+struct MiriValidatedState {
+	#[pina(validate(min = 1))]
+	pub value: u64,
+}
+
 struct AccountBuilder {
 	address: Address,
 	owner: Address,
@@ -242,6 +259,21 @@ fn build_compact_state_bytes(authority: Address, bump: u8) -> Vec<u8> {
 	.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
 
 	bytes
+}
+
+#[cfg(feature = "validation")]
+#[test]
+fn application_validation_failure_zeroes_fixed_storage() {
+	let mut bytes = vec![0xff; MiriValidatedState::SIZE];
+	let error = MiriValidatedState::initialize(&mut bytes, |value| {
+		value.value.set(0);
+		Ok(())
+	})
+	.err()
+	.unwrap_or_else(|| panic!("invalid application value should fail initialization"));
+
+	assert_eq!(error, ProgramError::InvalidAccountData);
+	assert!(bytes.iter().all(|byte| *byte == 0));
 }
 
 #[cfg(feature = "token")]

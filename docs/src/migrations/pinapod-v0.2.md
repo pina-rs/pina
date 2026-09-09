@@ -220,7 +220,21 @@ UpdateResizableAccount {
 
 `JournalPatch` distinguishes an unchanged field from a field set to an empty or absent value. A method named after a fixed field replaces that field. A `replace_*` method replaces a collection tail. The patch validates every requested value and computes the target length before Pina changes account bytes or lamports.
 
-`UpdateResizableAccount` ends the data borrow before resizing. It grows the account before writing, or writes a valid shorter representation before shrinking. It clears bytes removed by the update. If preflight validation fails, account bytes and lamport balances remain unchanged.
+The typed creation and update builders accept the generated patch associated with the account. They no longer accept an unrelated custom `PinaPodPatch<T>` implementation, because that could bypass the account's generated structural and application validation. Existing calls that pass `JournalPatch` are unchanged. For a generic helper, replace a `PinaPodPatch<T>` bound with `PinaCompactPatch<T>`. A wrapper may implement `PinaCompactPatch<T>` by returning the generated patch it contains:
+
+```rust
+struct JournalUpdate<'a> {
+	patch: JournalPatch<'a>,
+}
+
+impl PinaCompactPatch<Journal> for JournalUpdate<'_> {
+	fn as_pina_patch(&self) -> &JournalPatch<'_> {
+		&self.patch
+	}
+}
+```
+
+`UpdateResizableAccount` ends the data borrow before resizing. It grows the account before writing, or writes a structurally valid shorter representation before shrinking. It clears bytes removed by the update. If structural preflight fails, account bytes and lamport balances remain unchanged. With the `validation` feature, application rules run after the patch is written; propagate the returned error so Solana rolls back the bytes and any earlier rent movement.
 
 Use `rent_account` for this builder. The account both funds growth and receives excess rent after a shrink. The lower-level `ReallocAccount`, `ReallocAccountZeroed`, and `ReallocCompactAccount` builders use the same field name and take an explicit `target_size`. Creation and allocation builders retain `payer` because those APIs only fund a new account.
 

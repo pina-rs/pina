@@ -1,0 +1,32 @@
+error[E0277]: the trait bound `UncheckedPatch: pina::PinaCompactPatch<State>` is not satisfied
+  --> tests/ui/fail/compact_builder_custom_patch.rs:34:24
+   |
+34 |     require_builder_patch(UncheckedPatch);
+   |     --------------------- ^^^^^^^^^^^^^^ unsatisfied trait bound
+   |     |
+   |     required by a bound introduced by this call
+   |
+help: the trait `pina::PinaCompactPatch<State>` is not implemented for `UncheckedPatch`
+  --> tests/ui/fail/compact_builder_custom_patch.rs:13:1
+   |
+13 | struct UncheckedPatch;
+   | ^^^^^^^^^^^^^^^^^^^^^
+help: the following other types implement trait `pina::PinaCompactPatch<T>`
+  --> tests/ui/fail/compact_builder_custom_patch.rs:8:1
+   |
+ 8 |   #[account(discriminator = Kind, compact)]
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `StatePatch<'__pina_patch>` implements `pina::PinaCompactPatch<State>`
+   |
+  ::: crates/pina/src/traits.rs
+   |
+   | / impl<T, P> PinaCompactPatch<T> for &P
+   | | where
+   | |     T: PinaCompactAccount,
+   | |     P: PinaCompactPatch<T> + ?Sized,
+   | |____________________________________^ `&P` implements `pina::PinaCompactPatch<T>`
+note: required by a bound in `require_builder_patch`
+  --> tests/ui/fail/compact_builder_custom_patch.rs:31:29
+   |
+31 | fn require_builder_patch<P: PinaCompactPatch<State>>(_patch: P) {}
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `require_builder_patch`
+   = note: this error originates in the attribute macro `account` (in Nightly builds, run with -Z macro-backtrace for more info)

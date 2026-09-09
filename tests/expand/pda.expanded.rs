@@ -2763,7 +2763,12 @@ impl CompactState {
         }
         patch.updated_len(data).map_err(|_| pina::ProgramError::InvalidAccountData)
     }
-    /// Atomically apply `patch` to initialized compact account storage.
+    /// Apply `patch` to initialized compact account storage.
+    ///
+    /// Structural patch failures are atomic. With the `validation` feature,
+    /// application validation runs after the patch is written. Propagate an
+    /// application-validation error so the Solana runtime rolls the instruction
+    /// back instead of committing the rejected representation.
     pub fn update(
         data: &mut [u8],
         patch: &CompactStatePatch<'_>,
@@ -2876,6 +2881,13 @@ impl pina::PinaCompactAccount for CompactState {
         patch: &Self::Patch<'_>,
     ) -> Result<usize, pina::ProgramError> {
         Self::initialize(data, patch)
+    }
+}
+impl<'__pina_patch> pina::PinaCompactPatch<CompactState>
+for CompactStatePatch<'__pina_patch> {
+    #[inline(always)]
+    fn as_pina_patch(&self) -> &<CompactState as pina::PinaCompactAccount>::Patch<'_> {
+        self
     }
 }
 pub struct AuthorityState {}

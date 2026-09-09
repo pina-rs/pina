@@ -15,4 +15,21 @@ pub struct State {
 	pub labels: Vec<String<16>, 4>,
 }
 
-fn main() {}
+struct WrappedPatch<'a> {
+	patch: StatePatch<'a>,
+}
+
+impl PinaCompactPatch<State> for WrappedPatch<'_> {
+	fn as_pina_patch(&self) -> &StatePatch<'_> {
+		&self.patch
+	}
+}
+
+fn main() {
+	fn accepts_builder_patch<P: PinaCompactPatch<State>>(_patch: P) {}
+
+	accepts_builder_patch(StatePatch::new());
+	accepts_builder_patch(WrappedPatch {
+		patch: StatePatch::new(),
+	});
+}

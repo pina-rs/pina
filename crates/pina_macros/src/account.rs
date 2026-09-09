@@ -196,6 +196,17 @@ pub(crate) fn expand(
 				}
 			}
 
+			impl<'__pina_patch> #crate_path::PinaCompactPatch<#struct_name>
+				for #patch_name<'__pina_patch>
+			{
+				#[inline(always)]
+				fn as_pina_patch(
+					&self,
+				) -> &<#struct_name as #crate_path::PinaCompactAccount>::Patch<'_> {
+					self
+				}
+			}
+
 		}
 	} else {
 		quote! {
@@ -338,6 +349,13 @@ fn generate_compact_view_helpers(
 	};
 	#[cfg(not(feature = "validation"))]
 	let validate_initialized = quote! {};
+	#[cfg(feature = "validation")]
+	let validate_updated = quote! {
+		let value = #ref_name::new(&data[..encoded_len]).map_err(|_| #error)?;
+		<#ref_name<'_> as #crate_path::PinaValidate>::validate(&value)?;
+	};
+	#[cfg(not(feature = "validation"))]
+	let validate_updated = quote! {};
 	let capacity_constants = schema.tails.iter().map(|tail| {
 		let name = format_ident!("{}_CAPACITY", tail.name.to_string().to_uppercase());
 		let field_name = tail.name.to_string();
@@ -450,7 +468,12 @@ fn generate_compact_view_helpers(
 			patch.updated_len(data).map_err(|_| #error)
 		}
 
-		/// Atomically apply `patch` to initialized compact account storage.
+		/// Apply `patch` to initialized compact account storage.
+		///
+		/// Structural patch failures are atomic. With the `validation` feature,
+		/// application validation runs after the patch is written. Propagate an
+		/// application-validation error so the Solana runtime rolls the instruction
+		/// back instead of committing the rejected representation.
 		pub fn update(
 			data: &mut [u8],
 			patch: &#patch_name<'_>,
@@ -464,6 +487,8 @@ fn generate_compact_view_helpers(
 
 			let encoded_len = patch.update(data).map_err(|_| #error)?;
 			<Self as #crate_path::HasDiscriminator>::write_discriminator(data);
+			#validate_updated
+
 			Ok(encoded_len)
 		}
 

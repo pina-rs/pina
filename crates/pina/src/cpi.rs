@@ -33,6 +33,8 @@ use crate::MAX_SEEDS;
 use crate::PinaAccount;
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 use crate::PinaCompactAccount;
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+use crate::PinaCompactPatch;
 use crate::PinaPodError;
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 use crate::PinaPodPatch;
@@ -388,6 +390,11 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 }
 
 /// Creates and initializes a variable-length PDA-backed account.
+///
+/// Pina accepts the account's generated patch type and clears the new account
+/// data if initialization fails. With the `validation` feature, the generated
+/// account boundary runs application validation and clears the data before
+/// returning its error.
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 #[must_use = "account creation has no effect until invoke or invoke_signed is called"]
 pub struct CreateCompactProgramAccount<'account, 'address, 'seeds, 'seed, P> {
@@ -411,7 +418,7 @@ impl<P> CreateCompactProgramAccount<'_, '_, '_, '_, P> {
 	pub fn invoke<T>(&mut self) -> Result<(Address, u8), ProgramError>
 	where
 		T: PinaCompactAccount,
-		P: PinaPodPatch<T>,
+		P: PinaCompactPatch<T>,
 	{
 		self.invoke_signed::<T>(&[])
 	}
@@ -423,7 +430,7 @@ impl<P> CreateCompactProgramAccount<'_, '_, '_, '_, P> {
 	) -> Result<(Address, u8), ProgramError>
 	where
 		T: PinaCompactAccount,
-		P: PinaPodPatch<T>,
+		P: PinaCompactPatch<T>,
 	{
 		self.invoke_signed_inner::<T>(signers, None)
 	}
@@ -436,7 +443,7 @@ impl<P> CreateCompactProgramAccount<'_, '_, '_, '_, P> {
 	) -> Result<(Address, u8), ProgramError>
 	where
 		T: PinaCompactAccount,
-		P: PinaPodPatch<T>,
+		P: PinaCompactPatch<T>,
 	{
 		self.invoke_signed_inner::<T>(signers, Some(rent))
 	}
@@ -448,7 +455,7 @@ impl<P> CreateCompactProgramAccount<'_, '_, '_, '_, P> {
 	) -> Result<(Address, u8), ProgramError>
 	where
 		T: PinaCompactAccount,
-		P: PinaPodPatch<T>,
+		P: PinaCompactPatch<T>,
 	{
 		let Some((address, bump)) = crate::try_find_program_address(self.seeds, self.owner) else {
 			return Err(ProgramError::InvalidSeeds);
@@ -470,6 +477,11 @@ impl<P> CreateCompactProgramAccount<'_, '_, '_, '_, P> {
 }
 
 /// Creates a variable-length PDA-backed account using an explicit bump.
+///
+/// Pina accepts the account's generated patch type and clears the new account
+/// data if initialization fails. With the `validation` feature, the generated
+/// account boundary runs application validation and clears the data before
+/// returning its error.
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 #[must_use = "account creation has no effect until invoke or invoke_signed is called"]
 pub struct CreateCompactProgramAccountWithBump<'account, 'address, 'seeds, 'seed, P> {
@@ -495,7 +507,7 @@ impl<P> CreateCompactProgramAccountWithBump<'_, '_, '_, '_, P> {
 	pub fn invoke<T>(&mut self) -> ProgramResult
 	where
 		T: PinaCompactAccount,
-		P: PinaPodPatch<T>,
+		P: PinaCompactPatch<T>,
 	{
 		self.invoke_signed::<T>(&[])
 	}
@@ -504,7 +516,7 @@ impl<P> CreateCompactProgramAccountWithBump<'_, '_, '_, '_, P> {
 	pub fn invoke_signed<T>(&mut self, signers: &[Signer<'_, '_>]) -> ProgramResult
 	where
 		T: PinaCompactAccount,
-		P: PinaPodPatch<T>,
+		P: PinaCompactPatch<T>,
 	{
 		self.invoke_signed_inner::<T>(signers, None)
 	}
@@ -516,7 +528,7 @@ impl<P> CreateCompactProgramAccountWithBump<'_, '_, '_, '_, P> {
 	) -> ProgramResult
 	where
 		T: PinaCompactAccount,
-		P: PinaPodPatch<T>,
+		P: PinaCompactPatch<T>,
 	{
 		self.account.assert_writable()?;
 		self.payer.assert_writable()?;
@@ -532,9 +544,11 @@ impl<P> CreateCompactProgramAccountWithBump<'_, '_, '_, '_, P> {
 		.invoke_signed_inner(signers, rent)?;
 
 		let mut data = self.account.try_borrow_mut()?;
-		<P as PinaPodPatch<T>>::initialize(&self.patch, &mut data)
-			.map_err(|_| ProgramError::InvalidAccountData)?;
-		T::write_discriminator(&mut data);
+		let encoded_len =
+			T::initialize(&mut data, self.patch.as_pina_patch()).inspect_err(|_| {
+				data.fill(0);
+			})?;
+		debug_assert!(encoded_len <= data.len());
 
 		Ok(())
 	}
@@ -1176,11 +1190,14 @@ impl ReallocAccountZeroed<'_, '_, '_> {
 	}
 }
 
-/// Applies an atomic patch and rent-adjusts the compact account around it.
+/// Applies a structurally atomic patch and rent-adjusts the compact account.
 ///
 /// Growth happens before the patch is written. Shrinkage happens after the
 /// shorter representation is complete, so no account-data borrow crosses the
-/// reallocation CPI.
+/// reallocation CPI. The account's generated patch validates the representation
+/// and, with the `validation` feature, the completed application state.
+/// Propagate any post-patch error so Solana rolls back the patch and any
+/// preceding rent movement.
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 #[must_use = "account updates have no effect until invoke or invoke_signed is called"]
 pub struct UpdateResizableAccount<'account, 'rent, 'address, P> {
@@ -1200,7 +1217,7 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 	pub fn invoke<T>(&mut self) -> Result<usize, ProgramError>
 	where
 		T: PinaCompactAccount,
-		P: PinaPodPatch<T>,
+		P: PinaCompactPatch<T>,
 	{
 		self.invoke_signed::<T>(&[])
 	}
@@ -1209,7 +1226,7 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 	pub fn invoke_signed<T>(&mut self, signers: &[Signer<'_, '_>]) -> Result<usize, ProgramError>
 	where
 		T: PinaCompactAccount,
-		P: PinaPodPatch<T>,
+		P: PinaCompactPatch<T>,
 	{
 		self.invoke_signed_inner::<T>(signers, None)
 	}
@@ -1222,7 +1239,7 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 	) -> Result<usize, ProgramError>
 	where
 		T: PinaCompactAccount,
-		P: PinaPodPatch<T>,
+		P: PinaCompactPatch<T>,
 	{
 		self.invoke_signed_inner::<T>(signers, Some(rent))
 	}
@@ -1234,7 +1251,7 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 	) -> Result<usize, ProgramError>
 	where
 		T: PinaCompactAccount,
-		P: PinaPodPatch<T>,
+		P: PinaCompactPatch<T>,
 	{
 		self.account
 			.assert_writable()?
@@ -1246,7 +1263,8 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 			if !T::matches_discriminator(&data) {
 				return Err(ProgramError::InvalidAccountData);
 			}
-			<P as PinaPodPatch<T>>::updated_len(&self.patch, &data)
+
+			PinaPodPatch::updated_len(self.patch.as_pina_patch(), &data)
 				.map_err(|_| ProgramError::InvalidAccountData)?
 		};
 		T::validate_size(target_size)?;
@@ -1264,10 +1282,17 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 
 		let encoded_len = {
 			let mut data = self.account.try_borrow_mut()?;
-			let encoded_len = <P as PinaPodPatch<T>>::update(&self.patch, &mut data)
-				.map_err(|_| ProgramError::InvalidAccountData)?;
-			T::write_discriminator(&mut data);
-			encoded_len
+			#[cfg(feature = "validation")]
+			{
+				T::update(&mut data, self.patch.as_pina_patch())?
+			}
+			#[cfg(not(feature = "validation"))]
+			{
+				let encoded_len = PinaPodPatch::update(self.patch.as_pina_patch(), &mut data)
+					.map_err(|_| ProgramError::InvalidAccountData)?;
+				T::write_discriminator(&mut data);
+				encoded_len
+			}
 		};
 		debug_assert_eq!(encoded_len, target_size);
 
@@ -1816,6 +1841,18 @@ mod tests {
 	use compact_cpi_state::TestCompactState;
 	#[cfg(all(feature = "account-resize", feature = "compact"))]
 	use compact_cpi_state::TestCompactStatePatch;
+	#[cfg(all(
+		feature = "account-resize",
+		feature = "compact",
+		feature = "validation"
+	))]
+	use compact_cpi_state::ValidatedTestCompactState;
+	#[cfg(all(
+		feature = "account-resize",
+		feature = "compact",
+		feature = "validation"
+	))]
+	use compact_cpi_state::ValidatedTestCompactStatePatch;
 
 	struct TestState;
 
@@ -2134,6 +2171,41 @@ mod tests {
 		);
 	}
 
+	#[cfg(all(
+		feature = "account-resize",
+		feature = "compact",
+		feature = "validation"
+	))]
+	#[test]
+	fn compact_pda_builder_clears_storage_after_application_validation_fails() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"validated-compact-state"];
+		let (address, _) = crate::try_find_program_address(seeds, &owner)
+			.unwrap_or_else(|| panic!("derive validated compact test address"));
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let initial_size = ValidatedTestCompactState::HEADER_SIZE;
+		let mut stored_state = TestAccount::<64>::new(address, owner, 0, initial_size);
+		let mut state = stored_state.view();
+
+		let result = CreateCompactProgramAccount {
+			account: &mut state,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			patch: ValidatedTestCompactStatePatch::new().value(7),
+			space: initial_size,
+		}
+		.invoke_signed_with_rent::<ValidatedTestCompactState>(&[], test_rent());
+
+		assert_eq!(result, Err(ProgramError::Custom(71)));
+		assert!(
+			stored_state.data[..initial_size]
+				.iter()
+				.all(|byte| *byte == 0)
+		);
+	}
+
 	#[cfg(all(feature = "account-resize", feature = "compact"))]
 	#[test]
 	fn compact_update_builder_grows_before_applying_the_patch() {
@@ -2184,6 +2256,46 @@ mod tests {
 				Ok(())
 			})
 			.unwrap_or_else(|error| panic!("read grown compact state: {error:?}"));
+	}
+
+	#[cfg(all(
+		feature = "account-resize",
+		feature = "compact",
+		feature = "validation"
+	))]
+	#[test]
+	fn compact_update_builder_validates_the_completed_representation() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored_account = TestAccount::<64>::new(
+			Address::new_from_array([1; 32]),
+			owner,
+			1,
+			ValidatedTestCompactState::MIN_SIZE,
+		);
+		let mut stored_rent_account =
+			TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1_000, 0);
+		let mut account = stored_account.view();
+		let mut rent_account = stored_rent_account.view();
+		{
+			let mut data = account
+				.try_borrow_mut()
+				.unwrap_or_else(|error| panic!("borrow compact state: {error:?}"));
+			ValidatedTestCompactState::initialize(
+				&mut data,
+				&ValidatedTestCompactStatePatch::new().value(1),
+			)
+			.unwrap_or_else(|error| panic!("initialize compact state: {error:?}"));
+		}
+
+		let result = UpdateResizableAccount {
+			account: &mut account,
+			rent_account: &mut rent_account,
+			program_id: &owner,
+			patch: ValidatedTestCompactStatePatch::new().value(7),
+		}
+		.invoke_signed_with_rent::<ValidatedTestCompactState>(&[], test_rent());
+
+		assert_eq!(result, Err(ProgramError::Custom(71)));
 	}
 
 	#[cfg(all(feature = "account-resize", feature = "compact"))]
@@ -2309,6 +2421,46 @@ mod tests {
 
 		assert_eq!(result, Err(ProgramError::InvalidAccountData));
 		assert_eq!(account.data_len(), TestCompactState::MIN_SIZE);
+	}
+
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
+	#[test]
+	fn compact_update_builder_rejects_malformed_source_before_moving_rent() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored_account = TestAccount::<64>::new(
+			Address::new_from_array([1; 32]),
+			owner,
+			1,
+			TestCompactState::MIN_SIZE,
+		);
+		let mut stored_rent_account =
+			TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1_000, 0);
+		let mut account = stored_account.view();
+		let mut rent_account = stored_rent_account.view();
+		{
+			let mut data = account
+				.try_borrow_mut()
+				.unwrap_or_else(|error| panic!("borrow compact state: {error:?}"));
+			data.fill(u8::MAX);
+			TestCompactState::write_discriminator(&mut data);
+		}
+		let original_data = stored_account.data;
+		let original_lamports = (account.lamports(), rent_account.lamports());
+
+		let result = UpdateResizableAccount {
+			account: &mut account,
+			rent_account: &mut rent_account,
+			program_id: &owner,
+			patch: TestCompactStatePatch::new().value(34),
+		}
+		.invoke::<TestCompactState>();
+
+		assert_eq!(result, Err(ProgramError::InvalidAccountData));
+		assert_eq!(stored_account.data, original_data);
+		assert_eq!(
+			(account.lamports(), rent_account.lamports()),
+			original_lamports
+		);
 	}
 
 	#[cfg(all(feature = "account-resize", feature = "compact"))]

@@ -75,7 +75,12 @@ pub(crate) fn generate_view_helpers(
 		quote! {}
 	} else {
 		quote! {
-			<<Self as #crate_path::PinaPodFixed>::Zc as #crate_path::PinaValidate>::validate(value)?;
+			if let Err(error) =
+				<<Self as #crate_path::PinaPodFixed>::Zc as #crate_path::PinaValidate>::validate(value)
+			{
+				#crate_path::__clear_zc(value);
+				return Err(error);
+			}
 		}
 	};
 	#[cfg(feature = "validation")]
@@ -101,13 +106,23 @@ pub(crate) fn generate_view_helpers(
 	let initialize_body = initialize;
 	#[cfg(feature = "validation")]
 	let initialization_failure_docs = quote! {
-		/// structural validation fails, `PinaPod` zeros the complete slice again.
-		/// Application validation runs afterward and returns its declared
-		/// `ProgramError`.
+		/// structural or application validation fails, the complete slice is
+		/// zeroed again. Application validation returns its declared `ProgramError`.
 	};
 	#[cfg(not(feature = "validation"))]
 	let initialization_failure_docs = quote! {
 		/// validation fails, `PinaPod` zeros the complete slice again.
+	};
+	#[cfg(feature = "validation")]
+	let initialization_error_docs = quote! {
+		/// Returns the generated invalid-data error when `data` has the wrong length,
+		/// the closure fails, or structural validation rejects the representation.
+		/// Application validation returns its declared `ProgramError`.
+	};
+	#[cfg(not(feature = "validation"))]
+	let initialization_error_docs = quote! {
+		/// Returns the generated invalid-data error when `data` has the wrong length,
+		/// the closure fails, or the completed representation is invalid.
 	};
 
 	quote! {
@@ -136,8 +151,7 @@ pub(crate) fn generate_view_helpers(
 			///
 			/// # Errors
 			///
-			/// Returns the generated invalid-data error when `data` has the wrong length,
-			/// the closure fails, or the completed representation is invalid.
+			#initialization_error_docs
 			pub fn initialize<'data>(
 			data: &'data mut [u8],
 			initialize: impl FnOnce(

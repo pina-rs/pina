@@ -101,7 +101,7 @@ Unit enums with explicit discriminants can derive `PinaPod`. PinaPod generates a
 
 PinaPod initializes the full capacity of fixed strings, vectors, and options. Shortening or clearing a value also zeroes the removed payload, so stale application data does not remain in inactive capacity. Pina still exposes validated field accessors rather than a byte slice over an in-memory schema or storage view.
 
-Compact patches clear bytes removed by a tail replacement. `UpdateResizableAccount` validates the complete patch before moving rent or changing account bytes. A failed preflight leaves both data and lamports unchanged.
+Compact patches clear bytes removed by a tail replacement. Typed creation and update builders accept the account's exact generated patch through `PinaCompactPatch`; an unrelated `PinaPodPatch` implementation cannot bypass that boundary. `UpdateResizableAccount` preflights the structural patch and target size before moving rent or changing account bytes. A failed preflight leaves both data and lamports unchanged. With the `validation` feature, application rules run on the completed representation after the patch is written. Propagate every update error so Solana rolls back the bytes and any earlier rent movement.
 
 ## Testing strategy
 

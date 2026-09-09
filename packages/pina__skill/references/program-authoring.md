@@ -48,7 +48,9 @@ pina = { version = "0.15", features = ["validation"] }
 
 Each annotated macro generates a `PinaValidate` implementation with `fn validate(&self) -> ProgramResult`. Validation fails fast with the first Solana `ProgramError`; it does not allocate, collect an error tree, deserialize into a second value, or use dynamic dispatch.
 
-Pina runs generated validation automatically after structural decoding in `try_from_bytes`, after fixed or compact initialization, and after `#[derive(Accounts)]` parses the received account slice. Call `.validate()` directly when validating an already-borrowed value. Mutating a view can invalidate a previously checked rule, so validate again before emitting an event or committing application state when the mutation itself must be checked.
+Pina runs generated validation automatically after structural decoding in `try_from_bytes`, after fixed or compact initialization, after compact updates, and after `#[derive(Accounts)]` parses the received account slice. Failed initialization leaves the destination zeroed. Call `.validate()` directly when validating an already-borrowed value.
+
+Mutating a fixed view can invalidate a previously checked rule, so validate again before emitting an event or committing application state when the mutation itself must be checked. Compact updates return an error when the completed representation violates an application rule. Always propagate that error with `?`; Solana transaction rollback is what restores the pre-update bytes and any earlier rent movement.
 
 <!-- {/pinaValidationOverview} -->
 
@@ -349,7 +351,7 @@ UpdateResizableAccount {
 .invoke::<Journal>()?;
 ```
 
-The builder validates the complete patch and calculates the target size before changing bytes or lamports. It grows before applying a longer representation and applies a shorter representation before shrinking. It skips the resize when the allocation does not change. Use `invoke_signed::<Journal>(signers)` when `rent_account` is a PDA that funds growth.
+The builder preflights the patch's structural representation and calculates the target size before changing bytes or lamports. It grows before applying a longer representation and applies a shorter representation before shrinking. It skips the resize when the allocation does not change. With the `validation` feature, Pina checks application rules on the completed compact representation after writing the patch. Propagate every error with `?` so Solana rolls back the patch and any earlier rent movement. Use `invoke_signed::<Journal>(signers)` when `rent_account` is a PDA that funds growth.
 
 <!-- {/updateResizableAccountExample} -->
 
