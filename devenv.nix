@@ -763,7 +763,7 @@ in
           "$DEVENV_ROOT" \
           "$DEVENV_ROOT/target/cu/current"
       '';
-      description = "Build tracked SBF example programs and capture static CU profiles for the current checkout.";
+      description = "Build every SBF example program and capture its static CU and binary-size profile.";
       binary = "bash";
     };
     "report:cu:compare:main" = {
@@ -799,13 +799,14 @@ in
           "$DEVENV_ROOT" \
           "$DEVENV_ROOT/target/cu/runtime-head-elf"
 
-        node "$DEVENV_ROOT/scripts/measure-runtime-compute-units.ts" \
+        node "$DEVENV_ROOT/scripts/measure-example-compute-units.ts" \
           "$DEVENV_ROOT" \
           "$worktree_dir" \
           "$DEVENV_ROOT/target/cu/runtime-base-elf" \
-          "$DEVENV_ROOT/target/cu/runtime-base.json"
+          "$DEVENV_ROOT/target/cu/runtime-base.json" \
+          --allow-incomplete
 
-        node "$DEVENV_ROOT/scripts/measure-runtime-compute-units.ts" \
+        node "$DEVENV_ROOT/scripts/measure-example-compute-units.ts" \
           "$DEVENV_ROOT" \
           "$DEVENV_ROOT" \
           "$DEVENV_ROOT/target/cu/runtime-head-elf" \
@@ -822,7 +823,7 @@ in
 
         cat "$DEVENV_ROOT/target/cu/comparison.md"
       '';
-      description = "Compare tracked static CU profiles for the current checkout against origin/main.";
+      description = "Compare all example instruction CU, static CU, and program sizes against origin/main.";
       binary = "bash";
     };
     "idl:generate" = {

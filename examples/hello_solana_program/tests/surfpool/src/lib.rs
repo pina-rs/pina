@@ -49,7 +49,7 @@ fn hello_rejects_a_user_that_did_not_sign() {
 			.expect("start isolated program test");
 		// A bystander that is not the fee payer and did not sign: the runtime
 		// must not grant it signer privileges.
-		let user = Pubkey::new_unique();
+		let user = Pubkey::new_from_array([2; 32]);
 		program.fund(&user, 1_000_000_000).expect("fund user");
 
 		let error = program
@@ -75,7 +75,7 @@ fn hello_accepts_any_funded_signer() {
 			.await
 			.expect("start isolated program test");
 
-		let user = Keypair::new();
+		let user = Keypair::new_from_array([2; 32]);
 		program
 			.fund(&user.pubkey(), 1_000_000_000)
 			.expect("fund the guest user");

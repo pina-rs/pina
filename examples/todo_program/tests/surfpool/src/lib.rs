@@ -277,7 +277,7 @@ fn rejects_a_signer_who_is_not_the_stored_owner() {
 			))
 			.expect("execute Initialize");
 
-		let impostor = Keypair::new();
+		let impostor = Keypair::new_from_array([2; 32]);
 		program
 			.fund(&impostor.pubkey(), 1_000_000_000)
 			.expect("fund impostor");

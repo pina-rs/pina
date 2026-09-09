@@ -246,7 +246,7 @@ fn realloc2_rejects_a_foreign_authority_sample() {
 			.send_instruction(initialize_instruction(&program, &authority, &sample, bump))
 			.expect("initialize sample");
 
-		let foreign = Pubkey::new_unique();
+		let foreign = Pubkey::new_from_array([2; 32]);
 		program.fund(&foreign, 1_000_000_000).expect("fund foreign");
 
 		let error = program

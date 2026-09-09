@@ -16,7 +16,7 @@ fn accepts_an_authority_and_a_system_owned_wallet() {
 			.expect("start isolated program test");
 
 		let authority = program.payer();
-		let wallet = Pubkey::new_unique();
+		let wallet = Pubkey::new_from_array([2; 32]);
 		program.fund(&wallet, 1_000_000_000).expect("fund wallet");
 
 		program
@@ -76,7 +76,7 @@ fn requires_authority_signature() {
 			.expect("start isolated program test");
 
 		// A bystander account that appears unsigned cannot satisfy the guard.
-		let authority = Pubkey::new_unique();
+		let authority = Pubkey::new_from_array([2; 32]);
 		let wallet = program.payer();
 		let error = program
 			.send(

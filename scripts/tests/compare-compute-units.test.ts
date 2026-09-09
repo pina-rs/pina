@@ -121,6 +121,25 @@ test("missing head cases fail while missing base cases establish a baseline", ()
 	assert.equal(missingBase.newBaselines.length, 1);
 });
 
+test("base-only runtime cases are removed unless policy still requires them", () => {
+	const optionalCasePolicy = { ...policy, runtimeCases: [] };
+	const removed = compareRuntimeReports(
+		optionalCasePolicy,
+		{ cases: [{ id: "example/removed", computeUnits: 1_000 }] },
+		{ cases: [] },
+	);
+	assert.deepEqual(removed.removedCases, ["example/removed"]);
+	assert.equal(removed.hardErrors.length, 0);
+
+	const required = compareRuntimeReports(
+		{ ...policy, runtimeCases: ["example/removed"] },
+		{ cases: [{ id: "example/removed", computeUnits: 1_000 }] },
+		{ cases: [] },
+	);
+	assert.equal(required.removedCases.length, 0);
+	assert.equal(required.hardErrors.length, 1);
+});
+
 test("static reports use the same performance-score direction", () => {
 	const root = mkdtempSync(join(tmpdir(), "pina-cu-comparison-"));
 	const base = join(root, "base");
@@ -139,6 +158,14 @@ test("static reports use the same performance-score direction", () => {
 		total_syscalls: 1,
 	});
 	writeFileSync(join(root, "policy.json"), JSON.stringify(staticPolicy));
+	const manifest = {
+		results: {
+			faster: { status: "ok" },
+			slower: { status: "ok" },
+		},
+	};
+	writeFileSync(join(base, "manifest.json"), JSON.stringify(manifest));
+	writeFileSync(join(head, "manifest.json"), JSON.stringify(manifest));
 	writeFileSync(join(base, "faster.json"), JSON.stringify(profile(1_000)));
 	writeFileSync(join(head, "faster.json"), JSON.stringify(profile(900)));
 	writeFileSync(join(base, "slower.json"), JSON.stringify(profile(1_000)));
@@ -169,4 +196,229 @@ test("static reports use the same performance-score direction", () => {
 		],
 	);
 	assert.equal(performancePercent(1_000, 900), 10);
+	const markdown = readFileSync(join(root, "comparison.md"), "utf8");
+	assert.match(markdown, /⚠️ 1 advisory regression/u);
+	assert.match(markdown, /🚀 1 improvement/u);
+	assert.match(markdown, /<details>/u);
+	assert.match(
+		markdown,
+		/<summary>View program benchmark details<\/summary>/u,
+	);
+	assert.ok(
+		markdown.indexOf("<details>") < markdown.indexOf("| Program |"),
+		"program table should follow the details opener",
+	);
+	assert.ok(
+		markdown.indexOf("| Program |") < markdown.lastIndexOf("</details>"),
+		"program table should precede the details closer",
+	);
+});
+
+test("runtime report keeps its summary visible and table collapsed", () => {
+	const root = mkdtempSync(join(tmpdir(), "pina-runtime-summary-"));
+	const base = join(root, "base");
+	const head = join(root, "head");
+	const baseRuntime = join(root, "runtime-base.json");
+	const headRuntime = join(root, "runtime-head.json");
+	mkdirSync(base);
+	mkdirSync(head);
+	writeFileSync(join(base, "manifest.json"), JSON.stringify({ results: {} }));
+	writeFileSync(join(head, "manifest.json"), JSON.stringify({ results: {} }));
+	writeFileSync(join(root, "policy.json"), JSON.stringify(policy));
+	writeFileSync(
+		baseRuntime,
+		JSON.stringify({
+			cases: [{ id: "example/instruction", computeUnits: 1_000 }],
+		}),
+	);
+	writeFileSync(
+		headRuntime,
+		JSON.stringify({
+			cases: [{ id: "example/instruction", computeUnits: 900 }],
+		}),
+	);
+
+	const status = run({
+		policyFile: join(root, "policy.json"),
+		baseDir: base,
+		headDir: head,
+		baseRuntime,
+		headRuntime,
+		runtimeOnly: true,
+		markdownOutput: join(root, "comparison.md"),
+		jsonOutput: join(root, "comparison.json"),
+	});
+	assert.equal(status, 0);
+	const markdown = readFileSync(join(root, "comparison.md"), "utf8");
+	assert.match(markdown, /✅ No regressions or measurement errors/u);
+	assert.match(markdown, /🚀 1 improvement/u);
+	assert.match(
+		markdown,
+		/<summary>View instruction benchmark details<\/summary>/u,
+	);
+	assert.ok(
+		markdown.indexOf("<details>") < markdown.indexOf("| Instruction case |"),
+		"instruction table should follow the details opener",
+	);
+	assert.ok(
+		markdown.indexOf("| Instruction case |") < markdown.indexOf("</details>"),
+		"instruction table should precede the details closer",
+	);
+});
+
+test("runtime comparison combines discovered and focused exact cases", () => {
+	const root = mkdtempSync(join(tmpdir(), "pina-runtime-sources-"));
+	const base = join(root, "base");
+	const head = join(root, "head");
+	const baseRuntime = join(root, "runtime-base.json");
+	const headRuntime = join(root, "runtime-head.json");
+	const baseExactRuntime = join(root, "exact-runtime-base.json");
+	const headExactRuntime = join(root, "exact-runtime-head.json");
+	mkdirSync(base);
+	mkdirSync(head);
+	writeFileSync(join(base, "manifest.json"), JSON.stringify({ results: {} }));
+	writeFileSync(join(head, "manifest.json"), JSON.stringify({ results: {} }));
+	writeFileSync(
+		join(root, "policy.json"),
+		JSON.stringify({
+			...policy,
+			runtimeCases: ["exact/instruction"],
+			runtimeExpectedOutcomes: { "exact/instruction": true },
+		}),
+	);
+	writeFileSync(
+		baseRuntime,
+		JSON.stringify({
+			cases: [{ id: "discovered/instruction", computeUnits: 1_000 }],
+		}),
+	);
+	writeFileSync(
+		headRuntime,
+		JSON.stringify({
+			cases: [{ id: "discovered/instruction", computeUnits: 900 }],
+		}),
+	);
+	writeFileSync(
+		baseExactRuntime,
+		JSON.stringify({
+			cases: [
+				{ id: "exact/instruction", computeUnits: 100, succeeded: true },
+				{ id: "discovered/instruction", computeUnits: 500, succeeded: true },
+			],
+		}),
+	);
+	writeFileSync(
+		headExactRuntime,
+		JSON.stringify({
+			cases: [
+				{ id: "exact/instruction", computeUnits: 100, succeeded: true },
+				{ id: "discovered/instruction", computeUnits: 400, succeeded: true },
+			],
+		}),
+	);
+
+	const status = run({
+		policyFile: join(root, "policy.json"),
+		baseDir: base,
+		headDir: head,
+		baseRuntime,
+		headRuntime,
+		baseExactRuntime,
+		headExactRuntime,
+		runtimeOnly: true,
+		markdownOutput: join(root, "comparison.md"),
+		jsonOutput: join(root, "comparison.json"),
+	});
+	assert.equal(status, 0);
+
+	const report = JSON.parse(
+		readFileSync(join(root, "comparison.json"), "utf8"),
+	) as { runtime: { cases: Array<{ id: string }> } };
+	assert.deepEqual(
+		report.runtime.cases.map((item) => item.id).toSorted(),
+		["discovered/instruction", "exact/instruction"],
+	);
+});
+
+test("discovered comparison does not require focused exact cases", () => {
+	const root = mkdtempSync(join(tmpdir(), "pina-runtime-discovered-"));
+	const base = join(root, "base");
+	const head = join(root, "head");
+	const baseRuntime = join(root, "runtime-base.json");
+	const headRuntime = join(root, "runtime-head.json");
+	mkdirSync(base);
+	mkdirSync(head);
+	writeFileSync(join(base, "manifest.json"), JSON.stringify({ results: {} }));
+	writeFileSync(join(head, "manifest.json"), JSON.stringify({ results: {} }));
+	writeFileSync(
+		join(root, "policy.json"),
+		JSON.stringify({ ...policy, runtimeCases: ["focused/instruction"] }),
+	);
+	writeFileSync(
+		baseRuntime,
+		JSON.stringify({
+			cases: [{ id: "discovered/instruction", computeUnits: 1_000 }],
+		}),
+	);
+	writeFileSync(
+		headRuntime,
+		JSON.stringify({
+			cases: [{ id: "discovered/instruction", computeUnits: 1_000 }],
+		}),
+	);
+
+	const status = run({
+		policyFile: join(root, "policy.json"),
+		baseDir: base,
+		headDir: head,
+		baseRuntime,
+		headRuntime,
+		runtimeOnly: true,
+		markdownOutput: join(root, "comparison.md"),
+		jsonOutput: join(root, "comparison.json"),
+	});
+	assert.equal(status, 0);
+});
+
+test("a new program reports its current compute units and build size", () => {
+	const root = mkdtempSync(join(tmpdir(), "pina-cu-baseline-"));
+	const base = join(root, "base");
+	const head = join(root, "head");
+	mkdirSync(base);
+	mkdirSync(head);
+	writeFileSync(
+		join(root, "policy.json"),
+		JSON.stringify({
+			warn: { deltaCu: 250, deltaPercent: 5 },
+			fail: { deltaCu: 500, deltaPercent: 10 },
+		}),
+	);
+	writeFileSync(join(base, "manifest.json"), JSON.stringify({ results: {} }));
+	writeFileSync(
+		join(head, "manifest.json"),
+		JSON.stringify({
+			results: { new_example: { status: "ok" } },
+		}),
+	);
+	writeFileSync(
+		join(head, "new_example.json"),
+		JSON.stringify({
+			total_cu: 1_234,
+			binary_size: 56_789,
+			text_size: 5,
+			total_syscalls: 1,
+		}),
+	);
+
+	const status = run({
+		policyFile: join(root, "policy.json"),
+		baseDir: base,
+		headDir: head,
+		markdownOutput: join(root, "comparison.md"),
+		jsonOutput: join(root, "comparison.json"),
+	});
+	assert.equal(status, 0);
+	const markdown = readFileSync(join(root, "comparison.md"), "utf8");
+	assert.match(markdown, /new_example/u);
+	assert.match(markdown, /56,789 B/u);
 });

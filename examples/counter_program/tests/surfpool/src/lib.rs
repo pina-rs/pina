@@ -210,7 +210,7 @@ fn counters_are_isolated_per_authority() {
 			.expect("start isolated program test");
 
 		let first_authority = program.payer();
-		let second_authority = Keypair::new();
+		let second_authority = Keypair::new_from_array([2; 32]);
 		program
 			.fund(&second_authority.pubkey(), 1_000_000_000)
 			.expect("fund second authority");

@@ -61,7 +61,7 @@ fn create_roundtrips_float_bit_patterns() {
 			.expect("start isolated program test");
 
 		let authority = program.payer();
-		let account = Keypair::new();
+		let account = Keypair::new_from_array([2; 32]);
 
 		let e_half = std::f32::consts::E;
 		let e_full = std::f64::consts::E;
@@ -117,7 +117,7 @@ fn update_replaces_floats() {
 			.expect("start isolated program test");
 
 		let authority = program.payer();
-		let account = Keypair::new();
+		let account = Keypair::new_from_array([2; 32]);
 
 		program
 			.send_with_signers(
@@ -165,7 +165,7 @@ fn update_rejects_a_stranger_signer() {
 			.expect("start isolated program test");
 
 		let authority = program.payer();
-		let account = Keypair::new();
+		let account = Keypair::new_from_array([2; 32]);
 
 		program
 			.send_with_signers(
@@ -180,7 +180,7 @@ fn update_rejects_a_stranger_signer() {
 			)
 			.expect("execute Create");
 
-		let stranger = Keypair::new();
+		let stranger = Keypair::new_from_array([3; 32]);
 		program
 			.fund(&stranger.pubkey(), 1_000_000_000)
 			.expect("fund stranger");

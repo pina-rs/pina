@@ -32,9 +32,8 @@ The GitHub CI workflow verifies:
 
 Separate PR workflows also verify:
 
-- `binary-size` for SBF artifact size reporting
 - `surfpool` builds each example SBF program and exercises its runtime guards through the Surfpool SDK
-- `compute-units` for exact Mollusk instruction CU and tracked static SBF regression reporting vs the PR base revision
+- `performance` for instruction compute units, every example program's build size and static CU estimate, CLI timings, and core host timings against the PR base
 
 The main CI workflow also runs `release-publish` on every pull request. When a PR contains releaseable changesets, the job creates the same release commit as the production release workflow and keeps that commit local to the runner. Registry readiness and a publish dry-run both select every package from its embedded release record, and CI requires their package sets to match so a newly added package cannot be omitted by a maintained allowlist. Cargo cannot completely verify dependent crates until their same-release dependencies exist in crates.io; Monochange plans those packages and publishes them in dependency order during the real release. Prepared release PRs are checked directly. Pull requests without a publishable release keep the job visible but skip the preflight explicitly.
 
@@ -66,52 +65,41 @@ The broader Pina examples also run their purpose-built Mollusk, LiteSVM, and Qua
 
 An earlier revision of the `security/06-duplicate-mutable-accounts/secure` fixture checked distinct, program-owned balances but did not require that its signer matches the source balance's stored owner, so an unrelated signer could debit a victim's logical balance into an attacker's destination. That authorization invariant is now enforced: `validate_source_authority` rejects a signer that does not match the source balance's stored owner with `LedgerError::UnauthorizedSigner`, and dedicated regression tests cover both the unauthorized-transfer rejection and the legitimate owner path.
 
-## Compute-unit regression policy
+## Performance regression policy
 
-The `compute-units` workflow checks out the pull-request base in a sibling worktree and builds both revisions. It compares two signals:
+The `performance` workflow checks out the pull-request base in a sibling worktree. Four jobs run in parallel and update one sticky pull-request comment:
 
-- Exact runtime CU from deterministic Mollusk instruction fixtures that load the copied base and head ELF files directly.
-- Static `pina profile --json` estimates for a broader set of tracked SBF examples.
+- Instruction CU from the ignored Surfpool suites, simulated against copied base and head ELF files.
+- Static `pina profile --json` estimates and build sizes for every top-level example with a `bpf-entrypoint` feature.
+- Hyperfine timings for representative CLI commands and median host timings from `crates/pina/tests/benchmarks.rs`.
 
-The exact harness records each ELF SHA-256, source revision, Cargo lockfile SHA-256, SBF toolchain, Mollusk version, and repetition count. Each instruction runs twice and must return the same count. Missing head cases, unexpected cases, and every unapproved runtime increase fail CI.
+The report names the latest release reachable from the base. When that release is the base commit, the displayed comparison is also release-to-head. Otherwise the tag is context and timings remain base-to-head so the workflow avoids a third build.
 
-Tracked programs are defined in `scripts/compute-unit-policy.json`:
+The inventories are discovered instead of maintained by hand. A new example or instruction appears as a new baseline with its current result. Future pull requests compare against it. A missing head profile, ELF, or instruction measurement fails CI.
 
-- `hello_solana_program`
-- `duplicate_mutable_accounts_program`
-- `events_program`
-- `sysvar_checks_program`
-- `system_accounts_program`
-- `account_realloc_program`
-- `compact_accounts_program`
-- `counter_program`
-- `profile_program`
-
-Current policy:
+The compute-unit policy is:
 
 - warn when `total_cu` increases by at least `+250` CU and `+5.0%`
 - fail when `total_cu` increases by at least `+500` CU and `+10.0%`
 - decreases are positive and increases are negative
 - smaller static increases remain visible but do not fail the threshold gate
-- exact runtime increases fail unless a reviewed absolute ceiling permits that total
+- instruction runtime increases fail unless a reviewed absolute ceiling permits that total
 
 Notes:
 
-- exact cases use real instruction execution through Mollusk; static profiles complement them with broader whole-program coverage
-- the runtime inventory covers fixed scalar state, fixed `String`/`Vec`/`Option` state, and compact realloc growth, rewrite, and shrink paths
+- instruction cases use real transaction simulation through Surfpool; static profiles complement them with whole-program coverage and binary sizes
 - reviewed redesigns may record an absolute total in `approvedTotals`; the allowance applies only while the base is below that total, so later increases are still evaluated normally
-- reviewed exact-runtime redesigns use `runtimeApprovedTotals` with the same absolute-ceiling behavior
-- the tracked set should favor example programs that build reliably on both the PR head and the PR base with the gallery linker used in CI; richer CPI-heavy and token-heavy flows remain covered by the main `ci` and program E2E jobs
-- if the tracked set or thresholds need to change, update `scripts/compute-unit-policy.json`
+- reviewed instruction redesigns use `runtimeApprovedTotals` with the same absolute-ceiling behavior
+- update `scripts/compute-unit-policy.json` only for exclusions, thresholds, or reviewed ceilings; do not add new examples to an allowlist
 
 Local reproduction:
 
 ```bash
-profile:cu:tracked
-report:cu:compare:main
+devenv shell -- profile:cu:tracked
+devenv shell -- report:cu:compare:main
 ```
 
-The comparison writes artifacts to `target/cu/`, including a markdown summary and a machine-readable JSON report.
+The local comparison writes artifacts to `target/cu/`, including a Markdown summary, copied ELFs, and machine-readable JSON.
 
 See [Compute-unit performance](./compute-unit-performance.md) for the exact PinaPod v0.2 migration results and approval rationale.
 

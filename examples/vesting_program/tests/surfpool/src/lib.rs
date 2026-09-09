@@ -14,6 +14,7 @@ use pina_test::Signer;
 use pina_test::TestError;
 use program_under_test::ID;
 use program_under_test::VestingInstruction;
+use program_under_test::VestingState;
 
 /// SPL Token (Tokenkeg…), one of the example's allowlisted programs.
 const TOKEN_PROGRAM: &str = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
@@ -93,7 +94,7 @@ fn provision_mint(
 	payer: &Pubkey,
 	authority: &Keypair,
 ) -> Result<Pubkey, TestError> {
-	let mint = Keypair::new();
+	let mint = Keypair::new_from_array([13; 32]);
 	let create = create_account_instruction(
 		program,
 		payer,
@@ -119,31 +120,6 @@ fn provision_mint(
 	Ok(mint.pubkey())
 }
 
-fn mint_into(
-	program: &ProgramTest,
-	mint: &Pubkey,
-	destination: &Pubkey,
-	authority: &Keypair,
-	amount: u64,
-) -> Result<(), TestError> {
-	// MintTo = tag 7.
-	let mut data = vec![7u8];
-	data.extend_from_slice(&amount.to_le_bytes());
-	let instruction = Instruction::new_with_bytes(
-		token_program_id(),
-		&data,
-		vec![
-			AccountMeta::new(*mint, false),
-			AccountMeta::new(*destination, false),
-			AccountMeta::new_readonly(authority.pubkey(), true),
-		],
-	);
-
-	program
-		.send_with_signers(instruction, &[authority])
-		.map(|_| ())
-}
-
 fn initialize_instruction(
 	program: &ProgramTest,
 	admin: &Pubkey,
@@ -153,11 +129,12 @@ fn initialize_instruction(
 	vault: &Pubkey,
 	bump: u8,
 ) -> pina_test::Instruction {
-	let mut data = vec![VestingInstruction::Initialize as u8, bump];
+	let mut data = vec![VestingInstruction::Initialize as u8];
 	data.extend_from_slice(&TOTAL.to_le_bytes());
 	data.extend_from_slice(&0u64.to_le_bytes()); // start_ts
 	data.extend_from_slice(&0u64.to_le_bytes()); // cliff_ts
 	data.extend_from_slice(&u64::MAX.to_le_bytes()); // end_ts
+	data.push(bump);
 
 	program.instruction(
 		&data,
@@ -193,7 +170,7 @@ fn claim_instruction(
 			AccountMeta::new_readonly(*mint, false),
 			AccountMeta::new(*vesting_state, false),
 			AccountMeta::new(*beneficiary_ata, false),
-			AccountMeta::new_readonly(*vault, false),
+			AccountMeta::new(*vault, false),
 			AccountMeta::new_readonly(ata_program_id(), false),
 			AccountMeta::new_readonly(Pubkey::default(), false),
 			AccountMeta::new_readonly(token_program_id(), false),
@@ -220,8 +197,6 @@ fn cancel_instruction(
 	)
 }
 
-/// VestingState layout: [disc][admin 32][beneficiary 32][mint 32]
-/// [total 8][claimed 8][start 8][cliff 8][end 8][cancelled][bump].
 fn assert_vesting(
 	account: &Account,
 	admin: &Pubkey,
@@ -232,80 +207,115 @@ fn assert_vesting(
 	cancelled: bool,
 	bump: u8,
 ) {
-	assert_eq!(account.data[0], 1, "discriminator is VestingState");
-	assert_eq!(&account.data[1..33], admin.to_bytes());
-	assert_eq!(&account.data[33..65], beneficiary.to_bytes());
-	assert_eq!(&account.data[65..97], mint.to_bytes());
-	assert_eq!(&account.data[97..105], total.to_le_bytes());
-	assert_eq!(&account.data[105..113], claimed.to_le_bytes());
-	assert_eq!(account.data[137], u8::from(cancelled), "cancelled flag");
-	assert_eq!(account.data[138], bump);
+	let state = VestingState::try_from_bytes(&account.data).expect("decode vesting state");
+	assert_eq!(state.admin.as_ref(), admin.as_ref());
+	assert_eq!(state.beneficiary.as_ref(), beneficiary.as_ref());
+	assert_eq!(state.mint.as_ref(), mint.as_ref());
+	assert_eq!(state.total_amount.get(), total);
+	assert_eq!(state.claimed_amount.get(), claimed);
+	assert_eq!(state.cancelled.get(), cancelled);
+	assert_eq!(state.bump, bump);
 }
 
-fn token_amount(account: &Account) -> u64 {
-	u64::from_le_bytes(account.data[64..72].try_into().expect("token amount"))
-}
-
-/// The vesting PDA combines four seed arguments plus the bump. Real agave
-/// runtimes accept any number of seeds up to `MAX_SEEDS` (16), but Surfpool
-/// 1.5's embedded runtime rejects the CPI signer derivation for this shape
-/// with "Provided seeds do not result in a valid address".
+/// Exercise every vesting instruction with a real SPL mint and ATA.
 ///
-/// Lower the seed count in the program (or upgrade Surfpool) before this flow
-/// can be exercised end to end on surfpool. Until then, this test pins the
-/// observed behavior so a future runtime upgrade flips it loudly instead of
-/// silently.
+/// Fixed signer keys keep the PDA path and compute-unit measurements stable.
 #[test]
 #[ignore = "run with pina test"]
-fn initialize_is_blocked_by_the_surfpool_seed_limit() {
+fn initialize_claim_and_cancel() {
 	pina_test::run(async {
 		let program_id = Pubkey::new_from_array(ID.to_bytes());
 		let mut program = ProgramTest::start(program_id)
 			.await
 			.expect("start isolated program test");
 
-		let mint_authority = Keypair::new();
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
-		let admin = program.payer();
-		let beneficiary = Keypair::new();
+		let mint_authority = Keypair::new_from_array([12; 32]);
+		let admin = Keypair::new_from_array([11; 32]);
+		program.fund(&admin.pubkey(), FUND).expect("fund admin");
+		let beneficiary = Keypair::new_from_array([14; 32]);
 		program
 			.fund(&beneficiary.pubkey(), FUND)
 			.expect("fund beneficiary");
 
-		let mint =
-			provision_mint(&program, &admin, &mint_authority).expect("provision vesting mint");
+		let mint = provision_mint(&program, &program.payer(), &mint_authority)
+			.expect("provision vesting mint");
 
-		let (vesting_state, bump) = vesting_pda(&program_id, &admin, &beneficiary.pubkey(), &mint);
+		let (vesting_state, bump) =
+			vesting_pda(&program_id, &admin.pubkey(), &beneficiary.pubkey(), &mint);
 		let vault = ata_of(&vesting_state, &mint);
 		assert_ne!(bump, 0, "a canonical bump exists on the host");
 
-		// Host derivation agrees with the program's seeds (see the native
-		// tests in the program crate); the isolated VM refuses the CPI.
-		let error = program
-			.send_instruction(initialize_instruction(
-				&program,
-				&admin,
-				&beneficiary.pubkey(),
-				&mint,
-				&vesting_state,
-				&vault,
-				bump,
-			))
-			.expect_err("surfpool 1.5 cannot derive 5-seed CPI signers");
-		assert_eq!(error.operation(), "execute program instruction");
-		assert!(
-			error
-				.message()
-				.contains("Provided seeds do not result in a valid address"),
-			"expected the seed-limit error, got: {}",
-			error.message()
+		program
+			.send_with_signers(
+				initialize_instruction(
+					&program,
+					&admin.pubkey(),
+					&beneficiary.pubkey(),
+					&mint,
+					&vesting_state,
+					&vault,
+					bump,
+				),
+				&[&admin],
+			)
+			.expect("execute Initialize");
+		assert_vesting(
+			&program
+				.account(&vesting_state)
+				.expect("fetch initialized vesting state"),
+			&admin.pubkey(),
+			&beneficiary.pubkey(),
+			&mint,
+			TOTAL,
+			0,
+			false,
+			bump,
 		);
-		assert!(
-			program.account(&vesting_state).is_err(),
-			"no vesting state exists when the CPI fails"
+		let beneficiary_ata = ata_of(&beneficiary.pubkey(), &mint);
+		program
+			.send_with_signers(
+				claim_instruction(
+					&program,
+					&beneficiary.pubkey(),
+					&mint,
+					&vesting_state,
+					&beneficiary_ata,
+					&vault,
+					CLAIM_AMOUNT,
+				),
+				&[&beneficiary],
+			)
+			.expect("execute Claim");
+		assert_vesting(
+			&program
+				.account(&vesting_state)
+				.expect("fetch claimed state"),
+			&admin.pubkey(),
+			&beneficiary.pubkey(),
+			&mint,
+			TOTAL,
+			CLAIM_AMOUNT,
+			false,
+			bump,
+		);
+
+		program
+			.send_with_signers(
+				cancel_instruction(&program, &admin.pubkey(), &mint, &vesting_state, &vault),
+				&[&admin],
+			)
+			.expect("execute Cancel");
+		assert_vesting(
+			&program
+				.account(&vesting_state)
+				.expect("fetch cancelled state"),
+			&admin.pubkey(),
+			&beneficiary.pubkey(),
+			&mint,
+			TOTAL,
+			CLAIM_AMOUNT,
+			true,
+			bump,
 		);
 
 		program.stop().expect("stop isolated program test");

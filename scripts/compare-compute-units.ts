@@ -12,7 +12,8 @@ interface Threshold {
 }
 
 export interface ComputeUnitPolicy {
-	trackedPrograms: string[];
+	excludedPrograms?: string[];
+	trackedPrograms?: string[];
 	runtimeCases?: string[];
 	warn: Threshold;
 	fail: Threshold;
@@ -46,6 +47,9 @@ interface RuntimeCase {
 interface RuntimeReport {
 	provenance?: unknown;
 	cases?: RuntimeCase[];
+	missingCases?: string[];
+	testFailures?: string[];
+	unavailablePrograms?: string[];
 }
 
 type ComparisonStatus =
@@ -76,6 +80,12 @@ interface StaticComparison {
 	deltaTotalSyscalls: number;
 }
 
+interface StaticBaseline {
+	program: string;
+	totalCu: number;
+	binarySize: number;
+}
+
 export interface RuntimeComparison {
 	id: string;
 	status: ComparisonStatus;
@@ -91,6 +101,7 @@ export interface RuntimeComparison {
 interface RuntimeComparisonResult {
 	comparisons: RuntimeComparison[];
 	newBaselines: string[];
+	removedCases: string[];
 	hardErrors: string[];
 }
 
@@ -102,6 +113,10 @@ interface Arguments {
 	jsonOutput: string;
 	baseRuntime?: string;
 	headRuntime?: string;
+	baseExactRuntime?: string;
+	headExactRuntime?: string;
+	runtimeOnly?: boolean;
+	staticOnly?: boolean;
 }
 
 function requireValue(values: string[], index: number, option: string): string {
@@ -113,11 +128,19 @@ function requireValue(values: string[], index: number, option: string): string {
 }
 
 function parseArguments(values: string[]): Arguments {
-	const parsed: Partial<Arguments> = {};
-	for (let index = 0; index < values.length; index += 2) {
+	const parsed: Partial<Arguments> = {
+		runtimeOnly: false,
+		staticOnly: false,
+	};
+	for (let index = 0; index < values.length;) {
 		const option = values[index];
 		if (option === undefined) {
 			break;
+		}
+		if (option === "--runtime-only" || option === "--static-only") {
+			parsed[option === "--runtime-only" ? "runtimeOnly" : "staticOnly"] = true;
+			index += 1;
+			continue;
 		}
 		const value = requireValue(values, index, option);
 		switch (option) {
@@ -142,9 +165,20 @@ function parseArguments(values: string[]): Arguments {
 			case "--head-runtime":
 				parsed.headRuntime = value;
 				break;
+			case "--base-exact-runtime":
+				parsed.baseExactRuntime = value;
+				break;
+			case "--head-exact-runtime":
+				parsed.headExactRuntime = value;
+				break;
 			default:
 				throw new Error(`unknown option: ${option}`);
 		}
+		index += 2;
+	}
+
+	if (parsed.runtimeOnly && parsed.staticOnly) {
+		throw new Error("--runtime-only and --static-only are mutually exclusive");
 	}
 
 	for (
@@ -169,12 +203,43 @@ function parseArguments(values: string[]): Arguments {
 		);
 	}
 
+	if (
+		(parsed.baseExactRuntime === undefined) !==
+			(parsed.headExactRuntime === undefined)
+	) {
+		throw new Error(
+			"--base-exact-runtime and --head-exact-runtime must be provided together",
+		);
+	}
+
 	return parsed as Arguments;
 }
 
 function loadJson<T>(path: string): T {
 	const value: unknown = JSON.parse(readFileSync(path, "utf8"));
 	return value as T;
+}
+
+function selectRuntimeCases(
+	report: RuntimeReport,
+	requiredCases: ReadonlySet<string>,
+): RuntimeReport {
+	return {
+		...report,
+		cases: (report.cases ?? []).filter((item) => requiredCases.has(item.id)),
+	};
+}
+
+function mergeRuntimeReports(reports: RuntimeReport[]): RuntimeReport {
+	return {
+		provenance: reports.map((report) => report.provenance),
+		cases: reports.flatMap((report) => report.cases ?? []),
+		missingCases: reports.flatMap((report) => report.missingCases ?? []),
+		testFailures: reports.flatMap((report) => report.testFailures ?? []),
+		unavailablePrograms: reports.flatMap((report) =>
+			report.unavailablePrograms ?? []
+		),
+	};
 }
 
 function loadOptionalManifest(directory: string): ProfileManifest {
@@ -287,6 +352,7 @@ export function compareRuntimeReports(
 ): RuntimeComparisonResult {
 	const comparisons: RuntimeComparison[] = [];
 	const newBaselines: string[] = [];
+	const removedCases: string[] = [];
 	const hardErrors: string[] = [];
 	const baseCases = new Map(
 		(baseReport.cases ?? []).map((item) => [item.id, item]),
@@ -294,7 +360,12 @@ export function compareRuntimeReports(
 	const headCases = new Map(
 		(headReport.cases ?? []).map((item) => [item.id, item]),
 	);
-	const trackedCases = new Set(policy.runtimeCases ?? []);
+	const trackedCases = new Set([
+		...baseCases.keys(),
+		...headCases.keys(),
+		...(policy.runtimeCases ?? []),
+	]);
+	const requiredCases = new Set(policy.runtimeCases ?? []);
 
 	for (const caseId of trackedCases) {
 		const base = baseCases.get(caseId);
@@ -304,10 +375,18 @@ export function compareRuntimeReports(
 			continue;
 		}
 		if (head === undefined) {
-			hardErrors.push(`\`${caseId}\` is missing from the head runtime report`);
+			if (requiredCases.has(caseId)) {
+				hardErrors.push(
+					`\`${caseId}\` is missing from the head runtime report`,
+				);
+			} else {
+				removedCases.push(caseId);
+			}
 			continue;
 		}
+
 		const expectedHeadOutcome = policy.runtimeExpectedOutcomes?.[caseId];
+
 		if (expectedHeadOutcome !== undefined) {
 			if (head.succeeded === undefined) {
 				hardErrors.push(
@@ -321,6 +400,7 @@ export function compareRuntimeReports(
 				);
 			}
 		}
+
 		if (base === undefined) {
 			newBaselines.push(
 				`\`${caseId}\` established a new baseline at ${
@@ -352,19 +432,20 @@ export function compareRuntimeReports(
 		});
 	}
 
-	const unexpected = [...headCases.keys()].filter((caseId) =>
-		!trackedCases.has(caseId)
-	).sort();
-	if (unexpected.length > 0) {
+	for (const missing of headReport.missingCases ?? []) {
 		hardErrors.push(
-			`head runtime report contains untracked cases: ${
-				unexpected
-					.map((caseId) => `\`${caseId}\``)
-					.join(", ")
-			}`,
+			`\`${missing}\` has no successful or expected-error Surfpool coverage`,
 		);
 	}
-	return { comparisons, newBaselines, hardErrors };
+
+	for (const failure of headReport.testFailures ?? []) {
+		hardErrors.push(`head benchmark test failed: ${failure}`);
+	}
+
+	for (const program of headReport.unavailablePrograms ?? []) {
+		hardErrors.push(`head benchmark ELF is unavailable for \`${program}\``);
+	}
+	return { comparisons, newBaselines, removedCases, hardErrors };
 }
 
 function formatInt(value: number): string {
@@ -395,9 +476,64 @@ function statusLabel(status: ComparisonStatus): string {
 
 function outcomeLabel(succeeded: boolean | undefined): string {
 	if (succeeded === undefined) {
-		return "unknown";
+		return "not recorded";
 	}
+
 	return succeeded ? "success" : "rejected";
+}
+
+interface BenchmarkSummaryCounts {
+	advisoryRegressions: number;
+	blockingRegressions: number;
+	errors: number;
+	improvements: number;
+	newBaselines: number;
+	unchanged: number;
+}
+
+function formatCount(
+	count: number,
+	singular: string,
+	plural = `${singular}s`,
+): string {
+	return `${formatInt(count)} ${count === 1 ? singular : plural}`;
+}
+
+function benchmarkSummary(
+	counts: BenchmarkSummaryCounts,
+	extra: string[] = [],
+): string {
+	const health: string[] = [];
+
+	if (counts.errors > 0) {
+		health.push(`❌ ${formatCount(counts.errors, "measurement error")}`);
+	}
+
+	if (counts.blockingRegressions > 0) {
+		health.push(
+			`❌ ${formatCount(counts.blockingRegressions, "blocking regression")}`,
+		);
+	}
+
+	if (counts.advisoryRegressions > 0) {
+		health.push(
+			`⚠️ ${formatCount(counts.advisoryRegressions, "advisory regression")}`,
+		);
+	}
+
+	if (health.length === 0) {
+		health.push("✅ No regressions or measurement errors");
+	}
+
+	return [
+		...health,
+		`🚀 ${formatCount(counts.improvements, "improvement")}`,
+		`➖ ${formatCount(counts.unchanged, "unchanged result")}`,
+		...(counts.newBaselines > 0
+			? [`🆕 ${formatCount(counts.newBaselines, "new baseline")}`]
+			: []),
+		...extra,
+	].join(" · ");
 }
 
 function compareStaticReports(
@@ -406,38 +542,63 @@ function compareStaticReports(
 	headDir: string,
 ): {
 	comparisons: StaticComparison[];
-	skipped: string[];
+	newBaselines: StaticBaseline[];
+	removedPrograms: string[];
 	hardErrors: string[];
 } {
 	const comparisons: StaticComparison[] = [];
-	const skipped: string[] = [];
+	const newBaselines: StaticBaseline[] = [];
+	const removedPrograms: string[] = [];
 	const hardErrors: string[] = [];
 	const baseManifest = loadOptionalManifest(baseDir);
 	const headManifest = loadOptionalManifest(headDir);
+	const programs = new Set([
+		...(policy.trackedPrograms ?? []),
+		...Object.keys(baseManifest.results ?? {}),
+		...Object.keys(headManifest.results ?? {}),
+	]);
 
-	for (const program of policy.trackedPrograms) {
+	for (const program of [...programs].toSorted()) {
 		const base = loadOptionalProfile(baseDir, program);
 		const head = loadOptionalProfile(headDir, program);
+		const baseTracked = baseManifest.results?.[program] !== undefined;
+		const headTracked = headManifest.results?.[program] !== undefined;
 		const baseDetail = baseManifest.results?.[program]?.detail ??
 			`profile unavailable in ${baseDir}`;
 		const headDetail = headManifest.results?.[program]?.detail ??
 			`profile unavailable in ${headDir}`;
 
-		if (base === undefined && head === undefined) {
+		if (!baseTracked && !headTracked) {
 			hardErrors.push(
-				`\`${program}\` failed because base and head profiles were unavailable (${baseDetail}; ${headDetail})`,
+				`\`${program}\` is configured but absent from both profile inventories`,
 			);
 			continue;
 		}
+
+		if (!headTracked) {
+			removedPrograms.push(program);
+			continue;
+		}
+
 		if (head === undefined) {
 			hardErrors.push(
-				`\`${program}\` produced a base profile but not a head profile (${headDetail})`,
+				`\`${program}\` did not produce a head profile (${headDetail})`,
 			);
 			continue;
 		}
+
+		if (!baseTracked) {
+			newBaselines.push({
+				program,
+				totalCu: head.total_cu,
+				binarySize: head.binary_size,
+			});
+			continue;
+		}
+
 		if (base === undefined) {
-			skipped.push(
-				`\`${program}\` established a new head-only baseline because the base profile was unavailable (${baseDetail})`,
+			hardErrors.push(
+				`\`${program}\` did not produce a base profile (${baseDetail})`,
 			);
 			continue;
 		}
@@ -470,28 +631,118 @@ function compareStaticReports(
 			deltaTotalSyscalls: head.total_syscalls - base.total_syscalls,
 		});
 	}
-	return { comparisons, skipped, hardErrors };
+	return { comparisons, newBaselines, removedPrograms, hardErrors };
 }
 
 function renderMarkdown(
 	policy: ComputeUnitPolicy,
 	staticComparisons: StaticComparison[],
-	skipped: string[],
+	newStaticBaselines: StaticBaseline[],
+	removedPrograms: string[],
 	staticErrors: string[],
 	runtime: RuntimeComparisonResult,
+	runtimeOnly: boolean,
+	staticOnly: boolean,
 ): string {
-	const lines = [
-		"## Compute-unit regression report",
-		"",
-		"A positive performance change means the head uses fewer compute units. A negative change means it uses more.",
-		"",
-		"### Exact Mollusk instruction CU",
-		"",
-		"Each case runs twice against the exact copied ELF and must produce the same count. When the outcome is unchanged, any unapproved increase fails CI. Outcome changes are shown separately so an earlier rejection is not mislabeled as a speedup.",
-		"",
-	];
+	const runtimeBlockingRegressions = runtime.comparisons.filter(
+		(item) => item.status === "fail",
+	).length;
+	const runtimeAdvisoryRegressions = runtime.comparisons.filter(
+		(item) => item.status === "approved-regression",
+	).length;
+	const runtimeImprovements = runtime.comparisons.filter(
+		(item) => item.status === "improved",
+	).length;
+	const runtimeUnchanged = runtime.comparisons.filter(
+		(item) => item.status === "unchanged",
+	).length;
+	const runtimeBehaviorChanges = runtime.comparisons.filter(
+		(item) => item.status === "behavior-changed",
+	).length;
+	const runtimeSummary = benchmarkSummary(
+		{
+			advisoryRegressions: runtimeAdvisoryRegressions,
+			blockingRegressions: runtimeBlockingRegressions,
+			errors: runtime.hardErrors.length,
+			improvements: runtimeImprovements,
+			newBaselines: runtime.newBaselines.length,
+			unchanged: runtimeUnchanged,
+		},
+		[
+			...(runtimeBehaviorChanges > 0
+				? [`🔀 ${formatCount(runtimeBehaviorChanges, "behavior change")}`]
+				: []),
+			...(runtime.removedCases.length > 0
+				? [
+					`🗂️ ${formatCount(runtime.removedCases.length, "removed case")}`,
+				]
+				: []),
+		],
+	);
+	const staticBlockingRegressions = staticComparisons.filter(
+		(item) => item.status === "fail",
+	).length;
+	const staticAdvisoryRegressions =
+		staticComparisons.filter((item) =>
+			["warn", "small-regression", "approved-regression"].includes(item.status)
+		).length;
+	const staticImprovements = staticComparisons.filter(
+		(item) => item.status === "improved",
+	).length;
+	const staticUnchanged = staticComparisons.filter(
+		(item) => item.status === "unchanged",
+	).length;
+	const smallerPrograms = staticComparisons.filter(
+		(item) => item.deltaBinarySize < 0,
+	).length;
+	const largerPrograms = staticComparisons.filter(
+		(item) => item.deltaBinarySize > 0,
+	).length;
+	const staticSummary = benchmarkSummary(
+		{
+			advisoryRegressions: staticAdvisoryRegressions,
+			blockingRegressions: staticBlockingRegressions,
+			errors: staticErrors.length,
+			improvements: staticImprovements,
+			newBaselines: newStaticBaselines.length,
+			unchanged: staticUnchanged,
+		},
+		[
+			`📦 ${formatCount(smallerPrograms, "smaller program")}`,
+			`📦 ${formatCount(largerPrograms, "larger program")}`,
+			...(removedPrograms.length > 0
+				? [`🗂️ ${formatCount(removedPrograms.length, "removed program")}`]
+				: []),
+		],
+	);
+	const lines = staticOnly
+		? [
+			"## Program compute units and build sizes",
+			"",
+			staticSummary,
+			"",
+			"<details>",
+			"<summary>View program benchmark details</summary>",
+			"",
+		]
+		: [
+			runtimeOnly
+				? "## Instruction compute units"
+				: "## Compute-unit regression report",
+			"",
+			...(runtimeOnly ? [] : ["### Instruction compute units", ""]),
+			runtimeSummary,
+			"",
+			"<details>",
+			"<summary>View instruction benchmark details</summary>",
+			"",
+			"A positive performance change means the head uses fewer compute units. A negative change means it uses more.",
+			"",
+			"Every instruction exercised by the example Surfpool suites is simulated against the exact base and head ELFs. Security-sensitive focused fixtures also run twice under Mollusk. Unapproved increases fail CI, while outcome changes are reported separately.",
+			"",
+		];
 
-	if (runtime.comparisons.length > 0) {
+	if (!staticOnly && runtime.comparisons.length > 0) {
 		lines.push(
 			"| Instruction case | Base CU | Head CU | Base outcome | Head outcome | Performance change | Change % | Status |",
 			"| ---------------- | ------: | ------: | ------------ | ------------ | -----------------: | -------: | ------ |",
@@ -507,33 +758,52 @@ function renderMarkdown(
 				} | ${statusLabel(item.status)} |`,
 			);
 		}
-	} else {
+	} else if (!staticOnly) {
 		lines.push(
-			"No exact runtime cases produced comparable base/head measurements.",
+			"No instruction cases produced comparable base/head measurements.",
 		);
 	}
-	if (runtime.newBaselines.length > 0) {
+	if (!staticOnly && runtime.newBaselines.length > 0) {
 		lines.push(
 			"",
 			"New runtime baselines:",
 			...runtime.newBaselines.map((item) => `- ${item}`),
 		);
 	}
-	if (runtime.hardErrors.length > 0) {
+	if (!staticOnly && runtime.removedCases.length > 0) {
+		lines.push(
+			"",
+			`Removed runtime cases: ${
+				runtime.removedCases.map((item) => `\`${item}\``).join(", ")
+			}`,
+		);
+	}
+	if (!staticOnly && runtime.hardErrors.length > 0) {
 		lines.push(
 			"",
 			"Runtime measurement errors:",
 			...runtime.hardErrors.map((item) => `- ${item}`),
 		);
 	}
+	if (runtimeOnly) {
+		lines.push("", "</details>", "");
+		return lines.join("\n");
+	}
 
 	lines.push(
-		"",
-		"### Static SBF estimates",
-		"",
-		`Tracked programs: ${
-			policy.trackedPrograms.map((program) => `\`${program}\``).join(", ")
-		}`,
+		...(staticOnly ? [] : [
+			"",
+			"</details>",
+			"",
+			"### Static SBF estimates",
+			"",
+			staticSummary,
+			"",
+			"<details>",
+			"<summary>View program benchmark details</summary>",
+			"",
+		]),
+		"Static SBF estimates and ELF build sizes.",
 		"",
 		"Policy:",
 		`- warn when \`total_cu\` increases by at least +${policy.warn.deltaCu} CU and +${
@@ -547,25 +817,11 @@ function renderMarkdown(
 		"- smaller increases pass the threshold gate but are not labeled as improvements",
 		"- values come from `pina profile` static SBF estimates, not runtime validator traces",
 		"",
-		"Summary:",
-		`- compared programs: ${staticComparisons.length}`,
-		`- failures: ${
-			staticComparisons.filter((item) => item.status === "fail").length
-		}`,
-		`- warnings: ${
-			staticComparisons.filter((item) => item.status === "warn").length
-		}`,
-		`- improvements: ${
-			staticComparisons.filter((item) => item.status === "improved").length
-		}`,
-		`- skipped programs: ${skipped.length}`,
-		`- availability errors: ${staticErrors.length}`,
-		"",
 	);
 	if (staticComparisons.length > 0) {
 		lines.push(
-			"| Program | Base CU | Head CU | Performance change | Change % | Status |",
-			"| ------- | ------: | ------: | -----------------: | -------: | ------ |",
+			"| Program | Base CU | Head CU | CU change | Change % | Base size | Head size | Size change | Status |",
+			"| ------- | ------: | ------: | --------: | -------: | --------: | --------: | ----------: | ------ |",
 		);
 		for (const item of staticComparisons) {
 			lines.push(
@@ -573,17 +829,36 @@ function renderMarkdown(
 					formatInt(item.headTotalCu)
 				} | ${formatSignedInt(item.deltaCu)} | ${
 					formatPercent(item.deltaPercent)
-				} | ${statusLabel(item.status)} |`,
+				} | ${formatInt(item.baseBinarySize)} B | ${
+					formatInt(item.headBinarySize)
+				} B | ${formatSignedInt(item.deltaBinarySize)} B | ${
+					statusLabel(item.status)
+				} |`,
 			);
 		}
 	} else {
-		lines.push("No tracked programs produced comparable base/head profiles.");
+		lines.push("No programs produced comparable base/head profiles.");
 	}
-	if (skipped.length > 0) {
+	if (newStaticBaselines.length > 0) {
 		lines.push(
 			"",
-			"New static baselines:",
-			...skipped.map((item) => `- ${item}`),
+			"New program baselines:",
+			"",
+			"| Program | Current CU | Current build size |",
+			"| ------- | ---------: | -----------------: |",
+			...newStaticBaselines.map((item) =>
+				`| \`${item.program}\` | ${formatInt(item.totalCu)} | ${
+					formatInt(item.binarySize)
+				} B |`
+			),
+		);
+	}
+	if (removedPrograms.length > 0) {
+		lines.push(
+			"",
+			`Removed programs: ${
+				removedPrograms.map((program) => `\`${program}\``).join(", ")
+			}`,
 		);
 	}
 	if (staticErrors.length > 0) {
@@ -595,7 +870,9 @@ function renderMarkdown(
 	}
 	lines.push(
 		"",
-		"The JSON artifact includes exact-runtime provenance plus text-section, syscall, and binary-size deltas for each statically profiled program.",
+		"Program CU and build sizes come from `pina profile`. The JSON artifact also includes instruction-runtime provenance, text-section sizes, and syscall deltas.",
+		"",
+		"</details>",
 		"",
 	);
 	return lines.join("\n");
@@ -603,6 +880,11 @@ function renderMarkdown(
 
 export function run(arguments_: Arguments): number {
 	const policy = loadJson<ComputeUnitPolicy>(arguments_.policyFile);
+	const hasExactRuntime = arguments_.baseExactRuntime !== undefined &&
+		arguments_.headExactRuntime !== undefined;
+	const requiredRuntimeCases = new Set(
+		hasExactRuntime ? policy.runtimeCases ?? [] : [],
+	);
 	const staticResult = compareStaticReports(
 		policy,
 		arguments_.baseDir,
@@ -613,22 +895,56 @@ export function run(arguments_: Arguments): number {
 	let runtime: RuntimeComparisonResult = {
 		comparisons: [],
 		newBaselines: [],
+		removedCases: [],
 		hardErrors: [],
 	};
+	const baseReports: RuntimeReport[] = [];
+	const headReports: RuntimeReport[] = [];
+
+	if (
+		arguments_.baseExactRuntime !== undefined &&
+		arguments_.headExactRuntime !== undefined
+	) {
+		baseReports.push(
+			selectRuntimeCases(
+				loadJson<RuntimeReport>(arguments_.baseExactRuntime),
+				requiredRuntimeCases,
+			),
+		);
+		headReports.push(
+			selectRuntimeCases(
+				loadJson<RuntimeReport>(arguments_.headExactRuntime),
+				requiredRuntimeCases,
+			),
+		);
+	}
+
 	if (
 		arguments_.baseRuntime !== undefined && arguments_.headRuntime !== undefined
 	) {
-		baseRuntime = loadJson<RuntimeReport>(arguments_.baseRuntime);
-		headRuntime = loadJson<RuntimeReport>(arguments_.headRuntime);
-		runtime = compareRuntimeReports(policy, baseRuntime, headRuntime);
+		baseReports.push(loadJson<RuntimeReport>(arguments_.baseRuntime));
+		headReports.push(loadJson<RuntimeReport>(arguments_.headRuntime));
+	}
+
+	if (baseReports.length > 0) {
+		baseRuntime = mergeRuntimeReports(baseReports);
+		headRuntime = mergeRuntimeReports(headReports);
+		runtime = compareRuntimeReports(
+			hasExactRuntime ? policy : { ...policy, runtimeCases: [] },
+			baseRuntime,
+			headRuntime,
+		);
 	}
 
 	const markdown = renderMarkdown(
 		policy,
 		staticResult.comparisons,
-		staticResult.skipped,
+		staticResult.newBaselines,
+		staticResult.removedPrograms,
 		staticResult.hardErrors,
 		runtime,
+		arguments_.runtimeOnly ?? false,
+		arguments_.staticOnly ?? false,
 	);
 	mkdirSync(dirname(arguments_.markdownOutput), { recursive: true });
 	mkdirSync(dirname(arguments_.jsonOutput), { recursive: true });
@@ -645,6 +961,7 @@ export function run(arguments_: Arguments): number {
 							runtime.comparisons.filter((item) => item.status === "fail")
 								.length,
 						runtimeNewBaselines: runtime.newBaselines.length,
+						runtimeRemovedCases: runtime.removedCases.length,
 						runtimeErrors: runtime.hardErrors.length,
 						comparedPrograms: staticResult.comparisons.length,
 						failures:
@@ -657,7 +974,8 @@ export function run(arguments_: Arguments): number {
 							item.status === "improved"
 						)
 							.length,
-						skippedPrograms: staticResult.skipped.length,
+						newProgramBaselines: staticResult.newBaselines.length,
+						removedPrograms: staticResult.removedPrograms.length,
 						availabilityErrors: staticResult.hardErrors.length,
 					},
 					programs: staticResult.comparisons,
@@ -666,9 +984,11 @@ export function run(arguments_: Arguments): number {
 						headProvenance: headRuntime.provenance,
 						cases: runtime.comparisons,
 						newBaselines: runtime.newBaselines,
+						removedCases: runtime.removedCases,
 						errors: runtime.hardErrors,
 					},
-					newStaticBaselines: staticResult.skipped,
+					newStaticBaselines: staticResult.newBaselines,
+					removedPrograms: staticResult.removedPrograms,
 					staticErrors: staticResult.hardErrors,
 				},
 				null,

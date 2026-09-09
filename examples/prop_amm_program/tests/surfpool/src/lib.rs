@@ -80,7 +80,7 @@ fn initialize_records_the_payer_as_authority() {
 			.expect("start isolated program test");
 
 		let payer = program.payer();
-		let oracle = Keypair::new();
+		let oracle = Keypair::new_from_array([2; 32]);
 
 		// The oracle account must sign its own create-account CPI.
 		// No pre-funding: the create-account CPI inside the program funds the
@@ -113,7 +113,7 @@ fn update_requires_the_update_authority() {
 			.expect("start isolated program test");
 
 		let payer = program.payer();
-		let oracle = Keypair::new();
+		let oracle = Keypair::new_from_array([2; 32]);
 
 		program
 			.send_with_signers(
@@ -145,7 +145,7 @@ fn rotate_hands_over_the_oracle_authority() {
 			.expect("start isolated program test");
 
 		let payer = program.payer();
-		let oracle = Keypair::new();
+		let oracle = Keypair::new_from_array([2; 32]);
 
 		program
 			.send_with_signers(
@@ -154,7 +154,7 @@ fn rotate_hands_over_the_oracle_authority() {
 			)
 			.expect("execute Initialize");
 
-		let new_authority = Keypair::new();
+		let new_authority = Keypair::new_from_array([3; 32]);
 
 		program
 			.send_instruction(rotate_instruction(

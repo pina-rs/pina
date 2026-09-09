@@ -87,8 +87,9 @@ fn provision_mint(
 	program: &ProgramTest,
 	payer: &Pubkey,
 	authority: &Keypair,
+	seed: u8,
 ) -> Result<Pubkey, TestError> {
-	let mint = Keypair::new();
+	let mint = Keypair::new_from_array([seed; 32]);
 	let create = create_account_instruction(
 		program,
 		payer,
@@ -262,16 +263,16 @@ fn pool_positions_and_stake_accounting() {
 			.await
 			.expect("start isolated program test");
 
-		let mint_authority = Keypair::new();
+		let mint_authority = Keypair::new_from_array([2; 32]);
 		program
 			.fund(&mint_authority.pubkey(), FUND)
 			.expect("fund mint authority");
 
 		let admin = program.payer();
 		let stake_mint =
-			provision_mint(&program, &admin, &mint_authority).expect("provision stake mint");
+			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
 		let reward_mint =
-			provision_mint(&program, &admin, &mint_authority).expect("provision reward mint");
+			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
 
 		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
 		let stake_vault = ata_of(&pool, &stake_mint);

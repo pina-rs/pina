@@ -252,6 +252,7 @@ pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version
 cargo-expand = { version = "1.0.111" }
 cargo-semver-checks = { version = "0.50.0" }
 cargo-workspaces = { version = "0.4.2" }
+hyperfine = { version = "1.19.0" }
 
 [workspace.lints.rust]
 # Group lints

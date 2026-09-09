@@ -2,14 +2,15 @@
 
 import { spawnSync } from "node:child_process";
 import {
+	copyFileSync,
 	cpSync,
 	existsSync,
 	lstatSync,
 	mkdirSync,
+	readdirSync,
 	readFileSync,
 	readlinkSync,
 	realpathSync,
-	renameSync,
 	rmSync,
 	unlinkSync,
 	writeFileSync,
@@ -17,16 +18,13 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+	type ExampleProgram,
+	loadExampleInventory,
+} from "./example-inventory.ts";
 import { findExecutable } from "./find-executable.ts";
 
 const TOOLS_VERSION = "v1.54";
-const PROGRAMS = [
-	"account_realloc_program",
-	"counter_program",
-	"profile_program",
-	"token_loader_cu_program",
-] as const;
-
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 const TOKEN_LOADER_FIXTURE = join(
 	SCRIPT_DIRECTORY,
@@ -35,21 +33,6 @@ const TOKEN_LOADER_FIXTURE = join(
 	"fixtures",
 	"token_loader_cu_program",
 );
-
-// Baseline ELF builds may run against an older revision where a tracked
-// example was renamed. The alias map records the historical package name so
-// the base workspace can still be built; artifacts are always emitted under
-// the canonical (head) program name.
-const BASELINE_ALIASES: Record<string, string> = (() => {
-	const policyPath = join(
-		dirname(fileURLToPath(import.meta.url)),
-		"compute-unit-policy.json",
-	);
-	const policy = JSON.parse(readFileSync(policyPath, "utf8")) as {
-		baselineProgramAliases?: Record<string, string>;
-	};
-	return policy.baselineProgramAliases ?? {};
-})();
 
 interface CommandOptions {
 	cwd?: string;
@@ -145,81 +128,92 @@ function buildProgram(
 	executable: string,
 	workspace: string,
 	output: string,
-	program: (typeof PROGRAMS)[number],
+	program: ExampleProgram,
 	env: NodeJS.ProcessEnv,
 	linux: boolean,
 ): number {
-	if (program === "token_loader_cu_program") {
-		const generated = join(output, ".token-loader-cu-program");
-		rmSync(generated, { force: true, recursive: true });
-		mkdirSync(join(generated, "src"), { recursive: true });
-		cpSync(
-			join(TOKEN_LOADER_FIXTURE, "src", "lib.rs"),
-			join(generated, "src", "lib.rs"),
-		);
-		const manifest = readFileSync(
-			join(TOKEN_LOADER_FIXTURE, "Cargo.template.toml"),
-			"utf8",
-		).replace(
-			"__PINA_PATH__",
-			JSON.stringify(join(workspace, "crates", "pina")),
-		);
-		writeFileSync(join(generated, "Cargo.toml"), manifest);
-
-		const args = [
-			...(linux
-				? ["--skip-tools-install", "--tools-version", TOOLS_VERSION]
-				: []),
-			"--manifest-path",
-			join(generated, "Cargo.toml"),
-			"--sbf-out-dir",
-			output,
-			"--features",
-			"bpf-entrypoint",
-		];
-		return linux
-			? command(executable, args, { cwd: workspace, env })
-			: command("cargo", ["build-sbf", ...args], { cwd: workspace, env });
-	}
-
-	// Resolve the example directory for this workspace, falling back to the
-	// historical (aliased) name when the revision predates a rename.
-	const manifestDirectory = existsSync(join(workspace, "examples", program))
-		? program
-		: BASELINE_ALIASES[program] ?? program;
+	const features = ["bpf-entrypoint"];
 	const args = [
 		...(linux
 			? ["--skip-tools-install", "--tools-version", TOOLS_VERSION]
 			: []),
 		"--manifest-path",
-		join(workspace, "examples", manifestDirectory, "Cargo.toml"),
+		program.manifest,
+		"--sbf-out-dir",
+		output,
+		"--features",
+		features.join(","),
+		"--",
+		"--locked",
+	];
+	return linux
+		? command(executable, args, { cwd: workspace, env })
+		: command("cargo", ["build-sbf", ...args], { cwd: workspace, env });
+}
+
+function buildTokenLoaderProgram(
+	executable: string,
+	workspace: string,
+	output: string,
+	env: NodeJS.ProcessEnv,
+	linux: boolean,
+): number {
+	const generated = join(output, ".token-loader-cu-program");
+	rmSync(generated, { force: true, recursive: true });
+	mkdirSync(join(generated, "src"), { recursive: true });
+	cpSync(
+		join(TOKEN_LOADER_FIXTURE, "src", "lib.rs"),
+		join(generated, "src", "lib.rs"),
+	);
+
+	const manifest = readFileSync(
+		join(TOKEN_LOADER_FIXTURE, "Cargo.template.toml"),
+		"utf8",
+	).replace(
+		"__PINA_PATH__",
+		JSON.stringify(join(workspace, "crates", "pina")),
+	);
+	writeFileSync(join(generated, "Cargo.toml"), manifest);
+
+	const args = [
+		...(linux
+			? ["--skip-tools-install", "--tools-version", TOOLS_VERSION]
+			: []),
+		"--manifest-path",
+		join(generated, "Cargo.toml"),
 		"--sbf-out-dir",
 		output,
 		"--features",
 		"bpf-entrypoint",
-		"--",
-		"--locked",
 	];
-	const status = linux
+
+	return linux
 		? command(executable, args, { cwd: workspace, env })
 		: command("cargo", ["build-sbf", ...args], { cwd: workspace, env });
-	if (status !== 0) {
-		return status;
-	}
-	if (manifestDirectory !== program) {
-		const built = join(output, `${manifestDirectory}.so`);
-		const canonical = join(output, `${program}.so`);
-		rmSync(canonical, { force: true });
-		renameSync(built, canonical);
-	}
-	return 0;
 }
 
 function main(): number {
 	const values = process.argv.slice(2);
+	const tokenLoaderOnlyIndex = values.indexOf("--token-loader-only");
+	const examplesOnlyIndex = values.indexOf("--examples-only");
+	const tokenLoaderOnly = tokenLoaderOnlyIndex !== -1;
+	const examplesOnly = examplesOnlyIndex !== -1;
+
+	if (tokenLoaderOnly) {
+		values.splice(tokenLoaderOnlyIndex, 1);
+	}
+	if (examplesOnly) {
+		values.splice(values.indexOf("--examples-only"), 1);
+	}
+	if (tokenLoaderOnly && examplesOnly) {
+		process.stderr.write(
+			"--token-loader-only and --examples-only cannot be used together\n",
+		);
+		return 1;
+	}
 	if (values.length === 0 || values.length % 2 !== 0) {
 		process.stderr.write(
-			"Usage: build-runtime-compute-units.ts <workspace-root> <output-dir> [<workspace-root> <output-dir>...]\n",
+			"Usage: build-runtime-compute-units.ts [--examples-only | --token-loader-only] <workspace-root> <output-dir> [<workspace-root> <output-dir>...]\n",
 		);
 		return 1;
 	}
@@ -237,11 +231,17 @@ function main(): number {
 		const workspace = realpathSync(values[index] ?? ".");
 		const output = resolve(values[index + 1] ?? ".");
 		mkdirSync(output, { recursive: true });
-		for (const program of PROGRAMS) {
-			const artifact = join(output, `${program}.so`);
+		const programs = tokenLoaderOnly
+			? []
+			: loadExampleInventory(workspace, { env }).programs;
+
+		for (const program of programs) {
+			const artifact = join(output, `${program.name}.so`);
+			const cargoArtifact = join(output, `${program.artifactName}.so`);
 			rmSync(artifact, { force: true });
+			rmSync(cargoArtifact, { force: true });
 			process.stdout.write(
-				`Building runtime CU ELF for ${program} at ${workspace}\n`,
+				`Building runtime CU ELF for ${program.name} at ${workspace}\n`,
 			);
 			const status = buildProgram(
 				executable,
@@ -254,9 +254,48 @@ function main(): number {
 			if (status !== 0) {
 				return status;
 			}
-			if (!existsSync(artifact)) {
-				throw new Error(`cargo-build-sbf did not produce ${artifact}`);
+			if (!existsSync(cargoArtifact)) {
+				const outputFiles = readdirSync(output).toSorted().join(", ");
+				throw new Error(
+					`cargo-build-sbf did not produce ${cargoArtifact}; output contains: ${
+						outputFiles.length === 0 ? "nothing" : outputFiles
+					}`,
+				);
 			}
+
+			if (cargoArtifact !== artifact) {
+				copyFileSync(cargoArtifact, artifact);
+			}
+		}
+
+		if (examplesOnly) {
+			continue;
+		}
+
+		const tokenLoaderArtifact = join(output, "token_loader_cu_program.so");
+		rmSync(tokenLoaderArtifact, { force: true });
+		process.stdout.write(
+			`Building runtime CU ELF for token_loader_cu_program at ${workspace}\n`,
+		);
+		const tokenLoaderStatus = buildTokenLoaderProgram(
+			executable,
+			workspace,
+			output,
+			env,
+			linux,
+		);
+
+		if (tokenLoaderStatus !== 0) {
+			return tokenLoaderStatus;
+		}
+
+		if (!existsSync(tokenLoaderArtifact)) {
+			const outputFiles = readdirSync(output).toSorted().join(", ");
+			throw new Error(
+				`cargo-build-sbf did not produce ${tokenLoaderArtifact}; output contains: ${
+					outputFiles.length === 0 ? "nothing" : outputFiles
+				}`,
+			);
 		}
 	}
 	return 0;

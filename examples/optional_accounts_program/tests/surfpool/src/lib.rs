@@ -156,7 +156,7 @@ fn touch_rejects_a_wrong_type_store() {
 			.send_instruction(init_instruction(&program, &authority, &store, bump))
 			.expect("execute Init");
 
-		let impostor = Pubkey::new_unique();
+		let impostor = Pubkey::new_from_array([2; 32]);
 		program
 			.fund(&impostor, 1_000_000_000)
 			.expect("fund impostor");
@@ -198,7 +198,7 @@ fn inspect_enforces_the_witness_signer_when_provided() {
 			.send_instruction(init_instruction(&program, &authority, &store, bump))
 			.expect("execute Init");
 
-		let witness = Pubkey::new_unique();
+		let witness = Pubkey::new_from_array([2; 32]);
 		program.fund(&witness, 1_000_000_000).expect("fund witness");
 
 		let instruction = program.instruction(
@@ -215,6 +215,17 @@ fn inspect_enforces_the_witness_signer_when_provided() {
 			.expect_err("a provided witness must sign");
 		assert_eq!(error.operation(), "execute program instruction");
 		eprintln!("unsigned witness error: {}", error.message());
+
+		let note = program.instruction(
+			&[OptionalInstruction::Note as u8],
+			vec![
+				AccountMeta::new_readonly(authority, true),
+				AccountMeta::new_readonly(program_id, false),
+			],
+		);
+		program
+			.send_instruction(note)
+			.expect("Note with its optional account omitted");
 
 		program.stop().expect("stop isolated program test");
 	});

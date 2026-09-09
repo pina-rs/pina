@@ -115,7 +115,7 @@ fn add_update_deactivate_role_lifecycle() {
 			.send_instruction(initialize_instruction(&program, &admin, &registry, bump))
 			.expect("execute Initialize");
 
-		let grantee = Pubkey::new_unique();
+		let grantee = Pubkey::new_from_array([2; 32]);
 		program.fund(&grantee, 1_000_000_000).expect("fund grantee");
 		let (role_entry, role_bump) = role_entry_pda(&program_id, &registry, 1);
 
@@ -217,7 +217,7 @@ fn cannot_add_the_same_role_twice() {
 			.send_instruction(initialize_instruction(&program, &admin, &registry, bump))
 			.expect("execute Initialize");
 
-		let grantee = Pubkey::new_unique();
+		let grantee = Pubkey::new_from_array([2; 32]);
 		program.fund(&grantee, 1_000_000_000).expect("fund grantee");
 		let (role_entry, role_bump) = role_entry_pda(&program_id, &registry, 7);
 
@@ -270,7 +270,7 @@ fn rotate_admin_and_verify_the_new_admin() {
 			.send_instruction(initialize_instruction(&program, &admin, &registry, bump))
 			.expect("execute Initialize");
 
-		let new_admin = Pubkey::new_unique();
+		let new_admin = Pubkey::new_from_array([2; 32]);
 		program
 			.fund(&new_admin, 1_000_000_000)
 			.expect("fund new admin");

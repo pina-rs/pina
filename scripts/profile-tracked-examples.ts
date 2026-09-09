@@ -11,29 +11,15 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
+
+import {
+	DEFAULT_COMPUTE_UNIT_POLICY,
+	type ExampleProgram,
+	loadExampleInventory,
+} from "./example-inventory.ts";
 
 const OK_STATUS = "ok";
-
-interface Policy {
-	trackedPrograms: string[];
-	baselineProgramAliases?: Record<string, string>;
-}
-
-interface CargoDependency {
-	name: string;
-	features: string[];
-}
-
-interface CargoPackage {
-	name: string;
-	dependencies: CargoDependency[];
-}
-
-interface CargoMetadata {
-	packages: CargoPackage[];
-}
 
 interface ProfileResult {
 	status: "ok" | "unavailable";
@@ -59,32 +45,45 @@ function command(
 
 function resolveArtifact(
 	workspaceRoot: string,
-	program: string,
+	artifactName: string,
 ): string | undefined {
-	for (
-		const candidate of [
-			join(workspaceRoot, "target", "deploy", `${program}.so`),
-			join(
-				workspaceRoot,
-				"target",
-				"sbpf-solana-solana",
-				"release",
-				`${program}.so`,
-			),
-			join(
-				workspaceRoot,
-				"target",
-				"bpfel-unknown-none",
-				"release",
-				`${program}.so`,
-			),
-		]
-	) {
+	for (const candidate of artifactCandidates(workspaceRoot, artifactName)) {
 		if (existsSync(candidate)) {
 			return candidate;
 		}
 	}
+
 	return undefined;
+}
+
+function artifactSearchRoots(workspaceRoot: string): string[] {
+	return [
+		...new Set([
+			process.env.CARGO_TARGET_DIR,
+			join(workspaceRoot, "target"),
+		]),
+	].filter((value): value is string => value !== undefined);
+}
+
+function artifactCandidates(
+	workspaceRoot: string,
+	artifactName: string,
+): string[] {
+	return artifactSearchRoots(workspaceRoot).flatMap((targetRoot) => [
+		join(targetRoot, "deploy", `${artifactName}.so`),
+		join(
+			targetRoot,
+			"sbpf-solana-solana",
+			"release",
+			`${artifactName}.so`,
+		),
+		join(
+			targetRoot,
+			"bpfel-unknown-none",
+			"release",
+			`${artifactName}.so`,
+		),
+	]);
 }
 
 function sha256(path: string): string {
@@ -104,16 +103,13 @@ function main(): number {
 		return 1;
 	}
 
-	const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 	const workspaceRoot = realpathSync(workspaceArgument);
 	const outputDirectory = resolve(outputArgument);
-	const policyFile = policyArgument ??
-		join(scriptDirectory, "compute-unit-policy.json");
+	const policyFile = policyArgument ?? DEFAULT_COMPUTE_UNIT_POLICY;
 	const bpfToolchain = process.env.PINA_BPF_TOOLCHAIN;
 	if (bpfToolchain === undefined || bpfToolchain.length === 0) {
 		throw new Error("PINA_BPF_TOOLCHAIN must be set (devenv sets it)");
 	}
-	const policy: Policy = JSON.parse(readFileSync(policyFile, "utf8")) as Policy;
 	mkdirSync(outputDirectory, { recursive: true });
 
 	const toolchains = command("rustup", ["toolchain", "list"], {
@@ -147,55 +143,41 @@ function main(): number {
 		}
 	}
 
-	const metadataResult = command(
-		"cargo",
-		["metadata", "--format-version", "1", "--no-deps", "--locked"],
-		{ cwd: workspaceRoot, capture: true },
-	);
-	if (metadataResult.status !== 0) {
-		return metadataResult.status;
-	}
-	const metadata = JSON.parse(metadataResult.stdout) as CargoMetadata;
-	const packages = new Map(metadata.packages.map((item) => [item.name, item]));
-	const aliases = policy.baselineProgramAliases ?? {};
-	const buildGroups = new Map<string, string[]>();
-	const buildNames = new Map<string, string>();
-	for (const program of policy.trackedPrograms) {
-		if (!/^[A-Za-z0-9_-]+$/u.test(program)) {
-			throw new Error(`invalid tracked Cargo package name: ${program}`);
+	const { programs: trackedPrograms } = loadExampleInventory(workspaceRoot, {
+		policyFile,
+	});
+	const buildGroups = new Map<string, ExampleProgram[]>();
+	for (const program of trackedPrograms) {
+		if (!/^[A-Za-z0-9_-]+$/u.test(program.name)) {
+			throw new Error(`invalid tracked Cargo package name: ${program.name}`);
 		}
-		// Baseline profiling may run against an older revision where a tracked
-		// example was renamed. Fall back to the aliased (historical) package name
-		// for building while emitting artifacts under the canonical name.
-		const buildName = packages.has(program) ? program : aliases[program];
-		const package_ = buildName === undefined
-			? undefined
-			: packages.get(buildName);
-		if (package_ === undefined) {
-			throw new Error(
-				`tracked Cargo package is not in the workspace: ${program}`,
-			);
-		}
-		buildNames.set(program, buildName);
-		const pinaDependency = package_.dependencies.find(
+		const pinaDependency = program.package.dependencies.find(
 			(dependency) => dependency.name === "pina",
 		);
-		const groupKey = pinaDependency?.features.toSorted().join(",") ?? program;
+		const groupKey = pinaDependency?.features.toSorted().join(",") ??
+			program.name;
 		buildGroups.set(groupKey, [...(buildGroups.get(groupKey) ?? []), program]);
 	}
 
 	const results: Record<string, ProfileResult> = {};
 	for (const programs of buildGroups.values()) {
 		for (const program of programs) {
-			const buildName = buildNames.get(program) ?? program;
-			rmSync(join(outputDirectory, `${program}.json`), { force: true });
-			rmSync(join(outputDirectory, `${program}.so`), { force: true });
-			rmSync(join(workspaceRoot, "target", "deploy", `${buildName}.so`), {
-				force: true,
-			});
+			rmSync(join(outputDirectory, `${program.name}.json`), { force: true });
+			rmSync(join(outputDirectory, `${program.name}.so`), { force: true });
+
+			for (
+				const artifact of artifactCandidates(
+					workspaceRoot,
+					program.artifactName,
+				)
+			) {
+				rmSync(artifact, { force: true });
+			}
 		}
 		process.stdout.write(
-			`Building ${programs.join(" ")} with cargo +${bpfToolchain} build-bpf\n`,
+			`Building ${
+				programs.map((program) => program.name).join(" ")
+			} with cargo +${bpfToolchain} build-bpf\n`,
 		);
 		const build = command(
 			"cargo",
@@ -203,42 +185,36 @@ function main(): number {
 				`+${bpfToolchain}`,
 				"build-bpf",
 				"--locked",
-				...programs.flatMap((program) => [
-					"-p",
-					buildNames.get(program) ?? program,
-				]),
+				...programs.flatMap((program) => ["-p", program.name]),
 			],
 			{ cwd: workspaceRoot },
 		);
 		if (build.status !== 0) {
 			for (const program of programs) {
-				results[program] = {
+				results[program.name] = {
 					status: "unavailable",
 					detail: `SBF build failed with status ${build.status}`,
 				};
 				process.stderr.write(
-					`warning: failed to build tracked program ${program} for CU profiling\n`,
+					`warning: failed to build tracked program ${program.name} for CU profiling\n`,
 				);
 			}
 			continue;
 		}
 
 		for (const program of programs) {
-			const artifact = resolveArtifact(
-				workspaceRoot,
-				buildNames.get(program) ?? program,
-			);
+			const artifact = resolveArtifact(workspaceRoot, program.artifactName);
 			if (artifact === undefined) {
-				results[program] = {
+				results[program.name] = {
 					status: "unavailable",
-					detail: `built ELF was not found under ${
-						join(workspaceRoot, "target")
+					detail: `built ELF ${program.artifactName}.so was not found under ${
+						artifactSearchRoots(workspaceRoot).join(", ")
 					}`,
 				};
 				continue;
 			}
-			copyFileSync(artifact, join(outputDirectory, `${program}.so`));
-			process.stdout.write(`Profiling ${program} from ${artifact}\n`);
+			copyFileSync(artifact, join(outputDirectory, `${program.name}.so`));
+			process.stdout.write(`Profiling ${program.name} from ${artifact}\n`);
 			const profile = command(
 				"cargo",
 				[
@@ -252,19 +228,19 @@ function main(): number {
 					artifact,
 					"--json",
 					"--output",
-					join(outputDirectory, `${program}.json`),
+					join(outputDirectory, `${program.name}.json`),
 				],
 				{ cwd: workspaceRoot },
 			);
 			if (profile.status !== 0) {
-				rmSync(join(outputDirectory, `${program}.json`), { force: true });
-				results[program] = {
+				rmSync(join(outputDirectory, `${program.name}.json`), { force: true });
+				results[program.name] = {
 					status: "unavailable",
 					detail: `static profiler failed with status ${profile.status}`,
 				};
 				continue;
 			}
-			results[program] = {
+			results[program.name] = {
 				status: OK_STATUS,
 				detail: "profile and ELF available",
 			};
@@ -284,7 +260,7 @@ function main(): number {
 					toolchain: bpfToolchain,
 					sourceRevision: revision.stdout.trim(),
 					cargoLockSha256: sha256(lockFile),
-					trackedPrograms: policy.trackedPrograms,
+					trackedPrograms: trackedPrograms.map((program) => program.name),
 					results,
 				},
 				null,
