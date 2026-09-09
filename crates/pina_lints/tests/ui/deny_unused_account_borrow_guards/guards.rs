@@ -69,6 +69,13 @@ fn dropped_without_reading(account: &mut AccountView) -> Result<(), ()> {
 	Ok(())
 }
 
+fn wildcard_pattern_does_not_release_guard(account: &AccountView) -> Result<(), ()> {
+	let guard = account.try_borrow()?;
+	//~^ ERROR: account borrow guard `guard` is never read
+	let _ = guard;
+	Ok(())
+}
+
 fn underscore_prefix_is_still_unused(mint: &MintView) -> Result<(), ()> {
 	let _guard = mint.as_token_mint_for_program(&0)?;
 	//~^ ERROR: account borrow guard `_guard` is never read

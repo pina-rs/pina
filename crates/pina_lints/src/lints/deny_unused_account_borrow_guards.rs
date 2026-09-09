@@ -172,6 +172,17 @@ impl<'tcx> Visitor<'tcx> for Analyzer<'_, 'tcx> {
 				initializer_span: initializer.span,
 			};
 			collector.visit_pat(local.pat);
+
+			// A wildcard pattern does not bind or move a bare local. In
+			// particular, `let _ = guard;` leaves an account borrow guard alive
+			// until its original scope ends, so it must not count as a read or
+			// disposal. Complex initializers such as `let _ = guard.value();`
+			// still descend normally and count their actual reads.
+			if matches!(local.pat.kind, rustc_hir::PatKind::Wild)
+				&& local_binding(initializer).is_some()
+			{
+				return;
+			}
 		}
 
 		if let StmtKind::Semi(expr) = statement.kind

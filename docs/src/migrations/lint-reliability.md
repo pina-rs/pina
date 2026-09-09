@@ -54,7 +54,7 @@ Every remaining-account source in a chained iterator needs its own dominating le
 
 ## Review unused borrow-guard warnings
 
-The unused-borrow-guard lint now classifies each binding's inferred type instead of matching loader names inside an expression. It therefore catches `Ref` and `RefMut` results returned through aliases or function pointers, including guards nested in tuple and `let ... else` patterns, while no longer treating an unrelated wrapper result as a guard merely because the wrapper consumed one. If code intentionally stores a guard, read through the binding; otherwise discard the loader result immediately with `?` so the runtime borrow ends at the statement boundary.
+The unused-borrow-guard lint now classifies each binding's inferred type instead of matching loader names inside an expression. It therefore catches `Ref` and `RefMut` results returned through aliases or function pointers, including guards nested in tuple and `let ... else` patterns, while no longer treating an unrelated wrapper result as a guard merely because the wrapper consumed one. If code intentionally stores a guard, read through the binding; otherwise discard the loader result immediately with `?` so the runtime borrow ends at the statement boundary. Write `let _ = account.try_borrow()?;` at the creation site when an explicit discard reads better. Do not write `let _ = guard;` after binding a guard: Rust's wildcard pattern does not move that local, so the borrow remains live and the lint continues to warn.
 
 ## Refresh the managed lint driver
 
