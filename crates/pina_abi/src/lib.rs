@@ -23,7 +23,7 @@ pub const PUBLICATIONS_PATH: &str = "migrations/publications.json";
 ///
 /// This version belongs to Pina's checked-in ABI document. It is independent
 /// from every user contract's on-chain migration version.
-pub const MANIFEST_FORMAT_VERSION: u32 = 2;
+pub const MANIFEST_FORMAT_VERSION: u32 = 3;
 
 /// Current serialization format for publication receipts.
 pub const PUBLICATION_FORMAT_VERSION: u32 = 2;
@@ -135,6 +135,85 @@ pub enum LayoutKind {
 	Compact,
 }
 
+/// Frozen physical representation derived from Pina's closed schema grammar.
+///
+/// Every size and offset excludes the discriminator and migration-version
+/// envelope. Generated program code adds that program-specific header before
+/// asserting `PinaPod`'s compiled representation.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(
+	tag = "kind",
+	rename_all = "camelCase",
+	rename_all_fields = "camelCase"
+)]
+pub enum PhysicalLayout {
+	/// One exact payload with every field stored inline.
+	Fixed {
+		size: u64,
+		fields: Vec<FixedFieldLayout>,
+	},
+	/// A fixed payload header followed by active bounded tails.
+	Compact {
+		header_size: u64,
+		maximum_size: u64,
+		tail_alignment: u64,
+		fields: Vec<CompactFieldLayout>,
+	},
+}
+
+/// Payload-relative location of one fixed field.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct FixedFieldLayout {
+	pub name: String,
+	pub offset: u64,
+	pub size: u64,
+}
+
+/// Payload-relative header location and optional tail metadata for one compact
+/// field.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct CompactFieldLayout {
+	pub name: String,
+	pub header_offset: u64,
+	pub header_size: u64,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub tail: Option<CompactTailLayout>,
+}
+
+/// Dynamic compact-tail representation in declaration order.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct CompactTailLayout {
+	pub index: u32,
+	pub kind: CompactTailKind,
+	pub optional: bool,
+	pub prefix_bytes: u8,
+	pub capacity: u64,
+	pub element_size: u64,
+	pub maximum_bytes: u64,
+}
+
+/// Logical payload encoded by one compact tail.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CompactTailKind {
+	String,
+	Vector,
+}
+
+/// Versioned byte codec whose invariants define a schema snapshot.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum DataCodec {
+	/// `PinaPod` 0.2 fixed and compact wire semantics.
+	PinaPodV2,
+}
+
 /// Identity of a wire contract, independent of its Rust name.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "camelCase")]
@@ -213,9 +292,37 @@ pub struct DataSchema {
 	pub layout: LayoutKind,
 	/// User fields in physical declaration order. Framework envelope fields are omitted.
 	pub fields: Vec<FieldSchema>,
+	/// Versioned codec used to validate and reconstruct these bytes.
+	pub codec: DataCodec,
+	/// Complete payload-relative physical descriptor.
+	pub physical: PhysicalLayout,
 }
 
 impl DataSchema {
+	/// Construct a schema and derive its frozen physical descriptor.
+	pub fn try_new(layout: LayoutKind, fields: Vec<FieldSchema>) -> Result<Self, String> {
+		let physical = physical_layout(layout, &fields)?;
+		Ok(Self {
+			layout,
+			fields,
+			codec: DataCodec::PinaPodV2,
+			physical,
+		})
+	}
+
+	/// Verify that the stored descriptor is the exact result of Pina's current
+	/// closed grammar.
+	pub fn validate(&self) -> Result<(), String> {
+		if self.codec != DataCodec::PinaPodV2 {
+			return Err("unsupported data codec".to_owned());
+		}
+		let expected = physical_layout(self.layout, &self.fields)?;
+		if self.physical != expected {
+			return Err("physical layout does not match the canonical field schema".to_owned());
+		}
+		Ok(())
+	}
+
 	/// SHA-256 of the canonical JSON representation.
 	#[must_use]
 	pub fn sha256(&self) -> String {
@@ -227,28 +334,30 @@ impl DataSchema {
 	/// Compact schemas return `None` because their active tail length is dynamic.
 	#[must_use]
 	pub fn fixed_payload_size(&self) -> Option<usize> {
-		if self.layout == LayoutKind::Compact {
-			return None;
+		match self.physical {
+			PhysicalLayout::Fixed { size, .. } => usize::try_from(size).ok(),
+			PhysicalLayout::Compact { .. } => None,
 		}
-		self.fields.iter().try_fold(0_usize, |total, field| {
-			fixed_type_size(&field.rust_type).and_then(|size| total.checked_add(size))
-		})
 	}
 
 	/// Return fixed payload offsets in declaration order.
 	#[must_use]
 	pub fn fixed_field_offsets(&self) -> Option<BTreeMap<String, (usize, usize)>> {
-		if self.layout == LayoutKind::Compact {
+		let PhysicalLayout::Fixed { fields, .. } = &self.physical else {
 			return None;
-		}
-		let mut offset = 0_usize;
-		let mut fields = BTreeMap::new();
-		for field in &self.fields {
-			let size = fixed_type_size(&field.rust_type)?;
-			fields.insert(field.name.clone(), (offset, size));
-			offset = offset.checked_add(size)?;
-		}
-		Some(fields)
+		};
+		fields
+			.iter()
+			.map(|field| {
+				Some((
+					field.name.clone(),
+					(
+						usize::try_from(field.offset).ok()?,
+						usize::try_from(field.size).ok()?,
+					),
+				))
+			})
+			.collect()
 	}
 }
 
@@ -457,6 +566,13 @@ impl ContractHistory {
 					version.version
 				));
 			}
+			version.schema.validate().map_err(|reason| {
+				format!(
+					"contract `{}` version {} has an invalid data schema: {reason}",
+					self.identity.key(),
+					version.version
+				)
+			})?;
 			if version.schema_sha256 != version.schema.sha256() {
 				return Err(format!(
 					"contract `{}` version {} schema hash does not match its contents",
@@ -942,6 +1058,7 @@ fn upgrade_manifest_document(
 ) -> Result<serde_json::Value, String> {
 	match version {
 		1 => migrate_manifest_v1_to_v2(value),
+		2 => migrate_manifest_v2_to_v3(value),
 		_ => {
 			Err(format!(
 				"no Pina ABI migration is available from manifest format {version}"
@@ -955,6 +1072,7 @@ fn downgrade_manifest_document(
 	value: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
 	match version {
+		3 => migrate_manifest_v3_to_v2(value),
 		2 => migrate_manifest_v2_to_v1(value),
 		_ => {
 			Err(format!(
@@ -1034,16 +1152,14 @@ fn migrate_manifest_v1_to_v2(mut value: serde_json::Value) -> Result<serde_json:
 			}
 		}
 	}
-	root.insert(
-		"formatVersion".to_owned(),
-		serde_json::Value::from(MANIFEST_FORMAT_VERSION),
-	);
+	root.insert("formatVersion".to_owned(), serde_json::Value::from(2));
 	Ok(value)
 }
 
 fn migrate_manifest_v2_to_v1(mut value: serde_json::Value) -> Result<serde_json::Value, String> {
-	let manifest: MigrationManifest = serde_json::from_value(value.clone())
-		.map_err(|error| format!("invalid migration manifest format 2: {error}"))?;
+	let current = migrate_manifest_v2_to_v3(value.clone())?;
+	let manifest: MigrationManifest = serde_json::from_value(current)
+		.map_err(|error| format!("invalid upgraded migration manifest format 2: {error}"))?;
 	manifest.validate()?;
 	let root = value
 		.as_object_mut()
@@ -1123,6 +1239,189 @@ fn migrate_manifest_v2_to_v1(mut value: serde_json::Value) -> Result<serde_json:
 		}
 	}
 	root.insert("formatVersion".to_owned(), serde_json::Value::from(1));
+	Ok(value)
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+struct DataSchemaV2 {
+	layout: LayoutKind,
+	fields: Vec<FieldSchema>,
+}
+
+impl DataSchemaV2 {
+	fn sha256(&self) -> String {
+		hash_json(self)
+	}
+
+	fn into_current(self) -> Result<DataSchema, String> {
+		DataSchema::try_new(self.layout, self.fields)
+	}
+}
+
+/// Format 3 freezes the complete payload-relative physical layout. Format 2
+/// stored only the layout family and canonical field strings.
+fn migrate_manifest_v2_to_v3(mut value: serde_json::Value) -> Result<serde_json::Value, String> {
+	let root = value
+		.as_object_mut()
+		.ok_or_else(|| "migration manifest must be a JSON object".to_owned())?;
+	let contracts = root
+		.get_mut("contracts")
+		.and_then(serde_json::Value::as_object_mut)
+		.ok_or_else(|| "migration manifest is missing its `contracts` object".to_owned())?;
+
+	for (key, history_value) in contracts {
+		let versions = history_value
+			.get_mut("versions")
+			.and_then(serde_json::Value::as_array_mut)
+			.ok_or_else(|| format!("contract `{key}` is missing its `versions` array"))?;
+		let mut previous_v2_hash: Option<String> = None;
+		let mut previous_v3_hash: Option<String> = None;
+		for (index, version_value) in versions.iter_mut().enumerate() {
+			let version = version_value
+				.as_object_mut()
+				.ok_or_else(|| format!("contract `{key}` contains a non-object version"))?;
+			let schema_value = version
+				.get("schema")
+				.cloned()
+				.ok_or_else(|| format!("contract `{key}` version {index} has no schema"))?;
+			let schema_v2: DataSchemaV2 =
+				serde_json::from_value(schema_value).map_err(|error| {
+					format!(
+						"contract `{key}` version {index} has an invalid format 2 schema: {error}"
+					)
+				})?;
+			let v2_hash = schema_v2.sha256();
+			if version
+				.get("schemaSha256")
+				.and_then(serde_json::Value::as_str)
+				!= Some(v2_hash.as_str())
+			{
+				return Err(format!(
+					"contract `{key}` version {index} format 2 schema hash does not match its \
+					 contents"
+				));
+			}
+			let schema = schema_v2.into_current()?;
+			let v3_hash = schema.sha256();
+			version.insert(
+				"schema".to_owned(),
+				serde_json::to_value(schema)
+					.map_err(|error| format!("could not encode format 3 schema: {error}"))?,
+			);
+			version.insert(
+				"schemaSha256".to_owned(),
+				serde_json::Value::from(v3_hash.clone()),
+			);
+
+			if let Some(transition) = version
+				.get_mut("transition")
+				.and_then(serde_json::Value::as_object_mut)
+			{
+				let Some(expected_v2_source) = &previous_v2_hash else {
+					return Err(format!(
+						"contract `{key}` version zero cannot contain a transition"
+					));
+				};
+				if transition
+					.get("sourceSchemaSha256")
+					.and_then(serde_json::Value::as_str)
+					!= Some(expected_v2_source.as_str())
+					|| transition
+						.get("destinationSchemaSha256")
+						.and_then(serde_json::Value::as_str)
+						!= Some(v2_hash.as_str())
+				{
+					return Err(format!(
+						"contract `{key}` version {index} has invalid format 2 transition schema \
+						 hashes"
+					));
+				}
+				transition.insert(
+					"sourceSchemaSha256".to_owned(),
+					serde_json::Value::from(
+						previous_v3_hash
+							.clone()
+							.ok_or_else(|| "missing previous format 3 schema hash".to_owned())?,
+					),
+				);
+				transition.insert(
+					"destinationSchemaSha256".to_owned(),
+					serde_json::Value::from(v3_hash.clone()),
+				);
+			}
+			previous_v2_hash = Some(v2_hash);
+			previous_v3_hash = Some(v3_hash);
+		}
+	}
+	root.insert(
+		"formatVersion".to_owned(),
+		serde_json::Value::from(MANIFEST_FORMAT_VERSION),
+	);
+	Ok(value)
+}
+
+fn migrate_manifest_v3_to_v2(mut value: serde_json::Value) -> Result<serde_json::Value, String> {
+	let manifest: MigrationManifest = serde_json::from_value(value.clone())
+		.map_err(|error| format!("invalid migration manifest format 3: {error}"))?;
+	manifest.validate()?;
+	let root = value
+		.as_object_mut()
+		.ok_or_else(|| "migration manifest must be a JSON object".to_owned())?;
+	let contracts = root
+		.get_mut("contracts")
+		.and_then(serde_json::Value::as_object_mut)
+		.ok_or_else(|| "migration manifest is missing its `contracts` object".to_owned())?;
+
+	for (key, history_value) in contracts {
+		let versions = history_value
+			.get_mut("versions")
+			.and_then(serde_json::Value::as_array_mut)
+			.ok_or_else(|| format!("contract `{key}` is missing its `versions` array"))?;
+		let mut previous_hash: Option<String> = None;
+		for (index, version_value) in versions.iter_mut().enumerate() {
+			let version = version_value
+				.as_object_mut()
+				.ok_or_else(|| format!("contract `{key}` contains a non-object version"))?;
+			let schema = version
+				.get_mut("schema")
+				.and_then(serde_json::Value::as_object_mut)
+				.ok_or_else(|| format!("contract `{key}` version {index} has no schema"))?;
+			schema.remove("codec");
+			schema.remove("physical");
+			let schema_v2: DataSchemaV2 = serde_json::from_value(serde_json::Value::Object(
+				schema.clone(),
+			))
+			.map_err(|error| {
+				format!("could not encode contract `{key}` version {index} as format 2: {error}")
+			})?;
+			let hash = schema_v2.sha256();
+			version.insert(
+				"schemaSha256".to_owned(),
+				serde_json::Value::from(hash.clone()),
+			);
+			if let Some(transition) = version
+				.get_mut("transition")
+				.and_then(serde_json::Value::as_object_mut)
+			{
+				transition.insert(
+					"sourceSchemaSha256".to_owned(),
+					serde_json::Value::from(
+						previous_hash
+							.clone()
+							.ok_or_else(|| "missing previous format 2 schema hash".to_owned())?,
+					),
+				);
+				transition.insert(
+					"destinationSchemaSha256".to_owned(),
+					serde_json::Value::from(hash.clone()),
+				);
+			}
+			previous_hash = Some(hash);
+		}
+	}
+	root.insert("formatVersion".to_owned(), serde_json::Value::from(2));
 	Ok(value)
 }
 
@@ -1324,10 +1623,10 @@ pub fn fixed_type_size(ty: &str) -> Option<usize> {
 		"u32" | "i32" | "PodU32" | "PodI32" => Some(4),
 		"u64" | "i64" | "PodU64" | "PodI64" => Some(8),
 		"u128" | "i128" | "PodU128" | "PodI128" => Some(16),
-		"Address" | "Pubkey" => Some(32),
+		"Address" => Some(32),
 		other => {
 			if let Some((element, length)) = parse_array(other) {
-				return fixed_type_size(element)?.checked_mul(length);
+				return (element.trim() == "u8").then_some(length);
 			}
 			let (name, arguments) = parse_generic(other)?;
 			match name {
@@ -1341,7 +1640,9 @@ pub fn fixed_type_size(ty: &str) -> Option<usize> {
 					let [capacity] = arguments.as_slice() else {
 						return None;
 					};
-					capacity.parse::<usize>().ok()?.checked_add(1)
+					let capacity = capacity.parse::<usize>().ok()?;
+					validate_compact_prefix(capacity, 1).ok()?;
+					capacity.checked_add(1)
 				}
 				"PodString" => {
 					let [capacity, rest @ ..] = arguments.as_slice() else {
@@ -1352,7 +1653,9 @@ pub fn fixed_type_size(ty: &str) -> Option<usize> {
 						[value] => value.parse::<usize>().ok()?,
 						_ => return None,
 					};
-					capacity.parse::<usize>().ok()?.checked_add(prefix)
+					let capacity = capacity.parse::<usize>().ok()?;
+					validate_compact_prefix(capacity, prefix).ok()?;
+					capacity.checked_add(prefix)
 				}
 				"Vec" | "PodVec" => {
 					let [element, capacity, rest @ ..] = arguments.as_slice() else {
@@ -1370,14 +1673,304 @@ pub fn fixed_type_size(ty: &str) -> Option<usize> {
 							_ => return None,
 						}
 					};
+					let capacity = capacity.parse::<usize>().ok()?;
+					validate_compact_prefix(capacity, prefix).ok()?;
 					fixed_type_size(element)?
-						.checked_mul(capacity.parse::<usize>().ok()?)?
+						.checked_mul(capacity)?
 						.checked_add(prefix)
 				}
 				_ => None,
 			}
 		}
 	}
+}
+
+fn physical_layout(layout: LayoutKind, fields: &[FieldSchema]) -> Result<PhysicalLayout, String> {
+	match layout {
+		LayoutKind::Fixed => {
+			let mut offset = 0_usize;
+			let mut physical_fields = Vec::with_capacity(fields.len());
+			for field in fields {
+				let size = fixed_type_size(&field.rust_type).ok_or_else(|| {
+					format!(
+						"field `{}` uses unsupported fixed ABI type `{}`",
+						field.name, field.rust_type
+					)
+				})?;
+				physical_fields.push(FixedFieldLayout {
+					name: field.name.clone(),
+					offset: u64::try_from(offset)
+						.map_err(|_| "fixed field offset exceeds u64".to_owned())?,
+					size: u64::try_from(size)
+						.map_err(|_| "fixed field size exceeds u64".to_owned())?,
+				});
+				offset = offset
+					.checked_add(size)
+					.ok_or_else(|| "fixed payload size overflowed".to_owned())?;
+			}
+			Ok(PhysicalLayout::Fixed {
+				size: u64::try_from(offset)
+					.map_err(|_| "fixed payload size exceeds u64".to_owned())?,
+				fields: physical_fields,
+			})
+		}
+		LayoutKind::Compact => compact_physical_layout(fields),
+	}
+}
+
+#[derive(Clone, Copy)]
+struct ParsedCompactTail {
+	kind: CompactTailKind,
+	optional: bool,
+	prefix_bytes: usize,
+	capacity: usize,
+	element_size: usize,
+}
+
+fn compact_physical_layout(fields: &[FieldSchema]) -> Result<PhysicalLayout, String> {
+	let mut header_size = 0_usize;
+	let mut maximum_tail_size = 0_usize;
+	let mut tail_alignment = 0_usize;
+	let mut tail_index = 0_u32;
+	let mut seen_tail = false;
+	let mut physical_fields = Vec::with_capacity(fields.len());
+
+	for field in fields {
+		let header_offset = header_size;
+		let Some(tail) = parse_compact_tail(&field.rust_type)? else {
+			if seen_tail {
+				return Err(format!(
+					"compact inline field `{}` cannot follow a dynamic tail",
+					field.name
+				));
+			}
+			let size = fixed_type_size(&field.rust_type).ok_or_else(|| {
+				format!(
+					"field `{}` uses unsupported compact inline ABI type `{}`",
+					field.name, field.rust_type
+				)
+			})?;
+			header_size = header_size
+				.checked_add(size)
+				.ok_or_else(|| "compact header size overflowed".to_owned())?;
+			physical_fields.push(CompactFieldLayout {
+				name: field.name.clone(),
+				header_offset: u64::try_from(header_offset)
+					.map_err(|_| "compact header offset exceeds u64".to_owned())?,
+				header_size: u64::try_from(size)
+					.map_err(|_| "compact header field size exceeds u64".to_owned())?,
+				tail: None,
+			});
+			continue;
+		};
+
+		seen_tail = true;
+		validate_compact_prefix(tail.capacity, tail.prefix_bytes)?;
+		let header_field_size = if tail.optional { 1 } else { tail.prefix_bytes };
+		header_size = header_size
+			.checked_add(header_field_size)
+			.ok_or_else(|| "compact header size overflowed".to_owned())?;
+		let payload_size = tail
+			.capacity
+			.checked_mul(tail.element_size)
+			.ok_or_else(|| "compact tail capacity overflowed".to_owned())?;
+		let maximum_bytes = if tail.optional {
+			tail.prefix_bytes
+				.checked_add(payload_size)
+				.ok_or_else(|| "optional compact tail size overflowed".to_owned())?
+		} else {
+			payload_size
+		};
+		maximum_tail_size = maximum_tail_size
+			.checked_add(maximum_bytes)
+			.ok_or_else(|| "compact maximum size overflowed".to_owned())?;
+		let field_alignment = if tail.optional {
+			greatest_common_divisor(tail.prefix_bytes, tail.element_size)
+		} else {
+			tail.element_size
+		};
+		tail_alignment = greatest_common_divisor(tail_alignment, field_alignment);
+		physical_fields.push(CompactFieldLayout {
+			name: field.name.clone(),
+			header_offset: u64::try_from(header_offset)
+				.map_err(|_| "compact header offset exceeds u64".to_owned())?,
+			header_size: u64::try_from(header_field_size)
+				.map_err(|_| "compact header field size exceeds u64".to_owned())?,
+			tail: Some(CompactTailLayout {
+				index: tail_index,
+				kind: tail.kind,
+				optional: tail.optional,
+				prefix_bytes: u8::try_from(tail.prefix_bytes)
+					.map_err(|_| "compact prefix width exceeds u8".to_owned())?,
+				capacity: u64::try_from(tail.capacity)
+					.map_err(|_| "compact capacity exceeds u64".to_owned())?,
+				element_size: u64::try_from(tail.element_size)
+					.map_err(|_| "compact element size exceeds u64".to_owned())?,
+				maximum_bytes: u64::try_from(maximum_bytes)
+					.map_err(|_| "compact tail size exceeds u64".to_owned())?,
+			}),
+		});
+		tail_index = tail_index
+			.checked_add(1)
+			.ok_or_else(|| "compact tail count exceeds u32".to_owned())?;
+	}
+
+	if !seen_tail {
+		return Err("compact schemas require at least one dynamic tail".to_owned());
+	}
+	let maximum_size = header_size
+		.checked_add(maximum_tail_size)
+		.ok_or_else(|| "compact maximum size overflowed".to_owned())?;
+	Ok(PhysicalLayout::Compact {
+		header_size: u64::try_from(header_size)
+			.map_err(|_| "compact header size exceeds u64".to_owned())?,
+		maximum_size: u64::try_from(maximum_size)
+			.map_err(|_| "compact maximum size exceeds u64".to_owned())?,
+		tail_alignment: u64::try_from(tail_alignment)
+			.map_err(|_| "compact tail alignment exceeds u64".to_owned())?,
+		fields: physical_fields,
+	})
+}
+
+fn parse_compact_tail(ty: &str) -> Result<Option<ParsedCompactTail>, String> {
+	let mut optional = false;
+	let mut tail_type = ty.trim();
+	if let Some(("Option", arguments)) = parse_generic(tail_type) {
+		let [inner] = arguments.as_slice() else {
+			return Err(format!("invalid compact option type `{ty}`"));
+		};
+		optional = true;
+		tail_type = inner;
+	}
+
+	let Some((name, arguments)) = parse_generic(tail_type) else {
+		return Ok(None);
+	};
+	match name {
+		"String" | "PodString" => {
+			let (capacity, prefix_bytes) = parse_compact_capacity(name, &arguments, 1)?;
+			Ok(Some(ParsedCompactTail {
+				kind: CompactTailKind::String,
+				optional,
+				prefix_bytes,
+				capacity,
+				element_size: 1,
+			}))
+		}
+		"Vec" | "PodVec" => {
+			let [element, capacity, rest @ ..] = arguments.as_slice() else {
+				return Err(format!("invalid compact vector type `{ty}`"));
+			};
+			let prefix_bytes = match (name, rest) {
+				("Vec" | "PodVec", []) => 2,
+				("PodVec", [prefix]) => parse_compact_prefix(prefix)?,
+				_ => return Err(format!("invalid compact vector type `{ty}`")),
+			};
+			let capacity = capacity
+				.parse::<usize>()
+				.map_err(|_| format!("invalid compact vector capacity in `{ty}`"))?;
+			if optional && is_compact_string_name(element) {
+				return Err(format!(
+					"optional compact vectors cannot contain string elements in `{ty}`"
+				));
+			}
+			if !is_compact_string_name(element) && contains_dynamic_compact_name(element) {
+				return Err(format!(
+					"compact vector element `{element}` contains a nested dynamic type"
+				));
+			}
+			let element_size = fixed_type_size(element)
+				.ok_or_else(|| format!("unsupported compact vector element `{element}`"))?;
+			Ok(Some(ParsedCompactTail {
+				kind: CompactTailKind::Vector,
+				optional,
+				prefix_bytes,
+				capacity,
+				element_size,
+			}))
+		}
+		_ if optional && contains_dynamic_compact_name(tail_type) => {
+			Err(format!("nested dynamic compact type `{ty}` is unsupported"))
+		}
+		_ if optional => Ok(None),
+		_ => Ok(None),
+	}
+}
+
+fn is_compact_string_name(ty: &str) -> bool {
+	parse_generic(ty.trim()).is_some_and(|(name, _)| matches!(name, "String" | "PodString"))
+}
+
+fn contains_dynamic_compact_name(ty: &str) -> bool {
+	let Some((name, arguments)) = parse_generic(ty.trim()) else {
+		return false;
+	};
+	if matches!(name, "String" | "PodString" | "Vec" | "PodVec") {
+		return true;
+	}
+
+	name == "Option"
+		&& arguments
+			.first()
+			.is_some_and(|inner| contains_dynamic_compact_name(inner))
+}
+
+fn parse_compact_capacity(
+	name: &str,
+	arguments: &[&str],
+	default_prefix: usize,
+) -> Result<(usize, usize), String> {
+	let [capacity, rest @ ..] = arguments else {
+		return Err(format!("invalid compact {name} type"));
+	};
+	let capacity = capacity
+		.parse::<usize>()
+		.map_err(|_| format!("invalid compact {name} capacity"))?;
+	let prefix = match (name, rest) {
+		("String" | "PodString", []) => default_prefix,
+		("PodString", [prefix]) => parse_compact_prefix(prefix)?,
+		_ => return Err(format!("invalid compact {name} type")),
+	};
+	Ok((capacity, prefix))
+}
+
+fn parse_compact_prefix(value: &str) -> Result<usize, String> {
+	let prefix = value
+		.parse::<usize>()
+		.map_err(|_| format!("invalid compact prefix width `{value}`"))?;
+	if !matches!(prefix, 1 | 2 | 4 | 8) {
+		return Err(format!(
+			"compact prefix width must be 1, 2, 4, or 8 bytes, got {prefix}"
+		));
+	}
+	Ok(prefix)
+}
+
+fn validate_compact_prefix(capacity: usize, prefix_bytes: usize) -> Result<(), String> {
+	let capacity =
+		u64::try_from(capacity).map_err(|_| "compact capacity exceeds u64".to_owned())?;
+	let maximum = match prefix_bytes {
+		1 => u64::from(u8::MAX),
+		2 => u64::from(u16::MAX),
+		4 => u64::from(u32::MAX),
+		8 => u64::MAX,
+		_ => return Err(format!("invalid compact prefix width {prefix_bytes}")),
+	};
+	if capacity > maximum {
+		return Err(format!(
+			"compact capacity {capacity} exceeds a {prefix_bytes}-byte prefix"
+		));
+	}
+	Ok(())
+}
+
+const fn greatest_common_divisor(mut left: usize, mut right: usize) -> usize {
+	while right != 0 {
+		let remainder = left % right;
+		left = right;
+		right = remainder;
+	}
+	left
 }
 
 /// Build the data-only schema seen by an attribute macro before envelope fields are injected.
@@ -1401,7 +1994,7 @@ pub fn data_schema(item: &syn::ItemStruct, layout: LayoutKind) -> Result<DataSch
 		})
 		.collect::<Result<Vec<_>, String>>()?;
 
-	Ok(DataSchema { layout, fields })
+	DataSchema::try_new(layout, fields)
 }
 
 fn canonical_generic_argument(argument: &syn::GenericArgument) -> String {
@@ -1542,6 +2135,169 @@ mod tests {
 	}
 
 	#[test]
+	fn physical_layout_freezes_compact_headers_tails_and_alignment() {
+		let item: syn::ItemStruct = syn::parse_quote! {
+			struct Profile {
+				authority: Address,
+				name: String<8>,
+				tags: Option<PodVec<u16, 3, 1>>,
+			}
+		};
+		let schema = data_schema(&item, LayoutKind::Compact)
+			.unwrap_or_else(|error| panic!("compact schema: {error}"));
+
+		assert_eq!(
+			schema.physical,
+			PhysicalLayout::Compact {
+				header_size: 34,
+				maximum_size: 49,
+				tail_alignment: 1,
+				fields: vec![
+					CompactFieldLayout {
+						name: "authority".to_owned(),
+						header_offset: 0,
+						header_size: 32,
+						tail: None,
+					},
+					CompactFieldLayout {
+						name: "name".to_owned(),
+						header_offset: 32,
+						header_size: 1,
+						tail: Some(CompactTailLayout {
+							index: 0,
+							kind: CompactTailKind::String,
+							optional: false,
+							prefix_bytes: 1,
+							capacity: 8,
+							element_size: 1,
+							maximum_bytes: 8,
+						}),
+					},
+					CompactFieldLayout {
+						name: "tags".to_owned(),
+						header_offset: 33,
+						header_size: 1,
+						tail: Some(CompactTailLayout {
+							index: 1,
+							kind: CompactTailKind::Vector,
+							optional: true,
+							prefix_bytes: 1,
+							capacity: 3,
+							element_size: 2,
+							maximum_bytes: 7,
+						}),
+					},
+				],
+			}
+		);
+	}
+
+	#[test]
+	fn physical_layout_rejects_tampered_offsets_even_with_a_matching_content_hash() {
+		let item: syn::ItemStruct = syn::parse_quote! {
+			struct Profile { name: String<8> }
+		};
+		let mut schema = data_schema(&item, LayoutKind::Compact)
+			.unwrap_or_else(|error| panic!("compact schema: {error}"));
+		let PhysicalLayout::Compact { header_size, .. } = &mut schema.physical else {
+			panic!("expected compact physical layout");
+		};
+		*header_size += 1;
+
+		assert_eq!(
+			schema.validate(),
+			Err("physical layout does not match the canonical field schema".to_owned()),
+		);
+		assert_eq!(schema.sha256().len(), 64);
+	}
+
+	#[test]
+	fn physical_layout_rejects_shapes_the_compact_macro_cannot_generate() {
+		let nested_vector: syn::ItemStruct = syn::parse_quote! {
+			struct Invalid { values: Vec<Vec<u16, 2>, 3> }
+		};
+		let optional_strings: syn::ItemStruct = syn::parse_quote! {
+			struct Invalid { values: Option<Vec<String<4>, 3>> }
+		};
+		let nested_option: syn::ItemStruct = syn::parse_quote! {
+			struct Invalid { values: Option<Option<String<4>>> }
+		};
+		let non_byte_array: syn::ItemStruct = syn::parse_quote! {
+			struct Invalid { values: [u16; 2], name: String<4> }
+		};
+
+		for item in [
+			nested_vector,
+			optional_strings,
+			nested_option,
+			non_byte_array,
+		] {
+			assert!(data_schema(&item, LayoutKind::Compact).is_err());
+		}
+
+		let invalid_prefix: syn::ItemStruct = syn::parse_quote! {
+			struct Invalid { value: PodString<4, 3> }
+		};
+		let overflowing_capacity: syn::ItemStruct = syn::parse_quote! {
+			struct Invalid { value: String<256> }
+		};
+		let unsupported_key_alias: syn::ItemStruct = syn::parse_quote! {
+			struct Invalid { value: Pubkey }
+		};
+		for item in [invalid_prefix, overflowing_capacity, unsupported_key_alias] {
+			assert!(data_schema(&item, LayoutKind::Fixed).is_err());
+		}
+	}
+
+	#[test]
+	fn manifest_format_two_round_trips_through_physical_layout_upgrade() {
+		let item: syn::ItemStruct = syn::parse_quote! {
+			struct Profile { name: String<8> }
+		};
+		let schema = data_schema(&item, LayoutKind::Compact)
+			.unwrap_or_else(|error| panic!("compact schema: {error}"));
+		let schema_sha256 = schema.sha256();
+		let identity = ContractIdentity::try_new(ContractKind::Account, 1, 7).unwrap();
+		let key = identity.key();
+		let manifest = MigrationManifest {
+			format_version: MANIFEST_FORMAT_VERSION,
+			program_id: "program".to_owned(),
+			version_type: MigrationVersionType::U8,
+			contracts: BTreeMap::from([(
+				key.clone(),
+				ContractHistory {
+					identity,
+					rust_name: "Profile".to_owned(),
+					versions: vec![SchemaVersion {
+						version: 0,
+						schema_sha256,
+						schema,
+						process: None,
+						process_sha256: None,
+						transition: None,
+					}],
+				},
+			)]),
+		};
+
+		let format_two = encode_manifest_for_format(&manifest, 2)
+			.unwrap_or_else(|error| panic!("downgrade to format 2: {error}"));
+		let value: serde_json::Value = serde_json::from_slice(&format_two).unwrap();
+		assert_eq!(value["formatVersion"], 2);
+		assert!(value["contracts"][&key]["versions"][0]["schema"]["physical"].is_null());
+		assert_eq!(
+			decode_manifest(&format_two)
+				.unwrap_or_else(|error| panic!("upgrade format 2: {error}")),
+			manifest,
+		);
+
+		let mut tampered = value;
+		tampered["contracts"][&key]["versions"][0]["schema"]["fields"][0]["rustType"] =
+			serde_json::Value::from("String<9>");
+		assert!(decode_manifest(&serde_json::to_vec(&tampered).unwrap()).is_err());
+	}
+
+	#[test]
 	fn publication_ledger_is_hash_chained() {
 		let first = PublicationReceipt {
 			sequence: 0,
@@ -1613,15 +2369,20 @@ mod tests {
 
 	#[test]
 	fn manifest_format_one_upgrades_to_versioned_process_snapshots() {
-		let schema = DataSchema {
-			layout: LayoutKind::Fixed,
-			fields: vec![FieldSchema {
+		let schema = DataSchema::try_new(
+			LayoutKind::Fixed,
+			vec![FieldSchema {
 				name: "amount".to_owned(),
 				rust_type: "u64".to_owned(),
 			}],
+		)
+		.unwrap();
+		let schema_v2 = DataSchemaV2 {
+			layout: schema.layout,
+			fields: schema.fields.clone(),
 		};
 		let process = process(vec![process_account("authority", false)]);
-		let schema_sha256 = schema.sha256();
+		let schema_sha256 = schema_v2.sha256();
 		let process_sha256 = process.sha256();
 		let identity = ContractIdentity::try_new(ContractKind::Instruction, 1, 4).unwrap();
 		let key = identity.key();
@@ -1639,13 +2400,13 @@ mod tests {
 						{
 							"version": 0,
 							"schemaSha256": schema_sha256,
-							"schema": schema,
+							"schema": schema_v2,
 							"transition": null
 						},
 						{
 							"version": 1,
 							"schemaSha256": schema_sha256,
-							"schema": schema,
+							"schema": schema_v2,
 							"transition": {
 								"from": 0,
 								"to": 1,
@@ -1687,13 +2448,14 @@ mod tests {
 
 	#[test]
 	fn manifest_downgrade_rejects_versioned_process_changes_and_unknown_targets() {
-		let schema = DataSchema {
-			layout: LayoutKind::Fixed,
-			fields: vec![FieldSchema {
+		let schema = DataSchema::try_new(
+			LayoutKind::Fixed,
+			vec![FieldSchema {
 				name: "amount".to_owned(),
 				rust_type: "u64".to_owned(),
 			}],
-		};
+		)
+		.unwrap();
 		let original_process = process(vec![process_account("authority", false)]);
 		let changed_process = process(vec![
 			process_account("authority", false),

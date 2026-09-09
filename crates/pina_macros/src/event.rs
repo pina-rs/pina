@@ -123,6 +123,15 @@ pub(crate) fn expand(
 	let migration_impl = migration.as_ref().map(|migration| {
 		migration.implementation(&crate_path, &struct_name, &discriminator, &variant)
 	});
+	let event_migration_impl = match migration.as_ref() {
+		Some(migration) => {
+			match migration.event_implementation(&crate_path, &struct_name) {
+				Ok(value) => Some(value),
+				Err(error) => return error.to_compile_error(),
+			}
+		}
+		None => None,
+	};
 	let implementations = quote! {
 		impl #struct_name {
 			#view_helpers
@@ -135,6 +144,7 @@ pub(crate) fn expand(
 		}
 
 		#migration_impl
+		#event_migration_impl
 
 		#value_validation_impl
 	};

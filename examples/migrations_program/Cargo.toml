@@ -14,6 +14,7 @@ crate-type = ["cdylib", "lib"]
 
 [features]
 bpf-entrypoint = []
+fuzzing = []
 
 [dependencies]
 pina = { workspace = true, features = ["compact", "derive", "validation"] }

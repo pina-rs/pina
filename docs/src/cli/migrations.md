@@ -62,6 +62,10 @@ All account properties are part of a slot. A name, signer flag, writable flag, d
 
 The runtime treats an omitted optional suffix as absent. It never creates an account, signature, writable privilege, or PDA for an old client.
 
+## Decode historical events
+
+Events are immutable, so Pina projects rather than rewrites them. A migratable event generates `with_current_event_data(bytes, |current, source_version| ...)`. The current bytes use the latest event schema; `source_version` records which historical schema actually emitted the log. Unknown versions, future versions, trailing bytes, and invalid historical values fail before a transition runs. Keep golden log bytes in `pina_test::HistoricalEvent` rather than encoding fixtures with the current event type.
+
 ## Publish a version
 
 Use `pina deploy` for a persistent cluster. After deployment succeeds, Pina rechecks the planned files and appends a hash-chained receipt with the program ID, RPC target, executable digest, manifest digest, and current contract versions.
@@ -73,6 +77,8 @@ If deployment succeeds but receipt recording fails, stop the release. The remote
 ## ABI document upgrades
 
 `formatVersion` belongs to Pina's migration document. It is independent of each account or instruction version. Pina rejects newer document formats and migrates supported older formats through adjacent internal converters before it reads the typed model. The `pina_abi` crate can also encode a validated current model through adjacent downgrade converters. A downgrade fails instead of discarding information that the older format cannot represent. `pina migrations make` writes the current document format.
+
+Format 3 freezes the PinaPod codec plus payload-relative fixed offsets and compact header, prefix, capacity, tail-order, and alignment metadata. Pina derives that descriptor from its closed field grammar and rejects a stored descriptor that disagrees. Historical format 2 documents are upgraded by deriving and rehashing this metadata; a format 3 document can downgrade to format 2 only through the matching inverse converter.
 
 An ABI document upgrade does not consume an on-chain migration version.
 

@@ -1,9 +1,10 @@
 # pina_fuzz
 
-Fuzz harnesses for the pina Solana framework, targeting the two most security-critical deserialization paths:
+Fuzz harnesses for the Pina Solana framework, targeting its security-critical deserialization and migration paths:
 
 - **`PinaAccount::try_from_bytes`** — zero-copy account data reinterpretation with discriminator and content validation
 - **`parse_instruction`** — instruction discriminator decoding with program-ID verification
+- **Migration decoding** — generated fixed, compact, instruction, and event transitions over arbitrary historical bytes
 
 ## Structure
 
@@ -16,6 +17,7 @@ crates/pina_fuzz/
     ├── seed_corpus/                    # Inputs replayed before every CI fuzz run
     └── fuzz_targets/
         ├── account_deserialize.rs      # Fuzz PinaAccount validation
+        ├── migration_decode.rs         # Fuzz every generated migration boundary
         └── parse_instruction.rs        # Fuzz parse_instruction
 ```
 

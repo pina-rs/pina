@@ -10,6 +10,7 @@ use pina_abi::LayoutKind;
 use pina_abi::MANIFEST_PATH;
 use pina_abi::MigrationManifest;
 use pina_abi::MigrationVersionType;
+use pina_abi::PhysicalLayout;
 use pina_abi::TransitionMode;
 use quote::format_ident;
 use quote::quote;
@@ -22,6 +23,12 @@ pub(crate) struct MigrationExpansion {
 	discriminator_bytes: u8,
 	discriminator_value: u64,
 	history: ContractHistory,
+}
+
+#[derive(Clone, Copy)]
+enum ImmutableContract {
+	Instruction,
+	Event,
 }
 
 impl MigrationExpansion {
@@ -170,6 +177,28 @@ impl MigrationExpansion {
 		crate_path: &syn::Path,
 		struct_name: &syn::Ident,
 	) -> syn::Result<proc_macro2::TokenStream> {
+		self.immutable_implementation(crate_path, struct_name, ImmutableContract::Instruction)
+	}
+
+	/// Generate immutable historical event projection with source provenance.
+	pub(crate) fn event_implementation(
+		&self,
+		crate_path: &syn::Path,
+		struct_name: &syn::Ident,
+	) -> syn::Result<proc_macro2::TokenStream> {
+		self.immutable_implementation(crate_path, struct_name, ImmutableContract::Event)
+	}
+
+	fn immutable_implementation(
+		&self,
+		crate_path: &syn::Path,
+		struct_name: &syn::Ident,
+		contract: ImmutableContract,
+	) -> syn::Result<proc_macro2::TokenStream> {
+		let contract_label = match contract {
+			ImmutableContract::Instruction => "instruction",
+			ImmutableContract::Event => "event",
+		};
 		if self
 			.history
 			.versions
@@ -178,7 +207,7 @@ impl MigrationExpansion {
 		{
 			return Err(syn::Error::new_spanned(
 				struct_name,
-				"migration-aware instruction history must use fixed layouts",
+				format!("migration-aware {contract_label} history must use fixed layouts"),
 			));
 		}
 
@@ -195,21 +224,25 @@ impl MigrationExpansion {
 			})
 			.collect::<Option<Vec<_>>>()
 			.ok_or_else(|| {
-				syn::Error::new_spanned(struct_name, "instruction migration size overflowed")
+				syn::Error::new_spanned(
+					struct_name,
+					format!("{contract_label} migration size overflowed"),
+				)
 			})?;
-		let current_size = *sizes
-			.last()
-			.ok_or_else(|| syn::Error::new_spanned(struct_name, "instruction history is empty"))?;
+		let current_size = *sizes.last().ok_or_else(|| {
+			syn::Error::new_spanned(struct_name, format!("{contract_label} history is empty"))
+		})?;
 		let working_size = sizes.iter().copied().max().unwrap_or(current_size);
 		let module_name = format_ident!(
-			"__pina_{}_instruction_migrations",
+			"__pina_{}_{}_migrations",
 			struct_name.to_string().to_snake_case(),
+			contract_label,
 		);
 		let transition_modules = versions.iter().skip(1).map(|version| {
 			let transition = version
 				.transition
 				.as_ref()
-				.expect("validated instruction history has adjacent transitions");
+				.expect("validated immutable history has adjacent transitions");
 			let name = format_ident!("v{}_to_v{}", transition.from, transition.to);
 			let relative =
 				pina_abi::transition_path(&self.history.identity, transition.from, transition.to)
@@ -301,6 +334,72 @@ impl MigrationExpansion {
 					}
 				});
 		let max_inline = current.min(u32::from(MAX_INLINE_STEPS)) as u16;
+		let (trait_name, migrate_method, validate_method, consumer_impl) = match contract {
+			ImmutableContract::Instruction => {
+				let consumer_impl = quote! {
+					impl #struct_name {
+						/// Normalize historical instruction data and run a current-data handler.
+						pub fn with_current_instruction_data<R>(
+							data: &[u8],
+							handler: impl FnOnce(&[u8]) -> Result<R, #crate_path::ProgramError>,
+						) -> Result<R, #crate_path::ProgramError> {
+							let mut workspace = [0_u8; #working_size];
+							let current = #crate_path::normalize_instruction_data::<Self>(
+								data,
+								&mut workspace,
+							)?;
+							handler(current.as_bytes())
+						}
+
+						/// Normalize historical data before invoking the current account process.
+						pub fn process_versioned<'accounts, A>(
+							accounts: A,
+							data: &[u8],
+						) -> #crate_path::ProgramResult
+						where
+							A: #crate_path::ProcessAccountInfos<'accounts>,
+						{
+							Self::with_current_instruction_data(data, |current| {
+								accounts.process(current)
+							})
+						}
+					}
+				};
+				(
+					format_ident!("MigratableInstruction"),
+					format_ident!("migrate_stale_instruction"),
+					format_ident!("validate_current_instruction"),
+					consumer_impl,
+				)
+			}
+			ImmutableContract::Event => {
+				let consumer_impl = quote! {
+					impl #struct_name {
+						/// Project historical event bytes and preserve their source version.
+						pub fn with_current_event_data<R>(
+							data: &[u8],
+							handler: impl FnOnce(
+								&[u8],
+								<Self as #crate_path::HasMigrationVersion>::Version,
+							) -> Result<R, #crate_path::ProgramError>,
+						) -> Result<R, #crate_path::ProgramError> {
+							let mut workspace = [0_u8; #working_size];
+							let current = #crate_path::normalize_event_data::<Self>(
+								data,
+								&mut workspace,
+							)?;
+							handler(current.as_bytes(), current.source_version())
+						}
+					}
+				};
+				(
+					format_ident!("MigratableEvent"),
+					format_ident!("migrate_stale_event"),
+					format_ident!("validate_current_event"),
+					consumer_impl,
+				)
+			}
+		};
 
 		Ok(quote! {
 			#[allow(dead_code)]
@@ -310,12 +409,12 @@ impl MigrationExpansion {
 
 			#(#historical_structs)*
 
-			impl #crate_path::MigratableInstruction for #struct_name {
+			impl #crate_path::#trait_name for #struct_name {
 				const CURRENT_SIZE: usize = #current_size;
 				const WORKING_SIZE: usize = #working_size;
 				const MAX_INLINE_STEPS: u16 = #max_inline;
 
-				fn migrate_stale_instruction(
+				fn #migrate_method(
 					data: &[u8],
 					workspace: &mut [u8],
 				) -> #crate_path::ProgramResult {
@@ -333,7 +432,7 @@ impl MigrationExpansion {
 					}
 				}
 
-				fn validate_current_instruction(data: &[u8]) -> #crate_path::ProgramResult {
+				fn #validate_method(data: &[u8]) -> #crate_path::ProgramResult {
 					if data.len() != #current_size
 						|| !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data)
 					{
@@ -345,33 +444,7 @@ impl MigrationExpansion {
 				}
 			}
 
-			impl #struct_name {
-				/// Normalize historical instruction data and run a current-data handler.
-				pub fn with_current_instruction_data<R>(
-					data: &[u8],
-					handler: impl FnOnce(&[u8]) -> Result<R, #crate_path::ProgramError>,
-				) -> Result<R, #crate_path::ProgramError> {
-					let mut workspace = [0_u8; #working_size];
-					let current = #crate_path::normalize_instruction_data::<Self>(
-						data,
-						&mut workspace,
-					)?;
-					handler(current.as_bytes())
-				}
-
-				/// Normalize historical data before invoking the current account process.
-				pub fn process_versioned<'accounts, A>(
-					accounts: A,
-					data: &[u8],
-				) -> #crate_path::ProgramResult
-				where
-					A: #crate_path::ProcessAccountInfos<'accounts>,
-				{
-					Self::with_current_instruction_data(data, |current| {
-						accounts.process(current)
-					})
-				}
-			}
+			#consumer_impl
 		})
 	}
 
@@ -521,6 +594,9 @@ impl MigrationExpansion {
 				fn plan_migration(
 					data: &[u8],
 				) -> Result<#crate_path::AccountMigrationPlan<Self::Plan>, #crate_path::ProgramError> {
+					if !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data) {
+						return Err(#crate_path::ProgramError::InvalidAccountData);
+					}
 					let stored = <Self as #crate_path::HasMigrationVersion>::read_migration_version(data)?;
 					let stored = <<Self as #crate_path::HasMigrationVersion>::Version as #crate_path::MigrationVersion>::into_u32(stored);
 					match stored {
@@ -768,6 +844,9 @@ impl MigrationExpansion {
 				fn plan_migration(
 					data: &[u8],
 				) -> Result<#crate_path::AccountMigrationPlan<Self::Plan>, #crate_path::ProgramError> {
+					if !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data) {
+						return Err(#crate_path::ProgramError::InvalidAccountData);
+					}
 					let stored = <Self as #crate_path::HasMigrationVersion>::read_migration_version(data)?;
 					let stored = <<Self as #crate_path::HasMigrationVersion>::Version as #crate_path::MigrationVersion>::into_u32(stored);
 					match stored {
@@ -888,14 +967,18 @@ fn historical_struct(
 		.collect::<syn::Result<Vec<_>>>()?;
 	let (attribute, proof) = match version.schema.layout {
 		LayoutKind::Fixed => {
+			let PhysicalLayout::Fixed { size, .. } = &version.schema.physical else {
+				return Err(syn::Error::new_spanned(
+					struct_name,
+					"historical fixed schema has a non-fixed physical descriptor",
+				));
+			};
+			let payload_size = usize::try_from(*size).map_err(|_| {
+				syn::Error::new_spanned(struct_name, "historical fixed schema exceeds usize")
+			})?;
 			let expected_size = discriminator_bytes
 				.checked_add(version_bytes)
-				.and_then(|header| {
-					version
-						.schema
-						.fixed_payload_size()
-						.and_then(|payload| header.checked_add(payload))
-				})
+				.and_then(|header| header.checked_add(payload_size))
 				.ok_or_else(|| {
 					syn::Error::new_spanned(struct_name, "historical schema size overflowed")
 				})?;
@@ -909,9 +992,52 @@ fn historical_struct(
 			)
 		}
 		LayoutKind::Compact => {
+			let PhysicalLayout::Compact {
+				header_size,
+				maximum_size,
+				tail_alignment,
+				..
+			} = &version.schema.physical
+			else {
+				return Err(syn::Error::new_spanned(
+					struct_name,
+					"historical compact schema has a non-compact physical descriptor",
+				));
+			};
+			let envelope_size =
+				discriminator_bytes
+					.checked_add(version_bytes)
+					.ok_or_else(|| {
+						syn::Error::new_spanned(
+							struct_name,
+							"historical compact envelope overflowed",
+						)
+					})?;
+			let header_size = usize::try_from(*header_size)
+				.ok()
+				.and_then(|size| envelope_size.checked_add(size))
+				.ok_or_else(|| {
+					syn::Error::new_spanned(struct_name, "historical compact header overflowed")
+				})?;
+			let maximum_size = usize::try_from(*maximum_size)
+				.ok()
+				.and_then(|size| envelope_size.checked_add(size))
+				.ok_or_else(|| {
+					syn::Error::new_spanned(struct_name, "historical compact maximum overflowed")
+				})?;
+			let tail_alignment = usize::try_from(*tail_alignment).map_err(|_| {
+				syn::Error::new_spanned(struct_name, "historical compact alignment exceeds usize")
+			})?;
 			(
 				quote!(#[pinapod(crate = #crate_path::pinapod, compact, no_inherent)]),
-				quote!(),
+				quote! {
+					const _: () = {
+						::core::assert!(<#name as #crate_path::PinaPodCompact>::HEADER_SIZE == #header_size);
+						::core::assert!(<#name as #crate_path::PinaPodCompact>::MIN_SIZE == #header_size);
+						::core::assert!(<#name as #crate_path::PinaPodCompact>::MAX_SIZE == #maximum_size);
+						::core::assert!(<#name as #crate_path::PinaPodCompact>::TAIL_ALIGNMENT == #tail_alignment);
+					};
+				},
 			)
 		}
 	};

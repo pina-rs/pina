@@ -713,15 +713,17 @@ fn test_accounts_derive_optional_immutable_absent() {
 }
 
 #[test]
-fn test_accounts_derive_optional_immutable_not_enough_keys() {
+fn test_accounts_derive_trailing_optional_immutable_may_be_absent() {
 	let ix_data = [3u8; 100];
 	let mut input = create_input_with_layout(1, &ix_data, |_| false, |_| false, unique_keys);
 	let mut accounts = [UNINIT; 1];
 	// SAFETY: the buffer encodes exactly one account.
 	let accounts = unsafe { slice_input(&mut input, &mut accounts) };
 
-	let result = TestAccountsOptional::try_from_account_infos(&MOCK_PROGRAM_ID, accounts);
-	assert!(matches!(result, Err(ProgramError::NotEnoughAccountKeys)));
+	let parsed = TestAccountsOptional::try_from_account_infos(&MOCK_PROGRAM_ID, accounts)
+		.unwrap_or_else(|error| panic!("parse trailing optional account: {error:?}"));
+	assert_eq!(parsed.one.address(), &key_from_byte(1));
+	assert!(parsed.optional.is_none());
 }
 
 #[test]

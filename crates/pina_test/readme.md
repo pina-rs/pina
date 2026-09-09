@@ -60,9 +60,25 @@ let old_update = HistoricalInstruction::new(
 	vec![AccountMeta::new(authority.pubkey(), true)],
 );
 program.send_historical_instruction(&old_update, &[&authority])?;
+
+let old_event = HistoricalEvent::new(
+	0,
+	include_bytes!("fixtures/value-changed-v0.bin").to_vec(),
+);
+ValueChangedEvent::with_current_event_data(
+	old_event.data(),
+	|current, source_version| {
+		assert_eq!(source_version, old_event.version());
+		let event = ValueChangedEvent::try_from_bytes(current)?;
+		assert_eq!(event.memo.get(), 0);
+		Ok(())
+	},
+)?;
 ```
 
 `HistoricalInstruction` preserves the old positional account list. An old request can therefore omit an optional suffix that the current process added. `HistoricalAccount` installs the complete old account state, including the discriminator and migration version.
+
+`HistoricalEvent` preserves immutable log bytes. The generated event projection validates their exact historical shape, returns current-shape bytes in caller-owned scratch space, and reports the source version so a field absent from the old event is not confused with a field that was emitted as its default value.
 
 For rejection tests, protect every account that the migration can touch:
 

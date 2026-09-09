@@ -133,6 +133,40 @@ impl HistoricalInstruction {
 	}
 }
 
+/// Exact event bytes captured from one released program version.
+///
+/// Keep these bytes as a golden fixture and pass them to the event type's
+/// generated projection API. Encoding the fixture with the current event type
+/// would only test the current schema and can conceal a broken decoder.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HistoricalEvent {
+	version: u32,
+	data: Vec<u8>,
+}
+
+impl HistoricalEvent {
+	/// Create one immutable event fixture from released wire bytes.
+	#[must_use]
+	pub fn new(version: u32, data: impl Into<Vec<u8>>) -> Self {
+		Self {
+			version,
+			data: data.into(),
+		}
+	}
+
+	/// Historical migration version named by the fixture.
+	#[must_use]
+	pub const fn version(&self) -> u32 {
+		self.version
+	}
+
+	/// Exact discriminator, version, and payload bytes emitted historically.
+	#[must_use]
+	pub fn data(&self) -> &[u8] {
+		&self.data
+	}
+}
+
 /// Exact account state captured for one historical on-chain schema version.
 ///
 /// The data includes the discriminator and migration version envelope. Tests
@@ -894,6 +928,10 @@ mod tests {
 		assert_eq!(instruction.version(), 2);
 		assert_eq!(instruction.data(), [9, 2, 4, 5]);
 		assert_eq!(instruction.accounts(), metas);
+
+		let event = HistoricalEvent::new(1, [4, 1, 8, 7]);
+		assert_eq!(event.version(), 1);
+		assert_eq!(event.data(), [4, 1, 8, 7]);
 	}
 
 	#[test]

@@ -71,7 +71,7 @@ The checked-in Pina ABI history records the physical information needed to recon
 
 Stable identity derives from contract kind and discriminator, not a Rust type name. Renaming a Rust type does not create a new on-chain identity.
 
-The ABI history must come from the same closed schema grammar used by Pina's macros. The Codama IDL and unconstrained Rust type strings are not precise enough to be the long-term physical-layout authority. PinaPod may expose a stable physical-layout descriptor and fingerprint, but it does not own Solana migration policy.
+The ABI history comes from the same closed schema grammar used by Pina's macros. Format 3 records the `pinaPodV2` codec and a derived, payload-relative physical descriptor. Historical generated types assert their compiled fixed size or compact header, maximum size, and tail alignment against that descriptor. The Codama IDL and unconstrained Rust type strings are not precise enough to be the long-term physical-layout authority. PinaPod does not own Solana migration policy.
 
 Pina's ABI document has its own `formatVersion`, separate from every on-chain contract version. All readers decode the document into a generic envelope, reject future formats, and run Pina-owned adjacent format migrations before deserializing the current typed model. The ABI library also provides adjacent downgrade paths. A downgrade fails closed when an older format cannot represent the current document without information loss. Normal manifest writes always use the current format. An internal ABI-format upgrade therefore does not consume an account or instruction migration number, and old checked-in manifests remain buildable as long as Pina retains their adjacent document migrators.
 
@@ -179,7 +179,7 @@ Account-local structural migrations cannot read or mutate unrelated accounts. A 
 
 ### Events
 
-Events are not migrated on-chain. New code emits only the current event representation. Historical decoders remain in tooling and generated clients. A latest-shape projection preserves provenance and distinguishes a field that was absent historically from a field that was emitted with a default value.
+Events are not migrated on-chain. New code emits only the current event representation. `normalize_event_data` and the generated `with_current_event_data` helper validate exact historical bytes and project them into caller-owned scratch space. The projection returns the source version with the latest-shape bytes, preserving whether a defaulted field was absent historically or was actually emitted with its default value. Golden event fixtures live in `pina_test::HistoricalEvent`; generated clients can apply the same manifest transitions off-chain.
 
 ### Compatibility verification
 

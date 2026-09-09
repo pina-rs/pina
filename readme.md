@@ -407,6 +407,8 @@ Run `pina migrations make` before a release. Pina updates the replaceable draft 
 
 An old instruction can omit only newly appended optional accounts. Pina does not synthesize signers, writable privileges, PDAs, or required accounts. Any change to an existing process slot requires a new discriminator.
 
+Historical events are immutable. Generated event decoders validate their exact released shape, project them into current-shape scratch bytes, and retain the source version so consumers can distinguish an absent historical field from an emitted default value.
+
 <!-- {/pinaDiscriminatorVersionCompatibility} -->
 
 The `#[discriminator]` macro generates:

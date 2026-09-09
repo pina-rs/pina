@@ -90,3 +90,6 @@ crates/pina_fuzz/target/
 
 # Compiler probe artifacts dropped by rustc-driver runs
 *.rmeta
+
+# Advisory locks created by migration commands
+**/migrations/.lock

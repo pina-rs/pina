@@ -195,6 +195,10 @@ pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
 /// `validate(with = function)` hook. Event views implement `PinaValidate` and
 /// generated read/initialize helpers validate automatically.
 ///
+/// Add `migrations` to generate exact historical decoders and
+/// `with_current_event_data`. The helper projects immutable historical bytes to
+/// the current representation and supplies their source version as provenance.
+///
 /// # Example
 ///
 /// ```ignore

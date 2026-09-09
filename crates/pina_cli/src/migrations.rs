@@ -572,24 +572,23 @@ fn scan_current_contracts(project: &Project) -> Result<CurrentProgram, Migration
 		} else {
 			LayoutKind::Fixed
 		};
+		let fields = account
+			.fields
+			.into_iter()
+			.map(|field| {
+				FieldSchema {
+					name: field.name,
+					rust_type: field.rust_type,
+				}
+			})
+			.collect();
+		let schema = DataSchema::try_new(layout, fields).map_err(MigrationError::InvalidHistory)?;
 		insert_current(
 			&mut contracts,
 			CurrentContract {
 				identity,
 				rust_name: account.name,
-				schema: DataSchema {
-					layout,
-					fields: account
-						.fields
-						.into_iter()
-						.map(|field| {
-							FieldSchema {
-								name: field.name,
-								rust_type: field.rust_type,
-							}
-						})
-						.collect(),
-				},
+				schema,
 				process: None,
 			},
 		)?;
@@ -618,24 +617,24 @@ fn scan_current_contracts(project: &Project) -> Result<CurrentProgram, Migration
 					instruction.name
 				))
 			})?;
+		let fields = instruction
+			.fields
+			.into_iter()
+			.map(|field| {
+				FieldSchema {
+					name: field.name,
+					rust_type: field.rust_type,
+				}
+			})
+			.collect();
+		let schema = DataSchema::try_new(LayoutKind::Fixed, fields)
+			.map_err(MigrationError::InvalidHistory)?;
 		insert_current(
 			&mut contracts,
 			CurrentContract {
 				identity,
 				rust_name: instruction.name,
-				schema: DataSchema {
-					layout: LayoutKind::Fixed,
-					fields: instruction
-						.fields
-						.into_iter()
-						.map(|field| {
-							FieldSchema {
-								name: field.name,
-								rust_type: field.rust_type,
-							}
-						})
-						.collect(),
-				},
+				schema,
 				process: Some(process_contract(ir_instruction)),
 			},
 		)?;
@@ -801,7 +800,10 @@ fn write_json_atomic(path: &Path, value: &impl Serialize) -> Result<(), Migratio
 		}
 	})?;
 	ensure_safe_path(path)?;
-	let mut bytes = serde_json::to_vec_pretty(value).map_err(|source| {
+	let mut bytes = Vec::new();
+	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+	let mut serializer = serde_json::Serializer::with_formatter(&mut bytes, formatter);
+	value.serialize(&mut serializer).map_err(|source| {
 		MigrationError::SerializeJson {
 			path: path.to_path_buf(),
 			source,
@@ -1347,9 +1349,9 @@ mod tests {
 	use super::*;
 
 	fn schema(layout: LayoutKind, fields: &[(&str, &str)]) -> DataSchema {
-		DataSchema {
+		DataSchema::try_new(
 			layout,
-			fields: fields
+			fields
 				.iter()
 				.map(|(name, rust_type)| {
 					FieldSchema {
@@ -1358,7 +1360,8 @@ mod tests {
 					}
 				})
 				.collect(),
-		}
+		)
+		.unwrap_or_else(|error| panic!("valid test schema: {error}"))
 	}
 
 	#[test]
@@ -1611,7 +1614,7 @@ mod tests {
 	fn field_type_changes_and_compact_changes_are_manual() {
 		let old = schema(LayoutKind::Fixed, &[("count", "u64")]);
 		let changed = schema(LayoutKind::Fixed, &[("count", "u32")]);
-		let compact = schema(LayoutKind::Compact, &[("count", "u64")]);
+		let compact = schema(LayoutKind::Compact, &[("label", "String<8>")]);
 
 		assert_eq!(transition_mode(&old, &changed), TransitionMode::Manual);
 		assert_eq!(transition_mode(&old, &compact), TransitionMode::Manual);

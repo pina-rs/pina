@@ -12,6 +12,7 @@ cargo-fuzz = true
 [dependencies]
 counter_program = { path = "../../../examples/counter_program" }
 libfuzzer-sys = "0.4"
+migrations_program = { path = "../../../examples/migrations_program", features = ["fuzzing"] }
 pina = { path = "../../pina" }
 pina_fuzz = { path = ".." }
 role_registry_program = { path = "../../../examples/role_registry_program" }
@@ -26,6 +27,13 @@ bench = false
 [[bin]]
 name = "parse_instruction"
 path = "fuzz_targets/parse_instruction.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "migration_decode"
+path = "fuzz_targets/migration_decode.rs"
 test = false
 doc = false
 bench = false

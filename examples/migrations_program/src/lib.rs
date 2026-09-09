@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(not(feature = "fuzzing"), no_std)]
 
 use pina::*;
 
@@ -14,6 +14,11 @@ pub enum MigrationAccount {
 	State = 1,
 	ManualState = 2,
 	CompactState = 3,
+}
+
+#[discriminator]
+pub enum MigrationEvent {
+	ValueChanged = 4,
 }
 
 #[account(discriminator = MigrationAccount::State, migrations)]
@@ -36,6 +41,12 @@ pub struct CompactState {
 
 #[instruction(discriminator = MigrationInstruction::Update, migrations)]
 pub struct UpdateInstruction {
+	pub value: u64,
+	pub memo: u16,
+}
+
+#[event(discriminator = MigrationEvent::ValueChanged, migrations)]
+pub struct ValueChangedEvent {
 	pub value: u64,
 	pub memo: u16,
 }
@@ -117,6 +128,45 @@ mod tests {
 	}
 
 	#[test]
+	fn generated_event_projection_preserves_provenance_and_defaults_new_fields() {
+		let mut old = [0_u8; 10];
+		old[0] = MigrationEvent::ValueChanged as u8;
+		old[1] = 0;
+		old[2..].copy_from_slice(&42_u64.to_le_bytes());
+		let mut workspace = [0xaa; 12];
+
+		let current = normalize_event_data::<ValueChangedEvent>(&old, &mut workspace)
+			.unwrap_or_else(|error| panic!("normalize event: {error:?}"));
+		assert!(current.was_migrated());
+		assert_eq!(current.source_version(), 0);
+		assert_eq!(current.as_bytes()[0..2], [4, 1]);
+		assert_eq!(&current.as_bytes()[2..10], &42_u64.to_le_bytes());
+		assert_eq!(&current.as_bytes()[10..12], &[0, 0]);
+
+		ValueChangedEvent::with_current_event_data(&old, |bytes, source_version| {
+			let event = ValueChangedEvent::try_from_bytes(bytes)?;
+			assert_eq!(source_version, 0);
+			assert_eq!(event.value.get(), 42);
+			assert_eq!(event.memo.get(), 0);
+			Ok(())
+		})
+		.unwrap_or_else(|error| panic!("project event: {error:?}"));
+	}
+
+	#[test]
+	fn generated_event_projection_rejects_malleable_historical_bytes() {
+		let mut trailing = [0_u8; 11];
+		trailing[0] = MigrationEvent::ValueChanged as u8;
+		trailing[1] = 0;
+		let future = [MigrationEvent::ValueChanged as u8, 2, 0, 0];
+
+		for rejected in [&trailing[..], &future[..], &[5, 0, 0][..]] {
+			let mut workspace = [0xaa; 12];
+			assert!(normalize_event_data::<ValueChangedEvent>(rejected, &mut workspace).is_err());
+		}
+	}
+
+	#[test]
 	fn generated_account_migration_preserves_old_fields_and_zeros_new_fields() {
 		let authority = Address::new_from_array([9; 32]);
 		let mut old = [0_u8; 42];
@@ -194,9 +244,20 @@ mod tests {
 	#[test]
 	fn compact_account_planner_rejects_forged_historical_lengths() {
 		let forged = [MigrationAccount::CompactState as u8, 0, 5, b'A', b'd', b'a'];
+		let wrong_discriminator = [0, 0, 0, b'A', b'd', b'a'];
 
 		assert_eq!(
 			CompactState::plan_migration(&forged),
+			Err(ProgramError::InvalidAccountData),
+		);
+		assert_eq!(
+			CompactState::plan_migration(&wrong_discriminator),
+			Err(ProgramError::InvalidAccountData),
+		);
+		let mut wrong_fixed = [0_u8; 42];
+		wrong_fixed[1] = 0;
+		assert_eq!(
+			State::plan_migration(&wrong_fixed),
 			Err(ProgramError::InvalidAccountData),
 		);
 	}
