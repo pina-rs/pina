@@ -58,6 +58,18 @@ fn process_non_asset_saturating(raw_value: u64, offset: u64) -> u64 {
 	raw_value.saturating_add(offset)
 }
 
+struct CustomAccumulator;
+
+impl CustomAccumulator {
+	fn saturating_add(self, _amount: u64) -> Self {
+		self
+	}
+}
+
+fn process_custom_method(accumulator: CustomAccumulator, amount: u64) -> CustomAccumulator {
+	accumulator.saturating_add(amount)
+}
+
 fn process_non_asset_assignment(raw_value: &mut u64, offset: u64) {
 	*raw_value += offset;
 }

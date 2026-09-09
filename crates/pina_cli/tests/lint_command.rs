@@ -112,6 +112,7 @@ impl Fixture {
 		command
 			.args(["lint", "--project"])
 			.arg(&self.project)
+			.env_remove("RUSTC_WRAPPER")
 			.env("CARGO", &self.fake_cargo)
 			.env("REAL_CARGO", real_cargo)
 			.env("PINA_LINT_DRIVER_PATH", &self.fake_driver)
@@ -148,7 +149,7 @@ fn lint_runs_cargo_check_with_the_bundled_driver() {
 	assert!(log.contains("--manifest-path"), "log: {log}");
 	assert!(
 		log.contains(&format!(
-			"rustc_wrapper= workspace_wrapper={FAKE_DRIVER} driver_build="
+			"rustc_wrapper=unset workspace_wrapper={FAKE_DRIVER} driver_build="
 		)),
 		"log: {log}"
 	);
@@ -156,7 +157,7 @@ fn lint_runs_cargo_check_with_the_bundled_driver() {
 }
 
 #[test]
-fn lint_disables_an_inherited_rustc_wrapper() {
+fn lint_preserves_an_inherited_rustc_wrapper() {
 	let fixture = Fixture::new("pina-lint-outer-wrapper", None);
 	let output = fixture
 		.command()
@@ -175,11 +176,7 @@ fn lint_disables_an_inherited_rustc_wrapper() {
 		.find(|line| line.starts_with("rustc_wrapper="))
 		.unwrap_or_else(|| panic!("missing lint environment in log: {log}"));
 	assert!(
-		environment.starts_with("rustc_wrapper= workspace_wrapper="),
-		"environment: {environment}"
-	);
-	assert!(
-		!environment.contains("outer-wrapper"),
+		environment.starts_with("rustc_wrapper=outer-wrapper workspace_wrapper="),
 		"environment: {environment}"
 	);
 }

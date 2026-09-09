@@ -127,6 +127,57 @@ fn process_two_bounded_iterators(remaining: &[u8], other: &[u8]) {
 	}
 }
 
+fn process_only_one_of_two_guarded(remaining_a: &[u8], remaining_b: &[u8]) -> Result<(), ()> {
+	if remaining_a.len() > MAX_REMAINING_ACCOUNTS {
+		return Err(());
+	}
+
+	for account in remaining_a.iter().chain(remaining_b) {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+
+	Ok(())
+}
+
+fn process_two_guarded_sources(remaining_a: &[u8], remaining_b: &[u8]) -> Result<(), ()> {
+	if remaining_a.len() > MAX_REMAINING_ACCOUNTS {
+		return Err(());
+	}
+
+	if remaining_b.len() > MAX_REMAINING_ACCOUNTS {
+		return Err(());
+	}
+
+	for account in remaining_a.iter().chain(remaining_b) {
+		let _ = account;
+	}
+
+	Ok(())
+}
+
+struct RemainingSource<'a> {
+	remaining: &'a [u8],
+}
+
+fn process_comment_cannot_spoof_a_bound(
+	checked_remaining: &[u8],
+	source: RemainingSource<'_>,
+) -> Result<(), ()> {
+	if checked_remaining.len() > MAX_REMAINING_ACCOUNTS {
+		return Err(());
+	}
+
+	for account in source.remaining
+	// checked_remaining
+	{
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+
+	Ok(())
+}
+
 fn process_filter_after_guard(remaining: &[u8]) -> Result<(), ()> {
 	if remaining.len() > MAX_REMAINING_ACCOUNTS {
 		return Err(());
@@ -141,6 +192,38 @@ fn process_filter_after_guard(remaining: &[u8]) -> Result<(), ()> {
 
 struct Passthrough<'a> {
 	remaining: core::slice::Iter<'a, u8>,
+}
+
+struct LyingRemaining<'a> {
+	accounts: &'a [u8],
+}
+
+impl LyingRemaining<'_> {
+	fn len(&self) -> usize {
+		0
+	}
+}
+
+impl<'a> IntoIterator for &'a LyingRemaining<'a> {
+	type IntoIter = core::slice::Iter<'a, u8>;
+	type Item = &'a u8;
+
+	fn into_iter(self) -> Self::IntoIter {
+		self.accounts.iter()
+	}
+}
+
+fn process_custom_len(remaining: &LyingRemaining<'_>) -> Result<(), ()> {
+	if remaining.len() > MAX_REMAINING_ACCOUNTS {
+		return Err(());
+	}
+
+	for account in remaining {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+
+	Ok(())
 }
 
 impl Passthrough<'_> {

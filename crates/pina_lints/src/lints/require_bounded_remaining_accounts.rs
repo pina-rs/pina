@@ -1,4 +1,5 @@
 extern crate rustc_hir;
+extern crate rustc_middle;
 extern crate rustc_span;
 
 use std::collections::HashSet;
@@ -16,6 +17,7 @@ use rustc_hir::intravisit::FnKind;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
 use rustc_lint::LintContext;
+use rustc_middle::ty::TyKind;
 
 use crate::shared;
 
@@ -103,7 +105,10 @@ fn expression_has_static_bound(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
 // The UI tests exercise this compiler-generated HIR adapter end to end, but
 // LLVM maps its structural pattern fields to synthetic, unreachable regions.
 #[coverage(off)]
-fn for_loop_has_constant_take(cx: &LateContext<'_>, loop_expr: &Expr<'_>) -> bool {
+fn for_loop_iterator<'tcx>(
+	cx: &LateContext<'tcx>,
+	loop_expr: &'tcx Expr<'tcx>,
+) -> Option<&'tcx Expr<'tcx>> {
 	cx.tcx
 		.hir_parent_iter(loop_expr.hir_id)
 		.find_map(|(_, node)| {
@@ -125,10 +130,9 @@ fn for_loop_has_constant_take(cx: &LateContext<'_>, loop_expr: &Expr<'_>) -> boo
 
 			Some(iterator)
 		})
-		.is_some_and(|iterator| expression_has_static_bound(cx, iterator))
 }
 
-fn len_identity(expr: &Expr<'_>) -> Option<String> {
+fn len_identity(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<String> {
 	let ExprKind::MethodCall(segment, receiver, arguments, _) = &expr.kind else {
 		return None;
 	};
@@ -136,17 +140,23 @@ fn len_identity(expr: &Expr<'_>) -> Option<String> {
 		return None;
 	}
 
+	let receiver_type = cx.typeck_results().expr_ty_adjusted(receiver).peel_refs();
+
+	if !matches!(receiver_type.kind(), TyKind::Slice(_) | TyKind::Array(_, _)) {
+		return None;
+	}
+
 	shared::expression_identity(receiver)
 }
 
-fn bounded_identity(condition: &Expr<'_>) -> Option<String> {
+fn bounded_identity(cx: &LateContext<'_>, condition: &Expr<'_>) -> Option<String> {
 	let ExprKind::Binary(operation, left, right) = &condition.kind else {
 		return None;
 	};
 
 	match operation.node {
-		BinOpKind::Gt | BinOpKind::Ge if is_constant_bound(right) => len_identity(left),
-		BinOpKind::Lt | BinOpKind::Le if is_constant_bound(left) => len_identity(right),
+		BinOpKind::Gt | BinOpKind::Ge if is_constant_bound(right) => len_identity(cx, left),
+		BinOpKind::Lt | BinOpKind::Le if is_constant_bound(left) => len_identity(cx, right),
 		_ => None,
 	}
 }
@@ -170,18 +180,6 @@ fn expression_returns(expr: &Expr<'_>) -> bool {
 	}
 }
 
-fn header_contains_identity(header: &str, identity: &str) -> bool {
-	header.match_indices(identity).any(|(start, matched)| {
-		let before = header[..start].chars().next_back();
-		let after = header[start + matched.len()..].chars().next();
-		let is_boundary = |character: Option<char>| {
-			character.is_none_or(|character| !character.is_ascii_alphanumeric() && character != '_')
-		};
-
-		is_boundary(before) && is_boundary(after)
-	})
-}
-
 #[derive(Clone, Default)]
 struct AnalysisState {
 	bounded: HashSet<String>,
@@ -195,19 +193,18 @@ fn same_or_descendant(candidate: &str, identity: &str) -> bool {
 			.is_some_and(|suffix| suffix.starts_with(['.', '[']))
 }
 
-fn intersect_states(states: &[AnalysisState]) -> AnalysisState {
-	let first = states
-		.first()
-		.expect("state intersections always contain at least one control-flow path");
-	let mut bounded = first.bounded.clone();
-	let mut remaining = HashSet::new();
+fn intersect_states(states: impl IntoIterator<Item = AnalysisState>) -> AnalysisState {
+	states
+		.into_iter()
+		.reduce(|mut intersection, state| {
+			intersection
+				.bounded
+				.retain(|identity| state.bounded.contains(identity));
+			intersection.remaining.extend(state.remaining);
 
-	for state in states {
-		bounded.retain(|identity| state.bounded.contains(identity));
-		remaining.extend(state.remaining.iter().cloned());
-	}
-
-	AnalysisState { bounded, remaining }
+			intersection
+		})
+		.unwrap_or_default()
 }
 
 struct Analyzer<'cx, 'tcx> {
@@ -268,16 +265,72 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		}
 	}
 
-	fn loop_mentions_remaining(&self, snippet: &str, state: &AnalysisState) -> bool {
-		let header = snippet
-			.split_once('{')
-			.map_or(snippet, |(header, _)| header);
+	fn collect_iterator_identities(&self, expression: &Expr<'_>, identities: &mut HashSet<String>) {
+		if let Some(identity) = self.expression_identity(expression) {
+			identities.insert(identity);
+		}
 
-		state
-			.remaining
-			.iter()
-			.any(|identity| header_contains_identity(header, identity))
-			|| header.to_ascii_lowercase().contains("remaining")
+		match &expression.kind {
+			ExprKind::MethodCall(segment, receiver, arguments, _) => {
+				self.collect_iterator_identities(receiver, identities);
+
+				if segment.ident.name.as_str() == "chain"
+					&& is_iterator_method(self.cx, expression, "chain")
+				{
+					for argument in *arguments {
+						self.collect_iterator_identities(argument, identities);
+					}
+				}
+			}
+			ExprKind::Call(_, arguments) => {
+				for argument in *arguments {
+					self.collect_iterator_identities(argument, identities);
+				}
+			}
+			ExprKind::If(_, then, otherwise) => {
+				self.collect_iterator_identities(then, identities);
+
+				if let Some(otherwise) = otherwise {
+					self.collect_iterator_identities(otherwise, identities);
+				}
+			}
+			ExprKind::Match(_, arms, _) => {
+				for arm in *arms {
+					self.collect_iterator_identities(arm.body, identities);
+				}
+			}
+			ExprKind::Block(block, _) => {
+				if let Some(tail) = block.expr {
+					self.collect_iterator_identities(tail, identities);
+				}
+			}
+			ExprKind::Unary(_, inner)
+			| ExprKind::Use(inner, _)
+			| ExprKind::Cast(inner, _)
+			| ExprKind::Type(inner, _)
+			| ExprKind::DropTemps(inner)
+			| ExprKind::AddrOf(_, _, inner) => {
+				self.collect_iterator_identities(inner, identities);
+			}
+			ExprKind::Tup(expressions) | ExprKind::Array(expressions) => {
+				for expression in *expressions {
+					self.collect_iterator_identities(expression, identities);
+				}
+			}
+			_ => {}
+		}
+	}
+
+	fn remaining_iterator_identities(
+		&self,
+		expression: &Expr<'_>,
+		state: &AnalysisState,
+	) -> HashSet<String> {
+		let mut identities = HashSet::new();
+		self.collect_iterator_identities(expression, &mut identities);
+		identities.retain(|identity| self.is_remaining_identity(identity, state));
+
+		identities
 	}
 
 	fn visit_block(&self, block: &'tcx rustc_hir::Block<'tcx>, state: &mut AnalysisState) {
@@ -318,22 +371,19 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 	fn visit_expr(&self, expr: &'tcx Expr<'tcx>, state: &mut AnalysisState) {
 		match &expr.kind {
 			ExprKind::Loop(block, _, source, _) => {
-				let snippet = self
-					.cx
-					.sess()
-					.source_map()
-					.span_to_snippet(expr.span)
+				let iterator = matches!(source, LoopSource::ForLoop)
+					.then(|| for_loop_iterator(self.cx, expr))
+					.flatten();
+				let remaining_identities = iterator
+					.map(|iterator| self.remaining_iterator_identities(iterator, state))
 					.unwrap_or_default();
-				let loop_header = snippet
-					.split_once('{')
-					.map_or(snippet.as_str(), |(header, _)| header);
-				let mentions_remaining = self.loop_mentions_remaining(&snippet, state);
-				let has_validated_bound = state
-					.bounded
-					.iter()
-					.any(|identity| header_contains_identity(loop_header, identity));
-				let has_constant_take = matches!(source, LoopSource::ForLoop)
-					&& for_loop_has_constant_take(self.cx, expr);
+				let mentions_remaining = !remaining_identities.is_empty();
+				let has_validated_bound = mentions_remaining
+					&& remaining_identities
+						.iter()
+						.all(|identity| state.bounded.contains(identity));
+				let has_constant_take =
+					iterator.is_some_and(|iterator| expression_has_static_bound(self.cx, iterator));
 
 				if mentions_remaining && !has_constant_take && !has_validated_bound {
 					self.cx.lint(REQUIRE_BOUNDED_REMAINING_ACCOUNTS, |diag| {
@@ -351,7 +401,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				let entry = state.clone();
 				let mut body_state = entry.clone();
 				self.visit_block(block, &mut body_state);
-				*state = intersect_states(&[entry, body_state]);
+				*state = intersect_states([entry, body_state]);
 			}
 			ExprKind::If(condition, then, otherwise) => {
 				self.visit_expr(condition, state);
@@ -370,16 +420,16 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 						branches.push(otherwise_state);
 					}
 					if !branches.is_empty() {
-						*state = intersect_states(&branches);
+						*state = intersect_states(branches);
 					}
 				} else if expression_returns(then)
-					&& let Some(identity) = bounded_identity(condition)
+					&& let Some(identity) = bounded_identity(self.cx, condition)
 					&& self.is_remaining_identity(&identity, &base)
 				{
 					*state = base;
 					state.bounded.insert(identity);
 				} else {
-					*state = intersect_states(&[base, then_state]);
+					*state = intersect_states([base, then_state]);
 				}
 			}
 			ExprKind::MethodCall(_, receiver, arguments, _) => {
@@ -417,7 +467,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					}
 				}
 				if !branches.is_empty() {
-					*state = intersect_states(&branches);
+					*state = intersect_states(branches);
 				}
 			}
 			ExprKind::Closure(closure) => {
@@ -425,7 +475,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				let mut body_state = entry.clone();
 				let body = self.cx.tcx.hir_body(closure.body);
 				self.visit_expr(body.value, &mut body_state);
-				*state = intersect_states(&[entry, body_state]);
+				*state = intersect_states([entry, body_state]);
 			}
 			ExprKind::AddrOf(_, rustc_hir::Mutability::Mut, inner) => {
 				self.visit_expr(inner, state);
@@ -450,7 +500,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					let base = state.clone();
 					let mut right_state = base.clone();
 					self.visit_expr(right, &mut right_state);
-					*state = intersect_states(&[base, right_state]);
+					*state = intersect_states([base, right_state]);
 				} else {
 					self.visit_expr(right, state);
 				}
@@ -463,15 +513,15 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					|| expression_has_static_bound(self.cx, right);
 				self.visit_expr(left, state);
 				self.visit_expr(right, state);
-				let _ = self.expression_identity(left).inspect(|identity| {
-					self.invalidate(state, identity);
+				if let Some(identity) = self.expression_identity(left) {
+					self.invalidate(state, &identity);
 					if right_is_remaining {
-						state.remaining.insert((*identity).clone());
+						state.remaining.insert(identity.clone());
 					}
 					if right_is_bounded {
-						state.bounded.insert((*identity).clone());
+						state.bounded.insert(identity);
 					}
-				});
+				}
 			}
 			ExprKind::AssignOp(_, left, right) => {
 				self.visit_expr(left, state);

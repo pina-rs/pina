@@ -90,9 +90,9 @@ LL | |     }
    = help: reject `remaining.len() > MAX_REMAINING_ACCOUNTS` before the loop, or iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
 
 error: remaining accounts are processed without an explicit bound
-  --> $DIR/remaining_accounts.rs:167:2
+  --> $DIR/remaining_accounts.rs:135:2
    |
-LL | /     for account in passthrough(remaining).take(8) {
+LL | /     for account in remaining_a.iter().chain(remaining_b) {
 LL | |         //~^ ERROR: remaining accounts are processed without an explicit bound
 LL | |         let _ = account;
 LL | |     }
@@ -101,29 +101,17 @@ LL | |     }
    = help: reject `remaining.len() > MAX_REMAINING_ACCOUNTS` before the loop, or iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
 
 error: remaining accounts are processed without an explicit bound
-  --> $DIR/remaining_accounts.rs:175:2
+  --> $DIR/remaining_accounts.rs:171:2
    |
-LL | /     for account in accounts {
-LL | |         //~^ ERROR: remaining accounts are processed without an explicit bound
-LL | |         let _ = account;
+LL | /     for account in source.remaining
+...  |
 LL | |     }
    | |_____^
    |
    = help: reject `remaining.len() > MAX_REMAINING_ACCOUNTS` before the loop, or iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
 
 error: remaining accounts are processed without an explicit bound
-  --> $DIR/remaining_accounts.rs:211:2
-   |
-LL | /     for account in remaining {
-LL | |         //~^ ERROR: remaining accounts are processed without an explicit bound
-LL | |         let _ = account;
-LL | |     }
-   | |_____^
-   |
-   = help: reject `remaining.len() > MAX_REMAINING_ACCOUNTS` before the loop, or iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
-
-error: remaining accounts are processed without an explicit bound
-  --> $DIR/remaining_accounts.rs:232:2
+  --> $DIR/remaining_accounts.rs:221:2
    |
 LL | /     for account in remaining {
 LL | |         //~^ ERROR: remaining accounts are processed without an explicit bound
@@ -136,7 +124,7 @@ LL | |     }
 error: remaining accounts are processed without an explicit bound
   --> $DIR/remaining_accounts.rs:250:2
    |
-LL | /     for account in *remaining_ref {
+LL | /     for account in passthrough(remaining).take(8) {
 LL | |         //~^ ERROR: remaining accounts are processed without an explicit bound
 LL | |         let _ = account;
 LL | |     }
@@ -145,7 +133,18 @@ LL | |     }
    = help: reject `remaining.len() > MAX_REMAINING_ACCOUNTS` before the loop, or iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
 
 error: remaining accounts are processed without an explicit bound
-  --> $DIR/remaining_accounts.rs:268:2
+  --> $DIR/remaining_accounts.rs:258:2
+   |
+LL | /     for account in accounts {
+LL | |         //~^ ERROR: remaining accounts are processed without an explicit bound
+LL | |         let _ = account;
+LL | |     }
+   | |_____^
+   |
+   = help: reject `remaining.len() > MAX_REMAINING_ACCOUNTS` before the loop, or iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
+
+error: remaining accounts are processed without an explicit bound
+  --> $DIR/remaining_accounts.rs:294:2
    |
 LL | /     for account in remaining {
 LL | |         //~^ ERROR: remaining accounts are processed without an explicit bound
@@ -156,7 +155,40 @@ LL | |     }
    = help: reject `remaining.len() > MAX_REMAINING_ACCOUNTS` before the loop, or iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
 
 error: remaining accounts are processed without an explicit bound
-  --> $DIR/remaining_accounts.rs:293:2
+  --> $DIR/remaining_accounts.rs:315:2
+   |
+LL | /     for account in remaining {
+LL | |         //~^ ERROR: remaining accounts are processed without an explicit bound
+LL | |         let _ = account;
+LL | |     }
+   | |_____^
+   |
+   = help: reject `remaining.len() > MAX_REMAINING_ACCOUNTS` before the loop, or iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
+
+error: remaining accounts are processed without an explicit bound
+  --> $DIR/remaining_accounts.rs:333:2
+   |
+LL | /     for account in *remaining_ref {
+LL | |         //~^ ERROR: remaining accounts are processed without an explicit bound
+LL | |         let _ = account;
+LL | |     }
+   | |_____^
+   |
+   = help: reject `remaining.len() > MAX_REMAINING_ACCOUNTS` before the loop, or iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
+
+error: remaining accounts are processed without an explicit bound
+  --> $DIR/remaining_accounts.rs:351:2
+   |
+LL | /     for account in remaining {
+LL | |         //~^ ERROR: remaining accounts are processed without an explicit bound
+LL | |         let _ = account;
+LL | |     }
+   | |_____^
+   |
+   = help: reject `remaining.len() > MAX_REMAINING_ACCOUNTS` before the loop, or iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
+
+error: remaining accounts are processed without an explicit bound
+  --> $DIR/remaining_accounts.rs:376:2
    |
 LL | /     for account in holder.remaining {
 LL | |         //~^ ERROR: remaining accounts are processed without an explicit bound
@@ -167,7 +199,7 @@ LL | |     }
    = help: reject `remaining.len() > MAX_REMAINING_ACCOUNTS` before the loop, or iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
 
 error: remaining accounts are processed without an explicit bound
-  --> $DIR/remaining_accounts.rs:316:2
+  --> $DIR/remaining_accounts.rs:399:2
    |
 LL | /     for account in remaining {
 LL | |         //~^ ERROR: remaining accounts are processed without an explicit bound
@@ -177,4 +209,4 @@ LL | |     }
    |
    = help: reject `remaining.len() > MAX_REMAINING_ACCOUNTS` before the loop, or iterate with `remaining.iter().take(MAX_REMAINING_ACCOUNTS)`
 
-error: aborting due to 16 previous errors
+error: aborting due to 19 previous errors

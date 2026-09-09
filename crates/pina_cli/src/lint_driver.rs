@@ -89,7 +89,7 @@ pub fn prepare_driver(
 		return Ok(PreparedDriver { path: bin });
 	}
 
-	install_driver(&root)?;
+	install_driver(&root, project_root)?;
 
 	if is_executable(&bin) {
 		return Ok(PreparedDriver { path: bin });
@@ -98,10 +98,11 @@ pub fn prepare_driver(
 }
 
 /// Install the driver from the crates.io release matching this CLI.
-fn install_driver(root: &Path) -> Result<(), DriverError> {
+fn install_driver(root: &Path, project_root: &Path) -> Result<(), DriverError> {
 	let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
 
 	let status = Command::new(&cargo)
+		.current_dir(project_root)
 		.arg("install")
 		.arg("--locked")
 		.arg("--root")
@@ -178,7 +179,8 @@ pub fn driver_build_identity(path: &Path) -> std::io::Result<String> {
 /// Return the `release-commit-host` fingerprint of the Rust compiler used for
 /// `project_root`.
 fn rustc_fingerprint(project_root: &Path) -> Result<String, DriverError> {
-	let output = Command::new("rustc")
+	let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| OsString::from("rustc"));
+	let output = Command::new(rustc)
 		.arg("-vV")
 		.current_dir(project_root)
 		.output()

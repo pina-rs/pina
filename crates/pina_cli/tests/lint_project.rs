@@ -112,6 +112,7 @@ struct Fixture {
 	_temp: TempDir,
 	project: PathBuf,
 	cargo_home: PathBuf,
+	install_pwd: PathBuf,
 	/// Installs a driver-shaped stub into `$root/bin` when invoked as cargo
 	/// install (or fails, for error-path tests); every other verb delegates
 	/// to the real cargo and the check verb is configurable for lint
@@ -175,6 +176,7 @@ fi
 if [[ "$1" != "install" ]]; then
 	exit 0
 fi
+pwd > "$FAKE_INSTALL_PWD"
 if [[ -n "${FAKE_INSTALL_SKIP:-}" ]]; then
 	exit 0
 fi
@@ -192,11 +194,13 @@ chmod +x "$root/bin/pina_lint_driver"
 "#,
 		);
 		let cargo_home = temp.path().join("cargo-home");
+		let install_pwd = temp.path().join("install-pwd");
 
 		Self {
 			_temp: temp,
 			project,
 			cargo_home,
+			install_pwd,
 			fake_cargo,
 		}
 	}
@@ -226,6 +230,7 @@ chmod +x "$root/bin/pina_lint_driver"
 		environment.set("CARGO_HOME", &self.cargo_home);
 		environment.set("CARGO", &self.fake_cargo);
 		environment.set("REAL_CARGO", real_cargo);
+		environment.set("FAKE_INSTALL_PWD", &self.install_pwd);
 		environment
 	}
 
@@ -349,6 +354,14 @@ fn successful_install_reuses_the_managed_driver() {
 	let output =
 		lint_project(&fixture.options()).expect("the installed driver should satisfy lint_project");
 	assert_eq!(output.package_name, "lint-fixture");
+	assert_eq!(
+		fs::read_to_string(&fixture.install_pwd)
+			.expect("the fake cargo should record its install directory")
+			.trim(),
+		fs::canonicalize(&fixture.project)
+			.expect("the fixture project should be canonicalizable")
+			.to_string_lossy(),
+	);
 
 	// The second run resolves the driver from the managed cache instead of
 	// reinstalling it.

@@ -6,7 +6,7 @@
 
 `pina_lints` is Pina's self-contained replacement for the previous [Dylint](https://github.com/trailofbits/dylint) setup: every security, performance, and IDL lint that Pina ships lives in this one importable crate, so the lints are built into Pina instead of being distributed as separate Dylint libraries. They turn repository security conventions into compiler diagnostics and are intended to run during normal development and CI.
 
-The crate keeps the Dylint authoring shape — each lint lives in its own module under `lints` and declares itself with `declare_late_lint!` or `declare_pre_expansion_lint!` — but no lint registers itself; registration is centralized in `register_all_lints`. The crate builds as both a library and a cdylib that exports the Dylint-compatible `register_lints` symbol, so a Dylint driver can still load it as a single library. It also ships the bundled `pina_lint_driver` binary, a `rustc` wrapper with every lint statically linked; `pina lint` runs it as `RUSTC_WRAPPER`, so it needs no external lint tooling.
+The crate keeps the Dylint authoring shape — each lint lives in its own module under `lints` and declares itself with `declare_late_lint!` or `declare_pre_expansion_lint!` — but no lint registers itself; registration is centralized in `register_all_lints`. The crate builds as both a library and a cdylib that exports the Dylint-compatible `register_lints` symbol, so a Dylint driver can still load it as a single library. It also ships the bundled `pina_lint_driver` binary, a `rustc` wrapper with every lint statically linked; `pina lint` runs it as `RUSTC_WORKSPACE_WRAPPER`, so it needs no external lint tooling.
 
 The lints complement tests and audits; they do not prove that a program's economic design is safe. Every path-sensitive lint documents the approximation it uses so findings can be reviewed with the right expectations.
 
@@ -26,9 +26,9 @@ pina lint
 pina lint --fix
 ```
 
-`pina lint` builds and manages the bundled `pina_lint_driver` under Cargo home, then invokes cargo with the driver as `RUSTC_WRAPPER`. Cargo calls the driver with the arguments it would have passed to `rustc`; the driver registers every lint compiled into this crate, and compilation continues normally. Because the lints are statically linked into the driver, no external lint tooling is downloaded or installed. The driver reads a few environment variables: `PINA_LINT_NO_DEPS` skips dependency crates, `PINA_LINT_LEVELS` forwards configured lint levels to `rustc` (see [Configuring lint levels](#configuring-lint-levels)), `PINA_LINT_ONLY` restricts linting to a single lint, and `PINA_LINT_LIST` prints the lint catalog instead of compiling. `PINA_LINT_NO_DEPS`, `PINA_LINT_LEVELS`, and `PINA_LINT_ONLY` are recorded in dep-info, so changing them invalidates cargo's cached check results.
+`pina lint` builds and manages the bundled `pina_lint_driver` under Cargo home, then invokes cargo with the driver as `RUSTC_WORKSPACE_WRAPPER`. Cargo calls the driver with the arguments it would have passed to `rustc`; the driver registers every lint compiled into this crate, and compilation continues normally. Cargo preserves and nests an existing `RUSTC_WRAPPER`, such as `sccache`, outside the lint driver. Because the lints are statically linked into the driver, no external lint tooling is downloaded or installed. The driver reads a few environment variables: `PINA_LINT_NO_DEPS` skips dependency crates, `PINA_LINT_LEVELS` forwards configured lint levels to `rustc` (see [Configuring lint levels](#configuring-lint-levels)), `PINA_LINT_ONLY` restricts linting to a single lint, and `PINA_LINT_LIST` prints the lint catalog instead of compiling. `PINA_LINT_NO_DEPS`, `PINA_LINT_LEVELS`, and `PINA_LINT_ONLY` are recorded in dep-info, so changing them invalidates cargo's cached check results.
 
-The crate itself is nightly-only: the lint passes and the driver link against the Rust compiler's unstable `rustc_private` crates. It is published to crates.io, but consuming projects never build it — the CLI builds and manages the driver for the active toolchain.
+The crate itself is nightly-only: the lint passes and the driver link against the Rust compiler's unstable `rustc_private` crates. It is published to crates.io, but consuming projects never build it — the CLI builds and manages the driver from the project directory for the active toolchain.
 
 Pina contributors still run the in-workspace driver when changing a lint:
 
@@ -36,7 +36,7 @@ Pina contributors still run the in-workspace driver when changing a lint:
 devenv shell -- security:pina-lint
 ```
 
-`security:pina-lint` is the authoritative gate. It builds the workspace's `pina_lint_driver` binary and runs cargo with `RUSTC_WRAPPER` pointing at it, discovering every package under `examples/` and every `security/*/secure` fixture, then checks each one in the driver's no-deps mode with `--locked`. Insecure fixtures are intentionally excluded because they preserve examples of unsafe patterns.
+`security:pina-lint` is the authoritative gate. It builds the workspace's `pina_lint_driver` binary and runs cargo with `RUSTC_WORKSPACE_WRAPPER` pointing at it, discovering every package under `examples/` and every `security/*/secure` fixture, then checks each one in the driver's no-deps mode with `--locked`. Insecure fixtures are intentionally excluded because they preserve examples of unsafe patterns.
 
 ## Importing the lints
 

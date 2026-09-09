@@ -48,9 +48,11 @@ for account in bounded {
 }
 ```
 
+Every remaining-account source in a chained iterator needs its own dominating length check. The lint only accepts the built-in length of a slice or array as evidence; a custom method named `len` cannot establish a security bound.
+
 ## Refresh the managed lint driver
 
-No manual cache cleanup is normally required. The CLI now keys the installed lint driver by the exact `rustc` commit and rebuilds it when the active compiler changes. If `PINA_LINT_DRIVER_PATH` is set for local lint development, make sure it points to a driver built by the same toolchain as the project.
+No manual cache cleanup is normally required. The CLI now keys the installed lint driver by the exact `rustc` commit and rebuilds it when the active compiler changes. It installs the driver as `RUSTC_WORKSPACE_WRAPPER`, so Cargo can retain an existing outer `RUSTC_WRAPPER` such as `sccache`. If `PINA_LINT_DRIVER_PATH` is set for local lint development, make sure it points to a driver built by the same toolchain as the project.
 
 Run the complete catalog after migrating:
 

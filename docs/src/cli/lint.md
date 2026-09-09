@@ -27,7 +27,7 @@ pina lint --project ./programs/counter
 
 ## Managed lint driver
 
-`pina lint` runs `cargo check` — or `cargo fix` with `--fix` — with the driver as `RUSTC_WRAPPER`. Cargo calls the driver with the arguments it would have passed to `rustc`; the driver registers every lint statically linked into it, and compilation continues normally with the lints emitted as ordinary compiler diagnostics.
+`pina lint` runs `cargo check` — or `cargo fix` with `--fix` — with the driver as `RUSTC_WORKSPACE_WRAPPER`. Cargo calls the driver with the arguments it would have passed to `rustc`; the driver registers every lint statically linked into it, and compilation continues normally with the lints emitted as ordinary compiler diagnostics. If `RUSTC_WRAPPER` already selects a compiler cache such as `sccache`, Cargo preserves it as the outer wrapper.
 
 The CLI prepares the driver below Cargo home:
 
@@ -37,7 +37,7 @@ $CARGO_HOME/pina/lint-driver/<pina-version>/<rustc-release>-<host>/bin/pina_lint
 
 - The first use installs it from crates.io with `cargo install --locked --root <that directory> --bin pina_lint_driver --version =<CLI version> pina_lints`. This step requires network access once; later runs reuse the cached binary.
 - The driver release identity is the `pina_lints` version, which matches the installed CLI version. There is no separate tool release or revision selector to pick.
-- The driver is built with the project's pinned nightly toolchain, the same compiler that builds the project, because `pina_lints` is nightly-only: its lint passes and the driver link against the compiler's unstable `rustc_private` crates. The toolchain must have the `rustc-dev` component installed (`rustup component add rustc-dev` if it is missing).
+- The driver is built from the project directory with the project's pinned nightly toolchain, the same compiler that builds the project, because `pina_lints` is nightly-only: its lint passes and the driver link against the compiler's unstable `rustc_private` crates. The toolchain must have the `rustc-dev` component installed (`rustup component add rustc-dev` if it is missing).
 - Set `CARGO_HOME` to move the driver cache. `CARGO_TARGET_DIR` continues to control normal project build artifacts.
 
 To run a driver you built yourself — typically the workspace driver while developing a lint — set `PINA_LINT_DRIVER_PATH` to an executable binary path and `pina lint` uses it instead of the managed cache. The repository's own `security:pina-lint` task uses this variable to run the workspace-built driver.

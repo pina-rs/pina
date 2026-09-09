@@ -86,7 +86,11 @@ fn visit_expr(cx: &LateContext<'_>, expr: &Expr<'_>) {
 			for argument in *args {
 				visit_expr(cx, argument);
 			}
-			if UNCHECKED_METHODS.contains(&segment.ident.name.as_str())
+
+			let receiver_is_integer = cx.typeck_results().expr_ty_adjusted(receiver).is_integral();
+
+			if receiver_is_integer
+				&& UNCHECKED_METHODS.contains(&segment.ident.name.as_str())
 				&& (looks_like_asset(receiver)
 					|| args.iter().any(|argument| looks_like_asset(argument)))
 			{
