@@ -286,11 +286,11 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<ConfigStateZc>()
-        == AccountDisc::BYTES + ::core::mem::size_of::<::core::primitive::u8>()
+        == AccountDisc::BYTES + 0usize + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<::core::primitive::u8>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<ConfigStateZc>() ==\n    AccountDisc::BYTES + ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
+            "assertion failed: ::core::mem::size_of::<ConfigStateZc>() ==\n    AccountDisc::BYTES + 0usize +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
         )
     }
 };
@@ -573,11 +573,11 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<GameStateZc>()
-        == AccountDisc::BYTES + ::core::mem::size_of::<::core::primitive::u8>()
+        == AccountDisc::BYTES + 0usize + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<::core::primitive::u8>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<GameStateZc>() ==\n    AccountDisc::BYTES + ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
+            "assertion failed: ::core::mem::size_of::<GameStateZc>() ==\n    AccountDisc::BYTES + 0usize +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
         )
     }
 };
@@ -883,12 +883,13 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<DataAccountZc>()
-        == AccountDisc::BYTES + ::core::mem::size_of::<[::core::primitive::u8; 32]>()
+        == AccountDisc::BYTES + 0usize
+            + ::core::mem::size_of::<[::core::primitive::u8; 32]>()
             + ::core::mem::size_of::<[::core::primitive::u8; 64]>()
             + ::core::mem::size_of::<[::core::primitive::u8; 4]>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<DataAccountZc>() ==\n    AccountDisc::BYTES + ::core::mem::size_of::<[::core::primitive::u8; 32]>()\n            + ::core::mem::size_of::<[::core::primitive::u8; 64]>() +\n        ::core::mem::size_of::<[::core::primitive::u8; 4]>()",
+            "assertion failed: ::core::mem::size_of::<DataAccountZc>() ==\n    AccountDisc::BYTES + 0usize +\n                ::core::mem::size_of::<[::core::primitive::u8; 32]>() +\n            ::core::mem::size_of::<[::core::primitive::u8; 64]>() +\n        ::core::mem::size_of::<[::core::primitive::u8; 4]>()",
         )
     }
 };
@@ -1233,13 +1234,14 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<BalanceAccountZc>()
-        == AccountDisc::BYTES + ::core::mem::size_of::<[::core::primitive::u8; 32]>()
+        == AccountDisc::BYTES + 0usize
+            + ::core::mem::size_of::<[::core::primitive::u8; 32]>()
             + ::core::mem::size_of::<pina::PodU64>()
             + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<pina::PodBool>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<BalanceAccountZc>() ==\n    AccountDisc::BYTES + ::core::mem::size_of::<[::core::primitive::u8; 32]>()\n                + ::core::mem::size_of::<pina::PodU64>() +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<pina::PodBool>()",
+            "assertion failed: ::core::mem::size_of::<BalanceAccountZc>() ==\n    AccountDisc::BYTES + 0usize +\n                    ::core::mem::size_of::<[::core::primitive::u8; 32]>() +\n                ::core::mem::size_of::<pina::PodU64>() +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<pina::PodBool>()",
         )
     }
 };
@@ -1467,10 +1469,10 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<MyStructZc>()
-        == AccountDisc::BYTES + ::core::mem::size_of::<::core::primitive::u8>())
+        == AccountDisc::BYTES + 0usize + ::core::mem::size_of::<::core::primitive::u8>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<MyStructZc>() ==\n    AccountDisc::BYTES + ::core::mem::size_of::<::core::primitive::u8>()",
+            "assertion failed: ::core::mem::size_of::<MyStructZc>() ==\n    AccountDisc::BYTES + 0usize +\n        ::core::mem::size_of::<::core::primitive::u8>()",
         )
     }
 };
@@ -1971,7 +1973,8 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<LargeStateZc>()
-        == AccountDisc::BYTES + ::core::mem::size_of::<[::core::primitive::u8; 32]>()
+        == AccountDisc::BYTES + 0usize
+            + ::core::mem::size_of::<[::core::primitive::u8; 32]>()
             + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<::core::primitive::u8>()
@@ -1981,7 +1984,7 @@ const _: () = {
             + ::core::mem::size_of::<[::core::primitive::u8; 32]>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<LargeStateZc>() ==\n    AccountDisc::BYTES + ::core::mem::size_of::<[::core::primitive::u8; 32]>()\n                                + ::core::mem::size_of::<::core::primitive::u8>() +\n                            ::core::mem::size_of::<::core::primitive::u8>() +\n                        ::core::mem::size_of::<::core::primitive::u8>() +\n                    ::core::mem::size_of::<::core::primitive::u8>() +\n                ::core::mem::size_of::<[::core::primitive::u8; 3]>() +\n            ::core::mem::size_of::<pina::PodU64>() +\n        ::core::mem::size_of::<[::core::primitive::u8; 32]>()",
+            "assertion failed: ::core::mem::size_of::<LargeStateZc>() ==\n    AccountDisc::BYTES + 0usize +\n                                    ::core::mem::size_of::<[::core::primitive::u8; 32]>() +\n                                ::core::mem::size_of::<::core::primitive::u8>() +\n                            ::core::mem::size_of::<::core::primitive::u8>() +\n                        ::core::mem::size_of::<::core::primitive::u8>() +\n                    ::core::mem::size_of::<::core::primitive::u8>() +\n                ::core::mem::size_of::<[::core::primitive::u8; 3]>() +\n            ::core::mem::size_of::<pina::PodU64>() +\n        ::core::mem::size_of::<[::core::primitive::u8; 32]>()",
         )
     }
 };

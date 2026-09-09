@@ -202,9 +202,9 @@ const _: () = {
             "assertion failed: ::core::mem::align_of::<InitializeZc>() == 1",
         )
     }
-    if !(::core::mem::size_of::<InitializeZc>() == InstructionDisc::BYTES) {
+    if !(::core::mem::size_of::<InitializeZc>() == InstructionDisc::BYTES + 0usize) {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<InitializeZc>() == InstructionDisc::BYTES",
+            "assertion failed: ::core::mem::size_of::<InitializeZc>() == InstructionDisc::BYTES + 0usize",
         )
     }
 };
@@ -495,13 +495,14 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<FlipBitZc>()
-        == InstructionDisc::BYTES + ::core::mem::size_of::<::core::primitive::u8>()
+        == InstructionDisc::BYTES + 0usize
+            + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<::core::primitive::u8>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<FlipBitZc>() ==\n    InstructionDisc::BYTES + ::core::mem::size_of::<::core::primitive::u8>() +\n                ::core::mem::size_of::<::core::primitive::u8>() +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
+            "assertion failed: ::core::mem::size_of::<FlipBitZc>() ==\n    InstructionDisc::BYTES + 0usize +\n                    ::core::mem::size_of::<::core::primitive::u8>() +\n                ::core::mem::size_of::<::core::primitive::u8>() +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
         )
     }
 };
@@ -675,10 +676,10 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<TransferZc>()
-        == InstructionDisc::BYTES + ::core::mem::size_of::<pina::PodU64>())
+        == InstructionDisc::BYTES + 0usize + ::core::mem::size_of::<pina::PodU64>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<TransferZc>() ==\n    InstructionDisc::BYTES + ::core::mem::size_of::<pina::PodU64>()",
+            "assertion failed: ::core::mem::size_of::<TransferZc>() ==\n    InstructionDisc::BYTES + 0usize + ::core::mem::size_of::<pina::PodU64>()",
         )
     }
 };
@@ -891,11 +892,11 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<CustomTransferDataZc>()
-        == InstructionDisc::BYTES + ::core::mem::size_of::<pina::PodU64>()
+        == InstructionDisc::BYTES + 0usize + ::core::mem::size_of::<pina::PodU64>()
             + ::core::mem::size_of::<[::core::primitive::u8; 32]>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<CustomTransferDataZc>() ==\n    InstructionDisc::BYTES + ::core::mem::size_of::<pina::PodU64>() +\n        ::core::mem::size_of::<[::core::primitive::u8; 32]>()",
+            "assertion failed: ::core::mem::size_of::<CustomTransferDataZc>() ==\n    InstructionDisc::BYTES + 0usize + ::core::mem::size_of::<pina::PodU64>() +\n        ::core::mem::size_of::<[::core::primitive::u8; 32]>()",
         )
     }
 };
@@ -1186,13 +1187,14 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<ComplexInstructionZc>()
-        == InstructionDisc::BYTES + ::core::mem::size_of::<[::core::primitive::u8; 32]>()
+        == InstructionDisc::BYTES + 0usize
+            + ::core::mem::size_of::<[::core::primitive::u8; 32]>()
             + ::core::mem::size_of::<pina::PodU64>()
             + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<[::core::primitive::u8; 4]>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<ComplexInstructionZc>() ==\n    InstructionDisc::BYTES +\n                    ::core::mem::size_of::<[::core::primitive::u8; 32]>() +\n                ::core::mem::size_of::<pina::PodU64>() +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<[::core::primitive::u8; 4]>()",
+            "assertion failed: ::core::mem::size_of::<ComplexInstructionZc>() ==\n    InstructionDisc::BYTES + 0usize +\n                    ::core::mem::size_of::<[::core::primitive::u8; 32]>() +\n                ::core::mem::size_of::<pina::PodU64>() +\n            ::core::mem::size_of::<::core::primitive::u8>() +\n        ::core::mem::size_of::<[::core::primitive::u8; 4]>()",
         )
     }
 };

@@ -416,11 +416,11 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<CounterStateZc>()
-        == PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>()
+        == PdaDisc::BYTES + 0usize + ::core::mem::size_of::<pina::Address>()
             + ::core::mem::size_of::<::core::primitive::u8>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<CounterStateZc>() ==\n    PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
+            "assertion failed: ::core::mem::size_of::<CounterStateZc>() ==\n    PdaDisc::BYTES + 0usize + ::core::mem::size_of::<pina::Address>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
         )
     }
 };
@@ -1095,7 +1095,7 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<AllSeedStateZc>()
-        == PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>()
+        == PdaDisc::BYTES + 0usize + ::core::mem::size_of::<pina::Address>()
             + ::core::mem::size_of::<pina::PodU64>()
             + ::core::mem::size_of::<::core::primitive::u8>()
             + ::core::mem::size_of::<[::core::primitive::u8; 8]>()
@@ -1104,7 +1104,7 @@ const _: () = {
             + ::core::mem::size_of::<::core::primitive::u8>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<AllSeedStateZc>() ==\n    PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>() +\n                            ::core::mem::size_of::<pina::PodU64>() +\n                        ::core::mem::size_of::<::core::primitive::u8>() +\n                    ::core::mem::size_of::<[::core::primitive::u8; 8]>() +\n                ::core::mem::size_of::<pina::PodU16>() +\n            ::core::mem::size_of::<pina::PodU32>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
+            "assertion failed: ::core::mem::size_of::<AllSeedStateZc>() ==\n    PdaDisc::BYTES + 0usize + ::core::mem::size_of::<pina::Address>() +\n                            ::core::mem::size_of::<pina::PodU64>() +\n                        ::core::mem::size_of::<::core::primitive::u8>() +\n                    ::core::mem::size_of::<[::core::primitive::u8; 8]>() +\n                ::core::mem::size_of::<pina::PodU16>() +\n            ::core::mem::size_of::<pina::PodU32>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
         )
     }
 };
@@ -1587,11 +1587,11 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<TodoStateZc>()
-        == PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>()
+        == PdaDisc::BYTES + 0usize + ::core::mem::size_of::<pina::Address>()
             + ::core::mem::size_of::<::core::primitive::u8>())
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<TodoStateZc>() ==\n    PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
+            "assertion failed: ::core::mem::size_of::<TodoStateZc>() ==\n    PdaDisc::BYTES + 0usize + ::core::mem::size_of::<pina::Address>() +\n        ::core::mem::size_of::<::core::primitive::u8>()",
         )
     }
 };
@@ -2654,28 +2654,28 @@ const _: () = {
         )
     }
     if !(::core::mem::size_of::<CompactStateHeader>()
-        == PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>()
+        == PdaDisc::BYTES + 0usize + ::core::mem::size_of::<pina::Address>()
             + ::core::mem::size_of::<::core::primitive::u8>() + 2usize)
     {
         ::core::panicking::panic(
-            "assertion failed: ::core::mem::size_of::<CompactStateHeader>() ==\n    PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>() +\n            ::core::mem::size_of::<::core::primitive::u8>() + 2usize",
+            "assertion failed: ::core::mem::size_of::<CompactStateHeader>() ==\n    PdaDisc::BYTES + 0usize + ::core::mem::size_of::<pina::Address>() +\n            ::core::mem::size_of::<::core::primitive::u8>() + 2usize",
         )
     }
     if !(<CompactState as pina::PinaPodCompact>::MIN_SIZE
-        == PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>()
+        == PdaDisc::BYTES + 0usize + ::core::mem::size_of::<pina::Address>()
             + ::core::mem::size_of::<::core::primitive::u8>() + 2usize)
     {
         ::core::panicking::panic(
-            "assertion failed: <CompactState as pina::PinaPodCompact>::MIN_SIZE ==\n    PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>() +\n            ::core::mem::size_of::<::core::primitive::u8>() + 2usize",
+            "assertion failed: <CompactState as pina::PinaPodCompact>::MIN_SIZE ==\n    PdaDisc::BYTES + 0usize + ::core::mem::size_of::<pina::Address>() +\n            ::core::mem::size_of::<::core::primitive::u8>() + 2usize",
         )
     }
     if !(<CompactState as pina::PinaPodCompact>::MAX_SIZE
-        == PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>()
+        == PdaDisc::BYTES + 0usize + ::core::mem::size_of::<pina::Address>()
             + ::core::mem::size_of::<::core::primitive::u8>() + 2usize
             + 4 * ::core::mem::size_of::<pina::PodU64>())
     {
         ::core::panicking::panic(
-            "assertion failed: <CompactState as pina::PinaPodCompact>::MAX_SIZE ==\n    PdaDisc::BYTES + ::core::mem::size_of::<pina::Address>() +\n                ::core::mem::size_of::<::core::primitive::u8>() + 2usize +\n        4 * ::core::mem::size_of::<pina::PodU64>()",
+            "assertion failed: <CompactState as pina::PinaPodCompact>::MAX_SIZE ==\n    PdaDisc::BYTES + 0usize + ::core::mem::size_of::<pina::Address>() +\n                ::core::mem::size_of::<::core::primitive::u8>() + 2usize +\n        4 * ::core::mem::size_of::<pina::PodU64>()",
         )
     }
     if !(<CompactState as pina::PinaPodCompact>::TAIL_ALIGNMENT
