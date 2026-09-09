@@ -593,8 +593,7 @@ fn sha256_file(path: &Path) -> String {
 	encoded
 }
 
-#[test]
-fn measure_runtime_compute_units() {
+fn record_measurements(measure: fn(&Path) -> BTreeMap<String, Measurement>, programs: &[&str]) {
 	let Some(elf_dir) = std::env::var_os("PINA_CU_ELF_DIR").map(PathBuf::from) else {
 		eprintln!("skipping exact CU snapshot: PINA_CU_ELF_DIR is not set");
 		return;
@@ -603,8 +602,8 @@ fn measure_runtime_compute_units() {
 		.map(PathBuf::from)
 		.unwrap_or_else(|| panic!("PINA_CU_OUTPUT must be set with PINA_CU_ELF_DIR"));
 
-	let first = measure_all(&elf_dir);
-	let second = measure_all(&elf_dir);
+	let first = measure(&elf_dir);
+	let second = measure(&elf_dir);
 	assert_eq!(first, second, "Mollusk CU results must be deterministic");
 
 	let cases = first
@@ -617,24 +616,20 @@ fn measure_runtime_compute_units() {
 			})
 		})
 		.collect::<Vec<_>>();
-	let artifacts = [
-		"account_realloc_program",
-		"counter_program",
-		"profile_program",
-		"token_loader_cu_program",
-	]
-	.into_iter()
-	.map(|program| {
-		let path = elf_dir.join(format!("{program}.so"));
-		(
-			program,
-			json!({
-				"file": path.file_name().unwrap_or_default().to_string_lossy(),
-				"sha256": sha256_file(&path),
-			}),
-		)
-	})
-	.collect::<BTreeMap<_, _>>();
+	let artifacts = programs
+		.iter()
+		.copied()
+		.map(|program| {
+			let path = elf_dir.join(format!("{program}.so"));
+			(
+				program,
+				json!({
+					"file": path.file_name().unwrap_or_default().to_string_lossy(),
+					"sha256": sha256_file(&path),
+				}),
+			)
+		})
+		.collect::<BTreeMap<_, _>>();
 	let lock_file = std::env::var_os("PINA_CU_SOURCE_LOCK_FILE")
 		.map(PathBuf::from)
 		.unwrap_or_else(|| panic!("PINA_CU_SOURCE_LOCK_FILE must be set"));
@@ -662,4 +657,22 @@ fn measure_runtime_compute_units() {
 			.unwrap_or_else(|error| panic!("serialize CU report: {error}")),
 	)
 	.unwrap_or_else(|error| panic!("write CU report {}: {error}", output.display()));
+}
+
+#[test]
+fn measure_runtime_compute_units() {
+	record_measurements(
+		measure_all,
+		&[
+			"account_realloc_program",
+			"counter_program",
+			"profile_program",
+			"token_loader_cu_program",
+		],
+	);
+}
+
+#[test]
+fn measure_token_loader_compute_units() {
+	record_measurements(token_loader_measurements, &["token_loader_cu_program"]);
 }

@@ -194,9 +194,26 @@ function buildTokenLoaderProgram(
 
 function main(): number {
 	const values = process.argv.slice(2);
+	const tokenLoaderOnlyIndex = values.indexOf("--token-loader-only");
+	const examplesOnlyIndex = values.indexOf("--examples-only");
+	const tokenLoaderOnly = tokenLoaderOnlyIndex !== -1;
+	const examplesOnly = examplesOnlyIndex !== -1;
+
+	if (tokenLoaderOnly) {
+		values.splice(tokenLoaderOnlyIndex, 1);
+	}
+	if (examplesOnly) {
+		values.splice(values.indexOf("--examples-only"), 1);
+	}
+	if (tokenLoaderOnly && examplesOnly) {
+		process.stderr.write(
+			"--token-loader-only and --examples-only cannot be used together\n",
+		);
+		return 1;
+	}
 	if (values.length === 0 || values.length % 2 !== 0) {
 		process.stderr.write(
-			"Usage: build-runtime-compute-units.ts <workspace-root> <output-dir> [<workspace-root> <output-dir>...]\n",
+			"Usage: build-runtime-compute-units.ts [--examples-only | --token-loader-only] <workspace-root> <output-dir> [<workspace-root> <output-dir>...]\n",
 		);
 		return 1;
 	}
@@ -214,7 +231,9 @@ function main(): number {
 		const workspace = realpathSync(values[index] ?? ".");
 		const output = resolve(values[index + 1] ?? ".");
 		mkdirSync(output, { recursive: true });
-		const { programs } = loadExampleInventory(workspace, { env });
+		const programs = tokenLoaderOnly
+			? []
+			: loadExampleInventory(workspace, { env }).programs;
 
 		for (const program of programs) {
 			const artifact = join(output, `${program.name}.so`);
@@ -247,6 +266,10 @@ function main(): number {
 			if (cargoArtifact !== artifact) {
 				copyFileSync(cargoArtifact, artifact);
 			}
+		}
+
+		if (examplesOnly) {
+			continue;
 		}
 
 		const tokenLoaderArtifact = join(output, "token_loader_cu_program.so");

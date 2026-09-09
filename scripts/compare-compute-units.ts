@@ -880,7 +880,11 @@ function renderMarkdown(
 
 export function run(arguments_: Arguments): number {
 	const policy = loadJson<ComputeUnitPolicy>(arguments_.policyFile);
-	const requiredRuntimeCases = new Set(policy.runtimeCases ?? []);
+	const hasExactRuntime = arguments_.baseExactRuntime !== undefined &&
+		arguments_.headExactRuntime !== undefined;
+	const requiredRuntimeCases = new Set(
+		hasExactRuntime ? policy.runtimeCases ?? [] : [],
+	);
 	const staticResult = compareStaticReports(
 		policy,
 		arguments_.baseDir,
@@ -925,7 +929,11 @@ export function run(arguments_: Arguments): number {
 	if (baseReports.length > 0) {
 		baseRuntime = mergeRuntimeReports(baseReports);
 		headRuntime = mergeRuntimeReports(headReports);
-		runtime = compareRuntimeReports(policy, baseRuntime, headRuntime);
+		runtime = compareRuntimeReports(
+			hasExactRuntime ? policy : { ...policy, runtimeCases: [] },
+			baseRuntime,
+			headRuntime,
+		);
 	}
 
 	const markdown = renderMarkdown(

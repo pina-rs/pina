@@ -340,6 +340,46 @@ test("runtime comparison combines discovered and focused exact cases", () => {
 	);
 });
 
+test("discovered comparison does not require focused exact cases", () => {
+	const root = mkdtempSync(join(tmpdir(), "pina-runtime-discovered-"));
+	const base = join(root, "base");
+	const head = join(root, "head");
+	const baseRuntime = join(root, "runtime-base.json");
+	const headRuntime = join(root, "runtime-head.json");
+	mkdirSync(base);
+	mkdirSync(head);
+	writeFileSync(join(base, "manifest.json"), JSON.stringify({ results: {} }));
+	writeFileSync(join(head, "manifest.json"), JSON.stringify({ results: {} }));
+	writeFileSync(
+		join(root, "policy.json"),
+		JSON.stringify({ ...policy, runtimeCases: ["focused/instruction"] }),
+	);
+	writeFileSync(
+		baseRuntime,
+		JSON.stringify({
+			cases: [{ id: "discovered/instruction", computeUnits: 1_000 }],
+		}),
+	);
+	writeFileSync(
+		headRuntime,
+		JSON.stringify({
+			cases: [{ id: "discovered/instruction", computeUnits: 1_000 }],
+		}),
+	);
+
+	const status = run({
+		policyFile: join(root, "policy.json"),
+		baseDir: base,
+		headDir: head,
+		baseRuntime,
+		headRuntime,
+		runtimeOnly: true,
+		markdownOutput: join(root, "comparison.md"),
+		jsonOutput: join(root, "comparison.json"),
+	});
+	assert.equal(status, 0);
+});
+
 test("a new program reports its current compute units and build size", () => {
 	const root = mkdtempSync(join(tmpdir(), "pina-cu-baseline-"));
 	const base = join(root, "base");

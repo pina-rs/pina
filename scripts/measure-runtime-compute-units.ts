@@ -33,17 +33,24 @@ function revision(workspace: string): string {
 }
 
 function main(): number {
-	const [harnessArgument, sourceArgument, elfArgument, outputArgument] = process
-		.argv.slice(2);
+	const values = process.argv.slice(2);
+	const tokenLoaderOnlyIndex = values.indexOf("--token-loader-only");
+	const tokenLoaderOnly = tokenLoaderOnlyIndex !== -1;
+
+	if (tokenLoaderOnly) {
+		values.splice(tokenLoaderOnlyIndex, 1);
+	}
+
+	const [harnessArgument, sourceArgument, elfArgument, outputArgument] = values;
 	if (
 		harnessArgument === undefined ||
 		sourceArgument === undefined ||
 		elfArgument === undefined ||
 		outputArgument === undefined ||
-		process.argv.length !== 6
+		values.length !== 4
 	) {
 		process.stderr.write(
-			"Usage: measure-runtime-compute-units.ts <harness-workspace> <source-workspace> <elf-dir> <output-file>\n",
+			"Usage: measure-runtime-compute-units.ts [--token-loader-only] <harness-workspace> <source-workspace> <elf-dir> <output-file>\n",
 		);
 		return 1;
 	}
@@ -52,14 +59,13 @@ function main(): number {
 	const sourceWorkspace = resolve(sourceArgument);
 	const elfDirectory = resolve(elfArgument);
 	const outputFile = resolve(outputArgument);
-	for (
-		const program of [
-			"account_realloc_program",
-			"counter_program",
-			"profile_program",
-			"token_loader_cu_program",
-		]
-	) {
+	const programs = tokenLoaderOnly ? ["token_loader_cu_program"] : [
+		"account_realloc_program",
+		"counter_program",
+		"profile_program",
+		"token_loader_cu_program",
+	];
+	for (const program of programs) {
 		const path = resolve(elfDirectory, `${program}.so`);
 		if (!existsSync(path)) {
 			throw new Error(`required runtime CU artifact is missing: ${path}`);
@@ -89,7 +95,9 @@ function main(): number {
 			"compute_units",
 			"--",
 			"--exact",
-			"measure_runtime_compute_units",
+			tokenLoaderOnly
+				? "measure_token_loader_compute_units"
+				: "measure_runtime_compute_units",
 			"--nocapture",
 		],
 		harnessWorkspace,

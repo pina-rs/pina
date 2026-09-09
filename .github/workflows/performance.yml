@@ -128,6 +128,7 @@ jobs:
       - name: build base and head runtime programs
         run: |
           node ./scripts/build-runtime-compute-units.ts \
+            --examples-only \
             "${{ github.workspace }}/../pina-performance-base" \
             "${{ github.workspace }}/target/performance-build/instructions/base" \
             "${{ github.workspace }}" \
@@ -144,15 +145,6 @@ jobs:
             --allow-incomplete
         shell: devenv shell -c -- bash -e {0}
 
-      - name: measure exact base token-loader cases
-        run: |
-          node ./scripts/measure-runtime-compute-units.ts \
-            "${{ github.workspace }}" \
-            "${{ github.workspace }}/../pina-performance-base" \
-            "${{ github.workspace }}/target/performance-build/instructions/base" \
-            "${{ github.workspace }}/target/performance/instructions/exact-runtime-base.json"
-        shell: devenv shell -c -- bash -e {0}
-
       - name: measure head instructions
         run: |
           node ./scripts/measure-example-compute-units.ts \
@@ -160,15 +152,6 @@ jobs:
             "${{ github.workspace }}" \
             "${{ github.workspace }}/target/performance-build/instructions/head" \
             "${{ github.workspace }}/target/performance/instructions/runtime-head.json"
-        shell: devenv shell -c -- bash -e {0}
-
-      - name: measure exact head token-loader cases
-        run: |
-          node ./scripts/measure-runtime-compute-units.ts \
-            "${{ github.workspace }}" \
-            "${{ github.workspace }}" \
-            "${{ github.workspace }}/target/performance-build/instructions/head" \
-            "${{ github.workspace }}/target/performance/instructions/exact-runtime-head.json"
         shell: devenv shell -c -- bash -e {0}
 
       - name: compare instruction reports
@@ -182,8 +165,6 @@ jobs:
             --head-dir ./target/performance/instructions/empty-head \
             --base-runtime ./target/performance/instructions/runtime-base.json \
             --head-runtime ./target/performance/instructions/runtime-head.json \
-            --base-exact-runtime ./target/performance/instructions/exact-runtime-base.json \
-            --head-exact-runtime ./target/performance/instructions/exact-runtime-head.json \
             --markdown-output ./target/performance/instructions/report.md \
             --json-output ./target/performance/instructions/report.json \
             --runtime-only
@@ -226,6 +207,119 @@ jobs:
         run: |
           if [ -z "$COMPARE_STATUS" ]; then
             echo "instruction compute-unit comparison did not finish" >&2
+            exit 1
+          fi
+
+          exit "$COMPARE_STATUS"
+        shell: bash
+
+  token-loader-compute:
+    name: focused token-loader compute units
+    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    env:
+      XDG_CACHE_HOME: ${{ github.workspace }}/.cache
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: setup
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: create base worktree
+        run: git worktree add --detach ../pina-performance-base ${{ github.event.pull_request.base.sha }}
+        shell: bash
+
+      - name: build base and head token-loader programs
+        run: |
+          node ./scripts/build-runtime-compute-units.ts \
+            --token-loader-only \
+            "${{ github.workspace }}/../pina-performance-base" \
+            "${{ github.workspace }}/target/performance-build/token-loader/base" \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}/target/performance-build/token-loader/head"
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: measure exact base token-loader cases
+        run: |
+          node ./scripts/measure-runtime-compute-units.ts \
+            --token-loader-only \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}/../pina-performance-base" \
+            "${{ github.workspace }}/target/performance-build/token-loader/base" \
+            "${{ github.workspace }}/target/performance/token-loader/exact-runtime-base.json"
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: measure exact head token-loader cases
+        run: |
+          node ./scripts/measure-runtime-compute-units.ts \
+            --token-loader-only \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}" \
+            "${{ github.workspace }}/target/performance-build/token-loader/head" \
+            "${{ github.workspace }}/target/performance/token-loader/exact-runtime-head.json"
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: compare exact token-loader reports
+        run: |
+          set +e
+          mkdir -p ./target/performance/token-loader/empty-base \
+            ./target/performance/token-loader/empty-head
+          node ./scripts/compare-compute-units.ts \
+            --policy-file ./scripts/compute-unit-policy.json \
+            --base-dir ./target/performance/token-loader/empty-base \
+            --head-dir ./target/performance/token-loader/empty-head \
+            --base-exact-runtime ./target/performance/token-loader/exact-runtime-base.json \
+            --head-exact-runtime ./target/performance/token-loader/exact-runtime-head.json \
+            --markdown-output ./target/performance/token-loader/report.md \
+            --json-output ./target/performance/token-loader/report.json \
+            --runtime-only
+          status=$?
+          set -e
+
+          sed -i '1s/Instruction compute units/Focused token-loader compute units/' \
+            ./target/performance/token-loader/report.md
+          printf '%s\n' "$status" > ./target/performance/token-loader/compare.status
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: prepare token-loader report
+        id: token-loader-report
+        if: always()
+        run: |
+          mkdir -p ./target/performance/token-loader
+          if [ ! -f ./target/performance/token-loader/report.md ]; then
+            printf '## Focused token-loader compute units\n\n⚠️ The benchmark did not finish. See the job log.\n' \
+              > ./target/performance/token-loader/report.md
+          fi
+
+          status=''
+          if [ -f ./target/performance/token-loader/compare.status ]; then
+            status="$(tr -d '\n' < ./target/performance/token-loader/compare.status)"
+          fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat ./target/performance/token-loader/report.md >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
+
+      - name: upload token-loader report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: performance-token-loader
+          path: target/performance/token-loader
+          if-no-files-found: error
+
+      - name: enforce token-loader compute-unit threshold
+        if: always()
+        env:
+          COMPARE_STATUS: ${{ steps.token-loader-report.outputs.status }}
+        run: |
+          if [ -z "$COMPARE_STATUS" ]; then
+            echo "token-loader compute-unit comparison did not finish" >&2
             exit 1
           fi
 
@@ -347,6 +441,7 @@ jobs:
     if: always()
     needs:
       - instruction-compute
+      - token-loader-compute
       - program-profiles
       - cli
       - core
@@ -405,6 +500,8 @@ jobs:
             echo "Each section shows its result at a glance. Expand the details to inspect the full table."
             echo
             append_report ./target/performance/reports/performance-instructions/report.md "Instruction compute units"
+            echo
+            append_report ./target/performance/reports/performance-token-loader/report.md "Focused token-loader compute units"
             echo
             append_report ./target/performance/reports/performance-programs/report.md "Program compute units and build sizes"
             echo
