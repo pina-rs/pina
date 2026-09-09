@@ -11,9 +11,15 @@ exit_code: 0
 ----- stdout -----
 Profile compute-unit costs in a compiled SBF program.
 
-Performs static analysis of an SBF shared object. Text is written to stdout by default. Use --json for machine-readable output and --output to write either format to a file.
+Performs static analysis of an SBF shared object. Text is written to stdout by default. Use --json for machine-readable output and --output to write either format to a file. Use `pina profile compare` to diff a saved baseline report against the current artifact.
 
-Usage: pina profile [OPTIONS] [PROGRAM.SO]
+Usage: pina profile [OPTIONS] [PROGRAM.SO] [COMMAND]
+
+Commands:
+  compare
+          Compare the current artifact against a saved baseline profile report
+  help
+          Print this message or the help of the given subcommand(s)
 
 Arguments:
   [PROGRAM.SO]
@@ -38,5 +44,11 @@ Examples:
   pina profile --project ./programs/counter_program
   pina profile ./target/deploy/counter_program.so --json
   pina profile ./target/deploy/counter_program.so --json -o ./profile.json
+  pina profile compare ./profile.json
+  pina profile compare ./profile.json ./target/deploy/counter_program.so --json
+  pina profile compare ./profile.json --fail-cu 100 --fail-percent 5
+
+Baselines:
+  compare accepts any report written by `pina profile --json`, including the versioned baseline document. The exit status is 2 when the total CU regression reaches both --fail-cu and --fail-percent, so local runs mirror the CI compute-unit gate.
 
 ----- stderr -----

@@ -1,0 +1,55 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - profile
+    - compare
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Compare the current artifact against a saved baseline profile report.
+
+Profiles the current artifact, loads BASELINE (a report written by `pina profile --json` or a versioned baseline document), and prints a delta-oriented summary sorted by impact. Exits 2 when the total CU regression reaches both --fail-cu and --fail-percent; exit 1 is reserved for operational errors.
+
+Usage: pina profile compare [OPTIONS] <BASELINE> [PROGRAM.SO]
+
+Arguments:
+  <BASELINE>
+          Saved profile report used as the comparison baseline
+
+  [PROGRAM.SO]
+          Compiled SBF shared object. Omit to discover the current project's artifact
+
+Options:
+      --project <DIR>
+          Project used for artifact discovery when PROGRAM.SO is omitted
+
+      --json
+          Emit a stable machine-readable comparison document
+
+      --fail-cu <CU>
+          Absolute total-CU increase that fails the comparison
+          
+          [default: 500]
+
+      --fail-percent <PERCENT>
+          Percentage total-CU increase that fails the comparison. Both limits must be reached
+          
+          [default: 10]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina profile compare ./profile.json
+  pina profile compare ./profile.json ./target/deploy/counter_program.so
+  pina profile compare ./profile.json --json
+  pina profile compare ./profile.json --fail-cu 100 --fail-percent 5
+
+Baselines:
+  Capture a baseline with `pina profile --json --output ./profile.json` before changing the program, rebuild, then run this command. Functions are matched by symbol name; added and removed functions are reported separately.
+
+----- stderr -----
