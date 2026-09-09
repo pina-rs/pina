@@ -73,7 +73,7 @@ Stable identity derives from contract kind and discriminator, not a Rust type na
 
 The ABI history must come from the same closed schema grammar used by Pina's macros. The Codama IDL and unconstrained Rust type strings are not precise enough to be the long-term physical-layout authority. PinaPod may expose a stable physical-layout descriptor and fingerprint, but it does not own Solana migration policy.
 
-Pina's ABI document has its own `formatVersion`, separate from every on-chain contract version. All readers decode the document into a generic envelope, reject future formats, and run Pina-owned adjacent format migrations before deserializing the current typed model. Writing the manifest always writes the current format. An internal ABI-format upgrade therefore does not consume an account or instruction migration number, and old checked-in manifests remain buildable as long as Pina retains their adjacent document migrators.
+Pina's ABI document has its own `formatVersion`, separate from every on-chain contract version. All readers decode the document into a generic envelope, reject future formats, and run Pina-owned adjacent format migrations before deserializing the current typed model. The ABI library also provides adjacent downgrade paths. A downgrade fails closed when an older format cannot represent the current document without information loss. Normal manifest writes always use the current format. An internal ABI-format upgrade therefore does not consume an account or instruction migration number, and old checked-in manifests remain buildable as long as Pina retains their adjacent document migrators.
 
 ### Drafts and publication
 

@@ -129,9 +129,9 @@ impl std::fmt::Display for ContractKind {
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum LayoutKind {
-	/// Fixed-size PinaPod layout.
+	/// Fixed-size `PinaPod` layout.
 	Fixed,
-	/// Compact PinaPod account with a variable-length tail.
+	/// Compact `PinaPod` account with a variable-length tail.
 	Compact,
 }
 
@@ -660,7 +660,7 @@ pub fn decode_manifest(source: &[u8]) -> Result<MigrationManifest, String> {
 		));
 	}
 	while version < MANIFEST_FORMAT_VERSION {
-		value = migrate_manifest_document(version, value)?;
+		value = upgrade_manifest_document(version, value)?;
 		version += 1;
 	}
 
@@ -668,6 +668,38 @@ pub fn decode_manifest(source: &[u8]) -> Result<MigrationManifest, String> {
 		.map_err(|error| format!("invalid migration manifest format {version}: {error}"))?;
 	manifest.validate()?;
 	Ok(manifest)
+}
+
+/// Convert a supported migration manifest to a requested historical or current
+/// document format.
+///
+/// Downgrades fail when the target format cannot represent the current
+/// document without losing compatibility information.
+pub fn convert_manifest_format(source: &[u8], target_version: u32) -> Result<Vec<u8>, String> {
+	let manifest = decode_manifest(source)?;
+	encode_manifest_for_format(&manifest, target_version)
+}
+
+/// Encode one validated current manifest in a supported document format.
+pub fn encode_manifest_for_format(
+	manifest: &MigrationManifest,
+	target_version: u32,
+) -> Result<Vec<u8>, String> {
+	manifest.validate()?;
+	let mut value = serde_json::to_value(manifest)
+		.map_err(|error| format!("could not encode migration manifest: {error}"))?;
+	let mut version = MANIFEST_FORMAT_VERSION;
+	validate_target_format(
+		"migration manifest",
+		target_version,
+		MANIFEST_FORMAT_VERSION,
+	)?;
+	while version > target_version {
+		value = downgrade_manifest_document(version, value)?;
+		version -= 1;
+	}
+	serde_json::to_vec_pretty(&value)
+		.map_err(|error| format!("could not encode migration manifest format {version}: {error}"))
 }
 
 /// Decode and validate the publication ledger format.
@@ -682,7 +714,7 @@ pub fn decode_publication_ledger(source: &[u8]) -> Result<PublicationLedger, Str
 		));
 	}
 	while version < PUBLICATION_FORMAT_VERSION {
-		value = migrate_publication_document(version, value)?;
+		value = upgrade_publication_document(version, value)?;
 		version += 1;
 	}
 	let ledger: PublicationLedger = serde_json::from_value(value)
@@ -691,7 +723,39 @@ pub fn decode_publication_ledger(source: &[u8]) -> Result<PublicationLedger, Str
 	Ok(ledger)
 }
 
-fn migrate_publication_document(
+/// Convert a supported publication ledger to a requested historical or current
+/// document format without discarding receipt identity.
+pub fn convert_publication_ledger_format(
+	source: &[u8],
+	target_version: u32,
+) -> Result<Vec<u8>, String> {
+	let ledger = decode_publication_ledger(source)?;
+	encode_publication_ledger_for_format(&ledger, target_version)
+}
+
+/// Encode one validated current publication ledger in a supported format.
+pub fn encode_publication_ledger_for_format(
+	ledger: &PublicationLedger,
+	target_version: u32,
+) -> Result<Vec<u8>, String> {
+	ledger.validate()?;
+	let mut value = serde_json::to_value(ledger)
+		.map_err(|error| format!("could not encode publication ledger: {error}"))?;
+	let mut version = PUBLICATION_FORMAT_VERSION;
+	validate_target_format(
+		"publication ledger",
+		target_version,
+		PUBLICATION_FORMAT_VERSION,
+	)?;
+	while version > target_version {
+		value = downgrade_publication_document(version, value)?;
+		version -= 1;
+	}
+	serde_json::to_vec_pretty(&value)
+		.map_err(|error| format!("could not encode publication ledger format {version}: {error}"))
+}
+
+fn upgrade_publication_document(
 	version: u32,
 	value: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
@@ -705,41 +769,153 @@ fn migrate_publication_document(
 	}
 }
 
-fn migrate_publication_v1_to_v2(mut value: serde_json::Value) -> Result<serde_json::Value, String> {
-	let root = value
-		.as_object_mut()
-		.ok_or_else(|| "publication ledger must be a JSON object".to_owned())?;
-	let receipts = root
-		.get_mut("receipts")
-		.and_then(serde_json::Value::as_array_mut)
-		.ok_or_else(|| "publication ledger is missing its receipts array".to_owned())?;
-	for receipt_value in receipts {
-		let receipt = receipt_value
-			.as_object_mut()
-			.ok_or_else(|| "publication ledger contains a non-object receipt".to_owned())?;
-		let legacy_cluster = receipt
-			.get("cluster")
-			.and_then(serde_json::Value::as_str)
-			.ok_or_else(|| "publication receipt is missing its cluster".to_owned())?
-			.to_owned();
-		receipt.insert(
-			"rpcUrl".to_owned(),
-			serde_json::Value::String(legacy_cluster),
-		);
+fn downgrade_publication_document(
+	version: u32,
+	value: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+	match version {
+		2 => migrate_publication_v2_to_v1(value),
+		_ => {
+			Err(format!(
+				"no Pina ABI downgrade is available from publication format {version}"
+			))
+		}
 	}
-	root.insert(
-		"formatVersion".to_owned(),
-		serde_json::Value::from(PUBLICATION_FORMAT_VERSION),
-	);
-	let mut ledger: PublicationLedger = serde_json::from_value(value)
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+struct PublicationReceiptV1 {
+	sequence: u64,
+	cluster: String,
+	program_id: String,
+	executable_sha256: String,
+	manifest_sha256: String,
+	versions: BTreeMap<String, u32>,
+	previous_receipt_sha256: Option<String>,
+}
+
+impl PublicationReceiptV1 {
+	fn sha256(&self) -> String {
+		hash_json(self)
+	}
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+struct PublicationLedgerV1 {
+	format_version: u32,
+	receipts: Vec<PublicationReceiptV1>,
+}
+
+impl PublicationLedgerV1 {
+	fn validate(&self) -> Result<(), String> {
+		if self.format_version != 1 {
+			return Err(format!(
+				"unsupported publication ledger format {}; expected 1",
+				self.format_version
+			));
+		}
+		let mut previous = None;
+		let mut published_versions = BTreeMap::<String, u32>::new();
+		for (index, receipt) in self.receipts.iter().enumerate() {
+			if receipt.sequence != index as u64 {
+				return Err(format!(
+					"publication receipt sequence expected {index}, found {}",
+					receipt.sequence
+				));
+			}
+			if receipt.previous_receipt_sha256 != previous {
+				return Err(format!(
+					"publication receipt {} does not extend the previous hash",
+					receipt.sequence
+				));
+			}
+			validate_publication_identity(
+				receipt.sequence,
+				&receipt.cluster,
+				&receipt.program_id,
+				&receipt.executable_sha256,
+				&receipt.manifest_sha256,
+				&receipt.versions,
+			)?;
+			validate_publication_versions(
+				receipt.sequence,
+				&receipt.versions,
+				&mut published_versions,
+			)?;
+			previous = Some(receipt.sha256());
+		}
+		Ok(())
+	}
+}
+
+fn migrate_publication_v1_to_v2(value: serde_json::Value) -> Result<serde_json::Value, String> {
+	let legacy: PublicationLedgerV1 = serde_json::from_value(value)
 		.map_err(|error| format!("invalid publication ledger format 1: {error}"))?;
+	legacy.validate()?;
 	let mut previous = None;
-	for receipt in &mut ledger.receipts {
-		receipt.previous_receipt_sha256 = previous;
-		previous = Some(receipt.sha256());
-	}
-	serde_json::to_value(ledger)
-		.map_err(|error| format!("could not encode publication ledger format 2: {error}"))
+	let receipts = legacy
+		.receipts
+		.into_iter()
+		.map(|receipt| {
+			let migrated = PublicationReceipt {
+				sequence: receipt.sequence,
+				rpc_url: receipt.cluster.clone(),
+				cluster: receipt.cluster,
+				program_id: receipt.program_id,
+				executable_sha256: receipt.executable_sha256,
+				manifest_sha256: receipt.manifest_sha256,
+				versions: receipt.versions,
+				previous_receipt_sha256: previous.clone(),
+			};
+			previous = Some(migrated.sha256());
+			migrated
+		})
+		.collect();
+	serde_json::to_value(PublicationLedger {
+		format_version: PUBLICATION_FORMAT_VERSION,
+		receipts,
+	})
+	.map_err(|error| format!("could not encode publication ledger format 2: {error}"))
+}
+
+fn migrate_publication_v2_to_v1(value: serde_json::Value) -> Result<serde_json::Value, String> {
+	let ledger: PublicationLedger = serde_json::from_value(value)
+		.map_err(|error| format!("invalid publication ledger format 2: {error}"))?;
+	ledger.validate()?;
+	let mut previous = None;
+	let receipts = ledger
+		.receipts
+		.into_iter()
+		.map(|receipt| {
+			if receipt.rpc_url != receipt.cluster {
+				return Err(format!(
+					"publication receipt {} cannot downgrade to format 1 because its RPC URL \
+					 differs from its cluster label",
+					receipt.sequence
+				));
+			}
+			let migrated = PublicationReceiptV1 {
+				sequence: receipt.sequence,
+				cluster: receipt.cluster,
+				program_id: receipt.program_id,
+				executable_sha256: receipt.executable_sha256,
+				manifest_sha256: receipt.manifest_sha256,
+				versions: receipt.versions,
+				previous_receipt_sha256: previous.clone(),
+			};
+			previous = Some(migrated.sha256());
+			Ok(migrated)
+		})
+		.collect::<Result<Vec<_>, String>>()?;
+	serde_json::to_value(PublicationLedgerV1 {
+		format_version: 1,
+		receipts,
+	})
+	.map_err(|error| format!("could not encode publication ledger format 1: {error}"))
 }
 
 fn document_format_version(value: &serde_json::Value, kind: &str) -> Result<u32, String> {
@@ -751,7 +927,16 @@ fn document_format_version(value: &serde_json::Value, kind: &str) -> Result<u32,
 	u32::try_from(version).map_err(|_| format!("{kind} format version exceeds u32"))
 }
 
-fn migrate_manifest_document(
+fn validate_target_format(kind: &str, target: u32, current: u32) -> Result<(), String> {
+	if (1..=current).contains(&target) {
+		return Ok(());
+	}
+	Err(format!(
+		"unsupported {kind} target format {target}; supported formats are 1 through {current}"
+	))
+}
+
+fn upgrade_manifest_document(
 	version: u32,
 	value: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
@@ -760,6 +945,20 @@ fn migrate_manifest_document(
 		_ => {
 			Err(format!(
 				"no Pina ABI migration is available from manifest format {version}"
+			))
+		}
+	}
+}
+
+fn downgrade_manifest_document(
+	version: u32,
+	value: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+	match version {
+		2 => migrate_manifest_v2_to_v1(value),
+		_ => {
+			Err(format!(
+				"no Pina ABI downgrade is available from manifest format {version}"
 			))
 		}
 	}
@@ -842,6 +1041,91 @@ fn migrate_manifest_v1_to_v2(mut value: serde_json::Value) -> Result<serde_json:
 	Ok(value)
 }
 
+fn migrate_manifest_v2_to_v1(mut value: serde_json::Value) -> Result<serde_json::Value, String> {
+	let manifest: MigrationManifest = serde_json::from_value(value.clone())
+		.map_err(|error| format!("invalid migration manifest format 2: {error}"))?;
+	manifest.validate()?;
+	let root = value
+		.as_object_mut()
+		.ok_or_else(|| "migration manifest must be a JSON object".to_owned())?;
+	let contracts = root
+		.get_mut("contracts")
+		.and_then(serde_json::Value::as_object_mut)
+		.ok_or_else(|| "migration manifest is missing its `contracts` object".to_owned())?;
+
+	for (key, history_value) in contracts {
+		let history = history_value
+			.as_object_mut()
+			.ok_or_else(|| format!("contract `{key}` history must be an object"))?;
+		let is_instruction = history
+			.get("identity")
+			.and_then(|identity| identity.get("kind"))
+			.and_then(serde_json::Value::as_str)
+			== Some("instruction");
+		let versions = history
+			.get_mut("versions")
+			.and_then(serde_json::Value::as_array_mut)
+			.ok_or_else(|| format!("contract `{key}` is missing its `versions` array"))?;
+		let mut shared_process = None;
+		let mut shared_process_sha256 = None;
+
+		for version_value in versions {
+			let schema_version = version_value
+				.as_object_mut()
+				.ok_or_else(|| format!("contract `{key}` contains a non-object version"))?;
+			let process = schema_version.remove("process");
+			let process_sha256 = schema_version.remove("processSha256");
+			if is_instruction {
+				match (&shared_process, &process) {
+					(None, Some(process)) => shared_process = Some(process.clone()),
+					(Some(shared), Some(process)) if shared == process => {}
+					_ => {
+						return Err(format!(
+							"instruction contract `{key}` cannot downgrade to format 1 because \
+							 its process changed between versions"
+						));
+					}
+				}
+				match (&shared_process_sha256, &process_sha256) {
+					(None, Some(hash)) => shared_process_sha256 = Some(hash.clone()),
+					(Some(shared), Some(hash)) if shared == hash => {}
+					_ => {
+						return Err(format!(
+							"instruction contract `{key}` cannot downgrade to format 1 because \
+							 its process hash changed between versions"
+						));
+					}
+				}
+			}
+			if let Some(transition) = schema_version
+				.get_mut("transition")
+				.and_then(serde_json::Value::as_object_mut)
+			{
+				transition.remove("sourceProcessSha256");
+				transition.remove("destinationProcessSha256");
+				transition.remove("process");
+			}
+		}
+
+		if is_instruction {
+			history.insert(
+				"process".to_owned(),
+				shared_process.ok_or_else(|| {
+					format!("instruction contract `{key}` contains no process snapshot")
+				})?,
+			);
+			history.insert(
+				"processSha256".to_owned(),
+				shared_process_sha256.ok_or_else(|| {
+					format!("instruction contract `{key}` contains no process hash")
+				})?,
+			);
+		}
+	}
+	root.insert("formatVersion".to_owned(), serde_json::Value::from(1));
+	Ok(value)
+}
+
 /// One successful persistent deployment receipt.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -906,7 +1190,7 @@ impl PublicationLedger {
 			));
 		}
 		let mut previous = None;
-		let mut published_versions = BTreeMap::<&str, u32>::new();
+		let mut published_versions = BTreeMap::<String, u32>::new();
 		for (index, receipt) in self.receipts.iter().enumerate() {
 			if receipt.sequence != index as u64 {
 				return Err(format!(
@@ -920,42 +1204,75 @@ impl PublicationLedger {
 					receipt.sequence
 				));
 			}
-			if receipt.cluster.is_empty()
-				|| receipt.cluster.chars().any(char::is_control)
-				|| receipt.rpc_url.is_empty()
-				|| receipt.rpc_url.chars().any(char::is_control)
-				|| receipt.program_id.is_empty()
-				|| !is_sha256(&receipt.executable_sha256)
-				|| !is_sha256(&receipt.manifest_sha256)
-				|| receipt.versions.is_empty()
-			{
+			validate_publication_identity(
+				receipt.sequence,
+				&receipt.cluster,
+				&receipt.program_id,
+				&receipt.executable_sha256,
+				&receipt.manifest_sha256,
+				&receipt.versions,
+			)?;
+			if receipt.rpc_url.is_empty() || receipt.rpc_url.chars().any(char::is_control) {
 				return Err(format!(
-					"publication receipt {} contains invalid identity or hash fields",
+					"publication receipt {} contains an invalid RPC URL",
 					receipt.sequence
 				));
 			}
-			for (contract, version) in &receipt.versions {
-				if contract.is_empty() || contract.chars().any(char::is_control) {
-					return Err(format!(
-						"publication receipt {} contains an invalid contract identity",
-						receipt.sequence
-					));
-				}
-				if published_versions
-					.get(contract.as_str())
-					.is_some_and(|published| version < published)
-				{
-					return Err(format!(
-						"publication receipt {} regresses `{contract}` to version {version}",
-						receipt.sequence
-					));
-				}
-				published_versions.insert(contract, *version);
-			}
+			validate_publication_versions(
+				receipt.sequence,
+				&receipt.versions,
+				&mut published_versions,
+			)?;
 			previous = Some(receipt.sha256());
 		}
 		Ok(())
 	}
+}
+
+fn validate_publication_identity(
+	sequence: u64,
+	cluster: &str,
+	program_id: &str,
+	executable_sha256: &str,
+	manifest_sha256: &str,
+	versions: &BTreeMap<String, u32>,
+) -> Result<(), String> {
+	if cluster.is_empty()
+		|| cluster.chars().any(char::is_control)
+		|| program_id.is_empty()
+		|| !is_sha256(executable_sha256)
+		|| !is_sha256(manifest_sha256)
+		|| versions.is_empty()
+	{
+		return Err(format!(
+			"publication receipt {sequence} contains invalid identity or hash fields"
+		));
+	}
+	Ok(())
+}
+
+fn validate_publication_versions(
+	sequence: u64,
+	versions: &BTreeMap<String, u32>,
+	published_versions: &mut BTreeMap<String, u32>,
+) -> Result<(), String> {
+	for (contract, version) in versions {
+		if contract.is_empty() || contract.chars().any(char::is_control) {
+			return Err(format!(
+				"publication receipt {sequence} contains an invalid contract identity"
+			));
+		}
+		if published_versions
+			.get(contract)
+			.is_some_and(|published| version < published)
+		{
+			return Err(format!(
+				"publication receipt {sequence} regresses `{contract}` to version {version}"
+			));
+		}
+		published_versions.insert(contract.clone(), *version);
+	}
+	Ok(())
 }
 
 fn is_sha256(value: &str) -> bool {
@@ -1141,7 +1458,8 @@ fn parse_generic(ty: &str) -> Option<(&str, Vec<&str>)> {
 }
 
 fn hash_json(value: &impl Serialize) -> String {
-	let encoded = serde_json::to_vec(value).expect("serializing Pina ABI model cannot fail");
+	let encoded = serde_json::to_vec(value)
+		.unwrap_or_else(|error| panic!("serializing Pina ABI model failed: {error}"));
 	sha256_bytes(encoded)
 }
 
@@ -1254,6 +1572,11 @@ mod tests {
 		assert!(ledger.ever_published("account:1:00", 0));
 		assert!(ledger.ever_published("account:1:00", 1));
 		assert!(!ledger.ever_published("account:1:00", 2));
+		assert!(encode_publication_ledger_for_format(&ledger, 1).is_err());
+		assert!(encode_publication_ledger_for_format(&ledger, 0).is_err());
+		assert!(
+			encode_publication_ledger_for_format(&ledger, PUBLICATION_FORMAT_VERSION + 1).is_err()
+		);
 	}
 
 	#[test]
@@ -1350,6 +1673,83 @@ mod tests {
 				.map(|proof| proof.kind),
 			Some(ProcessTransitionKind::Unchanged)
 		);
+
+		let downgraded = convert_manifest_format(&serde_json::to_vec(&migrated).unwrap(), 1)
+			.unwrap_or_else(|error| panic!("downgrade manifest: {error}"));
+		let downgraded_value: serde_json::Value = serde_json::from_slice(&downgraded).unwrap();
+		assert_eq!(downgraded_value["formatVersion"], 1);
+		assert_eq!(
+			decode_manifest(&downgraded)
+				.unwrap_or_else(|error| panic!("upgrade downgraded manifest: {error}")),
+			migrated,
+		);
+	}
+
+	#[test]
+	fn manifest_downgrade_rejects_versioned_process_changes_and_unknown_targets() {
+		let schema = DataSchema {
+			layout: LayoutKind::Fixed,
+			fields: vec![FieldSchema {
+				name: "amount".to_owned(),
+				rust_type: "u64".to_owned(),
+			}],
+		};
+		let original_process = process(vec![process_account("authority", false)]);
+		let changed_process = process(vec![
+			process_account("authority", false),
+			process_account("referrer", true),
+		]);
+		let identity = ContractIdentity::try_new(ContractKind::Instruction, 1, 4).unwrap();
+		let key = identity.key();
+		let schema_sha256 = schema.sha256();
+		let transition_proof =
+			classify_process_transition(&original_process, &changed_process).unwrap();
+		let manifest = MigrationManifest {
+			format_version: MANIFEST_FORMAT_VERSION,
+			program_id: "program".to_owned(),
+			version_type: MigrationVersionType::U8,
+			contracts: BTreeMap::from([(
+				key,
+				ContractHistory {
+					identity,
+					rust_name: "Transfer".to_owned(),
+					versions: vec![
+						SchemaVersion {
+							version: 0,
+							schema_sha256: schema_sha256.clone(),
+							schema: schema.clone(),
+							process_sha256: Some(original_process.sha256()),
+							process: Some(original_process.clone()),
+							transition: None,
+						},
+						SchemaVersion {
+							version: 1,
+							schema_sha256: schema_sha256.clone(),
+							schema,
+							process_sha256: Some(changed_process.sha256()),
+							process: Some(changed_process.clone()),
+							transition: Some(Transition {
+								from: 0,
+								to: 1,
+								mode: TransitionMode::Automatic,
+								source_schema_sha256: schema_sha256.clone(),
+								destination_schema_sha256: schema_sha256,
+								source_process_sha256: Some(original_process.sha256()),
+								destination_process_sha256: Some(changed_process.sha256()),
+								process: Some(transition_proof),
+								implementation_sha256: Some("implementation".to_owned()),
+							}),
+						},
+					],
+				},
+			)]),
+		};
+
+		assert!(manifest.validate().is_ok());
+		let error = encode_manifest_for_format(&manifest, 1).unwrap_err();
+		assert!(error.contains("process changed between versions"));
+		assert!(encode_manifest_for_format(&manifest, 0).is_err());
+		assert!(encode_manifest_for_format(&manifest, MANIFEST_FORMAT_VERSION + 1).is_err());
 	}
 
 	#[test]
@@ -1398,6 +1798,21 @@ mod tests {
 			Some(ledger.receipts[0].sha256())
 		);
 		assert_eq!(ledger.validate(), Ok(()));
+
+		let downgraded =
+			convert_publication_ledger_format(&serde_json::to_vec(&ledger).unwrap(), 1)
+				.unwrap_or_else(|error| panic!("downgrade publication ledger: {error}"));
+		assert_eq!(
+			decode_publication_ledger(&downgraded)
+				.unwrap_or_else(|error| panic!("upgrade downgraded ledger: {error}")),
+			ledger,
+		);
+
+		let mut tampered = legacy;
+		tampered["receipts"][1]["previousReceiptSha256"] =
+			serde_json::Value::String("f".repeat(64));
+		let error = decode_publication_ledger(&serde_json::to_vec(&tampered).unwrap()).unwrap_err();
+		assert!(error.contains("does not extend the previous hash"));
 	}
 
 	#[test]

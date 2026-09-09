@@ -70,7 +70,7 @@ If deployment succeeds but receipt recording fails, stop the release. The remote
 
 ## ABI document upgrades
 
-`formatVersion` belongs to Pina's migration document. It is independent of each account or instruction version. Pina rejects newer document formats and migrates supported older formats through adjacent internal converters before it reads the typed model. `pina migrations make` writes the current document format.
+`formatVersion` belongs to Pina's migration document. It is independent of each account or instruction version. Pina rejects newer document formats and migrates supported older formats through adjacent internal converters before it reads the typed model. The `pina_abi` crate can also encode a validated current model through adjacent downgrade converters. A downgrade fails instead of discarding information that the older format cannot represent. `pina migrations make` writes the current document format.
 
 An ABI document upgrade does not consume an on-chain migration version.
 
