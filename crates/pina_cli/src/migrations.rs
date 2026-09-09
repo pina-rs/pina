@@ -20,6 +20,7 @@ use pina_abi::MANIFEST_PATH;
 use pina_abi::MigrationManifest;
 use pina_abi::MigrationVersionType;
 use pina_abi::PUBLICATIONS_PATH;
+use pina_abi::PendingPublication;
 use pina_abi::ProcessAccount;
 use pina_abi::ProcessContract;
 use pina_abi::ProcessTransition;
@@ -70,6 +71,7 @@ pub struct MigrationStatus {
 	pub rust_name: String,
 	pub current_version: u32,
 	pub published: bool,
+	pub publication_pending: bool,
 	pub schema_sha256: String,
 }
 
@@ -179,10 +181,10 @@ pub enum MigrationError {
 	},
 
 	#[error(
-		"Published migration implementation {path} changed after publication. Add a repair \
-		 migration instead of rewriting live history."
+		"Frozen migration implementation {path} changed after publication became possible. Add a \
+		 repair migration instead of rewriting possibly-live history."
 	)]
-	PublishedImplementationChanged { path: PathBuf },
+	FrozenImplementationChanged { path: PathBuf },
 
 	#[error(
 		"Manual migration {path} is unfinished. Replace the `TODO(pina-manual-migration)` body \
@@ -213,12 +215,21 @@ pub enum MigrationError {
 
 	#[error("Publication receipt sequence exceeded u64")]
 	PublicationSequenceExhausted,
+
+	#[error(
+		"Another deployment may already be live for {program_id} on {cluster}. Restore its exact \
+		 inputs and rerun `pina deploy` before starting a different deployment."
+	)]
+	PublicationPending { program_id: String, cluster: String },
+
+	#[error("No matching pending deployment exists to complete its publication receipt")]
+	MissingPendingPublication,
 }
 
 /// Create the initial ABI database or refresh its latest draft versions.
 ///
-/// An unpublished latest version is mutable. A published latest version is
-/// immutable and a source change appends one adjacent version.
+/// An unfrozen latest version is mutable. A published or pending latest
+/// version is immutable and a source change appends one adjacent version.
 pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationError> {
 	let project = Project::discover(start)?;
 	let _lock = acquire_migration_lock(&project.program_dir)?;
@@ -277,7 +288,7 @@ pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationEr
 				}
 
 				let latest_version = latest.version;
-				if ledger.ever_published(&key, latest_version) {
+				if ledger.version_is_frozen(&key, latest_version) {
 					if latest_version == manifest.version_type.max_version() {
 						return Err(MigrationError::VersionExhausted {
 							version_type: manifest.version_type.to_string(),
@@ -437,6 +448,12 @@ pub(crate) fn check_project_migrations(
 			rust_name: source.rust_name,
 			current_version: latest.version,
 			published: ledger.ever_published(&key, latest.version),
+			publication_pending: ledger.pending.as_ref().is_some_and(|pending| {
+				pending
+					.versions
+					.get(&key)
+					.is_some_and(|version| *version >= latest.version)
+			}),
 			schema_sha256: latest.schema_sha256.clone(),
 		});
 	}
@@ -476,11 +493,96 @@ pub(crate) fn idl_migration_metadata(
 	}))
 }
 
-/// Append one receipt after a successful persistent deployment.
+/// Persist the exact ABI candidate before a persistent deployment starts.
 ///
-/// Local deployments must not call this function. The expected digest comes
-/// from the immutable deployment plan and is compared with the artifact again
-/// before any version is marked published.
+/// Repeating the same attempt is idempotent. A different attempt is rejected
+/// until the pending deployment is reconciled, because it may already be live.
+pub fn begin_publication(
+	start: &Path,
+	cluster: &str,
+	rpc_url: &str,
+	program_id: &str,
+	artifact: &Path,
+	expected_artifact_digest: [u8; 32],
+) -> Result<Option<PendingPublication>, MigrationError> {
+	let project = Project::discover(start)?;
+	let _lock = acquire_migration_lock(&project.program_dir)?;
+	let publication_path = project.program_dir.join(PUBLICATIONS_PATH);
+	let mut ledger = load_publication_ledger(&publication_path)?;
+	let manifest_path = project.program_dir.join(MANIFEST_PATH);
+	let manifest = load_manifest(&manifest_path)?;
+
+	if let Some(existing) = &ledger.pending {
+		let manifest = manifest.as_ref().ok_or_else(|| {
+			MigrationError::InvalidHistory(
+				"migration manifest disappeared during publication".to_owned(),
+			)
+		})?;
+		validate_ledger_for_manifest(&ledger, manifest)?;
+		let artifact_digest = hash_regular_file(artifact)?;
+		if artifact_digest != expected_artifact_digest {
+			return Err(MigrationError::PublicationArtifactChanged {
+				path: artifact.to_path_buf(),
+			});
+		}
+		if existing.cluster == cluster
+			&& existing.rpc_url == rpc_url
+			&& existing.program_id == program_id
+			&& existing.executable_sha256 == hex_digest(artifact_digest)
+		{
+			return Ok(Some(existing.clone()));
+		}
+		return Err(MigrationError::PublicationPending {
+			program_id: existing.program_id.clone(),
+			cluster: existing.cluster.clone(),
+		});
+	}
+
+	let statuses = check_project_migrations(&project)?;
+	if statuses.is_empty() {
+		return Ok(None);
+	}
+	let manifest = manifest.ok_or_else(|| {
+		MigrationError::InvalidHistory(
+			"migration manifest disappeared during publication".to_owned(),
+		)
+	})?;
+	if manifest.program_id != program_id {
+		return Err(MigrationError::PublicationProgramMismatch {
+			deployed: program_id.to_owned(),
+			manifest: manifest.program_id,
+		});
+	}
+	validate_ledger_for_manifest(&ledger, &manifest)?;
+	let artifact_digest = hash_regular_file(artifact)?;
+	if artifact_digest != expected_artifact_digest {
+		return Err(MigrationError::PublicationArtifactChanged {
+			path: artifact.to_path_buf(),
+		});
+	}
+	let versions = statuses
+		.into_iter()
+		.map(|status| (status.identity, status.current_version))
+		.collect();
+	let pending = PendingPublication {
+		cluster: cluster.to_owned(),
+		rpc_url: rpc_url.to_owned(),
+		program_id: program_id.to_owned(),
+		executable_sha256: hex_digest(artifact_digest),
+		manifest_sha256: manifest.sha256(),
+		versions,
+		previous_receipt_sha256: ledger.receipts.last().map(PublicationReceipt::sha256),
+	};
+	ledger.pending = Some(pending.clone());
+	validate_ledger_for_manifest(&ledger, &manifest)?;
+	write_json_atomic(&publication_path, &ledger)?;
+	Ok(Some(pending))
+}
+
+/// Convert the matching pending deployment into an immutable receipt.
+///
+/// The pending record remains intact on every error so a remotely successful
+/// deployment cannot become a mutable local draft.
 pub fn record_publication(
 	start: &Path,
 	cluster: &str,
@@ -491,10 +593,6 @@ pub fn record_publication(
 ) -> Result<Option<PublicationReceipt>, MigrationError> {
 	let project = Project::discover(start)?;
 	let _lock = acquire_migration_lock(&project.program_dir)?;
-	let statuses = check_migrations(&project.program_dir)?;
-	if statuses.is_empty() {
-		return Ok(None);
-	}
 	let manifest_path = project.program_dir.join(MANIFEST_PATH);
 	let manifest = load_manifest(&manifest_path)?.ok_or_else(|| {
 		MigrationError::InvalidHistory(
@@ -516,23 +614,31 @@ pub fn record_publication(
 			path: artifact.to_path_buf(),
 		});
 	}
-	let versions = statuses
-		.into_iter()
-		.map(|status| (status.identity, status.current_version))
-		.collect();
+	let pending = ledger
+		.pending
+		.clone()
+		.ok_or(MigrationError::MissingPendingPublication)?;
+	if pending.cluster != cluster
+		|| pending.rpc_url != rpc_url
+		|| pending.program_id != deployed_program_id
+		|| pending.executable_sha256 != hex_digest(artifact_digest)
+	{
+		return Err(MigrationError::MissingPendingPublication);
+	}
 	let sequence = u64::try_from(ledger.receipts.len())
 		.map_err(|_| MigrationError::PublicationSequenceExhausted)?;
 	let receipt = PublicationReceipt {
 		sequence,
-		cluster: cluster.to_owned(),
-		rpc_url: rpc_url.to_owned(),
-		program_id: deployed_program_id.to_owned(),
-		executable_sha256: hex_digest(artifact_digest),
-		manifest_sha256: manifest.sha256(),
-		versions,
-		previous_receipt_sha256: ledger.receipts.last().map(PublicationReceipt::sha256),
+		cluster: pending.cluster,
+		rpc_url: pending.rpc_url,
+		program_id: pending.program_id,
+		executable_sha256: pending.executable_sha256,
+		manifest_sha256: pending.manifest_sha256,
+		versions: pending.versions,
+		previous_receipt_sha256: pending.previous_receipt_sha256,
 	};
 	ledger.receipts.push(receipt.clone());
+	ledger.pending = None;
 	validate_ledger_for_manifest(&ledger, &manifest)?;
 	write_json_atomic(&publication_path, &ledger)?;
 	Ok(Some(receipt))
@@ -564,6 +670,29 @@ fn validate_ledger_for_manifest(
 				return Err(MigrationError::InvalidHistory(format!(
 					"publication receipt {} claims future version {} for `{key}`",
 					receipt.sequence, published
+				)));
+			}
+		}
+	}
+	if let Some(pending) = &ledger.pending {
+		if pending.program_id != manifest.program_id {
+			return Err(MigrationError::InvalidHistory(format!(
+				"pending publication belongs to program {}, expected {}",
+				pending.program_id, manifest.program_id
+			)));
+		}
+		for (key, candidate) in &pending.versions {
+			let history = manifest.contracts.get(key).ok_or_else(|| {
+				MigrationError::InvalidHistory(format!(
+					"pending publication names unknown contract `{key}`"
+				))
+			})?;
+			let current = history.current().ok_or_else(|| {
+				MigrationError::InvalidHistory(format!("contract `{key}` has no versions"))
+			})?;
+			if *candidate > current.version {
+				return Err(MigrationError::InvalidHistory(format!(
+					"pending publication claims future version {candidate} for `{key}`"
 				)));
 			}
 		}
@@ -1359,8 +1488,8 @@ fn verify_transition_files(
 		}
 		let current_hash = hash_transition_file(&path)?;
 		if transition.implementation_sha256.as_deref() != Some(current_hash.as_str()) {
-			if ledger.ever_published(key, version.version) {
-				return Err(MigrationError::PublishedImplementationChanged { path });
+			if ledger.version_is_frozen(key, version.version) {
+				return Err(MigrationError::FrozenImplementationChanged { path });
 			}
 			return Err(MigrationError::TransitionDrift {
 				kind: history.identity.kind.to_string(),
@@ -1394,8 +1523,8 @@ fn refresh_draft_transition_hash(
 	if transition.implementation_sha256.as_deref() == Some(hash.as_str()) {
 		return Ok(());
 	}
-	if ledger.ever_published(key, latest.version) {
-		return Err(MigrationError::PublishedImplementationChanged { path });
+	if ledger.version_is_frozen(key, latest.version) {
+		return Err(MigrationError::FrozenImplementationChanged { path });
 	}
 	transition.implementation_sha256 = Some(hash);
 	output
@@ -1570,6 +1699,81 @@ mod tests {
 	fn publication_records_exact_artifact_and_freezes_current_versions() {
 		let fixture = publication_fixture();
 		let digest: [u8; 32] = Sha256::digest(b"artifact").into();
+		let pending = begin_publication(
+			&fixture.root,
+			"devnet",
+			"https://api.devnet.solana.com",
+			fixture.program_id,
+			&fixture.artifact,
+			digest,
+		)
+		.unwrap_or_else(|error| panic!("begin publication: {error}"))
+		.expect("migration-aware fixture has a pending publication");
+		assert_eq!(pending.versions.get("account:1:01"), Some(&0));
+		let repeated = begin_publication(
+			&fixture.root,
+			"devnet",
+			"https://api.devnet.solana.com",
+			fixture.program_id,
+			&fixture.artifact,
+			digest,
+		)
+		.unwrap_or_else(|error| panic!("resume publication: {error}"));
+		assert_eq!(repeated, Some(pending.clone()));
+		let conflicting = begin_publication(
+			&fixture.root,
+			"testnet",
+			"https://api.testnet.solana.com",
+			fixture.program_id,
+			&fixture.artifact,
+			digest,
+		);
+		assert!(matches!(
+			conflicting,
+			Err(MigrationError::PublicationPending { .. })
+		));
+
+		let rejected = record_publication(
+			&fixture.root,
+			"devnet",
+			"https://api.devnet.solana.com",
+			fixture.program_id,
+			&fixture.artifact,
+			[9; 32],
+		);
+		assert!(matches!(
+			rejected,
+			Err(MigrationError::PublicationArtifactChanged { .. })
+		));
+		let ledger = load_publication_ledger(&fixture.root.join(PUBLICATIONS_PATH))
+			.unwrap_or_else(|error| panic!("reload pending publication: {error}"));
+		assert!(ledger.pending.is_some());
+		assert!(ledger.version_is_frozen("account:1:01", 0));
+		assert!(!ledger.ever_published("account:1:01", 0));
+		std::fs::write(
+			fixture.root.join("src/lib.rs"),
+			format!(
+				"use pina::*;\ndeclare_id!(\"{}\");\n#[discriminator]\nenum Kind {{ State = 1 \
+				 }}\n#[account(discriminator = Kind::State, migrations)]\nstruct State {{ value: \
+				 u64, enabled: bool }}\n",
+				fixture.program_id
+			),
+		)
+		.unwrap_or_else(|error| panic!("change source during pending deployment: {error}"));
+		let advanced = make_migrations(&fixture.root)
+			.unwrap_or_else(|error| panic!("advance frozen pending version: {error}"));
+		assert_eq!(advanced.advanced_versions, ["account:1:01@1"]);
+		let resumed = begin_publication(
+			&fixture.root,
+			"devnet",
+			"https://api.devnet.solana.com",
+			fixture.program_id,
+			&fixture.artifact,
+			digest,
+		)
+		.unwrap_or_else(|error| panic!("resume exact pending publication: {error}"));
+		assert_eq!(resumed, Some(pending));
+
 		let receipt = record_publication(
 			&fixture.root,
 			"devnet",
@@ -1586,22 +1790,8 @@ mod tests {
 		assert_eq!(receipt.versions.get("account:1:01"), Some(&0));
 		let ledger = load_publication_ledger(&fixture.root.join(PUBLICATIONS_PATH))
 			.unwrap_or_else(|error| panic!("reload publication: {error}"));
+		assert!(ledger.pending.is_none());
 		assert!(ledger.ever_published("account:1:01", 0));
-
-		let rejected = record_publication(
-			&fixture.root,
-			"devnet",
-			"https://api.devnet.solana.com",
-			fixture.program_id,
-			&fixture.artifact,
-			[9; 32],
-		);
-		assert!(matches!(
-			rejected,
-			Err(MigrationError::PublicationArtifactChanged { .. })
-		));
-		let ledger = load_publication_ledger(&fixture.root.join(PUBLICATIONS_PATH))
-			.unwrap_or_else(|error| panic!("reload rejected publication: {error}"));
 		assert_eq!(ledger.receipts.len(), 1);
 	}
 

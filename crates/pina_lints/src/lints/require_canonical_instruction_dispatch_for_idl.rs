@@ -55,7 +55,6 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalInstructionDispatchForIdl {
 		};
 		let function_name = def_path.rsplit("::").next().unwrap_or(&def_path);
 		if generated_name
-			|| kind.header().is_some_and(|header| header.is_unsafe())
 			|| span.from_expansion()
 			|| body.value.span.from_expansion()
 			|| shared::should_skip_def_path(&def_path)
@@ -67,6 +66,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalInstructionDispatchForIdl {
 		let facts = shared::collect_function_facts(cx, body);
 		if !facts.has_match {
 			cx.lint(REQUIRE_CANONICAL_INSTRUCTION_DISPATCH_FOR_IDL, |diag| {
+				diag.span(span);
 				diag.primary_message(
 					"IDL-friendly instruction dispatch should be a direct `match` over the parsed \
 					 instruction enum",

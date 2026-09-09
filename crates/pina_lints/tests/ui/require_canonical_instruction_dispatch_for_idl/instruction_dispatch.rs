@@ -41,6 +41,10 @@ fn entrypoint_helper(data: &[u8]) -> Result<(), ()> {
 	}
 }
 
+unsafe fn process_instruction(_data: &[u8]) -> Result<(), ()> {
+	process_a()
+}
+
 macro_rules! generated_entrypoint {
 	() => {
 		fn entrypoint_generated(data: &[u8]) -> Result<(), ()> {

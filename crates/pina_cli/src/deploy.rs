@@ -676,14 +676,37 @@ fn deploy_command(
 	}
 }
 
-/// Execute an already-reviewed deployment plan.
-pub fn execute_deployment(
-	plan: &DeploymentPlan,
+/// A deployment that passed target policy and operator confirmation.
+///
+/// Only [`approve_deployment`] can construct this token. Callers may therefore
+/// persist any required pre-execution state before handing it to [`Self::execute`].
+#[must_use = "an approved deployment has not executed yet"]
+pub struct ApprovedDeployment<'plan> {
+	plan: &'plan DeploymentPlan,
+}
+
+impl ApprovedDeployment<'_> {
+	/// Revalidate every planned input and execute the remote command.
+	pub fn execute(self, runner: &mut impl CommandRunner) -> Result<(), DeployError> {
+		self.plan.revalidate()?;
+		let command = deploy_command(
+			self.plan.program(),
+			self.plan.program_keypair(),
+			self.plan.upgrade_authority(),
+			self.plan.payer(),
+			self.plan.rpc_url(),
+		);
+		run_command(&command, Path::new(self.plan.project_root()), runner)
+	}
+}
+
+/// Enforce target policy and obtain any required operator confirmation.
+pub fn approve_deployment<'plan>(
+	plan: &'plan DeploymentPlan,
 	yes: bool,
 	allow_mainnet: bool,
-	runner: &mut impl CommandRunner,
 	confirmer: &mut impl DeploymentConfirmer,
-) -> Result<(), DeployError> {
+) -> Result<ApprovedDeployment<'plan>, DeployError> {
 	if allow_mainnet && !plan.requires_mainnet_acknowledgement() {
 		return Err(DeployError::UnexpectedMainnetAcknowledgement);
 	}
@@ -708,15 +731,18 @@ pub fn execute_deployment(
 		}
 	}
 
-	plan.revalidate()?;
-	let command = deploy_command(
-		plan.program(),
-		plan.program_keypair(),
-		plan.upgrade_authority(),
-		plan.payer(),
-		plan.rpc_url(),
-	);
-	run_command(&command, Path::new(plan.project_root()), runner)
+	Ok(ApprovedDeployment { plan })
+}
+
+/// Approve and execute an already-reviewed deployment plan.
+pub fn execute_deployment(
+	plan: &DeploymentPlan,
+	yes: bool,
+	allow_mainnet: bool,
+	runner: &mut impl CommandRunner,
+	confirmer: &mut impl DeploymentConfirmer,
+) -> Result<(), DeployError> {
+	approve_deployment(plan, yes, allow_mainnet, confirmer)?.execute(runner)
 }
 
 fn run_command(
@@ -1827,8 +1853,13 @@ mod tests {
 			prompts: Vec::new(),
 		};
 
-		execute_deployment(&plan, false, false, &mut runner, &mut confirmer)
-			.unwrap_or_else(|error| panic!("execute deployment: {error}"));
+		let approved = approve_deployment(&plan, false, false, &mut confirmer)
+			.unwrap_or_else(|error| panic!("approve deployment: {error}"));
+		assert!(runner.calls.is_empty());
+		assert_eq!(confirmer.prompts.len(), 1);
+		approved
+			.execute(&mut runner)
+			.unwrap_or_else(|error| panic!("execute approved deployment: {error}"));
 		assert_eq!(runner.calls.len(), 1);
 	}
 

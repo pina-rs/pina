@@ -6009,6 +6009,7 @@ dependencies = [
  "solana-slot-history 3.1.0",
  "solana-stake-history",
  "solana-transaction 4.1.5",
+ "solana-transaction-error 3.3.2",
  "surfpool-sdk",
  "thiserror 2.0.20",
  "tokio",

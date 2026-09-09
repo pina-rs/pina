@@ -358,6 +358,27 @@ mod tests {
 	}
 
 	#[test]
+	fn rejects_constant_and_field_discriminators_at_the_same_offset() {
+		let constant = DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			codama_nodes::ConstantValueNode::new(NumberTypeNode::le(U8), NumberValueNode::new(0u8)),
+			0,
+		));
+		let field = DiscriminatorNode::Field(FieldDiscriminatorNode::new("discriminator", 0));
+
+		for discriminators in [vec![constant.clone(), field.clone()], vec![field, constant]] {
+			assert!(matches!(
+				render_constant_discriminator(
+					"update",
+					&discriminators,
+					&[field_argument()],
+					"test"
+				),
+				Err(RenderError::UnsupportedDiscriminator { .. })
+			));
+		}
+	}
+
+	#[test]
 	fn rejects_mismatched_constant_discriminators() {
 		let constant = ConstantDiscriminatorNode::new(
 			codama_nodes::ConstantValueNode::new(

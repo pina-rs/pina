@@ -81,7 +81,7 @@ Local iteration has one replaceable draft head per changed contract. `pina migra
 
 `pina build` never creates or changes migration history. It fails on ABI drift, an unresolved custom transition, a modified published schema or transition, version exhaustion, or a version-width mismatch.
 
-Developers do not mark versions as published. After a successful non-local deployment, `pina deploy` rechecks every planned input and appends a local receipt. Each receipt records:
+Developers do not mark versions as published. Before a non-local deployment starts, `pina deploy` atomically records the exact ABI candidate as pending. The pending versions are frozen because they may already be live. After success, Pina rechecks every planned input and converts the pending record into a local receipt. Each receipt records:
 
 - the cluster label and credential-free RPC URL;
 - the program identity;
@@ -89,9 +89,9 @@ Developers do not mark versions as published. After a successful non-local deplo
 - the ABI manifest digest and every current contract version;
 - the preceding receipt digest.
 
-The checked-in, hash-chained publication ledger is the current source of truth for version allocation. Loopback local deployments do not add receipts.
+The checked-in, hash-chained publication ledger is the current source of truth for version allocation. Both receipts and a pending deployment freeze versions. Loopback local deployments do not add publication state.
 
-The first implementation does not query the deployed program-data account, cluster genesis hash, deployment slot, or transaction signature. A process interruption after remote success but before the local append can therefore leave a live version recorded as a draft. Until remote reconciliation lands, release automation must treat that result as ambiguous and preserve the candidate history. The local ledger is reviewable release evidence, not an independent on-chain attestation.
+The first implementation does not query the deployed program-data account, cluster genesis hash, deployment slot, or transaction signature. A process interruption can therefore leave the remote outcome ambiguous. The pending record preserves and freezes the candidate before the remote command starts. Rerunning the exact deployment resumes it; Pina rejects a different deployment until the pending attempt is reconciled. The local ledger is reviewable release evidence, not an independent on-chain attestation.
 
 ### Generated data compatibility boundary
 

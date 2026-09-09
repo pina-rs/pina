@@ -26,7 +26,7 @@ pub const PUBLICATIONS_PATH: &str = "migrations/publications.json";
 pub const MANIFEST_FORMAT_VERSION: u32 = 3;
 
 /// Current serialization format for publication receipts.
-pub const PUBLICATION_FORMAT_VERSION: u32 = 2;
+pub const PUBLICATION_FORMAT_VERSION: u32 = 3;
 
 /// Stable relative path for one adjacent Rust transition.
 #[must_use]
@@ -877,6 +877,7 @@ fn upgrade_publication_document(
 ) -> Result<serde_json::Value, String> {
 	match version {
 		1 => migrate_publication_v1_to_v2(value),
+		2 => migrate_publication_v2_to_v3(value),
 		_ => {
 			Err(format!(
 				"no Pina ABI migration is available from publication format {version}"
@@ -891,6 +892,7 @@ fn downgrade_publication_document(
 ) -> Result<serde_json::Value, String> {
 	match version {
 		2 => migrate_publication_v2_to_v1(value),
+		3 => migrate_publication_v3_to_v2(value),
 		_ => {
 			Err(format!(
 				"no Pina ABI downgrade is available from publication format {version}"
@@ -924,6 +926,31 @@ impl PublicationReceiptV1 {
 struct PublicationLedgerV1 {
 	format_version: u32,
 	receipts: Vec<PublicationReceiptV1>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+struct PublicationLedgerV2 {
+	format_version: u32,
+	receipts: Vec<PublicationReceipt>,
+}
+
+impl PublicationLedgerV2 {
+	fn validate(&self) -> Result<(), String> {
+		if self.format_version != 2 {
+			return Err(format!(
+				"unsupported publication ledger format {}; expected 2",
+				self.format_version
+			));
+		}
+		PublicationLedger {
+			format_version: PUBLICATION_FORMAT_VERSION,
+			receipts: self.receipts.clone(),
+			pending: None,
+		}
+		.validate()
+	}
 }
 
 impl PublicationLedgerV1 {
@@ -991,15 +1018,15 @@ fn migrate_publication_v1_to_v2(value: serde_json::Value) -> Result<serde_json::
 			migrated
 		})
 		.collect();
-	serde_json::to_value(PublicationLedger {
-		format_version: PUBLICATION_FORMAT_VERSION,
+	serde_json::to_value(PublicationLedgerV2 {
+		format_version: 2,
 		receipts,
 	})
 	.map_err(|error| format!("could not encode publication ledger format 2: {error}"))
 }
 
 fn migrate_publication_v2_to_v1(value: serde_json::Value) -> Result<serde_json::Value, String> {
-	let ledger: PublicationLedger = serde_json::from_value(value)
+	let ledger: PublicationLedgerV2 = serde_json::from_value(value)
 		.map_err(|error| format!("invalid publication ledger format 2: {error}"))?;
 	ledger.validate()?;
 	let mut previous = None;
@@ -1032,6 +1059,34 @@ fn migrate_publication_v2_to_v1(value: serde_json::Value) -> Result<serde_json::
 		receipts,
 	})
 	.map_err(|error| format!("could not encode publication ledger format 1: {error}"))
+}
+
+fn migrate_publication_v2_to_v3(value: serde_json::Value) -> Result<serde_json::Value, String> {
+	let legacy: PublicationLedgerV2 = serde_json::from_value(value)
+		.map_err(|error| format!("invalid publication ledger format 2: {error}"))?;
+	legacy.validate()?;
+	serde_json::to_value(PublicationLedger {
+		format_version: PUBLICATION_FORMAT_VERSION,
+		receipts: legacy.receipts,
+		pending: None,
+	})
+	.map_err(|error| format!("could not encode publication ledger format 3: {error}"))
+}
+
+fn migrate_publication_v3_to_v2(value: serde_json::Value) -> Result<serde_json::Value, String> {
+	let ledger: PublicationLedger = serde_json::from_value(value)
+		.map_err(|error| format!("invalid publication ledger format 3: {error}"))?;
+	ledger.validate()?;
+	if ledger.pending.is_some() {
+		return Err(
+			"publication ledger format 3 cannot downgrade while a deployment is pending".to_owned(),
+		);
+	}
+	serde_json::to_value(PublicationLedgerV2 {
+		format_version: 2,
+		receipts: ledger.receipts,
+	})
+	.map_err(|error| format!("could not encode publication ledger format 2: {error}"))
 }
 
 fn document_format_version(value: &serde_json::Value, kind: &str) -> Result<u32, String> {
@@ -1450,6 +1505,25 @@ impl PublicationReceipt {
 	}
 }
 
+/// Recoverable record written before a persistent deployment starts.
+///
+/// A pending record means the named versions may already be live. Pina freezes
+/// them until the exact deployment is completed into a receipt.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct PendingPublication {
+	pub cluster: String,
+	/// Credential-free RPC endpoint used by the deployment plan.
+	pub rpc_url: String,
+	pub program_id: String,
+	pub executable_sha256: String,
+	pub manifest_sha256: String,
+	/// Highest version that the in-flight deployment may make live.
+	pub versions: BTreeMap<String, u32>,
+	pub previous_receipt_sha256: Option<String>,
+}
+
 /// Local, hash-chained record of versions that have been made persistent.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -1457,6 +1531,8 @@ impl PublicationReceipt {
 pub struct PublicationLedger {
 	pub format_version: u32,
 	pub receipts: Vec<PublicationReceipt>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub pending: Option<PendingPublication>,
 }
 
 impl Default for PublicationLedger {
@@ -1464,6 +1540,7 @@ impl Default for PublicationLedger {
 		Self {
 			format_version: PUBLICATION_FORMAT_VERSION,
 			receipts: Vec::new(),
+			pending: None,
 		}
 	}
 }
@@ -1478,6 +1555,18 @@ impl PublicationLedger {
 				.get(contract)
 				.is_some_and(|published| *published >= version)
 		})
+	}
+
+	/// Return whether a published or possibly-live deployment freezes a version.
+	#[must_use]
+	pub fn version_is_frozen(&self, contract: &str, version: u32) -> bool {
+		self.ever_published(contract, version)
+			|| self.pending.as_ref().is_some_and(|pending| {
+				pending
+					.versions
+					.get(contract)
+					.is_some_and(|candidate| *candidate >= version)
+			})
 	}
 
 	/// Validate receipt sequence and hash-chain integrity.
@@ -1523,6 +1612,26 @@ impl PublicationLedger {
 				&mut published_versions,
 			)?;
 			previous = Some(receipt.sha256());
+		}
+		if let Some(pending) = &self.pending {
+			let sequence = self.receipts.len() as u64;
+			if pending.previous_receipt_sha256 != previous {
+				return Err(
+					"pending publication does not extend the previous receipt hash".to_owned(),
+				);
+			}
+			validate_publication_identity(
+				sequence,
+				&pending.cluster,
+				&pending.program_id,
+				&pending.executable_sha256,
+				&pending.manifest_sha256,
+				&pending.versions,
+			)?;
+			if pending.rpc_url.is_empty() || pending.rpc_url.chars().any(char::is_control) {
+				return Err("pending publication contains an invalid RPC URL".to_owned());
+			}
+			validate_publication_versions(sequence, &pending.versions, &mut published_versions)?;
 		}
 		Ok(())
 	}
@@ -2322,6 +2431,7 @@ mod tests {
 		let ledger = PublicationLedger {
 			format_version: PUBLICATION_FORMAT_VERSION,
 			receipts: vec![first, second],
+			pending: None,
 		};
 
 		assert_eq!(ledger.validate(), Ok(()));
@@ -2333,6 +2443,21 @@ mod tests {
 		assert!(
 			encode_publication_ledger_for_format(&ledger, PUBLICATION_FORMAT_VERSION + 1).is_err()
 		);
+
+		let mut pending = ledger.clone();
+		pending.pending = Some(PendingPublication {
+			cluster: "devnet".to_owned(),
+			rpc_url: "https://api.devnet.solana.com".to_owned(),
+			program_id: "program".to_owned(),
+			executable_sha256: "e".repeat(64),
+			manifest_sha256: "f".repeat(64),
+			versions: BTreeMap::from([("account:1:00".to_owned(), 2)]),
+			previous_receipt_sha256: pending.receipts.last().map(PublicationReceipt::sha256),
+		});
+		assert_eq!(pending.validate(), Ok(()));
+		assert!(pending.version_is_frozen("account:1:00", 2));
+		assert!(!pending.ever_published("account:1:00", 2));
+		assert!(encode_publication_ledger_for_format(&pending, 2).is_err());
 	}
 
 	#[test]
@@ -2602,6 +2727,7 @@ mod tests {
 		let ledger = PublicationLedger {
 			format_version: PUBLICATION_FORMAT_VERSION,
 			receipts: vec![first, second],
+			pending: None,
 		};
 
 		assert!(ledger.validate().unwrap_err().contains("regresses"));

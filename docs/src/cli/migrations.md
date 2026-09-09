@@ -30,7 +30,7 @@ pina migrations status
 
 Pina writes `migrations/manifest.json`, `migrations/publications.json`, and adjacent transition files under `migrations/transitions/`.
 
-If the current version has never been deployed to a non-local cluster, `make` replaces that draft. If a publication receipt contains the version, `make` appends the next version.
+If the current version has never been deployed to a non-local cluster, `make` replaces that draft. If a publication receipt or pending deployment contains the version, `make` appends the next version.
 
 Commit the manifest, publication ledger, and transition files. Do not generate them during a build.
 
@@ -47,7 +47,7 @@ pina migrations check
 pina test --compatibility
 ```
 
-`check` rejects a remaining marker. After publication, it also rejects any change to the transition file or either schema hash. Fix a published transition with another migration version.
+`check` rejects a remaining marker. Once publication is pending or complete, it also rejects any change to the transition file or either schema hash. Fix frozen transition code with another migration version.
 
 IDL generation runs the same check. The current IDL contains one omitted `migrationVersion` constant for each migration-aware account or instruction, so generated clients serialize the current envelope without asking the application developer for a version. Historical schemas and transition code remain exclusively in `migrations/manifest.json`.
 
@@ -70,17 +70,19 @@ Events are immutable, so Pina projects rather than rewrites them. A migratable e
 
 ## Publish a version
 
-Use `pina deploy` for a persistent cluster. After deployment succeeds, Pina rechecks the planned files and appends a hash-chained receipt with the program ID, RPC target, executable digest, manifest digest, and current contract versions.
+Use `pina deploy` for a persistent cluster. Before the remote command starts, Pina atomically records the exact program ID, RPC target, executable digest, manifest digest, and current contract versions as pending. A pending version is frozen because it may already be live. After deployment succeeds, Pina rechecks the planned files and converts that record into a hash-chained receipt.
 
 Local deployments do not publish versions. A published version is immutable even if a later deployment replaces it.
 
-If deployment succeeds but receipt recording fails, stop the release. The remote deployment is ambiguous until you reconcile it. The current ledger does not prove the deployed program-data hash, genesis hash, slot, or transaction signature.
+If deployment or receipt recording fails, stop the release. The pending record remains, and `pina migrations status` reports `publication pending`. Restore the exact planned inputs and rerun the same deployment to reconcile it; Pina rejects a different deployment while the outcome is ambiguous. The current ledger does not prove the deployed program-data hash, genesis hash, slot, or transaction signature.
 
 ## ABI document upgrades
 
 `formatVersion` belongs to Pina's migration document. It is independent of each account or instruction version. Pina rejects newer document formats and migrates supported older formats through adjacent internal converters before it reads the typed model. The `pina_abi` crate can also encode a validated current model through adjacent downgrade converters. A downgrade fails instead of discarding information that the older format cannot represent. `pina migrations make` writes the current document format.
 
-Format 3 freezes the PinaPod codec plus payload-relative fixed offsets and compact header, prefix, capacity, tail-order, and alignment metadata. Pina derives that descriptor from its closed field grammar and rejects a stored descriptor that disagrees. Historical format 2 documents are upgraded by deriving and rehashing this metadata; a format 3 document can downgrade to format 2 only through the matching inverse converter.
+Manifest format 3 freezes the PinaPod codec plus payload-relative fixed offsets and compact header, prefix, capacity, tail-order, and alignment metadata. Pina derives that descriptor from its closed field grammar and rejects a stored descriptor that disagrees. Historical manifest format 2 documents are upgraded by deriving and rehashing this metadata; a format 3 manifest can downgrade to format 2 only through the matching inverse converter.
+
+Publication-ledger format 3 adds the recoverable pending deployment record. Format 2 ledgers upgrade with no pending deployment. A format 3 ledger can downgrade to format 2 only when no deployment is pending.
 
 An ABI document upgrade does not consume an on-chain migration version.
 

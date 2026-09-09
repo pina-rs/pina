@@ -179,7 +179,9 @@ fn run_migrations(command: MigrationCommands) {
 				return;
 			}
 			for status in statuses {
-				let publication = if status.published {
+				let publication = if status.publication_pending {
+					"publication pending"
+				} else if status.published {
 					"published"
 				} else {
 					"draft"
@@ -786,17 +788,56 @@ fn run_deploy(
 	if dry_run {
 		return;
 	}
-
 	let mut confirmer = StdinDeploymentConfirmer;
-
-	if let Err(error) =
-		pina_cli::deploy::execute_deployment(&plan, yes, allow_mainnet, &mut runner, &mut confirmer)
-	{
+	let approved =
+		match pina_cli::deploy::approve_deployment(&plan, yes, allow_mainnet, &mut confirmer) {
+			Ok(approved) => approved,
+			Err(error) => {
+				eprintln!("{} {}", "Error".red().bold(), error);
+				std::process::exit(1);
+			}
+		};
+	if let Err(error) = plan.verify_inputs_unchanged() {
 		eprintln!("{} {}", "Error".red().bold(), error);
 		std::process::exit(1);
 	}
 
-	if !plan.is_local() {
+	let pending_publication = if plan.is_local() {
+		None
+	} else {
+		match pina_cli::migrations::begin_publication(
+			Path::new(plan.project_root()),
+			plan.cluster(),
+			plan.rpc_url(),
+			plan.program_id(),
+			Path::new(plan.program()),
+			plan.program_digest(),
+		) {
+			Ok(pending) => pending,
+			Err(error) => {
+				eprintln!(
+					"{} Could not reserve migration publication: {}",
+					"Error".red().bold(),
+					error
+				);
+				std::process::exit(1);
+			}
+		}
+	};
+
+	if let Err(error) = approved.execute(&mut runner) {
+		if pending_publication.is_some() {
+			eprintln!(
+				"{} The recoverable pending publication was retained; rerun this exact deployment \
+				 to reconcile whether it became live.",
+				"Warning".yellow().bold()
+			);
+		}
+		eprintln!("{} {}", "Error".red().bold(), error);
+		std::process::exit(1);
+	}
+
+	if pending_publication.is_some() {
 		if let Err(error) = plan.verify_inputs_unchanged() {
 			eprintln!(
 				"{} Deployment succeeded, but its inputs changed before migration publication \

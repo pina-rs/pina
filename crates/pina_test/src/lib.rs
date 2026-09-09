@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 pub use solana_account::Account;
+use solana_client::client_error::ClientError;
 pub use solana_instruction::AccountMeta;
 pub use solana_instruction::Instruction;
 pub use solana_keypair::Keypair;
@@ -22,6 +23,7 @@ pub use solana_rent::Rent;
 pub use solana_signature::Signature;
 pub use solana_signer::Signer;
 use solana_transaction::Transaction;
+use solana_transaction_error::TransactionError;
 use surfpool_sdk::Surfnet;
 use surfpool_sdk::cheatcodes::builders::DeployProgram;
 use surfpool_sdk::cheatcodes::builders::SetAccount;
@@ -71,6 +73,8 @@ pub fn compatibility_mode() -> bool {
 pub struct TestError {
 	operation: &'static str,
 	message: String,
+	#[source]
+	client_error: Option<ClientError>,
 }
 
 impl TestError {
@@ -84,6 +88,20 @@ impl TestError {
 	#[must_use]
 	pub fn message(&self) -> &str {
 		&self.message
+	}
+
+	/// Complete RPC client error retained for transaction execution failures.
+	#[must_use]
+	pub const fn client_error(&self) -> Option<&ClientError> {
+		self.client_error.as_ref()
+	}
+
+	/// Transaction-level failure extracted from the retained RPC client error.
+	#[must_use]
+	pub fn transaction_error(&self) -> Option<TransactionError> {
+		self.client_error
+			.as_ref()
+			.and_then(ClientError::get_transaction_error)
 	}
 }
 
@@ -654,7 +672,7 @@ impl OfflineSurfnet {
 		}
 
 		rpc.send_and_confirm_transaction(&transaction)
-			.map_err(|error| test_error("execute program instruction", error))
+			.map_err(execution_error)
 	}
 
 	/// Submit exact historical bytes and account metas to `program_id`.
@@ -738,7 +756,11 @@ impl OfflineSurfnet {
 					),
 				));
 			}
-			Err(error) if error.operation() == "execute program instruction" => {}
+			Err(error)
+				if matches!(
+					error.transaction_error(),
+					Some(TransactionError::InstructionError(..))
+				) => {}
 			Err(error) => return Err(error),
 		}
 
@@ -838,6 +860,15 @@ fn test_error(operation: &'static str, error: impl std::fmt::Display) -> TestErr
 	TestError {
 		operation,
 		message: error.to_string(),
+		client_error: None,
+	}
+}
+
+fn execution_error(error: ClientError) -> TestError {
+	TestError {
+		operation: "execute program instruction",
+		message: error.to_string(),
+		client_error: Some(error),
 	}
 }
 
@@ -979,7 +1010,7 @@ mod tests {
 			let rejected = HistoricalInstruction::new(0, [9, 0], Vec::new());
 			surfnet
 				.expect_historical_rejection_with_rollback(
-					Pubkey::new_unique(),
+					system_program_id(),
 					&rejected,
 					&[address],
 					&[],

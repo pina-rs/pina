@@ -15,6 +15,7 @@ use migrations_program::MigrationInstruction;
 use migrations_program::RelayInstruction;
 use migrations_program::State;
 use mollusk_svm::Mollusk;
+use mollusk_svm::program::create_program_account_loader_v3;
 use mollusk_svm::program::keyed_account_for_system_program;
 use mollusk_svm::result::Check;
 use mollusk_svm::result::InstructionResult;
@@ -273,8 +274,12 @@ fn self_cpi_migrates_callee_owned_state_and_caller_reloads_after_resize() {
 	let referrer = Pubkey::new_unique();
 	let state = Pubkey::new_unique();
 	let payer = Pubkey::new_unique();
-	let (accounts, ..) =
+	let (mut accounts, ..) =
 		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
+	accounts.push((
+		program_id(),
+		create_program_account_loader_v3(&program_id()),
+	));
 	let instruction = Instruction::new_with_bytes(
 		program_id(),
 		&relay_data(144),
