@@ -135,23 +135,34 @@ jobs:
             "${{ github.workspace }}/target/performance-build/instructions/head"
         shell: devenv shell -c -- bash -e {0}
 
-      - name: measure base instructions
+      - name: measure base and head instructions
         run: |
+          set +e
           node ./scripts/measure-example-compute-units.ts \
             "${{ github.workspace }}" \
             "${{ github.workspace }}/../pina-performance-base" \
             "${{ github.workspace }}/target/performance-build/instructions/base" \
             "${{ github.workspace }}/target/performance/instructions/runtime-base.json" \
-            --allow-incomplete
-        shell: devenv shell -c -- bash -e {0}
+            --allow-incomplete &
+          base_pid=$!
 
-      - name: measure head instructions
-        run: |
           node ./scripts/measure-example-compute-units.ts \
             "${{ github.workspace }}" \
             "${{ github.workspace }}" \
             "${{ github.workspace }}/target/performance-build/instructions/head" \
-            "${{ github.workspace }}/target/performance/instructions/runtime-head.json"
+            "${{ github.workspace }}/target/performance/instructions/runtime-head.json" &
+          head_pid=$!
+
+          base_status=0
+          head_status=0
+          wait "$base_pid" || base_status=$?
+          wait "$head_pid" || head_status=$?
+          set -e
+
+          if [ "$base_status" -ne 0 ]; then
+            exit "$base_status"
+          fi
+          exit "$head_status"
         shell: devenv shell -c -- bash -e {0}
 
       - name: compare instruction reports
