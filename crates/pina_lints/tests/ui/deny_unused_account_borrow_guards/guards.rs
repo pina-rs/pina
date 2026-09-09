@@ -1,3 +1,4 @@
+// check-warn
 // normalize-stderr-test: "\n$" -> ""
 
 #![allow(dead_code, unused_variables)]

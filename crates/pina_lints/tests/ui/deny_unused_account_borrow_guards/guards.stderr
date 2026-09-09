@@ -1,5 +1,5 @@
 warning: account borrow guard `guard` is never read
-  --> $DIR/guards.rs:75:14
+  --> $DIR/guards.rs:76:14
    |
 LL |     let guard = account.try_borrow_mut()?;
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -14,7 +14,7 @@ LL ~
    |
 
 warning: account borrow guard `_guard` is never read
-  --> $DIR/guards.rs:82:15
+  --> $DIR/guards.rs:83:15
    |
 LL |     let _guard = mint.as_token_mint_for_program(&0)?;
    |     -------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^- help: discard this guard immediately: `mint.as_token_mint_for_program(&0)?;`
@@ -22,7 +22,7 @@ LL |     let _guard = mint.as_token_mint_for_program(&0)?;
    = help: the guard holds the account data borrow until the end of its scope; discard the validation value immediately by calling it as a `?` statement, binding it with `let _ = ...`, or reading it before the scope ends
 
 warning: account borrow guard `guard` is never read
-  --> $DIR/guards.rs:88:14
+  --> $DIR/guards.rs:89:14
    |
 LL |     let guard = mint.as_associated_token_account(&0)?;
    |     ------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^- help: discard this guard immediately: `mint.as_associated_token_account(&0)?;`
@@ -30,7 +30,7 @@ LL |     let guard = mint.as_associated_token_account(&0)?;
    = help: the guard holds the account data borrow until the end of its scope; discard the validation value immediately by calling it as a `?` statement, binding it with `let _ = ...`, or reading it before the scope ends
 
 warning: account borrow guard `guard` is never read
-  --> $DIR/guards.rs:95:15
+  --> $DIR/guards.rs:96:15
    |
 LL |         let guard = State::load_pda(account)?;
    |         ------------^^^^^^^^^^^^^^^^^^^^^^^^^- help: discard this guard immediately: `State::load_pda(account)?;`
@@ -38,7 +38,7 @@ LL |         let guard = State::load_pda(account)?;
    = help: the guard holds the account data borrow until the end of its scope; discard the validation value immediately by calling it as a `?` statement, binding it with `let _ = ...`, or reading it before the scope ends
 
 warning: account borrow guard `guard` is never read
-  --> $DIR/guards.rs:102:14
+  --> $DIR/guards.rs:103:14
    |
 LL |     let guard = { account.try_borrow()? };
    |     ------------^^^^^^^^^^^^^^^^^^^^^^^^^- help: discard this guard immediately: `{ account.try_borrow()? };`
@@ -46,7 +46,7 @@ LL |     let guard = { account.try_borrow()? };
    = help: the guard holds the account data borrow until the end of its scope; discard the validation value immediately by calling it as a `?` statement, binding it with `let _ = ...`, or reading it before the scope ends
 
 warning: account borrow guard `guard` is never read
-  --> $DIR/guards.rs:56:15
+  --> $DIR/guards.rs:57:15
    |
 LL |         let guard = $account.try_borrow()?;
    |                     ^^^^^^^^^^^^^^^^^^^^^^
@@ -58,7 +58,7 @@ LL |     bind_guard!(account);
    = note: this warning originates in the macro `bind_guard` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 warning: account borrow guard `guard` is never read
-  --> $DIR/guards.rs:114:14
+  --> $DIR/guards.rs:115:14
    |
 LL |     let guard = account.try_borrow()?;
    |                 ^^^^^^^^^^^^^^^^^^^^^
@@ -66,7 +66,7 @@ LL |     let guard = account.try_borrow()?;
    = help: the guard holds the account data borrow until the end of its scope; discard the validation value immediately by calling it as a `?` statement, binding it with `let _ = ...`, or reading it before the scope ends
 
 warning: calls to `std::mem::drop` with a value that implements `Copy` does nothing
-  --> $DIR/guards.rs:135:2
+  --> $DIR/guards.rs:136:2
    |
 LL |     drop(guard.value());
    |     ^^^^^-------------^
@@ -81,7 +81,7 @@ LL +     let _ = guard.value();
    |
 
 warning: calls to `std::mem::drop` with a value that implements `Copy` does nothing
-  --> $DIR/guards.rs:140:2
+  --> $DIR/guards.rs:141:2
    |
 LL |     drop(UNRELATED_CONSTANT);
    |     ^^^^^------------------^
