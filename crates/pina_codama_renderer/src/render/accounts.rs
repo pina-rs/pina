@@ -1,3 +1,5 @@
+use std::fmt::Write as _;
+
 use codama_nodes::AccountNode;
 use codama_nodes::DefaultValueStrategy;
 use codama_nodes::NestedTypeNodeTrait;
@@ -289,10 +291,10 @@ fn render_compact_account_helpers(
 	];
 	let mut patch = "\t\tpatch".to_string();
 	if let Some(discriminator) = discriminator {
-		patch.push_str(&format!(".discriminator({})", discriminator.name));
+		let _ = write!(patch, ".discriminator({})", discriminator.name);
 	}
 	for constant in omitted_constants {
-		patch.push_str(&format!(".{}({})", constant.field, constant.name));
+		let _ = write!(patch, ".{}({})", constant.field, constant.name);
 	}
 	lines.push(format!("{patch}.initialize(data)"));
 	lines.extend([
