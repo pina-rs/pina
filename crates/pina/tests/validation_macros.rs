@@ -85,6 +85,7 @@ fn instruction_validation_runs_explicitly_and_at_decode_boundaries() {
 	.err()
 	.unwrap();
 	assert_eq!(exact_length_error, ProgramError::InvalidInstructionData);
+	assert!(bytes.iter().all(|byte| *byte == 0));
 }
 
 #[test]
@@ -100,6 +101,7 @@ fn instruction_custom_hook_runs_after_field_rules() {
 	.unwrap();
 
 	assert_eq!(error, ProgramError::Custom(42));
+	assert!(bytes.iter().all(|byte| *byte == 0));
 }
 
 #[test]
@@ -113,6 +115,7 @@ fn event_and_account_helpers_validate_automatically() {
 	.err()
 	.unwrap();
 	assert_eq!(event_error, ProgramError::InvalidInstructionData);
+	assert!(event_bytes.iter().all(|byte| *byte == 0));
 
 	let mut account_bytes = [0u8; ValidatedAccount::SIZE];
 	let account_error = ValidatedAccount::initialize(&mut account_bytes, |value| {
@@ -123,6 +126,7 @@ fn event_and_account_helpers_validate_automatically() {
 	.err()
 	.unwrap();
 	assert_eq!(account_error, ProgramError::InvalidAccountData);
+	assert!(account_bytes.iter().all(|byte| *byte == 0));
 }
 
 #[test]

@@ -132,6 +132,7 @@ fn compact_account_validation_covers_inline_fields_tails_and_hooks() {
 	.err()
 	.unwrap();
 	assert_eq!(hook_error, ProgramError::Custom(61));
+	assert!(data.iter().all(|byte| *byte == 0));
 
 	let short_values = [PodU16::from(7)];
 	let length_error = ValidatedCompactState::initialize(
@@ -143,6 +144,20 @@ fn compact_account_validation_covers_inline_fields_tails_and_hooks() {
 	.err()
 	.unwrap();
 	assert_eq!(length_error, ProgramError::InvalidAccountData);
+	assert!(data.iter().all(|byte| *byte == 0));
+
+	ValidatedCompactState::initialize(
+		&mut data,
+		&ValidatedCompactStatePatch::new()
+			.level(3)
+			.replace_values(&values),
+	)
+	.unwrap();
+	let update_error =
+		ValidatedCompactState::update(&mut data, &ValidatedCompactStatePatch::new().level(2))
+			.err()
+			.unwrap();
+	assert_eq!(update_error, ProgramError::Custom(61));
 }
 
 #[test]

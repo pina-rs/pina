@@ -507,7 +507,9 @@ UpdateResizableAccount {
 .invoke::<Journal>()?;
 ```
 
-`UpdateResizableAccount` validates the complete patch and calculates the final encoded length before it changes the account. It grows the allocation before applying a longer representation. For a shorter representation, it applies the patch before shrinking the allocation. If the allocation stays the same size, the builder skips the resize. It adjusts the rent balance through `rent_account` and clears bytes removed by the patch. If validation or size calculation fails, both account data and lamport balances remain unchanged.
+`UpdateResizableAccount` preflights the patch's structural representation and calculates the final encoded length before it changes the account. It grows the allocation before applying a longer representation. For a shorter representation, it applies the patch before shrinking the allocation. If the allocation stays the same size, the builder skips the resize. It adjusts the rent balance through `rent_account` and clears bytes removed by the patch. A structural or size preflight failure leaves account data and lamports unchanged.
+
+With the `validation` feature, Pina checks application rules on the completed compact representation after applying the patch. Always propagate an update error with `?`; Solana transaction rollback is what restores the previous bytes and any rent moved earlier in the instruction.
 
 Use `invoke_signed::<Journal>(signers)` when `rent_account` is a PDA that must sign the system transfer used for growth. The patch and resize ordering stay the same.
 

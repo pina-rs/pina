@@ -55,7 +55,7 @@ UpdateResizableAccount {
 .invoke::<Journal>()?;
 ```
 
-The builder validates the complete patch and calculates the target size before changing bytes or lamports. It grows before applying a longer representation and applies a shorter representation before shrinking. It skips the resize when the allocation does not change. Use `invoke_signed::<Journal>(signers)` when `rent_account` is a PDA that funds growth.
+The builder preflights the patch's structural representation and calculates the target size before changing bytes or lamports. It grows before applying a longer representation and applies a shorter representation before shrinking. It skips the resize when the allocation does not change. With the `validation` feature, Pina checks application rules on the completed compact representation after writing the patch. Propagate every error with `?` so Solana rolls back the patch and any earlier rent movement. Use `invoke_signed::<Journal>(signers)` when `rent_account` is a PDA that funds growth.
 
 <!-- {/updateResizableAccountExample} -->
 

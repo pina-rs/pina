@@ -38,7 +38,7 @@ let target_len = Sample::updated_len(current_data, &patch)?;
 
 `Sample::MIN_SIZE` is the empty-tail allocation. `updated_len` validates the replacement against the declared capacity and calculates its encoded size.
 
-`UpdateResizableAccount` validates the patch before changing bytes or lamports. It grows before applying a longer value and applies a shorter value before shrinking. It skips reallocation when `target_len` equals the current allocation. Use `invoke_signed` when the rent account is a PDA. Use `ReallocCompactAccount` only when the caller needs lower-level allocation control or spare bytes.
+`UpdateResizableAccount` preflights the structural patch before changing bytes or lamports. It grows before applying a longer value and applies a shorter value before shrinking. It skips reallocation when `target_len` equals the current allocation. With the `validation` feature, propagate application-validation errors so Solana rolls back the patch and rent movement. Use `invoke_signed` when the rent account is a PDA. Use `ReallocCompactAccount` only when the caller needs lower-level allocation control or spare bytes.
 
 ## Security invariants
 
