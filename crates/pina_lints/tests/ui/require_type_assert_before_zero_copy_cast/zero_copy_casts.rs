@@ -62,7 +62,10 @@ fn process_instruction(data: &AccountView, bytes: &[u8]) -> Result<(), ()> {
 	let view = guard.cast_ref()?;
 	let parsed = parse_bytes::<VaultData>(bytes)?;
 	//~^ ERROR: raw zero-copy account casts bypass guard-backed account validation
+	let indirect: fn(&[u8]) -> Result<&VaultData, ()> = parse_bytes::<VaultData>;
+	let indirect_parsed = indirect(bytes)?;
 	let _ = (view.amount, parsed.amount);
+	let _ = indirect_parsed.amount;
 	Ok(())
 }
 

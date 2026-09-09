@@ -9,7 +9,7 @@ LL |     let parsed = parse_bytes::<VaultData>(bytes)?;
    = note: `#[deny(require_type_assert_before_zero_copy_cast)]` on by default
 
 error: raw zero-copy account casts bypass guard-backed account validation
-  --> $DIR/zero_copy_casts.rs:78:14
+  --> $DIR/zero_copy_casts.rs:81:14
    |
 LL |         let view = bytemuck::try_from_bytes::<VaultData>(bytes)?;
    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

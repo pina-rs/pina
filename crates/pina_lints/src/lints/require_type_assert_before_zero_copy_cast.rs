@@ -48,10 +48,11 @@ fn is_instruction_handler(cx: &LateContext<'_>, def_id: rustc_hir::def_id::Local
 		return true;
 	}
 
-	let Some(trait_item) = cx.tcx.trait_item_of(def_id) else {
-		return false;
-	};
-	let Some(trait_id) = cx.tcx.trait_of_assoc(trait_item) else {
+	let Some((trait_item, trait_id)) = cx.tcx.trait_item_of(def_id).and_then(|trait_item| {
+		cx.tcx
+			.trait_of_assoc(trait_item)
+			.map(|trait_id| (trait_item, trait_id))
+	}) else {
 		return false;
 	};
 
@@ -64,9 +65,7 @@ fn is_bytemuck_cast(call: &shared::CallInfo) -> bool {
 	let Some(def_path) = call.def_path.as_deref() else {
 		return false;
 	};
-	let Some(method) = def_path.rsplit("::").next() else {
-		return false;
-	};
+	let method = def_path.rsplit("::").next().unwrap_or(def_path);
 
 	call.def_crate.as_deref() == Some("bytemuck") && TARGET_METHODS.contains(&method)
 }
