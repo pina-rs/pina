@@ -276,7 +276,7 @@ let next_balance = balance
 	.ok_or(ProgramError::ArithmeticOverflow)?;
 ```
 
-Saturating arithmetic is rejected because silently clamping economic state can violate conservation just as surely as wrapping. Components are split at Rust identifier separators, so `vault_balance` is covered while an unrelated name such as `rebalance_attempts` is not. The naming heuristic favors clear domain names and may not recognize opaque abbreviations.
+Saturating arithmetic is rejected because silently clamping economic state can violate conservation just as surely as wrapping. The check applies to primitive integers; custom domain types own their arithmetic contract and are not given an inapplicable `checked_*` suggestion. Components are split at Rust identifier separators, so `vault_balance` is covered while an unrelated name such as `rebalance_attempts` is not. The naming heuristic favors clear domain names and may not recognize opaque abbreviations.
 
 ### `require_bounded_remaining_accounts`
 

@@ -16,6 +16,9 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
+use sha2::Digest as _;
+use sha2::Sha256;
+
 /// Environment variable pointing at an existing driver binary.
 const PINA_LINT_DRIVER_PATH: &str = "PINA_LINT_DRIVER_PATH";
 
@@ -160,20 +163,25 @@ pub fn driver_build_identity(path: &Path) -> std::io::Result<String> {
 	let file = File::open(path)?;
 	let mut reader = BufReader::new(file);
 	let mut buffer = [0u8; 16 * 1024];
-	let mut hash = 0xcbf2_9ce4_8422_2325u64;
+	let mut hash = Sha256::new();
 
 	loop {
 		let read = reader.read(&mut buffer)?;
 		if read == 0 {
 			break;
 		}
-		for byte in &buffer[..read] {
-			hash ^= u64::from(*byte);
-			hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
-		}
+		hash.update(&buffer[..read]);
 	}
 
-	Ok(format!("{hash:016x}"))
+	const HEX: &[u8; 16] = b"0123456789abcdef";
+	let digest = hash.finalize();
+	let mut identity = String::with_capacity(digest.len() * 2);
+	for byte in digest {
+		identity.push(char::from(HEX[usize::from(byte >> 4)]));
+		identity.push(char::from(HEX[usize::from(byte & 0x0f)]));
+	}
+
+	Ok(identity)
 }
 
 /// Return the `release-commit-host` fingerprint of the Rust compiler used for
@@ -413,5 +421,6 @@ mod tests {
 			first_identity,
 			driver_build_identity(second.path()).expect("fingerprint second driver")
 		);
+		assert_eq!(first_identity.len(), 64);
 	}
 }
