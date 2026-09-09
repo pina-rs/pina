@@ -513,6 +513,16 @@ fn pda_creation_target(
 	if !PDA_CREATION_BUILDERS.contains(&builder_name.as_str()) {
 		return None;
 	}
+	if ["account", "payer", "owner", "seeds"]
+		.iter()
+		.any(|required| {
+			!builder
+				.fields
+				.iter()
+				.any(|field| member_to_string(&field.member) == *required)
+		}) {
+		return None;
+	}
 
 	let account = builder
 		.fields
@@ -871,6 +881,7 @@ mod tests {
 				fn process(self, data: &[u8]) -> ProgramResult {
 					UnrelatedBuilder { account: self.first }.invoke()?;
 					CreateProgramAccount { account: self.second }.inspect()?;
+					CreateProgramAccount { account: self.third }.invoke()?;
 					Ok(())
 				}
 			}
