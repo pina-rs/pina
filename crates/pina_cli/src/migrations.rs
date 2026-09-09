@@ -151,6 +151,17 @@ pub enum MigrationError {
 	},
 
 	#[error(
+		"Migration implementation {path} differs from the recorded hash for {kind} `{name}` \
+		 version {version}. Run `pina migrations make` and review the transition."
+	)]
+	TransitionDrift {
+		kind: String,
+		name: String,
+		version: u32,
+		path: PathBuf,
+	},
+
+	#[error(
 		"Historical {kind} contract `{name}` ({identity}) is no longer present in source. \
 		 Published decoders and account migrations cannot be silently removed. Restore it or \
 		 perform an explicitly reviewed retirement."
@@ -1034,7 +1045,7 @@ fn create_transition(
 	if mode == TransitionMode::Manual {
 		output.manual_transitions.push(path.clone());
 	}
-	let implementation_sha256 = Some(hash_file(&path)?);
+	let implementation_sha256 = Some(hash_transition_file(&path)?);
 	Ok(Transition {
 		from: source.version,
 		to: destination_version,
@@ -1305,14 +1316,17 @@ fn transition_path(project: &Project, identity: &ContractIdentity, from: u32, to
 		.join(pina_abi::transition_path(identity, from, to))
 }
 
-fn hash_file(path: &Path) -> Result<String, MigrationError> {
-	let bytes = std::fs::read(path).map_err(|source| {
+fn hash_transition_file(path: &Path) -> Result<String, MigrationError> {
+	let source = std::fs::read_to_string(path).map_err(|source| {
 		MigrationError::Read {
 			path: path.to_path_buf(),
 			source,
 		}
 	})?;
-	Ok(pina_abi::sha256_bytes(bytes))
+	// Rust normalizes CRLF to LF before tokenization. Hash the same canonical
+	// source so one reviewed transition remains stable across Git checkouts.
+	let canonical = source.replace("\r\n", "\n");
+	Ok(pina_abi::sha256_bytes(canonical.as_bytes()))
 }
 
 fn verify_transition_files(
@@ -1343,15 +1357,16 @@ fn verify_transition_files(
 		{
 			return Err(MigrationError::ManualTransitionIncomplete { path });
 		}
-		let current_hash = hash_file(&path)?;
+		let current_hash = hash_transition_file(&path)?;
 		if transition.implementation_sha256.as_deref() != Some(current_hash.as_str()) {
 			if ledger.ever_published(key, version.version) {
 				return Err(MigrationError::PublishedImplementationChanged { path });
 			}
-			return Err(MigrationError::SchemaDrift {
+			return Err(MigrationError::TransitionDrift {
 				kind: history.identity.kind.to_string(),
 				name: history.rust_name.clone(),
 				version: version.version,
+				path,
 			});
 		}
 	}
@@ -1375,7 +1390,7 @@ fn refresh_draft_transition_hash(
 	if !path.is_file() {
 		return Err(MigrationError::MissingTransition { path });
 	}
-	let hash = hash_file(&path)?;
+	let hash = hash_transition_file(&path)?;
 	if transition.implementation_sha256.as_deref() == Some(hash.as_str()) {
 		return Ok(());
 	}
@@ -1532,6 +1547,23 @@ mod tests {
 			process_transition(&identity, "Transfer", Some(&source), Some(&escalated),),
 			Err(MigrationError::ProcessChanged { .. })
 		));
+	}
+
+	#[test]
+	fn transition_hash_matches_rusts_cross_platform_line_ending_normalization() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let source = temp.path().join("transition.rs");
+		std::fs::write(&source, "fn migrate() {\n\tlet value = 1;\n}\n")
+			.unwrap_or_else(|error| panic!("write LF source: {error}"));
+		let lf =
+			hash_transition_file(&source).unwrap_or_else(|error| panic!("hash LF source: {error}"));
+
+		std::fs::write(&source, "fn migrate() {\r\n\tlet value = 1;\r\n}\r\n")
+			.unwrap_or_else(|error| panic!("write CRLF source: {error}"));
+		let crlf = hash_transition_file(&source)
+			.unwrap_or_else(|error| panic!("hash CRLF source: {error}"));
+
+		assert_eq!(lf, crlf);
 	}
 
 	#[test]
