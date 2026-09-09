@@ -146,6 +146,33 @@ fn process_closure_after_acquiring_borrow(account: &mut AccountView, cpi: &Cpi) 
 	invoke()
 }
 
+fn process_block_wrapped_closure(account: &mut AccountView, cpi: &Cpi) -> Result<(), ()> {
+	let invoke = || cpi.invoke();
+	//~^ ERROR: CPI invoked while a mutable account-data borrow is still alive
+	let _guard = account.try_borrow_mut()?;
+	({ invoke })()
+}
+
+fn process_reassigned_closure(account: &mut AccountView, cpi: &Cpi) -> Result<(), ()> {
+	let invoke = || cpi.invoke();
+	//~^ ERROR: CPI invoked while a mutable account-data borrow is still alive
+	let mut selected = invoke;
+	selected()?;
+	selected = invoke;
+	let _guard = account.try_borrow_mut()?;
+	selected()
+}
+
+fn process_opaque_reassigned_closure(account: &mut AccountView, cpi: &Cpi) -> Result<(), ()> {
+	let invoke = || cpi.invoke();
+	//~^ ERROR: CPI invoked while a mutable account-data borrow is still alive
+	let mut selected = invoke;
+	selected()?;
+	selected = core::convert::identity(invoke);
+	let _guard = account.try_borrow_mut()?;
+	selected()
+}
+
 fn process_cpi_in_match_guard(account: &mut AccountView, cpi: &Cpi) -> Result<(), ()> {
 	let _guard = account.try_borrow_mut()?;
 	match () {

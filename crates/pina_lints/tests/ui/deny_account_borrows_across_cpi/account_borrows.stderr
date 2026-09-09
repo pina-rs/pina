@@ -72,7 +72,31 @@ LL |     let invoke = || cpi.invoke();
    = help: copy the required values, then call `drop(guard)` or end the borrow's scope before invoking another program
 
 error: CPI invoked while a mutable account-data borrow is still alive
-  --> $DIR/account_borrows.rs:152:8
+  --> $DIR/account_borrows.rs:150:18
+   |
+LL |     let invoke = || cpi.invoke();
+   |                     ^^^^^^^^^^^^
+   |
+   = help: copy the required values, then call `drop(guard)` or end the borrow's scope before invoking another program
+
+error: CPI invoked while a mutable account-data borrow is still alive
+  --> $DIR/account_borrows.rs:157:18
+   |
+LL |     let invoke = || cpi.invoke();
+   |                     ^^^^^^^^^^^^
+   |
+   = help: copy the required values, then call `drop(guard)` or end the borrow's scope before invoking another program
+
+error: CPI invoked while a mutable account-data borrow is still alive
+  --> $DIR/account_borrows.rs:167:18
+   |
+LL |     let invoke = || cpi.invoke();
+   |                     ^^^^^^^^^^^^
+   |
+   = help: copy the required values, then call `drop(guard)` or end the borrow's scope before invoking another program
+
+error: CPI invoked while a mutable account-data borrow is still alive
+  --> $DIR/account_borrows.rs:179:8
    |
 LL |         _ if cpi.invoke().is_ok() => Ok(()),
    |              ^^^^^^^^^^^^
@@ -80,11 +104,11 @@ LL |         _ if cpi.invoke().is_ok() => Ok(()),
    = help: copy the required values, then call `drop(guard)` or end the borrow's scope before invoking another program
 
 error: CPI invoked while a mutable account-data borrow is still alive
-  --> $DIR/account_borrows.rs:167:2
+  --> $DIR/account_borrows.rs:194:2
    |
 LL |     cpi.invoke()
    |     ^^^^^^^^^^^^
    |
    = help: copy the required values, then call `drop(guard)` or end the borrow's scope before invoking another program
 
-error: aborting due to 11 previous errors
+error: aborting due to 14 previous errors

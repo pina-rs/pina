@@ -127,11 +127,6 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			ExprKind::Path(_) => {
 				local_binding(expr).and_then(|binding| self.closures.get(&binding).copied())
 			}
-			ExprKind::Unary(_, inner)
-			| ExprKind::Use(inner, _)
-			| ExprKind::Cast(inner, _)
-			| ExprKind::Type(inner, _)
-			| ExprKind::DropTemps(inner) => self.closure_body(inner),
 			ExprKind::Block(block, _) => block.expr.and_then(|tail| self.closure_body(tail)),
 			_ => None,
 		}
@@ -272,12 +267,10 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				let closure_body = self.closure_body(right);
 				self.visit_expr(left, active);
 				self.visit_expr(right, active);
-				if let Some(binding) = local_binding(left) {
-					if let Some(body) = closure_body {
-						self.closures.insert(binding, body);
-					} else {
-						self.closures.remove(&binding);
-					}
+				if let Some(binding) = local_binding(left)
+					&& let Some(body) = closure_body
+				{
+					self.closures.insert(binding, body);
 				}
 			}
 			ExprKind::Index(base, index, _) => {
