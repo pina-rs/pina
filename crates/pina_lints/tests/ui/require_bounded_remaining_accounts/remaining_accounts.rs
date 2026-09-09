@@ -1,6 +1,9 @@
 // normalize-stderr-test: "\n$" -> ""
 
-#![allow(dead_code)]
+#![allow(dead_code, incomplete_features, unused_braces)]
+#![feature(ergonomic_clones)]
+#![feature(try_blocks)]
+#![feature(try_blocks_heterogeneous)]
 
 fn process(remaining: &[u8]) {
 	for account in remaining.iter().take(8) {
@@ -97,6 +100,54 @@ fn process_break_payload(remaining: &[u8]) {
 
 fn process_runtime_take(remaining: &[u8], limit: usize) {
 	for account in remaining.iter().take(limit) {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+}
+
+fn process_conditional_iterator(remaining: &[u8], use_first: bool) {
+	for account in if use_first {
+		remaining.iter()
+	} else {
+		remaining.iter()
+	} {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+}
+
+fn process_matched_iterator(remaining: &[u8], use_first: bool) {
+	for account in match use_first {
+		true => remaining.iter(),
+		false => remaining.iter(),
+	} {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+}
+
+fn process_block_iterator(remaining: &[u8]) {
+	for account in { remaining.iter() } {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+}
+
+fn iterator_with_marker<T, M>(iterator: T, _marker: M) -> T {
+	iterator
+}
+
+fn process_nested_iterator_expressions(remaining: &[u8]) {
+	for account in iterator_with_marker(
+		remaining.iter(),
+		(
+			(&*remaining, remaining as *const [u8]),
+			[remaining],
+			remaining.use,
+			try bikeshed Result<&[u8], ()> { remaining },
+			for _ in core::iter::empty::<()>() {},
+		),
+	) {
 		//~^ ERROR: remaining accounts are processed without an explicit bound
 		let _ = account;
 	}
@@ -426,6 +477,9 @@ struct AnalysisShapes<'a> {
 
 fn exercise_analysis_shapes(remaining: &[u8]) {
 	let mut count = 0;
+	// A temporary field has no stable expression identity, so assigning to it
+	// exercises the analysis path that leaves tracked state unchanged.
+	(0,).0 = 1;
 	count += remaining.len();
 	let _ = remaining[0];
 	let _ = (remaining, count);

@@ -513,14 +513,19 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					|| expression_has_static_bound(self.cx, right);
 				self.visit_expr(left, state);
 				self.visit_expr(right, state);
-				if let Some(identity) = self.expression_identity(left) {
-					self.invalidate(state, &identity);
-					if right_is_remaining {
-						state.remaining.insert(identity.clone());
-					}
-					if right_is_bounded {
-						state.bounded.insert(identity);
-					}
+
+				let Some(identity) = self.expression_identity(left) else {
+					return;
+				};
+
+				self.invalidate(state, &identity);
+
+				if right_is_remaining {
+					state.remaining.insert(identity.clone());
+				}
+
+				if right_is_bounded {
+					state.bounded.insert(identity);
 				}
 			}
 			ExprKind::AssignOp(_, left, right) => {
