@@ -818,7 +818,7 @@ fn run_docs(topic: Option<&str>) {
 		println!("Bundled documentation topics:");
 
 		for (name, description) in BUNDLED_DOC_TOPICS {
-			println!("  {name:<14} {description}");
+			println!("  {name:<16} {description}");
 		}
 
 		println!("\nRun `pina docs <topic>` to open a topic.");
@@ -860,7 +860,7 @@ fn run_docs(topic: Option<&str>) {
 	eprintln!("Bundled topics:");
 
 	for (name, description) in BUNDLED_DOC_TOPICS {
-		eprintln!("  {name:<14} {description}");
+		eprintln!("  {name:<16} {description}");
 	}
 
 	if !attempted_paths.is_empty() {
@@ -882,12 +882,17 @@ const BUNDLED_DOC_TOPICS: &[(&str, &str)] = &[
 		"pina-overview",
 		"framework concepts, crates, features, and workflows",
 	),
+	(
+		"pina-validation",
+		"declarative rules, manual alternatives, and code generation",
+	),
 ];
 
 fn bundled_docs(topic: &str) -> Option<&'static str> {
 	match topic {
 		"pina-idl" => Some(include_str!("../templates/pina-idl.md")),
 		"pina-overview" => Some(include_str!("../templates/pina-overview.md")),
+		"pina-validation" => Some(include_str!("../templates/pina-validation.md")),
 		_ => None,
 	}
 }

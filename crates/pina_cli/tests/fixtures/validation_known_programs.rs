@@ -10,21 +10,19 @@ pub struct ValidateProgramsInstruction {}
 
 #[derive(Accounts, Debug)]
 pub struct ValidateProgramsAccounts<'a> {
+	#[pina(validate(program = system::ID))]
 	pub system_program: &'a AccountView,
+	#[pina(validate(program = token::ID))]
 	pub token_program: &'a AccountView,
+	#[pina(validate(program = token_2022::ID))]
 	pub token_2022_program: &'a AccountView,
+	#[pina(validate(program = associated_token_account::ID))]
 	pub associated_token_program: &'a AccountView,
 }
 
 impl<'a> ProcessAccountInfos<'a> for ValidateProgramsAccounts<'a> {
 	fn process(&self, data: &[u8]) -> ProgramResult {
 		let _ = ValidateProgramsInstruction::try_from_bytes(data)?;
-		self.system_program.assert_address(&system::ID)?;
-		self.token_program.assert_address(&token::ID)?;
-		self.token_2022_program.assert_address(&token_2022::ID)?;
-		self
-			.associated_token_program
-			.assert_address(&associated_token_account::ID)?;
 		Ok(())
 	}
 }

@@ -1,0 +1,5 @@
+error: `writable` validation on `state` is redundant because its mutable AccountView type already requires writability; remove `writable` and keep the mutable field type
+ --> tests/ui/validation_rejects_redundant_writable.rs:6:2
+  |
+6 |     state: &'a mut AccountView,
+  |     ^^^^^

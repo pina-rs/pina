@@ -54,6 +54,7 @@ const EXAMPLE_PROGRAMS = [
 	"sysvar_checks_program",
 	"todo_program",
 	"transfer_sol_program",
+	"validation_program",
 	"vesting_program",
 ] as const;
 
@@ -515,6 +516,11 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 	},
 	transfer_sol_program: {
 		instruction: "cpiTransfer",
+		accounts: "none",
+		programError: "NotEnoughAccountKeys",
+	},
+	validation_program: {
+		instruction: "initializePolicy",
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
 	},

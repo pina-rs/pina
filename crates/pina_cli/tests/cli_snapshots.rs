@@ -220,12 +220,17 @@ fn docs_unknown_topic_error_snapshot() {
 
 #[test]
 fn docs_load_bundled_and_custom_topics() {
-	let bundled = Command::new(env!("CARGO_BIN_EXE_pina"))
-		.args(["docs", "pina-overview"])
-		.output()
-		.unwrap_or_else(|error| panic!("failed to load bundled docs: {error}"));
-	assert!(bundled.status.success());
-	assert!(String::from_utf8_lossy(&bundled.stdout).contains("Pina"));
+	for (topic, expected) in [
+		("pina-overview", "Pina"),
+		("pina-validation", "Pina Validation"),
+	] {
+		let bundled = Command::new(env!("CARGO_BIN_EXE_pina"))
+			.args(["docs", topic])
+			.output()
+			.unwrap_or_else(|error| panic!("failed to load bundled docs: {error}"));
+		assert!(bundled.status.success());
+		assert!(String::from_utf8_lossy(&bundled.stdout).contains(expected));
+	}
 
 	let templates = reset_snapshot_dir("custom_docs");
 	fs::write(templates.join("local.t.md"), "# Local Pina docs\n")

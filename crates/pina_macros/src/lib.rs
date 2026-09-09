@@ -3,6 +3,20 @@
 //! Expansion code is organized by macro so each generated contract can be
 //! reviewed independently. Public entry points stay here because procedural
 //! macros must be exported from the crate root.
+//!
+//! ## Macro index
+//!
+//! - [`macro@account`] defines fixed or compact account data.
+//! - [`macro@instruction`] defines instruction data.
+//! - [`macro@event`] defines event data.
+//! - [`derive@Accounts`] parses instruction accounts.
+//! - [`macro@discriminator`] defines typed discriminator enums.
+//! - [`macro@pda`] defines typed PDA seeds and loaders.
+//! - [`macro@error`] maps custom errors to Solana program errors.
+//!
+//! Enable the `validation` feature to use `#[pina(validate(...))]` with the
+//! first four macros. The generated code is allocation-free syntactic sugar
+//! over Pina's runtime validation traits; direct validation remains available.
 
 use proc_macro::TokenStream;
 
@@ -16,6 +30,7 @@ mod instruction;
 mod pda;
 mod schema;
 mod support;
+mod validation;
 
 /// Parses an account slice into a named-field struct.
 ///
@@ -25,6 +40,14 @@ mod support;
 /// `#[pina(remaining, distinct = false)]` only when duplicate addresses are an
 /// intentional part of the instruction contract, and document the safety
 /// invariant on the field.
+///
+/// With the `validation` feature, fields accept `signer`, `writable`,
+/// `executable`, `address`, `addresses`, `owner`, `owners`, `program`,
+/// `sysvar`, `empty`, `not_empty`, `data_len`, `distinct_from`, and `error`
+/// inside `#[pina(validate(...))]`. Mutable account references already enforce
+/// writability. Add `#[pina(validate(with = function))]` to the struct for a
+/// final cross-field hook. Parsing calls the generated `PinaValidate`
+/// implementation automatically.
 ///
 /// # Example
 ///
@@ -83,6 +106,14 @@ pub fn discriminator(args: TokenStream, input: TokenStream) -> TokenStream {
 /// `Vec<T, N>` fields whose active contents, rather than their full capacities,
 /// occupy account data. Compact accounts require the `compact` crate feature.
 ///
+/// With the `validation` feature, schema fields accept inclusive `min` and
+/// `max` rules for integers, plus `min_len`, `max_len`, and `exact_len` for
+/// bounded strings, vectors, and arrays. Add `error = ERROR` to override
+/// `ProgramError::InvalidAccountData`, or add `validate(with = function)` to
+/// the outer macro for a final application hook. Generated read and initialize
+/// helpers validate automatically; the zero-copy view also implements
+/// `PinaValidate` for explicit checks.
+///
 /// # Example
 ///
 /// ```ignore
@@ -134,6 +165,12 @@ pub fn pda(args: TokenStream, input: TokenStream) -> TokenStream {
 /// Generated helpers enforce exact length, discriminator, and `PinaPod` field
 /// validation at the instruction boundary.
 ///
+/// Enable `validation` for field-level `min`, `max`, `min_len`, `max_len`,
+/// `exact_len`, and `error` rules. A `validate(with = function)` macro
+/// argument adds cross-field validation. Generated helpers return
+/// `ProgramError::InvalidInstructionData` by default and call validation
+/// automatically after structural decoding.
+///
 /// # Example
 ///
 /// ```ignore
@@ -151,6 +188,11 @@ pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// Event payloads use the same checked schema and byte-view helpers as
 /// instruction payloads.
+///
+/// Enable `validation` for field-level `min`, `max`, `min_len`, `max_len`,
+/// `exact_len`, and `error` rules, plus a type-level
+/// `validate(with = function)` hook. Event views implement `PinaValidate` and
+/// generated read/initialize helpers validate automatically.
 ///
 /// # Example
 ///

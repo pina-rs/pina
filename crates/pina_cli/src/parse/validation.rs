@@ -20,16 +20,167 @@ const KNOWN_ADDRESSES: &[(&str, &str)] = &[
 		"associated_token_account::ID",
 		"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 	),
+	(
+		"instructions::ID",
+		"Sysvar1nstructions1111111111111111111111111",
+	),
+	("clock::ID", "SysvarC1ock11111111111111111111111111111111"),
+	(
+		"epoch_rewards::ID",
+		"SysvarEpochRewards1111111111111111111111111",
+	),
+	(
+		"epoch_schedule::ID",
+		"SysvarEpochSchedu1e111111111111111111111111",
+	),
+	("fees::ID", "SysvarFees111111111111111111111111111111111"),
+	(
+		"last_restart_slot::ID",
+		"SysvarLastRestartS1ot1111111111111111111111",
+	),
+	(
+		"recent_blockhashes::ID",
+		"SysvarRecentB1ockHashes11111111111111111111",
+	),
+	("rent::ID", "SysvarRent111111111111111111111111111111111"),
+	("rewards::ID", "SysvarRewards111111111111111111111111111111"),
+	(
+		"slot_hashes::ID",
+		"SysvarS1otHashes111111111111111111111111111",
+	),
+	(
+		"slot_history::ID",
+		"SysvarS1otHistory11111111111111111111111111",
+	),
+	(
+		"stake_history::ID",
+		"SysvarStakeHistory1111111111111111111111111",
+	),
 ];
 
-/// Properties inferred from validation chain analysis for a single account
-/// field.
+/// Client properties declared by annotations or inferred from a validation
+/// chain for one account field.
 #[derive(Debug, Clone, Default)]
 pub struct AccountProperties {
 	pub is_signer: bool,
 	pub is_writable: bool,
 	pub is_pda: bool,
 	pub default_value: Option<DefaultValueIr>,
+}
+
+/// Extract client-visible properties from declarative account validation.
+///
+/// Codama can represent signer, writable, and default-address metadata. Other
+/// Pina validators remain runtime-only constraints and are still parsed here
+/// so malformed source fails with a useful error instead of being ignored.
+pub fn extract_attribute_properties(
+	attributes: &[syn::Attribute],
+) -> Result<AccountProperties, syn::Error> {
+	let mut properties = AccountProperties::default();
+
+	for attribute in attributes {
+		if !attribute.path().is_ident("pina") {
+			continue;
+		}
+
+		attribute.parse_nested_meta(|meta| {
+			if meta.path.is_ident("validate") {
+				return meta.parse_nested_meta(|rule| {
+					if rule.path.is_ident("signer") {
+						properties.is_signer = true;
+						return Ok(());
+					}
+					if rule.path.is_ident("writable") {
+						properties.is_writable = true;
+						return Ok(());
+					}
+					if rule.path.is_ident("executable")
+						|| rule.path.is_ident("empty")
+						|| rule.path.is_ident("not_empty")
+					{
+						return Ok(());
+					}
+
+					let is_default_address = rule.path.is_ident("address")
+						|| rule.path.is_ident("program")
+						|| rule.path.is_ident("sysvar");
+					if is_default_address
+						|| rule.path.is_ident("addresses")
+						|| rule.path.is_ident("owner")
+						|| rule.path.is_ident("owners")
+						|| rule.path.is_ident("data_len")
+						|| rule.path.is_ident("distinct_from")
+						|| rule.path.is_ident("error")
+					{
+						let value: Expr = rule.value()?.parse()?;
+						if is_default_address && let Some(address) = known_address_from_expr(&value)
+						{
+							properties.default_value = Some(DefaultValueIr::PublicKey(address));
+						}
+						return Ok(());
+					}
+
+					Err(rule.error(
+						"unknown account validation rule; expected `signer`, `writable`, \
+						 `executable`, `address`, `addresses`, `owner`, `owners`, `program`, \
+						 `sysvar`, `empty`, `not_empty`, `data_len`, `distinct_from`, or `error`",
+					))
+				});
+			}
+
+			if meta.path.is_ident("remaining") {
+				return Ok(());
+			}
+			if meta.path.is_ident("distinct") {
+				if meta.input.peek(syn::Token![=]) {
+					let _: Expr = meta.value()?.parse()?;
+				}
+				return Ok(());
+			}
+
+			Err(meta.error(
+				"unknown `#[pina]` account-field option; expected `validate(...)`, `remaining`, \
+				 or `distinct`",
+			))
+		})?;
+	}
+
+	Ok(properties)
+}
+
+/// Extract declarative properties without adding parser state to the public
+/// `AccountsField` model.
+pub(crate) fn extract_declared_validation_properties(
+	file: &syn::File,
+) -> Result<HashMap<String, HashMap<String, AccountProperties>>, syn::Error> {
+	let mut result = HashMap::new();
+
+	for item in &file.items {
+		let Item::Struct(item_struct) = item else {
+			continue;
+		};
+		if !super::accounts_struct::has_accounts_derive(&item_struct.attrs) {
+			continue;
+		}
+		let syn::Fields::Named(fields) = &item_struct.fields else {
+			continue;
+		};
+
+		let mut field_properties = HashMap::new();
+		for field in &fields.named {
+			let name = field
+				.ident
+				.as_ref()
+				.expect("named fields always have identifiers");
+			field_properties.insert(
+				name.to_string(),
+				extract_attribute_properties(&field.attrs)?,
+			);
+		}
+		result.insert(item_struct.ident.to_string(), field_properties);
+	}
+
+	Ok(result)
 }
 
 /// Analyse all `impl ProcessAccountInfos for X` blocks in a file and return a
@@ -395,7 +546,12 @@ fn first_arg_to_known_address(
 	args: &syn::punctuated::Punctuated<Expr, syn::Token![,]>,
 ) -> Option<String> {
 	let first = args.first()?;
-	let path_str = expr_to_path_string(first)?;
+	known_address_from_expr(first)
+}
+
+/// Resolve a known Solana program or sysvar path to its base58 address.
+fn known_address_from_expr(expression: &Expr) -> Option<String> {
+	let path_str = expr_to_path_string(expression)?;
 	for &(known_path, known_addr) in KNOWN_ADDRESSES {
 		if path_str.contains(known_path) {
 			return Some(known_addr.to_owned());
@@ -451,6 +607,66 @@ fn type_to_name(ty: &syn::Type) -> String {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[test]
+	fn extracts_declarative_account_properties_privately() {
+		let source = r#"
+			enum NotAnAccount { Value }
+			struct PlainStruct { value: u8 }
+			#[derive(Accounts)]
+			struct TupleAccounts(&'static AccountView);
+			#[derive(Accounts)]
+			struct ValidateAccounts<'a> {
+				#[pina(validate(signer, writable, executable, empty, not_empty))]
+				authority: &'a AccountView,
+				#[pina(validate(program = system::ID))]
+				system_program: &'a AccountView,
+				#[pina(validate(sysvar = sysvars::clock::ID))]
+				clock: &'a AccountView,
+				#[pina(remaining)]
+				remaining: &'a [AccountView],
+				#[pina(distinct)]
+				payer: &'a AccountView,
+				#[pina(distinct = authority)]
+				recipient: &'a AccountView,
+			}
+		"#;
+		let file = syn::parse_file(source).expect("valid Rust");
+		let all = extract_declared_validation_properties(&file)
+			.expect("supported declarative validation");
+		let fields = &all["ValidateAccounts"];
+
+		assert!(fields["authority"].is_signer);
+		assert!(fields["authority"].is_writable);
+		assert!(matches!(
+			&fields["system_program"].default_value,
+			Some(DefaultValueIr::PublicKey(address))
+				if address == "11111111111111111111111111111111"
+		));
+		assert!(matches!(
+			&fields["clock"].default_value,
+			Some(DefaultValueIr::PublicKey(address))
+				if address == "SysvarC1ock11111111111111111111111111111111"
+		));
+		assert!(!all.contains_key("TupleAccounts"));
+		assert!(!all.contains_key("PlainStruct"));
+	}
+
+	#[test]
+	fn rejects_unknown_declarative_account_option() {
+		let field: syn::Field = syn::parse_quote! {
+			#[pina(validte(signer))]
+			authority: &'static AccountView
+		};
+		let error = extract_attribute_properties(&field.attrs)
+			.expect_err("an unknown outer helper option must fail");
+		let message = error.to_string();
+
+		assert!(message.contains("unknown `#[pina]` account-field option"));
+		assert!(message.contains("`validate(...)`"));
+		assert!(message.contains("`remaining`"));
+		assert!(message.contains("`distinct`"));
+	}
 
 	#[test]
 	fn extracts_signer_and_writable() {

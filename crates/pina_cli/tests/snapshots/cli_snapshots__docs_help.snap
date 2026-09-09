@@ -27,6 +27,7 @@ Examples:
   pina docs
   pina docs pina-overview
   pina docs pina-idl
+  pina docs pina-validation
   PINA_TEMPLATES_DIR=./templates pina docs team-conventions
 
 ----- stderr -----

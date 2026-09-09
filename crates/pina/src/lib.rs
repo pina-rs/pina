@@ -16,6 +16,9 @@
 //!   identification.
 //! - **Validation chaining** — chain assertions on `AccountView` references
 //!   (e.g. `account.assert_signer()?.assert_writable()?.assert_owner(&id)?`).
+//! - **Declarative validation** *(optional)* — generate allocation-free
+//!   `PinaValidate` implementations for accounts, instructions, events, and
+//!   instruction account lists.
 //! - **Proc-macro sugar** — `#[account]`, `#[instruction]`, `#[event]`,
 //!   `#[error]`, `#[discriminator]`, and `#[derive(Accounts)]` reduce
 //!   boilerplate.
@@ -27,6 +30,8 @@
 //! - `derive` *(default)* — enables the `pina_macros` proc-macro crate.
 //! - `compact` — enables compact account schemas, checked loaders, and typed
 //!   account APIs. This also enables `derive`.
+//! - `validation` — enables `PinaValidate` and declarative
+//!   `#[pina(validate(...))]` rules. This also enables `derive`.
 //! - `token` — enables SPL token / token-2022 helpers and associated token
 //!   account utilities.
 //! - `memo` — enables memo program helpers.

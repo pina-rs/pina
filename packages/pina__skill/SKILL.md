@@ -42,7 +42,7 @@ Read [references/program-authoring.md](references/program-authoring.md) before c
 ## Task routing
 
 - Project creation, dependency features, entrypoint wiring, or workspace layout: read [references/project-setup.md](references/project-setup.md).
-- Accounts, instructions, discriminators, PDAs, validation, CPI, resize, or close behavior: read [references/program-authoring.md](references/program-authoring.md).
+- Accounts, instructions, discriminators, PDAs, declarative `#[pina(validate(...))]` rules, manual validation, CPI, resize, or close behavior: read [references/program-authoring.md](references/program-authoring.md).
 - CLI discovery, project diagnostics, program keys, IDL extraction, Codama client generation, terminal docs, completions, or profiling: read [references/cli-and-codegen.md](references/cli-and-codegen.md).
 - Unit, Mollusk, SBF, generated-artifact, or release checks: read [references/testing.md](references/testing.md).
 

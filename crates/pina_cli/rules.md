@@ -40,8 +40,8 @@ The extractor currently supports these dispatch shapes:
 Keep in mind:
 
 - Account metadata is only inferred for routed `Accounts::try_from((program_id, accounts))` arms.
-- Signer/PDA/default-account inference still depends on direct `self.field.assert_*()` chains inside `impl ProcessAccountInfos`. A field inferred as a PDA must resolve to a declared `#[pda]`; generation fails instead of emitting an incomplete link.
-- Writable inference comes from either direct `assert_writable()` chains or mutable `#[derive(Accounts)]` fields such as `&'a mut AccountView`.
+- Signer, writable, and known default-account metadata can be declared with `#[pina(validate(...))]` on `#[derive(Accounts)]` fields. PDA inference still depends on direct validation calls and a field inferred as a PDA must resolve to a declared `#[pda]`; generation fails instead of emitting an incomplete link.
+- Existing direct `assert_signer()`, `assert_writable()`, `assert_address()`, and PDA validation-chain inference remains supported. Writable inference also comes from mutable fields such as `&'a mut AccountView`.
 - If you hide routing or validation behind helper layers, instruction nodes may still exist, but account metadata becomes less complete.
 - Multiple files containing `process_instruction`, malformed or unresolved `#[pda]` attributes, missing package names, and missing unconditional modules are rejected as ambiguous or incomplete inputs.
 
@@ -273,6 +273,24 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 	}
 }
 ```
+
+The equivalent client-visible constraints can be declared next to the fields:
+
+```rust
+#[derive(Accounts)]
+pub struct InitializeAccounts<'a> {
+	#[pina(validate(signer))]
+	pub authority: &'a AccountView,
+
+	#[pina(validate(writable))]
+	pub state: &'a AccountView,
+
+	#[pina(validate(program = system::ID))]
+	pub system_program: &'a AccountView,
+}
+```
+
+Value bounds, owners, data lengths, relationships, and custom hooks remain runtime-only because Codama does not represent them as instruction account metadata.
 
 ### PDA seed helpers
 

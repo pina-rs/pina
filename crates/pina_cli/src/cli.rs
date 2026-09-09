@@ -250,7 +250,8 @@ pub(crate) enum Commands {
 	/// to a directory containing `<topic>.t.md` files to override or add topics.
 	#[command(
 		after_help = "Examples:\n  pina docs\n  pina docs pina-overview\n  pina docs pina-idl\n  \
-		              PINA_TEMPLATES_DIR=./templates pina docs team-conventions"
+		              pina docs pina-validation\n  PINA_TEMPLATES_DIR=./templates pina docs \
+		              team-conventions"
 	)]
 	Docs {
 		/// Topic to render. Omit to list bundled topics.

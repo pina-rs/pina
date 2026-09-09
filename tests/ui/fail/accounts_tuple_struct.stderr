@@ -1,4 +1,4 @@
-error: Unsupported shape `one unnamed field`. Expected named fields.
+error: could not parse the `#[derive(Accounts)]` input: Unsupported shape `one unnamed field`. Expected named fields. Struct options are `crate = path` and `validate(with = function)`. Field options are `remaining`, `distinct`, and `validate(...)`; account validation rules are `signer`, `writable`, `executable`, `address`, `addresses`, `owner`, `owners`, `program`, `sysvar`, `empty`, `not_empty`, `data_len`, `distinct_from`, and `error`
  --> tests/ui/fail/accounts_tuple_struct.rs:3:10
   |
 3 | #[derive(Accounts)]

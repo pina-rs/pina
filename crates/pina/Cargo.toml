@@ -21,6 +21,7 @@ memo = ["dep:pinocchio-memo"]
 account-resize = ["pinocchio/account-resize", "pinocchio-system/account-resize"]
 derive = ["dep:pina_macros"]
 compact = ["derive", "pina_macros/compact"]
+validation = ["derive", "pina_macros/validation"]
 
 [dependencies]
 pastey = { workspace = true, default-features = true }
