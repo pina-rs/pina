@@ -47,36 +47,12 @@ function resolveArtifact(
 	workspaceRoot: string,
 	artifactName: string,
 ): string | undefined {
-	const targetRoots = new Set([
-		process.env.CARGO_TARGET_DIR,
-		join(workspaceRoot, "target"),
-	]);
-
-	for (
-		const targetRoot of [...targetRoots].filter((value) => value !== undefined)
-	) {
-		for (
-			const candidate of [
-				join(targetRoot, "deploy", `${artifactName}.so`),
-				join(
-					targetRoot,
-					"sbpf-solana-solana",
-					"release",
-					`${artifactName}.so`,
-				),
-				join(
-					targetRoot,
-					"bpfel-unknown-none",
-					"release",
-					`${artifactName}.so`,
-				),
-			]
-		) {
-			if (existsSync(candidate)) {
-				return candidate;
-			}
+	for (const candidate of artifactCandidates(workspaceRoot, artifactName)) {
+		if (existsSync(candidate)) {
+			return candidate;
 		}
 	}
+
 	return undefined;
 }
 
@@ -87,6 +63,27 @@ function artifactSearchRoots(workspaceRoot: string): string[] {
 			join(workspaceRoot, "target"),
 		]),
 	].filter((value): value is string => value !== undefined);
+}
+
+function artifactCandidates(
+	workspaceRoot: string,
+	artifactName: string,
+): string[] {
+	return artifactSearchRoots(workspaceRoot).flatMap((targetRoot) => [
+		join(targetRoot, "deploy", `${artifactName}.so`),
+		join(
+			targetRoot,
+			"sbpf-solana-solana",
+			"release",
+			`${artifactName}.so`,
+		),
+		join(
+			targetRoot,
+			"bpfel-unknown-none",
+			"release",
+			`${artifactName}.so`,
+		),
+	]);
 }
 
 function sha256(path: string): string {
@@ -167,10 +164,14 @@ function main(): number {
 		for (const program of programs) {
 			rmSync(join(outputDirectory, `${program.name}.json`), { force: true });
 			rmSync(join(outputDirectory, `${program.name}.so`), { force: true });
-			for (const targetRoot of artifactSearchRoots(workspaceRoot)) {
-				rmSync(join(targetRoot, "deploy", `${program.artifactName}.so`), {
-					force: true,
-				});
+
+			for (
+				const artifact of artifactCandidates(
+					workspaceRoot,
+					program.artifactName,
+				)
+			) {
+				rmSync(artifact, { force: true });
 			}
 		}
 		process.stdout.write(

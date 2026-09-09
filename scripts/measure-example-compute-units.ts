@@ -93,6 +93,7 @@ function attachTestPackages(
 	metadata: CargoMetadata,
 	workspace: string,
 	programs: ExampleProgram[],
+	unavailablePrograms: Set<string>,
 ): MeasuredProgram[] {
 	const packagesByManifest = new Map(
 		metadata.packages.map((package_) => [
@@ -113,7 +114,8 @@ function attachTestPackages(
 		const testPackage = packagesByManifest.get(testManifest);
 
 		if (testPackage === undefined) {
-			throw new Error(`${program.name} has no Surfpool test package`);
+			unavailablePrograms.add(program.name);
+			continue;
 		}
 
 		measuredPrograms.push({
@@ -240,13 +242,14 @@ async function main(): Promise<number> {
 	const elfDirectory = resolve(elfArgument);
 	const outputFile = resolve(outputArgument);
 	const inventory = loadExampleInventory(harnessWorkspace);
+	const unavailablePrograms = new Set<string>();
 	const programs = attachTestPackages(
 		inventory.metadata,
 		harnessWorkspace,
 		inventory.programs,
+		unavailablePrograms,
 	);
 	const testFailures: string[] = [];
-	const unavailablePrograms = new Set<string>();
 	const instructionNamesByProgram = new Map<string, Map<number, string>>();
 	mkdirSync(dirname(outputFile), { recursive: true });
 
