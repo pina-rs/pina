@@ -797,10 +797,7 @@ fn run_deploy(
 				std::process::exit(1);
 			}
 		};
-	if let Err(error) = plan.verify_inputs_unchanged() {
-		eprintln!("{} {}", "Error".red().bold(), error);
-		std::process::exit(1);
-	}
+	unwrap_or_exit(plan.verify_inputs_unchanged());
 
 	let pending_publication = if plan.is_local() {
 		None
@@ -847,24 +844,24 @@ fn run_deploy(
 			);
 			std::process::exit(1);
 		}
-		if let Err(error) = pina_cli::migrations::record_publication(
-			Path::new(plan.project_root()),
-			plan.cluster(),
-			plan.rpc_url(),
-			plan.program_id(),
-			Path::new(plan.program()),
-			plan.program_digest(),
-		) {
-			eprintln!(
-				"{} Deployment succeeded, but migration publication could not be recorded: {}",
-				"Error".red().bold(),
-				error
-			);
-			std::process::exit(1);
-		}
+		unwrap_or_exit(
+			pina_cli::migrations::record_publication(
+				Path::new(plan.project_root()),
+				plan.cluster(),
+				plan.rpc_url(),
+				plan.program_id(),
+				Path::new(plan.program()),
+				plan.program_digest(),
+			)
+			.map_err(publication_record_error),
+		);
 	}
 
 	println!("{} Deployment complete", "✔".green());
+}
+
+fn publication_record_error(error: impl std::fmt::Display) -> String {
+	format!("Deployment succeeded, but migration publication could not be recorded: {error}")
 }
 
 struct StdinDeploymentConfirmer;
@@ -1109,6 +1106,7 @@ mod tests {
 	use super::escaped_path;
 	use super::escaped_text;
 	use super::prepare_and_confirm_record;
+	use super::publication_record_error;
 
 	#[test]
 	fn escapes_control_characters_in_confirmation_paths() {
@@ -1125,6 +1123,11 @@ mod tests {
 		assert_eq!(
 			display_features(&["logs".to_owned(), "trace".to_owned()]),
 			"logs,trace"
+		);
+		assert_eq!(
+			publication_record_error("ledger became unreadable"),
+			"Deployment succeeded, but migration publication could not be recorded: ledger became \
+			 unreadable"
 		);
 	}
 

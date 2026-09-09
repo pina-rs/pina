@@ -76,10 +76,7 @@ pub(crate) fn render_constant_discriminator(
 
 	let mut bytes = Vec::new();
 	for (offset, part) in parts {
-		let offset = usize::try_from(offset).map_err(|_| {
-			unsupported_discriminator(context, "discriminator offset exceeds usize".to_string())
-		})?;
-		if offset != bytes.len() {
+		if offset != bytes.len() as u64 {
 			return Err(unsupported_discriminator(
 				context,
 				format!(

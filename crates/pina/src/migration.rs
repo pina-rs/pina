@@ -575,6 +575,17 @@ mod executor {
 		}
 	}
 
+	fn continue_or_abort<T>(
+		result: Result<T, ProgramError>,
+		mutation_started: bool,
+	) -> Result<T, ProgramError> {
+		match (result, mutation_started) {
+			(Ok(value), _) => Ok(value),
+			(Err(error), false) => Err(error),
+			(Err(error), true) => abort_after_mutation(error),
+		}
+	}
+
 	#[allow(
 		clippy::trivially_copy_pass_by_ref,
 		reason = "validation consistently receives borrowed account handles"
@@ -683,7 +694,7 @@ mod executor {
 
 			let current = T::CURRENT_VERSION;
 			let total_steps = current.into_u32().saturating_sub(stored.into_u32());
-			if total_steps == 0 || total_steps > u32::from(T::MAX_INLINE_STEPS) {
+			if total_steps > u32::from(T::MAX_INLINE_STEPS) {
 				return Err(PinaProgramError::MigrationUnavailable.into());
 			}
 
@@ -702,36 +713,22 @@ mod executor {
 
 			while from < current.into_u32() {
 				let plan = {
-					let data = match self.account.try_borrow() {
-						Ok(data) => data,
-						Err(error) if mutation_started => abort_after_mutation(error),
-						Err(error) => return Err(error),
-					};
-					match T::plan_migration(&data) {
-						Ok(plan) => plan,
-						Err(error) if mutation_started => abort_after_mutation(error),
-						Err(error) => return Err(error),
-					}
+					let data = continue_or_abort(self.account.try_borrow(), mutation_started)?;
+					continue_or_abort(T::plan_migration(&data), mutation_started)?
 				};
 
-				let to = match from.checked_add(1) {
-					Some(to) => to,
-					None if mutation_started => {
-						abort_after_mutation(PinaProgramError::InvalidMigrationVersion.into())
-					}
-					None => return Err(PinaProgramError::InvalidMigrationVersion.into()),
-				};
+				// `from < current <= u32::MAX`, so this addition cannot overflow.
+				let to = from + 1;
 				if plan.from_version() != from
 					|| plan.to_version() != to
 					|| plan.steps() != 1
 					|| plan.target_size() < T::MIGRATION_HEADER_SIZE
 					|| plan.working_size() < plan.target_size()
 				{
-					let error = PinaProgramError::MigrationUnavailable.into();
-					if mutation_started {
-						abort_after_mutation(error);
-					}
-					return Err(error);
+					return continue_or_abort(
+						Err(PinaProgramError::MigrationUnavailable.into()),
+						mutation_started,
+					);
 				}
 
 				let current_size = self.account.data_len();
@@ -742,89 +739,65 @@ mod executor {
 					.checked_sub(original_size)
 					.is_some_and(|growth| growth > MAX_PERMITTED_DATA_INCREASE)
 				{
-					let error = PinaProgramError::MigrationBudgetExceeded.into();
-					if mutation_started {
-						abort_after_mutation(error);
-					}
-					return Err(error);
+					return continue_or_abort(
+						Err(PinaProgramError::MigrationBudgetExceeded.into()),
+						mutation_started,
+					);
 				}
 
 				let funding = if working_size > current_size {
 					let rent = match rent {
 						Some(rent) => rent,
-						None => {
-							match Rent::get() {
-								Ok(rent) => rent,
-								Err(error) if mutation_started => abort_after_mutation(error),
-								Err(error) => return Err(error),
-							}
-						}
+						None => continue_or_abort(Rent::get(), mutation_started)?,
 					};
-					let target_minimum = match rent.try_minimum_balance(working_size) {
-						Ok(minimum) => minimum,
-						Err(error) if mutation_started => abort_after_mutation(error),
-						Err(error) => return Err(error),
-					};
+					let target_minimum = continue_or_abort(
+						rent.try_minimum_balance(working_size),
+						mutation_started,
+					)?;
 					target_minimum.saturating_sub(self.account.lamports())
 				} else {
 					0
 				};
 				let next_transferred = transferred.checked_add(funding);
 				if next_transferred.is_none_or(|total| total > self.max_lamports) {
-					let error = PinaProgramError::MigrationBudgetExceeded.into();
-					if mutation_started {
-						abort_after_mutation(error);
-					}
-					return Err(error);
+					return continue_or_abort(
+						Err(PinaProgramError::MigrationBudgetExceeded.into()),
+						mutation_started,
+					);
 				}
 
 				if funding > 0 {
-					let payer = match self.payer {
-						Some(payer) => payer,
-						None if mutation_started => {
-							abort_after_mutation(PinaProgramError::MigrationRequired.into())
-						}
-						None => return Err(PinaProgramError::MigrationRequired.into()),
-					};
-					if let Err(error) =
-						validate_funding_payer(payer, self.account, !signers.is_empty())
-					{
-						if mutation_started {
-							abort_after_mutation(error);
-						}
-						return Err(error);
-					}
+					let payer = continue_or_abort(
+						self.payer
+							.ok_or_else(|| PinaProgramError::MigrationRequired.into()),
+						mutation_started,
+					)?;
+					continue_or_abort(
+						validate_funding_payer(payer, self.account, !signers.is_empty()),
+						mutation_started,
+					)?;
 
-					let result = SystemTransfer {
-						from: payer,
-						to: self.account,
-						lamports: funding,
-					}
-					.invoke_signed(signers);
-					match result {
-						Ok(()) => {
-							transferred = next_transferred.unwrap_or(u64::MAX);
-							mutation_started = true;
+					continue_or_abort(
+						SystemTransfer {
+							from: payer,
+							to: self.account,
+							lamports: funding,
 						}
-						Err(error) if mutation_started => abort_after_mutation(error),
-						Err(error) => return Err(error),
-					}
+						.invoke_signed(signers),
+						mutation_started,
+					)?;
+					transferred = next_transferred.unwrap_or(u64::MAX);
+					mutation_started = true;
 				}
 
 				if working_size > current_size {
-					match self.account.resize(working_size) {
-						Ok(()) => mutation_started = true,
-						Err(error) if mutation_started => abort_after_mutation(error),
-						Err(error) => return Err(error),
-					}
+					continue_or_abort(self.account.resize(working_size), mutation_started)?;
+					mutation_started = true;
 				}
 
 				{
-					let mut data = match self.account.try_borrow_mut() {
-						Ok(data) => data,
-						Err(error) if mutation_started => abort_after_mutation(error),
-						Err(error) => return Err(error),
-					};
+					let mut data =
+						continue_or_abort(self.account.try_borrow_mut(), mutation_started)?;
 					T::apply_migration(plan.into_payload(), &mut data);
 					mutation_started = true;
 				}
@@ -842,9 +815,8 @@ mod executor {
 				}
 
 				from = to;
-				completed_steps = completed_steps.checked_add(1).unwrap_or_else(|| {
-					abort_after_mutation(PinaProgramError::MigrationBudgetExceeded.into())
-				});
+				// The preflight caps total steps to `MAX_INLINE_STEPS: u16`.
+				completed_steps += 1;
 			}
 
 			{
@@ -1125,6 +1097,22 @@ mod tests {
 		assert_eq!(workspace, [0xaa; 4]);
 	}
 
+	#[test]
+	fn event_projection_rejects_wrong_future_and_underfunded_inputs() {
+		for rejected in [&[8, 0, 42][..], &[7, 2, 42, 99][..]] {
+			let mut workspace = [0xaa; 4];
+			assert!(
+				normalize_event_data::<VersionedInstruction>(rejected, &mut workspace).is_err()
+			);
+		}
+
+		let mut workspace = [0xaa; 3];
+		assert_eq!(
+			normalize_event_data::<VersionedInstruction>(&[7, 0, 42], &mut workspace),
+			Err(PinaProgramError::MigrationBudgetExceeded.into())
+		);
+	}
+
 	#[cfg(feature = "account-resize")]
 	#[repr(C)]
 	struct TestAccount<const N: usize> {
@@ -1389,6 +1377,79 @@ mod tests {
 	}
 
 	#[cfg(feature = "account-resize")]
+	struct StepBudgetAccount;
+
+	#[cfg(feature = "account-resize")]
+	impl HasDiscriminator for StepBudgetAccount {
+		type Type = u8;
+
+		const VALUE: Self::Type = 11;
+	}
+
+	#[cfg(feature = "account-resize")]
+	impl HasMigrationVersion for StepBudgetAccount {
+		type Version = u8;
+
+		const CURRENT_VERSION: Self::Version = 2;
+	}
+
+	#[cfg(feature = "account-resize")]
+	impl MigratableAccount for StepBudgetAccount {
+		type Plan = u32;
+
+		const MAX_INLINE_STEPS: u16 = 1;
+
+		fn plan_migration(data: &[u8]) -> Result<AccountMigrationPlan<Self::Plan>, ProgramError> {
+			TwoStepAccount::plan_migration(data)
+		}
+
+		fn apply_migration(plan: Self::Plan, destination: &mut [u8]) {
+			TwoStepAccount::apply_migration(plan, destination);
+		}
+
+		fn validate_migration_destination(version: u32, data: &[u8]) -> ProgramResult {
+			TwoStepAccount::validate_migration_destination(version, data)
+		}
+	}
+
+	#[cfg(feature = "account-resize")]
+	struct PlannerFailureAfterMutation;
+
+	#[cfg(feature = "account-resize")]
+	impl HasDiscriminator for PlannerFailureAfterMutation {
+		type Type = u8;
+
+		const VALUE: Self::Type = 12;
+	}
+
+	#[cfg(feature = "account-resize")]
+	impl HasMigrationVersion for PlannerFailureAfterMutation {
+		type Version = u8;
+
+		const CURRENT_VERSION: Self::Version = 2;
+	}
+
+	#[cfg(feature = "account-resize")]
+	impl MigratableAccount for PlannerFailureAfterMutation {
+		type Plan = ();
+
+		const MAX_INLINE_STEPS: u16 = 2;
+
+		fn plan_migration(data: &[u8]) -> Result<AccountMigrationPlan<Self::Plan>, ProgramError> {
+			match data {
+				[Self::VALUE, 0, 5] => AccountMigrationPlan::try_new(0, 1, 3, 1, ()),
+				_ => Err(ProgramError::InvalidAccountData),
+			}
+		}
+
+		fn apply_migration((): Self::Plan, _: &mut [u8]) {}
+
+		fn validate_migration_destination(_: u32, _: &[u8]) -> ProgramResult {
+			Ok(())
+		}
+	}
+
+	#[cfg(feature = "account-resize")]
 	fn test_rent() -> Rent {
 		Rent::from_bytes(&1_u64.to_le_bytes())
 			.unwrap_or_else(|error| panic!("create test rent: {error:?}"))
@@ -1561,6 +1622,156 @@ mod tests {
 
 	#[cfg(feature = "account-resize")]
 	#[test]
+	fn public_executor_entrypoints_return_already_current_without_syscalls() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored = TestAccount::<8>::new(
+			Address::new_from_array([1; 32]),
+			owner,
+			1_000,
+			&[7, 1, 42, 99],
+		);
+		let mut account = stored.view();
+		let mut migration = MigrateAccount {
+			account: &mut account,
+			payer: None,
+			program_id: &owner,
+			max_lamports: 0,
+		};
+		assert_eq!(
+			migration.invoke::<GrowingAccount>(),
+			Ok(AccountMigrationOutcome::AlreadyCurrent { version: 1 })
+		);
+		assert_eq!(
+			migration.invoke_signed::<GrowingAccount>(&[]),
+			Ok(AccountMigrationOutcome::AlreadyCurrent { version: 1 })
+		);
+		assert_eq!(
+			VersionedInstruction::validate_current_instruction(&[7, 1, 42, 13]),
+			Err(ProgramError::InvalidInstructionData)
+		);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn public_executor_propagates_unavailable_rent_before_mutation() {
+		let owner = Address::new_from_array([9; 32]);
+		let original = [7, 0, 42];
+		let mut stored =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 0, &original);
+		let mut account = stored.view();
+		let result = MigrateAccount {
+			account: &mut account,
+			payer: None,
+			program_id: &owner,
+			max_lamports: u64::MAX,
+		}
+		.invoke::<GrowingAccount>();
+
+		assert_eq!(result, Err(ProgramError::UnsupportedSysvar));
+		assert_eq!(&*account.try_borrow().unwrap(), &original);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn executor_funds_growth_only_from_a_valid_explicit_payer() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored_account =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 0, &[7, 0, 42]);
+		let mut stored_payer =
+			TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1_000, &[]);
+		let mut account = stored_account.view();
+		let payer = stored_payer.view();
+		let outcome = MigrateAccount {
+			account: &mut account,
+			payer: Some(&payer),
+			program_id: &owner,
+			max_lamports: u64::MAX,
+		}
+		.invoke_with_rent::<GrowingAccount>(test_rent())
+		.unwrap_or_else(|error| panic!("funded migration: {error:?}"));
+
+		assert!(matches!(
+			outcome,
+			AccountMigrationOutcome::Migrated {
+				from: 0,
+				to: 1,
+				steps: 1
+			}
+		));
+		assert_eq!(&*account.try_borrow().unwrap(), &[7, 1, 42, 99]);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn executor_rejects_invalid_or_borrowed_payers_before_account_mutation() {
+		let owner = Address::new_from_array([9; 32]);
+		let original = [7, 0, 42];
+		let mut stored_account =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 0, &original);
+		let mut stored_readonly_payer =
+			TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1_000, &[]);
+		stored_readonly_payer.header.is_writable = 0;
+		let mut account = stored_account.view();
+		let readonly_payer = stored_readonly_payer.view();
+		assert_eq!(
+			MigrateAccount {
+				account: &mut account,
+				payer: Some(&readonly_payer),
+				program_id: &owner,
+				max_lamports: u64::MAX,
+			}
+			.invoke_with_rent::<GrowingAccount>(test_rent()),
+			Err(ProgramError::InvalidAccountData)
+		);
+		assert_eq!(&*account.try_borrow().unwrap(), &original);
+
+		let mut stored_account =
+			TestAccount::<8>::new(Address::new_from_array([3; 32]), owner, 0, &original);
+		let mut stored_borrowed_payer =
+			TestAccount::<1>::new(Address::new_from_array([4; 32]), owner, 1_000, &[0]);
+		let mut account = stored_account.view();
+		let borrowed_payer = stored_borrowed_payer.view();
+		let payer_guard = borrowed_payer
+			.try_borrow()
+			.unwrap_or_else(|error| panic!("borrow payer: {error:?}"));
+		assert_eq!(
+			MigrateAccount {
+				account: &mut account,
+				payer: Some(&borrowed_payer),
+				program_id: &owner,
+				max_lamports: u64::MAX,
+			}
+			.invoke_with_rent::<GrowingAccount>(test_rent()),
+			Err(ProgramError::AccountBorrowFailed)
+		);
+		drop(payer_guard);
+		assert_eq!(&*account.try_borrow().unwrap(), &original);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn invalid_rent_is_rejected_before_account_or_payer_mutation() {
+		let owner = Address::new_from_array([9; 32]);
+		let original = [7, 0, 42];
+		let mut stored =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 0, &original);
+		let mut account = stored.view();
+		let rent = Rent::from_bytes(&u64::MAX.to_le_bytes())
+			.unwrap_or_else(|error| panic!("construct invalid rent: {error:?}"));
+		let result = MigrateAccount {
+			account: &mut account,
+			payer: None,
+			program_id: &owner,
+			max_lamports: u64::MAX,
+		}
+		.invoke_with_rent::<GrowingAccount>(rent);
+
+		assert_eq!(result, Err(ProgramError::InvalidArgument));
+		assert_eq!(&*account.try_borrow().unwrap(), &original);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
 	fn executor_rejects_untrusted_account_boundaries_before_mutation() {
 		let program_id = Address::new_from_array([9; 32]);
 
@@ -1649,50 +1860,127 @@ mod tests {
 			));
 			assert_eq!(&*account.try_borrow().unwrap(), &source);
 		}
+
+		let mut stored =
+			TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 1_000, &[11, 0, 5]);
+		let mut account = stored.view();
+		assert_eq!(
+			MigrateAccount {
+				account: &mut account,
+				payer: None,
+				program_id: &owner,
+				max_lamports: u64::MAX,
+			}
+			.invoke_with_rent::<StepBudgetAccount>(test_rent()),
+			Err(PinaProgramError::MigrationUnavailable.into())
+		);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn adversarial_fixture_contracts_reject_every_unmodeled_shape() {
+		assert_eq!(
+			ShrinkingAccount::plan_migration(&[8, 0, 1]),
+			Err(ProgramError::InvalidAccountData)
+		);
+		assert_eq!(
+			ShrinkingAccount::validate_migration_destination(1, &[8, 1]),
+			Err(ProgramError::InvalidAccountData)
+		);
+		assert_eq!(
+			AdversarialPlanAccount::plan_migration(&[9, 0, 3]),
+			Err(ProgramError::InvalidAccountData)
+		);
+		AdversarialPlanAccount::apply_migration((), &mut []);
+		assert_eq!(
+			AdversarialPlanAccount::validate_migration_destination(1, &[]),
+			Ok(())
+		);
+		assert_eq!(
+			InvalidDestinationAccount::plan_migration(&[10, 0, 41]),
+			Err(ProgramError::InvalidAccountData)
+		);
+		assert_eq!(
+			InvalidDestinationAccount::validate_migration_destination(1, &[10, 1, 99]),
+			Err(ProgramError::InvalidAccountData)
+		);
+		assert_eq!(
+			InvalidDestinationAccount::validate_migration_destination(1, &[10, 1, 42]),
+			Ok(())
+		);
+		assert_eq!(
+			TwoStepAccount::plan_migration(&[11, 2, 5, 9, 7]),
+			Err(ProgramError::InvalidAccountData)
+		);
+		let mut ignored = [0_u8; 1];
+		TwoStepAccount::apply_migration(2, &mut ignored);
+		assert_eq!(
+			TwoStepAccount::validate_migration_destination(3, &ignored),
+			Err(ProgramError::InvalidAccountData)
+		);
+		let plan = StepBudgetAccount::plan_migration(&[11, 0, 5])
+			.unwrap_or_else(|error| panic!("delegate migration plan: {error:?}"));
+		let mut destination = [11, 0, 5, 0];
+		StepBudgetAccount::apply_migration(plan.into_payload(), &mut destination);
+		assert_eq!(
+			StepBudgetAccount::validate_migration_destination(1, &[11, 1, 5, 9]),
+			Ok(())
+		);
 	}
 
 	#[cfg(feature = "account-resize")]
 	#[test]
 	fn executor_aborts_instead_of_returning_an_error_after_mutation() {
 		const RETURNED_EXIT_CODE: i32 = 86;
-		let output = std::process::Command::new(
-			std::env::current_exe().unwrap_or_else(|error| panic!("locate test binary: {error}")),
-		)
-		.arg("--exact")
-		.arg("migration::tests::post_mutation_invariant_failure_child")
-		.arg("--nocapture")
-		.env("PINA_TEST_POST_MUTATION_ABORT_CHILD", "1")
-		.output()
-		.unwrap_or_else(|error| panic!("run abort probe: {error}"));
+		for scenario in ["destination", "planner"] {
+			let output = std::process::Command::new(
+				std::env::current_exe()
+					.unwrap_or_else(|error| panic!("locate test binary: {error}")),
+			)
+			.arg("--exact")
+			.arg("migration::tests::post_mutation_invariant_failure_child")
+			.arg("--nocapture")
+			.env("PINA_TEST_POST_MUTATION_ABORT_CHILD", scenario)
+			.output()
+			.unwrap_or_else(|error| panic!("run {scenario} abort probe: {error}"));
 
-		assert!(!output.status.success());
-		assert_ne!(
-			output.status.code(),
-			Some(RETURNED_EXIT_CODE),
-			"migration returned after mutation: {}",
-			std::string::String::from_utf8_lossy(&output.stderr),
-		);
+			assert!(!output.status.success(), "{scenario} failure was returned");
+			assert_ne!(output.status.code(), Some(RETURNED_EXIT_CODE),);
+		}
 	}
 
 	#[cfg(feature = "account-resize")]
 	#[test]
 	fn post_mutation_invariant_failure_child() {
 		const RETURNED_EXIT_CODE: i32 = 86;
-		if std::env::var_os("PINA_TEST_POST_MUTATION_ABORT_CHILD").is_none() {
+		let Some(scenario) = std::env::var_os("PINA_TEST_POST_MUTATION_ABORT_CHILD") else {
 			return;
-		}
+		};
 
 		let owner = Address::new_from_array([9; 32]);
-		let mut stored =
-			TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 1_000, &[10, 0, 42]);
-		let mut account = stored.view();
-		let _result = MigrateAccount {
-			account: &mut account,
-			payer: None,
-			program_id: &owner,
-			max_lamports: 0,
+		if scenario == "destination" {
+			let mut stored =
+				TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 1_000, &[10, 0, 42]);
+			let mut account = stored.view();
+			let _result = MigrateAccount {
+				account: &mut account,
+				payer: None,
+				program_id: &owner,
+				max_lamports: 0,
+			}
+			.invoke_with_rent::<InvalidDestinationAccount>(test_rent());
+		} else {
+			let mut stored =
+				TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 1_000, &[12, 0, 5]);
+			let mut account = stored.view();
+			let _result = MigrateAccount {
+				account: &mut account,
+				payer: None,
+				program_id: &owner,
+				max_lamports: 0,
+			}
+			.invoke_with_rent::<PlannerFailureAfterMutation>(test_rent());
 		}
-		.invoke_with_rent::<InvalidDestinationAccount>(test_rent());
 
 		std::process::exit(RETURNED_EXIT_CODE);
 	}

@@ -44,4 +44,10 @@ fn process_break_payload(balance: u64, amount: u64) -> u64 {
 	}
 }
 
+fn process_assignment_shapes(mut raw_value: u64, other: u64) -> bool {
+	raw_value = raw_value + 1;
+	raw_value += 1;
+	raw_value == other
+}
+
 fn main() {}

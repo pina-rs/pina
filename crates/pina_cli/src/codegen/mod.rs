@@ -361,7 +361,7 @@ fn build_account_node(
 		node.discriminators.push(build_migration_discriminator_node(
 			migration,
 			account.discriminator.repr_size,
-		)?);
+		));
 	}
 	node.pda = account
 		.pda_name
@@ -408,7 +408,7 @@ fn build_instruction_node(
 		discriminators.push(build_migration_discriminator_node(
 			migration,
 			instruction.discriminator.repr_size,
-		)?);
+		));
 	}
 
 	let mut node = InstructionNode {
@@ -586,14 +586,12 @@ fn build_discriminator_node(disc: &DiscriminatorIr) -> DiscriminatorNode {
 fn build_migration_discriminator_node(
 	migration: CurrentMigration,
 	offset: usize,
-) -> Result<DiscriminatorNode, IdlError> {
+) -> DiscriminatorNode {
 	let (r#type, value) = migration_type_and_value(migration);
-	let offset = u64::try_from(offset)
-		.map_err(|_| IdlError::Other("migration discriminator offset overflowed".to_owned()))?;
-	Ok(DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+	DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
 		ConstantValueNode::new(r#type, value),
-		offset,
-	)))
+		offset as u64,
+	))
 }
 
 fn build_discriminator_type_and_value(disc: &DiscriminatorIr) -> (NumberTypeNode, NumberValueNode) {
@@ -1009,7 +1007,7 @@ mod tests {
 		.key();
 		let metadata = IdlMigrationMetadata {
 			version_type: MigrationVersionType::U16,
-			current_versions: BTreeMap::from([(account_key, 7), (instruction_key, 9)]),
+			current_versions: BTreeMap::from([(account_key.clone(), 7), (instruction_key, 9)]),
 		};
 
 		let missing = try_ir_to_root_node(&ir)
@@ -1018,6 +1016,18 @@ mod tests {
 			missing
 				.to_string()
 				.contains("checked-in migration metadata")
+		);
+		let account_only_metadata = IdlMigrationMetadata {
+			version_type: MigrationVersionType::U16,
+			current_versions: BTreeMap::from([(account_key.clone(), 7)]),
+		};
+		let missing_instruction =
+			try_ir_to_root_node_with_migrations(&ir, Some(&account_only_metadata))
+				.expect_err("every migratable instruction needs a current version");
+		assert!(
+			missing_instruction
+				.to_string()
+				.contains("missing current version metadata")
 		);
 
 		let root = try_ir_to_root_node_with_migrations(&ir, Some(&metadata))
@@ -1050,6 +1060,13 @@ mod tests {
 		);
 		assert!(json.get("versions").is_none());
 		assert!(!json.to_string().contains("transition"));
+
+		let (version_type, version) = migration_type_and_value(CurrentMigration {
+			version_type: MigrationVersionType::U32,
+			version: 11,
+		});
+		assert_eq!(version_type.format, NumberFormat::U32);
+		assert_eq!(version.number, codama_nodes::Number::UnsignedInteger(11));
 	}
 
 	#[test]

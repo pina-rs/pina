@@ -4,8 +4,6 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::fs::File;
 use std::fs::OpenOptions;
-use std::io::Read as _;
-use std::io::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -278,9 +276,9 @@ pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationEr
 			}
 			Some(history) => {
 				history.rust_name = source.rust_name;
-				let latest = history.current().ok_or_else(|| {
-					MigrationError::InvalidHistory(format!("contract `{key}` has no versions"))
-				})?;
+				let latest = history
+					.current()
+					.expect("decoded migration histories always contain a current version");
 				if latest.schema == source.schema && latest.process == source.process {
 					refresh_draft_transition_hash(&project, &ledger, &key, history, &mut output)?;
 					output.unchanged_contracts.push(key);
@@ -289,13 +287,7 @@ pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationEr
 
 				let latest_version = latest.version;
 				if ledger.version_is_frozen(&key, latest_version) {
-					if latest_version == manifest.version_type.max_version() {
-						return Err(MigrationError::VersionExhausted {
-							version_type: manifest.version_type.to_string(),
-							identity: key,
-						});
-					}
-					let next = latest_version + 1;
+					let next = next_migration_version(&key, latest_version, manifest.version_type)?;
 					let transition = create_transition(
 						&project,
 						TransitionRequest {
@@ -333,11 +325,7 @@ pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationEr
 						let previous = history
 							.versions
 							.get((latest_version - 1) as usize)
-							.ok_or_else(|| {
-								MigrationError::InvalidHistory(format!(
-									"contract `{key}` has no previous version"
-								))
-							})?;
+							.expect("decoded histories contain every adjacent prior version");
 						let transition = create_transition(
 							&project,
 							TransitionRequest {
@@ -388,6 +376,22 @@ pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationEr
 	Ok(output)
 }
 
+fn next_migration_version(
+	identity: &str,
+	current: u32,
+	version_type: MigrationVersionType,
+) -> Result<u32, MigrationError> {
+	if current == version_type.max_version() {
+		return Err(MigrationError::VersionExhausted {
+			version_type: version_type.to_string(),
+			identity: identity.to_owned(),
+		});
+	}
+
+	// The configured maximum is at most `u32::MAX`, and equality returned above.
+	Ok(current + 1)
+}
+
 /// Verify source, snapshots, process contracts, and frozen transition code.
 pub fn check_migrations(start: &Path) -> Result<Vec<MigrationStatus>, MigrationError> {
 	let project = Project::discover(start)?;
@@ -431,9 +435,9 @@ pub(crate) fn check_project_migrations(
 				name: source.rust_name.clone(),
 			}
 		})?;
-		let latest = history.current().ok_or_else(|| {
-			MigrationError::InvalidHistory(format!("contract `{key}` has no versions"))
-		})?;
+		let latest = history
+			.current()
+			.expect("validated migration histories always contain a current version");
 		if latest.schema != source.schema || latest.process != source.process {
 			return Err(MigrationError::SchemaDrift {
 				kind: source.identity.kind.to_string(),
@@ -542,11 +546,8 @@ pub fn begin_publication(
 	if statuses.is_empty() {
 		return Ok(None);
 	}
-	let manifest = manifest.ok_or_else(|| {
-		MigrationError::InvalidHistory(
-			"migration manifest disappeared during publication".to_owned(),
-		)
-	})?;
+	let manifest = manifest
+		.expect("a successful migration check with contracts requires the already-loaded manifest");
 	if manifest.program_id != program_id {
 		return Err(MigrationError::PublicationProgramMismatch {
 			deployed: program_id.to_owned(),
@@ -663,9 +664,9 @@ fn validate_ledger_for_manifest(
 					receipt.sequence
 				))
 			})?;
-			let current = history.current().ok_or_else(|| {
-				MigrationError::InvalidHistory(format!("contract `{key}` has no versions"))
-			})?;
+			let current = history
+				.current()
+				.expect("decoded manifests always contain a current contract version");
 			if *published > current.version {
 				return Err(MigrationError::InvalidHistory(format!(
 					"publication receipt {} claims future version {} for `{key}`",
@@ -706,21 +707,14 @@ struct CurrentProgram {
 }
 
 fn scan_current_contracts(project: &Project) -> Result<CurrentProgram, MigrationError> {
-	let ir = parse::parse_program(&project.program_dir, Some(&project.library_name))?;
-	let src_dir = project.program_dir.join("src");
-	let files = parse::module_resolver::resolve_crate(&src_dir, &src_dir.join("lib.rs"))?;
+	let (ir, files) =
+		parse::parse_program_with_sources(&project.program_dir, Some(&project.library_name))?;
 	let mut discriminators = Vec::new();
-	let mut accounts = Vec::new();
-	let mut instructions = Vec::new();
 	let mut events = Vec::new();
 	for resolved in &files {
+		// The shared parser has already validated discriminator declarations in
+		// these exact syntax trees while assembling `ir`.
 		discriminators.extend(parse::discriminator::extract_discriminator_enums(
-			&resolved.file,
-		)?);
-		accounts.extend(parse::account_state::extract_account_structs(
-			&resolved.file,
-		)?);
-		instructions.extend(parse::instruction_data::extract_instruction_structs(
 			&resolved.file,
 		)?);
 		events.extend(parse::event_data::extract_migratable_events(
@@ -730,13 +724,8 @@ fn scan_current_contracts(project: &Project) -> Result<CurrentProgram, Migration
 	let discriminator_map = parse::build_discriminator_map(&discriminators);
 	let mut contracts = BTreeMap::new();
 
-	for account in accounts.into_iter().filter(|account| account.migratable) {
-		let discriminator = resolve_discriminator(
-			&discriminator_map,
-			&account.discriminator_enum,
-			&account.variant,
-			"account",
-		)?;
+	for account in ir.accounts.iter().filter(|account| account.is_migratable()) {
+		let discriminator = &account.discriminator;
 		let identity = ContractIdentity::try_new(
 			ContractKind::Account,
 			discriminator.repr_size,
@@ -750,11 +739,11 @@ fn scan_current_contracts(project: &Project) -> Result<CurrentProgram, Migration
 		};
 		let fields = account
 			.fields
-			.into_iter()
+			.iter()
 			.map(|field| {
 				FieldSchema {
-					name: field.name,
-					rust_type: field.rust_type,
+					name: field.name.clone(),
+					rust_type: field.rust_type.clone(),
 				}
 			})
 			.collect();
@@ -763,43 +752,32 @@ fn scan_current_contracts(project: &Project) -> Result<CurrentProgram, Migration
 			&mut contracts,
 			CurrentContract {
 				identity,
-				rust_name: account.name,
+				rust_name: account.name.clone(),
 				schema,
 				process: None,
 			},
 		)?;
 	}
 
-	for instruction in instructions
-		.into_iter()
-		.filter(|instruction| instruction.migratable)
+	for instruction in ir
+		.instructions
+		.iter()
+		.filter(|instruction| instruction.is_migratable())
 	{
-		let discriminator = resolve_discriminator(
-			&discriminator_map,
-			&instruction.discriminator_enum,
-			&instruction.variant,
-			"instruction",
-		)?;
+		let discriminator = &instruction.discriminator;
 		let identity = ContractIdentity::try_new(
 			ContractKind::Instruction,
 			discriminator.repr_size,
 			discriminator.value,
 		)
 		.map_err(MigrationError::InvalidHistory)?;
-		let ir_instruction =
-			find_instruction(&ir.instructions, discriminator).ok_or_else(|| {
-				MigrationError::InvalidHistory(format!(
-					"could not resolve process contract for instruction `{}`",
-					instruction.name
-				))
-			})?;
 		let fields = instruction
-			.fields
-			.into_iter()
+			.arguments
+			.iter()
 			.map(|field| {
 				FieldSchema {
-					name: field.name,
-					rust_type: field.rust_type,
+					name: field.name.clone(),
+					rust_type: field.rust_type.clone(),
 				}
 			})
 			.collect();
@@ -809,9 +787,9 @@ fn scan_current_contracts(project: &Project) -> Result<CurrentProgram, Migration
 			&mut contracts,
 			CurrentContract {
 				identity,
-				rust_name: instruction.name,
+				rust_name: instruction.name.clone(),
 				schema,
-				process: Some(process_contract(ir_instruction)),
+				process: Some(process_contract(instruction)),
 			},
 		)?;
 	}
@@ -869,16 +847,6 @@ fn insert_current(
 		return Err(MigrationError::DuplicateIdentity { identity: key });
 	}
 	Ok(())
-}
-
-fn find_instruction<'a>(
-	instructions: &'a [InstructionIr],
-	discriminator: &DiscriminatorIr,
-) -> Option<&'a InstructionIr> {
-	instructions.iter().find(|instruction| {
-		instruction.discriminator.value == discriminator.value
-			&& instruction.discriminator.repr_size == discriminator.repr_size
-	})
 }
 
 fn process_contract(instruction: &InstructionIr) -> ProcessContract {
@@ -997,13 +965,21 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), MigrationError> {
 			source,
 		}
 	})?;
-	file.write_all(bytes).map_err(|source| {
+	write_all(&mut file, bytes, path)?;
+	file.commit().map_err(|source| {
 		MigrationError::Write {
 			path: path.to_path_buf(),
 			source,
 		}
-	})?;
-	file.commit().map_err(|source| {
+	})
+}
+
+fn write_all(
+	mut writer: impl std::io::Write,
+	bytes: &[u8],
+	path: &Path,
+) -> Result<(), MigrationError> {
+	writer.write_all(bytes).map_err(|source| {
 		MigrationError::Write {
 			path: path.to_path_buf(),
 			source,
@@ -1081,10 +1057,14 @@ fn hash_regular_file(path: &Path) -> Result<[u8; 32], MigrationError> {
 			source,
 		}
 	})?;
+	hash_reader(path, &mut file)
+}
+
+fn hash_reader(path: &Path, mut reader: impl std::io::Read) -> Result<[u8; 32], MigrationError> {
 	let mut digest = Sha256::new();
 	let mut buffer = vec![0_u8; 64 * 1024];
 	loop {
-		let read = file.read(&mut buffer).map_err(|source| {
+		let read = reader.read(&mut buffer).map_err(|source| {
 			MigrationError::Read {
 				path: path.to_path_buf(),
 				source,
@@ -1341,9 +1321,9 @@ fn automatic_transition_source(
 		{
 			continue;
 		}
-		let Some(&(destination_offset, size)) = destination_offsets.get(&field.name) else {
-			continue;
-		};
+		let &(destination_offset, size) = destination_offsets
+			.get(&field.name)
+			.expect("fixed layout offsets contain every destination field");
 		let start = header + destination_offset;
 		let end = start + size;
 		let _ = writeln!(zeroes, "\tdata[{start}..{end}].fill(0);");
@@ -1509,9 +1489,10 @@ fn refresh_draft_transition_hash(
 	history: &mut ContractHistory,
 	output: &mut MakeMigrationsOutput,
 ) -> Result<(), MigrationError> {
-	let Some(latest) = history.versions.last_mut() else {
-		return Ok(());
-	};
+	let latest = history
+		.versions
+		.last_mut()
+		.expect("decoded migration histories always contain a current version");
 	let Some(transition) = latest.transition.as_mut() else {
 		return Ok(());
 	};
@@ -1578,6 +1559,29 @@ mod tests {
 		);
 
 		assert_eq!(transition_mode(&old, &reordered), TransitionMode::Manual);
+	}
+
+	#[test]
+	fn configured_version_width_rejects_exhaustion_before_incrementing() {
+		assert_eq!(
+			next_migration_version("account:1:01", 254, MigrationVersionType::U8)
+				.expect("u8 has one version remaining"),
+			255
+		);
+		assert!(matches!(
+			next_migration_version("account:1:01", 255, MigrationVersionType::U8),
+			Err(MigrationError::VersionExhausted { identity, .. })
+				if identity == "account:1:01"
+		));
+		assert_eq!(
+			next_migration_version(
+				"account:1:01",
+				u32::from(u16::MAX),
+				MigrationVersionType::U32,
+			)
+			.expect("u32 has remaining versions"),
+			u32::from(u16::MAX) + 1
+		);
 	}
 
 	#[test]
@@ -1676,6 +1680,180 @@ mod tests {
 			process_transition(&identity, "Transfer", Some(&source), Some(&escalated),),
 			Err(MigrationError::ProcessChanged { .. })
 		));
+		assert!(matches!(
+			process_transition(&identity, "Transfer", Some(&source), None),
+			Err(MigrationError::InvalidHistory(_))
+		));
+
+		let account = ContractIdentity::try_new(ContractKind::Account, 1, 7).unwrap();
+		assert!(matches!(
+			process_transition(&account, "State", Some(&source), None),
+			Err(MigrationError::InvalidHistory(_))
+		));
+	}
+
+	#[test]
+	fn transition_creation_propagates_process_and_directory_failures() {
+		let fixture = migration_fixture();
+		let project = Project::discover(&fixture.root)
+			.unwrap_or_else(|error| panic!("discover transition fixture: {error}"));
+		let identity =
+			ContractIdentity::try_new(ContractKind::Instruction, 1, 7).expect("valid identity");
+		let source_schema = schema(LayoutKind::Fixed, &[("value", "u64")]);
+		let source_process = ProcessContract {
+			accounts: vec![ProcessAccount {
+				name: "authority".to_owned(),
+				writable: false,
+				signer: true,
+				optional: false,
+				default_value: None,
+				pda: None,
+				constraints: vec![],
+			}],
+		};
+		let source = SchemaVersion {
+			version: 0,
+			schema_sha256: source_schema.sha256(),
+			schema: source_schema.clone(),
+			process_sha256: Some(source_process.sha256()),
+			process: Some(source_process.clone()),
+			transition: None,
+		};
+		let mut escalated = source_process;
+		escalated.accounts[0].writable = true;
+		assert!(matches!(
+			create_transition(
+				&project,
+				TransitionRequest {
+					identity: &identity,
+					rust_name: "Update",
+					source: &source,
+					destination_version: 1,
+					destination: &source_schema,
+					destination_process: Some(&escalated),
+					preserve_manual: false,
+				},
+				&mut MakeMigrationsOutput::default(),
+			),
+			Err(MigrationError::ProcessChanged { .. })
+		));
+
+		let blocked = migration_fixture();
+		std::fs::write(blocked.root.join("migrations/transitions"), b"blocked")
+			.unwrap_or_else(|error| panic!("block transition directory: {error}"));
+		let project = Project::discover(&blocked.root)
+			.unwrap_or_else(|error| panic!("discover blocked fixture: {error}"));
+		let account =
+			ContractIdentity::try_new(ContractKind::Account, 1, 1).expect("valid identity");
+		let account_source = SchemaVersion {
+			version: 0,
+			schema_sha256: source_schema.sha256(),
+			schema: source_schema,
+			process_sha256: None,
+			process: None,
+			transition: None,
+		};
+		let destination = schema(LayoutKind::Fixed, &[("value", "u64"), ("enabled", "bool")]);
+		assert!(matches!(
+			create_transition(
+				&project,
+				TransitionRequest {
+					identity: &account,
+					rust_name: "State",
+					source: &account_source,
+					destination_version: 1,
+					destination: &destination,
+					destination_process: None,
+					preserve_manual: false,
+				},
+				&mut MakeMigrationsOutput::default(),
+			),
+			Err(MigrationError::CreateDirectory { .. })
+		));
+	}
+
+	#[test]
+	fn migration_lifecycle_propagates_transition_failures_for_frozen_and_draft_versions() {
+		let frozen = publication_fixture();
+		publish_current(&frozen);
+		std::fs::write(frozen.root.join("migrations/transitions"), b"blocked")
+			.unwrap_or_else(|error| panic!("block frozen transition directory: {error}"));
+		write_state_source(&frozen, "value: u64, enabled: bool");
+		assert!(matches!(
+			make_migrations(&frozen.root),
+			Err(MigrationError::CreateDirectory { .. })
+		));
+
+		let draft = publication_fixture();
+		publish_current(&draft);
+		write_state_source(&draft, "value: u64, enabled: bool");
+		make_migrations(&draft.root)
+			.unwrap_or_else(|error| panic!("create version-one draft: {error}"));
+		let transitions = draft.root.join("migrations/transitions");
+		std::fs::remove_dir_all(&transitions)
+			.unwrap_or_else(|error| panic!("remove generated transitions: {error}"));
+		std::fs::write(&transitions, b"blocked")
+			.unwrap_or_else(|error| panic!("block draft transition directory: {error}"));
+		write_state_source(&draft, "value: u64, enabled: bool, counter: u16");
+		assert!(matches!(
+			make_migrations(&draft.root),
+			Err(MigrationError::CreateDirectory { .. })
+		));
+	}
+
+	#[test]
+	fn direction_and_manual_sizing_cover_every_layout_shape() {
+		let mixed_source = schema(
+			LayoutKind::Fixed,
+			&[("removed", "u64"), ("first", "u8"), ("second", "u8")],
+		);
+		let mixed_destination = schema(
+			LayoutKind::Fixed,
+			&[("first", "u8"), ("inserted", "u128"), ("second", "u8")],
+		);
+		assert!(automatic_direction(&mixed_source, &mixed_destination).is_none());
+
+		let source_schema = schema(LayoutKind::Fixed, &[("value", "u64")]);
+		let destination = schema(LayoutKind::Fixed, &[("prefix", "u8"), ("value", "u64")]);
+		assert!(matches!(
+			automatic_direction(&source_schema, &destination),
+			Some(MoveDirection::Backward)
+		));
+		let source = SchemaVersion {
+			version: 0,
+			schema_sha256: source_schema.sha256(),
+			schema: source_schema,
+			process: None,
+			process_sha256: None,
+			transition: None,
+		};
+		let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
+		let generated = automatic_transition_source(
+			&identity,
+			MigrationVersionType::U8,
+			&source,
+			1,
+			&destination,
+		);
+		assert!(generated.contains("copy_within(2..10, 3)"));
+
+		let compact = schema(LayoutKind::Compact, &[("name", "String<4>")]);
+		let compact_source = SchemaVersion {
+			version: 0,
+			schema_sha256: compact.sha256(),
+			schema: compact,
+			process: None,
+			process_sha256: None,
+			transition: None,
+		};
+		let generated = manual_transition_source(
+			&identity,
+			MigrationVersionType::U8,
+			&compact_source,
+			1,
+			&destination,
+		);
+		assert!(generated.contains("Some(11)"));
 	}
 
 	#[test]
@@ -1693,6 +1871,432 @@ mod tests {
 			.unwrap_or_else(|error| panic!("hash CRLF source: {error}"));
 
 		assert_eq!(lf, crlf);
+	}
+
+	#[test]
+	fn filesystem_boundaries_reject_missing_special_and_linked_paths() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let root = std::fs::canonicalize(temp.path())
+			.unwrap_or_else(|error| panic!("canonicalize temp dir: {error}"));
+		let missing = root.join("missing");
+		assert!(matches!(
+			read_bytes(&missing),
+			Err(MigrationError::Read { .. })
+		));
+		assert!(matches!(
+			hash_regular_file(&missing),
+			Err(MigrationError::Read { .. })
+		));
+		assert!(matches!(
+			hash_regular_file(&root),
+			Err(MigrationError::InvalidHistory(_))
+		));
+		assert!(matches!(
+			write_json_atomic(Path::new("/"), &serde_json::json!({})),
+			Err(MigrationError::InvalidHistory(_))
+		));
+
+		let blocked = root.join("blocked");
+		std::fs::write(&blocked, b"not a directory")
+			.unwrap_or_else(|error| panic!("write blocked path: {error}"));
+		assert!(matches!(
+			acquire_migration_lock(&blocked),
+			Err(MigrationError::Read { .. })
+		));
+		#[cfg(unix)]
+		{
+			use std::os::unix::fs::PermissionsExt as _;
+
+			let readonly = root.join("readonly");
+			std::fs::create_dir(&readonly)
+				.unwrap_or_else(|error| panic!("create readonly directory: {error}"));
+			std::fs::set_permissions(&readonly, std::fs::Permissions::from_mode(0o555))
+				.unwrap_or_else(|error| panic!("protect readonly directory: {error}"));
+			assert!(matches!(
+				acquire_migration_lock(&readonly),
+				Err(MigrationError::CreateDirectory { .. })
+			));
+			assert!(matches!(
+				write_json_atomic(&readonly.join("nested/value.json"), &serde_json::json!({}),),
+				Err(MigrationError::CreateDirectory { .. })
+			));
+			std::fs::set_permissions(&readonly, std::fs::Permissions::from_mode(0o755))
+				.unwrap_or_else(|error| panic!("restore readonly directory: {error}"));
+		}
+		let lock_root = root.join("lock-root");
+		std::fs::create_dir_all(lock_root.join("migrations/.lock"))
+			.unwrap_or_else(|error| panic!("create directory lock: {error}"));
+		assert!(matches!(
+			acquire_migration_lock(&lock_root),
+			Err(MigrationError::Lock { .. })
+		));
+
+		struct FailingSerialize;
+		impl Serialize for FailingSerialize {
+			fn serialize<S>(&self, _: S) -> Result<S::Ok, S::Error>
+			where
+				S: serde::Serializer,
+			{
+				Err(<S::Error as serde::ser::Error>::custom(
+					"intentional failure",
+				))
+			}
+		}
+		assert!(matches!(
+			write_json_atomic(&root.join("failing.json"), &FailingSerialize),
+			Err(MigrationError::SerializeJson { .. })
+		));
+		assert!(matches!(
+			write_atomic(&root.join("absent/target"), b"value"),
+			Err(MigrationError::Write { .. })
+		));
+		let directory_target = root.join("directory-target");
+		std::fs::create_dir(&directory_target)
+			.unwrap_or_else(|error| panic!("create directory target: {error}"));
+		assert!(matches!(
+			write_atomic(&directory_target, b"value"),
+			Err(MigrationError::Write { .. })
+		));
+
+		struct FailingIo;
+		impl std::io::Write for FailingIo {
+			fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+				Err(std::io::Error::other("intentional write failure"))
+			}
+
+			fn flush(&mut self) -> std::io::Result<()> {
+				Ok(())
+			}
+		}
+		impl std::io::Read for FailingIo {
+			fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+				Err(std::io::Error::other("intentional read failure"))
+			}
+		}
+		std::io::Write::flush(&mut FailingIo)
+			.unwrap_or_else(|error| panic!("flush inert failing writer: {error}"));
+		assert!(matches!(
+			write_all(FailingIo, b"value", &root.join("logical")),
+			Err(MigrationError::Write { .. })
+		));
+		assert!(matches!(
+			hash_reader(&root.join("logical"), FailingIo),
+			Err(MigrationError::Read { .. })
+		));
+
+		#[cfg(unix)]
+		{
+			use std::os::unix::fs::PermissionsExt as _;
+			use std::os::unix::fs::symlink;
+
+			let target = root.join("target");
+			let linked = root.join("linked");
+			std::fs::write(&target, b"target")
+				.unwrap_or_else(|error| panic!("write link target: {error}"));
+			symlink(&target, &linked).unwrap_or_else(|error| panic!("create link: {error}"));
+			assert!(matches!(
+				ensure_safe_path(&linked),
+				Err(MigrationError::UnsafePath { .. })
+			));
+
+			let unreadable = root.join("unreadable");
+			std::fs::write(&unreadable, b"secret")
+				.unwrap_or_else(|error| panic!("write unreadable file: {error}"));
+			std::fs::set_permissions(&unreadable, std::fs::Permissions::from_mode(0o000))
+				.unwrap_or_else(|error| panic!("protect unreadable file: {error}"));
+			let result = hash_regular_file(&unreadable);
+			std::fs::set_permissions(&unreadable, std::fs::Permissions::from_mode(0o600))
+				.unwrap_or_else(|error| panic!("restore unreadable file: {error}"));
+			assert!(matches!(result, Err(MigrationError::Read { .. })));
+		}
+	}
+
+	#[test]
+	fn draft_lifecycle_requires_creates_refreshes_and_removes_snapshots() {
+		let fixture = migration_fixture();
+		assert!(matches!(
+			check_migrations(&fixture.root),
+			Err(MigrationError::MissingSnapshot { .. })
+		));
+
+		let created = make_migrations(&fixture.root)
+			.unwrap_or_else(|error| panic!("create migration history: {error}"));
+		assert_eq!(created.created_contracts, ["account:1:01"]);
+		let statuses = migration_status(&fixture.root)
+			.unwrap_or_else(|error| panic!("read draft status: {error}"));
+		assert_eq!(statuses.len(), 1);
+		assert_eq!(statuses[0].current_version, 0);
+		assert!(!statuses[0].published);
+		assert!(!statuses[0].publication_pending);
+		let metadata = idl_migration_metadata(&fixture.root)
+			.unwrap_or_else(|error| panic!("read IDL metadata: {error}"))
+			.expect("migration-aware project has IDL metadata");
+		assert_eq!(metadata.version_type, MigrationVersionType::U8);
+		assert_eq!(metadata.current_versions.get("account:1:01"), Some(&0));
+
+		let unchanged = make_migrations(&fixture.root)
+			.unwrap_or_else(|error| panic!("refresh unchanged draft: {error}"));
+		assert_eq!(unchanged.unchanged_contracts, ["account:1:01"]);
+		write_state_source(&fixture, "value: u64, enabled: bool");
+		let updated = make_migrations(&fixture.root)
+			.unwrap_or_else(|error| panic!("replace draft version zero: {error}"));
+		assert_eq!(updated.updated_drafts, ["account:1:01@0"]);
+		check_migrations(&fixture.root)
+			.unwrap_or_else(|error| panic!("check replaced draft: {error}"));
+
+		std::fs::write(
+			fixture.root.join("src/lib.rs"),
+			format!("use pina::*;\ndeclare_id!(\"{}\");\n", fixture.program_id),
+		)
+		.unwrap_or_else(|error| panic!("remove migratable account: {error}"));
+		assert!(matches!(
+			check_migrations(&fixture.root),
+			Err(MigrationError::ContractRemoved { .. })
+		));
+		assert!(matches!(
+			make_migrations(&fixture.root),
+			Err(MigrationError::ContractRemoved { .. })
+		));
+	}
+
+	#[test]
+	fn discovery_snapshots_accounts_instructions_events_and_processes() {
+		let fixture = migration_fixture();
+		std::fs::write(
+			fixture.root.join("src/lib.rs"),
+			include_str!("../../../examples/migrations_program/src/lib.rs"),
+		)
+		.unwrap_or_else(|error| panic!("write complete migration source: {error}"));
+		let project = Project::discover(&fixture.root)
+			.unwrap_or_else(|error| panic!("discover complete fixture: {error}"));
+		let current = scan_current_contracts(&project)
+			.unwrap_or_else(|error| panic!("scan complete fixture: {error}"));
+		assert_eq!(current.contracts.len(), 5);
+		assert_eq!(
+			current
+				.contracts
+				.iter()
+				.filter(|contract| contract.identity.kind == ContractKind::Instruction)
+				.count(),
+			1
+		);
+		let instruction = current
+			.contracts
+			.iter()
+			.find(|contract| contract.identity.kind == ContractKind::Instruction)
+			.expect("instruction contract");
+		assert_eq!(
+			instruction
+				.process
+				.as_ref()
+				.expect("process")
+				.accounts
+				.len(),
+			5
+		);
+
+		let output = make_migrations(&fixture.root)
+			.unwrap_or_else(|error| panic!("snapshot complete fixture: {error}"));
+		assert_eq!(output.created_contracts.len(), 5);
+	}
+
+	#[test]
+	fn event_discovery_rejects_invalid_unresolved_and_duplicate_contracts() {
+		let fixture = migration_fixture();
+		let scan = |body: &str| {
+			std::fs::write(
+				fixture.root.join("src/lib.rs"),
+				format!(
+					"use pina::*;\ndeclare_id!(\"{}\");\n#[discriminator]\nenum EventKind {{ \
+					 Value = 1 }}\n{body}\n",
+					fixture.program_id
+				),
+			)
+			.unwrap_or_else(|error| panic!("write event source: {error}"));
+			let project = Project::discover(&fixture.root)
+				.unwrap_or_else(|error| panic!("discover event fixture: {error}"));
+			scan_current_contracts(&project)
+		};
+
+		assert!(matches!(
+			scan("#[event(migrations)] struct ValueEvent { value: u64 }"),
+			Err(MigrationError::Parse(_))
+		));
+		assert!(matches!(
+			scan(
+				"#[event(discriminator = Missing::Value, migrations)] struct ValueEvent { value: \
+				 u64 }"
+			),
+			Err(MigrationError::InvalidHistory(_))
+		));
+		assert!(matches!(
+			scan(
+				"#[event(discriminator = EventKind::Value, migrations)] struct First { value: u64 \
+				 }\n#[event(discriminator = EventKind::Value, migrations)] struct Second { value: \
+				 u64 }"
+			),
+			Err(MigrationError::DuplicateIdentity { .. })
+		));
+	}
+
+	#[test]
+	fn lifecycle_rejects_drift_configuration_changes_and_invalid_documents() {
+		let fixture = migration_fixture();
+		make_migrations(&fixture.root)
+			.unwrap_or_else(|error| panic!("create baseline history: {error}"));
+		write_state_source(&fixture, "value: u16");
+		assert!(matches!(
+			check_migrations(&fixture.root),
+			Err(MigrationError::SchemaDrift { .. })
+		));
+
+		let manifest_path = fixture.root.join(MANIFEST_PATH);
+		let mut manifest = load_manifest(&manifest_path)
+			.unwrap_or_else(|error| panic!("read baseline manifest: {error}"))
+			.expect("baseline manifest");
+		manifest.program_id = "11111111111111111111111111111111".to_owned();
+		write_json_atomic(&manifest_path, &manifest)
+			.unwrap_or_else(|error| panic!("write mismatched program: {error}"));
+		assert!(matches!(
+			check_migrations(&fixture.root),
+			Err(MigrationError::ProgramIdentityChanged { .. })
+		));
+
+		manifest.program_id = fixture.program_id.to_owned();
+		write_json_atomic(&manifest_path, &manifest)
+			.unwrap_or_else(|error| panic!("restore program identity: {error}"));
+		std::fs::write(
+			fixture.root.join("pina.toml"),
+			"[project]\nprogram = \".\"\n[migrations]\nversion-type = \"u16\"\n",
+		)
+		.unwrap_or_else(|error| panic!("write changed version type: {error}"));
+		assert!(matches!(
+			check_migrations(&fixture.root),
+			Err(MigrationError::VersionTypeChanged { .. })
+		));
+
+		std::fs::write(&manifest_path, b"not json")
+			.unwrap_or_else(|error| panic!("corrupt manifest: {error}"));
+		assert!(matches!(
+			load_manifest(&manifest_path),
+			Err(MigrationError::InvalidDocument { .. })
+		));
+		let publications = fixture.root.join(PUBLICATIONS_PATH);
+		std::fs::write(&publications, b"not json")
+			.unwrap_or_else(|error| panic!("corrupt ledger: {error}"));
+		assert!(matches!(
+			load_publication_ledger(&publications),
+			Err(MigrationError::InvalidDocument { .. })
+		));
+	}
+
+	#[test]
+	fn lifecycle_rejects_a_new_contract_without_a_snapshot() {
+		let fixture = migration_fixture();
+		make_migrations(&fixture.root)
+			.unwrap_or_else(|error| panic!("create baseline history: {error}"));
+		std::fs::write(
+			fixture.root.join("src/lib.rs"),
+			format!(
+				"use pina::*;\ndeclare_id!(\"{}\");\n#[discriminator]\nenum Kind {{ State = 1, \
+				 Other = 2 }}\n#[account(discriminator = Kind::State, migrations)]\nstruct State \
+				 {{ value: u64 }}\n#[account(discriminator = Kind::Other, migrations)]\nstruct \
+				 Other {{ value: u8 }}\n",
+				fixture.program_id
+			),
+		)
+		.unwrap_or_else(|error| panic!("add second contract: {error}"));
+		assert!(matches!(
+			check_migrations(&fixture.root),
+			Err(MigrationError::MissingSnapshot { name, .. }) if name == "Other"
+		));
+	}
+
+	#[test]
+	fn internal_contract_helpers_fail_closed_on_collisions_and_missing_values() {
+		let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
+		let contract = CurrentContract {
+			identity,
+			rust_name: "State".to_owned(),
+			schema: schema(LayoutKind::Fixed, &[("value", "u64")]),
+			process: None,
+		};
+		let mut contracts = BTreeMap::new();
+		insert_current(&mut contracts, contract.clone())
+			.unwrap_or_else(|error| panic!("insert first contract: {error}"));
+		assert!(matches!(
+			insert_current(&mut contracts, contract),
+			Err(MigrationError::DuplicateIdentity { .. })
+		));
+		assert!(
+			resolve_discriminator(
+				&std::collections::HashMap::new(),
+				"Kind",
+				"State",
+				"account"
+			)
+			.is_err()
+		);
+
+		let instruction = InstructionIr {
+			name: "update".to_owned(),
+			accounts: vec![
+				crate::ir::InstructionAccountIr {
+					name: "program".to_owned(),
+					is_writable: false,
+					is_signer: false,
+					is_optional: false,
+					default_value: Some(DefaultValueIr::ProgramId("program".to_owned())),
+					is_pda: false,
+					pda_name: None,
+					constraints: vec![],
+					docs: vec![],
+				},
+				crate::ir::InstructionAccountIr {
+					name: "authority".to_owned(),
+					is_writable: false,
+					is_signer: false,
+					is_optional: false,
+					default_value: Some(DefaultValueIr::PublicKey("address".to_owned())),
+					is_pda: false,
+					pda_name: None,
+					constraints: vec![],
+					docs: vec![],
+				},
+			],
+			arguments: vec![],
+			discriminator: DiscriminatorIr {
+				value: 2,
+				repr_size: 1,
+			},
+			docs: vec![],
+		};
+		let process = process_contract(&instruction);
+		assert_eq!(
+			process.accounts[0].default_value.as_deref(),
+			Some("program:program")
+		);
+		assert_eq!(
+			process.accounts[1].default_value.as_deref(),
+			Some("publicKey:address")
+		);
+	}
+
+	#[test]
+	fn non_migratable_projects_have_no_idl_migration_metadata() {
+		let fixture = migration_fixture();
+		std::fs::write(
+			fixture.root.join("src/lib.rs"),
+			format!("use pina::*;\ndeclare_id!(\"{}\");\n", fixture.program_id),
+		)
+		.unwrap_or_else(|error| panic!("write ordinary source: {error}"));
+		std::fs::remove_file(fixture.root.join(PUBLICATIONS_PATH))
+			.unwrap_or_else(|error| panic!("remove empty ledger: {error}"));
+		assert!(
+			idl_migration_metadata(&fixture.root)
+				.unwrap_or_else(|error| panic!("read ordinary metadata: {error}"))
+				.is_none()
+		);
 	}
 
 	#[test]
@@ -1750,6 +2354,9 @@ mod tests {
 		assert!(ledger.pending.is_some());
 		assert!(ledger.version_is_frozen("account:1:01", 0));
 		assert!(!ledger.ever_published("account:1:01", 0));
+		let statuses = migration_status(&fixture.root)
+			.unwrap_or_else(|error| panic!("read pending status: {error}"));
+		assert!(statuses[0].publication_pending);
 		std::fs::write(
 			fixture.root.join("src/lib.rs"),
 			format!(
@@ -1793,6 +2400,286 @@ mod tests {
 		assert!(ledger.pending.is_none());
 		assert!(ledger.ever_published("account:1:01", 0));
 		assert_eq!(ledger.receipts.len(), 1);
+
+		write_state_source(&fixture, "value: u64, enabled: bool, count: u16");
+		let refreshed = make_migrations(&fixture.root)
+			.unwrap_or_else(|error| panic!("replace unpublished version one: {error}"));
+		assert_eq!(refreshed.updated_drafts, ["account:1:01@1"]);
+		check_migrations(&fixture.root)
+			.unwrap_or_else(|error| panic!("check refreshed version one: {error}"));
+	}
+
+	#[test]
+	fn publication_rejects_mismatched_programs_artifacts_and_attempts() {
+		let digest: [u8; 32] = Sha256::digest(b"artifact").into();
+
+		let fixture = publication_fixture();
+		assert!(matches!(
+			begin_publication(
+				&fixture.root,
+				"devnet",
+				"https://api.devnet.solana.com",
+				"11111111111111111111111111111111",
+				&fixture.artifact,
+				digest,
+			),
+			Err(MigrationError::PublicationProgramMismatch { .. })
+		));
+		assert!(matches!(
+			begin_publication(
+				&fixture.root,
+				"devnet",
+				"https://api.devnet.solana.com",
+				fixture.program_id,
+				&fixture.artifact,
+				[7; 32],
+			),
+			Err(MigrationError::PublicationArtifactChanged { .. })
+		));
+
+		begin_publication(
+			&fixture.root,
+			"devnet",
+			"https://api.devnet.solana.com",
+			fixture.program_id,
+			&fixture.artifact,
+			digest,
+		)
+		.unwrap_or_else(|error| panic!("begin exact publication: {error}"));
+		std::fs::write(&fixture.artifact, b"swapped artifact")
+			.unwrap_or_else(|error| panic!("swap pending artifact: {error}"));
+		assert!(matches!(
+			begin_publication(
+				&fixture.root,
+				"devnet",
+				"https://api.devnet.solana.com",
+				fixture.program_id,
+				&fixture.artifact,
+				digest,
+			),
+			Err(MigrationError::PublicationArtifactChanged { .. })
+		));
+		std::fs::write(&fixture.artifact, b"artifact")
+			.unwrap_or_else(|error| panic!("restore pending artifact: {error}"));
+		assert!(matches!(
+			record_publication(
+				&fixture.root,
+				"testnet",
+				"https://api.testnet.solana.com",
+				fixture.program_id,
+				&fixture.artifact,
+				digest,
+			),
+			Err(MigrationError::MissingPendingPublication)
+		));
+
+		let missing_manifest = publication_fixture();
+		begin_publication(
+			&missing_manifest.root,
+			"devnet",
+			"https://api.devnet.solana.com",
+			missing_manifest.program_id,
+			&missing_manifest.artifact,
+			digest,
+		)
+		.unwrap_or_else(|error| panic!("begin publication before removal: {error}"));
+		std::fs::remove_file(missing_manifest.root.join(MANIFEST_PATH))
+			.unwrap_or_else(|error| panic!("remove pending manifest: {error}"));
+		assert!(matches!(
+			begin_publication(
+				&missing_manifest.root,
+				"devnet",
+				"https://api.devnet.solana.com",
+				missing_manifest.program_id,
+				&missing_manifest.artifact,
+				digest,
+			),
+			Err(MigrationError::InvalidHistory(_))
+		));
+
+		let record_without_manifest = publication_fixture();
+		std::fs::remove_file(record_without_manifest.root.join(MANIFEST_PATH))
+			.unwrap_or_else(|error| panic!("remove record manifest: {error}"));
+		assert!(matches!(
+			record_publication(
+				&record_without_manifest.root,
+				"devnet",
+				"https://api.devnet.solana.com",
+				record_without_manifest.program_id,
+				&record_without_manifest.artifact,
+				digest,
+			),
+			Err(MigrationError::InvalidHistory(_))
+		));
+
+		let wrong_record_program = publication_fixture();
+		assert!(matches!(
+			record_publication(
+				&wrong_record_program.root,
+				"devnet",
+				"https://api.devnet.solana.com",
+				"11111111111111111111111111111111",
+				&wrong_record_program.artifact,
+				digest,
+			),
+			Err(MigrationError::PublicationProgramMismatch { .. })
+		));
+	}
+
+	#[test]
+	fn ledger_binding_rejects_wrong_unknown_and_future_contracts() {
+		let fixture = publication_fixture();
+		let digest: [u8; 32] = Sha256::digest(b"artifact").into();
+		begin_publication(
+			&fixture.root,
+			"devnet",
+			"https://api.devnet.solana.com",
+			fixture.program_id,
+			&fixture.artifact,
+			digest,
+		)
+		.unwrap_or_else(|error| panic!("begin publication: {error}"));
+		let pending_ledger = load_publication_ledger(&fixture.root.join(PUBLICATIONS_PATH))
+			.unwrap_or_else(|error| panic!("read pending ledger: {error}"));
+		let manifest = load_manifest(&fixture.root.join(MANIFEST_PATH))
+			.unwrap_or_else(|error| panic!("read manifest: {error}"))
+			.expect("fixture manifest");
+
+		let mut wrong_program = pending_ledger.clone();
+		wrong_program.pending.as_mut().expect("pending").program_id =
+			"11111111111111111111111111111111".to_owned();
+		assert!(validate_ledger_for_manifest(&wrong_program, &manifest).is_err());
+
+		let mut unknown = pending_ledger.clone();
+		unknown.pending.as_mut().expect("pending").versions =
+			BTreeMap::from([("account:1:ff".to_owned(), 0)]);
+		assert!(validate_ledger_for_manifest(&unknown, &manifest).is_err());
+
+		let mut future = pending_ledger.clone();
+		future
+			.pending
+			.as_mut()
+			.expect("pending")
+			.versions
+			.insert("account:1:01".to_owned(), 1);
+		assert!(validate_ledger_for_manifest(&future, &manifest).is_err());
+
+		record_publication(
+			&fixture.root,
+			"devnet",
+			"https://api.devnet.solana.com",
+			fixture.program_id,
+			&fixture.artifact,
+			digest,
+		)
+		.unwrap_or_else(|error| panic!("record publication: {error}"));
+		let receipt_ledger = load_publication_ledger(&fixture.root.join(PUBLICATIONS_PATH))
+			.unwrap_or_else(|error| panic!("read receipt ledger: {error}"));
+
+		let mut wrong_program = receipt_ledger.clone();
+		wrong_program.receipts[0].program_id = "11111111111111111111111111111111".to_owned();
+		assert!(validate_ledger_for_manifest(&wrong_program, &manifest).is_err());
+
+		let mut unknown = receipt_ledger.clone();
+		unknown.receipts[0].versions = BTreeMap::from([("account:1:ff".to_owned(), 0)]);
+		assert!(validate_ledger_for_manifest(&unknown, &manifest).is_err());
+
+		let mut future = receipt_ledger;
+		future.receipts[0]
+			.versions
+			.insert("account:1:01".to_owned(), 1);
+		assert!(validate_ledger_for_manifest(&future, &manifest).is_err());
+	}
+
+	#[test]
+	fn transition_files_fail_closed_before_and_after_publication() {
+		let fixture = publication_fixture();
+		publish_current(&fixture);
+		write_state_source(&fixture, "value: u32");
+		let generated = make_migrations(&fixture.root)
+			.unwrap_or_else(|error| panic!("generate manual transition: {error}"));
+		let path = generated.manual_transitions[0].clone();
+		assert!(matches!(
+			check_migrations(&fixture.root),
+			Err(MigrationError::ManualTransitionIncomplete { .. })
+		));
+
+		std::fs::write(&path, "pub(crate) fn migrate(_: &mut [u8]) {}\n")
+			.unwrap_or_else(|error| panic!("complete manual transition: {error}"));
+		assert!(matches!(
+			check_migrations(&fixture.root),
+			Err(MigrationError::TransitionDrift { .. })
+		));
+		let refreshed = make_migrations(&fixture.root)
+			.unwrap_or_else(|error| panic!("refresh manual hash: {error}"));
+		assert_eq!(refreshed.updated_drafts, ["account:1:01@1"]);
+		check_migrations(&fixture.root)
+			.unwrap_or_else(|error| panic!("check completed transition: {error}"));
+		let unchanged = make_migrations(&fixture.root)
+			.unwrap_or_else(|error| panic!("keep matching draft hash: {error}"));
+		assert_eq!(unchanged.unchanged_contracts, ["account:1:01"]);
+
+		publish_current(&fixture);
+		std::fs::write(&path, "pub(crate) fn migrate(_: &mut [u8]) { panic!() }\n")
+			.unwrap_or_else(|error| panic!("tamper frozen transition: {error}"));
+		assert!(matches!(
+			check_migrations(&fixture.root),
+			Err(MigrationError::FrozenImplementationChanged { .. })
+		));
+		assert!(matches!(
+			make_migrations(&fixture.root),
+			Err(MigrationError::FrozenImplementationChanged { .. })
+		));
+
+		let missing = publication_fixture();
+		publish_current(&missing);
+		write_state_source(&missing, "value: u64, enabled: bool");
+		let generated = make_migrations(&missing.root)
+			.unwrap_or_else(|error| panic!("generate automatic transition: {error}"));
+		let manifest = load_manifest(&generated.manifest)
+			.unwrap_or_else(|error| panic!("read generated manifest: {error}"))
+			.expect("generated manifest");
+		let transition = manifest.contracts["account:1:01"].versions[1]
+			.transition
+			.as_ref()
+			.expect("generated transition");
+		let path = transition_path(
+			&Project::discover(&missing.root).expect("discover fixture"),
+			&manifest.contracts["account:1:01"].identity,
+			transition.from,
+			transition.to,
+		);
+		std::fs::write(&path, [0xff])
+			.unwrap_or_else(|error| panic!("write invalid transition text: {error}"));
+		assert!(matches!(
+			check_migrations(&missing.root),
+			Err(MigrationError::Read { .. })
+		));
+		std::fs::remove_file(&path).unwrap_or_else(|error| panic!("remove transition: {error}"));
+		assert!(matches!(
+			check_migrations(&missing.root),
+			Err(MigrationError::MissingTransition { .. })
+		));
+		assert!(matches!(
+			make_migrations(&missing.root),
+			Err(MigrationError::MissingTransition { .. })
+		));
+		assert!(matches!(
+			hash_transition_file(&path),
+			Err(MigrationError::Read { .. })
+		));
+
+		let mut incomplete = manifest.contracts["account:1:01"].clone();
+		incomplete.versions[1].transition = None;
+		assert!(matches!(
+			verify_transition_files(
+				&Project::discover(&missing.root).expect("discover fixture"),
+				&PublicationLedger::default(),
+				"account:1:01",
+				&incomplete,
+			),
+			Err(MigrationError::InvalidHistory(_))
+		));
 	}
 
 	struct PublicationFixture {
@@ -1802,7 +2689,7 @@ mod tests {
 		program_id: &'static str,
 	}
 
-	fn publication_fixture() -> PublicationFixture {
+	fn migration_fixture() -> PublicationFixture {
 		const PROGRAM_ID: &str = "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS";
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp fixture: {error}"));
 		let root = std::fs::canonicalize(temp.path())
@@ -1826,30 +2713,6 @@ mod tests {
 			),
 		)
 		.unwrap_or_else(|error| panic!("write source: {error}"));
-		let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
-		let schema = schema(LayoutKind::Fixed, &[("value", "u64")]);
-		let mut manifest = MigrationManifest::new(PROGRAM_ID.to_owned(), MigrationVersionType::U8);
-		manifest.contracts.insert(
-			identity.key(),
-			ContractHistory {
-				identity,
-				rust_name: "State".to_owned(),
-				versions: vec![SchemaVersion {
-					version: 0,
-					schema_sha256: schema.sha256(),
-					schema,
-					process: None,
-					process_sha256: None,
-					transition: None,
-				}],
-			},
-		);
-		std::fs::write(
-			root.join(MANIFEST_PATH),
-			serde_json::to_vec_pretty(&manifest)
-				.unwrap_or_else(|error| panic!("serialize manifest: {error}")),
-		)
-		.unwrap_or_else(|error| panic!("write manifest: {error}"));
 		std::fs::write(
 			root.join(PUBLICATIONS_PATH),
 			serde_json::to_vec_pretty(&PublicationLedger::default())
@@ -1866,6 +2729,75 @@ mod tests {
 			artifact,
 			program_id: PROGRAM_ID,
 		}
+	}
+
+	fn publication_fixture() -> PublicationFixture {
+		let fixture = migration_fixture();
+		let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
+		let schema = schema(LayoutKind::Fixed, &[("value", "u64")]);
+		let mut manifest =
+			MigrationManifest::new(fixture.program_id.to_owned(), MigrationVersionType::U8);
+		manifest.contracts.insert(
+			identity.key(),
+			ContractHistory {
+				identity,
+				rust_name: "State".to_owned(),
+				versions: vec![SchemaVersion {
+					version: 0,
+					schema_sha256: schema.sha256(),
+					schema,
+					process: None,
+					process_sha256: None,
+					transition: None,
+				}],
+			},
+		);
+		std::fs::write(
+			fixture.root.join(MANIFEST_PATH),
+			serde_json::to_vec_pretty(&manifest)
+				.unwrap_or_else(|error| panic!("serialize manifest: {error}")),
+		)
+		.unwrap_or_else(|error| panic!("write manifest: {error}"));
+		fixture
+	}
+
+	fn publish_current(fixture: &PublicationFixture) {
+		let digest: [u8; 32] = Sha256::digest(
+			std::fs::read(&fixture.artifact)
+				.unwrap_or_else(|error| panic!("read fixture artifact: {error}")),
+		)
+		.into();
+		begin_publication(
+			&fixture.root,
+			"devnet",
+			"https://api.devnet.solana.com",
+			fixture.program_id,
+			&fixture.artifact,
+			digest,
+		)
+		.unwrap_or_else(|error| panic!("begin fixture publication: {error}"));
+		record_publication(
+			&fixture.root,
+			"devnet",
+			"https://api.devnet.solana.com",
+			fixture.program_id,
+			&fixture.artifact,
+			digest,
+		)
+		.unwrap_or_else(|error| panic!("record fixture publication: {error}"));
+	}
+
+	fn write_state_source(fixture: &PublicationFixture, fields: &str) {
+		std::fs::write(
+			fixture.root.join("src/lib.rs"),
+			format!(
+				"use pina::*;\ndeclare_id!(\"{}\");\n#[discriminator]\nenum Kind {{ State = 1 \
+				 }}\n#[account(discriminator = Kind::State, migrations)]\nstruct State {{ \
+				 {fields} }}\n",
+				fixture.program_id
+			),
+		)
+		.unwrap_or_else(|error| panic!("write State source: {error}"));
 	}
 
 	#[test]

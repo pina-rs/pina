@@ -559,6 +559,35 @@ mod tests {
 	}
 
 	#[test]
+	fn build_requires_checked_migration_history() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		fs::create_dir_all(temp.path().join("src"))
+			.unwrap_or_else(|error| panic!("create source: {error}"));
+		fs::write(
+			temp.path().join("Cargo.toml"),
+			"[package]\nname = \"migration-build\"\nversion = \"0.0.0\"\nedition = \
+			 \"2024\"\n[lib]\npath = \"src/lib.rs\"\n",
+		)
+		.unwrap_or_else(|error| panic!("write manifest: {error}"));
+		fs::write(
+			temp.path().join("src/lib.rs"),
+			"use pina::*;\ndeclare_id!(\"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS\");\n#\
+			 [discriminator]\nenum Kind { State = 1 }\n#[account(discriminator = Kind::State, \
+			 migrations)]\nstruct State { value: u64 }\n",
+		)
+		.unwrap_or_else(|error| panic!("write source: {error}"));
+		let project = Project::discover(temp.path())
+			.unwrap_or_else(|error| panic!("discover fixture: {error}"));
+
+		assert!(matches!(
+			check_migrations_for_build(&project),
+			Err(BuildError::Migration(
+				crate::migrations::MigrationError::MissingSnapshot { .. }
+			))
+		));
+	}
+
+	#[test]
 	fn publication_replaces_both_outputs_repeatedly() {
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 		let idl = temp.path().join("program.json");

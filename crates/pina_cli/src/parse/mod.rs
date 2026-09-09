@@ -39,6 +39,18 @@ pub fn parse_program(
 	program_path: &Path,
 	name_override: Option<&str>,
 ) -> Result<ProgramIr, IdlError> {
+	parse_program_with_sources(program_path, name_override).map(|(program, _)| program)
+}
+
+/// Parse a program and retain the exact source snapshot used to construct it.
+///
+/// Migration discovery consumes the returned syntax trees for event contracts,
+/// avoiding a second filesystem read that could observe a different source
+/// revision from the assembled program IR.
+pub(crate) fn parse_program_with_sources(
+	program_path: &Path,
+	name_override: Option<&str>,
+) -> Result<(ProgramIr, Vec<module_resolver::ResolvedFile>), IdlError> {
 	let cargo_toml = program_path.join("Cargo.toml");
 	let cargo_contents =
 		std::fs::read_to_string(&cargo_toml).map_err(|e| IdlError::io(&cargo_toml, e))?;
@@ -66,7 +78,9 @@ pub fn parse_program(
 		return Err(IdlError::NoEntrypoint);
 	}
 
-	assemble_program_ir_multi(&syn_files, name_override.unwrap_or(&package_name))
+	let program = assemble_program_ir_multi(&syn_files, name_override.unwrap_or(&package_name))?;
+
+	Ok((program, resolved_files))
 }
 
 /// Assemble a `ProgramIr` from multiple parsed syn `File`s.
@@ -571,10 +585,14 @@ mod tests {
 				TestEvent = 1,
 			}
 
-			#[instruction(discriminator = EventsInstruction, variant = Initialize)]
+			#[instruction(
+				discriminator = EventsInstruction,
+				variant = Initialize,
+				migrations
+			)]
 			pub struct InitializeInstruction {}
 
-			#[instruction(discriminator = EventsInstruction, variant = TestEvent)]
+			#[instruction(discriminator = EventsInstruction, variant = TestEvent, migrations)]
 			pub struct TestEventInstruction {}
 		"#;
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
@@ -583,8 +601,15 @@ mod tests {
 		assert_eq!(ir.instructions.len(), 2);
 		assert_eq!(ir.instructions[0].name, "initialize");
 		assert_eq!(ir.instructions[0].accounts.len(), 0);
+		assert_eq!(ir.instructions[0].docs, [crate::ir::MIGRATABLE_DOC_MARKER]);
 		assert_eq!(ir.instructions[1].name, "test_event");
 		assert_eq!(ir.instructions[1].accounts.len(), 0);
+		assert!(
+			ir.instructions[1]
+				.docs
+				.iter()
+				.any(|doc| doc == crate::ir::MIGRATABLE_DOC_MARKER)
+		);
 	}
 
 	#[test]

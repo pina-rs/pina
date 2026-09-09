@@ -28,11 +28,9 @@ pub fn extract_migratable_events(file: &File) -> Result<Vec<EventStruct>, IdlErr
 		if !has_migrations_flag(&item_struct.attrs, "event") {
 			continue;
 		}
-		let Some((discriminator_enum, variant)) =
+		let (discriminator_enum, variant) =
 			extract_discriminator_and_variant(&item_struct.attrs, "event", &item_struct.ident)?
-		else {
-			continue;
-		};
+				.expect("an event attribute with `migrations` always supplies the parsed event");
 		let schema = pina_abi::data_schema(item_struct, pina_abi::LayoutKind::Fixed)
 			.map_err(IdlError::Other)?;
 		events.push(EventStruct {

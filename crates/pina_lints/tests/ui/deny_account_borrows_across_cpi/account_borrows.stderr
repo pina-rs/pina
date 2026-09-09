@@ -1,5 +1,5 @@
 error: CPI invoked while a mutable account-data borrow is still alive
-  --> $DIR/account_borrows.rs:50:2
+  --> $DIR/account_borrows.rs:64:2
    |
 LL |     cpi.invoke()
    |     ^^^^^^^^^^^^
@@ -8,7 +8,7 @@ LL |     cpi.invoke()
    = note: `#[deny(deny_account_borrows_across_cpi)]` on by default
 
 error: CPI invoked while a mutable account-data borrow is still alive
-  --> $DIR/account_borrows.rs:56:9
+  --> $DIR/account_borrows.rs:70:9
    |
 LL |     return cpi.invoke();
    |            ^^^^^^^^^^^^
@@ -16,7 +16,7 @@ LL |     return cpi.invoke();
    = help: copy the required values, then call `drop(guard)` or end the borrow's scope before invoking another program
 
 error: CPI invoked while a mutable account-data borrow is still alive
-  --> $DIR/account_borrows.rs:63:9
+  --> $DIR/account_borrows.rs:77:9
    |
 LL |         break cpi.invoke();
    |               ^^^^^^^^^^^^
@@ -24,7 +24,7 @@ LL |         break cpi.invoke();
    = help: copy the required values, then call `drop(guard)` or end the borrow's scope before invoking another program
 
 error: CPI invoked while a mutable account-data borrow is still alive
-  --> $DIR/account_borrows.rs:70:2
+  --> $DIR/account_borrows.rs:84:2
    |
 LL |     cpi.invoke()
    |     ^^^^^^^^^^^^

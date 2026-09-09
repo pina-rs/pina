@@ -721,6 +721,7 @@ mod tests {
 		let field: syn::Field = syn::parse_quote! {
 			#[pina(validate(signer, writable, owner = ID, not_empty, error = Error::Denied))]
 			#[pina(distinct)]
+			#[pina(distinct = authority)]
 			account: &'static AccountView
 		};
 
@@ -728,7 +729,14 @@ mod tests {
 			canonical_account_constraints(&field.attrs).expect("supported declarative constraints");
 		assert_eq!(
 			constraints,
-			["distinct", "not_empty", "owner=ID", "signer", "writable"]
+			[
+				"distinct",
+				"distinct=authority",
+				"not_empty",
+				"owner=ID",
+				"signer",
+				"writable"
+			]
 		);
 	}
 
@@ -746,6 +754,10 @@ mod tests {
 		assert!(message.contains("`validate(...)`"));
 		assert!(message.contains("`remaining`"));
 		assert!(message.contains("`distinct`"));
+
+		let error = canonical_account_constraints(&field.attrs)
+			.expect_err("an unknown compatibility constraint must fail");
+		assert!(error.to_string().contains("unknown account-field option"));
 	}
 
 	#[test]

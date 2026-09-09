@@ -7,6 +7,7 @@ use rustc_hir::Expr;
 use rustc_hir::ExprKind;
 use rustc_hir::HirId;
 use rustc_hir::intravisit::FnKind;
+use rustc_hir::intravisit::Visitor;
 use rustc_lint::LateContext;
 use rustc_lint::LateLintPass;
 use rustc_lint::LintContext;
@@ -47,11 +48,8 @@ fn is_account_borrow(cx: &LateContext<'_>, expr: &Expr<'_>, method: &str) -> boo
 
 	method_def_path(cx, expr).is_some_and(|path| {
 		let path = path.to_ascii_lowercase();
-		match method {
-			"try_borrow_mut" => path.contains("accountview::try_borrow_mut"),
-			"as_account_mut" => path.contains("asaccount::as_account_mut"),
-			_ => false,
-		}
+		(method == "try_borrow_mut" && path.contains("accountview::try_borrow_mut"))
+			|| (method == "as_account_mut" && path.contains("asaccount::as_account_mut"))
 	})
 }
 
@@ -86,29 +84,30 @@ fn is_generated_pda_mut_borrow(callee: &Expr<'_>) -> bool {
 	method.is_some_and(|method| method.name.as_str() == "load_pda_mut")
 }
 
-fn contains_mutable_borrow(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
-	match &expr.kind {
-		ExprKind::MethodCall(segment, receiver, args, _) => {
-			is_account_borrow(cx, expr, segment.ident.name.as_str())
-				|| contains_mutable_borrow(cx, receiver)
-				|| args
-					.iter()
-					.any(|argument| contains_mutable_borrow(cx, argument))
+struct MutableBorrowFinder<'cx, 'tcx> {
+	cx: &'cx LateContext<'tcx>,
+	found: bool,
+}
+
+impl<'tcx> Visitor<'tcx> for MutableBorrowFinder<'_, 'tcx> {
+	fn visit_expr(&mut self, expr: &'tcx Expr<'tcx>) {
+		self.found |= match &expr.kind {
+			ExprKind::MethodCall(segment, ..) => {
+				is_account_borrow(self.cx, expr, segment.ident.name.as_str())
+			}
+			ExprKind::Call(callee, _) => is_generated_pda_mut_borrow(callee),
+			_ => false,
+		};
+		if !self.found {
+			rustc_hir::intravisit::walk_expr(self, expr);
 		}
-		ExprKind::Match(scrutinee, ..)
-		| ExprKind::DropTemps(scrutinee)
-		| ExprKind::Use(scrutinee, _)
-		| ExprKind::Type(scrutinee, _)
-		| ExprKind::UnsafeBinderCast(_, scrutinee, _) => contains_mutable_borrow(cx, scrutinee),
-		ExprKind::Call(callee, args) => {
-			is_generated_pda_mut_borrow(callee)
-				|| contains_mutable_borrow(cx, callee)
-				|| args
-					.iter()
-					.any(|argument| contains_mutable_borrow(cx, argument))
-		}
-		_ => false,
 	}
+}
+
+fn contains_mutable_borrow<'tcx>(cx: &LateContext<'tcx>, expr: &'tcx Expr<'tcx>) -> bool {
+	let mut finder = MutableBorrowFinder { cx, found: false };
+	finder.visit_expr(expr);
+	finder.found
 }
 
 fn local_binding(expr: &Expr<'_>) -> Option<HirId> {

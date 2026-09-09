@@ -268,3 +268,59 @@ fn render_discriminator_literal(
 		NumberFormat::F32 | NumberFormat::F64 | NumberFormat::ShortU16 => unreachable!(),
 	})
 }
+
+#[cfg(test)]
+mod tests {
+	use codama_nodes::InstructionInputValueNode;
+	use codama_nodes::NumberValueNode;
+	use codama_nodes::StringTypeNode;
+	use codama_nodes::TypeNode;
+	use codama_nodes::ValueNode;
+
+	use super::render_omitted_instruction_constant;
+	use super::render_omitted_value_constant;
+
+	#[test]
+	fn omitted_constants_require_numeric_defaults() {
+		let string_type = TypeNode::from(StringTypeNode::utf8());
+		let instruction_value = InstructionInputValueNode::NumberValue(NumberValueNode::new(1_u8));
+		let account_value = ValueNode::Number(NumberValueNode::new(1_u8));
+
+		for result in [
+			render_omitted_instruction_constant(
+				"state",
+				"migrationVersion",
+				&string_type,
+				Some(&instruction_value),
+				"instruction",
+			),
+			render_omitted_instruction_constant(
+				"state",
+				"migrationVersion",
+				&string_type,
+				None,
+				"instruction",
+			),
+		] {
+			assert!(result.is_err());
+		}
+		for result in [
+			render_omitted_value_constant(
+				"state",
+				"migrationVersion",
+				&string_type,
+				Some(&account_value),
+				"account",
+			),
+			render_omitted_value_constant(
+				"state",
+				"migrationVersion",
+				&string_type,
+				None,
+				"account",
+			),
+		] {
+			assert!(result.is_err());
+		}
+	}
+}
