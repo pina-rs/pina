@@ -7,6 +7,7 @@
   - [Initialize a Program](./cli/init.md)
   - [Run Security Lints](./cli/lint.md)
   - [Build a Program](./cli/build.md)
+  - [Manage ABI migrations](./cli/migrations.md)
   - [Verify a Deployed Program](./cli/verify.md)
   - [Generate Clients](./cli/generate.md)
   - [Generate a CPI Crate](./cli/cpi.md)

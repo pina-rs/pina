@@ -39,6 +39,43 @@ program.stop()?;
 
 The payer signs and submits by default; `send_with_signers` adds program-specific signers, and `TestError::operation` plus `TestError::message` make failure assertions readable without parsing display text. `OfflineSurfnet` remains available when a test needs to control deployment itself.
 
+## Test historical compatibility
+
+Run `pina test --compatibility` to verify the checked-in migration history and run the complete Surfpool suite against the latest SBF artifact. `compatibility_mode()` returns `true` during that run. Use the signal to add expensive historical matrices without skipping current-flow tests.
+
+Build fixtures from checked-in golden bytes. Do not encode them with the current generated type.
+
+```rust,ignore
+let old_state = HistoricalAccount::new(
+	0,
+	state_address,
+	program.program_id(),
+	include_bytes!("fixtures/state-v0.bin").to_vec(),
+);
+program.install_historical_account(&old_state)?;
+
+let old_update = HistoricalInstruction::new(
+	0,
+	include_bytes!("fixtures/update-v0.bin").to_vec(),
+	vec![AccountMeta::new(authority.pubkey(), true)],
+);
+program.send_historical_instruction(&old_update, &[&authority])?;
+```
+
+`HistoricalInstruction` preserves the old positional account list. An old request can therefore omit an optional suffix that the current process added. `HistoricalAccount` installs the complete old account state, including the discriminator and migration version.
+
+For rejection tests, protect every account that the migration can touch:
+
+```rust,ignore
+program.expect_historical_rejection_with_rollback(
+	&malformed_update,
+	&[state_address, treasury_address],
+	&[&authority],
+)?;
+```
+
+The assertion accepts only an error from program execution. Signing and RPC failures do not satisfy it. After rejection, the assertion compares the protected accounts byte-for-byte, including lamports, ownership, the executable flag, and the rent epoch.
+
 Generated programs keep `pina_test` in a dedicated `tests/surfpool` Cargo package with its own workspace boundary. Native tests therefore do not resolve, compile, or link Surfpool, and SBF builds cannot enable the host dependency.
 
 This crate is for host tests only. Do not enable it in an SBF build.

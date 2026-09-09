@@ -77,25 +77,21 @@ Pina's ABI document has its own `formatVersion`, separate from every on-chain co
 
 ### Drafts and publication
 
-Local iteration has one replaceable draft head per changed contract. `pina migrations create` captures the current ABI. It replaces an unpublished draft without consuming another version. If the current head has appeared in a persistent release, it allocates the next version.
+Local iteration has one replaceable draft head per changed contract. `pina migrations make` captures the current ABI. It replaces an unpublished draft without consuming another version. If the current head has appeared in a persistent release, it allocates the next version.
 
-`pina build` never creates or changes migration history. It fails on ABI drift, an unresolved custom transition, a modified published schema or transition, version exhaustion, or a version-width mismatch. A successful build seals the executable hash to an ABI manifest hash.
+`pina build` never creates or changes migration history. It fails on ABI drift, an unresolved custom transition, a modified published schema or transition, version exhaustion, or a version-width mismatch.
 
-Developers do not mark versions as published. `pina deploy` records publication after it proves that the deployed executable and runtime ABI manifest match the sealed artifact. Publication records bind:
+Developers do not mark versions as published. After a successful non-local deployment, `pina deploy` rechecks every planned input and appends a local receipt. Each receipt records:
 
-- cluster genesis hash and program identity;
-- deployed executable hash and slot;
-- complete ABI-history root;
-- every current schema and transition hash;
-- generator and ABI format versions;
-- version width;
-- the preceding publication receipt.
+- the cluster label and credential-free RPC URL;
+- the program identity;
+- the SHA-256 digest of the exact planned executable;
+- the ABI manifest digest and every current contract version;
+- the preceding receipt digest.
 
-The deployed executable is the source of truth for what is live now. The publication ledger is the source of truth for what has ever been live, including releases later replaced or rolled back. A checked-in lock file mirrors verified receipts for offline builds, but is not an editable substitute for them.
+The checked-in, hash-chained publication ledger is the current source of truth for version allocation. Loopback local deployments do not add receipts.
 
-An interrupted or ambiguous deployment freezes its candidate versions until recovery proves that the executable never became live. Loopback localnet deployments are ephemeral by default. Devnet, testnet, mainnet, and remote custom clusters count as publications.
-
-A production-grade append-only registry is the eventual authority. A mutable metadata account may bootstrap the workflow, but Pina must describe its weaker tamper guarantees accurately.
+The first implementation does not query the deployed program-data account, cluster genesis hash, deployment slot, or transaction signature. A process interruption after remote success but before the local append can therefore leave a live version recorded as a draft. Until remote reconciliation lands, release automation must treat that result as ambiguous and preserve the candidate history. The local ledger is reviewable release evidence, not an independent on-chain attestation.
 
 ### Generated data compatibility boundary
 

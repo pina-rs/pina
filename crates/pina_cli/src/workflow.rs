@@ -116,6 +116,8 @@ pub struct TestOptions {
 	pub project: PathBuf,
 	/// Run native Rust and Mollusk tests without building SBF or starting Surfpool.
 	pub unit: bool,
+	/// Verify migrations and identify the run as a complete compatibility suite.
+	pub compatibility: bool,
 	/// Optional Cargo test-name filter.
 	pub filter: Option<String>,
 }
@@ -141,7 +143,12 @@ pub fn test_project(options: &TestOptions) -> Result<(), WorkflowError> {
 
 	require_surfpool_test(&project)?;
 	let output = build_project(&options.project)?;
-	run_surfpool_test(&project, &output.sbf_artifact, options.filter.as_deref())
+	run_surfpool_test(
+		&project,
+		&output.sbf_artifact,
+		options.filter.as_deref(),
+		options.compatibility,
+	)
 }
 
 /// Build a project, then delegate persistent watch and redeploy to Surfpool.
@@ -277,6 +284,7 @@ fn run_native_tests(project: &Project, filter: Option<&str>) -> Result<(), Workf
 	let mut command = Command::new(&cargo);
 	command
 		.current_dir(&project.root)
+		.env_remove("PINA_COMPATIBILITY")
 		.arg("test")
 		.arg("--manifest-path")
 		.arg(manifest);
@@ -292,6 +300,7 @@ fn run_surfpool_test(
 	project: &Project,
 	artifact: &Path,
 	filter: Option<&str>,
+	compatibility: bool,
 ) -> Result<(), WorkflowError> {
 	let cargo = executable("CARGO", "cargo");
 	let manifest = project.program_dir.join("tests/surfpool/Cargo.toml");
@@ -299,10 +308,14 @@ fn run_surfpool_test(
 	command
 		.current_dir(&project.root)
 		.env("PINA_SBF_ARTIFACT", artifact)
+		.env_remove("PINA_COMPATIBILITY")
 		.arg("test")
 		.arg("--manifest-path")
 		.arg(manifest)
 		.arg("--lib");
+	if compatibility {
+		command.env("PINA_COMPATIBILITY", "1");
+	}
 
 	if let Some(filter) = filter {
 		command.arg(filter);

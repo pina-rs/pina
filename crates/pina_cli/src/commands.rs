@@ -71,8 +71,9 @@ pub(crate) fn run(cli: Cli) {
 		Commands::Test {
 			project,
 			unit,
+			compatibility,
 			filter,
-		} => run_test(project, unit, filter),
+		} => run_test(project, unit, compatibility, filter),
 		Commands::Dev {
 			project,
 			network,
@@ -693,10 +694,11 @@ fn run_cpi(
 	);
 }
 
-fn run_test(project: PathBuf, unit: bool, filter: Option<String>) {
+fn run_test(project: PathBuf, unit: bool, compatibility: bool, filter: Option<String>) {
 	let options = pina_cli::workflow::TestOptions {
 		project,
 		unit,
+		compatibility,
 		filter,
 	};
 

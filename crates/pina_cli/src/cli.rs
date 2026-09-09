@@ -377,12 +377,13 @@ pub(crate) enum Commands {
 	/// Mollusk tests only.
 	#[command(
 		after_help = "Examples:\n  pina test\n  pina test --filter initialize\n  pina test \
-		              --unit\n  pina test --unit --filter rejects_wrong_owner\n\nTest layers:\n  \
-		              --unit keeps the fast native/Mollusk loop and does not build SBF.\n  The \
-		              default builds SBF and runs the ignored test in the isolated \
-		              `tests/surfpool` package.\n\nSafety:\n  Embedded Surfpool tests allocate \
-		              isolated ports and must stop their instance before returning. Missing SBF \
-		              artifacts and incomplete Surfpool test packages are hard failures."
+		              --unit\n  pina test --compatibility\n  pina test --unit --filter \
+		              rejects_wrong_owner\n\nTest layers:\n  --unit keeps the fast native/Mollusk \
+		              loop and does not build SBF.\n  The default builds SBF and runs the ignored \
+		              test in the isolated `tests/surfpool` package.\n\nSafety:\n  Embedded \
+		              Surfpool tests allocate isolated ports and must stop their instance before \
+		              returning. Missing SBF artifacts and incomplete Surfpool test packages are \
+		              hard failures."
 	)]
 	Test {
 		/// Project directory or a directory below it. Defaults to the current directory.
@@ -398,6 +399,10 @@ pub(crate) enum Commands {
 		/// Run native Rust and Mollusk tests without building SBF or starting Surfpool.
 		#[arg(long)]
 		unit: bool,
+
+		/// Verify migration history, then expose historical fixtures to the complete Surfpool suite.
+		#[arg(long, conflicts_with = "unit")]
+		compatibility: bool,
 
 		/// Run only tests whose names contain FILTER.
 		#[arg(short, long, value_name = "FILTER")]

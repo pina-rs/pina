@@ -22,6 +22,9 @@ Options:
       --unit
           Run native Rust and Mollusk tests without building SBF or starting Surfpool
 
+      --compatibility
+          Verify migration history, then expose historical fixtures to the complete Surfpool suite
+
   -f, --filter <FILTER>
           Run only tests whose names contain FILTER
 
@@ -32,6 +35,7 @@ Examples:
   pina test
   pina test --filter initialize
   pina test --unit
+  pina test --compatibility
   pina test --unit --filter rejects_wrong_owner
 
 Test layers:
