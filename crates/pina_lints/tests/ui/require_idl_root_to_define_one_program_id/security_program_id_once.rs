@@ -19,3 +19,5 @@ fn entrypoint() -> Result<(), ()> {
 }
 
 fn main() {}
+
+// check-pass

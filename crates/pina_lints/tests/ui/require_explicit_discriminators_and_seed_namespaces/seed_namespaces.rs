@@ -58,3 +58,5 @@ fn process_local_helper(authority: &[u8]) {
 }
 
 fn main() {}
+
+// check-warn

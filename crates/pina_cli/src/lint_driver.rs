@@ -9,9 +9,15 @@
 //! own tasks and tests use it to run the workspace driver.
 
 use std::ffi::OsString;
+use std::fs::File;
+use std::io::BufReader;
+use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+
+use sha2::Digest as _;
+use sha2::Sha256;
 
 /// Environment variable pointing at an existing driver binary.
 const PINA_LINT_DRIVER_PATH: &str = "PINA_LINT_DRIVER_PATH";
@@ -60,8 +66,9 @@ pub enum DriverError {
 ///
 /// The driver is installed below `cargo_home` at
 /// `pina/lint-driver/<pina-version>/<toolchain>/bin/pina_lint_driver`, where
-/// the toolchain component is the `release-host` fingerprint reported by the
-/// Rust compiler that builds the project.
+/// the toolchain component contains the release, optional commit, host, and a
+/// hash of the complete version report from the compiler that builds the
+/// project.
 pub fn prepare_driver(
 	cargo_home: &Path,
 	project_root: &Path,
@@ -86,7 +93,7 @@ pub fn prepare_driver(
 		return Ok(PreparedDriver { path: bin });
 	}
 
-	install_driver(&root)?;
+	install_driver(&root, project_root)?;
 
 	if is_executable(&bin) {
 		return Ok(PreparedDriver { path: bin });
@@ -95,10 +102,11 @@ pub fn prepare_driver(
 }
 
 /// Install the driver from the crates.io release matching this CLI.
-fn install_driver(root: &Path) -> Result<(), DriverError> {
+fn install_driver(root: &Path, project_root: &Path) -> Result<(), DriverError> {
 	let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
 
 	let status = Command::new(&cargo)
+		.current_dir(project_root)
 		.arg("install")
 		.arg("--locked")
 		.arg("--root")
@@ -148,10 +156,33 @@ fn is_executable(path: &Path) -> bool {
 	path.is_file()
 }
 
-/// Return the `release-host` fingerprint of the Rust compiler used for
+/// Return a deterministic content identity for the prepared driver.
+///
+/// The identity is forwarded into rustc dep-info so Cargo invalidates a prior
+/// lint result when a rebuilt driver occupies the same path.
+pub fn driver_build_identity(path: &Path) -> std::io::Result<String> {
+	let file = File::open(path)?;
+	let mut reader = BufReader::new(file);
+	let mut buffer = [0u8; 16 * 1024];
+	let mut hash = Sha256::new();
+
+	loop {
+		let read = reader.read(&mut buffer)?;
+		if read == 0 {
+			break;
+		}
+		hash.update(&buffer[..read]);
+	}
+
+	let digest = hash.finalize();
+	Ok(hex(&digest))
+}
+
+/// Return the version-report fingerprint of the Rust compiler used for
 /// `project_root`.
 fn rustc_fingerprint(project_root: &Path) -> Result<String, DriverError> {
-	let output = Command::new("rustc")
+	let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| OsString::from("rustc"));
+	let output = Command::new(rustc)
 		.arg("-vV")
 		.current_dir(project_root)
 		.output()
@@ -166,23 +197,29 @@ fn rustc_fingerprint(project_root: &Path) -> Result<String, DriverError> {
 	parse_rustc_fingerprint(&output.stdout).ok_or(DriverError::MissingRustcFingerprint)
 }
 
-/// Parse the release and host from verbose rustc version output.
+/// Parse a stable identity from verbose rustc version output.
+///
+/// Official toolchains expose a commit hash, but source-built compilers may
+/// omit it. Hashing the complete version report keeps every compiler property
+/// that rustc does expose in the cache identity without rejecting those
+/// toolchains or collapsing all of them onto an `unknown` placeholder.
 fn parse_rustc_fingerprint(output: &[u8]) -> Option<String> {
-	let release = String::from_utf8_lossy(output)
-		.lines()
-		.find_map(|line| line.strip_prefix("release: "))?
-		.split_whitespace()
-		.next()?
-		.to_owned();
-	let host = String::from_utf8_lossy(output)
-		.lines()
-		.find_map(|line| line.strip_prefix("host: "))?
-		.split_whitespace()
-		.next()?
-		.to_owned();
+	let version_hash = Sha256::digest(output);
+	let version_hash = hex(&version_hash);
+	let output = String::from_utf8_lossy(output);
+	let field = |prefix| {
+		output
+			.lines()
+			.find_map(|line| line.strip_prefix(prefix))?
+			.split_whitespace()
+			.next()
+	};
+	let release = field("release: ")?;
+	let commit_hash = field("commit-hash: ").unwrap_or("no-commit");
+	let host = field("host: ")?;
 
-	let fingerprint = format!("{release}-{host}");
-	// The release and host prefixes were parsed above, so the leftover
+	let fingerprint = format!("{release}-{commit_hash}-{host}-{version_hash}");
+	// The required fields were parsed above, so the leftover
 	// replacements cannot blank the name out.
 	Some(
 		fingerprint
@@ -196,6 +233,17 @@ fn parse_rustc_fingerprint(output: &[u8]) -> Option<String> {
 			})
 			.collect::<String>(),
 	)
+}
+
+fn hex(bytes: &[u8]) -> String {
+	const HEX: &[u8; 16] = b"0123456789abcdef";
+	let mut encoded = String::with_capacity(bytes.len() * 2);
+	for byte in bytes {
+		encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+		encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+	}
+
+	encoded
 }
 
 /// Resolve the directory Cargo uses for its managed state.
@@ -313,25 +361,50 @@ mod tests {
 	#[test]
 	fn parses_rustc_fingerprint_from_verbose_version_output() {
 		let output = b"rustc 1.95.0-nightly (abc 2026-02-20)\nbinary: rustc\nrelease: \
-		               1.95.0-nightly\nhost: x86_64-unknown-linux-gnu\n";
+		               1.95.0-nightly\ncommit-hash: abc123\nhost: x86_64-unknown-linux-gnu\n";
 
-		assert_eq!(
-			parse_rustc_fingerprint(output).as_deref(),
-			Some("1.95.0-nightly-x86_64-unknown-linux-gnu")
-		);
+		let fingerprint = parse_rustc_fingerprint(output).expect("the version report should parse");
+		assert!(fingerprint.starts_with("1.95.0-nightly-abc123-x86_64-unknown-linux-gnu-"));
+		assert_eq!(fingerprint.rsplit('-').next().map(str::len), Some(64));
 		assert!(parse_rustc_fingerprint(b"rustc without fingerprint lines\n").is_none());
+	}
+
+	#[test]
+	fn fingerprints_source_built_compilers_without_a_commit_hash() {
+		let first = b"release: 1.95.0-dev\nhost: x86_64-unknown-linux-gnu\nLLVM version: 21.0.0\n";
+		let second = b"release: 1.95.0-dev\nhost: x86_64-unknown-linux-gnu\nLLVM version: 22.0.0\n";
+
+		let fingerprint = parse_rustc_fingerprint(first).expect("a commit hash should be optional");
+		assert!(fingerprint.starts_with("1.95.0-dev-no-commit-x86_64-unknown-linux-gnu-"));
+		assert_ne!(
+			parse_rustc_fingerprint(first),
+			parse_rustc_fingerprint(second),
+			"the complete compiler version report must contribute to the identity"
+		);
+	}
+
+	#[test]
+	fn distinguishes_nightly_compiler_revisions() {
+		let first = b"release: 1.95.0-nightly\ncommit-hash: abc123\nhost: aarch64-apple-darwin\n";
+		let second = b"release: 1.95.0-nightly\ncommit-hash: def456\nhost: aarch64-apple-darwin\n";
+
+		assert_ne!(
+			parse_rustc_fingerprint(first),
+			parse_rustc_fingerprint(second)
+		);
 	}
 
 	#[test]
 	fn sanitizes_unexpected_characters_out_of_the_toolchain_fingerprint() {
 		let output = b"rustc 1.95.0 nightly\nbinary: rustc\nrelease: \
-		               1.95.0~rolling\nhost: aarch64 unknown linux\n";
+		               1.95.0~rolling\ncommit-hash: abc/123\nhost: aarch64 unknown linux\n";
 
 		// The tilde is not allowed in a cargo target fingerprint, so the
 		// sanitizer must replace it with the safe placeholder. The host token
 		// is the first whitespace-separated word of the host line.
 		let parsed = parse_rustc_fingerprint(output).expect("the crafted output should parse");
-		assert_eq!(parsed, "1.95.0-rolling-aarch64");
+		assert!(parsed.starts_with("1.95.0-rolling-abc-123-aarch64-"));
+		assert_eq!(parsed.rsplit('-').next().map(str::len), Some(64));
 	}
 
 	#[test]
@@ -356,5 +429,24 @@ mod tests {
 		std::fs::set_permissions(file.path(), std::fs::Permissions::from_mode(0o644))
 			.expect("permissions");
 		assert!(!is_executable(file.path()));
+	}
+
+	#[test]
+	fn driver_build_identity_tracks_binary_contents() {
+		let first = tempfile::NamedTempFile::new().expect("first temp file");
+		std::fs::write(first.path(), b"first driver").expect("write first driver");
+		let second = tempfile::NamedTempFile::new().expect("second temp file");
+		std::fs::write(second.path(), b"second driver").expect("write second driver");
+
+		let first_identity = driver_build_identity(first.path()).expect("fingerprint first driver");
+		assert_eq!(
+			first_identity,
+			driver_build_identity(first.path()).expect("fingerprint first driver again")
+		);
+		assert_ne!(
+			first_identity,
+			driver_build_identity(second.path()).expect("fingerprint second driver")
+		);
+		assert_eq!(first_identity.len(), 64);
 	}
 }

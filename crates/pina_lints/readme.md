@@ -6,7 +6,7 @@
 
 `pina_lints` is Pina's self-contained replacement for the previous [Dylint](https://github.com/trailofbits/dylint) setup: every security, performance, and IDL lint that Pina ships lives in this one importable crate, so the lints are built into Pina instead of being distributed as separate Dylint libraries. They turn repository security conventions into compiler diagnostics and are intended to run during normal development and CI.
 
-The crate keeps the Dylint authoring shape — each lint lives in its own module under `lints` and declares itself with `declare_late_lint!` or `declare_pre_expansion_lint!` — but no lint registers itself; registration is centralized in `register_all_lints`. The crate builds as both a library and a cdylib that exports the Dylint-compatible `register_lints` symbol, so a Dylint driver can still load it as a single library. It also ships the bundled `pina_lint_driver` binary, a `rustc` wrapper with every lint statically linked; `pina lint` runs it as `RUSTC_WRAPPER`, so it needs no external lint tooling.
+The crate keeps the Dylint authoring shape — each lint lives in its own module under `lints` and declares itself with `declare_late_lint!` or `declare_pre_expansion_lint!` — but no lint registers itself; registration is centralized in `register_all_lints`. The crate builds as both a library and a cdylib that exports the Dylint-compatible `register_lints` symbol, so a Dylint driver can still load it as a single library. It also ships the bundled `pina_lint_driver` binary, a `rustc` wrapper with every lint statically linked; `pina lint` runs it as `RUSTC_WORKSPACE_WRAPPER`, so it needs no external lint tooling.
 
 The lints complement tests and audits; they do not prove that a program's economic design is safe. Every path-sensitive lint documents the approximation it uses so findings can be reviewed with the right expectations.
 
@@ -26,9 +26,9 @@ pina lint
 pina lint --fix
 ```
 
-`pina lint` builds and manages the bundled `pina_lint_driver` under Cargo home, then invokes cargo with the driver as `RUSTC_WRAPPER`. Cargo calls the driver with the arguments it would have passed to `rustc`; the driver registers every lint compiled into this crate, and compilation continues normally. Because the lints are statically linked into the driver, no external lint tooling is downloaded or installed. The driver reads a few environment variables: `PINA_LINT_NO_DEPS` skips dependency crates, `PINA_LINT_LEVELS` forwards configured lint levels to `rustc` (see [Configuring lint levels](#configuring-lint-levels)), `PINA_LINT_ONLY` restricts linting to a single lint, and `PINA_LINT_LIST` prints the lint catalog instead of compiling. `PINA_LINT_NO_DEPS`, `PINA_LINT_LEVELS`, and `PINA_LINT_ONLY` are recorded in dep-info, so changing them invalidates cargo's cached check results.
+`pina lint` builds and manages the bundled `pina_lint_driver` under Cargo home, then invokes cargo with the driver as `RUSTC_WORKSPACE_WRAPPER`. Cargo calls the driver with the arguments it would have passed to `rustc`; the driver registers every lint compiled into this crate, and compilation continues normally. Cargo preserves and nests an existing `RUSTC_WRAPPER`, such as `sccache`, outside the lint driver. Because the lints are statically linked into the driver, no external lint tooling is downloaded or installed. The driver reads a few environment variables: `PINA_LINT_NO_DEPS` skips dependency crates, `PINA_LINT_LEVELS` forwards configured lint levels to `rustc` (see [Configuring lint levels](#configuring-lint-levels)), `PINA_LINT_ONLY` restricts linting to a single lint, and `PINA_LINT_LIST` prints the lint catalog instead of compiling. `PINA_LINT_NO_DEPS`, `PINA_LINT_LEVELS`, and `PINA_LINT_ONLY` are recorded in dep-info, so changing them invalidates cargo's cached check results.
 
-The crate itself is nightly-only: the lint passes and the driver link against the Rust compiler's unstable `rustc_private` crates. It is published to crates.io, but consuming projects never build it — the CLI builds and manages the driver for the active toolchain.
+The crate itself is nightly-only: the lint passes and the driver link against the Rust compiler's unstable `rustc_private` crates. It is published to crates.io, but consuming projects never build it — the CLI builds and manages the driver from the project directory for the active toolchain.
 
 Pina contributors still run the in-workspace driver when changing a lint:
 
@@ -36,7 +36,7 @@ Pina contributors still run the in-workspace driver when changing a lint:
 devenv shell -- security:pina-lint
 ```
 
-`security:pina-lint` is the authoritative gate. It builds the workspace's `pina_lint_driver` binary and runs cargo with `RUSTC_WRAPPER` pointing at it, discovering every package under `examples/` and every `security/*/secure` fixture, then checks each one in the driver's no-deps mode with `--locked`. Insecure fixtures are intentionally excluded because they preserve examples of unsafe patterns.
+`security:pina-lint` is the authoritative gate. It builds the workspace's `pina_lint_driver` binary and runs cargo with `RUSTC_WORKSPACE_WRAPPER` pointing at it, discovering every package under `examples/` and every `security/*/secure` fixture, then checks each one in the driver's no-deps mode with `--locked`. Insecure fixtures are intentionally excluded because they preserve examples of unsafe patterns.
 
 ## Importing the lints
 
@@ -73,6 +73,7 @@ Deny-level security lints should not be disabled at crate scope; see the [suppre
 | `require_sysvar_assert_before_sysvar_use`               | deny  | Sysvar accounts cannot be substituted               |
 | `require_type_assert_before_zero_copy_cast`             | deny  | Raw account casts use guard-backed typed loading    |
 | `require_reason_for_duplicate_remaining_accounts`       | deny  | Duplicate mutable remaining accounts are justified  |
+| `deny_unchecked_remaining_mut`                          | deny  | Direct mutable remaining accounts reject aliases    |
 | `require_canonical_bump_before_pda_write`               | deny  | PDA namespaces use canonical bumps                  |
 | `deny_account_borrows_across_cpi`                       | deny  | Mutable data guards end before CPI                  |
 | `deny_unused_account_borrow_guards`                     | warn  | Unread borrow guards are discarded immediately      |
@@ -164,6 +165,16 @@ pub votes: &'a mut [AccountView],
 
 `#[pina(remaining)]` is distinct by default. The word threshold only rejects missing or placeholder explanations; reviewers must still verify the stated invariant.
 
+### `deny_unchecked_remaining_mut`
+
+Detects direct calls to Pina's `AccountsCursor::remaining_mut()`. The method validates writability but preserves duplicate addresses, so one logical account can appear more than once in the returned mutable slice.
+
+```rust
+let remaining = cursor.remaining_mut_distinct()?;
+```
+
+The lint resolves the method definition before reporting, so same-named methods from other crates are ignored. It rejects method syntax, UFCS calls, stored function items, and calls hidden by local or external macros. Pina's `#[derive(Accounts)]` expansion remains exempt: the macro uses `remaining_mut()` only for the explicit, documented `#[pina(remaining, distinct = false)]` escape hatch, which is checked separately by `require_reason_for_duplicate_remaining_accounts`.
+
 ### `require_canonical_bump_before_pda_write`
 
 Detects `assert_seeds_with_bump()` in instruction paths unless the same account has already passed `assert_canonical_bump()` or `assert_seeds()`.
@@ -190,7 +201,7 @@ let amount = {
 transfer.invoke()?;
 ```
 
-An explicit `drop(guard)` or the end of a nested block releases the guard. The analysis follows block scope and explicit drops. It resolves method definitions before classifying a borrow or CPI, so an unrelated type that happens to define `try_borrow_mut()` or `invoke()` does not trigger the lint. Account borrows hidden inside custom wrapper constructors and CPIs hidden behind opaque helpers are outside its current model.
+An explicit `drop(guard)` or the end of a nested block releases the guard. The analysis follows block scope, locally bound closure calls, match guards, nested binding patterns, guard-returning aliases, and calls to the real `std::mem::drop`. Closure bodies are evaluated with the borrow state at each visible invocation, so defining a callback before a borrow or dropping a borrow before invoking it is modeled in execution order. It resolves method and guard types before classifying a borrow or CPI, so unrelated same-named operations do not create or discharge a proof. Account borrows hidden inside custom wrapper constructors, closures invoked through opaque higher-order helpers, and CPIs hidden behind opaque helpers are outside its current model.
 
 ### `deny_unused_account_borrow_guards`
 
@@ -205,7 +216,7 @@ let _guard = mint.as_token_mint_for_program(&token_program)?;
 mint.as_token_mint_for_program(&token_program)?;
 ```
 
-Assertion-style guards exist only for their `?` validation. Binding them without reading keeps the borrow open to the end of the scope, which obscures the borrow boundary and can turn a later borrow of the same account data into a runtime panic. Discard immediately by calling the validation as a `?` statement — optionally wrapped as `drop(account.try_borrow()?)` — or bind with `let _ = ...`; when the value matters, read it. Passing a _bound_ guard to a later `drop(local)` is not a discard: the lint still flags that pattern because the borrow stayed open in between. The lint recognizes `try_borrow`, `as_account`, the token guard loaders, and generated `load_pda` helpers, and it counts any use of the binding — method calls, field access, `&` borrows, and closure captures — as a read. Guards constructed behind opaque helper functions are outside its model, and a `drop(local)` call is treated as a discard rather than a read only when it resolves to `std::mem::drop`; a shadowing `drop` function is an ordinary use.
+Assertion-style guards exist only for their `?` validation. Binding them without reading keeps the borrow open to the end of the scope, which obscures the borrow boundary and can turn a later borrow of the same account data into a runtime panic. Discard immediately by calling the validation as a `?` statement — optionally wrapped as `drop(account.try_borrow()?)` — or write `let _ = account.try_borrow()?;` at the creation site; when the value matters, read it. `let _ = guard;` does not move an existing local in Rust, so it does not release the borrow and remains a lint warning. Passing a bound guard to a later `drop(local)` is also flagged because the borrow stayed open in between. The lint recognizes the concrete `solana_account_view::Ref` and `RefMut` binding types re-exported by Pinocchio and Pina, including aliases, values returned through function pointers, and bindings nested in tuple or `let ... else` patterns. It counts any use of the binding — method calls, field access, `&` borrows, and closure captures — as a read. Wrapper types that contain a guard are outside its current model. A `drop(local)` call is treated as a discard rather than a read only when it resolves to `std::mem::drop`; a shadowing `drop` function is an ordinary use.
 
 The warning carries a suggested rewrite: `pina lint --fix` rewrites the binding into the immediate `?` statement. When the only other occurrence of the binding is a later `drop(local);`, the suggested edit also removes that statement — but it is marked `MaybeIncorrect` rather than machine-applicable, because releasing the borrow earlier than the user wrote it is observable to the code in between and needs human review. Suggestions are withheld entirely when the guard binding originates inside a macro expansion or when a `drop` appears outside a statement (for example inside a closure tail), because the rewrite could not be applied safely there.
 
@@ -265,7 +276,7 @@ let next_balance = balance
 	.ok_or(ProgramError::ArithmeticOverflow)?;
 ```
 
-Saturating arithmetic is rejected because silently clamping economic state can violate conservation just as surely as wrapping. Components are split at Rust identifier separators, so `vault_balance` is covered while an unrelated name such as `rebalance_attempts` is not. The naming heuristic favors clear domain names and may not recognize opaque abbreviations.
+Saturating arithmetic is rejected because silently clamping economic state can violate conservation just as surely as wrapping. The check applies to primitive integers; custom domain types own their arithmetic contract and are not given an inapplicable `checked_*` suggestion. Components are split at Rust identifier separators, so `vault_balance` is covered while an unrelated name such as `rebalance_attempts` is not. The naming heuristic favors clear domain names and may not recognize opaque abbreviations.
 
 ### `require_bounded_remaining_accounts`
 
@@ -281,7 +292,7 @@ for account in remaining {
 }
 ```
 
-Remaining accounts are caller-controlled; an explicit bound keeps worst-case compute auditable. Rejecting an oversized list is preferred when every supplied account must be processed, while `.take(MAX)` is suitable only when ignoring surplus accounts is intentional. The guard must compare `remaining.len()` against an integer literal or resolved constant, return early on the oversized path, and dominate the loop. A runtime limit, branch-local check, late check, or opaque helper does not satisfy the rule because it does not establish a source-visible protocol maximum on every path.
+Remaining accounts are caller-controlled; an explicit bound keeps worst-case compute auditable. Rejecting an oversized list is preferred when every supplied account must be processed, while `.take(MAX)` is suitable only when ignoring surplus accounts is intentional. Standard adapters that cannot increase cardinality, such as `filter`, `map`, and `enumerate`, preserve a preceding `take`; expanding adapters such as `flat_map` must be bounded afterward. The guard must compare `remaining.len()` against an integer literal or resolved constant, return early on the oversized path, and dominate the loop. The analysis follows local aliases and computes loop-carried state to a fixed point. Reassignment, mutable borrows, `&mut self` calls, and closures that may replace a checked binding invalidate its bound, including for later iterations of an enclosing loop. A runtime limit, branch-local check, late check, or opaque helper does not satisfy the rule because it does not establish a source-visible protocol maximum on every path.
 
 ## Performance reference
 

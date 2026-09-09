@@ -67,3 +67,5 @@ fn reassigned_builder(insecure: &AccountView, secure: &AccountView) -> Result<()
 }
 
 fn main() {}
+
+// compile-fail

@@ -1,11 +1,22 @@
+// aux-build: pina.rs
 // normalize-stderr-test: "\n$" -> ""
 
 #![allow(dead_code)]
 
-#[derive(Debug)]
+extern crate pina;
+
+use pina::parse_instruction;
+
+#[derive(Debug, Default)]
 enum Instruction {
+	#[default]
 	Initialize,
 	Update,
+}
+
+enum Mode {
+	Fast,
+	Safe,
 }
 
 fn process_a() -> Result<(), ()> {
@@ -17,7 +28,15 @@ fn process_b() -> Result<(), ()> {
 }
 
 fn entrypoint(data: &[u8]) -> Result<(), ()> {
-	match Instruction::try_from_data(data)? {
+	match parse_instruction::<Instruction>(data)? {
+		Instruction::Initialize => process_a(),
+		Instruction::Update => process_b(),
+	}
+}
+
+fn entrypoint_with_local(data: &[u8]) -> Result<(), ()> {
+	let instruction: Instruction = parse_instruction(data)?;
+	match instruction {
 		Instruction::Initialize => process_a(),
 		Instruction::Update => process_b(),
 	}
@@ -41,7 +60,86 @@ fn entrypoint_helper(data: &[u8]) -> Result<(), ()> {
 	}
 }
 
+fn entrypoint_unrelated_match(data: &[u8]) -> Result<(), ()> {
+	match data.len() {
+		0 => process_a(),
+		_ => process_b(),
+	}
+}
+
+fn entrypoint_unrelated_enum(mode: Mode) -> Result<(), ()> {
+	match (|mode| mode)(mode) {
+		Mode::Fast => process_a(),
+		Mode::Safe => process_b(),
+	}
+}
+
+fn entrypoint_with_trailing_expression(data: &[u8]) -> Result<(), ()> {
+	let result = match parse_instruction::<Instruction>(data)? {
+		Instruction::Initialize => process_a(),
+		Instruction::Update => process_b(),
+	};
+
+	result
+}
+
+#[derive(Default)]
+enum FakeInstruction {
+	#[default]
+	Initialize,
+	Update,
+}
+
+fn entrypoint_with_unrelated_instruction_name(
+	data: &[u8],
+	fake: FakeInstruction,
+) -> Result<(), ()> {
+	let _: Instruction = parse_instruction(data)?;
+	match fake {
+		//~^ WARNING: IDL-friendly instruction dispatch should be a direct `match`
+		FakeInstruction::Initialize => process_a(),
+		FakeInstruction::Update => process_b(),
+	}
+}
+
+fn entrypoint_with_discarded_parse(data: &[u8]) -> Result<(), ()> {
+	let _: Instruction = parse_instruction(data)?;
+	match synthetic_instruction(data) {
+		//~^ WARNING: IDL-friendly instruction dispatch should be a direct `match`
+		Instruction::Initialize => process_a(),
+		Instruction::Update => process_b(),
+	}
+}
+
+fn entrypoint_matches_parse_result(data: &[u8]) -> Result<(), ()> {
+	match parse_instruction::<Instruction>(data) {
+		//~^ WARNING: IDL-friendly instruction dispatch should be a direct `match`
+		Ok(Instruction::Initialize) => process_a(),
+		Ok(Instruction::Update) => process_b(),
+		Err(_) => Err(()),
+	}
+}
+
+fn synthetic_instruction(_: &[u8]) -> Instruction {
+	Instruction::default()
+}
+
+fn entrypoint_with_block(data: &[u8]) -> Result<(), ()> {
+	match { parse_instruction::<Instruction>(data)? } {
+		Instruction::Initialize => process_a(),
+		Instruction::Update => process_b(),
+	}
+}
+
+fn process_instruction_variant(mode: Mode) -> Result<(), ()> {
+	match mode {
+		Mode::Fast => process_a(),
+		Mode::Safe => process_b(),
+	}
+}
+
 unsafe fn process_instruction(_data: &[u8]) -> Result<(), ()> {
+	//~^ WARNING: IDL-friendly instruction dispatch should be a direct `match`
 	process_a()
 }
 
@@ -59,10 +157,6 @@ macro_rules! generated_entrypoint {
 
 generated_entrypoint!();
 
-impl Instruction {
-	fn try_from_data(_data: &[u8]) -> Result<Self, ()> {
-		Ok(Self::Initialize)
-	}
-}
-
 fn main() {}
+
+// check-warn

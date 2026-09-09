@@ -82,3 +82,5 @@ fn process_reassigned(
 }
 
 fn main() {}
+
+// compile-fail

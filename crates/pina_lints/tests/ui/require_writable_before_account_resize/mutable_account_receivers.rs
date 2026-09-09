@@ -33,3 +33,5 @@ fn process_instruction(accounts: &mut [AccountView]) -> Result<(), ()> {
 }
 
 fn main() {}
+
+// compile-fail

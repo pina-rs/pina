@@ -12,7 +12,6 @@ use rustc_span::hygiene::ExpnKind;
 use rustc_span::hygiene::MacroKind;
 
 thread_local! {
-	static DECLARE_ID_COUNT: Cell<usize> = const { Cell::new(0) };
 	/// Definition paths, spans, and defining nodes of the found program
 	/// ids, so warnings and suppression resolve against the declaration
 	/// that introduced them. Entries whose definition path carries no `::`
@@ -70,7 +69,11 @@ fn is_program_id_path(def_path: &str) -> bool {
 /// omitted from local `def_path_str` output), so repository scoping has to
 /// look at the source file itself.
 fn repository_scoped(cx: &LateContext<'_>, span: rustc_span::Span) -> bool {
-	let rustc_span::FileName::Real(real) = cx.sess().source_map().span_to_filename(span) else {
+	let rustc_span::FileName::Real(real) = cx
+		.sess()
+		.source_map()
+		.span_to_filename(span.source_callsite())
+	else {
 		return false;
 	};
 	let Some(local) = real.local_path() else {
@@ -91,7 +94,6 @@ impl<'tcx> LateLintPass<'tcx> for RequireIdlRootToDefineOneProgramId {
 
 		HAS_MATCHED_ITEMS.with(|flag| flag.set(true));
 		if is_declare_id_expansion(item, &def_path) {
-			DECLARE_ID_COUNT.with(|count| count.set(count.get() + 1));
 			DECLARE_ID_DECLARATIONS.with(|declarations| {
 				declarations.borrow_mut().push((
 					def_path.clone(),
@@ -103,25 +105,28 @@ impl<'tcx> LateLintPass<'tcx> for RequireIdlRootToDefineOneProgramId {
 	}
 
 	fn check_crate_post(&mut self, cx: &LateContext<'tcx>) {
-		let declare_id_count = DECLARE_ID_COUNT.with(Cell::get);
 		let has_matched_items = HAS_MATCHED_ITEMS.with(Cell::get);
 		let declarations = DECLARE_ID_DECLARATIONS
 			.with(|declarations| std::mem::take(&mut *declarations.borrow_mut()));
-		DECLARE_ID_COUNT.with(|count| count.set(0));
 		HAS_MATCHED_ITEMS.with(|flag| flag.set(false));
+		let root_count = declarations
+			.iter()
+			.filter(|(def_path, ..)| !def_path.contains("::"))
+			.count();
 
-		if !has_matched_items || declare_id_count == 1 {
+		if !has_matched_items || declarations.len() == 1 && root_count == 1 {
 			return;
 		}
 
 		// The check runs outside any item scope, so the lint level has to be
 		// resolved explicitly against the declaration site; this keeps
-		// module-scoped `#[allow(...)]` attributes working. Only non-root
-		// declarations are reported: the crate-root program id is the
-		// contract, and every additional declaration is the violation.
-		let extra_declarations = declarations
+		// module-scoped `#[allow(...)]` attributes working. A valid root
+		// declaration is retained when only additional module declarations
+		// violate the contract. Without exactly one root, every declaration
+		// belongs to the invalid configuration.
+		let invalid_declarations = declarations
 			.iter()
-			.filter(|(def_path, ..)| def_path.contains("::"))
+			.filter(|(def_path, ..)| root_count != 1 || def_path.contains("::"))
 			.filter(|(_, _, declaration_id)| {
 				!matches!(
 					cx.tcx
@@ -135,15 +140,25 @@ impl<'tcx> LateLintPass<'tcx> for RequireIdlRootToDefineOneProgramId {
 			})
 			.collect::<Vec<_>>();
 
-		if extra_declarations.is_empty() {
+		if declarations.is_empty() {
+			cx.lint(REQUIRE_IDL_ROOT_TO_DEFINE_ONE_PROGRAM_ID, |diag| {
+				diag.primary_message(
+					"IDL-oriented example crates should define exactly one `declare_id!` in the \
+					 crate root",
+				);
+				diag.help("add one `declare_id!(...)` invocation to the crate root");
+			});
+
+			return;
+		}
+
+		if invalid_declarations.is_empty() {
 			return;
 		}
 
 		cx.lint(REQUIRE_IDL_ROOT_TO_DEFINE_ONE_PROGRAM_ID, |diag| {
-			// Point at a discovered declaration so suppression and the lint
-			// level resolve against the item that introduced the extra (or
-			// missing) program id.
-			if let Some((_, declaration_span, _)) = extra_declarations.first() {
+			// Point at the declaration that makes the crate-level contract invalid.
+			if let Some((_, declaration_span, _)) = invalid_declarations.first() {
 				diag.span(*declaration_span);
 			}
 			diag.primary_message(

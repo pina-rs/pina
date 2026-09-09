@@ -94,3 +94,5 @@ fn process_plain(other: &OtherView) -> Result<(), ()> {
 }
 
 fn main() {}
+
+// compile-fail

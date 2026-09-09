@@ -12,3 +12,5 @@ fn entrypoint() -> Result<(), ()> {
 }
 
 fn main() {}
+
+// check-warn

@@ -1,10 +1,10 @@
 //! `rustc` wrapper that runs Pina's security lints.
 //!
-//! The driver is used as `RUSTC_WRAPPER`: cargo invokes it with the arguments
-//! it would have passed to `rustc`, the driver registers every lint compiled
-//! into [`pina_lints`], and compilation continues normally. Because the lints
-//! are linked into the driver, no dynamic library loading or external lint
-//! tooling is required.
+//! The driver is used as `RUSTC_WORKSPACE_WRAPPER`: cargo invokes it with the
+//! arguments it would have passed to `rustc`, the driver registers every lint
+//! compiled into [`pina_lints`], and compilation continues normally. Because
+//! the lints are linked into the driver, no dynamic library loading or external
+//! lint tooling is required.
 //!
 //! # Environment variables
 //!
@@ -14,6 +14,9 @@
 //! - `PINA_LINT_LEVELS`: a comma-separated list of `lint=level` pairs where
 //!   `level` is `allow`, `warn`, or `deny`. Each pair is forwarded to `rustc`
 //!   as a `-A`/`-W`/`-D` lint level argument, overriding the lint's default.
+//! - `PINA_LINT_DRIVER_BUILD`: a content identity for this driver binary. The
+//!   CLI sets it so rebuilding a driver at the same path invalidates Cargo's
+//!   cached lint results.
 //! - `PINA_LINT_LIST`: when set to a value other than `0`, the driver prints
 //!   the lint catalog and exits instead of compiling.
 //!
@@ -46,6 +49,9 @@ use pina_lints::LINTS;
 /// Environment variable holding the configured lint levels.
 const PINA_LINT_LEVELS: &str = "PINA_LINT_LEVELS";
 
+/// Environment variable identifying the exact lint-driver build.
+const PINA_LINT_DRIVER_BUILD: &str = "PINA_LINT_DRIVER_BUILD";
+
 /// Environment variable enabling primary-package-only linting.
 const PINA_LINT_NO_DEPS: &str = "PINA_LINT_NO_DEPS";
 
@@ -60,7 +66,12 @@ const PINA_LINT_ONLY: &str = "PINA_LINT_ONLY";
 
 /// Environment variables that change lint behavior and must invalidate
 /// cargo's cached check results.
-const UNTRACKED_STATE_VARS: &[&str] = &[PINA_LINT_LEVELS, PINA_LINT_NO_DEPS, PINA_LINT_ONLY];
+const UNTRACKED_STATE_VARS: &[&str] = &[
+	PINA_LINT_DRIVER_BUILD,
+	PINA_LINT_LEVELS,
+	PINA_LINT_NO_DEPS,
+	PINA_LINT_ONLY,
+];
 
 /// Dep-info key recording the hash of [`UNTRACKED_STATE_VARS`].
 const UNTRACKED_STATE_VAR: &str = "PINA_LINT_UNTRACKED_STATE";

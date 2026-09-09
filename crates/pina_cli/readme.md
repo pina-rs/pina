@@ -141,7 +141,7 @@ Generated manifests do not install lint tooling. `pina lint` builds and manages 
 
 ### `pina lint`
 
-Discover the current program and run Pina's official security lints. The first invocation installs the `pina_lint_driver` binary built from the `pina_lints` release matching this CLI below Cargo home; the driver statically links every lint and is used as `cargo check`'s `RUSTC_WRAPPER`. Fix mode applies only machine-applicable suggestions. Lint levels honor the `[lints]` table of the project's `pina.toml`.
+Discover the current program and run Pina's official security lints. The first invocation installs the `pina_lint_driver` binary built from the `pina_lints` release matching this CLI below Cargo home; the driver statically links every lint and is used as `cargo check`'s `RUSTC_WORKSPACE_WRAPPER`. Cargo nests an existing `RUSTC_WRAPPER`, such as `sccache`, outside the lint driver. Fix mode applies only machine-applicable suggestions. Lint levels honor the `[lints]` table of the project's `pina.toml`.
 
 ```bash
 pina lint
