@@ -20,6 +20,15 @@ mod private {
 	impl Sealed for u32 {}
 }
 
+/// Largest caller-owned migration workspace generated on the SBF stack.
+///
+/// `with_current_instruction_data` and `with_current_event_data` place the
+/// historical-normalization workspace in their own stack frame, and the
+/// caller's handler runs inside that frame. Generated code refuses to compile
+/// beyond this bound so a migration-aware payload can never silently exhaust
+/// the 4 KiB SBF stack budget.
+pub const MAX_MIGRATION_WORKSPACE: usize = 1024;
+
 /// Integer encoding used by the program-wide migration version envelope.
 ///
 /// Pina implements this trait only for `u8`, `u16`, and `u32`. A program picks

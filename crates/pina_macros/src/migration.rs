@@ -409,6 +409,15 @@ impl MigrationExpansion {
 
 			#(#historical_structs)*
 
+			const _: () = assert!(
+				#working_size <= #crate_path::MAX_MIGRATION_WORKSPACE,
+				concat!(
+					"migration workspace for ",
+					stringify!(#struct_name),
+					" exceeds the SBF stack budget; reduce the payload or field count",
+				),
+			);
+
 			impl #crate_path::#trait_name for #struct_name {
 				const CURRENT_SIZE: usize = #current_size;
 				const WORKING_SIZE: usize = #working_size;

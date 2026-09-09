@@ -448,3 +448,91 @@ fn future_account_version_is_rejected_without_trial_decoding() {
 	assert_eq!(account(&result, &state).lamports, old_lamports);
 	assert_eq!(account(&result, &payer).lamports, payer_lamports);
 }
+
+/// Compute-unit ceiling for the current-version update hot path.
+///
+/// The version check adds one envelope read over a non-migratable instruction;
+/// growth beyond this budget means the hot path started doing historical work.
+const CURRENT_UPDATE_CU_BUDGET: u64 = 1_000;
+
+/// Compute-unit ceiling for the full on-demand migration path: historical
+/// payload normalization, rent inspection, funded growth, resize, rewrite,
+/// destination validation, and the business handler.
+const MIGRATING_UPDATE_CU_BUDGET: u64 = 4_000;
+
+/// Compute-unit ceiling for migration overhead alone.
+const MIGRATION_OVERHEAD_CU_BUDGET: u64 = 3_000;
+
+#[test]
+#[ignore = "requires the migrations_program SBF binary"]
+fn migration_paths_stay_within_compute_budgets() {
+	let mollusk = create_mollusk();
+	let authority = Pubkey::new_unique();
+	let referrer = Pubkey::new_unique();
+	let state = Pubkey::new_unique();
+	let payer = Pubkey::new_unique();
+
+	let current_data = {
+		let mut data = historical_state_data(&authority, 7);
+		data[1] = 1;
+		data.push(1);
+		data
+	};
+	let mut current_accounts = vec![
+		(authority, system_account(1_000_000)),
+		(referrer, system_account(1)),
+		(
+			state,
+			stored_state(
+				current_data,
+				mollusk.sysvars.rent.minimum_balance(State::SIZE),
+			),
+		),
+		(payer, system_account(1_000_000_000)),
+		keyed_account_for_system_program(),
+	];
+	let _ = &mut current_accounts;
+	let current_instruction_data = {
+		let mut data = [0_u8; 12];
+		data[0] = MigrationInstruction::Update as u8;
+		data[1] = 1;
+		data[2..10].copy_from_slice(&88_u64.to_le_bytes());
+		data
+	};
+	let current_result = mollusk.process_and_validate_instruction(
+		&update_instruction(authority, referrer, state, payer, &current_instruction_data),
+		&current_accounts,
+		&[Check::success()],
+	);
+	let current_cu = current_result.compute_units_consumed;
+
+	let (accounts, ..) =
+		migration_accounts(&mollusk, authority, referrer, state, payer, &authority);
+	let migrating_result = mollusk.process_and_validate_instruction(
+		&update_instruction(
+			authority,
+			referrer,
+			state,
+			payer,
+			&historical_update_data(88),
+		),
+		&accounts,
+		&[Check::success()],
+	);
+	let migrating_cu = migrating_result.compute_units_consumed;
+
+	assert!(
+		current_cu <= CURRENT_UPDATE_CU_BUDGET,
+		"current update path consumed {current_cu} CU, budget {CURRENT_UPDATE_CU_BUDGET}",
+	);
+	assert!(
+		migrating_cu <= MIGRATING_UPDATE_CU_BUDGET,
+		"migrating update path consumed {migrating_cu} CU, budget {MIGRATING_UPDATE_CU_BUDGET}",
+	);
+	assert!(
+		migrating_cu.saturating_sub(current_cu) <= MIGRATION_OVERHEAD_CU_BUDGET,
+		"migration overhead consumed {} CU over the current hot path, budget \
+		 {MIGRATION_OVERHEAD_CU_BUDGET}",
+		migrating_cu.saturating_sub(current_cu),
+	);
+}

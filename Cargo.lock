@@ -5957,6 +5957,7 @@ dependencies = [
  "counter_program",
  "insta",
  "macrotest",
+ "migrations_program",
  "mollusk-svm",
  "pina",
  "pina_macros",

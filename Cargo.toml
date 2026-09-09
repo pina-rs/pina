@@ -152,6 +152,7 @@ account_realloc_program = { path = "examples/account_realloc_program", version =
 counter_program = { path = "examples/counter_program", version = "0.0.0" }
 insta = { workspace = true }
 macrotest = { workspace = true }
+migrations_program = { path = "examples/migrations_program", version = "0.0.0" }
 mollusk-svm = { workspace = true, default-features = true }
 prettyplease = { workspace = true }
 profile_program = { path = "examples/profile_program", version = "0.0.0" }
