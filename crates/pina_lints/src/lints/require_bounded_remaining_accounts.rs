@@ -6,6 +6,7 @@ use std::collections::HashSet;
 use rustc_hir::BinOpKind;
 use rustc_hir::Expr;
 use rustc_hir::ExprKind;
+use rustc_hir::LangItem;
 use rustc_hir::LoopSource;
 use rustc_hir::MatchSource;
 use rustc_hir::Node;
@@ -48,21 +49,51 @@ fn is_constant_bound(expr: &Expr<'_>) -> bool {
 	}
 }
 
-fn expression_has_static_bound(expr: &Expr<'_>) -> bool {
+fn is_iterator_method(cx: &LateContext<'_>, expr: &Expr<'_>, expected: &str) -> bool {
+	cx.typeck_results()
+		.type_dependent_def_id(expr.hir_id)
+		.is_some_and(|method| {
+			cx.tcx.item_name(method).as_str() == expected
+				&& cx
+					.tcx
+					.trait_of_assoc(method)
+					.is_some_and(|trait_id| cx.tcx.is_lang_item(trait_id, LangItem::Iterator))
+		})
+}
+
+fn is_array_iteration_method(cx: &LateContext<'_>, expr: &Expr<'_>, expected: &str) -> bool {
+	cx.typeck_results()
+		.type_dependent_def_id(expr.hir_id)
+		.is_some_and(|method| {
+			if expected == "iter" {
+				cx.tcx.crate_name(method.krate).as_str() == "core"
+					&& cx.tcx.item_name(method).as_str() == "iter"
+			} else {
+				debug_assert_eq!(expected, "into_iter");
+				cx.tcx.is_lang_item(method, LangItem::IntoIterIntoIter)
+			}
+		})
+}
+
+fn expression_has_static_bound(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
 	match &expr.kind {
 		ExprKind::MethodCall(segment, receiver, arguments, _) => {
 			let method = segment.ident.name.as_str();
 			if method == "take" {
-				return arguments.len() == 1 && is_constant_bound(&arguments[0]);
+				return arguments.len() == 1
+					&& is_constant_bound(&arguments[0])
+					&& is_iterator_method(cx, expr, "take");
 			}
 			if method == "chain" {
 				return arguments.len() == 1
-					&& expression_has_static_bound(receiver)
-					&& expression_has_static_bound(&arguments[0]);
+					&& is_iterator_method(cx, expr, "chain")
+					&& expression_has_static_bound(cx, receiver)
+					&& expression_has_static_bound(cx, &arguments[0]);
 			}
 
 			matches!(method, "iter" | "into_iter")
 				&& arguments.is_empty()
+				&& is_array_iteration_method(cx, expr, method)
 				&& matches!(receiver.kind, ExprKind::Array(_) | ExprKind::Repeat(_, _))
 		}
 		_ => false,
@@ -94,7 +125,7 @@ fn for_loop_has_constant_take(cx: &LateContext<'_>, loop_expr: &Expr<'_>) -> boo
 
 			Some(iterator)
 		})
-		.is_some_and(expression_has_static_bound)
+		.is_some_and(|iterator| expression_has_static_bound(cx, iterator))
 }
 
 fn remaining_len_identity(expr: &Expr<'_>) -> Option<String> {

@@ -111,6 +111,15 @@ fn entrypoint_with_discarded_parse(data: &[u8]) -> Result<(), ()> {
 	}
 }
 
+fn entrypoint_matches_parse_result(data: &[u8]) -> Result<(), ()> {
+	match parse_instruction::<Instruction>(data) {
+		//~^ WARNING: IDL-friendly instruction dispatch should be a direct `match`
+		Ok(Instruction::Initialize) => process_a(),
+		Ok(Instruction::Update) => process_b(),
+		Err(_) => Err(()),
+	}
+}
+
 fn synthetic_instruction(_: &[u8]) -> Instruction {
 	Instruction::default()
 }

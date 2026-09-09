@@ -8,6 +8,7 @@ use rustc_hir::ExprKind;
 use rustc_hir::MatchSource;
 use rustc_hir::def::DefKind;
 use rustc_hir::def::Res;
+use rustc_hir::def_id::DefId;
 use rustc_hir::intravisit::FnKind;
 use rustc_hir::intravisit::Visitor;
 use rustc_hir::intravisit::walk_expr;
@@ -50,6 +51,7 @@ impl Default for RequireCanonicalInstructionDispatchForIdl {
 
 struct DispatchVisitor<'cx, 'tcx> {
 	cx: &'cx LateContext<'tcx>,
+	canonical_instruction_types: &'cx HashSet<DefId>,
 	parsed_instruction_bindings: &'cx HashSet<rustc_hir::HirId>,
 	found: bool,
 }
@@ -66,7 +68,7 @@ impl<'tcx> DispatchVisitor<'_, 'tcx> {
 				self.cx,
 				scrutinee,
 				self.parsed_instruction_bindings,
-			)
+			) && self.canonical_instruction_types.contains(&definition.did())
 	}
 }
 
@@ -141,9 +143,26 @@ fn expression_is_parsed_instruction<'tcx>(
 struct ParsedInstructionBindingCollector<'cx, 'tcx> {
 	cx: &'cx LateContext<'tcx>,
 	bindings: HashSet<rustc_hir::HirId>,
+	types: HashSet<DefId>,
 }
 
 impl<'tcx> Visitor<'tcx> for ParsedInstructionBindingCollector<'_, 'tcx> {
+	fn visit_expr(&mut self, expr: &'tcx Expr<'tcx>) {
+		if is_parse_instruction_call(self.cx, expr)
+			&& let ExprKind::Call(callee, _) = &expr.kind
+		{
+			for argument in self.cx.typeck_results().node_args(callee.hir_id).types() {
+				if let Some(definition) = argument.peel_refs().ty_adt_def()
+					&& definition.is_enum()
+				{
+					self.types.insert(definition.did());
+				}
+			}
+		}
+
+		walk_expr(self, expr);
+	}
+
 	fn visit_stmt(&mut self, statement: &'tcx rustc_hir::Stmt<'tcx>) {
 		if let rustc_hir::StmtKind::Let(local) = &statement.kind
 			&& let Some(initializer) = local.init
@@ -178,11 +197,13 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalInstructionDispatchForIdl {
 		let mut collector = ParsedInstructionBindingCollector {
 			cx,
 			bindings: HashSet::new(),
+			types: HashSet::new(),
 		};
 		collector.visit_expr(body.value);
 
 		let mut visitor = DispatchVisitor {
 			cx,
+			canonical_instruction_types: &collector.types,
 			parsed_instruction_bindings: &collector.bindings,
 			found: false,
 		};

@@ -108,6 +108,12 @@ fn process_take_before_chain(remaining: &[u8]) {
 	}
 }
 
+fn process_take_before_into_iter_chain(remaining: &[u8]) {
+	for account in remaining.iter().take(8).chain([&0_u8; 0].into_iter()) {
+		let _ = account;
+	}
+}
+
 fn process_take_on_other_iterator(remaining: &[u8], other: &[u8]) {
 	for account in remaining.iter().chain(other.iter().take(8)) {
 		//~^ ERROR: remaining accounts are processed without an explicit bound
@@ -131,6 +137,37 @@ fn process_filter_after_guard(remaining: &[u8]) -> Result<(), ()> {
 	}
 
 	Ok(())
+}
+
+struct Passthrough<'a> {
+	remaining: core::slice::Iter<'a, u8>,
+}
+
+impl Passthrough<'_> {
+	fn take(self, _: usize) -> Self {
+		self
+	}
+}
+
+impl<'a> Iterator for Passthrough<'a> {
+	type Item = &'a u8;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		self.remaining.next()
+	}
+}
+
+fn passthrough(remaining: &[u8]) -> Passthrough<'_> {
+	Passthrough {
+		remaining: remaining.iter(),
+	}
+}
+
+fn process_custom_take(remaining: &[u8]) {
+	for account in passthrough(remaining).take(8) {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
 }
 
 fn main() {}

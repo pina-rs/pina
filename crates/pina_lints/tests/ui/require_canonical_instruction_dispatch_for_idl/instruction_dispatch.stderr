@@ -63,4 +63,17 @@ LL | | }
    |
    = help: keep the dispatch in the entrypoint itself so `pina idl` can follow the instruction routing
 
-warning: 5 warnings emitted
+warning: IDL-friendly instruction dispatch should be a direct `match` over the parsed instruction enum
+  --> $DIR/instruction_dispatch.rs:114:1
+   |
+LL | / fn entrypoint_matches_parse_result(data: &[u8]) -> Result<(), ()> {
+LL | |     match parse_instruction::<Instruction>(data) {
+LL | |         //~^ WARNING: IDL-friendly instruction dispatch should be a direct `match`
+LL | |         Ok(Instruction::Initialize) => process_a(),
+...  |
+LL | | }
+   | |_^
+   |
+   = help: keep the dispatch in the entrypoint itself so `pina idl` can follow the instruction routing
+
+warning: 6 warnings emitted
