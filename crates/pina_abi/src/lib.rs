@@ -266,6 +266,43 @@ impl ContractIdentity {
 		)
 	}
 
+	/// Validate a decoded identity against its own declared width.
+	///
+	/// The identity is interpolated into history keys and transition paths, so
+	/// a decoded document must prove that `discriminator_hex` is canonical
+	/// lowercase hexadecimal of exactly `discriminator_bytes` bytes from the
+	/// supported width set. Without this check a tampered manifest can alias
+	/// one on-chain discriminator under several keys or escape the migrations
+	/// directory through the derived transition path.
+	pub fn validate(&self) -> Result<(), String> {
+		if !matches!(self.discriminator_bytes, 1 | 2 | 4 | 8) {
+			return Err(format!(
+				"identity `{}` declares unsupported discriminator width {}; expected 1, 2, 4, or 8",
+				self.key(),
+				self.discriminator_bytes
+			));
+		}
+
+		let bytes = unhex(&self.discriminator_hex)?;
+		if bytes.len() != usize::from(self.discriminator_bytes) {
+			return Err(format!(
+				"identity `{}` contains {} discriminator bytes, expected {}",
+				self.key(),
+				bytes.len(),
+				self.discriminator_bytes
+			));
+		}
+
+		if self.discriminator_hex != hex(&bytes) {
+			return Err(format!(
+				"identity `{}` must encode its discriminator as canonical lowercase hexadecimal",
+				self.key()
+			));
+		}
+
+		Ok(())
+	}
+
 	/// Decode the exact little-endian discriminator value.
 	pub fn discriminator_value(&self) -> Result<u64, String> {
 		let bytes = unhex(&self.discriminator_hex)?;
@@ -550,6 +587,12 @@ impl ContractHistory {
 				self.identity.key()
 			));
 		}
+		self.identity.validate().map_err(|reason| {
+			format!(
+				"contract `{}` has an invalid identity: {reason}",
+				self.identity.key()
+			)
+		})?;
 		for (index, version) in self.versions.iter().enumerate() {
 			let expected = index as u32;
 			if version.version != expected {
@@ -582,6 +625,13 @@ impl ContractHistory {
 			}
 			match self.identity.kind {
 				ContractKind::Instruction => {
+					if version.schema.layout != LayoutKind::Fixed {
+						return Err(format!(
+							"instruction contract `{}` version {} must use a fixed layout",
+							self.identity.key(),
+							version.version
+						));
+					}
 					let process = version.process.as_ref().ok_or_else(|| {
 						format!(
 							"instruction contract `{}` version {} is missing its process contract",
@@ -599,6 +649,15 @@ impl ContractHistory {
 					}
 				}
 				ContractKind::Account | ContractKind::Event => {
+					if self.identity.kind == ContractKind::Event
+						&& version.schema.layout != LayoutKind::Fixed
+					{
+						return Err(format!(
+							"event contract `{}` version {} must use a fixed layout",
+							self.identity.key(),
+							version.version
+						));
+					}
 					if version.process.is_some() || version.process_sha256.is_some() {
 						return Err(format!(
 							"{} contract `{}` version {} cannot contain an instruction process",
@@ -619,8 +678,8 @@ impl ContractHistory {
 				}
 				(_, Some(transition)) => {
 					let previous = &self.versions[index - 1];
-					if transition.from + 1 != transition.to
-						|| transition.to != version.version
+					if transition.to != version.version
+						|| transition.from != transition.to.wrapping_sub(1)
 						|| transition.source_schema_sha256 != previous.schema_sha256
 						|| transition.destination_schema_sha256 != version.schema_sha256
 					{
@@ -1723,9 +1782,22 @@ pub fn canonical_type(ty: &syn::Type) -> String {
 	}
 }
 
+/// Maximum nested generic depth accepted by the fixed-layout type grammar.
+///
+/// Real schemas stay within a handful of levels; the bound keeps hostile type
+/// strings in a decoded manifest from driving unbounded recursion.
+const MAX_TYPE_NESTING_DEPTH: usize = 32;
+
 /// Exact storage size for Pina's closed fixed-layout type grammar.
 #[must_use]
 pub fn fixed_type_size(ty: &str) -> Option<usize> {
+	fixed_type_size_at_depth(ty, 0)
+}
+
+fn fixed_type_size_at_depth(ty: &str, depth: usize) -> Option<usize> {
+	if depth > MAX_TYPE_NESTING_DEPTH {
+		return None;
+	}
 	match ty.trim() {
 		"u8" | "i8" | "bool" | "PodBool" => Some(1),
 		"u16" | "i16" | "PodU16" | "PodI16" => Some(2),
@@ -1743,7 +1815,7 @@ pub fn fixed_type_size(ty: &str) -> Option<usize> {
 					let [inner] = arguments.as_slice() else {
 						return None;
 					};
-					fixed_type_size(inner)?.checked_add(1)
+					fixed_type_size_at_depth(inner, depth + 1)?.checked_add(1)
 				}
 				"String" => {
 					let [capacity] = arguments.as_slice() else {
@@ -1784,7 +1856,7 @@ pub fn fixed_type_size(ty: &str) -> Option<usize> {
 					};
 					let capacity = capacity.parse::<usize>().ok()?;
 					validate_compact_prefix(capacity, prefix).ok()?;
-					fixed_type_size(element)?
+					fixed_type_size_at_depth(element, depth + 1)?
 						.checked_mul(capacity)?
 						.checked_add(prefix)
 				}
@@ -2011,6 +2083,13 @@ fn is_compact_string_name(ty: &str) -> bool {
 }
 
 fn contains_dynamic_compact_name(ty: &str) -> bool {
+	contains_dynamic_compact_name_at_depth(ty, 0)
+}
+
+fn contains_dynamic_compact_name_at_depth(ty: &str, depth: usize) -> bool {
+	if depth > MAX_TYPE_NESTING_DEPTH {
+		return true;
+	}
 	let Some((name, arguments)) = parse_generic(ty.trim()) else {
 		return false;
 	};
@@ -2021,7 +2100,7 @@ fn contains_dynamic_compact_name(ty: &str) -> bool {
 	name == "Option"
 		&& arguments
 			.first()
-			.is_some_and(|inner| contains_dynamic_compact_name(inner))
+			.is_some_and(|inner| contains_dynamic_compact_name_at_depth(inner, depth + 1))
 }
 
 fn parse_compact_capacity(
@@ -2764,5 +2843,232 @@ mod tests {
 			.insert("injected".to_owned(), serde_json::Value::Bool(true));
 
 		assert!(decode_manifest(&serde_json::to_vec(&value).unwrap()).is_err());
+	}
+
+	fn single_version_account_manifest() -> MigrationManifest {
+		let item: syn::ItemStruct = syn::parse_quote! {
+			struct Profile { value: u64 }
+		};
+		let schema = data_schema(&item, LayoutKind::Fixed)
+			.unwrap_or_else(|error| panic!("fixed schema: {error}"));
+		let schema_sha256 = schema.sha256();
+		let identity = ContractIdentity::try_new(ContractKind::Account, 1, 0xAB)
+			.unwrap_or_else(|error| panic!("identity: {error}"));
+		let key = identity.key();
+		MigrationManifest {
+			format_version: MANIFEST_FORMAT_VERSION,
+			program_id: "program".to_owned(),
+			version_type: MigrationVersionType::U8,
+			contracts: BTreeMap::from([(
+				key,
+				ContractHistory {
+					identity,
+					rust_name: "Profile".to_owned(),
+					versions: vec![SchemaVersion {
+						version: 0,
+						schema_sha256,
+						schema,
+						process: None,
+						process_sha256: None,
+						transition: None,
+					}],
+				},
+			)]),
+		}
+	}
+
+	fn decoded_with_identity_hex(hex: &str) -> Result<MigrationManifest, String> {
+		let mut value = serde_json::to_value(single_version_account_manifest())
+			.unwrap_or_else(|error| panic!("serialize manifest: {error}"));
+		let contracts = value
+			.get_mut("contracts")
+			.and_then(|contracts| contracts.as_object_mut())
+			.unwrap_or_else(|| panic!("contracts map"));
+		let key = format!("account:1:{hex}");
+		let (_, contract) = contracts
+			.iter_mut()
+			.next()
+			.unwrap_or_else(|| panic!("one contract"));
+		contract["identity"]["discriminatorHex"] = serde_json::Value::String(hex.to_owned());
+		let (_, history) = contracts
+			.remove_entry("account:1:ab")
+			.unwrap_or_else(|| panic!("canonical entry"));
+		contracts.insert(key.clone(), history);
+		let encoded = serde_json::to_vec(&value)
+			.unwrap_or_else(|error| panic!("serialize tampered manifest: {error}"));
+		decode_manifest(&encoded).map(|manifest| {
+			assert_eq!(manifest.contracts.keys().next(), Some(&key));
+			manifest
+		})
+	}
+
+	#[test]
+	fn manifest_rejects_path_traversal_in_contract_identities() {
+		// Before identity validation, this document decoded and validated,
+		// and `transition_path` interpolated the unvalidated hex into
+		// `migrations/transitions/account_1_ab/../../../evil/v0_to_v1.rs`,
+		// giving a tampered manifest a file-write primitive outside the
+		// migrations directory.
+		assert!(
+			decoded_with_identity_hex("ab/../../../evil").is_err(),
+			"path traversal inside a contract identity must be rejected"
+		);
+	}
+
+	#[test]
+	fn manifest_rejects_noncanonical_identity_hex() {
+		// Before identity validation, the uppercase spelling decoded and
+		// validated, silently aliasing the same on-chain discriminator under
+		// a second contract key.
+		assert!(
+			decoded_with_identity_hex("AB").is_err(),
+			"noncanonical identity hex must be rejected"
+		);
+	}
+
+	#[test]
+	fn manifest_rejects_identity_width_mismatches() {
+		// Odd-length hex, declared width disagreeing with the hex length, and
+		// zero-width discriminators must all be rejected.
+		for (hex, bytes) in [("a", 1_u8), ("ab", 2), ("", 0)] {
+			let mut value = serde_json::to_value(single_version_account_manifest())
+				.unwrap_or_else(|error| panic!("serialize manifest: {error}"));
+			let contracts = value
+				.get_mut("contracts")
+				.and_then(|contracts| contracts.as_object_mut())
+				.unwrap_or_else(|| panic!("contracts map"));
+			let key = format!("account:{bytes}:{hex}");
+			let (_, contract) = contracts
+				.iter_mut()
+				.next()
+				.unwrap_or_else(|| panic!("one contract"));
+			contract["identity"]["discriminatorHex"] = serde_json::Value::String(hex.to_owned());
+			contract["identity"]["discriminatorBytes"] = serde_json::Value::from(bytes);
+			let entry = key.clone();
+			let (_, history) = contracts.remove_entry(&format!("account:1:ab")).unwrap();
+			contracts.insert(entry, history);
+
+			let encoded =
+				serde_json::to_vec(&value).unwrap_or_else(|error| panic!("serialize: {error}"));
+			assert!(
+				decode_manifest(&encoded).is_err(),
+				"identity width {bytes} with hex `{hex}` must be rejected"
+			);
+		}
+	}
+
+	#[test]
+	fn transition_adjacency_survives_hostile_version_numbers() {
+		let item: syn::ItemStruct = syn::parse_quote! {
+			struct Profile { value: u64, enabled: bool }
+		};
+		let schema = data_schema(&item, LayoutKind::Fixed)
+			.unwrap_or_else(|error| panic!("fixed schema: {error}"));
+		let schema_sha256 = schema.sha256();
+		let identity = ContractIdentity::try_new(ContractKind::Account, 1, 0xAB)
+			.unwrap_or_else(|error| panic!("identity: {error}"));
+		let key = identity.key();
+		let manifest = MigrationManifest {
+			format_version: MANIFEST_FORMAT_VERSION,
+			program_id: "program".to_owned(),
+			version_type: MigrationVersionType::U8,
+			contracts: BTreeMap::from([(
+				key,
+				ContractHistory {
+					identity,
+					rust_name: "Profile".to_owned(),
+					versions: vec![
+						SchemaVersion {
+							version: 0,
+							schema_sha256: schema_sha256.clone(),
+							schema: schema.clone(),
+							process: None,
+							process_sha256: None,
+							transition: None,
+						},
+						SchemaVersion {
+							version: 1,
+							schema_sha256: schema_sha256.clone(),
+							schema,
+							process: None,
+							process_sha256: None,
+							transition: Some(Transition {
+								from: u32::MAX,
+								to: 1,
+								mode: TransitionMode::Automatic,
+								source_schema_sha256: schema_sha256.clone(),
+								destination_schema_sha256: schema_sha256,
+								source_process_sha256: None,
+								destination_process_sha256: None,
+								process: None,
+								implementation_sha256: None,
+							}),
+						},
+					],
+				},
+			)]),
+		};
+
+		// `from + 1` on `u32::MAX` must produce a validation error, never an
+		// arithmetic overflow.
+		assert!(
+			manifest.validate().is_err(),
+			"hostile transition version numbers must fail validation"
+		);
+	}
+
+	#[test]
+	fn instruction_and_event_histories_reject_compact_layouts() {
+		let item: syn::ItemStruct = syn::parse_quote! {
+			struct Payload { name: String<8> }
+		};
+		let schema = data_schema(&item, LayoutKind::Compact)
+			.unwrap_or_else(|error| panic!("compact schema: {error}"));
+		let schema_sha256 = schema.sha256();
+
+		for kind in [ContractKind::Instruction, ContractKind::Event] {
+			let identity = ContractIdentity::try_new(kind, 1, 1)
+				.unwrap_or_else(|error| panic!("identity: {error}"));
+			let mut version = SchemaVersion {
+				version: 0,
+				schema_sha256: schema_sha256.clone(),
+				schema: schema.clone(),
+				process: None,
+				process_sha256: None,
+				transition: None,
+			};
+			if kind == ContractKind::Instruction {
+				let process = process(vec![process_account("authority", false)]);
+				version.process_sha256 = Some(process.sha256());
+				version.process = Some(process);
+			}
+			let history = ContractHistory {
+				identity,
+				rust_name: "Payload".to_owned(),
+				versions: vec![version],
+			};
+
+			assert!(
+				history.validate(MigrationVersionType::U8).is_err(),
+				"{kind} contracts must use fixed layouts"
+			);
+		}
+	}
+
+	#[test]
+	fn type_nesting_depth_is_bounded() {
+		let mut deep = String::from("u64");
+		for _ in 0..128 {
+			deep = format!("Option<{deep}>");
+		}
+
+		// Deeply nested option strings must fail size evaluation instead of
+		// recursing without a bound.
+		assert!(
+			fixed_type_size(&deep).is_none(),
+			"deeply nested type strings must be rejected"
+		);
+		assert_eq!(fixed_type_size("u64"), Some(8));
+		assert_eq!(fixed_type_size("Option<u64>"), Some(9));
 	}
 }
