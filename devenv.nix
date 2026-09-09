@@ -81,6 +81,9 @@ in
 
   env = {
     OPENSSL_NO_VENDOR = "1";
+    # Rustup otherwise fails immediately on transient manifest or component
+    # download errors, including while cargo-build-sbf inspects a base worktree.
+    RUSTUP_MAX_RETRIES = "3";
     LIBCLANG_PATH = "${llvm.libclang.lib}/lib";
     CC = "${llvm.clang}/bin/clang";
     CXX = "${llvm.clang}/bin/clang++";
