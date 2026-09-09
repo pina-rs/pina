@@ -1,5 +1,5 @@
 error: direct mutable remaining-account access permits duplicate writable aliases
-  --> $DIR/remaining_mut.rs:17:10
+  --> $DIR/remaining_mut.rs:27:10
    |
 LL |     let _ = cursor.remaining_mut()?;
    |             ^^^^^^^^^^^^^^^^^^^^^^
@@ -8,4 +8,40 @@ LL |     let _ = cursor.remaining_mut()?;
    = help: if duplicates are intentional, contain the call in a reviewed helper and allow this lint there with a reason
    = note: `#[deny(deny_unchecked_remaining_mut)]` on by default
 
-error: aborting due to 1 previous error
+error: direct mutable remaining-account access permits duplicate writable aliases
+  --> $DIR/remaining_mut.rs:33:10
+   |
+LL |     let _ = pina::traits::AccountsCursor::remaining_mut(cursor)?;
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use `remaining_mut_distinct()` to reject duplicate addresses
+   = help: if duplicates are intentional, contain the call in a reviewed helper and allow this lint there with a reason
+
+error: direct mutable remaining-account access permits duplicate writable aliases
+  --> $DIR/remaining_mut.rs:39:22
+   |
+LL |     let remaining_mut = pina::traits::AccountsCursor::remaining_mut;
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use `remaining_mut_distinct()` to reject duplicate addresses
+   = help: if duplicates are intentional, contain the call in a reviewed helper and allow this lint there with a reason
+
+error: direct mutable remaining-account access permits duplicate writable aliases
+  --> $DIR/remaining_mut.rs:52:10
+   |
+LL |     let _ = unchecked_remaining_mut!(cursor)?;
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use `remaining_mut_distinct()` to reject duplicate addresses
+   = help: if duplicates are intentional, contain the call in a reviewed helper and allow this lint there with a reason
+
+error: direct mutable remaining-account access permits duplicate writable aliases
+  --> $DIR/remaining_mut.rs:58:10
+   |
+LL |     let _ = unchecked_external_remaining_mut!(cursor)?;
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: use `remaining_mut_distinct()` to reject duplicate addresses
+   = help: if duplicates are intentional, contain the call in a reviewed helper and allow this lint there with a reason
+
+error: aborting due to 5 previous errors

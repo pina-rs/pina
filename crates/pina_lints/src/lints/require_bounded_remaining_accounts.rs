@@ -128,7 +128,7 @@ fn for_loop_has_constant_take(cx: &LateContext<'_>, loop_expr: &Expr<'_>) -> boo
 		.is_some_and(|iterator| expression_has_static_bound(cx, iterator))
 }
 
-fn remaining_len_identity(expr: &Expr<'_>) -> Option<String> {
+fn len_identity(expr: &Expr<'_>) -> Option<String> {
 	let ExprKind::MethodCall(segment, receiver, arguments, _) = &expr.kind else {
 		return None;
 	};
@@ -136,11 +136,7 @@ fn remaining_len_identity(expr: &Expr<'_>) -> Option<String> {
 		return None;
 	}
 
-	let identity = shared::expression_identity(receiver)?;
-	identity
-		.to_ascii_lowercase()
-		.contains("remaining")
-		.then_some(identity)
+	shared::expression_identity(receiver)
 }
 
 fn bounded_identity(condition: &Expr<'_>) -> Option<String> {
@@ -149,8 +145,8 @@ fn bounded_identity(condition: &Expr<'_>) -> Option<String> {
 	};
 
 	match operation.node {
-		BinOpKind::Gt | BinOpKind::Ge if is_constant_bound(right) => remaining_len_identity(left),
-		BinOpKind::Lt | BinOpKind::Le if is_constant_bound(left) => remaining_len_identity(right),
+		BinOpKind::Gt | BinOpKind::Ge if is_constant_bound(right) => len_identity(left),
+		BinOpKind::Lt | BinOpKind::Le if is_constant_bound(left) => len_identity(right),
 		_ => None,
 	}
 }
@@ -186,31 +182,143 @@ fn header_contains_identity(header: &str, identity: &str) -> bool {
 	})
 }
 
+#[derive(Clone, Default)]
+struct AnalysisState {
+	bounded: HashSet<String>,
+	remaining: HashSet<String>,
+}
+
+fn same_or_descendant(candidate: &str, identity: &str) -> bool {
+	candidate == identity
+		|| candidate
+			.strip_prefix(identity)
+			.is_some_and(|suffix| suffix.starts_with(['.', '[']))
+}
+
+fn intersect_states(states: &[AnalysisState]) -> AnalysisState {
+	let Some(first) = states.first() else {
+		return AnalysisState::default();
+	};
+	let mut bounded = first.bounded.clone();
+	let mut remaining = HashSet::new();
+
+	for state in states {
+		bounded.retain(|identity| state.bounded.contains(identity));
+		remaining.extend(state.remaining.iter().cloned());
+	}
+
+	AnalysisState { bounded, remaining }
+}
+
 struct Analyzer<'cx, 'tcx> {
 	cx: &'cx LateContext<'tcx>,
 }
 
 impl<'tcx> Analyzer<'_, 'tcx> {
-	fn visit_block(&self, block: &'tcx rustc_hir::Block<'tcx>, bounded: &mut HashSet<String>) {
+	fn is_remaining_identity(&self, identity: &str, state: &AnalysisState) -> bool {
+		state.remaining.contains(identity) || identity.to_ascii_lowercase().contains("remaining")
+	}
+
+	fn expression_identity(&self, expression: &Expr<'_>) -> Option<String> {
+		shared::expression_identity(expression)
+	}
+
+	fn expression_is_remaining(&self, expression: &Expr<'_>, state: &AnalysisState) -> bool {
+		self.expression_identity(expression)
+			.is_some_and(|identity| self.is_remaining_identity(&identity, state))
+	}
+
+	fn invalidate(&self, state: &mut AnalysisState, identity: &str) {
+		state
+			.bounded
+			.retain(|candidate| !same_or_descendant(candidate, identity));
+	}
+
+	fn method_mutably_borrows_receiver(&self, expression: &Expr<'_>) -> bool {
+		let Some(definition) = self
+			.cx
+			.typeck_results()
+			.type_dependent_def_id(expression.hir_id)
+		else {
+			return false;
+		};
+
+		self.cx
+			.tcx
+			.fn_sig(definition)
+			.instantiate_identity()
+			.skip_binder()
+			.inputs()
+			.first()
+			.and_then(|receiver| receiver.ref_mutability())
+			== Some(rustc_hir::Mutability::Mut)
+	}
+
+	fn invalidate_mutable_reference_argument(
+		&self,
+		state: &mut AnalysisState,
+		argument: &Expr<'_>,
+	) {
+		if self
+			.cx
+			.typeck_results()
+			.expr_ty_adjusted(argument)
+			.ref_mutability()
+			== Some(rustc_hir::Mutability::Mut)
+			&& let Some(identity) = self.expression_identity(argument)
+		{
+			self.invalidate(state, &identity);
+		}
+	}
+
+	fn loop_mentions_remaining(&self, snippet: &str, state: &AnalysisState) -> bool {
+		let header = snippet
+			.split_once('{')
+			.map_or(snippet, |(header, _)| header);
+
+		state
+			.remaining
+			.iter()
+			.any(|identity| header_contains_identity(header, identity))
+			|| header.to_ascii_lowercase().contains("remaining")
+	}
+
+	fn visit_block(&self, block: &'tcx rustc_hir::Block<'tcx>, state: &mut AnalysisState) {
 		for statement in block.stmts {
 			match &statement.kind {
 				rustc_hir::StmtKind::Let(local) => {
 					if let Some(initializer) = local.init {
-						self.visit_expr(initializer, bounded);
+						let inherits_remaining = self.expression_is_remaining(initializer, state);
+						let inherits_bound = self
+							.expression_identity(initializer)
+							.is_some_and(|identity| state.bounded.contains(&identity))
+							|| expression_has_static_bound(self.cx, initializer);
+						self.visit_expr(initializer, state);
+
+						if let rustc_hir::PatKind::Binding(_, _, identifier, None) = local.pat.kind
+						{
+							let identity = identifier.as_str().to_owned();
+							if inherits_remaining {
+								state.remaining.insert(identity.clone());
+							}
+							if inherits_bound {
+								state.bounded.insert(identity);
+							}
+						}
 					}
 				}
 				rustc_hir::StmtKind::Expr(expr) | rustc_hir::StmtKind::Semi(expr) => {
-					self.visit_expr(expr, bounded);
+					self.visit_expr(expr, state);
 				}
 				_ => {}
 			}
 		}
 		if let Some(expr) = block.expr {
-			self.visit_expr(expr, bounded);
+			self.visit_expr(expr, state);
 		}
 	}
 
-	fn visit_expr(&self, expr: &'tcx Expr<'tcx>, bounded: &mut HashSet<String>) {
+	fn visit_expr(&self, expr: &'tcx Expr<'tcx>, state: &mut AnalysisState) {
 		match &expr.kind {
 			ExprKind::Loop(block, _, source, _) => {
 				let snippet = self
@@ -222,8 +330,9 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				let loop_header = snippet
 					.split_once('{')
 					.map_or(snippet.as_str(), |(header, _)| header);
-				let mentions_remaining = loop_header.to_ascii_lowercase().contains("remaining");
-				let has_validated_bound = bounded
+				let mentions_remaining = self.loop_mentions_remaining(&snippet, state);
+				let has_validated_bound = state
+					.bounded
 					.iter()
 					.any(|identity| header_contains_identity(loop_header, identity));
 				let has_constant_take = matches!(source, LoopSource::ForLoop)
@@ -242,43 +351,89 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					});
 				}
 
-				let mut nested = bounded.clone();
-				self.visit_block(block, &mut nested);
+				let entry = state.clone();
+				let mut body_state = entry.clone();
+				self.visit_block(block, &mut body_state);
+				*state = intersect_states(&[entry, body_state]);
 			}
 			ExprKind::If(condition, then, otherwise) => {
-				self.visit_expr(condition, bounded);
-				let mut branch = bounded.clone();
-				self.visit_expr(then, &mut branch);
+				self.visit_expr(condition, state);
+				let base = state.clone();
+				let mut then_state = base.clone();
+				self.visit_expr(then, &mut then_state);
+
 				if let Some(otherwise) = otherwise {
-					let mut branch = bounded.clone();
-					self.visit_expr(otherwise, &mut branch);
+					let mut branches = Vec::with_capacity(2);
+					if !expression_returns(then) {
+						branches.push(then_state);
+					}
+					let mut otherwise_state = base;
+					self.visit_expr(otherwise, &mut otherwise_state);
+					if !expression_returns(otherwise) {
+						branches.push(otherwise_state);
+					}
+					if !branches.is_empty() {
+						*state = intersect_states(&branches);
+					}
 				} else if expression_returns(then)
 					&& let Some(identity) = bounded_identity(condition)
+					&& self.is_remaining_identity(&identity, &base)
 				{
-					bounded.insert(identity);
+					*state = base;
+					state.bounded.insert(identity);
+				} else {
+					*state = intersect_states(&[base, then_state]);
 				}
 			}
 			ExprKind::MethodCall(_, receiver, arguments, _) => {
-				self.visit_expr(receiver, bounded);
+				self.visit_expr(receiver, state);
 				for argument in *arguments {
-					self.visit_expr(argument, bounded);
+					self.visit_expr(argument, state);
+					self.invalidate_mutable_reference_argument(state, argument);
+				}
+				if self.method_mutably_borrows_receiver(expr)
+					&& let Some(identity) = self.expression_identity(receiver)
+				{
+					self.invalidate(state, &identity);
 				}
 			}
 			ExprKind::Call(callee, arguments) => {
-				self.visit_expr(callee, bounded);
+				self.visit_expr(callee, state);
 				for argument in *arguments {
-					self.visit_expr(argument, bounded);
+					self.visit_expr(argument, state);
+					self.invalidate_mutable_reference_argument(state, argument);
 				}
 			}
-			ExprKind::Block(block, _) => {
-				let mut nested = bounded.clone();
-				self.visit_block(block, &mut nested);
-			}
+			ExprKind::Block(block, _) => self.visit_block(block, state),
 			ExprKind::Match(scrutinee, arms, _) => {
-				self.visit_expr(scrutinee, bounded);
+				self.visit_expr(scrutinee, state);
+				let base = state.clone();
+				let mut branches = Vec::with_capacity(arms.len());
 				for arm in *arms {
-					let mut branch = bounded.clone();
+					let mut branch = base.clone();
+					if let Some(guard) = arm.guard {
+						self.visit_expr(guard, &mut branch);
+					}
 					self.visit_expr(arm.body, &mut branch);
+					if !expression_returns(arm.body) {
+						branches.push(branch);
+					}
+				}
+				if !branches.is_empty() {
+					*state = intersect_states(&branches);
+				}
+			}
+			ExprKind::Closure(closure) => {
+				let entry = state.clone();
+				let mut body_state = entry.clone();
+				let body = self.cx.tcx.hir_body(closure.body);
+				self.visit_expr(body.value, &mut body_state);
+				*state = intersect_states(&[entry, body_state]);
+			}
+			ExprKind::AddrOf(_, rustc_hir::Mutability::Mut, inner) => {
+				self.visit_expr(inner, state);
+				if let Some(identity) = self.expression_identity(inner) {
+					self.invalidate(state, &identity);
 				}
 			}
 			ExprKind::Unary(_, inner)
@@ -286,38 +441,68 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			| ExprKind::Cast(inner, _)
 			| ExprKind::Type(inner, _)
 			| ExprKind::DropTemps(inner)
-			| ExprKind::AddrOf(_, _, inner)
+			| ExprKind::AddrOf(_, rustc_hir::Mutability::Not, inner)
 			| ExprKind::Field(inner, _)
 			| ExprKind::Repeat(inner, _)
 			| ExprKind::Yield(inner, _)
 			| ExprKind::Become(inner)
-			| ExprKind::UnsafeBinderCast(_, inner, _) => self.visit_expr(inner, bounded),
-			ExprKind::Binary(_, left, right)
-			| ExprKind::Assign(left, right, _)
-			| ExprKind::AssignOp(_, left, right) => {
-				self.visit_expr(left, bounded);
-				self.visit_expr(right, bounded);
+			| ExprKind::UnsafeBinderCast(_, inner, _) => self.visit_expr(inner, state),
+			ExprKind::Binary(operation, left, right) => {
+				self.visit_expr(left, state);
+				if matches!(operation.node, BinOpKind::And | BinOpKind::Or) {
+					let base = state.clone();
+					let mut right_state = base.clone();
+					self.visit_expr(right, &mut right_state);
+					*state = intersect_states(&[base, right_state]);
+				} else {
+					self.visit_expr(right, state);
+				}
+			}
+			ExprKind::Assign(left, right, _) => {
+				let right_is_remaining = self.expression_is_remaining(right, state);
+				let right_is_bounded = self
+					.expression_identity(right)
+					.is_some_and(|identity| state.bounded.contains(&identity))
+					|| expression_has_static_bound(self.cx, right);
+				self.visit_expr(left, state);
+				self.visit_expr(right, state);
+				if let Some(identity) = self.expression_identity(left) {
+					self.invalidate(state, &identity);
+					if right_is_remaining {
+						state.remaining.insert(identity.clone());
+					}
+					if right_is_bounded {
+						state.bounded.insert(identity);
+					}
+				}
+			}
+			ExprKind::AssignOp(_, left, right) => {
+				self.visit_expr(left, state);
+				self.visit_expr(right, state);
+				if let Some(identity) = self.expression_identity(left) {
+					self.invalidate(state, &identity);
+				}
 			}
 			ExprKind::Index(base, index, _) => {
-				self.visit_expr(base, bounded);
-				self.visit_expr(index, bounded);
+				self.visit_expr(base, state);
+				self.visit_expr(index, state);
 			}
-			ExprKind::Let(let_expr) => self.visit_expr(let_expr.init, bounded),
+			ExprKind::Let(let_expr) => self.visit_expr(let_expr.init, state),
 			ExprKind::Tup(expressions) | ExprKind::Array(expressions) => {
 				for expression in *expressions {
-					self.visit_expr(expression, bounded);
+					self.visit_expr(expression, state);
 				}
 			}
 			ExprKind::Struct(_, fields, tail) => {
 				for field in *fields {
-					self.visit_expr(field.expr, bounded);
+					self.visit_expr(field.expr, state);
 				}
 				if let rustc_hir::StructTailExpr::Base(base) = tail {
-					self.visit_expr(base, bounded);
+					self.visit_expr(base, state);
 				}
 			}
 			ExprKind::Ret(Some(inner)) | ExprKind::Break(_, Some(inner)) => {
-				self.visit_expr(inner, bounded);
+				self.visit_expr(inner, state);
 			}
 			_ => {}
 		}
@@ -334,6 +519,16 @@ impl<'tcx> LateLintPass<'tcx> for RequireBoundedRemainingAccounts {
 		_: rustc_span::Span,
 		_: rustc_hir::def_id::LocalDefId,
 	) {
-		Analyzer { cx }.visit_expr(body.value, &mut HashSet::new());
+		let mut state = AnalysisState::default();
+		for parameter in body.params {
+			if let rustc_hir::PatKind::Binding(_, _, identifier, None) = parameter.pat.kind {
+				let identity = identifier.as_str().to_owned();
+				if identity.to_ascii_lowercase().contains("remaining") {
+					state.remaining.insert(identity);
+				}
+			}
+		}
+
+		Analyzer { cx }.visit_expr(body.value, &mut state);
 	}
 }

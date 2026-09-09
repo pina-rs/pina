@@ -173,7 +173,7 @@ Detects direct calls to Pina's `AccountsCursor::remaining_mut()`. The method val
 let remaining = cursor.remaining_mut_distinct()?;
 ```
 
-The lint resolves both the method and `AccountsCursor` type before reporting, so same-named methods from other crates are ignored. `#[derive(Accounts)]` expansions are also ignored: the macro uses `remaining_mut()` only for the explicit, documented `#[pina(remaining, distinct = false)]` escape hatch, which is checked separately by `require_reason_for_duplicate_remaining_accounts`.
+The lint resolves the method definition before reporting, so same-named methods from other crates are ignored. It rejects method syntax, UFCS calls, stored function items, and calls hidden by local or external macros. Pina's `#[derive(Accounts)]` expansion remains exempt: the macro uses `remaining_mut()` only for the explicit, documented `#[pina(remaining, distinct = false)]` escape hatch, which is checked separately by `require_reason_for_duplicate_remaining_accounts`.
 
 ### `require_canonical_bump_before_pda_write`
 
@@ -292,7 +292,7 @@ for account in remaining {
 }
 ```
 
-Remaining accounts are caller-controlled; an explicit bound keeps worst-case compute auditable. Rejecting an oversized list is preferred when every supplied account must be processed, while `.take(MAX)` is suitable only when ignoring surplus accounts is intentional. The guard must compare `remaining.len()` against an integer literal or resolved constant, return early on the oversized path, and dominate the loop. A runtime limit, branch-local check, late check, or opaque helper does not satisfy the rule because it does not establish a source-visible protocol maximum on every path.
+Remaining accounts are caller-controlled; an explicit bound keeps worst-case compute auditable. Rejecting an oversized list is preferred when every supplied account must be processed, while `.take(MAX)` is suitable only when ignoring surplus accounts is intentional. The guard must compare `remaining.len()` against an integer literal or resolved constant, return early on the oversized path, and dominate the loop. The analysis follows local aliases. Reassignment, mutable borrows, `&mut self` calls, and closures that may replace a checked binding invalidate its bound. A runtime limit, branch-local check, late check, or opaque helper does not satisfy the rule because it does not establish a source-visible protocol maximum on every path.
 
 ## Performance reference
 

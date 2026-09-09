@@ -170,6 +170,134 @@ fn process_custom_take(remaining: &[u8]) {
 	}
 }
 
+fn process_unbounded_alias(remaining: &[u8]) {
+	let accounts = remaining;
+	for account in accounts {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+}
+
+fn process_bounded_alias(remaining: &[u8]) -> Result<(), ()> {
+	let accounts = remaining;
+	if accounts.len() > MAX_REMAINING_ACCOUNTS {
+		return Err(());
+	}
+
+	for account in accounts {
+		let _ = account;
+	}
+
+	Ok(())
+}
+
+fn process_stored_bounded_iterator(remaining: &[u8]) {
+	let accounts = remaining.iter().take(MAX_REMAINING_ACCOUNTS);
+
+	for account in accounts {
+		let _ = account;
+	}
+}
+
+fn process_reassigned_after_guard<'a>(
+	mut remaining: &'a [u8],
+	attacker: &'a [u8],
+) -> Result<(), ()> {
+	if remaining.len() > MAX_REMAINING_ACCOUNTS {
+		return Err(());
+	}
+
+	remaining = attacker;
+	for account in remaining {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+
+	Ok(())
+}
+
+fn replace_remaining<'a>(remaining: &mut &'a [u8], replacement: &'a [u8]) {
+	*remaining = replacement;
+}
+
+fn process_mutably_borrowed_after_guard<'a>(
+	mut remaining: &'a [u8],
+	attacker: &'a [u8],
+) -> Result<(), ()> {
+	if remaining.len() > MAX_REMAINING_ACCOUNTS {
+		return Err(());
+	}
+
+	replace_remaining(&mut remaining, attacker);
+	for account in remaining {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+
+	Ok(())
+}
+
+fn process_stored_mutable_reference_after_guard<'a>(
+	mut remaining: &'a [u8],
+	attacker: &'a [u8],
+) -> Result<(), ()> {
+	let remaining_ref = &mut remaining;
+	if remaining_ref.len() > MAX_REMAINING_ACCOUNTS {
+		return Err(());
+	}
+
+	replace_remaining(remaining_ref, attacker);
+	for account in *remaining_ref {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+
+	Ok(())
+}
+
+fn process_closure_replacement_after_guard<'a>(
+	mut remaining: &'a [u8],
+	attacker: &'a [u8],
+) -> Result<(), ()> {
+	if remaining.len() > MAX_REMAINING_ACCOUNTS {
+		return Err(());
+	}
+
+	let mut replace = || remaining = attacker;
+	replace();
+	for account in remaining {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+
+	Ok(())
+}
+
+struct RemainingHolder<'a> {
+	remaining: &'a [u8],
+}
+
+impl<'a> RemainingHolder<'a> {
+	fn replace(&mut self, replacement: &'a [u8]) {
+		self.remaining = replacement;
+	}
+}
+
+fn process_mutable_receiver_after_guard(remaining: &[u8], attacker: &[u8]) -> Result<(), ()> {
+	let mut holder = RemainingHolder { remaining };
+	if holder.remaining.len() > MAX_REMAINING_ACCOUNTS {
+		return Err(());
+	}
+
+	holder.replace(attacker);
+	for account in holder.remaining {
+		//~^ ERROR: remaining accounts are processed without an explicit bound
+		let _ = account;
+	}
+
+	Ok(())
+}
+
 fn main() {}
 
 // compile-fail
