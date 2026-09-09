@@ -163,7 +163,7 @@ pub mod entrypoint {
 
 	nostd_entrypoint!(process_instruction);
 
-	#[inline(always)]
+	#[inline]
 	pub fn process_instruction(
 		program_id: &Address,
 		accounts: &mut [AccountView],

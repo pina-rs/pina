@@ -56,11 +56,8 @@ pub fn generate_idl(
 	name_override: Option<&str>,
 ) -> Result<RootNode, IdlError> {
 	let ir = parse_program(program_path, name_override)?;
-	let needs_migration_constants = ir.accounts.iter().any(|account| account.is_migratable())
-		|| ir
-			.instructions
-			.iter()
-			.any(|instruction| instruction.is_migratable());
+	let needs_migration_constants = ir.accounts.iter().any(ir::AccountIr::is_migratable)
+		|| ir.instructions.iter().any(ir::InstructionIr::is_migratable);
 	let migrations = needs_migration_constants
 		.then(|| migrations::idl_migration_metadata(program_path))
 		.transpose()

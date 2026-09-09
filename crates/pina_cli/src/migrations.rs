@@ -276,13 +276,15 @@ pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationEr
 					let next = latest_version + 1;
 					let transition = create_transition(
 						&project,
-						&history.identity,
-						&history.rust_name,
-						latest,
-						next,
-						&source.schema,
-						source.process.as_ref(),
-						false,
+						TransitionRequest {
+							identity: &history.identity,
+							rust_name: &history.rust_name,
+							source: latest,
+							destination_version: next,
+							destination: &source.schema,
+							destination_process: source.process.as_ref(),
+							preserve_manual: false,
+						},
 						&mut output,
 					)?;
 					let schema_sha256 = source.schema.sha256();
@@ -316,13 +318,15 @@ pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationEr
 							})?;
 						let transition = create_transition(
 							&project,
-							&history.identity,
-							&history.rust_name,
-							previous,
-							latest_version,
-							&source.schema,
-							source.process.as_ref(),
-							true,
+							TransitionRequest {
+								identity: &history.identity,
+								rust_name: &history.rust_name,
+								source: previous,
+								destination_version: latest_version,
+								destination: &source.schema,
+								destination_process: source.process.as_ref(),
+								preserve_manual: true,
+							},
 							&mut output,
 						)?;
 						SchemaVersion {
@@ -643,7 +647,7 @@ fn scan_current_contracts(project: &Project) -> Result<CurrentProgram, Migration
 		)
 		.map_err(MigrationError::InvalidHistory)?;
 		let ir_instruction =
-			find_instruction(&ir.instructions, &discriminator).ok_or_else(|| {
+			find_instruction(&ir.instructions, discriminator).ok_or_else(|| {
 				MigrationError::InvalidHistory(format!(
 					"could not resolve process contract for instruction `{}`",
 					instruction.name
@@ -938,7 +942,7 @@ fn hash_regular_file(path: &Path) -> Result<[u8; 32], MigrationError> {
 		}
 	})?;
 	let mut digest = Sha256::new();
-	let mut buffer = [0_u8; 64 * 1024];
+	let mut buffer = vec![0_u8; 64 * 1024];
 	loop {
 		let read = file.read(&mut buffer).map_err(|source| {
 			MigrationError::Read {
@@ -962,17 +966,31 @@ fn hex_digest(digest: [u8; 32]) -> String {
 	output
 }
 
+#[derive(Clone, Copy)]
+struct TransitionRequest<'a> {
+	identity: &'a ContractIdentity,
+	rust_name: &'a str,
+	source: &'a SchemaVersion,
+	destination_version: u32,
+	destination: &'a DataSchema,
+	destination_process: Option<&'a ProcessContract>,
+	preserve_manual: bool,
+}
+
 fn create_transition(
 	project: &Project,
-	identity: &ContractIdentity,
-	rust_name: &str,
-	source: &SchemaVersion,
-	destination_version: u32,
-	destination: &DataSchema,
-	destination_process: Option<&ProcessContract>,
-	preserve_manual: bool,
+	request: TransitionRequest<'_>,
 	output: &mut MakeMigrationsOutput,
 ) -> Result<Transition, MigrationError> {
+	let TransitionRequest {
+		identity,
+		rust_name,
+		source,
+		destination_version,
+		destination,
+		destination_process,
+		preserve_manual,
+	} = request;
 	let process = process_transition(
 		identity,
 		rust_name,
@@ -1156,12 +1174,8 @@ fn automatic_transition_source(
 			if source_types.get(field.name.as_str()) != Some(&field.rust_type.as_str()) {
 				return None;
 			}
-			let Some(&(source_offset, size)) = source_offsets.get(&field.name) else {
-				return None;
-			};
-			let Some(&(destination_offset, _)) = destination_offsets.get(&field.name) else {
-				return None;
-			};
+			let &(source_offset, size) = source_offsets.get(&field.name)?;
+			let &(destination_offset, _) = destination_offsets.get(&field.name)?;
 			Some((source_offset, destination_offset, size))
 		})
 		.collect::<Vec<_>>();
@@ -1239,8 +1253,9 @@ fn manual_transition_source(
 					},
 				);
 				format!(
-					"{target}\npub(crate) fn working_size(\n\tdata: &[u8],\n\ttarget_size: \
-					 usize,\n) -> Option<usize> {{\n\tSome(data.len().max(target_size))\n}}\n"
+					"{target}\n#[allow(clippy::unnecessary_wraps)]\npub(crate) fn \
+					 working_size(\n\tdata: &[u8],\n\ttarget_size: usize,\n) -> Option<usize> \
+					 {{\n\tSome(data.len().max(target_size))\n}}\n"
 				)
 			} else {
 				let source_size = source_size.expect("fixed source size");

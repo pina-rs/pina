@@ -560,7 +560,6 @@ impl OfflineSurfnet {
 					.rent_epoch(fixture.account.rent_epoch)
 					.executable(fixture.account.executable),
 			)
-			.map(|_| ())
 			.map_err(|error| test_error("install historical account", error))
 	}
 

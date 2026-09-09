@@ -13,6 +13,7 @@ repository.workspace = true
 crate-type = ["cdylib", "lib"]
 
 [features]
+default = ["bpf-entrypoint"]
 bpf-entrypoint = []
 fuzzing = []
 

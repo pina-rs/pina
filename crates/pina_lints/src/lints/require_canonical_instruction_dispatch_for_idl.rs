@@ -42,15 +42,24 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalInstructionDispatchForIdl {
 	fn check_fn(
 		&mut self,
 		cx: &LateContext<'tcx>,
-		_: FnKind<'tcx>,
+		kind: FnKind<'tcx>,
 		_: &'tcx rustc_hir::FnDecl<'tcx>,
 		body: &'tcx rustc_hir::Body<'tcx>,
-		_: rustc_span::Span,
+		span: rustc_span::Span,
 		def_id: rustc_hir::def_id::LocalDefId,
 	) {
 		let def_path = cx.tcx.def_path_str(def_id.to_def_id());
-		if shared::should_skip_def_path(&def_path)
-			|| !shared::def_path_matches(&def_path, &["process_instruction", "entrypoint"])
+		let generated_name = match kind {
+			FnKind::ItemFn(ident, ..) => ident.span.from_expansion(),
+			FnKind::Method(..) | FnKind::Closure => false,
+		};
+		let function_name = def_path.rsplit("::").next().unwrap_or(&def_path);
+		if generated_name
+			|| kind.header().is_some_and(|header| header.is_unsafe())
+			|| span.from_expansion()
+			|| body.value.span.from_expansion()
+			|| shared::should_skip_def_path(&def_path)
+			|| !shared::def_path_matches(function_name, &["process_instruction", "entrypoint"])
 		{
 			return;
 		}

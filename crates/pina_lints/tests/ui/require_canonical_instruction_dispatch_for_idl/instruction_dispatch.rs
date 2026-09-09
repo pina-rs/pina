@@ -41,6 +41,20 @@ fn entrypoint_helper(data: &[u8]) -> Result<(), ()> {
 	}
 }
 
+macro_rules! generated_entrypoint {
+	() => {
+		fn entrypoint_generated(data: &[u8]) -> Result<(), ()> {
+			if data.is_empty() {
+				process_a()
+			} else {
+				process_b()
+			}
+		}
+	};
+}
+
+generated_entrypoint!();
+
 impl Instruction {
 	fn try_from_data(_data: &[u8]) -> Result<Self, ()> {
 		Ok(Self::Initialize)

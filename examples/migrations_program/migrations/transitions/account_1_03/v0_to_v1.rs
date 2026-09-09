@@ -5,6 +5,7 @@ pub(crate) fn target_size(data: &[u8]) -> Option<usize> {
 	5_usize.checked_add(usize::from(*data.get(2)?))
 }
 
+#[allow(clippy::unnecessary_wraps)]
 pub(crate) fn working_size(data: &[u8], target_size: usize) -> Option<usize> {
 	Some(data.len().max(target_size))
 }
