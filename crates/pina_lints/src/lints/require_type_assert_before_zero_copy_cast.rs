@@ -35,7 +35,12 @@ const TARGET_METHODS: &[&str] = &[
 	"cast_ref",
 	"cast_mut",
 ];
-const TARGET_NEEDLES: &[&str] = &["process", "process_instruction", "instruction", "account"];
+fn is_instruction_handler(def_path: &str) -> bool {
+	def_path
+		.split("::")
+		.any(|segment| matches!(segment, "process" | "process_instruction"))
+}
+
 fn is_bytemuck_cast(call: &shared::CallInfo) -> bool {
 	let Some(def_path) = call.def_path.as_deref() else {
 		return false;
@@ -58,9 +63,7 @@ impl<'tcx> LateLintPass<'tcx> for RequireTypeAssertBeforeZeroCopyCast {
 		def_id: rustc_hir::def_id::LocalDefId,
 	) {
 		let def_path = cx.tcx.def_path_str(def_id.to_def_id());
-		if shared::should_skip_def_path(&def_path)
-			|| !shared::def_path_matches(&def_path, TARGET_NEEDLES)
-		{
+		if shared::should_skip_def_path(&def_path) || !is_instruction_handler(&def_path) {
 			return;
 		}
 
