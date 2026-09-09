@@ -30,9 +30,9 @@ The developer declares that a contract is migratable, but does not choose or mai
 
 ## Decision
 
-Pina will treat migrations as a versioned data ABI system, backed by a checked-in ABI history and a content-addressed publication history. Pina migrates stored account data and instruction payload data. It does not migrate a process or its account list.
+Pina will treat migrations as a versioned ABI system, backed by a checked-in ABI history and a content-addressed publication history. Pina migrates stored account data, instruction payload data, and the generated instruction process contract when it can prove that an old positional account list remains a valid request.
 
-If a process needs different accounts, privileges, PDAs, external programs, ordering, or business semantics, the developer creates a new instruction discriminator and keeps the old process. This is Pina's single default compatibility policy. The first implementation will not offer account-list adapters, process-version policies, or compatibility-mode configuration.
+The first process proof is deliberately narrow. Existing account slots must remain an identical positional prefix and newly appended slots must all be optional. An old request then represents the appended suffix as absent. Reordering, insertion into the middle, removal, renaming, privilege or signer changes, PDA changes, known-address changes, and newly required accounts are genuinely breaking under the same discriminator. The developer creates a new instruction discriminator for those changes. Pina may add new formally specified proofs later, but it will not expose compatibility policy switches.
 
 ### Version envelope
 
@@ -46,7 +46,7 @@ The discriminator remains at offset zero. The version is little-endian and is hi
 
 `[migrations].version-type` is global for the program. Pina initially accepts `u8`, `u16`, and `u32`. It does not accept per-account or per-instruction overrides. The width may change while the program has no published migration-aware release. The first persistent publication freezes the width, byte order, and header offset for that program identity.
 
-Each account, instruction payload, and event advances independently. An instruction discriminator has one immutable process contract, including its positional account list. Its version may advance only when the payload changes and that process contract remains identical.
+Each account, instruction contract, and event advances independently. An instruction version snapshots both its payload and its process account ABI. Either a payload change or a compatible appended-optional process change advances the instruction version after publication.
 
 Existing unversioned data is not silently treated as version zero. Its first payload bytes may be a valid version by accident. Adoption requires an explicit legacy bridge or a new discriminator.
 
@@ -65,12 +65,15 @@ The checked-in Pina ABI history records the physical information needed to recon
 - fixed offsets and sizes;
 - compact prefix widths, capacities, header offsets, tail order, and alignment;
 - referenced enum representations and explicit discriminants;
-- the immutable process contract for each instruction discriminator, including accounts, positions, signer and writable requirements, known addresses, and PDAs;
+- the process contract for every instruction version, including accounts, positions, optionality, signer and writable requirements, known addresses, and PDAs;
+- the adjacent proof that relates each pair of process versions;
 - canonical schema and transition hashes.
 
 Stable identity derives from contract kind and discriminator, not a Rust type name. Renaming a Rust type does not create a new on-chain identity.
 
 The ABI history must come from the same closed schema grammar used by Pina's macros. The Codama IDL and unconstrained Rust type strings are not precise enough to be the long-term physical-layout authority. PinaPod may expose a stable physical-layout descriptor and fingerprint, but it does not own Solana migration policy.
+
+Pina's ABI document has its own `formatVersion`, separate from every on-chain contract version. All readers decode the document into a generic envelope, reject future formats, and run Pina-owned adjacent format migrations before deserializing the current typed model. Writing the manifest always writes the current format. An internal ABI-format upgrade therefore does not consume an account or instruction migration number, and old checked-in manifests remain buildable as long as Pina retains their adjacent document migrators.
 
 ### Drafts and publication
 
@@ -99,9 +102,9 @@ A production-grade append-only registry is the eventual authority. A mutable met
 The generated dispatcher, not an ordinary current-only decoder, owns historical instruction payload compatibility. Its conceptual flow is:
 
 1. Read the instruction discriminator and request version.
-2. Verify that the instruction's process contract has not changed under this discriminator.
+2. Load the exact process snapshot for that instruction version and verify its frozen compatibility path to the current process.
 3. Decode the exact historical payload.
-4. Validate the unchanged account count, positions, signer and writable privileges, known addresses, PDAs, and duplicate mutable aliases.
+4. Validate the historical positional prefix, signer and writable privileges, known addresses, PDAs, and duplicate mutable aliases; represent a proven appended optional suffix as absent.
 5. Inspect all typed migratable accounts required by the route.
 6. Preflight every account migration without retaining account-data borrows.
 7. Apply account migrations in generated deterministic order.
@@ -149,17 +152,22 @@ Inline account migration is unavailable when any required condition is missing:
 - growth needs lamports and no authorized payer was supplied by the historical request;
 - growth exceeds the runtime's per-instruction limit;
 - the bounded chain exceeds the supported compute or stack budget;
-- a custom transition needs an account outside the immutable process contract.
+- a custom transition needs an account absent from the historical process contract.
 
 A stable migration instruction can advance a bounded amount of work and return success. Generated migration-aware clients may invoke it repeatedly, then retry the original operation. An old client cannot acquire this retry behavior after release. For that reason, Pina classifies compatibility at migration creation time instead of promising that every old request remains transparent.
 
 ### Process compatibility
 
-Pina never migrates instruction account lists. Any account insertion, removal, reordering, optionality change, signer or writable change, PDA change, address change, external-program change, or business-process change requires a new instruction discriminator. The old discriminator and handler remain available for backward compatibility.
+Pina versions the instruction account ABI with the instruction payload. The default adjacent proof accepts only two relationships:
 
-This rule applies even when a mapping looks mechanically possible. It keeps each discriminator's authorization and account-position contract stable, makes old CPI clients predictable, and avoids a large policy surface. A change from the SPL Token program to Token-2022 therefore creates a new process. The old token-program process stays supported for old clients.
+1. the process account ABI is byte-for-byte unchanged; or
+2. the destination retains the complete source list as an identical positional prefix and appends only optional slots.
 
-Pina permits a version advance under the same instruction discriminator only when its data payload changes and the process contract is byte-for-byte and privilege-for-privilege identical. Schema generation fails if the account contract changed without a new discriminator.
+The current `Accounts` parser treats missing trailing optional slots as `None`. Optional fields followed by another positional field still require the program-address filler, so absence cannot shift a later account into an earlier slot.
+
+Every other relationship fails closed. Insertion into the middle, removal, reordering, slot renaming, signer or writable changes, PDA changes, known-address changes, and a new required account require a new instruction discriminator. Solana cannot synthesize a missing `AccountView` or escalate a privilege that was not present in the transaction. A change from the SPL Token program to Token-2022 therefore remains a new process unless both program slots already existed and the change is expressed entirely as current business logic.
+
+Process compatibility proves only the generated account ABI. Arbitrary application semantics are not statically knowable. Every historical request is normalized and then runs current validation and authorization; developers must add semantic fixtures for manual migration logic.
 
 ### CPI and mixed versions
 
@@ -181,8 +189,8 @@ Events are not migrated on-chain. New code emits only the current event represen
 - fixed, compact, fixed-to-compact, growth, shrink, and unchanged-size transitions;
 - current no-op, future-version rejection, truncation, malformed lengths, and maximum capacities;
 - rent deficit, surplus retention, unauthorized funding, aliasing, and arithmetic overflow;
-- historical instruction payload replay through its unchanged process contract against the latest SBF artifact;
-- rejection of account-contract drift under an existing discriminator;
+- historical instruction payload replay through every supported process version against the latest SBF artifact;
+- acceptance of appended optional account suffixes and rejection of required additions, insertion, reorder, removal, and privilege drift;
 - mixed-version sets, duplicate aliases, and missing privileges;
 - old caller programs performing CPI into the latest callee;
 - reload behavior after writable CPI resize;
@@ -210,7 +218,7 @@ An upgrade authority can bypass Pina and deploy arbitrary code. Publication guar
 - Historical decoders and transitions increase SBF size and compute cost.
 - The runtime stays `no_std` and allocator-free.
 - PinaPod remains responsible for byte-layout validity; Pina owns versioning, rent, dispatch, publication, and compatibility policy.
-- Process changes intentionally use a new instruction discriminator while the old process remains compiled for backward compatibility.
+- Appended optional process accounts can share a discriminator; all process changes outside the proved relationship use a new discriminator.
 
 ## Rejected alternatives
 
@@ -226,9 +234,9 @@ This saves at most a few bytes while making generic inspection, generated dispat
 
 A loader cannot adapt historical instruction payloads. It may also retain a borrow when resize or CPI needs exclusive access.
 
-### Account-list adapters
+### Configurable account-list adapters
 
-Even apparently safe account-list transforms enlarge the authorization and dispatch surface. A new instruction discriminator with the old process retained is easier to audit and test.
+User-selected compatibility modes make the authorization boundary depend on configuration and make two Pina programs interpret the same diff differently. Pina instead ships a small set of versioned, tested proofs. The initial proof covers only an identical prefix plus an optional suffix.
 
 ### Client-only migration
 

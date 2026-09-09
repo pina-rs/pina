@@ -1,0 +1,1179 @@
+//! Checked-in ABI snapshots and adjacent migration generation.
+
+use std::collections::BTreeMap;
+use std::fmt::Write as _;
+use std::io::Write as _;
+use std::path::Path;
+use std::path::PathBuf;
+
+use atomic_write_file::AtomicWriteFile;
+use pina_abi::ContractHistory;
+use pina_abi::ContractIdentity;
+use pina_abi::ContractKind;
+use pina_abi::DataSchema;
+use pina_abi::FieldSchema;
+use pina_abi::LayoutKind;
+use pina_abi::MANIFEST_PATH;
+use pina_abi::MigrationManifest;
+use pina_abi::PUBLICATIONS_PATH;
+use pina_abi::ProcessAccount;
+use pina_abi::ProcessContract;
+use pina_abi::ProcessTransition;
+use pina_abi::PublicationLedger;
+use pina_abi::SchemaVersion;
+use pina_abi::Transition;
+use pina_abi::TransitionMode;
+use serde::Serialize;
+
+use crate::error::IdlError;
+use crate::ir::DefaultValueIr;
+use crate::ir::DiscriminatorIr;
+use crate::ir::InstructionIr;
+use crate::parse;
+use crate::project::Project;
+use crate::project::ProjectError;
+
+/// One source contract discovered during migration inspection.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct CurrentContract {
+	identity: ContractIdentity,
+	rust_name: String,
+	schema: DataSchema,
+	process: Option<ProcessContract>,
+}
+
+/// Result of creating or refreshing draft migrations.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MakeMigrationsOutput {
+	pub manifest: PathBuf,
+	pub created_contracts: Vec<String>,
+	pub advanced_versions: Vec<String>,
+	pub updated_drafts: Vec<String>,
+	pub unchanged_contracts: Vec<String>,
+	pub manual_transitions: Vec<PathBuf>,
+}
+
+/// Current status of one migration-aware wire contract.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MigrationStatus {
+	pub identity: String,
+	pub kind: String,
+	pub rust_name: String,
+	pub current_version: u32,
+	pub published: bool,
+	pub schema_sha256: String,
+}
+
+/// Errors produced by migration snapshot and compatibility operations.
+#[derive(Debug, thiserror::Error)]
+pub enum MigrationError {
+	#[error(transparent)]
+	Project(#[from] ProjectError),
+
+	#[error(transparent)]
+	Parse(#[from] IdlError),
+
+	#[error("Could not read migration file {path}: {source}")]
+	Read {
+		path: PathBuf,
+		source: std::io::Error,
+	},
+
+	#[error("Could not decode migration file {path}: {reason}")]
+	InvalidDocument { path: PathBuf, reason: String },
+
+	#[error("Could not serialize migration file {path}: {source}")]
+	SerializeJson {
+		path: PathBuf,
+		source: serde_json::Error,
+	},
+
+	#[error("Could not create migration directory {path}: {source}")]
+	CreateDirectory {
+		path: PathBuf,
+		source: std::io::Error,
+	},
+
+	#[error("Could not write migration file {path}: {source}")]
+	Write {
+		path: PathBuf,
+		source: std::io::Error,
+	},
+
+	#[error("Invalid migration history: {0}")]
+	InvalidHistory(String),
+
+	#[error("Migration history belongs to program {found}, but current source declares {expected}")]
+	ProgramIdentityChanged { expected: String, found: String },
+
+	#[error("Migration version encoding is frozen as {found}, but pina.toml configures {expected}")]
+	VersionTypeChanged { expected: String, found: String },
+
+	#[error(
+		"Instruction process `{name}` changed incompatibly under discriminator `{identity}`: \
+		 {reason}. Pina currently preserves an unchanged positional prefix and permits only newly \
+		 appended optional accounts. Use a new instruction discriminator for this process change."
+	)]
+	ProcessChanged {
+		name: String,
+		identity: String,
+		reason: String,
+	},
+
+	#[error(
+		"Migration-aware {kind} `{name}` has no checked-in snapshot. Run `pina migrations make`."
+	)]
+	MissingSnapshot { kind: String, name: String },
+
+	#[error(
+		"Migration-aware {kind} `{name}` differs from version {version}. Its data schema or \
+		 instruction process ABI changed. Run `pina migrations make` and review the transition."
+	)]
+	SchemaDrift {
+		kind: String,
+		name: String,
+		version: u32,
+	},
+
+	#[error(
+		"Historical {kind} contract `{name}` ({identity}) is no longer present in source. \
+		 Published decoders and account migrations cannot be silently removed. Restore it or \
+		 perform an explicitly reviewed retirement."
+	)]
+	ContractRemoved {
+		kind: String,
+		name: String,
+		identity: String,
+	},
+
+	#[error("Configured {version_type} migration versions are exhausted for `{identity}`")]
+	VersionExhausted {
+		version_type: String,
+		identity: String,
+	},
+
+	#[error(
+		"Published migration implementation {path} changed after publication. Add a repair \
+		 migration instead of rewriting live history."
+	)]
+	PublishedImplementationChanged { path: PathBuf },
+
+	#[error(
+		"Manual migration {path} is unfinished. Replace the `TODO(pina-manual-migration)` body \
+		 and run `pina migrations make`."
+	)]
+	ManualTransitionIncomplete { path: PathBuf },
+
+	#[error("Migration transition file is missing: {path}")]
+	MissingTransition { path: PathBuf },
+
+	#[error("Multiple migration-aware source contracts resolve to `{identity}`")]
+	DuplicateIdentity { identity: String },
+}
+
+/// Create the initial ABI database or refresh its latest draft versions.
+///
+/// An unpublished latest version is mutable. A published latest version is
+/// immutable and a source change appends one adjacent version.
+pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationError> {
+	let project = Project::discover(start)?;
+	let current = scan_current_contracts(&project)?;
+	let manifest_path = project.program_dir.join(MANIFEST_PATH);
+	let publication_path = project.program_dir.join(PUBLICATIONS_PATH);
+	let ledger = load_publication_ledger(&publication_path)?;
+	let mut manifest = load_manifest(&manifest_path)?.unwrap_or_else(|| {
+		MigrationManifest::new(current.program_id.clone(), project.migration_version_type)
+	});
+	validate_program_configuration(&project, &current.program_id, &manifest)?;
+	ledger.validate().map_err(MigrationError::InvalidHistory)?;
+
+	let mut output = MakeMigrationsOutput {
+		manifest: manifest_path.clone(),
+		..MakeMigrationsOutput::default()
+	};
+	let mut seen = BTreeMap::new();
+
+	for source in current.contracts {
+		let key = source.identity.key();
+		seen.insert(
+			key.clone(),
+			(source.identity.kind, source.rust_name.clone()),
+		);
+		match manifest.contracts.get_mut(&key) {
+			None => {
+				let schema_sha256 = source.schema.sha256();
+				let process_sha256 = source.process.as_ref().map(ProcessContract::sha256);
+				manifest.contracts.insert(
+					key.clone(),
+					ContractHistory {
+						identity: source.identity,
+						rust_name: source.rust_name,
+						versions: vec![SchemaVersion {
+							version: 0,
+							schema_sha256,
+							schema: source.schema,
+							process: source.process,
+							process_sha256,
+							transition: None,
+						}],
+					},
+				);
+				output.created_contracts.push(key);
+			}
+			Some(history) => {
+				history.rust_name = source.rust_name;
+				let latest = history.current().ok_or_else(|| {
+					MigrationError::InvalidHistory(format!("contract `{key}` has no versions"))
+				})?;
+				if latest.schema == source.schema && latest.process == source.process {
+					refresh_draft_transition_hash(&project, &ledger, &key, history, &mut output)?;
+					output.unchanged_contracts.push(key);
+					continue;
+				}
+
+				let latest_version = latest.version;
+				if ledger.ever_published(&key, latest_version) {
+					if latest_version == manifest.version_type.max_version() {
+						return Err(MigrationError::VersionExhausted {
+							version_type: manifest.version_type.to_string(),
+							identity: key,
+						});
+					}
+					let next = latest_version + 1;
+					let transition = create_transition(
+						&project,
+						&history.identity,
+						&history.rust_name,
+						latest,
+						next,
+						&source.schema,
+						source.process.as_ref(),
+						false,
+						&mut output,
+					)?;
+					let schema_sha256 = source.schema.sha256();
+					history.versions.push(SchemaVersion {
+						version: next,
+						schema_sha256,
+						schema: source.schema,
+						process_sha256: source.process.as_ref().map(ProcessContract::sha256),
+						process: source.process,
+						transition: Some(transition),
+					});
+					output.advanced_versions.push(format!("{key}@{next}"));
+				} else {
+					let replacement = if latest_version == 0 {
+						SchemaVersion {
+							version: 0,
+							schema_sha256: source.schema.sha256(),
+							schema: source.schema,
+							process_sha256: source.process.as_ref().map(ProcessContract::sha256),
+							process: source.process,
+							transition: None,
+						}
+					} else {
+						let previous = history
+							.versions
+							.get((latest_version - 1) as usize)
+							.ok_or_else(|| {
+								MigrationError::InvalidHistory(format!(
+									"contract `{key}` has no previous version"
+								))
+							})?;
+						let transition = create_transition(
+							&project,
+							&history.identity,
+							&history.rust_name,
+							previous,
+							latest_version,
+							&source.schema,
+							source.process.as_ref(),
+							true,
+							&mut output,
+						)?;
+						SchemaVersion {
+							version: latest_version,
+							schema_sha256: source.schema.sha256(),
+							schema: source.schema,
+							process_sha256: source.process.as_ref().map(ProcessContract::sha256),
+							process: source.process,
+							transition: Some(transition),
+						}
+					};
+					let index = latest_version as usize;
+					history.versions[index] = replacement;
+					output
+						.updated_drafts
+						.push(format!("{key}@{latest_version}"));
+				}
+			}
+		}
+	}
+
+	for (key, history) in &manifest.contracts {
+		if !seen.contains_key(key) {
+			return Err(MigrationError::ContractRemoved {
+				kind: history.identity.kind.to_string(),
+				name: history.rust_name.clone(),
+				identity: key.clone(),
+			});
+		}
+	}
+
+	manifest
+		.validate()
+		.map_err(MigrationError::InvalidHistory)?;
+	write_json_atomic(&manifest_path, &manifest)?;
+	if !publication_path.exists() {
+		write_json_atomic(&publication_path, &ledger)?;
+	}
+	Ok(output)
+}
+
+/// Verify source, snapshots, process contracts, and frozen transition code.
+pub fn check_migrations(start: &Path) -> Result<Vec<MigrationStatus>, MigrationError> {
+	let project = Project::discover(start)?;
+	let current = scan_current_contracts(&project)?;
+	let manifest_path = project.program_dir.join(MANIFEST_PATH);
+	let manifest = load_manifest(&manifest_path)?;
+	if current.contracts.is_empty() && manifest.is_none() {
+		return Ok(Vec::new());
+	}
+	let manifest = manifest.ok_or_else(|| {
+		let first = &current.contracts[0];
+		MigrationError::MissingSnapshot {
+			kind: first.identity.kind.to_string(),
+			name: first.rust_name.clone(),
+		}
+	})?;
+	let ledger = load_publication_ledger(&project.program_dir.join(PUBLICATIONS_PATH))?;
+	validate_program_configuration(&project, &current.program_id, &manifest)?;
+	manifest
+		.validate()
+		.map_err(MigrationError::InvalidHistory)?;
+	ledger.validate().map_err(MigrationError::InvalidHistory)?;
+
+	let mut seen = BTreeMap::new();
+	let mut statuses = Vec::new();
+	for source in current.contracts {
+		let key = source.identity.key();
+		seen.insert(
+			key.clone(),
+			(source.identity.kind, source.rust_name.clone()),
+		);
+		let history = manifest.contracts.get(&key).ok_or_else(|| {
+			MigrationError::MissingSnapshot {
+				kind: source.identity.kind.to_string(),
+				name: source.rust_name.clone(),
+			}
+		})?;
+		let latest = history.current().ok_or_else(|| {
+			MigrationError::InvalidHistory(format!("contract `{key}` has no versions"))
+		})?;
+		if latest.schema != source.schema || latest.process != source.process {
+			return Err(MigrationError::SchemaDrift {
+				kind: source.identity.kind.to_string(),
+				name: source.rust_name,
+				version: latest.version,
+			});
+		}
+		verify_transition_files(&project, &ledger, &key, history)?;
+		statuses.push(MigrationStatus {
+			identity: key.clone(),
+			kind: source.identity.kind.to_string(),
+			rust_name: source.rust_name,
+			current_version: latest.version,
+			published: ledger.ever_published(&key, latest.version),
+			schema_sha256: latest.schema_sha256.clone(),
+		});
+	}
+	for (key, history) in &manifest.contracts {
+		if !seen.contains_key(key) {
+			return Err(MigrationError::ContractRemoved {
+				kind: history.identity.kind.to_string(),
+				name: history.rust_name.clone(),
+				identity: key.clone(),
+			});
+		}
+	}
+	Ok(statuses)
+}
+
+/// Return migration status after applying every build-time compatibility check.
+pub fn migration_status(start: &Path) -> Result<Vec<MigrationStatus>, MigrationError> {
+	check_migrations(start)
+}
+
+struct CurrentProgram {
+	program_id: String,
+	contracts: Vec<CurrentContract>,
+}
+
+fn scan_current_contracts(project: &Project) -> Result<CurrentProgram, MigrationError> {
+	let ir = parse::parse_program(&project.program_dir, Some(&project.library_name))?;
+	let src_dir = project.program_dir.join("src");
+	let files = parse::module_resolver::resolve_crate(&src_dir, &src_dir.join("lib.rs"))?;
+	let mut discriminators = Vec::new();
+	let mut accounts = Vec::new();
+	let mut instructions = Vec::new();
+	let mut events = Vec::new();
+	for resolved in &files {
+		discriminators.extend(parse::discriminator::extract_discriminator_enums(
+			&resolved.file,
+		)?);
+		accounts.extend(parse::account_state::extract_account_structs(
+			&resolved.file,
+		)?);
+		instructions.extend(parse::instruction_data::extract_instruction_structs(
+			&resolved.file,
+		)?);
+		events.extend(parse::event_data::extract_migratable_events(
+			&resolved.file,
+		)?);
+	}
+	let discriminator_map = parse::build_discriminator_map(&discriminators);
+	let mut contracts = BTreeMap::new();
+
+	for account in accounts.into_iter().filter(|account| account.migratable) {
+		let discriminator = resolve_discriminator(
+			&discriminator_map,
+			&account.discriminator_enum,
+			&account.variant,
+			"account",
+		)?;
+		let identity = ContractIdentity::try_new(
+			ContractKind::Account,
+			discriminator.repr_size,
+			discriminator.value,
+		)
+		.map_err(MigrationError::InvalidHistory)?;
+		let layout = if account.is_compact() {
+			LayoutKind::Compact
+		} else {
+			LayoutKind::Fixed
+		};
+		insert_current(
+			&mut contracts,
+			CurrentContract {
+				identity,
+				rust_name: account.name,
+				schema: DataSchema {
+					layout,
+					fields: account
+						.fields
+						.into_iter()
+						.map(|field| {
+							FieldSchema {
+								name: field.name,
+								rust_type: field.rust_type,
+							}
+						})
+						.collect(),
+				},
+				process: None,
+			},
+		)?;
+	}
+
+	for instruction in instructions
+		.into_iter()
+		.filter(|instruction| instruction.migratable)
+	{
+		let discriminator = resolve_discriminator(
+			&discriminator_map,
+			&instruction.discriminator_enum,
+			&instruction.variant,
+			"instruction",
+		)?;
+		let identity = ContractIdentity::try_new(
+			ContractKind::Instruction,
+			discriminator.repr_size,
+			discriminator.value,
+		)
+		.map_err(MigrationError::InvalidHistory)?;
+		let ir_instruction =
+			find_instruction(&ir.instructions, &discriminator).ok_or_else(|| {
+				MigrationError::InvalidHistory(format!(
+					"could not resolve process contract for instruction `{}`",
+					instruction.name
+				))
+			})?;
+		insert_current(
+			&mut contracts,
+			CurrentContract {
+				identity,
+				rust_name: instruction.name,
+				schema: DataSchema {
+					layout: LayoutKind::Fixed,
+					fields: instruction
+						.fields
+						.into_iter()
+						.map(|field| {
+							FieldSchema {
+								name: field.name,
+								rust_type: field.rust_type,
+							}
+						})
+						.collect(),
+				},
+				process: Some(process_contract(ir_instruction)),
+			},
+		)?;
+	}
+
+	for event in events {
+		let discriminator = resolve_discriminator(
+			&discriminator_map,
+			&event.discriminator_enum,
+			&event.variant,
+			"event",
+		)?;
+		let identity = ContractIdentity::try_new(
+			ContractKind::Event,
+			discriminator.repr_size,
+			discriminator.value,
+		)
+		.map_err(MigrationError::InvalidHistory)?;
+		insert_current(
+			&mut contracts,
+			CurrentContract {
+				identity,
+				rust_name: event.name,
+				schema: event.schema,
+				process: None,
+			},
+		)?;
+	}
+
+	Ok(CurrentProgram {
+		program_id: ir.public_key,
+		contracts: contracts.into_values().collect(),
+	})
+}
+
+fn resolve_discriminator<'a>(
+	map: &'a std::collections::HashMap<(String, String), DiscriminatorIr>,
+	enum_name: &str,
+	variant: &str,
+	kind: &str,
+) -> Result<&'a DiscriminatorIr, MigrationError> {
+	map.get(&(enum_name.to_owned(), variant.to_owned()))
+		.ok_or_else(|| {
+			MigrationError::InvalidHistory(format!(
+				"could not resolve {kind} discriminator `{enum_name}::{variant}`"
+			))
+		})
+}
+
+fn insert_current(
+	contracts: &mut BTreeMap<String, CurrentContract>,
+	contract: CurrentContract,
+) -> Result<(), MigrationError> {
+	let key = contract.identity.key();
+	if contracts.insert(key.clone(), contract).is_some() {
+		return Err(MigrationError::DuplicateIdentity { identity: key });
+	}
+	Ok(())
+}
+
+fn find_instruction<'a>(
+	instructions: &'a [InstructionIr],
+	discriminator: &DiscriminatorIr,
+) -> Option<&'a InstructionIr> {
+	instructions.iter().find(|instruction| {
+		instruction.discriminator.value == discriminator.value
+			&& instruction.discriminator.repr_size == discriminator.repr_size
+	})
+}
+
+fn process_contract(instruction: &InstructionIr) -> ProcessContract {
+	ProcessContract {
+		accounts: instruction
+			.accounts
+			.iter()
+			.map(|account| {
+				ProcessAccount {
+					name: account.name.clone(),
+					writable: account.is_writable,
+					signer: account.is_signer,
+					optional: account.is_optional,
+					default_value: account.default_value.as_ref().map(|value| {
+						match value {
+							DefaultValueIr::ProgramId(value) => format!("program:{value}"),
+							DefaultValueIr::PublicKey(value) => format!("publicKey:{value}"),
+						}
+					}),
+					pda: account.pda_name.clone(),
+					constraints: account.constraints.clone(),
+				}
+			})
+			.collect(),
+	}
+}
+
+fn validate_program_configuration(
+	project: &Project,
+	program_id: &str,
+	manifest: &MigrationManifest,
+) -> Result<(), MigrationError> {
+	if manifest.program_id != program_id {
+		return Err(MigrationError::ProgramIdentityChanged {
+			expected: program_id.to_owned(),
+			found: manifest.program_id.clone(),
+		});
+	}
+	if manifest.version_type != project.migration_version_type {
+		return Err(MigrationError::VersionTypeChanged {
+			expected: project.migration_version_type.to_string(),
+			found: manifest.version_type.to_string(),
+		});
+	}
+	Ok(())
+}
+
+fn load_manifest(path: &Path) -> Result<Option<MigrationManifest>, MigrationError> {
+	if !path.exists() {
+		return Ok(None);
+	}
+	let source = read_bytes(path)?;
+	pina_abi::decode_manifest(&source)
+		.map(Some)
+		.map_err(|reason| {
+			MigrationError::InvalidDocument {
+				path: path.to_path_buf(),
+				reason,
+			}
+		})
+}
+
+fn load_publication_ledger(path: &Path) -> Result<PublicationLedger, MigrationError> {
+	if !path.exists() {
+		return Ok(PublicationLedger::default());
+	}
+	let source = read_bytes(path)?;
+	pina_abi::decode_publication_ledger(&source).map_err(|reason| {
+		MigrationError::InvalidDocument {
+			path: path.to_path_buf(),
+			reason,
+		}
+	})
+}
+
+fn read_bytes(path: &Path) -> Result<Vec<u8>, MigrationError> {
+	std::fs::read(path).map_err(|source| {
+		MigrationError::Read {
+			path: path.to_path_buf(),
+			source,
+		}
+	})
+}
+
+fn write_json_atomic(path: &Path, value: &impl Serialize) -> Result<(), MigrationError> {
+	let parent = path.parent().ok_or_else(|| {
+		MigrationError::InvalidHistory(format!("{} has no parent directory", path.display()))
+	})?;
+	std::fs::create_dir_all(parent).map_err(|source| {
+		MigrationError::CreateDirectory {
+			path: parent.to_path_buf(),
+			source,
+		}
+	})?;
+	let mut bytes = serde_json::to_vec_pretty(value).map_err(|source| {
+		MigrationError::SerializeJson {
+			path: path.to_path_buf(),
+			source,
+		}
+	})?;
+	bytes.push(b'\n');
+	write_atomic(path, &bytes)
+}
+
+fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), MigrationError> {
+	let mut file = AtomicWriteFile::open(path).map_err(|source| {
+		MigrationError::Write {
+			path: path.to_path_buf(),
+			source,
+		}
+	})?;
+	file.write_all(bytes).map_err(|source| {
+		MigrationError::Write {
+			path: path.to_path_buf(),
+			source,
+		}
+	})?;
+	file.commit().map_err(|source| {
+		MigrationError::Write {
+			path: path.to_path_buf(),
+			source,
+		}
+	})
+}
+
+fn create_transition(
+	project: &Project,
+	identity: &ContractIdentity,
+	rust_name: &str,
+	source: &SchemaVersion,
+	destination_version: u32,
+	destination: &DataSchema,
+	destination_process: Option<&ProcessContract>,
+	preserve_manual: bool,
+	output: &mut MakeMigrationsOutput,
+) -> Result<Transition, MigrationError> {
+	let process = process_transition(
+		identity,
+		rust_name,
+		source.process.as_ref(),
+		destination_process,
+	)?;
+	let mode = transition_mode(&source.schema, destination);
+	let path = transition_path(project, identity, source.version, destination_version);
+	let generated = match mode {
+		TransitionMode::Automatic => {
+			automatic_transition_source(
+				identity,
+				project.migration_version_type,
+				source,
+				destination_version,
+				destination,
+			)
+		}
+		TransitionMode::Manual => {
+			manual_transition_source(
+				identity,
+				project.migration_version_type,
+				source,
+				destination_version,
+				destination,
+			)
+		}
+	};
+	if mode == TransitionMode::Manual && preserve_manual && path.exists() {
+		// Keep a developer-owned draft body while its destination snapshot evolves.
+	} else {
+		let parent = path.parent().expect("transition path always has parent");
+		std::fs::create_dir_all(parent).map_err(|source| {
+			MigrationError::CreateDirectory {
+				path: parent.to_path_buf(),
+				source,
+			}
+		})?;
+		write_atomic(&path, generated.as_bytes())?;
+	}
+	if mode == TransitionMode::Manual {
+		output.manual_transitions.push(path.clone());
+	}
+	let implementation_sha256 = Some(hash_file(&path)?);
+	Ok(Transition {
+		from: source.version,
+		to: destination_version,
+		mode,
+		source_schema_sha256: source.schema_sha256.clone(),
+		destination_schema_sha256: destination.sha256(),
+		source_process_sha256: source.process_sha256.clone(),
+		destination_process_sha256: destination_process.map(ProcessContract::sha256),
+		process,
+		implementation_sha256,
+	})
+}
+
+fn process_transition(
+	identity: &ContractIdentity,
+	rust_name: &str,
+	source: Option<&ProcessContract>,
+	destination: Option<&ProcessContract>,
+) -> Result<Option<ProcessTransition>, MigrationError> {
+	match (identity.kind, source, destination) {
+		(ContractKind::Instruction, Some(source), Some(destination)) => {
+			pina_abi::classify_process_transition(source, destination)
+				.map(Some)
+				.map_err(|reason| {
+					MigrationError::ProcessChanged {
+						name: rust_name.to_owned(),
+						identity: identity.key(),
+						reason,
+					}
+				})
+		}
+		(ContractKind::Instruction, ..) => {
+			Err(MigrationError::InvalidHistory(format!(
+				"instruction contract `{}` is missing a process snapshot",
+				identity.key()
+			)))
+		}
+		(ContractKind::Account | ContractKind::Event, None, None) => Ok(None),
+		(ContractKind::Account | ContractKind::Event, ..) => {
+			Err(MigrationError::InvalidHistory(format!(
+				"{} contract `{}` unexpectedly contains a process snapshot",
+				identity.kind,
+				identity.key()
+			)))
+		}
+	}
+}
+
+fn transition_mode(source: &DataSchema, destination: &DataSchema) -> TransitionMode {
+	if source.layout != LayoutKind::Fixed || destination.layout != LayoutKind::Fixed {
+		return TransitionMode::Manual;
+	}
+	let destination_fields = destination
+		.fields
+		.iter()
+		.map(|field| (field.name.as_str(), field.rust_type.as_str()))
+		.collect::<BTreeMap<_, _>>();
+	let compatible = source.fields.iter().all(|field| {
+		destination_fields
+			.get(field.name.as_str())
+			.is_none_or(|destination_type| **destination_type == field.rust_type)
+	});
+	if compatible
+		&& source.fixed_payload_size().is_some()
+		&& destination.fixed_payload_size().is_some()
+		&& automatic_direction(source, destination).is_some()
+	{
+		TransitionMode::Automatic
+	} else {
+		TransitionMode::Manual
+	}
+}
+
+#[derive(Clone, Copy)]
+enum MoveDirection {
+	Forward,
+	Backward,
+}
+
+fn automatic_direction(source: &DataSchema, destination: &DataSchema) -> Option<MoveDirection> {
+	let source_offsets = source.fixed_field_offsets()?;
+	let destination_offsets = destination.fixed_field_offsets()?;
+	let destination_types = destination
+		.fields
+		.iter()
+		.map(|field| (field.name.as_str(), field.rust_type.as_str()))
+		.collect::<BTreeMap<_, _>>();
+	let mut previous_destination = None;
+	let mut moves_left = false;
+	let mut moves_right = false;
+	for field in &source.fields {
+		if destination_types.get(field.name.as_str()) != Some(&field.rust_type.as_str()) {
+			continue;
+		}
+		let (source_offset, _) = source_offsets.get(&field.name)?;
+		let (destination_offset, _) = destination_offsets.get(&field.name)?;
+		if previous_destination.is_some_and(|previous| *destination_offset < previous) {
+			return None;
+		}
+		previous_destination = Some(*destination_offset);
+		moves_left |= destination_offset < source_offset;
+		moves_right |= destination_offset > source_offset;
+	}
+	match (moves_left, moves_right) {
+		(true, true) => None,
+		(false, true) => Some(MoveDirection::Backward),
+		(true, false) | (false, false) => Some(MoveDirection::Forward),
+	}
+}
+
+fn automatic_transition_source(
+	identity: &ContractIdentity,
+	version_type: pina_abi::MigrationVersionType,
+	source: &SchemaVersion,
+	destination_version: u32,
+	destination: &DataSchema,
+) -> String {
+	let discriminator_bytes = usize::from(identity.discriminator_bytes);
+	let header = discriminator_bytes + version_type.bytes();
+	let source_size = header + source.schema.fixed_payload_size().unwrap_or(0);
+	let destination_size = header + destination.fixed_payload_size().unwrap_or(0);
+	let working_size = source_size.max(destination_size);
+	let source_offsets = source.schema.fixed_field_offsets().unwrap_or_default();
+	let destination_offsets = destination.fixed_field_offsets().unwrap_or_default();
+	let source_types = source
+		.schema
+		.fields
+		.iter()
+		.map(|field| (field.name.as_str(), field.rust_type.as_str()))
+		.collect::<BTreeMap<_, _>>();
+	let direction = automatic_direction(&source.schema, destination)
+		.expect("automatic transition must have a safe move direction");
+	let mut mapped = destination
+		.fields
+		.iter()
+		.filter_map(|field| {
+			if source_types.get(field.name.as_str()) != Some(&field.rust_type.as_str()) {
+				return None;
+			}
+			let Some(&(source_offset, size)) = source_offsets.get(&field.name) else {
+				return None;
+			};
+			let Some(&(destination_offset, _)) = destination_offsets.get(&field.name) else {
+				return None;
+			};
+			Some((source_offset, destination_offset, size))
+		})
+		.collect::<Vec<_>>();
+	match direction {
+		MoveDirection::Forward => mapped.sort_by_key(|(source, ..)| *source),
+		MoveDirection::Backward => mapped.sort_by_key(|(source, ..)| std::cmp::Reverse(*source)),
+	}
+	let mut moves = String::new();
+	for (source_offset, destination_offset, size) in mapped {
+		let source_start = header + source_offset;
+		let source_end = source_start + size;
+		let destination_start = header + destination_offset;
+		let _ = writeln!(
+			moves,
+			"\tdata.copy_within({source_start}..{source_end}, {destination_start});"
+		);
+	}
+	let source_names = source_types.keys().copied().collect::<Vec<_>>();
+	let mut zeroes = String::new();
+	for field in &destination.fields {
+		if source_names.contains(&field.name.as_str())
+			&& source_types.get(field.name.as_str()) == Some(&field.rust_type.as_str())
+		{
+			continue;
+		}
+		let Some(&(destination_offset, size)) = destination_offsets.get(&field.name) else {
+			continue;
+		};
+		let start = header + destination_offset;
+		let end = start + size;
+		let _ = writeln!(zeroes, "\tdata[{start}..{end}].fill(0);");
+	}
+	format!(
+		"// @generated by `pina migrations make`; do not edit an automatic \
+		 transition.\npub(crate) const FROM_VERSION: u32 = {};\npub(crate) const TO_VERSION: u32 \
+		 = {destination_version};\npub(crate) const SOURCE_SIZE: usize = \
+		 {source_size};\npub(crate) const DESTINATION_SIZE: usize = \
+		 {destination_size};\n\npub(crate) const WORKING_SIZE: usize = \
+		 {working_size};\n\npub(crate) fn migrate(data: &mut [u8]) {{\n\tif data.len() < \
+		 WORKING_SIZE {{\n\t\treturn;\n\t}}\n{moves}{zeroes}}}\n",
+		source.version,
+	)
+}
+
+fn manual_transition_source(
+	identity: &ContractIdentity,
+	version_type: pina_abi::MigrationVersionType,
+	source: &SchemaVersion,
+	destination_version: u32,
+	destination: &DataSchema,
+) -> String {
+	let header = usize::from(identity.discriminator_bytes) + version_type.bytes();
+	let source_size = source
+		.schema
+		.fixed_payload_size()
+		.map(|size| (header + size).to_string())
+		.unwrap_or_else(|| "dynamic".to_owned());
+	let destination_size = destination
+		.fixed_payload_size()
+		.map(|size| (header + size).to_string())
+		.unwrap_or_else(|| "dynamic".to_owned());
+	let working_size = match (
+		source.schema.fixed_payload_size(),
+		destination.fixed_payload_size(),
+	) {
+		(Some(source), Some(destination)) => (header + source.max(destination)).to_string(),
+		_ => "dynamic".to_owned(),
+	};
+	format!(
+		"// Manual adjacent ABI migration generated by `pina migrations make`.\n// Source \
+		 version: {} ({source_size} bytes)\n// Destination version: {destination_version} \
+		 ({destination_size} bytes)\n// TODO(pina-manual-migration): validate exact historical \
+		 bytes, then fully initialize destination.\npub(crate) const SOURCE_SIZE: usize = \
+		 {source_size};\npub(crate) const DESTINATION_SIZE: usize = \
+		 {destination_size};\npub(crate) const WORKING_SIZE: usize = \
+		 {working_size};\n\npub(crate) fn migrate(data: &mut [u8]) -> bool {{\n\tlet _ = \
+		 data;\n\tfalse\n}}\n",
+		source.version,
+	)
+}
+
+fn transition_path(project: &Project, identity: &ContractIdentity, from: u32, to: u32) -> PathBuf {
+	project
+		.program_dir
+		.join(pina_abi::transition_path(identity, from, to))
+}
+
+fn hash_file(path: &Path) -> Result<String, MigrationError> {
+	let bytes = std::fs::read(path).map_err(|source| {
+		MigrationError::Read {
+			path: path.to_path_buf(),
+			source,
+		}
+	})?;
+	Ok(pina_abi::sha256_bytes(bytes))
+}
+
+fn verify_transition_files(
+	project: &Project,
+	ledger: &PublicationLedger,
+	key: &str,
+	history: &ContractHistory,
+) -> Result<(), MigrationError> {
+	for version in history.versions.iter().skip(1) {
+		let transition = version.transition.as_ref().ok_or_else(|| {
+			MigrationError::InvalidHistory(format!(
+				"contract `{key}` version {} has no transition",
+				version.version
+			))
+		})?;
+		let path = transition_path(project, &history.identity, transition.from, transition.to);
+		if !path.is_file() {
+			return Err(MigrationError::MissingTransition { path });
+		}
+		let contents = std::fs::read_to_string(&path).map_err(|source| {
+			MigrationError::Read {
+				path: path.clone(),
+				source,
+			}
+		})?;
+		if transition.mode == TransitionMode::Manual
+			&& contents.contains("TODO(pina-manual-migration)")
+		{
+			return Err(MigrationError::ManualTransitionIncomplete { path });
+		}
+		let current_hash = hash_file(&path)?;
+		if transition.implementation_sha256.as_deref() != Some(current_hash.as_str()) {
+			if ledger.ever_published(key, version.version) {
+				return Err(MigrationError::PublishedImplementationChanged { path });
+			}
+			return Err(MigrationError::SchemaDrift {
+				kind: history.identity.kind.to_string(),
+				name: history.rust_name.clone(),
+				version: version.version,
+			});
+		}
+	}
+	Ok(())
+}
+
+fn refresh_draft_transition_hash(
+	project: &Project,
+	ledger: &PublicationLedger,
+	key: &str,
+	history: &mut ContractHistory,
+	output: &mut MakeMigrationsOutput,
+) -> Result<(), MigrationError> {
+	let Some(latest) = history.versions.last_mut() else {
+		return Ok(());
+	};
+	let Some(transition) = latest.transition.as_mut() else {
+		return Ok(());
+	};
+	let path = transition_path(project, &history.identity, transition.from, transition.to);
+	if !path.is_file() {
+		return Err(MigrationError::MissingTransition { path });
+	}
+	let hash = hash_file(&path)?;
+	if transition.implementation_sha256.as_deref() == Some(hash.as_str()) {
+		return Ok(());
+	}
+	if ledger.ever_published(key, latest.version) {
+		return Err(MigrationError::PublishedImplementationChanged { path });
+	}
+	transition.implementation_sha256 = Some(hash);
+	output
+		.updated_drafts
+		.push(format!("{key}@{}", latest.version));
+	Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	fn schema(layout: LayoutKind, fields: &[(&str, &str)]) -> DataSchema {
+		DataSchema {
+			layout,
+			fields: fields
+				.iter()
+				.map(|(name, rust_type)| {
+					FieldSchema {
+						name: (*name).to_owned(),
+						rust_type: (*rust_type).to_owned(),
+					}
+				})
+				.collect(),
+		}
+	}
+
+	#[test]
+	fn automatic_fixed_migration_allows_direction_safe_add_and_remove() {
+		let old = schema(
+			LayoutKind::Fixed,
+			&[("authority", "Address"), ("count", "u64")],
+		);
+		let new = schema(LayoutKind::Fixed, &[("count", "u64"), ("enabled", "bool")]);
+
+		assert_eq!(transition_mode(&old, &new), TransitionMode::Automatic);
+	}
+
+	#[test]
+	fn automatic_fixed_migration_rejects_true_field_reordering() {
+		let old = schema(
+			LayoutKind::Fixed,
+			&[("authority", "Address"), ("count", "u64")],
+		);
+		let reordered = schema(
+			LayoutKind::Fixed,
+			&[("count", "u64"), ("authority", "Address")],
+		);
+
+		assert_eq!(transition_mode(&old, &reordered), TransitionMode::Manual);
+	}
+
+	#[test]
+	fn process_transition_accepts_optional_suffix_and_rejects_privilege_changes() {
+		let identity = ContractIdentity::try_new(ContractKind::Instruction, 1, 7).unwrap();
+		let authority = ProcessAccount {
+			name: "authority".to_owned(),
+			writable: false,
+			signer: true,
+			optional: false,
+			default_value: None,
+			pda: None,
+			constraints: vec![],
+		};
+		let source = ProcessContract {
+			accounts: vec![authority.clone()],
+		};
+		let destination = ProcessContract {
+			accounts: vec![
+				authority.clone(),
+				ProcessAccount {
+					name: "referrer".to_owned(),
+					writable: false,
+					signer: false,
+					optional: true,
+					default_value: None,
+					pda: None,
+					constraints: vec![],
+				},
+			],
+		};
+		assert!(
+			process_transition(&identity, "Transfer", Some(&source), Some(&destination),).is_ok()
+		);
+
+		let mut escalated = source.clone();
+		escalated.accounts[0].writable = true;
+		assert!(matches!(
+			process_transition(&identity, "Transfer", Some(&source), Some(&escalated),),
+			Err(MigrationError::ProcessChanged { .. })
+		));
+	}
+
+	#[test]
+	fn field_type_changes_and_compact_changes_are_manual() {
+		let old = schema(LayoutKind::Fixed, &[("count", "u64")]);
+		let changed = schema(LayoutKind::Fixed, &[("count", "u32")]);
+		let compact = schema(LayoutKind::Compact, &[("count", "u64")]);
+
+		assert_eq!(transition_mode(&old, &changed), TransitionMode::Manual);
+		assert_eq!(transition_mode(&old, &compact), TransitionMode::Manual);
+	}
+}

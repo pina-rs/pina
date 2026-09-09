@@ -15,6 +15,7 @@ use crate::cli::CodamaCommands;
 use crate::cli::Commands;
 use crate::cli::ExportEncodingArg;
 use crate::cli::KeysCommands;
+use crate::cli::MigrationCommands;
 use crate::cli::SurfpoolCluster;
 use crate::cli::VerifyCommands;
 use crate::idl_command;
@@ -37,6 +38,7 @@ pub(crate) fn run(cli: Cli) {
 			);
 		}
 		Commands::Lint { project, fix } => run_lint(project, fix),
+		Commands::Migrations { command } => run_migrations(command),
 		Commands::Generate {
 			project,
 			clients,
@@ -138,6 +140,55 @@ pub(crate) fn run(cli: Cli) {
 					});
 				}
 			}
+		}
+	}
+}
+
+fn run_migrations(command: MigrationCommands) {
+	match command {
+		MigrationCommands::Make { project, json } => {
+			let output = unwrap_or_exit(pina_cli::migrations::make_migrations(&project));
+			if json {
+				print_json(&output);
+				return;
+			}
+			println!("{} Updated {}", "✔".green(), escaped_path(&output.manifest));
+			for contract in output.created_contracts {
+				println!("Created {contract}@0");
+			}
+			for contract in output.advanced_versions {
+				println!("Advanced {contract}");
+			}
+			for contract in output.updated_drafts {
+				println!("Updated draft {contract}");
+			}
+			for path in output.manual_transitions {
+				println!("Manual migration required: {}", escaped_path(&path));
+			}
+		}
+		MigrationCommands::Check { project, json }
+		| MigrationCommands::Status { project, json } => {
+			let statuses = unwrap_or_exit(pina_cli::migrations::migration_status(&project));
+			if json {
+				print_json(&statuses);
+				return;
+			}
+			if statuses.is_empty() {
+				println!("No migration-aware contracts.");
+				return;
+			}
+			for status in statuses {
+				let publication = if status.published {
+					"published"
+				} else {
+					"draft"
+				};
+				println!(
+					"{} {} v{} ({publication})",
+					status.kind, status.rust_name, status.current_version
+				);
+			}
+			println!("{} Migration history is consistent", "✔".green());
 		}
 	}
 }

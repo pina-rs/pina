@@ -15,7 +15,6 @@ use codama_nodes::PublicKeyTypeNode;
 use codama_nodes::SizePrefixTypeNode;
 use codama_nodes::StringTypeNode;
 use codama_nodes::TypeNode;
-use quote::ToTokens;
 
 use crate::ir::PinaPodEnumIr;
 
@@ -704,16 +703,6 @@ fn parse_generic_args(ty: &str) -> Option<(String, Vec<String>)> {
 	Some((name, args))
 }
 
-/// Render a single generic argument (type, const, or lifetime) as a string.
-fn generic_arg_to_string(arg: &syn::GenericArgument) -> String {
-	match arg {
-		syn::GenericArgument::Type(t) => type_to_string(t),
-		syn::GenericArgument::Const(e) => e.to_token_stream().to_string(),
-		syn::GenericArgument::Lifetime(lt) => lt.ident.to_string(),
-		_ => "unknown".to_owned(),
-	}
-}
-
 /// Try to parse `[u8; N]` and return `N`.
 fn parse_byte_array(ty: &str) -> Option<usize> {
 	let ty = ty.trim();
@@ -728,44 +717,7 @@ fn parse_byte_array(ty: &str) -> Option<usize> {
 /// Extract the simple type name from a `syn::Type`. Handles paths like
 /// `PodU64`, `Address`, `u8`, and arrays like `[u8; 32]`.
 pub fn type_to_string(ty: &syn::Type) -> String {
-	match ty {
-		syn::Type::Path(p) => {
-			// Use the last segment (e.g. `PodU64` from `pina::PodU64`),
-			// preserving generic arguments (e.g. `PodString<32>`, `PodVec<
-			// PodU64, 8>`) so collection types keep their capacity parameters
-			// for IDL extraction.
-			if let Some(seg) = p.path.segments.last() {
-				let mut s = seg.ident.to_string();
-				if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
-					let inner = args
-						.args
-						.iter()
-						.map(generic_arg_to_string)
-						.collect::<Vec<_>>()
-						.join(", ");
-					s = format!("{s}<{inner}>");
-				}
-				s
-			} else {
-				"unknown".to_owned()
-			}
-		}
-		syn::Type::Array(arr) => {
-			let elem = type_to_string(&arr.elem);
-			let len = match &arr.len {
-				syn::Expr::Lit(syn::ExprLit {
-					lit: syn::Lit::Int(i),
-					..
-				}) => i.base10_digits().to_owned(),
-				_ => {
-					// Non-literal array length; fallback.
-					"0".to_owned()
-				}
-			};
-			format!("[{elem}; {len}]")
-		}
-		_ => "unknown".to_owned(),
-	}
+	pina_abi::canonical_type(ty)
 }
 
 #[cfg(test)]

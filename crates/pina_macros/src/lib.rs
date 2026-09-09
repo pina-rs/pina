@@ -27,6 +27,7 @@ mod discriminator;
 mod error;
 mod event;
 mod instruction;
+mod migration;
 mod pda;
 mod schema;
 mod support;

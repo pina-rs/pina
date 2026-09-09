@@ -8,6 +8,8 @@ use syn::Path;
 use syn::Token;
 use syn::punctuated::Punctuated;
 
+use crate::migration::MigrationExpansion;
+
 /// Add derives to an item without duplicating an existing derive name.
 pub(crate) fn add_derives(attributes: &mut Vec<Attribute>, additions: &[Path]) -> syn::Result<()> {
 	if let Some(attribute) = attributes
@@ -50,7 +52,10 @@ pub(crate) fn generate_view_helpers(
 	crate_path: &Path,
 	error: &proc_macro2::TokenStream,
 	account_boundary: bool,
+	migration: Option<&MigrationExpansion>,
 ) -> proc_macro2::TokenStream {
+	let require_current = migration.map(|migration| migration.require_current(crate_path));
+	let write_version = migration.map(MigrationExpansion::write_zc_version);
 	let initialize = if account_boundary {
 		quote! {
 			<Self as #crate_path::PinaAccount>::initialize(data, initialize)
@@ -61,6 +66,7 @@ pub(crate) fn generate_view_helpers(
 				<Self as #crate_path::HasDiscriminator>::write_discriminator(
 					&mut value.discriminator,
 				);
+				#write_version
 				initialize(value)
 			})
 			.map_err(|_| #error)
@@ -138,6 +144,7 @@ pub(crate) fn generate_view_helpers(
 			{
 				return Err(#error);
 			}
+			#require_current
 
 			#read
 		}

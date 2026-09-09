@@ -130,6 +130,16 @@ pub(crate) enum Commands {
 		fix: bool,
 	},
 
+	/// Create and verify checked-in ABI migrations.
+	///
+	/// `make` snapshots the current desired schema. It rewrites an unpublished
+	/// draft in place and advances only after that version has been published.
+	/// `check` is the non-mutating build/CI gate. `status` reports the same checks.
+	Migrations {
+		#[command(subcommand)]
+		command: MigrationCommands,
+	},
+
 	/// Generate configured clients for the current Pina program.
 	///
 	/// Discovers the project, refreshes its IDL, and generates only the selected
@@ -876,6 +886,38 @@ pub(crate) enum KeysCommands {
 		/// Replace an existing keypair and rotate the source program ID.
 		#[arg(long)]
 		force: bool,
+	},
+}
+
+/// ABI migration history operations.
+#[derive(Subcommand, Debug)]
+pub(crate) enum MigrationCommands {
+	/// Snapshot source changes and generate the adjacent transition.
+	Make {
+		/// Directory inside the project to discover.
+		#[arg(short, long, default_value = ".", hide_default_value = true)]
+		project: PathBuf,
+		/// Emit a machine-readable result.
+		#[arg(long)]
+		json: bool,
+	},
+	/// Fail if source, process contracts, or transition files drifted.
+	Check {
+		/// Directory inside the project to discover.
+		#[arg(short, long, default_value = ".", hide_default_value = true)]
+		project: PathBuf,
+		/// Emit a machine-readable result.
+		#[arg(long)]
+		json: bool,
+	},
+	/// Show the current version and publication state of every contract.
+	Status {
+		/// Directory inside the project to discover.
+		#[arg(short, long, default_value = ".", hide_default_value = true)]
+		project: PathBuf,
+		/// Emit a machine-readable result.
+		#[arg(long)]
+		json: bool,
 	},
 }
 

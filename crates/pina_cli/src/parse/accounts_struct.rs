@@ -20,6 +20,8 @@ pub struct AccountsField {
 	/// Whether the field is wrapped in `Option<...>`, marking the account
 	/// slot as optional in generated clients.
 	pub is_optional: bool,
+	/// Canonical declarative account constraints used by the migration ABI.
+	pub constraints: Vec<String>,
 }
 
 /// Extract all `#[derive(Accounts)]` structs from a file.
@@ -89,12 +91,14 @@ fn extract_account_fields(fields: &syn::Fields) -> Result<Vec<AccountsField>, sy
 			// Parse helper attributes here as well as during IR assembly so callers
 			// of this parser receive the same precise diagnostics.
 			let _ = super::validation::extract_attribute_properties(&field.attrs)?;
+			let constraints = super::validation::canonical_account_constraints(&field.attrs)?;
 
 			Ok(AccountsField {
 				name,
 				docs,
 				is_mutable,
 				is_optional,
+				constraints,
 			})
 		})
 		.collect()

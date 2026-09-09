@@ -844,6 +844,7 @@ mod tests {
 						default_value: None,
 						is_pda: false,
 						pda_name: None,
+						constraints: vec![],
 						docs: vec![],
 					},
 					// An optional PDA must stay a plain optional slot.
@@ -855,6 +856,7 @@ mod tests {
 						default_value: None,
 						is_pda: true,
 						pda_name: Some("store".to_string()),
+						constraints: vec![],
 						docs: vec![],
 					},
 					InstructionAccountIr {
@@ -867,6 +869,7 @@ mod tests {
 						)),
 						is_pda: false,
 						pda_name: None,
+						constraints: vec![],
 						docs: vec![],
 					},
 				],
@@ -916,6 +919,7 @@ mod tests {
 				default_value: None,
 				is_pda: false,
 				pda_name: None,
+				constraints: vec![],
 				docs: vec![],
 			}
 		};
@@ -1073,6 +1077,7 @@ mod tests {
 						default_value: None,
 						is_pda: false,
 						pda_name: None,
+						constraints: vec![],
 						docs: vec![],
 					},
 					InstructionAccountIr {
@@ -1083,6 +1088,7 @@ mod tests {
 						default_value: None,
 						is_pda: true,
 						pda_name: Some("state".to_string()),
+						constraints: vec![],
 						docs: vec![],
 					},
 				],

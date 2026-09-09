@@ -49,6 +49,7 @@ members = [
 	"codama/clients/rust/validation_program",
 	"codama/clients/rust/vesting_program",
 	"crates/pina",
+	"crates/pina_abi",
 	"crates/pina_cli",
 	"crates/pina_codama_renderer",
 	"crates/pina_cpi_renderer",
@@ -79,6 +80,7 @@ members = [
 	"examples/float_accounts_program/tests/surfpool",
 	"examples/hello_solana_program",
 	"examples/hello_solana_program/tests/surfpool",
+	"examples/migrations_program",
 	"examples/optional_accounts_program",
 	"examples/optional_accounts_program/tests/surfpool",
 	"examples/pina_bpf_program",
@@ -240,6 +242,7 @@ walkdir = { default-features = false, version = "^2" }
 
 # publishable crates
 pina = { default-features = false, path = "crates/pina", version = "0.15.0" }
+pina_abi = { default-features = false, path = "crates/pina_abi", version = "0.15.0" }
 pina_cli = { default-features = false, path = "crates/pina_cli", version = "0.15.0" }
 pina_codama_renderer = { default-features = false, path = "crates/pina_codama_renderer", version = "0.15.0" }
 pina_cpi_renderer = { default-features = false, path = "crates/pina_cpi_renderer", version = "0.15.0" }

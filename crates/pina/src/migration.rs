@@ -183,6 +183,94 @@ pub trait HasMigrationVersion: HasDiscriminator {
 	}
 }
 
+/// A current instruction byte slice produced by historical normalization.
+#[derive(Debug, PartialEq, Eq)]
+pub enum CurrentInstructionData<'source, 'workspace> {
+	/// The request already used the current representation.
+	Current(&'source [u8]),
+	/// A historical request was rewritten into caller-owned workspace.
+	Migrated(&'workspace [u8]),
+}
+
+impl CurrentInstructionData<'_, '_> {
+	/// Return the exact current instruction representation.
+	#[must_use]
+	pub const fn as_bytes(&self) -> &[u8] {
+		match self {
+			Self::Current(data) => data,
+			Self::Migrated(data) => data,
+		}
+	}
+
+	/// Return whether a historical transition ran.
+	#[must_use]
+	pub const fn was_migrated(&self) -> bool {
+		matches!(self, Self::Migrated(_))
+	}
+}
+
+/// Generated conversion contract for one migratable instruction payload.
+///
+/// The caller owns the workspace so the runtime remains allocator-free.
+/// Generated implementations validate one exact historical representation,
+/// clear the workspace, run adjacent transitions, validate the destination,
+/// and commit the current version marker last.
+pub trait MigratableInstruction: HasMigrationVersion {
+	/// Exact current instruction length.
+	const CURRENT_SIZE: usize;
+
+	/// Largest temporary byte region needed by any supported transition path.
+	const WORKING_SIZE: usize;
+
+	/// Maximum adjacent transitions accepted during ordinary dispatch.
+	const MAX_INLINE_STEPS: u16;
+
+	/// Rewrite one exact stale request into the workspace.
+	fn migrate_stale_instruction(data: &[u8], workspace: &mut [u8]) -> ProgramResult;
+
+	/// Validate the current representation without interpreting a stale layout.
+	fn validate_current_instruction(data: &[u8]) -> ProgramResult;
+}
+
+/// Normalize current or historical instruction bytes before account parsing
+/// and business logic.
+///
+/// Unknown and future versions fail without consulting a historical decoder.
+/// The workspace is cleared before any old bytes are copied into it, preventing
+/// caller-controlled residue from becoming a newly added field.
+pub fn normalize_instruction_data<'source, 'workspace, T>(
+	data: &'source [u8],
+	workspace: &'workspace mut [u8],
+) -> Result<CurrentInstructionData<'source, 'workspace>, ProgramError>
+where
+	T: MigratableInstruction,
+{
+	if !T::matches_discriminator(data) {
+		return Err(ProgramError::InvalidInstructionData);
+	}
+
+	match T::inspect_migration_version(data)? {
+		StoredVersion::Current(_) => {
+			T::validate_current_instruction(data)?;
+			Ok(CurrentInstructionData::Current(data))
+		}
+		StoredVersion::Future { .. } => Err(PinaProgramError::InvalidMigrationVersion.into()),
+		StoredVersion::Stale { .. } => {
+			if T::WORKING_SIZE < T::CURRENT_SIZE || workspace.len() < T::WORKING_SIZE {
+				return Err(PinaProgramError::MigrationBudgetExceeded.into());
+			}
+			workspace[..T::WORKING_SIZE].fill(0);
+			T::migrate_stale_instruction(data, &mut workspace[..T::WORKING_SIZE])?;
+			T::write_current_migration_version(&mut workspace[..T::CURRENT_SIZE])?;
+			T::validate_current_instruction(&workspace[..T::CURRENT_SIZE])?;
+
+			Ok(CurrentInstructionData::Migrated(
+				&workspace[..T::CURRENT_SIZE],
+			))
+		}
+	}
+}
+
 /// Pure plan for one complete account migration to the current representation.
 ///
 /// Generated planning code validates the exact historical source and owns
@@ -194,6 +282,7 @@ pub struct AccountMigrationPlan<P> {
 	from_version: u32,
 	to_version: u32,
 	target_size: usize,
+	working_size: usize,
 	steps: u16,
 	payload: P,
 }
@@ -212,7 +301,30 @@ impl<P> AccountMigrationPlan<P> {
 		steps: u16,
 		payload: P,
 	) -> Result<Self, ProgramError> {
-		if from_version >= to_version || steps == 0 {
+		Self::try_with_working_size(
+			from_version,
+			to_version,
+			target_size,
+			target_size,
+			steps,
+			payload,
+		)
+	}
+
+	/// Construct a plan that needs a larger temporary account-data workspace.
+	///
+	/// `working_size` must be at least the final `target_size`. The executor grows
+	/// to this size before applying the infallible rewrite and shrinks to the
+	/// target only after the rewrite completes.
+	pub fn try_with_working_size(
+		from_version: u32,
+		to_version: u32,
+		target_size: usize,
+		working_size: usize,
+		steps: u16,
+		payload: P,
+	) -> Result<Self, ProgramError> {
+		if from_version >= to_version || steps == 0 || working_size < target_size {
 			return Err(PinaProgramError::InvalidMigrationVersion.into());
 		}
 
@@ -220,6 +332,7 @@ impl<P> AccountMigrationPlan<P> {
 			from_version,
 			to_version,
 			target_size,
+			working_size,
 			steps,
 			payload,
 		})
@@ -241,6 +354,12 @@ impl<P> AccountMigrationPlan<P> {
 	#[must_use]
 	pub const fn target_size(&self) -> usize {
 		self.target_size
+	}
+
+	/// Largest account-data length needed while adjacent transitions run.
+	#[must_use]
+	pub const fn working_size(&self) -> usize {
+		self.working_size
 	}
 
 	/// Number of logical adjacent transitions represented by this plan.
@@ -416,22 +535,29 @@ mod executor {
 				|| plan.to_version() != current.into_u32()
 				|| plan.steps() > T::MAX_INLINE_STEPS
 				|| plan.target_size() < T::MIGRATION_HEADER_SIZE
+				|| plan.working_size() < plan.target_size()
 			{
 				return Err(PinaProgramError::MigrationUnavailable.into());
 			}
 
 			let current_size = self.account.data_len();
 			let target_size = plan.target_size();
-			if target_size
+			let working_size = plan.working_size();
+			let allocated_working_size = current_size.max(working_size);
+			if working_size
 				.checked_sub(current_size)
 				.is_some_and(|growth| growth > MAX_PERMITTED_DATA_INCREASE)
 			{
 				return Err(PinaProgramError::MigrationBudgetExceeded.into());
 			}
 
-			let rent = rent.map_or_else(Rent::get, Ok)?;
-			let target_minimum = rent.try_minimum_balance(target_size)?;
-			let funding = target_minimum.saturating_sub(self.account.lamports());
+			let funding = if working_size > current_size {
+				let rent = rent.map_or_else(Rent::get, Ok)?;
+				let target_minimum = rent.try_minimum_balance(working_size)?;
+				target_minimum.saturating_sub(self.account.lamports())
+			} else {
+				0
+			};
 			if funding > self.max_lamports {
 				return Err(PinaProgramError::MigrationBudgetExceeded.into());
 			}
@@ -451,9 +577,9 @@ mod executor {
 				.invoke_signed(signers)?;
 			}
 
-			if target_size > current_size {
+			if working_size > current_size {
 				self.account.check_borrow_mut()?;
-				self.account.resize(target_size)?;
+				self.account.resize(working_size)?;
 			}
 
 			let steps = plan.steps();
@@ -462,7 +588,7 @@ mod executor {
 				T::apply_migration(plan.into_payload(), &mut data);
 			}
 
-			if target_size < current_size {
+			if target_size < allocated_working_size {
 				self.account.check_borrow_mut()?;
 				self.account.resize(target_size)?;
 			}
@@ -514,6 +640,46 @@ mod tests {
 		type Version = u8;
 
 		const CURRENT_VERSION: Self::Version = 2;
+	}
+
+	struct VersionedInstruction;
+
+	impl HasDiscriminator for VersionedInstruction {
+		type Type = u8;
+
+		const VALUE: Self::Type = 7;
+	}
+
+	impl HasMigrationVersion for VersionedInstruction {
+		type Version = u8;
+
+		const CURRENT_VERSION: Self::Version = 1;
+	}
+
+	impl MigratableInstruction for VersionedInstruction {
+		const CURRENT_SIZE: usize = 4;
+		const MAX_INLINE_STEPS: u16 = 1;
+		const WORKING_SIZE: usize = 4;
+
+		fn migrate_stale_instruction(data: &[u8], workspace: &mut [u8]) -> ProgramResult {
+			if data.len() != 3 || data[0] != Self::VALUE || data[1] != 0 {
+				return Err(ProgramError::InvalidInstructionData);
+			}
+			workspace[..3].copy_from_slice(data);
+			workspace[3] = 99;
+			Ok(())
+		}
+
+		fn validate_current_instruction(data: &[u8]) -> ProgramResult {
+			if data.len() != Self::CURRENT_SIZE
+				|| data[0] != Self::VALUE
+				|| data[1] != Self::CURRENT_VERSION
+				|| data[3] != 99
+			{
+				return Err(ProgramError::InvalidInstructionData);
+			}
+			Ok(())
+		}
 	}
 
 	#[test]
@@ -601,6 +767,7 @@ mod tests {
 				from_version: 0,
 				to_version: 2,
 				target_size: 64,
+				working_size: 64,
 				steps: 2,
 				payload: 7,
 			})
@@ -617,6 +784,48 @@ mod tests {
 			AccountMigrationPlan::try_new(1, 2, 64, 0, ()),
 			Err(PinaProgramError::InvalidMigrationVersion.into())
 		);
+	}
+
+	#[test]
+	fn historical_instruction_normalization_clears_workspace_and_commits_version_last() {
+		let mut workspace = [0xaa; 4];
+		let normalized =
+			normalize_instruction_data::<VersionedInstruction>(&[7, 0, 42], &mut workspace)
+				.unwrap_or_else(|error| panic!("normalize instruction: {error:?}"));
+
+		assert!(normalized.was_migrated());
+		assert_eq!(normalized.as_bytes(), [7, 1, 42, 99]);
+	}
+
+	#[test]
+	fn current_instruction_hot_path_does_not_touch_workspace() {
+		let current = [7, 1, 42, 99];
+		let mut workspace = [0xaa; 4];
+		let normalized =
+			normalize_instruction_data::<VersionedInstruction>(&current, &mut workspace)
+				.unwrap_or_else(|error| panic!("normalize instruction: {error:?}"));
+
+		assert!(!normalized.was_migrated());
+		assert_eq!(normalized.as_bytes(), current);
+		assert_eq!(workspace, [0xaa; 4]);
+	}
+
+	#[test]
+	fn instruction_normalization_rejects_forged_versions_lengths_and_workspace() {
+		for rejected in [&[7, 2, 42, 99][..], &[7, 0, 42, 13][..], &[8, 0, 42][..]] {
+			let mut workspace = [0xaa; 4];
+			assert!(
+				normalize_instruction_data::<VersionedInstruction>(rejected, &mut workspace)
+					.is_err()
+			);
+		}
+
+		let mut short_workspace = [0xaa; 3];
+		assert_eq!(
+			normalize_instruction_data::<VersionedInstruction>(&[7, 0, 42], &mut short_workspace,),
+			Err(PinaProgramError::MigrationBudgetExceeded.into())
+		);
+		assert_eq!(short_workspace, [0xaa; 3]);
 	}
 
 	#[cfg(feature = "account-resize")]

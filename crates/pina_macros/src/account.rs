@@ -8,6 +8,7 @@ use syn::Fields;
 use syn::ItemStruct;
 
 use crate::args::AccountArgs;
+use crate::migration::MigrationExpansion;
 use crate::schema;
 use crate::support::add_derives;
 use crate::support::generate_view_helpers;
@@ -53,6 +54,7 @@ pub(crate) fn expand(
 		discriminator,
 		variant,
 		compact,
+		migrations,
 		validate,
 	} = args;
 	#[cfg(not(feature = "validation"))]
@@ -65,6 +67,25 @@ pub(crate) fn expand(
 			Err(e) => return e.to_compile_error(),
 		};
 	let compact = compact.is_present();
+	let migration = if migrations.is_present() {
+		match MigrationExpansion::load(
+			&item_struct,
+			pina_abi::ContractKind::Account,
+			if compact {
+				pina_abi::LayoutKind::Compact
+			} else {
+				pina_abi::LayoutKind::Fixed
+			},
+		) {
+			Ok(value) => Some(value),
+			Err(error) => return error.to_compile_error(),
+		}
+	} else {
+		None
+	};
+	let migration_bytes = migration
+		.as_ref()
+		.map_or(0, MigrationExpansion::version_bytes);
 	#[cfg(not(feature = "compact"))]
 	if compact {
 		return syn::Error::new_spanned(
@@ -79,12 +100,19 @@ pub(crate) fn expand(
 			&crate_path,
 			&discriminator,
 			&header_name,
+			migration_bytes,
 		) {
 			Ok(schema) => (schema.proofs.clone(), Some(schema)),
 			Err(error) => return error.to_compile_error(),
 		}
 	} else {
-		match schema::validate_fixed_schema(&item_struct, &crate_path, &discriminator, &zc_name) {
+		match schema::validate_fixed_schema(
+			&item_struct,
+			&crate_path,
+			&discriminator,
+			&zc_name,
+			migration_bytes,
+		) {
 			Ok(proofs) => (proofs, None),
 			Err(error) => return error.to_compile_error(),
 		}
@@ -115,12 +143,22 @@ pub(crate) fn expand(
 		discriminator: [u8; #discriminator::BYTES]
 	};
 	named_fields.named.insert(0, discriminator_field);
+	if let Some(migration) = &migration {
+		named_fields.named.insert(1, migration.field(true));
+	}
 
 	let error = quote!(#crate_path::ProgramError::InvalidAccountData);
 	let view_helpers = if let Some(schema) = &compact_schema {
-		generate_compact_view_helpers(&crate_path, &error, &ref_name, &patch_name, schema)
+		generate_compact_view_helpers(
+			&crate_path,
+			&error,
+			&ref_name,
+			&patch_name,
+			schema,
+			migration.as_ref(),
+		)
 	} else {
-		generate_view_helpers(&crate_path, &error, true)
+		generate_view_helpers(&crate_path, &error, true, migration.as_ref())
 	};
 	let validation_type = if compact { &header_name } else { &zc_name };
 	let validation_impl = generate_validation_impl(&crate_path, validation_type);
@@ -209,6 +247,7 @@ pub(crate) fn expand(
 
 		}
 	} else {
+		let write_version = migration.as_ref().map(MigrationExpansion::write_zc_version);
 		quote! {
 			impl #crate_path::PinaAccount for #struct_name {
 				#application_validation_hook
@@ -219,9 +258,22 @@ pub(crate) fn expand(
 					<Self as #crate_path::HasDiscriminator>::write_discriminator(
 						&mut value.discriminator,
 					);
+					#write_version
 				}
 			}
 		}
+	};
+	let migration_impl = migration.as_ref().map(|migration| {
+		migration.implementation(&crate_path, &struct_name, &discriminator, &variant)
+	});
+	let automatic_account_migration = match migration.as_ref() {
+		Some(migration) => {
+			match migration.automatic_account_implementation(&crate_path, &struct_name) {
+				Ok(implementation) => implementation,
+				Err(error) => return error.to_compile_error(),
+			}
+		}
+		None => None,
 	};
 
 	let implementations = quote! {
@@ -235,10 +287,13 @@ pub(crate) fn expand(
 			const VALUE: Self::Type = #discriminator::#variant;
 		}
 
+		#migration_impl
+
 		#validation_impl
 		#value_validation_impl
 
 		#account_impl
+		#automatic_account_migration
 	};
 
 	quote! {
@@ -327,7 +382,10 @@ fn generate_compact_view_helpers(
 	ref_name: &syn::Ident,
 	patch_name: &syn::Ident,
 	schema: &schema::CompactSchema,
+	migration: Option<&MigrationExpansion>,
 ) -> proc_macro2::TokenStream {
+	let require_current = migration.map(|migration| migration.require_current(crate_path));
+	let write_current = migration.map(|migration| migration.write_current(crate_path));
 	#[cfg(feature = "validation")]
 	let read_value = quote! {
 		let value = #ref_name::new(data).map_err(|_| #error)?;
@@ -449,6 +507,7 @@ fn generate_compact_view_helpers(
 			if !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data) {
 				return Err(#error);
 			}
+			#require_current
 
 			#read_value
 		}
@@ -464,6 +523,7 @@ fn generate_compact_view_helpers(
 			if !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data) {
 				return Err(#error);
 			}
+			#require_current
 
 			patch.updated_len(data).map_err(|_| #error)
 		}
@@ -484,9 +544,11 @@ fn generate_compact_view_helpers(
 			if !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data) {
 				return Err(#error);
 			}
+			#require_current
 
 			let encoded_len = patch.update(data).map_err(|_| #error)?;
 			<Self as #crate_path::HasDiscriminator>::write_discriminator(data);
+			#write_current
 			#validate_updated
 
 			Ok(encoded_len)
@@ -499,6 +561,7 @@ fn generate_compact_view_helpers(
 		) -> Result<usize, #crate_path::ProgramError> {
 			let encoded_len = patch.initialize(data).map_err(|_| #error)?;
 			<Self as #crate_path::HasDiscriminator>::write_discriminator(data);
+			#write_current
 			#validate_initialized
 
 			Ok(encoded_len)

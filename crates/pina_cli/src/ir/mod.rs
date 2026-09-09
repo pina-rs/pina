@@ -84,6 +84,8 @@ pub struct InstructionAccountIr {
 	pub default_value: Option<DefaultValueIr>,
 	pub is_pda: bool,
 	pub pda_name: Option<String>,
+	/// Canonical declarative account constraints used by compatibility checks.
+	pub constraints: Vec<String>,
 	pub docs: Vec<String>,
 }
 

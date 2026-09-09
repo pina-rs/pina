@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use quote::ToTokens as _;
 use syn::Expr;
 use syn::ImplItem;
 use syn::Item;
@@ -66,6 +67,65 @@ pub struct AccountProperties {
 	pub is_writable: bool,
 	pub is_pda: bool,
 	pub default_value: Option<DefaultValueIr>,
+}
+
+/// Return a stable representation of declarative account constraints.
+///
+/// Signer, writable, optional, known-address, and PDA properties also have
+/// dedicated ABI fields. Keeping the complete declarative rule set here makes
+/// owner, executable, data-length, distinctness, and related changes visible
+/// to process compatibility checks.
+pub(crate) fn canonical_account_constraints(
+	attributes: &[syn::Attribute],
+) -> Result<Vec<String>, syn::Error> {
+	let mut constraints = Vec::new();
+
+	for attribute in attributes {
+		if !attribute.path().is_ident("pina") {
+			continue;
+		}
+		attribute.parse_nested_meta(|meta| {
+			if meta.path.is_ident("validate") {
+				return meta.parse_nested_meta(|rule| {
+					let name = rule
+						.path
+						.segments
+						.last()
+						.map(|segment| segment.ident.to_string())
+						.ok_or_else(|| rule.error("validation rule path cannot be empty"))?;
+					if name == "error" {
+						let _: Expr = rule.value()?.parse()?;
+						return Ok(());
+					}
+					if rule.input.is_empty() {
+						constraints.push(name);
+						return Ok(());
+					}
+					let value: Expr = rule.value()?.parse()?;
+					let rendered = value.to_token_stream().to_string().replace(' ', "");
+					constraints.push(format!("{name}={rendered}"));
+					Ok(())
+				});
+			}
+			if meta.path.is_ident("remaining") {
+				constraints.push("remaining".to_owned());
+				return Ok(());
+			}
+			if meta.path.is_ident("distinct") {
+				let value: Expr = meta.value()?.parse()?;
+				let rendered = value.to_token_stream().to_string().replace(' ', "");
+				constraints.push(format!("distinct={rendered}"));
+				return Ok(());
+			}
+			Err(meta.error(
+				"unknown account-field option; expected validate(...), remaining, or distinct",
+			))
+		})?;
+	}
+
+	constraints.sort();
+	constraints.dedup();
+	Ok(constraints)
 }
 
 /// Extract client-visible properties from declarative account validation.

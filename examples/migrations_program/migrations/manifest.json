@@ -1,0 +1,160 @@
+{
+	"formatVersion": 2,
+	"programId": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+	"versionType": "u8",
+	"contracts": {
+		"account:1:01": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "01"
+			},
+			"rustName": "State",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0391f7b1fe45bb5c2e4f8b32300a5c07dd44c8fbb139c503f9c775dfde8cceae",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "authority",
+								"rustType": "Address"
+							},
+							{
+								"name": "value",
+								"rustType": "u64"
+							}
+						]
+					},
+					"transition": null
+				},
+				{
+					"version": 1,
+					"schemaSha256": "e9a5f635e3bbf770ed1171cc7d3c8c059531300ef1754b44201f2ce3f311927d",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "authority",
+								"rustType": "Address"
+							},
+							{
+								"name": "value",
+								"rustType": "u64"
+							},
+							{
+								"name": "enabled",
+								"rustType": "bool"
+							}
+						]
+					},
+					"transition": {
+						"from": 0,
+						"to": 1,
+						"mode": "automatic",
+						"sourceSchemaSha256": "0391f7b1fe45bb5c2e4f8b32300a5c07dd44c8fbb139c503f9c775dfde8cceae",
+						"destinationSchemaSha256": "e9a5f635e3bbf770ed1171cc7d3c8c059531300ef1754b44201f2ce3f311927d",
+						"implementationSha256": "6bda773f65d18948730da72fd92083f2b309b0ba1ce35d714e952e5508a5fda0"
+					}
+				}
+			]
+		},
+		"instruction:1:00": {
+			"identity": {
+				"kind": "instruction",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "00"
+			},
+			"rustName": "UpdateInstruction",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "907b63e84aa862d1b997a1f928c1e1694270a09868bac33afa97a5c5f1a4f6b1",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "value",
+								"rustType": "u64"
+							}
+						]
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "authority",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null,
+								"constraints": [
+									"signer"
+								]
+							}
+						]
+					},
+					"processSha256": "2e57b7563c550adb4fc9421ee058c4dccb1cdb1e44d2e258af8f7a8278a5f985",
+					"transition": null
+				},
+				{
+					"version": 1,
+					"schemaSha256": "1fa7cf4cd0531e2958de8cbdecc6939126a76a5888365d5ade7679da673a92f0",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "value",
+								"rustType": "u64"
+							},
+							{
+								"name": "memo",
+								"rustType": "u16"
+							}
+						]
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "authority",
+								"writable": false,
+								"signer": true,
+								"optional": false,
+								"defaultValue": null,
+								"pda": null,
+								"constraints": [
+									"signer"
+								]
+							},
+							{
+								"name": "referrer",
+								"writable": false,
+								"signer": false,
+								"optional": true,
+								"defaultValue": null,
+								"pda": null
+							}
+						]
+					},
+					"processSha256": "edee54def35a71c03f15d8c198244b6ebb97aa9c60024a6168fb6c1d385655f4",
+					"transition": {
+						"from": 0,
+						"to": 1,
+						"mode": "automatic",
+						"sourceSchemaSha256": "907b63e84aa862d1b997a1f928c1e1694270a09868bac33afa97a5c5f1a4f6b1",
+						"destinationSchemaSha256": "1fa7cf4cd0531e2958de8cbdecc6939126a76a5888365d5ade7679da673a92f0",
+						"sourceProcessSha256": "2e57b7563c550adb4fc9421ee058c4dccb1cdb1e44d2e258af8f7a8278a5f985",
+						"destinationProcessSha256": "edee54def35a71c03f15d8c198244b6ebb97aa9c60024a6168fb6c1d385655f4",
+						"process": {
+							"kind": "appendOptional",
+							"sourceAccounts": 1,
+							"destinationAccounts": 2
+						},
+						"implementationSha256": "3826a92c03ddcda22d78ac51cce2d71fe21bffc5effc13dc6656f2864b466336"
+					}
+				}
+			]
+		}
+	}
+}

@@ -197,6 +197,7 @@ mod tests {
 						default_value: None,
 						is_pda: false,
 						pda_name: None,
+						constraints: vec![],
 						docs: vec![],
 					}
 				})

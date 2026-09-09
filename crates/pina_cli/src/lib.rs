@@ -13,6 +13,7 @@ pub mod keys;
 pub mod lint;
 pub mod lint_catalog;
 pub mod lint_driver;
+pub mod migrations;
 pub mod parse;
 mod path_security;
 pub mod profile;
@@ -27,6 +28,7 @@ mod verifiable;
 use std::path::Path;
 
 use codama_nodes::RootNode;
+pub use pina_abi::MigrationVersionType;
 
 pub use crate::codama::CodamaGenerateOptions;
 pub use crate::codama::ProjectGenerateOptions;

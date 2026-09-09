@@ -4986,6 +4986,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "migrations_program"
+version = "0.0.0"
+dependencies = [
+ "pina",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5772,6 +5779,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pina_abi"
+version = "0.15.0"
+dependencies = [
+ "quote",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "syn 3.0.4",
+]
+
+[[package]]
 name = "pina_bpf_program"
 version = "0.0.0"
 dependencies = [
@@ -5809,6 +5827,7 @@ dependencies = [
  "insta-cmd",
  "object 0.40.0",
  "owo-colors",
+ "pina_abi",
  "pina_codama_renderer",
  "pina_cpi_renderer",
  "pina_profile",
@@ -5877,6 +5896,7 @@ version = "0.15.0"
 dependencies = [
  "darling 0.24.1",
  "heck 0.5.0",
+ "pina_abi",
  "proc-macro2",
  "quote",
  "syn 3.0.4",

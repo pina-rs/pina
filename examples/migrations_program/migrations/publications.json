@@ -1,0 +1,17 @@
+{
+	"formatVersion": 1,
+	"receipts": [
+		{
+			"sequence": 0,
+			"cluster": "fixture",
+			"programId": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+			"executableSha256": "fixture-v0",
+			"manifestSha256": "fixture-v0",
+			"versions": {
+				"account:1:01": 0,
+				"instruction:1:00": 0
+			},
+			"previousReceiptSha256": null
+		}
+	]
+}

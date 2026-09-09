@@ -52,6 +52,9 @@ pub enum BuildError {
 	#[error(transparent)]
 	Verify(#[from] VerifyBuildError),
 
+	#[error(transparent)]
+	Migration(#[from] crate::migrations::MigrationError),
+
 	#[error("Failed to run `{command}`: {source}")]
 	RunCargo {
 		command: String,
@@ -152,6 +155,7 @@ pub fn build_project(start: &Path) -> Result<BuildOutput, BuildError> {
 /// [`build_project`].
 pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput, BuildError> {
 	let project = Project::discover(&options.project_dir)?;
+	crate::migrations::check_migrations(&project.program_dir)?;
 	let manifest_path = project.program_dir.join("Cargo.toml");
 	let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
 	let features = options
@@ -254,6 +258,7 @@ pub fn build_project_verified_with_options(
 	verify: &VerifyBuildOptions,
 ) -> Result<VerifiedBuildOutput, BuildError> {
 	let project = Project::discover(&options.project_dir)?;
+	crate::migrations::check_migrations(&project.program_dir)?;
 	let features = options
 		.features
 		.iter()

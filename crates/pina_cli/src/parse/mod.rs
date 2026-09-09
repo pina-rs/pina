@@ -5,6 +5,7 @@ pub mod discriminator;
 pub mod doc_comments;
 pub mod entrypoint;
 pub mod error_enum;
+pub mod event_data;
 pub mod instruction_data;
 pub mod module_resolver;
 pub mod pda_attr;
@@ -481,6 +482,7 @@ fn build_instruction_accounts(
 				default_value: properties.default_value,
 				is_pda: properties.is_pda,
 				pda_name,
+				constraints: field.constraints.clone(),
 				docs: field.docs.clone(),
 			})
 		})
@@ -876,6 +878,7 @@ mod tests {
 			variant: "Vault".to_owned(),
 			fields: Vec::new(),
 			docs: Vec::new(),
+			migratable: false,
 			pda_name: Some("vault".to_owned()),
 		};
 
