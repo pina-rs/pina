@@ -201,7 +201,7 @@ let amount = {
 transfer.invoke()?;
 ```
 
-An explicit `drop(guard)` or the end of a nested block releases the guard. The analysis follows block scope, closures, match guards, nested binding patterns, guard-returning aliases, and calls to the real `std::mem::drop`. It resolves method and guard types before classifying a borrow or CPI, so unrelated same-named operations do not create or discharge a proof. Account borrows hidden inside custom wrapper constructors and CPIs hidden behind opaque helpers are outside its current model.
+An explicit `drop(guard)` or the end of a nested block releases the guard. The analysis follows block scope, locally bound closure calls, match guards, nested binding patterns, guard-returning aliases, and calls to the real `std::mem::drop`. Closure bodies are evaluated with the borrow state at each visible invocation, so defining a callback before a borrow or dropping a borrow before invoking it is modeled in execution order. It resolves method and guard types before classifying a borrow or CPI, so unrelated same-named operations do not create or discharge a proof. Account borrows hidden inside custom wrapper constructors, closures invoked through opaque higher-order helpers, and CPIs hidden behind opaque helpers are outside its current model.
 
 ### `deny_unused_account_borrow_guards`
 
@@ -292,7 +292,7 @@ for account in remaining {
 }
 ```
 
-Remaining accounts are caller-controlled; an explicit bound keeps worst-case compute auditable. Rejecting an oversized list is preferred when every supplied account must be processed, while `.take(MAX)` is suitable only when ignoring surplus accounts is intentional. Standard adapters that cannot increase cardinality, such as `filter`, `map`, and `enumerate`, preserve a preceding `take`; expanding adapters such as `flat_map` must be bounded afterward. The guard must compare `remaining.len()` against an integer literal or resolved constant, return early on the oversized path, and dominate the loop. The analysis follows local aliases. Reassignment, mutable borrows, `&mut self` calls, and closures that may replace a checked binding invalidate its bound. A runtime limit, branch-local check, late check, or opaque helper does not satisfy the rule because it does not establish a source-visible protocol maximum on every path.
+Remaining accounts are caller-controlled; an explicit bound keeps worst-case compute auditable. Rejecting an oversized list is preferred when every supplied account must be processed, while `.take(MAX)` is suitable only when ignoring surplus accounts is intentional. Standard adapters that cannot increase cardinality, such as `filter`, `map`, and `enumerate`, preserve a preceding `take`; expanding adapters such as `flat_map` must be bounded afterward. The guard must compare `remaining.len()` against an integer literal or resolved constant, return early on the oversized path, and dominate the loop. The analysis follows local aliases and computes loop-carried state to a fixed point. Reassignment, mutable borrows, `&mut self` calls, and closures that may replace a checked binding invalidate its bound, including for later iterations of an enclosing loop. A runtime limit, branch-local check, late check, or opaque helper does not satisfy the rule because it does not establish a source-visible protocol maximum on every path.
 
 ## Performance reference
 

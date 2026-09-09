@@ -46,7 +46,7 @@ pub enum DriverError {
 	)]
 	RustcFailed { status: String },
 
-	#[error("Could not parse a release, commit hash, or host target from rustc -vV")]
+	#[error("Could not parse a release or host target from rustc -vV")]
 	MissingRustcFingerprint,
 
 	#[error("`PINA_LINT_DRIVER_PATH` does not point at an executable: {path}")]
@@ -66,8 +66,9 @@ pub enum DriverError {
 ///
 /// The driver is installed below `cargo_home` at
 /// `pina/lint-driver/<pina-version>/<toolchain>/bin/pina_lint_driver`, where
-/// the toolchain component is the `release-commit-host` fingerprint reported
-/// by the Rust compiler that builds the project.
+/// the toolchain component contains the release, optional commit, host, and a
+/// hash of the complete version report from the compiler that builds the
+/// project.
 pub fn prepare_driver(
 	cargo_home: &Path,
 	project_root: &Path,
@@ -173,18 +174,11 @@ pub fn driver_build_identity(path: &Path) -> std::io::Result<String> {
 		hash.update(&buffer[..read]);
 	}
 
-	const HEX: &[u8; 16] = b"0123456789abcdef";
 	let digest = hash.finalize();
-	let mut identity = String::with_capacity(digest.len() * 2);
-	for byte in digest {
-		identity.push(char::from(HEX[usize::from(byte >> 4)]));
-		identity.push(char::from(HEX[usize::from(byte & 0x0f)]));
-	}
-
-	Ok(identity)
+	Ok(hex(&digest))
 }
 
-/// Return the `release-commit-host` fingerprint of the Rust compiler used for
+/// Return the version-report fingerprint of the Rust compiler used for
 /// `project_root`.
 fn rustc_fingerprint(project_root: &Path) -> Result<String, DriverError> {
 	let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| OsString::from("rustc"));
@@ -203,8 +197,15 @@ fn rustc_fingerprint(project_root: &Path) -> Result<String, DriverError> {
 	parse_rustc_fingerprint(&output.stdout).ok_or(DriverError::MissingRustcFingerprint)
 }
 
-/// Parse the release, commit hash, and host from verbose rustc version output.
+/// Parse a stable identity from verbose rustc version output.
+///
+/// Official toolchains expose a commit hash, but source-built compilers may
+/// omit it. Hashing the complete version report keeps every compiler property
+/// that rustc does expose in the cache identity without rejecting those
+/// toolchains or collapsing all of them onto an `unknown` placeholder.
 fn parse_rustc_fingerprint(output: &[u8]) -> Option<String> {
+	let version_hash = Sha256::digest(output);
+	let version_hash = hex(&version_hash);
 	let output = String::from_utf8_lossy(output);
 	let field = |prefix| {
 		output
@@ -214,10 +215,10 @@ fn parse_rustc_fingerprint(output: &[u8]) -> Option<String> {
 			.next()
 	};
 	let release = field("release: ")?;
-	let commit_hash = field("commit-hash: ")?;
+	let commit_hash = field("commit-hash: ").unwrap_or("no-commit");
 	let host = field("host: ")?;
 
-	let fingerprint = format!("{release}-{commit_hash}-{host}");
+	let fingerprint = format!("{release}-{commit_hash}-{host}-{version_hash}");
 	// The required fields were parsed above, so the leftover
 	// replacements cannot blank the name out.
 	Some(
@@ -232,6 +233,17 @@ fn parse_rustc_fingerprint(output: &[u8]) -> Option<String> {
 			})
 			.collect::<String>(),
 	)
+}
+
+fn hex(bytes: &[u8]) -> String {
+	const HEX: &[u8; 16] = b"0123456789abcdef";
+	let mut encoded = String::with_capacity(bytes.len() * 2);
+	for byte in bytes {
+		encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+		encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+	}
+
+	encoded
 }
 
 /// Resolve the directory Cargo uses for its managed state.
@@ -351,11 +363,24 @@ mod tests {
 		let output = b"rustc 1.95.0-nightly (abc 2026-02-20)\nbinary: rustc\nrelease: \
 		               1.95.0-nightly\ncommit-hash: abc123\nhost: x86_64-unknown-linux-gnu\n";
 
-		assert_eq!(
-			parse_rustc_fingerprint(output).as_deref(),
-			Some("1.95.0-nightly-abc123-x86_64-unknown-linux-gnu")
-		);
+		let fingerprint = parse_rustc_fingerprint(output).expect("the version report should parse");
+		assert!(fingerprint.starts_with("1.95.0-nightly-abc123-x86_64-unknown-linux-gnu-"));
+		assert_eq!(fingerprint.rsplit('-').next().map(str::len), Some(64));
 		assert!(parse_rustc_fingerprint(b"rustc without fingerprint lines\n").is_none());
+	}
+
+	#[test]
+	fn fingerprints_source_built_compilers_without_a_commit_hash() {
+		let first = b"release: 1.95.0-dev\nhost: x86_64-unknown-linux-gnu\nLLVM version: 21.0.0\n";
+		let second = b"release: 1.95.0-dev\nhost: x86_64-unknown-linux-gnu\nLLVM version: 22.0.0\n";
+
+		let fingerprint = parse_rustc_fingerprint(first).expect("a commit hash should be optional");
+		assert!(fingerprint.starts_with("1.95.0-dev-no-commit-x86_64-unknown-linux-gnu-"));
+		assert_ne!(
+			parse_rustc_fingerprint(first),
+			parse_rustc_fingerprint(second),
+			"the complete compiler version report must contribute to the identity"
+		);
 	}
 
 	#[test]
@@ -378,7 +403,8 @@ mod tests {
 		// sanitizer must replace it with the safe placeholder. The host token
 		// is the first whitespace-separated word of the host line.
 		let parsed = parse_rustc_fingerprint(output).expect("the crafted output should parse");
-		assert_eq!(parsed, "1.95.0-rolling-abc-123-aarch64");
+		assert!(parsed.starts_with("1.95.0-rolling-abc-123-aarch64-"));
+		assert_eq!(parsed.rsplit('-').next().map(str::len), Some(64));
 	}
 
 	#[test]

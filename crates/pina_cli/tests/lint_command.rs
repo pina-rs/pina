@@ -147,13 +147,23 @@ fn lint_runs_cargo_check_with_the_bundled_driver() {
 	assert!(log.contains("cargo check --locked"), "log: {log}");
 	assert!(log.contains("--package lint-fixture"), "log: {log}");
 	assert!(log.contains("--manifest-path"), "log: {log}");
-	assert!(
-		log.contains(&format!(
+	let environment = log
+		.lines()
+		.find(|line| line.starts_with("rustc_wrapper="))
+		.unwrap_or_else(|| panic!("missing lint environment in log: {log}"));
+	let identity = environment
+		.strip_prefix(&format!(
 			"rustc_wrapper=unset workspace_wrapper={FAKE_DRIVER} driver_build="
-		)),
-		"log: {log}"
+		))
+		.and_then(|rest| rest.strip_suffix(" no_deps=1 levels="))
+		.unwrap_or_else(|| panic!("unexpected lint environment: {environment}"));
+	assert_eq!(identity.len(), 64, "driver build identity: {identity}");
+	assert!(
+		identity
+			.chars()
+			.all(|character| character.is_ascii_hexdigit()),
+		"driver build identity: {identity}"
 	);
-	assert!(log.contains(" no_deps=1 levels="), "log: {log}");
 }
 
 #[test]

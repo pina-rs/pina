@@ -132,6 +132,20 @@ fn process_borrow_and_cpi_in_closure(account: &mut AccountView, cpi: &Cpi) -> Re
 	invoke()
 }
 
+fn process_closure_after_dropping_borrow(account: &mut AccountView, cpi: &Cpi) -> Result<(), ()> {
+	let guard = account.try_borrow_mut()?;
+	let invoke = || cpi.invoke();
+	drop(guard);
+	invoke()
+}
+
+fn process_closure_after_acquiring_borrow(account: &mut AccountView, cpi: &Cpi) -> Result<(), ()> {
+	let invoke = || cpi.invoke();
+	//~^ ERROR: CPI invoked while a mutable account-data borrow is still alive
+	let _guard = account.try_borrow_mut()?;
+	invoke()
+}
+
 fn process_cpi_in_match_guard(account: &mut AccountView, cpi: &Cpi) -> Result<(), ()> {
 	let _guard = account.try_borrow_mut()?;
 	match () {

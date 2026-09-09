@@ -205,7 +205,7 @@ fn expression_returns(expr: &Expr<'_>) -> bool {
 	}
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, PartialEq, Eq)]
 struct AnalysisState {
 	bounded: HashSet<String>,
 	remaining: HashSet<String>,
@@ -234,6 +234,7 @@ fn intersect_states(states: impl IntoIterator<Item = AnalysisState>) -> Analysis
 
 struct Analyzer<'cx, 'tcx> {
 	cx: &'cx LateContext<'tcx>,
+	emit_diagnostics: bool,
 }
 
 impl<'tcx> Analyzer<'_, 'tcx> {
@@ -393,9 +394,33 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		}
 	}
 
+	fn loop_entry_state(
+		&self,
+		block: &'tcx rustc_hir::Block<'tcx>,
+		entry: &AnalysisState,
+	) -> AnalysisState {
+		let analyzer = Analyzer {
+			cx: self.cx,
+			emit_diagnostics: false,
+		};
+		let mut current = entry.clone();
+
+		loop {
+			let mut body_state = current.clone();
+			analyzer.visit_block(block, &mut body_state);
+			let next = intersect_states([entry.clone(), body_state]);
+			if next == current {
+				return next;
+			}
+			current = next;
+		}
+	}
+
 	fn visit_expr(&self, expr: &'tcx Expr<'tcx>, state: &mut AnalysisState) {
 		match &expr.kind {
 			ExprKind::Loop(block, _, source, _) => {
+				let entry = state.clone();
+				*state = self.loop_entry_state(block, &entry);
 				let iterator = matches!(source, LoopSource::ForLoop)
 					.then(|| for_loop_iterator(self.cx, expr))
 					.flatten();
@@ -410,7 +435,11 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				let has_constant_take =
 					iterator.is_some_and(|iterator| expression_has_static_bound(self.cx, iterator));
 
-				if mentions_remaining && !has_constant_take && !has_validated_bound {
+				if self.emit_diagnostics
+					&& mentions_remaining
+					&& !has_constant_take
+					&& !has_validated_bound
+				{
 					self.cx.lint(REQUIRE_BOUNDED_REMAINING_ACCOUNTS, |diag| {
 						diag.span(expr.span);
 						diag.primary_message(
@@ -423,8 +452,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					});
 				}
 
-				let entry = state.clone();
-				let mut body_state = entry.clone();
+				let mut body_state = state.clone();
 				self.visit_block(block, &mut body_state);
 				*state = intersect_states([entry, body_state]);
 			}
@@ -606,6 +634,10 @@ impl<'tcx> LateLintPass<'tcx> for RequireBoundedRemainingAccounts {
 			}
 		}
 
-		Analyzer { cx }.visit_expr(body.value, &mut state);
+		Analyzer {
+			cx,
+			emit_diagnostics: true,
+		}
+		.visit_expr(body.value, &mut state);
 	}
 }

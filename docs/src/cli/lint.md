@@ -32,11 +32,12 @@ pina lint --project ./programs/counter
 The CLI prepares the driver below Cargo home:
 
 ```text
-$CARGO_HOME/pina/lint-driver/<pina-version>/<rustc-release>-<host>/bin/pina_lint_driver
+$CARGO_HOME/pina/lint-driver/<pina-version>/<rustc-fingerprint>/bin/pina_lint_driver
 ```
 
 - The first use installs it from crates.io with `cargo install --locked --root <that directory> --bin pina_lint_driver --version =<CLI version> pina_lints`. This step requires network access once; later runs reuse the cached binary.
 - The driver release identity is the `pina_lints` version, which matches the installed CLI version. There is no separate tool release or revision selector to pick.
+- The Rust compiler fingerprint contains the release, host, commit when available, and a SHA-256 digest of the complete `rustc -vV` report. Source-built compilers without commit metadata are supported without sharing a generic fallback cache entry.
 - The driver is built from the project directory with the project's pinned nightly toolchain, the same compiler that builds the project, because `pina_lints` is nightly-only: its lint passes and the driver link against the compiler's unstable `rustc_private` crates. The toolchain must have the `rustc-dev` component installed (`rustup component add rustc-dev` if it is missing).
 - Set `CARGO_HOME` to move the driver cache. `CARGO_TARGET_DIR` continues to control normal project build artifacts.
 

@@ -117,15 +117,33 @@ fn is_drop_callee(cx: &LateContext<'_>, callee: &Expr<'_>) -> bool {
 
 struct Analyzer<'cx, 'tcx> {
 	cx: &'cx LateContext<'tcx>,
+	closures: HashMap<HirId, &'tcx Expr<'tcx>>,
 }
 
 impl<'tcx> Analyzer<'_, 'tcx> {
+	fn closure_body(&self, expr: &'tcx Expr<'tcx>) -> Option<&'tcx Expr<'tcx>> {
+		match &expr.kind {
+			ExprKind::Closure(closure) => Some(self.cx.tcx.hir_body(closure.body).value),
+			ExprKind::Path(_) => {
+				local_binding(expr).and_then(|binding| self.closures.get(&binding).copied())
+			}
+			ExprKind::Unary(_, inner)
+			| ExprKind::Use(inner, _)
+			| ExprKind::Cast(inner, _)
+			| ExprKind::Type(inner, _)
+			| ExprKind::DropTemps(inner) => self.closure_body(inner),
+			ExprKind::Block(block, _) => block.expr.and_then(|tail| self.closure_body(tail)),
+			_ => None,
+		}
+	}
+
 	fn visit_block(
-		&self,
+		&mut self,
 		block: &'tcx rustc_hir::Block<'tcx>,
 		active: &mut HashMap<HirId, rustc_span::Span>,
 	) {
 		let mut block_bindings = Vec::new();
+		let mut block_closures = Vec::new();
 
 		for statement in block.stmts {
 			match &statement.kind {
@@ -141,6 +159,13 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 						for binding in bindings {
 							active.insert(binding, initializer.span);
 							block_bindings.push(binding);
+						}
+
+						if let rustc_hir::PatKind::Binding(_, binding, ..) = local.pat.kind
+							&& let Some(body) = self.closure_body(initializer)
+						{
+							self.closures.insert(binding, body);
+							block_closures.push(binding);
 						}
 					}
 				}
@@ -158,9 +183,16 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		for binding in block_bindings {
 			active.remove(&binding);
 		}
+		for binding in block_closures {
+			self.closures.remove(&binding);
+		}
 	}
 
-	fn visit_expr(&self, expr: &'tcx Expr<'tcx>, active: &mut HashMap<HirId, rustc_span::Span>) {
+	fn visit_expr(
+		&mut self,
+		expr: &'tcx Expr<'tcx>,
+		active: &mut HashMap<HirId, rustc_span::Span>,
+	) {
 		match &expr.kind {
 			ExprKind::MethodCall(segment, receiver, args, _) => {
 				self.visit_expr(receiver, active);
@@ -183,6 +215,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				}
 			}
 			ExprKind::Call(callee, args) => {
+				let closure_body = self.closure_body(callee);
 				self.visit_expr(callee, active);
 				for argument in *args {
 					self.visit_expr(argument, active);
@@ -192,6 +225,8 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					&& let Some(binding) = args.first().and_then(|argument| local_binding(argument))
 				{
 					active.remove(&binding);
+				} else if let Some(body) = closure_body {
+					self.visit_expr(body, active);
 				}
 			}
 			ExprKind::Block(block, _) => self.visit_block(block, active),
@@ -205,13 +240,9 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					self.visit_expr(arm.body, &mut branch);
 				}
 			}
-			ExprKind::Closure(closure) => {
-				let mut closure_active = active.clone();
-				self.visit_expr(
-					self.cx.tcx.hir_body(closure.body).value,
-					&mut closure_active,
-				);
-			}
+			// A closure body runs when the closure is called, not when its value is
+			// created. Local closure calls are handled by `ExprKind::Call` above.
+			ExprKind::Closure(_) => {}
 			ExprKind::If(condition, then, otherwise) => {
 				self.visit_expr(condition, active);
 				let mut branch = active.clone();
@@ -233,11 +264,21 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			| ExprKind::Yield(inner, _)
 			| ExprKind::Become(inner)
 			| ExprKind::UnsafeBinderCast(_, inner, _) => self.visit_expr(inner, active),
-			ExprKind::Binary(_, left, right)
-			| ExprKind::Assign(left, right, _)
-			| ExprKind::AssignOp(_, left, right) => {
+			ExprKind::Binary(_, left, right) | ExprKind::AssignOp(_, left, right) => {
 				self.visit_expr(left, active);
 				self.visit_expr(right, active);
+			}
+			ExprKind::Assign(left, right, _) => {
+				let closure_body = self.closure_body(right);
+				self.visit_expr(left, active);
+				self.visit_expr(right, active);
+				if let Some(binding) = local_binding(left) {
+					if let Some(body) = closure_body {
+						self.closures.insert(binding, body);
+					} else {
+						self.closures.remove(&binding);
+					}
+				}
 			}
 			ExprKind::Index(base, index, _) => {
 				self.visit_expr(base, active);
@@ -275,6 +316,10 @@ impl<'tcx> LateLintPass<'tcx> for DenyAccountBorrowsAcrossCpi {
 		_: rustc_span::Span,
 		_: rustc_hir::def_id::LocalDefId,
 	) {
-		Analyzer { cx }.visit_expr(body.value, &mut HashMap::new());
+		Analyzer {
+			cx,
+			closures: HashMap::new(),
+		}
+		.visit_expr(body.value, &mut HashMap::new());
 	}
 }

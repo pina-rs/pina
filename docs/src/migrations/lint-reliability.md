@@ -25,7 +25,7 @@ For a manual parser, contain `remaining_mut()` in the smallest reviewed helper a
 
 ## Re-establish bounds after mutation
 
-The remaining-account bound check now follows local aliases. Reassignment, mutable borrowing, a mutable method receiver, a mutable-reference function argument, or a closure that can replace a checked binding invalidates the earlier proof. Move the guard after the last possible mutation:
+The remaining-account bound check now follows local aliases and loop-carried state. Reassignment, mutable borrowing, a mutable method receiver, a mutable-reference function argument, or a closure that can replace a checked binding invalidates the earlier proof, including for later iterations of an enclosing loop. Move the guard after the last possible mutation:
 
 ```rust
 replace_remaining(&mut remaining, replacement);
@@ -58,7 +58,7 @@ The unused-borrow-guard lint now classifies each binding's inferred type instead
 
 ## Refresh the managed lint driver
 
-No manual cache cleanup is normally required. The CLI now keys the installed lint driver by the exact `rustc` commit and rebuilds it when the active compiler changes. It installs the driver as `RUSTC_WORKSPACE_WRAPPER`, so Cargo can retain an existing outer `RUSTC_WRAPPER` such as `sccache`. If `PINA_LINT_DRIVER_PATH` is set for local lint development, make sure it points to a driver built by the same toolchain as the project.
+No manual cache cleanup is normally required. The CLI now keys the installed lint driver by the complete `rustc -vV` report: release, host, commit when present, and a SHA-256 digest of the report. It therefore rebuilds when the reported compiler identity changes and still supports source-built toolchains that omit commit metadata. It installs the driver as `RUSTC_WORKSPACE_WRAPPER`, so Cargo can retain an existing outer `RUSTC_WRAPPER` such as `sccache`. If `PINA_LINT_DRIVER_PATH` is set for local lint development, make sure it points to a driver built by the same toolchain as the project.
 
 Run the complete catalog after migrating:
 

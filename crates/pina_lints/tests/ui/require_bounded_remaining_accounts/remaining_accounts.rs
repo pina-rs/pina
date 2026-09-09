@@ -474,6 +474,29 @@ fn process_branch_replacement_after_guard<'a>(
 	Ok(())
 }
 
+fn process_loop_replacement_after_guard<'a>(
+	mut remaining: &'a [u8],
+	attacker: &'a [u8],
+	repeat: bool,
+) -> Result<(), ()> {
+	if remaining.len() > MAX_REMAINING_ACCOUNTS {
+		return Err(());
+	}
+
+	loop {
+		for account in remaining {
+			//~^ ERROR: remaining accounts are processed without an explicit bound
+			let _ = account;
+		}
+		remaining = attacker;
+		if !repeat {
+			break;
+		}
+	}
+
+	Ok(())
+}
+
 fn process_bounded_assignment<'a>(remaining: &'a [u8], attacker: &'a [u8]) -> Result<(), ()> {
 	if remaining.len() > MAX_REMAINING_ACCOUNTS {
 		return Err(());
