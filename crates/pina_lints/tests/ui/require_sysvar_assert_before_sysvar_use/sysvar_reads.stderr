@@ -320,7 +320,7 @@ LL |     let _ = clock.try_borrow()?;
    = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
 
 error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
-  --> $DIR/sysvar_reads.rs:579:10
+  --> $DIR/sysvar_reads.rs:583:10
    |
 LL |     let _ = clock.try_borrow()?;
    |             ^^^^^^^^^^^^^^^^^^
@@ -328,7 +328,15 @@ LL |     let _ = clock.try_borrow()?;
    = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
 
 error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
-  --> $DIR/sysvar_reads.rs:617:10
+  --> $DIR/sysvar_reads.rs:591:10
+   |
+LL |     let _ = clock.try_borrow()?;
+   |             ^^^^^^^^^^^^^^^^^^
+   |
+   = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
+
+error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
+  --> $DIR/sysvar_reads.rs:629:10
    |
 LL |     let _ = epoch_sysvar.try_borrow()?;
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -336,11 +344,11 @@ LL |     let _ = epoch_sysvar.try_borrow()?;
    = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
 
 error: raw sysvar access should be preceded by `assert_sysvar()` on the same account
-  --> $DIR/sysvar_reads.rs:629:10
+  --> $DIR/sysvar_reads.rs:641:10
    |
 LL |     let _ = sysvar_instructions.try_borrow()?;
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = help: use the sysvar type's checked `from_account_view()` or `try_from()` loader, or call `sysvar_account.assert_sysvar(&sysvar::ID)?` before borrowing raw data
 
-error: aborting due to 43 previous errors
+error: aborting due to 44 previous errors

@@ -573,6 +573,18 @@ fn process_closure_reassignment_invalidates_asserted_sysvar(
 	Ok(())
 }
 
+fn process_mutable_receiver_call_invalidates_asserted_sysvar(
+	checked: &ClockView,
+	attacker: &ClockView,
+) -> Result<(), ()> {
+	let mut clock = checked;
+	clock.assert_sysvar(&sysvar::clock::ID)?;
+	clock.clone_from(&attacker);
+	let _ = clock.try_borrow()?;
+	//~^ ERROR: raw sysvar access should be preceded by
+	Ok(())
+}
+
 fn process_closure_assertion_does_not_escape(clock: &ClockView) -> Result<(), ()> {
 	let validate = || clock.assert_sysvar(&sysvar::clock::ID);
 	validate()?;

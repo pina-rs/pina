@@ -38,6 +38,8 @@ crate::declare_late_lint! {
 	/// their callbacks can replace the validated binding before execution
 	/// continues. An instruction argument is not a trusted expected ID: comparing
 	/// two attacker-controlled values proves consistency, not authenticity.
+	/// Assignments, mutable borrows, and methods that take the validated binding
+	/// through `&mut self` invalidate the earlier proof.
 	/// Static `.invoke()` and `.invoke_signed()` builders encode their target in
 	/// the builder and do not accept a replaceable program argument. Restricting
 	/// unverified calls to direct method or UFCS syntax keeps the target proof
@@ -297,6 +299,26 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			.is_some_and(|expected| self.is_trusted_program_id(expected, state))
 	}
 
+	fn method_mutably_borrows_receiver(&self, expression: &Expr<'_>) -> bool {
+		let Some(definition) = self
+			.cx
+			.typeck_results()
+			.type_dependent_def_id(expression.hir_id)
+		else {
+			return false;
+		};
+
+		self.cx
+			.tcx
+			.fn_sig(definition)
+			.instantiate_identity()
+			.skip_binder()
+			.inputs()
+			.first()
+			.and_then(|receiver| receiver.ref_mutability())
+			== Some(rustc_hir::Mutability::Mut)
+	}
+
 	fn lint_unchecked_cpi(&self, expr: &Expr<'_>, method: &str) {
 		let verified_method = match method {
 			"invoke_signed_with_unverified_program" => "invoke_signed_with_program",
@@ -384,6 +406,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				for argument in *args {
 					self.visit_expr(argument, state);
 				}
+				let mutably_borrows_receiver = self.method_mutably_borrows_receiver(expr);
 
 				let method = segment.ident.name.as_str();
 				if PROGRAM_CHECK_METHODS.contains(&method) {
@@ -398,6 +421,9 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				}
 
 				if !DYNAMIC_CPI_METHODS.contains(&method) {
+					if mutably_borrows_receiver && let Some(place) = self.place_identity(receiver) {
+						self.invalidate(state, &place);
+					}
 					return;
 				}
 				let Some(definition) = self.cx.typeck_results().type_dependent_def_id(expr.hir_id)
@@ -417,6 +443,9 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 
 				if !validated {
 					self.lint_unchecked_cpi(expr, method);
+				}
+				if mutably_borrows_receiver && let Some(place) = self.place_identity(receiver) {
+					self.invalidate(state, &place);
 				}
 			}
 			ExprKind::Call(callee, args) => {

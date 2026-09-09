@@ -23,6 +23,8 @@ crate::declare_late_lint! {
 	/// asserting their identity through Pina and the matching canonical sysvar
 	/// ID first. Success-side `Result` callbacks do not establish a proof because
 	/// they can replace the asserted binding before execution continues.
+	/// Assignments, mutable borrows, and `&mut self` method calls also invalidate
+	/// an earlier proof for that binding.
 	///
 	/// ### Why is this bad?
 	///
@@ -319,6 +321,26 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		!self.cx.typeck_results().expr_ty(expression).is_never()
 	}
 
+	fn method_mutably_borrows_receiver(&self, expression: &Expr<'_>) -> bool {
+		let Some(definition) = self
+			.cx
+			.typeck_results()
+			.type_dependent_def_id(expression.hir_id)
+		else {
+			return false;
+		};
+
+		self.cx
+			.tcx
+			.fn_sig(definition)
+			.instantiate_identity()
+			.skip_binder()
+			.inputs()
+			.first()
+			.and_then(|receiver| receiver.ref_mutability())
+			== Some(rustc_hir::Mutability::Mut)
+	}
+
 	fn invalidate(&self, state: &mut ValidationState, assigned: &Place) {
 		state
 			.places
@@ -402,6 +424,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				for argument in *arguments {
 					self.visit_expr(argument, state);
 				}
+				let mutably_borrows_receiver = self.method_mutably_borrows_receiver(expression);
 
 				let method = segment.ident.name.as_str();
 				if method == "assert_sysvar" {
@@ -412,6 +435,9 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					return;
 				}
 				if self.method_is_trusted(expression) {
+					if mutably_borrows_receiver && let Some(place) = self.place_identity(receiver) {
+						self.invalidate(state, &place);
+					}
 					return;
 				}
 				if self
@@ -420,6 +446,9 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					.type_dependent_def_id(expression.hir_id)
 					.is_some_and(|definition| self.definition_is_ignored(definition))
 				{
+					if mutably_borrows_receiver && let Some(place) = self.place_identity(receiver) {
+						self.invalidate(state, &place);
+					}
 					return;
 				}
 
@@ -432,6 +461,9 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 						.is_some_and(|place| state.contains(&place))
 				{
 					emit_unchecked_sysvar(self.cx, expression.span);
+				}
+				if mutably_borrows_receiver && let Some(place) = self.place_identity(receiver) {
+					self.invalidate(state, &place);
 				}
 			}
 			ExprKind::Call(callee, arguments) => {

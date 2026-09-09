@@ -400,6 +400,28 @@ fn success_adapters_cannot_mutate_program_after_validation(
 	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
 }
 
+fn mutable_receiver_calls_invalidate_program_proof(
+	checked: &ProgramAccount,
+	attacker: &ProgramAccount,
+) -> Result<(), ()> {
+	let mut token_program = checked;
+	token_program.assert_program(&TOKEN_PROGRAM_ID)?;
+	token_program.clone_from(&attacker);
+	Instruction.invoke_with_unverified_program(token_program.address())
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+}
+
+fn mutable_receiver_calls_invalidate_trusted_id_alias(
+	token_program: &ProgramAccount,
+	attacker_id: &Address,
+) -> Result<(), ()> {
+	let mut expected = &TOKEN_PROGRAM_ID;
+	expected.clone_from(&attacker_id);
+	token_program.assert_program(expected)?;
+	Instruction.invoke_with_unverified_program(token_program.address())
+	//~^ ERROR: `.invoke_with_unverified_program()` called without a preceding program address verification
+}
+
 fn chainable_program_assertions_preserve_identity(
 	token_program: &ProgramAccount,
 	expected: &Address,
