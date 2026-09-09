@@ -266,9 +266,9 @@ pub(crate) fn expand(
 	let migration_impl = migration.as_ref().map(|migration| {
 		migration.implementation(&crate_path, &struct_name, &discriminator, &variant)
 	});
-	let automatic_account_migration = match migration.as_ref() {
+	let account_migration = match migration.as_ref() {
 		Some(migration) => {
-			match migration.automatic_account_implementation(&crate_path, &struct_name) {
+			match migration.fixed_account_implementation(&crate_path, &struct_name) {
 				Ok(implementation) => implementation,
 				Err(error) => return error.to_compile_error(),
 			}
@@ -293,7 +293,7 @@ pub(crate) fn expand(
 		#value_validation_impl
 
 		#account_impl
-		#automatic_account_migration
+		#account_migration
 	};
 
 	quote! {

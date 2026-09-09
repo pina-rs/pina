@@ -60,6 +60,51 @@
 				}
 			]
 		},
+		"account:1:02": {
+			"identity": {
+				"kind": "account",
+				"discriminatorBytes": 1,
+				"discriminatorHex": "02"
+			},
+			"rustName": "ManualState",
+			"versions": [
+				{
+					"version": 0,
+					"schemaSha256": "0660737445b41501de8fb692b868057005610ad20c48a78807c7921ec9e94fd1",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "amount",
+								"rustType": "u8"
+							}
+						]
+					},
+					"transition": null
+				},
+				{
+					"version": 1,
+					"schemaSha256": "a89a3863c337c3ca23697d6c645ac97bbd6a74673943d9ec1c3f65c2eda0d906",
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "amount",
+								"rustType": "u16"
+							}
+						]
+					},
+					"transition": {
+						"from": 0,
+						"to": 1,
+						"mode": "manual",
+						"sourceSchemaSha256": "0660737445b41501de8fb692b868057005610ad20c48a78807c7921ec9e94fd1",
+						"destinationSchemaSha256": "a89a3863c337c3ca23697d6c645ac97bbd6a74673943d9ec1c3f65c2eda0d906",
+						"implementationSha256": "f191f13303cf51ca540056ebbda747f0844a1279b8e0bdf125d909546e1d5b54"
+					}
+				}
+			]
+		},
 		"instruction:1:00": {
 			"identity": {
 				"kind": "instruction",

@@ -12,6 +12,7 @@ pub enum MigrationInstruction {
 #[discriminator]
 pub enum MigrationAccount {
 	State = 1,
+	ManualState = 2,
 }
 
 #[account(discriminator = MigrationAccount::State, migrations)]
@@ -19,6 +20,11 @@ pub struct State {
 	pub authority: Address,
 	pub value: u64,
 	pub enabled: bool,
+}
+
+#[account(discriminator = MigrationAccount::ManualState, migrations)]
+pub struct ManualState {
+	pub amount: u16,
 }
 
 #[instruction(discriminator = MigrationInstruction::Update, migrations)]
@@ -127,5 +133,23 @@ mod tests {
 		assert_eq!(&destination[2..34], authority.as_ref());
 		assert_eq!(&destination[34..42], &42_u64.to_le_bytes());
 		assert_eq!(destination[42], 0);
+	}
+
+	#[test]
+	fn manual_account_migration_widens_a_historical_value() {
+		let old = [MigrationAccount::ManualState as u8, 0, u8::MAX];
+		let plan = ManualState::plan_migration(&old)
+			.unwrap_or_else(|error| panic!("plan manual account migration: {error:?}"));
+		assert_eq!(plan.target_size(), 4);
+		let mut destination = [0xaa; 4];
+		destination[..old.len()].copy_from_slice(&old);
+		ManualState::apply_migration(plan.into_payload(), &mut destination);
+		ManualState::validate_migration_destination(&destination)
+			.unwrap_or_else(|error| panic!("validate manual destination: {error:?}"));
+		ManualState::write_current_migration_version(&mut destination)
+			.unwrap_or_else(|error| panic!("write manual version: {error:?}"));
+
+		assert_eq!(destination[..2], [MigrationAccount::ManualState as u8, 1]);
+		assert_eq!(u16::from_le_bytes([destination[2], destination[3]]), 255);
 	}
 }

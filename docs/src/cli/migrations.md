@@ -38,7 +38,7 @@ Commit the manifest, publication ledger, and transition files. Do not generate t
 
 Pina generates automatic transitions only for direction-safe fixed-layout changes. A type change, compact layout, or ambiguous field move creates a manual Rust file with `TODO(pina-manual-migration)`.
 
-Replace the generated body. The function must validate the exact source representation and fully initialize the destination bytes. Then run:
+Replace the generated body. Pina preflights the exact historical shape for fixed accounts, so an account conversion must be total for every valid source and fully initialize the destination bytes. It cannot return an error after mutation starts. A manual instruction conversion runs in scratch space and may reject invalid semantic values before dispatch. Then run:
 
 ```bash
 pina migrations check

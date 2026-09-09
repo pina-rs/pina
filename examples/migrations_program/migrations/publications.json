@@ -10,6 +10,7 @@
 			"manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
 			"versions": {
 				"account:1:01": 0,
+				"account:1:02": 0,
 				"instruction:1:00": 0
 			},
 			"previousReceiptSha256": null

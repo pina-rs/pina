@@ -375,9 +375,10 @@ impl MigrationExpansion {
 		})
 	}
 
-	/// Generate an allocator-free in-place implementation when every historical
-	/// fixed-layout transition is mechanical and proven direction-safe.
-	pub(crate) fn automatic_account_implementation(
+	/// Generate an allocator-free in-place implementation for a fixed-layout
+	/// account history. Manual transitions use the same preflighted, infallible
+	/// runtime boundary as generated transitions.
+	pub(crate) fn fixed_account_implementation(
 		&self,
 		crate_path: &syn::Path,
 		struct_name: &syn::Ident,
@@ -387,12 +388,7 @@ impl MigrationExpansion {
 			.versions
 			.iter()
 			.any(|version| version.schema.layout != LayoutKind::Fixed)
-			|| self.history.versions.iter().skip(1).any(|version| {
-				version
-					.transition
-					.as_ref()
-					.is_none_or(|transition| transition.mode != TransitionMode::Automatic)
-			}) {
+		{
 			return Ok(None);
 		}
 
@@ -488,8 +484,8 @@ impl MigrationExpansion {
 			.map(|version| {
 				let number = version.version;
 				let calls = ((number + 1)..=current).map(|to| {
-					let transition = format_ident!("v{}_to_v{}", to - 1, to);
-					quote!(#module_name::#transition::migrate(destination);)
+					let transition_name = format_ident!("v{}_to_v{}", to - 1, to);
+					quote!(#module_name::#transition_name::migrate(destination);)
 				});
 				quote! {
 					#number => { #(#calls)* }
