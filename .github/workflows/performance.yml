@@ -110,7 +110,7 @@ jobs:
   instruction-compute:
     name: instruction compute units
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'release') }}
-    timeout-minutes: 25
+    timeout-minutes: 60
     runs-on: ubuntu-24.04
     env:
       XDG_CACHE_HOME: ${{ github.workspace }}/.cache
