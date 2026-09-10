@@ -26,6 +26,7 @@ use codama_nodes::U8;
 use codama_nodes::U64;
 
 use super::*;
+use crate::render::discriminator::render_constant_discriminator;
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {
 	let nanos = SystemTime::now()
@@ -125,13 +126,36 @@ fn vesting_cancel_instruction_snapshot() {
 
 #[test]
 fn migration_version_is_part_of_the_framework_owned_cpi_prefix() {
+	let root = load_fixture_root("migrations_program");
+	let update = root
+		.program
+		.instructions
+		.iter()
+		.find(|candidate| candidate.name.as_ref() == "update")
+		.unwrap_or_else(|| panic!("fixture has no `update` instruction"));
 	let content = render_fixture_instruction("migrations_program", "update");
+
+	// The prefix bytes are framework-owned and track the fixture's current
+	// version, so derive them from the IDL instead of hardcoding them.
+	let prefix = render_constant_discriminator(
+		"update",
+		&update.discriminators,
+		&update.arguments,
+		"test fixture",
+	)
+	.unwrap_or_else(|error| panic!("resolves fixture discriminator: {error}"));
+	let discriminator_const = format!(
+		"const {}: [u8; {}] = {:?};",
+		prefix.name,
+		prefix.bytes.len(),
+		prefix.bytes
+	);
 
 	assert!(content.contains("pub const LEN: usize = 12;"));
 	assert!(content.contains("data[..2].copy_from_slice(&UPDATE_DISCRIMINATOR);"));
 	assert!(content.contains("data[2..10].copy_from_slice(&self.value.to_le_bytes());"));
 	assert!(content.contains("data[10..12].copy_from_slice(&self.memo.to_le_bytes());"));
-	assert!(content.contains("const UPDATE_DISCRIMINATOR: [u8; 2] = [0, 1];"));
+	assert!(content.contains(&discriminator_const));
 }
 
 #[test]
