@@ -265,8 +265,15 @@ function encodeInstruction(instruction: InstructionNode): Uint8Array {
 		(size, part) => Math.max(size, part.offset + part.bytes.length),
 		0,
 	);
+	// Omitted arguments (the framework discriminator and migration version)
+	// are already carried by the constant discriminator prefix; encoding them
+	// again would double-count their bytes and shift every later field.
 	const args = (instruction.arguments ?? [])
-		.filter((argument) => argument.name !== "discriminator")
+		.filter(
+			(argument) =>
+				argument.name !== "discriminator" &&
+				argument.defaultValueStrategy !== "omitted",
+		)
 		.map((argument) => zeroValue(argument.type));
 	const bytes = new Uint8Array(
 		discriminatorSize +

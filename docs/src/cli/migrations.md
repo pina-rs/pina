@@ -46,7 +46,7 @@ pina migrations make --rename score:points          # preserve the renamed data
 pina migrations make --assume-removed score         # discard it; `points` starts zeroed
 ```
 
-`--json` emits the open questions as a machine-readable array so agents can parse, decide, and re-run. Answered renames are recorded in the manifest transition, so repeated `make` runs never re-ask, the generated transition copies the field's bytes, and `--assume-removed` prints a data-loss warning. Type changes and unpaired removals always fall back to a manual transition with a TODO body; nothing is dropped silently.
+`--json` emits the open questions as a machine-readable array so agents can parse, decide, and re-run. With `--json`, `--no-interactive`, or no terminal attached, an unanswered question is a hard failure with a defined contract: the question array prints on stdout, the human-readable error prints on stderr, and the exit status is 1; capture both streams and re-invoke with the flags each question names. Answered renames are recorded in the manifest transition, so repeated `make` runs never re-ask, the generated transition copies the field's bytes, and `--assume-removed` prints a data-loss warning. Type changes and unpaired removals always fall back to a manual transition with a TODO body; nothing is dropped silently.
 
 ## Resolve a manual transition
 
@@ -65,7 +65,7 @@ pina test --compatibility
 
 `check` rejects a remaining marker. Once publication is pending or complete, it also rejects any change to the transition file or either schema hash. Fix frozen transition code with another migration version.
 
-IDL generation runs the same check. The current IDL contains one omitted `migrationVersion` constant for each migration-aware account or instruction, so generated clients serialize the current envelope without asking the application developer for a version. Historical schemas and transition code remain exclusively in `migrations/manifest.json`.
+IDL generation runs the same check. The current IDL keeps each migration-aware account or instruction's `migrationVersion` field in place with `defaultValueStrategy: "omitted"` and its default value: generated client inputs omit it, encoders stamp the current value into the envelope automatically, and decoders reject any other version. Historical schemas and transition code remain exclusively in `migrations/manifest.json`. Historical schemas and transition code remain exclusively in `migrations/manifest.json`.
 
 ## Change an instruction process
 

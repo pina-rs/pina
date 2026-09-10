@@ -17,16 +17,19 @@ use codama_nodes::InstructionAccountNode;
 use codama_nodes::InstructionArgumentNode;
 use codama_nodes::InstructionNode;
 use codama_nodes::IsSigner;
+use codama_nodes::Number;
+use codama_nodes::NumberFormat;
 use codama_nodes::NumberTypeNode;
 use codama_nodes::NumberValueNode;
 use codama_nodes::ProgramNode;
 use codama_nodes::PublicKeyTypeNode;
 use codama_nodes::RootNode;
+use codama_nodes::TypeNode;
 use codama_nodes::U8;
 use codama_nodes::U64;
+use codama_nodes::ValueNode;
 
 use super::*;
-use crate::render::discriminator::render_constant_discriminator;
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {
 	let nanos = SystemTime::now()
@@ -135,20 +138,31 @@ fn migration_version_is_part_of_the_framework_owned_cpi_prefix() {
 		.unwrap_or_else(|| panic!("fixture has no `update` instruction"));
 	let content = render_fixture_instruction("migrations_program", "update");
 
-	// The prefix bytes are framework-owned and track the fixture's current
-	// version, so derive them from the IDL instead of hardcoding them.
-	let prefix = render_constant_discriminator(
-		"update",
-		&update.discriminators,
-		&update.arguments,
-		"test fixture",
-	)
-	.unwrap_or_else(|error| panic!("resolves fixture discriminator: {error}"));
+	// The oracle must not share code with the renderer, so build the expected
+	// prefix bytes straight from the fixture's constant discriminator nodes:
+	// offset 0 carries the instruction discriminator and offset 1 the current
+	// migration version, both little-endian u8.
+	let mut bytes = Vec::new();
+	for node in &update.discriminators {
+		let DiscriminatorNode::Constant(node) = node else {
+			panic!("fixture uses a non-constant discriminator");
+		};
+		let (TypeNode::Number(r#type), ValueNode::Number(value)) =
+			(&*node.constant.r#type, &*node.constant.value)
+		else {
+			panic!("fixture discriminator is not a numeric constant");
+		};
+		assert_eq!(node.offset, bytes.len() as u64, "prefix must be contiguous");
+		assert_eq!(r#type.format, U8, "fixture prefix is u8");
+		let Number::UnsignedInteger(byte) = value.number else {
+			panic!("fixture discriminator value is not an unsigned integer");
+		};
+		bytes.push(u8::try_from(byte).unwrap_or_else(|error| panic!("byte fits u8: {error}")));
+	}
 	let discriminator_const = format!(
-		"const {}: [u8; {}] = {:?};",
-		prefix.name,
-		prefix.bytes.len(),
-		prefix.bytes
+		"const UPDATE_DISCRIMINATOR: [u8; {}] = {:?};",
+		bytes.len(),
+		bytes
 	);
 
 	assert!(content.contains("pub const LEN: usize = 12;"));

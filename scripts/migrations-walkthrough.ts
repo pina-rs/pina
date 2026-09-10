@@ -59,12 +59,6 @@ const CLIENT_HISTORY = resolve(WORK, "client-history");
 const DEPLOY_DIR = resolve(WORK, "deploy");
 const argv = process.argv.slice(2);
 const flag = (name: string) => argv.includes(`--${name}`);
-const value = (name: string) => {
-	const index = argv.indexOf(`--${name}`);
-	return index === -1 ? undefined : Number(argv[index + 1]);
-};
-const FROM_STEP = value("from-step") ?? 1;
-const TO_STEP = value("to-step") ?? 10;
 const KEEP = flag("keep");
 
 let failures = 0;
@@ -73,14 +67,29 @@ function say(message: string): void {
 	console.log(`\n\u001B[36m${message}\u001B[0m`);
 }
 
-function fail(message: string): never {
+function fail(message: string): void {
 	failures += 1;
 	console.error(`\u001B[31mFAIL\u001B[0m ${message}`);
 	if (!KEEP) {
 		throw new Error(message);
 	}
-	throw new Error(message);
 }
+
+const value = (name: string) => {
+	const index = argv.indexOf(`--${name}`);
+	if (index === -1) {
+		return undefined;
+	}
+	const operand = argv[index + 1];
+	const parsed = Number(operand);
+	if (operand === undefined || !Number.isFinite(parsed)) {
+		fail(`--${name} requires a finite numeric operand, got ${String(operand)}`);
+		return undefined;
+	}
+	return parsed;
+};
+const FROM_STEP = value("from-step") ?? 1;
+const TO_STEP = value("to-step") ?? 10;
 
 function expect(condition: boolean, message: string): void {
 	if (condition) {
@@ -1320,27 +1329,51 @@ async function main(): Promise<void> {
 
 	const keypair = resolve(DEPLOY_DIR, "walkthrough-keypair.json");
 	const authority = resolve(DEPLOY_DIR, "walkthrough-authority.json");
+	const pubkeyOf = (keypairPath: string) => {
+		const result = mustRun(
+			"solana-keygen",
+			["pubkey", keypairPath],
+			{},
+			`derive pubkey for ${keypairPath}`,
+		);
+		const pubkey = result.stdout.trim();
+		if (pubkey.length === 0) {
+			throw new Error(
+				`solana-keygen emitted an empty pubkey for ${keypairPath}`,
+			);
+		}
+		return pubkey;
+	};
 	if (!existsSync(keypair)) {
-		run("solana-keygen", [
-			"new",
-			"--no-bip39-passphrase",
-			"-o",
-			keypair,
-			"--force",
-		]);
+		mustRun(
+			"solana-keygen",
+			[
+				"new",
+				"--no-bip39-passphrase",
+				"-o",
+				keypair,
+				"--force",
+			],
+			{},
+			"generate walkthrough keypair",
+		);
 	}
 	if (!existsSync(authority)) {
-		run("solana-keygen", [
-			"new",
-			"--no-bip39-passphrase",
-			"-o",
-			authority,
-			"--force",
-		]);
+		mustRun(
+			"solana-keygen",
+			[
+				"new",
+				"--no-bip39-passphrase",
+				"-o",
+				authority,
+				"--force",
+			],
+			{},
+			"generate walkthrough authority",
+		);
 	}
-	const programId = run("solana-keygen", ["pubkey", keypair]).stdout.trim();
-	const authorityId = run("solana-keygen", ["pubkey", authority]).stdout
-		.trim();
+	const programId = pubkeyOf(keypair);
+	const authorityId = pubkeyOf(authority);
 	console.log(`program:   ${programId}`);
 	console.log(`authority: ${authorityId}`);
 
