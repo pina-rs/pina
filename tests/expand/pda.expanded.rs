@@ -436,27 +436,32 @@ impl CounterState {
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::PinaPodFixed>::read_exact(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+        let value = <Self as pina::PinaPodFixed>::read_exact(data)
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(value)?;
+        Ok(value)
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
     /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, `PinaPod` zeros the complete slice again.
+    /// structural or application validation fails, the complete slice is
+    /// zeroed again. Application validation returns its declared `ProgramError`.
     ///
     /// # Errors
     ///
     /// Returns the generated invalid-data error when `data` has the wrong length,
-    /// the closure fails, or the completed representation is invalid.
+    /// the closure fails, or structural validation rejects the representation.
+    /// Application validation returns its declared `ProgramError`.
     pub fn initialize<'data>(
         data: &'data mut [u8],
         initialize: impl FnOnce(
             &mut <Self as pina::PinaPodFixed>::Zc,
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        <Self as pina::PinaAccount>::initialize(data, initialize)
+        let value = <Self as pina::PinaAccount>::initialize(data, initialize)?;
+        Ok(value)
     }
 }
 impl pina::HasDiscriminator for CounterState {
@@ -521,7 +526,16 @@ impl pina::AccountValidation for CounterStateZc {
         }
     }
 }
+impl pina::PinaValidate for CounterStateZc {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
+    }
+}
 impl pina::PinaAccount for CounterState {
+    fn validate_account_value(value: &Self::Zc) -> pina::ProgramResult {
+        <CounterStateZc as pina::PinaValidate>::validate(value)
+    }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
     }
@@ -1120,27 +1134,32 @@ impl AllSeedState {
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::PinaPodFixed>::read_exact(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+        let value = <Self as pina::PinaPodFixed>::read_exact(data)
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(value)?;
+        Ok(value)
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
     /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, `PinaPod` zeros the complete slice again.
+    /// structural or application validation fails, the complete slice is
+    /// zeroed again. Application validation returns its declared `ProgramError`.
     ///
     /// # Errors
     ///
     /// Returns the generated invalid-data error when `data` has the wrong length,
-    /// the closure fails, or the completed representation is invalid.
+    /// the closure fails, or structural validation rejects the representation.
+    /// Application validation returns its declared `ProgramError`.
     pub fn initialize<'data>(
         data: &'data mut [u8],
         initialize: impl FnOnce(
             &mut <Self as pina::PinaPodFixed>::Zc,
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        <Self as pina::PinaAccount>::initialize(data, initialize)
+        let value = <Self as pina::PinaAccount>::initialize(data, initialize)?;
+        Ok(value)
     }
 }
 impl pina::HasDiscriminator for AllSeedState {
@@ -1205,7 +1224,16 @@ impl pina::AccountValidation for AllSeedStateZc {
         }
     }
 }
+impl pina::PinaValidate for AllSeedStateZc {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
+    }
+}
 impl pina::PinaAccount for AllSeedState {
+    fn validate_account_value(value: &Self::Zc) -> pina::ProgramResult {
+        <AllSeedStateZc as pina::PinaValidate>::validate(value)
+    }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
     }
@@ -1607,27 +1635,32 @@ impl TodoState {
         {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        <Self as pina::PinaPodFixed>::read_exact(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)
+        let value = <Self as pina::PinaPodFixed>::read_exact(data)
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(value)?;
+        Ok(value)
     }
     /// Initialize caller-owned storage with a complete typed configuration.
     ///
     /// `PinaPod` zeros the complete slice before calling `initialize`, then
     /// validates the finished representation once. The discriminator is written
     /// before the caller configures the remaining fields. If the closure or final
-    /// validation fails, `PinaPod` zeros the complete slice again.
+    /// structural or application validation fails, the complete slice is
+    /// zeroed again. Application validation returns its declared `ProgramError`.
     ///
     /// # Errors
     ///
     /// Returns the generated invalid-data error when `data` has the wrong length,
-    /// the closure fails, or the completed representation is invalid.
+    /// the closure fails, or structural validation rejects the representation.
+    /// Application validation returns its declared `ProgramError`.
     pub fn initialize<'data>(
         data: &'data mut [u8],
         initialize: impl FnOnce(
             &mut <Self as pina::PinaPodFixed>::Zc,
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<&'data mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError> {
-        <Self as pina::PinaAccount>::initialize(data, initialize)
+        let value = <Self as pina::PinaAccount>::initialize(data, initialize)?;
+        Ok(value)
     }
 }
 impl pina::HasDiscriminator for TodoState {
@@ -1692,7 +1725,16 @@ impl pina::AccountValidation for TodoStateZc {
         }
     }
 }
+impl pina::PinaValidate for TodoStateZc {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
+    }
+}
 impl pina::PinaAccount for TodoState {
+    fn validate_account_value(value: &Self::Zc) -> pina::ProgramResult {
+        <TodoStateZc as pina::PinaValidate>::validate(value)
+    }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
     }
@@ -2749,7 +2791,10 @@ impl CompactState {
         if !<Self as pina::HasDiscriminator>::matches_discriminator(data) {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        CompactStateRef::new(data).map_err(|_| pina::ProgramError::InvalidAccountData)
+        let value = CompactStateRef::new(data)
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        <CompactStateRef<'_> as pina::PinaValidate>::validate(&value)?;
+        Ok(value)
     }
     /// Calculate the encoded length after applying `patch` without changing `data`.
     pub fn updated_len(
@@ -2782,6 +2827,9 @@ impl CompactState {
             .update(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)?;
         <Self as pina::HasDiscriminator>::write_discriminator(data);
+        let value = CompactStateRef::new(&data[..encoded_len])
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        <CompactStateRef<'_> as pina::PinaValidate>::validate(&value)?;
         Ok(encoded_len)
     }
     /// Initialize compact account storage from one complete patch.
@@ -2793,6 +2841,14 @@ impl CompactState {
             .initialize(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)?;
         <Self as pina::HasDiscriminator>::write_discriminator(data);
+        let value = CompactStateRef::new(&data[..encoded_len])
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+        if let Err(error) = <CompactStateRef<
+            '_,
+        > as pina::PinaValidate>::validate(&value) {
+            data.fill(0);
+            return Err(error);
+        }
         Ok(encoded_len)
     }
 }
@@ -2856,6 +2912,12 @@ impl pina::AccountValidation for CompactStateHeader {
             Err(err) => Err(err),
             Ok(()) => Ok(self),
         }
+    }
+}
+impl<'__pina_validation> pina::PinaValidate for CompactStateRef<'__pina_validation> {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
     }
 }
 impl pina::PinaCompactAccount for CompactState {

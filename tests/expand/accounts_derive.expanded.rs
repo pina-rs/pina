@@ -18,6 +18,10 @@ impl<'a> pina::ParseAccounts<'a> for InitAccounts<'a> {
             system_program,
         })
     }
+    #[inline]
+    fn validate_accounts(&self) -> pina::ProgramResult {
+        <Self as pina::PinaValidate>::validate(self)
+    }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for InitAccounts<'a> {
     fn try_from_account_infos(
@@ -27,6 +31,7 @@ impl<'a> pina::TryFromAccountInfos<'a> for InitAccounts<'a> {
         let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
         let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
         cursor.finish_exact()?;
+        <InitAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }
 }
@@ -37,6 +42,12 @@ for InitAccounts<'a> {
         (program_id, accounts): (&'a pina::Address, &'a mut [pina::AccountView]),
     ) -> ::core::result::Result<Self, Self::Error> {
         <Self as pina::TryFromAccountInfos>::try_from_account_infos(program_id, accounts)
+    }
+}
+impl<'a> pina::PinaValidate for InitAccounts<'a> {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
     }
 }
 #[automatically_derived]
@@ -78,6 +89,10 @@ impl<'a> pina::ParseAccounts<'a> for TransferAccounts<'a> {
             extra,
         })
     }
+    #[inline]
+    fn validate_accounts(&self) -> pina::ProgramResult {
+        <Self as pina::PinaValidate>::validate(self)
+    }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for TransferAccounts<'a> {
     fn try_from_account_infos(
@@ -86,6 +101,7 @@ impl<'a> pina::TryFromAccountInfos<'a> for TransferAccounts<'a> {
     ) -> ::core::result::Result<Self, pina::ProgramError> {
         let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
         let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
+        <TransferAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }
 }
@@ -96,6 +112,12 @@ for TransferAccounts<'a> {
         (program_id, accounts): (&'a pina::Address, &'a mut [pina::AccountView]),
     ) -> ::core::result::Result<Self, Self::Error> {
         <Self as pina::TryFromAccountInfos>::try_from_account_infos(program_id, accounts)
+    }
+}
+impl<'a> pina::PinaValidate for TransferAccounts<'a> {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
     }
 }
 #[automatically_derived]
@@ -130,6 +152,10 @@ impl<'a> pina::ParseAccounts<'a> for MutableTransferAccounts<'a> {
         let extra = cursor.remaining_mut_distinct()?;
         Ok(Self { authority, extra })
     }
+    #[inline]
+    fn validate_accounts(&self) -> pina::ProgramResult {
+        <Self as pina::PinaValidate>::validate(self)
+    }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for MutableTransferAccounts<'a> {
     fn try_from_account_infos(
@@ -138,6 +164,7 @@ impl<'a> pina::TryFromAccountInfos<'a> for MutableTransferAccounts<'a> {
     ) -> ::core::result::Result<Self, pina::ProgramError> {
         let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
         let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
+        <MutableTransferAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }
 }
@@ -148,6 +175,12 @@ for MutableTransferAccounts<'a> {
         (program_id, accounts): (&'a pina::Address, &'a mut [pina::AccountView]),
     ) -> ::core::result::Result<Self, Self::Error> {
         <Self as pina::TryFromAccountInfos>::try_from_account_infos(program_id, accounts)
+    }
+}
+impl<'a> pina::PinaValidate for MutableTransferAccounts<'a> {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
     }
 }
 #[automatically_derived]
@@ -179,6 +212,10 @@ impl<'a> pina::ParseAccounts<'a> for DuplicateMutableRemainingAccounts<'a> {
         let extra = cursor.remaining_mut()?;
         Ok(Self { authority, extra })
     }
+    #[inline]
+    fn validate_accounts(&self) -> pina::ProgramResult {
+        <Self as pina::PinaValidate>::validate(self)
+    }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for DuplicateMutableRemainingAccounts<'a> {
     fn try_from_account_infos(
@@ -187,6 +224,9 @@ impl<'a> pina::TryFromAccountInfos<'a> for DuplicateMutableRemainingAccounts<'a>
     ) -> ::core::result::Result<Self, pina::ProgramError> {
         let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
         let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
+        <DuplicateMutableRemainingAccounts<
+            'a,
+        > as pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }
 }
@@ -197,6 +237,12 @@ for DuplicateMutableRemainingAccounts<'a> {
         (program_id, accounts): (&'a pina::Address, &'a mut [pina::AccountView]),
     ) -> ::core::result::Result<Self, Self::Error> {
         <Self as pina::TryFromAccountInfos>::try_from_account_infos(program_id, accounts)
+    }
+}
+impl<'a> pina::PinaValidate for DuplicateMutableRemainingAccounts<'a> {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
     }
 }
 #[automatically_derived]
@@ -224,6 +270,10 @@ impl<'a> pina::ParseAccounts<'a> for SingleAccount<'a> {
         let account = cursor.next()?;
         Ok(Self { account })
     }
+    #[inline]
+    fn validate_accounts(&self) -> pina::ProgramResult {
+        <Self as pina::PinaValidate>::validate(self)
+    }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for SingleAccount<'a> {
     fn try_from_account_infos(
@@ -233,6 +283,7 @@ impl<'a> pina::TryFromAccountInfos<'a> for SingleAccount<'a> {
         let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
         let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
         cursor.finish_exact()?;
+        <SingleAccount<'a> as pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }
 }
@@ -243,6 +294,12 @@ for SingleAccount<'a> {
         (program_id, accounts): (&'a pina::Address, &'a mut [pina::AccountView]),
     ) -> ::core::result::Result<Self, Self::Error> {
         <Self as pina::TryFromAccountInfos>::try_from_account_infos(program_id, accounts)
+    }
+}
+impl<'a> pina::PinaValidate for SingleAccount<'a> {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
     }
 }
 #[automatically_derived]
@@ -294,6 +351,10 @@ impl<'a> pina::ParseAccounts<'a> for EscrowAccounts<'a> {
             system_program,
         })
     }
+    #[inline]
+    fn validate_accounts(&self) -> pina::ProgramResult {
+        <Self as pina::PinaValidate>::validate(self)
+    }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for EscrowAccounts<'a> {
     fn try_from_account_infos(
@@ -303,6 +364,7 @@ impl<'a> pina::TryFromAccountInfos<'a> for EscrowAccounts<'a> {
         let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
         let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
         cursor.finish_exact()?;
+        <EscrowAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }
 }
@@ -313,6 +375,12 @@ for EscrowAccounts<'a> {
         (program_id, accounts): (&'a pina::Address, &'a mut [pina::AccountView]),
     ) -> ::core::result::Result<Self, Self::Error> {
         <Self as pina::TryFromAccountInfos>::try_from_account_infos(program_id, accounts)
+    }
+}
+impl<'a> pina::PinaValidate for EscrowAccounts<'a> {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
     }
 }
 #[automatically_derived]
@@ -361,6 +429,10 @@ impl<'a> ::pina::ParseAccounts<'a> for DefaultCrateAccounts<'a> {
         let data = cursor.next()?;
         Ok(Self { authority, data })
     }
+    #[inline]
+    fn validate_accounts(&self) -> ::pina::ProgramResult {
+        <Self as ::pina::PinaValidate>::validate(self)
+    }
 }
 impl<'a> ::pina::TryFromAccountInfos<'a> for DefaultCrateAccounts<'a> {
     fn try_from_account_infos(
@@ -370,6 +442,7 @@ impl<'a> ::pina::TryFromAccountInfos<'a> for DefaultCrateAccounts<'a> {
         let mut cursor = ::pina::AccountsCursor::new(*program_id, accounts);
         let parsed = <Self as ::pina::ParseAccounts>::parse_accounts(&mut cursor)?;
         cursor.finish_exact()?;
+        <DefaultCrateAccounts<'a> as ::pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }
 }
@@ -383,6 +456,12 @@ for DefaultCrateAccounts<'a> {
             program_id,
             accounts,
         )
+    }
+}
+impl<'a> ::pina::PinaValidate for DefaultCrateAccounts<'a> {
+    #[inline]
+    fn validate(&self) -> ::pina::ProgramResult {
+        Ok(())
     }
 }
 #[automatically_derived]
@@ -421,6 +500,10 @@ impl<'a> pina::ParseAccounts<'a> for MakeAccounts<'a> {
             system_program,
         })
     }
+    #[inline]
+    fn validate_accounts(&self) -> pina::ProgramResult {
+        <Self as pina::PinaValidate>::validate(self)
+    }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for MakeAccounts<'a> {
     fn try_from_account_infos(
@@ -430,6 +513,7 @@ impl<'a> pina::TryFromAccountInfos<'a> for MakeAccounts<'a> {
         let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
         let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
         cursor.finish_exact()?;
+        <MakeAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }
 }
@@ -440,6 +524,12 @@ for MakeAccounts<'a> {
         (program_id, accounts): (&'a pina::Address, &'a mut [pina::AccountView]),
     ) -> ::core::result::Result<Self, Self::Error> {
         <Self as pina::TryFromAccountInfos>::try_from_account_infos(program_id, accounts)
+    }
+}
+impl<'a> pina::PinaValidate for MakeAccounts<'a> {
+    #[inline]
+    fn validate(&self) -> pina::ProgramResult {
+        Ok(())
     }
 }
 #[automatically_derived]
