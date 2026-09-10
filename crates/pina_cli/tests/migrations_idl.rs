@@ -15,7 +15,9 @@ fn current_idl_contains_only_omitted_migration_constants() {
 	let idl = serde_json::to_value(root)
 		.unwrap_or_else(|error| panic!("serialize migration-aware IDL: {error}"));
 
-	for account_index in 0..3 {
+	// Accounts advance independently: State and ManualState reached version
+	// two while CompactState still publishes version one.
+	for (account_index, current_version) in [(0, 2), (1, 2), (2, 1)] {
 		let base = format!("/program/accounts/{account_index}");
 		assert_eq!(
 			idl.pointer(&format!("{base}/data/fields/1/name")),
@@ -27,7 +29,7 @@ fn current_idl_contains_only_omitted_migration_constants() {
 		);
 		assert_eq!(
 			idl.pointer(&format!("{base}/data/fields/1/defaultValue/number")),
-			Some(&serde_json::json!(1)),
+			Some(&serde_json::json!(current_version)),
 		);
 		assert_eq!(
 			idl.pointer(&format!("{base}/discriminators/1/offset")),
@@ -46,7 +48,7 @@ fn current_idl_contains_only_omitted_migration_constants() {
 	);
 	assert_eq!(
 		idl.pointer(&format!("{update}/arguments/1/defaultValue/number")),
-		Some(&serde_json::json!(1)),
+		Some(&serde_json::json!(2)),
 	);
 	assert_eq!(
 		idl.pointer(&format!("{update}/discriminators/1/offset")),
