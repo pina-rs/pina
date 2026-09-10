@@ -34,6 +34,7 @@ import {
 	getAccountMetaFactory,
 	type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
+import { findStatePda } from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PINA_BPF_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -101,6 +102,85 @@ export function getCreatePdaInstructionDataCodec(): FixedSizeCodec<
 		getCreatePdaInstructionDataEncoder(),
 		getCreatePdaInstructionDataDecoder(),
 	);
+}
+
+export type CreatePdaAsyncInput<
+	TAccountPayer extends string = string,
+	TAccountState extends string = string,
+	TAccountSystemProgram extends string = string,
+> = {
+	payer: TransactionSigner<TAccountPayer>;
+	state?: Address<TAccountState>;
+	systemProgram?: Address<TAccountSystemProgram>;
+	bump: CreatePdaInstructionDataArgs["bump"];
+};
+
+export async function getCreatePdaInstructionAsync<
+	TAccountPayer extends string,
+	TAccountState extends string,
+	TAccountSystemProgram extends string,
+	TProgramAddress extends Address = typeof PINA_BPF_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: CreatePdaAsyncInput<
+		TAccountPayer,
+		TAccountState,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	CreatePdaInstruction<
+		TProgramAddress,
+		TAccountPayer,
+		TAccountState,
+		TAccountSystemProgram
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		PINA_BPF_PROGRAM_PROGRAM_ADDRESS;
+
+	// Original accounts.
+	const originalAccounts = {
+		payer: { value: input.payer ?? null, isWritable: true },
+		state: { value: input.state ?? null, isWritable: true },
+		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.state.value) {
+		accounts.state.value = await findStatePda({ programAddress });
+	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("payer", accounts.payer),
+			getAccountMeta("state", accounts.state),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getCreatePdaInstructionDataEncoder().encode(
+			args as CreatePdaInstructionDataArgs,
+		),
+		programAddress,
+	} as CreatePdaInstruction<
+		TProgramAddress,
+		TAccountPayer,
+		TAccountState,
+		TAccountSystemProgram
+	>);
 }
 
 export type CreatePdaInput<

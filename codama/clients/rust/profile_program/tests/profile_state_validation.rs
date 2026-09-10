@@ -79,7 +79,7 @@ fn profile_state_reads_some_option_value() {
 }
 
 #[test]
-fn instruction_builder_owns_the_discriminator() {
+fn instruction_builder_owns_the_discriminator_and_derives_profile() {
 	let data = InitializeInstructionData::new(|data| {
 		data.discriminator = u8::MAX;
 		data.bump = 42;
@@ -88,10 +88,16 @@ fn instruction_builder_owns_the_discriminator() {
 			.unwrap_or_else(|error| panic!("name should fit: {error}"));
 	})
 	.unwrap_or_else(|error| panic!("instruction data failed: {error}"));
-	let instruction =
-		Initialize::new(solana_pubkey::Pubkey::new_from_array([7; 32])).instruction(data);
+	let authority = solana_pubkey::Pubkey::new_from_array([7; 32]);
+	let expected_profile = solana_pubkey::Pubkey::find_program_address(
+		&[b"profile", authority.as_ref()],
+		&profile_program_client::programs::PROFILE_PROGRAM_ID,
+	)
+	.0;
+	let instruction = Initialize::new(authority).instruction(data);
 
 	assert_eq!(instruction.data[0], 0);
 	assert_eq!(instruction.data[1], 42);
 	assert_eq!(&instruction.data[2..4], &[1, b'A']);
+	assert_eq!(instruction.accounts[1].pubkey, expected_profile);
 }

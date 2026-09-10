@@ -803,7 +803,7 @@ let (address, bump) = CreateProgramAccount {
 }
 .invoke::<MyState>()?;
 
-// Create a PDA account with a known bump.
+// Create a PDA account with a supplied canonical bump.
 CreateProgramAccountWithBump {
     account: target,
     payer,
@@ -813,15 +813,15 @@ CreateProgramAccountWithBump {
 }
 .invoke::<MyState>()?;
 
-// Create and configure a fixed account before its final validation.
-CreateProgramAccountWithBump {
+// Derive once, then store the same canonical bump during initialization.
+CreateProgramAccount {
     account: target,
     payer,
     owner: &program_id,
     seeds: &[b"seed"],
-    bump,
 }
-.invoke_with::<MyState>(|state| {
+.invoke_with_bump::<MyState>(|state, bump| {
+    state.bump = bump;
     state.authority = authority;
     state.name.try_set("Alice")?;
     Ok(())
@@ -829,6 +829,8 @@ CreateProgramAccountWithBump {
 ```
 
 `invoke` and `invoke_signed` leave every field other than the discriminator at zero. Use them only when that is a valid completed representation. `invoke_with` and `invoke_signed_with` accept a `Result<(), PinaPodError>` initializer and validate after it configures the generated zero-copy view. This is required for an advanced fixed schema with a nonzero-only storage enum, and it also avoids a separate mutable borrow for ordinary initial values.
+
+`invoke_with_bump` and `invoke_signed_with_bump` pass the derived canonical bump into the initializer. Explicit-bump creation builders verify canonicality themselves. Do not call `assert_canonical_bump` or `assert_seeds_with_bump` immediately before a creation builder, because that repeats PDA derivation.
 
 #### Lamport transfers
 
@@ -1028,7 +1030,8 @@ Pina provides strong built-in protections against common Solana vulnerabilities 
 - **Reserve `assert_type::<T>()` for validation-only paths** that do not need typed fields, and never treat it as proof for a later raw cast
 - **Use `send_owned(&ID, amount, recipient)`** for direct lamport debits; it verifies that the program owns the sender before mutation
 - **Use `CloseAccountZeroed { account, recipient, program_id: &ID }.invoke()` or `zeroed()` + `close_with_recipient(&ID, recipient)`** when stale account bytes must be invalidated before close
-- **Prefer `assert_seeds()` / `assert_canonical_bump()`** over `assert_seeds_with_bump()` to enforce canonical PDA bumps
+- **Use `CreateProgramAccount` or `CreateCompactProgramAccount` for canonical PDA creation**; their explicit-bump variants also reject noncanonical bumps without separate seed assertions
+- **Keep `assert_seeds()` / `assert_canonical_bump()` for validation-only paths** that are not immediately followed by a checked creation builder
 - **Give each account type its own seed namespace** so PDAs cannot collide across account types
 
 <!-- {/pinaSecurityBestPractices} -->

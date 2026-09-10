@@ -169,7 +169,6 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 		let args = MakeInstruction::try_from_bytes(data)?;
 		let maker_address = *self.maker.address();
 		let escrow_seeds = EscrowState::seeds(&maker_address, u64::from(args.seed));
-		let escrow_seeds_with_bump = escrow_seeds.with_bump(args.bump);
 
 		// Validate all accounts before mutating anything.
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
@@ -190,10 +189,7 @@ impl<'a> ProcessAccountInfos<'a> for MakeAccounts<'a> {
 			self.mint_a.address(),
 			&token_program,
 		)?);
-		self.escrow
-			.assert_empty()?
-			.assert_writable()?
-			.assert_seeds_with_bump(&escrow_seeds_with_bump.as_slices(), &ID)?;
+		self.escrow.assert_empty()?.assert_writable()?;
 		self.vault
 			.assert_empty()?
 			.assert_writable()?
@@ -215,7 +211,8 @@ Key validation patterns:
 - `assert_signer` ensures the maker signed the transaction.
 - `as_token_mint_for_program` accepts only a canonical token program, checks the mint owner, and parses its concrete layout.
 - `as_associated_token_account` checks the canonical token-program owner, derived address, stored current authority, and stored mint. The escrow separately owns any required state, delegate, close-authority, and Token-2022 extension policy.
-- `assert_empty` + `assert_writable` + `assert_seeds_with_bump` validates the PDA is fresh and derivable.
+- `assert_empty` and `assert_writable` validate the initialization state and runtime permissions. The creation builder validates the canonical PDA itself.
+- `assert_associated_token_address` derives and checks the empty vault ATA address before creation.
 
 Validation methods return the same reference type they receive, so mutable chains stay mutable all the way to `as_account_mut()`.
 
@@ -245,7 +242,7 @@ CreateProgramAccountWithBump {
 })?;
 ```
 
-`CreateProgramAccountWithBump::invoke_with` issues a `CreateAccount` CPI, allocates `EscrowState::SIZE` bytes, writes the discriminator, runs the initializer, and validates the completed state. Plain `invoke` is for account types whose fields may all remain zero after the discriminator is written. The closure form keeps allocation and typed initialization in one operation and does not expose a partially configured account between those steps.
+`CreateProgramAccountWithBump::invoke_with` first derives the canonical PDA and rejects `args.bump` if it differs. It then issues a `CreateAccount` CPI, allocates `EscrowState::SIZE` bytes, writes the discriminator, runs the initializer, and validates the completed state. Do not add separate `assert_canonical_bump` or `assert_seeds_with_bump` calls before this builder. Plain `invoke` is for account types whose fields may all remain zero after the discriminator is written.
 
 ## Make: token operations via CPI
 

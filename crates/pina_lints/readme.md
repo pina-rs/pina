@@ -189,6 +189,8 @@ state.assert_seeds_with_bump(&seeds_with_bump, &ID)?;
 
 Multiple valid bump values can otherwise create multiple addresses for one logical namespace. See Solana's [PDA documentation](https://solana.com/docs/core/pda). The lint tracks lexical receiver identity; it cannot inspect opaque validation helpers.
 
+This lint applies to validation-only assertion chains. `CreateProgramAccountWithBump` and `CreateCompactProgramAccountWithBump` enforce canonicality inside the builder, so creation handlers should not call either assertion first. Prefer the canonical builders when the instruction does not need to carry a bump.
+
 ### `deny_account_borrows_across_cpi`
 
 Detects CPI while a local returned by `try_borrow_mut()` or `as_account_mut()` is still alive.

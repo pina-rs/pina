@@ -19,10 +19,14 @@ pub struct CreatePda {
 }
 
 impl CreatePda {
-	pub fn new(payer: solana_pubkey::Pubkey, state: solana_pubkey::Pubkey) -> Self {
+	pub fn new(payer: solana_pubkey::Pubkey) -> Self {
 		Self {
 			payer,
-			state,
+			state: solana_pubkey::Pubkey::find_program_address(
+				&["state".as_bytes()],
+				&crate::PINA_BPF_PROGRAM_ID,
+			)
+			.0,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}

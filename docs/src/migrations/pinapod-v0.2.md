@@ -70,6 +70,7 @@ Typed fixed-account creation now has two initialization paths:
 
 - `invoke::<T>()` and `invoke_signed::<T>(signers)` write the discriminator and leave every other byte at zero. Use them only when that completed representation is valid.
 - `invoke_with::<T>(initialize)` and `invoke_signed_with::<T>(signers, initialize)` run a caller-supplied initializer before PinaPod validates the completed representation. Use them when the account needs nonzero initial values.
+- `invoke_with_bump::<T>(initialize)` and `invoke_signed_with_bump::<T>(signers, initialize)` also pass the canonical bump into the initializer so the account can store it without a second derivation.
 
 Move a create-then-mutate sequence into the creation call:
 
@@ -179,22 +180,22 @@ pub struct Journal {
 
 Pina's schema classifier is closed. It rejects unsupported nesting instead of accepting an arbitrary `ZcField` implementation. The diagnostic lists the supported forms.
 
-Compact creation also requires an initial patch. Even a header-only account must make the initialization plan explicit:
+Compact creation also requires an initial patch. Pass it to `invoke`, or construct it from the canonical bump with `invoke_with_bump`:
 
 ```rust
-CreateCompactProgramAccountWithBump {
+CreateCompactProgramAccount {
 	account: self.journal,
 	payer: self.authority,
 	owner: &ID,
 	seeds: &Journal::seeds(self.authority.address()).as_slices(),
-	bump,
-	patch: JournalPatch::new()
-		.bump(bump)
-		.authority(*self.authority.address())
-		.revision(0),
 	space: Journal::MIN_SIZE,
 }
-.invoke::<Journal>()?;
+.invoke_with_bump::<Journal, _>(|bump| {
+	JournalPatch::new()
+		.bump(bump)
+		.authority(*self.authority.address())
+		.revision(0)
+})?;
 ```
 
 The builder applies `patch` while it initializes the allocated bytes. Omitted patch fields use their zero, empty, or absent representation. Include nonempty tail replacements in the patch and allocate enough `space` for those encoded values.

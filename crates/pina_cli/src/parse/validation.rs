@@ -58,6 +58,22 @@ const KNOWN_ADDRESSES: &[(&str, &str)] = &[
 	),
 ];
 
+const PDA_CREATION_BUILDERS: &[&str] = &[
+	"CreateProgramAccount",
+	"CreateProgramAccountWithBump",
+	"CreateCompactProgramAccount",
+	"CreateCompactProgramAccountWithBump",
+];
+
+const PDA_CREATION_METHODS: &[&str] = &[
+	"invoke",
+	"invoke_with",
+	"invoke_signed",
+	"invoke_signed_with",
+	"invoke_with_bump",
+	"invoke_signed_with_bump",
+];
+
 /// Client properties declared by annotations or inferred from a validation
 /// chain for one account field.
 #[derive(Debug, Clone, Default)]
@@ -367,7 +383,11 @@ fn collect_assertions_from_expr(
 		Expr::MethodCall(mc) => {
 			let method = mc.method.to_string();
 
-			if let Some(field_name) = resolve_self_field(&mc.receiver, bindings) {
+			if let Some(field_name) = pda_creation_target(&method, &mc.receiver, bindings) {
+				let entry = props.entry(field_name).or_default();
+				entry.is_pda = true;
+				entry.is_writable = true;
+			} else if let Some(field_name) = resolve_self_field(&mc.receiver, bindings) {
 				let entry = props.entry(field_name).or_default();
 				apply_assertion(&method, &mc.args, entry);
 			}
@@ -473,6 +493,43 @@ fn collect_assertions_from_expr(
 
 		_ => {}
 	}
+}
+
+/// Return the account field passed to a canonical PDA creation builder.
+fn pda_creation_target(
+	method: &str,
+	receiver: &Expr,
+	bindings: &HashMap<String, String>,
+) -> Option<String> {
+	if !PDA_CREATION_METHODS.contains(&method) {
+		return None;
+	}
+
+	let Expr::Struct(builder) = receiver else {
+		return None;
+	};
+	let builder_name = builder.path.segments.last()?.ident.to_string();
+
+	if !PDA_CREATION_BUILDERS.contains(&builder_name.as_str()) {
+		return None;
+	}
+	if ["account", "payer", "owner", "seeds"]
+		.iter()
+		.any(|required| {
+			!builder
+				.fields
+				.iter()
+				.any(|field| member_to_string(&field.member) == *required)
+		}) {
+		return None;
+	}
+
+	let account = builder
+		.fields
+		.iter()
+		.find(|field| member_to_string(&field.member) == "account")?;
+
+	resolve_self_field(&account.expr, bindings)
 }
 
 /// Walk through chained method calls and `?` to find the originating
@@ -783,6 +840,83 @@ mod tests {
 
 		assert!(props["counter"].is_pda);
 		assert!(!props["counter"].is_writable);
+	}
+
+	#[test]
+	fn extracts_pda_from_canonical_creation_builders() {
+		for builder in PDA_CREATION_BUILDERS {
+			let source = format!(
+				r#"
+				impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {{
+					fn process(self, data: &[u8]) -> ProgramResult {{
+						{builder} {{
+							account: self.counter,
+							payer: self.authority,
+							owner: &ID,
+							seeds: &seeds,
+						}}
+						.invoke::<CounterState>()?;
+						Ok(())
+					}}
+				}}
+				"#,
+			);
+			let file =
+				syn::parse_file(&source).unwrap_or_else(|error| panic!("parse failed: {error}"));
+			let all = extract_validation_properties(&file);
+			let props = &all["MyAccounts"]["counter"];
+
+			assert!(props.is_pda, "{builder} must identify its target as a PDA");
+			assert!(
+				props.is_writable,
+				"{builder} must identify its target as writable"
+			);
+		}
+	}
+
+	#[test]
+	fn ignores_unrelated_builders_and_non_invocation_methods() {
+		let source = r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					UnrelatedBuilder { account: self.first }.invoke()?;
+					CreateProgramAccount { account: self.second }.inspect()?;
+					CreateProgramAccount { account: self.third }.invoke()?;
+					Ok(())
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|error| panic!("parse failed: {error}"));
+		let all = extract_validation_properties(&file);
+
+		assert!(
+			all["MyAccounts"]
+				.values()
+				.all(|properties| !properties.is_pda),
+			"only a canonical creation builder invocation may establish PDA metadata"
+		);
+	}
+
+	#[test]
+	fn ignores_invoke_on_non_struct_receiver() {
+		let source = r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					let builder = make_builder();
+					builder.invoke::<CounterState>()?;
+					Ok(())
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|error| panic!("parse failed: {error}"));
+		let all = extract_validation_properties(&file);
+
+		assert!(
+			all["MyAccounts"]
+				.values()
+				.all(|properties| !properties.is_pda),
+			"a non-struct receiver on an invoke method must not establish PDA metadata"
+		);
 	}
 
 	#[test]

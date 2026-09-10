@@ -52,17 +52,16 @@ Fixed containers initialize their complete capacity. Shortening or clearing a st
 
 ### Fixed account creation
 
-`CreateProgramAccount` and `CreateProgramAccountWithBump` expose the same initialization boundary:
+`CreateProgramAccount` and `CreateProgramAccountWithBump` expose the same initialization boundary. The canonical builder can pass its derived bump directly into the initializer:
 
 ```rust,ignore
-CreateProgramAccountWithBump {
+CreateProgramAccount {
 	account,
 	payer,
 	owner: &ID,
 	seeds,
-	bump,
 }
-.invoke_with::<ProfileState>(|profile| {
+.invoke_with_bump::<ProfileState>(|profile, bump| {
 	profile.bump = bump;
 	profile.name.try_set("alice")?;
 	profile.tags.try_set([1, 2, 3])?;
@@ -93,22 +92,20 @@ Use `Type::with_pda` when the handler needs compact data. Do not call `assert_co
 
 ### Compact account creation
 
-Compact creation does not use an initializer closure. `CreateCompactProgramAccount` and `CreateCompactProgramAccountWithBump` require a generated `patch` field:
+Compact creation uses a generated patch. The canonical builder accepts the patch at invocation time, including a factory that receives the derived bump:
 
 ```rust,ignore
-CreateCompactProgramAccountWithBump {
+CreateCompactProgramAccount {
 	account,
 	payer,
 	owner: &ID,
 	seeds,
-	bump,
-	patch: JournalPatch::new().bump(bump),
 	space: Journal::HEADER_SIZE,
 }
-.invoke::<Journal>()?;
+.invoke_with_bump::<Journal, _>(|bump| JournalPatch::new().bump(bump))?;
 ```
 
-The patch is the typed initialization plan. The builder validates `space`, allocates the account, applies the patch, and writes the discriminator. Pass `JournalPatch::new()` for an all-zero, empty-tail default, but do not omit the `patch` field.
+The patch is the typed initialization plan. The builder validates `space`, allocates the account, applies the patch, and writes the discriminator. Pass `JournalPatch::new()` to `invoke` for an all-zero, empty-tail default.
 
 Generated clients allocate zeroed instruction buffers, configure private generated views, validate them, and move the buffers into Solana instructions. They do not expose a general-purpose `to_bytes()` method.
 

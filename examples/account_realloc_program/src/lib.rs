@@ -182,17 +182,9 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		let args = InitializeIx::try_from_bytes(data)?;
 		let authority_key = *self.authority.address();
 		let seeds = Sample::seeds(&authority_key);
-		let seeds_with_bump = seeds.with_bump(args.bump);
 
 		self.authority.assert_signer()?.assert_writable()?;
-		let canonical_bump = self.sample.assert_canonical_bump(&seeds.as_slices(), &ID)?;
-		if canonical_bump != args.bump {
-			return Err(ProgramError::InvalidSeeds);
-		}
-		self.sample
-			.assert_empty()?
-			.assert_writable()?
-			.assert_seeds_with_bump(&seeds_with_bump.as_slices(), &ID)?;
+		self.sample.assert_empty()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
 
 		CreateCompactProgramAccountWithBump {
