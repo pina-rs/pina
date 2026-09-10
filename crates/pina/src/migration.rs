@@ -661,6 +661,12 @@ mod executor {
 		if next_transferred.is_none_or(|total| total > ctx.max_lamports) {
 			return Err(PinaProgramError::MigrationBudgetExceeded.into());
 		}
+		// Account for the planned funding up front so the post-mutation tail
+		// carries no budget bookkeeping after the transfer call: on the host
+		// the transfer CPI can never succeed, and any statement after it would
+		// be unreachable in coverage. [`Preflight`] rolls this back when the
+		// step fails before its first effect.
+		ctx.transferred = next_transferred.unwrap_or(u64::MAX);
 
 		if funding > 0 {
 			let payer = ctx
@@ -680,6 +686,18 @@ mod executor {
 	}
 
 	impl MigrationCtx<'_, '_, '_> {
+		/// Execute one planned rent transfer. Only reachable after the first
+		/// effect, so a failure aborts the instruction.
+		fn execute_funding_transfer(&mut self, funding: u64) -> ProgramResult {
+			let payer = self.payer.expect("planned transfer validated the payer");
+			SystemTransfer {
+				from: payer,
+				to: self.account,
+				lamports: funding,
+			}
+			.invoke_signed(self.signers)
+		}
+
 		/// Apply one planned transition. Only reachable after the first
 		/// effect, so every failure aborts the instruction.
 		fn complete_step_after_effect<T>(&mut self, step: &mut PlannedStep<T::Plan>)
@@ -687,16 +705,7 @@ mod executor {
 			T: MigratableAccount,
 		{
 			if step.funding > 0 {
-				let payer = self.payer.expect("planned transfer validated the payer");
-				finish_after_mutation(
-					SystemTransfer {
-						from: payer,
-						to: self.account,
-						lamports: step.funding,
-					}
-					.invoke_signed(self.signers),
-				);
-				self.transferred = self.transferred.saturating_add(step.funding);
+				finish_after_mutation(self.execute_funding_transfer(step.funding));
 			}
 			if step.working_size > self.account.data_len() {
 				finish_after_mutation(self.account.resize(step.working_size));
@@ -745,19 +754,13 @@ mod executor {
 			let mut step = plan_next_step::<T>(&mut self.ctx)?;
 			if step.funding > 0 {
 				// The transfer is the first effect; its failure leaves the
-				// account untouched and stays catchable. Everything after it
-				// runs through the aborting tail.
-				let payer = self
-					.ctx
-					.payer
-					.ok_or_else(|| ProgramError::from(PinaProgramError::MigrationRequired))?;
-				SystemTransfer {
-					from: payer,
-					to: self.ctx.account,
-					lamports: step.funding,
+				// account untouched and stays catchable, so the planned
+				// funding is rolled back. Everything after it runs through
+				// the aborting tail.
+				if let Err(error) = self.ctx.execute_funding_transfer(step.funding) {
+					self.ctx.transferred = self.ctx.transferred.saturating_sub(step.funding);
+					return Err(error);
 				}
-				.invoke_signed(self.ctx.signers)?;
-				self.ctx.transferred = self.ctx.transferred.saturating_add(step.funding);
 				step.funding = 0;
 			} else if step.working_size > self.ctx.account.data_len() {
 				// The resize is the first effect; its failure also leaves the
@@ -1494,6 +1497,55 @@ mod tests {
 		}
 	}
 
+	/// A two-hop ladder whose second hop grows, so the funding transfer runs
+	/// from the post-mutation tail of the executor.
+	#[cfg(feature = "account-resize")]
+	struct FundedLadderAccount;
+
+	#[cfg(feature = "account-resize")]
+	impl HasDiscriminator for FundedLadderAccount {
+		type Type = u8;
+
+		const VALUE: Self::Type = 12;
+	}
+
+	#[cfg(feature = "account-resize")]
+	impl HasMigrationVersion for FundedLadderAccount {
+		type Version = u8;
+
+		const CURRENT_VERSION: Self::Version = 2;
+	}
+
+	#[cfg(feature = "account-resize")]
+	impl MigratableAccount for FundedLadderAccount {
+		type Plan = u32;
+
+		const MAX_INLINE_STEPS: u16 = 2;
+
+		fn plan_migration(data: &[u8]) -> Result<AccountMigrationPlan<Self::Plan>, ProgramError> {
+			match data {
+				[Self::VALUE, 0, 5] => AccountMigrationPlan::try_new(0, 1, 4, 1, 0),
+				[Self::VALUE, 1, 5, 9] => AccountMigrationPlan::try_new(1, 2, 5, 1, 1),
+				_ => Err(ProgramError::InvalidAccountData),
+			}
+		}
+
+		fn apply_migration(plan: Self::Plan, destination: &mut [u8]) {
+			match plan {
+				0 => destination[3] = 9,
+				1 => destination[4] = 7,
+				_ => {}
+			}
+		}
+
+		fn validate_migration_destination(version: u32, data: &[u8]) -> ProgramResult {
+			match (version, data) {
+				(1, [Self::VALUE, _, 5, 9]) | (2, [Self::VALUE, _, 5, 9, 7]) => Ok(()),
+				_ => Err(ProgramError::InvalidAccountData),
+			}
+		}
+	}
+
 	#[cfg(feature = "account-resize")]
 	struct StepBudgetAccount;
 
@@ -2065,6 +2117,64 @@ mod tests {
 			assert!(!output.status.success(), "{scenario} failure was returned");
 			assert_ne!(output.status.code(), Some(RETURNED_EXIT_CODE),);
 		}
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn executor_aborts_when_a_later_hop_needs_funding() {
+		let output = std::process::Command::new(
+			std::env::current_exe().unwrap_or_else(|error| panic!("locate test binary: {error}")),
+		)
+		.arg("--exact")
+		.arg("migration::tests::funded_ladder_transfer_failure_child")
+		.arg("--nocapture")
+		.env("PINA_TEST_FUNDED_LADDER_CHILD", "funded")
+		.output()
+		.unwrap_or_else(|error| panic!("run funded ladder probe: {error}"));
+
+		assert!(
+			!output.status.success(),
+			"a second-hop funding failure was returned instead of aborting"
+		);
+		assert_ne!(output.status.code(), Some(86));
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn funded_ladder_transfer_failure_child() {
+		let Some(scenario) = std::env::var_os("PINA_TEST_FUNDED_LADDER_CHILD") else {
+			return;
+		};
+		assert_eq!(scenario, "funded");
+
+		let owner = Address::new_from_array([9; 32]);
+		let rent = test_rent();
+		// Exactly rent-exempt at the v1 size: hop one resizes for free, and
+		// hop two must then fund one more lamport of rent from the payer.
+		let start = rent
+			.try_minimum_balance(4)
+			.unwrap_or_else(|error| panic!("rent for v1: {error}"));
+		let mut stored =
+			TestAccount::<32>::new(Address::new_from_array([1; 32]), owner, start, &[12, 0, 5]);
+		let mut stored_payer =
+			TestAccount::<32>::new(Address::new_from_array([2; 32]), owner, 10_000, &[]);
+		let mut account = stored.view();
+		let mut payer = stored_payer.view();
+
+		let outcome = MigrateAccount {
+			account: &mut account,
+			payer: Some(&payer),
+			program_id: &owner,
+			max_lamports: u64::MAX,
+		}
+		.invoke_with_rent::<FundedLadderAccount>(rent);
+
+		// Reaching this point means the post-mutation transfer was returned
+		// as a catchable error instead of aborting the instruction.
+		assert!(
+			matches!(outcome, Err(ProgramError::InvalidArgument)),
+			"the funded ladder must abort at the second transfer: {outcome:?}"
+		);
 	}
 
 	#[cfg(feature = "account-resize")]

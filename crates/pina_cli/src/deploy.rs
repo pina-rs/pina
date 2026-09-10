@@ -765,15 +765,11 @@ impl ApprovedDeployment<'_> {
 	/// Revalidate every planned input and execute the remote command.
 	pub fn execute(self, runner: &mut impl CommandRunner) -> Result<(), DeployError> {
 		self.plan.revalidate()?;
-		let command = self.plan.commands().pop().unwrap_or_else(|| {
-			deploy_command(
-				self.plan.program(),
-				self.plan.program_keypair(),
-				self.plan.upgrade_authority(),
-				self.plan.payer(),
-				self.plan.rpc_url(),
-			)
-		});
+		let command = self
+			.plan
+			.commands()
+			.pop()
+			.expect("a deployment plan always carries exactly one command");
 		run_command(&command, Path::new(self.plan.project_root()), runner)
 	}
 }
