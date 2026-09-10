@@ -193,6 +193,40 @@ fn run_migrations(command: MigrationCommands) {
 			}
 			println!("{} Migration history is consistent", "✔".green());
 		}
+		MigrationCommands::Reconcile {
+			project,
+			abandon,
+			json,
+		} => {
+			let output = unwrap_or_exit(pina_cli::migrations::reconcile_publication(
+				&project, abandon,
+			));
+			if json {
+				print_json(&output);
+				return;
+			}
+			if output.no_pending {
+				println!("No pending deployment.");
+				return;
+			}
+			if output.abandoned {
+				println!(
+					"{} Pending deployment recorded as abandoned. Its versions stay frozen.",
+					"✔".green()
+				);
+				return;
+			}
+			let cluster = output.cluster.as_deref().unwrap_or("unknown");
+			let rpc_url = output.rpc_url.as_deref().unwrap_or("unknown");
+			let program_id = output.program_id.as_deref().unwrap_or("unknown");
+			let digest = output.executable_sha256.as_deref().unwrap_or("unknown");
+			println!("Pending deployment for {program_id} on {cluster} ({rpc_url})");
+			println!("Planned executable digest: {digest}");
+			println!(
+				"Rerun the exact same {} deployment to reconcile it, or pass --abandon once you 				 are certain it never went live.",
+				cluster,
+			);
+		}
 	}
 }
 

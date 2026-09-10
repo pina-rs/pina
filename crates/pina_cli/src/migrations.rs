@@ -236,10 +236,10 @@ pub fn make_migrations(start: &Path) -> Result<MakeMigrationsOutput, MigrationEr
 	let current = scan_current_contracts(&project)?;
 	let manifest_path = project.program_dir.join(MANIFEST_PATH);
 	let publication_path = project.program_dir.join(PUBLICATIONS_PATH);
-	let ledger = load_publication_ledger(&publication_path)?;
 	let mut manifest = load_manifest(&manifest_path)?.unwrap_or_else(|| {
 		MigrationManifest::new(current.program_id.clone(), project.migration_version_type)
 	});
+	let ledger = load_publication_ledger_for_manifest(&publication_path, &manifest)?;
 	validate_program_configuration(&project, &current.program_id, &manifest)?;
 	validate_ledger_for_manifest(&ledger, &manifest)?;
 
@@ -416,7 +416,8 @@ pub(crate) fn check_project_migrations(
 			name: first.rust_name.clone(),
 		}
 	})?;
-	let ledger = load_publication_ledger(&project.program_dir.join(PUBLICATIONS_PATH))?;
+	let publication_path = project.program_dir.join(PUBLICATIONS_PATH);
+	let ledger = load_publication_ledger_for_manifest(&publication_path, &manifest)?;
 	validate_program_configuration(project, &current.program_id, &manifest)?;
 	manifest
 		.validate()
@@ -664,12 +665,102 @@ pub fn record_publication(
 		manifest_sha256: pending.manifest_sha256,
 		versions: pending.versions,
 		previous_receipt_sha256: pending.previous_receipt_sha256,
+		abandoned: false,
 	};
 	ledger.receipts.push(receipt.clone());
 	ledger.pending = None;
 	validate_ledger_for_manifest(&ledger, &manifest)?;
 	write_json_atomic(&publication_path, &ledger)?;
 	Ok(Some(receipt))
+}
+
+/// Outcome of reconciling a pending deployment.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+pub struct ReconcileOutput {
+	/// No deployment was pending, so there was nothing to reconcile.
+	pub no_pending: bool,
+	/// The pending deployment was converted into an abandoned receipt.
+	pub abandoned: bool,
+	/// Cluster of the pending deployment.
+	pub cluster: Option<String>,
+	/// RPC URL of the pending deployment.
+	pub rpc_url: Option<String>,
+	/// Program identity of the pending deployment.
+	pub program_id: Option<String>,
+	/// Executable digest the pending deployment planned to ship.
+	pub executable_sha256: Option<String>,
+}
+
+/// Inspect or abandon an ambiguous pending deployment.
+///
+/// Without `abandon`, this reports the exact deployment that must be resumed:
+/// rerunning the same cluster, RPC URL, program, and artifact reconciles the
+/// pending record into a receipt. With `abandon`, the operator asserts the
+/// deployment never went live or accepts the risk; the pending record becomes
+/// an abandoned receipt that still freezes its pinned versions because the
+/// remote outcome cannot be proven from the local ledger.
+pub fn reconcile_publication(
+	start: &Path,
+	abandon: bool,
+) -> Result<ReconcileOutput, MigrationError> {
+	let project = Project::discover(start)?;
+	let publication_path = project.program_dir.join(PUBLICATIONS_PATH);
+	let manifest_path = project.program_dir.join(MANIFEST_PATH);
+	let manifest = load_manifest(&manifest_path)?.ok_or_else(|| {
+		MigrationError::InvalidHistory(
+			"migration manifest disappeared during reconciliation".to_owned(),
+		)
+	})?;
+	let ledger = load_publication_ledger_for_manifest(&publication_path, &manifest)?;
+	let Some(pending) = ledger.pending.clone() else {
+		return Ok(ReconcileOutput {
+			no_pending: true,
+			abandoned: false,
+			cluster: None,
+			rpc_url: None,
+			program_id: None,
+			executable_sha256: None,
+		});
+	};
+
+	if !abandon {
+		return Ok(ReconcileOutput {
+			no_pending: false,
+			abandoned: false,
+			cluster: Some(pending.cluster),
+			rpc_url: Some(pending.rpc_url),
+			program_id: Some(pending.program_id),
+			executable_sha256: Some(pending.executable_sha256),
+		});
+	}
+
+	let mut ledger = ledger;
+	let _lock = acquire_migration_lock(&project.program_dir)?;
+	let sequence = u64::try_from(ledger.receipts.len())
+		.map_err(|_| MigrationError::PublicationSequenceExhausted)?;
+	let receipt = PublicationReceipt {
+		sequence,
+		cluster: pending.cluster,
+		rpc_url: pending.rpc_url,
+		program_id: pending.program_id,
+		executable_sha256: pending.executable_sha256,
+		manifest_sha256: pending.manifest_sha256,
+		versions: pending.versions,
+		previous_receipt_sha256: pending.previous_receipt_sha256,
+		abandoned: true,
+	};
+	ledger.receipts.push(receipt);
+	ledger.pending = None;
+	validate_ledger_for_manifest(&ledger, &manifest)?;
+	write_json_atomic(&publication_path, &ledger)?;
+	Ok(ReconcileOutput {
+		no_pending: false,
+		abandoned: true,
+		cluster: None,
+		rpc_url: None,
+		program_id: None,
+		executable_sha256: None,
+	})
 }
 
 fn validate_ledger_for_manifest(
@@ -976,6 +1067,33 @@ fn load_publication_ledger(path: &Path) -> Result<PublicationLedger, MigrationEr
 			reason,
 		}
 	})
+}
+
+/// Load the ledger and fail closed when advanced versions lost their pins.
+///
+/// Versions beyond zero only exist after a publication, so a manifest with
+/// advanced versions and no ledger file means the publication evidence was
+/// deleted or never committed. Treating that state as drafts would let
+/// `pina migrations make` rewrite published history in place.
+fn load_publication_ledger_for_manifest(
+	path: &Path,
+	manifest: &MigrationManifest,
+) -> Result<PublicationLedger, MigrationError> {
+	let ledger = load_publication_ledger(path)?;
+	if !path.exists()
+		&& manifest
+			.contracts
+			.values()
+			.any(|history| history.versions.len() > 1)
+	{
+		return Err(MigrationError::InvalidHistory(
+			"the manifest records advanced versions but the publication ledger is missing; 			 \
+			 restore migrations/publications.json from version control because published 			 \
+			 history must stay pinned"
+				.to_owned(),
+		));
+	}
+	Ok(ledger)
 }
 
 fn read_bytes(path: &Path) -> Result<Vec<u8>, MigrationError> {
@@ -2604,6 +2722,144 @@ mod tests {
 	}
 
 	#[test]
+	fn missing_ledger_with_advanced_versions_fails_closed() {
+		let fixture = publication_fixture();
+		publish_current(&fixture);
+
+		// Advance to a draft v1 on top of the published v0.
+		let advanced_schema = schema(LayoutKind::Fixed, &[("value", "u64"), ("enabled", "bool")]);
+		let identity = ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap();
+		let mut advanced =
+			MigrationManifest::new(fixture.program_id.to_owned(), MigrationVersionType::U8);
+		let base = schema(LayoutKind::Fixed, &[("value", "u64")]);
+		let transition = Transition {
+			from: 0,
+			to: 1,
+			mode: TransitionMode::Automatic,
+			source_schema_sha256: base.sha256(),
+			destination_schema_sha256: advanced_schema.sha256(),
+			source_process_sha256: None,
+			destination_process_sha256: None,
+			process: None,
+			implementation_sha256: Some("e".repeat(64)),
+		};
+		advanced.contracts.insert(
+			identity.key(),
+			ContractHistory {
+				identity,
+				rust_name: "State".to_owned(),
+				versions: vec![
+					SchemaVersion {
+						version: 0,
+						schema_sha256: base.sha256(),
+						schema: base,
+						process: None,
+						process_sha256: None,
+						transition: None,
+					},
+					SchemaVersion {
+						version: 1,
+						schema_sha256: advanced_schema.sha256(),
+						schema: advanced_schema,
+						process: None,
+						process_sha256: None,
+						transition: Some(transition),
+					},
+				],
+			},
+		);
+		advanced
+			.validate()
+			.unwrap_or_else(|error| panic!("advanced manifest must be internally valid: {error}"));
+		std::fs::write(
+			fixture.root.join(MANIFEST_PATH),
+			serde_json::to_vec_pretty(&advanced)
+				.unwrap_or_else(|error| panic!("serialize manifest: {error}")),
+		)
+		.unwrap_or_else(|error| panic!("write manifest: {error}"));
+
+		// Losing the ledger must fail closed instead of unfreezing history:
+		// without this check `make` would rewrite published v1 in place.
+		std::fs::remove_file(fixture.root.join(PUBLICATIONS_PATH))
+			.unwrap_or_else(|error| panic!("remove ledger: {error}"));
+		let rejection = check_migrations(&fixture.root)
+			.expect_err("a missing ledger with advanced versions must fail closed");
+		assert!(
+			format!("{rejection:?}").contains("publication ledger is missing"),
+			"unexpected rejection: {rejection:?}"
+		);
+	}
+
+	#[test]
+	fn reconcile_reports_and_abandons_pending_deployments() {
+		let fixture = publication_fixture();
+		let digest: [u8; 32] = Sha256::digest(
+			std::fs::read(&fixture.artifact)
+				.unwrap_or_else(|error| panic!("read fixture artifact: {error}")),
+		)
+		.into();
+		begin_publication(
+			&fixture.root,
+			"devnet",
+			"https://api.devnet.solana.com",
+			fixture.program_id,
+			&fixture.artifact,
+			digest,
+		)
+		.unwrap_or_else(|error| panic!("begin publication: {error}"));
+
+		// Inspection reports the exact deployment that must be resumed and
+		// keeps the pending record.
+		let report = reconcile_publication(&fixture.root, false)
+			.unwrap_or_else(|error| panic!("inspect pending: {error:?}"));
+		assert!(!report.no_pending && !report.abandoned);
+		assert_eq!(report.cluster.as_deref(), Some("devnet"));
+		assert_eq!(
+			report.rpc_url.as_deref(),
+			Some("https://api.devnet.solana.com")
+		);
+		assert_eq!(report.program_id.as_deref(), Some(fixture.program_id));
+		assert!(report.executable_sha256.is_some());
+		let ledger = load_publication_ledger(&fixture.root.join(PUBLICATIONS_PATH))
+			.unwrap_or_else(|error| panic!("load ledger: {error:?}"));
+		assert!(ledger.pending.is_some());
+
+		// Abandonment converts the pending record into a receipt that still
+		// freezes the pinned versions.
+		let abandoned = reconcile_publication(&fixture.root, true)
+			.unwrap_or_else(|error| panic!("abandon pending: {error:?}"));
+		assert!(abandoned.abandoned);
+		let ledger = load_publication_ledger(&fixture.root.join(PUBLICATIONS_PATH))
+			.unwrap_or_else(|error| panic!("load ledger: {error:?}"));
+		assert!(ledger.pending.is_none());
+		assert_eq!(ledger.receipts.len(), 1);
+		assert!(ledger.receipts[0].abandoned);
+		assert!(ledger.version_is_frozen("account:1:01", 0));
+
+		// A different deployment is no longer blocked by the pending record.
+		let pending = begin_publication(
+			&fixture.root,
+			"testnet",
+			"https://api.testnet.solana.com",
+			fixture.program_id,
+			&fixture.artifact,
+			digest,
+		)
+		.unwrap_or_else(|error| panic!("new publication after abandon: {error:?}"))
+		.expect("abandonment unblocks new deployments");
+		assert_eq!(pending.cluster, "testnet");
+
+		let settled = reconcile_publication(&fixture.root, false)
+			.unwrap_or_else(|error| panic!("reconcile again: {error:?}"));
+		assert!(!settled.no_pending);
+
+		reconcile_publication(&fixture.root, true)
+			.unwrap_or_else(|error| panic!("cleanup abandon: {error:?}"));
+		let empty = reconcile_publication(&fixture.root, false)
+			.unwrap_or_else(|error| panic!("final reconcile: {error:?}"));
+		assert!(empty.no_pending);
+	}
+
 	fn receipts_pin_published_schema_hashes() {
 		let fixture = publication_fixture();
 		publish_current(&fixture);

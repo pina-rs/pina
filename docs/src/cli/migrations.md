@@ -76,6 +76,8 @@ Local deployments do not publish versions. A published version is immutable even
 
 If deployment or receipt recording fails, stop the release. The pending record remains, and `pina migrations status` reports `publication pending`. Restore the exact planned inputs and rerun the same deployment to reconcile it; Pina rejects a different deployment while the outcome is ambiguous. The current ledger does not prove the deployed program-data hash, genesis hash, slot, or transaction signature.
 
+When the exact planned inputs cannot be reproduced (for example a cleaned build directory), inspect the pending deployment with `pina migrations reconcile`. It prints the cluster, RPC endpoint, program, and executable digest that must be resumed. Once you are certain the deployment never went live, `pina migrations reconcile --abandon` converts the pending record into an abandoned receipt that still freezes its pinned versions and unblocks the next deployment. Losing `migrations/publications.json` entirely fails every later check while the manifest still records advanced versions, because published history must stay pinned; restore the ledger from version control instead of regenerating it.
+
 ## ABI document upgrades
 
 `formatVersion` belongs to Pina's migration document. It is independent of each account or instruction version. Pina rejects newer document formats and migrates supported older formats through adjacent internal converters before it reads the typed model. The `pina_abi` crate can also encode a validated current model through adjacent downgrade converters. A downgrade fails instead of discarding information that the older format cannot represent. `pina migrations make` writes the current document format.

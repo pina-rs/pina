@@ -1196,6 +1196,7 @@ fn migrate_publication_v2_to_v3(value: serde_json::Value) -> Result<serde_json::
 					.map(|(contract, version)| (contract, PublishedContract::legacy(version)))
 					.collect(),
 				previous_receipt_sha256: previous.clone(),
+				abandoned: false,
 			};
 			previous = Some(migrated.sha256());
 			migrated
@@ -1715,6 +1716,11 @@ pub struct PublicationReceipt {
 	/// history those deployments froze.
 	pub versions: BTreeMap<String, PublishedContract>,
 	pub previous_receipt_sha256: Option<String>,
+	/// Marks a receipt created by reconciling an ambiguous deployment as
+	/// abandoned. The pinned versions stay frozen because the deployment may
+	/// still have gone live.
+	#[serde(default, skip_serializing_if = "std::ops::Not::not")]
+	pub abandoned: bool,
 }
 
 impl PublicationReceipt {
@@ -2709,6 +2715,7 @@ mod tests {
 			manifest_sha256: "b".repeat(64),
 			versions: BTreeMap::from([("account:1:00".to_owned(), PublishedContract::legacy(0))]),
 			previous_receipt_sha256: None,
+			abandoned: false,
 		};
 		let second = PublicationReceipt {
 			sequence: 1,
@@ -2719,6 +2726,7 @@ mod tests {
 			manifest_sha256: "d".repeat(64),
 			versions: BTreeMap::from([("account:1:00".to_owned(), PublishedContract::legacy(1))]),
 			previous_receipt_sha256: Some(first.sha256()),
+			abandoned: false,
 		};
 		let ledger = PublicationLedger {
 			format_version: PUBLICATION_FORMAT_VERSION,
@@ -3005,6 +3013,7 @@ mod tests {
 			manifest_sha256: "b".repeat(64),
 			versions: BTreeMap::from([("account:1:00".to_owned(), PublishedContract::legacy(1))]),
 			previous_receipt_sha256: None,
+			abandoned: false,
 		};
 		let second = PublicationReceipt {
 			sequence: 1,
@@ -3015,6 +3024,7 @@ mod tests {
 			manifest_sha256: "d".repeat(64),
 			versions: BTreeMap::from([("account:1:00".to_owned(), PublishedContract::legacy(0))]),
 			previous_receipt_sha256: Some(first.sha256()),
+			abandoned: false,
 		};
 		let ledger = PublicationLedger {
 			format_version: PUBLICATION_FORMAT_VERSION,

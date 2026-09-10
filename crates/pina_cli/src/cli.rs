@@ -924,6 +924,19 @@ pub(crate) enum MigrationCommands {
 		#[arg(long)]
 		json: bool,
 	},
+	/// Inspect or abandon an ambiguous pending deployment.
+	Reconcile {
+		/// Directory inside the project to discover.
+		#[arg(short, long, default_value = ".", hide_default_value = true)]
+		project: PathBuf,
+		/// Convert the pending deployment into an abandoned receipt. The pinned
+		/// versions stay frozen because the deployment may still have gone live.
+		#[arg(long)]
+		abandon: bool,
+		/// Emit a machine-readable result.
+		#[arg(long)]
+		json: bool,
+	},
 }
 
 /// Deployed-program verification operations.
