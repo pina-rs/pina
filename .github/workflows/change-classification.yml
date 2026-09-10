@@ -30,10 +30,28 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
+      - name: setup devenv
+        uses: ./.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: add devenv monochange to PATH
+        run: |
+          set -euo pipefail
+          profile="$(devenv shell -- bash -c 'printf %s "${DEVENV_PROFILE:-}"')"
+          if [[ -z "$profile" ]]; then
+            echo "devenv profile was not resolved." >&2
+            exit 1
+          fi
+          echo "$profile/bin" >> "$GITHUB_PATH"
+          "$profile/bin/monochange" --version
+        shell: bash
+
       - name: classify changes
         id: classify
         uses: monochange/actions/change-classification@da3911fecf67478deb0ad60f717da5eca649caba # v0.9.1
         with:
+          setup-monochange: false
           detection-level: signature
           dependency-propagation: public
           github-token: ${{ secrets.GITHUB_TOKEN }}
