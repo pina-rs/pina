@@ -1,4 +1,5 @@
 extern crate rustc_hir;
+extern crate rustc_middle;
 extern crate rustc_span;
 
 use std::collections::HashSet;
@@ -37,9 +38,11 @@ crate::declare_late_lint! {
 	/// `map()`, `and_then()`, and `inspect()` do not establish a proof because
 	/// their callbacks can replace the validated binding before execution
 	/// continues. An instruction argument is not a trusted expected ID: comparing
-	/// two attacker-controlled values proves consistency, not authenticity.
-	/// Assignments, mutable borrows, and methods that take the validated binding
-	/// through `&mut self` invalidate the earlier proof.
+	/// two attacker-controlled values proves consistency, not authenticity. An
+	/// immutable static whose type contains interior mutability, for example
+	/// `Mutex<Pubkey>`, can equally be rewritten at runtime, so it is not trusted
+	/// provenance either. Assignments, mutable borrows, and methods that take the
+	/// validated binding through `&mut self` invalidate the earlier proof.
 	/// Static `.invoke()` and `.invoke_signed()` builders encode their target in
 	/// the builder and do not accept a replaceable program argument. Restricting
 	/// unverified calls to direct method or UFCS syntax keeps the target proof
@@ -179,14 +182,18 @@ fn dynamic_cpi_method(cx: &LateContext<'_>, expr: &Expr<'_>) -> Option<DynamicCp
 	dynamic_cpi_method_from_definition(cx, definition)
 }
 
-fn is_static_address(expr: &Expr<'_>) -> bool {
+fn is_static_address(cx: &LateContext<'_>, expr: &Expr<'_>) -> bool {
 	match &expr.kind {
 		ExprKind::Path(rustc_hir::QPath::Resolved(_, path)) => {
 			match path.res {
 				Res::Def(DefKind::Const | DefKind::AssocConst, _) => true,
-				Res::Def(DefKind::Static { mutability, .. }, _) => {
-					mutability == rustc_hir::Mutability::Not
-				}
+				Res::Def(
+					DefKind::Static {
+						mutability: rustc_hir::Mutability::Not,
+						..
+					},
+					definition,
+				) => static_type_is_freeze(cx, definition),
 				_ => false,
 			}
 		}
@@ -194,9 +201,24 @@ fn is_static_address(expr: &Expr<'_>) -> bool {
 		| ExprKind::Use(inner, _)
 		| ExprKind::Type(inner, _)
 		| ExprKind::DropTemps(inner)
-		| ExprKind::AddrOf(_, _, inner) => is_static_address(inner),
+		| ExprKind::AddrOf(_, _, inner) => is_static_address(cx, inner),
 		_ => false,
 	}
+}
+
+/// An immutable static is compile-time-trusted provenance only when its
+/// contents cannot change after initialization. `Freeze` holds exactly when
+/// the type contains no `UnsafeCell` anywhere, so an interior-mutable static
+/// (for example `Mutex<Pubkey>` or a struct wrapping one) falls through to the
+/// narrow allowance path instead of establishing a proof. Statics cannot be
+/// generic, so instantiating the type with its own environment is total, and
+/// `extern static` items are held to the same standard through the same query.
+fn static_type_is_freeze(cx: &LateContext<'_>, definition: rustc_hir::def_id::DefId) -> bool {
+	let typing_env = rustc_middle::ty::TypingEnv::post_analysis(cx.tcx, definition);
+	cx.tcx
+		.type_of(definition)
+		.instantiate_identity()
+		.is_freeze(cx.tcx, typing_env)
 }
 
 fn intersect_states(states: &[ValidationState]) -> ValidationState {
@@ -269,7 +291,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 	}
 
 	fn is_trusted_program_id(&self, expression: &Expr<'_>, state: &ValidationState) -> bool {
-		if is_static_address(expression)
+		if is_static_address(self.cx, expression)
 			|| self
 				.place_identity(expression)
 				.is_some_and(|place| state.contains_trusted_id(&place))
@@ -333,7 +355,8 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			diag.help(format!(
 				"use the verified `{verified_method}` variant, or call \
 				 `program_account.assert_program(&trusted_program_id)?` before the unverified CPI \
-				 invocation; the expected ID must come from a const or immutable static"
+				 invocation; the expected ID must come from a const or an immutable static \
+				 without interior mutability"
 			));
 		});
 	}
@@ -372,7 +395,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 						// let an authenticated account become trusted expected-ID provenance.
 						if let rustc_hir::PatKind::Binding(_, binding, _, None) = local.pat.kind {
 							let source = self.place_identity(init);
-							let inherits_identity = is_static_address(init)
+							let inherits_identity = is_static_address(self.cx, init)
 								|| source.as_ref().is_some_and(|source| state.contains(source));
 							if inherits_identity {
 								state.insert(Place::Local(binding));
@@ -435,7 +458,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 				}
 
 				let validated = program_argument(method, args).is_some_and(|target| {
-					is_static_address(target)
+					is_static_address(self.cx, target)
 						|| self
 							.place_identity(target)
 							.is_some_and(|place| state.contains(&place))
@@ -461,7 +484,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					return;
 				};
 				let validated = args.get(method.program_index()).is_some_and(|target| {
-					is_static_address(target)
+					is_static_address(self.cx, target)
 						|| self
 							.place_identity(target)
 							.is_some_and(|place| state.contains(&place))
