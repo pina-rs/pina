@@ -223,8 +223,7 @@ fn run_migrations(command: MigrationCommands) {
 			println!("Pending deployment for {program_id} on {cluster} ({rpc_url})");
 			println!("Planned executable digest: {digest}");
 			println!(
-				"Rerun the exact same {} deployment to reconcile it, or pass --abandon once you 				 are certain it never went live.",
-				cluster,
+				"Rerun the exact same {cluster} deployment to reconcile it, or pass --abandon 				 once you are certain it never went live."
 			);
 		}
 	}

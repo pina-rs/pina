@@ -1038,10 +1038,11 @@ impl PublicationLedgerV2 {
 					receipt.sequence
 				));
 			}
-			let empty_history =
-				BTreeMap::from_iter(receipt.versions.iter().map(|(contract, version)| {
-					(contract.clone(), PublishedContract::legacy(*version))
-				}));
+			let empty_history = receipt
+				.versions
+				.iter()
+				.map(|(contract, version)| (contract.clone(), PublishedContract::legacy(*version)))
+				.collect::<BTreeMap<_, _>>();
 			validate_publication_identity(
 				receipt.sequence,
 				&receipt.cluster,
@@ -1085,10 +1086,11 @@ impl PublicationLedgerV1 {
 					receipt.sequence
 				));
 			}
-			let legacy_versions =
-				BTreeMap::from_iter(receipt.versions.iter().map(|(contract, version)| {
-					(contract.clone(), PublishedContract::legacy(*version))
-				}));
+			let legacy_versions = receipt
+				.versions
+				.iter()
+				.map(|(contract, version)| (contract.clone(), PublishedContract::legacy(*version)))
+				.collect::<BTreeMap<_, _>>();
 			validate_publication_identity(
 				receipt.sequence,
 				&receipt.cluster,
@@ -3119,9 +3121,8 @@ mod tests {
 		contracts.insert(key.clone(), history);
 		let encoded = serde_json::to_vec(&value)
 			.unwrap_or_else(|error| panic!("serialize tampered manifest: {error}"));
-		decode_manifest(&encoded).map(|manifest| {
+		decode_manifest(&encoded).inspect(|manifest| {
 			assert_eq!(manifest.contracts.keys().next(), Some(&key));
-			manifest
 		})
 	}
 
@@ -3168,7 +3169,7 @@ mod tests {
 			contract["identity"]["discriminatorHex"] = serde_json::Value::String(hex.to_owned());
 			contract["identity"]["discriminatorBytes"] = serde_json::Value::from(bytes);
 			let entry = key.clone();
-			let (_, history) = contracts.remove_entry(&format!("account:1:ab")).unwrap();
+			let (_, history) = contracts.remove_entry("account:1:ab").unwrap();
 			contracts.insert(entry, history);
 
 			let encoded =
